@@ -169,6 +169,24 @@ function passFailRows(plan, outcomes, text) {
 }
 
 /**
+ * The odds heading a roll-under or character-value check names: "exact · {formula}", with each
+ * separately rolled bonus the joint space crosses in; `''` leaves the heading to count faces.
+ */
+function exactCaption(plan, { bonuses = [] }, text) {
+  if (gradesLikeFixedOver(plan)) return '';
+  const formula = String(plan.formula ?? '').trim();
+  if (bonuses.length === 0) {
+    return interpolate(text('FABRICATE.Admin.Manager.Checks.Odds.Exact', 'exact · {formula}'), {
+      formula,
+    });
+  }
+  return interpolate(
+    text('FABRICATE.Admin.Manager.Checks.Odds.ExactJoint', 'exact · {formula} with {bonuses}'),
+    { formula, bonuses: bonuses.join(' + ') }
+  );
+}
+
+/**
  * The model `CheckOddsPanel` renders, every branch either enumerating or stating why it did not.
  * `sandbox` carries a progressive check's `{ difficulties, awardMode }`.
  */
@@ -182,6 +200,7 @@ export function buildOddsModel({ plan, enumeration, abstention = null, sandbox }
   }
   const { faces, combinations, outcomes } = enumeration;
   if (kind === 'progressive') return progressiveOdds(enumeration, sandbox, text);
+  const caption = exactCaption(plan, enumeration, text);
   if (kind === 'routed') {
     const unrouted = text('FABRICATE.Admin.Manager.Checks.Odds.Unrouted', 'No outcome');
     const rows = enumerateRoutedOdds({ outcomes, args: plan.args }).map((row) => ({
@@ -190,10 +209,10 @@ export function buildOddsModel({ plan, enumeration, abstention = null, sandbox }
       percent: row.percent,
       success: row.success,
     }));
-    return { kind, direction, enumerable: true, faces, combinations, rows };
+    return { kind, direction, enumerable: true, faces, combinations, caption, rows };
   }
   const rows = passFailRows(plan, outcomes, text);
-  return { kind, direction, enumerable: true, faces, combinations, rows };
+  return { kind, direction, enumerable: true, faces, combinations, caption, rows };
 }
 
 function passFailDetail(success, under, text) {
@@ -337,37 +356,33 @@ function gradingFacts(data, text) {
   return facts;
 }
 
+const signed = (value) => (value >= 0 ? `+${value}` : String(value));
+
 /**
- * The readout's target and margin. Sum/over against a fixed DC reads `total − dc` against the
- * previewed DC; every other evaluation reads the runner's executed `data.target` and `data.margin`.
+ * The readout's target, margin and their line. Sum/over against a fixed DC reads `total − dc`
+ * against the previewed DC; every other evaluation reads the runner's executed `data.target` and
+ * `data.margin`, as "target {target} · margin {margin}".
  */
 function readoutGrading(plan, result, total, text) {
-  if (plan.kind === 'progressive' || !Number.isFinite(total)) {
-    return { target: null, margin: null, vsLabel: '' };
-  }
+  const none = { target: null, margin: null, gradeLabel: '' };
+  if (plan.kind === 'progressive' || !Number.isFinite(total)) return none;
   if (isFixedSumOver(plan.evaluation)) {
+    const margin = total - plan.dc;
+    const vsDc = text('FABRICATE.Admin.Manager.Checks.Simulator.VsDc', 'vs DC {dc}');
     return {
       target: plan.dc,
-      margin: total - plan.dc,
-      vsLabel: text('FABRICATE.Admin.Manager.Checks.Simulator.VsDc', 'vs DC {dc}').replace(
-        '{dc}',
-        String(plan.dc)
-      ),
+      margin,
+      gradeLabel: `${vsDc.replace('{dc}', String(plan.dc))} · ${signed(margin)}`,
     };
   }
   const { target = null, margin = null } = result?.data ?? {};
   // Otherwise and fixed ranges execute with no target, which is not a target of 0.
-  if (!Number.isFinite(target) || !Number.isFinite(margin)) {
-    return { target: null, margin: null, vsLabel: '' };
-  }
-  return {
-    target,
-    margin,
-    vsLabel: interpolate(
-      text('FABRICATE.Admin.Manager.Checks.Simulator.VsTarget', 'vs target {target}'),
-      { target }
-    ),
-  };
+  if (!Number.isFinite(target) || !Number.isFinite(margin)) return none;
+  const line = text(
+    'FABRICATE.Admin.Manager.Checks.Simulator.TargetMargin',
+    'target {target} · margin {margin}'
+  );
+  return { target, margin, gradeLabel: interpolate(line, { target, margin: signed(margin) }) };
 }
 
 /** Why the simulator will not roll, in the sentence its hint shows. */

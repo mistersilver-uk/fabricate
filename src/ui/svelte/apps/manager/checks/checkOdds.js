@@ -164,7 +164,7 @@ function enumerateOutcomes(display, dice) {
 /**
  * Decide whether a formula's outcome space can be enumerated for a previewed actor.
  *
- * IT ENUMERATES THE FORMULA THE RUNNER WILL ACTUALLY ROLL, not the one the GM authored: the
+ * It enumerates the formula the runner rolls, not the one the GM authored: the
  * shared {@link deriveCheckRoll} places the check modifiers by `evaluation`, so sum/over appends
  * them to the roll and every other evaluation moves them onto the target. Each outcome of a
  * roll-under carries its own `targetDelta`: the scalar benefits plus one face of every separately
@@ -243,13 +243,17 @@ export function describeFormulaEnumerability(
   return { enumerable: true, ...jointSpace(plan.dice, outcomes, placed), display: display.display };
 }
 
-/** The main dice's outcomes crossed with every settled target delta a placement can reach. */
+/**
+ * The main dice's outcomes crossed with every settled target delta a placement can reach.
+ * `bonuses` names each separately rolled bonus the joint space crosses in.
+ */
 function jointSpace(dice, outcomes, placed) {
   const joint = placed.deltas.length > 1;
   return {
     dice,
+    bonuses: placed.bonuses ?? [],
     // `faces` survives for the single-die reading the rail heading names; a multi-die formula
-    // or a joint space has a COMBINATION count instead, which is a different sentence.
+    // or a joint space has a combination count instead, which is a different sentence.
     faces: dice.length === 1 && !joint ? dice[0].faces : null,
     combinations: outcomes.length * placed.deltas.length,
     outcomes: placed.moves
@@ -280,7 +284,14 @@ function targetPlacement(placement, rollData, Roll) {
     }
     deltas = deltas.flatMap((delta) => entry.totals.map((total) => delta + total));
   }
-  return { moves, deltas };
+  const bonuses = pending
+    .filter((_, index) => totals.entries[index].totals.length > 1)
+    .map((entry) =>
+      String(entry.expression ?? '')
+        .trim()
+        .replace(/^\(([^()]*)\)$/u, '$1')
+    );
+  return { moves, deltas, bonuses };
 }
 
 /**

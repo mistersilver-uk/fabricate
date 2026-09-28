@@ -72,6 +72,12 @@ function oddsOf(previewPlan) {
   return buildOddsModel({ plan: previewPlan, enumeration, sandbox: {} }, text);
 }
 
+/** The odds model the route builds, through the same enumeration it reads. */
+function previewEnumerated(previewPlan) {
+  const enumeration = previewEnumeration(previewPlan, null, { Roll: LAB_ROLL });
+  return buildOddsModel({ plan: previewPlan, enumeration, sandbox: {} }, text);
+}
+
 const percentOf = (odds, id) => odds.rows.find((row) => row.id === id)?.percent ?? 0;
 
 const MULTIPLY_ROUTED = {
@@ -324,6 +330,26 @@ describe('roll-under odds place the modifiers on the target (QE7)', () => {
     assert.equal(percentOf(oddsOf(previewPlan), 'success'), 62.5);
   });
 
+  it('places a Tool term on the roll-under target through the odds enumeration', () => {
+    const args = (toolTerms) =>
+      buildPreviewCheckArgs({ activity: 'crafting', mode: 'simple', draft: SIMPLE_UNDER, toolTerms });
+    assert.equal(percentOf(previewEnumerated(args([])), 'success'), 50);
+    assert.equal(
+      percentOf(previewEnumerated(args([{ value: 3, label: 'Tools' }])), 'success'),
+      65,
+      'a scalar Tool term of +3 raises the under-10 target to 13'
+    );
+  });
+
+  it('heads roll-under odds with the formula, naming a separately rolled bonus', () => {
+    const fixed = previewEnumerated(plan({ draft: SIMPLE_UNDER }));
+    assert.equal(fixed.caption, 'exact · 1d20');
+    const joint = previewEnumerated(plan({ draft: SIMPLE_UNDER, system: systemWith('1d4') }));
+    assert.equal(joint.caption, 'exact · 1d20 with 1d4');
+    const over = previewEnumerated(plan({ draft: { rollFormula: '1d20', dc: 10 } }));
+    assert.equal(over.caption, '', 'roll-over against a fixed DC counts its faces');
+  });
+
   it('abstains for a pre-roll outside the whitelist and for a joint space above the cap', () => {
     const knack = plan({ draft: SIMPLE_UNDER, system: systemWith('2d4') });
     assert.equal(oddsOf(knack).reason, ODDS_REASONS.preRollNotEnumerable);
@@ -367,7 +393,7 @@ describe('routed roll-under odds rows run worst to best', () => {
 describe('the simulator readout reads the executed target', () => {
   const result = (data) => ({ success: true, outcome: 'pass', data: { diceGroups: [], ...data } });
 
-  it('shows the runner’s target and margin under, vs target', () => {
+  it('shows the runner’s target and margin under as target and margin', () => {
     const previewPlan = plan({ draft: { rollFormula: '1d20', dc: 12, evaluation: under({}) } });
     const readout = buildReadoutModel(
       {
@@ -378,7 +404,10 @@ describe('the simulator readout reads the executed target', () => {
       },
       text
     );
-    assert.deepEqual([readout.target, readout.margin, readout.vsLabel], [14, 5, 'vs target 14']);
+    assert.deepEqual(
+      [readout.target, readout.margin, readout.gradeLabel],
+      [14, 5, 'target 14 · margin +5']
+    );
     assert.equal(readout.direction, 'under');
     assert.match(readout.bandDetail, /stays at or under the target/);
   });
@@ -393,7 +422,7 @@ describe('the simulator readout reads the executed target', () => {
       },
       text
     );
-    assert.deepEqual([readout.target, readout.margin, readout.vsLabel], [null, null, '']);
+    assert.deepEqual([readout.target, readout.margin, readout.gradeLabel], [null, null, '']);
   });
 
   it('keeps roll-over against a fixed DC reading total − DC', () => {
@@ -407,7 +436,7 @@ describe('the simulator readout reads the executed target', () => {
       },
       text
     );
-    assert.deepEqual([readout.target, readout.margin, readout.vsLabel], [12, 3, 'vs DC 12']);
+    assert.deepEqual([readout.target, readout.margin, readout.gradeLabel], [12, 3, 'vs DC 12 · +3']);
   });
 
   it('states the dynamic target, not the dynamic DC, for a character value', () => {

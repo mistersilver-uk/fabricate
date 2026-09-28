@@ -3,14 +3,14 @@
   The Checks Studio's OUTCOME PREVIEW readout. It renders values already on the runner's own
   result object and nothing else, so a readout that disagreed with a real craft would need the
   engine to disagree with itself: a `Medallion` die face, the TERSE breakdown line, the total
-  against the DC with its margin, the matched band card and a "What happens" list.
+  against its target with its margin, the matched band card and a "What happens" list.
 
-  FIVE STATES THAT ARE NOT THE READOUT, each saying why: NO FORMULA; DYNAMIC DC, which the engine
-  resolves by RUNNING the linked macro and a preview must not, so it previews the static fallback
-  and states so; UNRESOLVED ROLL DATA, where `Roll.parse`'s `missing: "0"` turns an `@` key the
-  actor lacks into a plausible WRONG total that "renders only values present on the result"
-  cannot catch, the signal being `resolved === false`; ABSTAINING, where the check reads a value
-  it cannot resolve, so Roll is disabled and no target or margin is shown; and NO CHECK.
+  Five states are not the readout, each saying why: no formula; a dynamic DC, which the engine
+  resolves by running the linked macro and a preview must not, so it previews the static fallback
+  and says so; unresolved roll data, where `Roll.parse`'s `missing: "0"` turns an `@` key the
+  actor lacks into a plausible wrong total, the signal being `resolved === false`; abstaining,
+  where the check reads a value it cannot resolve, so Roll is disabled and no target or margin is
+  shown; and no check.
 -->
 <script>
   import IconFactRow from '../IconFactRow.svelte';
@@ -34,11 +34,7 @@
   const facts = $derived(Array.isArray(preview?.facts) ? preview.facts : []);
   // The FIRST rolled face, the breakdown line beside it carrying the rest.
   const face = $derived(result?.data?.diceGroups?.[0]?.results?.[0] ?? null);
-  const marginLabel = $derived.by(() => {
-    if (!Number.isFinite(preview?.margin) || !preview.vsLabel) return '';
-    const margin = preview.margin;
-    return `${preview.vsLabel} · ${margin >= 0 ? `+${margin}` : String(margin)}`;
-  });
+  const marginLabel = $derived(Number.isFinite(preview?.margin) ? preview.gradeLabel : '');
   const abstain = $derived(preview?.abstain ?? null);
   const DYNAMIC_NOTES = {
     'dynamic-dc': [

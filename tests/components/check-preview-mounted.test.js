@@ -964,7 +964,7 @@ describe('roll-under preview, odds and readiness (issue 2003)', () => {
     assert.equal(readout.dataset.checksSimulatorDirection, 'under');
     const margin = root.querySelector('[data-checks-simulator-target]');
     assert.equal(margin.dataset.checksSimulatorTarget, '12', 'the Regular threshold the runner met');
-    assert.equal(margin.textContent.trim(), 'vs target 12 · +3', 'a 9 is three under 12');
+    assert.equal(margin.textContent.trim(), 'target 12 · margin +3', 'a 9 is three under 12');
     assert.equal(
       root.querySelector('[data-checks-simulator-band-name]').textContent.trim(),
       'Regular'
@@ -1033,6 +1033,11 @@ describe('roll-under preview, odds and readiness (issue 2003)', () => {
       },
     });
     assert.equal(odds(root).dataset.checksOddsState, 'enumerated', 'a literal formula needs no actor');
+    assert.equal(
+      root.querySelector('[data-checks-odds-domain]').textContent.trim(),
+      'exact · 1d20',
+      'a roll-under check names its formula, as the prototype does'
+    );
     await rollAndSettle(root);
     assert.match(
       root.querySelector('[data-checks-simulator-band] small').textContent,
@@ -1041,7 +1046,7 @@ describe('roll-under preview, odds and readiness (issue 2003)', () => {
     assert.equal(root.querySelector('[data-checks-simulator-target]').dataset.checksSimulatorTarget, '10');
   });
 
-  it('charts a separately rolled bonus jointly, and the heading counts combinations', async () => {
+  it('charts a separately rolled bonus jointly, and the heading names it beside the formula', async () => {
     const root = await mountChecks({
       resolutionMode: 'simple',
       craftingCheck: null,
@@ -1058,8 +1063,8 @@ describe('roll-under preview, odds and readiness (issue 2003)', () => {
     assert.equal(odds(root).dataset.checksOddsState, 'enumerated');
     assert.equal(
       root.querySelector('[data-checks-odds-domain]').textContent.trim(),
-      'all 80 combinations',
-      'twenty faces times four, never "all 0 faces"'
+      'exact · 1d20 with 1d4',
+      'the prototype’s exact heading, never "all 0 faces"'
     );
     // P(d20 <= 10 + d4) = 50 / 80.
     assert.equal(root.querySelector('[data-checks-odds-percent="success"]').textContent.trim(), '62.5%');

@@ -186,6 +186,8 @@
   const oddsDomain = $derived.by(() => {
     if (odds) {
       if (odds.enumerable !== true) return '';
+      // A roll-under or character-value check names its formula, as the prototype does.
+      if (odds.caption) return odds.caption;
       // TWO SENTENCES, two different facts: one die has FACES, a formula carrying a rolling
       // modifier has a joint SPACE, and calling 160 assignments "faces" names a die nothing rolls.
       // A joint space reports `faces: null`, which is not a die with 0 faces.

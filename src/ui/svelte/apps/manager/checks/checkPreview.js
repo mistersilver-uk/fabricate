@@ -95,10 +95,10 @@ export function cloneRollData(actor) {
 }
 
 /**
- * The records a check can be previewed AGAINST: whatever supplies the target, which for a simple
- * or relative-routed check is its OWN authored recipe tiers, the default always offered first. A
- * FIXED routed check's bands are the same for every record and the selector still lists them,
- * the readout being per-record. A RECORD SUPPLIES A DC AND AN ADJUSTMENT AND NOTHING ELSE: a
+ * The records a check can be previewed against: whatever supplies the target, which for a simple
+ * or relative-routed check is its own authored recipe tiers, the default always offered first. A
+ * fixed routed check's bands are the same for every record and the selector still lists them,
+ * the readout being per-record. A record supplies a DC and an adjustment and nothing else: a
  * character-value target reads the adjustment (null inherits the base), every other the DC.
  * @param {object} params Params.
  * @param {object|null} params.check The active check draft.
