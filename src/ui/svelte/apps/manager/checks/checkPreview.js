@@ -31,8 +31,9 @@ import {
 } from '../../../../../systems/normalize/checkEvaluation.js';
 import { appendToolBonusTerms } from '../../../../../systems/toolCheckBonus.js';
 
-/** The "No actor" selection. An id no Foundry document can carry. */
-export const NO_ACTOR_ID = '';
+import { NO_ACTOR_ID } from './previewActorId.js';
+
+export { NO_ACTOR_ID } from './previewActorId.js';
 
 /** The record that IS the check's own default DC, when no named record is chosen. */
 export const DEFAULT_RECORD_ID = '__default';

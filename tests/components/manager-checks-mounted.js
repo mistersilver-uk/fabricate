@@ -2668,7 +2668,7 @@ export function registerChecksCases() {
       'under Player picks it names the PLAYER — the same sentence, a different chooser'
     );
     assert.ok(
-      introText('highest').includes('only the largest of them is added'),
+      introText('highest').includes('only the largest of them applies'),
       'under Highest it states the reduction, because marking an entry enters it into a comparison'
     );
     for (const locked of ['addAll', 'highest']) {

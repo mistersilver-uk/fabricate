@@ -29,3 +29,8 @@ manager-environment-edit-events
 manager-gathering-events-normal
 manager-gathering-event-editor-normal
 manager-gathering-task-drop-modifiers-normal
+manager-gathering-task-editor-check-fixed-over
+manager-gathering-task-editor-check-fixed-under
+manager-gathering-task-editor-check-add
+manager-gathering-task-editor-check-multiply
+manager-gathering-task-editor-check-default

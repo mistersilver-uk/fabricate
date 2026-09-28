@@ -5,28 +5,29 @@
  * A PRESET PRODUCES AN ORDINARY TRIGGER — no marker field, no preset id, nothing downstream
  * treating it differently — and that is a hard rule: the moment a preset produced something
  * special, the engine, the readiness pass and the summariser would each need to know about it.
- * THEY ADAPT TO WHAT THE CHECK CAN DO through its `kind`, and are withheld entirely when the
- * formula rolls no dice, a preset offered against one authoring a condition pointing at a group
- * that does not exist. `tests/check-trigger-presets.test.js` pins what each preset authors. */
+ * THEY ADAPT TO WHAT THE CHECK CAN DO through its `kind` and its evaluation's polarity, and are
+ * withheld entirely when the formula rolls no dice, a preset offered against one authoring a
+ * condition pointing at a group that does not exist. `tests/check-trigger-presets.test.js` pins
+ * what each preset authors. */
 
 const NAMESPACE = 'FABRICATE.Admin.Manager.Checks.Breakage.';
 
 /**
  * The two presets, as descriptions rather than built triggers, the die group and the check kind
  * not being known until a call site supplies them: `high` fires on the best face of the leading
- * die group and `low` on the worst. */
+ * die group and `low` on the worst, whichever face {@link presetPolarity} calls best. */
 const PRESETS = Object.freeze([
   Object.freeze({
     id: 'high',
     icon: 'fas fa-arrow-up',
     key: `${NAMESPACE}PresetHigh`,
-    fallback: 'Natural {max} on {die} → {effect}',
+    fallback: 'Natural {face} on {die} → {effect}',
   }),
   Object.freeze({
     id: 'low',
     icon: 'fas fa-arrow-down',
     key: `${NAMESPACE}PresetLow`,
-    fallback: 'Natural {min} on {die} → {effect}',
+    fallback: 'Natural {face} on {die} → {effect}',
   }),
 ]);
 
@@ -46,6 +47,22 @@ const EFFECT_COPY = Object.freeze({
   },
 });
 
+/**
+ * Which end of a die is its best face under `evaluation`: `'low'` when the check rolls under,
+ * whether it sums or counts, else `'high'`. Count direction qualifies dice and never reverses
+ * the net ranking, so the outcome each preset forces is unchanged.
+ */
+export function presetPolarity(evaluation) {
+  return evaluation?.direction === 'under' ? 'low' : 'high';
+}
+
+/** The face the `high` (best) or `low` (worst) preset names on a die of `sides`. */
+function presetFace(presetId, sides, evaluation) {
+  const best = presetPolarity(evaluation) === 'low' ? 1 : sides;
+  const worst = best === 1 ? sides : 1;
+  return presetId === 'high' ? best : worst;
+}
+
 function effectKind(kind) {
   if (kind === 'routed') return 'routed';
   if (kind === 'progressive') return 'progressive';
@@ -58,10 +75,11 @@ function effectKind(kind) {
  * @param {string} args.kind `routed` | `progressive` | `simple`.
  * @param {Array<{groupId: number, label: string, sides: number}>} args.diceGroups Groups parsed
  *   from the roll formula, in evaluated-term order.
+ * @param {object|null} [args.evaluation] The check's evaluation, which sets the best face.
  * @returns {Array<{id: string, icon: string, key: string, fallback: string, data: object}>} Each
  *   a `{ key, fallback, data }` fragment in `checkTriggerSummary`'s shape.
  */
-export function checkTriggerPresets({ kind = 'simple', diceGroups = [] } = {}) {
+export function checkTriggerPresets({ kind = 'simple', diceGroups = [], evaluation = null } = {}) {
   const groups = Array.isArray(diceGroups) ? diceGroups : [];
   // The LEADING d20 if the formula has one, else the first group: a system rolling `2d6 + 1d20`
   // means the d20 by "natural 20", where index order alone picks the 2d6.
@@ -75,8 +93,7 @@ export function checkTriggerPresets({ kind = 'simple', diceGroups = [] } = {}) {
     fallback: preset.fallback,
     data: {
       die: group.label,
-      max: String(group.sides),
-      min: '1',
+      face: String(presetFace(preset.id, group.sides, evaluation)),
       effect: { key: effects[preset.id][0], fallback: effects[preset.id][1] },
     },
   }));
@@ -92,6 +109,7 @@ export function checkTriggerPresets({ kind = 'simple', diceGroups = [] } = {}) {
  * @param {Array<{groupId: number, sides: number}>} args.diceGroups Parsed groups.
  * @param {boolean} [args.showBreakTools] Whether tool breakage is reachable on this check.
  * @param {() => string} args.newId The caller's id generator, so ids come from one source.
+ * @param {object|null} [args.evaluation] The check's evaluation, which sets the best face.
  * @returns {object|null} The trigger, or `null` when no preset can be built.
  */
 export function buildPresetTrigger({
@@ -100,6 +118,7 @@ export function buildPresetTrigger({
   diceGroups = [],
   showBreakTools = false,
   newId,
+  evaluation = null,
 }) {
   const groups = Array.isArray(diceGroups) ? diceGroups : [];
   const group = groups.find((entry) => entry.sides === 20) ?? groups[0];
@@ -112,7 +131,7 @@ export function buildPresetTrigger({
     groupId: group.groupId,
     aggregate: 'anyDie',
     operator: '==',
-    value: presetId === 'high' ? group.sides : 1,
+    value: presetFace(presetId, group.sides, evaluation),
   };
 
   const routed = effectKind(kind) === 'routed';

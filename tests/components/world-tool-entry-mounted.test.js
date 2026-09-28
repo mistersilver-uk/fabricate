@@ -84,6 +84,7 @@ const harness = createMountedComponentHarness({
     // list and the Checks Studio catalogue render it, so it is static in this tree's graph
     // and an omission HANGS this suite rather than failing it.
     'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte',
+    'src/ui/svelte/components/Kicker.svelte',
     'src/ui/svelte/apps/manager/tools/ToolRequirementsTab.svelte',
     // `ToolRequirementsTab` draws each of its two sections as a `ToolInheritCard` now (issue
     // 1373), so the card and the shared inherit row it wraps are in this tree's static graph.
@@ -1096,7 +1097,7 @@ describe('the world Tool entry (issue 1373)', () => {
       );
       assert.equal(
         target.querySelector('[data-tool-bonus-note]').textContent.trim(),
-        'Applied to the crafting check as @prof.'
+        'Applies @prof to any check this tool is used for, in the way that check applies bonuses.'
       );
 
       rows[1].querySelector('input[type="radio"]').click();

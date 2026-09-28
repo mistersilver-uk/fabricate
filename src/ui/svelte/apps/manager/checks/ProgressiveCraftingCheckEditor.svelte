@@ -92,6 +92,7 @@
       rollFormula={value?.rollFormula || ''}
       kind="progressive"
       showBreakTools={checkDriven}
+      evaluation={value?.evaluation ?? null}
       onChange={(checkBreakage) => emit({ checkBreakage })}
     />
   {/if}

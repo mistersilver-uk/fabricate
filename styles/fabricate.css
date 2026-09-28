@@ -20256,33 +20256,31 @@
   background: var(--fab-bg-1);
 }
 
-/* `proto:1429`: `Salvage check DC` is a title over a note, radius 9, `surface-soft` behind a `border-strong` hairline. Its 34px snapped the reference's 32, and it now uses the shared control's `toolbar` rung (issue 1510), which matches without an override. */
+/* Checks Studio frames 23-24 (issue 2005): a kicker over the controls, the hint beneath, then the kept-value callout and the Player sees block, stacked. The library's `.k-lbl` stacks its kicker, field and `.k-hint` the same way. */
 .fabricate-manager .manager-salvage-dc-card {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: var(--fab-space-3);
-  align-items: center;
+  align-items: stretch;
 }
 
 .fabricate-manager .manager-salvage-dc-copy {
   display: flex;
-  flex: 1 1 220px;
   flex-direction: column;
-  gap: var(--fab-space-2xs);
+  gap: var(--fab-space-chip);
   min-width: 0;
 }
 
 .fabricate-manager .manager-salvage-dc-title {
-  color: var(--fab-text);
-  font-weight: 600;
-  font-size: 0.72rem;
+  display: flex;
 }
 
+/* `library.html` `.k-hint`: 10.5px / 1.5 in `--fab-text-subtle`. */
 .fabricate-manager .manager-salvage-dc-note {
   color: var(--fab-text-subtle);
   font-weight: 400;
-  font-size: 0.63rem;
-  line-height: 1.45;
+  font-size: 0.66rem;
+  line-height: 1.5;
 }
 
 /* The preset control's box comes from the shared `<Select>`'s `toolbar` rung (issue 1510): 34px, radius 9, `0.72rem`, `--fab-bg-1`. `surface-soft` is licensed per-site skin on the trigger below; the `border-strong` hairline is this rule's own. */
@@ -20290,7 +20288,6 @@
   flex: 0 0 auto;
   width: auto;
   min-width: 0;
-  margin-left: auto;
 }
 
 .fabricate-manager .manager-salvage-dc-select .fabricate-select-trigger {

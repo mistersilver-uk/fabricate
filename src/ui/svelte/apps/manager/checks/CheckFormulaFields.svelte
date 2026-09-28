@@ -192,7 +192,7 @@
     }
     return text(
       'FABRICATE.Admin.Manager.Checks.Crafting.ResolvedAddAll',
-      'Add all — every applied modifier is summed into the roll.'
+      'Apply all — every applied modifier is summed into the roll.'
     );
   });
 </script>

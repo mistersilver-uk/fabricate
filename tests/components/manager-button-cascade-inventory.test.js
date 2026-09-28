@@ -150,10 +150,15 @@ const CONVERTED_BATCHES = Object.freeze([
   Object.freeze({
     task: 9,
     files: Object.freeze([
-      // 38 sites across the remaining eighteen components, all `<button>`.
+      // 38 sites across the remaining nineteen components, all `<button>`. The salvage DC card's
+      // Manage presets moved into `CheckOverrideField` with the card (issue 2005).
       Object.freeze({
         file: 'src/ui/svelte/apps/manager/ComponentEditView.svelte',
-        sites: 4,
+        sites: 3,
+      }),
+      Object.freeze({
+        file: 'src/ui/svelte/apps/manager/component/CheckOverrideField.svelte',
+        sites: 1,
       }),
       Object.freeze({
         file: 'src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte',
@@ -1108,10 +1113,11 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   );
   assert.equal(
     new Set(cascade.convertingSites.map((site) => site.file)).size + converted.length,
-    47,
-    // One per file the root's task-5 sites moved into (issues 1707, 1720, 1721); the 123-site
-    // total above is unchanged, because nothing converted.
-    'across 47 components'
+    48,
+    // One per file the root's task-5 sites moved into (issues 1707, 1720, 1721), and one for the
+    // salvage DC card's move into `CheckOverrideField` (issue 2005); the 123-site total above is
+    // unchanged, because nothing converted.
+    'across 48 components'
   );
 
   // …and the ledger is not allowed to be fiction. A converted file must actually render the
