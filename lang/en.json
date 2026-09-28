@@ -6575,7 +6575,7 @@
             "CountExact": "exact · expected {expected}",
             "CountNearlyExact": "nearly exact · expected {expected}",
             "Botch": "Botch",
-            "ReasonCountPathUnresolved": "{actor} has no value at {path}, so there is nothing to chart for them.",
+            "ReasonCountPathUnresolved": "{actor} is missing a value this check reads ({path}), so it cannot resolve for them.",
             "ReasonCountValueNotNumeric": "A value this check reads from {actor} is not a number, so there is nothing to chart for them.",
             "ReasonCountResidualTooLarge": "These dice keep exploding too often to work every result out exactly, and an estimate here would be worse than none.",
             "ReasonCountFaceTriggerNotEnumerable": "A trigger on this check reads individual dice in a way the chart cannot follow, so no odds are shown.",

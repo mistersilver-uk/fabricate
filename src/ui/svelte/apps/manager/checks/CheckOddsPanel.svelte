@@ -109,7 +109,7 @@
     ],
     [ODDS_REASONS.countPathUnresolved]: [
       'FABRICATE.Admin.Manager.Checks.Odds.ReasonCountPathUnresolved',
-      '{actor} has no value at {path}, so there is nothing to chart for them.',
+      '{actor} is missing a value this check reads ({path}), so it cannot resolve for them.',
     ],
     [ODDS_REASONS.countValueNotNumeric]: [
       'FABRICATE.Admin.Manager.Checks.Odds.ReasonCountValueNotNumeric',

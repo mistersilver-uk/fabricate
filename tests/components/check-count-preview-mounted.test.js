@@ -209,7 +209,7 @@ describe('count odds and the simulator readout', () => {
     assert.equal(odds(root).dataset.checksOddsReason, 'count-path-unresolved');
     assert.equal(
       odds(root).textContent.trim(),
-      'Vosk has no value at @skills.smith.rank, so there is nothing to chart for them.'
+      'Vosk is missing a value this check reads (@skills.smith.rank), so it cannot resolve for them.'
     );
     assert.equal(rollButton(root).disabled, true);
     const callout = root.querySelector(
