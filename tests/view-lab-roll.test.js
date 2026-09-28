@@ -26,6 +26,9 @@ import {
   resolveModifierPolicy,
 } from '../src/systems/checkModifierResolver.js';
 import { resolveModifierLibrary } from '../src/systems/characterLibraries.js';
+import { CraftingEngine } from '../src/systems/CraftingEngine.js';
+import { stubInteractiveRollEnvironment } from './helpers/rollPromptDialogStub.js';
+import { rollPromptTarget } from '../src/ui/svelte/apps/crafting/rollPromptTarget.js';
 
 test('roll-prompt View Lab variants project valid checks and long world modifier labels', async () => {
   const content = buildLabContent();
@@ -43,18 +46,71 @@ test('roll-prompt View Lab variants project valid checks and long world modifier
     listModifiers() { return this.entries; },
     async saveModifiers(entries) { this.entries = entries; },
   };
-  const world = { fabricate: { craftingSystemManager: manager, characterLibrariesStore: store } };
+  const recipes = new Map(content.recipes.map((recipe) => [recipe.id, recipe]));
+  const recipeManager = {
+    getRecipe: (id) => recipes.get(id),
+    updateRecipe: async (id, updates) => recipes.set(id, { ...recipes.get(id), ...updates }),
+  };
+  const world = {
+    actorList: buildLabActors(content),
+    fabricate: { craftingSystemManager: manager, characterLibrariesStore: store, recipeManager },
+  };
   await seedRollPromptFixture(world, 'basic');
   assert.equal(resolveActiveCraftingCheckFormula(manager.getSystem('lab-smithing')).rollFormula, '2d6 + @abilities.int.mod');
   await seedRollPromptFixture(world, 'advantage');
   assert.equal(resolveActiveCraftingCheckFormula(manager.getSystem('lab-smithing')).rollFormula, '1d20 + @abilities.int.mod');
   await seedRollPromptFixture(world, 'pick-one');
   assert.equal(manager.getSystem('lab-herbalism').craftingCheck.maxModifierPicks, 1);
+  await underPromptView(world);
   await seedRollPromptFixture(world, 'overflow');
   const herbalism = manager.getSystem('lab-herbalism');
   assert.equal(herbalism.craftingCheck.maxModifierPicks, 2);
   assert.ok(resolveModifierLibrary(herbalism, store).some((entry) => entry.id === 'hb-mod-luck' && entry.label.length > 40));
 });
+
+/**
+ * The `under` state is frame 29: the real engine prompt names Sera Vane's target after the
+ * applied modifier, and explains it from the Smithing level and the Hard Work tier.
+ */
+async function underPromptView(world) {
+  const manager = world.fabricate.craftingSystemManager;
+  await seedRollPromptFixture(world, 'under');
+  const system = manager.getSystem('lab-smithing');
+  const store = world.fabricate.characterLibrariesStore;
+  assert.equal(system.craftingCheck.defaultModifierPolicy, 'addAll');
+  assert.deepEqual(system.craftingCheck.defaultModifierIds, ['lab-mod-steady-hands']);
+  const steady = resolveModifierLibrary(system, store).find((entry) => entry.id === 'lab-mod-steady-hands');
+  assert.deepEqual([steady?.label, steady?.expression], ['Steady hands', '1'], "frame 29's applied modifier");
+  const recipe = world.fabricate.recipeManager.getRecipe('sm-r-horseshoe');
+  const crafter = world.actorList.find((actor) => actor.id === 'lab-actor-brenna');
+  assert.deepEqual([crafter.name, recipe.name], ['Sera Vane', 'Hard Work'], "frame 29's subtitle");
+  const stub = stubInteractiveRollEnvironment();
+  const previousGame = globalThis.game;
+  globalThis.game = { fabricate: { getCharacterLibrariesStore: () => store } };
+  try {
+    const engine = new CraftingEngine(null);
+    await engine._runPassFailCheck(system, system.craftingCheck.simple, recipe, null, crafter, {
+      interactive: true,
+    });
+    const view = stub.surface.view;
+    assert.deepEqual([view.formula, view.direction, view.dc, view.subtitle], ['1d20', 'under', 10, 'Sera Vane · Hard Work']);
+    assert.deepEqual(rollPromptTarget(view, []), {
+      chipText: 'Target 11 · stay at or under',
+      source: '@skills.smith.level 12 · Hard Work -2 · modifiers +1',
+    });
+    engine._resolveSimpleCheckDc = async () => 14;
+    await engine._runPassFailCheck(system, system.craftingCheck.simple, recipe, null, crafter, {
+      interactive: true,
+    });
+    assert.deepEqual(rollPromptTarget(stub.surface.view, []), {
+      chipText: 'Target 15 · stay at or under', source: 'Base 14 · modifiers +1',
+    }, 'a DC macro that moved the target leaves no character value to explain it');
+  } finally {
+    if (previousGame === undefined) delete globalThis.game;
+    else globalThis.game = previousGame;
+    stub.restore();
+  }
+}
 
 /** The two statics the shim hands through, reproduced verbatim from `installFoundryShim.js`. */
 const STATICS = {

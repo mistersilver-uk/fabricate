@@ -721,6 +721,45 @@ describe('CraftingListingBuilder — check DC resolution (issue 778)', () => {
   });
 });
 
+describe('CraftingListingBuilder — check evaluation (issue 2003)', () => {
+  const skill = { source: 'attribute', expression: '@skills.craft.value' };
+  const withEvaluation = (evaluation) =>
+    makeSystem({
+      craftingCheck: {
+        simple: { rollFormula: '1d20 + @prof', dc: 15, evaluation },
+        routed: {},
+        progressive: {},
+      },
+    });
+
+  it('derives the display formula with the check evaluation', () => {
+    const seen = [];
+    buildOne({
+      system: withEvaluation({ direction: 'under' }),
+      resolveCheckFormula: (formula, actor, context, evaluation) => {
+        seen.push(evaluation);
+        return { display: formula, resolved: true };
+      },
+    });
+    assert.equal(seen.length, 1);
+    assert.deepEqual(
+      [seen[0].product, seen[0].direction, seen[0].target.source],
+      ['sum', 'under', 'fixed'],
+      'the normalized evaluation, not the sum/over default'
+    );
+  });
+
+  it('shows a DC chip only for a summed roll-over fixed DC', () => {
+    const dc = (evaluation) => buildOne({ system: withEvaluation(evaluation) }).recipe.check.dc;
+    assert.equal(dc(undefined), 15);
+    assert.equal(dc({ direction: 'over' }), 15);
+    assert.equal(dc({ direction: 'under' }), null, 'a roll-under target is no DC to meet or beat');
+    assert.equal(dc({ direction: 'over', target: skill }), null, 'a character value is no single DC');
+    assert.equal(dc({ direction: 'under', target: skill }), null);
+    assert.equal(dc({ product: 'count' }), null);
+  });
+});
+
 describe('CraftingListingBuilder — outcome tiers', () => {
   function routedSystem() {
     return makeSystem({

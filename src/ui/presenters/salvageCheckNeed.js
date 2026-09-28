@@ -1,3 +1,4 @@
+import { activeCheckEvaluation } from '../../systems/checkTarget.js';
 import { isCountCheck } from '../../systems/salvageCheckUsability.js';
 
 /** The salvage DC shown to players; fixed routing, stages and a count check have no single DC. */
@@ -10,10 +11,21 @@ export function salvageDisplayDc({ mode, routedType, config, component }) {
   return Number.isFinite(dc) ? Math.trunc(dc) : 15;
 }
 
-/** Display-only need; evaluation continues to use the system's authored check. */
+/**
+ * Display-only need; evaluation continues to use the system's authored check. A character-value
+ * target differs per actor, so a summed check reading one has no single target.
+ */
 export function salvageCheckNeed({ mode, config, checkUsable, component }) {
   if (!checkUsable) return { kind: 'noCheck' };
+  const evaluation = activeCheckEvaluation(config);
+  const summed = evaluation.product === 'sum';
+  if (summed && evaluation.target.source === 'attribute') {
+    return { kind: 'noSingleTarget', direction: evaluation.direction };
+  }
   const routedType = mode === 'routed' && config?.type === 'fixed' ? 'fixed' : 'relative';
   const dc = salvageDisplayDc({ mode, routedType, config, component });
-  return Number.isFinite(dc) ? { kind: 'dc', dc } : { kind: 'noSingleTarget' };
+  if (!Number.isFinite(dc)) return { kind: 'noSingleTarget' };
+  // A finite `dc` here is only reachable for a summed check (a count check's
+  // `salvageDisplayDc` returns null and returns above), so `summed` is redundant.
+  return evaluation.direction === 'under' ? { kind: 'target', target: dc } : { kind: 'dc', dc };
 }

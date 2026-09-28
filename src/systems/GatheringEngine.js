@@ -21,6 +21,7 @@ import { evaluateSituationalBonus, runFormulaProgressive, runFormulaRouted } fro
 import {
   activeCheckEvaluation,
   actorRollData,
+  attributeTargetBasis,
   checkTargetRefusal,
   dcFlavorSuffix,
   progressiveTargetRefusal,
@@ -3795,6 +3796,11 @@ export class GatheringEngine {
         activity: 'Gathering',
         img: task?.img,
         dc: target.target,
+        targetBasis: attributeTargetBasis(routed, {
+          override: task?.adjustmentOverride,
+          label: '',
+          readRollData: () => actorRollData(actor),
+        }),
         evaluation,
       }),
     });

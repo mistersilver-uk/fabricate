@@ -34,8 +34,8 @@ export const CASES = Object.freeze([
     kinds: ['player', 'crafting'],
     sourceMatches: [
       CRAFTING_SIMPLE,
-      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/,
-      /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target)?\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
       /^src\/ui\/svelte\/apps\/crafting\/rollPromptHost\.js$/,
     ],
   }),
@@ -57,8 +57,56 @@ export const CASES = Object.freeze([
     kinds: ['player', 'crafting'],
     sourceMatches: [
       CRAFTING_SIMPLE,
-      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/,
-      /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target)?\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
+    ],
+  }),
+  playerCase({
+    id: 'player-crafting-roll-prompt-under',
+    label: 'Player app — roll-under crafting roll prompt',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', dialog: 'open', rollPromptState: 'under' },
+    steps: [
+      { selector: '.crafting-recipe-row[data-recipe-id="sm-r-horseshoe"]' },
+      { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
+    ],
+    expectSelector:
+      `${SINGLE_PROMPT}:has(button[data-action="advantage"])` +
+      ':has(.manager-modal-subtitle:text-is("Sera Vane · Hard Work"))' +
+      ':has(.formula-content .formula:text-is("1d20") + .formula-note:text-is("The dice are compared as rolled."))' +
+      ':has(.target-row > .manager-chip[data-roll-prompt-target="under"]:has-text("Target 11 · stay at or under"))' +
+      ':has(.target-row > .target-source:has-text("12 · Hard Work -2 · modifiers +1"))' +
+      ':has(.static-modifiers .manager-chip:has-text("Steady hands +1"))' +
+      ':has(.static-modifiers > .help:text-is("Each raises the target."))',
+    kinds: ['player', 'crafting'],
+    sourceMatches: [
+      CRAFTING_SIMPLE,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target)?\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
+    ],
+  }),
+  // The recipe detail behind that prompt: the bare roll, and no DC chip for a roll-under target.
+  playerCase({
+    id: 'player-crafting-check-under',
+    label: 'Player app — roll-under crafting check in the recipe detail',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', rollPromptState: 'under' },
+    steps: [
+      { selector: '.crafting-recipe-row[data-recipe-id="sm-r-horseshoe"]' },
+      { selector: '[data-recipe-section="check"]', scroll: true },
+    ],
+    expectSelector:
+      '[data-recipe-section="check"][data-check-usable="true"]' +
+      ':has([data-check-formula] code:text-is("1d20"))' +
+      ':not(:has([data-check-dc]))',
+    kinds: ['player', 'crafting'],
+    sourceMatches: [
+      CRAFTING_SHARED,
+      CRAFTING_SIMPLE,
+      /^src\/ui\/presenters\/CraftingListingBuilder\.js$/,
+      /^src\/ui\/svelte\/stores\/craftingStore/,
     ],
   }),
   playerCase({
@@ -79,8 +127,8 @@ export const CASES = Object.freeze([
     kinds: ['player', 'crafting'],
     sourceMatches: [
       CRAFTING_SIMPLE,
-      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/,
-      /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target)?\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
     ],
   }),
   playerCase({
@@ -383,9 +431,9 @@ export const CASES = Object.freeze([
     kinds: ['player', 'crafting'],
     sourceMatches: [
       // Narrow rather than `CRAFTING_SHARED`: `rollPrompt.js` builds this dialog end to end and nothing else does.
-      /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/,
+      /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
       /^src\/ui\/svelte\/apps\/crafting\/rollPromptHost\.js$/,
-      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target)?\.svelte$/,
       CRAFTING_PROGRESSIVE,
       /^src\/ui\/svelte\/stores\/craftingStore/,
       /^src\/ui\/svelte\/stores\/playerResultOrder/,
@@ -413,8 +461,8 @@ export const CASES = Object.freeze([
     kinds: ['player', 'crafting'],
     sourceMatches: [
       CRAFTING_PROGRESSIVE,
-      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/,
-      /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target)?\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
     ],
   }),
   playerCase({
@@ -438,8 +486,8 @@ export const CASES = Object.freeze([
     kinds: ['player', 'crafting'],
     sourceMatches: [
       CRAFTING_PROGRESSIVE,
-      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/,
-      /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target)?\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
     ],
   }),
   playerCase({
@@ -465,8 +513,8 @@ export const CASES = Object.freeze([
     kinds: ['player', 'crafting'],
     sourceMatches: [
       CRAFTING_PROGRESSIVE,
-      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/,
-      /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target)?\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
       /^src\/ui\/svelte\/apps\/crafting\/rollPromptHost\.js$/,
     ],
   }),

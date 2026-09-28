@@ -21,3 +21,30 @@ test('a count check shows no DC: it grades successes, not its retained DC (issue
   assert.equal(salvageDisplayDc({ mode: 'simple', config, component: { salvage: { dcOverride: 9 } } }), null);
   assert.deepEqual(salvageCheckNeed({ mode: 'simple', config, checkUsable: true }), { kind: 'noSingleTarget' });
 });
+
+test('a summed roll-under row names its fixed target, and a character value has no single one', () => {
+  const need = (evaluation, config = {}) =>
+    salvageCheckNeed({ mode: 'simple', config: { dc: 12, ...config, evaluation }, checkUsable: true });
+  assert.deepEqual(need({ product: 'sum', direction: 'under' }), { kind: 'target', target: 12 });
+  assert.deepEqual(
+    salvageCheckNeed({
+      mode: 'routed', config: { type: 'relative', evaluation: { direction: 'under' } }, checkUsable: true,
+      component: { salvage: { dcOverride: 9 } },
+    }),
+    { kind: 'target', target: 9 },
+    'the component override and the fallback arithmetic still apply'
+  );
+  for (const direction of ['over', 'under']) {
+    assert.deepEqual(
+      need({ direction, target: { source: 'attribute', expression: '@skill' } }),
+      { kind: 'noSingleTarget', direction },
+      'a character value keeps its direction for the bulk help'
+    );
+  }
+  assert.deepEqual(need({ direction: 'over' }), { kind: 'dc', dc: 12 }, 'sum/over fixed is unchanged');
+  assert.deepEqual(need({ product: 'count', direction: 'under' }), { kind: 'noSingleTarget' }, 'a count row shows no DC (issue 2004)');
+  assert.deepEqual(
+    salvageCheckNeed({ mode: 'progressive', config: { evaluation: { direction: 'under' } }, checkUsable: true }),
+    { kind: 'noSingleTarget' }
+  );
+});

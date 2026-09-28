@@ -12,6 +12,8 @@ import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { GatheringEngine } from '../src/systems/GatheringEngine.js';
 import { evaluatePreparedRunCheck } from '../src/systems/checkRoll.js';
 import { MacroExecutor } from '../src/utils/MacroExecutor.js';
+import { rollPromptTarget } from '../src/ui/svelte/apps/crafting/rollPromptTarget.js';
+import { stubPromptSurface } from './helpers/rollPromptDialogStub.js';
 import {
   GatheringDocumentActor,
   gatheringFixture,
@@ -367,6 +369,31 @@ test('a dynamic target macro runs only after validation and receives the adjuste
   }
 });
 
+test('a DC macro that moves a roll-under target hides its character-value basis', async () => {
+  const original = MacroExecutor.run;
+  MacroExecutor.run = async (_uuid, payload) => payload.anchorDc + 3;
+  const surface = stubPromptSurface(() => null);
+  try {
+    const evaluation = attribute('@skills.craft.value', { direction: 'under', adjustmentKind: 'add', baseAdjustment: -2 });
+    const config = { ...simpleCheck(evaluation), dcMode: 'dynamic', macroUuid: 'Macro.dc' };
+    const world = craftingWorld({ resolutionMode: 'simple', slot: 'simple', config });
+    world.craftingActor.system.skills = SKILLS;
+    installCountingRoll();
+    const tool = { ...HAMMER, bonus: { enabled: true, expression: '2' } };
+    const toolItems = [{ tool: HAMMER, contributionInput: { tool, primaryActor: world.craftingActor } }];
+    await world.engine._runCraftingCheck(
+      world.recipe, world.craftingActor, [world.sourceActor], null, null, { interactive: true, toolItems }
+    );
+    assert.equal(surface.view.targetBasis, null, 'the macro moved 12 to 15, off what @skills.craft.value explains');
+    assert.deepEqual(rollPromptTarget(surface.view, []), {
+      chipText: 'Target 17 · stay at or under', source: 'Base 15 · tools +2',
+    });
+  } finally {
+    surface.restore();
+    MacroExecutor.run = original;
+  }
+});
+
 // ── the adjustment each activity selects ──────────────────────────────────────
 
 /** A summed evaluation against `@skill` with the given adjustment kind and base. */
@@ -383,6 +410,42 @@ test('salvage takes the component adjustmentOverride over the base, read from ge
     {}
   );
   assert.deepEqual([result.data.dc, result.data.target, result.success], [null, 10, true]);
+});
+
+test('salvage and gathering roll-under prompts name the character value, never a Base', async () => {
+  const actor = { name: 'Scavenger', system: {}, getRollData: () => ({ skill: 14 }) };
+  const tool = { ...HAMMER, bonus: { enabled: true, expression: '2' } };
+  const toolItems = [{ tool: HAMMER, contributionInput: { tool, primaryActor: actor } }];
+  const evaluation = skillTarget('under', 'add', 0);
+  const salvage = Object.create(CraftingEngine.prototype);
+  const gathering = Object.create(GatheringEngine.prototype);
+  const component = { name: 'Scrap', salvage: { adjustmentOverride: -4 } };
+  const runs = {
+    'salvage simple': () => salvage._runSalvageSimpleCheck(
+      simpleCheck(evaluation), component, actor, { interactive: true, toolItems }),
+    'salvage routed': () => salvage._runSalvageRoutedCheck(
+      routedCheck(evaluation), component, actor, { interactive: true, toolItems }),
+    'gathering routed': () => gathering._rollRoutedFormula({
+      routed: routedCheck(evaluation), rollFormula: '1d20', actor,
+      task: { name: 'Forage', adjustmentOverride: -4 }, interactive: true,
+    }),
+  };
+  const expected = {
+    'salvage simple': ['Target 12 · stay at or under', '@skill 14 · difficulty -4 · tools +2'],
+    'salvage routed': ['Target 12 · stay at or under', '@skill 14 · difficulty -4 · tools +2'],
+    'gathering routed': ['Target 10 · stay at or under', '@skill 14 · difficulty -4'],
+  };
+  for (const [site, run] of Object.entries(runs)) {
+    installCountingRoll();
+    const surface = stubPromptSurface(() => null);
+    try {
+      await run();
+      const { chipText, source } = rollPromptTarget(surface.view, []);
+      assert.deepEqual([chipText, source], expected[site], site);
+    } finally {
+      surface.restore();
+    }
+  }
 });
 
 test('crafting takes the selected recipe tier adjustment over the base', async () => {

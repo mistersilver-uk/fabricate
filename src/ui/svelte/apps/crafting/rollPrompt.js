@@ -2,6 +2,7 @@
 import { dcFlavorSuffix } from '../../../../systems/checkTarget.js';
 
 import { openRollPromptModal } from './rollPromptHost.js';
+import { fill } from './rollPromptTarget.js';
 
 // Legacy tokens on both versions (issue 1043): V14 maps them in Roll#toMessage, and core.messageMode is unregistered on V13, where reading it throws.
 const ROLL_MODES = [
@@ -45,14 +46,6 @@ function promptLabel(name, fallback) {
   return localize(`FABRICATE.App.RollPrompt.${name}`, fallback);
 }
 
-// A function replacer, so a `$&` or `$1` in a user-authored name is inserted literally.
-function fill(template, values) {
-  return Object.entries(values).reduce(
-    (text, [token, value]) => text.replace(`{${token}}`, () => String(value)),
-    template
-  );
-}
-
 function copy() {
   return {
     modifiers: promptLabel('Modifiers', 'Modifiers'),
@@ -77,6 +70,7 @@ function copy() {
     worse: promptLabel('KeepWorse', 'keep the worse'),
     better: promptLabel('KeepBetter', 'keep the better'),
     dcValue: promptLabel('DcValue', 'DC {dc}'),
+    targetValue: promptLabel('TargetValue', 'Target {target}'),
     roll: promptLabel('roll', 'Roll'),
     advantage: promptLabel('advantage', 'Advantage'),
     disadvantage: promptLabel('disadvantage', 'Disadvantage'),
@@ -129,17 +123,45 @@ export function translatePromptAnswer(answer, { defaultRollMode, choicePlan }) {
   return result;
 }
 
+/** A summed roll-under check's wording: the chip names a target, and every bonus raises it. */
+function underCopy() {
+  return {
+    meet: promptLabel('StayAtOrUnder', 'stay at or under'),
+    exceed: promptLabel('StayUnder', 'stay under'),
+    formulaNote: promptLabel('ComparedAsRolled', 'The dice are compared as rolled.'),
+    targetBase: promptLabel('TargetBase', 'Base {value}'),
+    targetValueOf: promptLabel('TargetValueOf', '{source} {value}'),
+    targetAdjustment: promptLabel('TargetAdjustment', '{label} {value}'),
+    targetDifficulty: promptLabel('TargetDifficulty', 'difficulty {value}'),
+    targetTools: promptLabel('TargetTools', 'tools {value}'),
+    targetModifiers: promptLabel('TargetModifiers', 'modifiers {value}'),
+    eachAdds: promptLabel('EachRaises', 'Each raises the target.'),
+    bonusHelp: promptLabel(
+      'BonusHelpUnder',
+      'A bonus raises the target. A rolled bonus such as 1d4 is rolled first, and its result is applied.'
+    ),
+  };
+}
+
 function needText(need, labels) {
   if (need?.kind === 'dc') return fill(labels.dcValue, { dc: need.dc });
+  if (need?.kind === 'target') return fill(labels.targetValue, { target: need.target });
   return need?.kind === 'noSingleTarget' ? labels.noSingleTarget : labels.noCheck;
 }
 
-/** The DC, bulk-need and pick-cap copy, formatted here so the component renders strings only. */
+function targetText(data, labels) {
+  if (!Number.isFinite(data.dc)) return '';
+  return data.direction === 'under'
+    ? fill(labels.targetValue, { target: data.dc })
+    : fill(labels.dcValue, { dc: data.dc });
+}
+
+/** The target, bulk-need and pick-cap copy, formatted here so the component renders strings only. */
 function formatCopy(data, choicePlan) {
-  const labels = copy();
+  const labels = data.direction === 'under' ? { ...copy(), ...underCopy() } : copy();
   const formatted = {
     labels: { ...labels, pickUpTo: fill(labels.pickUpTo, { count: choicePlan.maxPicks }) },
-    dcText: Number.isFinite(data.dc) ? fill(labels.dcValue, { dc: data.dc }) : '',
+    dcText: targetText(data, labels),
   };
   if (Array.isArray(data.subjects)) {
     formatted.subjects = data.subjects.map((subject) => ({
@@ -173,12 +195,23 @@ export async function waitForPrompt(data, allowAdvantage, choicePlan, open = res
   return translatePromptAnswer(answer, { defaultRollMode, choicePlan });
 }
 
-/** `displayFormula` is the producer's base without the itemised modifier terms, shown as chips. */
+/** A bulk row's need rolls under when it names a target or reads an under character value. */
+function rollsUnder(need) {
+  return need?.kind === 'target' || (need?.kind === 'noSingleTarget' && need.direction === 'under');
+}
+
+/**
+ * `displayFormula` is the producer's base without the itemised modifier terms, shown as chips.
+ * `target` (else `dc`) is the pre-modifier number; `direction: 'under'` names it a target, which
+ * `targetBasis` and `toolBonus` explain (see `rollPromptTarget`).
+ */
 export function buildSinglePromptData({
   formula,
   resolvedFormula,
   displayFormula,
   dc,
+  target,
+  direction,
   name,
   actorName,
   activity,
@@ -186,10 +219,13 @@ export function buildSinglePromptData({
   selectedModifiers,
   thresholdMode,
   comparison,
+  targetBasis = null,
+  toolBonus = 0,
 } = {}) {
   const title = fill(promptLabel('CheckTitle', '{activity} check'), {
     activity: activity || promptLabel('roll', 'Roll'),
   });
+  const value = Number.isFinite(target) ? target : dc;
   const subtitle =
     actorName && name
       ? fill(promptLabel('ActorSubject', '{actor} · {subject}'), {
@@ -197,13 +233,16 @@ export function buildSinglePromptData({
           subject: name,
         })
       : actorName || name || '';
+  const under = direction === 'under' && Number.isFinite(value);
   return {
     kind: 'single',
     title,
     subtitle,
     img: img || '',
     formula: displayFormula || resolvedFormula || formula || '',
-    dc: Number.isFinite(dc) ? dc : null,
+    dc: Number.isFinite(value) ? value : null,
+    direction: under ? 'under' : 'over',
+    ...(under && { targetBasis, toolBonus }),
     comparison:
       comparison === undefined ? (thresholdMode === 'exceed' ? 'exceed' : 'meet') : comparison,
     selectedModifiers: Array.isArray(selectedModifiers) ? selectedModifiers : [],
@@ -218,6 +257,9 @@ export function buildBulkPromptData({ count, subjects, activity, actorName } = {
   });
   return {
     kind: 'bulk',
+    // Every row rolling under (a fixed target or a character value) gets the roll-under bonus
+    // help; any other row (or an empty batch) keeps the roll-over copy.
+    direction: rows.length > 0 && rows.every((row) => rollsUnder(row?.need)) ? 'under' : 'over',
     title: activity
       ? fill(promptLabel('CheckTitlePlural', '{activity} checks'), { activity })
       : promptLabel('BulkTitle', 'Bulk check'),
@@ -267,7 +309,7 @@ export async function promptBulkCheckRoll({
 }
 
 export function buildInteractiveRollOptions(
-  { interactive, actor, name, activity, dc, img, modifierChoice, ...input },
+  { interactive, actor, name, activity, dc, img, modifierChoice, targetBasis, ...input },
   prompt = promptCheckRoll
 ) {
   const dcLabel = dcFlavorSuffix(dc, input.evaluation);
@@ -283,5 +325,6 @@ export function buildInteractiveRollOptions(
     img,
   };
   if (modifierChoice) rollOptions.modifierChoice = modifierChoice;
+  if (targetBasis) rollOptions.targetBasis = targetBasis;
   return rollOptions;
 }

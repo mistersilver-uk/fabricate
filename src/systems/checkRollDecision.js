@@ -59,6 +59,25 @@ export function defersModifierChoice(options) {
   );
 }
 
+/**
+ * A summed roll-under prompt's character-value target basis and the Tool bonus already rolled
+ * into its target, which the prompt adds to the target it names; nothing for any other check.
+ */
+export function underTargetPromptFields(
+  evaluation,
+  { targetBasis = null, toolContributions } = {}
+) {
+  if (evaluation?.product !== 'sum' || evaluation.direction !== 'under') return {};
+  const tools = Array.isArray(toolContributions) ? toolContributions : [];
+  return {
+    targetBasis,
+    toolBonus: tools.reduce(
+      (sum, tool) => sum + (Number.isFinite(tool?.value) ? tool.value : 0),
+      0
+    ),
+  };
+}
+
 function promptInput({
   authoredFormula,
   actor,
@@ -81,6 +100,10 @@ function promptInput({
     resolvedFormula: resolved?.display ?? null,
     displayFormula: displayFormula(shownFormula, actor)?.display ?? shownFormula,
     dc: options.dc,
+    // The pre-modifier target and, for a summed check, the direction the roll must land on.
+    target: Number.isFinite(options.dc) ? options.dc : null,
+    direction: evaluation.product === 'sum' ? evaluation.direction : null,
+    ...underTargetPromptFields(evaluation, options),
     label: options.flavor,
     name: options.name,
     activity: options.activity,

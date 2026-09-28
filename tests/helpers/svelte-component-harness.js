@@ -242,6 +242,14 @@ export const PLAYER_APP_COMPILED_MODULES = Object.freeze([
 ]);
 
 // The raw `.js` modules the player Crafting tab tree needs in a mounted test.
+/** `src/systems/checkTarget.js` and its import closure. */
+export const CHECK_TARGET_RAW_MODULES = Object.freeze([
+  'src/systems/checkTarget.js',
+  'src/systems/checkEvaluation.js',
+  'src/systems/normalize/checkEvaluation.js',
+  'src/utils/localizeWithFallback.js',
+]);
+
 export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`, spread
   // from the roster above rather than copied so the two cannot drift.
@@ -278,6 +286,8 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   // SAME check-modifier context the engine rolls, so it imports the resolver.
   'src/systems/checkModifierResolver.js',
   'src/systems/checkModifierRouter.js',
+  // Issue 2003: the builder reads the check evaluation to hide the DC chip off sum/over/fixed.
+  ...CHECK_TARGET_RAW_MODULES,
   // …and issue 1094 gave that resolver its first two imports, so one entry no longer suffices.
   'src/systems/toolCheckBonus.js',
   'src/utils/craftingCheckExpression.js',

@@ -45,6 +45,7 @@
  */
 
 import { buildCheckModifierContext } from '../../systems/checkModifierResolver.js';
+import { activeCheckEvaluation, isFixedSumOver } from '../../systems/checkTarget.js';
 import { buildPassInventorySnapshot } from '../../systems/passInventorySnapshot.js';
 import { resolvedComponentsFor } from '../../systems/scopedEntityReads.js';
 import { activeRunStepState, buildStepRecipeView } from '../../systems/stepRecipeView.js';
@@ -908,6 +909,7 @@ export class CraftingListingBuilder {
     }
     if (!config) return null;
 
+    const evaluation = activeCheckEvaluation(config);
     const rollFormula = typeof config.rollFormula === 'string' ? config.rollFormula.trim() : '';
     const usable = rollFormula.length > 0;
     // "Mandatory" reflects whether the engine will actually roll this check and a
@@ -958,7 +960,8 @@ export class CraftingListingBuilder {
           this._resolveCheckFormula(
             rollFormula,
             craftingActor,
-            buildCheckModifierContext(system, 'crafting', recipe)
+            buildCheckModifierContext(system, 'crafting', recipe),
+            evaluation
           )
         : null;
     // A routed fixed check (routedByCheck, or alchemy tiered) matches by value
@@ -968,11 +971,8 @@ export class CraftingListingBuilder {
       (mode === 'routedByCheck' || (mode === 'alchemy' && alchemyCheckMode === 'tiered')) &&
       config.type === 'fixed';
     // Resolve the displayed DC AFTER the issue 765 suppression guard above (never
-    // reorder it there): routed-fixed and dynamic-DC checks surface no chip
-    // (`null`); otherwise the recipe's tier DC wins over the static fallback. See
-    // the method JSDoc and `_resolveDisplayDc`.
-    const dc =
-      routedFixed || config.dcMode === 'dynamic' ? null : this._resolveDisplayDc(config, recipe);
+    // reorder it there). See the method JSDoc and `_chipDc`.
+    const dc = this._chipDc(config, recipe, routedFixed, evaluation);
     return {
       dc,
       rollFormula: rollFormula.length > 0 ? rollFormula : null,
@@ -983,6 +983,15 @@ export class CraftingListingBuilder {
       mandatory,
       usable,
     };
+  }
+
+  /**
+   * The DC chip's value: null for a routed-fixed or dynamic-DC check, and for every evaluation
+   * but a summed roll-over fixed DC, whose target is no single DC to meet or beat.
+   */
+  _chipDc(config, recipe, routedFixed, evaluation) {
+    if (routedFixed || config.dcMode === 'dynamic' || !isFixedSumOver(evaluation)) return null;
+    return this._resolveDisplayDc(config, recipe);
   }
 
   /**
