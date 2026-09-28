@@ -55,7 +55,6 @@ export async function seedRollPromptFixture(world, state) {
  */
 async function seedRollUnder(world) {
   const crafter = world.actorList.find((actor) => actor.id === 'lab-actor-brenna');
-  crafter.name = 'Sera Vane';
   crafter.system.skills = { ...crafter.system.skills, smith: { level: 12 } };
   const store = world.fabricate.characterLibrariesStore;
   await store.saveModifiers([
@@ -82,10 +81,13 @@ async function seedRollUnder(world) {
       },
     },
   });
-  await world.fabricate.recipeManager.updateRecipe('sm-r-horseshoe', {
-    name: 'Hard Work',
-    checkTierId: 'lab-tier-hard-work',
-  });
+  await nameFrameSubject(world, { name: 'Hard Work', checkTierId: 'lab-tier-hard-work' });
+}
+
+/** The frames' "Sera Vane · {recipe}" subtitle: the crafter the player app opens, and the horseshoe. */
+async function nameFrameSubject(world, recipeUpdates) {
+  world.actorList.find((actor) => actor.id === 'lab-actor-brenna').name = 'Sera Vane';
+  await world.fabricate.recipeManager.updateRecipe('sm-r-horseshoe', recipeUpdates);
 }
 
 /**
@@ -124,7 +126,8 @@ async function seedSalvageUnder(world, state) {
  * frame 35: six d10s, each qualifying at 8 or more, the best face exploding and the worst
  * cancelling. `count-threshold` is frame 30: two d20s, each qualifying at or under a threshold
  * read from the character, and modifiers move the threshold. Both need two successes; the retained
- * roll formula stays authored and inert, so the prompt must not show it.
+ * roll formula stays authored and inert, so the prompt must not show it. The subtitles are the
+ * frames': "Sera Vane · Fine Craft" and "Sera Vane · Complex Work".
  */
 async function seedCount(world, state) {
   const store = world.fabricate.characterLibrariesStore;
@@ -160,6 +163,7 @@ async function seedCount(world, state) {
       },
     },
   });
+  await nameFrameSubject(world, { name: state === 'count' ? 'Fine Craft' : 'Complex Work' });
 }
 
 /** Nine long-named world modifiers Herbalism's check offers, so the prompt meets the height cap. */

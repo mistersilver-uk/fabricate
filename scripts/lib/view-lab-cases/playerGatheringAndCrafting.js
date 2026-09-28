@@ -121,7 +121,7 @@ export const CASES = Object.freeze([
     ],
     expectSelector:
       `${SINGLE_PROMPT}:not(:has(button[data-action="advantage"]))` +
-      ':has(.manager-modal-subtitle:has-text("Bend Horseshoe"))' +
+      ':has(.manager-modal-subtitle:text-is("Sera Vane · Fine Craft"))' +
       ':has(.formula-content .formula[data-roll-prompt-count="over"]:text-is("6d10 · each ≥ 8"))' +
       ':has(.formula-content .formula-note:text-is("Success on ≥ 8 · best face explodes · worst face cancels"))' +
       ':has(.formula-content .manager-chip[data-roll-prompt-required="2"]:has-text("2 successes needed"))' +
@@ -130,8 +130,8 @@ export const CASES = Object.freeze([
     kinds: ['player', 'crafting'],
     sourceMatches: [
       CRAFTING_SIMPLE,
-      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/,
-      /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target)?\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
     ],
   }),
   playerCase({
@@ -146,7 +146,7 @@ export const CASES = Object.freeze([
     ],
     expectSelector:
       `${SINGLE_PROMPT}:not(:has(button[data-action="advantage"]))` +
-      ':has(.manager-modal-subtitle:has-text("Bend Horseshoe"))' +
+      ':has(.manager-modal-subtitle:text-is("Sera Vane · Complex Work"))' +
       ':has(.formula-content .formula[data-roll-prompt-count="under"]:text-is("2d20 · each ≤ 14"))' +
       ':has(.formula-content .formula-note:text-is("Success on ≤ 14 (@abilities.int.mod + 11)"))' +
       ':has(.formula-content .manager-chip[data-roll-prompt-required="2"]:has-text("2 successes needed"))' +
@@ -155,8 +155,8 @@ export const CASES = Object.freeze([
     kinds: ['player', 'crafting'],
     sourceMatches: [
       CRAFTING_SIMPLE,
-      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/,
-      /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target)?\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
     ],
   }),
   playerCase({

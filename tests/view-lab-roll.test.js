@@ -66,7 +66,7 @@ test('roll-prompt View Lab variants project valid checks and long world modifier
   await seedRollPromptFixture(world, 'pick-one');
   assert.equal(manager.getSystem('lab-herbalism').craftingCheck.maxModifierPicks, 1);
   await underPromptView(world);
-  await countPromptView(world, content);
+  await countPromptView(world);
   await seedRollPromptFixture(world, 'overflow');
   const herbalism = manager.getSystem('lab-herbalism');
   assert.equal(herbalism.craftingCheck.maxModifierPicks, 2);
@@ -118,15 +118,19 @@ async function underPromptView(world) {
 }
 
 /** The `count` and `count-threshold` states: the horseshoe's real engine prompt, frames 35 and 30. */
-async function countPromptView(world, content) {
+async function countPromptView(world) {
   const manager = world.fabricate.craftingSystemManager;
-  const recipe = content.recipes.find((entry) => entry.id === 'sm-r-horseshoe');
   const frames = {
-    count: ['6d10 · each ≥ 8', 'Success on ≥ 8 · best face explodes · worst face cancels', 'Each adds dice.'],
-    'count-threshold': ['2d20 · each ≤ 14', 'Success on ≤ 14 (@abilities.int.mod + 11)', 'Each moves the threshold.'],
+    count: ['6d10 · each ≥ 8', 'Success on ≥ 8 · best face explodes · worst face cancels', 'Each adds dice.', 'Fine Craft'],
+    'count-threshold': [
+      '2d20 · each ≤ 14', 'Success on ≤ 14 (@abilities.int.mod + 11)', 'Each moves the threshold.', 'Complex Work',
+    ],
   };
-  for (const [state, [formula, rules, eachAdds]] of Object.entries(frames)) {
+  for (const [state, [formula, rules, eachAdds, recipeName]] of Object.entries(frames)) {
     await seedRollPromptFixture(world, state);
+    const recipe = world.fabricate.recipeManager.getRecipe('sm-r-horseshoe');
+    const crafter = world.actorList.find((actor) => actor.id === 'lab-actor-brenna');
+    assert.deepEqual([crafter.name, recipe.name], ['Sera Vane', recipeName], `${state}: the frame's subtitle`);
     const system = manager.getSystem('lab-smithing');
     assert.deepEqual(system.craftingCheck.defaultModifierIds, ['lab-mod-steady-hands'], 'the frames\' one modifier');
     const dice = installCountDice();
@@ -134,10 +138,11 @@ async function countPromptView(world, content) {
     try {
       await new CraftingEngine(null)._runPassFailCheck(
         system, system.craftingCheck.simple, recipe, null,
-        { name: 'Idrin', getRollData: () => ({ abilities: { int: { mod: 3 } } }) },
+        crafter,
         { interactive: true }
       );
       const { view } = surface;
+      assert.equal(view.subtitle, `Sera Vane · ${recipeName}`);
       assert.equal(view.formula, formula, `${state}: the pool line, not the retained formula`);
       assert.equal(view.labels.formulaNote, rules);
       assert.equal(view.neededText, '2 successes needed');
