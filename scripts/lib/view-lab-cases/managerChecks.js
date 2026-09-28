@@ -1188,6 +1188,50 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'checks'],
     sourceMatches: PARITY_SOURCES,
   }),
+  managerCase({
+    id: 'manager-checks-under-attribute-narrow',
+    label:
+      'Manager — Checks roll-under preview, multiplied character value, odds, narrow (prototype state 5)',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-runework' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      ...underMultiplySteps('@skills.med.mod + 51'),
+      ...SCROLL_ODDS,
+    ],
+    expectView: 'checks-crafting',
+    expectSelector:
+      '.fabricate-manager [data-checks-odds-state="enumerated"][data-checks-odds-direction="under"] [data-checks-odds-bar]',
+    // The 1024x640 declared floor, stacked, for the same enumerated row `manager-checks-stacked-floor`
+    // proves for sum/over: the odds panel restacks under the same ladder for a roll-under record.
+    position: { width: 1024, height: 640 },
+    kinds: ['manager', 'checks', 'responsive'],
+    sourceMatches: PARITY_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-checks-under-progressive-salvage',
+    label:
+      'Manager — Checks roll-under preview, progressive salvage check set to lower is better (prototype state 20)',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-salvage' },
+      ...previewAsActor('lab-actor-idrin'),
+      ...PARITY_UNDER,
+      ...SCROLL_ODDS,
+    ],
+    expectView: 'checks-salvage',
+    expectSelector:
+      '.fabricate-manager' +
+      ':has([data-checks-section-notice="progressiveUnderUnsupported"])' +
+      ':has([data-checks-odds-reason="progressive-under-unsupported"])',
+    kinds: ['manager', 'checks'],
+    sourceMatches: PARITY_SOURCES,
+  }),
   countCase({
     id: 'manager-checks-count-over',
     label: 'six d10s, odds',
