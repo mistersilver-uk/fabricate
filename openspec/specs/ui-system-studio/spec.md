@@ -274,7 +274,7 @@ The pool resolves through `countEvaluation.js` exactly as the runtime resolves i
 
 The odds panel charts OUTCOMES, never a net-count histogram, from `countOdds.js` over the runner's own modifier placement, with every separately rolled benefit mixed in exactly.
 Each outcome is graded by the runtime's count graders, so pass/fail, routed tiers and progressive award counts are the ones a real roll would produce, and rows run worst to best.
-An any-die or all-dice trigger on the pool is enumerated jointly with the net; any other per-die trigger abstains as `count-face-trigger-not-enumerable`, explosions that leave material mass unexpanded abstain as `count-residual-too-large`, and a pool above the 999 dice Foundry rolls at once abstains as `pool-too-large`.
+An any-die or all-dice trigger on the pool is enumerated jointly with the net; any other per-die trigger abstains as `count-face-trigger-not-enumerable`, explosions that leave material mass unexpanded abstain as `count-residual-too-large`, and a pool above the 999 dice Foundry rolls at once abstains as `pool-too-large` (`This pool is more dice than Foundry can roll at once, so there is nothing to chart.`).
 With cancelling on, the mass below zero net is split out of the bucket it grades into as a first `Botch` row (danger tone), only when every such outcome grades as a non-success; for a progressive check it comes out of the rows that award nothing.
 The heading adjunct reads `exact · expected {expected}`, or `nearly exact · expected {expected}` when recursion left a residual, with the expected net to two decimals mirrored on `data-checks-odds-expected`; an abstaining panel shows neither.
 The panel root carries `data-checks-odds-product="count"`.
