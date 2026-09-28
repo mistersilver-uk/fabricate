@@ -186,6 +186,11 @@ const SALVAGE_CHECKS = {
     under({ source: 'attribute', expression: '@abilities.int.value' }),
   ],
   'salvage-count': () => [pooled(2), pooled(1)],
+  // Smithing stays at or under the salvager's Smithing level, so its Salvage tab names a source.
+  'salvage-under-skill': () => [
+    under({ source: 'attribute', expression: '@skills.smith.level' }),
+    under(),
+  ],
 };
 
 /**
@@ -195,6 +200,8 @@ const SALVAGE_CHECKS = {
  */
 async function seedSalvageChecks(world, state) {
   const [smithingEvaluation, runeworkEvaluation] = SALVAGE_CHECKS[state]();
+  const salvager = world.actorList.find((actor) => actor.id === 'lab-actor-brenna');
+  salvager.system.skills = { ...salvager.system.skills, smith: { level: 12 } };
   const rollFormula = smithingEvaluation.product === 'count' ? '' : '1d20';
   const manager = world.fabricate.craftingSystemManager;
   const smithing = manager.getSystem('lab-smithing');
