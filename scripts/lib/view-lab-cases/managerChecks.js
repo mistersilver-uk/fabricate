@@ -3,7 +3,7 @@
  */
 
 import { ANCHORED_POPOVER_SOURCES, GATHERING_ROUTE_MODEL_PATTERN } from './caseConstants.js';
-import { chooseSelectOption, managerCase } from './caseFactories.js';
+import { chooseSelectOption, managerCase, previewAsActor } from './caseFactories.js';
 
 const AUTHOR_TRANSFORMED_MODIFIER = Object.freeze([
   { selector: '#manager-world-nav-rules', press: 'Enter' },
@@ -19,6 +19,75 @@ const AUTHOR_TRANSFORMED_MODIFIER = Object.freeze([
   },
   { selector: '[data-world-modifier-done="hb-mod-luck"]' },
 ]);
+
+/*
+ * The roll-under Studio parity states (issue 2005), one per approved-prototype frame that depicts
+ * a surface the roll-under authoring changes. Each fixture reproduces its frame's content where the
+ * lab can: the same tier names and numbers, and a formula with the frame's range where the frame's
+ * own dice cannot be authored (a roll-under refuses 3d6, so `1d20` stands in at the same average).
+ */
+const PARITY_NAV = Object.freeze(['Checks', { selector: '#manager-checks-nav-crafting' }]);
+const PARITY_SOURCES = Object.freeze([/^src\/ui\/svelte\/apps\/manager\/checks\//]);
+const nthMatch = (selector, index) => `:nth-match(${selector}, ${index})`;
+const parityFormula = (formula) => [{ selector: '[data-check-roll-formula]', fill: formula }];
+const parityType = (selector, index, value) => [
+  { selector: nthMatch(selector, index), fill: value },
+  { selector: nthMatch(selector, index), press: 'Enter' },
+];
+const PARITY_UNDER = Object.freeze([{ selector: '[data-check-direction-option="under"]' }]);
+const parityAttribute = (expression) => [
+  { selector: '[data-check-target-source-option="attribute"] input' },
+  { selector: '[data-check-target-expression]', fill: expression },
+];
+const PARITY_MULTIPLY = Object.freeze([
+  { selector: '[data-check-adjustment-kind-option="multiply"]' },
+]);
+/** Grow the recipe tier list from `existing` rows to `names`, naming each and typing its value. */
+const parityTiers = (existing, names, field, values) => [
+  ...Array.from({ length: names.length - existing }, () => ({ selector: '[data-add-tier]' })),
+  ...names.map((name, index) => ({
+    selector: nthMatch('[data-tier-name]', index + 1),
+    fill: name,
+  })),
+  ...values.flatMap((value, index) => parityType(field, index + 1, value)),
+];
+/** Preview the record at `position` in the Studio's own `Preview against` list. */
+const parityPreview = (position) => [
+  { selector: '[data-checks-preview-record]' },
+  { selector: nthMatch('.fabricate-select-popover [data-popover-option]', position + 1) },
+];
+const PARITY_WORK_TIERS = Object.freeze([
+  'Simple Work',
+  'Standard Work',
+  'Hard Work',
+  'Heroic Work',
+]);
+/** The frame-11 and frame-12 outcome ladders, typed onto a fresh routed list. */
+const parityOutcomes = (names, field, values, counts) => [
+  { selector: '#checks-section-outcomes' },
+  { selector: '[data-add-outcome-tier]' },
+  ...names.map((name, index) => ({
+    selector: nthMatch('[data-outcome-name]', index + 1),
+    fill: name,
+  })),
+  ...values.flatMap(([index, value]) => parityType(field, index, value)),
+  ...counts.map((flag, index) => ({
+    selector: `${nthMatch('[data-outcome-row]', index + 1)} [data-outcome-success-option="${flag}"]`,
+  })),
+];
+const parityCase = ({ id, label, frame, query = {}, steps, expectSelector }) =>
+  managerCase({
+    id,
+    label: `Manager — Checks roll-under parity, ${label} (prototype state ${frame})`,
+    reaches: 'beyond',
+    smokeLabels: [],
+    query,
+    steps: [...PARITY_NAV, ...steps],
+    expectView: 'checks-crafting',
+    expectSelector,
+    kinds: ['manager', 'checks'],
+    sourceMatches: PARITY_SOURCES,
+  });
 
 export const CASES = Object.freeze([
   managerCase({
@@ -685,5 +754,157 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/(VocabularyShell|VocabularyShellPanel|VocabularyPanel|InlineVocabularyAdd)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/(vocabularyShell|systemVocabularyStudio)\.js$/,
     ],
+  }),
+  parityCase({
+    id: 'manager-checks-parity-over-fixed',
+    label: 'higher is better, fixed difficulty',
+    frame: 1,
+    steps: [
+      ...parityFormula('1d20 + @prof'),
+      ...previewAsActor('lab-actor-idrin'),
+      ...parityType('[data-check-dc]', 1, '12'),
+      ...parityTiers(
+        2,
+        ['Common Craft', 'Uncommon Craft', 'Rare Craft', 'Very Rare Craft', 'Legendary Craft'],
+        '[data-tier-dc]',
+        ['8', '12', '15', '19', '23']
+      ),
+      ...parityPreview(2),
+    ],
+    expectSelector: '.fabricate-manager [data-check-direction-field]',
+  }),
+  parityCase({
+    id: 'manager-checks-parity-over-attribute',
+    label: 'higher is better, character value added',
+    frame: 2,
+    steps: [
+      ...parityFormula('1d20 + @prof'),
+      ...previewAsActor('lab-actor-idrin'),
+      ...parityAttribute('@skills.med.mod + 8'),
+      ...parityType('[data-check-base-adjustment]', 1, '0'),
+      ...parityTiers(2, PARITY_WORK_TIERS, '[data-tier-adjustment]', ['-2', '0', '+3', '+6']),
+      ...parityPreview(2),
+    ],
+    expectSelector: '.fabricate-manager [data-check-attribute-fields]',
+  }),
+  parityCase({
+    id: 'manager-checks-parity-under-fixed',
+    label: 'lower is better, fixed difficulty',
+    frame: 3,
+    steps: [
+      ...parityFormula('1d20'),
+      ...previewAsActor('lab-actor-idrin'),
+      ...PARITY_UNDER,
+      ...parityType('[data-check-dc]', 1, '10'),
+      ...parityTiers(2, PARITY_WORK_TIERS, '[data-tier-dc]', ['12', '10', '8', '6']),
+      ...parityPreview(2),
+    ],
+    expectSelector: '.fabricate-manager [data-check-formula-target]',
+  }),
+  parityCase({
+    id: 'manager-checks-parity-under-attribute',
+    label: 'lower is better, character value added',
+    frame: 4,
+    steps: [
+      ...parityFormula('1d20'),
+      ...previewAsActor('lab-actor-idrin'),
+      ...PARITY_UNDER,
+      ...parityAttribute('@skills.med.mod + 8'),
+      ...parityType('[data-check-base-adjustment]', 1, '0'),
+      ...parityTiers(2, PARITY_WORK_TIERS, '[data-tier-adjustment]', ['+2', '0', '-2', '-4']),
+      ...parityPreview(3),
+    ],
+    expectSelector: '.fabricate-manager [data-check-target-resolution="resolved"]',
+  }),
+  parityCase({
+    id: 'manager-checks-parity-under-multiply',
+    label: 'lower is better, character value multiplied',
+    frame: 5,
+    query: { system: 'lab-runework' },
+    steps: [
+      ...parityFormula('1d100'),
+      ...previewAsActor('lab-actor-idrin'),
+      ...PARITY_UNDER,
+      ...parityAttribute('@skills.med.mod + 51'),
+      ...PARITY_MULTIPLY,
+      ...parityType('[data-check-base-adjustment]', 1, '1'),
+      ...parityTiers(0, ['Standard', 'Demanding'], '[data-tier-adjustment]', ['1', '1/2']),
+      ...parityPreview(1),
+    ],
+    expectSelector: '.fabricate-manager [data-check-formula-target]',
+  }),
+  parityCase({
+    id: 'manager-checks-parity-progressive',
+    label: 'progressive',
+    frame: 9,
+    query: { system: 'lab-herbalism' },
+    steps: [],
+    expectSelector: '.fabricate-manager [data-check-direction-field]',
+  }),
+  parityCase({
+    id: 'manager-checks-parity-under-attribute-no-actor',
+    label: 'lower is better, character value, no character chosen',
+    frame: 10,
+    steps: [
+      ...parityFormula('1d20'),
+      ...PARITY_UNDER,
+      ...parityAttribute('@skills.med.mod + 8'),
+      ...parityType('[data-check-base-adjustment]', 1, '0'),
+      ...parityTiers(2, PARITY_WORK_TIERS, '[data-tier-adjustment]', ['+2', '0', '-2', '-4']),
+      ...parityPreview(2),
+    ],
+    expectSelector: '.fabricate-manager [data-check-attribute-fields]',
+  }),
+  parityCase({
+    id: 'manager-checks-parity-outcomes-multiply',
+    label: 'outcome tiers against a multiplied character value',
+    frame: 11,
+    query: { system: 'lab-runework' },
+    steps: [
+      ...parityFormula('1d100'),
+      ...previewAsActor('lab-actor-idrin'),
+      ...PARITY_UNDER,
+      ...parityAttribute('@skills.med.mod + 51'),
+      ...PARITY_MULTIPLY,
+      ...parityType('[data-check-base-adjustment]', 1, '1'),
+      ...parityTiers(0, ['Standard', 'Demanding'], '[data-tier-adjustment]', ['1', '1/2']),
+      ...parityPreview(1),
+      ...parityOutcomes(
+        ['Failure', 'Regular', 'Hard', 'Extreme'],
+        '[data-outcome-adjustment]',
+        [
+          [2, '1'],
+          [3, '1/2'],
+          [4, '1/5'],
+        ],
+        ['failure', 'success', 'success', 'success']
+      ),
+    ],
+    expectSelector: '.fabricate-manager [data-outcome-head]',
+  }),
+  parityCase({
+    id: 'manager-checks-parity-outcomes-under-fixed',
+    label: 'outcome tiers against a fixed target',
+    frame: 12,
+    query: { system: 'lab-runework' },
+    steps: [
+      ...parityFormula('1d20'),
+      ...previewAsActor('lab-actor-idrin'),
+      ...PARITY_UNDER,
+      ...parityTiers(0, ['Standard Work'], '[data-tier-dc]', ['10']),
+      ...parityPreview(1),
+      ...parityOutcomes(
+        ['Botched', 'Flawed', 'Success', 'Fine'],
+        '[data-outcome-dc]',
+        [
+          [1, '-4'],
+          [2, '-1'],
+          [3, '0'],
+          [4, '+3'],
+        ],
+        ['failure', 'failure', 'success', 'success']
+      ),
+    ],
+    expectSelector: '.fabricate-manager [data-outcome-head]',
   }),
 ]);

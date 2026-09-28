@@ -25,3 +25,12 @@ manager-components-grouped-continuation
 manager-tags-categories-normal
 manager-tags-categories-tags-tab
 manager-tags-categories-stacked
+manager-checks-parity-over-fixed
+manager-checks-parity-over-attribute
+manager-checks-parity-under-fixed
+manager-checks-parity-under-attribute
+manager-checks-parity-under-multiply
+manager-checks-parity-progressive
+manager-checks-parity-under-attribute-no-actor
+manager-checks-parity-outcomes-multiply
+manager-checks-parity-outcomes-under-fixed
