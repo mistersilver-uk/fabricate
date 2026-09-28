@@ -947,9 +947,7 @@ export async function runFormulaRouted({
       success,
       breakTools: classified.breakTools,
       diceGroups,
-      // Only when a trigger decided or rerouted the outcome (issue 2080 R5).
       ...(classified.forcedDisposition && { forcedOutcome: classified.forcedDisposition }),
-      // Only on a real tier change (issue 975).
       ...(classified.tierStepApplied && { tierStepApplied: classified.tierStepApplied }),
       // Only on a min-tier failure: the post-step tier the gate blocked.
       ...(classified.minTierFailed && {
