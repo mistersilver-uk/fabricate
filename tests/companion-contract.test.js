@@ -103,6 +103,7 @@ const EXPECTED_OUTCOMES = Object.freeze([
   'evaluationInvalid',
   'evaluationUnsupported',
   'targetUnresolved',
+  'poolUnresolved',
   'cancelled',
   'invalidCallSite',
   'notElected',
@@ -303,6 +304,8 @@ test('the descriptor publishes versioned evaluation features, frozen', () => {
       { product: 'sum', direction: 'over', targetSources: ['fixed'], interactive: true },
       { product: 'sum', direction: 'over', targetSources: ['attribute'], interactive: false },
       { product: 'sum', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: false },
+      { product: 'count', direction: 'over', targetSources: ['fixed', 'attribute'], interactive: false },
+      { product: 'count', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: false },
     ],
     additionalDice: false,
   });
@@ -423,12 +426,15 @@ test('the outcome vocabulary is complete for this schema version and maps token 
   }
 });
 
-// `rollActorCheck`'s table also carries these two, auxiliary to `checkPassed`/`checkFailed`
-// (issue 2003): a target-graded answer keeps that OUTCOME and picks one of these two keys
-// instead of Passed/Failed, so neither is itself a declared outcome token.
+// `rollActorCheck`'s table also carries these, auxiliary to `checkPassed`/`checkFailed`: a
+// target-graded answer (issue 2003) or a count answer (issue 2004) keeps that OUTCOME and picks
+// one of these keys instead of Passed/Failed, so none of them is itself a declared outcome token.
 const CHECK_ROLL_AUXILIARY_MESSAGE_KEYS = Object.freeze([
   'checkPassedTarget',
   'checkFailedTarget',
+  'checkPassedCount',
+  'checkFailedCount',
+  'checkFailedZeroPool',
 ]);
 
 test('every declared outcome is emittable by a member, and every member outcome is declared', () => {
@@ -534,6 +540,25 @@ test('every outcome message key resolves to a string leaf in lang/en.json', () =
   assert.doesNotMatch(localizedString(CHECK_ROLL_MESSAGE_KEYS.checkPassed), /failed/);
   assert.match(localizedString(CHECK_ROLL_MESSAGE_KEYS.checkFailed), /failed/);
   assert.doesNotMatch(localizedString(CHECK_ROLL_MESSAGE_KEYS.checkFailed), /passed/);
+  // The count-graded pair (issue 2004) is the same swap risk, one word apart, naming the
+  // successes needed rather than a DC.
+  for (const outcome of ['checkPassedCount', 'checkFailedCount']) {
+    assert.match(
+      localizedString(CHECK_ROLL_MESSAGE_KEYS[outcome]),
+      /\{label\}[\s\S]*\{total\}[\s\S]*\{required\}/,
+      `the graded ${outcome} names the successes needed it was measured against`
+    );
+  }
+  assert.match(localizedString(CHECK_ROLL_MESSAGE_KEYS.checkPassedCount), /passed/);
+  assert.doesNotMatch(localizedString(CHECK_ROLL_MESSAGE_KEYS.checkPassedCount), /failed/);
+  assert.match(localizedString(CHECK_ROLL_MESSAGE_KEYS.checkFailedCount), /failed/);
+  assert.doesNotMatch(localizedString(CHECK_ROLL_MESSAGE_KEYS.checkFailedCount), /passed/);
+  assert.match(localizedString(CHECK_ROLL_MESSAGE_KEYS.checkFailedZeroPool), /failed/);
+  assert.doesNotMatch(
+    localizedString(CHECK_ROLL_MESSAGE_KEYS.checkFailedZeroPool),
+    /\{total\}|\{required\}/,
+    'a zero pool never rolled a total or checked a required count'
+  );
   // The three refusals the FACADE DELEGATOR answers with are emitted before any label has
   // been resolved, so a placeholder in one of them would put literal braces in front of a GM
   // with nothing able to supply them. Same for the two the call-site gate answers with.
@@ -753,6 +778,7 @@ test('every rollActorCheck refusal answers the WHOLE refusal shape', () => {
     'evaluationInvalid',
     'evaluationUnsupported',
     'targetUnresolved',
+    'poolUnresolved',
   ]) {
     assertContractResult(
       checkRollResult(outcome, { label: 'Fabricate' }),
@@ -856,6 +882,53 @@ test('a target-graded pass or fail picks the target key over Passed/Failed (issu
     targetGraded: true,
   });
   assert.equal(refused.message, CHECK_ROLL_MESSAGE_KEYS.rollFailed);
+});
+
+test('a count pass or fail picks the count key, and a zero pool picks its own (issue 2004)', () => {
+  const countEvidence = {
+    total: 1,
+    product: 'count',
+    direction: 'over',
+    comparison: 'meet',
+    target: 8,
+    margin: 0,
+    successes: 1,
+    cancelled: 0,
+  };
+  const passed = checkRollResult(
+    'checkPassed',
+    { label: 'Fabricate', total: 1, required: 1 },
+    countEvidence
+  );
+  assert.equal(passed.message, CHECK_ROLL_MESSAGE_KEYS.checkPassedCount);
+  assert.equal(passed.outcome, 'checkPassed', 'the OUTCOME stays checkPassed; only the key differs');
+  assertMessageDataCovers(passed, 'a count pass');
+
+  const failed = checkRollResult(
+    'checkFailed',
+    { label: 'Fabricate', total: 0, required: 1 },
+    { ...countEvidence, total: 0, successes: 0, margin: -1 }
+  );
+  assert.equal(failed.message, CHECK_ROLL_MESSAGE_KEYS.checkFailedCount);
+  assertMessageDataCovers(failed, 'a count failure');
+
+  // A zero pool (issue 2004) is a checkFailed answer too, but it never reached the dice, so it
+  // picks its own key and needs no `total`/`required` in its messageData.
+  const zeroPool = checkRollResult(
+    'checkFailed',
+    { label: 'Fabricate' },
+    { ...countEvidence, total: null, successes: null, cancelled: null, margin: null, zeroPool: true }
+  );
+  assert.equal(zeroPool.message, CHECK_ROLL_MESSAGE_KEYS.checkFailedZeroPool);
+  assertMessageDataCovers(zeroPool, 'a zero-pool failure');
+
+  // `product: 'count'` alone, without `zeroPool`, still keeps the plain count key.
+  const nonZero = checkRollResult(
+    'checkFailed',
+    { label: 'Fabricate', total: 0, required: 1 },
+    { ...countEvidence, total: 0, zeroPool: false }
+  );
+  assert.equal(nonZero.message, CHECK_ROLL_MESSAGE_KEYS.checkFailedCount);
 });
 
 test('an ungraded roll has no pass, and a bulk answer derives its own three fields', () => {
