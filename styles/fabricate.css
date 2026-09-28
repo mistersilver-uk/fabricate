@@ -1926,7 +1926,7 @@
 .fabricate-manager .manager-checks-difficulty-field.is-dc {
   flex: 0 0 auto;
 
-  /* The shared `Stepper` takes its HEIGHT from the layout context: the 30px field rung, at the width of two 26px adjuncts round a 42px value. */
+  /* The shared `Stepper` takes its height from the layout context: the 30px field rung, at the width of two 26px adjuncts round a 42px value. */
   --fab-stepper-fill-height: 30px;
 
   width: 96px;
@@ -1946,12 +1946,10 @@
   line-height: normal;
 }
 
-/* The check-type chooser still renders through the shared `RadioCardGroup`; only the checks studio's own scale is restated, at (0,4,0) so it lands without touching the primitive every other screen uses. skin census (issue 1523): not an adopter — a CONTEXTUAL override keyed on the Checks card's ancestor chain, which a class stamped on the shared option card cannot express; it carries the tuple since issue 2005. */
+/* The check-type chooser still renders through the shared `RadioCardGroup`; only the checks studio's own scale is restated, at (0,4,0). Padding, radius, radio and legend are the primitive's. */
 .fabricate-manager .manager-checks-card .manager-resolution-mode-card.is-config-cards .manager-resolution-option {
   gap: 11px;
-  padding: var(--fab-space-3);
   border: 1px solid var(--fab-border);
-  border-radius: 9px;
   background: var(--fab-bg-1);
 }
 
@@ -1963,7 +1961,6 @@
   background: var(--fab-surface-soft);
 }
 
-/* The glyph tile carries no edge of its own: the prototype's tile is a fill, not a well. */
 .fabricate-manager
   .manager-checks-card
   .manager-resolution-mode-card.is-config-cards
@@ -1971,7 +1968,6 @@
   flex: 0 0 28px;
   width: 28px;
   height: 28px;
-  border-color: transparent;
   border-radius: 8px;
   color: var(--fab-text-subtle);
   background: var(--fab-surface-active);
@@ -1985,35 +1981,6 @@
   .manager-resolution-option-icon {
   color: var(--fab-accent);
   background: var(--fab-accent-soft);
-}
-
-/* The prototype's radio: a quiet ring at rest, a thick accent ring when chosen, centred on the card. */
-.fabricate-manager
-  .manager-checks-card
-  .manager-resolution-mode-card.is-config-cards
-  .manager-resolution-option
-  input[type='radio'] {
-  align-self: center;
-  margin-top: 0;
-  border: 1px solid var(--fab-border-strong);
-  background: var(--fab-bg-1);
-}
-
-.fabricate-manager
-  .manager-checks-card
-  .manager-resolution-mode-card.is-config-cards
-  .manager-resolution-option
-  input[type='radio']:checked {
-  border: 4px solid var(--fab-accent);
-  box-shadow: none;
-}
-
-/* A named group's caption sits on the checks' micro-label gap above its cards. */
-.fabricate-manager
-  .manager-checks-card
-  .manager-resolution-mode-card.is-config-cards.is-legend-visible
-  .manager-resolution-mode-legend {
-  margin-bottom: var(--fab-space-chip);
 }
 
 .fabricate-manager .manager-checks-card .manager-resolution-option-name {
@@ -2076,7 +2043,7 @@
   min-width: 0;
 }
 
-/* The outcome row's own box: swatch, name, stepper, toggle and remove on ONE line inside one bordered card. Issue 1512 deleted this rule with the tier list it converted onto `SortableList`, but the outcome list in `CraftingCheckEditor.svelte` never converted and still draws these rows itself, so without it every child stacked unboxed at content width. The gap and padding sit on the scale (the deleted rule said 10px and 8px 11px). Scoped to the list's own children: the recipe tier rows in `CheckRecipeTiers.svelte` carry this class on a `.fabricate-sortable-list-row`, whose line already owns the box and the padding. skin census (issue 1523): a pinned carrier of the target tuple since issue 2005 moved its fill to `--fab-bg-1` — `tests/components/manager-checks-mounted.js` reads `.manager-checks-tier-row` by name. */
+/* The outcome row's own box: swatch, name, stepper, toggle and remove on ONE line inside one bordered card. Issue 1512 deleted this rule with the tier list it converted onto `SortableList`, but the outcome list in `CraftingCheckEditor.svelte` never converted and still draws these rows itself, so without it every child stacked unboxed at content width. The gap and padding sit on the scale (the deleted rule said 10px and 8px 11px). Scoped to the list's own children: the recipe tier rows in `CheckRecipeTiers.svelte` carry this class on a `.fabricate-sortable-list-row`, whose line already owns the box and the padding. skin census (issue 1523): a pinned carrier — `tests/components/manager-checks-mounted.js` reads `.manager-checks-tier-row` by name. */
 .fabricate-manager .manager-checks-tier-list > .manager-checks-tier-row {
   display: flex;
   align-items: center;
@@ -2135,7 +2102,7 @@
   flex: 0 0 26px;
 }
 
-/* The outcome list's own append action, which lives OUTSIDE that list so it is reachable from the zero state too (issue 1097 follow-up); full width, as the tier list's footer adder is. */
+/* The outcome list's own append action, which lives outside that list so it is reachable from the zero state too (issue 1097 follow-up); full width, as the tier list's footer adder is. */
 .fabricate-button.manager-button.manager-checks-outcome-add {
   width: 100%;
   margin-top: 6px;
@@ -2183,7 +2150,7 @@
   font-size: 9px;
 }
 
-/* A 12px ROUNDED SQUARE, which is what the prototype draws. The 50% dot this replaces was the same 12px key in a different shape. */
+/* A 9px circle, the prototype's tier key. */
 .fabricate-manager .manager-checks-tier-swatch {
   display: block;
   flex: 0 0 auto;
@@ -2238,7 +2205,7 @@
   width: 158px;
 }
 
-/* The studio's remove action: a subtle danger icon button, 28px square, not the manager's 34px `.manager-icon-button`. The converted tier list's delete is `SortableList`'s own since issue 1512; the outcome list in `CraftingCheckEditor.svelte` still draws this one. */
+/* The studio's remove action: a subtle danger icon button, 26px square, not the manager's 34px `.manager-icon-button`. The converted tier list's delete is `SortableList`'s own since issue 1512; the outcome list in `CraftingCheckEditor.svelte` still draws this one. */
 .fabricate-manager .manager-checks-tier-row .manager-checks-tier-remove,
 .fabricate-manager .manager-checks-trigger-head .manager-checks-trigger-remove {
   appearance: none;
@@ -7964,14 +7931,14 @@
   border: 0;
 }
 
-/* `legendVisible` PUTS THE GROUP'S OWN NAME BACK ON SCREEN (issue 1373). */
+/* `legendVisible` puts the group's own name back on screen (issue 1373), a chip gap above its cards as the Checks Studio prototype draws it. */
 .fabricate-option-cards.manager-resolution-mode-card.is-config-cards.is-legend-visible
   .manager-resolution-mode-legend {
   position: static;
   width: auto;
   height: auto;
   padding: 0;
-  margin: 0;
+  margin: 0 0 var(--fab-space-chip);
   overflow: visible;
   clip-path: none;
   white-space: normal;
@@ -7984,12 +7951,13 @@
   gap: var(--fab-space-3);
 }
 
+/* The library's `<OptionCards>` padding and radius. */
 .fabricate-option-cards.manager-resolution-mode-card.is-config-cards .manager-resolution-option {
   align-items: flex-start;
   gap: var(--fab-space-3);
   padding: var(--fab-space-3);
   border: 1px solid var(--fab-border);
-  border-radius: 10px;
+  border-radius: 11px;
   background: var(--fab-overlay-light-04);
 }
 
@@ -7999,9 +7967,7 @@
   box-shadow: none;
 }
 
-/* THE TILE IS A RUNG ABOVE THE CARD, NOT THE RAMP'S TOP. `proto:2637` fills this glyph `--bg2` — our `--fab-bg-1` — inside a card the same screen draws over a `--bg1` pane (issue 1373). */
-
-/* skin census (issue 1523): not an adopter — this tile's fill and border were taken TOGETHER from the prototype under issue 1373 as a component treatment, not a shared field/well rung; its tuple joins the card-skin census as a deferral. */
+/* The tile is a rung above the card, not the ramp's top. `proto:2637` fills this glyph `--bg2` — our `--fab-bg-1` — inside a card the same screen draws over a `--bg1` pane (issue 1373). The library's icon chip is a fill with no edge, so the border is transparent. */
 .fabricate-option-cards.manager-resolution-mode-card.is-config-cards .manager-resolution-option-icon {
   order: 1;
   flex: 0 0 40px;
@@ -8010,7 +7976,7 @@
   justify-content: center;
   width: 40px;
   height: 40px;
-  border: 1px solid var(--fab-border);
+  border: 1px solid transparent;
   border-radius: 9px;
   background: var(--fab-bg-1);
   color: var(--fab-accent);
@@ -8023,10 +7989,18 @@
   gap: var(--fab-space-1);
 }
 
+/* The Checks Studio prototype's radio, where the library's `<OptionCards>` draws none: a quiet ring at rest, a thick accent ring when chosen, centred on the card. */
 .fabricate-option-cards.manager-resolution-mode-card.is-config-cards .manager-resolution-option input[type='radio'] {
   order: 3;
-  align-self: flex-start;
-  margin-top: 0.1rem;
+  align-self: center;
+  margin-top: 0;
+  border: 1px solid var(--fab-border-strong);
+  background: var(--fab-bg-1);
+}
+
+.fabricate-option-cards.manager-resolution-mode-card.is-config-cards .manager-resolution-option input[type='radio']:checked {
+  border: 4px solid var(--fab-accent);
+  box-shadow: none;
 }
 
 @container (max-width: 620px) {

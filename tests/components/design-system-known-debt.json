@@ -226,7 +226,7 @@
     "src/ui/svelte/components/ThresholdBandStrip.svelte | border-radius | 3px | 1",
     "styles/fabricate.css | border-bottom-left-radius | 8px | 1",
     "styles/fabricate.css | border-bottom-right-radius | 8px | 1",
-    "styles/fabricate.css | border-radius | 10px | 10",
+    "styles/fabricate.css | border-radius | 10px | 9",
     "styles/fabricate.css | border-radius | 12px | 5",
     "styles/fabricate.css | border-radius | 13px | 1",
     "styles/fabricate.css | border-radius | 3px | 1",

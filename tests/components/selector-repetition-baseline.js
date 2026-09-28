@@ -8,7 +8,7 @@
  * not a thing that can be done. Keyed on the selector ALONE the sheet holds 215 repeated selectors
  * rather than these 106, and both figures are published so a reader can tell which produced a pin.
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 3,041 `(at-context, selector)` keys, of which 2,935 appear exactly
+ * Unfiltered, the sheet holds 3,039 `(at-context, selector)` keys, of which 2,933 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
@@ -19,7 +19,7 @@
  * variant and adds ListRow name/detail truncation, by `the sheet's cross-list selector repetition
  * does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
- * printed from. The sheet holds 2,541 rules at that head, 106 repeated keys and 217 appearances
+ * printed from. The sheet holds 2,539 rules at that head, 106 repeated keys and 217 appearances
  * between them; five keys appear three times and none appears four or more.
  * ISSUE 1510 PHASE 2 moves both the contextual figures and one repeated row. The component
  * studio conversion is already in main; the checks conversion adds two net rules and one net
@@ -195,10 +195,10 @@
  * sheet and one standalone-host rule arrives, leaving 2,526 rules, 3,026 keys and 2,920
  * singletons; the `.fabricate-roll-prompt__modifier-value` pair leaves the repeated table, now 106
  * keys and 217 appearances. Re-derived by running the same census command.
- * Issue 2005's Studio parity pass adds fifteen singleton rules — the outcome list's column head,
- * the option cards' radio, the formula card's body, the inset glyphs and the quick tokens' kind
- * glyph — leaving 2,541 rules, 3,041 keys and 2,935 singletons; the repeated table is unmoved.
- * Re-derived by running the same census command.
+ * Issue 2005's Studio parity pass adds thirteen singleton rules — the outcome list's column head,
+ * the option cards' checked radio, the formula card's body, the inset glyphs and the quick tokens'
+ * kind glyph — leaving 2,539 rules, 3,039 keys and 2,933 singletons; the repeated table is
+ * unmoved. Re-derived by running the same census command.
  */
 import { readFileSync } from 'node:fs';
 
