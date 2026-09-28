@@ -195,6 +195,10 @@ export const CHECK_ISSUE_LABELS = Object.freeze({
     'IssueCountRequiredExceedsBasePool',
     'The successes needed by {names} exceed the base pool of {base} dice, so an attempt succeeds only when dice explode or are added to the pool.',
   ],
+  countPoolTooLarge: [
+    'IssueCountPoolTooLarge',
+    "This check's base pool is more than the {max} dice Foundry can roll at once, so the check cannot roll. Use a smaller pool.",
+  ],
   countPathUnresolvedForPreview: [
     'IssueCountPathUnresolvedForPreview',
     '{actor} has no value at {path}, so this check cannot roll for them.',

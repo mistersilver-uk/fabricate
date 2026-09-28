@@ -339,6 +339,13 @@ describe('count odds', () => {
     assert.equal(odds.reason, ODDS_REASONS.countResidualTooLarge);
   });
 
+  it('refuses a pool above the dice Foundry rolls at once, as the runtime does', () => {
+    const draft = { thresholdMode: 'meet', evaluation: count({ die: 6, base: '1000', threshold: '5', required: 2 }), checkBreakage: { triggers: [] } };
+    const odds = oddsFor(plan({ draft, actor: null }));
+    assert.equal(odds.enumerable, false);
+    assert.equal(odds.reason, ODDS_REASONS.countPoolTooLarge);
+  });
+
   it('mixes a separately rolled pool bonus in exactly, and refuses one it cannot enumerate', () => {
     const system = (expression) => ({
       modifiers: [{ id: 'knack', label: 'Knack', expression }],

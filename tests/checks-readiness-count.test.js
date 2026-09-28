@@ -210,6 +210,23 @@ describe('count readiness raises each id with its copy, section and severity', (
     assert.ok(!/[-−]2 dice/.test(sentence), `no negative dice: ${sentence}`);
   });
 
+  it('countPoolTooLarge, for a literal base above the dice Foundry rolls at once', () => {
+    const result = evaluateCheckReadiness(check({ base: '1000', required: 1 }), { mode: 'progressive' });
+    assert.deepEqual(described(result, 'countPoolTooLarge'), {
+      severity: 'critical',
+      section: 'roll',
+      tick: null,
+      satisfied: null,
+      sentence:
+        "This check's base pool is more than the 999 dice Foundry can roll at once, so the check cannot roll. Use a smaller pool.",
+    });
+    assert.ok(!issue(result, 'countRequiredExceedsMaxPool'), 'no ceiling row for a pool that cannot roll');
+    for (const base of ['999', '@skills.smith.rank * 1000']) {
+      const fits = evaluateCheckReadiness(check({ base, required: 1 }), { mode: 'simple' });
+      assert.ok(!issue(fits, 'countPoolTooLarge'), `${base} raises nothing`);
+    }
+  });
+
   it('countRequiredExceedsBasePool, reachable once a ceiling rises above the base', () => {
     const requirements = [
       { defaultRecord: true, required: 2 },

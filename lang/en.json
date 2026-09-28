@@ -6348,6 +6348,7 @@
             "IssueCountTierWithoutSuccesses": "{names} set no successes needed, so they use the check's {required} and are no harder than the default. Set successes needed on each tier.",
             "IssueCountRequiredExceedsMaxPool": "The successes needed by {names} exceed the {ceiling} dice this check allows before any explode, so an attempt succeeds only when dice explode or are added. Lower the successes needed or allow more dice.",
             "IssueCountRequiredExceedsBasePool": "The successes needed by {names} exceed the base pool of {base} dice, so an attempt succeeds only when dice explode or are added to the pool.",
+            "IssueCountPoolTooLarge": "This check's base pool is more than the {max} dice Foundry can roll at once, so the check cannot roll. Use a smaller pool.",
             "IssueCountPathUnresolvedForPreview": "{actor} has no value at {path}, so this check cannot roll for them.",
             "IssueCountValueNotNumericForPreview": "The value this check reads from {actor} is not a number, so this check cannot roll for them.",
             "FaceKindExplode": "explode",
@@ -6577,7 +6578,8 @@
             "ReasonCountPathUnresolved": "{actor} has no value at {path}, so there is nothing to chart for them.",
             "ReasonCountValueNotNumeric": "A value this check reads from {actor} is not a number, so there is nothing to chart for them.",
             "ReasonCountResidualTooLarge": "These dice keep exploding too often to work every result out exactly, and an estimate here would be worse than none.",
-            "ReasonCountFaceTriggerNotEnumerable": "A trigger on this check reads individual dice in a way the chart cannot follow, so no odds are shown."
+            "ReasonCountFaceTriggerNotEnumerable": "A trigger on this check reads individual dice in a way the chart cannot follow, so no odds are shown.",
+            "ReasonCountPoolTooLarge": "This pool is more dice than Foundry can roll at once, so there is nothing to chart."
           },
           "Evaluation": {
             "DirectionTitle": "Which way is better",

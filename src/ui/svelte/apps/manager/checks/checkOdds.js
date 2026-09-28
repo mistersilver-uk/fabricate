@@ -49,6 +49,7 @@ export const ODDS_REASONS = Object.freeze({
   countValueNotNumeric: 'count-value-not-numeric',
   countResidualTooLarge: COUNT_ODDS_REASONS.residualTooLarge,
   countFaceTriggerNotEnumerable: 'count-face-trigger-not-enumerable',
+  countPoolTooLarge: 'pool-too-large',
 });
 
 /**

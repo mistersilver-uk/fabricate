@@ -123,6 +123,10 @@
       'FABRICATE.Admin.Manager.Checks.Odds.ReasonCountFaceTriggerNotEnumerable',
       'A trigger on this check reads individual dice in a way the chart cannot follow, so no odds are shown.',
     ],
+    [ODDS_REASONS.countPoolTooLarge]: [
+      'FABRICATE.Admin.Manager.Checks.Odds.ReasonCountPoolTooLarge',
+      'This pool is more dice than Foundry can roll at once, so there is nothing to chart.',
+    ],
   };
 
   const reasonNote = $derived.by(() => {

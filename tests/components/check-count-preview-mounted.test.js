@@ -219,6 +219,16 @@ describe('count odds and the simulator readout', () => {
     assert.equal(dots(), before, 'a transient warning puts no dot on a section');
   });
 
+  it('says why a pool above the dice Foundry rolls at once is not charted', async () => {
+    script([]);
+    const root = await mountSimple({ ...SMITHING, evaluation: pool({ base: '1000', required: 1 }), tiers: [] });
+    assert.equal(odds(root).dataset.checksOddsReason, 'pool-too-large');
+    assert.equal(
+      odds(root).textContent.trim(),
+      'This pool is more dice than Foundry can roll at once, so there is nothing to chart.'
+    );
+  });
+
   it('fails a zero pool without a tile or a Roll', async () => {
     const counted = script([]);
     const root = await mountSimple({

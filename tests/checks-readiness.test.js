@@ -622,6 +622,7 @@ describe('CHECK_READINESS_ISSUE_IDS is the source of truth for every issue id', 
       { mode: 'simple', activity: 'crafting' }
     );
     collect(count({ base: '2', required: 3 }), { mode: 'simple' });
+    collect(count({ base: '1000', required: 1 }), { mode: 'simple' });
     collect(count({ base: '@skills.smith.rank' }), {
       mode: 'simple',
       previewActor: { name: 'Vosk', rollData: {} },

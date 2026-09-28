@@ -8,7 +8,11 @@ import {
   resolveModifierPolicy,
 } from '../../../../../systems/checkModifierResolver.js';
 import { isValidTargetAdjustment } from '../../../../../systems/checkTarget.js';
-import { faceBeyondDie, resolvePool } from '../../../../../systems/countEvaluation.js';
+import {
+  faceBeyondDie,
+  MAX_COUNT_POOL,
+  resolvePool,
+} from '../../../../../systems/countEvaluation.js';
 import {
   normalizeCheckEvaluation,
   normalizeNullableAdjustment,
@@ -72,6 +76,7 @@ export const CHECK_READINESS_ISSUE_IDS = Object.freeze([
   'countTierWithoutSuccesses',
   'countRequiredExceedsMaxPool',
   'countRequiredExceedsBasePool',
+  'countPoolTooLarge',
   // Transient: they name the Preview-as actor and feed no badge, dot, tally or enable gate.
   'attributePathUnresolvedForPreview',
   'attributeValueNotNumeric',
@@ -130,6 +135,7 @@ export const CHECK_ISSUE_SECTIONS = Object.freeze({
   countTierWithoutSuccesses: 'roll',
   countRequiredExceedsMaxPool: 'roll',
   countRequiredExceedsBasePool: 'roll',
+  countPoolTooLarge: 'roll',
   attributePathUnresolvedForPreview: 'roll',
   attributeValueNotNumeric: 'roll',
   countPathUnresolvedForPreview: 'roll',
@@ -505,8 +511,11 @@ function literalBaseDice(evaluation, thresholdMode) {
   return resolvePool({ evaluation: { ...evaluation, pool }, thresholdMode, placement });
 }
 
-/** Recipe tiers set their own successes, and a literal base pool can meet every required count. */
-function countRequiredReadiness(result, check, evaluation, { activity, thresholdMode }) {
+/**
+ * Recipe tiers set their own successes, and a literal base pool can meet every required count.
+ * `literal` is the base's settled read, or null when the base reads the character or is faulted.
+ */
+function countRequiredReadiness(result, check, evaluation, { activity, literal }) {
   const { pool } = evaluation;
   const tiers = activity === 'crafting' && Array.isArray(check?.tiers) ? check.tiers : [];
   const tierRequired = tiers.map((tier) => ({
@@ -527,9 +536,8 @@ function countRequiredReadiness(result, check, evaluation, { activity, threshold
     result.checks.push({ id: 'countPoolCharacterDependent', satisfied: true });
     return;
   }
-  const read = literalBaseDice(evaluation, thresholdMode);
-  if (!read.ok) return;
-  const base = read.policy.dice;
+  if (!literal?.ok) return;
+  const base = literal.policy.dice;
   const requirements = [
     { defaultRecord: true, required: pool.required },
     ...tierRequired.map((tier) => ({ name: tier.name, required: tier.successes ?? pool.required })),
@@ -582,9 +590,13 @@ function countReadiness(result, check, evaluation, { mode, activity, previewActo
   result.checks.push({ id: 'countThresholdReadable', satisfied: !thresholdFault });
   if (thresholdFault) pushIssue(result.issues, 'countThresholdInvalid', 'critical');
   countFaceReadiness(result, evaluation, thresholdMode);
+  const literal =
+    baseFault || readsCharacter(base) ? null : literalBaseDice(evaluation, thresholdMode);
+  if (literal?.reason === 'pool-too-large') {
+    pushIssue(result.issues, 'countPoolTooLarge', 'critical', { max: MAX_COUNT_POOL });
+  }
   const gradesRequired = mode === 'simple' || (mode === 'routed' && check?.type !== 'fixed');
-  if (gradesRequired)
-    countRequiredReadiness(result, check, evaluation, { activity, thresholdMode });
+  if (gradesRequired) countRequiredReadiness(result, check, evaluation, { activity, literal });
   if (previewActor && !baseFault && !thresholdFault) {
     previewActorPoolWarnings(result.transient, evaluation, thresholdMode, previewActor);
   }
