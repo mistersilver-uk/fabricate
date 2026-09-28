@@ -1588,7 +1588,7 @@ describe('Tool Studio editor (mounted)', () => {
     );
     assert.equal(
       root.querySelector('[data-tool-bonus-note]').textContent.trim(),
-      'Applied to the crafting check as @prof.',
+      'Applies @prof to any check this tool is used for, in the way that check applies bonuses.',
       '`proto:4755`'
     );
   });
@@ -1609,6 +1609,34 @@ describe('Tool Studio editor (mounted)', () => {
       'Nothing is added to the check until you pick a modifier.',
       '`proto:4755`'
     );
+  });
+
+  // ── WHERE THE BONUS LANDS (issue 2005): a benefit, per kind of check ───────────────────────
+  it('previews the bonus as a benefit for each kind of check, and updates with the pick', async () => {
+    const rows = (root) =>
+      [...root.querySelectorAll('[data-tool-bonus-behaviour-row]')].map((row) => [
+        row.dataset.toolBonusBehaviourRow,
+        row.querySelector('dt').textContent.trim(),
+        row.querySelector('dd').textContent.trim(),
+      ]);
+    const root = await harness.mount(
+      props({ activeTab: 'requirements', tool: tool({ bonus: { enabled: true, expression: '2' } }) })
+    );
+    assert.deepEqual(rows(root), [
+      ['sum-over', 'Adds the dice', '+2 to the total'],
+      ['sum-under', 'Lower is better', '+2 to the target'],
+      ['count', 'Counts successes', 'moves the threshold +2, or adds +2 dice, as the check routes it'],
+    ]);
+
+    await harness.setProps({ tool: tool({ bonus: { enabled: true, expression: '@prof' } }) });
+    assert.equal(
+      root.querySelector('[data-tool-bonus-behaviour-row="sum-under"] dd').textContent.trim(),
+      '@prof to the target',
+      'an expression is named as written'
+    );
+
+    await harness.setProps({ tool: tool({ bonus: { enabled: true, expression: '' } }) });
+    assert.ok(!root.querySelector('[data-tool-bonus-behaviour]'), 'no bonus, no preview');
   });
 
   // ── AN EXPRESSION THE LIBRARY DOES NOT CONTAIN IS NOT DISCARDED ──────────────────────────

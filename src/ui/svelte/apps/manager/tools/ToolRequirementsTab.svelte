@@ -47,7 +47,7 @@
   import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
   import ModifierLibraryRow from '../ModifierLibraryRow.svelte';
   import ToolInheritCard from './ToolInheritCard.svelte';
-  import { toolWorldDefaultFact } from './toolStudio.js';
+  import { projectToolBonusBehaviour, toolWorldDefaultFact } from './toolStudio.js';
 
   // The row standing for an authored expression the library does not contain: a RADIO VALUE, never
   // a persisted id, spelled so no library entry can collide with it.
@@ -91,7 +91,7 @@
     const template = localize(key);
     if (template && template !== key) return localize(key, data);
     return Object.entries(data).reduce(
-      (copy, [name, value]) => copy.replace(`{${name}}`, String(value)),
+      (copy, [name, value]) => copy.replaceAll(`{${name}}`, String(value)),
       fallback
     );
   }
@@ -162,13 +162,15 @@
       ? formattedText(
           'FABRICATE.Admin.Manager.Tools.Editor.BonusApplied',
           { expression: bonus.expression },
-          'Applied to the crafting check as {expression}.'
+          'Applies {expression} to any check this tool is used for, in the way that check applies bonuses.'
         )
       : text(
           'FABRICATE.Admin.Manager.Tools.Editor.BonusUnset',
           'Nothing is added to the check until you pick a modifier.'
         )
   );
+  const bonusBehaviour = $derived(projectToolBonusBehaviour(bonus.expression, text, formattedText));
+
   function chooseBonusModifier(value) {
     // The custom row is already the selected one, so re-selecting it is a no-op rather than a
     // write: it carries no library entry to read an expression off.
@@ -395,7 +397,7 @@
     title={text('FABRICATE.Admin.Manager.Tools.Editor.BonusToCheck', 'Bonus to the check')}
     subtitle={text(
       'FABRICATE.Admin.Manager.Tools.Editor.BonusToCheckHint',
-      'What using this Tool adds to the crafting check, if anything.'
+      'What using this Tool contributes to a check, if anything.'
     )}
     control={member ? undefined : bonusSwitch}
     inheritable={member}
@@ -497,6 +499,22 @@
           </Field>
         {/if}
         <p class="manager-tool-requirements-summary" data-tool-bonus-note>{bonusNote}</p>
+        {#if bonusBehaviour.length > 0}
+          <p class="manager-kicker manager-tool-bonus-behaviour-kicker">
+            {text('FABRICATE.Admin.Manager.Tools.Editor.BehaviourPreview', 'Behaviour preview')}
+          </p>
+          <dl class="manager-tool-bonus-behaviour" data-tool-bonus-behaviour>
+            {#each bonusBehaviour as entry (entry.id)}
+              <div
+                class="manager-tool-bonus-behaviour-row"
+                data-tool-bonus-behaviour-row={entry.id}
+              >
+                <dt>{entry.label}</dt>
+                <dd>{entry.value}</dd>
+              </div>
+            {/each}
+          </dl>
+        {/if}
       {:else}
         <p class="manager-tool-requirements-summary" data-tool-bonus-off>
           {text(
@@ -548,6 +566,39 @@
      marks where the world's library begins rather than heading a question the way
      `Which prerequisites` does. `margin: 0` stays, because the section's own flex gap is already
      the reference's step and the shared class adds to it. */
+  .manager-tool-bonus-behaviour-kicker,
+  .manager-tool-bonus-behaviour {
+    margin: 0;
+  }
+
+  .manager-tool-bonus-behaviour {
+    border: 1px solid var(--fab-border);
+    border-radius: 9px;
+    overflow: hidden;
+  }
+
+  .manager-tool-bonus-behaviour-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    gap: var(--fab-space-3);
+    padding: var(--fab-space-2) var(--fab-space-3);
+    font-size: 0.66rem;
+  }
+
+  .manager-tool-bonus-behaviour-row + .manager-tool-bonus-behaviour-row {
+    border-top: 1px solid var(--fab-border);
+  }
+
+  .manager-tool-bonus-behaviour-row dt {
+    color: var(--fab-text-muted);
+  }
+
+  .manager-tool-bonus-behaviour-row dd {
+    margin: 0;
+    color: var(--fab-text);
+    font-weight: 600;
+  }
+
   .manager-tool-bonus-kicker {
     display: flex;
     gap: var(--fab-space-2);

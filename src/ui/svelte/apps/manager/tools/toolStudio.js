@@ -210,13 +210,53 @@ export function projectToolBehaviorFacts(
       title: bonusTitle,
       value: bonusTitle,
       subtitle: tool?.bonus?.enabled
-        ? text('FABRICATE.Admin.Manager.Tools.Editor.PreviewBonus', 'Added to the crafting check')
+        ? text(
+            'FABRICATE.Admin.Manager.Tools.Editor.PreviewBonus',
+            'Applies to any check this tool is used for, in the way that check applies bonuses.'
+          )
         : text(
             'FABRICATE.Admin.Manager.Tools.Editor.PreviewNoBonus',
             'Adds nothing to the crafting check'
           ),
     },
   ];
+}
+
+/**
+ * Where a Tool's check bonus lands in each kind of check, as `{ id, label, value }` rows: a bonus
+ * is a benefit, so a summed roll-high check adds it to the total, a roll-under check raises its
+ * target, and a counted check moves its threshold or dice. Empty when no expression is set; a bare
+ * number reads signed.
+ */
+export function projectToolBonusBehaviour(rawExpression, text, format) {
+  const raw = String(rawExpression ?? '').trim();
+  if (!raw) return [];
+  const expression = /^\d/.test(raw) ? `+${raw}` : raw;
+  const rows = [
+    [
+      'sum-over',
+      ['FABRICATE.Admin.Manager.Tools.Editor.BehaviourSumOver', 'Adds the dice'],
+      ['FABRICATE.Admin.Manager.Tools.Editor.BehaviourSumOverValue', '{expression} to the total'],
+    ],
+    [
+      'sum-under',
+      ['FABRICATE.Admin.Manager.Tools.Editor.BehaviourSumUnder', 'Lower is better'],
+      ['FABRICATE.Admin.Manager.Tools.Editor.BehaviourSumUnderValue', '{expression} to the target'],
+    ],
+    [
+      'count',
+      ['FABRICATE.Admin.Manager.Tools.Editor.BehaviourCount', 'Counts successes'],
+      [
+        'FABRICATE.Admin.Manager.Tools.Editor.BehaviourCountValue',
+        'moves the threshold {expression}, or adds {expression} dice, as the check routes it',
+      ],
+    ],
+  ];
+  return rows.map(([id, [labelKey, label], [valueKey, value]]) => ({
+    id,
+    label: text(labelKey, label),
+    value: format(valueKey, { expression }, value),
+  }));
 }
 
 const VALIDATION_ERROR_PROJECTIONS = [

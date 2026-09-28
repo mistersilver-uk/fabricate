@@ -1096,7 +1096,7 @@ describe('the world Tool entry (issue 1373)', () => {
       );
       assert.equal(
         target.querySelector('[data-tool-bonus-note]').textContent.trim(),
-        'Applied to the crafting check as @prof.'
+        'Applies @prof to any check this tool is used for, in the way that check applies bonuses.'
       );
 
       rows[1].querySelector('input[type="radio"]').click();

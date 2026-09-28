@@ -112,8 +112,7 @@
       labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyAddAll',
       fallback: 'Add all',
       descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyAddAllDesc',
-      descFallback:
-        'Every modifier you mark applied is summed into the roll — nothing is chosen at the table.',
+      descFallback: 'Every modifier marked applied reaches the check.',
     },
     {
       value: 'highest',
@@ -122,7 +121,7 @@
       fallback: 'Highest',
       descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHighestDesc',
       descFallback:
-        'The modifiers you mark considered are compared and only the largest is added — a deterministic maximum.',
+        'The modifiers marked considered are compared by value and only the largest applies.',
     },
     {
       value: 'bySubject',
@@ -156,7 +155,7 @@
       key: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilityConsidered',
       label: 'Considered',
       leadKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilityIntroHighest',
-      lead: 'Mark which of the system’s modifiers are compared — only the largest of them is added.',
+      lead: 'Mark which of the system’s modifiers are compared — only the largest of them applies.',
     },
     playerPicks: {
       key: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilitySelectable',
@@ -203,7 +202,7 @@
     noFormula: {
       key: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierInertNoFormula',
       fallback:
-        'The check for this resolution mode has no roll formula yet, so nothing here is rolled. Author one on The roll section and these modifiers are added to it automatically.',
+        'The check for this resolution mode has no roll formula yet, so nothing here is rolled. Author one on The roll section and these modifiers apply to it automatically.',
     },
     // GATHERING d100 ONLY, because `noCheck` is FALSE here: the drop-chance roll IS this mode's
     // check, lacking only a seam for modifiers.
@@ -462,12 +461,12 @@
           {#if boundsFault(modifier) === 'inverted'}
             {text(
               'FABRICATE.Admin.Manager.Checks.Crafting.ModifierBoundsInverted',
-              'This modifier’s minimum is above its maximum, so it adds nothing to the roll until you fix the two values.'
+              'This modifier’s minimum is above its maximum, so it contributes nothing until you fix the two values.'
             )}
           {:else}
             {text(
               'FABRICATE.Admin.Manager.Checks.Crafting.ModifierBoundsUnsafe',
-              'This modifier’s bound is too large or too small to appear in a roll formula, so it adds nothing to the roll until you fix it.'
+              'This modifier’s bound is too large or too small to appear in a roll formula, so it contributes nothing until you fix it.'
             )}
           {/if}
         </p>
@@ -499,7 +498,7 @@
       <p class="manager-checks-card-description">
         {text(
           'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyLead',
-          'Which of the named modifiers reach the roll, and how they are added up.'
+          'Which of the named modifiers reach the check, and how they combine.'
         )}
       </p>
     </div>

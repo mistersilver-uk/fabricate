@@ -267,7 +267,7 @@
             selectedEntry.defaults?.bonus?.enabled === true
               ? text(
                   'FABRICATE.Admin.Manager.Tools.Editor.PreviewBonus',
-                  'Added to the crafting check'
+                  'Applies to any check this tool is used for, in the way that check applies bonuses.'
                 )
               : text(
                   'FABRICATE.Admin.Manager.Tools.Editor.PreviewNoBonus',
