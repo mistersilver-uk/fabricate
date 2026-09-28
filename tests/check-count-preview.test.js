@@ -391,11 +391,12 @@ describe('the count readout', () => {
     );
     assert.equal(readout.count.faces.length, result.data.diceGroups[0].results.length);
     assert.equal(readout.count.faces[1].label, '10, qualified and exploded');
-    assert.equal(readout.total, 2);
+    assert.deepEqual([readout.total, readout.totalValue], ['2', 2]);
+    assert.deepEqual(readout.medallion, { value: '2', caption: 'net' });
     assert.equal(readout.breakdown, '4 qualified − 2 cancelled = 2 net');
-    assert.equal(readout.marginLabel, '2 needed · margin +0', 'a zero margin is signed');
-    assert.equal(readout.bandName, 'Success');
-    assert.equal(readout.bandDetail, 'The result group is produced.');
+    assert.equal(readout.targetLine, 'needs 2 · margin +0', 'a zero margin is signed');
+    assert.equal(readout.card.title, 'Success');
+    assert.equal(readout.card.detail, 'The recipe’s result group is produced');
     assert.equal(readout.hasFormula, true);
   });
 
@@ -451,17 +452,18 @@ describe('the count readout', () => {
       plan({ draft, activity: 'gathering', mode: 'routed', actor: null }),
       [2, 4, 6]
     );
-    assert.equal(readout.total, -3);
-    assert.equal(readout.count.shownTotal, '−3');
+    assert.deepEqual([readout.total, readout.totalValue], ['−3', -3]);
+    assert.equal(readout.medallion.value, '−3', 'the true minus (M4)');
     assert.equal(readout.count.botch, true);
     assert.deepEqual(readout.count.faces.map((tile) => tile.marks.join(' ')), ['cancelled', 'cancelled', 'cancelled']);
-    assert.equal(readout.bandDetail, 'Botched. Nothing is produced; the failure policy applies.');
-    assert.equal(readout.bandName, 'Botch', 'named as the odds panel names it, not as its band');
+    assert.equal(readout.card.detail, 'Net below zero');
+    assert.equal(readout.card.title, 'Botch', 'named as the odds panel names it, not as its band');
     assert.equal(
-      readout.marginLabel,
-      '1 needed · a net below zero is a botch',
+      readout.targetLine,
+      'needs 1 · a net below zero is a botch',
       "the record's count, not the Failure tier's 0 the net graded into"
     );
+    assert.equal(readout.marginKind, 'botch');
   });
 
   it('keeps a rescued botch’s success copy, the net-below-zero fact still marked', async () => {
@@ -469,10 +471,11 @@ describe('the count readout', () => {
     const draft = { ...SMITHING, checkBreakage: { triggers: [rescue] } };
     const { readout } = await rolled(plan({ draft }), [1, 1, 1, 1, 1, 1]);
     assert.equal(readout.count.botch, true, 'the net is below zero');
-    assert.equal(readout.bandSuccess, true);
-    assert.equal(readout.bandName, 'Success');
-    assert.equal(readout.bandDetail, 'The result group is produced.');
-    assert.equal(readout.marginLabel, '2 needed · margin −8', 'the normal line, naming no botch');
+    assert.equal(readout.card.tone, 'success');
+    assert.equal(readout.card.title, 'Success');
+    assert.equal(readout.card.detail, 'The recipe’s result group is produced');
+    assert.equal(readout.targetLine, 'needs 2 · margin −8', 'the normal line, naming no botch');
+    assert.equal(readout.marginKind, 'margin');
   });
 
   it('fails a zero pool with no tiles, no total and no Roll', async () => {
@@ -485,18 +488,24 @@ describe('the count readout', () => {
     assert.equal(constructed.length, 0, 'nothing was rolled');
     assert.equal(readout.count.zeroPool, true);
     assert.deepEqual(readout.count.faces, []);
-    assert.equal(readout.total, null);
-    assert.equal(readout.bandSuccess, false);
+    assert.deepEqual(readout.medallion, { value: '0', caption: 'net' });
+    assert.equal(readout.breakdown, 'pool reduced to 0');
+    assert.equal(readout.targetLine, 'needs 1 · margin −1');
+    assert.deepEqual(readout.note, {
+      kind: 'zero-pool',
+      text: 'The pool was reduced to zero, so the check fails automatically.',
+    });
+    assert.deepEqual([readout.card.tone, readout.card.title], ['danger', 'Failure']);
   });
 
   it('shows a progressive pool’s raw net and awards what is left above zero', async () => {
     const draft = { evaluation: count({ die: 6, base: '2', threshold: '7', required: 1, cancel: WORST }), checkBreakage: { triggers: [] } };
     const { readout } = await rolled(plan({ draft, mode: 'progressive', actor: null }), [1, 3]);
-    assert.equal(readout.total, -1);
-    assert.equal(readout.bandName, 'Awards 0');
-    assert.equal(readout.marginLabel, '', 'a progressive check grades no required count');
+    assert.equal(readout.totalValue, -1);
+    assert.equal(readout.card.title, 'Awards 0', 'with no typed difficulty list');
+    assert.equal(readout.targetLine, 'value spent', 'a progressive check grades no required count');
     assert.equal(
-      readout.bandDetail,
+      readout.card.detail,
       'The value is spent down the recipe’s ordered results, each costing its own difficulty.',
       'a progressive net below zero keeps its award detail'
     );
