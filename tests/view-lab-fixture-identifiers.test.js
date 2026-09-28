@@ -300,7 +300,11 @@ function fixtureFunction(file, name, dependencies = {}) {
 
 function journalFixture(state) {
   const seeded = structuredClone(buildLabContent({ journalCaseState: state }));
-  const mode = { 'gathering-straight': 'straight', 'gathering-check': 'routed' }[state];
+  const mode = {
+    'gathering-straight': 'straight',
+    'gathering-check': 'routed',
+    'gathering-journal-check-prompt': 'routed-under',
+  }[state];
   if (mode) {
     fixtureFunction('./view-lab/world/labWorld.js', 'seedGatheringTaskMode', { LAB_SYSTEM_IDS })(
       seeded,

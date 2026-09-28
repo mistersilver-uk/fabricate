@@ -7,6 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { craftProbe, probeResolutionService, salvageProbe } from './helpers/craftPipelineProbe.js';
+import { promptJournalStageCheck } from '../src/bootstrap/journalOperations.js';
 import { BulkSalvageService } from '../src/systems/BulkSalvageService.js';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { GatheringEngine } from '../src/systems/GatheringEngine.js';
@@ -686,6 +687,118 @@ test('the gathering versioned descriptor refuses a target and captures a resolve
     [15, 15, 'fixed']
   );
   assert.equal(fixed.flavor, 'Forage — Gathering check (DC 15)');
+});
+
+test('the gathering versioned descriptor names a roll-under target and its character-value basis', () => {
+  const engine = new GatheringEngine({ localize: (key) => key });
+  const { system, environment, task } = gatheringFixture({ mode: 'routed' });
+  const describe = (evaluation, actor) => {
+    Object.assign(system.gatheringCraftingCheck.routed, { evaluation });
+    return engine._versionedCheckDescriptor({
+      actor,
+      run: { taskId: task.id },
+      system,
+      environment,
+      task: { ...task, resolutionMode: 'routed', adjustmentOverride: -2 },
+    }).publicPrompt;
+  };
+
+  const fixed = describe(SUM_UNDER, { uuid: 'Actor.g', system: {} });
+  assert.deepEqual(
+    [fixed.target, fixed.direction, fixed.comparison, fixed.targetBasis, fixed.toolBonus],
+    [15, 'under', 'meet', null, 0],
+    'the routed anchor names a roll-under target with no character-value basis'
+  );
+
+  const under = attribute('@skills.craft.value', { direction: 'under', adjustmentKind: 'add' });
+  const named = describe(under, { uuid: 'Actor.g', getRollData: () => ({ skills: SKILLS }) });
+  assert.equal(named.target, 12, '14 from @skills.craft.value, minus 2 from the task override');
+  assert.equal(named.direction, 'under');
+  assert.deepEqual(named.targetBasis, {
+    expression: '@skills.craft.value',
+    value: 14,
+    adjustment: { kind: 'add', value: -2, label: '' },
+  });
+  assert.equal(named.toolBonus, 0, 'gathering has no tool-bonus seam');
+
+  const over = describe({ product: 'sum', direction: 'over' }, { uuid: 'Actor.g', system: {} });
+  assert.deepEqual(
+    [over.target, over.direction, over.targetBasis],
+    [15, 'over', undefined],
+    'a roll-over check names its target but no roll-under basis'
+  );
+});
+
+test('the gathering versioned descriptor keeps a hidden task and a fixed-range check silent', () => {
+  const engine = new GatheringEngine({ localize: (key) => key });
+  const { system, environment, task } = gatheringFixture({ mode: 'routed' });
+  Object.assign(system.gatheringCraftingCheck.routed, { evaluation: SUM_UNDER });
+  const bare = { uuid: 'Actor.g', system: {} };
+
+  const hidden = engine._versionedCheckDescriptor({
+    actor: bare,
+    run: { taskId: `blind:${environment.id}` },
+    system,
+    environment,
+    task: { ...task, resolutionMode: 'routed' },
+  }).publicPrompt;
+  assert.equal(hidden.target, null, 'a hidden task names no target');
+  assert.equal(hidden.direction, null);
+  assert.equal(hidden.comparison, null);
+  assert.ok(!Object.hasOwn(hidden, 'targetBasis'), 'a hidden task carries no basis field either');
+
+  const fixedRangeSystem = {
+    ...system,
+    gatheringCraftingCheck: {
+      ...system.gatheringCraftingCheck,
+      routed: { ...system.gatheringCraftingCheck.routed, type: 'fixed' },
+    },
+  };
+  const fixedRange = engine._versionedCheckDescriptor({
+    actor: bare,
+    run: { taskId: task.id },
+    system: fixedRangeSystem,
+    environment,
+    task: { ...task, resolutionMode: 'routed' },
+  }).publicPrompt;
+  assert.equal(fixedRange.target, null, 'a fixed-range routed check grades the raw roll, not a target');
+  assert.equal(fixedRange.direction, null);
+  assert.equal(fixedRange.comparison, null);
+});
+
+test('a Journal-prompted roll-under gathering check shows its target chip and roll-under help', async () => {
+  const engine = new GatheringEngine({ localize: (key) => key });
+  const { system, environment, task } = gatheringFixture({ mode: 'routed' });
+  Object.assign(system.gatheringCraftingCheck.routed, {
+    evaluation: attribute('@skills.craft.value', { direction: 'under', adjustmentKind: 'add' }),
+  });
+  const descriptor = engine._versionedCheckDescriptor({
+    actor: { uuid: 'Actor.g', name: 'Scavenger', getRollData: () => ({ skills: SKILLS }) },
+    run: { taskId: task.id },
+    system,
+    environment,
+    task: { ...task, resolutionMode: 'routed', adjustmentOverride: -2 },
+  });
+  const surface = stubPromptSurface(() => null);
+  try {
+    await promptJournalStageCheck({
+      subject: descriptor.publicPrompt.label,
+      actorName: 'Scavenger',
+      formula: '1d20',
+      resolvedFormula: '1d20',
+      displayFormula: '1d20',
+      ...descriptor.publicPrompt,
+    });
+  } finally {
+    surface.restore();
+  }
+  const { chipText, source } = rollPromptTarget(surface.view, []);
+  assert.equal(chipText, 'Target 12 · stay at or under');
+  assert.equal(source, '@skills.craft.value 14 · difficulty -2');
+  assert.equal(
+    surface.view.labels.bonusHelp,
+    'A bonus raises the target. A rolled bonus such as 1d4 is rolled first, and its result is applied.'
+  );
 });
 
 // ── the prepared evaluator ────────────────────────────────────────────────────

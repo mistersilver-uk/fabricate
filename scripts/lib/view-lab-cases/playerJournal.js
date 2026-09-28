@@ -135,6 +135,34 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/crafting\/(?:RollPrompt(?:Target)?\.svelte|rollPrompt(?:Target)?\.js)$/,
     ],
   }),
+  playerCase({
+    id: 'player-gathering-journal-check-roll-prompt',
+    label: 'Player Journal — versioned gathering roll-under check prompt',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: {
+      tab: 'journal',
+      journalCaseState: 'gathering-journal-check-prompt',
+      gatheringTaskMode: 'routed-under',
+      dialog: 'open',
+    },
+    steps: [
+      { selector: '[data-run-id="lab-v1-gathering-journal-check-prompt"]' },
+      { selector: '[data-journal-detail] [data-run-action="primary"]' },
+    ],
+    expectTab: 'journal',
+    expectSelector:
+      '.fabricate-app .manager-modal[data-roll-prompt="single"]' +
+      ':has(.manager-modal-subtitle:has-text("Tend the Slow Bloom"))' +
+      ':has(.target-row > .manager-chip[data-roll-prompt-target="under"]:has-text("Target 2 · stay at or under"))',
+    kinds: ['player', 'journal', 'gathering'],
+    sourceMatches: [
+      JOURNAL_SOURCES,
+      /^src\/bootstrap\/journalOperations\.js$/,
+      /^src\/systems\/GatheringEngine\.js$/,
+      /^src\/ui\/svelte\/apps\/crafting\/(?:RollPrompt(?:Target)?\.svelte|rollPrompt(?:Target)?\.js)$/,
+    ],
+  }),
   ...journalBlindRunCases(),
   ...journalLifecycleCases(),
   ...journalHistoryBatchCases(),

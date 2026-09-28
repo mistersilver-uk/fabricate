@@ -27,7 +27,7 @@ const FABRICATE_NAMESPACE = 'fabricate';
 // These variants change persisted authoring before the real services initialize. The default
 // world remains unchanged, including every existing d100 editor and gathering screenshot.
 function seedGatheringTaskMode(content, mode) {
-  if (!['straight', 'routed', 'routed-unmatched'].includes(mode)) return;
+  if (!['straight', 'routed', 'routed-under', 'routed-unmatched'].includes(mode)) return;
   const system = content.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.HERBALISM);
   const slice = content.gatheringConfig.systems[LAB_SYSTEM_IDS.HERBALISM];
   const task = structuredClone(slice.tasks.find((entry) => entry.id === 'hb-task-slowbloom'));
@@ -39,19 +39,38 @@ function seedGatheringTaskMode(content, mode) {
       results: [{ id: 'lab-gathering-emberbloom', componentId: 'hb-emberbloom', quantity: 2 }],
     },
   ];
+  // `routed-under`: issue 2073, a roll-under target read from Brenna's Intelligence, difficulty -1.
+  if (mode === 'routed-under') task.adjustmentOverride = -1;
   if (mode !== 'straight') {
     system.gatheringCraftingCheck = {
       ...system.gatheringCraftingCheck,
-      routed: {
-        rollFormula: '1d20',
-        dc: 15,
-        type: 'relative',
-        thresholdMode: 'meet',
-        relativeOutcomes: [
-          { id: 'lab-abundant', name: 'Abundant', success: true, dc: 0 },
-          { id: 'lab-failed', name: 'Failed', success: false, dc: -15 },
-        ],
-      },
+      routed:
+        mode === 'routed-under'
+          ? {
+              rollFormula: '1d20',
+              dc: 15,
+              type: 'relative',
+              thresholdMode: 'meet',
+              evaluation: {
+                product: 'sum',
+                direction: 'under',
+                target: { source: 'attribute', expression: '@abilities.int.mod' },
+              },
+              relativeOutcomes: [
+                { id: 'lab-abundant', name: 'Abundant', success: true, dc: 0 },
+                { id: 'lab-failed', name: 'Failed', success: false, dc: -15 },
+              ],
+            }
+          : {
+              rollFormula: '1d20',
+              dc: 15,
+              type: 'relative',
+              thresholdMode: 'meet',
+              relativeOutcomes: [
+                { id: 'lab-abundant', name: 'Abundant', success: true, dc: 0 },
+                { id: 'lab-failed', name: 'Failed', success: false, dc: -15 },
+              ],
+            },
     };
   }
   const replaceTask = (entry) => (entry.id === task.id ? task : entry);
