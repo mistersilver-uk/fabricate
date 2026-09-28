@@ -250,6 +250,38 @@ describe('ChecksValidationTab (mounted)', () => {
     harness.remount();
   });
 
+  it('lists a transient warning naming the Preview-as actor without counting it (issue 2003)', async () => {
+    const section = {
+      subsystem: 'crafting',
+      mode: 'routed',
+      check: {
+        type: 'relative',
+        rollFormula: '1d100',
+        evaluation: {
+          product: 'sum',
+          direction: 'under',
+          target: { source: 'attribute', expression: '@skills.craft.value', adjustmentKind: 'add' },
+        },
+        relativeOutcomes: [{ id: 'a', name: 'Success', success: true, dc: 0 }],
+      },
+    };
+    const without = await harness.mount({ sections: [section] });
+    const counted = railCounts(without);
+    assert.ok(!without.querySelector('[data-issue-transient]'), 'no actor, no warning');
+    harness.remount();
+
+    const target = await harness.mount({
+      sections: [section],
+      previewActor: { name: 'Vosk', rollData: {} },
+    });
+    const row = target.querySelector('[data-issue="attributePathUnresolvedForPreview"]');
+    assert.ok(Boolean(row), 'the warning is listed');
+    assert.ok(row.hasAttribute('data-issue-transient'), 'and marked transient');
+    assert.match(row.textContent, /"actor":"Vosk","path":"@skills\.craft\.value"/, 'naming them');
+    assert.deepEqual(railCounts(target), counted, 'the tally is what it was with no actor');
+    harness.remount();
+  });
+
   it('deep-links each issue to the ACTIVITY and the SECTION that owns its control', async () => {
     // The whole point of rebuilding on the shared surface. A GM who reads "no roll formula"
     // on this route has to get to the control that fixes it, and the section is half of

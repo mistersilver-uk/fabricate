@@ -899,6 +899,173 @@ describe('the progressive PREVIEW SANDBOX', () => {
   // The field's "keeps the GM's own text" guard is NOT graded here.
 });
 
+describe('roll-under preview, odds and readiness (issue 2003)', () => {
+  // Sera's `@prof + 9` is 12; the tiers route at or under 12 (Regular) and 6 (Hard).
+  const UNDER_ROUTED = {
+    ...ROUTED_CHECK,
+    rollFormula: '1d20',
+    evaluation: {
+      product: 'sum',
+      direction: 'under',
+      target: {
+        source: 'attribute',
+        expression: '@prof + 9',
+        adjustmentKind: 'multiply',
+        baseAdjustment: 1,
+      },
+    },
+    relativeOutcomes: [
+      { id: 'otherwise', name: 'Otherwise', adjustment: null, success: false },
+      { id: 'regular', name: 'Regular', adjustment: 1, success: true },
+      { id: 'hard', name: 'Hard', adjustment: 0.5, success: true },
+    ],
+    tiers: [],
+  };
+  const odds = (root) => root.querySelector('[data-checks-odds-state]');
+  const rollButton = (root) => root.querySelector('[data-checks-simulator-roll]');
+
+  it('abstains with no actor, then charts worst to best once one is chosen', async () => {
+    const root = await mountChecks({ craftingCheck: UNDER_ROUTED });
+    assert.equal(odds(root).dataset.checksOddsReason, 'needs-preview-actor');
+    assert.match(odds(root).textContent, /nothing to chart without one/);
+    const hint = root.querySelector('[data-checks-simulator-state="needs-preview-actor"]');
+    assert.equal(
+      hint?.textContent.trim(),
+      'Choose a character who has every value this check reads, then roll.'
+    );
+    assert.equal(rollButton(root).disabled, true, 'Roll is disabled while abstaining');
+    assert.equal(
+      root.querySelector('[data-checks-preview-actor-summary]').textContent.trim(),
+      'No actor chosen. Values read from a character are not charted.'
+    );
+
+    await choosePreviewActor(root, 'sera');
+    assert.equal(odds(root).dataset.checksOddsState, 'enumerated');
+    assert.equal(odds(root).dataset.checksOddsDirection, 'under');
+    assert.deepEqual(
+      [...root.querySelectorAll('[data-checks-odds-percent]')].map((cell) => [
+        cell.dataset.checksOddsPercent,
+        cell.textContent.trim(),
+      ]),
+      [
+        ['otherwise', '40%'],
+        ['regular', '30%'],
+        ['hard', '30%'],
+      ]
+    );
+    assert.equal(rollButton(root).disabled, false);
+  });
+
+  it('reads the runner’s executed target and margin, and drops it when the actor is cleared', async () => {
+    const root = await mountChecks({ craftingCheck: UNDER_ROUTED });
+    await choosePreviewActor(root, 'sera');
+    await rollAndSettle(root);
+    const readout = root.querySelector('[data-checks-simulator-readout]');
+    assert.equal(readout.dataset.checksSimulatorDirection, 'under');
+    const margin = root.querySelector('[data-checks-simulator-target]');
+    assert.equal(margin.dataset.checksSimulatorTarget, '12', 'the Regular threshold the runner met');
+    assert.equal(margin.textContent.trim(), 'vs target 12 · +3', 'a 9 is three under 12');
+    assert.equal(
+      root.querySelector('[data-checks-simulator-band-name]').textContent.trim(),
+      'Regular'
+    );
+
+    await choosePreviewActor(root, 'no-actor');
+    assert.ok(!root.querySelector('[data-checks-simulator-readout]'), 'the result is dropped');
+    assert.ok(root.querySelector('[data-checks-simulator-state="needs-preview-actor"]'));
+  });
+
+  it('names the actor lacking the path in the odds, the callout and not the section dot', async () => {
+    const root = await mountChecks({ craftingCheck: UNDER_ROUTED });
+    const dots = () => root.querySelectorAll('[data-checks-section-dot]').length;
+    const before = dots();
+    await choosePreviewActor(root, 'bare');
+    assert.equal(odds(root).dataset.checksOddsReason, 'attribute-path-unresolved');
+    assert.match(odds(root).textContent, /Bare Hands is missing a value this check reads \(@prof\)/);
+    const callout = root.querySelector(
+      '[data-checks-section-callout="attributePathUnresolvedForPreview"]'
+    );
+    assert.ok(Boolean(callout), 'the roll section explains the warning');
+    assert.equal(dots(), before, 'a transient warning puts no dot on a section');
+  });
+
+  it('describes a pass/fail roll-under band in its own terms', async () => {
+    const root = await mountChecks({
+      resolutionMode: 'simple',
+      craftingCheck: null,
+      craftingCheckSimple: {
+        ...SIMPLE_CHECK,
+        rollFormula: '1d20',
+        evaluation: { product: 'sum', direction: 'under', target: { source: 'fixed' } },
+      },
+    });
+    assert.equal(odds(root).dataset.checksOddsState, 'enumerated', 'a literal formula needs no actor');
+    await rollAndSettle(root);
+    assert.match(
+      root.querySelector('[data-checks-simulator-band] small').textContent,
+      /stays at or under the target/
+    );
+    assert.equal(root.querySelector('[data-checks-simulator-target]').dataset.checksSimulatorTarget, '10');
+  });
+
+  it('charts a separately rolled bonus jointly, and the heading counts combinations', async () => {
+    const root = await mountChecks({
+      resolutionMode: 'simple',
+      craftingCheck: null,
+      craftingCheckSimple: {
+        ...SIMPLE_CHECK,
+        rollFormula: '1d20',
+        evaluation: { product: 'sum', direction: 'under', target: { source: 'fixed' } },
+      },
+      modifiers: [{ id: 'mod-knack', label: 'Knack', expression: '1d4' }],
+      craftingDefaultModifierPolicy: 'addAll',
+      craftingDefaultModifierIds: ['mod-knack'],
+    });
+    await choosePreviewActor(root, 'sera');
+    assert.equal(odds(root).dataset.checksOddsState, 'enumerated');
+    assert.equal(
+      root.querySelector('[data-checks-odds-domain]').textContent.trim(),
+      'all 80 combinations',
+      'twenty faces times four, never "all 0 faces"'
+    );
+    // P(d20 <= 10 + d4) = 50 / 80.
+    assert.equal(root.querySelector('[data-checks-odds-percent="success"]').textContent.trim(), '62.5%');
+  });
+
+  it('never publishes a result rolled before its inputs changed', async () => {
+    let release;
+    const gate = new Promise((resolveGate) => {
+      release = resolveGate;
+    });
+    const evaluate = globalThis.Roll.prototype.evaluate;
+    globalThis.Roll.prototype.evaluate = async function deferred(...args) {
+      await gate;
+      return evaluate.apply(this, args);
+    };
+    try {
+      const root = await mountChecks({ craftingCheck: UNDER_ROUTED });
+      await choosePreviewActor(root, 'sera');
+      rollButton(root).click();
+      await settle();
+      await harness.setProps({
+        craftingCheck: {
+          ...UNDER_ROUTED,
+          evaluation: { ...UNDER_ROUTED.evaluation, direction: 'over' },
+        },
+      });
+      await settle();
+      release();
+      for (let attempt = 0; attempt < 12; attempt += 1) await settle();
+      assert.ok(
+        !root.querySelector('[data-checks-simulator-readout]'),
+        'the deferred result from the earlier inputs is dropped'
+      );
+    } finally {
+      globalThis.Roll.prototype.evaluate = evaluate;
+    }
+  });
+});
+
 describe('the source contract these hooks are pinned by', () => {
   it('keeps the panels on the shared primitives the spec names', () => {
     const odds = readFileSync(
