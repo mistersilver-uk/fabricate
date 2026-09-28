@@ -39,6 +39,7 @@ export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
   ...CHECK_TARGET_RAW_MODULES,
   'src/utils/scalars.js',
   'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
+  'src/utils/checkAdjustmentFormat.js',
   'src/ui/svelte/apps/manager/checks/checksCopy.js',
   'src/ui/svelte/apps/manager/checks/previewActorId.js',
   'src/ui/svelte/apps/manager/component/overridePlayerSees.js',

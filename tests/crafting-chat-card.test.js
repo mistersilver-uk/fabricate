@@ -1095,3 +1095,15 @@ test('labels carrying [[ or @ reach the card with neither enrichment pattern lef
     'only invisible joiners were added'
   );
 });
+
+test('a label naming a placeholder is stated literally, never substituted (QE6)', () => {
+  const data = {
+    ...UNDER_DATA,
+    preRolls: [{ ...UNDER_DATA.preRolls[0], label: 'Lucky {total}' }],
+  };
+  const html = buildCraftingChatContent(
+    successModel({ check: executedCheck(data) }),
+    shippedKeyLocalize
+  );
+  assert.equal(evidenceRowsOf(html)[1][2], 'Lucky {total} 1d4 rolled 3, raising the target');
+});

@@ -5,9 +5,9 @@ import {
   describedFaceRules,
   faceSign,
 } from '../../../../systems/countEvaluation.js';
+import { fill } from '../../../../utils/fillPlaceholders.js';
 
 import { openRollPromptModal } from './rollPromptHost.js';
-import { fill } from './rollPromptTarget.js';
 
 // Legacy tokens on both versions (issue 1043): V14 maps them in Roll#toMessage, and core.messageMode is unregistered on V13, where reading it throws.
 const ROLL_MODES = [

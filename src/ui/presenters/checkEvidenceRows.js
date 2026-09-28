@@ -3,8 +3,8 @@
  * summed check (issue 2005), read from its display projection only. A sum/over/fixed check has no
  * rows, so its surfaces are unchanged; `localize` is key-only, as every card module's is.
  */
-import { fill } from '../svelte/apps/crafting/rollPromptTarget.js';
-import { formatCheckAdjustment } from '../svelte/apps/manager/checks/checkAdjustmentLabel.js';
+import { formatCheckAdjustment, formatSignedStep } from '../../utils/checkAdjustmentFormat.js';
+import { fill } from '../../utils/fillPlaceholders.js';
 
 const KEYS = Object.freeze({
   target: 'FABRICATE.Check.Evidence.Target',
@@ -30,9 +30,6 @@ const BENEFIT_GROUPS = Object.freeze([
   ['modifiers', ['library', 'advantage']],
   ['situational', ['situational']],
 ]);
-
-/** `+5`, `+0` or `−2`, with the true minus sign. */
-const signed = (value) => (value === 0 ? '+0' : formatCheckAdjustment('add', value));
 
 /** Whether a projection's surfaces gain evidence rows: a summed check other than sum/over/fixed. */
 export function statesEvidence(display) {
@@ -77,7 +74,7 @@ function targetParts(evidence, loc) {
   }
   const totals = benefitTotals(evidence);
   for (const [group] of BENEFIT_GROUPS) {
-    if (totals.get(group)) parts.push(fill(loc(KEYS[group]), { value: signed(totals.get(group)) }));
+    if (totals.get(group)) parts.push(fill(loc(KEYS[group]), { value: formatSignedStep(totals.get(group)) }));
   }
   return parts;
 }
@@ -128,7 +125,7 @@ export function checkEvidenceRows(display, localize = (key) => key) {
   const preRolled = preRolledText(evidence, loc);
   if (preRolled) rows.push({ id: 'preRolled', label: loc(KEYS.preRolled), text: preRolled });
   if (evidence.target !== null && evidence.margin !== null) {
-    const margin = signed(evidence.margin);
+    const margin = formatSignedStep(evidence.margin);
     rows.push({
       id: 'margin',
       label: loc(KEYS.margin),

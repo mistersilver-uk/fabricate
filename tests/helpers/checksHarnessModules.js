@@ -74,6 +74,7 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/checks/countPreviewModel.js',
   // The Studio's adjustment labels and read-only band pictures (issue 2005).
   'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
+  'src/utils/checkAdjustmentFormat.js',
   'src/ui/svelte/apps/manager/checks/checkBandModel.js',
   'src/ui/svelte/apps/manager/checks/checkTargetStatus.js',
   'src/systems/checkEvaluation.js',

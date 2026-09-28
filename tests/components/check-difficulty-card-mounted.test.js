@@ -22,6 +22,7 @@ const harness = createMountedComponentHarness({
     'src/systems/characterModifierPrerequisiteCopy.js',
     'src/systems/characterPrerequisites.js',
     'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
+    'src/utils/checkAdjustmentFormat.js',
     'src/ui/svelte/apps/manager/checks/checkTargetStatus.js',
     'src/systems/checkTarget.js',
     'src/utils/localizeWithFallback.js',

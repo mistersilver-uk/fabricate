@@ -1,17 +1,8 @@
 /** The roll prompt's target chip text, and a summed roll-under target's explanation line. */
-import { formatCheckAdjustment } from '../manager/checks/checkAdjustmentLabel.js';
-
-// A function replacer, so a `$&` or `$1` in a user-authored name is inserted literally.
-export function fill(template, values) {
-  return Object.entries(values).reduce(
-    (text, [token, value]) => text.replace(`{${token}}`, () => String(value)),
-    template
-  );
-}
+import { formatCheckAdjustment, formatSignedStep } from '../../../../utils/checkAdjustmentFormat.js';
+import { fill } from '../../../../utils/fillPlaceholders.js';
 
 const signed = (value) => (value < 0 ? String(value) : `+${value}`);
-/** The explanation line's signed step, with the true minus sign the check card and results use. */
-const signedStep = (value) => (value < 0 ? `−${-value}` : `+${value}`);
 
 /** A modifier's chip value: its prepared display, else its signed flat value. */
 export function modifierValue(modifier) {
@@ -68,7 +59,7 @@ function basisParts(basis, labels, actorName) {
     const value =
       adjustment.kind === 'multiply'
         ? formatCheckAdjustment('multiply', adjustment.value)
-        : signedStep(adjustment.value);
+        : formatSignedStep(adjustment.value);
     parts.push(
       adjustment.label
         ? fill(labels.targetAdjustment, { label: adjustment.label, value })
@@ -93,10 +84,10 @@ export function rollPromptTarget(data, selectedIds, bonus = '') {
   const parts = data.targetBasis
     ? basisParts(data.targetBasis, labels, data.actorName ?? '')
     : [fill(labels.targetBase, { value: data.dc })];
-  if (tools) parts.push(fill(labels.targetTools, { value: signedStep(tools) }));
-  if (modifiers) parts.push(fill(labels.targetModifiers, { value: signedStep(modifiers) }));
+  if (tools) parts.push(fill(labels.targetTools, { value: formatSignedStep(tools) }));
+  if (modifiers) parts.push(fill(labels.targetModifiers, { value: formatSignedStep(modifiers) }));
   if (situational) {
-    parts.push(fill(labels.targetSituational, { value: signedStep(situational) }));
+    parts.push(fill(labels.targetSituational, { value: formatSignedStep(situational) }));
   }
   const settled = fill(labels.targetValue, { target: data.dc + tools + modifiers + situational });
   const target =

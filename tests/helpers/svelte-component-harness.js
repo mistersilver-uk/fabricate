@@ -254,7 +254,9 @@ export const CHECK_TARGET_RAW_MODULES = Object.freeze([
 export const CHECK_EVIDENCE_RAW_MODULES = Object.freeze([
   'src/ui/presenters/checkEvidenceRows.js',
   'src/ui/svelte/apps/crafting/rollPromptTarget.js',
+  'src/utils/fillPlaceholders.js',
   'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
+  'src/utils/checkAdjustmentFormat.js',
   'src/utils/scalars.js',
 ]);
 

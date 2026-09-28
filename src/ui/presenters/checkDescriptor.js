@@ -5,7 +5,7 @@
  * line never states a modifier the roll has not applied; a value that cannot be read says so.
  */
 import { attributeTargetBasis, resolveActivityTarget } from '../../systems/checkTarget.js';
-import { formatCheckAdjustment } from '../svelte/apps/manager/checks/checkAdjustmentLabel.js';
+import { formatCheckAdjustment } from '../../utils/checkAdjustmentFormat.js';
 
 const COMPARISON_KEYS = Object.freeze({
   under: {

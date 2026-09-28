@@ -30,7 +30,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/util/pickerOptionModel.js',
     'src/ui/svelte/apps/crafting/rollPromptTarget.js',
+    'src/utils/fillPlaceholders.js',
     'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
+    'src/utils/checkAdjustmentFormat.js',
     'src/utils/scalars.js',
   ],
   compiledModules: [

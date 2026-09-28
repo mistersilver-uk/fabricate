@@ -24,6 +24,7 @@ const harness = createMountedComponentHarness({
     // The tier's adjustment labels (issue 2005).
     'src/systems/normalize/checkEvaluation.js',
     'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
+    'src/utils/checkAdjustmentFormat.js',
     'src/utils/scalars.js',
   ],
   compiledModules: [
