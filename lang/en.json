@@ -874,7 +874,15 @@
           "Optional": "Optional",
           "Mandatory": "Required",
           "NoFormula": "No roll formula is configured for this check.",
-          "FormulaUnresolved": "This check can't be resolved to a number for the selected character."
+          "FormulaUnresolved": "This check can't be resolved to a number for the selected character.",
+          "TargetLine": "Target {target} · {comparison}",
+          "StayAtOrUnder": "stay at or under",
+          "StayUnder": "stay under",
+          "MeetOrBeat": "meet or beat",
+          "Beat": "beat",
+          "TargetSource": "{actor} {expression} {value}",
+          "TargetAdjustment": "{label} {value}",
+          "TargetDifficulty": "difficulty {value}"
         },
         "Io": {
           "Essences": "Essences",
@@ -961,7 +969,9 @@
           "Completed": "Craft complete",
           "Failed": "Craft failed",
           "Advance": "Craft next step",
-          "Dismiss": "Back to shopping list"
+          "Dismiss": "Back to shopping list",
+          "ResultProduced": "The result group is produced.",
+          "NothingProduced": "Nothing is produced; the failure policy applies."
         },
         "Button": {
           "Craft": "Craft 1 item",

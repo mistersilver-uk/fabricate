@@ -35,7 +35,7 @@ const BENEFIT_GROUPS = Object.freeze([
 const signed = (value) => (value === 0 ? '+0' : formatCheckAdjustment('add', value));
 
 /** Whether a projection's surfaces gain evidence rows: a summed check other than sum/over/fixed. */
-function statesEvidence(display) {
+export function statesEvidence(display) {
   const evidence = display?.evidence;
   if (!evidence || display.evaluation?.product !== 'sum') return false;
   return display.evaluation.direction === 'under' || Array.isArray(evidence.targetTerms);

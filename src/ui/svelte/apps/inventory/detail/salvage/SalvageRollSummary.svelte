@@ -61,8 +61,7 @@
     </p>
     {#if message}
       <p class="salvage-summary-message" data-inventory-salvage-message>
-        {message}{#if hasRoll}
-          {localize('FABRICATE.App.Inventory.Salvage.SummaryWithRoll')}
+        {message}{#if hasRoll}{` ${localize('FABRICATE.App.Inventory.Salvage.SummaryWithRoll')}`}
           <span class="salvage-summary-roll" data-inventory-salvage-roll>{rollValue}</span>{/if}
       </p>
     {/if}

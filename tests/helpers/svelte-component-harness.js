@@ -286,6 +286,8 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/recipeDuration.js',
   'src/systems/characterLibraries.js',
   'src/ui/presenters/CraftingListingBuilder.js',
+  // Issue 2005: the check card's roll-under or character-value target line.
+  'src/ui/presenters/checkDescriptor.js',
   // Same rule, issue 1091: the browse-status vocabulary and its precedence rule moved out of the
   // builder into an import-free leaf so #1091's summary projection can share them without pulling
   // the builder in.

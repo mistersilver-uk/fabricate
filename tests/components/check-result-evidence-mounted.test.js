@@ -35,6 +35,7 @@ const EVIDENCE = 'src/ui/svelte/apps/crafting/detail/CheckEvidenceRows.svelte';
 const MEDALLION = 'src/ui/svelte/components/Medallion.svelte';
 const RESULT_BOX = 'src/ui/svelte/apps/crafting/detail/RollResultBox.svelte';
 const SALVAGE_SUMMARY = 'src/ui/svelte/apps/inventory/detail/salvage/SalvageRollSummary.svelte';
+const CHECK_CARD = 'src/ui/svelte/apps/crafting/detail/CraftingCheckCard.svelte';
 
 /** `[id, label, text]` for every rendered evidence row. */
 function rowsOf(root) {
@@ -73,7 +74,13 @@ describe('RollResultBox evidence rows', () => {
     assert.deepEqual(rowsOf(root), UNDER_ROWS);
     const box = root.querySelector('[data-recipe-section="roll-result"]');
     const order = [...box.children].map((child) => child.className.split(' ')[0]);
-    assert.deepEqual(order, ['crafting-roll-head', 'crafting-roll-message', 'check-evidence', 'crafting-roll-awards']);
+    assert.deepEqual(order, [
+      'crafting-roll-head',
+      'crafting-roll-summary',
+      'crafting-roll-message',
+      'check-evidence',
+      'crafting-roll-awards',
+    ]);
   });
 
   it('reads only the executed record, never what changed after it (Q9)', async () => {
@@ -105,6 +112,20 @@ describe('RollResultBox evidence rows', () => {
     harness.remount();
     const withOver = markupOf(await harness.mount({ result: result(executedCheck(OVER_FIXED_DATA)) }));
     assert.equal(withOver, bare);
+  });
+
+  it('says what a roll-under outcome means for the award, beside its evidence', async () => {
+    const summaryOf = (root) => root.querySelector('[data-roll-summary]')?.textContent;
+    const passed = await harness.mount({ result: result(executedCheck()) });
+    assert.equal(summaryOf(passed), 'The result group is produced.');
+    const head = [...passed.querySelector('[data-recipe-section="roll-result"]').children];
+    assert.equal(head[1].dataset.rollSummary, '', 'directly under the head');
+    harness.remount();
+    const failed = await harness.mount({ result: { ...result(executedCheck()), success: false } });
+    assert.equal(summaryOf(failed), 'Nothing is produced; the failure policy applies.');
+    harness.remount();
+    const over = await harness.mount({ result: result(executedCheck(OVER_FIXED_DATA)) });
+    assert.ok(!over.querySelector('[data-roll-summary]'), 'a sum/over fixed box gains no sentence');
   });
 
   it('renders nothing at all without a recorded result, which a refusal leaves (Q10)', async () => {
@@ -143,5 +164,50 @@ describe('SalvageRollSummary evidence rows', () => {
       await harness.mount({ result: { ...base, check: executedCheck(OVER_FIXED_DATA) } })
     );
     assert.equal(withOver, bare);
+  });
+});
+
+describe('CraftingCheckCard target line', () => {
+  const harness = createMountedComponentHarness({
+    ...SHARED,
+    tmpPrefix: 'fabricate-check-card-target-',
+    compiledModules: ['src/ui/svelte/components/Kicker.svelte', CHECK_CARD],
+    componentPath: CHECK_CARD,
+  });
+  before(async () => {
+    await harness.setup();
+    localizeShipped();
+  });
+  after(harness.teardown);
+  afterEach(harness.remount);
+
+  const card = (extra) => ({ dc: null, rollFormula: '1d20', usable: true, mandatory: true, ...extra });
+
+  it('states the target and its source fact where a sum/over card states its DC', async () => {
+    const root = await harness.mount({
+      check: card({
+        target: { direction: 'under', text: 'Target 10 · stay at or under', source: 'Sera Vane @skills.smith.level 12, Hard Work −2' },
+      }),
+    });
+    const target = root.querySelector('[data-check-target="under"]');
+    assert.equal(target.textContent.trim(), 'Target 10 · stay at or under');
+    assert.equal(
+      target.nextElementSibling.textContent.trim(),
+      'Sera Vane @skills.smith.level 12, Hard Work −2'
+    );
+    assert.ok(!root.querySelector('[data-check-dc]'), 'no DC beside a target to stay under');
+  });
+
+  it('shows the unavailable reason instead of a target it could not read', async () => {
+    const reason = 'Crafting check could not read a number for its target from this character.';
+    const root = await harness.mount({ check: card({ target: { unresolved: reason } }) });
+    assert.equal(root.querySelector('[data-check-target-unresolved]').textContent.trim(), reason);
+    assert.ok(!root.querySelector('[data-check-target]'));
+  });
+
+  it('leaves a sum/over card byte-identical', async () => {
+    const bare = markupOf(await harness.mount({ check: card({ dc: 15 }) }));
+    assert.match(bare, /data-check-dc/);
+    assert.ok(!/data-check-target/.test(bare));
   });
 });

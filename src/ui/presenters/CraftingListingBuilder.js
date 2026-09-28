@@ -63,6 +63,7 @@ import {
 } from '../../utils/scalars.js';
 import { resolveRecipeImage } from '../svelte/util/craftingImageDefaults.js';
 
+import { describeCheckTarget } from './checkDescriptor.js';
 import { CRAFTING_BROWSE_STATUS, deriveBrowseStatus } from './craftingBrowseStatus.js';
 import { SUMMARY_AUDIENCE, projectRecipeSummary } from './summaryProjection.js';
 
@@ -917,16 +918,9 @@ export class CraftingListingBuilder {
     const rollFormula = typeof config.rollFormula === 'string' ? config.rollFormula.trim() : '';
     // An active structured count check is usable, and its retained formula is inert.
     const usable = hasActiveCheck(config, rollFormula);
-    // "Mandatory" reflects whether the engine will actually roll this check and a
-    // failure fails the craft (CraftingEngine._runCraftingCheck) — NOT merely whether
-    // the mode requires a check to be configured. Otherwise a routed-by-ingredients
-    // recipe with an authored simple pass/fail check + DC reads "Optional" even though it is
-    // always rolled and can fail. Active when: the mode requires a check
-    // (routedByCheck / progressive); routedByIngredients with an authored
-    // formula (no enabled toggle); or simple/alchemy with a formula AND checks enabled.
-    // Alchemy check-ness is driven by `alchemy.checkMode` (simple/tiered are
-    // mandatory, independent of the `checksEnabled` toggle); other modes keep the
-    // MANDATORY_CHECK_MODES contract.
+    // "Mandatory" means the engine will roll this check and a failure fails the craft
+    // (`CraftingEngine._runCraftingCheck`): a check-requiring mode, routedByIngredients with an
+    // authored formula, simple with a formula and checks enabled, or alchemy's `checkMode`.
     const requiredByMode =
       MANDATORY_CHECK_MODES.has(mode) ||
       (mode === 'alchemy' && (alchemyCheckMode === 'simple' || alchemyCheckMode === 'tiered'));
@@ -956,8 +950,18 @@ export class CraftingListingBuilder {
     // Resolve the displayed DC AFTER the issue 765 suppression guard above (never
     // reorder it there). See the method JSDoc and `_chipDc`.
     const dc = this._chipDc(config, recipe, routedFixed, evaluation);
+    const anchor = config === checks.simple ? this._resolveDisplayDc(config, recipe) : NaN;
+    const target = describeCheckTarget({
+      config,
+      recipe,
+      evaluation,
+      anchor,
+      actor: craftingActor,
+      localize: this.localize,
+    });
     return {
       dc,
+      ...(target && { target }),
       ...formula,
       skill: stringOrNull(config.skill),
       optional: !mandatory,

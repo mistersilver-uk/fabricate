@@ -3,11 +3,12 @@
   RollResultBox shows the outcome of the player's most recent craft of the current
   recipe (store.lastRollResult[recipeId]). It is defensive about the result shape:
   it surfaces a success/failure tone, the rolled total and outcome label when
-  present, an optional message, the executed check's evidence rows, and any awarded
-  items. Renders nothing when there is no recorded result.
+  present, a roll-under or character-value check's outcome sentence, an optional message, the
+  executed check's evidence rows, and any awarded items. Renders nothing when there is no recorded result.
 -->
 <script>
   import Medallion from '../../../components/Medallion.svelte';
+  import { statesEvidence } from '../../../../presenters/checkEvidenceRows.js';
   import CheckEvidenceRows from './CheckEvidenceRows.svelte';
   import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
   import { localize } from '../../../util/foundryBridge.js';
@@ -18,6 +19,16 @@
   const outcome = $derived(result?.outcome ?? result?.checkResult?.outcome ?? null);
   const total = $derived(result?.total ?? result?.checkResult?.total ?? null);
   const message = $derived(typeof result?.message === 'string' ? result.message : '');
+  // What the outcome means for the award, beside a roll-under or character-value check's evidence.
+  const summary = $derived(
+    statesEvidence(result?.check)
+      ? localize(
+          success
+            ? 'FABRICATE.App.Crafting.Run.ResultProduced'
+            : 'FABRICATE.App.Crafting.Run.NothingProduced'
+        )
+      : ''
+  );
   const items = $derived(
     Array.isArray(result?.items)
       ? result.items
@@ -46,6 +57,9 @@
         <span class="crafting-roll-total" data-roll-total>{total}</span>
       {/if}
     </header>
+    {#if summary}
+      <p class="crafting-roll-summary" data-roll-summary>{summary}</p>
+    {/if}
     {#if outcome}
       <p class="crafting-roll-outcome">{outcome}</p>
     {/if}
@@ -114,6 +128,7 @@
     font-size: 15px;
   }
 
+  .crafting-roll-summary,
   .crafting-roll-outcome,
   .crafting-roll-message {
     margin: 0;

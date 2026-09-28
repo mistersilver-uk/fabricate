@@ -42,6 +42,8 @@ const harness = createMountedComponentHarness({
     'src/config/stackQuantityPathPresets.js',
     'src/gatheringImageDefaults.js',
     'src/ui/presenters/CraftingListingBuilder.js',
+    // Issue 2005: the check card's roll-under or character-value target line.
+    'src/ui/presenters/checkDescriptor.js',
     ...CHECK_TARGET_RAW_MODULES,
     'src/systems/countEvaluation.js',
     'src/systems/characterLibraries.js',
