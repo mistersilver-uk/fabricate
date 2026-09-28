@@ -278,9 +278,22 @@ export function checkTickCopy(id) {
   return copyFor(CHECK_TICK_LABELS, id);
 }
 
+/** The record a flag in an issue's data stands for, named before the tier and outcome names. */
+function flaggedRecordName(data, text) {
+  if (data.defaultRecord) {
+    return text('FABRICATE.Admin.Manager.Checks.PreviewAs.DefaultRecord', 'Default');
+  }
+  if (!data.baseAdjustment) return '';
+  const base = text(
+    'FABRICATE.Admin.Manager.Checks.Evaluation.RecordBaseAdjustment',
+    'base adjustment'
+  );
+  return `${base.charAt(0).toLocaleUpperCase()}${base.slice(1)}`;
+}
+
 /**
- * An issue's data in the reader's language: a faulted base adjustment named before the rest, and
- * any coded phrase (a face rule's kind and effect) localized.
+ * An issue's data in the reader's language: a flagged default record or faulted base adjustment
+ * named before the rest, and any coded phrase (a face rule's kind and effect) localized.
  */
 function issueData(data, text) {
   if (!data) return data;
@@ -289,12 +302,8 @@ function issueData(data, text) {
     const phrase = phrases[resolved[field]];
     if (phrase) resolved[field] = text(`${NAMESPACE}${phrase[0]}`, phrase[1]);
   }
-  if (!data.baseAdjustment) return resolved;
-  const base = text(
-    'FABRICATE.Admin.Manager.Checks.Evaluation.RecordBaseAdjustment',
-    'base adjustment'
-  );
-  const named = `${base.charAt(0).toLocaleUpperCase()}${base.slice(1)}`;
+  const named = flaggedRecordName(data, text);
+  if (!named) return resolved;
   return { ...resolved, names: [named, data.names].filter(Boolean).join(', ') };
 }
 

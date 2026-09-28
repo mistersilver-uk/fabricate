@@ -212,22 +212,34 @@ describe('count readiness raises each id with its copy, section and severity', (
 
   it('countRequiredExceedsBasePool, reachable once a ceiling rises above the base', () => {
     const requirements = [
-      { name: 'Default', required: 2 },
+      { defaultRecord: true, required: 2 },
       { name: 'Arcane Work', required: 3 },
       { name: 'Impossible Work', required: 4 },
     ];
     assert.deepEqual(countCeilingIssues({ base: 2, ceiling: 3, requirements }), {
-      overMax: 'Impossible Work',
-      overBase: 'Arcane Work',
+      overMax: { names: 'Impossible Work' },
+      overBase: { names: 'Arcane Work' },
     });
     assert.deepEqual(countCeilingIssues({ base: 2, ceiling: 2, requirements }), {
-      overMax: 'Arcane Work, Impossible Work',
-      overBase: '',
+      overMax: { names: 'Arcane Work, Impossible Work' },
+      overBase: { names: '' },
+    });
+    assert.deepEqual(countCeilingIssues({ base: 1, ceiling: 2, requirements }).overBase, {
+      names: '',
+      defaultRecord: true,
     });
     assert.equal(
       checkIssueSentence('countRequiredExceedsBasePool', { names: 'Arcane Work', base: 2 }, text),
       'The successes needed by Arcane Work exceed the base pool of 2 dice, so an attempt succeeds only when dice explode or are added to the pool.'
     );
+  });
+
+  it('names the default record in the reader’s language, before the tiers', () => {
+    const draft = check({ base: '1', required: 2 }, { tiers: [{ id: 'arcane', name: 'Arcane Work', successes: 3 }] });
+    const entry = issue(evaluateCheckReadiness(draft, { mode: 'simple', activity: 'crafting' }), 'countRequiredExceedsMaxPool');
+    const german = (key, fallback) => (key.endsWith('PreviewAs.DefaultRecord') ? 'Standard' : fallback);
+    assert.match(checkIssueSentence(entry.id, entry.data, text), /^The successes needed by Default, Arcane Work exceed/);
+    assert.match(checkIssueSentence(entry.id, entry.data, german), /^The successes needed by Standard, Arcane Work exceed/);
   });
 
   it('raises no ceiling for a base that reads the character, and ticks why', () => {

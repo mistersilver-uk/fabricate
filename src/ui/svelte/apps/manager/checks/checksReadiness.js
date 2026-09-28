@@ -471,25 +471,28 @@ function countFaceReadiness(result, evaluation, thresholdMode) {
   if (unbounded) pushIssue(result.issues, 'countExplodeUnbounded', 'critical');
 }
 
-/** Name the record `Default` beside recipe tier names, as the Preview-as record list does. */
-const DEFAULT_REQUIRED_NAME = 'Default';
-
 /**
- * The names whose required count exceeds the authored ceiling (`overMax`) and those above the base
- * pool but within the ceiling (`overBase`). The ceiling is the base alone until additional dice
- * (issue 2008) raise it, so `overBase` stays empty until then.
+ * The issue data for the requirements whose count exceeds the authored ceiling (`overMax`) and
+ * those above the base pool but within the ceiling (`overBase`): tier `names`, and `defaultRecord`
+ * when the check's own count is among them, which the copy layer names in the reader's language.
+ * The ceiling is the base alone until additional dice (issue 2008) raise it.
  */
 export function countCeilingIssues({ base, ceiling, requirements }) {
-  const names = (predicate) =>
-    requirements
-      .filter(({ required }) => predicate(required))
+  const group = (predicate) => {
+    const over = requirements.filter(({ required }) => predicate(required));
+    const names = over
+      .filter((entry) => !entry.defaultRecord)
       .map(({ name }) => name)
       .join(', ');
+    return over.some((entry) => entry.defaultRecord) ? { names, defaultRecord: true } : { names };
+  };
   return {
-    overMax: names((required) => required > ceiling),
-    overBase: names((required) => required > base && required <= ceiling),
+    overMax: group((required) => required > ceiling),
+    overBase: group((required) => required > base && required <= ceiling),
   };
 }
+
+const raisesAny = (group) => group.defaultRecord === true || group.names !== '';
 
 /**
  * The dice a literal base rolls, as the runtime settles it with no benefit applied, or the refusal.
@@ -528,20 +531,20 @@ function countRequiredReadiness(result, check, evaluation, { activity, threshold
   if (!read.ok) return;
   const base = read.policy.dice;
   const requirements = [
-    { name: DEFAULT_REQUIRED_NAME, required: pool.required },
+    { defaultRecord: true, required: pool.required },
     ...tierRequired.map((tier) => ({ name: tier.name, required: tier.successes ?? pool.required })),
   ];
   const { overMax, overBase } = countCeilingIssues({ base, ceiling: base, requirements });
-  result.checks.push({ id: 'countRequiredWithinMaxPool', satisfied: overMax === '' });
-  if (overMax !== '') {
+  result.checks.push({ id: 'countRequiredWithinMaxPool', satisfied: !raisesAny(overMax) });
+  if (raisesAny(overMax)) {
     pushIssue(result.issues, 'countRequiredExceedsMaxPool', 'critical', {
-      names: overMax,
+      ...overMax,
       ceiling: base,
     });
   }
-  if (overBase !== '') {
+  if (raisesAny(overBase)) {
     result.checks.push({ id: 'countRequiredWithinBasePool', satisfied: false });
-    pushIssue(result.issues, 'countRequiredExceedsBasePool', 'warning', { names: overBase, base });
+    pushIssue(result.issues, 'countRequiredExceedsBasePool', 'warning', { ...overBase, base });
   }
 }
 
@@ -580,7 +583,8 @@ function countReadiness(result, check, evaluation, { mode, activity, previewActo
   if (thresholdFault) pushIssue(result.issues, 'countThresholdInvalid', 'critical');
   countFaceReadiness(result, evaluation, thresholdMode);
   const gradesRequired = mode === 'simple' || (mode === 'routed' && check?.type !== 'fixed');
-  if (gradesRequired) countRequiredReadiness(result, check, evaluation, { activity, thresholdMode });
+  if (gradesRequired)
+    countRequiredReadiness(result, check, evaluation, { activity, thresholdMode });
   if (previewActor && !baseFault && !thresholdFault) {
     previewActorPoolWarnings(result.transient, evaluation, thresholdMode, previewActor);
   }
