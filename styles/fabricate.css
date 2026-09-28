@@ -1653,6 +1653,11 @@
   padding: 14px;
 }
 
+/* The Formula card's head keeps the prototype's tighter lead-to-control gap. */
+.fabricate-manager .manager-checks-card[data-roll-formula-card] > .manager-checks-card-body {
+  padding-top: var(--fab-space-3);
+}
+
 .fabricate-manager .manager-checks-card-body.is-roomy {
   padding: 14px 16px;
 }
@@ -1673,6 +1678,7 @@
   font-family: var(--fab-font-serif);
   font-size: 13px;
   font-weight: 600;
+  line-height: normal;
   letter-spacing: 0;
   text-transform: none;
 }
@@ -1920,8 +1926,10 @@
 .fabricate-manager .manager-checks-difficulty-field.is-dc {
   flex: 0 0 auto;
 
-  /* The shared `Stepper` takes its HEIGHT from the layout context; its border, radius, background and type stay the primitive's own. */
-  width: 118px;
+  /* The shared `Stepper` takes its HEIGHT from the layout context: the 30px field rung, at the width of two 26px adjuncts round a 42px value. */
+  --fab-stepper-fill-height: 30px;
+
+  width: 96px;
 }
 
 .fabricate-manager .manager-checks-difficulty-field.is-comparison {
@@ -1935,15 +1943,16 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  line-height: normal;
 }
 
-/* The check-type chooser still renders through the shared `RadioCardGroup`; only the checks studio's own scale is restated, at (0,4,0) so it lands without touching the primitive every other screen uses. */
+/* The check-type chooser still renders through the shared `RadioCardGroup`; only the checks studio's own scale is restated, at (0,4,0) so it lands without touching the primitive every other screen uses. skin census (issue 1523): not an adopter — a CONTEXTUAL override keyed on the Checks card's ancestor chain, which a class stamped on the shared option card cannot express; it carries the tuple since issue 2005. */
 .fabricate-manager .manager-checks-card .manager-resolution-mode-card.is-config-cards .manager-resolution-option {
   gap: 11px;
-  padding: 12px 13px;
+  padding: var(--fab-space-3);
   border: 1px solid var(--fab-border);
-  border-radius: 10px;
-  background: var(--fab-bg-0);
+  border-radius: 9px;
+  background: var(--fab-bg-1);
 }
 
 .fabricate-manager
@@ -1951,9 +1960,10 @@
   .manager-resolution-mode-card.is-config-cards
   .manager-resolution-option.is-active {
   border-color: var(--fab-accent-border);
-  background: var(--fab-accent-soft);
+  background: var(--fab-surface-soft);
 }
 
+/* The glyph tile carries no edge of its own: the prototype's tile is a fill, not a well. */
 .fabricate-manager
   .manager-checks-card
   .manager-resolution-mode-card.is-config-cards
@@ -1961,10 +1971,11 @@
   flex: 0 0 28px;
   width: 28px;
   height: 28px;
+  border-color: transparent;
   border-radius: 8px;
   color: var(--fab-text-subtle);
-  background: var(--fab-bg-2);
-  font-size: 12px;
+  background: var(--fab-surface-active);
+  font-size: 11px;
 }
 
 .fabricate-manager
@@ -1973,7 +1984,36 @@
   .manager-resolution-option.is-active
   .manager-resolution-option-icon {
   color: var(--fab-accent);
+  background: var(--fab-accent-soft);
+}
+
+/* The prototype's radio: a quiet ring at rest, a thick accent ring when chosen, centred on the card. */
+.fabricate-manager
+  .manager-checks-card
+  .manager-resolution-mode-card.is-config-cards
+  .manager-resolution-option
+  input[type='radio'] {
+  align-self: center;
+  margin-top: 0;
+  border: 1px solid var(--fab-border-strong);
   background: var(--fab-bg-1);
+}
+
+.fabricate-manager
+  .manager-checks-card
+  .manager-resolution-mode-card.is-config-cards
+  .manager-resolution-option
+  input[type='radio']:checked {
+  border: 4px solid var(--fab-accent);
+  box-shadow: none;
+}
+
+/* A named group's caption sits on the checks' micro-label gap above its cards. */
+.fabricate-manager
+  .manager-checks-card
+  .manager-resolution-mode-card.is-config-cards.is-legend-visible
+  .manager-resolution-mode-legend {
+  margin-bottom: var(--fab-space-chip);
 }
 
 .fabricate-manager .manager-checks-card .manager-resolution-option-name {
@@ -1991,7 +2031,7 @@
 
 .fabricate-manager .manager-checks-card .manager-resolution-option-desc {
   color: var(--fab-text-muted);
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 400;
   line-height: 1.5;
 }
@@ -2036,7 +2076,7 @@
   min-width: 0;
 }
 
-/* The outcome row's own box: swatch, name, stepper, toggle and remove on ONE line inside one bordered card. Issue 1512 deleted this rule with the tier list it converted onto `SortableList`, but the outcome list in `CraftingCheckEditor.svelte` never converted and still draws these rows itself, so without it every child stacked unboxed at content width. The gap and padding sit on the scale (the deleted rule said 10px and 8px 11px). Scoped to the list's own children: the recipe tier rows in `CheckRecipeTiers.svelte` carry this class on a `.fabricate-sortable-list-row`, whose line already owns the box and the padding. */
+/* The outcome row's own box: swatch, name, stepper, toggle and remove on ONE line inside one bordered card. Issue 1512 deleted this rule with the tier list it converted onto `SortableList`, but the outcome list in `CraftingCheckEditor.svelte` never converted and still draws these rows itself, so without it every child stacked unboxed at content width. The gap and padding sit on the scale (the deleted rule said 10px and 8px 11px). Scoped to the list's own children: the recipe tier rows in `CheckRecipeTiers.svelte` carry this class on a `.fabricate-sortable-list-row`, whose line already owns the box and the padding. skin census (issue 1523): a pinned carrier of the target tuple since issue 2005 moved its fill to `--fab-bg-1` — `tests/components/manager-checks-mounted.js` reads `.manager-checks-tier-row` by name. */
 .fabricate-manager .manager-checks-tier-list > .manager-checks-tier-row {
   display: flex;
   align-items: center;
@@ -2045,11 +2085,59 @@
   padding: var(--fab-space-2) var(--fab-space-3);
   border: 1px solid var(--fab-border);
   border-radius: 9px;
-  background: var(--fab-bg-0);
+  background: var(--fab-bg-1);
 }
 
-/* The outcome list's own append action, which lives OUTSIDE that list so it is reachable from the zero state too (issue 1097 follow-up). */
+/* The outcome list's column captions, for the eye alone, aligned over the row's own tracks. */
+.fabricate-manager .manager-checks-tier-head {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-3);
+  margin: var(--fab-space-4) 0 var(--fab-space-chip);
+  padding: 0 var(--fab-space-3);
+  color: var(--fab-text-subtle);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.fabricate-manager .manager-checks-tier-head > .is-swatch {
+  flex: 0 0 9px;
+}
+
+.fabricate-manager .manager-checks-tier-head > .is-name {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-checks-tier-head > .is-threshold {
+  flex: 0 0 118px;
+  text-align: center;
+}
+
+.fabricate-manager .manager-checks-tier-head > .is-range {
+  flex: 0 0 84px;
+  text-align: center;
+}
+
+.fabricate-manager .manager-checks-tier-head > .is-success {
+  flex: 0 0 158px;
+  text-align: center;
+}
+
+.fabricate-manager .manager-checks-tier-head > .is-break {
+  flex: 0 0 76px;
+  text-align: center;
+}
+
+.fabricate-manager .manager-checks-tier-head > .is-remove {
+  flex: 0 0 26px;
+}
+
+/* The outcome list's own append action, which lives OUTSIDE that list so it is reachable from the zero state too (issue 1097 follow-up); full width, as the tier list's footer adder is. */
 .fabricate-button.manager-button.manager-checks-outcome-add {
+  width: 100%;
   margin-top: 6px;
 }
 
@@ -2099,9 +2187,9 @@
 .fabricate-manager .manager-checks-tier-swatch {
   display: block;
   flex: 0 0 auto;
-  width: 12px;
-  height: 12px;
-  border-radius: 4px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
   background: var(--fab-outcome-swatch, var(--fab-surface-active));
 }
 
@@ -2111,12 +2199,13 @@
   width: auto;
   min-width: 0;
   height: 28px;
-  padding: 0 9px;
-  border: 1px solid var(--fab-border);
+  min-height: 0;
+  padding: 0 var(--fab-space-2xs);
+  border: 1px solid transparent;
   border-radius: 7px;
   color: var(--fab-text);
-  background: var(--fab-bg-2);
-  font-size: 12.5px;
+  background: transparent;
+  font-size: 12px;
   font-weight: 500;
 }
 
@@ -2158,8 +2247,8 @@
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   min-height: 0;
   padding: 0;
   border: 1px solid var(--fab-danger-border);
@@ -3061,7 +3150,7 @@
   align-items: center;
   gap: 9px;
   min-width: 0;
-  height: 40px;
+  height: 38px;
   padding: 0 12px;
   border: 1px solid var(--fab-border);
   border-radius: 9px;
@@ -3084,7 +3173,7 @@
   color: var(--fab-text);
   background: transparent;
   font-family: var(--fab-font-mono);
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 500;
 }
 
@@ -3122,6 +3211,7 @@
 }
 
 .fabricate-manager .manager-checks-formula-resolved-body {
+  flex: 1 1 auto;
   min-width: 0;
 }
 
@@ -3146,7 +3236,7 @@
 .fabricate-manager .manager-checks-formula-base {
   color: var(--fab-text);
   font-family: var(--fab-font-mono);
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 500;
 }
 
@@ -3168,14 +3258,19 @@
 .fabricate-manager .manager-checks-formula-chip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
+  gap: var(--fab-space-chip);
+  padding: var(--fab-space-1) var(--fab-space-2);
   border: 1px solid var(--fab-accent-border);
-  border-radius: 7px;
+  border-radius: 999px;
   color: var(--fab-accent);
   background: var(--fab-accent-soft);
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 600;
+  line-height: normal;
+}
+
+.fabricate-manager .manager-checks-formula-chip > i {
+  font-size: 9px;
 }
 
 .fabricate-manager .manager-checks-formula-rule {
@@ -10170,7 +10265,7 @@
   flex-wrap: wrap;
   gap: var(--fab-space-chip);
   min-width: 0;
-  margin-top: var(--fab-space-chip);
+  margin-top: var(--fab-space-2);
 }
 
 .fabricate-manager .manager-checks-formula-token {
@@ -10179,17 +10274,23 @@
   align-items: center;
   gap: var(--fab-space-chip);
   width: auto;
-  height: auto;
-  min-height: 22px;
+  height: 26px;
+  min-height: 26px;
   padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 6px;
+  border: 1px dashed var(--fab-border-strong);
+  border-radius: 7px;
   color: var(--fab-text-muted);
-  background: transparent;
+  background: var(--fab-bg-1);
   font-family: var(--fab-font-mono);
-  font-size: 0.66rem;
-  line-height: 1;
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: normal;
   cursor: pointer;
+}
+
+.fabricate-manager .manager-checks-formula-token > i {
+  font-size: 8px;
+  opacity: 0.6;
 }
 
 .fabricate-manager .manager-checks-formula-token:hover {

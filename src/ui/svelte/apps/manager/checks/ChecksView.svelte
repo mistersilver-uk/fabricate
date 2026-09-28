@@ -67,6 +67,7 @@
     parsePreviewDifficulties,
   } from '../../../../../systems/progressiveCheckSandbox.js';
   import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
+  import { formatCheckAdjustment } from './checkAdjustmentLabel.js';
 
   // `resolutionMode` picks the crafting editor; the three `craftingCheck*` props are its drafts.
   let {
@@ -855,11 +856,32 @@
       defaultLabel: text('FABRICATE.Admin.Manager.Checks.PreviewAs.DefaultRecord', 'Default'),
     }).map((record) => ({
       ...record,
-      label: [record.name, recordsCarryDc ? `${dcWord} ${record.dc}` : '']
-        .filter(Boolean)
-        .join(' · '),
+      label: [record.name, recordsCarryDc ? recordReading(record) : ''].filter(Boolean).join(' · '),
     }))
   );
+
+  // What a record grades against, in the evaluation's own terms: its adjustment under a character
+  // value, `target n` under a fixed roll-under, and `DC n` otherwise.
+  function recordReading(record) {
+    const evaluation = normalizeCheckEvaluation(activeCheck?.evaluation);
+    if (evaluation.target.source === 'attribute') {
+      const tier = (activeCheck?.tiers ?? []).find((entry) => String(entry?.id) === record.id);
+      if (!tier) {
+        return text(
+          'FABRICATE.Admin.Manager.Checks.Evaluation.RecordBaseAdjustment',
+          'base adjustment'
+        );
+      }
+      return formatCheckAdjustment(evaluation.target.adjustmentKind, tier.adjustment) || '—';
+    }
+    if (evaluation.direction === 'under') {
+      return text('FABRICATE.Admin.Manager.Checks.Evaluation.RecordTarget', 'target {dc}').replace(
+        '{dc}',
+        String(record.dc)
+      );
+    }
+    return `${dcWord} ${record.dc}`;
+  }
   const previewRecord = $derived(
     previewRecords.find((record) => record.id === previewRecordId) ?? previewRecords[0] ?? null
   );

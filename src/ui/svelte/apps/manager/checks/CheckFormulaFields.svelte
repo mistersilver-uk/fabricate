@@ -49,6 +49,9 @@
     thresholdMode = 'meet',
     targetChip = '',
     underNote = true,
+    // Under a character value, the previewed tier's `{ name, adjustment }` reading, named in the
+    // under rule sentence as the adjustment applied first.
+    underTier = null,
     offerSituationalBonus = true,
     onChange = () => {},
   } = $props();
@@ -139,8 +142,23 @@
   const DEFAULT_MODIFIER_ICON = 'fas fa-wand-magic-sparkles';
   const applied = $derived(Array.isArray(appliedModifiers) ? appliedModifiers : []);
 
-  // ONE sentence naming the rule in force, restating what the Modifiers section authors.
+  // ONE sentence naming the rule in force, restating what the Modifiers section authors. Under,
+  // the dice are compared raw, so the sentence names where the modifiers land instead.
   const ruleSentence = $derived.by(() => {
+    if (underInset) {
+      const lead = text(
+        'FABRICATE.Admin.Manager.Checks.Evaluation.UnderRule',
+        'The dice are compared raw. Every modifier that applies raises the target instead of being added to the roll'
+      );
+      if (!underTier) return `${lead}.`;
+      const clause = text(
+        'FABRICATE.Admin.Manager.Checks.Evaluation.UnderRuleTier',
+        '; the {tier} adjustment ({adjustment}) is applied first.'
+      )
+        .replaceAll('{tier}', underTier.name)
+        .replaceAll('{adjustment}', underTier.adjustment);
+      return `${lead}${clause}`;
+    }
     if (applied.length === 0) {
       return text(
         'FABRICATE.Admin.Manager.Checks.Crafting.ResolvedNoModifiers',
@@ -173,22 +191,26 @@
 </script>
 
 <div class="manager-checks-formula">
-  <div class="manager-checks-difficulty-field" data-check-direction-field>
-    <span class="manager-checks-difficulty-label">{directionLabel}</span>
-    <SegmentedControl
-      fill
-      density="field"
-      options={DIRECTION_OPTIONS}
-      value={direction}
-      groupName="check-evaluation-direction"
-      ariaLabel={directionLabel}
-      dataAttr="data-check-direction"
-      optionDataAttr="data-check-direction-option"
-      onChange={setDirection}
-    />
+  <!-- The prototype's two-column axis row: `What the roll produces` (issue 2006) takes the first
+       column, so the direction axis keeps the second. -->
+  <div class="manager-checks-formula-axes">
+    <div class="manager-checks-difficulty-field is-direction" data-check-direction-field>
+      <span class="manager-checks-difficulty-label">{directionLabel}</span>
+      <SegmentedControl
+        fill
+        density="field"
+        options={DIRECTION_OPTIONS}
+        value={direction}
+        groupName="check-evaluation-direction"
+        ariaLabel={directionLabel}
+        dataAttr="data-check-direction"
+        optionDataAttr="data-check-direction-option"
+        onChange={setDirection}
+      />
+    </div>
   </div>
   {#if direction === 'under' && underNote}
-    <p class="manager-checks-formula-rule" data-check-direction-note>
+    <p class="manager-checks-formula-direction-note" data-check-direction-note>
       {interpolateCmp(
         text(
           'FABRICATE.Admin.Manager.Checks.Evaluation.UnderNote',
@@ -201,7 +223,7 @@
   <!-- The CARD TITLE is `Formula`, so the input takes an `aria-label` rather than a second
          visible label. -->
   <div class="manager-checks-formula-input">
-    <i class="fas fa-dice-d20" aria-hidden="true"></i>
+    <i class="fas fa-dice" aria-hidden="true"></i>
     <!-- THE CONTROL HALF of the Validation route's row action. All three roll issues are about
              THIS field, the roll section's first control in every editor, so it is addressed as
              `checks-roll-formula`. An `<input>` is natively focusable, so no `tabindex`. -->
@@ -253,7 +275,7 @@
           <!-- Under, the modifiers raise the target: `+` joins them to the target chip, never to
                the dice, which a reader would take for a sum. -->
           {#if targetChip}
-            <span class="manager-checks-formula-join" data-check-formula-comparison
+            <span class="manager-checks-formula-comparison" data-check-formula-comparison
               >{comparisonPhrase}</span
             >
             <Chip tone="info" density="tag-run" icon="fas fa-bullseye" data-check-formula-target
@@ -316,3 +338,30 @@
     onChange={(offer) => onChange({ offerSituationalBonus: offer })}
   />
 </div>
+
+<style>
+  .manager-checks-formula-axes {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--fab-space-3);
+    margin-bottom: var(--fab-space-3);
+  }
+
+  .manager-checks-formula-axes > .is-direction {
+    grid-column: 2;
+  }
+
+  /* The axis note tucks under the axis row; it is the rule the GM is reading, in secondary ink. */
+  .manager-checks-formula-direction-note {
+    margin: calc(-1 * var(--fab-space-1)) 0 var(--fab-space-3);
+    color: var(--fab-text-secondary);
+    font-size: 10.5px;
+    line-height: 1.5;
+  }
+
+  .manager-checks-formula-comparison {
+    color: var(--fab-text-subtle);
+    font-size: 11.5px;
+    font-weight: 600;
+  }
+</style>

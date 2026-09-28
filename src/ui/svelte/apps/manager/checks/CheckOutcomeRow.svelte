@@ -1,14 +1,15 @@
 <!-- Svelte 5 runes mode -->
 <!--
   One routed outcome tier row: its band swatch, name, threshold field, success toggle, the
-  `checkDriven` break-tools toggle and delete. `column` names the threshold field: `dc` (`DC ±`)
+  `checkDriven` break-tools switch and delete. `column` names the threshold field: `dc` (`DC ±`)
   and `benefit` (`Benefit ±`) edit the tier's `dc` offset, `adjustment` edits its multiplier with
-  a null endpoint read as Otherwise, and a fixed-type row edits its `start`/`end` range. Outside
-  `dc` the field's name is also shown, since the bands no longer read as plain offsets.
+  a null endpoint read as Otherwise, and a fixed-type row edits its `start`/`end` range. The list's
+  column header names each field on screen; every control also carries its own accessible name.
 -->
 <script>
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import SegmentedControl from '../../../components/SegmentedControl.svelte';
+  import StatusToggle from '../../../components/StatusToggle.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
   import { localize } from '../../../util/foundryBridge.js';
@@ -65,21 +66,14 @@
     },
   ]);
 
-  // The same shape for the `checkDriven`-only tool-breakage choice; `keep` is the benign one.
-  const breakToolsSegments = $derived([
-    {
-      value: 'keep',
-      fallback: text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreakOff', "Don't break"),
-      variant: 'success',
-    },
-    {
-      value: 'break',
-      fallback: text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreakOn', 'Break'),
-      variant: 'danger',
-    },
-  ]);
+  const breakLabel = $derived(
+    text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreak', 'Break tools')
+  );
 
   const formatMultiplier = (value) => formatCheckAdjustment('multiply', value);
+  // A relative offset reads signed (`+3`, `−1`, `0`), as the recipe tiers' adjustments do.
+  const formatOffset = (value) => formatCheckAdjustment('add', value);
+  const parseOffset = (value) => parseCheckAdjustment('add', value);
   const parseMultiplier = (value) =>
     value.trim() === otherwiseLabel ? null : parseCheckAdjustment('multiply', value);
 </script>
@@ -129,11 +123,9 @@
       />
     </div>
   {:else if column === 'adjustment'}
-    <span class="manager-checks-tier-unit" aria-hidden="true">{thresholdLabel}</span>
     <!-- The multiplier, with Otherwise one step below the lowest stop: the tier a roll lands in
-         when it meets no multiplied threshold. Its kept `dc` offset is left untouched. The wider
-         track fits the Otherwise label. -->
-    <div class="manager-checks-tier-stepper is-wide">
+         when it meets no multiplied threshold. Its kept `dc` offset is left untouched. -->
+    <div class="manager-checks-tier-stepper">
       <Stepper
         fill
         value={outcome.adjustment ?? null}
@@ -147,13 +139,12 @@
       />
     </div>
   {:else}
-    {#if column !== 'dc'}
-      <span class="manager-checks-tier-unit" aria-hidden="true">{thresholdLabel}</span>
-    {/if}
     <div class="manager-checks-tier-stepper">
       <Stepper
         fill
         value={outcome.dc ?? 0}
+        formatValue={formatOffset}
+        parseValue={parseOffset}
         {...stepperLabels(thresholdLabel)}
         inputProps={{ 'data-outcome-dc': '' }}
         onChange={(dc) => onUpdate({ dc })}
@@ -178,16 +169,14 @@
        `checkRoll.js`, so under `checkDriven` this is the only authoring surface for a
        live engine field. -->
   {#if checkDriven}
-    <SegmentedControl
-      density="compact"
-      options={breakToolsSegments}
-      value={outcome.breakTools === true ? 'break' : 'keep'}
-      groupName={`outcome-break-${outcome.id}`}
-      ariaLabel={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreak', 'Break tools')}
-      dataAttr="data-outcome-break"
-      optionDataAttr="data-outcome-break-option"
-      onChange={(next) => onUpdate({ breakTools: next === 'break' })}
-    />
+    <span class="manager-checks-tier-break">
+      <StatusToggle
+        on={outcome.breakTools === true}
+        ariaLabel={breakLabel}
+        data-outcome-break=""
+        onclick={() => onUpdate({ breakTools: outcome.breakTools !== true })}
+      />
+    </span>
   {/if}
 
   <ManagerButton
@@ -202,7 +191,9 @@
 </div>
 
 <style>
-  .manager-checks-tier-stepper.is-wide {
-    width: 136px;
+  .manager-checks-tier-break {
+    display: flex;
+    flex: 0 0 76px;
+    justify-content: center;
   }
 </style>

@@ -154,7 +154,8 @@
       removable
       onReorder={(from, to) => moveTier(from, to)}
       onRemove={(tier) => removeTier(tier.id)}
-      rowClass={() => 'manager-checks-tier-row'}
+      rowClass={(tier) =>
+        `manager-checks-tier-row${attribute && tier.adjustment == null ? ' is-invalid' : ''}`}
       rowData={(tier) => ({ 'data-tier-row': tier.id })}
       removeData={() => ({
         'data-remove-tier': '',
@@ -171,7 +172,11 @@
         />
         <!-- A missing adjustment is named before the unit and describes the stepper it belongs to. -->
         {#if attribute && tier.adjustment == null}
-          <span class="manager-checks-tier-unit" id={missingId(tier)} data-tier-adjustment-missing>
+          <span
+            class="manager-checks-tier-missing"
+            id={missingId(tier)}
+            data-tier-adjustment-missing
+          >
             {text('FABRICATE.Admin.Manager.Checks.Evaluation.SetAdjustment', 'Set an adjustment')}
           </span>
         {/if}
@@ -184,7 +189,7 @@
              real DC, and the `data-*` hook rides `inputProps` onto the real `<input>`. `min={0}`
              because -1 is not a DC, and without the clamp one click of the `−` adjunct commits one. -->
         {#if attribute}
-          <div class="manager-checks-tier-stepper">
+          <div class="manager-checks-tier-stepper is-recipe">
             {#key kind}
               <Stepper
                 fill
@@ -204,7 +209,7 @@
             {/key}
           </div>
         {:else}
-          <div class="manager-checks-tier-stepper is-narrow">
+          <div class="manager-checks-tier-stepper is-recipe">
             <Stepper
               fill
               min={0}
@@ -229,3 +234,17 @@
     <span>{text('FABRICATE.Admin.Manager.Checks.Crafting.AddTier', 'Add difficulty tier')}</span>
   </ManagerButton>
 {/snippet}
+
+<style>
+  /* The prototype's recipe tier stepper width, on the row's 28px rung. */
+  .manager-checks-tier-stepper.is-recipe {
+    width: 90px;
+  }
+
+  .manager-checks-tier-missing {
+    flex: 0 0 auto;
+    color: var(--fab-danger-text);
+    font-size: 10px;
+    font-weight: 600;
+  }
+</style>

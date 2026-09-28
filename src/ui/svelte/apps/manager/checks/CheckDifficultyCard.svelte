@@ -248,6 +248,8 @@
     />
 
     {#if showDcSource}
+      <!-- The target source leads the card, ruled off from the choice it governs. -->
+      <div class="manager-checks-difficulty-rule" aria-hidden="true"></div>
       <RadioCardGroup
         legendKey={attribute
           ? 'FABRICATE.Admin.Manager.Checks.Evaluation.AdjustmentSourceTitle'
@@ -286,7 +288,9 @@
             placeholder="@skills.craft.value"
             onChange={(next) => emitTarget({ expression: next })}
           />
-          <small class="manager-muted" id={hintId} data-check-target-expression-hint>
+          <!-- The path syntax stays the field's description for assistive tech; the prototype
+               draws only the live reading beneath the field. -->
+          <small class="visually-hidden" id={hintId} data-check-target-expression-hint>
             {text(
               'FABRICATE.Admin.Manager.Checks.Evaluation.ValueHint',
               'A character path with its leading @, or arithmetic on paths without dice, such as @skills.craft.value - 2.'
@@ -384,10 +388,10 @@
 </InspectorCard>
 
 <style>
-  /* Two option-card groups stack with the gap the fields below them keep from a chooser. */
-  .manager-checks-card-body
-    > :global(.manager-resolution-mode-card + .manager-resolution-mode-card) {
-    margin-top: var(--fab-space-3);
+  /* The rule between the two option-card groups, on the gap the fields below keep from a chooser. */
+  .manager-checks-difficulty-rule {
+    margin: var(--fab-space-3) 0;
+    border-top: 1px solid var(--fab-border);
   }
 
   /* Each group's visible name takes the card's micro-label style. */
@@ -397,14 +401,34 @@
     letter-spacing: 0.08em;
   }
 
-  /* The character-value row stacks, so its expression and kind segments never overflow the card. */
+  /* The character value and its adjustment kind share one row: the path takes the room, the kind
+     a fixed column. */
   .manager-checks-difficulty-fields[data-check-attribute-fields] {
-    flex-direction: column;
-    align-items: stretch;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    align-items: start;
   }
 
   .manager-checks-difficulty-fields[data-check-attribute-fields]
     + .manager-checks-difficulty-fields {
     margin-top: var(--fab-space-3);
+  }
+
+  [data-check-attribute-fields] small {
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 1.45;
+  }
+
+  [data-check-target-resolution='muted'] {
+    color: var(--fab-text-subtle);
+  }
+
+  [data-check-target-resolution='resolved'] {
+    color: var(--fab-text-secondary);
+  }
+
+  [data-check-target-resolution='unresolved'] {
+    color: var(--fab-danger-text);
   }
 </style>

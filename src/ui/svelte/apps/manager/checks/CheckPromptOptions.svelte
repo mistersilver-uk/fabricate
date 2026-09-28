@@ -5,7 +5,7 @@
   stays the runtime's authority gate. `extra` is the slot later prompt options extend.
 -->
 <script>
-  import ToggleCard from '../../../components/ToggleCard.svelte';
+  import StatusToggle from '../../../components/StatusToggle.svelte';
   import { localize } from '../../../util/foundryBridge.js';
 
   let { offer = true, direction = 'over', extra = undefined, onChange = () => {} } = $props();
@@ -50,42 +50,73 @@
     <p class="manager-checks-prompt-options-title" id={titleId}>
       {text('FABRICATE.Admin.Manager.Checks.Evaluation.PromptTitle', 'In the roll prompt')}
     </p>
-    <p class="manager-checks-formula-rule">
+    <p class="manager-checks-prompt-options-hint">
       {text(
         'FABRICATE.Admin.Manager.Checks.Evaluation.PromptLead',
         'What the player can change before the dice are rolled.'
       )}
     </p>
   </div>
-  <ToggleCard
-    icon=""
-    {title}
-    sub={hint}
-    on={offered}
-    toggleLabel={title}
-    toggleAttr="data-check-offer-situational-bonus"
-    onToggle={(next) => onChange(next)}
-  />
+  <!-- A switch ROW inside the group rather than a nested card: the group is the one frame. -->
+  <div class="manager-checks-prompt-options-row">
+    <div class="manager-checks-prompt-options-copy">
+      <p class="manager-checks-prompt-options-label">{title}</p>
+      <p class="manager-checks-prompt-options-hint">{hint}</p>
+    </div>
+    <StatusToggle
+      on={offered}
+      ariaLabel={title}
+      data-check-offer-situational-bonus=""
+      onclick={() => onChange(!offered)}
+    />
+  </div>
   {@render extra?.()}
 </div>
 
 <style>
   .manager-checks-prompt-options {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-2);
     margin-top: var(--fab-space-3);
+    border: 1px solid var(--fab-border);
+    border-radius: 9px;
+    background: var(--fab-bg-1);
   }
 
-  /* The prototype's group head: a bold title with its lead directly beneath. */
-  .manager-checks-prompt-options-head .manager-checks-formula-rule {
-    margin-top: var(--fab-space-2xs);
+  .manager-checks-prompt-options-head {
+    padding: var(--fab-space-2) var(--fab-space-3) 0;
+  }
+
+  .manager-checks-prompt-options-row {
+    display: flex;
+    align-items: center;
+    gap: var(--fab-space-3);
+    padding: var(--fab-space-2) var(--fab-space-3);
+  }
+
+  .manager-checks-prompt-options-copy {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .manager-checks-prompt-options-title,
+  .manager-checks-prompt-options-label {
+    margin: 0;
+    font-size: 11.5px;
   }
 
   .manager-checks-prompt-options-title {
-    margin: 0;
     color: var(--fab-text);
-    font-size: 12.5px;
     font-weight: 600;
+  }
+
+  .manager-checks-prompt-options-label {
+    color: var(--fab-text-secondary);
+    font-weight: 500;
+  }
+
+  .manager-checks-prompt-options-hint {
+    margin: var(--fab-space-2xs) 0 0;
+    color: var(--fab-text-subtle);
+    font-size: 10px;
+    line-height: 1.45;
   }
 </style>

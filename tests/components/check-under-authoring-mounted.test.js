@@ -175,7 +175,7 @@ describe('the routed editor authors an under check losslessly (Q13)', () => {
     const state = await mount(start);
     await state.act((root) => choose(root, 'data-check-adjustment-kind-option', 'add'));
     const extreme = state.root.querySelector('[data-outcome-row="extreme"] [data-outcome-dc]');
-    assert.equal(extreme.value, '5', 'an added check edits the kept benefit offset');
+    assert.equal(extreme.value, '+5', 'an added check edits the kept benefit offset, signed');
     assert.equal(
       state.root.querySelector('[data-tier-row="t-hard"] [data-tier-adjustment]').value,
       '−2'
@@ -374,7 +374,7 @@ describe('the routed editor authors an under check losslessly (Q13)', () => {
     }));
     const state = await mount(allOtherwise);
     assert.equal(
-      state.root.querySelector('[data-outcome-row="extreme"] .manager-checks-tier-unit').textContent.trim(),
+      state.root.querySelector('[data-outcome-head] .is-threshold').textContent.trim(),
       'Adjustment'
     );
     assert.match(
@@ -477,7 +477,7 @@ describe('the routed editor authors an under check losslessly (Q13)', () => {
       'Benefit ±'
     );
     assert.equal(
-      state.root.querySelector('[data-outcome-row="extreme"] .manager-checks-tier-unit').textContent.trim(),
+      state.root.querySelector('[data-outcome-head] .is-threshold').textContent.trim(),
       'Benefit ±',
       'the column is named on screen'
     );

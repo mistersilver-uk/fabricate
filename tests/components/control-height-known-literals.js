@@ -16,8 +16,9 @@ export const SCANNED_HEIGHT_PROPERTIES = Object.freeze([
   'max-block-size',
 ]);
 
-/** The headline. Pinned exactly rather than derived. */
-export const KNOWN_RETIRED_HEIGHT_TOTAL = 58;
+/** The headline. Pinned exactly rather than derived. 59 -> 58 was before; 58 -> 57 (issue 2005):
+ * the Checks formula field snaps from the retired 40 to the 38 rung. */
+export const KNOWN_RETIRED_HEIGHT_TOTAL = 57;
 
 /** The per-corpus height-declaration counts the floors were CHOSEN AGAINST. */
 export const FLOOR_REFERENCE_STYLESHEET_DECLARATIONS = 491;
@@ -52,7 +53,7 @@ const ROWS = Object.freeze([
   'src/ui/svelte/components/Stepper.svelte | height | 36 | 1 | var(--fab-stepper-fill-height, 36px) => 36px',
   'styles/fabricate.css | height | 32 | 4 | 32px => 32px',
   'styles/fabricate.css | height | 36 | 8 | 36px => 36px',
-  'styles/fabricate.css | height | 40 | 6 | 40px => 40px',
+  'styles/fabricate.css | height | 40 | 5 | 40px => 40px',
   'styles/fabricate.css | min-height | 32 | 6 | 32px => 32px',
   'styles/fabricate.css | min-height | 36 | 5 | 36px => 36px',
   'styles/fabricate.css | min-height | 40 | 4 | 40px => 40px ; calc(40px + (2 * var(--fab-space-3)) + 2px) => calc(40px + (2 * 12px) + 2px)',

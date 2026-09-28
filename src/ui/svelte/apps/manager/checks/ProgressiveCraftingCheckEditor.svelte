@@ -58,7 +58,7 @@
           <p class="manager-checks-card-description">
             {text(
               'FABRICATE.Admin.Manager.Checks.Crafting.ProgressiveLead',
-              'Roll a formula for a numeric value. Results are awarded in order, each spending its difficulty from the value, until the value can no longer cover the next. Per-die crits force award-all or award-none.'
+              'Resolves to a numeric value, not a pass or fail. Modifiers from the Modifiers tab are applied by the check; they never appear in the formula.'
             )}
           </p>
         </div>

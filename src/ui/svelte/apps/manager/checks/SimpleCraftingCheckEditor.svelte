@@ -27,6 +27,7 @@
   import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
   import { activeCheckEvaluation } from '../../../../../systems/checkTarget.js';
   import { checkTargetChip } from './checksCopy.js';
+  import { previewTierAdjustment } from './checkAdjustmentLabel.js';
   import {
     bandsAreEditable,
     buildPassFailBands,
@@ -187,7 +188,7 @@
           <p class="manager-checks-card-description">
             {text(
               'FABRICATE.Admin.Manager.Checks.Crafting.FormulaLead',
-              'Rolled once per attempt.'
+              'Rolled once per attempt. Modifiers from the Modifiers tab are applied by the check; they never appear in the formula.'
             )}
           </p>
         </div>
@@ -202,6 +203,7 @@
           {evaluation}
           thresholdMode={comparison}
           {targetChip}
+          underTier={previewTierAdjustment(evaluation, previewedTier)}
           offerSituationalBonus={value?.offerSituationalBonus !== false}
           onChange={emit}
         />

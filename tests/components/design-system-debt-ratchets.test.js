@@ -1159,8 +1159,10 @@ const WITHDRAWN_UTILITIES = Object.freeze([
   {
     name: 'fab-field-skin',
     why:
-      'measured at thirteen carriers of the target tuple: two are PINNED by a test or a script ' +
-      'that reads their selectors, seven are recorded non-adopters and four are unpinned. The ' +
+      'measured at fifteen carriers of the target tuple: three are PINNED by a test or a script ' +
+      'that reads their selectors, eight are recorded non-adopters and four are unpinned. Issue ' +
+      "2005's Studio parity pass added two: the outcome tier row, pinned by the Checks mounted " +
+      "suite, and the Checks option cards' contextual override, a non-adopter. The " +
       'new non-adopter is the read-only dense ListRow in issue 1648, not a field; the four ' +
       'carriers that left are select skins issue 1510 took — the recipe overview cells, the ' +
       "recipe, component and essence browse toolbars' shared select skin and the vocabulary " +
@@ -1430,9 +1432,9 @@ test('every carrier of the withdrawn skin tuple carries its census marker', () =
 
   assert.equal(
     carriers.length,
-    13,
-    'the census is thirteen carrier blocks. `WITHDRAWN_UTILITIES` publishes that population and ' +
-      'its two-pinned / seven-non-adopter / four-unpinned split as prose, so a carrier arriving ' +
+    15,
+    'the census is fifteen carrier blocks. `WITHDRAWN_UTILITIES` publishes that population and ' +
+      'its three-pinned / eight-non-adopter / four-unpinned split as prose, so a carrier arriving ' +
       'or ' +
       'leaving means re-deriving that `why` text with it rather than moving this number alone.'
   );
@@ -1529,8 +1531,8 @@ test("the repetition ledger publishes the figures the sheet actually produces", 
 });
 
 test("the module sheet's cross-list selector repetition does not move", () => {
-  // Filtered to count >= 2 on both sides. Unfiltered the sheet holds 3,026 `(at-context, selector)`
-  // keys under this very keying, of which 2,920 appear exactly once; `assertRatchet` compares key
+  // Filtered to count >= 2 on both sides. Unfiltered the sheet holds 3,040 `(at-context, selector)`
+  // keys under this very keying, of which 2,934 appear exactly once; `assertRatchet` compares key
   // by key, so an unfiltered table would report every singleton as new debt the first time anybody
   // added a rule. Filtering both sides keeps a selector FALLING to one appearance visible: it
   // leaves the observed tally, and a baseline row nothing matches is a VANISHED failure.

@@ -39,6 +39,7 @@
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import Select from '../../../components/Select.svelte';
   import { previewRecordSelectOptions } from './checksSelectOptions.js';
+  import { previewTierAdjustment } from './checkAdjustmentLabel.js';
 
   // `showTiers` (default true) renders the per-recipe tier table, relative type only;
   // salvage/gathering reuse this editor with it off, having no records to pick a tier from.
@@ -147,6 +148,22 @@
   const outcomeColumn = $derived.by(() => {
     if (multiplyTiers) return 'adjustment';
     return editableBands ? 'dc' : 'benefit';
+  });
+  // The tier list's column header: one caption per threshold field, as the row draws them.
+  const thresholdHeads = $derived.by(() => {
+    if (type === 'fixed') {
+      return [
+        text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeStart', 'Start'),
+        text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeEnd', 'End'),
+      ];
+    }
+    if (outcomeColumn === 'adjustment') {
+      return [text('FABRICATE.Admin.Manager.Checks.Evaluation.Adjustment', 'Adjustment')];
+    }
+    if (outcomeColumn === 'benefit') {
+      return [text('FABRICATE.Admin.Manager.Checks.Evaluation.OutcomeBenefit', 'Benefit ±')];
+    }
+    return [text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeDc', 'DC ±')];
   });
   const comparison = $derived(value?.thresholdMode === 'exceed' ? 'exceed' : 'meet');
   // The under inset's target chip; absolute ranges read no target, so they have none.
@@ -440,7 +457,7 @@
           <p class="manager-checks-card-description">
             {text(
               'FABRICATE.Admin.Manager.Checks.Crafting.FormulaLead',
-              'Rolled once per attempt.'
+              'Rolled once per attempt. Modifiers from the Modifiers tab are applied by the check; they never appear in the formula.'
             )}
           </p>
         </div>
@@ -456,6 +473,7 @@
           {evaluation}
           thresholdMode={comparison}
           {targetChip}
+          underTier={previewTierAdjustment(evaluation, previewedTier)}
           offerSituationalBonus={value?.offerSituationalBonus !== false}
           onChange={emit}
         />
@@ -596,8 +614,29 @@
             )}
           </p>
         {:else}
-          <!-- A FLEX LIST, not a subgrid table, and no column headers: every control on the row
-                         states its own subject through its accessible name. -->
+          <!-- A FLEX LIST, not a subgrid table. The header row is for the eye alone: every control on
+               the row states its own subject through its accessible name. -->
+          <div class="manager-checks-tier-head" aria-hidden="true" data-outcome-head>
+            <span class="is-swatch"></span>
+            <span class="is-name"
+              >{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeTier', 'Tier')}</span
+            >
+            {#each thresholdHeads as head (head)}
+              <span class={type === 'fixed' ? 'is-range' : 'is-threshold'}>{head}</span>
+            {/each}
+            <span class="is-success">
+              {text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeCountsAs', 'Counts as')}
+            </span>
+            {#if checkDriven}
+              <span class="is-break"
+                >{text(
+                  'FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreaksTools',
+                  'Breaks tools'
+                )}</span
+              >
+            {/if}
+            <span class="is-remove"></span>
+          </div>
           <div
             class="manager-checks-tier-list"
             role="list"

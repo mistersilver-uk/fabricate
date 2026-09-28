@@ -77,9 +77,11 @@ describe('the formula card states what a roll actually resolves to (issue 1096)'
       ['Dexterity', 'Intelligence'],
       'every applied modifier is a chip, in the order the resolver returned them'
     );
-    assert.equal(
-      resolved.querySelector('[data-check-formula-modifier="m-dex"] i').className,
-      'fas fa-feather',
+    assert.deepEqual(
+      [...resolved.querySelector('[data-check-formula-modifier="m-dex"] i').classList].filter(
+        (token) => token.startsWith('fa')
+      ),
+      ['fas', 'fa-feather'],
       "a chip carries its modifier's own glyph"
     );
   });

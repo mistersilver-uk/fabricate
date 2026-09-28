@@ -61,3 +61,14 @@ export function parseCheckAdjustment(kind, text) {
   if (kind === 'multiply' && (sign === '-' || !(magnitude > 0))) return NaN;
   return sign === '-' ? -magnitude : magnitude;
 }
+
+/**
+ * The previewed tier's `{ name, adjustment }` reading under a character-value `evaluation`, or null
+ * when the check is not graded against one or the tier sets no adjustment.
+ */
+export function previewTierAdjustment(evaluation, tier) {
+  const target = evaluation?.target;
+  if (target?.source !== 'attribute' || !tier) return null;
+  const adjustment = formatCheckAdjustment(target.adjustmentKind, tier.adjustment);
+  return adjustment ? { name: tier.name || '', adjustment } : null;
+}
