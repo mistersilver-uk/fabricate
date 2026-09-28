@@ -1761,6 +1761,14 @@ threshold/outcome-tier configuration) drives resolution:
    failure loot.
 7. A routed task with no system routed `rollFormula` reports a GM-fix-required
    misconfiguration diagnostic and does not resolve.
+8. A `product: 'count'` routed check reads no target and no `rollFormula`; it rolls the
+   structured count pool instead (see `resolution-modes/spec.md` § Structured Count Evaluation)
+   and grades its required count from the task's non-null `successesOverride`, else `pool.required`.
+   A count refusal — an unresolved pool, an invalid die, explode, cancel, or the settled pool
+   itself — answers `misconfiguredOutcome` with code `CHECK_TARGET_INVALID`, exactly as a sum
+   target refusal does, before any roll.
+   Gathering's legacy progressive mode supports `product: 'count'` the same way, through the
+   shared progressive runner; the d100 drop roll is unaffected either way.
 
 ### Failure-Result Path
 

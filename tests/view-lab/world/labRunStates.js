@@ -61,6 +61,7 @@ export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({
   'gathering-straight': 'lab-v1-gathering-straight',
   'gathering-d100': 'lab-v1-gathering-d100',
   'gathering-check': 'lab-v1-gathering-check',
+  'gathering-journal-check-prompt': 'lab-v1-gathering-journal-check-prompt',
   'finished-success': 'lab-v1-finished-success',
   'finished-failure': 'lab-v1-finished-failure',
   'finished-cancelled': 'lab-v1-finished-cancelled',
@@ -596,6 +597,14 @@ function journalCaseFactories(context) {
       emptyRunContainers({ gatheringActive: [gatheringCaseRun(context, 'd100')] }),
     'gathering-check': () =>
       emptyRunContainers({ gatheringActive: [gatheringCaseRun(context, 'routed')] }),
+    // Issue 2073: a matured routed gathering run, primed for `execute` to fall through to the
+    // real engine (see the fixture-execute short circuit below) and open the real roll prompt.
+    'gathering-journal-check-prompt': () =>
+      emptyRunContainers({
+        gatheringActive: [
+          { ...gatheringCaseRun(context, 'routed'), id: 'lab-v1-gathering-journal-check-prompt' },
+        ],
+      }),
     'finished-success': () => finished(terminalCraftingCase(context, single(), 'succeeded')),
     'finished-failure': () => finished(terminalCraftingCase(context, checkRoute(), 'failed')),
     'finished-cancelled': () => finished(cancelledCraftingCase(context, multi())),
@@ -1602,7 +1611,12 @@ export function createLabJournalCaseController({
   };
 
   async function execute(command) {
-    if (state === 'journal-check-prompt' && command?.action === 'execute') return undefined;
+    if (
+      ['journal-check-prompt', 'gathering-journal-check-prompt'].includes(state) &&
+      command?.action === 'execute'
+    ) {
+      return undefined;
+    }
     const event = { ...cloneFixtureValue(command ?? {}), state };
     events.push(event);
     const located = locateActiveRun(containers, command);
