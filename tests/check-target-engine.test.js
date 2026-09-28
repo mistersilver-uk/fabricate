@@ -798,6 +798,67 @@ test('the gathering versioned descriptor names the formula and actor crafting na
   );
 });
 
+test('the gathering versioned descriptor appends an active check modifier to formula and resolvedFormula, never displayFormula', () => {
+  installCountingRoll();
+  const engine = new GatheringEngine({ localize: (key) => key });
+  const { system, environment, task } = gatheringFixture({ mode: 'routed' });
+  system.modifiers = [{ id: 'knack', label: 'Knack', expression: '2' }];
+  Object.assign(system.gatheringCraftingCheck.routed, { rollFormula: '1d20' });
+  Object.assign(system.gatheringCraftingCheck, {
+    defaultModifierPolicy: 'addAll',
+    defaultModifierIds: ['knack'],
+  });
+  const publicPrompt = engine._versionedCheckDescriptor({
+    actor: { uuid: 'Actor.g', system: {} },
+    run: { taskId: task.id },
+    system,
+    environment,
+    task: { ...task, resolutionMode: 'routed' },
+  }).publicPrompt;
+  assert.equal(publicPrompt.formula, '1d20 + 2[Modifiers]', 'the retained formula carries the applied modifier');
+  assert.equal(
+    publicPrompt.resolvedFormula,
+    '1d20 + 2[Modifiers]',
+    'the resolved formula also carries it, or the prompt would roll a term it never showed'
+  );
+  assert.equal(
+    publicPrompt.displayFormula,
+    '1d20',
+    'the pre-modifier display formula names no applied modifier: it is itemised as a chip instead'
+  );
+});
+
+test('the gathering versioned descriptor names an exceed threshold in its comparison', () => {
+  const engine = new GatheringEngine({ localize: (key) => key });
+  const { system, environment, task } = gatheringFixture({ mode: 'routed' });
+  Object.assign(system.gatheringCraftingCheck.routed, { thresholdMode: 'exceed' });
+  const publicPrompt = engine._versionedCheckDescriptor({
+    actor: { uuid: 'Actor.g', system: {} },
+    run: { taskId: task.id },
+    system,
+    environment,
+    task: { ...task, resolutionMode: 'routed' },
+  }).publicPrompt;
+  assert.equal(publicPrompt.comparison, 'exceed', 'an authored exceed threshold names exceed, not meet');
+});
+
+test('the gathering versioned descriptor grades a count evaluation with no dc or target', () => {
+  const engine = new GatheringEngine({ localize: (key) => key });
+  const { system, environment, task } = gatheringFixture({ mode: 'routed' });
+  Object.assign(system.gatheringCraftingCheck.routed, {
+    evaluation: { product: 'count', direction: 'over', pool: { base: '3', threshold: '8', required: 2 } },
+  });
+  const described = engine._versionedCheckDescriptor({
+    actor: { uuid: 'Actor.g', system: {} },
+    run: { taskId: task.id },
+    system,
+    environment,
+    task: { ...task, resolutionMode: 'routed' },
+  });
+  assert.equal(described.privateEvaluation.decisionPolicy.dc, null, 'a count check names no dc');
+  assert.equal(described.privateEvaluation.decisionPolicy.target, null, 'and no target either');
+});
+
 test('the gathering versioned descriptor names no formula for a count check', () => {
   const engine = new GatheringEngine({ localize: (key) => key });
   const { system, environment, task } = gatheringFixture({ mode: 'routed' });
@@ -848,6 +909,29 @@ test('a Journal-prompted roll-under gathering check shows its target chip and ro
   );
   assert.equal(surface.view.subtitle, 'Scavenger · Forage', 'the Journal subtitle names the actor and task');
   assert.equal(surface.view.formula, '1d20', 'the retained formula reaches the prompt untouched');
+});
+
+test('a Journal-prompted roll-high gathering check shows its DC chip, subtitle and formula', async () => {
+  const engine = new GatheringEngine({ localize: (key) => key });
+  // The fixture's default routed check names a fixed DC 15, `meet`, and no evaluation override
+  // (sum/over/fixed), so this is a roll-high (DC) check, not the roll-under case above.
+  const { system, environment, task } = gatheringFixture({ mode: 'routed' });
+  const descriptor = engine._versionedCheckDescriptor({
+    actor: { uuid: 'Actor.g', name: 'Scavenger', system: {} },
+    run: { taskId: task.id },
+    system,
+    environment,
+    task: { ...task, resolutionMode: 'routed' },
+  });
+  const surface = stubPromptSurface(() => null);
+  try {
+    await promptJournalStageCheck({ subject: descriptor.publicPrompt.label, ...descriptor.publicPrompt });
+  } finally {
+    surface.restore();
+  }
+  assert.equal(surface.view.subtitle, 'Scavenger · Forage', 'the Journal subtitle names the actor and task');
+  assert.equal(surface.view.formula, '1d20', 'the retained formula reaches the prompt untouched');
+  assert.equal(surface.view.chipText, 'DC 15 · meet or beat', 'a roll-high check still names its DC');
 });
 
 // ── the prepared evaluator ────────────────────────────────────────────────────
