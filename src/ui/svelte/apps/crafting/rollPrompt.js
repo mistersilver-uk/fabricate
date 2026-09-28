@@ -141,6 +141,8 @@ function underCopy() {
     targetDifficulty: promptLabel('TargetDifficulty', 'difficulty {value}'),
     targetTools: promptLabel('TargetTools', 'tools {value}'),
     targetModifiers: promptLabel('TargetModifiers', 'modifiers {value}'),
+    targetSituational: promptLabel('TargetSituational', 'situational {value}'),
+    targetPending: promptLabel('TargetPending', '{target} + {formula}'),
     eachAdds: promptLabel('EachRaises', 'Each raises the target.'),
     bonusHelp: promptLabel(
       'BonusHelpUnder',
@@ -373,7 +375,9 @@ export function buildSinglePromptData({
   cancel,
   required,
   modifierDestination,
+  offerSituationalBonus,
 } = {}) {
+  const offer = offerSituationalBonus !== false;
   const title = fill(promptLabel('CheckTitle', '{activity} check'), {
     activity: activity || promptLabel('roll', 'Roll'),
   });
@@ -396,6 +400,7 @@ export function buildSinglePromptData({
       direction: direction === 'under' ? 'under' : 'over',
       comparison: (comparison ?? thresholdMode) === 'exceed' ? 'exceed' : 'meet',
       selectedModifiers: Array.isArray(selectedModifiers) ? selectedModifiers : [],
+      offerSituationalBonus: offer,
       count: countPromptView({
         pool,
         die,
@@ -421,12 +426,17 @@ export function buildSinglePromptData({
     comparison:
       comparison === undefined ? (thresholdMode === 'exceed' ? 'exceed' : 'meet') : comparison,
     selectedModifiers: Array.isArray(selectedModifiers) ? selectedModifiers : [],
+    offerSituationalBonus: offer,
   };
 }
 
-/** The bulk heading names the activity and the one actor when the caller knows them. */
+/**
+ * The bulk heading names the activity and the one actor when the caller knows them. The bonus
+ * field is hidden only when every row with a check has its offer off; a row without one says nothing.
+ */
 export function buildBulkPromptData({ count, subjects, activity, actorName } = {}) {
   const rows = Array.isArray(subjects) ? subjects : [];
+  const checked = rows.filter((row) => row?.need && row.need.kind !== 'noCheck');
   const items = fill(promptLabel('BulkHeading', '{count} items'), {
     count: Number.isFinite(count) ? count : rows.length,
   });
@@ -451,6 +461,8 @@ export function buildBulkPromptData({ count, subjects, activity, actorName } = {
         })
       : items,
     subjects: rows,
+    offerSituationalBonus:
+      checked.length === 0 || checked.some((row) => row.offerSituationalBonus !== false),
   };
 }
 

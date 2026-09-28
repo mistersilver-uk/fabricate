@@ -466,8 +466,8 @@ describe('roll prompt adapter', () => {
       chipText: 'Target 14 · stay at or under', source: 'Base 15 · tools +2 · modifiers -3',
     }, 'a fixed target names its base once something raised it');
     assert.deepEqual(await target({ dc: 15, target: 15, selectedModifiers: [{ label: 'Die', display: '+1d4', value: null }] }), {
-      chipText: 'Target 15 · stay at or under', source: '',
-    }, 'a rolled modifier is rolled first, so it neither moves the chip nor shows a line');
+      chipText: 'Target 15 + 1d4 · stay at or under', source: '',
+    }, 'a rolled modifier is named as pending, never averaged in, and shows no line (issue 2005)');
     const choicePlan = { options: [{ id: 'a', value: 1 }, { id: 'b', value: null }, { id: 'c', value: 3 }] };
     const { view } = await open({ dc: 10, target: 10, direction: 'under', targetBasis: hardWork }, null);
     const live = (ids) => rollPromptTarget({ ...view, choicePlan }, ids).chipText;

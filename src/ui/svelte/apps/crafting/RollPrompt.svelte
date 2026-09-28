@@ -20,18 +20,19 @@
   import Select from '../../components/Select.svelte';
   import SelectionCheckbox from '../../components/SelectionCheckbox.svelte';
   import ManagerModal from '../manager/ManagerModal.svelte';
-  import { rollPromptTarget } from './rollPromptTarget.js';
+  import { modifierValue, rollPromptTarget } from './rollPromptTarget.js';
   import RollPromptTarget from './RollPromptTarget.svelte';
 
   let { data, onSubmit = () => {}, onDismiss = () => {} } = $props();
   let selectedIds = $state(untrack(() => [...data.choicePlan.defaultSelectedIds]));
   let rollMode = $state(untrack(() => data.defaultRollMode));
+  let bonus = $state('');
   let settled = false;
   const instanceId = $props.id();
   const modeCaptionId = `${instanceId}-roll-mode`;
   const multiPick = $derived(data.choicePlan.maxPicks > 1);
   const atCap = $derived(selectedIds.length >= data.choicePlan.maxPicks);
-  const target = $derived(rollPromptTarget(data, selectedIds));
+  const target = $derived(rollPromptTarget(data, selectedIds, bonus));
 
   function selectCheckbox(id, checked) {
     if (checked && atCap) return;
@@ -40,13 +41,6 @@
 
   function modifierLabel(modifier) {
     return modifier?.label || data.labels.unnamedModifier;
-  }
-
-  function modifierValue(modifier) {
-    if (typeof modifier?.display === 'string' && modifier.display) return modifier.display;
-    const value = Number(modifier?.value);
-    if (!Number.isFinite(value)) return '0';
-    return value >= 0 ? `+${value}` : String(value);
   }
 
   function answer(form, advantage) {
@@ -181,18 +175,22 @@
         </section>
       {/if}
 
-      <div class="bonus-group">
-        <Field as="label" class="prompt-field bonus-field">
-          <span class="eyebrow field-caption">{data.labels.bonus}</span>
-          <input
-            type="text"
-            name="situationalBonus"
-            placeholder={data.labels.bonusPlaceholder}
-            autocomplete="off"
-          />
-        </Field>
-        <p class="help">{data.labels.bonusHelp}</p>
-      </div>
+      <!-- With the offer off there is no field, so initial focus falls through to Roll. -->
+      {#if data.offerSituationalBonus !== false}
+        <div class="bonus-group">
+          <Field as="label" class="prompt-field bonus-field">
+            <span class="eyebrow field-caption">{data.labels.bonus}</span>
+            <input
+              type="text"
+              name="situationalBonus"
+              placeholder={data.labels.bonusPlaceholder}
+              autocomplete="off"
+              oninput={(event) => (bonus = event.currentTarget.value)}
+            />
+          </Field>
+          <p class="help">{data.labels.bonusHelp}</p>
+        </div>
+      {/if}
 
       <!-- A `div`, not a `label`: a caption click would re-open the list its mousedown dismissed. -->
       <Field as="div" class="prompt-field mode-field">

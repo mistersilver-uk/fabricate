@@ -825,3 +825,23 @@ test('the gathering evaluator hands back no executed visibility, which its run w
   assert.ok(!Object.hasOwn(gathered, 'visibility'));
   delete globalThis.Roll;
 });
+
+test('the ordinary engine prompt carries the check offer, and the prompt view keeps it (issue 2005)', async () => {
+  const offered = async (offerSituationalBonus) => {
+    const surface = stubPromptSurface(() => null);
+    try {
+      const config = { ...simpleCheck(SUM_UNDER), ...(offerSituationalBonus === false && { offerSituationalBonus }) };
+      const world = craftingWorld({ resolutionMode: 'simple', slot: 'simple', config });
+      installCountingRoll();
+      await world.engine._runCraftingCheck(
+        world.recipe, world.craftingActor, [world.sourceActor], null, null, { interactive: true }
+      );
+      return surface.view.offerSituationalBonus;
+    } finally {
+      surface.restore();
+    }
+  };
+  assert.equal(await offered(false), false, 'an offer-false check hides the field');
+  assert.equal(await offered(undefined), true, 'positive control');
+  delete globalThis.Roll;
+});

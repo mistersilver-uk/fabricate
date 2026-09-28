@@ -24,6 +24,17 @@ import { awardReceipts } from './runHistoryEvidence.js';
 import { isCountCheck, resolveSalvageCheck } from './salvageCheckUsability.js';
 import { resolvedComponentsFor } from './scopedEntityReads.js';
 
+/** Whether a subject's salvage check offers the prompt's situational bonus (issue 2005). */
+function offersSituationalBonus(system) {
+  return resolveSalvageCheck(system).config?.offerSituationalBonus !== false;
+}
+
+/** The batch decision one subject rolls with: a typed bonus applies only where its check offers one. */
+function subjectRollDecision(system, rollDecision) {
+  if (!rollDecision || offersSituationalBonus(system)) return rollDecision;
+  return { ...rollDecision, bonus: null };
+}
+
 /**
  * The targets one gesture may carry, enforced at SELECTION so salvage and destroy share one bound;
  * re-checked here as a backstop, hence the `maxItems` seam that makes `bulkLimit` testable.
@@ -170,7 +181,10 @@ export class BulkSalvageService {
     for (const entry of entries) {
       // SEQUENTIAL BY CONTRACT (see the module header); a skipped row still advances the count.
       if (entry.outcome === null) {
-        await this._runOne(entry, { interactive, rollDecision: decision.rollDecision });
+        await this._runOne(entry, {
+          interactive,
+          rollDecision: subjectRollDecision(entry.system, decision.rollDecision),
+        });
       }
       completed += 1;
       reportBulkProgress(onProgress, completed, entries.length);
@@ -349,6 +363,7 @@ export class BulkSalvageService {
           ...resolveSalvageCheck(entry.system),
           component: entry.component,
         }),
+        offerSituationalBonus: offersSituationalBonus(entry.system),
       })),
     });
     if (!choice || choice.confirmed === false) return { cancelled: true, rollDecision: null };

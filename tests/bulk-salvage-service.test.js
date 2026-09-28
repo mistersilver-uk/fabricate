@@ -540,9 +540,41 @@ describe('BulkSalvageService.run: the ONE roll prompt', () => {
     assert.equal(prompts.length, 1, 'one prompt, not one per item');
     assert.equal(prompts[0].count, 2);
     assert.deepEqual(prompts[0].subjects, [
-      { name: 'Iron Ore', img: 'icons/ore.webp', need: { kind: 'dc', dc: 15 } },
-      { name: 'Boar Hide', img: 'icons/hide.webp', need: { kind: 'dc', dc: 15 } },
+      { name: 'Iron Ore', img: 'icons/ore.webp', need: { kind: 'dc', dc: 15 }, offerSituationalBonus: true },
+      { name: 'Boar Hide', img: 'icons/hide.webp', need: { kind: 'dc', dc: 15 }, offerSituationalBonus: true },
     ]);
+  });
+
+  it('applies the typed batch bonus per subject, only where its own check offers one (issue 2005)', async () => {
+    const prompts = [];
+    const { seam, calls } = recordingSalvage();
+    const service = makeService({
+      systems: [
+        bulkSystem({ id: 'sys-a', rollFormula: '1d20', check: { offerSituationalBonus: false }, components: [ORE] }),
+        bulkSystem({ id: 'sys-b', rollFormula: '1d20', components: [HIDE] }),
+      ],
+      salvage: seam,
+      promptRollDecision: async (args) => {
+        prompts.push(args);
+        return { confirmed: true, bonus: '2', rollMode: 'gmroll', advantage: 'normal' };
+      },
+    });
+    await service.run({
+      targets: [
+        bulkTarget({ systemId: 'sys-a', componentId: 'comp-ore' }),
+        bulkTarget({ systemId: 'sys-b', componentId: 'comp-hide' }),
+      ],
+      interactive: true,
+    });
+    assert.deepEqual(prompts[0].subjects.map((subject) => subject.offerSituationalBonus), [false, true]);
+    assert.deepEqual(
+      calls.map((call) => [call.componentId, call.options.rollDecision]),
+      [
+        ['comp-ore', { bonus: null, rollMode: 'gmroll', advantage: 'normal' }],
+        ['comp-hide', { bonus: '2', rollMode: 'gmroll', advantage: 'normal' }],
+      ],
+      'the declining subject keeps the batch roll mode and advantage, never the bonus'
+    );
   });
 
   it('projects each subject\'s own need across a mixed batch, and names the activity and actor', async () => {

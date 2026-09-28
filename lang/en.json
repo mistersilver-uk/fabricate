@@ -504,6 +504,8 @@
         "TargetDifficulty": "difficulty {value}",
         "TargetTools": "tools {value}",
         "TargetModifiers": "modifiers {value}",
+        "TargetSituational": "situational {value}",
+        "TargetPending": "{target} + {formula}",
         "BulkRows": "Rolls in this batch",
         "NoCheck": "No check",
         "NoSingleTarget": "No single target",

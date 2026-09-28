@@ -31,6 +31,18 @@ describe('Journal roll prompt adapter', () => {
     assert.deepEqual(view.selectedModifiers, selectedModifiers, 'the modifier is still itemised');
   });
 
+  it('forwards the prepared offer, so an offer-false stage prompt shows no bonus field (issue 2005)', async () => {
+    const offerOf = async (descriptor) => {
+      let received;
+      await promptJournalStageCheck({ subject: 'Horseshoe', ...descriptor }, async (options) => {
+        received = options;
+      });
+      return buildSinglePromptData(received).offerSituationalBonus;
+    };
+    assert.equal(await offerOf({ offerSituationalBonus: false }), false);
+    assert.equal(await offerOf({}), true, 'an unentitled prompt without the key still offers the field');
+  });
+
   it('forwards the versioned target direction, so a roll-under stage names its target', async () => {
     const view = async (descriptor) => {
       let received;
