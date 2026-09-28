@@ -426,6 +426,35 @@ test('a dynamic-DC simple check moved into routedByCheck KEEPS its dynamic DC (i
   assert.equal(routed.dc, 13, 'the static DC still travels, as the anchor the macro receives');
 });
 
+test('the pass/fail move carries the evaluation and a false offer both ways (issue 2005)', async () => {
+  const evaluation = {
+    product: 'sum',
+    direction: 'under',
+    target: { source: 'attribute', expression: '@skills.craft.value', adjustmentKind: 'add', baseAdjustment: -2 },
+  };
+  for (const [fromMode, toMode, from, to] of [
+    ['routedByCheck', 'routedByIngredients', 'routed', 'simple'],
+    ['routedByIngredients', 'routedByCheck', 'simple', 'routed'],
+  ]) {
+    settingsStore.clear();
+    const manager = makeManager(makeRecipeManager([]));
+    manager.systems.set('sys-1', manager._normalizeSystem({
+      id: 'sys-1',
+      name: 'Forge',
+      resolutionMode: fromMode,
+      craftingCheck: { [from]: { rollFormula: '1d20', evaluation, offerSituationalBonus: false } }
+    }));
+
+    await manager.updateSystem('sys-1', { resolutionMode: toMode });
+
+    const moved = manager.getSystem('sys-1').craftingCheck[to];
+    assert.equal(moved.rollFormula, '1d20', `${from} → ${to} moved`);
+    assert.equal(moved.evaluation.direction, 'under', `${from} → ${to} keeps the evaluation`);
+    assert.deepEqual(moved.evaluation.target, evaluation.target);
+    assert.equal(moved.offerSituationalBonus, false, `${from} → ${to} keeps the offer`);
+  }
+});
+
 test('crossing into a non-RI, non-routedByCheck mode moves no crafting-check config', async () => {
   settingsStore.clear();
   const recipeManager = makeRecipeManager([]);

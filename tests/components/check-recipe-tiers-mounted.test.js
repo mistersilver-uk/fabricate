@@ -21,6 +21,10 @@ const harness = createMountedComponentHarness({
     ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/components/stepperLabels.js',
+    // The tier's adjustment labels (issue 2005).
+    'src/systems/normalize/checkEvaluation.js',
+    'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
+    'src/utils/scalars.js',
   ],
   compiledModules: [
     'src/ui/svelte/components/Stepper.svelte',

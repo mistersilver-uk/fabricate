@@ -7,7 +7,7 @@ import { publicComplications } from '../utils/complicationPlan.js';
 import { activityPermitsFailureResults } from '../utils/failureResultPolicy.js';
 
 import { refusalData } from './checkTarget.js';
-import { rollTotalForCard, tierStepForCard } from './craftCardFields.js';
+import { checkDisplayForCard, rollTotalForCard, tierStepForCard } from './craftCardFields.js';
 import { readStackQuantity } from './itemStackQuantity.js';
 import {
   assertNativeEffectsUninvoked,
@@ -364,6 +364,7 @@ export async function publishSalvageFailure(engine, ctx) {
     failureReason: checkResult.message || 'Salvage check failed',
     rollValue: rollTotalForCard(checkResult),
     tierStep: tierStepForCard(checkResult),
+    check: checkDisplayForCard(checkResult),
     suppressed: options?.suppressChat === true,
   });
 
@@ -515,6 +516,7 @@ export async function publishSalvageSuccess(engine, ctx) {
     failureReason: '',
     rollValue: rollTotalForCard(checkResult),
     tierStep: tierStepForCard(checkResult),
+    check: checkDisplayForCard(checkResult),
     suppressed: options?.suppressChat === true,
     firedComplications,
   });

@@ -216,13 +216,21 @@ export function actorRollData(actor) {
 /**
  * An activity's target from its check config. `anchor` is its fixed DC, `override` its non-null
  * adjustment override, and `readRollData` is called only for an attribute source. A fixed-range
- * routed check reads no target, so its target source is inert, as a progressive one is.
+ * routed check reads no target, so its target source is inert, as a progressive one is. A resolved
+ * target also carries `terms`, the arithmetic its executed `targetTerms` evidence begins with.
  */
 export function resolveActivityTarget(config, { anchor, override = null, readRollData }) {
-  if (config?.type === 'fixed') return { ok: true, target: anchor, source: 'fixed' };
+  if (config?.type === 'fixed') {
+    return {
+      ok: true,
+      target: anchor,
+      source: 'fixed',
+      terms: [{ kind: 'anchor', value: anchor }],
+    };
+  }
   const evaluation = activeCheckEvaluation(config);
   const attribute = evaluation.target.source === 'attribute';
-  return resolveCheckTarget({
+  return resolveTargetWithTerms({
     evaluation,
     rollData: attribute ? readRollData() : {},
     anchor,
@@ -248,11 +256,20 @@ export function selectTargetAdjustment(evaluation, override) {
  * an attribute source resolves its expression with Foundry path semantics, applies the
  * adjustment, then floors, and never reads an unusable value as 0.
  */
-export function resolveCheckTarget({ evaluation, rollData = {}, anchor, adjustment = null }) {
+export function resolveCheckTarget(input) {
+  const { terms: _terms, ...resolved } = resolveTargetWithTerms(input);
+  return resolved;
+}
+
+/**
+ * {@link resolveCheckTarget} plus the `terms` that fold back to its target: the anchor, then the
+ * adjustment it applied. With no adjustment the anchor is the floored value, so the fold is exact.
+ */
+function resolveTargetWithTerms({ evaluation, rollData = {}, anchor, adjustment = null }) {
   const target = evaluation?.target ?? {};
   if (target.source !== 'attribute') {
     return Number.isFinite(anchor)
-      ? { ok: true, target: anchor, source: 'fixed' }
+      ? { ok: true, target: anchor, source: 'fixed', terms: [{ kind: 'anchor', value: anchor }] }
       : { ok: false, reason: 'non-finite' };
   }
   if (!String(target.expression ?? '').trim()) return { ok: false, reason: 'expression-missing' };
@@ -266,9 +283,15 @@ export function resolveCheckTarget({ evaluation, rollData = {}, anchor, adjustme
     return { ok: false, reason: 'adjustment-invalid' };
   }
   const value = Math.floor(adjusted(resolved.value, kind, factor));
-  return Number.isFinite(value)
-    ? { ok: true, target: value, source: 'attribute' }
-    : { ok: false, reason: 'non-finite' };
+  if (!Number.isFinite(value)) return { ok: false, reason: 'non-finite' };
+  const terms =
+    factor === null
+      ? [{ kind: 'anchor', value }]
+      : [
+          { kind: 'anchor', value: resolved.value },
+          { kind: kind === 'multiply' ? 'multiplier' : 'adjustment', value: factor },
+        ];
+  return { ok: true, target: value, source: 'attribute', terms };
 }
 
 /** A relative multiply tier's threshold, floored again; NaN when the multiplier is invalid. */

@@ -8,7 +8,8 @@
   actor, and returns the final number, so tiers and the macro COMPOSE and the tier list is NOT
   hidden under dynamic. One that throws, returns a non-number or is missing falls back to the
   anchor and never throws mid-craft: a throw inside the engine is a CONSUMING failure, so this
-  card's copy promises what `CraftingEngine._resolveSimpleCheckDc` guarantees.
+  card's copy promises what `CraftingEngine._resolveSimpleCheckDc` guarantees. Under a character
+  value (issue 2005) the macro receives the target already computed from it instead.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -18,7 +19,7 @@
   import ItemDropZone from '../../../components/ItemDropZone.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
 
-  let { macroUuid = null, onChange = () => {} } = $props();
+  let { macroUuid = null, evaluation = null, onChange = () => {} } = $props();
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -44,6 +45,24 @@
     onChange({ macroUuid: uuid });
   }
 
+  const macroHint = $derived.by(() => {
+    if (evaluation?.target?.source !== 'attribute') {
+      return text(
+        'FABRICATE.Admin.Manager.Checks.Crafting.MacroHint',
+        'The macro is handed the base DC above — the difficulty tier the record selected, or the base DC when it selects none — alongside the ingredients, the record and the actor, and returns the number to use. A macro that fails or returns no number leaves the base DC in place.'
+      );
+    }
+    return evaluation?.direction === 'under'
+      ? text(
+          'FABRICATE.Admin.Manager.Checks.Evaluation.MacroHintUnder',
+          'The macro receives the target already computed from the character value, and must return the target to roll under.'
+        )
+      : text(
+          'FABRICATE.Admin.Manager.Checks.Evaluation.MacroHintOver',
+          'The macro receives the target already computed from the character value, and must return the target to reach.'
+        );
+  });
+
   // The ONE string the zone renders — empty prompt, resolved name, or the missing notice.
   const macroCardLabel = $derived.by(() => {
     if (!macroUuid) {
@@ -66,10 +85,7 @@
         {text('FABRICATE.Admin.Manager.Checks.Crafting.MacroTitle', 'DC macro')}
       </h3>
       <p class="manager-checks-card-description">
-        {text(
-          'FABRICATE.Admin.Manager.Checks.Crafting.MacroHint',
-          'The macro is handed the base DC above — the difficulty tier the record selected, or the base DC when it selects none — alongside the ingredients, the record and the actor, and returns the number to use. A macro that fails or returns no number leaves the base DC in place.'
-        )}
+        {macroHint}
       </p>
     </div>
   </div>

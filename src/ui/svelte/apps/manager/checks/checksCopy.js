@@ -131,3 +131,99 @@ export function interpolate(sentence, data) {
     Object.hasOwn(data, key) ? String(data[key]) : match
   );
 }
+
+/** The roll-under comparison word: `at or under`, or `under` for a strict comparison. */
+export function underComparisonPhrase(thresholdMode, text) {
+  return thresholdMode === 'exceed'
+    ? text('FABRICATE.Admin.Manager.Checks.Evaluation.CmpExceed', 'under')
+    : text('FABRICATE.Admin.Manager.Checks.Evaluation.CmpMeet', 'at or under');
+}
+
+/**
+ * The Formula inset's target chip: `Target {dc}` for a fixed source, else the character expression,
+ * or `Character value` while none is written.
+ */
+export function checkTargetChip(evaluation, dc, text) {
+  if (evaluation?.target?.source === 'attribute') {
+    return (
+      String(evaluation.target.expression ?? '').trim() ||
+      text('FABRICATE.Admin.Manager.Checks.Evaluation.SourceAttribute', 'Character value')
+    );
+  }
+  return interpolate(text('FABRICATE.Admin.Manager.Checks.Evaluation.TargetChip', 'Target {dc}'), {
+    dc: Number(dc ?? 0) || 0,
+  });
+}
+
+/**
+ * The Check type chooser's two options (the prototype's copy), each sentence resolved with the
+ * activity's own record words before it reaches `RadioCardGroup`, which takes no interpolation.
+ * Icons name what a tier threshold IS: an offset from the record's DC, or a measured segment.
+ */
+export function checkTypeOptions(text, { record, records }) {
+  const words = { record, records };
+  return [
+    {
+      value: 'relative',
+      icon: 'fas fa-plus-minus',
+      labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.TypeRelative',
+      fallback: 'Relative',
+      description: interpolate(
+        text(
+          'FABRICATE.Admin.Manager.Checks.Crafting.TypeRelativeDesc',
+          "Bands are offsets from the {record}'s own DC, so they move with it — DC −10 to −5 might be Bad. Each {record} picks a difficulty tier or overrides the DC with a number."
+        ),
+        words
+      ),
+    },
+    {
+      value: 'fixed',
+      icon: 'fas fa-ruler',
+      labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.TypeFixed',
+      fallback: 'Fixed',
+      description: interpolate(
+        text(
+          'FABRICATE.Admin.Manager.Checks.Crafting.TypeFixedDesc',
+          'Bands are absolute roll values and never move — 13 to 17 is always Good. {records} carry no DC at all; they only route their result groups to these tiers.'
+        ),
+        words
+      ),
+    },
+  ];
+}
+
+/**
+ * An outcome tier's threshold field names, shared by the row's accessible names and the list's
+ * column head: `[start, end]` for a fixed range, else the one field `column` edits.
+ */
+export function outcomeThresholdLabels(type, column, text) {
+  if (type === 'fixed') {
+    return [
+      text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeStart', 'Start'),
+      text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeEnd', 'End'),
+    ];
+  }
+  if (column === 'adjustment') {
+    return [text('FABRICATE.Admin.Manager.Checks.Evaluation.Adjustment', 'Adjustment')];
+  }
+  if (column === 'benefit') {
+    return [text('FABRICATE.Admin.Manager.Checks.Evaluation.OutcomeBenefit', 'Benefit ±')];
+  }
+  return [text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeDc', 'DC ±')];
+}
+
+/** The prototype's reference-kind glyphs, each a Font Awesome Free name, first match wins. */
+const FORMULA_TOKEN_KINDS = Object.freeze([
+  [/^\d*d\d+/i, 'fas fa-dice-d20'],
+  [/^@prof\b/, 'fas fa-medal'],
+  [/^@abilities\./, 'fas fa-hand'],
+  [/^@ingredients\b/, 'fas fa-flask'],
+  [/^@(?:details\.)?level\b/, 'fas fa-arrow-up-9-1'],
+]);
+
+/** A quick formula token's kind glyph (a die, proficiency, an ability…), or `''` for a kind the
+ *  prototype draws none for. */
+export function formulaTokenIcon(token) {
+  const source = String(token ?? '').trim();
+  return FORMULA_TOKEN_KINDS.find(([pattern]) => pattern.test(source))?.[1] ?? '';
+}

@@ -5,6 +5,7 @@ import { compileFunction } from 'node:vm';
 import { IngredientSet } from '../src/models/IngredientSet.js';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
+import { GatheringEngine } from '../src/systems/GatheringEngine.js';
 import { RunJournalBuilder } from '../src/ui/presenters/RunJournalBuilder.js';
 import { resolveAlchemySubmissions } from '../src/utils/alchemySubmissions.js';
 import { resolvedComponentsFor } from '../src/systems/scopedEntityReads.js';
@@ -14,6 +15,7 @@ import { evaluatePreparedRunCheck } from '../src/systems/checkRoll.js';
 import { installCountDice } from './helpers/countEngineDice.js';
 import { preparedCountCheck } from './helpers/countFixtures.js';
 import { mergeHistoryFlag } from './helpers/journal-fixtures.js';
+import { gatheringFixture } from './helpers/real-gathering-attempt.js';
 
 import {
   JOURNAL_RUN_SOCKET_KIND,
@@ -133,7 +135,7 @@ it('Journal prompt adapter forwards only named, permitted display fields', async
     img: 'icons/tea.webp', formula: '1d20 + 3[Modifiers]',
     resolvedFormula: '1d20 + 3[Modifiers]', displayFormula: '1d20', target: 14, comparison: 'exceed',
     selectedModifiers: [{ label: 'Focus', display: '+3' }],
-    allowAdvantage: true, allowsSituationalModifier: true,
+    allowAdvantage: true, allowsSituationalModifier: true, offerSituationalBonus: false,
     modifierChoice: null, privateEvaluation: { rollFormula: 'SECRET' },
   };
   let received;
@@ -143,13 +145,15 @@ it('Journal prompt adapter forwards only named, permitted display fields', async
     formula: '1d20 + 3', resolvedFormula: '1d20 + 3', displayFormula: '1d20',
     dc: 14, comparison: 'exceed', thresholdMode: 'exceed',
     selectedModifiers: [{ label: 'Focus', display: '+3' }],
-    allowAdvantage: true, modifierChoice: null,
+    allowAdvantage: true, offerSituationalBonus: false, modifierChoice: null,
   });
-  await promptJournalStageCheck({ ...descriptor, target: null, comparison: null },
+  await promptJournalStageCheck(
+    { ...descriptor, target: null, comparison: null, offerSituationalBonus: undefined },
     async (options) => { received = options; });
   assert.equal(received.dc, null);
   assert.equal(received.comparison, null);
   assert.equal(received.thresholdMode, null);
+  assert.equal(received.offerSituationalBonus, true, 'a descriptor without the flag offers it');
 });
 
 describe('journal run command protocol', () => {
@@ -332,6 +336,7 @@ describe('journal run command protocol', () => {
         activity: 'Crafting', img: canary, formula: '1d20+987', resolvedFormula: '1d20+987',
         target: 987, comparison: 'exceed', dc: 987,
         mode: 'simple', allowsSituationalModifier: true, allowAdvantage: true,
+        offerSituationalBonus: false,
         modifierChoice: { modifiers: [{ id: canary, label: canary }] },
         selectedModifiers: [{ label: canary, display: '+987' }],
         allowedModifierIds: [canary], protectedFields: { nested: canary },
@@ -361,7 +366,7 @@ describe('journal run command protocol', () => {
       const hidden = await service.handleSocketMessage(request, 'player');
       assert.equal(hidden.response.checkRequired, true);
       assert.deepEqual(hidden.response.promptDescriptor, {
-        allowsSituationalModifier: true, allowAdvantage: true,
+        allowsSituationalModifier: true, allowAdvantage: true, offerSituationalBonus: false,
       });
       assert.equal(JSON.stringify(hidden).includes(canary), false);
       assert.equal(JSON.stringify(hidden).includes('987'), false);
@@ -1363,6 +1368,60 @@ describe('journal run command protocol', () => {
     } finally {
       dice.restore();
     }
+  });
+
+  it('prompts with the offer captured at prepare, not a config edited after it (issue 2005)', async () => {
+    const run = { id: 'run-1', lifecycleVersion: 1, runRevision: 3, status: 'waiting' };
+    const fixture = gatheringFixture({ mode: 'routed' });
+    const routed = fixture.system.gatheringCraftingCheck.routed;
+    routed.offerSituationalBonus = false;
+    const gathering = new GatheringEngine({ localize: (key) => key });
+    let prompted = null;
+    let evaluated = null;
+    const engine = {
+      describeVersionedStageCheck: async () => {
+        const descriptor = gathering._versionedCheckDescriptor({
+          actor: { uuid: 'Actor.a', system: {} },
+          run: { taskId: fixture.task.id },
+          ...fixture,
+        });
+        // The GM turns the offer back on while the player's prompt is still to open.
+        routed.offerSituationalBonus = true;
+        return descriptor;
+      },
+      evaluatePreparedVersionedCheck: async ({ privateEvaluation, decision }) => {
+        evaluated = { privateEvaluation, decision };
+        return { engineEvaluated: true, success: true, data: {} };
+      },
+      executeVersionedStage: async () => ({ success: true, runId: run.id, status: 'completed' }),
+    };
+    const operations = createGatheringJournalRunOperations({
+      engine,
+      runManager: { getRun: () => run },
+      getService: () => service,
+      getUser: () => ({ id: 'gm', isGM: true }),
+    });
+    const { service } = commandHarness({
+      currentUserId: 'gm',
+      authority: replicatedAuthorityFixture().authority,
+      run,
+      operations: { gathering: operations },
+      promptCheck: (descriptor) =>
+        promptJournalStageCheck(descriptor, async (options) => {
+          prompted = options;
+          return { confirmed: true, bonus: '2' };
+        }),
+    });
+    const response = await service.executeJournalRunCommand({
+      actorUuid: 'Actor.a', runType: 'gathering', runId: run.id, expectedRevision: 3,
+      action: 'execute',
+    });
+
+    assert.equal(response.success, true, JSON.stringify(response));
+    assert.equal(prompted.offerSituationalBonus, false, 'the prompt reads the prepared offer');
+    assert.equal(evaluated.privateEvaluation.checkConfig.offerSituationalBonus, false, 'snapshot');
+    assert.equal(evaluated.decision.allowsSituationalModifier, true, 'the gate is not the offer');
+    assert.equal(evaluated.decision.bonus, '2');
   });
 
   /**

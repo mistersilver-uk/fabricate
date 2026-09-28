@@ -13,6 +13,10 @@
   their kin — shows a visible `avg —` with an accessible reason instead of the numeric one, so
   the withholding is never mistaken for the malformed-input case. For the same reason THE RULE
   SENTENCE STOPS AT THE RULE. Controlled through `onChange`.
+
+  The card also carries the `Which way is better` axis and the `In the roll prompt` group (issue
+  2005). Under, the dice stay as rolled and modifiers raise the target, so the inset joins the
+  target chip and the modifier chips with `+` and joins nothing to the dice.
 -->
 <script>
   import { getModifierExpressionSuggestions } from '../../../../../config/modifierExpressionSuggestions.js';
@@ -20,7 +24,12 @@
     classifyRollQuantity,
     reduceRollExpression,
   } from '../../../../../utils/rollExpressionAverage.js';
+  import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
+  import Chip from '../../../components/Chip.svelte';
+  import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import { localize } from '../../../util/foundryBridge.js';
+  import CheckPromptOptions from './CheckPromptOptions.svelte';
+  import { formulaTokenIcon, interpolate, underComparisonPhrase } from './checksCopy.js';
 
   let {
     rollFormula = '',
@@ -33,8 +42,51 @@
     modifierPolicy = 'addAll',
     // The activity's word for the thing a check is rolled for, for the `bySubject` sentence.
     recordNoun = 'recipe',
+    // The check's evaluation and comparison, and the under inset's target chip (`Target 12`, or the
+    // character expression); a check with no target passes none. `underNote` is false where the
+    // runtime refuses a roll-under check, so the note does not describe a roll that never happens.
+    evaluation = null,
+    thresholdMode = 'meet',
+    targetChip = '',
+    underNote = true,
+    // Under a character value, the previewed tier's `{ name, adjustment }` reading, named in the
+    // under rule sentence as the adjustment applied first.
+    underTier = null,
+    offerSituationalBonus = true,
     onChange = () => {},
   } = $props();
+
+  const normalizedEvaluation = $derived(normalizeCheckEvaluation(evaluation));
+  const direction = $derived(normalizedEvaluation.direction);
+  const underInset = $derived(direction === 'under');
+
+  const DIRECTION_OPTIONS = [
+    {
+      value: 'over',
+      labelKey: 'FABRICATE.Admin.Manager.Checks.Evaluation.DirectionOver',
+      fallback: 'Higher is better',
+    },
+    {
+      value: 'under',
+      labelKey: 'FABRICATE.Admin.Manager.Checks.Evaluation.DirectionUnder',
+      fallback: 'Lower is better',
+    },
+  ];
+
+  const comparisonPhrase = $derived(underComparisonPhrase(thresholdMode, text));
+
+  const directionLabel = $derived(
+    text('FABRICATE.Admin.Manager.Checks.Evaluation.DirectionTitle', 'Which way is better')
+  );
+
+  function interpolateCmp(sentence) {
+    return sentence.replaceAll('{cmp}', comparisonPhrase);
+  }
+
+  function setDirection(next) {
+    if (next === direction) return;
+    onChange({ evaluation: { ...normalizedEvaluation, direction: next } });
+  }
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -90,8 +142,30 @@
   const DEFAULT_MODIFIER_ICON = 'fas fa-wand-magic-sparkles';
   const applied = $derived(Array.isArray(appliedModifiers) ? appliedModifiers : []);
 
-  // ONE sentence naming the rule in force, restating what the Modifiers section authors.
+  // The prototype's under sentence: the raw-dice rule, naming the previewed tier's adjustment.
+  function underRuleSentence() {
+    if (!underTier) {
+      return text(
+        'FABRICATE.Admin.Manager.Checks.Evaluation.UnderRule',
+        'The dice are compared raw. Every modifier that applies raises the target instead of being added to the roll.'
+      );
+    }
+    const sentence = underTier.name
+      ? text(
+          'FABRICATE.Admin.Manager.Checks.Evaluation.UnderRuleWithTier',
+          'The dice are compared raw. Every modifier that applies raises the target instead of being added to the roll; the {tier} adjustment ({adjustment}) is applied first.'
+        )
+      : text(
+          'FABRICATE.Admin.Manager.Checks.Evaluation.UnderRuleWithUnnamedTier',
+          "The dice are compared raw. Every modifier that applies raises the target instead of being added to the roll; the tier's adjustment ({adjustment}) is applied first."
+        );
+    return interpolate(sentence, { tier: underTier.name, adjustment: underTier.adjustment });
+  }
+
+  // ONE sentence naming the rule in force, restating what the Modifiers section authors. Under,
+  // the dice are compared raw, so the sentence names where the modifiers land instead.
   const ruleSentence = $derived.by(() => {
+    if (underInset) return underRuleSentence();
     if (applied.length === 0) {
       return text(
         'FABRICATE.Admin.Manager.Checks.Crafting.ResolvedNoModifiers',
@@ -124,10 +198,39 @@
 </script>
 
 <div class="manager-checks-formula">
+  <!-- The prototype's two-column axis row: `What the roll produces` (issue 2006) takes the first
+       column, so the direction axis keeps the second. -->
+  <div class="manager-checks-formula-axes">
+    <div class="manager-checks-difficulty-field is-direction" data-check-direction-field>
+      <span class="manager-checks-difficulty-label">{directionLabel}</span>
+      <SegmentedControl
+        fill
+        density="field"
+        options={DIRECTION_OPTIONS}
+        value={direction}
+        groupName="check-evaluation-direction"
+        ariaLabel={directionLabel}
+        dataAttr="data-check-direction"
+        optionDataAttr="data-check-direction-option"
+        onChange={setDirection}
+      />
+    </div>
+  </div>
+  {#if direction === 'under' && underNote}
+    <p class="manager-checks-formula-direction-note" data-check-direction-note>
+      {interpolateCmp(
+        text(
+          'FABRICATE.Admin.Manager.Checks.Evaluation.UnderNote',
+          'The total must stay {cmp} the target. Modifiers raise the target; the dice stay as rolled.'
+        )
+      )}
+    </p>
+  {/if}
+
   <!-- The CARD TITLE is `Formula`, so the input takes an `aria-label` rather than a second
          visible label. -->
   <div class="manager-checks-formula-input">
-    <i class="fas fa-dice-d20" aria-hidden="true"></i>
+    <i class="fas fa-dice" aria-hidden="true"></i>
     <!-- THE CONTROL HALF of the Validation route's row action. All three roll issues are about
              THIS field, the roll section's first control in every editor, so it is addressed as
              `checks-roll-formula`. An `<input>` is natively focusable, so no `tabindex`. -->
@@ -175,21 +278,43 @@
       </p>
       <p class="manager-checks-formula-expression">
         <span class="manager-checks-formula-base">{rollFormula || placeholder}</span>
-        {#if applied.length > 0}
-          <!-- The join between the FORMULA and the modifier list carries the accent and the list's
-                         own separators are subtle, so the expression reads as one written term plus a set
-                         of automatic ones rather than a flat sum. -->
-          <span class="manager-checks-formula-join" aria-hidden="true">+</span>
-        {/if}
-        {#each applied as modifier, index (modifier.id)}
-          {#if index > 0}
-            <span class="manager-checks-formula-sep" aria-hidden="true">+</span>
+        {#if underInset}
+          <!-- Under, the modifiers raise the target: `+` joins them to the target chip, never to
+               the dice, which a reader would take for a sum. -->
+          {#if targetChip}
+            <span class="manager-checks-formula-comparison" data-check-formula-comparison
+              >{comparisonPhrase}</span
+            >
+            <Chip tone="info" density="tag-run" icon="fas fa-bullseye" data-check-formula-target
+              >{targetChip}</Chip
+            >
           {/if}
-          <span class="manager-checks-formula-chip" data-check-formula-modifier={modifier.id}>
-            <i class={modifier.icon || DEFAULT_MODIFIER_ICON} aria-hidden="true"></i>
-            <span>{modifier.name}</span>
-          </span>
-        {/each}
+          {#each applied as modifier, index (modifier.id)}
+            {#if targetChip || index > 0}
+              <span class="manager-checks-formula-sep" aria-hidden="true">+</span>
+            {/if}
+            <span class="manager-checks-formula-chip" data-check-formula-modifier={modifier.id}>
+              <i class={modifier.icon || DEFAULT_MODIFIER_ICON} aria-hidden="true"></i>
+              <span>{modifier.name}</span>
+            </span>
+          {/each}
+        {:else}
+          {#if applied.length > 0}
+            <!-- The join between the FORMULA and the modifier list carries the accent and the list's
+                 own separators are subtle, so the expression reads as one written term plus a set
+                 of automatic ones rather than a flat sum. -->
+            <span class="manager-checks-formula-join" aria-hidden="true">+</span>
+          {/if}
+          {#each applied as modifier, index (modifier.id)}
+            {#if index > 0}
+              <span class="manager-checks-formula-sep" aria-hidden="true">+</span>
+            {/if}
+            <span class="manager-checks-formula-chip" data-check-formula-modifier={modifier.id}>
+              <i class={modifier.icon || DEFAULT_MODIFIER_ICON} aria-hidden="true"></i>
+              <span>{modifier.name}</span>
+            </span>
+          {/each}
+        {/if}
       </p>
       <p class="manager-checks-formula-rule" data-check-formula-rule={modifierPolicy}>
         {ruleSentence}
@@ -209,8 +334,48 @@
       >
         <!-- The verb as a GLYPH: a literal `+` in the label reads as part of the expression. -->
         <i class="fas fa-plus" aria-hidden="true"></i>
+        {#if formulaTokenIcon(token)}
+          <i
+            class={`${formulaTokenIcon(token)} is-kind`}
+            aria-hidden="true"
+            data-check-formula-token-kind
+          ></i>
+        {/if}
         <span>{token}</span>
       </button>
     {/each}
   </span>
+
+  <CheckPromptOptions
+    offer={offerSituationalBonus}
+    {direction}
+    onChange={(offer) => onChange({ offerSituationalBonus: offer })}
+  />
 </div>
+
+<style>
+  .manager-checks-formula-axes {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--fab-space-3);
+    margin-bottom: var(--fab-space-3);
+  }
+
+  .manager-checks-formula-axes > .is-direction {
+    grid-column: 2;
+  }
+
+  /* The axis note tucks under the axis row; it is the rule the GM is reading, in secondary ink. */
+  .manager-checks-formula-direction-note {
+    margin: calc(-1 * var(--fab-space-1)) 0 var(--fab-space-3);
+    color: var(--fab-text-secondary);
+    font-size: 10.5px;
+    line-height: 1.5;
+  }
+
+  .manager-checks-formula-comparison {
+    color: var(--fab-text-subtle);
+    font-size: 11.5px;
+    font-weight: 600;
+  }
+</style>

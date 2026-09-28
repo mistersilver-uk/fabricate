@@ -1182,7 +1182,7 @@ export class CraftingSystemManager {
   }
 
   /** Copy the pass/fail check fields to a destination only when it has no `rollFormula` and the
-   * source does, including `dcMode`/`macroUuid` (issue 1096). */
+   * source does, including `dcMode`/`macroUuid` (issue 1096), the evaluation and the offer. */
   _copyPassFailCheckFields(source, destination) {
     if (!source || typeof source !== 'object' || !destination || typeof destination !== 'object') {
       return;
@@ -1208,6 +1208,10 @@ export class CraftingSystemManager {
         source.checkBreakage && typeof source.checkBreakage === 'object'
           ? structuredClone(source.checkBreakage)
           : source.checkBreakage;
+    }
+    if ('evaluation' in source) destination.evaluation = structuredClone(source.evaluation);
+    if ('offerSituationalBonus' in source) {
+      destination.offerSituationalBonus = source.offerSituationalBonus;
     }
   }
 
