@@ -22,6 +22,10 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/actions/anchoredPopover.js',
   'src/ui/svelte/util/overlayBounds.js',
   'src/ui/svelte/apps/manager/checks/checksReadiness.js',
+  // `checksReadiness.js` grades a kept salvage/task override through the same rule the
+  // component and task editors warn with (issue 2078).
+  'src/ui/svelte/apps/manager/checks/checkOverrideReadiness.js',
+  'src/ui/svelte/apps/manager/component/overridePlayerSees.js',
   // The studio's eight converted option vocabularies (issue 1510).
   'src/ui/svelte/apps/manager/checks/checksSelectOptions.js',
   // The Validation route's focus half (issue 1517).

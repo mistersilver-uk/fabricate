@@ -34,3 +34,4 @@ manager-gathering-task-editor-check-fixed-under
 manager-gathering-task-editor-check-add
 manager-gathering-task-editor-check-multiply
 manager-gathering-task-editor-check-default
+manager-gathering-task-editor-check-invalid

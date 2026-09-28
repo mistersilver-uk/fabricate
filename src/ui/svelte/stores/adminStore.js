@@ -2394,6 +2394,18 @@ export function createAdminStore(services) {
       localize: services.localize,
     });
   }
+
+  /**
+   * Every managed component of `systemId`, raw and unfiltered (issue 2078). Neither `itemCards`
+   * (search-filtered by the Components browser's own term) nor `selectedSystem.managedItemOptions`
+   * (a summary allowlist) carries the persisted `salvage` sub-object the Checks Studio's
+   * readiness needs, so this reads the manager's own raw system the way `managedItemOptionsFor`
+   * above already does.
+   */
+  function componentsForSystem(systemId) {
+    return _getManagedItems(services.getCraftingSystemManager?.()?.getSystem?.(systemId) || null);
+  }
+
   /**
    * Build the derived `evaluateSystemValidation` report for the selected system, assembling the
    * collaborators the pure aggregator needs. Pure and synchronous.
@@ -7127,6 +7139,7 @@ export function createAdminStore(services) {
     saveGatheringCheckActive,
     saveGatheringCheckProgressive,
     saveGatheringCheckRouted,
+    componentsForSystem,
     addCurrencyUnit: currency.addCurrencyUnit,
     updateCurrencyUnit: currency.updateCurrencyUnit,
     deleteCurrencyUnit: currency.deleteCurrencyUnit,

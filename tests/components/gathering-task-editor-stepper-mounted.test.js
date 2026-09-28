@@ -745,4 +745,35 @@ describe('the task check override follows the routed check evaluation (issue 200
     );
     assert.equal(view.note(), '', 'a chosen character needs no note');
   });
+
+  it('a kept override invalidated by a kind switch is marked invalid at the field', async () => {
+    const view = await mountOverride(
+      { adjustmentOverride: -2 },
+      { evaluation: evaluation({ kind: 'multiply' }) }
+    );
+    assert.equal(view.input().getAttribute('aria-invalid'), 'true');
+    const message = view.card().querySelector('[data-gathering-task-override-invalid]');
+    assert.ok(Boolean(message), 'the field names the invalid override');
+    assert.equal(
+      message.textContent.trim(),
+      'This override does not suit its kind: an added adjustment must be a finite number and a multiplier must be above zero.'
+    );
+    assert.equal(view.input().getAttribute('aria-describedby'), message.id);
+  });
+
+  it('clears the invalid-field warning once the kept override suits its kind again', async () => {
+    const view = await mountOverride(
+      { adjustmentOverride: -2 },
+      { evaluation: evaluation({ kind: 'multiply' }) }
+    );
+    assert.ok(Boolean(view.card().querySelector('[data-gathering-task-override-invalid]')));
+    await harness.setProps({
+      checkConfig: { thresholdMode: 'meet', evaluation: evaluation({ kind: 'add' }) },
+    });
+    assert.ok(
+      !view.card().querySelector('[data-gathering-task-override-invalid]'),
+      'an added adjustment of -2 is valid, so the warning clears'
+    );
+    assert.ok(!view.input().hasAttribute('aria-invalid'));
+  });
 });

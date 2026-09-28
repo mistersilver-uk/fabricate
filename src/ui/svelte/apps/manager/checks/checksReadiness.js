@@ -24,6 +24,7 @@ import {
 } from '../../../../../utils/craftingCheckExpression.js';
 import { trimString as trimmed } from '../../../../../utils/scalars.js';
 
+import { invalidOverrideRecords, overrideEntriesFor } from './checkOverrideReadiness.js';
 import { missingTargetPaths, readsCharacter, targetExpressionFault } from './checkTargetStatus.js';
 
 /**
@@ -414,13 +415,23 @@ function recipeTierReadiness(result, tiers) {
 }
 
 /**
- * The base and every set tier adjustment suit the target's adjustment kind. A faulted base is
- * flagged as `baseAdjustment` rather than named, so the copy layer names it in the reader's language.
+ * The base, every set tier adjustment and every named override record suit the target's
+ * adjustment kind. A faulted base is flagged as `baseAdjustment` rather than named, so the copy
+ * layer names it in the reader's language; a faulted override is a component's or a gathering
+ * task's kept value (issue 2078), named beside the tiers in the same sentence.
  */
-function adjustmentKindReadiness(result, { adjustmentKind: kind, baseAdjustment }, set) {
+function adjustmentKindReadiness(
+  result,
+  { adjustmentKind: kind, baseAdjustment },
+  set,
+  overrideRecords = []
+) {
   const suits = (value) => isValidTargetAdjustment(kind, value);
   const baseInvalid = baseAdjustment !== null && !suits(baseAdjustment);
-  const invalid = set.filter((entry) => !suits(entry.value));
+  const invalid = [
+    ...set.filter((entry) => !suits(entry.value)),
+    ...invalidOverrideRecords(overrideRecords, kind),
+  ];
   result.checks.push({
     id: 'adjustmentsSuitKind',
     satisfied: !baseInvalid && invalid.length === 0,
@@ -608,7 +619,7 @@ function countReadiness(result, check, evaluation, { mode, activity, previewActo
  * progressive or fixed-range target source is inert, so nothing about it is validated.
  * @returns {{ checks: CheckReadinessCheck[], issues: CheckReadinessIssue[],
  *   transient: CheckReadinessIssue[] }} */
-function targetReadiness(check, { mode, activity, previewActor }) {
+function targetReadiness(check, { mode, activity, previewActor, overrideEntries = [] }) {
   const result = { checks: [], issues: [], transient: [] };
   const evaluation = normalizeCheckEvaluation(check?.evaluation);
   if (evaluation.product === 'count') {
@@ -631,10 +642,12 @@ function targetReadiness(check, { mode, activity, previewActor }) {
   recipeTierReadiness(result, tiers);
   const multiplyTiers =
     mode === 'routed' && evaluation.target.adjustmentKind === 'multiply' ? outcomes : [];
-  adjustmentKindReadiness(result, evaluation.target, [
-    ...setAdjustments(tiers),
-    ...setAdjustments(multiplyTiers),
-  ]);
+  adjustmentKindReadiness(
+    result,
+    evaluation.target,
+    [...setAdjustments(tiers), ...setAdjustments(multiplyTiers)],
+    overrideEntries
+  );
   if (multiplyTiers.length > 0) otherwiseReadiness(result, multiplyTiers);
   return result;
 }
@@ -674,6 +687,10 @@ function formulaReadiness(check, evaluation) {
  *   it decides WHY a no-check mode's selection reaches no roll, and whether recipe tiers apply.
  * @param {?{name: string, rollData: object}} [options.previewActor] The Preview-as character,
  *   whose unreadable target value raises a `transient` warning naming them.
+ * @param {object[]} [options.components] Every component; `activity: 'salvage'` grades each
+ *   salvage-enabled one's kept override (issue 2078).
+ * @param {object[]} [options.gatheringTasks] Every gathering task; `activity: 'gathering'`
+ *   grades each routed one's kept override the same way.
  * @returns {{ checks: CheckReadinessCheck[], issues: CheckReadinessIssue[],
  *   transient: CheckReadinessIssue[] }} */
 export function evaluateCheckReadiness(check = {}, options = {}) {
@@ -756,10 +773,12 @@ export function evaluateCheckReadiness(check = {}, options = {}) {
     issues.push(...tierStep.issues);
   }
 
+  const overrideEntries = overrideEntriesFor(options.activity, options);
   const target = targetReadiness(check, {
     mode,
     activity: options.activity || '',
     previewActor: options.previewActor ?? null,
+    overrideEntries,
   });
   checks.push(...target.checks);
   issues.push(...target.issues);
