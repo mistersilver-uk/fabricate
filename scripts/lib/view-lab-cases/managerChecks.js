@@ -170,6 +170,31 @@ const underCase = ({ id, label, frame, query = {}, steps, expectView, expectSele
     sourceMatches: PARITY_SOURCES,
   });
 
+/*
+ * The success-counting preview states (issue 2004): the odds panel, simulator readout, abstention,
+ * readiness and Validation rows for a count check, seeded onto Karrun Forgecraft through the lab's
+ * `checkPreviewState` (count authoring is issue 2006's), each on the prototype frame it answers.
+ */
+const COUNT_ODDS = Object.freeze([{ selector: '[data-checks-odds]', scroll: true }]);
+const COUNT_IDRIN = Object.freeze(previewAsActor('lab-actor-idrin'));
+const COUNT_ROLL = Object.freeze([
+  { selector: '[data-checks-simulator-roll]' },
+  { selector: '[data-checks-simulator-panel]', scroll: true },
+]);
+const countCase = ({ id, label, frame, state = 'dice-pool', nav = 'crafting', steps, ...rest }) =>
+  managerCase({
+    id,
+    label: `Manager — Checks count preview, ${label} (prototype state ${frame})`,
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-smithing', checkPreviewState: state },
+    steps: ['Checks', { selector: `#manager-checks-nav-${nav}` }, ...steps],
+    expectView: `checks-${nav}`,
+    kinds: ['manager', 'checks'],
+    sourceMatches: PARITY_SOURCES,
+    ...rest,
+  });
+
 export const CASES = Object.freeze([
   managerCase({
     id: 'manager-checks-gathering',
@@ -1162,5 +1187,196 @@ export const CASES = Object.freeze([
       '.fabricate-manager [data-checks-odds-reason="modifier-preroll-not-enumerable"]',
     kinds: ['manager', 'checks'],
     sourceMatches: PARITY_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-checks-under-attribute-narrow',
+    label:
+      'Manager — Checks roll-under preview, multiplied character value, odds, narrow (prototype state 5)',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-runework' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      ...underMultiplySteps('@skills.med.mod + 51'),
+      ...SCROLL_ODDS,
+    ],
+    expectView: 'checks-crafting',
+    expectSelector:
+      '.fabricate-manager [data-checks-odds-state="enumerated"][data-checks-odds-direction="under"] [data-checks-odds-bar]',
+    // The 1024x640 declared floor, stacked, for the same enumerated row `manager-checks-stacked-floor`
+    // proves for sum/over: the odds panel restacks under the same ladder for a roll-under record.
+    position: { width: 1024, height: 640 },
+    kinds: ['manager', 'checks', 'responsive'],
+    sourceMatches: PARITY_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-checks-under-progressive-salvage',
+    label:
+      'Manager — Checks roll-under preview, progressive salvage check set to lower is better (prototype state 20)',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-salvage' },
+      ...previewAsActor('lab-actor-idrin'),
+      ...PARITY_UNDER,
+      ...SCROLL_ODDS,
+    ],
+    expectView: 'checks-salvage',
+    expectSelector:
+      '.fabricate-manager' +
+      ':has([data-checks-section-notice="progressiveUnderUnsupported"])' +
+      ':has([data-checks-odds-reason="progressive-under-unsupported"])',
+    kinds: ['manager', 'checks'],
+    sourceMatches: PARITY_SOURCES,
+  }),
+  countCase({
+    id: 'manager-checks-count-over',
+    label: 'six d10s, odds',
+    frame: 6,
+    steps: [...COUNT_IDRIN, ...COUNT_ODDS],
+    expectSelector:
+      '.fabricate-manager:has([data-checks-odds-expected="1.33"]) [data-checks-odds-product="count"] [data-checks-odds-row="botch"] [data-checks-odds-bar]',
+  }),
+  countCase({
+    id: 'manager-checks-count-over-rolled',
+    label: 'six d10s, rolled',
+    frame: '06, with the 39 readout',
+    steps: [...COUNT_IDRIN, ...COUNT_ROLL],
+    expectSelector:
+      '.fabricate-manager [data-checks-simulator-readout][data-checks-simulator-product="count"] [data-checks-simulator-face]',
+  }),
+  countCase({
+    id: 'manager-checks-count-over-narrow',
+    label: 'six d10s, rolled at 1024x640',
+    frame: '06, with the 39 readout',
+    position: { width: 1024, height: 640 },
+    steps: [...COUNT_IDRIN, ...COUNT_ROLL],
+    expectSelector:
+      '.fabricate-manager [data-checks-simulator-readout][data-checks-simulator-product="count"] [data-checks-simulator-face]',
+  }),
+  countCase({
+    id: 'manager-checks-count-literal',
+    label: 'a literal pool with no character',
+    frame: 7,
+    nav: 'salvage',
+    steps: COUNT_ODDS,
+    expectSelector:
+      '.fabricate-manager [data-checks-odds-state="enumerated"][data-checks-odds-product="count"]',
+  }),
+  countCase({
+    id: 'manager-checks-count-no-actor',
+    label: 'a pool reading the character, none chosen',
+    frame: 10,
+    steps: COUNT_ODDS,
+    expectSelector:
+      '.fabricate-manager' +
+      ':has([data-checks-odds-reason="needs-preview-actor"])' +
+      ':has([data-checks-simulator-state="needs-preview-actor"])',
+  }),
+  countCase({
+    id: 'manager-checks-count-missing-path',
+    label: 'a character lacking the pool path',
+    frame: 19,
+    steps: [...previewAsActor('lab-actor-vosk'), ...COUNT_ODDS],
+    expectSelector:
+      '.fabricate-manager' +
+      ':has([data-checks-odds-reason="count-path-unresolved"])' +
+      ':has([data-checks-section-notice="countPathUnresolvedForPreview"])',
+  }),
+  countCase({
+    id: 'manager-checks-count-missing-path-validation',
+    label: 'a character lacking the pool path, on Validation',
+    frame: 19,
+    nav: 'validation',
+    steps: [
+      { selector: '#manager-checks-nav-crafting' },
+      ...previewAsActor('lab-actor-vosk'),
+      { selector: '#manager-checks-nav-validation' },
+      { selector: '[data-issue="countPathUnresolvedForPreview"]', scroll: true },
+    ],
+    expectSelector:
+      '.fabricate-manager:has([data-issue="countPathUnresolvedForPreview"]):not(:has([data-checks-nav-issues]))',
+  }),
+  countCase({
+    id: 'manager-checks-count-routed',
+    label: 'routed tiers worst to best',
+    frame: 13,
+    nav: 'gathering',
+    steps: COUNT_ODDS,
+    expectSelector:
+      '.fabricate-manager [data-checks-odds-product="count"] [data-checks-odds-row="botch"]',
+  }),
+  countCase({
+    id: 'manager-checks-count-progressive',
+    label: 'progressive awards, rolled',
+    frame: 9,
+    state: 'dice-pool-extended',
+    steps: [{ selector: '[data-checks-preview-difficulties]', fill: '1, 1, 2' }, ...COUNT_ROLL],
+    expectSelector:
+      '.fabricate-manager:has([data-checks-odds-row="botch"]):has([data-checks-simulator-band])',
+  }),
+  countCase({
+    id: 'manager-checks-count-zero',
+    label: 'a pool of no dice, rolled',
+    frame: '41 semantic',
+    state: 'dice-pool-extended',
+    nav: 'salvage',
+    steps: COUNT_ROLL,
+    expectSelector:
+      '.fabricate-manager' +
+      ':has([data-checks-simulator-note="zero-pool"])' +
+      ':has([data-checks-simulator-band="failure"])' +
+      ':not(:has([data-checks-simulator-face]))',
+  }),
+  countCase({
+    id: 'manager-checks-count-botch',
+    label: 'a botch, rolled',
+    frame: '40 semantic',
+    state: 'dice-pool-extended',
+    nav: 'gathering',
+    steps: COUNT_ROLL,
+    expectSelector:
+      '.fabricate-manager [data-checks-simulator-readout][data-checks-simulator-botch] [data-checks-simulator-total="-3"]',
+  }),
+  countCase({
+    id: 'manager-checks-count-odds-refused',
+    label: 'a separately rolled bonus that cannot be charted',
+    frame: 11,
+    steps: [
+      ...COUNT_IDRIN,
+      { selector: '#checks-section-modifiers' },
+      { selector: '[data-crafting-modifier-eligibility="lab-mod-knack"]' },
+      ...COUNT_ODDS,
+    ],
+    expectSelector:
+      '.fabricate-manager [data-checks-odds-reason="modifier-preroll-not-enumerable"]',
+  }),
+  countCase({
+    id: 'manager-checks-count-callouts',
+    label: 'pool readiness in the roll section',
+    frame: '08 and 07, amended copy',
+    state: 'dice-pool-faults',
+    steps: [],
+    expectSelector:
+      '.fabricate-manager' +
+      ':has([data-checks-section-notice="countRequiredExceedsMaxPool"])' +
+      ':has([data-checks-section-notice="countTierWithoutSuccesses"])',
+  }),
+  countCase({
+    id: 'manager-checks-count-readiness',
+    label: 'pool readiness on Validation',
+    frame: '16 and 17',
+    state: 'dice-pool-faults',
+    nav: 'validation',
+    steps: [],
+    expectSelector:
+      '.fabricate-manager' +
+      ':has([data-issue="countRequiredExceedsMaxPool"])' +
+      ':has([data-issue="countTierWithoutSuccesses"])' +
+      ':has([data-issue="countThresholdInvalid"])' +
+      ':has([data-issue="countPoolInvalid"])',
   }),
 ]);

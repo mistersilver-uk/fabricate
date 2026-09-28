@@ -29,7 +29,7 @@ import { resolveModifierLibrary } from '../src/systems/characterLibraries.js';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { installCountDice } from './helpers/countEngineDice.js';
 import { evaluateCountCheckRoll } from '../src/systems/countCheckRoll.js';
-import { findCountRoll } from '../src/systems/countRoll.js';
+import { findCountRoll, registerCountRoll } from '../src/systems/countRoll.js';
 import { normalizeCheckEvaluation } from '../src/systems/normalize/checkEvaluation.js';
 import { stubInteractiveRollEnvironment, stubPromptSurface } from './helpers/rollPromptDialogStub.js';
 import { rollPromptTarget } from '../src/ui/svelte/apps/crafting/rollPromptTarget.js';
@@ -337,6 +337,54 @@ test('kl keeps the lowest', async () => {
   assert.equal(die.total, kept[0].result);
 });
 
+/** A lab Roll whose dice show `faces` in order, on dice of `sides`. */
+function scriptedRoll(faces, sides) {
+  const queue = [...faces];
+  return createLabRoll({
+    random: () => (queue.shift() - 0.5) / sides,
+    replaceFormulaData: STATICS.replaceFormulaData,
+    validate: STATICS.validate,
+  });
+}
+
+const facesOf = (roll) => roll.dice[0].results.map((entry) => [entry.result, entry.exploded === true]);
+
+test('x explodes recursively, xo tests the originals only, and a comparison names the faces', async () => {
+  const recursive = await new (scriptedRoll([6, 2, 6, 1], 6))('2d6x=6').evaluate();
+  assert.deepEqual(facesOf(recursive), [[6, true], [2, false], [6, true], [1, false]]);
+  assert.equal(recursive.total, 15);
+  const once = await new (scriptedRoll([6, 2, 6], 6))('2d6xo=6').evaluate();
+  assert.deepEqual(facesOf(once), [[6, true], [2, false], [6, false]], 'a generated 6 stays put');
+  const under = await new (scriptedRoll([2, 5, 1, 4], 6))('2d6x<=2').evaluate();
+  assert.deepEqual(facesOf(under), [[2, true], [5, false], [1, true], [4, false]]);
+  assert.equal(under._formula, '2d6x<=2', 'the formula a count Roll compares its policy against');
+});
+
+test('an explosion that never stops raises core\'s recursion error', async () => {
+  const Roll = scriptedRoll(Array.from({ length: 1200 }, () => 6), 6);
+  await assert.rejects(new Roll('1d6x>=1').evaluate(), /Maximum recursion depth/);
+});
+
+test('the count Roll nets the lab Roll\'s faces through the production projection', async () => {
+  const config = { Dice: { rolls: [] } };
+  const CountRoll = registerCountRoll({ config, BaseRoll: scriptedRoll([8, 10, 1, 3], 10) });
+  const policy = {
+    dice: 3,
+    die: 10,
+    direction: 'over',
+    comparison: 'meet',
+    threshold: 8,
+    explode: { kind: 'best', value: null, once: false },
+    cancel: { kind: 'worst', value: null },
+  };
+  const roll = await CountRoll.fromPolicy(policy).evaluate();
+  assert.equal(roll.total, 1, '8 and 10 qualify, the 1 cancels, the exploded 3 does nothing');
+  assert.deepEqual(
+    roll.countProjection().results.map((entry) => [entry.face, entry.contribution]),
+    [[8, 1], [10, 1], [1, -1], [3, 0]]
+  );
+});
+
 test('roll data substitutes, and a missing key contributes zero', async () => {
   const Roll = makeRoll();
   // `missing: '0'` inside evaluate mirrors Foundry's behaviour for a Roll constructed WITH data:
@@ -443,7 +491,8 @@ test('Roll reconstruction preserves zero totals and unevaluated state', async ()
   );
   assert.equal(pending._evaluated, false);
   assert.equal(pending.total, undefined);
-  assert.deepEqual(pending.dice, []);
+  // Core parses its terms at construction, so the die exists before it rolls, with no faces.
+  assert.deepEqual(pending.dice.map((die) => die.results), [[]]);
   const expected = await new (makeRoll())('1d6 + 2').evaluate();
   assert.equal((await pending.evaluate()).total, expected.total);
 });

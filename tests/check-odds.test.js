@@ -18,6 +18,7 @@ import {
   recordedRollDouble,
 } from './helpers/recordedRollParse.js';
 import { createLabRoll } from './view-lab/foundry/labRoll.js';
+import { installCountDice } from './helpers/countEngineDice.js';
 
 /** The previewed actor the recording was made against. */
 const ACTOR = { getRollData: () => RECORDED_ROLL_DATA };
@@ -388,21 +389,28 @@ describe('checkOdds: the per-face dice bag comes from the production code path',
 });
 
 describe('checkOdds: pass/fail and progressive bucketing', () => {
-  it('keeps an authored future preview evaluation on the current sum/over runner', async () => {
-    const previousRoll = globalThis.Roll;
-    globalThis.Roll = LAB_ROLL;
+  it('previews a count check through its count runner, its retained formula inert (issue 2004)', async () => {
+    const dice = installCountDice({ faces: [6, 1], chat: false });
     try {
       const plan = buildPreviewCheckArgs({
         activity: 'crafting', mode: 'simple', actor: ACTOR,
-        draft: { rollFormula: '1d20', dc: 10, evaluation: { product: 'count', direction: 'under' } },
+        draft: {
+          rollFormula: '1d20', dc: 10,
+          evaluation: {
+            product: 'count', direction: 'under',
+            pool: { die: 6, base: '2', threshold: '3', required: 1 },
+          },
+        },
       });
+      assert.equal(plan.formula, '', 'the retained 1d20 never reaches the preview');
       const result = await runCheckPreview(plan);
+      assert.deepEqual(dice.formulas(), ['2d6'], 'the pool rolls, once');
+      assert.equal(result.data.product, 'count');
+      assert.equal(result.data.direction, 'under');
+      assert.equal(result.data.total, 1, 'the 1 qualifies at or under 3 and the 6 does not');
       assert.equal(result.success, true);
-      assert.equal(result.data.product, 'sum');
-      assert.equal(result.data.direction, 'over');
     } finally {
-      if (previousRoll === undefined) delete globalThis.Roll;
-      else globalThis.Roll = previousRoll;
+      dice.restore();
     }
   });
 

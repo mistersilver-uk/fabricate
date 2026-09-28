@@ -107,6 +107,26 @@
       'FABRICATE.Admin.Manager.Checks.Odds.ReasonProgressiveUnderUnsupported',
       'A progressive check spends its total as a budget, so Lower is better cannot apply and there is nothing to chart.',
     ],
+    [ODDS_REASONS.countPathUnresolved]: [
+      'FABRICATE.Admin.Manager.Checks.Odds.ReasonCountPathUnresolved',
+      '{actor} is missing a value this check reads ({path}), so it cannot resolve for them.',
+    ],
+    [ODDS_REASONS.countValueNotNumeric]: [
+      'FABRICATE.Admin.Manager.Checks.Odds.ReasonCountValueNotNumeric',
+      'A value this check reads from {actor} is not a number, so there is nothing to chart for them.',
+    ],
+    [ODDS_REASONS.countResidualTooLarge]: [
+      'FABRICATE.Admin.Manager.Checks.Odds.ReasonCountResidualTooLarge',
+      'These dice keep exploding too often to work every result out exactly, and an estimate here would be worse than none.',
+    ],
+    [ODDS_REASONS.countFaceTriggerNotEnumerable]: [
+      'FABRICATE.Admin.Manager.Checks.Odds.ReasonCountFaceTriggerNotEnumerable',
+      'A trigger on this check reads individual dice in a way the chart cannot follow, so no odds are shown.',
+    ],
+    [ODDS_REASONS.countPoolTooLarge]: [
+      'FABRICATE.Admin.Manager.Checks.Odds.ReasonCountPoolTooLarge',
+      'This pool is more dice than Foundry can roll at once, so there is nothing to chart.',
+    ],
   };
 
   const reasonNote = $derived.by(() => {
@@ -138,11 +158,16 @@
     class="manager-muted"
     data-checks-odds-state="not-enumerable"
     data-checks-odds-reason={odds.reason}
+    data-checks-odds-product={odds.product}
   >
     {reasonNote}
   </p>
 {:else if rows.length === 0}
-  <p class="manager-muted" data-checks-odds-state="no-outcomes">
+  <p
+    class="manager-muted"
+    data-checks-odds-state="no-outcomes"
+    data-checks-odds-product={odds.product}
+  >
     {text(
       'FABRICATE.Admin.Manager.Checks.Odds.NoOutcomes',
       'Add outcome bands to see how often each one comes up.'
@@ -153,6 +178,7 @@
     class="manager-checks-odds"
     data-checks-odds-state="enumerated"
     data-checks-odds-direction={odds.direction}
+    data-checks-odds-product={odds.product}
   >
     <ul class="manager-checks-odds-list">
       {#each rows as row, index (row.id)}
