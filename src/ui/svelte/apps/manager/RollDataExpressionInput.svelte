@@ -58,8 +58,8 @@
 {/if}
 
 <style>
-  /* THE PLAIN FIELD IS THE LIBRARY'S MONO FIELD (`<ExprInput>`): an expression is typed in the mono
-     face every number a GM compares or tunes takes. The affixed branch keeps its wrapper's type. */
+  /* The plain field is the library's mono `<ExprInput>`; the affixed branch keeps its wrapper's
+     type. */
   .is-plain {
     font-family: var(--fab-font-mono);
     font-size: 11.5px;

@@ -16,8 +16,7 @@ export const SCANNED_HEIGHT_PROPERTIES = Object.freeze([
   'max-block-size',
 ]);
 
-/** The headline. Pinned exactly rather than derived. 59 -> 58 was before; 58 -> 57 (issue 2005):
- * the Checks formula field snaps from the retired 40 to the 38 rung. */
+/** The headline. Pinned exactly rather than derived. */
 export const KNOWN_RETIRED_HEIGHT_TOTAL = 57;
 
 /** The per-corpus height-declaration counts the floors were CHOSEN AGAINST. */

@@ -57,7 +57,7 @@
       )}
     </p>
   </div>
-  <!-- A switch ROW inside the group rather than a nested card: the group is the one frame. -->
+  <!-- A switch row inside the group rather than a nested card: the group is the one frame. -->
   <div class="manager-checks-prompt-options-row">
     <div class="manager-checks-prompt-options-copy">
       <p class="manager-checks-prompt-options-label">{title}</p>
