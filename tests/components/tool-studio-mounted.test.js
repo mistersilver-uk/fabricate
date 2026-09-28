@@ -132,6 +132,7 @@ const harness = createMountedComponentHarness({
     // list and the Checks Studio catalogue render it, so it is static in this tree's graph
     // and an omission HANGS this suite rather than failing it.
     'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte',
+    'src/ui/svelte/components/Kicker.svelte',
     'src/ui/svelte/apps/manager/tools/ToolRequirementsTab.svelte',
     'src/ui/svelte/apps/manager/tools/ToolValidationTab.svelte',
     'src/ui/svelte/apps/manager/ToolEditView.svelte',
@@ -1625,7 +1626,7 @@ describe('Tool Studio editor (mounted)', () => {
     assert.deepEqual(rows(root), [
       ['sum-over', 'Adds the dice', '+2 to the total'],
       ['sum-under', 'Lower is better', '+2 to the target'],
-      ['count', 'Counts successes', 'moves the threshold +2, or adds +2 dice, as the check routes it'],
+      ['count', 'Counts successes', 'moves the threshold 2, or adds 2 dice, as the check routes it'],
     ]);
 
     await harness.setProps({ tool: tool({ bonus: { enabled: true, expression: '@prof' } }) });

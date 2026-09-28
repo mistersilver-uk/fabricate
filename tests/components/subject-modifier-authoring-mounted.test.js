@@ -349,6 +349,8 @@ const gatheringHarness = createMountedComponentHarness({
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/components/Notice.svelte',
     'src/ui/svelte/apps/manager/checks/PreviewAsPicker.svelte',
+    'src/ui/svelte/components/Callout.svelte',
+    'src/ui/svelte/components/Kicker.svelte',
     'src/ui/svelte/apps/manager/component/OverridePlayerSees.svelte',
     GATHERING_PATH,
   ],

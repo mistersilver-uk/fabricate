@@ -110,7 +110,7 @@
       value: 'addAll',
       icon: 'fas fa-layer-group',
       labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyAddAll',
-      fallback: 'Add all',
+      fallback: 'Apply all',
       descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyAddAllDesc',
       descFallback: 'Every modifier marked applied reaches the check.',
     },

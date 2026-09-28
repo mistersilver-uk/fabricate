@@ -30,7 +30,7 @@
   import RadioCardGroup from '../../components/RadioCardGroup.svelte';
   import RecipeResultsSection from './recipe/RecipeResultsSection.svelte';
   import RecipeResultGroupCard from './recipe/RecipeResultGroupCard.svelte';
-  import Notice from '../../components/Notice.svelte';
+  import Callout from '../../components/Callout.svelte';
   import OverridePlayerSees from './component/OverridePlayerSees.svelte';
   import { normalizeCheckEvaluation } from '../../../../systems/normalize/checkEvaluation.js';
   import {
@@ -1539,11 +1539,7 @@
           </Field>
         </div>
         {#if keptOverrideNotice}
-          <Notice
-            tone="info"
-            title={keptOverrideNotice}
-            dataAttr="data-gathering-task-override-kept"
-          />
+          <Callout text={keptOverrideNotice} dataAttr="data-gathering-task-override-kept" />
         {/if}
         <OverridePlayerSees
           subject={task?.name || ''}

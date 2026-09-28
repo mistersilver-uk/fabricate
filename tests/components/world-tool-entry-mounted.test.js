@@ -84,6 +84,7 @@ const harness = createMountedComponentHarness({
     // list and the Checks Studio catalogue render it, so it is static in this tree's graph
     // and an omission HANGS this suite rather than failing it.
     'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte',
+    'src/ui/svelte/components/Kicker.svelte',
     'src/ui/svelte/apps/manager/tools/ToolRequirementsTab.svelte',
     // `ToolRequirementsTab` draws each of its two sections as a `ToolInheritCard` now (issue
     // 1373), so the card and the shared inherit row it wraps are in this tree's static graph.

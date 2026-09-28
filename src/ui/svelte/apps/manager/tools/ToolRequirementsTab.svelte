@@ -42,6 +42,7 @@
   import { prerequisitePreview } from '../../../../../systems/characterPrerequisites.js';
   import Callout from '../../../components/Callout.svelte';
   import Field from '../../../components/Field.svelte';
+  import Kicker from '../../../components/Kicker.svelte';
   import SelectionCheckbox from '../../../components/SelectionCheckbox.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
   import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
@@ -500,20 +501,22 @@
         {/if}
         <p class="manager-tool-requirements-summary" data-tool-bonus-note>{bonusNote}</p>
         {#if bonusBehaviour.length > 0}
-          <p class="manager-kicker manager-tool-bonus-behaviour-kicker">
-            {text('FABRICATE.Admin.Manager.Tools.Editor.BehaviourPreview', 'Behaviour preview')}
-          </p>
-          <dl class="manager-tool-bonus-behaviour" data-tool-bonus-behaviour>
-            {#each bonusBehaviour as entry (entry.id)}
-              <div
-                class="manager-tool-bonus-behaviour-row"
-                data-tool-bonus-behaviour-row={entry.id}
-              >
-                <dt>{entry.label}</dt>
-                <dd>{entry.value}</dd>
-              </div>
-            {/each}
-          </dl>
+          <div class="manager-tool-bonus-behaviour-block">
+            <Kicker>
+              {text('FABRICATE.Admin.Manager.Tools.Editor.BehaviourPreview', 'Behaviour preview')}
+            </Kicker>
+            <dl class="manager-tool-bonus-behaviour" data-tool-bonus-behaviour>
+              {#each bonusBehaviour as entry (entry.id)}
+                <div
+                  class="manager-tool-bonus-behaviour-row"
+                  data-tool-bonus-behaviour-row={entry.id}
+                >
+                  <dt>{entry.label}</dt>
+                  <dd>{entry.value}</dd>
+                </div>
+              {/each}
+            </dl>
+          </div>
         {/if}
       {:else}
         <p class="manager-tool-requirements-summary" data-tool-bonus-off>
@@ -566,12 +569,15 @@
      marks where the world's library begins rather than heading a question the way
      `Which prerequisites` does. `margin: 0` stays, because the section's own flex gap is already
      the reference's step and the shared class adds to it. */
-  .manager-tool-bonus-behaviour-kicker,
-  .manager-tool-bonus-behaviour {
-    margin: 0;
+  /* Checks Studio frame 26: the kicker over a hairline table of `bg-1` rows, a 150px label track. */
+  .manager-tool-bonus-behaviour-block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-chip);
   }
 
   .manager-tool-bonus-behaviour {
+    margin: 0;
     border: 1px solid var(--fab-border);
     border-radius: 9px;
     overflow: hidden;
@@ -579,10 +585,10 @@
 
   .manager-tool-bonus-behaviour-row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    grid-template-columns: 150px minmax(0, 1fr);
     gap: var(--fab-space-3);
     padding: var(--fab-space-2) var(--fab-space-3);
-    font-size: 0.66rem;
+    background: var(--fab-bg-1);
   }
 
   .manager-tool-bonus-behaviour-row + .manager-tool-bonus-behaviour-row {
@@ -590,13 +596,17 @@
   }
 
   .manager-tool-bonus-behaviour-row dt {
-    color: var(--fab-text-muted);
+    margin: 0;
+    color: var(--fab-text-subtle);
+    font-weight: 600;
+    font-size: 0.66rem;
   }
 
   .manager-tool-bonus-behaviour-row dd {
     margin: 0;
-    color: var(--fab-text);
-    font-weight: 600;
+    color: var(--fab-text-secondary);
+    font-weight: 500;
+    font-size: 0.69rem;
   }
 
   .manager-tool-bonus-kicker {

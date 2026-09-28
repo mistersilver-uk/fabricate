@@ -98,6 +98,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/ManagerSearchField.svelte',
     'src/ui/svelte/components/Notice.svelte',
     'src/ui/svelte/apps/manager/checks/PreviewAsPicker.svelte',
+    'src/ui/svelte/components/Callout.svelte',
+    'src/ui/svelte/components/Kicker.svelte',
     'src/ui/svelte/apps/manager/component/OverridePlayerSees.svelte',
     EDITOR_PATH,
   ],
@@ -609,6 +611,10 @@ describe('the task check override follows the routed check evaluation (issue 200
     assert.equal(
       view.kept(),
       'A difficulty adjustment override of +2 is kept on this task. This system does not read it, so it is not shown for editing.'
+    );
+    assert.ok(
+      view.root.querySelector('[data-gathering-task-override-kept]').classList.contains('manager-callout'),
+      'the kept value is a standing Callout, as frame 24 draws it'
     );
 
     view.input().value = '12';

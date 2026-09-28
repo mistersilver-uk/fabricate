@@ -16,6 +16,7 @@
   - The chosen character is transient preview state, never draft data; it starts at "No actor".
 -->
 <script>
+  import Kicker from '../../../components/Kicker.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import PreviewAsPicker from '../checks/PreviewAsPicker.svelte';
   import { NO_ACTOR_ID } from '../checks/previewActorId.js';
@@ -58,9 +59,9 @@
 {#if seen.line}
   <div class="manager-override-player-sees" data-override-player-sees={seen.state}>
     <div class="manager-override-player-sees-head">
-      <span class="manager-override-player-sees-label">
+      <Kicker as="span">
         {text('FABRICATE.Admin.Manager.Checks.PlayerSees.Title', 'Player sees')}
-      </span>
+      </Kicker>
       {#if seen.readsCharacter}
         <PreviewAsPicker
           {actors}
@@ -87,7 +88,7 @@
     display: flex;
     flex: 1 1 100%;
     flex-direction: column;
-    gap: var(--fab-space-2xs);
+    gap: var(--fab-space-chip);
     min-width: 0;
     padding-top: var(--fab-space-3);
     border-top: 1px solid var(--fab-border);
@@ -98,14 +99,6 @@
     gap: var(--fab-space-2);
     align-items: center;
     justify-content: space-between;
-  }
-
-  .manager-override-player-sees-label {
-    color: var(--fab-text-subtle);
-    font-weight: 700;
-    font-size: 0.53rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
   }
 
   .manager-override-player-sees-line {

@@ -226,12 +226,13 @@ export function projectToolBehaviorFacts(
  * Where a Tool's check bonus lands in each kind of check, as `{ id, label, value }` rows: a bonus
  * is a benefit, so a summed roll-high check adds it to the total, a roll-under check raises its
  * target, and a counted check moves its threshold or dice. Empty when no expression is set; a bare
- * number reads signed.
+ * number reads signed on the summed rows and unsigned on the count row, as frame 26 draws them.
  */
 export function projectToolBonusBehaviour(rawExpression, text, format) {
   const raw = String(rawExpression ?? '').trim();
   if (!raw) return [];
-  const expression = /^\d/.test(raw) ? `+${raw}` : raw;
+  const signed = /^\d/.test(raw) ? `+${raw}` : raw;
+  const unsigned = raw.replace(/^\+(?=\d)/, '');
   const rows = [
     [
       'sum-over',
@@ -255,7 +256,7 @@ export function projectToolBonusBehaviour(rawExpression, text, format) {
   return rows.map(([id, [labelKey, label], [valueKey, value]]) => ({
     id,
     label: text(labelKey, label),
-    value: format(valueKey, { expression }, value),
+    value: format(valueKey, { expression: id === 'count' ? unsigned : signed }, value),
   }));
 }
 

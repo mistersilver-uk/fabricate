@@ -145,6 +145,7 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Notice.svelte',
   // Its Player sees block and the Checks Studio's own Preview-as picker it reuses.
   'src/ui/svelte/apps/manager/checks/PreviewAsPicker.svelte',
+  'src/ui/svelte/components/Kicker.svelte',
   'src/ui/svelte/apps/manager/component/OverridePlayerSees.svelte',
   'src/ui/svelte/apps/manager/component/CheckOverrideField.svelte',
   'src/ui/svelte/apps/manager/ComponentEditView.svelte',

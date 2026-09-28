@@ -3,7 +3,7 @@
   One component's salvage check override: a preset Select over the system's own tiers, a Custom…
   Stepper and Manage presets. It edits `dcOverride` under a fixed target and `adjustmentOverride`
   under a character value, clears only that field for System default, and never rewrites the other;
-  a kept dormant value is named in a notice. Every check shows what its player sees.
+  a kept dormant value is named in a callout. Every check shows what its player sees.
 
   Props:
   | prop | values | default | contract |
@@ -23,9 +23,10 @@
   - `tests/components/component-edit-salvage-override-mounted.test.js` pins every state.
 -->
 <script>
+  import Callout from '../../../components/Callout.svelte';
   import Field from '../../../components/Field.svelte';
+  import Kicker from '../../../components/Kicker.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
-  import Notice from '../../../components/Notice.svelte';
   import Select from '../../../components/Select.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
@@ -145,7 +146,7 @@
 
   const isSet = (value) => ![null, undefined, ''].includes(value) && Number.isFinite(Number(value));
 
-  // The dormant field is kept, never edited or cleared from here; the notice says so.
+  // The dormant field is kept, never edited or cleared from here; the callout says so.
   const keptNotice = $derived.by(() => {
     if (legacy) return '';
     if (attribute && isSet(dcOverride)) {
@@ -176,72 +177,74 @@
   data-salvage-dc-override=""
   data-salvage-override-field={field}
 >
+  <!-- Frame 23-24's order: the kicker, then the controls, then the hint beneath them. -->
   <div class="manager-salvage-dc-copy">
-    <span id={titleId} class="manager-salvage-dc-title">{title}</span>
+    <span id={titleId} class="manager-salvage-dc-title"><Kicker as="span">{title}</Kicker></span>
+    <div class="manager-salvage-dc-controls">
+      <!-- Presets are the SYSTEM'S authored salvage check tiers (decision 7), never a hard-coded list. -->
+      <Select
+        size="toolbar"
+        class="manager-salvage-dc-select"
+        value={selection}
+        {options}
+        ariaLabelledBy={titleId}
+        {disabled}
+        triggerData={{ 'data-salvage-dc-preset': '' }}
+        onChange={choose}
+      />
+      {#if selection === SALVAGE_DC_CUSTOM}
+        <!-- `allowUnset`: a cleared field is the system default. A DC floors at 0, so one `−` click on
+             the blank field cannot commit -1; an adjustment is formatted and may be negative. -->
+        {#if attribute}
+          {#key kind}
+            <Stepper
+              value={adjustmentOverride}
+              allowUnset
+              fill
+              {disabled}
+              formatValue={formatAdjustment}
+              parseValue={parseAdjustment}
+              stops={kind === 'multiply' ? MULTIPLIER_STOPS : []}
+              {...stepperLabels(customLabel)}
+              inputProps={{ 'data-salvage-adjustment-custom': '' }}
+              onChange={typeValue}
+            />
+          {/key}
+        {:else}
+          <Stepper
+            value={dcOverride}
+            allowUnset
+            step={1}
+            min={0}
+            fill
+            {disabled}
+            {...stepperLabels(customLabel)}
+            inputProps={{ 'data-salvage-dc-custom': '' }}
+            onChange={typeValue}
+          />
+        {/if}
+      {/if}
+      <!-- Kept by decision 7: with no authored tiers, the common case, this is the way forward. -->
+      <ManagerButton
+        class="manager-salvage-manage-presets"
+        data-salvage-manage-presets
+        onclick={() => onManagePresets()}
+        {disabled}
+      >
+        <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
+        <span
+          >{text(
+            'FABRICATE.Admin.Manager.Component.SalvageEditor.ManagePresets',
+            'Manage presets'
+          )}</span
+        >
+      </ManagerButton>
+    </div>
     <span class="manager-salvage-dc-note" data-salvage-override-hint>{hint}</span>
   </div>
-  <!-- Presets are the SYSTEM'S authored salvage check tiers (decision 7), never a hard-coded list. -->
-  <Select
-    size="toolbar"
-    class="manager-salvage-dc-select"
-    value={selection}
-    {options}
-    ariaLabelledBy={titleId}
-    {disabled}
-    triggerData={{ 'data-salvage-dc-preset': '' }}
-    onChange={choose}
-  />
-  {#if selection === SALVAGE_DC_CUSTOM}
-    <!-- `allowUnset`: a cleared field is the system default. A DC floors at 0, so one `−` click on
-         the blank field cannot commit -1; an adjustment is formatted and may be negative. -->
-    {#if attribute}
-      {#key kind}
-        <Stepper
-          value={adjustmentOverride}
-          allowUnset
-          fill
-          {disabled}
-          formatValue={formatAdjustment}
-          parseValue={parseAdjustment}
-          stops={kind === 'multiply' ? MULTIPLIER_STOPS : []}
-          {...stepperLabels(customLabel)}
-          inputProps={{ 'data-salvage-adjustment-custom': '' }}
-          onChange={typeValue}
-        />
-      {/key}
-    {:else}
-      <Stepper
-        value={dcOverride}
-        allowUnset
-        step={1}
-        min={0}
-        fill
-        {disabled}
-        {...stepperLabels(customLabel)}
-        inputProps={{ 'data-salvage-dc-custom': '' }}
-        onChange={typeValue}
-      />
-    {/if}
-  {/if}
-  <!-- Kept by decision 7: with no authored tiers, the common case, this is the way forward. -->
-  <ManagerButton
-    class="manager-salvage-manage-presets"
-    data-salvage-manage-presets
-    onclick={() => onManagePresets()}
-    {disabled}
-  >
-    <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
-    <span
-      >{text(
-        'FABRICATE.Admin.Manager.Component.SalvageEditor.ManagePresets',
-        'Manage presets'
-      )}</span
-    >
-  </ManagerButton>
   {#if keptNotice}
-    <div class="manager-salvage-override-row">
-      <Notice tone="info" title={keptNotice} dataAttr="data-salvage-override-kept" />
-    </div>
+    <!-- A Callout, not a Notice: the kept value is a standing fact about the record (library routing rule). -->
+    <Callout text={keptNotice} dataAttr="data-salvage-override-kept" />
   {/if}
   <OverridePlayerSees
     subject={text('FABRICATE.Admin.Manager.Checks.PlayerSees.SalvageSubject', 'Salvage check')}
@@ -257,8 +260,11 @@
 </Field>
 
 <style>
-  .manager-salvage-override-row {
-    flex: 1 1 100%;
+  .manager-salvage-dc-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--fab-space-3);
+    align-items: center;
     min-width: 0;
   }
 </style>

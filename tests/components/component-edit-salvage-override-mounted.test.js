@@ -322,6 +322,23 @@ describe('ComponentEditView — the salvage override follows the evaluation (iss
     assert.ok(!reopened.dirty.includes(true), 'reopening the saved record is clean');
   });
 
+  it('stacks frames 23-24: a kicker, the controls, the hint, then a standing callout', async () => {
+    const { target } = await mountOverride({ salvage: { dcOverride: 15, adjustmentOverride: -2 } });
+    const root = card(target);
+    const order = ['.manager-salvage-dc-title', PRESET, '[data-salvage-override-hint]'].map((selector) =>
+      root.querySelector(selector)
+    );
+    assert.ok(root.querySelector('.manager-salvage-dc-title .fab-kicker'), 'the title is the Kicker');
+    for (let i = 1; i < order.length; i += 1) {
+      const follows = order[i - 1].compareDocumentPosition(order[i]);
+      assert.ok(follows & globalThis.Node.DOCUMENT_POSITION_FOLLOWING, `part ${i} follows part ${i - 1}`);
+    }
+    const kept = root.querySelector('[data-salvage-override-kept]');
+    assert.ok(kept.classList.contains('manager-callout'), 'the kept value is a Callout, not a Notice');
+    assert.equal(kept.dataset.calloutTone, 'neutral');
+    assert.ok(root.querySelector('[data-override-player-sees] .fab-kicker'), 'Player sees is the Kicker');
+  });
+
   it('a roll-high fixed DC keeps its legacy card and still shows what the player sees', async () => {
     const { target, drafts } = await mountOverride({
       salvage: { dcOverride: null, adjustmentOverride: -2 },
