@@ -76,6 +76,8 @@
   .journal-fact-row.is-keyed .journal-fact-value {
     font-size: 13px;
     line-height: 1.45;
+    /* A typed path breaks at a space first, and only mid-word when a word alone overflows. */
+    overflow-wrap: break-word;
     text-align: left;
   }
   .journal-fact-row.is-inline .journal-fact-value {
