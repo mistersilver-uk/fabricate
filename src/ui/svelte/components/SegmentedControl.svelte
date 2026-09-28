@@ -129,7 +129,7 @@
 
   /* `:not(.is-active)` is load-bearing: (0,3,0) against `.is-active`'s (0,2,0). */
   .manager-segmented.is-compact .manager-segment:not(.is-active) {
-    color: var(--fab-text-muted);
+    color: var(--fab-text-subtle);
     font-weight: 500;
   }
 
@@ -152,7 +152,7 @@
 
   /* `:not(.is-active)` is load-bearing here for the same specificity reason as on `.is-compact`. */
   .manager-segmented.is-field .manager-segment:not(.is-active) {
-    color: var(--fab-text-muted);
+    color: var(--fab-text-subtle);
     font-weight: 500;
   }
 
