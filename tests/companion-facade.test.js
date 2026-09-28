@@ -552,19 +552,32 @@ describe('AC-14 (facade half) — the delegator forwards NAMED KEYS, never the r
   it('forwards evaluation to the real leaf and preserves caller isolation', async () => {
     const actor = makeGrantTargetActor('actor-1');
     const { facade, checkCalls } = standUpFacade({ actors: [actor] });
+    const impostorActor = { id: 'impostor' };
+    const impostorSpeaker = { alias: 'impostor' };
+    const callerPrompt = () => {
+      throw new Error('caller prompt');
+    };
+    // ONE request object reused across both calls, mutated in place between them: proves the
+    // facade reads `interactive`/`evaluation` fresh each call rather than caching a resolved mode,
+    // and (via the fields asserted unchanged below) that it never rewrites the caller's own object.
     const request = {
       actorId: actor.id,
       callSite: 'gmAction',
       formula: '1d20',
       dc: 15,
+      actor: impostorActor,
+      speaker: impostorSpeaker,
+      prompt: callerPrompt,
+      // Every non-interactive product/direction/source combination is published (issue 2004), so
+      // an INTERACTIVE count request is what stays unsupported.
+      interactive: true,
       evaluation: { product: 'count' },
-      actor: { id: 'impostor' },
-      speaker: { alias: 'impostor' },
-      prompt: () => { throw new Error('caller prompt'); },
     };
     const unsupported = await facade.rollActorCheck(request);
     assert.equal(unsupported.outcome, 'evaluationUnsupported');
     assert.deepEqual(checkCalls.bags, []);
+
+    request.interactive = false;
     request.evaluation = { product: 'sum', direction: 'over' };
     const supported = await facade.rollActorCheck(request);
     assert.equal(supported.outcome, 'checkPassed');
@@ -572,6 +585,11 @@ describe('AC-14 (facade half) — the delegator forwards NAMED KEYS, never the r
     assert.equal(supported.direction, 'over');
     assert.equal(supported.target, 15);
     assert.equal(checkCalls.bags[0].actor, actor);
+
+    assert.equal(request.actorId, actor.id, 'the facade never rewrites the caller-owned fields');
+    assert.equal(request.actor, impostorActor);
+    assert.equal(request.speaker, impostorSpeaker);
+    assert.equal(request.prompt, callerPrompt);
   });
 
   it('cannot be handed an actor that overrides the one the ownership gate resolved', async () => {

@@ -20,6 +20,8 @@ describe('companion check evaluation boundary', () => {
         { product: 'sum', direction: 'over', targetSources: ['fixed'], interactive: true },
         { product: 'sum', direction: 'over', targetSources: ['attribute'], interactive: false },
         { product: 'sum', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: false },
+        { product: 'count', direction: 'over', targetSources: ['fixed', 'attribute'], interactive: false },
+        { product: 'count', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: false },
       ],
       additionalDice: false,
     });
@@ -50,7 +52,12 @@ describe('companion check evaluation boundary', () => {
       supportsCompanionCheckEvaluation({ ...result.evaluation, direction: 'under' }, true),
       false
     );
-    assert.equal(supportsCompanionCheckEvaluation({ ...result.evaluation, product: 'count' }), false);
+    // count/over/fixed (issue 2004) is published too, but not interactively.
+    assert.equal(supportsCompanionCheckEvaluation({ ...result.evaluation, product: 'count' }), true);
+    assert.equal(
+      supportsCompanionCheckEvaluation({ ...result.evaluation, product: 'count' }, true),
+      false
+    );
     assert.equal(
       supportsCompanionCheckEvaluation({
         ...result.evaluation,

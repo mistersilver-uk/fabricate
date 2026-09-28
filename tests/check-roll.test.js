@@ -1732,10 +1732,11 @@ test('executed simple evidence records the raw sum/over comparison under a force
   );
 });
 
-test('standalone companion check refuses a future mode before the current over runner', async () => {
+test('standalone companion check refuses an unpublished mode before the current over runner', async () => {
   stubRoll(8);
+  // Count rows publish `interactive: false` (issue 2004), so an interactive count request is unsupported.
   const result = await rollActorCheck(
-    { actor: ACTOR, callSite: 'gmAction', formula: '1d20', dc: 10,
+    { actor: ACTOR, callSite: 'gmAction', formula: '1d20', dc: 10, interactive: true,
       evaluation: { product: 'count', direction: 'under' } },
     {
       isElectedExecutor: () => true,
