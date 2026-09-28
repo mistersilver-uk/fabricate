@@ -367,7 +367,7 @@ describe('M12a — the inspector rail’s action button takes the corner its hei
 });
 
 describe('epic 1997 — the banded Modal frame and the Select glyph (rulings 2026-09-28)', () => {
-  it('sizes the close as IconButton’s 26px rung (its paint is measured mounted)', () => {
+  it('pins the rung rule the close takes: IconButton’s 26px square in the module sheet', () => {
     const [box] = bodiesOf('.fabricate-icon-button.manager-icon-button.is-size-26');
     for (const property of ['width', 'height', 'min-width', 'min-height']) {
       assert.equal(pixels(valueOf(box, property)), 26, `the rung states a 26px ${property}`);
