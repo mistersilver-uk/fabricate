@@ -343,7 +343,8 @@ On an ordinary check, the **Chance per outcome** panel works out each outcome's 
 
 A success-counting check is charted differently, because there is no single formula total to build a histogram from.
 The panel still charts it by outcome, showing each outcome's percentage and the expected number of successes, labelled "exact" or, once the dice explode often enough to leave a very small chance unaccounted for, "nearly exact".
-When cancelling is part of the check, a result below zero successes is always a failure, and the panel breaks it out as its own **Botch** row.
+When cancelling is part of the check, the panel breaks a below-zero result out as its own **Botch** row whenever every below-zero result on that check fails.
+If an authored outcome lets a below-zero result still succeed, there is no separate Botch row, and that result stays counted in its own outcome.
 
 The **Outcome preview** panel rolls a real test check and shows one tile per die, marked qualified, cancelled, or exploded with its own glyph and a legend reading "✓ qualified · ✕ cancelled · ↻ exploded", followed by the net successes and the margin against how many were needed.
 A result below zero successes reads "Botched.
