@@ -18,6 +18,7 @@ export async function seedRollPromptFixture(world, state) {
     });
   }
   if (state === 'under') await seedRollUnder(world);
+  if (Object.hasOwn(EVIDENCE_STATES, state)) await seedCheckEvidence(world, EVIDENCE_STATES[state]);
   if (Object.hasOwn(SALVAGE_CHECKS, state)) await seedSalvageChecks(world, state);
   if (state === 'count' || state === 'count-threshold') await seedCount(world, state);
   if (state === 'pick-one' || state === 'overflow') {
@@ -80,6 +81,47 @@ async function seedRollUnder(world) {
     },
   });
   await nameFrameSubject(world, { name: 'Hard Work', checkTierId: 'lab-tier-hard-work' });
+}
+
+/**
+ * Issue 2005's player result box, chat card and prompt states. Each outcome is forced by formula
+ * rather than by seed: frame 29's target of 11 holds any `1d4` and no `1d4 + 20`. `chatOutput`
+ * narrates the craft or salvage so a `chatLog=1` case can photograph its result card.
+ */
+const EVIDENCE_STATES = {
+  'under-evidence': { rollFormula: '1d4' },
+  'under-evidence-fail': { rollFormula: '1d4 + 20' },
+  'under-bonus-off': { rollFormula: '1d20', offerSituationalBonus: false },
+  'over-attribute': { rollFormula: '1d20', direction: 'over' },
+  'over-evidence': { control: true },
+  'salvage-under-evidence': { salvage: true },
+};
+
+async function seedCheckEvidence(world, { rollFormula, offerSituationalBonus, direction, control, salvage }) {
+  const manager = world.fabricate.craftingSystemManager;
+  if (!control && !salvage) await seedRollUnder(world);
+  const system = manager.getSystem('lab-smithing');
+  const simple = system.craftingCheck.simple;
+  const evaluation = direction
+    ? normalizeCheckEvaluation({ ...simple.evaluation, direction })
+    : simple.evaluation;
+  await manager.updateSystem(system.id, {
+    features: { ...system.features, chatOutput: true },
+    ...(!control &&
+      !salvage && {
+        craftingCheck: {
+          ...system.craftingCheck,
+          simple: { ...simple, rollFormula, evaluation, ...(offerSituationalBonus === false && { offerSituationalBonus }) },
+        },
+      }),
+    ...(salvage && {
+      salvageCraftingCheck: {
+        ...system.salvageCraftingCheck,
+        enabled: true,
+        simple: { rollFormula: '1d4', dc: 12, thresholdMode: 'meet', evaluation: under() },
+      },
+    }),
+  });
 }
 
 /** The frames' "Sera Vane · {recipe}" subtitle: the crafter the player app opens, and the horseshoe. */

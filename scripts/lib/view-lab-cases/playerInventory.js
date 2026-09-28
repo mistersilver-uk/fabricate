@@ -220,6 +220,35 @@ export const CASES = Object.freeze([
       /^src\/utils\/progressiveResultOrder\.js$/,
     ],
   }),
+  // Issue 2005: a salvage rolled under a fixed target states its evidence rows in the summary.
+  playerCase({
+    id: 'player-salvage-under-result',
+    label: 'Player app — Salvage summary after a roll-under salvage, with its evidence rows',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'inventory', dialog: 'open', rollPromptState: 'salvage-under-evidence' },
+    steps: [
+      { selector: '.inventory-filters input', fill: 'Longsword' },
+      {
+        selector:
+          '.inventory-card[data-inventory-card="lab-smithing:sm-longsword"] .inventory-card-button',
+      },
+      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+      { selector: '[data-inventory-salvage-action]' },
+      { selector: '.fabricate-app .manager-modal[data-roll-prompt="single"] button[type="submit"]' },
+      { selector: '[data-inventory-salvage-summary="success"] [data-check-evidence-rows]', scroll: true },
+    ],
+    expectSelector:
+      '[data-inventory-salvage-summary="success"] [data-check-evidence-rows]' +
+      ':has([data-check-evidence="target"]):has([data-check-evidence="margin"])',
+    kinds: ['player', 'inventory'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/inventory\/detail\/salvage\/SalvageRollSummary\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/detail\/CheckEvidenceRows\.svelte$/,
+      /^src\/ui\/presenters\/check(?:Display|EvidenceRows)\.js$/,
+      /^src\/ui\/svelte\/stores\/inventorySalvageExecution/,
+    ],
+  }),
   playerCase({
     id: 'player-inventory-multi-system',
     label: 'Player app — Inventory multi system',

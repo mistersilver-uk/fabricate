@@ -1141,8 +1141,9 @@ test('the capture runner threads the per-case console allowance into the render'
   ).map((viewCase) => viewCase.id);
   assert.deepEqual(
     declaring,
-    // The Knowledge error frame's rejected read is rethrown by the store (issue 1969).
-    ['manager-recipes-blocked-enable-flash', 'manager-knowledge-error'],
+    // The Knowledge error frame's rejected read is rethrown by the store (issue 1969), and a failed
+    // roll-under craft raises the resolved-failure toast the lab reports as a warning (issue 2005).
+    ['manager-recipes-blocked-enable-flash', 'manager-knowledge-error', 'player-crafting-roll-result-under-fail'],
     'a case gained or lost a console-error allowance; the console gate is what makes a lab frame ' +
       'evidence, so widening it is an accepted edit rather than an incidental one'
   );
@@ -2289,11 +2290,11 @@ test('every crafting case claims exactly the resolution-mode body it renders', (
 
   // The check above is only worth anything if it looked at the cases. It did not, in its first
   // draft, and passed clean. 31 rather than 28 as of issue 1513, and the three that joined are
-  // three DIFFERENT things this scan now sees.
+  // three DIFFERENT things this scan now sees; issue 2005 adds six prompt, result and salvage frames.
   assert.equal(
     examined.length,
-    50,
-    `expected the 50 crafting-path cases to be examined, saw ${examined.length}`
+    56,
+    `expected the 56 crafting-path cases to be examined, saw ${examined.length}`
   );
   assert.ok(
     examined.filter((id) =>

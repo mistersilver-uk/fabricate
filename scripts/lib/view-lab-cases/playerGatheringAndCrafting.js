@@ -15,6 +15,47 @@ import { playerCase, responsiveLayout } from './caseFactories.js';
 /** The single-subject roll prompt: Fabricate's own modal, mounted over the player window. */
 const SINGLE_PROMPT = '.fabricate-app .manager-modal[data-roll-prompt="single"]';
 
+/** Issue 2005's player-rendering states: open the horseshoe and press Craft, prompting. */
+const CRAFT_HORSESHOE = Object.freeze([
+  { selector: '.crafting-recipe-row[data-recipe-id="sm-r-horseshoe"]' },
+  { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
+]);
+/** Type a rolled situational bonus into the standing prompt, which the pre-roll row then states. */
+const TYPE_ROLLED_BONUS = Object.freeze({
+  selector: `${SINGLE_PROMPT} input[name="situationalBonus"]`,
+  fill: '1d4',
+});
+const ROLL = Object.freeze({ selector: `${SINGLE_PROMPT} button[type="submit"]` });
+/** Choose a roll mode on the standing prompt the way a player does, through the shared Select. */
+const ROLL_MODE = (mode) => [
+  { selector: `${SINGLE_PROMPT} .mode-field .fabricate-select-trigger` },
+  { selector: `.fabricate-app > .fabricate-select-popover [data-popover-option="${mode}"]` },
+];
+const RESULT_BOX = '[data-crafting-run-summary] [data-recipe-section="roll-result"]';
+const EVIDENCE_ROWS = (...ids) =>
+  `[data-check-evidence-rows]${ids.map((id) => `:has([data-check-evidence="${id}"])`).join('')}`;
+/** The result card a `chatLog=1` lab docks beside the window; it never whispers to hide a check. */
+const CHAT_CARD = '.fabricate-craft-chat';
+/** The lab's own docked log, asserted visibly rather than as UI the product emits. */
+const LAB_CHAT = (visibility) =>
+  `[data-view-lab-chat-log] > .chat-message[data-view-lab-chat-visibility="${visibility}"]`;
+const PROMPT_SOURCES = [
+  CRAFTING_SIMPLE,
+  /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target)?\.svelte$/,
+  /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
+];
+const RESULT_SOURCES = [
+  CRAFTING_SHARED,
+  CRAFTING_SIMPLE,
+  /^src\/ui\/svelte\/apps\/crafting\/detail\/(?:RollResultBox|CheckEvidenceRows)\.svelte$/,
+  /^src\/ui\/presenters\/check(?:Display|EvidenceRows)\.js$/,
+  /^src\/ui\/svelte\/stores\/craftingStore/,
+];
+const CHAT_SOURCES = [
+  /^src\/ui\/presenters\/(?:CraftingChatCard|checkDisplay|checkEvidenceRows)\.js$/,
+  /^src\/systems\/craftCardFields\.js$/,
+];
+
 export const CASES = Object.freeze([
   playerCase({
     id: 'player-crafting-roll-prompt-basic',
@@ -108,6 +149,123 @@ export const CASES = Object.freeze([
       /^src\/ui\/presenters\/CraftingListingBuilder\.js$/,
       /^src\/ui\/svelte\/stores\/craftingStore/,
     ],
+  }),
+  // Issue 2005: a check that offers no situational bonus shows no field, and focus falls to Roll.
+  playerCase({
+    id: 'player-crafting-roll-prompt-under-bonus-off',
+    label: 'Player app — roll-under crafting roll prompt with no bonus offer',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', dialog: 'open', rollPromptState: 'under-bonus-off' },
+    steps: [...CRAFT_HORSESHOE],
+    expectSelector:
+      `${SINGLE_PROMPT}:has(.target-row > .manager-chip[data-roll-prompt-target="under"])` +
+      ':not(:has(input[name="situationalBonus"])):not(:has(.bonus-group))',
+    kinds: ['player', 'crafting'],
+    sourceMatches: PROMPT_SOURCES,
+  }),
+  // A typed rolled bonus is pending: the chip names it beside the settled target, never an average.
+  playerCase({
+    id: 'player-crafting-roll-prompt-under-rolled-bonus',
+    label: 'Player app — roll-under crafting roll prompt with a rolled bonus typed',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', dialog: 'open', rollPromptState: 'under' },
+    steps: [...CRAFT_HORSESHOE, TYPE_ROLLED_BONUS],
+    expectSelector:
+      `${SINGLE_PROMPT} .target-row[aria-live="polite"]` +
+      ' > .manager-chip:has-text("Target 11 + 1d4 · stay at or under")',
+    kinds: ['player', 'crafting'],
+    sourceMatches: PROMPT_SOURCES,
+  }),
+  // A character-value target read over is a target to meet or beat, never a DC.
+  playerCase({
+    id: 'player-crafting-roll-prompt-over-attribute',
+    label: 'Player app — roll-over crafting roll prompt against a character value',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', dialog: 'open', rollPromptState: 'over-attribute' },
+    steps: [...CRAFT_HORSESHOE],
+    expectSelector:
+      `${SINGLE_PROMPT} .formula-content .manager-chip:has-text("Target 10 · meet or beat")`,
+    kinds: ['player', 'crafting'],
+    sourceMatches: PROMPT_SOURCES,
+  }),
+  // The player result box's Target, Pre-rolled and Margin rows for a passed and a failed roll-under.
+  playerCase({
+    id: 'player-crafting-roll-result-under-pass',
+    label: 'Player app — roll-under crafting result box, passed, with its evidence rows',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', dialog: 'open', rollPromptState: 'under-evidence' },
+    steps: [...CRAFT_HORSESHOE, TYPE_ROLLED_BONUS, ROLL, { selector: RESULT_BOX, scroll: true }],
+    expectSelector:
+      `${RESULT_BOX}[data-roll-success="true"] ${EVIDENCE_ROWS('target', 'preRolled', 'margin')}`,
+    kinds: ['player', 'crafting'],
+    sourceMatches: RESULT_SOURCES,
+  }),
+  playerCase({
+    id: 'player-crafting-roll-result-under-fail',
+    label: 'Player app — roll-under crafting result box, failed, with its evidence rows',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', dialog: 'open', rollPromptState: 'under-evidence-fail' },
+    steps: [...CRAFT_HORSESHOE, TYPE_ROLLED_BONUS, ROLL, { selector: RESULT_BOX, scroll: true }],
+    // The resolved-failure toast the player is shown, which the lab reports as a console warning.
+    allowedConsoleErrors: [/Your crafting check failed/],
+    expectSelector:
+      `${RESULT_BOX}[data-roll-success="false"] ${EVIDENCE_ROWS('target', 'preRolled', 'margin')}`,
+    kinds: ['player', 'crafting'],
+    sourceMatches: RESULT_SOURCES,
+  }),
+  // The posted result card, docked in a lab chat log: public states its rows, private and blind none.
+  playerCase({
+    id: 'player-crafting-chat-card-under-public',
+    label: 'Player app — roll-under crafting result card, public roll, with its evidence rows',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', dialog: 'open', rollPromptState: 'under-evidence', chatLog: '1' },
+    steps: [...CRAFT_HORSESHOE, TYPE_ROLLED_BONUS, ROLL],
+    expectSelector: `${CHAT_CARD} .fabricate-craft-chat__evidence:has([data-check-evidence="preRolled"])`,
+    expectVisible: `${LAB_CHAT('public')} .fabricate-craft-chat__evidence`,
+    kinds: ['player', 'crafting'],
+    sourceMatches: CHAT_SOURCES,
+  }),
+  playerCase({
+    id: 'player-crafting-chat-card-under-whispered',
+    label: 'Player app — roll-under crafting result card after a private GM roll, no evidence rows',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', dialog: 'open', rollPromptState: 'under-evidence', chatLog: '1' },
+    steps: [...CRAFT_HORSESHOE, TYPE_ROLLED_BONUS, ...ROLL_MODE('gmroll'), ROLL],
+    expectSelector: `${CHAT_CARD}:has(.fabricate-craft-chat__roll):not(:has(.fabricate-craft-chat__evidence))`,
+    expectVisible: LAB_CHAT('whisper'),
+    kinds: ['player', 'crafting'],
+    sourceMatches: CHAT_SOURCES,
+  }),
+  playerCase({
+    id: 'player-crafting-chat-card-under-blind',
+    label: 'Player app — roll-under crafting result card after a blind roll, no evidence rows',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', dialog: 'open', rollPromptState: 'under-evidence', chatLog: '1' },
+    steps: [...CRAFT_HORSESHOE, TYPE_ROLLED_BONUS, ...ROLL_MODE('blindroll'), ROLL],
+    expectSelector: `${CHAT_CARD}:has(.fabricate-craft-chat__roll):not(:has(.fabricate-craft-chat__evidence))`,
+    expectVisible: LAB_CHAT('blind'),
+    kinds: ['player', 'crafting'],
+    sourceMatches: CHAT_SOURCES,
+  }),
+  // The control: a sum/over fixed card gains no rows.
+  playerCase({
+    id: 'player-crafting-chat-card-over-control',
+    label: 'Player app — roll-over crafting result card, unchanged by the evidence rows',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', rollPromptState: 'over-evidence', chatLog: '1' },
+    steps: [...CRAFT_HORSESHOE],
+    expectSelector: `${CHAT_CARD}:has(.fabricate-craft-chat__roll):not(:has(.fabricate-craft-chat__evidence))`,
+    kinds: ['player', 'crafting'],
+    sourceMatches: CHAT_SOURCES,
   }),
   playerCase({
     id: 'player-crafting-roll-prompt-count',
