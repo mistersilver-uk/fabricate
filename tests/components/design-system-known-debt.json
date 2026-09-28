@@ -222,7 +222,6 @@
     "src/ui/svelte/components/Chip.svelte | border-radius | 10px | 1",
     "src/ui/svelte/components/CollapsibleGroupHeader.svelte | border-radius | 8px | 1",
     "src/ui/svelte/components/SelectionCheckbox.svelte | border-radius | 5px | 1",
-    "src/ui/svelte/components/Stepper.svelte | border-radius | 8px | 1",
     "src/ui/svelte/components/ThresholdBandStrip.svelte | border-radius | 3px | 1",
     "styles/fabricate.css | border-bottom-left-radius | 8px | 1",
     "styles/fabricate.css | border-bottom-right-radius | 8px | 1",

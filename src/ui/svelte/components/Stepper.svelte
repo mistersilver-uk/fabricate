@@ -301,7 +301,7 @@
     gap: var(--fab-space-2xs);
     padding: var(--fab-space-2xs);
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 7px;
     background: var(--fab-surface-soft);
   }
 
