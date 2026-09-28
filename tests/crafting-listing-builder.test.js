@@ -7,6 +7,7 @@ import {
 } from '../src/ui/presenters/CraftingListingBuilder.js';
 import { ResolutionModeService } from '../src/systems/ResolutionModeService.js';
 import { resolveCheckFormulaDisplay } from '../src/systems/checkRoll.js';
+import { describeCheckTarget } from '../src/ui/presenters/checkDescriptor.js';
 import { shippedLocalize } from './helpers/checkEvidenceFixtures.js';
 
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
@@ -1427,14 +1428,59 @@ describe('CraftingListingBuilder — the check card names a roll-under or charac
     assert.deepEqual(checkOf({ evaluation: { direction: 'under', target: skill }, tiers }, { recipe }).target, {
       direction: 'under',
       text: 'Target 10 · stay at or under',
-      source: 'Sera Vane @skills.smith.level 12, Hard Work −2',
+      source: 'Sera Vane @skills.smith.level 12 · Hard Work −2',
     });
     const multiplied = { ...skill, adjustmentKind: 'multiply', baseAdjustment: 0.5 };
     assert.deepEqual(checkOf({ evaluation: { direction: 'over', target: multiplied } }).target, {
       direction: 'over',
       text: 'Target 6 · meet or beat',
-      source: 'Sera Vane @skills.smith.level 12, difficulty ×½',
+      source: 'Sera Vane @skills.smith.level 12 · difficulty ×½',
     });
+  });
+
+  it('names no target for a routed or progressive slot, whatever its source (R1)', () => {
+    const slotCheck = (resolutionMode, slots) =>
+      makeBuilder({
+        system: makeSystem({
+          resolutionMode,
+          craftingCheck: { simple: {}, routed: {}, progressive: {}, ...slots },
+        }),
+        localize: format,
+      }).buildRecipeDetail({ recipeId: 'recipe-1', craftingActor: SERA, viewer: PLAYER }).check;
+    const outcomes = {
+      relativeOutcomes: [{ id: 'ok', name: 'Ok', success: true, dc: 0 }],
+      fixedOutcomes: [{ id: 'ok', name: 'Ok', success: true, start: 1, end: 100 }],
+    };
+    for (const type of ['fixed', 'relative']) {
+      const routed = { type, rollFormula: '1d100', dc: 50, ...outcomes };
+      for (const evaluation of [{ direction: 'under', target: skill }, { direction: 'under' }]) {
+        const check = slotCheck('routedByCheck', { routed: { ...routed, evaluation } });
+        assert.ok(check, `${type}: the routed card renders`);
+        assert.ok(!Object.hasOwn(check, 'target'), `${type} ${JSON.stringify(evaluation)}`);
+      }
+    }
+    for (const evaluation of [{ direction: 'over', target: skill }, { direction: 'under' }]) {
+      const progressive = slotCheck('progressive', {
+        progressive: { rollFormula: '1d20', evaluation },
+      });
+      assert.ok(progressive && !Object.hasOwn(progressive, 'target'), JSON.stringify(evaluation));
+    }
+  });
+
+  it('describes no fixed-range check even when handed one directly (R1 backstop)', () => {
+    const target = describeCheckTarget({
+      config: { type: 'fixed', rollFormula: '1d100' },
+      recipe: makeRecipe(),
+      evaluation: { product: 'sum', direction: 'under', target: skill },
+      anchor: NaN,
+      actor: SERA,
+      localize: format,
+    });
+    assert.equal(target, null);
+  });
+
+  it('names no target for a dynamic (macro) roll-under check (D6)', () => {
+    assert.ok(!Object.hasOwn(checkOf({ evaluation: { direction: 'under' }, dcMode: 'dynamic' }), 'target'));
   });
 
   it('says a character value cannot be read rather than invent one, and names none with no character', () => {
@@ -1445,7 +1491,7 @@ describe('CraftingListingBuilder — the check card names a roll-under or charac
     assert.ok(!Object.hasOwn(checkOf({ evaluation: { target: skill } }, { actor: null }), 'target'));
   });
 
-  it('never appends a roll-under benefit to the formula or the target it shows (Q7)', () => {
+  it('never appends a roll-under benefit to the formula, and names it in the target as the prompt does (Q7, M6)', () => {
     const resolveCheckFormula = (formula, actor, craftingModifier, evaluation) =>
       resolveCheckFormulaDisplay(formula, actor, craftingModifier, FORMULA_ROLL, evaluation);
     const system = (direction) => ({
@@ -1465,6 +1511,10 @@ describe('CraftingListingBuilder — the check card names a roll-under or charac
     assert.match(shown('over').resolvedFormula, /\+ 2/, 'positive control: over appends the modifier');
     const under = shown('under');
     assert.equal(under.resolvedFormula, '1d20', 'under, the benefit raises the target instead');
-    assert.equal(under.target.text, 'Target 12 · stay at or under', 'and the card target is before it');
+    assert.deepEqual(
+      under.target,
+      { direction: 'under', text: 'Target 14 · stay at or under', source: 'Base 12 · modifiers +2' },
+      'the card target includes the applied modifier, as the prompt chip does'
+    );
   });
 });

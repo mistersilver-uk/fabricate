@@ -937,7 +937,7 @@ export class CraftingListingBuilder {
       : mode === 'routedByIngredients'
         ? usable
         : usable && checksEnabled;
-    const formula =
+    const { appliedModifiers, ...formula } =
       evaluation.product === 'count'
         ? this._countFormulaDisplay(config, evaluation, craftingActor)
         : this._sumFormulaDisplay({ rollFormula, craftingActor, system, recipe, evaluation });
@@ -950,15 +950,18 @@ export class CraftingListingBuilder {
     // Resolve the displayed DC AFTER the issue 765 suppression guard above (never
     // reorder it there). See the method JSDoc and `_chipDc`.
     const dc = this._chipDc(config, recipe, routedFixed, evaluation);
-    const anchor = config === checks.simple ? this._resolveDisplayDc(config, recipe) : NaN;
-    const target = describeCheckTarget({
-      config,
-      recipe,
-      evaluation,
-      anchor,
-      actor: craftingActor,
-      localize: this.localize,
-    });
+    // Only the pass/fail slot names one target: a routed or progressive check has none (R1).
+    const target =
+      config === checks.simple &&
+      describeCheckTarget({
+        config,
+        recipe,
+        evaluation,
+        anchor: this._resolveDisplayDc(config, recipe),
+        actor: craftingActor,
+        modifiers: appliedModifiers,
+        localize: this.localize,
+      });
     return {
       dc,
       ...(target && { target }),
@@ -981,19 +984,9 @@ export class CraftingListingBuilder {
     // false when the formula does not reduce to a number for this actor (error state).
     const resolution =
       rollFormula.length > 0 && craftingActor
-        ? // The check-modifier context (issues 770, 1055, 1095): the SAME builder the
-          // engine threads to its check runners, not a second literal of the same shape.
-          // The display path and the evaluation path must agree on every axis the context
-          // carries — the combination rule, the activity's default eligible set, the
-          // subject's own picks under `bySubject`, each entry's `min`/`max` clamp, and
-          // the `maxModifierPicks` cap that bounds them — or the listed formula shows a
-          // scalar the roll will not use (`resolution-modes/spec.md` requirement 71).
-          //
-          // THE ACTIVITY ARGUMENT IS LOAD-BEARING (issue 1095). The catalogue is shared
-          // across crafting, salvage and gathering but the SELECTION is not, so an
-          // arity-2 call here would resolve this listed CRAFTING formula against
-          // whichever selection triple the builder happened to default to. This is the
-          // player-facing card; a wrong scalar here is a promise the roll breaks.
+        ? // The SAME check-modifier context the engine rolls with (issues 770, 1055, 1095), for
+          // the CRAFTING activity: the selection is per activity, so the listed formula and the
+          // applied modifiers agree with the roll (`resolution-modes/spec.md` requirement 71).
           this._resolveCheckFormula(
             rollFormula,
             craftingActor,
@@ -1005,6 +998,7 @@ export class CraftingListingBuilder {
       rollFormula: rollFormula.length > 0 ? rollFormula : null,
       resolvedFormula: resolution?.display ?? null,
       formulaResolved: resolution ? resolution.resolved === true : null,
+      appliedModifiers: resolution?.modifiers ?? [],
     };
   }
 

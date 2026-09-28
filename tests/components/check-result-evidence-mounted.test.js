@@ -226,14 +226,14 @@ describe('CraftingCheckCard target line', () => {
   it('states the target and its source fact where a sum/over card states its DC', async () => {
     const root = await harness.mount({
       check: card({
-        target: { direction: 'under', text: 'Target 10 · stay at or under', source: 'Sera Vane @skills.smith.level 12, Hard Work −2' },
+        target: { direction: 'under', text: 'Target 11 · stay at or under', source: 'Sera Vane @skills.smith.level 12 · Hard Work −2 · modifiers +1' },
       }),
     });
     const target = root.querySelector('[data-check-target="under"]');
-    assert.equal(target.textContent.trim(), 'Target 10 · stay at or under');
+    assert.equal(target.textContent.trim(), 'Target 11 · stay at or under');
     assert.equal(
       target.nextElementSibling.textContent.trim(),
-      'Sera Vane @skills.smith.level 12, Hard Work −2'
+      'Sera Vane @skills.smith.level 12 · Hard Work −2 · modifiers +1'
     );
     assert.ok(!root.querySelector('[data-check-dc]'), 'no DC beside a target to stay under');
   });

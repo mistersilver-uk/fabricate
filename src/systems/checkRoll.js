@@ -638,8 +638,8 @@ export async function evaluateSideRoll(formula, actor, options = {}) {
  * Resolve a check formula's `@` placeholders for display without rolling (`1d20 + @prof` to
  * `1d20 + 2`), through the same shim and modifier append the roll uses, so display equals eval.
  * `null` with no formula or no engine; `resolved` is false when the formula does not reduce for
- * this actor, detected through `missing: 'NaN'`. `Roll` is a parameter so the Checks Studio's
- * odds enumerator drives one injected engine (issue 1097).
+ * this actor, detected through `missing: 'NaN'`; `modifiers` are the library entries it applied.
+ * `Roll` is a parameter so the Checks Studio's odds enumerator drives one injected engine.
  */
 export function resolveCheckFormulaDisplay(
   formula,
@@ -650,7 +650,8 @@ export function resolveCheckFormulaDisplay(
 ) {
   if (typeof formula !== 'string' || formula.trim() === '') return null;
   if (typeof Roll?.replaceFormulaData !== 'function') return null;
-  const substituted = resolveRolledFormula(formula, actor, craftingModifier, Roll, evaluation);
+  const rolled = resolveRolledCheck(formula, actor, craftingModifier, Roll, evaluation);
+  const substituted = rolled.formula;
   if (substituted.trim() === '') return null;
   const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
   const display = Roll.replaceFormulaData(substituted, rollData, {
@@ -661,7 +662,7 @@ export function resolveCheckFormulaDisplay(
     !/NaN/.test(display) &&
     !/@/.test(display) &&
     (typeof Roll.validate !== 'function' || Roll.validate(display) === true);
-  return { display, resolved };
+  return { display, resolved, modifiers: rolled.selected };
 }
 
 /**

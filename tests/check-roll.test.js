@@ -134,7 +134,7 @@ test('resolveCheckFormulaDisplay substitutes @-placeholders inline against the a
   stubResolvingRoll();
   const actor = { getRollData: () => ({ abilities: { str: { mod: 3 } }, prof: 2 }) };
   const result = resolveCheckFormulaDisplay('1d20 + @abilities.str.mod + @prof', actor);
-  assert.deepEqual(result, { display: '1d20 + 3 + 2', resolved: true });
+  assert.deepEqual(result, { display: '1d20 + 3 + 2', resolved: true, modifiers: [] });
 });
 
 test('resolveCheckFormulaDisplay flags an unresolved key as not resolved', () => {

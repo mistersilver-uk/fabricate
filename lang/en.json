@@ -882,7 +882,10 @@
           "Beat": "beat",
           "TargetSource": "{actor} {expression} {value}",
           "TargetAdjustment": "{label} {value}",
-          "TargetDifficulty": "difficulty {value}"
+          "TargetDifficulty": "difficulty {value}",
+          "TargetBase": "Base {value}",
+          "TargetModifiers": "modifiers {value}",
+          "TargetPending": "{target} + {formula}"
         },
         "Io": {
           "Essences": "Essences",

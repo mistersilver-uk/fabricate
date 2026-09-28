@@ -1,11 +1,12 @@
 /**
  * The player check card's target line for a summed check other than sum/over/fixed (issue 2005):
  * `Target {T} · stay at or under` or `· meet or beat`, and for a character value the character's
- * name, the typed formula, its value and the adjustment. The target is before any benefit, so the
- * line never states a modifier the roll has not applied; a value that cannot be read says so.
+ * name, the typed formula, its value and the adjustment, separated by middots as the prompt's line
+ * is. Roll-under names the target with the applied flat modifiers, as the prompt chip does, and a
+ * rolled one as pending; a value that cannot be read says so.
  */
 import { attributeTargetBasis, resolveActivityTarget } from '../../systems/checkTarget.js';
-import { formatCheckAdjustment } from '../../utils/checkAdjustmentFormat.js';
+import { formatCheckAdjustment, formatSignedStep } from '../../utils/checkAdjustmentFormat.js';
 
 const COMPARISON_KEYS = Object.freeze({
   under: {
@@ -26,13 +27,13 @@ function selectedTier(config, recipe) {
 }
 
 /** `{actor} {expression} {value}`, then the adjustment named by its tier, else as difficulty. */
-function sourceFact(basis, actorName, localize) {
+function sourceFacts(basis, actorName, localize) {
   const fact = localize('FABRICATE.App.Crafting.Check.TargetSource', {
     actor: actorName,
     expression: basis.expression,
     value: basis.value,
-  });
-  if (!basis.adjustment) return fact.trim();
+  }).trim();
+  if (!basis.adjustment) return [fact];
   const value = formatCheckAdjustment(basis.adjustment.kind, basis.adjustment.value);
   const adjustment = basis.adjustment.label
     ? localize('FABRICATE.App.Crafting.Check.TargetAdjustment', {
@@ -40,15 +41,50 @@ function sourceFact(basis, actorName, localize) {
         value,
       })
     : localize('FABRICATE.App.Crafting.Check.TargetDifficulty', { value });
-  return `${fact.trim()}, ${adjustment}`;
+  return [fact, adjustment];
+}
+
+/**
+ * The applied library modifiers a roll-under target gains before the roll: their flat total, and
+ * each rolled one's formula, which the prompt rolls first and so names as pending.
+ */
+function appliedBenefits(modifiers, direction) {
+  const applied = direction === 'under' && Array.isArray(modifiers) ? modifiers : [];
+  const flat = applied.reduce((sum, modifier) => {
+    const value = Number(modifier?.value);
+    return Number.isFinite(value) && modifier?.value !== null ? sum + value : sum;
+  }, 0);
+  const pending = applied
+    .filter((modifier) => modifier?.value === null && typeof modifier.display === 'string')
+    .map((modifier) => modifier.display.replace(/^\+\s*/, ''));
+  return { flat, pending };
+}
+
+function targetValue(target, pending, localize) {
+  return pending.length === 0
+    ? target
+    : localize('FABRICATE.App.Crafting.Check.TargetPending', {
+        target,
+        formula: pending.join(' + '),
+      });
 }
 
 /**
  * `{ direction, text, source }`, `{ unresolved: reason }`, or null when the card names no target:
- * sum/over/fixed keeps its DC chip, and a count, progressive, routed or macro-moved check, or a
- * character value with no acting character, has no single target to name.
+ * sum/over/fixed keeps its DC chip, and a count, progressive, routed or macro-moved check, a
+ * fixed-range one, or a character value with no acting character, has no single target to name.
+ * `modifiers` are the library entries the display resolver applied for this character.
  */
-export function describeCheckTarget({ config, recipe, evaluation, anchor, actor, localize }) {
+export function describeCheckTarget({
+  config,
+  recipe,
+  evaluation,
+  anchor,
+  actor,
+  modifiers = [],
+  localize,
+}) {
+  if (config?.type === 'fixed') return null;
   if (evaluation.product !== 'sum' || config?.dcMode === 'dynamic') return null;
   const attribute = evaluation.target.source === 'attribute';
   if (!attribute && evaluation.direction !== 'under') return null;
@@ -65,8 +101,9 @@ export function describeCheckTarget({ config, recipe, evaluation, anchor, actor,
     return { unresolved: localize('FABRICATE.Check.Roll.TargetUnresolved', { label }) };
   }
   const comparison = config.thresholdMode === 'exceed' ? 'exceed' : 'meet';
+  const { flat, pending } = appliedBenefits(modifiers, evaluation.direction);
   const text = localize('FABRICATE.App.Crafting.Check.TargetLine', {
-    target: resolved.target,
+    target: targetValue(resolved.target + flat, pending, localize),
     comparison: localize(COMPARISON_KEYS[evaluation.direction][comparison]),
   });
   const basis = attribute
@@ -76,9 +113,17 @@ export function describeCheckTarget({ config, recipe, evaluation, anchor, actor,
         readRollData,
       })
     : null;
+  const parts = basis
+    ? sourceFacts(basis, actor?.name ?? '', localize)
+    : [localize('FABRICATE.App.Crafting.Check.TargetBase', { value: resolved.target })];
+  if (flat) {
+    parts.push(
+      localize('FABRICATE.App.Crafting.Check.TargetModifiers', { value: formatSignedStep(flat) })
+    );
+  }
   return {
     direction: evaluation.direction,
     text,
-    source: basis ? sourceFact(basis, actor?.name ?? '', localize) : '',
+    source: basis || parts.length > 1 ? parts.join(' · ') : '',
   };
 }
