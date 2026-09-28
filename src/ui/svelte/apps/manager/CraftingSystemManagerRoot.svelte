@@ -414,6 +414,12 @@
     gatheringResolutionMode: () => gathering.gatheringResolutionMode,
     selectedSystemModifiers: () => selectedSystemModifiers,
     currentView: () => currentView,
+    // Readiness needs the raw records overrides live on, outside any check draft (issue 2078):
+    // every component (its persisted `salvage`, not the search-filtered `itemCards` projection)
+    // and every gathering task of the selected system. Both thunks so nothing is walked unless
+    // the Checks route actually reads them.
+    components: () => store?.componentsForSystem?.(selectedSystemId) ?? [],
+    gatheringTasks: () => $viewState.gatheringConfig?.systems?.[selectedSystemId]?.tasks ?? [],
   });
   // The gathering workspace's tab, selections, drafts and library (issue 1721).
   const gathering = createGatheringRouteModel({
@@ -5397,6 +5403,8 @@
             gatheringResolutionMode={gathering.gatheringResolutionMode}
             gatheringCheckProgressive={checks.gatheringProgressiveDraft}
             gatheringCheckRouted={checks.gatheringRoutedDraft}
+            components={checks.checksComponents}
+            gatheringTasks={checks.checksGatheringTasks}
             breakageAuthority={selectedSystem?.toolBreakage?.authority || 'toolSpecific'}
             features={selectedSystem?.features || {}}
             activation={checks.checkActivation}
