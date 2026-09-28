@@ -484,7 +484,7 @@ describe('createAdminStore', () => {
     it('projects every policy the manager accepts, including playerPicks (issue 855)', async () => {
       // The projection normalized the policy through a LOCAL allowlist that predated `playerPicks`,
       // so a stored `playerPicks` came back out as `addAll`: the GM clicked "Player picks", the
-      // card re-rendered on "Add all", and the system-level policy was unselectable through the UI
+      // card re-rendered on "Apply all", and the system-level policy was unselectable through the UI
       // even though the write itself was correct.
       const services = createMockServices();
       const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
@@ -497,7 +497,7 @@ describe('createAdminStore', () => {
 
       // All FOUR rules, `bySubject` included (issue 1055): it is a first-class rule with
       // its own radio-card, so a projection that translated it away would recreate this
-      // very defect — the GM clicks "By recipe" and the card re-renders on "Add all".
+      // very defect — the GM clicks "By recipe" and the card re-renders on "Apply all".
       for (const policy of ['addAll', 'highest', 'bySubject', 'playerPicks']) {
         assert.equal(await projectPolicy(policy), policy, `${policy} survives the projection`);
       }
