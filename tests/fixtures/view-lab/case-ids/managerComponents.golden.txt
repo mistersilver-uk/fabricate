@@ -30,3 +30,4 @@ manager-component-edit-salvage-override-add
 manager-component-edit-salvage-override-multiply
 manager-component-edit-salvage-override-default
 manager-component-edit-salvage-override-custom
+manager-component-edit-salvage-override-routed

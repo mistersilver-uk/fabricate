@@ -760,4 +760,13 @@ export const CASES = Object.freeze([
     frame: 24,
     sees: 'resolved',
   }),
+  // Routed salvage whose `simple` check is a fixed DC: the adjustment field proves the override
+  // reads the routed sub-object salvage rolls.
+  overrideCase({
+    id: 'manager-component-edit-salvage-override-routed',
+    label: 'routed salvage reading a character value, a character chosen',
+    field: 'adjustmentOverride',
+    frame: 24,
+    sees: 'resolved',
+  }),
 ]);

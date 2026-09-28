@@ -77,6 +77,21 @@ const CHECK_OVERRIDE_STATES = Object.freeze({
   multiply: { source: 'attribute', kind: 'multiply', salvage: [15, 0.5], task: [15, 0.5] },
   default: { source: 'attribute', kind: 'add', salvage: [15, null], task: [15, null] },
   custom: { source: 'attribute', kind: 'multiply', salvage: [15, 0.7], task: [15, 0.7] },
+  // Routed salvage whose `routed` check alone reads a character value: the override must follow it.
+  routed: { source: 'attribute', kind: 'add', salvage: [15, -2], task: [15, -2], routed: true },
+});
+
+/** A relative routed check over `evaluation`, as the salvage and gathering states seed it. */
+const routedCheck = (evaluation) => ({
+  rollFormula: '1d20',
+  dc: 15,
+  type: 'relative',
+  thresholdMode: 'meet',
+  relativeOutcomes: [
+    { id: 'lab-ov-found', name: 'Found', success: true, dc: 0 },
+    { id: 'lab-ov-missed', name: 'Missed', success: false, dc: -15 },
+  ],
+  evaluation,
 });
 
 function seedCheckOverride(content, state) {
@@ -99,23 +114,24 @@ function seedCheckOverride(content, state) {
     ['Hard', 20, multiply ? 0.2 : -2],
   ].map(([name, dc, adjustment]) => ({ id: `lab-ov-${name.toLowerCase()}`, name, dc, adjustment }));
   const system = content.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.SMITHING);
+  // A routed state gives `simple` a fixed target, so an override reading it would edit the DC.
+  const simpleEvaluation = spec.routed
+    ? { ...evaluation, target: { ...evaluation.target, source: 'fixed' } }
+    : evaluation;
   system.salvageCraftingCheck = {
     enabled: true,
-    simple: { rollFormula: '1d20', dc: 15, dcMode: 'static', thresholdMode: 'meet', tiers, evaluation },
-  };
-  system.gatheringCraftingCheck = {
-    routed: {
+    simple: {
       rollFormula: '1d20',
       dc: 15,
-      type: 'relative',
+      dcMode: 'static',
       thresholdMode: 'meet',
-      relativeOutcomes: [
-        { id: 'lab-ov-found', name: 'Found', success: true, dc: 0 },
-        { id: 'lab-ov-missed', name: 'Missed', success: false, dc: -15 },
-      ],
-      evaluation,
+      tiers,
+      evaluation: simpleEvaluation,
     },
+    ...(spec.routed && { routed: routedCheck(evaluation) }),
   };
+  if (spec.routed) system.salvageResolutionMode = 'routed';
+  system.gatheringCraftingCheck = { routed: routedCheck(evaluation) };
   const overrides = ([dcOverride, adjustmentOverride]) => ({ dcOverride, adjustmentOverride });
   const sword = content.components.find((entry) => entry.id === 'sm-longsword');
   sword.salvage = { ...sword.salvage, ...overrides(spec.salvage) };
