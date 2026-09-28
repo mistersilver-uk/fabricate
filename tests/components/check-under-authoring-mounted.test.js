@@ -210,7 +210,7 @@ describe('the routed editor authors an under check losslessly (Q13)', () => {
     await routedHarness.setProps({ value: state.value });
     assert.equal(
       state.root.querySelector('[data-outcome-band-scale]').textContent.trim(),
-      'Target 53 (@skills.craft.value 55, Hard work −2). Success sits at the low end: a total at or under 53 succeeds.'
+      'Target 53 (Idrin @skills.craft.value 55, Hard work −2). Success sits at the low end: a total at or under 53 succeeds.'
     );
   });
 
@@ -412,7 +412,7 @@ describe('the routed editor authors an under check losslessly (Q13)', () => {
     const scale = state.root.querySelector('[data-outcome-band-scale]');
     assert.equal(
       scale.textContent.trim(),
-      'Target 55 (@skills.craft.value 55). Success sits at the low end: a total at or under 55 succeeds.'
+      'Target 55 (Idrin @skills.craft.value 55). Success sits at the low end: a total at or under 55 succeeds.'
     );
     assert.ok(scale.classList.contains('manager-checks-card-description'), 'the card leads with it');
     assert.doesNotMatch(state.root.querySelector('[data-outcome-bands]').textContent, /Transition points/);
@@ -483,7 +483,7 @@ describe('the routed editor authors an under check losslessly (Q13)', () => {
     );
     assert.match(
       state.root.querySelector('[data-outcome-band-scale]').textContent,
-      /^Target 50 \(@skills\.craft\.value 55, base −5\)\. Success sits at the high end: a total of 50 or more succeeds\.$/
+      /^Target 50 \(Idrin @skills\.craft\.value 55, base −5\)\. Success sits at the high end: a total of 50 or more succeeds\.$/
     );
     assert.ok(!state.root.querySelector('[data-outcome-band-strip] [role="slider"]'));
   });
@@ -671,7 +671,7 @@ describe('the simple editor draws an under target read-only', () => {
     });
     assert.match(
       read.root.querySelector('[data-simple-band-scale]').textContent,
-      /^Target 53 \(@skills\.craft\.value 55, Hard −2\)\./
+      /^Target 53 \(Idrin @skills\.craft\.value 55, Hard −2\)\./
     );
   });
 

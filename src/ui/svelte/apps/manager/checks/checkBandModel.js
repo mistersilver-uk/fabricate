@@ -287,9 +287,9 @@ export function previewScaleSentence(state, { direction, comparison }, text) {
 }
 
 /**
- * The previewed target plus the `source` reading {@link describeBandScale} names: the typed
- * expression and its value (the maintainer's 2026-09-28 ruling puts the GM's formula where the
- * prototype shows a friendly label), the adjustment applied, the previewed tier's or else the
+ * The previewed target plus the `source` reading {@link describeBandScale} names: the actor, the
+ * typed expression and its value (the maintainer's 2026-09-28 ruling puts the GM's formula where
+ * the prototype shows a friendly label), the adjustment applied, the previewed tier's or else the
  * base, and the check modifiers a roll-under adds to its target. Without an actor the target is
  * unsourced. `tier` is `{ name, adjustment }` or null for the base; `modifiers` is the previewed
  * actor's deterministic check-modifier total.
@@ -326,8 +326,15 @@ export function previewBandTarget(
   }
   const parts = [
     interpolate(
-      text('FABRICATE.Admin.Manager.Checks.Evaluation.ScaleSourceValue', '{expression} {value}'),
-      { expression: normalized.target.expression.trim(), value: resolved.value }
+      text(
+        'FABRICATE.Admin.Manager.Checks.Evaluation.ScaleSourceValue',
+        '{actor} {expression} {value}'
+      ),
+      {
+        actor: character.name,
+        expression: normalized.target.expression.trim(),
+        value: resolved.value,
+      }
     ),
   ];
   const { adjustmentKind, baseAdjustment } = normalized.target;

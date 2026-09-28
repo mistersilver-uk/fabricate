@@ -282,12 +282,12 @@ describe('previewBandTarget', () => {
     const evaluation = attribute('over', 'add', -5);
     assert.equal(
       previewBandTarget({ evaluation, anchor: 0, character: idrin }, fallback).source,
-      '@skills.craft.value 55, base −5'
+      'Idrin @skills.craft.value 55, base −5'
     );
     assert.equal(
       previewBandTarget({ evaluation, anchor: 0, tier: { name: 'Hard', adjustment: -2 }, character: idrin }, fallback)
         .source,
-      '@skills.craft.value 55, Hard −2'
+      'Idrin @skills.craft.value 55, Hard −2'
     );
   });
 
@@ -297,7 +297,7 @@ describe('previewBandTarget', () => {
       fallback
     );
     assert.equal(under.target, 56);
-    assert.equal(under.source, '@skills.craft.value 55, modifiers +1');
+    assert.equal(under.source, 'Idrin @skills.craft.value 55, modifiers +1');
     const fixedUnder = previewBandTarget(
       { evaluation: { product: 'sum', direction: 'under' }, anchor: 10, character: idrin, modifiers: 1 },
       fallback
@@ -307,7 +307,7 @@ describe('previewBandTarget', () => {
       { evaluation: attribute('over'), anchor: 0, character: idrin, modifiers: 1 },
       fallback
     );
-    assert.deepEqual([over.target, over.source], [55, '@skills.craft.value 55']);
+    assert.deepEqual([over.target, over.source], [55, 'Idrin @skills.craft.value 55']);
   });
 
   it('leaves an actor-free literal unsourced', () => {

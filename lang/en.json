@@ -6526,7 +6526,7 @@
             "ScaleOverMeetSourced": "Target {target} ({source}). Success sits at the high end: a total of {target} or more succeeds.",
             "ScaleOverExceed": "Target {target}. Success sits at the high end: a total above {target} succeeds.",
             "ScaleOverExceedSourced": "Target {target} ({source}). Success sits at the high end: a total above {target} succeeds.",
-            "ScaleSourceValue": "{expression} {value}",
+            "ScaleSourceValue": "{actor} {expression} {value}",
             "ScaleSourceModifiers": "modifiers {total}",
             "ScaleSourceIncludes": "includes {part}",
             "ScaleSourceBase": "base {adjustment}",
