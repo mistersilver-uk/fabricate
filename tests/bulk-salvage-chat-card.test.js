@@ -474,19 +474,29 @@ describe('buildBulkSalvageChatContent: each subject states its own executed evid
     assert.doesNotMatch(rows[1], /evidence/, 'the gmroll subject states nothing beyond its roll');
   });
 
-  it('every non-public subject, and a sum/over fixed one, leaves the card byte-identical (Q19)', () => {
+  it('every non-public subject leaves the card byte-identical (Q19)', () => {
     const bare = buildBulkSalvageChatContent(model([cardSubject({ rollValue: 15 })]), shippedLocalize);
-    const checks = [
-      ...NOT_PUBLIC.map((visibility) => executedCheck(UNDER_DATA, visibility)),
-      executedCheck(OVER_FIXED_DATA),
-    ];
-    for (const check of checks) {
+    for (const visibility of NOT_PUBLIC) {
       const html = buildBulkSalvageChatContent(
-        model([cardSubject({ rollValue: 15, check })]),
+        model([cardSubject({ rollValue: 15, check: executedCheck(UNDER_DATA, visibility) })]),
         shippedLocalize
       );
-      assert.equal(html, bare, JSON.stringify(check.visibility));
+      assert.equal(html, bare, JSON.stringify(visibility));
     }
+  });
+
+  it('a public sum/over fixed subject gains only its Needed and Margin rows (M3)', () => {
+    const html = buildBulkSalvageChatContent(
+      model([cardSubject({ rollValue: 15, check: executedCheck(OVER_FIXED_DATA) })]),
+      shippedLocalize
+    );
+    const [row] = html.split('<li ').slice(1);
+    assert.match(row, /fabricate-craft-chat__item--evidence/);
+    assert.deepEqual(
+      [...row.matchAll(/data-check-evidence="(\w+)"/g)].map(([, id]) => id),
+      ['needed', 'margin']
+    );
+    assert.ok(row.includes('DC 12, meet or beat') && row.includes('>+3<'));
   });
 
   it('the service hands each row its own executed projection from the salvage result', async () => {

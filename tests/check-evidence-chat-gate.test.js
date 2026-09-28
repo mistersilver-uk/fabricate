@@ -1,26 +1,31 @@
 /**
- * Issue 2005 — a result card posted by a real salvage states the executed check's evidence rows
- * only for a public, non-secret roll, on a V13 (`applyRollMode`) and a V14 (`applyMode`) build, and
- * a hostile modifier label posts with no enrichment pattern left in the card.
+ * Issue 2005 — a result card posted by a real salvage or craft states the executed check's evidence
+ * rows only for a public, non-secret roll, on a V13 (`applyRollMode`) and a V14 (`applyMode`) build,
+ * and a hostile modifier label posts with no enrichment pattern left in the card.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { shippedLocalize } from './helpers/checkEvidenceFixtures.js';
-import { salvageProbe } from './helpers/craftPipelineProbe.js';
+import { craftProbe, probeResolutionService, salvageProbe } from './helpers/craftPipelineProbe.js';
+import { stubPromptSurface } from './helpers/rollPromptDialogStub.js';
 
 const ROLL_MODES = ['publicroll', 'gmroll', 'blindroll', 'selfroll'];
 const HOSTILE_LABEL = '[[1d20]] @abilities.str.value';
 
-/** A `1d4` totals 3 and any other formula 9; every posted roll message is recorded. */
+/** A `1d4` (or `(1d4)`) totals 3 and any other formula 9 as 2, 4 and 3; every posted roll message
+ * is recorded. */
 function installRoll(rollMessages) {
   globalThis.Roll = class EvidenceRoll {
     constructor(formula) {
       this.formula = String(formula);
       const constant = Number(this.formula);
       if (Number.isFinite(constant)) this.total = constant;
-      else this.total = this.formula === '1d4' ? 3 : 9;
-      this.dice = Number.isFinite(constant) ? [] : [{ number: 3, faces: 6, total: this.total }];
+      else this.total = this.formula.replaceAll(/[()\s]/g, '') === '1d4' ? 3 : 9;
+      const faces = [2, 4, 3].map((result) => ({ result }));
+      this.dice = Number.isFinite(constant)
+        ? []
+        : [{ number: 3, faces: 6, total: this.total, results: faces }];
     }
     async evaluate() {
       return this;
@@ -107,6 +112,13 @@ for (const version of [13, 14]) {
         assert.match(content, /data-check-evidence="target"/);
         assert.match(content, /data-check-evidence="preRolled"/);
         assert.match(content, /data-check-evidence="margin"/);
+        // 12 − 2, raised by the rolled 1d4 of 3, against the 3d6 of 9.
+        assert.ok(
+          content
+            .replaceAll('\u2060', '')
+            .includes('13 · Salvager @skills.craft.value 12, difficulty −2, modifiers +3')
+        );
+        assert.ok(content.includes('+4 under the target'));
       } else {
         assert.doesNotMatch(content, /evidence|character value|under the target/);
       }
@@ -121,3 +133,64 @@ test('a hostile label posts with no inline-roll opener and no @ reference left t
   assert.doesNotMatch(content, /\[\[/);
   assert.doesNotMatch(content, /@\w/);
 });
+
+/** A real sum/under craft against Hard Work's −2 on character value 12, with a rolled 1d4 bonus. */
+async function craftAs(version, rollMode) {
+  const world = craftProbe({
+    features: { craftingChecks: true },
+    craftingCheck: {
+      enabled: true,
+      consumption: {},
+      defaultModifierIds: ['steady'],
+      simple: {
+        rollFormula: '3d6',
+        dc: 10,
+        evaluation: {
+          product: 'sum',
+          direction: 'under',
+          target: { source: 'attribute', expression: '@skills.craft.value', adjustmentKind: 'add' },
+        },
+        tiers: [{ id: 'hard', name: 'Hard Work', adjustment: -2 }],
+      },
+    },
+    resolutionService: probeResolutionService({ mode: 'simple' }),
+  });
+  world.system.modifiers = [{ id: 'steady', label: 'Steady hands', expression: '1d4' }];
+  world.recipe.checkTierId = 'hard';
+  world.craftingActor.system.skills = { craft: { value: 12 } };
+  globalThis.game.i18n.localize = shippedLocalize;
+  const created = [];
+  installRoll([]);
+  installChatMessage(version, created);
+  const prompt = stubPromptSurface(() => ({ confirmed: true, rollMode }));
+  const result = await world.craft(null, { interactive: true }).finally(prompt.restore);
+  delete globalThis.Roll;
+  const cards = created.filter((data) => String(data.content).includes('fabricate-craft-chat'));
+  return { result, cards };
+}
+
+/** The card with its invisible enrichment joiners removed. */
+const readable = (card) => String(card.content).replaceAll('\u2060', '');
+
+for (const version of [13, 14]) {
+  test(`V${version}: a public craft card states the pill, dice line and ruled rows (QE3)`, async () => {
+    const { result, cards } = await craftAs(version, 'publicroll');
+    assert.equal(result.success, true, 'the 3d6 of 9 stays at or under 13');
+    assert.equal(cards.length, 1);
+    const content = readable(cards[0]);
+    assert.ok(content.includes('fa-circle-check" aria-hidden="true"></i>Success</div>'));
+    assert.ok(content.includes('3d6 (2 + 4 + 3) = 9, compared as rolled'));
+    assert.ok(content.includes('13 · Crafter @skills.craft.value 12, Hard Work −2, modifiers +3'));
+    assert.ok(content.includes('Steady hands 1d4 rolled 3, raising the target'));
+    assert.ok(content.includes('+4 under the target'));
+  });
+
+  for (const rollMode of ROLL_MODES.slice(1)) {
+    test(`V${version} ${rollMode}: a private craft card states no dice line or rows`, async () => {
+      const { cards } = await craftAs(version, rollMode);
+      const content = readable(cards[0]);
+      assert.doesNotMatch(content, /evidence|__dice|under the target|Crafter @/);
+      assert.match(content, /__roll-value">9</, 'it keeps the bare total');
+    });
+  }
+}

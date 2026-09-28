@@ -19,6 +19,7 @@
  * wrapper, so a card that has none is byte-identical — asserted, not assumed.
  */
 
+import { checkDiceLine } from './checkDiceLine.js';
 import { isPublicCheckDisplay } from './checkDisplay.js';
 import { checkEvidenceRows } from './checkEvidenceRows.js';
 
@@ -99,6 +100,8 @@ export const CRAFTING_CHAT_KEYS = Object.freeze({
   consumedOnFailure: 'FABRICATE.Chat.ConsumedOnFailure',
   producedOnFailure: 'FABRICATE.Chat.ProducedOnFailure',
   complications: COMPLICATIONS_HEADING_KEY,
+  checkSuccess: 'FABRICATE.Check.Evidence.Success',
+  checkFailure: 'FABRICATE.Check.Evidence.Failure',
 });
 
 /** Escape text destined for HTML so user-authored names cannot inject markup. */
@@ -199,6 +202,25 @@ export function renderCheckEvidenceRows(check, localize = (key) => key) {
     ),
     '</dl>',
   ].join('');
+}
+
+/**
+ * The rolled check's head (issue 2005, frames 37 and 38): a key map naming `checkSuccess` adds the
+ * Success or Failure pill, and a public check's dice line replaces the bare total. Without a
+ * rolled total, or for another card's keys, it is {@link renderRollTotal} unchanged.
+ */
+function renderCheckHead(model, keys, loc) {
+  const total = renderRollTotal(model.rollValue, loc(keys.roll));
+  if (!total || !keys.checkSuccess) return total;
+  const succeeded = model.status === 'succeeded';
+  const pill =
+    `<div class="fabricate-craft-chat__result fabricate-craft-chat__result--${succeeded ? 'success' : 'failure'}">` +
+    `<i class="fa-solid ${succeeded ? 'fa-circle-check' : 'fa-circle-xmark'}" aria-hidden="true"></i>` +
+    `${esc(loc(succeeded ? keys.checkSuccess : keys.checkFailure))}</div>`;
+  const diceLine = isPublicCheckDisplay(model.check) ? checkDiceLine(model.check, loc) : '';
+  return diceLine
+    ? `${pill}<div class="fabricate-craft-chat__dice">${inertText(diceLine)}</div>`
+    : `${pill}${total}`;
 }
 
 /**
@@ -479,7 +501,7 @@ export function buildResultCard(model = {}, keys, localize = (key) => key) {
     subtitleParts.push(`${esc(loc(keys.subject))}: ${esc(model.subjectName)}`);
   }
 
-  const rollTotal = renderRollTotal(model.rollValue, loc(keys.roll));
+  const rollTotal = renderCheckHead(model, keys, loc);
   const tierStep = renderTierStep(model.tierStep, keys, loc);
   const evidence = renderCheckEvidenceRows(model.check, loc);
 

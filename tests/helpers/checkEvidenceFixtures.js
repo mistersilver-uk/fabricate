@@ -17,7 +17,10 @@ export function shippedLocalize(key) {
   return typeof value === 'string' ? value : key;
 }
 
-/** Sum/under against character value 12, −2 and a library +1, raised by a situational 1d4 of 3. */
+/**
+ * Sum/under against Sera Vane's `@skills.smith.level` 12, Hard Work's −2 and a library +1, raised by
+ * a situational 1d4 of 3; `3d6` rolled 2, 4 and 3.
+ */
 export const UNDER_DATA = Object.freeze({
   product: 'sum',
   direction: 'under',
@@ -29,15 +32,23 @@ export const UNDER_DATA = Object.freeze({
     { source: 'situational', label: '', expression: '1d4', total: 3, destination: 'target' },
   ],
   targetSource: 'attribute',
+  targetExpression: '@skills.smith.level',
+  targetActor: 'Sera Vane',
   targetTerms: [
     { kind: 'anchor', value: 12 },
-    { kind: 'adjustment', value: -2 },
+    { kind: 'adjustment', value: -2, label: 'Hard Work' },
     { kind: 'benefit', value: 1, source: 'library' },
   ],
+  resolvedFormula: '3d6',
+  diceGroups: [{ groupId: 0, group: '3d6', sum: 9, results: [2, 4, 3] }],
 });
 
 export const UNDER_ROWS = Object.freeze([
-  ['target', 'Target', '14 · character value 12, difficulty −2, modifiers +1, situational +3'],
+  [
+    'target',
+    'Target',
+    '14 · Sera Vane @skills.smith.level 12, Hard Work −2, modifiers +1, situational +3',
+  ],
   ['preRolled', 'Pre-rolled', 'Situational 1d4 rolled 3, raising the target'],
   ['margin', 'Margin', '+5 under the target'],
 ]);

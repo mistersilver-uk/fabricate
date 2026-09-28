@@ -1,8 +1,8 @@
 /**
  * The one display projection of a summed check (issue 2005): immutable plain data rebuilt from an
  * allowlist, which the prompt, the descriptor, the result box and the chat cards read. It carries
- * no evaluation record, target expression, path, policy or term label; actor reads and target
- * resolution stay with their adapters and the resolver.
+ * no evaluation record, path or policy; executed evidence alone names the recorded typed formula,
+ * character and tier labels. Actor reads and target resolution stay with their adapters.
  */
 import { numberOrNull } from '../../utils/scalars.js';
 
@@ -20,13 +20,17 @@ function deepFreeze(value) {
   return value;
 }
 
-/** One `{ kind, value, source? }` target term, or null when it is not one. */
+const text = (value) => (typeof value === 'string' ? value.trim() : '');
+
+/** One `{ kind, value, source?, label? }` target term, or null when it is not one. */
 function targetTerm(term) {
   const kind = oneOf(TERM_KINDS, term?.kind);
   const value = numberOrNull(term?.value);
   if (!kind || value === null) return null;
   const source = kind === 'benefit' ? oneOf(TERM_SOURCES, term.source) : null;
-  return source ? { kind, value, source } : { kind, value };
+  if (source) return { kind, value, source };
+  const label = kind === 'adjustment' || kind === 'multiplier' ? text(term.label) : '';
+  return label ? { kind, value, label } : { kind, value };
 }
 
 /** Target terms rebuilt from the allowlist, dropping anything that is not a term. */
@@ -67,10 +71,29 @@ function preRollRow(entry) {
   };
 }
 
+/** The rolled dice as `{ group, results }`, for a card's dice line. */
+function diceRows(groups) {
+  return (Array.isArray(groups) ? groups : [])
+    .filter((entry) => typeof entry?.group === 'string')
+    .map((entry) => ({
+      group: entry.group,
+      results: (Array.isArray(entry.results) ? entry.results : [])
+        .map(numberOrNull)
+        .filter((face) => face !== null),
+    }));
+}
+
+/** A character value's recorded typed formula and character name, each only when recorded. */
+function attributeFacts(data) {
+  const expression = text(data.targetExpression);
+  const actor = text(data.targetActor);
+  return { ...(expression && { targetExpression: expression }), ...(actor && { targetActor: actor }) };
+}
+
 /**
  * The executed evidence a result box or card may state, read from the check result's `data` only
  * and never from later actor or config state. Null for a refusal or a check that never rolled; a
- * legacy record without `preRolls` or `targetTerms` omits them.
+ * legacy record without `preRolls`, `targetTerms`, its formula or its dice omits them.
  */
 export function executedCheckEvidence(data) {
   if (!data || typeof data !== 'object' || data.targetRefusal) return null;
@@ -82,6 +105,8 @@ export function executedCheckEvidence(data) {
     comparison: oneOf(['meet', 'exceed'], data.comparison),
     margin: numberOrNull(data.margin),
   };
+  if (text(data.resolvedFormula)) evidence.formula = text(data.resolvedFormula);
+  if (Array.isArray(data.diceGroups)) evidence.dice = diceRows(data.diceGroups);
   if (Array.isArray(data.preRolls)) {
     evidence.preRolls = data.preRolls.map(preRollRow).filter(Boolean);
   }
@@ -89,6 +114,7 @@ export function executedCheckEvidence(data) {
     evidence.targetTerms = sanitizeTargetTerms(data.targetTerms);
     const targetSource = oneOf(['fixed', 'attribute'], data.targetSource);
     if (targetSource) evidence.targetSource = targetSource;
+    if (targetSource === 'attribute') Object.assign(evidence, attributeFacts(data));
   }
   return evidence;
 }

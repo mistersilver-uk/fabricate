@@ -47,10 +47,20 @@ export { rolledDiceGroups } from './checkRollOutput.js';
 /**
  * `data.targetTerms` outside sum/over/fixed (issue 2005): the resolved target's terms, else its
  * anchor, then the rolled tier's step, then the settled scalar benefits. Folded in order with
- * `preRolls` they reproduce `data.target`. A term is `{ kind, value, source? }` and nothing else;
- * `data.targetSource` names whether the anchor was a fixed number or a character value.
+ * `preRolls` they reproduce `data.target`. A term is `{ kind, value, source?, label? }`, `label`
+ * naming the tier of an adjustment. `data.targetSource` names the anchor's source; a character
+ * value also records its typed formula and the character's name, so results never re-read them.
  */
-function targetTermsEvidence({ grading, target, anchor, baseTerms, tierTerm = null, rolled }) {
+function targetTermsEvidence({
+  grading,
+  target,
+  anchor,
+  baseTerms,
+  tierTerm = null,
+  rolled,
+  evaluation,
+  actor,
+}) {
   if (target === null || (grading.direction === 'over' && grading.source === 'fixed')) return {};
   const base =
     Array.isArray(baseTerms) && baseTerms.length > 0
@@ -59,12 +69,21 @@ function targetTermsEvidence({ grading, target, anchor, baseTerms, tierTerm = nu
   const benefits = grading.direction === 'under' ? (rolled?.benefitTerms ?? []) : [];
   return {
     targetSource: grading.source,
+    ...attributeTargetFacts(grading, evaluation, actor),
     targetTerms: [
-      ...base.map(({ kind, value }) => ({ kind, value })),
+      ...base.map(({ kind, value, label }) => ({ kind, value, ...(label && { label }) })),
       ...(tierTerm ? [tierTerm] : []),
       ...benefits.map(({ kind, value, source }) => ({ kind, value, source })),
     ],
   };
+}
+
+/** A character-value target's typed formula and the name of the character it was read from. */
+function attributeTargetFacts(grading, evaluation, actor) {
+  if (grading.source !== 'attribute') return {};
+  const expression = String(evaluation?.target?.expression ?? '').trim();
+  const name = typeof actor?.name === 'string' ? actor.name.trim() : '';
+  return { ...(expression && { targetExpression: expression }), ...(name && { targetActor: name }) };
 }
 
 /** The relative tier the roll matched, before forcing or steps, as its target term; its
@@ -72,9 +91,10 @@ function targetTermsEvidence({ grading, target, anchor, baseTerms, tierTerm = nu
 function rolledTierTerm(grading, classifyInput) {
   const { matched } = classifyCheckTotal({ ...classifyInput, triggers: [], minOutcomeId: null });
   if (!matched) return null;
-  if (grading.multiply) return { kind: 'multiplier', value: Number(matched.adjustment) };
+  const label = typeof matched.name === 'string' && matched.name ? { label: matched.name } : {};
+  if (grading.multiply) return { kind: 'multiplier', value: Number(matched.adjustment), ...label };
   const step = Number(matched.dc);
-  return { kind: 'adjustment', value: grading.direction === 'under' ? 0 - step : step };
+  return { kind: 'adjustment', value: grading.direction === 'under' ? 0 - step : step, ...label };
 }
 
 /** The executed roll mode, on a result whose caller asked for it; never persisted. */
@@ -342,7 +362,7 @@ function preparedCheckRefusal(kind, evaluation, formula) {
 /** Grades a prepared total as the matching runner does, against the captured anchor. */
 function gradePreparedTotal(
   kind,
-  { config, evaluation, anchor, rolled, total, diceGroups, secret }
+  { config, evaluation, anchor, rolled, total, diceGroups, secret, actor }
 ) {
   const grading = sumGrading(evaluation);
   const targetDelta = rolled.modifierPlacement?.targetDelta;
@@ -358,6 +378,8 @@ function gradePreparedTotal(
           baseTerms: config.targetTerms,
           tierTerm,
           rolled,
+          evaluation,
+          actor,
         });
   if (kind === 'routed') {
     const classifyInput = {
@@ -508,6 +530,7 @@ export async function evaluatePreparedRunCheck(
     total,
     diceGroups,
     secret,
+    actor,
   });
   return {
     success: graded.success,
@@ -758,7 +781,15 @@ export async function runFormulaPassFail({
       comparison,
       ...(formula && executedSumEvidence(total, target, comparison, grading.direction)),
       ...(formula &&
-        targetTermsEvidence({ grading, target, anchor: dc, baseTerms: targetTerms, rolled })),
+        targetTermsEvidence({
+          grading,
+          target,
+          anchor: dc,
+          baseTerms: targetTerms,
+          rolled,
+          evaluation,
+          actor,
+        })),
       diceGroups,
       ...preRollEvidence(rolled),
     },
@@ -935,6 +966,8 @@ export async function runFormulaRouted({
           baseTerms: targetTerms,
           tierTerm,
           rolled,
+          evaluation,
+          actor,
         })),
       ...preRollEvidence(rolled),
       outcomeId: matched?.id ?? null,

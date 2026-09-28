@@ -396,7 +396,7 @@ const NO_COMPLICATION_MODELS = Object.freeze({
  */
 const PRE_CHANGE_CARDS = Object.freeze({
   crafting:
-    '<div class="fabricate-craft-chat fabricate-craft-chat--success"><header class="fabricate-craft-chat__header"><div class="fabricate-craft-chat__title">FABRICATE.Chat.CraftSuccess</div><div class="fabricate-craft-chat__subtitle">FABRICATE.Chat.Actor: Gandalf · FABRICATE.Chat.Recipe: Iron Sword</div></header><div class="fabricate-craft-chat__roll"><span class="fabricate-craft-chat__roll-label">FABRICATE.Chat.Roll</span><span class="fabricate-craft-chat__roll-value">17</span></div><section class="fabricate-craft-chat__section fabricate-craft-chat__section--results"><div class="fabricate-craft-chat__heading">FABRICATE.Chat.Results</div><ul class="fabricate-craft-chat__grid"><li class="fabricate-craft-chat__item"><img class="fabricate-craft-chat__icon" src="icons/sword.png" alt="" /><span class="fabricate-craft-chat__label">Iron Sword</span></li></ul></section><section class="fabricate-craft-chat__section fabricate-craft-chat__section--consumed"><div class="fabricate-craft-chat__heading">FABRICATE.Chat.Consumed</div><ul class="fabricate-craft-chat__grid"><li class="fabricate-craft-chat__item"><img class="fabricate-craft-chat__icon" src="icons/ingot.png" alt="" /><span class="fabricate-craft-chat__label">3× Iron Ingot</span></li></ul></section><section class="fabricate-craft-chat__section fabricate-craft-chat__section--tools"><div class="fabricate-craft-chat__heading">FABRICATE.Chat.Tools</div><ul class="fabricate-craft-chat__grid"><li class="fabricate-craft-chat__item"><img class="fabricate-craft-chat__icon" src="icons/hammer.png" alt="" /><span class="fabricate-craft-chat__label">Forge Hammer</span></li></ul></section></div>',
+    '<div class="fabricate-craft-chat fabricate-craft-chat--success"><header class="fabricate-craft-chat__header"><div class="fabricate-craft-chat__title">FABRICATE.Chat.CraftSuccess</div><div class="fabricate-craft-chat__subtitle">FABRICATE.Chat.Actor: Gandalf · FABRICATE.Chat.Recipe: Iron Sword</div></header><div class="fabricate-craft-chat__result fabricate-craft-chat__result--success"><i class="fa-solid fa-circle-check" aria-hidden="true"></i>FABRICATE.Check.Evidence.Success</div><div class="fabricate-craft-chat__roll"><span class="fabricate-craft-chat__roll-label">FABRICATE.Chat.Roll</span><span class="fabricate-craft-chat__roll-value">17</span></div><section class="fabricate-craft-chat__section fabricate-craft-chat__section--results"><div class="fabricate-craft-chat__heading">FABRICATE.Chat.Results</div><ul class="fabricate-craft-chat__grid"><li class="fabricate-craft-chat__item"><img class="fabricate-craft-chat__icon" src="icons/sword.png" alt="" /><span class="fabricate-craft-chat__label">Iron Sword</span></li></ul></section><section class="fabricate-craft-chat__section fabricate-craft-chat__section--consumed"><div class="fabricate-craft-chat__heading">FABRICATE.Chat.Consumed</div><ul class="fabricate-craft-chat__grid"><li class="fabricate-craft-chat__item"><img class="fabricate-craft-chat__icon" src="icons/ingot.png" alt="" /><span class="fabricate-craft-chat__label">3× Iron Ingot</span></li></ul></section><section class="fabricate-craft-chat__section fabricate-craft-chat__section--tools"><div class="fabricate-craft-chat__heading">FABRICATE.Chat.Tools</div><ul class="fabricate-craft-chat__grid"><li class="fabricate-craft-chat__item"><img class="fabricate-craft-chat__icon" src="icons/hammer.png" alt="" /><span class="fabricate-craft-chat__label">Forge Hammer</span></li></ul></section></div>',
   salvage:
     '<div class="fabricate-craft-chat fabricate-craft-chat--success"><header class="fabricate-craft-chat__header"><div class="fabricate-craft-chat__title">FABRICATE.Chat.SalvageSuccess</div><div class="fabricate-craft-chat__subtitle">FABRICATE.Chat.SalvageActor: Akra · FABRICATE.Chat.SalvageSource: Iron Ore</div></header><div class="fabricate-craft-chat__roll"><span class="fabricate-craft-chat__roll-label">FABRICATE.Chat.Roll</span><span class="fabricate-craft-chat__roll-value">12</span></div><section class="fabricate-craft-chat__section fabricate-craft-chat__section--results"><div class="fabricate-craft-chat__heading">FABRICATE.Chat.SalvageRecovered</div><ul class="fabricate-craft-chat__grid"><li class="fabricate-craft-chat__item"><img class="fabricate-craft-chat__icon" src="icons/shard.png" alt="" /><span class="fabricate-craft-chat__label">2× Iron Shard</span></li></ul></section><section class="fabricate-craft-chat__section fabricate-craft-chat__section--consumed"><div class="fabricate-craft-chat__heading">FABRICATE.Chat.SalvageConsumed</div><ul class="fabricate-craft-chat__grid"><li class="fabricate-craft-chat__item"><img class="fabricate-craft-chat__icon" src="icons/ore.png" alt="" /><span class="fabricate-craft-chat__label">Iron Ore</span></li></ul></section></div>',
   gathering:
@@ -1015,15 +1015,90 @@ test('a card omits the rows for every secret, whispered, blind, self or unknown 
   }
 });
 
-test('a sum/over fixed card gains no rows and stays byte-identical', () => {
+/** The card's bare total line, which a public check's dice line replaces. */
+const rollLine = (value) =>
+  '<div class="fabricate-craft-chat__roll"><span class="fabricate-craft-chat__roll-label">Roll</span>' +
+  `<span class="fabricate-craft-chat__roll-value">${value}</span></div>`;
+
+/** One evidence row as the card writes it. */
+const evidenceRow = (id, label, text) =>
+  `<div class="fabricate-craft-chat__evidence-row" data-check-evidence="${id}">` +
+  `<dt class="fabricate-craft-chat__evidence-label">${label}</dt>` +
+  `<dd class="fabricate-craft-chat__evidence-value">${text}</dd></div>`;
+
+test('a public sum/over fixed card differs from the bare card only by the ruled additions (M1, M3)', () => {
+  const data = {
+    ...OVER_FIXED_DATA,
+    resolvedFormula: '1d20 + 3',
+    diceGroups: [{ groupId: 0, group: '1d20', sum: 12, results: [12] }],
+  };
   for (const status of ['succeeded', 'failed']) {
-    const model = status === 'succeeded' ? successModel({ rollValue: 15 }) : failureModel();
+    const base = status === 'succeeded' ? successModel() : failureModel();
+    const model = { ...base, rollValue: 15 };
     const bare = buildCraftingChatContent(model, shippedKeyLocalize);
     const withCheck = buildCraftingChatContent(
-      { ...model, check: executedCheck(OVER_FIXED_DATA) },
+      { ...model, check: executedCheck(data) },
       shippedKeyLocalize
     );
-    assert.equal(withCheck, bare, status);
+    assert.ok(bare.includes(rollLine(15)), `${status}: the bare card keeps its total line`);
+    assert.equal(
+      withCheck,
+      bare.replace(
+        rollLine(15),
+        '<div class="fabricate-craft-chat__dice">1d20 (12) + 3 = 15</div>' +
+          '<dl class="fabricate-craft-chat__evidence">' +
+          evidenceRow('needed', 'Needed', 'DC 12, meet or beat') +
+          evidenceRow('margin', 'Margin', '+3') +
+          '</dl>'
+      ),
+      status
+    );
+  }
+});
+
+test('every crafting card with a rolled total states the Success or Failure pill (M1)', () => {
+  const pill = (tone, icon, text) =>
+    `<div class="fabricate-craft-chat__result fabricate-craft-chat__result--${tone}">` +
+    `<i class="fa-solid ${icon}" aria-hidden="true"></i>${text}</div>`;
+  const success = buildCraftingChatContent(successModel({ rollValue: 15 }), shippedKeyLocalize);
+  const failure = buildCraftingChatContent(failureModel({ rollValue: 4 }), shippedKeyLocalize);
+  assert.ok(success.includes(pill('success', 'fa-circle-check', 'Success') + rollLine(15)));
+  assert.ok(failure.includes(pill('failure', 'fa-circle-xmark', 'Failure') + rollLine(4)));
+  const noCheck = buildCraftingChatContent(successModel(), shippedKeyLocalize);
+  assert.ok(!noCheck.includes('__result'), 'a craft that rolled nothing has no pill');
+  const salvage = buildSalvageChatContent({ status: 'succeeded', actorName: 'A', rollValue: 9 });
+  assert.ok(!salvage.includes('__result'), 'the pill is a crafting card addition');
+});
+
+test('a public roll-under card reads frame 38: pill, dice line, then the ruled rows', () => {
+  const html = buildCraftingChatContent(
+    successModel({ rollValue: 9, check: executedCheck() }),
+    shippedKeyLocalize
+  );
+  assert.ok(
+    html.includes(
+      '<i class="fa-solid fa-circle-check" aria-hidden="true"></i>Success</div>' +
+        '<div class="fabricate-craft-chat__dice">3d6 (2 + 4 + 3) = 9, compared as rolled</div>' +
+        '<dl class="fabricate-craft-chat__evidence">'
+    )
+  );
+  assert.ok(!html.includes('__roll-value'), 'the dice line replaces the bare total');
+  assert.deepEqual(evidenceRowsOf(html), UNDER_ROWS);
+});
+
+test('a private card keeps its bare total and gains neither dice nor rows (M4)', () => {
+  const data = {
+    ...UNDER_DATA,
+    resolvedFormula: '3d6',
+    diceGroups: [{ groupId: 0, group: '3d6', sum: 9, results: [2, 4, 3] }],
+  };
+  for (const visibility of NOT_PUBLIC) {
+    const html = buildCraftingChatContent(
+      successModel({ rollValue: 9, check: executedCheck(data, visibility) }),
+      shippedKeyLocalize
+    );
+    assert.ok(html.includes(rollLine(9)), JSON.stringify(visibility));
+    assert.ok(!html.includes('__dice') && !html.includes('data-check-evidence'));
   }
 });
 

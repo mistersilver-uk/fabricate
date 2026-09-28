@@ -16162,6 +16162,35 @@
   font-weight: 700;
 }
 
+/* A crafting check's Success or Failure pill and its dice line (issue 2005, frames 37 and 38), in the card's own chat ink. */
+.fabricate-craft-chat__result {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: var(--fab-space-chip);
+  padding: var(--fab-space-2xs) var(--fab-space-2);
+  border: 1px solid currentcolor;
+  border-radius: 999px;
+  font-size: 0.85em;
+  font-weight: 700;
+}
+
+.fabricate-craft-chat__result--success {
+  color: var(--fab-success);
+}
+
+.fabricate-craft-chat__result--failure {
+  color: var(--fab-danger);
+}
+
+.fabricate-craft-chat__dice {
+  font-family: var(--fab-font-mono);
+  font-size: 0.85em;
+  font-weight: 500;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
 /* The executed check's Target, Pre-rolled and Margin rows (issue 2005): a key column beside wrapping text, as the prototype's chat card sets them. */
 .fabricate-craft-chat__evidence {
   display: flex;

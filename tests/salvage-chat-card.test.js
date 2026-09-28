@@ -175,17 +175,37 @@ test('routes every label through the localize function', () => {
   }
 });
 
-test('a salvage card states public roll-under evidence and nothing for a private or sum/over check (issue 2005)', () => {
-  const shown = buildSalvageChatContent(successModel({ check: executedCheck() }), shippedLocalize);
+test('a salvage card states public roll-under evidence and nothing for a private check (issue 2005)', () => {
+  const shown = buildSalvageChatContent(
+    successModel({ check: executedCheck() }),
+    shippedLocalize
+  ).replaceAll('\u2060', '');
   assert.ok(shown.includes('<dl class="fabricate-craft-chat__evidence">'));
   for (const [, label, text] of UNDER_ROWS) {
     assert.ok(shown.includes(label) && shown.includes(text), text);
   }
   const bare = buildSalvageChatContent(failureModel(), shippedLocalize);
-  for (const check of [
-    ...NOT_PUBLIC.map((visibility) => executedCheck(UNDER_DATA, visibility)),
-    executedCheck(OVER_FIXED_DATA),
-  ]) {
+  for (const visibility of NOT_PUBLIC) {
+    const check = executedCheck(UNDER_DATA, visibility);
     assert.equal(buildSalvageChatContent(failureModel({ check }), shippedLocalize), bare);
   }
+});
+
+test('a public sum/over fixed salvage card gains only the Needed and Margin rows (M3)', () => {
+  const bare = buildSalvageChatContent(failureModel(), shippedLocalize);
+  const html = buildSalvageChatContent(
+    failureModel({ check: executedCheck(OVER_FIXED_DATA) }),
+    shippedLocalize
+  );
+  const rows =
+    '<dl class="fabricate-craft-chat__evidence">' +
+    '<div class="fabricate-craft-chat__evidence-row" data-check-evidence="needed">' +
+    '<dt class="fabricate-craft-chat__evidence-label">Needed</dt>' +
+    '<dd class="fabricate-craft-chat__evidence-value">DC 12, meet or beat</dd></div>' +
+    '<div class="fabricate-craft-chat__evidence-row" data-check-evidence="margin">' +
+    '<dt class="fabricate-craft-chat__evidence-label">Margin</dt>' +
+    '<dd class="fabricate-craft-chat__evidence-value">+3</dd></div></dl>';
+  const header = '</header>';
+  assert.equal(html, bare.replace(header, header + rows));
+  assert.ok(!html.includes('__dice') && !html.includes('__result'), 'no crafting-only head');
 });

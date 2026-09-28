@@ -347,7 +347,7 @@ test('a forced routed roll-under keeps the rolled tier in terms that fold to its
   assert.equal(result.data.target, 45, 'the rolled Good tier: 50 − 10, then +2 and the 3 pre-rolled');
   assert.deepEqual(result.data.targetTerms, [
     { kind: 'anchor', value: 50 },
-    { kind: 'adjustment', value: -10 },
+    { kind: 'adjustment', value: -10, label: 'Good' },
     { kind: 'benefit', value: 2, source: 'tool' },
   ]);
   assert.equal(foldTargetTerms(result.data.targetTerms, result.data.preRolls), 45);

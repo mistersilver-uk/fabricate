@@ -184,3 +184,47 @@ describe('isPublicCheckDisplay', () => {
     assert.ok(!Object.hasOwn(executedCheckEvidence({ ...EXECUTED, targetSource: '@x' }), 'targetSource'));
   });
 });
+
+describe('executedCheckEvidence (maintainer rulings, #2088 r1)', () => {
+  it('keeps a difficulty step tier label, and a character value formula and name, only there', () => {
+    const evidence = executedCheckEvidence({
+      ...EXECUTED,
+      targetSource: 'attribute',
+      targetExpression: ' @skills.smith.level ',
+      targetActor: 'Sera Vane',
+      targetTerms: [
+        { kind: 'anchor', value: 12, label: 'SECRET_LABEL' },
+        { kind: 'adjustment', value: -2, label: 'Hard Work' },
+        { kind: 'multiplier', value: 0.5, label: 7 },
+        { kind: 'benefit', value: 1, source: 'library', label: 'SECRET_LABEL' },
+      ],
+    });
+    assert.deepEqual(evidence.targetTerms, [
+      { kind: 'anchor', value: 12 },
+      { kind: 'adjustment', value: -2, label: 'Hard Work' },
+      { kind: 'multiplier', value: 0.5 },
+      { kind: 'benefit', value: 1, source: 'library' },
+    ]);
+    assert.equal(evidence.targetExpression, '@skills.smith.level');
+    assert.equal(evidence.targetActor, 'Sera Vane');
+    const fixed = executedCheckEvidence({
+      ...EXECUTED,
+      targetSource: 'fixed',
+      targetExpression: '@x',
+      targetActor: 'A',
+    });
+    assert.ok(!Object.hasOwn(fixed, 'targetExpression') && !Object.hasOwn(fixed, 'targetActor'));
+  });
+
+  it('keeps the executed formula and each die group kept faces for the dice line', () => {
+    const evidence = executedCheckEvidence({
+      ...EXECUTED,
+      resolvedFormula: '3d6',
+      diceGroups: [{ groupId: 0, group: '3d6', sum: 9, results: [2, 4, 'x', 3] }, { group: 7 }],
+    });
+    assert.equal(evidence.formula, '3d6');
+    assert.deepEqual(evidence.dice, [{ group: '3d6', results: [2, 4, 3] }]);
+    const legacy = executedCheckEvidence(EXECUTED);
+    assert.ok(!Object.hasOwn(legacy, 'formula') && !Object.hasOwn(legacy, 'dice'));
+  });
+});

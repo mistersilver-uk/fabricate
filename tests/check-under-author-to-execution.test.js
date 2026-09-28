@@ -287,7 +287,7 @@ test('a percentile roll-under ladder authored in the Studio saves, reopens and e
   assert.deepEqual([hard.check.data.outcomeId, hard.check.success], ['hard', true]);
   assert.deepEqual(hard.check.data.targetTerms, [
     { kind: 'anchor', value: SKILL },
-    { kind: 'multiplier', value: 0.5 },
+    { kind: 'multiplier', value: 0.5, label: 'Hard' },
   ]);
   assert.equal(foldTargetTerms(hard.check.data.targetTerms, hard.check.data.preRolls), 27);
   assert.equal(hard.awarded, 1, 'the success tier produces its result');

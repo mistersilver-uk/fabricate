@@ -5982,6 +5982,7 @@ export class CraftingEngine {
     return resolveActivityCheck(config, {
       anchor: this._resolveCheckAnchorDc(config, recipe),
       override: selectedCheckTier(config, recipe)?.adjustment,
+      label: selectedCheckTier(config, recipe)?.name ?? '',
       required: this._resolveCountRequired(config, recipe),
       readRollData: () => actorRollData(actor),
     });

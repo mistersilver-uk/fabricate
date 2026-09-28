@@ -1890,10 +1890,16 @@
         "Target": "Target",
         "PreRolled": "Pre-rolled",
         "Margin": "Margin",
+        "Needed": "Needed",
+        "NeededDc": "DC {target}, {comparison}",
+        "MeetOrBeat": "meet or beat",
+        "Beat": "beat",
         "TargetTerms": "{target} · {terms}",
         "CharacterValue": "character value {value}",
+        "CharacterValueOf": "{actor} {expression} {value}",
         "Fixed": "fixed",
         "Difficulty": "difficulty {value}",
+        "TierAdjustment": "{label} {value}",
         "Tools": "tools {value}",
         "Modifiers": "modifiers {value}",
         "Situational": "situational {value}",
@@ -1901,7 +1907,11 @@
         "MarginUnder": "{margin} under the target",
         "ToolLabel": "Tool",
         "ModifierLabel": "Modifier",
-        "SituationalLabel": "Situational"
+        "SituationalLabel": "Situational",
+        "DiceLine": "{formula} = {total}",
+        "DiceLineUnder": "{formula} = {total}, compared as rolled",
+        "Success": "Success",
+        "Failure": "Failure"
       }
     },
     "Knowledge": {
