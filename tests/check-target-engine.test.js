@@ -934,6 +934,29 @@ test('a Journal-prompted roll-high gathering check shows its DC chip, subtitle a
   assert.equal(surface.view.chipText, 'DC 15 · meet or beat', 'a roll-high check still names its DC');
 });
 
+test('a Journal-prompted roll-high gathering check against a character value names its target, not a DC (G5)', async () => {
+  const engine = new GatheringEngine({ localize: (key) => key });
+  const { system, environment, task } = gatheringFixture({ mode: 'routed' });
+  Object.assign(system.gatheringCraftingCheck.routed, {
+    evaluation: attribute('@skills.craft.value', { direction: 'over' }),
+  });
+  const descriptor = engine._versionedCheckDescriptor({
+    actor: { uuid: 'Actor.g', name: 'Scavenger', getRollData: () => ({ skills: SKILLS }) },
+    run: { taskId: task.id },
+    system,
+    environment,
+    task: { ...task, resolutionMode: 'routed' },
+  });
+  assert.equal(descriptor.publicPrompt.targetSource, 'attribute');
+  const surface = stubPromptSurface(() => null);
+  try {
+    await promptJournalStageCheck({ subject: descriptor.publicPrompt.label, ...descriptor.publicPrompt });
+  } finally {
+    surface.restore();
+  }
+  assert.equal(surface.view.chipText, 'Target 14 · meet or beat');
+});
+
 // ── the prepared evaluator ────────────────────────────────────────────────────
 
 test('the prepared evaluator refuses progressive sum/under before any roll', async () => {
