@@ -42,6 +42,8 @@ export function promptJournalStageCheck(descriptor, prompt = promptCheckRoll) {
     displayFormula: displayFormula(descriptor?.displayFormula),
     dc: descriptor?.target,
     direction: descriptor?.direction,
+    targetBasis: descriptor?.targetBasis,
+    toolBonus: descriptor?.toolBonus,
     comparison: descriptor?.comparison,
     thresholdMode: descriptor?.comparison === 'exceed' ? 'exceed' : null,
     selectedModifiers: descriptor?.selectedModifiers,

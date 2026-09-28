@@ -2,6 +2,7 @@
 import { dcFlavorSuffix } from '../../../../systems/checkTarget.js';
 
 import { openRollPromptModal } from './rollPromptHost.js';
+import { fill } from './rollPromptTarget.js';
 
 // Legacy tokens on both versions (issue 1043): V14 maps them in Roll#toMessage, and core.messageMode is unregistered on V13, where reading it throws.
 const ROLL_MODES = [
@@ -43,14 +44,6 @@ function localize(key, fallback) {
 
 function promptLabel(name, fallback) {
   return localize(`FABRICATE.App.RollPrompt.${name}`, fallback);
-}
-
-// A function replacer, so a `$&` or `$1` in a user-authored name is inserted literally.
-function fill(template, values) {
-  return Object.entries(values).reduce(
-    (text, [token, value]) => text.replace(`{${token}}`, () => String(value)),
-    template
-  );
 }
 
 function copy() {
@@ -136,6 +129,12 @@ function underCopy() {
     meet: promptLabel('StayAtOrUnder', 'stay at or under'),
     exceed: promptLabel('StayUnder', 'stay under'),
     formulaNote: promptLabel('ComparedAsRolled', 'The dice are compared as rolled.'),
+    targetBase: promptLabel('TargetBase', 'Base {value}'),
+    targetValueOf: promptLabel('TargetValueOf', '{source} {value}'),
+    targetAdjustment: promptLabel('TargetAdjustment', '{label} {value}'),
+    targetDifficulty: promptLabel('TargetDifficulty', 'difficulty {value}'),
+    targetTools: promptLabel('TargetTools', 'tools {value}'),
+    targetModifiers: promptLabel('TargetModifiers', 'modifiers {value}'),
     eachAdds: promptLabel('EachRaises', 'Each raises the target.'),
     bonusHelp: promptLabel(
       'BonusHelpUnder',
@@ -198,7 +197,8 @@ export async function waitForPrompt(data, allowAdvantage, choicePlan, open = res
 
 /**
  * `displayFormula` is the producer's base without the itemised modifier terms, shown as chips.
- * `target` (else `dc`) is the pre-modifier number; `direction: 'under'` names it a target.
+ * `target` (else `dc`) is the pre-modifier number; `direction: 'under'` names it a target, which
+ * `targetBasis` and `toolBonus` explain (see `rollPromptTarget`).
  */
 export function buildSinglePromptData({
   formula,
@@ -214,6 +214,8 @@ export function buildSinglePromptData({
   selectedModifiers,
   thresholdMode,
   comparison,
+  targetBasis = null,
+  toolBonus = 0,
 } = {}) {
   const title = fill(promptLabel('CheckTitle', '{activity} check'), {
     activity: activity || promptLabel('roll', 'Roll'),
@@ -226,6 +228,7 @@ export function buildSinglePromptData({
           subject: name,
         })
       : actorName || name || '';
+  const under = direction === 'under' && Number.isFinite(value);
   return {
     kind: 'single',
     title,
@@ -233,7 +236,8 @@ export function buildSinglePromptData({
     img: img || '',
     formula: displayFormula || resolvedFormula || formula || '',
     dc: Number.isFinite(value) ? value : null,
-    direction: direction === 'under' && Number.isFinite(value) ? 'under' : 'over',
+    direction: under ? 'under' : 'over',
+    ...(under && { targetBasis, toolBonus }),
     comparison:
       comparison === undefined ? (thresholdMode === 'exceed' ? 'exceed' : 'meet') : comparison,
     selectedModifiers: Array.isArray(selectedModifiers) ? selectedModifiers : [],
@@ -301,7 +305,7 @@ export async function promptBulkCheckRoll({
 }
 
 export function buildInteractiveRollOptions(
-  { interactive, actor, name, activity, dc, img, modifierChoice, ...input },
+  { interactive, actor, name, activity, dc, img, modifierChoice, targetBasis, ...input },
   prompt = promptCheckRoll
 ) {
   const dcLabel = dcFlavorSuffix(dc, input.evaluation);
@@ -317,5 +321,6 @@ export function buildInteractiveRollOptions(
     img,
   };
   if (modifierChoice) rollOptions.modifierChoice = modifierChoice;
+  if (targetBasis) rollOptions.targetBasis = targetBasis;
   return rollOptions;
 }

@@ -46,10 +46,13 @@ export async function seedRollPromptFixture(world, state) {
 }
 
 /**
- * Smithing's simple slot rolls a bare `1d20` that must stay at or under its fixed target, with
- * frame 29's one applied modifier.
+ * Frame 29: Sera Vane's Smithing level of 12, less the recipe's Hard Work tier of -2, is the
+ * target a bare `1d20` must stay at or under, which the one applied modifier raises by 1.
  */
 async function seedRollUnder(world) {
+  const crafter = world.actorList.find((actor) => actor.id === 'lab-actor-brenna');
+  crafter.name = 'Sera Vane';
+  crafter.system.skills = { ...crafter.system.skills, smith: { level: 12 } };
   const store = world.fabricate.characterLibrariesStore;
   await store.saveModifiers([
     { id: 'lab-mod-steady-hands', label: 'Steady hands', icon: 'fa-solid fa-hand', expression: '1' },
@@ -57,17 +60,27 @@ async function seedRollUnder(world) {
   ]);
   const manager = world.fabricate.craftingSystemManager;
   const system = manager.getSystem('lab-smithing');
+  const simple = system.craftingCheck.simple;
   await manager.updateSystem(system.id, {
     craftingCheck: {
       ...system.craftingCheck,
       defaultModifierPolicy: 'addAll',
       defaultModifierIds: ['lab-mod-steady-hands'],
       simple: {
-        ...system.craftingCheck.simple,
+        ...simple,
         rollFormula: '1d20',
-        evaluation: normalizeCheckEvaluation({ product: 'sum', direction: 'under' }),
+        tiers: [...(simple.tiers ?? []), { id: 'lab-tier-hard-work', name: 'Hard Work', adjustment: -2 }],
+        evaluation: normalizeCheckEvaluation({
+          product: 'sum',
+          direction: 'under',
+          target: { source: 'attribute', expression: '@skills.smith.level' },
+        }),
       },
     },
+  });
+  await world.fabricate.recipeManager.updateRecipe('sm-r-horseshoe', {
+    name: 'Hard Work',
+    checkTierId: 'lab-tier-hard-work',
   });
 }
 

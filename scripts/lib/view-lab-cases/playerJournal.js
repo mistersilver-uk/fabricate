@@ -132,7 +132,7 @@ export const CASES = Object.freeze([
       JOURNAL_SOURCES,
       /^src\/bootstrap\/journalOperations\.js$/,
       /^src\/systems\/CraftingEngine\.js$/,
-      /^src\/ui\/svelte\/apps\/crafting\/(?:RollPrompt\.svelte|rollPrompt\.js)$/,
+      /^src\/ui\/svelte\/apps\/crafting\/(?:RollPrompt(?:Target)?\.svelte|rollPrompt(?:Target)?\.js)$/,
     ],
   }),
   ...journalBlindRunCases(),

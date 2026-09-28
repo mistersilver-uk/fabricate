@@ -20,6 +20,8 @@
   import Select from '../../components/Select.svelte';
   import SelectionCheckbox from '../../components/SelectionCheckbox.svelte';
   import ManagerModal from '../manager/ManagerModal.svelte';
+  import { rollPromptTarget } from './rollPromptTarget.js';
+  import RollPromptTarget from './RollPromptTarget.svelte';
 
   let { data, onSubmit = () => {}, onDismiss = () => {} } = $props();
   let selectedIds = $state(untrack(() => [...data.choicePlan.defaultSelectedIds]));
@@ -29,6 +31,7 @@
   const modeCaptionId = `${instanceId}-roll-mode`;
   const multiPick = $derived(data.choicePlan.maxPicks > 1);
   const atCap = $derived(selectedIds.length >= data.choicePlan.maxPicks);
+  const target = $derived(rollPromptTarget(data, selectedIds));
 
   function selectCheckbox(id, checked) {
     if (checked && atCap) return;
@@ -93,15 +96,11 @@
                   {data.labels.formulaNote}
                 </p>{/if}
               {#if data.dc !== null}
-                <Chip
-                  tone="info"
-                  density="tag-run"
-                  icon="fa-solid fa-bullseye"
+                <RollPromptTarget
+                  text={target.chipText}
+                  source={target.source}
                   data-roll-prompt-target={data.direction === 'under' ? 'under' : undefined}
-                  >{data.dcText} · {data.comparison === 'exceed'
-                    ? data.labels.exceed
-                    : data.labels.meet}</Chip
-                >
+                />
               {/if}
             </div>
           </div>

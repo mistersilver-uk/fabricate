@@ -133,6 +133,7 @@ it('Journal prompt adapter forwards only named, permitted display fields', async
     img: 'icons/tea.webp', formula: '1d20 + 3[Modifiers]',
     resolvedFormula: '1d20 + 3[Modifiers]', displayFormula: '1d20', target: 14, direction: 'under',
     comparison: 'exceed', selectedModifiers: [{ label: 'Focus', display: '+3' }],
+    targetBasis: { expression: '@skills.brew', value: 16, adjustment: null }, toolBonus: 1,
     allowAdvantage: true, allowsSituationalModifier: true,
     modifierChoice: null, privateEvaluation: { rollFormula: 'SECRET' },
   };
@@ -142,6 +143,7 @@ it('Journal prompt adapter forwards only named, permitted display fields', async
     name: 'Steep tea', actorName: 'Tinker', activity: 'Crafting', img: 'icons/tea.webp',
     formula: '1d20 + 3', resolvedFormula: '1d20 + 3', displayFormula: '1d20',
     dc: 14, direction: 'under', comparison: 'exceed', thresholdMode: 'exceed',
+    targetBasis: { expression: '@skills.brew', value: 16, adjustment: null }, toolBonus: 1,
     selectedModifiers: [{ label: 'Focus', display: '+3' }],
     allowAdvantage: true, modifierChoice: null,
   });

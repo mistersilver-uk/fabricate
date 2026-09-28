@@ -8,6 +8,7 @@ import {
   translatePromptAnswer,
 } from '../src/ui/svelte/apps/crafting/rollPrompt.js';
 import { resolveCheckDecision } from '../src/systems/checkRollDecision.js';
+import { rollPromptTarget } from '../src/ui/svelte/apps/crafting/rollPromptTarget.js';
 import { normalizeCheckEvaluation } from '../src/systems/normalize/checkEvaluation.js';
 import { stubI18n, stubPromptSurface } from './helpers/rollPromptDialogStub.js';
 
@@ -204,6 +205,67 @@ describe('roll prompt adapter', () => {
     assert.equal(buildSinglePromptData({ dc: 12 }).dc, 12);
     const blank = buildSinglePromptData({ dc: null, direction: 'under' });
     assert.deepEqual([blank.dc, blank.direction], [null, 'over']);
+  });
+
+  it('hands a roll-under prompt its target basis and the Tool bonus, and nothing to any other', async () => {
+    const basis = { expression: '@skills.smith.level', value: 12, adjustment: null };
+    const received = async (evaluation) => {
+      let input;
+      await resolveCheckDecision({
+        authoredFormula: '1d20', actor: null, deferred: false, Roll: null,
+        evaluation: normalizeCheckEvaluation(evaluation),
+        resolvedCheck: { formula: '1d20', selected: [] },
+        displayFormula: (formula) => ({ display: formula }),
+        options: {
+          interactive: true, dc: 12, targetBasis: basis,
+          toolContributions: [{ value: 2 }, { value: -1 }, null, { value: Number.NaN }],
+          prompt: async (payload) => { input = payload; return null; },
+        },
+      });
+      return [input.targetBasis, input.toolBonus];
+    };
+    assert.deepEqual(await received({ direction: 'under' }), [basis, 1]);
+    for (const evaluation of [{}, { product: 'count', direction: 'under' }]) {
+      assert.deepEqual(await received(evaluation), [undefined, undefined], JSON.stringify(evaluation));
+    }
+    const options = buildInteractiveRollOptions({ interactive: true, dc: 10, targetBasis: basis }, () => null);
+    assert.equal(options.targetBasis, basis);
+    assert.equal(Object.hasOwn(buildInteractiveRollOptions({ interactive: true, dc: 10 }), 'targetBasis'), false);
+  });
+
+  it('names a roll-under target after its flat modifiers and Tool bonus, and explains it', async () => {
+    const target = async (args, selectedIds = []) => {
+      const { view } = await open({ dc: 10, target: 10, direction: 'under', ...args }, null);
+      return rollPromptTarget(view, selectedIds);
+    };
+    const hardWork = { expression: '@skills.smith.level', value: 12, adjustment: { kind: 'add', value: -2, label: 'Hard Work' } };
+    assert.deepEqual(await target({ targetBasis: hardWork, selectedModifiers: [{ label: 'Steady hands', value: 1 }] }), {
+      chipText: 'Target 11 · stay at or under', source: '@skills.smith.level 12 · Hard Work -2 · modifiers +1',
+    }, 'frame 29');
+    assert.deepEqual(await target({ targetBasis: hardWork, thresholdMode: 'exceed' }), {
+      chipText: 'Target 10 · stay under', source: '@skills.smith.level 12 · Hard Work -2',
+    }, 'a character-value target explains itself with no modifier applied');
+    const halved = { ...hardWork, adjustment: { kind: 'multiply', value: 0.5, label: '' } };
+    assert.equal((await target({ targetBasis: halved, dc: 6, target: 6 })).source, '@skills.smith.level 12 · difficulty ×0.5');
+    assert.deepEqual(await target({ dc: 15, target: 15, toolBonus: 2, selectedModifiers: [{ value: 1 }, { value: -4 }] }), {
+      chipText: 'Target 14 · stay at or under', source: 'Base 15 · tools +2 · modifiers -3',
+    }, 'a fixed target names its base once something raised it');
+    assert.deepEqual(await target({ dc: 15, target: 15, selectedModifiers: [{ label: 'Die', display: '+1d4', value: null }] }), {
+      chipText: 'Target 15 · stay at or under', source: '',
+    }, 'a rolled modifier is rolled first, so it neither moves the chip nor shows a line');
+    const choicePlan = { options: [{ id: 'a', value: 1 }, { id: 'b', value: null }, { id: 'c', value: 3 }] };
+    const { view } = await open({ dc: 10, target: 10, direction: 'under', targetBasis: hardWork }, null);
+    const live = (ids) => rollPromptTarget({ ...view, choicePlan }, ids).chipText;
+    assert.deepEqual([live(['a']), live(['c']), live(['b']), live(['a', 'c'])], [
+      'Target 11 · stay at or under', 'Target 13 · stay at or under',
+      'Target 10 · stay at or under', 'Target 14 · stay at or under',
+    ], 'the picked choices, not the offered ones, raise the target');
+  });
+
+  it('keeps the roll-over chip text and gives it no explanation', async () => {
+    const { view } = await open({ dc: 12, target: 12, direction: 'over', toolBonus: 2, selectedModifiers: [{ value: 1 }] }, null);
+    assert.deepEqual(rollPromptTarget(view, []), { chipText: 'DC 12 · meet or beat', source: '' });
+    assert.equal(Object.hasOwn(view, 'targetBasis'), false);
   });
 
   it('formats the pick cap and the DC before the component sees them', async () => {
