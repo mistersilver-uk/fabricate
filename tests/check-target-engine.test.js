@@ -369,6 +369,31 @@ test('a dynamic target macro runs only after validation and receives the adjuste
   }
 });
 
+test('a DC macro that moves a roll-under target hides its character-value basis', async () => {
+  const original = MacroExecutor.run;
+  MacroExecutor.run = async (_uuid, payload) => payload.anchorDc + 3;
+  const surface = stubPromptSurface(() => null);
+  try {
+    const evaluation = attribute('@skills.craft.value', { direction: 'under', adjustmentKind: 'add', baseAdjustment: -2 });
+    const config = { ...simpleCheck(evaluation), dcMode: 'dynamic', macroUuid: 'Macro.dc' };
+    const world = craftingWorld({ resolutionMode: 'simple', slot: 'simple', config });
+    world.craftingActor.system.skills = SKILLS;
+    installCountingRoll();
+    const tool = { ...HAMMER, bonus: { enabled: true, expression: '2' } };
+    const toolItems = [{ tool: HAMMER, contributionInput: { tool, primaryActor: world.craftingActor } }];
+    await world.engine._runCraftingCheck(
+      world.recipe, world.craftingActor, [world.sourceActor], null, null, { interactive: true, toolItems }
+    );
+    assert.equal(surface.view.targetBasis, null, 'the macro moved 12 to 15, off what @skills.craft.value explains');
+    assert.deepEqual(rollPromptTarget(surface.view, []), {
+      chipText: 'Target 17 · stay at or under', source: 'Base 15 · tools +2',
+    });
+  } finally {
+    surface.restore();
+    MacroExecutor.run = original;
+  }
+});
+
 // ── the adjustment each activity selects ──────────────────────────────────────
 
 /** A summed evaluation against `@skill` with the given adjustment kind and base. */
