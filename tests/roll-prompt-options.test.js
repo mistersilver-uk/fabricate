@@ -404,6 +404,7 @@ describe('roll prompt adapter', () => {
     assert.equal(await help([row('pool'), row('threshold')]), summed, 'two destinations have no one answer');
     assert.equal(await help([row('pool'), { name: 'Scrap', need: { kind: 'dc', dc: 12 } }]), summed);
     assert.equal(await help([row(undefined)]), summed, 'a row naming no destination keeps the summed help');
+    assert.equal(await help([row('pool'), row('pool', 'dc')]), summed, 'only count rows answer by destination');
   });
 
   it('reads the target before the legacy dc, and names no direction without a number', () => {
