@@ -221,7 +221,7 @@ A Validation group with no ticks and no issues states "No issues detected." rath
 
 A `Save checks` that does not land BLOCKS the route exit it was raised for, matching the shipped essence and system-details guards: every dirty activity is still attempted, the answer is the conjunction, and a failed activity keeps its draft dirty.
 
-A check is usable iff its mode carries an authored `rollFormula`; the legacy check-source/macro layer (`macroUuid` / `successMacroUuid` / `failureMacroUuid` / `checkSource` / `builtIn`) was removed by migration 1.8.0 and is not authored.
+A check is usable iff its mode carries an authored `rollFormula` or its evaluation is `count`; the legacy check-source/macro layer (`macroUuid` / `successMacroUuid` / `failureMacroUuid` / `checkSource` / `builtIn`) was removed by migration 1.8.0 and is not authored.
 
 - Enable checks (the on/off toggle for the optional simple-mode check)
 - Roll formula, DC, and tier controls per mode (`simple` / `routed` / `progressive`)

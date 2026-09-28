@@ -3,9 +3,7 @@ import { evaluateNumericExpression } from '../../../src/systems/checkModifierRes
 
 /**
  * `NdS` with an optional keep-highest / keep-lowest modifier, or the native explosion a count Roll
- * writes: `x`/`xo`, bare or with a comparison and face (issue 2004). That check no longer stands
- * where its own note said it did, and the note is corrected rather than deleted because the
- * correction is the interesting part (issue 1118).
+ * writes: `x`/`xo`, bare or with a comparison and face (issue 2004).
  */
 const DIE_TERM = /(\d*)d(\d+)(?:(kh|kl)(\d*)|(xo?)(?:(<=|>=|<|>|=)(\d+))?)?/gi;
 
