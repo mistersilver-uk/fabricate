@@ -370,9 +370,10 @@ function finiteOrNaN(value) {
 
 /**
  * The simulator readout's count fields: tiles, the qualified-minus-cancelled breakdown, the
- * required count and margin the runner executed, and the botch and zero-pool states.
+ * required count and margin the runner executed, and the botch and zero-pool states. `success` is
+ * the graded result's: a botch the grader rescued reads the normal margin line.
  */
-export function buildCountReadout(plan, result, text) {
+export function buildCountReadout(plan, result, text, { success = false } = {}) {
   const data = result?.data ?? {};
   const zeroPool = data.zeroPool === true;
   const faces = zeroPool ? [] : countFaces(plan, data, text);
@@ -390,8 +391,9 @@ export function buildCountReadout(plan, result, text) {
   const botch = Number.isFinite(net) && net < 0;
   // A botch states why instead of a margin, against the record's own count, as the player's
   // result box does; a margin reads against the count the runner graded it by.
-  const required = botch && Number.isFinite(plan.dc) ? plan.dc : net - margin;
-  const marginCopy = botch
+  const botchLine = botch && !success;
+  const required = botchLine && Number.isFinite(plan.dc) ? plan.dc : net - margin;
+  const marginCopy = botchLine
     ? [
         'FABRICATE.Admin.Manager.Checks.Simulator.VsRequiredBotch',
         '{required} needed · a net below zero is a botch',

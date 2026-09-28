@@ -472,6 +472,7 @@ describe('the count readout', () => {
     assert.equal(readout.bandSuccess, true);
     assert.equal(readout.bandName, 'Success');
     assert.equal(readout.bandDetail, 'The result group is produced.');
+    assert.equal(readout.marginLabel, '2 needed · margin −8', 'the normal line, naming no botch');
   });
 
   it('fails a zero pool with no tiles, no total and no Roll', async () => {

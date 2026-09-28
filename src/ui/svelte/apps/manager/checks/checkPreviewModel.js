@@ -427,7 +427,7 @@ function dynamicNote(plan) {
  * count and margin, and a zero pool's absent total. Its policy stands in for a roll formula.
  */
 function countReadoutFields(plan, result, band, text) {
-  const count = result ? buildCountReadout(plan, result, text) : null;
+  const count = result ? buildCountReadout(plan, result, text, { success: band.success }) : null;
   return {
     product: 'count',
     hasFormula: true,
