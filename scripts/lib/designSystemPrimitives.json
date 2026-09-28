@@ -118,7 +118,7 @@
       "status": "target",
       "evidence": "targeted",
       "scope": "shared",
-      "why": "The executed check's Target, Pre-rolled and Margin rows (issue 2005), drawn by the crafting result box and the salvage summary, so its two independent callers are the player crafting and inventory applications. No library entry names a key-and-value evidence list; the approved prototype's player result box is its geometry. Targeted: the roll-result and salvage-result frames claim it by `sourceMatches`. Scoped `shared` DESPITE its `apps/crafting/` path, because the inventory application renders it as well."
+      "why": "The executed check's evidence rows (issue 2005): Target, Pre-rolled and Margin, or Needed and Margin for a fixed roll-high target, drawn by the crafting result box and the salvage summary, so its two independent callers are the player crafting and inventory applications. Each row renders through `apps/journal/JournalFactRow.svelte` in its `keyed` form, the `.k-fact` fact atom `library.html:1141` names for recorded check evidence, so the label and value typography are that atom's; this component owns only the bordered list and the 120px key column, which a box narrower than 360px sets to the chat card's 88px. No library entry names the list itself, so `library` stays null. Targeted: the roll-result and salvage-result frames claim it by `sourceMatches`. Scoped `shared` DESPITE its `apps/crafting/` path, because the inventory application renders it as well."
     },
     {
       "path": "src/ui/svelte/components/EditorTabs.svelte",

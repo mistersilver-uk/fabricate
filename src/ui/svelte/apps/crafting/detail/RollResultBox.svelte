@@ -3,8 +3,8 @@
   RollResultBox shows the outcome of the player's most recent craft of the current
   recipe (store.lastRollResult[recipeId]). It is defensive about the result shape:
   it surfaces a success/failure tone, the rolled total and outcome label when
-  present, a roll-under or character-value check's outcome sentence, an optional message, the
-  executed check's evidence rows, and any awarded items. Renders nothing when there is no recorded result.
+  present, a summed check's outcome sentence, an optional message, the executed check's evidence
+  rows, and any awarded items. Renders nothing when there is no recorded result.
 -->
 <script>
   import Medallion from '../../../components/Medallion.svelte';
@@ -19,16 +19,6 @@
   const outcome = $derived(result?.outcome ?? result?.checkResult?.outcome ?? null);
   const total = $derived(result?.total ?? result?.checkResult?.total ?? null);
   const message = $derived(typeof result?.message === 'string' ? result.message : '');
-  // What the outcome means for the award, beside a roll-under or character-value check's evidence.
-  const summary = $derived(
-    statesEvidence(result?.check)
-      ? localize(
-          success
-            ? 'FABRICATE.App.Crafting.Run.ResultProduced'
-            : 'FABRICATE.App.Crafting.Run.NothingProduced'
-        )
-      : ''
-  );
   const items = $derived(
     Array.isArray(result?.items)
       ? result.items
@@ -36,6 +26,13 @@
         ? result.awardedResults
         : []
   );
+  // What the outcome means for the award, beside the check's evidence; a failure that still
+  // awarded items says nothing rather than claim nothing was produced.
+  const summary = $derived.by(() => {
+    if (!statesEvidence(result?.check)) return '';
+    if (success) return localize('FABRICATE.App.Crafting.Run.ResultProduced');
+    return items.length === 0 ? localize('FABRICATE.App.Crafting.Run.NothingProduced') : '';
+  });
 </script>
 
 {#if result}

@@ -31,6 +31,7 @@ const SHARED = {
   ],
   rootClass: 'fabricate fabricate-app',
 };
+const FACT_ROW = 'src/ui/svelte/apps/journal/JournalFactRow.svelte';
 const EVIDENCE = 'src/ui/svelte/apps/crafting/detail/CheckEvidenceRows.svelte';
 const MEDALLION = 'src/ui/svelte/components/Medallion.svelte';
 const RESULT_BOX = 'src/ui/svelte/apps/crafting/detail/RollResultBox.svelte';
@@ -41,8 +42,8 @@ const CHECK_CARD = 'src/ui/svelte/apps/crafting/detail/CraftingCheckCard.svelte'
 function rowsOf(root) {
   return [...root.querySelectorAll('[data-check-evidence]')].map((row) => [
     row.dataset.checkEvidence,
-    row.querySelector('dt').textContent,
-    row.querySelector('dd').textContent,
+    row.querySelector('.journal-fact-label').textContent,
+    row.querySelector('.journal-fact-value').textContent,
   ]);
 }
 
@@ -57,7 +58,7 @@ describe('RollResultBox evidence rows', () => {
   const harness = createMountedComponentHarness({
     ...SHARED,
     tmpPrefix: 'fabricate-roll-result-evidence-',
-    compiledModules: [MEDALLION, EVIDENCE, RESULT_BOX],
+    compiledModules: [MEDALLION, FACT_ROW, EVIDENCE, RESULT_BOX],
     componentPath: RESULT_BOX,
   });
   before(async () => {
@@ -107,11 +108,28 @@ describe('RollResultBox evidence rows', () => {
     }
   });
 
-  it('leaves a sum/over fixed or check-less box byte-identical', async () => {
-    const bare = markupOf(await harness.mount({ result: result(undefined) }));
+  it('gives a sum/over fixed box only the Needed and Margin rows and its sentence (M3)', async () => {
+    const bare = await harness.mount({ result: result(undefined) });
+    const bareOrder = [...bare.querySelector('[data-recipe-section]').children].map(
+      (child) => child.className.split(' ')[0]
+    );
+    assert.deepEqual(bareOrder, ['crafting-roll-head', 'crafting-roll-awards']);
     harness.remount();
-    const withOver = markupOf(await harness.mount({ result: result(executedCheck(OVER_FIXED_DATA)) }));
-    assert.equal(withOver, bare);
+    const over = await harness.mount({ result: result(executedCheck(OVER_FIXED_DATA)) });
+    assert.deepEqual(rowsOf(over), [
+      ['needed', 'Needed', 'DC 12, meet or beat'],
+      ['margin', 'Margin', '+3'],
+    ]);
+    assert.equal(over.querySelector('[data-roll-summary]').textContent, 'The result group is produced.');
+    const order = [...over.querySelector('[data-recipe-section]').children].map(
+      (child) => child.className.split(' ')[0]
+    );
+    assert.deepEqual(order, [
+      'crafting-roll-head',
+      'crafting-roll-summary',
+      'check-evidence',
+      'crafting-roll-awards',
+    ]);
   });
 
   it('says what a roll-under outcome means for the award, beside its evidence', async () => {
@@ -121,11 +139,25 @@ describe('RollResultBox evidence rows', () => {
     const head = [...passed.querySelector('[data-recipe-section="roll-result"]').children];
     assert.equal(head[1].dataset.rollSummary, '', 'directly under the head');
     harness.remount();
-    const failed = await harness.mount({ result: { ...result(executedCheck()), success: false } });
+    const failed = await harness.mount({
+      result: { ...result(executedCheck()), success: false, items: [] },
+    });
     assert.equal(summaryOf(failed), 'Nothing is produced; the failure policy applies.');
     harness.remount();
-    const over = await harness.mount({ result: result(executedCheck(OVER_FIXED_DATA)) });
-    assert.ok(!over.querySelector('[data-roll-summary]'), 'a sum/over fixed box gains no sentence');
+    const checkless = await harness.mount({ result: result(undefined) });
+    assert.ok(!checkless.querySelector('[data-roll-summary]'), 'a box with no check says nothing');
+  });
+
+  it('states the failure sentence only when the failure awarded nothing (F9)', async () => {
+    const failed = (items) => ({ success: false, items, check: executedCheck() });
+    const awarded = await harness.mount({ result: failed([{ name: 'Slag', qty: 1 }]) });
+    assert.ok(!awarded.querySelector('[data-roll-summary]'), 'failure awards were produced');
+    harness.remount();
+    const empty = await harness.mount({ result: failed([]) });
+    assert.equal(
+      empty.querySelector('[data-roll-summary]').textContent,
+      'Nothing is produced; the failure policy applies.'
+    );
   });
 
   it('renders nothing at all without a recorded result, which a refusal leaves (Q10)', async () => {
@@ -139,7 +171,7 @@ describe('SalvageRollSummary evidence rows', () => {
   const harness = createMountedComponentHarness({
     ...SHARED,
     tmpPrefix: 'fabricate-salvage-summary-evidence-',
-    compiledModules: [MEDALLION, EVIDENCE, SALVAGE_SUMMARY],
+    compiledModules: [MEDALLION, FACT_ROW, EVIDENCE, SALVAGE_SUMMARY],
     componentPath: SALVAGE_SUMMARY,
   });
   before(async () => {
@@ -156,14 +188,22 @@ describe('SalvageRollSummary evidence rows', () => {
     assert.deepEqual(rowsOf(root), UNDER_ROWS);
   });
 
-  it('adds nothing for a sum/over fixed salvage', async () => {
+  it('gives a sum/over fixed salvage only its Needed and Margin rows (M3)', async () => {
     const base = { state: 'success', message: 'Salvaged.', rollValue: 15 };
-    const bare = markupOf(await harness.mount({ result: base }));
-    harness.remount();
-    const withOver = markupOf(
-      await harness.mount({ result: { ...base, check: executedCheck(OVER_FIXED_DATA) } })
-    );
-    assert.equal(withOver, bare);
+    const root = await harness.mount({ result: { ...base, check: executedCheck(OVER_FIXED_DATA) } });
+    assert.deepEqual(rowsOf(root), [
+      ['needed', 'Needed', 'DC 12, meet or beat'],
+      ['margin', 'Margin', '+3'],
+    ]);
+    assert.ok(!markupOf(root).includes('result group'), 'the outcome sentence is crafting-only');
+  });
+
+  it('keeps the space between the message and the roll it names (F5)', async () => {
+    const root = await harness.mount({
+      result: { state: 'success', message: 'Salvaged.', rollValue: 9 },
+    });
+    const message = root.querySelector('[data-inventory-salvage-message]').textContent;
+    assert.match(message.trim(), /^Salvaged\. with a roll of\s+9$/);
   });
 });
 

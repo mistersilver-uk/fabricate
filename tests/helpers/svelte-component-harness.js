@@ -402,6 +402,7 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/crafting/detail/OutcomeTierTable.svelte',
   'src/ui/svelte/apps/crafting/detail/RollResultBox.svelte',
   'src/ui/svelte/apps/crafting/detail/CheckEvidenceRows.svelte',
+  'src/ui/svelte/apps/journal/JournalFactRow.svelte',
   'src/ui/svelte/apps/crafting/detail/RecipeBodyShell.svelte',
   'src/ui/svelte/apps/crafting/detail/SimpleRecipeBody.svelte',
   // SimpleRecipeBody renders this for an explicit multi-step recipe (issue 765).
