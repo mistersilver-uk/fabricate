@@ -779,4 +779,12 @@ export const CASES = Object.freeze([
     frame: 24,
     sees: 'no-character',
   }),
+  // A kind switch left this kept override invalid (issue 2078); the field itself names it.
+  taskOverrideCase({
+    id: 'manager-gathering-task-editor-check-invalid',
+    label: 'character value, a kept override invalid for its kind',
+    field: 'adjustmentOverride',
+    frame: 24,
+    sees: 'adjustment-invalid',
+  }),
 ]);

@@ -404,6 +404,50 @@ describe('ComponentEditView — the salvage override follows the evaluation (iss
     );
   });
 
+  it('a kept override invalidated by a kind switch is marked invalid at the field', async () => {
+    const { target } = await mountOverride({
+      salvage: { adjustmentOverride: -2 },
+      config: { evaluation: evaluation({ kind: 'multiply' }) },
+    });
+    const input = target.querySelector('[data-salvage-adjustment-custom]');
+    assert.equal(input.getAttribute('aria-invalid'), 'true');
+    const message = target.querySelector('[data-salvage-override-invalid]');
+    assert.ok(Boolean(message), 'the field names the invalid override');
+    assert.equal(
+      message.textContent.trim(),
+      'This override does not suit its kind: an added adjustment must be a finite number and a multiplier must be above zero.'
+    );
+    assert.equal(input.getAttribute('aria-describedby'), message.id);
+  });
+
+  it('clears the invalid-field warning once the kept override suits its kind again', async () => {
+    // -7 matches no authored tier under either kind, so Custom… stays chosen across the switch
+    // and the same Stepper input is checked before and after.
+    const { target } = await mountOverride({
+      salvage: { adjustmentOverride: -7 },
+      config: { evaluation: evaluation({ kind: 'multiply' }) },
+    });
+    assert.ok(
+      Boolean(target.querySelector('[data-salvage-override-invalid]')),
+      'starts invalid under multiply'
+    );
+    assert.equal(
+      target.querySelector('[data-salvage-adjustment-custom]').getAttribute('aria-invalid'),
+      'true'
+    );
+
+    await harness.setProps({
+      salvageCheckConfig: { dc: 15, evaluation: evaluation({ kind: 'add' }) },
+    });
+    assert.ok(
+      !target.querySelector('[data-salvage-override-invalid]'),
+      'an added adjustment of -7 is valid, so the warning clears'
+    );
+    const input = target.querySelector('[data-salvage-adjustment-custom]');
+    assert.ok(Boolean(input), 'Custom… is still chosen');
+    assert.ok(!input.hasAttribute('aria-invalid'));
+  });
+
   it('a fixed-range routed check is graded by its ranges, so it shows no Player sees line', async () => {
     const { target } = await mountOverride({
       salvageResolutionMode: 'routed',

@@ -41,7 +41,7 @@
   import { interpolate, underComparisonPhrase } from '../checks/checksCopy.js';
   import { buildSalvageDcSelectOptions } from './componentEditSelectOptions.js';
   import OverridePlayerSees from './OverridePlayerSees.svelte';
-  import { keptOverride } from './overridePlayerSees.js';
+  import { keptOverride, overrideInvalidForKind } from './overridePlayerSees.js';
   import {
     SALVAGE_DC_CUSTOM,
     resolveSalvageDcSelection,
@@ -77,6 +77,9 @@
   const activeValue = $derived(attribute ? adjustmentOverride : dcOverride);
   const cmp = $derived(underComparisonPhrase(config?.thresholdMode, text));
   const titleId = $derived(`${instanceId}-salvage-dc-title`);
+  const invalidId = $derived(`${instanceId}-salvage-dc-invalid`);
+  // A kind switch can leave a kept override invalid with no re-typing to catch it (issue 2078).
+  const invalidOverride = $derived(overrideInvalidForKind({ attribute, kind, adjustmentOverride }));
   // The sub-object salvage rolls owns the default, so the Select and the line name one number.
   const systemDefaultDc = $derived(Number(config?.dc ?? systemDc));
 
@@ -205,7 +208,11 @@
               parseValue={parseAdjustment}
               stops={kind === 'multiply' ? MULTIPLIER_STOPS : []}
               {...stepperLabels(customLabel)}
-              inputProps={{ 'data-salvage-adjustment-custom': '' }}
+              inputProps={{
+                'data-salvage-adjustment-custom': '',
+                'aria-invalid': invalidOverride ? 'true' : undefined,
+                'aria-describedby': invalidOverride ? invalidId : undefined,
+              }}
               onChange={typeValue}
             />
           {/key}
@@ -240,6 +247,19 @@
       </ManagerButton>
     </div>
     <span class="manager-salvage-dc-note" data-salvage-override-hint>{hint}</span>
+    {#if invalidOverride}
+      <p
+        class="manager-muted manager-salvage-dc-invalid"
+        id={invalidId}
+        data-salvage-override-invalid
+      >
+        <i class="fas fa-circle-exclamation" aria-hidden="true"></i>
+        {text(
+          'FABRICATE.Admin.Manager.Component.SalvageEditor.OverrideInvalidForKind',
+          'This override does not suit its kind: an added adjustment must be a finite number and a multiplier must be above zero.'
+        )}
+      </p>
+    {/if}
   </div>
   {#if keptNotice}
     <!-- A Callout, not a Notice: the kept value is a standing fact about the record (library routing rule). -->
@@ -265,5 +285,18 @@
     gap: var(--fab-space-3);
     align-items: center;
     min-width: 0;
+  }
+
+  .manager-salvage-dc-invalid {
+    display: flex;
+    align-items: center;
+    gap: var(--fab-space-2);
+    color: var(--fab-danger-text);
+  }
+
+  /* Edge-marks the Custom… stepper the same way an invalid formula is marked elsewhere: two
+     selectors deep to reach the stepper's own border, which the plain input never draws. */
+  :global(.manager-salvage-dc-controls .fab-stepper:has(input[aria-invalid='true'])) {
+    border-color: var(--fab-danger-border);
   }
 </style>

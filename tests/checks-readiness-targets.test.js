@@ -153,6 +153,48 @@ describe('target readiness raises each id with its copy, section and severity', 
     assert.equal(tick(added, 'adjustmentsSuitKind').satisfied, true, 'any finite number adds');
   });
 
+  it('adjustmentInvalidForKind also names an invalid salvage or gathering task override', () => {
+    const check = { rollFormula: '1d20', evaluation: attribute('@x', { baseAdjustment: 1 }) };
+    const salvage = evaluateCheckReadiness(check, {
+      mode: 'simple',
+      activity: 'salvage',
+      components: [
+        { id: 'c1', name: 'Iron Longsword', salvage: { enabled: true, adjustmentOverride: -2 } },
+        { id: 'c2', name: 'Whetstone', salvage: { enabled: false, adjustmentOverride: -3 } },
+        { id: 'c3', name: 'Rope', salvage: { enabled: true, adjustmentOverride: 0.5 } },
+      ],
+    });
+    assert.equal(
+      issue(salvage, 'adjustmentInvalidForKind').data.names,
+      'Iron Longsword',
+      'a disabled salvage and a valid override are both excluded'
+    );
+
+    const gathering = evaluateCheckReadiness(check, {
+      mode: 'routed',
+      activity: 'gathering',
+      gatheringTasks: [
+        { id: 't1', name: 'Prospect for Ore', resolutionMode: 'routed', adjustmentOverride: -2 },
+        { id: 't2', name: 'Chop Wood', resolutionMode: 'd100', adjustmentOverride: -3 },
+        { id: 't3', name: 'Forage', resolutionMode: 'routed', adjustmentOverride: 0.5 },
+      ],
+    });
+    assert.equal(
+      issue(gathering, 'adjustmentInvalidForKind').data.names,
+      'Prospect for Ore',
+      'a d100 task and a valid override are both excluded'
+    );
+
+    const clean = evaluateCheckReadiness(check, {
+      mode: 'simple',
+      activity: 'salvage',
+      components: [
+        { id: 'c1', name: 'Iron Longsword', salvage: { enabled: true, adjustmentOverride: 0.5 } },
+      ],
+    });
+    assert.equal(issue(clean, 'adjustmentInvalidForKind'), undefined, 'a valid override raises nothing');
+  });
+
   it('otherwiseTierMissing and multipleOtherwiseTiers share one tick', () => {
     const none = evaluateCheckReadiness(
       {
@@ -272,6 +314,27 @@ describe('readiness validates only what the active mode reads', () => {
       { mode: 'routed', previewActor: VOSK }
     );
     assert.deepEqual([ids(fixedRanges.issues), ids(fixedRanges.transient)], [[], []]);
+  });
+
+  it('a progressive mode is inert to an invalid kept salvage or gathering task override too', () => {
+    const check = { rollFormula: '1d20', evaluation: attribute('@x', { baseAdjustment: 1 }) };
+    const salvage = evaluateCheckReadiness(check, {
+      mode: 'progressive',
+      activity: 'salvage',
+      components: [
+        { id: 'c1', name: 'Iron Longsword', salvage: { enabled: true, adjustmentOverride: -2 } },
+      ],
+    });
+    assert.equal(issue(salvage, 'adjustmentInvalidForKind'), undefined);
+
+    const gathering = evaluateCheckReadiness(check, {
+      mode: 'progressive',
+      activity: 'gathering',
+      gatheringTasks: [
+        { id: 't1', name: 'Prospect for Ore', resolutionMode: 'routed', adjustmentOverride: -2 },
+      ],
+    });
+    assert.equal(issue(gathering, 'adjustmentInvalidForKind'), undefined);
   });
 });
 

@@ -277,13 +277,23 @@ function checksActivityIsOff(activation, activity) {
   return state.optional === true;
 }
 
-function checksIssueCount({ activation, draftSystem, activity, slot, drafts }) {
+function checksIssueCount({
+  activation,
+  draftSystem,
+  activity,
+  slot,
+  drafts,
+  components,
+  gatheringTasks,
+}) {
   if (checksActivityIsOff(activation, activity)) return 0;
   // No `previewActor`, deliberately: a transient warning must never reach the nav badge.
   return evaluateCheckReadiness(draftForSlot(slot, drafts) || {}, {
     mode: readinessModeForSlot(slot),
     modifierContext: buildCheckModifierContext(draftSystem, activity, null),
     activity,
+    components,
+    gatheringTasks,
   }).issues.length;
 }
 
@@ -324,6 +334,8 @@ function createChecksRail({ drafts, activation, craftingCheckMode, activities, i
       activity,
       slot,
       drafts: slotDrafts,
+      components: activity === 'salvage' ? inputs.components?.() : undefined,
+      gatheringTasks: activity === 'gathering' ? inputs.gatheringTasks?.() : undefined,
     });
   const checksIssueCounts = $derived({
     crafting: issueCount('crafting', craftingCheckMode(), {
@@ -512,6 +524,11 @@ export function createChecksRouteModel(inputs = {}) {
   );
   const checksDirty = $derived(checksDirtyActivities.length > 0);
   const checksSaving = $derived(ACTIVITIES.some((activity) => activities[activity].saving));
+  // Readiness's raw override records (issue 2078). The rail's nav badge reads these on EVERY
+  // view, not only an open Checks route, so `$derived` is what keeps the walk cheap: each thunk
+  // runs again only when a tracked dependency changes, never once per unrelated re-render.
+  const checksComponents = $derived(inputs.components?.() ?? []);
+  const checksGatheringTasks = $derived(inputs.gatheringTasks?.() ?? []);
   const rail = createChecksRail({
     drafts,
     activation: () => checkActivation,
@@ -544,6 +561,12 @@ export function createChecksRouteModel(inputs = {}) {
     },
     get checksSaving() {
       return checksSaving;
+    },
+    get checksComponents() {
+      return checksComponents;
+    },
+    get checksGatheringTasks() {
+      return checksGatheringTasks;
     },
     get checksActiveSection() {
       return checksActiveSection;

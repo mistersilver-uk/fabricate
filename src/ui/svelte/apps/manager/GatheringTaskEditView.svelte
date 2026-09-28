@@ -32,7 +32,7 @@
   import RecipeResultGroupCard from './recipe/RecipeResultGroupCard.svelte';
   import Callout from '../../components/Callout.svelte';
   import OverridePlayerSees from './component/OverridePlayerSees.svelte';
-  import { keptOverride } from './component/overridePlayerSees.js';
+  import { keptOverride, overrideInvalidForKind } from './component/overridePlayerSees.js';
   import { normalizeCheckEvaluation } from '../../../../systems/normalize/checkEvaluation.js';
   import {
     MULTIPLIER_STOPS,
@@ -704,6 +704,15 @@
   const overrideCmp = $derived(underComparisonPhrase(checkConfig?.thresholdMode, text));
   const dcOverrideValue = $derived(task?.dcOverride ?? null);
   const adjustmentOverrideValue = $derived(task?.adjustmentOverride ?? null);
+  // A kind switch can leave a kept override invalid with no re-typing to catch it (issue 2078).
+  const overrideInvalid = $derived(
+    overrideInvalidForKind({
+      attribute: overrideAttribute,
+      kind: overrideKind,
+      adjustmentOverride: adjustmentOverrideValue,
+    })
+  );
+  const overrideInvalidId = `${instanceId}-task-override-invalid`;
   function updateDcOverride(value) {
     if (value === null || value === undefined) {
       onUpdateTask({ dcOverride: null });
@@ -1510,7 +1519,11 @@
                     'System default'
                   )}
                   {...stepperLabels(overrideCopy.label)}
-                  inputProps={{ 'data-gathering-task-adjustment-override': '' }}
+                  inputProps={{
+                    'data-gathering-task-adjustment-override': '',
+                    'aria-invalid': overrideInvalid ? 'true' : undefined,
+                    'aria-describedby': overrideInvalid ? overrideInvalidId : undefined,
+                  }}
                   onChange={(next) => updateAdjustmentOverride(next)}
                 />
               {/key}
@@ -1539,6 +1552,19 @@
             {/if}
           </Field>
         </div>
+        {#if overrideInvalid}
+          <p
+            class="manager-muted manager-task-dc-invalid"
+            id={overrideInvalidId}
+            data-gathering-task-override-invalid
+          >
+            <i class="fas fa-circle-exclamation" aria-hidden="true"></i>
+            {text(
+              'FABRICATE.Admin.Manager.Gathering.TaskOverrideInvalidForKind',
+              'This override does not suit its kind: an added adjustment must be a finite number and a multiplier must be above zero.'
+            )}
+          </p>
+        {/if}
         {#if keptOverrideNotice}
           <Callout text={keptOverrideNotice} dataAttr="data-gathering-task-override-kept" />
         {/if}
@@ -2808,6 +2834,19 @@
      to (0,1,0). */
   :global(.manager-field.manager-task-dc-field) {
     max-width: 160px;
+  }
+
+  .manager-task-dc-invalid {
+    display: flex;
+    align-items: center;
+    gap: var(--fab-space-2);
+    color: var(--fab-danger-text);
+  }
+
+  /* Edge-marks the Custom… stepper the same way an invalid formula is marked elsewhere: two
+     selectors deep to reach the stepper's own border, which the plain input never draws. */
+  :global(.manager-task-dc-row .fab-stepper:has(input[aria-invalid='true'])) {
+    border-color: var(--fab-danger-border);
   }
 
   .manager-task-nodes-grid {

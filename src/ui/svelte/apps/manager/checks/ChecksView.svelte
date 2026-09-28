@@ -123,6 +123,10 @@
     gatheringResolutionMode = 'd100',
     gatheringCheckProgressive = null,
     gatheringCheckRouted = null,
+    // The raw records overrides live on, outside any check draft (issue 2078): every managed
+    // component (read for salvage) and every gathering task (read for gathering).
+    components = [],
+    gatheringTasks = [],
     // Tool-breakage authority: `checkDriven` adds the per-trigger break-tools toggle.
     breakageAuthority = 'toolSpecific',
     // Feature flags: salvage is always on, gathering only when `features.gathering === true`.
@@ -426,6 +430,7 @@
             ? salvageCheckProgressive
             : salvageCheckSimple,
         modifierContext: buildCheckModifierContext(draftSystem, 'salvage', null),
+        components,
       });
     }
     if (gatheringEnabled) {
@@ -435,6 +440,7 @@
         authoredMode: subsystemModeLabel('gathering', gatheringResolutionMode),
         check: gatheringProgressive ? gatheringCheckProgressive : gatheringCheckRouted,
         modifierContext: buildCheckModifierContext(draftSystem, 'gathering', null),
+        gatheringTasks,
       });
     }
     return list;
@@ -479,6 +485,8 @@
           modifierContext: activeActivity.modifierContext,
           activity: activeActivity.subsystem,
           previewActor: previewCharacter,
+          components: activeActivity.components,
+          gatheringTasks: activeActivity.gatheringTasks,
         })
       : { checks: [], issues: [], transient: [] }
   );
@@ -582,6 +590,8 @@
         mode: row.mode,
         modifierContext: row.modifierContext,
         activity: row.subsystem,
+        components: row.components,
+        gatheringTasks: row.gatheringTasks,
       });
       const label = text(
         `FABRICATE.Admin.Manager.Checks.Tabs.${row.subsystem[0].toUpperCase()}${row.subsystem.slice(1)}`,

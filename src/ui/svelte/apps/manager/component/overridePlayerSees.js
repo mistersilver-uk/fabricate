@@ -50,6 +50,20 @@ const KEY = {
 };
 
 /**
+ * Whether a kept `adjustmentOverride` breaks its kind's rule — the SAME rule
+ * `checksReadiness.js`'s `adjustmentInvalidForKind` grades a check's own base and tier
+ * adjustments by (issue 2078). Only an attribute target's override is graded; a fixed target's DC
+ * override has no kind to break.
+ */
+export function overrideInvalidForKind({ attribute, kind, adjustmentOverride }) {
+  return (
+    attribute === true &&
+    Number.isFinite(adjustmentOverride) &&
+    !isValidTargetAdjustment(kind, adjustmentOverride)
+  );
+}
+
+/**
  * The dormant override an editor names in its callout, or `null`: the DC override under a
  * character value, or the adjustment override under a fixed target. Neither is ever cleared.
  */
