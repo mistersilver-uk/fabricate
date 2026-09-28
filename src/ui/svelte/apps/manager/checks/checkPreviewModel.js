@@ -72,6 +72,11 @@ function readsAttributeTarget(plan) {
   );
 }
 
+/** Whether the plan grades as roll-over against a fixed DC, an inert character value included. */
+function gradesLikeFixedOver(plan) {
+  return plan.evaluation.direction === 'over' && !readsAttributeTarget(plan);
+}
+
 /** A static fault or a missing adjustment is the check's own; anything else is the actor's value. */
 function targetAbstention(plan, character) {
   const expression = plan.evaluation.target.expression;
@@ -95,7 +100,7 @@ function targetAbstention(plan, character) {
  * With no actor, a check reading the character abstains first, whatever else is wrong with it.
  */
 export function previewAbstention(plan, character) {
-  if (!plan?.kind || isFixedSumOver(plan.evaluation)) return null;
+  if (!plan?.kind || gradesLikeFixedOver(plan)) return null;
   if (String(plan.formula ?? '').trim() === '') return null;
   const attribute = readsAttributeTarget(plan);
   const expression = attribute ? plan.evaluation.target.expression : '';
@@ -377,7 +382,7 @@ function abstentionHint(abstention, text) {
 /** The dynamic-target note a check taking its target from a macro shows, or `''`. */
 function dynamicNote(plan) {
   if (!plan.dynamicDc) return '';
-  return plan.evaluation.target.source === 'attribute' ? 'dynamic-target' : 'dynamic-dc';
+  return readsAttributeTarget(plan) ? 'dynamic-target' : 'dynamic-dc';
 }
 
 /**
@@ -420,7 +425,7 @@ export function buildReadoutModel(
 /** The note under Preview as with no actor chosen, in the evaluation's own terms. */
 export function previewActorNote({ plan, actor }, text) {
   if (actor) return '';
-  if (plan?.kind && !isFixedSumOver(plan.evaluation)) {
+  if (plan?.kind && !gradesLikeFixedOver(plan)) {
     return text(
       'FABRICATE.Admin.Manager.Checks.PreviewAs.NoActorCharacter',
       'No actor chosen. Values read from a character are not charted.'

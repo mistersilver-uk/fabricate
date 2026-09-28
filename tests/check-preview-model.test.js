@@ -186,6 +186,35 @@ describe('previewAbstention', () => {
     assert.equal(abstain({ rollFormula: '1d20 + @prof', dc: 10 }, null), null);
   });
 
+  it('treats a character value the mode does not read as inert, grading like a fixed DC', () => {
+    const leftover = {
+      product: 'sum',
+      direction: 'over',
+      target: { source: 'attribute', expression: '@x' },
+    };
+    const progressive = { rollFormula: '1d20 + @prof', evaluation: leftover };
+    assert.equal(abstain(progressive, null, 'progressive'), null);
+    const ranges = {
+      ...MULTIPLY_ROUTED,
+      rollFormula: '1d20 + @prof',
+      evaluation: leftover,
+      type: 'fixed',
+      fixedOutcomes: [{ id: 'good', name: 'Good', start: 1, end: 20, success: true }],
+    };
+    assert.equal(abstain(ranges, null, 'routed'), null);
+    const inertPlan = plan({ draft: progressive, actor: null, mode: 'progressive' });
+    assert.equal(
+      previewActorNote({ plan: inertPlan, actor: null }, text),
+      'With no actor selected every roll-data key reads as 0.'
+    );
+    const dynamic = plan({ draft: { ...ranges, dcMode: 'dynamic' }, actor: null, mode: 'routed' });
+    const readout = buildReadoutModel(
+      { plan: dynamic, result: null, rolling: false, resolved: true },
+      text
+    );
+    assert.notEqual(readout.dynamicNote, 'dynamic-target', 'a range check reads no target');
+  });
+
   it('names the actor and the missing path, or the unreadable value', () => {
     const missing = previewAbstention(plan({ draft: MULTIPLY_ROUTED, actor: VOSK, mode: 'routed' }), character(VOSK));
     assert.deepEqual(missing, {
