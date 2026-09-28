@@ -247,13 +247,14 @@ function targetText(data, labels) {
     : fill(labels.dcValue, { dc: data.dc });
 }
 
-/** The target, bulk-need and pick-cap copy, formatted here so the component renders strings only. */
+/** The labels a check's product and direction word the prompt with. */
 function labelsFor(data) {
   if (data.count) return { ...copy(), ...countCopy(data.count.destination) };
   if (data.countDestination) return { ...copy(), ...countCopy(data.countDestination) };
   return data.direction === 'under' ? { ...copy(), ...underCopy() } : copy();
 }
 
+/** The target, bulk-need and pick-cap copy, formatted here so the component renders strings only. */
 function formatCopy(data, choicePlan) {
   const labels = labelsFor(data);
   const { formulaNote, ...counted } = data.count ? countText(data) : {};
