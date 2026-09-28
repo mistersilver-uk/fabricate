@@ -18,6 +18,7 @@
     formatCheckAdjustment,
     parseCheckAdjustment,
   } from './checkAdjustmentLabel.js';
+  import { outcomeThresholdLabels } from './checksCopy.js';
 
   let {
     outcome,
@@ -35,19 +36,11 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  const thresholdLabel = $derived.by(() => {
-    if (column === 'adjustment') {
-      return text('FABRICATE.Admin.Manager.Checks.Evaluation.Adjustment', 'Adjustment');
-    }
-    if (column === 'benefit') {
-      return text('FABRICATE.Admin.Manager.Checks.Evaluation.OutcomeBenefit', 'Benefit ±');
-    }
-    return text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeDc', 'DC ±');
-  });
-  const startLabel = $derived(
-    text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeStart', 'Start')
-  );
-  const endLabel = $derived(text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeEnd', 'End'));
+  // Fixed rows name `[start, end]`; a relative row names its one threshold field.
+  const labels = $derived(outcomeThresholdLabels(type, column, text));
+  const thresholdLabel = $derived(labels[0]);
+  const startLabel = $derived(labels[0]);
+  const endLabel = $derived(labels[1] ?? '');
   const otherwiseLabel = $derived(
     text('FABRICATE.Admin.Manager.Checks.Evaluation.Otherwise', 'Otherwise')
   );

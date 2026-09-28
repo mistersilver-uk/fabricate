@@ -192,6 +192,26 @@ export function checkTypeOptions(text, { record, records }) {
   ];
 }
 
+/**
+ * An outcome tier's threshold field names, shared by the row's accessible names and the list's
+ * column head: `[start, end]` for a fixed range, else the one field `column` edits.
+ */
+export function outcomeThresholdLabels(type, column, text) {
+  if (type === 'fixed') {
+    return [
+      text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeStart', 'Start'),
+      text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeEnd', 'End'),
+    ];
+  }
+  if (column === 'adjustment') {
+    return [text('FABRICATE.Admin.Manager.Checks.Evaluation.Adjustment', 'Adjustment')];
+  }
+  if (column === 'benefit') {
+    return [text('FABRICATE.Admin.Manager.Checks.Evaluation.OutcomeBenefit', 'Benefit ±')];
+  }
+  return [text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeDc', 'DC ±')];
+}
+
 /** The prototype's reference-kind glyphs, each a Font Awesome Free name, first match wins. */
 const FORMULA_TOKEN_KINDS = Object.freeze([
   [/^\d*d\d+/i, 'fas fa-dice-d20'],

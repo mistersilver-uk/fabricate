@@ -35,7 +35,7 @@
   import CheckFormulaFields from './CheckFormulaFields.svelte';
   import CheckRecipeTiers from './CheckRecipeTiers.svelte';
   import CheckTriggers from './CheckTriggers.svelte';
-  import { checkTargetChip, checkTypeOptions } from './checksCopy.js';
+  import { checkTargetChip, checkTypeOptions, outcomeThresholdLabels } from './checksCopy.js';
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import Select from '../../../components/Select.svelte';
   import { previewRecordSelectOptions } from './checksSelectOptions.js';
@@ -137,21 +137,7 @@
     return editableBands ? 'dc' : 'benefit';
   });
   // The tier list's column header: one caption per threshold field, as the row draws them.
-  const thresholdHeads = $derived.by(() => {
-    if (type === 'fixed') {
-      return [
-        text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeStart', 'Start'),
-        text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeEnd', 'End'),
-      ];
-    }
-    if (outcomeColumn === 'adjustment') {
-      return [text('FABRICATE.Admin.Manager.Checks.Evaluation.Adjustment', 'Adjustment')];
-    }
-    if (outcomeColumn === 'benefit') {
-      return [text('FABRICATE.Admin.Manager.Checks.Evaluation.OutcomeBenefit', 'Benefit ±')];
-    }
-    return [text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeDc', 'DC ±')];
-  });
+  const thresholdHeads = $derived(outcomeThresholdLabels(type, outcomeColumn, text));
   const comparison = $derived(value?.thresholdMode === 'exceed' ? 'exceed' : 'meet');
   // The under inset's target chip; absolute ranges read no target, so they have none.
   const targetChip = $derived(bandsAreAbsolute ? '' : checkTargetChip(evaluation, value?.dc, text));
@@ -603,7 +589,7 @@
             )}
           </p>
         {:else}
-          <!-- A FLEX LIST, not a subgrid table. The header row is for the eye alone: every control on
+          <!-- A flex list, not a subgrid table. The header row is for the eye alone: every control on
                the row states its own subject through its accessible name. -->
           <div class="manager-checks-tier-head" aria-hidden="true" data-outcome-head>
             <span class="is-swatch"></span>
