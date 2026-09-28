@@ -584,16 +584,6 @@ function readoutRows(facts, card, text) {
   return singleRow(facts, card, text);
 }
 
-/**
- * The "What happens" rows alone, for a caller holding the same input bag as
- * {@link buildReadoutModel}; `[]` before a roll.
- */
-export function buildPreviewFacts(input, text) {
-  if (!input.result) return [];
-  const facts = readoutFacts(input, text);
-  return readoutRows(facts, readoutCard(facts, text), text);
-}
-
 /** The total as shown, with the true minus, and as the number it is; a zero pool shows `0`. */
 function readoutTotal({ count, total }) {
   if (count?.zeroPool) return { total: '0', totalValue: 0 };

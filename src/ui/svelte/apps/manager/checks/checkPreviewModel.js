@@ -30,7 +30,7 @@ export const PREVIEW_ABSTENTIONS = Object.freeze({
   progressiveUnder: 'progressive-under-unsupported',
 });
 
-export { buildPreviewFacts, buildReadoutModel } from './checkReadoutModel.js';
+export { buildReadoutModel } from './checkReadoutModel.js';
 
 const NOT_NUMERIC = new Set(['dice', 'invalid', 'non-finite']);
 

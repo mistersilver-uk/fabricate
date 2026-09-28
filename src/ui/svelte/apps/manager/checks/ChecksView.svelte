@@ -60,7 +60,6 @@
   } from './checkPreview.js';
   import {
     buildOddsModel,
-    buildPreviewFacts,
     buildReadoutModel,
     labelPreviewRecords,
     previewAbstention,
@@ -759,6 +758,38 @@
     return text(entry[0], entry[1]);
   });
 
+  // The activity as the Roll button names it mid-sentence, lower-case and localized.
+  const ACTIVITY_WORDS = {
+    crafting: ['FABRICATE.Admin.Manager.Checks.Simulator.ActivityCrafting', 'crafting'],
+    salvage: ['FABRICATE.Admin.Manager.Checks.Simulator.ActivitySalvage', 'salvage'],
+    gathering: ['FABRICATE.Admin.Manager.Checks.Simulator.ActivityGathering', 'gathering'],
+  };
+  const activityWord = $derived.by(() => {
+    const entry = ACTIVITY_WORDS[activity];
+    return entry ? text(entry[0], entry[1]) : '';
+  });
+
+  // The failure-result policy of the activity on screen, read by its card and the readout alike.
+  const activeFailureResultPolicy = $derived(
+    activity === 'salvage'
+      ? salvageFailureResultPolicy
+      : activity === 'gathering'
+        ? gatheringFailureResultPolicy
+        : craftingFailureResultPolicy
+  );
+
+  // The readout's consumption rows read the ACTIVITY'S OWN failure policy: salvage its item pair,
+  // alchemy's simple check its own flag, and gathering none, having no consumption block.
+  const previewConsumption = $derived.by(() => {
+    if (activity === 'salvage') {
+      return { consumeOnFail: consumeComponentOnFail, breakToolsOnFail: salvageBreakToolsOnFail };
+    }
+    if (activity === 'gathering') return {};
+    const alchemySimple = craftingAlchemy && alchemyCheckMode === 'simple';
+    const consumeOnFail = alchemySimple ? alchemyConsumeOnFail !== false : consumeIngredientsOnFail;
+    return { consumeOnFail, breakToolsOnFail };
+  });
+
   // The PLURAL of the same noun, sentence-initial, and the three do not pluralize alike.
   const RECORD_NOUNS_PLURAL = {
     crafting: ['FABRICATE.Admin.Manager.Checks.RecordNoun.CraftingPlural', 'Recipes'],
@@ -906,17 +937,14 @@
   // enumerable, the editor falling back to a window around the DC.
   const previewTrackRange = $derived(previewTrack(enumeration));
 
+  const previewSandbox = $derived({
+    difficulties: previewDifficulties,
+    awardMode: activeCheck?.awardMode || 'equal',
+  });
+
   const oddsModel = $derived(
     buildOddsModel(
-      {
-        plan: previewPlan,
-        enumeration,
-        abstention: previewAbstaining,
-        sandbox: {
-          difficulties: previewDifficulties,
-          awardMode: activeCheck?.awardMode || 'equal',
-        },
-      },
+      { plan: previewPlan, enumeration, abstention: previewAbstaining, sandbox: previewSandbox },
       text
     )
   );
@@ -930,15 +958,12 @@
         resolved: previewResolved,
         abstention: previewAbstaining,
         actorName: previewActor?.name ?? '',
-        facts: buildPreviewFacts(
-          {
-            result: previewResult,
-            plan: previewPlan,
-            activity,
-            consumption: { consumeIngredientsOnFail, breakToolsOnFail },
-          },
-          text
-        ),
+        activity,
+        activityLabel: activityWord,
+        recordNoun,
+        failureResultPolicy: activeFailureResultPolicy,
+        consumption: previewConsumption,
+        sandbox: previewSandbox,
       },
       text
     )
@@ -1065,11 +1090,7 @@
     {recordNoun}
     {recordNounPlural}
     inertNote={failurePolicyInertNote}
-    value={activity === 'salvage'
-      ? salvageFailureResultPolicy
-      : activity === 'gathering'
-        ? gatheringFailureResultPolicy
-        : craftingFailureResultPolicy}
+    value={activeFailureResultPolicy}
     onChange={(next) => {
       if (activity === 'salvage') return onUpdateSalvageFailureResultPolicy(next);
       if (activity === 'gathering') return onUpdateGatheringFailureResultPolicy(next);
