@@ -7,20 +7,20 @@ const SUM_OVER_FIXED = Object.freeze({
   interactive: true,
 });
 
-/** An attribute target is always graded, never interactive: the reader has no prompt yet. */
+/** An attribute target, always graded; interactive through the shared roll prompt (issue 2005). */
 const SUM_OVER_ATTRIBUTE = Object.freeze({
   product: 'sum',
   direction: 'over',
   targetSources: Object.freeze(['attribute']),
-  interactive: false,
+  interactive: true,
 });
 
-/** Roll-under, either target source; not interactive until the companion gains its own prompt. */
+/** Roll-under, either target source; interactive through the shared roll prompt (issue 2005). */
 const SUM_UNDER = Object.freeze({
   product: 'sum',
   direction: 'under',
   targetSources: Object.freeze(['fixed', 'attribute']),
-  interactive: false,
+  interactive: true,
 });
 
 /**

@@ -43,6 +43,24 @@ describe('Journal roll prompt adapter', () => {
     assert.equal(await offerOf({}), true, 'an unentitled prompt without the key still offers the field');
   });
 
+  it('forwards a character-value target source, so a roll-over stage names a target, not a DC', async () => {
+    let received;
+    await promptJournalStageCheck(
+      { subject: 'Horseshoe', target: 55, direction: 'over', comparison: 'meet', targetSource: 'attribute' },
+      async (options) => {
+        received = options;
+      }
+    );
+    assert.equal(buildSinglePromptData(received).targetSource, 'attribute');
+    const surface = stubPromptSurface(() => null);
+    try {
+      await promptCheckRoll(received);
+      assert.equal(surface.view.chipText, 'Target 55 · meet or beat');
+    } finally {
+      surface.restore();
+    }
+  });
+
   it('forwards the versioned target direction, so a roll-under stage names its target', async () => {
     const view = async (descriptor) => {
       let received;

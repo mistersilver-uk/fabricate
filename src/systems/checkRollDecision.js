@@ -79,6 +79,13 @@ export function underTargetPromptFields(
   };
 }
 
+/** A summed character-value target is a target to name, never a DC, in either direction. */
+export function attributeTargetPromptField(evaluation) {
+  return evaluation?.product === 'sum' && evaluation.target?.source === 'attribute'
+    ? { targetSource: 'attribute' }
+    : {};
+}
+
 /**
  * A count prompt's fields: the pre-modifier pool, threshold and face rules from the pool resolved
  * before the prompt opens (`policy`, or null), and the required count, or null when nothing grades
@@ -135,6 +142,7 @@ function promptInput({
     // The pre-modifier target and, for a summed check, the direction the roll must land on.
     target: Number.isFinite(options.dc) ? options.dc : null,
     direction: evaluation.product === 'sum' ? evaluation.direction : null,
+    ...attributeTargetPromptField(evaluation),
     ...underTargetPromptFields(evaluation, options),
     label: options.flavor,
     name: options.name,

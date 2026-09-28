@@ -55,7 +55,11 @@ import {
   runFormulaProgressive,
   runFormulaRouted,
 } from './checkRoll.js';
-import { countPromptFields, underTargetPromptFields } from './checkRollDecision.js';
+import {
+  attributeTargetPromptField,
+  countPromptFields,
+  underTargetPromptFields,
+} from './checkRollDecision.js';
 import {
   activeCheckEvaluation,
   actorRollData,
@@ -7391,6 +7395,7 @@ function versionedCheckPrompt({
     target,
     direction: target === null ? null : evaluation.direction,
     comparison: target === null ? null : comparison,
+    ...(target !== null && attributeTargetPromptField(evaluation)),
     ...(target !== null &&
       underTargetPromptFields(evaluation, {
         targetBasis: promptTargetBasis(activeCheck.config, recipe, actor, checkTarget, dc),

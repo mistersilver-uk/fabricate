@@ -42,6 +42,7 @@ export function promptJournalStageCheck(descriptor, prompt = promptCheckRoll) {
     displayFormula: displayFormula(descriptor?.displayFormula),
     dc: descriptor?.target,
     direction: descriptor?.direction,
+    ...(descriptor?.targetSource === 'attribute' && { targetSource: 'attribute' }),
     targetBasis: descriptor?.targetBasis,
     toolBonus: descriptor?.toolBonus,
     comparison: descriptor?.comparison,

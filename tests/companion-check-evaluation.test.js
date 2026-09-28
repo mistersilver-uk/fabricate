@@ -18,8 +18,8 @@ describe('companion check evaluation boundary', () => {
       version: 1,
       modes: [
         { product: 'sum', direction: 'over', targetSources: ['fixed'], interactive: true },
-        { product: 'sum', direction: 'over', targetSources: ['attribute'], interactive: false },
-        { product: 'sum', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: false },
+        { product: 'sum', direction: 'over', targetSources: ['attribute'], interactive: true },
+        { product: 'sum', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: true },
         { product: 'count', direction: 'over', targetSources: ['fixed', 'attribute'], interactive: false },
         { product: 'count', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: false },
       ],
@@ -46,11 +46,11 @@ describe('companion check evaluation boundary', () => {
     assert.deepEqual(result.evaluation, normalizeCheckEvaluation(input));
     // The base row: sum/over/fixed, interactive.
     assert.equal(supportsCompanionCheckEvaluation(result.evaluation, true), true);
-    // sum/under/fixed and sum/over/attribute are both published, but neither is interactive.
+    // sum/under/fixed and sum/over/attribute are both published, and both interactive (issue 2005).
     assert.equal(supportsCompanionCheckEvaluation({ ...result.evaluation, direction: 'under' }), true);
     assert.equal(
       supportsCompanionCheckEvaluation({ ...result.evaluation, direction: 'under' }, true),
-      false
+      true
     );
     // count/over/fixed (issue 2004) is published too, but not interactively.
     assert.equal(supportsCompanionCheckEvaluation({ ...result.evaluation, product: 'count' }), true);
@@ -70,7 +70,7 @@ describe('companion check evaluation boundary', () => {
         { ...result.evaluation, target: { ...result.evaluation.target, source: 'attribute' } },
         true
       ),
-      false
+      true
     );
   });
 

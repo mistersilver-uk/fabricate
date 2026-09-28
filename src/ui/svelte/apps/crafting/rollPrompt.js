@@ -244,7 +244,7 @@ function faceRuleText({ kind, value }, direction, rule) {
 
 function targetText(data, labels) {
   if (!Number.isFinite(data.dc)) return '';
-  return data.direction === 'under'
+  return data.direction === 'under' || data.targetSource === 'attribute'
     ? fill(labels.targetValue, { target: data.dc })
     : fill(labels.dcValue, { dc: data.dc });
 }
@@ -376,6 +376,7 @@ export function buildSinglePromptData({
   required,
   modifierDestination,
   offerSituationalBonus,
+  targetSource,
 } = {}) {
   const offer = offerSituationalBonus !== false;
   const title = fill(promptLabel('CheckTitle', '{activity} check'), {
@@ -423,6 +424,8 @@ export function buildSinglePromptData({
     dc: Number.isFinite(value) ? value : null,
     direction: under ? 'under' : 'over',
     ...(under && { targetBasis, toolBonus }),
+    // A character value is a target to name in either direction, never a DC (issue 2005).
+    ...(targetSource === 'attribute' && Number.isFinite(value) && { targetSource }),
     comparison:
       comparison === undefined ? (thresholdMode === 'exceed' ? 'exceed' : 'meet') : comparison,
     selectedModifiers: Array.isArray(selectedModifiers) ? selectedModifiers : [],
