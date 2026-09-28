@@ -440,6 +440,8 @@ An explode or cancel face `value` is a positive integer or null and is not clamp
 Checks studio drafts carry the normalized record and the tier and outcome siblings, so a studio save preserves them, and schema-6 export/import MUST preserve the normalized record without a migration.
 Recipe difficulty tiers retain finite nullable `adjustment` and integer nullable `successes` beside their existing DC fields; relative outcome rows retain their finite nullable `adjustment` sibling.
 Component salvage and gathering task overrides retain `adjustmentOverride` and `successesOverride` beside `dcOverride`, including through their save projections.
+Under an attribute target source the runtime reads these sibling adjustments: the selected recipe tier's `adjustment`, the component's `salvage.adjustmentOverride` or the task's `adjustmentOverride` applies when non-null, and a null one inherits `target.baseAdjustment` (see `resolution-modes/spec.md` § Check Target Resolution).
+An added adjustment is any finite number and a multiplier is a finite number above zero; a relative outcome tier's `adjustment` is its multiplier under an attribute/multiply check, where a null one marks the Otherwise tier and a non-finite imported multiplier normalizes to null and so becomes Otherwise.
 
 ### Requirements
 
@@ -1363,7 +1365,7 @@ SCOPE and SUBJECT-COPIED-FROM separate them: requirement 9's snapshot is PER-SYS
     toolIds: string[],             // references to per-system library Tools
     resultGroups: ResultGroup[],
     dcOverride: number | null,     // default null; per-component salvage check DC override (replaces salvageCraftingCheck.simple/routed.dc at salvage time)
-    adjustmentOverride: number | null, // default null; retained per-component adjustment for an attribute target
+    adjustmentOverride: number | null, // default null; per-component adjustment for an attribute target, else the evaluation's baseAdjustment
     successesOverride: number | null,  // default null; retained per-component required count, clamped 0–20
     outcomeRouting?: { [outcome: string]: string },  // routed only
     timeRequirement?: TimeRequirement,
@@ -3330,7 +3332,7 @@ CraftingRunStepState = {
   selectedRequirementSnapshot?: object, // full selected authored set, including route/currency/tag/essence
 
   // Optional permitted historical meaning and purpose; never a live narrative lookup.
-  resolutionSnapshot?: { kind: "check" | "ingredients" | "none", mode: string, product?: "sum", direction?: "over" },
+  resolutionSnapshot?: { kind: "check" | "ingredients" | "none", mode: string, product?: "sum" | "count", direction?: "over" | "under" },
   presentationSnapshot?: { name: string, description: string },
   currencySpends?: Array<{ unit: string, amount: number }>, // applied settledSpends only
   essenceSpend?: {
@@ -3429,10 +3431,12 @@ CraftingRunStepState = {
 4. `completedAt` is required when `status` is `succeeded`, or `failed`.
 5. `lastCheckResult.outcome` is only valid in `routedByCheck` mode (and in alchemy when `checkMode` is `tiered`); `lastCheckResult.value` is only valid in progressive mode.
    An executed formula result's `data` preserves raw `total` and existing `dc` and adds `product`, `direction`, `comparison`, `target`, `margin`, `successes` and `cancelled`.
-   In this foundation the executed values are `sum/over`; `successes` and `data.cancelled` are null, and `data.cancelled` counts cancelled successes rather than the top-level prompt-abort sentinel.
-   A simple result targets its resolved DC; a relative routed result targets the effective threshold of the roll-matched tier, including the lowest tier when a below-every-threshold total is clamped to it, before forcing or stepping, or null when no tier is matched or clamped to; fixed routed and progressive results have null target and margin, and progressive comparison is null.
-   A non-null margin is raw total minus target even when forcing changes the disposition.
+   A summed result's `direction` is the executed `over` or `under`; `successes` and `data.cancelled` are null for it, and `data.cancelled` counts cancelled successes rather than the top-level prompt-abort sentinel.
+   `data.dc` names only a fixed target; an attribute result carries `dc: null` and its number in `data.target`.
+   A simple result targets its effective target, which under sum/under includes the settled `targetDelta`; a relative routed result targets the effective threshold of the roll-matched tier, including the tier a below-every-threshold total is clamped to, before forcing or stepping, or null when no tier is matched or clamped to; fixed routed, Otherwise and progressive results have null target and margin, and progressive comparison is null.
+   A non-null margin is benefit-positive — raw total minus target over, target minus raw total under — even when forcing changes the disposition.
    Error, prompt cancellation, missing engine and empty formula exits preserve their prior result shape and omit these new execution fields.
+   A target refusal returns `success: false` with `misconfigured: true` and `data.targetRefusal` naming its reason, and carries no executed fields.
    An executed result's `data.preRolls`, when present, is an ordered array of `{ source, label, expression, total, destination }` for separately evaluated modifiers; the main `total` and `diceGroups` still describe only the authored check roll and its appended terms.
    Error, prompt cancellation and unrolled exits do not fabricate pre-roll evidence, and a secret prepared check omits it.
 6. `failureReason` is required when `status` is `failed`.
@@ -3450,7 +3454,7 @@ Versioned stage arming captures `presentationSnapshot` from the authoritative ex
 For an implicit single stage whose wrapper has no description, the permitted recipe description supplies that captured purpose.
 Its first permitted name and description remain unchanged through execution and completion; later narrative edits do not rewrite history or require whole-Journal invalidation.
 `resolutionSnapshot` captures effective resolution meaning, with the executed meaning retained at completion and across an applied-prefix reload.
-Only an executed, permitted versioned `kind: "check"` stage may additionally retain validated `product: "sum"` and `direction: "over"`; both history allowlists require an executed versioned boundary and matching values beside a finite raw total in the check result.
+Only an executed, permitted versioned `kind: "check"` stage may additionally retain a validated `product` and `direction` (`over` or `under`); both history allowlists require an executed versioned boundary and snapshot values that agree with the check result's, beside a finite raw total in that result, and drop both when they disagree.
 No-check, ingredient-routed, fizzle, legacy and gathering d100 snapshots gain no evaluation metadata.
 The canonical active-check resolver determines `kind: "check"`; an unchecked ingredient-routed stage records `"ingredients"`, and another confirmed unchecked stage records `"none"`.
 Actual rolls remain in `lastCheckResult` and selected route identity and authored thresholds remain in `selectedRequirementSnapshot`.
@@ -4199,9 +4203,10 @@ They are unrelated mechanisms.
 
 The dynamic DC macro is a **crafting-check** mechanism, and within crafting it reaches exactly the two DC-bearing check slots.
 Those are `craftingCheck.simple` — the shared pass/fail slot backing the `simple` and `routedByIngredients` modes and the alchemy `simple` check mode — and `craftingCheck.routed`, backing `routedByCheck` and the alchemy `tiered` check mode.
-Both resolve their DC through `CraftingEngine._resolveSimpleCheckDc`, which is the sole caller of `CraftingEngine._resolveCheckAnchorDc` and the sole dynamic-DC caller of the shared macro executor.
+Both resolve their target through `CraftingEngine._resolveCheckTarget`, which calls `CraftingEngine._resolveCheckAnchorDc` for the fixed anchor, and then through `CraftingEngine._resolveSimpleCheckDc`, the sole dynamic-DC caller of the shared macro executor.
 No other check reaches either symbol.
 The crafting `progressive` check has no DC at all, and salvage and gathering resolve theirs arithmetically through `CraftingEngine._resolveSalvageDc` and `GatheringEngine._resolveGatheringRoutedDc` — a per-record `dcOverride` when finite, else the slot's static `dc`, else a literal `15` — consulting no `checkTierId`, no `tiers`, and no macro.
+Their targets resolve through `CraftingEngine._resolveSalvageTarget` and `GatheringEngine._resolveGatheringRoutedTarget`, which delegate a fixed target to those DC resolvers and run no macro.
 Salvage and gathering nonetheless persist `dcMode`, `macroUuid`, and `tiers`, because they reuse the `SimpleCheck` and `RoutedCheck` shapes so the Checks-tab editors can be shared.
 No DC-resolution path outside the crafting check reads any of the three.
 They are not inert for that reason.
@@ -4209,33 +4214,35 @@ Outside the shared Checks-tab editors, which round-trip whatever their slot hold
 Dropping salvage's `simple.tiers` would therefore silently empty that preset list, and dropping its `simple.dcMode` would mislabel the default option, so arithmetic DC resolution licenses removing neither.
 `macroUuid` is the one of the three with no reader at all on salvage or gathering, and gathering has no manager-side reader of any of them.
 
-Before the configured macro runs, `_resolveCheckAnchorDc` computes an **anchor DC** for the crafting check slot being resolved.
-The anchor is the recipe's selected difficulty tier — `Recipe.checkTierId` matched against that slot's `tiers[].id` — when it names a tier that still exists, and the slot's static `dc` otherwise.
+Before the configured macro runs, `_resolveCheckTarget` computes an **anchor** for the crafting check slot being resolved, and validates it: a target refusal aborts before the macro runs.
+Under a fixed target source the anchor is the anchor DC `_resolveCheckAnchorDc` computes; under an attribute source it is the adjusted character value (see `resolution-modes/spec.md` § Check Target Resolution).
+The anchor DC is the recipe's selected difficulty tier — `Recipe.checkTierId` matched against that slot's `tiers[].id` — when it names a tier that still exists, and the slot's static `dc` otherwise.
 `CraftingSystemManager._normalizeSimpleCraftingCheck` and `_normalizeRoutedCraftingCheck` normalize that `dc` to a finite integer, defaulting to 15, on every save, so a normalized crafting check slot's static `dc` is never absent or non-finite.
 `_resolveCheckAnchorDc`'s own fallback to a literal `15` therefore guards only a check config that reached it without that normalization, and is not reachable through normal play.
 
-When a crafting slot's `dcMode` is anything other than `dynamic`, or no `macroUuid` is configured, the anchor IS that check's resolved DC and no macro runs.
+When a crafting slot's `dcMode` is anything other than `dynamic`, or no `macroUuid` is configured, the anchor IS that check's resolved target and no macro runs.
 When `dcMode` is `dynamic` and a `macroUuid` is configured, `_resolveSimpleCheckDc` runs that macro and hands it one payload object containing:
 
 - `recipe`
 - `craftingSystem`
 - `craftingActor`
 - `candidateIngredientSet`
-- `anchorDc` — the anchor DC resolved above, before the macro runs
+- `anchorDc` — the anchor resolved above, before the macro runs: the anchor DC under a fixed target, or the adjusted character value under an attribute target
+- `evaluation` — a structured clone of the slot's normalized check evaluation
 
 Fabricate exposes that exact object with identity as `scope`, `context`, and `args`.
 The `scope` identifier provides Foundry-facing familiarity while `context` and `args` remain backward-compatible aliases.
 This is not full native `Macro#execute` behavior: Foundry's native `scope` is a rest copy, and Fabricate does not add Foundry's native `speaker`, `actor`, `token`, or `character` locals.
 
 Fabricate applies `Number(result)` to the macro's return value.
-When the coerced value is finite, Fabricate truncates it to an integer and uses it as that crafting check's DC.
-An absent configured macro, a `dcMode` other than `dynamic`, a thrown error, or a result whose numeric coercion is non-finite all leave the anchor DC in force, so a recipe's difficulty tier and a dynamic DC macro compose rather than acting as alternatives: the tier sets the number the macro is asked to adjust.
+When the coerced value is finite, Fabricate truncates it to an integer and uses it as that crafting check's target, replacing the anchor before any relative multiplication and before a sum/under `targetDelta` applies.
+An absent configured macro, a `dcMode` other than `dynamic`, a thrown error, or a result whose numeric coercion is non-finite all leave the anchor in force, so a recipe's difficulty tier and a dynamic DC macro compose rather than acting as alternatives: the tier sets the number the macro is asked to adjust.
 
 The shared executor deliberately evaluates the selected script Macro command instead of calling `Macro#execute`.
 This keeps player-initiated workflows from being blocked by Foundry's current-user Macro permission gate.
 The direct evaluation bypasses only the client-side Macro document check and grants no additional server or document authority; the script still runs as the current player.
 Foundry runtime globals `game`, `foundry`, `ui`, and `fromUuid` remain directly available and are not injected as payload parameters.
-Errors thrown by a configured macro propagate unchanged to the owning Fabricate workflow, which decides whether to abort or apply a documented fallback such as the anchor-DC fallback above, as does the executor's own `Macro not found or invalid` error when the configured uuid resolves to no document or to one carrying no string `command`.
+Errors thrown by a configured macro propagate unchanged to the owning Fabricate workflow, which decides whether to abort or apply a documented fallback such as the anchor fallback above, as does the executor's own `Macro not found or invalid` error when the configured uuid resolves to no document or to one carrying no string `command`.
 
 ### Crafting Check Macro Contract (Removed in 1.8.0)
 

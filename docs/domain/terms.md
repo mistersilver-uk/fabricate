@@ -1537,7 +1537,7 @@ Spec reference: openspec/specs/ui-crafting-app/spec.md, openspec/specs/recipe-vi
 
 ## Check
 
-One roll engine (`src/systems/checkRoll.js`) exposes three runners: `runFormulaPassFail` (roll vs a DC met or strictly exceeded according to `thresholdMode` → `pass`/`fail`), `runFormulaProgressive` (roll total IS the numeric value progressive awarding spends against result difficulties — **no DC**), and `runFormulaRouted` (map the total onto a named **Outcome Tier** whose name routes to a result group).
+One roll engine (`src/systems/checkRoll.js`) exposes three runners: `runFormulaPassFail` (roll vs a target met or strictly exceeded according to `thresholdMode`, over or under by the check's **Check Evaluation** → `pass`/`fail`), `runFormulaProgressive` (roll total IS the numeric value progressive awarding spends against result difficulties — **no DC**), and `runFormulaRouted` (map the total onto a named **Outcome Tier** whose name routes to a result group).
 A `label` (`Crafting`/`Salvage`/`Gathering`) only customises failure-message wording; the result shape is identical across activities.
 The persisted system keys are `craftingCheck`, `salvageCraftingCheck`, and `gatheringCraftingCheck` — the `*CraftingCheck` naming is kept **verbatim for back-compat** even though the model is now activity-agnostic, so `gatheringCraftingCheck` is the gathering check, NOT misplaced crafting config.
 
@@ -1547,26 +1547,66 @@ Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-mo
 
 ## Check Evaluation
 
-Each of the eight normalized check subobjects (crafting and salvage simple, routed and progressive; gathering routed and progressive) retains an `evaluation` record, even when its selected product, direction, target or pool settings are inactive.
-The record defaults to `sum/over`, and the current activity runners and odds classifier execute `sum/over` even when a future count or under choice was authored.
-Recipe tiers retain nullable `adjustment` and `successes` siblings beside `dc`, and relative outcome tiers retain a nullable `adjustment`; no current runner reads them.
-The private crafting and gathering prepared check descriptors clone that authored record beside the prepared formula and DC.
+Each of the eight normalized check subobjects (crafting and salvage simple, routed and progressive; gathering routed and progressive) retains an `evaluation` record, even when its selected mode does not read some of its product, direction, target or pool settings.
+The record defaults to `sum/over`; the activity runners and the prepared evaluator grade a summed total over or under a fixed or character-value target, while the Checks Studio preview and odds still grade every record as `sum/over`.
+Recipe tiers retain nullable `adjustment` and `successes` siblings beside `dc`, and relative outcome tiers retain a nullable `adjustment`; under a character-value target the tier `adjustment` is the **Difficulty Adjustment**, and under a multiplier a relative tier's `adjustment` is its multiplier.
+The private crafting and gathering prepared check descriptors clone that authored record beside the prepared formula, and capture the resolved pre-modifier target as `decisionPolicy.target` beside `decisionPolicy.targetSource`, with `decisionPolicy.dc` naming only a fixed target.
 They stay in the issuing authority instance and are neither the public executed `resolutionSnapshot` nor a replicated ledger flag.
 
-Canonical mapping: `normalizeCheckEvaluation`/`normalizeNullableAdjustment`/`normalizeNullableSuccesses` in `src/systems/normalize/checkEvaluation.js`; `system.{craftingCheck,salvageCraftingCheck,gatheringCraftingCheck}`; `CraftingEngine.describeVersionedStageCheck`, `GatheringEngine._versionedCheckDescriptor`
+Canonical mapping: `normalizeCheckEvaluation`/`normalizeNullableAdjustment`/`normalizeNullableSuccesses` in `src/systems/normalize/checkEvaluation.js`; `activeCheckEvaluation` in `src/systems/checkTarget.js`; `sumGrading` in `src/systems/checkRouting.js`; `system.{craftingCheck,salvageCraftingCheck,gatheringCraftingCheck}`; `CraftingEngine.describeVersionedStageCheck`, `GatheringEngine._versionedCheckDescriptor`
 
 Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-modes/spec.md
+
+## Target Source
+
+`evaluation.target.source` is `fixed` or `attribute`.
+A fixed target keeps the existing DC precedence: crafting uses the recipe's selected difficulty tier, else the slot's static `dc`, then any dynamic-DC macro; salvage and gathering use a finite `dcOverride`, else the static `dc`, else 15.
+An attribute target ignores those DC fields and resolves `target.expression` against `actor.getRollData()`, else `actor.system`, with Foundry `replaceFormulaData` path semantics (a `getProperty` walk that reaches prototype getters, and a value read through `String(value).trim()`), then applies the **Difficulty Adjustment** and floors.
+An unresolved or non-numeric value is a **Target Refusal** and never reads as 0.
+A progressive check and a fixed-range routed check read no target, so their target source is inert.
+The crafting dynamic-DC macro runs after validation, receives the anchor (the adjusted character value under an attribute source) as `anchorDc` with a cloned `evaluation`, and its result replaces that anchor.
+
+Canonical mapping: `evaluation.target.source`/`expression`; `resolveCheckTarget`/`resolveActivityTarget`/`actorRollData` in `src/systems/checkTarget.js`; the `pathMode: 'foundry'` option of `resolveDeterministicExpression` in `src/systems/checkEvaluation.js`; `CraftingEngine._resolveCheckTarget`/`_resolveSalvageTarget`, `GatheringEngine._resolveGatheringRoutedTarget`
+
+Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/data-models/spec.md
+
+## Difficulty Adjustment
+
+`target.adjustmentKind` is `add` or `multiply`.
+Crafting takes the selected recipe tier's non-null `adjustment`, salvage the component's non-null `salvage.adjustmentOverride`, and gathering the task's non-null `adjustmentOverride`, each else `target.baseAdjustment`; a null adjustment is identity.
+An added adjustment is any finite number, and a multiplier is a finite number above zero, so a multiplier at or below zero refuses `adjustment-invalid`.
+The value floors after adjusting: `floor(value + a)` or `floor(value × m)`.
+A relative multiply tier floors again (`floor(anchor × tierMultiplier)`), and a sum/under `targetDelta` is added last, so a harder tier never halves a flat bonus.
+Only a character-value target reads an adjustment; a fixed target ignores it.
+
+Canonical mapping: `evaluation.target.adjustmentKind`/`baseAdjustment`; `Recipe` difficulty tier `adjustment`; `salvage.adjustmentOverride`; `GatheringTask.adjustmentOverride`; `selectTargetAdjustment`/`isValidTargetAdjustment`/`multiplyTierThreshold` in `src/systems/checkTarget.js`
+
+Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/data-models/spec.md
+
+## Target Refusal
+
+The reasons are `expression-missing`, `unresolved-path`, `non-finite`, `dice`, `invalid`, `adjustment-invalid`, `progressive-under` and `formula-empty`, shared by every activity.
+`progressive-under` refuses a summed roll-under progressive check, whose total is spent as a budget, and `formula-empty` refuses a sum/under check with no formula rather than grading a total of 0 as a pass.
+A refused check returns `success: false, misconfigured: true` with `data.targetRefusal`, and its message is a localized sentence such as "Crafting check cannot roll: the character value its target reads was not found."; it records no **Executed Check Evidence**.
+`craft()`, a timed FINISH and `salvage()` carry `misconfigured: true` and `data.targetRefusal` to their callers; a timed FINISH refusal leaves the run resumable.
+Gathering answers a routed refusal with the `CHECK_TARGET_INVALID` misconfigured outcome and a progressive one with a `CHECK_TARGET_INVALID` diagnostic, and both versioned descriptors throw a `CHECK_TARGET_INVALID` lifecycle error with zero mutation.
+A **Standalone Check Roll** instead answers `targetUnresolved`, or `evaluationInvalid` for an invalid multiplier.
+
+Canonical mapping: `CHECK_TARGET_REFUSALS`/`checkTargetRefusal`/`checkRefusalMessage`/`refusalData`/`progressiveTargetRefusal` in `src/systems/checkTarget.js`; `misconfiguredCheckResult` in `src/systems/craftPipeline.js`; `FABRICATE.Check.TargetRefusal.*` in `lang/en.json`
+
+Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/recipes-and-steps/spec.md, openspec/specs/gathering-and-harvesting/spec.md, openspec/specs/ui-crafting-app/spec.md
 
 ## Executed Check Evidence
 
 An executed formula result records raw `data.total` and the existing `data.dc` alongside the actual product, direction, comparison, target, margin, successes and cancelled-success count.
-In the current `sum/over` execution, successes and cancelled-success count are null.
-Simple checks target their resolved DC; relative routed checks target the effective threshold of the roll-matched tier, including the lowest tier when a below-every-threshold total is clamped to it, before forcing or stepping, or null when no tier is matched or clamped to; fixed routed and progressive checks have no single target or margin.
-A non-null margin measures raw total minus target regardless of any forced disposition.
+In a summed execution the direction is the executed `over` or `under`, and successes and cancelled-success count are null.
+`data.dc` names only a fixed target, so a character-value result carries `dc: null` and its number in `data.target`.
+Simple checks target their effective target, which under sum/under includes the settled `targetDelta`; relative routed checks target the effective threshold of the roll-matched tier, including the tier a below-every-threshold total is clamped to, before forcing or stepping, or null when no tier is matched or clamped to; fixed routed, **Otherwise Tier** and progressive checks have no single target or margin.
+A non-null margin is benefit-positive — raw total minus target over, target minus raw total under — regardless of any forced disposition.
 An unrolled, prompt-cancelled, no-engine, empty-formula or errored evaluation does not gain executed fields.
 Optional `data.preRolls` preserves the ordered source, label, expression, actual total and destination of separately evaluated modifiers; the main `data.total` and `data.diceGroups` remain the main check roll's evidence.
 The result's `data.cancelled` is distinct from the top-level `cancelled` flag that aborts a prompt.
-Only a permitted executed versioned crafting check may carry matching `sum/over` metadata into its historical `resolutionSnapshot`.
+Only a permitted executed versioned crafting check may carry its executed product and direction into its historical `resolutionSnapshot`, and only when snapshot and result agree.
 
 Canonical mapping: `executedSumEvidence` and the formula runners in `src/systems/checkRoll.js`; `craftingStepHistoryEvidence` in `src/systems/CraftingRunManager.js`; `checkResolutionEvidence` and `historyEvidenceFields` in `src/systems/runHistoryEvidence.js`
 
@@ -1577,8 +1617,10 @@ Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-mo
 It is therefore NOT a **Check**: a Check is taken on a subject inside a Crafting System and carries that system's **Check Modifier** catalogue, combination rule, tool bonuses, **Check Breakage** triggers, **Tier Stepping** and failure-result policy, none of which a Standalone Check Roll has a system or a subject to derive.
 A companion wanting those routes a real craft or salvage instead.
 Its optional evaluation is strictly validated after the existing authorization and roll-decision gates: malformed records refuse `evaluationInvalid`, and valid modes absent from `game.fabricate.api.companion.features.checkEvaluation` refuse `evaluationUnsupported` before rolling or prompting.
-The version-1 capability descriptor advertises only `sum/over/fixed`, including interactive use; count, under and attribute choices remain valid authored data but have no standalone execution route yet.
-On that row the evaluation only selects the mode: the roll still grades `formula` against `dc` through `compare`, so `target.expression` and the pool settings are validated but never change the roll.
+The version-1 capability descriptor advertises `sum/over/fixed` (including interactive use), `sum/over/attribute` and `sum/under` with either target source, the last two non-interactively; count choices remain valid authored data with no standalone execution route yet.
+On the `sum/over/fixed` row the evaluation only selects the mode: the roll still grades `formula` against `dc` through `compare`, so `target.expression` and the pool settings are validated but never change the roll.
+An attribute row ignores `dc` and resolves its **Target Source** from the actor, answering `targetUnresolved` when it cannot, and a `sum/under` fixed request without a finite `dc` refuses `evaluationInvalid`.
+A graded answer against a resolved target reports through the auxiliary `PassedTarget`/`FailedTarget` message keys with `{ label, total, target }`, while `sum/over/fixed` keeps `Passed`/`Failed` with `{ dc }`.
 A rolled standalone answer projects **Executed Check Evidence** from the shared runner, while every refusal omits those execution fields.
 
 Canonical mapping: `src/systems/companionCheckRoll.js` (`rollActorCheck`, `resolveBulkCheckDecision`); `src/systems/companionCheckEvaluation.js`; `src/systems/companionContract.js` (`COMPANION_CONTRACT`); published as `game.fabricate.rollActorCheck` / `game.fabricate.resolveBulkCheckDecision` on the `companion` contract (issue 1293)
@@ -1587,19 +1629,30 @@ Spec reference: openspec/specs/companion-api/spec.md, openspec/specs/resolution-
 
 ## Outcome Tier
 
-Two banding types, never mixed in one check: **relative** tiers carry a `dc` **delta** added to a base DC (`threshold = baseDc + outcome.dc`), and among matching tiers the highest effective threshold (best tier) wins; **fixed** tiers own a non-overlapping `[start, end]` value range and match when `start <= total <= end`.
+Two banding types, never mixed in one check: **relative** tiers carry a benefit-signed `dc` step from the resolved anchor (`threshold = anchor + outcome.dc` over, `anchor − outcome.dc + targetDelta` under), or under a character-value multiplier a multiplied threshold (`floor(anchor × outcome.adjustment)`, plus `targetDelta` under), and among matching tiers the best qualifying tier wins; **fixed** tiers own a non-overlapping `[start, end]` value range and match when `start <= total <= end`, where under sum/under the matched value is `total − targetDelta` so a benefit shifts toward the better, lower end.
 The **final** tier's `name` is the routing key: a **Tier Stepping** trigger effect may move the rolled tier before anything routes (issue 975).
-**Clamp (relative only):** a total below EVERY relative threshold routes to the lowest (closest) tier rather than a null outcome, so a rising base DC never leaves a rolled attempt unrouted — opted into by all three activity runners (crafting, salvage, gathering) via `clampToNearest`; **fixed** mode keeps the null "no match" behaviour (its ranges are authored explicitly).
+**Clamp (relative only):** a total that meets no relative threshold, where no **Otherwise Tier** applies, routes to the least demanding tier (the lowest threshold over, the highest under) rather than a null outcome, so a rising base DC never leaves a rolled attempt unrouted — opted into by all three activity runners (crafting, salvage, gathering) via `clampToNearest`; **fixed** mode keeps the null "no match" behaviour (its ranges are authored explicitly).
 The clamp routes to the closest tier, it does not force success — a below-lowest roll adopts that tier's own `success`/`breakTools` flags, so a failing lowest tier still fails.
 **No DC in fixed mode:** because fixed tiers match by explicit range, the check DC and the meet/exceed `thresholdMode` are unused for `routedByCheck` + `type: fixed` (DC is relative-only), so the Checks editor hides both and no `DC N` chip renders on the player check card or the interactive roll prompt; `routedByIngredients` (a pass/fail gate) and relative tiers still use the DC.
-**Per-recipe minimum success tier (fixed only):** a `routedByCheck` recipe may carry `minSuccessOutcomeId` (a fixed success-tier id); when the **final** (post-step) tier ranks below it (by `start`), the craft fails outright (`success:false`, no outcome routes, the recipe's normal failure/consumption path runs, no success result), the default null = the final tier, a forced (crit) outcome bypasses it, and a stale/unknown id no-ops.
+**Per-recipe minimum success tier (fixed only):** a `routedByCheck` recipe may carry `minSuccessOutcomeId` (a fixed success-tier id); when the **final** (post-step) tier ranks below it (by `start` in the check's direction), the craft fails outright (`success:false`, no outcome routes, the recipe's normal failure/consumption path runs, no success result), the default null = the final tier, a forced (crit) outcome bypasses it, and a stale/unknown id no-ops.
 It is threaded only by the crafting `_runRoutedCheck` caller through `runFormulaRouted`'s optional `minOutcomeId`, so salvage and gathering routed checks are unaffected; on a blocked craft the tier it blocked is recorded as `data.blockedOutcomeId`.
-**One ranking (issue 975):** tier ORDER is derived in exactly one place, `rankedRoutedOutcomes`, shared by the forced reroute, this minimum gate and the tier-step pass — ascending by `dc` (relative) / `start` (fixed), non-finite ranks dropped, and the FIRST authored tier kept among equal ranks in both directions.
-The gate consumes it only to LOCATE the required tier and still compares threshold VALUES, so two fixed tiers sharing a `start` compare equal and the craft passes, where an index comparison would strictly fail it.
+**One ranking (issue 975):** tier ORDER is derived in exactly one place, `rankedRoutedOutcomes`, shared by the forced reroute, this minimum gate and the tier-step pass, and the same ranking rule picks the best qualifying tier and the clamp's tier — a fixed range by `start` and a multiply tier by its threshold, both in the check's direction, an additive relative tier by its benefit-signed `dc`, an **Otherwise Tier** lowest, other non-finite ranks dropped, and the FIRST authored tier kept among equal ranks in both directions.
+The gate consumes it only to LOCATE the required tier and still compares `start` VALUES as a meet in the check's direction, so two fixed tiers sharing a `start` compare equal and the craft passes, where an index comparison would strictly fail it.
 
-Canonical mapping: `matchRoutedOutcome`/`routeCritOutcome`/`rankedRoutedOutcomes`/`applyTierStepTriggers` in `src/systems/checkRoll.js`; `relativeOutcomes[]`/`fixedOutcomes[]` from `_normalizeRoutedCraftingCheck`, `normalizeRoutedCraftingCheck` in `src/systems/normalize/craftingCheck.js`; `Recipe.minSuccessOutcomeId`; `resolveRecipeFixedOutcomeTierOptions` in `src/utils/routedOutcomeKeywords.js`
+Canonical mapping: `classifyCheckTotal` and its private `matchRoutedOutcome`/`routeCritOutcome`/`rankedRoutedOutcomes`/`applyTierStepTriggers` in `src/systems/checkRouting.js` (re-exported by `src/systems/checkRoll.js`); `relativeOutcomes[]`/`fixedOutcomes[]` from `_normalizeRoutedCraftingCheck`, `normalizeRoutedCraftingCheck` in `src/systems/normalize/craftingCheck.js`; `Recipe.minSuccessOutcomeId`; `resolveRecipeFixedOutcomeTierOptions` in `src/utils/routedOutcomeKeywords.js`
 
 Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/data-models/spec.md, openspec/specs/ui-integration/spec.md, openspec/specs/gathering-and-harvesting/spec.md
+
+## Otherwise Tier
+
+It exists only under a character-value target whose adjustment kind is `multiply`, and only among **relative** tiers.
+It has no threshold: it applies when no multiplied threshold qualifies, before any clamp, and ranks below every tier with a threshold whatever its own `success` flag, so it takes part in forcing and stepping as the lowest tier and has null target and margin in **Executed Check Evidence**.
+Exactly one is intended; at runtime several take the first authored and none falls back to the clamp.
+A null `adjustment` on a fixed or additive check does not make a tier Otherwise, and a non-finite imported multiplier normalizes to null and so becomes Otherwise.
+
+Canonical mapping: a `relativeOutcomes[]` entry with `adjustment: null` under an attribute/multiply evaluation; `isOtherwise` and `rankedRoutedOutcomes` in `src/systems/checkRouting.js`
+
+Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/data-models/spec.md
 
 ## Forced Outcome
 
@@ -1621,7 +1674,7 @@ Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/gatherin
 A per-component `salvage.dcOverride` shifts the resolved DC.
 **Routed → result-group routing is explicit:** the final (post-step) tier NAME is looked up in `component.salvage.outcomeRouting` (outcome name → result-group id).
 
-Canonical mapping: `system.salvageCraftingCheck`, `_normalizeSalvageCraftingCheck`, `normalizeSalvageCraftingCheck` in `src/systems/normalize/craftingCheck.js`; `_resolveSalvageDc`/`_runSalvageSimpleCheck`/`_runSalvageRoutedCheck`/`_runSalvageProgressiveCheck` in `CraftingEngine`
+Canonical mapping: `system.salvageCraftingCheck`, `_normalizeSalvageCraftingCheck`, `normalizeSalvageCraftingCheck` in `src/systems/normalize/craftingCheck.js`; `_resolveSalvageDc`/`_resolveSalvageTarget`/`_runSalvageSimpleCheck`/`_runSalvageRoutedCheck`/`_runSalvageProgressiveCheck` in `CraftingEngine`
 
 Spec reference: openspec/specs/data-models/spec.md, openspec/specs/recipes-and-steps/spec.md
 
@@ -1631,7 +1684,7 @@ A per-task `dcOverride` shifts the resolved DC.
 **Routed → result-group routing differs by activity:** crafting and salvage use an explicit `outcomeRouting` map (outcome name → group id), but gathering matches the final (post-step) tier NAME against the task **result-group name** (case-insensitive) — so a routed gathering task's result groups are addressed BY NAME.
 The engine consults the system progressive/routed formula only when one is configured.
 
-Canonical mapping: `system.gatheringCraftingCheck`, `_normalizeGatheringCraftingCheck`, `normalizeGatheringCraftingCheck` in `src/systems/normalize/craftingCheck.js`; `_resolveRoutedFormulaOutcome`/`_resolveGatheringRoutedDc` in `GatheringEngine`
+Canonical mapping: `system.gatheringCraftingCheck`, `_normalizeGatheringCraftingCheck`, `normalizeGatheringCraftingCheck` in `src/systems/normalize/craftingCheck.js`; `_resolveRoutedFormulaOutcome`/`_resolveGatheringRoutedDc`/`_resolveGatheringRoutedTarget` in `GatheringEngine`
 
 Spec reference: openspec/specs/data-models/spec.md, openspec/specs/gathering-and-harvesting/spec.md
 
@@ -1640,7 +1693,7 @@ Spec reference: openspec/specs/data-models/spec.md, openspec/specs/gathering-and
 A per-component `salvage.dcOverride` and a per-task gathering `dcOverride` replace the check sub-object's default `dc` (else fallback 15) when finite.
 Progressive checks have **no DC**, so an override is irrelevant to (and ignored by) progressive salvage and progressive gathering: it is not a universal knob.
 Each `dcOverride` has two sibling overrides, `adjustmentOverride` (a finite number or null) and `successesOverride` (an integer clamped to 0–20, or null), both defaulting to null.
-They hold the per-record difficulty for an attribute target and a success count under a **Check Evaluation**; the current `sum/over` runners never read them, but normalization, the component salvage save, the admin gathering task save and the gathering runtime task projection all retain them.
+They hold the per-record **Difficulty Adjustment** for a character-value target and the required success count for a count check, and the runtime reads each only under that evaluation; normalization, the component salvage save, the admin gathering task save and the gathering runtime task projection all retain them.
 
 Canonical mapping: `salvage.dcOverride`, `GatheringTask.dcOverride`; `_resolveSalvageDc` in `CraftingEngine`, `_resolveGatheringRoutedDc` in `GatheringEngine`; `salvage.adjustmentOverride`/`salvage.successesOverride` via `normalizeSalvage` in `src/systems/normalize/salvage.js`; `GatheringTask.adjustmentOverride`/`GatheringTask.successesOverride` via `_normalizeGatheringTask` in `src/ui/svelte/stores/adminStore.js` and `normalizeLibraryTask` in `src/systems/GatheringRichStateService.js`
 

@@ -728,10 +728,13 @@ This additive `features` field leaves `schemaVersion` at `1`.
 Its shape is `{ version, modes, additionalDice }`: each `modes` row is `{ product, direction, targetSources, interactive }`, and an evaluation is executable when one row matches its `product` and `direction`, lists its `target.source` in `targetSources`, and has `interactive: true` when the roll is interactive.
 `version` names this descriptor's shape, not its rows.
 Activating a mode appends a row without changing it, so match rows rather than comparing versions.
-Today the one row is `{ product: 'sum', direction: 'over', targetSources: ['fixed'], interactive: true }` and `additionalDice` is `false`, so additional dice have no standalone execution route.
-On that row the evaluation only selects the mode.
-Fabricate still grades `formula` against `dc` through `compare`, so `target.expression` and the pool settings are validated but never change the roll, and a request without a finite `dc` rolls ungraded.
-Count, under and attribute-target evaluations remain authored data without a standalone route until Fabricate advertises and executes them.
+At version 1 the descriptor publishes three rows: `{ product: 'sum', direction: 'over', targetSources: ['fixed'], interactive: true }`, `{ product: 'sum', direction: 'over', targetSources: ['attribute'], interactive: false }`, and `{ product: 'sum', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: false }`.
+`additionalDice` stays `false`, so additional dice have no standalone execution route.
+On the fixed sum-over row the evaluation only selects the mode, `target.expression` and the pool settings are validated but never change the roll, and Fabricate still grades `formula` against `dc` through `compare`, so a request without a finite `dc` rolls ungraded.
+On an attribute row Fabricate ignores `dc` entirely and resolves the target from `target.expression` against the actor's roll data instead, using the same lookup Foundry's own `Roll.replaceFormulaData` uses, plus the row's `baseAdjustment`.
+An unresolved or non-numeric target refuses the outcome `targetUnresolved` before any roll, and an invalid multiplier refuses `evaluationInvalid`.
+A sum-under request against a fixed target with no finite `dc` also refuses `evaluationInvalid` rather than rolling ungraded.
+Count evaluations remain authored data without a standalone route until Fabricate advertises and executes them.
 
 A malformed evaluation returns `evaluationInvalid`.
 A valid evaluation whose mode is absent from the advertised rows returns `evaluationUnsupported`.
@@ -739,6 +742,11 @@ Both outcomes are stable refusals before Fabricate prompts or rolls.
 
 Only `checkPassed`, `checkFailed` and `rolled` results carry executed evaluation metadata from the runner: `product`, `direction`, `comparison`, `target`, `margin`, `successes` and `cancelled`.
 Every refusal omits those fields, including evaluation refusals.
+
+A graded answer against a resolved target, meaning an attribute row or any sum-under row, reports through `FABRICATE.Check.Roll.PassedTarget` or `FailedTarget` instead of the plain `Passed`/`Failed` keys, with `messageData` `{ label, total, target }` taken from the roll's own executed target, never from the request `dc`.
+Only the fixed sum-over row keeps `Passed`/`Failed` with `{ label, total, dc }`.
+An attribute target Fabricate could not read as a number answers the outcome `targetUnresolved`.
+Its message key is `FABRICATE.Check.Roll.TargetUnresolved`, whose English text is "{label} check could not read a number for its target from this character."
 
 **`callSite` is required and has no default.**
 Nothing in the request or the environment distinguishes your deliberate click from a synced `updateWorldTime` tick, so Fabricate refuses `invalidCallSite` rather than guessing.
