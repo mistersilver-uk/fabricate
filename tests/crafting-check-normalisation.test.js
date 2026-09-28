@@ -91,6 +91,7 @@ test('_normalizeCraftingCheck defaults the routed config when absent', () => {
     type: 'relative',
     rollFormula: '',
     evaluation: normalizeCheckEvaluation(),
+    offerSituationalBonus: true,
     dc: 15,
     thresholdMode: 'meet',
     // The routed slot carries its own DC SOURCE (issue 1096), absence-preserving: anything
@@ -160,6 +161,49 @@ test('all eight check slots retain inactive evaluation choices through a second 
       assert.deepEqual(once[key].evaluation, authored, key);
       assert.deepEqual(twice[key].evaluation, authored, `${key} is idempotent`);
     }
+  }
+});
+
+/** Every persisted check slot, as `[label, slot]`, from one normalization of each activity. */
+function eightSlots(mgr, input = {}) {
+  const crafting = mgr._normalizeCraftingCheck(input.crafting ?? {});
+  const salvage = mgr._normalizeSalvageCraftingCheck(input.salvage ?? {});
+  const gathering = mgr._normalizeGatheringCraftingCheck(input.gathering ?? {});
+  return [
+    ...['simple', 'progressive', 'routed'].map((key) => [`crafting.${key}`, crafting[key]]),
+    ...['simple', 'progressive', 'routed'].map((key) => [`salvage.${key}`, salvage[key]]),
+    ...['progressive', 'routed'].map((key) => [`gathering.${key}`, gathering[key]]),
+  ];
+}
+
+test('a legacy record offers the situational bonus on all eight check slots (issue 2005)', () => {
+  const mgr = makeManager();
+  const legacy = { simple: { rollFormula: '1d20' }, routed: {}, progressive: {} };
+  const slots = eightSlots(mgr, { crafting: legacy, salvage: legacy, gathering: legacy });
+  assert.equal(slots.length, 8);
+  for (const [label, slot] of slots) assert.equal(slot.offerSituationalBonus, true, label);
+  for (const offer of [null, 0, '', 'false']) {
+    const simple = mgr._normalizeCraftingCheck({ simple: { offerSituationalBonus: offer } }).simple;
+    assert.equal(simple.offerSituationalBonus, true, `only false turns the offer off, not ${offer}`);
+  }
+});
+
+test('an explicit false offer survives a second normalization on all eight slots', () => {
+  const mgr = makeManager();
+  const off = {
+    simple: { offerSituationalBonus: false },
+    routed: { offerSituationalBonus: false },
+    progressive: { offerSituationalBonus: false },
+  };
+  const once = { crafting: off, salvage: off, gathering: off };
+  const first = eightSlots(mgr, once);
+  const twice = eightSlots(mgr, {
+    crafting: mgr._normalizeCraftingCheck(off),
+    salvage: mgr._normalizeSalvageCraftingCheck(off),
+    gathering: mgr._normalizeGatheringCraftingCheck(off),
+  });
+  for (const [label, slot] of [...first, ...twice]) {
+    assert.equal(slot.offerSituationalBonus, false, label);
   }
 });
 
@@ -494,6 +538,7 @@ test('_normalizeCraftingCheck defaults the simple config when absent', () => {
   assert.deepEqual(result.simple, {
     rollFormula: '',
     evaluation: normalizeCheckEvaluation(),
+    offerSituationalBonus: true,
     dc: 15,
     thresholdMode: 'meet',
     dcMode: 'static',
@@ -510,6 +555,7 @@ test('_normalizeCraftingCheck defaults the progressive check when absent', () =>
     awardMode: 'equal',
     rollFormula: '',
     evaluation: normalizeCheckEvaluation(),
+    offerSituationalBonus: true,
     checkBreakage: { triggers: [] },
   });
 });

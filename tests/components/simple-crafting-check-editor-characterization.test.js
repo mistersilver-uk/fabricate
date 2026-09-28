@@ -7,6 +7,7 @@ import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 
+import { CHECKS_TREE_RAW_MODULES } from '../helpers/checksHarnessModules.js';
 import {
   createMountedComponentHarness,
   SEARCHABLE_POPOVER_RAW_MODULES,
@@ -46,6 +47,9 @@ const harness = createMountedComponentHarness({
     // A trigger's own summary and the common-trigger presets (issue 1096).
     'src/ui/svelte/apps/manager/checks/checkTriggerSummary.js',
     'src/ui/svelte/apps/manager/checks/checkTriggerPresets.js',
+    // The evaluation controls and read-only band model (issue 2005), whose closure reaches the
+    // engine's routing. Manifest only: no assertion below moved.
+    ...CHECKS_TREE_RAW_MODULES,
   ],
   compiledModules: [
     'src/ui/svelte/components/ItemDropZone.svelte',
@@ -69,6 +73,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/apps/manager/checks/CheckDcMacroCard.svelte',
+    'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
+    'src/ui/svelte/apps/manager/checks/CheckPromptOptions.svelte',
     'src/ui/svelte/apps/manager/checks/CheckDifficultyCard.svelte',
     // An issue 1097 addition, and ONLY the dependency manifest.
     'src/ui/svelte/components/ThresholdBandStrip.svelte',

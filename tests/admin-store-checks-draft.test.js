@@ -4,6 +4,12 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import { CraftingSystemManager } from '../src/systems/CraftingSystemManager.js';
+import {
+  cloneProgressiveCheck,
+  cloneRoutedCheck,
+  cloneSimpleCheck,
+} from '../src/ui/svelte/apps/manager/checks/checkDraftClone.js';
 import { createAdminStore } from '../src/ui/svelte/stores/adminStore.js';
 import { createServices, makeSystem } from './helpers/adminStoreServices.js';
 
@@ -123,4 +129,64 @@ describe('the Checks header Save is PLURAL', () => {
     assert.equal(typeof checks.DiscardDirtyContent, 'string');
     assert.match(checks.DiscardDirtyContent, /\{activities\}/, 'it carries the slot');
   });
+});
+
+describe('a false situational-bonus offer survives the Studio round trip (issue 2005)', () => {
+  const SLOTS = [
+    ['craftingCheck', 'simple', cloneSimpleCheck, 'saveCraftingCheckSimple'],
+    ['craftingCheck', 'routed', cloneRoutedCheck, 'saveCraftingCheckRouted'],
+    ['craftingCheck', 'progressive', cloneProgressiveCheck, 'saveCraftingCheckProgressive'],
+    ['salvageCraftingCheck', 'simple', cloneSimpleCheck, 'saveSalvageCheckSimple'],
+    ['salvageCraftingCheck', 'routed', cloneRoutedCheck, 'saveSalvageCheckRouted'],
+    ['salvageCraftingCheck', 'progressive', cloneProgressiveCheck, 'saveSalvageCheckProgressive'],
+    ['gatheringCraftingCheck', 'routed', cloneRoutedCheck, 'saveGatheringCheckRouted'],
+    ['gatheringCraftingCheck', 'progressive', cloneProgressiveCheck, 'saveGatheringCheckProgressive'],
+  ];
+
+  async function realStore() {
+    globalThis.foundry = { utils: { randomID: () => 'rid', deepClone: structuredClone } };
+    globalThis.game = {
+      user: { id: 'gm', isGM: true },
+      system: { id: 'generic' },
+      actors: [],
+      settings: { get: () => undefined, set: async () => {} },
+    };
+    globalThis.ui = { notifications: { info() {}, warn() {}, error() {} } };
+    const manager = new CraftingSystemManager({ getRecipes: () => [], getRecipe: () => null });
+    manager.initialized = true;
+    manager.save = async () => {};
+    const off = { rollFormula: '1d20', offerSituationalBonus: false };
+    manager.systems.set(
+      'sys1',
+      manager._normalizeSystem({
+        id: 'sys1',
+        name: 'Offer',
+        resolutionMode: 'simple',
+        craftingCheck: { simple: off, routed: off, progressive: off },
+        salvageCraftingCheck: { simple: off, routed: off, progressive: off },
+        gatheringCraftingCheck: { routed: off, progressive: off },
+      })
+    );
+    const store = createAdminStore(
+      createServices(manager.getSystem('sys1'), [], [], { getCraftingSystemManager: () => manager })
+    );
+    await store.selectSystem('sys1');
+    return { manager, store };
+  }
+
+  for (const [activity, slot, clone, save] of SLOTS) {
+    it(`${activity}.${slot}: clone, unrelated edit, save and reseed keep it off`, async () => {
+      const { manager, store } = await realStore();
+      const draft = clone(manager.getSystem('sys1')[activity][slot]);
+      assert.equal(draft.offerSituationalBonus, false, 'the clone keeps it');
+      draft.rollFormula = '2d6';
+      await store[save](draft);
+      const saved = manager.getSystem('sys1')[activity][slot];
+      assert.equal(saved.rollFormula, '2d6', 'the unrelated edit landed');
+      assert.equal(saved.offerSituationalBonus, false, 'the save keeps it');
+      const reseeded = clone(saved);
+      assert.equal(reseeded.offerSituationalBonus, false, 'the reseed keeps it');
+      assert.equal(JSON.stringify(reseeded), JSON.stringify(draft), 'the saved draft is clean');
+    });
+  }
 });

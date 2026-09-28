@@ -9,9 +9,11 @@ import {
   checkRefusalMessage,
   isValidTargetAdjustment,
   multiplyTierThreshold,
+  resolveActivityTarget,
   resolveCheckTarget,
   selectTargetAdjustment,
 } from '../src/systems/checkTarget.js';
+import { foldTargetTerms } from '../src/ui/presenters/checkDisplay.js';
 
 function attribute(expression, adjustmentKind = 'add', baseAdjustment = null) {
   return {
@@ -137,6 +139,27 @@ test('QE14 boundaries: a roll of 28 misses Hard at 55×½ and meets Regular; exc
   assert.equal(compareToTarget(27, hard, 'meet', 'under'), true);
   assert.equal(compareToTarget(27, hard, 'exceed', 'under'), false);
   assert.equal(compareToTarget(26, hard, 'exceed', 'under'), true);
+});
+
+test('an activity target reports terms that fold back to it, fractional values included (issue 2005)', () => {
+  const resolve = (adjustmentKind, override) =>
+    resolveActivityTarget(
+      { evaluation: attribute('@skills.craft.value', adjustmentKind) },
+      { anchor: 99, override, readRollData: () => ({ skills: { craft: { value: 12.5 } } }) }
+    );
+  for (const [kind, override, terms, target] of [
+    ['add', null, [{ kind: 'anchor', value: 12 }], 12],
+    ['add', 0.5, [{ kind: 'anchor', value: 12.5 }, { kind: 'adjustment', value: 0.5 }], 13],
+    ['multiply', 2, [{ kind: 'anchor', value: 12.5 }, { kind: 'multiplier', value: 2 }], 25],
+  ]) {
+    const resolved = resolve(kind, override);
+    assert.deepEqual([resolved.target, resolved.terms], [target, terms], `${kind} ${override}`);
+    assert.equal(foldTargetTerms(resolved.terms), resolved.target);
+  }
+  const fixed = resolveActivityTarget({ type: 'fixed' }, { anchor: 7, readRollData: () => ({}) });
+  assert.deepEqual(fixed.terms, [{ kind: 'anchor', value: 7 }]);
+  const plain = resolveAttribute('@skills.craft.value', { skills: { craft: { value: 12 } } });
+  assert.deepEqual(plain, { ok: true, target: 12, source: 'attribute' }, 'the resolver is unchanged');
 });
 
 test('adjustment validity: an addend is any finite number, a multiplier a finite number above zero', () => {

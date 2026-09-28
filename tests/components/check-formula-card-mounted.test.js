@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { formulaTokenIcon } from '../../src/ui/svelte/apps/manager/checks/checksCopy.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -25,8 +26,18 @@ const harness = createMountedComponentHarness({
     'src/config/gatheringCharacterModifierPresets.js',
     'src/utils/rollExpressionAverage.js',
     'src/utils/rollFormulaRollability.js',
+    // The direction axis and the roll-prompt group (issue 2005).
+    'src/systems/normalize/checkEvaluation.js',
+    'src/ui/svelte/apps/manager/checks/checksCopy.js',
   ],
-  compiledModules: ['src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte'],
+  compiledModules: [
+    'src/ui/svelte/components/Chip.svelte',
+    'src/ui/svelte/components/SegmentedControl.svelte',
+    'src/ui/svelte/components/StatusToggle.svelte',
+    'src/ui/svelte/components/ToggleCard.svelte',
+    'src/ui/svelte/apps/manager/checks/CheckPromptOptions.svelte',
+    'src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte',
+  ],
   componentPath: 'src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte',
 });
 
@@ -67,9 +78,11 @@ describe('the formula card states what a roll actually resolves to (issue 1096)'
       ['Dexterity', 'Intelligence'],
       'every applied modifier is a chip, in the order the resolver returned them'
     );
-    assert.equal(
-      resolved.querySelector('[data-check-formula-modifier="m-dex"] i').className,
-      'fas fa-feather',
+    assert.deepEqual(
+      [...resolved.querySelector('[data-check-formula-modifier="m-dex"] i').classList].filter(
+        (token) => token.startsWith('fa')
+      ),
+      ['fas', 'fa-feather'],
       "a chip carries its modifier's own glyph"
     );
   });
@@ -198,5 +211,142 @@ describe('a suggestion chip appends its term when CLICKED', () => {
     const chip = target.querySelector('[data-check-formula-token]');
     chip.click();
     assert.equal(emitted.at(-1).rollFormula, chip.dataset.checkFormulaToken);
+  });
+});
+
+describe('a suggestion chip carries its reference kind glyph (issue 2005, prototype)', () => {
+  it('draws the prototype kind glyph after the + verb, and none for a kind it has no glyph for', async () => {
+    const target = await harness.mount({ rollFormula: '1d20', foundrySystemId: 'dnd5e' });
+    const kinds = Object.fromEntries(
+      [...target.querySelectorAll('[data-check-formula-token]')].map((chip) => [
+        chip.dataset.checkFormulaToken,
+        [...(chip.querySelector('[data-check-formula-token-kind]')?.classList ?? [])]
+          .filter((token) => token.startsWith('fa'))
+          .join(' '),
+      ])
+    );
+    assert.deepEqual(kinds, {
+      '@abilities.int.mod': 'fas fa-hand',
+      '@abilities.wis.mod': 'fas fa-hand',
+      '@skills.sur.total': '',
+      2: '',
+      '1d4': 'fas fa-dice-d20',
+    });
+    const chip = target.querySelector('[data-check-formula-token="1d4"]');
+    assert.deepEqual(
+      [...chip.children].map((child) => child.tagName),
+      ['I', 'I', 'SPAN'],
+      'the + verb, then the kind glyph, then the term'
+    );
+  });
+
+  it('maps every prototype kind to its Font Awesome Free glyph', () => {
+    assert.deepEqual(
+      ['@prof', '@abilities.wis.mod', '@ingredients', '@level', '1d4', '@skills.sur.total', '2'].map(
+        formulaTokenIcon
+      ),
+      ['fas fa-medal', 'fas fa-hand', 'fas fa-flask', 'fas fa-arrow-up-9-1', 'fas fa-dice-d20', '', '']
+    );
+  });
+});
+
+describe('the formula card under a roll-under check (issue 2005, Q14)', () => {
+  const under = (target = {}) => ({
+    product: 'sum',
+    direction: 'under',
+    target: { source: 'fixed', expression: '', adjustmentKind: 'add', ...target },
+  });
+  const EVALUATIONS = [
+    under(),
+    under({ source: 'attribute', expression: '@skills.craft.value' }),
+    under({ source: 'attribute', expression: '@skills.craft.value', adjustmentKind: 'multiply' }),
+  ];
+
+  /** The inset's direct children in reading order, each as its visible text. */
+  const insetTerms = (target) =>
+    [...target.querySelector('.manager-checks-formula-expression').children].map((node) =>
+      node.textContent.trim()
+    );
+
+  it('joins the target and the modifier chips with + and joins nothing to the dice (Q14)', async () => {
+    for (const thresholdMode of ['meet', 'exceed']) {
+      harness.remount();
+      const cmp = thresholdMode === 'meet' ? 'at or under' : 'under';
+      const target = await harness.mount({
+        rollFormula: '1d100',
+        appliedModifiers: MODIFIERS,
+        evaluation: under(),
+        thresholdMode,
+        targetChip: 'Target 12',
+      });
+      assert.deepEqual(insetTerms(target), [
+        '1d100',
+        cmp,
+        'Target 12',
+        '+',
+        'Dexterity',
+        '+',
+        'Intelligence',
+      ]);
+      assert.match(
+        target.querySelector('[data-check-direction-note]').textContent,
+        new RegExp(`stay ${cmp} the target`)
+      );
+    }
+  });
+
+  it('with no target, lists the modifiers without joining the first to the dice', async () => {
+    const target = await harness.mount({
+      rollFormula: '1d100',
+      appliedModifiers: MODIFIERS,
+      evaluation: under(),
+    });
+    assert.deepEqual(insetTerms(target), ['1d100', 'Dexterity', '+', 'Intelligence']);
+    assert.ok(!target.querySelector('[data-check-formula-target]'));
+  });
+
+  it('omits the under note where the runtime refuses a roll-under check', async () => {
+    const target = await harness.mount({ rollFormula: '1d20', evaluation: under(), underNote: false });
+    assert.ok(!target.querySelector('[data-check-direction-note]'));
+    assert.ok(target.querySelector('[data-check-direction]'), 'the axis stays so the GM can switch back');
+  });
+
+  it('names the roll-prompt options as a group and draws the offer without a glyph', async () => {
+    const target = await harness.mount({ rollFormula: '1d20', evaluation: under() });
+    const group = target.querySelector('[data-check-prompt-options]');
+    assert.equal(group.getAttribute('role'), 'group');
+    const title = target.querySelector(`[id="${group.getAttribute('aria-labelledby')}"]`);
+    assert.equal(title?.textContent.trim(), 'In the roll prompt');
+    assert.ok(!group.querySelector('.manager-recipe-status-icon'), 'the offer row has no icon');
+  });
+
+  it('keeps the withheld average under every direction, source and kind', async () => {
+    for (const evaluation of EVALUATIONS) {
+      harness.remount();
+      const target = await harness.mount({
+        rollFormula: '2d6cs>=5',
+        evaluation,
+        targetChip: evaluation.target.expression || 'Target 12',
+      });
+      assert.ok(
+        target.querySelector('[data-check-formula-average-withheld="die-modifiers"]'),
+        `${evaluation.target.source}/${evaluation.target.adjustmentKind}: avg — stays`
+      );
+    }
+  });
+
+  it('writes the direction through its segmented control and leaves the rest of the record', async () => {
+    const emitted = [];
+    const target = await harness.mount({
+      rollFormula: '1d20',
+      evaluation: under({ source: 'attribute', expression: '@a.b', adjustmentKind: 'multiply' }),
+      onChange: (patch) => emitted.push(patch),
+    });
+    const radio = target.querySelector('[data-check-direction-option="over"] input[type="radio"]');
+    radio.checked = true;
+    radio.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+    assert.equal(emitted.at(-1).evaluation.direction, 'over');
+    assert.equal(emitted.at(-1).evaluation.target.expression, '@a.b');
+    assert.equal(emitted.at(-1).evaluation.target.adjustmentKind, 'multiply');
   });
 });

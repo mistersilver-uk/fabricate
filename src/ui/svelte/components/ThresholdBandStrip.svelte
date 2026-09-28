@@ -331,7 +331,7 @@
     align-items: center;
     justify-content: center;
     min-width: 0;
-    padding: 0 var(--fab-space-2);
+    padding: 0 var(--fab-space-chip);
     overflow: hidden;
     background: var(--fab-band-strip-fill, var(--fab-surface-soft));
   }
@@ -341,15 +341,15 @@
   }
 
   .fab-band-strip-band + .fab-band-strip-band {
-    border-left: 1px solid var(--fab-border);
+    border-left: 1px solid var(--fab-bg-0);
   }
 
   .fab-band-strip-band-name {
     max-width: 100%;
     overflow: hidden;
     color: var(--fab-band-strip-ink, var(--fab-text));
-    font-size: 0.72rem;
-    font-weight: 600;
+    font-size: 10px;
+    font-weight: 700;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -403,9 +403,10 @@
   .fab-band-strip-tick {
     position: absolute;
     transform: translateX(-50%);
-    color: var(--fab-text-muted);
+    color: var(--fab-text-subtle);
     font-family: var(--fab-font-mono);
     font-size: 0.66rem;
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
   }
 

@@ -75,6 +75,7 @@ describe('cloneRoutedCheck', () => {
       fixedOutcomes: [],
       checkBreakage: EMPTY_BREAKAGE,
       evaluation: DEFAULT_EVALUATION,
+      offerSituationalBonus: true,
     });
   });
 
@@ -118,6 +119,7 @@ describe('cloneSimpleCheck', () => {
       macroUuid: null,
       checkBreakage: EMPTY_BREAKAGE,
       evaluation: DEFAULT_EVALUATION,
+      offerSituationalBonus: true,
     });
   });
 
@@ -141,6 +143,7 @@ describe('cloneProgressiveCheck', () => {
       rollFormula: '',
       checkBreakage: EMPTY_BREAKAGE,
       evaluation: DEFAULT_EVALUATION,
+      offerSituationalBonus: true,
     });
     assert.ok(!Object.hasOwn(draft, 'preview'), 'an absent sandbox stays absent');
   });
@@ -232,6 +235,26 @@ describe('count data through update, save and reseed (issue 2004)', () => {
     normalized.successesOverride = 5;
     assert.equal(source.successesOverride, 2);
   });
+});
+
+describe('the situational-bonus offer (issue 2005)', () => {
+  for (const [name, clone] of [
+    ['cloneRoutedCheck', cloneRoutedCheck],
+    ['cloneSimpleCheck', cloneSimpleCheck],
+    ['cloneProgressiveCheck', cloneProgressiveCheck],
+  ]) {
+    it(`${name} keeps an authored false and reads anything else as offered`, () => {
+      assert.equal(clone({ offerSituationalBonus: false }).offerSituationalBonus, false);
+      for (const offer of [undefined, null, true, 'false']) {
+        assert.equal(clone({ offerSituationalBonus: offer }).offerSituationalBonus, true);
+      }
+    });
+
+    it(`${name} rebaselines a saved false offer as clean`, () => {
+      const saved = clone({ rollFormula: '1d20', offerSituationalBonus: false });
+      assert.equal(JSON.stringify(clone(saved)), JSON.stringify(saved));
+    });
+  }
 });
 
 describe('readCheckActive', () => {

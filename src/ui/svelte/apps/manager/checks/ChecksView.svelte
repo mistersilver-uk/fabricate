@@ -41,6 +41,8 @@
     resolveActiveCraftingCheckFormula,
     resolveActiveGatheringCheckFormula,
     resolveActiveSalvageCheckFormula,
+    makeRollDataExpressionResolver,
+    resolveCheckModifierContribution,
     resolveEligibleModifierIds,
     resolveModifierPolicy,
   } from '../../../../../systems/checkModifierResolver.js';
@@ -49,6 +51,7 @@
     NO_ACTOR_ID,
     buildPreviewCheckArgs,
     buildPreviewRecords,
+    cloneRollData,
     listPreviewActors,
     resolvePreviewActor,
     runCheckPreview,
@@ -65,6 +68,8 @@
     formatPreviewDifficulties,
     parsePreviewDifficulties,
   } from '../../../../../systems/progressiveCheckSandbox.js';
+  import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
+  import { formatCheckAdjustment } from './checkAdjustmentLabel.js';
 
   // `resolutionMode` picks the crafting editor; the three `craftingCheck*` props are its drafts.
   let {
@@ -452,6 +457,13 @@
   const activeActivity = $derived(validationSections.find((row) => row.subsystem === activity));
   const activeCheck = $derived(activeActivity?.check || null);
   const activeMode = $derived(activeActivity?.mode || '');
+  // The evaluation the active editor stack authors, stated on the stack for its captures.
+  const activeEvaluation = $derived(normalizeCheckEvaluation(activeCheck?.evaluation));
+  const evaluationAttrs = $derived({
+    'data-checks-evaluation-direction': activeEvaluation.direction,
+    'data-checks-target-source': activeEvaluation.target.source,
+    'data-checks-adjustment-kind': activeEvaluation.target.adjustmentKind,
+  });
 
   const activeReadiness = $derived(
     activeActivity
@@ -808,6 +820,10 @@
 
   const previewActors = $derived(activity === 'validation' ? [] : listPreviewActors());
   const previewActor = $derived(resolvePreviewActor(previewActorId));
+  // The Preview-as actor as the editors' character-value fields and strips read it: a copy.
+  const previewCharacter = $derived(
+    previewActor ? { name: previewActor.name, rollData: cloneRollData(previewActor) } : null
+  );
 
   // THE PROGRESSIVE PREVIEW SANDBOX: a progressive histogram needs an ORDERED list of result
   // difficulties, and that list is SANDBOX STATE ON THE CHECK rather than a record's. Read
@@ -842,11 +858,32 @@
       defaultLabel: text('FABRICATE.Admin.Manager.Checks.PreviewAs.DefaultRecord', 'Default'),
     }).map((record) => ({
       ...record,
-      label: [record.name, recordsCarryDc ? `${dcWord} ${record.dc}` : '']
-        .filter(Boolean)
-        .join(' · '),
+      label: [record.name, recordsCarryDc ? recordReading(record) : ''].filter(Boolean).join(' · '),
     }))
   );
+
+  // What a record grades against, in the evaluation's own terms: its adjustment under a character
+  // value, `target n` under a fixed roll-under, and `DC n` otherwise.
+  function recordReading(record) {
+    const evaluation = normalizeCheckEvaluation(activeCheck?.evaluation);
+    if (evaluation.target.source === 'attribute') {
+      const tier = (activeCheck?.tiers ?? []).find((entry) => String(entry?.id) === record.id);
+      if (!tier) {
+        return text(
+          'FABRICATE.Admin.Manager.Checks.Evaluation.RecordBaseAdjustment',
+          'base adjustment'
+        );
+      }
+      return formatCheckAdjustment(evaluation.target.adjustmentKind, tier.adjustment) || '—';
+    }
+    if (evaluation.direction === 'under') {
+      return text('FABRICATE.Admin.Manager.Checks.Evaluation.RecordTarget', 'target {dc}').replace(
+        '{dc}',
+        String(record.dc)
+      );
+    }
+    return `${dcWord} ${record.dc}`;
+  }
   const previewRecord = $derived(
     previewRecords.find((record) => record.id === previewRecordId) ?? previewRecords[0] ?? null
   );
@@ -866,6 +903,15 @@
   // THE SAME CONTEXT THE RUNNER IS HANDED: it appends the scalar, so a histogram computed
   // without this describes a formula nothing rolls.
   const previewModifier = $derived(previewPlan.args?.craftingModifier ?? null);
+  // The previewed actor's flat check-modifier total, which a roll-under strip adds to its target.
+  const previewModifierTotal = $derived.by(() => {
+    if (!previewActor || !previewModifier) return 0;
+    const { scalar } = resolveCheckModifierContribution(
+      previewModifier,
+      makeRollDataExpressionResolver(previewActor)
+    );
+    return Number.isFinite(scalar) ? scalar : 0;
+  });
 
   const enumeration = $derived(
     previewFormula === ''
@@ -1108,6 +1154,8 @@
       previewActorId,
       previewRecord?.id ?? '',
       previewPlan.dc,
+      JSON.stringify(activeEvaluation),
+      JSON.stringify(activeCheck?.tiers?.find((tier) => tier.id === previewRecord?.id) ?? null),
     ].join('\0')
   );
   let adoptedPreviewSignature = $state('');
@@ -1143,6 +1191,10 @@
     previewRecordId: previewRecord?.id ?? '',
     previewDcOverride: previewRecord?.dc ?? null,
     previewLabel: previewRecord?.name ?? '',
+    previewCharacter,
+    previewModifierTotal,
+    trackMin: previewTrack.min,
+    trackMax: previewTrack.max,
     onSelectPreviewRecord: selectPreviewRecord,
   });
   const simplePreviewProps = $derived({
@@ -1151,6 +1203,8 @@
     previewLabel: previewRecord?.name ?? '',
     trackMin: previewTrack.min,
     trackMax: previewTrack.max,
+    previewCharacter,
+    previewModifierTotal,
     onSelectPreviewRecord: selectPreviewRecord,
   });
   const previewActorSummary = $derived(
@@ -1409,7 +1463,7 @@
           </EmptyState>
         </div>
       {:else if activity === 'crafting' && craftingAlchemy}
-        <div class="manager-checks-editor-stack" data-checks-panel="crafting">
+        <div class="manager-checks-editor-stack" data-checks-panel="crafting" {...evaluationAttrs}>
           {#if activeSection === 'roll'}
             <InspectorCard>
               <h3 class="manager-checks-card-title">
@@ -1525,6 +1579,7 @@
               {appliedModifiers}
               modifierPolicy={appliedModifierPolicy}
               {recordNoun}
+              {recordNounPlural}
               value={craftingCheck}
               {resolutionMode}
               section={activeSection}
@@ -1555,12 +1610,13 @@
         <!-- Non-alchemy crafting: the per-mode editor plus the system-level failure consumption
                      policy. The wrapper keeps `data-checks-panel="crafting"` but deliberately NOT the
                      `manager-checks-page` class, which a test asserts is absent here. -->
-        <div class="manager-checks-editor-stack" data-checks-panel="crafting">
+        <div class="manager-checks-editor-stack" data-checks-panel="crafting" {...evaluationAttrs}>
           {#if craftingRouted}
             <CraftingCheckEditor
               {appliedModifiers}
               modifierPolicy={appliedModifierPolicy}
               {recordNoun}
+              {recordNounPlural}
               value={craftingCheck}
               {resolutionMode}
               section={activeSection}
@@ -1659,12 +1715,13 @@
           {/if}
         </div>
       {:else if activity === 'salvage'}
-        <div class="manager-checks-editor-stack" data-checks-panel="salvage">
+        <div class="manager-checks-editor-stack" data-checks-panel="salvage" {...evaluationAttrs}>
           {#if salvageRouted}
             <CraftingCheckEditor
               {appliedModifiers}
               modifierPolicy={appliedModifierPolicy}
               {recordNoun}
+              {recordNounPlural}
               value={salvageCheckRouted}
               showTiers={false}
               section={activeSection}
@@ -1790,7 +1847,7 @@
           {/if}
         </div>
       {:else if activity === 'gathering'}
-        <div class="manager-checks-editor-stack" data-checks-panel="gathering">
+        <div class="manager-checks-editor-stack" data-checks-panel="gathering" {...evaluationAttrs}>
           {#if gatheringProgressive}
             <ProgressiveCraftingCheckEditor
               {recordNoun}
@@ -1807,6 +1864,7 @@
               {appliedModifiers}
               modifierPolicy={appliedModifierPolicy}
               {recordNoun}
+              {recordNounPlural}
               value={gatheringCheckRouted}
               showTiers={false}
               section={activeSection}

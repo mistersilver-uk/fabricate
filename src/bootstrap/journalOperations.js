@@ -48,6 +48,7 @@ export function promptJournalStageCheck(descriptor, prompt = promptCheckRoll) {
     thresholdMode: descriptor?.comparison === 'exceed' ? 'exceed' : null,
     selectedModifiers: descriptor?.selectedModifiers,
     allowAdvantage: descriptor?.allowAdvantage === true,
+    offerSituationalBonus: descriptor?.offerSituationalBonus !== false,
     modifierChoice: descriptor?.modifierChoice ?? null,
     ...(descriptor?.product === 'count' && {
       product: 'count',
@@ -296,6 +297,7 @@ function buildCheckOperations(fabricate, authorizeRollHandoff) {
         publicPrompt: {
           allowsSituationalModifier: descriptor.publicPrompt?.allowsSituationalModifier === true,
           allowAdvantage: descriptor.publicPrompt?.allowAdvantage === true,
+          offerSituationalBonus: descriptor.publicPrompt?.offerSituationalBonus !== false,
           ...countPromptWording(descriptor.publicPrompt),
         },
       };

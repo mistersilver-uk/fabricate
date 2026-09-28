@@ -9,13 +9,22 @@
 
   The row renders through `SortableList` (issue 1512), which draws the numbered badge, the rocker,
   the delete and the polite announcement; the library's section 16 carries the ruling.
+
+  Under a character value (issue 2005) a tier names its difficulty ADJUSTMENT instead of a DC; a
+  tier without one reads `—` and says so, and its kept DC is left untouched.
 -->
 <script>
+  import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
   import { localize } from '../../../util/foundryBridge.js';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import SortableList from '../../../components/SortableList.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
+  import {
+    MULTIPLIER_STOPS,
+    formatCheckAdjustment,
+    parseCheckAdjustment,
+  } from './checkAdjustmentLabel.js';
 
   let {
     tiers = [],
@@ -23,8 +32,15 @@
     // Whether a tier's DC anchors the OUTCOME BANDS or simply replaces the base DC. One card,
     // two true sentences; one sentence would be wrong on one of the two screens.
     anchorsBands = false,
+    evaluation = null,
     onChange = () => {},
   } = $props();
+
+  const normalized = $derived(normalizeCheckEvaluation(evaluation));
+  const attribute = $derived(normalized.target.source === 'attribute');
+  const kind = $derived(normalized.target.adjustmentKind);
+  const formatAdjustment = (value) => formatCheckAdjustment(kind, value);
+  const parseAdjustment = (value) => parseCheckAdjustment(kind, value);
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -40,7 +56,13 @@
 
   // Named once: the row's micro label, the stepper's accessible name and the shared adjunct
   // strings' `{label}` slot all read it.
-  const dcLabel = $derived(text('FABRICATE.Admin.Manager.Checks.Crafting.TierDc', 'DC'));
+  const dcLabel = $derived.by(() => {
+    if (attribute)
+      return text('FABRICATE.Admin.Manager.Checks.Evaluation.Adjustment', 'Adjustment');
+    return normalized.direction === 'under'
+      ? text('FABRICATE.Admin.Manager.Checks.Evaluation.Target', 'Target')
+      : text('FABRICATE.Admin.Manager.Checks.Crafting.TierDc', 'DC');
+  });
 
   // Named once: the card's heading and the list's own `aria-label` are the same sentence.
   const tiersTitle = $derived(
@@ -73,6 +95,27 @@
     onChange(next);
   }
 
+  const tiersLead = $derived.by(() => {
+    if (attribute) {
+      return text(
+        'FABRICATE.Admin.Manager.Checks.Evaluation.TiersLeadAttribute',
+        'A recipe picks one of these; it adjusts the character value before the roll.'
+      );
+    }
+    return anchorsBands
+      ? text(
+          'FABRICATE.Admin.Manager.Checks.Crafting.TiersLeadBands',
+          'A recipe picks one of these; its DC anchors the outcome bands on the Outcomes section.'
+        )
+      : text(
+          'FABRICATE.Admin.Manager.Checks.Crafting.TiersLead',
+          'A recipe picks one of these; its DC replaces the base DC above.'
+        );
+  });
+
+  const uid = $props.id();
+  const missingId = (tier) => `${uid}-tier-adjustment-missing-${tier.id}`;
+
   function tierName(tier) {
     return tier.name || text('FABRICATE.Admin.Manager.Checks.Crafting.UnnamedTier', 'Unnamed tier');
   }
@@ -86,15 +129,7 @@
       {tiersTitle}
     </h3>
     <p class="manager-checks-card-description">
-      {anchorsBands
-        ? text(
-            'FABRICATE.Admin.Manager.Checks.Crafting.TiersLeadBands',
-            'A recipe picks one of these; its DC anchors the outcome bands on the Outcomes section.'
-          )
-        : text(
-            'FABRICATE.Admin.Manager.Checks.Crafting.TiersLead',
-            'A recipe picks one of these; its DC replaces the base DC above.'
-          )}
+      {tiersLead}
     </p>
   </div>
 </div>
@@ -119,7 +154,8 @@
       removable
       onReorder={(from, to) => moveTier(from, to)}
       onRemove={(tier) => removeTier(tier.id)}
-      rowClass={() => 'manager-checks-tier-row'}
+      rowClass={(tier) =>
+        `manager-checks-tier-row${attribute && tier.adjustment == null ? ' is-invalid' : ''}`}
       rowData={(tier) => ({ 'data-tier-row': tier.id })}
       removeData={() => ({
         'data-remove-tier': '',
@@ -134,6 +170,16 @@
           value={tier.name || ''}
           oninput={(event) => updateTier(tier.id, { name: event.currentTarget.value })}
         />
+        <!-- A missing adjustment is named before the unit and describes the stepper it belongs to. -->
+        {#if attribute && tier.adjustment == null}
+          <span
+            class="manager-checks-tier-missing"
+            id={missingId(tier)}
+            data-tier-adjustment-missing
+          >
+            {text('FABRICATE.Admin.Manager.Checks.Evaluation.SetAdjustment', 'Set an adjustment')}
+          </span>
+        {/if}
         <!-- The number is labelled in the row rather than in a column header, so the row stays
              self-describing with no header row above it. `aria-hidden`, because the stepper already
              carries the same word as its own accessible name. -->
@@ -142,16 +188,38 @@
              as a narrower inline island. No `allowUnset`: a tier's DC has no absent state, 0 being a
              real DC, and the `data-*` hook rides `inputProps` onto the real `<input>`. `min={0}`
              because -1 is not a DC, and without the clamp one click of the `−` adjunct commits one. -->
-        <div class="manager-checks-tier-stepper is-narrow">
-          <Stepper
-            fill
-            min={0}
-            value={tier.dc ?? 0}
-            {...stepperLabels(dcLabel)}
-            inputProps={{ 'data-tier-dc': '' }}
-            onChange={(dc) => updateTier(tier.id, { dc })}
-          />
-        </div>
+        {#if attribute}
+          <div class="manager-checks-tier-stepper is-recipe">
+            {#key kind}
+              <Stepper
+                fill
+                allowUnset
+                value={tier.adjustment ?? null}
+                placeholder="—"
+                formatValue={formatAdjustment}
+                parseValue={parseAdjustment}
+                stops={kind === 'multiply' ? MULTIPLIER_STOPS : []}
+                {...stepperLabels(dcLabel)}
+                inputProps={{
+                  'data-tier-adjustment': '',
+                  'aria-describedby': tier.adjustment == null ? missingId(tier) : undefined,
+                }}
+                onChange={(adjustment) => updateTier(tier.id, { adjustment })}
+              />
+            {/key}
+          </div>
+        {:else}
+          <div class="manager-checks-tier-stepper is-recipe">
+            <Stepper
+              fill
+              min={0}
+              value={tier.dc ?? 0}
+              {...stepperLabels(dcLabel)}
+              inputProps={{ 'data-tier-dc': '' }}
+              onChange={(dc) => updateTier(tier.id, { dc })}
+            />
+          </div>
+        {/if}
       {/snippet}
       {#snippet footer()}
         <li class="manager-checks-tier-add">{@render addTierButton()}</li>
@@ -166,3 +234,17 @@
     <span>{text('FABRICATE.Admin.Manager.Checks.Crafting.AddTier', 'Add difficulty tier')}</span>
   </ManagerButton>
 {/snippet}
+
+<style>
+  /* The prototype's recipe tier stepper width, on the row's 28px rung. */
+  .manager-checks-tier-stepper.is-recipe {
+    width: 90px;
+  }
+
+  .manager-checks-tier-missing {
+    flex: 0 0 auto;
+    color: var(--fab-danger-text);
+    font-size: 10px;
+    font-weight: 600;
+  }
+</style>

@@ -1,3 +1,5 @@
+import { executedCheckDisplay } from '../ui/presenters/checkDisplay.js';
+
 /** The check-result fields a crafting result card states, and the key a versioned execution
  * re-enters `craft()` under: identity-typed, so re-declaring it elsewhere reads as `undefined`. */
 export const VERSIONED_EXECUTION_CONTEXT = Symbol('fabricate.versionedCraftingExecution');
@@ -14,4 +16,12 @@ export function rollTotalForCard(checkResult) {
  * `runFormulaRouted` emits `data.tierStepApplied` only on an actual tier change (issue 975). */
 export function tierStepForCard(checkResult) {
   return checkResult?.data?.tierStepApplied ?? null;
+}
+
+/** The executed check projection a result card gates its evidence rows on, with the executed
+ * visibility handed over unpersisted; null when no check ran (issue 2005). */
+export function checkDisplayForCard(checkResult) {
+  return checkResult?.data && typeof checkResult.data === 'object'
+    ? executedCheckDisplay(checkResult)
+    : null;
 }

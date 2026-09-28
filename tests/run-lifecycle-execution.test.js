@@ -7,6 +7,7 @@ import {
 } from '../src/systems/CraftingLifecycleExecutor.js';
 import { CraftingFizzleExecutor } from '../src/systems/CraftingFizzleExecutor.js';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
+import { GatheringEngine } from '../src/systems/GatheringEngine.js';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
 import { craftingStepHistoryEvidence } from '../src/systems/CraftingRunManager.js';
 import { historyEvidenceFields } from '../src/systems/runHistoryEvidence.js';
@@ -25,6 +26,7 @@ import { installCountDice } from './helpers/countEngineDice.js';
 import { countEvaluation } from './helpers/countFixtures.js';
 import { stubPromptSurface } from './helpers/rollPromptDialogStub.js';
 import { createPersistedCraftingHistory, mergeHistoryFlag } from './helpers/journal-fixtures.js';
+import { gatheringFixture } from './helpers/real-gathering-attempt.js';
 
 test('both history allowlists retain only executed check evaluation metadata', () => {
   const executed = {
@@ -1995,6 +1997,7 @@ test('CraftingEngine check preflight is read-only and a missing trusted result w
       selectedModifiers: [],
       mode: 'simple',
       allowsSituationalModifier: true,
+      offerSituationalBonus: true,
       allowAdvantage: true,
       modifierChoice: null,
     });
@@ -2076,6 +2079,73 @@ test('CraftingEngine check preflight is read-only and a missing trusted result w
   // The start committed its own journal; the refused execute neither planned nor changed one.
   assert.equal(unchanged.executionJournal.status, 'committed');
   assert.equal(unchanged.executionJournal.intent.trigger, 'start');
+});
+
+/** A prepared check's decision as the Journal command binds it: the bonus rides the authority
+ * gate the public prompt published, never the display offer. */
+function boundDecision(publicPrompt, bonus) {
+  return { bonus, allowsSituationalModifier: publicPrompt.allowsSituationalModifier === true };
+}
+
+test('a prepared offer-false check still applies a decision bonus of 2 (issue 2005)', async () => {
+  const rolled = [];
+  const originalRoll = globalThis.Roll;
+  globalThis.Roll = class OfferRoll {
+    constructor(formula) {
+      this.formula = formula;
+      this.total = formula.endsWith('+ (2)') ? 12 : 10;
+      this.dice = [];
+    }
+    static validate() { return true; }
+    async evaluate() {
+      rolled.push(this.formula);
+      return this;
+    }
+    toJSON() { return { formula: this.formula, total: this.total, terms: [] }; }
+  };
+  try {
+    const { engine, recipe } = setupEngineFixture();
+    const actor = new FakeActor('offer-off');
+    const source = new FakeActor('offer-source');
+    const system = {
+      resolutionMode: 'simple',
+      features: { craftingChecks: true },
+      craftingCheck: { simple: { rollFormula: '1d20', dc: 12, offerSituationalBonus: false } },
+    };
+    game.fabricate.getCraftingSystemManager = () => ({ getSystem: () => system });
+    const started = await startReadyVersionedRun({ engine, recipe, actor, source });
+    game.time.worldTime = 1120;
+    const crafting = await engine.describeVersionedStageCheck({
+      actor, componentSourceActors: [source], runId: started.runId,
+      preparationGrant: 'prepare-grant',
+    });
+    assert.equal(crafting.publicPrompt.offerSituationalBonus, false, 'the prompt hides the field');
+    assert.equal(crafting.publicPrompt.allowsSituationalModifier, true, 'the gate stays open');
+    const crafted = await evaluatePreparedRunCheck(
+      JSON.parse(JSON.stringify(crafting.privateEvaluation)), actor,
+      boundDecision(crafting.publicPrompt, '2')
+    );
+    assert.equal(rolled.at(-1), '1d20 + (2)', 'the bonus still reaches the roll');
+    assert.equal(crafted.success, true, '10 + 2 meets 12');
+
+    const gathering = gatheringFixture({ mode: 'routed' });
+    gathering.system.gatheringCraftingCheck.routed.offerSituationalBonus = false;
+    const described = new GatheringEngine({ localize: (key) => key })._versionedCheckDescriptor({
+      actor: { uuid: 'Actor.g', system: {} },
+      run: { taskId: gathering.task.id },
+      ...gathering,
+    });
+    assert.equal(described.publicPrompt.offerSituationalBonus, false);
+    assert.equal(described.publicPrompt.allowsSituationalModifier, true);
+    await evaluatePreparedRunCheck(
+      JSON.parse(JSON.stringify(described.privateEvaluation)), actor,
+      boundDecision(described.publicPrompt, '2')
+    );
+    assert.equal(rolled.at(-1), '1d20 + (2)');
+  } finally {
+    if (originalRoll === undefined) delete globalThis.Roll;
+    else globalThis.Roll = originalRoll;
+  }
 });
 
 /** Starts a ready versioned run whose one Tool is supplied by a second actor's item. */
