@@ -7,11 +7,12 @@ import {
   ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB,
   GATHERING_ROUTE_MODEL_PATTERN,
 } from './caseConstants.js';
-import { chooseSelectOption, managerCase } from './caseFactories.js';
+import { chooseSelectOption, managerCase, previewAsActor } from './caseFactories.js';
 
 /**
  * The gathering task check override (issue 2005, R3), one per state of the approved prototype's
- * frames 23 and 24, on Smithing's Prospect task under `checkOverride`.
+ * frames 23 and 24, on Smithing's Prospect task under `checkOverride`. `sees` is the Player sees
+ * state; a `resolved` case chooses a character in the task's own Preview-as picker.
  */
 const OPEN_PROSPECT_TASK = Object.freeze([
   { selector: '#manager-gathering-nav-tasks' },
@@ -20,22 +21,31 @@ const OPEN_PROSPECT_TASK = Object.freeze([
       '[data-gathering-task-id="sm-task-prospect"] .manager-icon-button[aria-label^="Edit"]',
   },
 ]);
-const taskOverrideCase = (state, label, field, frame) =>
+const TASK_PREVIEW = '[data-gathering-task-dc] [data-override-preview-actor]';
+const taskOverrideCase = ({ id, label, field, frame, sees }) =>
   managerCase({
-    id: `manager-gathering-task-editor-check-${state}`,
+    id,
     label: `Manager — Gathering task check override, ${label} (prototype state ${frame})`,
     reaches: 'beyond',
     smokeLabels: [],
-    query: { system: 'lab-smithing', checkOverride: state },
+    query: {
+      system: 'lab-smithing',
+      checkOverride: id.slice('manager-gathering-task-editor-check-'.length),
+    },
     steps: [
       'Gathering',
       ...OPEN_PROSPECT_TASK,
       { selector: '[data-gathering-task-dc]', scroll: true },
+      ...(sees === 'resolved' ? previewAsActor('lab-actor-idrin', TASK_PREVIEW) : []),
     ],
     expectView: 'gathering-task-edit',
-    expectSelector: `.fabricate-manager [data-gathering-task-dc][data-gathering-task-override-field="${field}"]`,
+    expectSelector: `.fabricate-manager [data-gathering-task-dc][data-gathering-task-override-field="${field}"] [data-override-player-sees="${sees}"]`,
     kinds: ['manager', 'environments'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/component\/(OverridePlayerSees\.svelte|overridePlayerSees\.js)$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/PreviewAsPicker\.svelte$/,
+    ],
   });
 
 export const CASES = Object.freeze([
@@ -734,8 +744,39 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
     ],
   }),
-  taskOverrideCase('fixed-under', 'lower is better, fixed target', 'dcOverride', 23),
-  taskOverrideCase('add', 'character value, added adjustment', 'adjustmentOverride', 24),
-  taskOverrideCase('multiply', 'character value, multiplied adjustment', 'adjustmentOverride', 24),
-  taskOverrideCase('default', 'character value, system default', 'adjustmentOverride', 24),
+  taskOverrideCase({
+    id: 'manager-gathering-task-editor-check-fixed-over',
+    label: 'higher is better, fixed DC',
+    field: 'dcOverride',
+    frame: 23,
+    sees: 'fixed',
+  }),
+  taskOverrideCase({
+    id: 'manager-gathering-task-editor-check-fixed-under',
+    label: 'lower is better, fixed target',
+    field: 'dcOverride',
+    frame: 23,
+    sees: 'fixed',
+  }),
+  taskOverrideCase({
+    id: 'manager-gathering-task-editor-check-add',
+    label: 'character value, added adjustment, a character chosen',
+    field: 'adjustmentOverride',
+    frame: 24,
+    sees: 'resolved',
+  }),
+  taskOverrideCase({
+    id: 'manager-gathering-task-editor-check-multiply',
+    label: 'character value, multiplied adjustment, a character chosen',
+    field: 'adjustmentOverride',
+    frame: 24,
+    sees: 'resolved',
+  }),
+  taskOverrideCase({
+    id: 'manager-gathering-task-editor-check-default',
+    label: 'character value, system default, no character chosen',
+    field: 'adjustmentOverride',
+    frame: 24,
+    sees: 'no-character',
+  }),
 ]);

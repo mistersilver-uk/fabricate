@@ -65,6 +65,13 @@ function seedGatheringTaskMode(content, mode) {
  * Prospect task carry the overrides each state shows, with the other field kept dormant.
  */
 const CHECK_OVERRIDE_STATES = Object.freeze({
+  'fixed-over': {
+    direction: 'over',
+    source: 'fixed',
+    kind: 'add',
+    salvage: [15, null],
+    task: [12, null],
+  },
   'fixed-under': { source: 'fixed', kind: 'add', salvage: [15, null], task: [12, null] },
   add: { source: 'attribute', kind: 'add', salvage: [15, -2], task: [15, 0] },
   multiply: { source: 'attribute', kind: 'multiply', salvage: [15, 0.5], task: [15, 0.5] },
@@ -77,7 +84,7 @@ function seedCheckOverride(content, state) {
   if (!spec) return;
   const evaluation = {
     product: 'sum',
-    direction: 'under',
+    direction: spec.direction ?? 'under',
     target: {
       source: spec.source,
       expression: '@skills.med.mod + 8',
