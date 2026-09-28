@@ -272,6 +272,7 @@
     font-size: 17px;
   }
   .formula-content {
+    flex: 1 1 auto;
     display: flex;
     flex-direction: column;
     align-items: flex-start;

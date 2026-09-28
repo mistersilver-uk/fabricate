@@ -32,6 +32,7 @@
 <style>
   .target-row {
     display: flex;
+    align-self: stretch;
     flex-wrap: wrap;
     align-items: center;
     gap: var(--fab-space-2);
