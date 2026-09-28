@@ -130,7 +130,7 @@ export function projectToolBehaviorFacts(
       ? format(
           'FABRICATE.Admin.Manager.Tools.Editor.PreviewBonusValue',
           { expression: bonusExpression },
-          'Adds {expression}'
+          'Adds {expression} to any check'
         )
       : text('FABRICATE.Admin.Manager.Tools.Editor.PreviewBonusDisabled', 'No check bonus');
 
@@ -212,12 +212,9 @@ export function projectToolBehaviorFacts(
       subtitle: tool?.bonus?.enabled
         ? text(
             'FABRICATE.Admin.Manager.Tools.Editor.PreviewBonus',
-            'Applies to any check this tool is used for, in the way that check applies bonuses.'
+            'Applied the way each check applies bonuses'
           )
-        : text(
-            'FABRICATE.Admin.Manager.Tools.Editor.PreviewNoBonus',
-            'Adds nothing to the crafting check'
-          ),
+        : text('FABRICATE.Admin.Manager.Tools.Editor.PreviewNoBonus', 'Adds nothing to any check'),
     },
   ];
 }

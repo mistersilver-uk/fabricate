@@ -520,10 +520,7 @@
         {/if}
       {:else}
         <p class="manager-tool-requirements-summary" data-tool-bonus-off>
-          {text(
-            'FABRICATE.Admin.Manager.Tools.Editor.PreviewNoBonus',
-            'Adds nothing to the crafting check'
-          )}
+          {text('FABRICATE.Admin.Manager.Tools.Editor.PreviewNoBonus', 'Adds nothing to any check')}
         </p>
       {/if}
       {#if sectionNotes.bonus}

@@ -216,9 +216,11 @@
     if (bonus?.enabled !== true || expression === '') {
       return text('FABRICATE.Admin.Manager.Tools.Editor.PreviewBonusDisabled', 'No check bonus');
     }
-    return format('FABRICATE.Admin.Manager.Tools.Editor.PreviewBonusValue', 'Adds {expression}', {
-      expression,
-    });
+    return format(
+      'FABRICATE.Admin.Manager.Tools.Editor.PreviewBonusValue',
+      'Adds {expression} to any check',
+      { expression }
+    );
   }
 
   const sectionTitles = $derived(
@@ -267,11 +269,11 @@
             selectedEntry.defaults?.bonus?.enabled === true
               ? text(
                   'FABRICATE.Admin.Manager.Tools.Editor.PreviewBonus',
-                  'Applies to any check this tool is used for, in the way that check applies bonuses.'
+                  'Applied the way each check applies bonuses'
                 )
               : text(
                   'FABRICATE.Admin.Manager.Tools.Editor.PreviewNoBonus',
-                  'Adds nothing to the crafting check'
+                  'Adds nothing to any check'
                 ),
         }
       : {}

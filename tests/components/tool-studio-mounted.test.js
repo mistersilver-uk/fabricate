@@ -1053,7 +1053,7 @@ describe('Tool Studio editor (mounted)', () => {
     );
     assert.match(
       root.querySelector('[data-tool-bonus-off]').textContent,
-      /Adds nothing to the crafting check/
+      /Adds nothing to any check/
     );
     // And no second card head: the body head is a subordinate ROW.
     assert.ok(!root.querySelector('[data-tool-requirements-tab] .manager-tool-editor-card-heading'));
@@ -2112,7 +2112,7 @@ describe('Tool Studio editor (mounted)', () => {
       root.querySelector('[data-tool-preview-prerequisites]').textContent,
       '1 prerequisite'
     );
-    assert.equal(root.querySelector('[data-tool-preview-bonus]').textContent, 'Adds @prof');
+    assert.equal(root.querySelector('[data-tool-preview-bonus]').textContent, 'Adds @prof to any check');
     // THE IDENTITY CARD CARRIES NEITHER OF THOSE ANSWERS ANY MORE (issue 1373). Its two chips
     // restated the first and fourth effective-rules rows one line below them, and the design
     // draws a thumbnail, a name and a scope sentence.
