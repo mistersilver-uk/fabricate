@@ -189,6 +189,12 @@ export function forcedFailureTier({
 /** The `tierStep.mode` values that move; `none` and anything unrecognised is inert. */
 const TIER_STEP_MODES = new Set(['target', 'up', 'down']);
 
+/** Whether a trigger can move a graded outcome: it forces success or failure, or its tier steps. */
+export function triggerMovesOutcome(trigger) {
+  const forces = trigger?.outcome === 'success' || trigger?.outcome === 'failure';
+  return forces || TIER_STEP_MODES.has(trigger?.tierStep?.mode);
+}
+
 /**
  * The frozen rolled-tier snapshot every step condition is evaluated against, once: a step asks
  * about the tier the dice landed on, never the stepped one, so steps cannot cycle. `value` stays
