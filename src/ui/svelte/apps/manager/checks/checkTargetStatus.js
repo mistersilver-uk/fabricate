@@ -7,7 +7,7 @@ import {
   PATH_TOKEN,
   resolveDeterministicExpression,
 } from '../../../../../systems/checkEvaluation.js';
-import { checkRefusalMessage } from '../../../../../systems/checkTarget.js';
+import { refusalMessage } from '../../../../../systems/checkTarget.js';
 
 import { interpolate } from './checksCopy.js';
 
@@ -37,10 +37,14 @@ export function readsCharacter(source) {
   return (String(source ?? '').match(PATH_TOKEN) ?? []).length > 0;
 }
 
-/** The runtime's refusal sentence for `reason`, localized through the Studio's `text`. */
-export function targetRefusalSentence(reason, text) {
+/**
+ * The runtime's refusal sentence, localized through the Studio's `text`: `refusal` is a target
+ * reason, or a count refusal `{ reason, refusedInput, path }` whose sentence names its input.
+ */
+export function targetRefusalSentence(refusal, text) {
   const subject = text('FABRICATE.Admin.Manager.Checks.Evaluation.RefusalSubject', 'This');
-  return checkRefusalMessage(reason, subject, (key, data) => {
+  const refused = typeof refusal === 'string' ? { reason: refusal } : refusal;
+  return refusalMessage(refused, subject, (key, data) => {
     const sentence = text(key, key);
     return sentence === key ? key : interpolate(sentence, data);
   });

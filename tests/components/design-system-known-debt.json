@@ -387,7 +387,6 @@
     "src/ui/svelte/apps/manager/ManagerPageHeader.svelte | 42 | 1",
     "src/ui/svelte/apps/manager/ManagerPageHeader.svelte | 44 | 6",
     "src/ui/svelte/apps/manager/RecipesBrowserView.svelte | 40 | 1",
-    "src/ui/svelte/apps/manager/checks/CheckOutcomePreview.svelte | 44 | 1",
     "src/ui/svelte/apps/manager/component/ComponentIdentityStrip.svelte | 44 | 1",
     "src/ui/svelte/apps/manager/components/ComponentBrowserInspector.svelte | 40 | 1",
     "src/ui/svelte/apps/manager/components/ComponentRow.svelte | 40 | 1",

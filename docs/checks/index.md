@@ -8,7 +8,7 @@ has_children: true
 # Checks
 
 **Checks** in the Crafting Admin panel's left rail is where you author the rolls that gate what an activity produces.
-Each activity has its own page, and this page covers what they all share: the shape of the editor, and the named-modifier library every one of them selects from.
+Each activity has its own page, and this page covers what they all share: the shape of the editor, which way a roll is measured, and the named-modifier library every one of them selects from.
 
 For an activity's own rules, see [Crafting]({% link checks/crafting.md %}), [Salvage]({% link checks/salvage.md %}), or [Gathering]({% link checks/gathering.md %}).
 
@@ -65,7 +65,44 @@ A blocking issue never stops you saving, only enabling the system.
 
 The panel to the right of each activity page carries links to this documentation and to the quickstart, the check's on or off switch, and a **This check** summary of its formula, outcome tiers, triggers, and applied modifiers.
 It also carries **Preview as**, **Outcome preview**, and **Chance per outcome**.
-Those three are planned and not yet available, so each states what it will do and offers no controls yet.
+**Preview as** picks a character, and, where the check has one, a difficulty record, to try the check against.
+**Outcome preview** then rolls a test check against that choice.
+It never posts to chat and never costs the character anything, and it reports the outcome the roll lands on, the target and margin it was measured against, and what a real roll like it would cost.
+**Chance per outcome** works out the exact odds for the chosen character rather than estimating them, and shows each outcome's percentage.
+When a formula cannot be charted exactly, it explains why in place of a chart.
+See [What the previews will tell you]({% link checks/crafting.md %}#what-the-previews-will-tell-you) for a worked example.
+
+## Which way is better
+
+A pass-or-fail or routed check's **The roll** section carries a **Which way is better** setting.
+**Higher is better** is the classic roll-over-a-difficulty check.
+**Lower is better** instead requires the roll to stay at or under the difficulty.
+A progressive check has no such setting, because it spends its roll as a budget rather than measuring it against anything.
+
+Below that setting, **What the roll is measured against** picks where the difficulty itself comes from.
+
+- **Fixed difficulty** is the same number for every character, set here and per recipe difficulty tier, exactly as difficulty has always worked.
+- **Character value** reads a value from the crafting, salvage, or gathering character instead.
+Write a character-data path such as `@skills.craft.value`, the same way a modifier's expression is written.
+See [Defining modifiers](#defining-modifiers).
+
+A **Character value** target then takes a **Difficulty adjustment**.
+**Add a number** adds a flat amount to the character value.
+**Multiply, rounded down** scales it instead, and rounds the result down.
+A recipe difficulty tier, a salvage component's own override, or a gathering task's own override supplies that number when one is authored.
+Otherwise the check's own base adjustment does.
+
+A routed check under **Character value** and **Multiply, rounded down** can leave one tier with no adjustment of its own.
+That tier becomes the check's **Otherwise** tier, the catch-all a roll lands on when no multiplied tier's threshold is reached.
+Author at most one.
+It always sorts to the worst end of the tier list, whatever the tier is named.
+
+A **Lower is better** check reads differently at the table.
+The roll prompt shows a **Target** chip instead of a **DC** chip.
+The chip reads "stay at or under," or, on a strict comparison, "stay under."
+A flat or rolled situational bonus, and any Tool bonus or eligible named modifier, raise that target rather than joining the roll, and the prompt says so beneath the formula.
+The posted chat card still names the difficulty only for a Higher-is-better check against a fixed difficulty.
+Every other check keeps its difficulty off the card, exactly as it did before this setting existed.
 
 ## Check modifiers
 
@@ -94,9 +131,8 @@ Under the formula field, **What actually gets rolled** shows the same formula wi
 
 ### What a check rolls today
 
-The active check engine uses the usual roll-total-over-target evaluation.
-Other evaluation styles are planned and not yet available.
 For an active check, Fabricate builds the roll in this order: your authored formula, eligible Tool bonuses, the selected named modifiers, Advantage or Disadvantage, and then a valid situational bonus.
+Under **Lower is better**, the Tool bonus and the named modifiers raise the target instead of joining the roll, as [Which way is better](#which-way-is-better) describes.
 Flat named modifiers share one labelled term, while each named modifier that rolls dice keeps its own labelled term.
 
 A Tool bonus that rolls dice is rolled once before the main check, and its total joins the check as a labelled number.

@@ -269,8 +269,9 @@ export const KNOWN_OFF_LADDER_ART_SIZES = knownDebt('offLadderArtSizes');
  *    containers at once — a layout move in a commit whose rule is that a conversion preserves the
  *    rendered size.
  */
-// Issue 1648 removes six former Journal render sites and adds SlotTile's single 56px site.
-export const KNOWN_OFF_LADDER_ART_SIZE_TOTAL = 69;
+// Issue 1648 removes six former Journal render sites and adds SlotTile's single 56px site; issue
+// 2004 moves the Checks simulator's die tile onto the 38 rung.
+export const KNOWN_OFF_LADDER_ART_SIZE_TOTAL = 68;
 
 export const KNOWN_UNREGISTERED_SHARED_COMPONENTS = knownDebt('unregisteredSharedComponents');
 
