@@ -452,7 +452,7 @@ function labDowntimeProvider() {
           // An asset the LAB serves. A Foundry core path resolves in a real world and 404s
           // here, and the harness treats a console error during render as a failure -- so a
           // core icon would fail the capture rather than merely render a broken medallion.
-          image: 'assets/img/fabricate-logo.jpg',
+          image: 'docs/img/fabricate-logo.jpg',
           status: { label: 'Unsaved' },
           actions: [
             {
