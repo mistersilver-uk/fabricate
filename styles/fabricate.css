@@ -10448,6 +10448,17 @@
   flex: 0 0 24px;
 }
 
+/* The banded Modal's close (maintainer ruling 2026-09-28); its paint is `ManagerModal`'s. */
+.fabricate-icon-button.manager-icon-button.is-size-26 {
+  box-sizing: border-box;
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  min-height: 26px;
+  padding: 0;
+  flex: 0 0 26px;
+}
+
 /* The strip half, for the reason spelled out on `.fabricate-button:focus` above: core's orange
    `button:focus` outline and 4px glow survive in any host carrying no Fabricate root, so the
    repaint below would sit on top of them rather than replace them. Above the repaint because the
@@ -17252,6 +17263,11 @@
   background: var(--fab-bg-2);
   font-size: 11.5px;
   font-weight: 500;
+}
+
+/* The specimen's `.k-field .i` draws the inline rung's glyphs at 12px, not at the 11.5px type (ruling 2026-09-28). */
+.fabricate-select .fabricate-select-trigger-inline > i {
+  font-size: 12px;
 }
 
 /* THE LITERAL IS THE POINT. `--fab-recipe-control-font` has exactly one declaration site, inside the `.fabricate-manager` block, so it is area-scoped: read from a player surface it is undefined and the size falls back to inheritance. */

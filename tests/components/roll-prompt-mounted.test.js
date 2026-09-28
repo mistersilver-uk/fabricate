@@ -133,7 +133,7 @@ describe('mounted roll prompt', () => {
     assert.ok(!chip.classList.contains('is-mono'), 'the DC chip is not mono');
     assert.ok(dialog.classList.contains('is-banded'), 'the prompt draws the banded library Modal');
     assert.ok(dialog.querySelector('.manager-modal-body > .fabricate-roll-prompt'), 'in a padded body');
-    assert.ok(dialog.querySelector('[data-manager-modal-close]').classList.contains('is-size-24'));
+    assert.ok(dialog.querySelector('[data-manager-modal-close]').classList.contains('is-size-26'));
     assert.ok(!dialog.querySelector('select'), 'no native select remains');
     const mode = modeTrigger(dialog);
     assert.equal(mode.getAttribute('name'), 'rollMode');

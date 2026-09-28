@@ -389,6 +389,11 @@
     font-weight: 600;
   }
 
+  /* The library states no tag-run glyph, so the prototype's 9px is taken (ruling 2026-09-28). */
+  .manager-chip.is-tag-run > i:not(.fa-circle) {
+    font-size: 9px;
+  }
+
   .manager-chip.is-inspector {
     padding: var(--fab-space-1) var(--fab-space-2);
     border-radius: 999px;

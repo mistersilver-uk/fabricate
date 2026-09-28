@@ -13,7 +13,7 @@
   | `trapFocus` | boolean | `false` | Focus enters on open, Tab cycles inside, the modal owns every key, and focus returns to the opener, or the host while the opener is disabled. |
   | `initialFocus` | selector | `''` | The element `trapFocus` focuses first; the first focusable one when absent. |
   | `footerLayout` | `'end'` \| `'equal'` | `'end'` | `equal` gives every footer child one equal share of the rail. |
-  | `banded` | boolean | `false` | The design-system Modal: header and footer bands on `--fab-bg-2`, a padded body, a 14px serif title and a 24px close. |
+  | `banded` | boolean | `false` | The design-system Modal: header and footer bands on `--fab-bg-2`, a padded body, a 14px serif title and an unfilled 26px close (maintainer ruling 2026-09-28). |
   | `onSubmit(event)` | function | none | Wraps body and footer in one form; Enter submits through its first submit button. |
 -->
 <script>
@@ -165,7 +165,7 @@
         </div>
         <IconButton
           data-manager-modal-close=""
-          size={banded ? 24 : 'default'}
+          size={banded ? 26 : 'default'}
           ariaLabel={closeLabel}
           onclick={() => onClose()}
         >
@@ -249,22 +249,42 @@
     overflow: hidden;
   }
 
+  /* The banded frame is the prototype's, measured (maintainer ruling 2026-09-28): a 60px header. */
   .is-banded .manager-modal-header {
     align-items: center;
+    gap: calc(var(--fab-space-2) + var(--fab-space-2xs));
     padding: var(--fab-space-3) calc(var(--fab-space-3) + var(--fab-space-2xs));
     border-bottom: 1px solid var(--fab-border);
     background: var(--fab-bg-2);
   }
 
+  .is-banded .manager-modal-heading {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
   .is-banded .manager-modal-title {
     font-family: var(--fab-font-serif);
     font-size: 14px;
+    line-height: normal;
   }
 
   .is-banded .manager-modal-subtitle {
+    margin-top: 1px;
     color: var(--fab-text-subtle);
     font-size: 10.5px;
     font-weight: 500;
+  }
+
+  /* Paint only, at (0,3,0): above the family's resting paint and below its hover. */
+  .is-banded :global([data-manager-modal-close]) {
+    display: grid;
+    place-items: center;
+    gap: normal;
+    border-radius: 7px;
+    color: var(--fab-text-muted);
+    background: transparent;
+    font-size: 11px;
   }
 
   .manager-modal-body {
@@ -275,7 +295,7 @@
   }
 
   .is-banded .manager-modal-footer {
-    padding: var(--fab-space-3) var(--fab-space-4);
+    padding: var(--fab-space-3) var(--fab-space-4) calc(var(--fab-space-3) + var(--fab-space-2xs));
     border-top: 1px solid var(--fab-border);
     background: var(--fab-bg-2);
   }
