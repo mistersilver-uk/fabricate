@@ -18,9 +18,7 @@ export async function seedRollPromptFixture(world, state) {
     });
   }
   if (state === 'under') await seedRollUnder(world);
-  if (state === 'salvage-under' || state === 'salvage-under-attribute') {
-    await seedSalvageUnder(world, state);
-  }
+  if (Object.hasOwn(SALVAGE_CHECKS, state)) await seedSalvageChecks(world, state);
   if (state === 'count' || state === 'count-threshold') await seedCount(world, state);
   if (state === 'pick-one' || state === 'overflow') {
     const system = manager.getSystem('lab-herbalism');
@@ -90,33 +88,47 @@ async function nameFrameSubject(world, recipeUpdates) {
   await world.fabricate.recipeManager.updateRecipe('sm-r-horseshoe', recipeUpdates);
 }
 
+const under = (target) =>
+  normalizeCheckEvaluation({ product: 'sum', direction: 'under', ...(target && { target }) });
+const pooled = (required) =>
+  normalizeCheckEvaluation({
+    product: 'count',
+    direction: 'over',
+    pool: { die: 10, base: '4', threshold: '8', required, modifierDestination: 'pool' },
+  });
+
+/** Smithing's simple salvage evaluation, then Runework's routed one, for each bulk salvage state. */
+const SALVAGE_CHECKS = {
+  'salvage-under': () => [under(), under()],
+  'salvage-under-attribute': () => [
+    under(),
+    under({ source: 'attribute', expression: '@abilities.int.value' }),
+  ],
+  'salvage-count': () => [pooled(2), pooled(1)],
+};
+
 /**
- * Bulk salvage rows against roll-under checks: Smithing's simple salvage stays at or under a fixed
- * 12, and Runework's routed one under a fixed target (the slag's own override, 11) or, in
- * `salvage-under-attribute`, under the salvager's Intelligence score, which differs per actor.
+ * Bulk salvage rows. Roll-under: Smithing stays at or under a fixed 12, and Runework under a fixed
+ * target (the slag's own override, 11) or the salvager's Intelligence score, which differs per
+ * actor. Count: two successes needed, then one, and every modifier adds dice.
  */
-async function seedSalvageUnder(world, state) {
-  const under = (target) =>
-    normalizeCheckEvaluation({ product: 'sum', direction: 'under', ...(target && { target }) });
+async function seedSalvageChecks(world, state) {
+  const [smithingEvaluation, runeworkEvaluation] = SALVAGE_CHECKS[state]();
+  const rollFormula = smithingEvaluation.product === 'count' ? '' : '1d20';
   const manager = world.fabricate.craftingSystemManager;
   const smithing = manager.getSystem('lab-smithing');
   await manager.updateSystem(smithing.id, {
     salvageCraftingCheck: {
       ...smithing.salvageCraftingCheck,
       enabled: true,
-      simple: { rollFormula: '1d20', dc: 12, thresholdMode: 'meet', evaluation: under() },
+      simple: { rollFormula, dc: 12, thresholdMode: 'meet', evaluation: smithingEvaluation },
     },
   });
   const runework = manager.getSystem('lab-runework');
-  const attribute = state === 'salvage-under-attribute';
   await manager.updateSystem(runework.id, {
     salvageCraftingCheck: {
       ...runework.salvageCraftingCheck,
-      routed: {
-        ...runework.salvageCraftingCheck.routed,
-        rollFormula: '1d20',
-        evaluation: under(attribute && { source: 'attribute', expression: '@abilities.int.value' }),
-      },
+      routed: { ...runework.salvageCraftingCheck.routed, rollFormula, evaluation: runeworkEvaluation },
     },
   });
 }
