@@ -18,7 +18,7 @@ import { matchResultGroupsByName, normalizeRoutedName } from '../utils/routedOut
 
 import { buildCheckModifierContext } from './checkModifierResolver.js';
 import { evaluateSituationalBonus, runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
-import { countPromptFields } from './checkRollDecision.js';
+import { countPromptFields, underTargetPromptFields } from './checkRollDecision.js';
 import {
   activeCheckEvaluation,
   actorRollData,
@@ -770,6 +770,10 @@ export class GatheringEngine {
       : null;
     const dc = count ? null : target.target;
     const label = secret ? this.localize(BLIND_TASK_LABEL_KEY) : stringOrEmpty(task?.name);
+    // A fixed-range routed check grades the raw roll, never a target, and a hidden task names no
+    // numbers, so both keep the prompt's target fields empty, as a count check's already are.
+    const routedFixed = mode === 'routed' && config?.type === 'fixed';
+    const showTarget = !secret && !count && !routedFixed && Number.isFinite(dc);
     return {
       required: requiresCheck,
       publicPrompt: {
@@ -779,6 +783,17 @@ export class GatheringEngine {
         offerSituationalBonus: config?.offerSituationalBonus !== false,
         // A count check offers no advantage until it is mode-aware (issue 2007).
         allowAdvantage: !count && Boolean(rollFormula && /(?:^|\W)d20(?:\W|$)/i.test(rollFormula)),
+        target: showTarget ? dc : null,
+        direction: showTarget ? evaluation.direction : null,
+        comparison: showTarget ? (config?.thresholdMode === 'exceed' ? 'exceed' : 'meet') : null,
+        ...(showTarget &&
+          underTargetPromptFields(evaluation, {
+            targetBasis: attributeTargetBasis(config, {
+              override: task?.adjustmentOverride,
+              label: '',
+              readRollData: () => actorRollData(actor),
+            }),
+          })),
         // A hidden task's prompt keeps the count wording but shows no pool or required count,
         // and fixed ranges grade the net, so they name no required count either.
         ...(count &&
