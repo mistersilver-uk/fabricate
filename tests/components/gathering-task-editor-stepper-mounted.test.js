@@ -58,7 +58,8 @@ const harness = createMountedComponentHarness({
     'src/ui/model/complicationSummary.js',
     'src/systems/characterPrerequisites.js',
     // The seven converted option vocabularies (issue 1510).
-    'src/ui/svelte/apps/manager/gatheringTaskSelectOptions.js',    // The task check override reads the evaluation and formats an adjustment (issue 2005).
+    'src/ui/svelte/apps/manager/gatheringTaskSelectOptions.js',
+    // The task check override reads the evaluation and formats an adjustment (issue 2005).
     'src/systems/normalize/checkEvaluation.js',
     'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
     'src/utils/scalars.js',
@@ -541,18 +542,24 @@ describe('the task check override follows the routed check evaluation (issue 200
     target: { source, expression: '@skills.smith.level', adjustmentKind: kind },
   });
 
-  async function mountOverride(task, config) {
+  const CHARACTERS = {
+    'actor-sera': { name: 'Sera Vane', rollData: { skills: { smith: { level: 12 } } } },
+    'actor-idrin': { name: 'Idrin Ashfall', rollData: {} },
+  };
+  const ROSTER = [
+    { id: 'actor-sera', name: 'Sera Vane', img: '' },
+    { id: 'actor-idrin', name: 'Idrin Ashfall', img: '' },
+  ];
+
+  async function mountOverride(task, config, roster = ROSTER) {
     const updates = [];
     let current = { id: 'task-1', name: 'Riverbed Ore', dropRows: [], ...task };
     const root = await harness.mount({
       task: current,
       resolutionMode: 'routed',
       checkConfig: { thresholdMode: 'meet', ...config },
-      previewActors: [{ id: 'actor-sera', name: 'Sera Vane', img: '' }],
-      resolvePreviewCharacter: (id) =>
-        id === 'actor-sera'
-          ? { name: 'Sera Vane', rollData: { skills: { smith: { level: 12 } } } }
-          : null,
+      previewActors: roster,
+      resolvePreviewCharacter: (id) => CHARACTERS[id] ?? null,
       onUpdateTask: (patch) => {
         updates.push(patch);
         current = { ...current, ...patch };
@@ -688,15 +695,53 @@ describe('the task check override follows the routed check evaluation (issue 200
     assert.deepEqual(view.updates.at(-1), { adjustmentOverride: 0.65 });
   });
 
-  it('a roll-high fixed DC keeps the legacy card and label', async () => {
+  it('a roll-high fixed DC reads as frame 23 and names a kept adjustment', async () => {
     const view = await mountOverride(
-      { dcOverride: 14 },
+      { dcOverride: 14, adjustmentOverride: -2 },
       { evaluation: evaluation({ direction: 'over', source: 'fixed' }) }
     );
-    assert.equal(view.heading(), 'Check DC override');
+    assert.equal(view.heading(), 'DC override');
+    assert.equal(view.hint(), 'Replaces the system DC for this task.');
     assert.equal(view.label(), 'DC');
     assert.equal(view.input().value, '14');
-    assert.equal(view.kept(), '');
+    assert.equal(
+      view.kept(),
+      'A difficulty adjustment override of −2 is kept on this task. This system does not read it, so it is not shown for editing.'
+    );
     assert.equal(view.sees(), 'Riverbed Ore · DC 14', 'frame 23: every check shows the line');
+  });
+
+  it('a fixed-range routed check is graded by its ranges, so it shows no Player sees line', async () => {
+    const view = await mountOverride(
+      { dcOverride: 14 },
+      { type: 'fixed', evaluation: evaluation({ direction: 'over', source: 'fixed' }) }
+    );
+    assert.ok(Boolean(view.input()), 'the override itself still renders');
+    assert.ok(!view.card().querySelector('[data-override-player-sees]'), 'no line, no picker');
+  });
+
+  it('with no characters in the world the line names the formula and the picker offers only No actor', async () => {
+    const view = await mountOverride({ adjustmentOverride: -2 }, { evaluation: evaluation() }, []);
+    assert.equal(
+      view.sees(),
+      'Riverbed Ore · stay at or under the character value (@skills.smith.level, −2)'
+    );
+    assert.equal(view.note(), 'Choose a character in Preview as to see what this resolves to.');
+    view.card().querySelector('[data-override-preview-actor]').click();
+    await harness.setProps({});
+    const options = [...view.root.querySelectorAll('[data-popover-option]')].map(
+      (option) => option.dataset.popoverOption
+    );
+    assert.deepEqual(options, ['no-actor']);
+  });
+
+  it('a character without the value is named rather than read as zero', async () => {
+    const view = await mountOverride({ adjustmentOverride: -2 }, { evaluation: evaluation() });
+    await view.previewAs('actor-idrin');
+    assert.equal(
+      view.sees(),
+      'Idrin Ashfall has no value at @skills.smith.level. The check cannot resolve for them.'
+    );
+    assert.equal(view.note(), '', 'a chosen character needs no note');
   });
 });

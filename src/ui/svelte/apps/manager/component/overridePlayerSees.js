@@ -3,7 +3,12 @@
  * this subject's check, resolved for the character chosen in Preview as. Pure; the caller injects
  * `text` so every sentence stays localized, and a missing path is named rather than read as zero.
  */
-import { resolveCheckTarget, selectTargetAdjustment } from '../../../../../systems/checkTarget.js';
+import {
+  isValidTargetAdjustment,
+  resolveCheckTarget,
+  selectTargetAdjustment,
+} from '../../../../../systems/checkTarget.js';
+import { numberOrNull } from '../../../../../utils/scalars.js';
 import { formatCheckAdjustment } from '../checks/checkAdjustmentLabel.js';
 import { interpolate, underComparisonPhrase } from '../checks/checksCopy.js';
 
@@ -30,6 +35,10 @@ const KEY = {
     'FABRICATE.Admin.Manager.Checks.Evaluation.ScaleSourceValue',
     '{actor} {expression} {value}',
   ],
+  adjustmentInvalid: [
+    'FABRICATE.Admin.Manager.Checks.PlayerSees.AdjustmentInvalid',
+    '{subject} cannot resolve: the difficulty adjustment {adjustment} is invalid; a multiplier must be above zero.',
+  ],
   unresolved: [
     'FABRICATE.Admin.Manager.Checks.Evaluation.ValueUnresolved',
     '{actor} has no value at {path}. The check cannot resolve for them.',
@@ -40,23 +49,35 @@ const KEY = {
   ],
 };
 
-const isSet = (value) => ![null, undefined, ''].includes(value) && Number.isFinite(Number(value));
+/**
+ * The dormant override an editor names in its callout, or `null`: the DC override under a
+ * character value, or the adjustment override under a fixed target. Neither is ever cleared.
+ */
+export function keptOverride({ attribute, dcOverride = null, adjustmentOverride = null }) {
+  const [field, value] = attribute
+    ? ['dcOverride', dcOverride]
+    : ['adjustmentOverride', adjustmentOverride];
+  const number = numberOrNull(value);
+  return number === null ? null : { field, value: number };
+}
 
 /**
- * `{ line, note, readsCharacter, state }` for one override. `line` is `''` where a macro supplies
- * the number; `note` names the missing character; `readsCharacter` says whether Preview as matters;
- * `state` is `macro`, `fixed`, `no-character`, `unresolved` or `resolved`.
+ * `{ line, note, readsCharacter, state }` for one override. `line` is `''` where the check is not
+ * graded against one number (`count`, fixed-range `ranges`); `note` names the missing character;
+ * `readsCharacter` says whether Preview as matters; `state` is also `fixed`, `no-character`,
+ * `unresolved`, `adjustment-invalid` or `resolved`.
  * @param {object} args
  * @param {string} args.subject The line's lead: `Salvage check`, or the task's name.
  * @param {object} args.evaluation The normalized check evaluation.
+ * @param {string|null} args.type The routed check's `type`; `fixed` grades by ranges.
  * @param {number} args.anchorDc The system DC a fixed target falls back to.
  * @param {{ name: string, rollData: object }|null} args.character The Preview-as character.
  */
 export function overridePlayerSees({
   subject,
   evaluation,
+  type = null,
   thresholdMode = 'meet',
-  dcMode = 'static',
   dcOverride = null,
   adjustmentOverride = null,
   anchorDc = 15,
@@ -67,17 +88,23 @@ export function overridePlayerSees({
   const attribute = evaluation?.target?.source === 'attribute';
   const under = evaluation?.direction === 'under';
   const cmp = underComparisonPhrase(thresholdMode, text);
-  if (dcMode === 'dynamic')
-    return { line: '', note: '', readsCharacter: attribute, state: 'macro' };
+  // The runtime reads `successesOverride` for a count check, and a fixed-range check its ranges.
+  if (evaluation?.product === 'count')
+    return { line: '', note: '', readsCharacter: false, state: 'count' };
+  if (type === 'fixed') return { line: '', note: '', readsCharacter: false, state: 'ranges' };
   if (!attribute) {
-    const dc = isSet(dcOverride) ? Math.trunc(Number(dcOverride)) : Number(anchorDc);
-    const line = say(under ? KEY.fixedUnder : KEY.fixedOver, { subject, cmp, dc });
+    const dc = numberOrNull(dcOverride) ?? Number(anchorDc);
+    const line = say(under ? KEY.fixedUnder : KEY.fixedOver, { subject, cmp, dc: Math.trunc(dc) });
     return { line, note: '', readsCharacter: false, state: 'fixed' };
   }
   const kind = evaluation.target.adjustmentKind;
   const expression = String(evaluation.target.expression ?? '').trim();
   const adjustment = selectTargetAdjustment(evaluation, adjustmentOverride);
   const adjustmentLabel = formatCheckAdjustment(kind, adjustment);
+  if (adjustment !== null && !isValidTargetAdjustment(kind, adjustment)) {
+    const line = say(KEY.adjustmentInvalid, { subject, adjustment: adjustmentLabel });
+    return { line, note: '', readsCharacter: true, state: 'adjustment-invalid' };
+  }
   if (!character) {
     const source = [expression, adjustmentLabel].filter(Boolean).join(', ');
     const line = say(under ? KEY.underNone : KEY.overNone, { subject, cmp, source });

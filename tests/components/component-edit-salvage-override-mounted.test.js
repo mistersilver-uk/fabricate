@@ -1,6 +1,7 @@
 /** Issue 2005 — the salvage check override follows the salvage check's evaluation (Q16). */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
@@ -339,30 +340,84 @@ describe('ComponentEditView — the salvage override follows the evaluation (iss
     assert.ok(root.querySelector('[data-override-player-sees] .fab-kicker'), 'Player sees is the Kicker');
   });
 
-  it('a roll-high fixed DC keeps its legacy card and still shows what the player sees', async () => {
+  it('a roll-high fixed DC reads as frame 23, names a kept adjustment and shows what the player sees', async () => {
     const { target, drafts } = await mountOverride({
       salvage: { dcOverride: null, adjustmentOverride: -2 },
       config: { evaluation: evaluation({ direction: 'over', source: 'fixed' }) },
     });
-    assert.equal(title(target), 'Salvage check DC');
-    assert.equal(hint(target), 'Preset tiers come from this system’s Checks screen.');
+    assert.equal(title(target), 'Salvage DC override');
+    assert.equal(hint(target), 'Replaces the system DC for this component.');
     assert.equal(playerSees(target), 'Salvage check · DC 15', 'frame 23: every check shows it');
     assert.ok(
       !target.querySelector('[data-override-preview-actor]'),
       'a fixed DC reads no character, so it offers no Preview-as picker'
     );
-    assert.equal(kept(target), '');
+    assert.equal(
+      kept(target),
+      'A difficulty adjustment override of −2 is kept on this component. This system does not read it, so it is not shown for editing.',
+      'the kept adjustment is named here as the task editor names it'
+    );
     await choose(target, 'custom');
     await typeCommit(target.querySelector('[data-salvage-dc-custom]'), '12');
     assert.equal(lastSalvage(drafts).dcOverride, 12);
     assert.equal(playerSees(target), 'Salvage check · DC 12', 'the line follows the override');
   });
 
-  it('a dynamic system DC shows no Player sees line, since a macro sets the number', async () => {
+  it('ships frame 23 wording for the roll-high fixed DC in the language file', () => {
+    const lang = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
+    const keys = lang.FABRICATE.Admin.Manager.Component.SalvageEditor;
+    assert.equal(keys.DcOverride, 'Salvage DC override');
+    assert.equal(keys.DcOverrideHint, 'Replaces the system DC for this component.');
+  });
+
+  it('a dynamic system DC still shows its static number, since salvage never runs the DC macro', async () => {
     const { target } = await mountOverride({
       salvageCheckDcMode: 'dynamic',
       config: { evaluation: evaluation({ direction: 'over', source: 'fixed' }) },
     });
-    assert.equal(playerSees(target), '');
+    assert.equal(playerSees(target), 'Salvage check · DC 15');
+  });
+
+  it('the system default and the line both read the DC of the sub-object salvage rolls', async () => {
+    const { target } = await mountOverride({
+      salvageResolutionMode: 'routed',
+      salvageCheckDc: 15,
+      config: { dc: 18, type: 'relative', evaluation: evaluation({ direction: 'over', source: 'fixed' }) },
+    });
+    assert.equal(presetLabels(target)[0], 'System default — DC 18');
+    assert.equal(playerSees(target), 'Salvage check · DC 18');
+  });
+
+  it('an invalid adjustment is named as invalid, not as a missing value', async () => {
+    const { target } = await mountOverride({
+      salvage: { adjustmentOverride: -2 },
+      config: { evaluation: evaluation({ kind: 'multiply' }) },
+    });
+    await previewAs(target, 'actor-sera');
+    assert.equal(
+      playerSees(target),
+      'Salvage check cannot resolve: the difficulty adjustment ×-2 is invalid; a multiplier must be above zero.'
+    );
+    assert.equal(
+      card(target).querySelector('[data-override-player-sees]').dataset.overridePlayerSees,
+      'adjustment-invalid'
+    );
+  });
+
+  it('a fixed-range routed check is graded by its ranges, so it shows no Player sees line', async () => {
+    const { target } = await mountOverride({
+      salvageResolutionMode: 'routed',
+      config: { type: 'fixed', evaluation: evaluation({ direction: 'over', source: 'fixed' }) },
+    });
+    assert.ok(Boolean(card(target)), 'the override itself still renders');
+    assert.ok(!target.querySelector('[data-override-player-sees]'), 'no line, no picker');
+  });
+
+  it('a count check reads its successes override, so it shows no DC line', async () => {
+    const { target } = await mountOverride({
+      config: { evaluation: { product: 'count', direction: 'over', pool: { die: 10 } } },
+    });
+    assert.ok(Boolean(card(target)), 'the override itself still renders');
+    assert.ok(!target.querySelector('[data-override-player-sees]'), 'no DC line');
   });
 });

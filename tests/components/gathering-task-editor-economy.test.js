@@ -280,7 +280,8 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
 
   it('adds the per-task DC override i18n keys', () => {
     const keys = lang.FABRICATE.Admin.Manager.Gathering;
-    assert.equal(keys.TaskDcOverrideTitle, 'Check DC override');
+    assert.equal(keys.TaskDcOverrideTitle, 'DC override');
+    assert.equal(keys.TaskDcOverrideHint, 'Replaces the system DC for this task.');
     assert.equal(keys.TaskDcOverride, 'DC');
     assert.ok(typeof keys.TaskDcOverrideHint === 'string' && keys.TaskDcOverrideHint.length > 0, 'the DC override hint exists');
     assert.ok(typeof keys.TaskDcOverridePlaceholder === 'string' && keys.TaskDcOverridePlaceholder.length > 0, 'the DC override placeholder exists');

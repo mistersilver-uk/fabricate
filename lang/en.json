@@ -3393,8 +3393,8 @@
             "Routing": "Outcome routing",
             "Unrouted": "Unrouted",
             "NoOutcomes": "The routed salvage check has no outcome tiers to route yet.",
-            "DcOverride": "Salvage check DC",
-            "DcOverrideHint": "Preset tiers come from this system’s Checks screen.",
+            "DcOverride": "Salvage DC override",
+            "DcOverrideHint": "Replaces the system DC for this component.",
             "OverrideTarget": "Target override",
             "OverrideAdjustment": "Difficulty adjustment override",
             "OverrideTargetHint": "Replaces the system target for this component. The total must stay {cmp} it.",
@@ -4933,8 +4933,8 @@
             "AddSearchLabel": "Search character modifiers to add"
           },
           "TaskCheckModifierHint": "Which of the system’s check modifiers apply to this task’s rolled gathering check. These are not the character modifiers on drop rows, which shift a drop’s percentage chance.",
-          "TaskDcOverrideTitle": "Check DC override",
-          "TaskDcOverrideHint": "Override the system gathering check DC for this task. Leave blank to use the system default.",
+          "TaskDcOverrideTitle": "DC override",
+          "TaskDcOverrideHint": "Replaces the system DC for this task.",
           "TaskDcOverride": "DC",
           "TaskDcOverridePlaceholder": "System default",
           "TaskOverrideTarget": "Target override",
@@ -6484,7 +6484,8 @@
             "Under": "{subject} · stay {cmp} {target} ({source})",
             "Over": "{subject} · reach {target} ({source})",
             "UnderNoCharacter": "{subject} · stay {cmp} the character value ({source})",
-            "OverNoCharacter": "{subject} · reach the character value ({source})"
+            "OverNoCharacter": "{subject} · reach the character value ({source})",
+            "AdjustmentInvalid": "{subject} cannot resolve: the difficulty adjustment {adjustment} is invalid; a multiplier must be above zero."
           },
           "Simulator": {
             "Title": "Outcome preview",

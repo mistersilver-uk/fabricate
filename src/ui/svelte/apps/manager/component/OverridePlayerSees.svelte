@@ -8,7 +8,7 @@
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `subject` | string | `''` | The line's lead: `Salvage check`, or the task's name. |
-  | `evaluation` / `thresholdMode` / `dcMode` | normalized evaluation / `'meet'` \| `'exceed'` / `'static'` \| `'dynamic'` | — / `'meet'` / `'static'` | The check being overridden; a macro-set number renders no line. |
+  | `evaluation` / `thresholdMode` / `type` | normalized evaluation / `'meet'` \| `'exceed'` / the routed `type` \| `null` | — / `'meet'` / `null` | The check being overridden; a count or fixed-range check renders no line. |
   | `dcOverride` / `adjustmentOverride` / `anchorDc` | number \| `null` / number \| `null` / number | `null` / `null` / `15` | The subject's overrides and the system DC a fixed target falls back to. |
   | `actors` / `resolveCharacter(id)` | `[{ id, name, img }]` / `{ name, rollData }` \| `null` | `[]` / `() => null` | The Preview-as roster and the lookup for the chosen actor's roll data. |
 
@@ -26,7 +26,7 @@
     subject = '',
     evaluation,
     thresholdMode = 'meet',
-    dcMode = 'static',
+    type = null,
     dcOverride = null,
     adjustmentOverride = null,
     anchorDc = 15,
@@ -46,7 +46,7 @@
       subject,
       evaluation,
       thresholdMode,
-      dcMode,
+      type,
       dcOverride,
       adjustmentOverride,
       anchorDc,

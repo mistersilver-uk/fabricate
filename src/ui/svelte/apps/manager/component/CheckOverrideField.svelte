@@ -3,14 +3,15 @@
   One component's salvage check override: a preset Select over the system's own tiers, a Custom…
   Stepper and Manage presets. It edits `dcOverride` under a fixed target and `adjustmentOverride`
   under a character value, clears only that field for System default, and never rewrites the other;
-  a kept dormant value is named in a callout. Every check shows what its player sees.
+  a kept dormant value is named in a callout. A check graded against one number shows what its
+  player sees.
 
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `config` | the active salvage check sub-object \| `null` | `null` | Supplies `evaluation` and `thresholdMode`; absent reads as a roll-high fixed DC. |
+  | `config` | the active salvage check sub-object \| `null` | `null` | Supplies `evaluation`, `thresholdMode`, `type` and `dc`; absent reads as a roll-high fixed DC. |
   | `dcOverride` / `adjustmentOverride` | number \| `null` | `null` | The component's two persisted overrides, both passed so the dormant one can be named. |
-  | `tiers` / `dcMode` / `systemDc` | `simple.tiers` / `'static'` \| `'dynamic'` / number | `[]` / `'static'` / `0` | The preset source in every resolution mode, and the system default's number. |
+  | `tiers` / `dcMode` / `systemDc` | `simple.tiers` / `'static'` \| `'dynamic'` / number | `[]` / `'static'` / `0` | The preset source in every resolution mode, and the system default's number where `config` has no `dc`. |
   | `previewActors` / `resolvePreviewCharacter(id)` | `[{ id, name, img }]` / `{ name, rollData }` \| `null` | `[]` / `() => null` | The Preview-as roster and lookup for the Player sees line. |
   | `instanceId` / `disabled` | string / boolean | `''` / `false` | The id stem for the title, and the whole control's disabled state. |
 
@@ -40,6 +41,7 @@
   import { interpolate, underComparisonPhrase } from '../checks/checksCopy.js';
   import { buildSalvageDcSelectOptions } from './componentEditSelectOptions.js';
   import OverridePlayerSees from './OverridePlayerSees.svelte';
+  import { keptOverride } from './overridePlayerSees.js';
   import {
     SALVAGE_DC_CUSTOM,
     resolveSalvageDcSelection,
@@ -71,14 +73,16 @@
   const attribute = $derived(evaluation.target.source === 'attribute');
   const under = $derived(evaluation.direction === 'under');
   const kind = $derived(evaluation.target.adjustmentKind);
-  // The roll-high fixed DC keeps its legacy title, hint and notice.
-  const legacy = $derived(!attribute && !under);
   const field = $derived(salvageOverrideField(evaluation));
   const activeValue = $derived(attribute ? adjustmentOverride : dcOverride);
   const cmp = $derived(underComparisonPhrase(config?.thresholdMode, text));
   const titleId = $derived(`${instanceId}-salvage-dc-title`);
+  // The sub-object salvage rolls owns the default, so the Select and the line name one number.
+  const systemDefaultDc = $derived(Number(config?.dc ?? systemDc));
 
-  const options = $derived(buildSalvageDcSelectOptions(tiers, dcMode, systemDc, text, evaluation));
+  const options = $derived(
+    buildSalvageDcSelectOptions(tiers, dcMode, systemDefaultDc, text, evaluation)
+  );
   // Custom… and System default both persist null, so the GM's choice of Custom… is staged here.
   let customSelected = $state(false);
   const selection = $derived(
@@ -105,14 +109,14 @@
       );
     return under
       ? text('FABRICATE.Admin.Manager.Component.SalvageEditor.OverrideTarget', 'Target override')
-      : text('FABRICATE.Admin.Manager.Component.SalvageEditor.DcOverride', 'Salvage check DC');
+      : text('FABRICATE.Admin.Manager.Component.SalvageEditor.DcOverride', 'Salvage DC override');
   });
 
   const hint = $derived.by(() => {
-    if (legacy) {
+    if (!attribute && !under) {
       return text(
         'FABRICATE.Admin.Manager.Component.SalvageEditor.DcOverrideHint',
-        'Preset tiers come from this system’s Checks screen.'
+        'Replaces the system DC for this component.'
       );
     }
     if (!attribute) {
@@ -144,30 +148,25 @@
       : text('FABRICATE.Admin.Manager.Component.SalvageEditor.DcCustomLabel', 'Custom salvage DC')
   );
 
-  const isSet = (value) => ![null, undefined, ''].includes(value) && Number.isFinite(Number(value));
-
   // The dormant field is kept, never edited or cleared from here; the callout says so.
   const keptNotice = $derived.by(() => {
-    if (legacy) return '';
-    if (attribute && isSet(dcOverride)) {
-      return interpolate(
-        text(
-          'FABRICATE.Admin.Manager.Component.SalvageEditor.OverrideKeptDc',
-          'A DC override of {dc} is kept on this component. This system does not read it, so it is not shown for editing.'
-        ),
-        { dc: dcOverride }
-      );
-    }
-    if (!attribute && isSet(adjustmentOverride)) {
-      return interpolate(
-        text(
-          'FABRICATE.Admin.Manager.Component.SalvageEditor.OverrideKeptAdjustment',
-          'A difficulty adjustment override of {adjustment} is kept on this component. This system does not read it, so it is not shown for editing.'
-        ),
-        { adjustment: formatCheckAdjustment(kind, adjustmentOverride) }
-      );
-    }
-    return '';
+    const kept = keptOverride({ attribute, dcOverride, adjustmentOverride });
+    if (!kept) return '';
+    return kept.field === 'dcOverride'
+      ? interpolate(
+          text(
+            'FABRICATE.Admin.Manager.Component.SalvageEditor.OverrideKeptDc',
+            'A DC override of {dc} is kept on this component. This system does not read it, so it is not shown for editing.'
+          ),
+          { dc: kept.value }
+        )
+      : interpolate(
+          text(
+            'FABRICATE.Admin.Manager.Component.SalvageEditor.OverrideKeptAdjustment',
+            'A difficulty adjustment override of {adjustment} is kept on this component. This system does not read it, so it is not shown for editing.'
+          ),
+          { adjustment: formatCheckAdjustment(kind, kept.value) }
+        );
   });
 </script>
 
@@ -250,10 +249,10 @@
     subject={text('FABRICATE.Admin.Manager.Checks.PlayerSees.SalvageSubject', 'Salvage check')}
     {evaluation}
     thresholdMode={config?.thresholdMode}
-    {dcMode}
+    type={config?.type ?? null}
     {dcOverride}
     {adjustmentOverride}
-    anchorDc={Number(config?.dc ?? systemDc)}
+    anchorDc={systemDefaultDc}
     actors={previewActors}
     resolveCharacter={resolvePreviewCharacter}
   />

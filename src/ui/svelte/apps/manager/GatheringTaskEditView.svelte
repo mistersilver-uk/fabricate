@@ -32,6 +32,7 @@
   import RecipeResultGroupCard from './recipe/RecipeResultGroupCard.svelte';
   import Callout from '../../components/Callout.svelte';
   import OverridePlayerSees from './component/OverridePlayerSees.svelte';
+  import { keptOverride } from './component/overridePlayerSees.js';
   import { normalizeCheckEvaluation } from '../../../../systems/normalize/checkEvaluation.js';
   import {
     MULTIPLIER_STOPS,
@@ -751,37 +752,37 @@
       };
     }
     return {
-      title: text('FABRICATE.Admin.Manager.Gathering.TaskDcOverrideTitle', 'Check DC override'),
+      title: text('FABRICATE.Admin.Manager.Gathering.TaskDcOverrideTitle', 'DC override'),
       hint: text(
         'FABRICATE.Admin.Manager.Gathering.TaskDcOverrideHint',
-        'Override the system gathering check DC for this task. Leave blank to use the system default.'
+        'Replaces the system DC for this task.'
       ),
       label: text('FABRICATE.Admin.Manager.Gathering.TaskDcOverride', 'DC'),
     };
   });
-  const isOverrideSet = (value) =>
-    ![null, undefined, ''].includes(value) && Number.isFinite(Number(value));
   // The dormant field is kept rather than cleared; the notice says so.
   const keptOverrideNotice = $derived.by(() => {
-    if (overrideAttribute && isOverrideSet(dcOverrideValue)) {
-      return interpolate(
-        text(
-          'FABRICATE.Admin.Manager.Gathering.TaskOverrideKeptDc',
-          'A DC override of {dc} is kept on this task. This system does not read it, so it is not shown for editing.'
-        ),
-        { dc: dcOverrideValue }
-      );
-    }
-    if (!overrideAttribute && isOverrideSet(adjustmentOverrideValue)) {
-      return interpolate(
-        text(
-          'FABRICATE.Admin.Manager.Gathering.TaskOverrideKeptAdjustment',
-          'A difficulty adjustment override of {adjustment} is kept on this task. This system does not read it, so it is not shown for editing.'
-        ),
-        { adjustment: formatCheckAdjustment(overrideKind, adjustmentOverrideValue) }
-      );
-    }
-    return '';
+    const kept = keptOverride({
+      attribute: overrideAttribute,
+      dcOverride: dcOverrideValue,
+      adjustmentOverride: adjustmentOverrideValue,
+    });
+    if (!kept) return '';
+    return kept.field === 'dcOverride'
+      ? interpolate(
+          text(
+            'FABRICATE.Admin.Manager.Gathering.TaskOverrideKeptDc',
+            'A DC override of {dc} is kept on this task. This system does not read it, so it is not shown for editing.'
+          ),
+          { dc: kept.value }
+        )
+      : interpolate(
+          text(
+            'FABRICATE.Admin.Manager.Gathering.TaskOverrideKeptAdjustment',
+            'A difficulty adjustment override of {adjustment} is kept on this task. This system does not read it, so it is not shown for editing.'
+          ),
+          { adjustment: formatCheckAdjustment(overrideKind, kept.value) }
+        );
   });
 
   // Resource-node authoring (enforced only when the system has resource nodes enabled).
@@ -1545,6 +1546,7 @@
           subject={task?.name || ''}
           evaluation={checkEvaluation}
           thresholdMode={checkConfig?.thresholdMode}
+          type={checkConfig?.type ?? null}
           dcOverride={dcOverrideValue}
           adjustmentOverride={adjustmentOverrideValue}
           anchorDc={Number(checkConfig?.dc ?? 15)}

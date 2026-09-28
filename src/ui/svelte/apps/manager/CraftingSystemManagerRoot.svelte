@@ -607,13 +607,14 @@
   const salvageCheckDcMode = $derived(
     selectedSystem?.salvageCraftingCheck?.simple?.dcMode || 'static'
   );
-  const salvageCheckDc = $derived(selectedSystem?.salvageCraftingCheck?.simple?.dc ?? 0);
-  // The sub-object the salvage mode rolls, whose evaluation picks the override field (issue 2005).
+  // The sub-object the salvage mode rolls, whose evaluation picks the override field and whose DC
+  // is the system default (issue 2005).
   const salvageCheckConfig = $derived(
     selectedSystem?.salvageCraftingCheck?.[
       salvageResolutionMode === 'routed' ? 'routed' : 'simple'
     ] ?? null
   );
+  const salvageCheckDc = $derived(salvageCheckConfig?.dc ?? 0);
   // The Preview-as roster the salvage and task check overrides offer, and its roll-data lookup.
   const overridePreviewActors = $derived(
     currentView === 'component-edit' || currentView === 'gathering-task-edit'
