@@ -242,6 +242,12 @@ describe('ImportFolderMappingModal (mounted)', () => {
     // Maintainer ruling 2026-09-28 ("Move them too"): every Fabricate dialog is banded.
     assert.ok(root.classList.contains('is-banded'), 'in the banded library Modal frame');
     assert.ok(root.querySelector('.manager-modal-body > [data-import-mapping-match]'), 'in a padded body');
+    const close = document.querySelector('[data-manager-modal-close]');
+    assert.ok(close.classList.contains('is-size-26'), 'with the banded frame’s 26px close');
+    const paint = getComputedStyle(close);
+    assert.equal(paint.borderRadius, '7px', 'on the radius ladder’s 26-32px corner');
+    assert.equal(paint.backgroundColor, 'transparent', 'unfilled');
+    assert.equal(paint.fontSize, '11px', 'with an 11px glyph');
     assert.equal(root.getAttribute('role'), 'dialog');
   });
 });
