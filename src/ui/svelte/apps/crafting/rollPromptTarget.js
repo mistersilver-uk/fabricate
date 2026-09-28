@@ -1,5 +1,8 @@
 /** The roll prompt's target chip text, and a summed roll-under target's explanation line. */
-import { formatCheckAdjustment, formatSignedStep } from '../../../../utils/checkAdjustmentFormat.js';
+import {
+  formatCheckAdjustment,
+  formatSignedStep,
+} from '../../../../utils/checkAdjustmentFormat.js';
 import { fill } from '../../../../utils/fillPlaceholders.js';
 
 const signed = (value) => (value < 0 ? String(value) : `+${value}`);

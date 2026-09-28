@@ -83,7 +83,10 @@ function attributeTargetFacts(grading, evaluation, actor) {
   if (grading.source !== 'attribute') return {};
   const expression = String(evaluation?.target?.expression ?? '').trim();
   const name = typeof actor?.name === 'string' ? actor.name.trim() : '';
-  return { ...(expression && { targetExpression: expression }), ...(name && { targetActor: name }) };
+  return {
+    ...(expression && { targetExpression: expression }),
+    ...(name && { targetActor: name }),
+  };
 }
 
 /** The relative tier the roll matched, before forcing or steps, as its target term; its
@@ -922,8 +925,7 @@ export async function runFormulaRouted({
     label,
     kind: 'routed ',
     data,
-    // No `dc` here: `evaluateCheckRoll` uses it for the prompt only, and callers already put
-    // the prompt-facing DC on `rollOptions` (none for a fixed check).
+    // No `dc`: callers already put the prompt-facing DC on `rollOptions` (none for fixed).
     options: { ...rollOptions, evaluation, thresholdMode, craftingModifier },
     headless: { success: true, outcome: null, value: null, data, message: null },
   });
@@ -977,9 +979,8 @@ export async function runFormulaRouted({
       success,
       breakTools: classified.breakTools,
       diceGroups,
-      // Only on a real tier change (issue 975).
+      // Only on a real tier change (issue 975), and on a min-tier failure the tier it blocked.
       ...(classified.tierStepApplied && { tierStepApplied: classified.tierStepApplied }),
-      // Only on a min-tier failure: the post-step tier the gate blocked.
       ...(classified.minTierFailed && {
         minTierFailed: true,
         blockedOutcomeId: classified.blockedOutcomeId,

@@ -160,7 +160,6 @@
               </label>
             {/each}
           </div>
-          <!-- A roll-under pick raises the target, as an applied modifier does (frame 29). -->
           {#if data.direction === 'under' && !data.count}<p class="help">
               {data.labels.eachAdds}
             </p>{/if}

@@ -87,7 +87,10 @@ function diceRows(groups) {
 function attributeFacts(data) {
   const expression = text(data.targetExpression);
   const actor = text(data.targetActor);
-  return { ...(expression && { targetExpression: expression }), ...(actor && { targetActor: actor }) };
+  return {
+    ...(expression && { targetExpression: expression }),
+    ...(actor && { targetActor: actor }),
+  };
 }
 
 /**

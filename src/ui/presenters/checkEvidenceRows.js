@@ -102,7 +102,8 @@ function targetParts(evidence, loc) {
   }
   const totals = benefitTotals(evidence);
   for (const [group] of BENEFIT_GROUPS) {
-    if (totals.get(group)) parts.push(fill(loc(KEYS[group]), { value: formatSignedStep(totals.get(group)) }));
+    const total = totals.get(group);
+    if (total) parts.push(fill(loc(KEYS[group]), { value: formatSignedStep(total) }));
   }
   return parts;
 }
