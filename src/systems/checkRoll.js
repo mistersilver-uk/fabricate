@@ -544,7 +544,7 @@ export async function evaluatePreparedRunCheck(
       total,
       // The formulas the dice line states, typed and resolved; a secret roll hands back neither.
       ...(rolled.resolvedFormula && {
-        rollFormula: String(preparation.rollFormula ?? '').trim(),
+        rollFormula: stripRetiredModifierPlaceholder(String(preparation.rollFormula ?? '')).trim(),
         resolvedFormula: rolled.resolvedFormula,
       }),
       diceGroups,
@@ -784,7 +784,8 @@ export async function runFormulaPassFail({
     value: total,
     data: {
       dc: data.dc,
-      formula,
+      // Typed, after the retired-placeholder shim, so its operands align with the resolved one.
+      formula: stripRetiredModifierPlaceholder(formula),
       resolvedFormula,
       total,
       comparison,
@@ -960,7 +961,7 @@ export async function runFormulaRouted({
     value: total,
     data: {
       dc: data.dc,
-      formula,
+      formula: stripRetiredModifierPlaceholder(formula),
       resolvedFormula,
       total,
       type,

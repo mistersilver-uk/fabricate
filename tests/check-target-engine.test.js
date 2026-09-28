@@ -11,7 +11,10 @@ import { promptJournalStageCheck } from '../src/bootstrap/journalOperations.js';
 import { BulkSalvageService } from '../src/systems/BulkSalvageService.js';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { GatheringEngine } from '../src/systems/GatheringEngine.js';
-import { evaluatePreparedRunCheck } from '../src/systems/checkRoll.js';
+import { evaluatePreparedRunCheck, runFormulaPassFail } from '../src/systems/checkRoll.js';
+import { checkDiceLine } from '../src/ui/presenters/checkDiceLine.js';
+import { executedCheckDisplay } from '../src/ui/presenters/checkDisplay.js';
+import { shippedLocalize } from './helpers/checkEvidenceFixtures.js';
 import { MacroExecutor } from '../src/utils/MacroExecutor.js';
 import { rollPromptTarget } from '../src/ui/svelte/apps/crafting/rollPromptTarget.js';
 import { stubPromptSurface } from './helpers/rollPromptDialogStub.js';
@@ -958,6 +961,93 @@ test('a Journal-prompted roll-high gathering check against a character value nam
 });
 
 // ── the prepared evaluator ────────────────────────────────────────────────────
+
+/** A `Roll` whose `1d20` shows 14, resolving `@path` from roll data as the engine's display does. */
+function installPathRoll() {
+  const resolve = (formula, data) =>
+    String(formula).replaceAll(/@([\w.]+)/g, (_match, path) =>
+      String(path.split('.').reduce((node, key) => node?.[key], data) ?? 'NaN')
+    );
+  globalThis.Roll = class PathRoll {
+    constructor(formula, data = {}) {
+      this.formula = resolve(formula, data);
+      const extra = [...this.formula.matchAll(/[+-]\s*(\d+)(?![d\d])/g)].reduce(
+        (sum, [term, value]) => sum + (term.startsWith('-') ? -1 : 1) * Number(value),
+        0
+      );
+      this.total = 14 + extra;
+      this.dice = [{ number: 1, faces: 20, total: 14, results: [{ result: 14 }] }];
+    }
+    async evaluate() {
+      return this;
+    }
+    evaluateSync() {
+      return this;
+    }
+    toJSON() {
+      return { formula: this.formula, total: this.total };
+    }
+    async toMessage() {}
+    static replaceFormulaData(formula, data) {
+      return resolve(formula, data);
+    }
+    static validate() {
+      return true;
+    }
+  };
+}
+
+/** A Journal (prepared) pass/fail check typed as `rollFormula`, rolled for Sera's Smithing 12. */
+async function preparedTyped(rollFormula) {
+  installPathRoll();
+  const actor = { name: 'Sera Vane', getRollData: () => ({ skills: { smith: { level: 12 } } }) };
+  try {
+    return await evaluatePreparedRunCheck(
+      {
+        mode: 'simple',
+        slot: 'simple',
+        rollFormula,
+        checkConfig: { rollFormula, thresholdMode: 'meet', dc: 20 },
+        decisionPolicy: { target: 20 },
+      },
+      actor,
+      { rollMode: 'publicroll' }
+    );
+  } finally {
+    delete globalThis.Roll;
+  }
+}
+
+test('a Journal check records its typed formula, and its dice line names the path (QE r3 1)', async () => {
+  const result = await preparedTyped('1d20 + @skills.smith.level');
+  assert.equal(result.data.rollFormula, '1d20 + @skills.smith.level');
+  const line = checkDiceLine(executedCheckDisplay(result), shippedLocalize);
+  assert.ok(line.includes('12 @skills.smith.level'), line);
+});
+
+test('the typed formula is recorded after the retired-placeholder shim (QE r3 3)', async () => {
+  const prepared = await preparedTyped('1d20 + @craftingmod + @skills.smith.level');
+  assert.equal(prepared.data.rollFormula, '1d20 + @skills.smith.level');
+  const line = checkDiceLine(executedCheckDisplay(prepared), shippedLocalize);
+  assert.equal(line, '1d20 (14) + 12 @skills.smith.level = 26');
+  installPathRoll();
+  try {
+    const direct = await runFormulaPassFail({
+      formula: '1d20 + @craftingmod + @skills.smith.level',
+      dc: 20,
+      thresholdMode: 'meet',
+      triggers: [],
+      actor: { getRollData: () => ({ skills: { smith: { level: 12 } } }) },
+    });
+    assert.equal(direct.data.formula, '1d20 + @skills.smith.level');
+    assert.equal(
+      checkDiceLine(executedCheckDisplay(direct), shippedLocalize),
+      '1d20 (14) + 12 @skills.smith.level = 26'
+    );
+  } finally {
+    delete globalThis.Roll;
+  }
+});
 
 test('the prepared evaluator refuses progressive sum/under before any roll', async () => {
   const constructed = installCountingRoll();
