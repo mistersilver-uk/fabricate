@@ -303,8 +303,9 @@ A single per-screen size override of the shared panel is a second empty-state de
 #### Modal dialogs
 
 Every centred manager modal renders through one shared modal-chrome primitive.
-The chrome is the dialog surface itself, portaled into the manager area with Escape and outside-click dismissal, and it owns exactly four things: the panel, a compact heading of a title over an optional muted subtitle, a round close control aligned with the title, and a right-aligned footer rail for the dialog's actions.
+The chrome is the dialog surface itself, portaled into the manager area with Escape and outside-click dismissal, and it owns exactly four things: the panel, a compact heading of a title over an optional muted subtitle, a close control aligned with the title, and a right-aligned footer rail for the dialog's actions.
 Everything between the heading and the footer belongs to the feature and carries that feature's own scoped styling.
+Every Fabricate dialog draws that chrome in the design system's banded Modal frame (maintainer ruling 2026-09-28).
 
 A manager modal MUST NOT be assembled from a raw HTML string handed to a Foundry dialog.
 Such a dialog inherits Foundry's page-title headings, unstyled list markup, and full-width footer button, which is a second modal design standing beside the shared one; it also cannot use any shared primitive, since a string is not a component.

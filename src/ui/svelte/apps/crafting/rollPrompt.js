@@ -1,7 +1,13 @@
 /** The single and bulk check prompt: view preparation, the modal surface and answer translation. */
 import { dcFlavorSuffix } from '../../../../systems/checkTarget.js';
+import {
+  countFormulaValues,
+  describedFaceRules,
+  faceSign,
+} from '../../../../systems/countEvaluation.js';
 
 import { openRollPromptModal } from './rollPromptHost.js';
+import { fill } from './rollPromptTarget.js';
 
 // Legacy tokens on both versions (issue 1043): V14 maps them in Roll#toMessage, and core.messageMode is unregistered on V13, where reading it throws.
 const ROLL_MODES = [
@@ -45,14 +51,6 @@ function promptLabel(name, fallback) {
   return localize(`FABRICATE.App.RollPrompt.${name}`, fallback);
 }
 
-// A function replacer, so a `$&` or `$1` in a user-authored name is inserted literally.
-function fill(template, values) {
-  return Object.entries(values).reduce(
-    (text, [token, value]) => text.replace(`{${token}}`, () => String(value)),
-    template
-  );
-}
-
 function copy() {
   return {
     modifiers: promptLabel('Modifiers', 'Modifiers'),
@@ -77,6 +75,8 @@ function copy() {
     worse: promptLabel('KeepWorse', 'keep the worse'),
     better: promptLabel('KeepBetter', 'keep the better'),
     dcValue: promptLabel('DcValue', 'DC {dc}'),
+    targetValue: promptLabel('TargetValue', 'Target {target}'),
+    countNeed: promptLabel('CountNeed', '{count} needed'),
     roll: promptLabel('roll', 'Roll'),
     advantage: promptLabel('advantage', 'Advantage'),
     disadvantage: promptLabel('disadvantage', 'Disadvantage'),
@@ -129,18 +129,148 @@ export function translatePromptAnswer(answer, { defaultRollMode, choicePlan }) {
   return result;
 }
 
+/** A summed roll-under check's wording: the chip names a target, and every bonus raises it. */
+function underCopy() {
+  return {
+    meet: promptLabel('StayAtOrUnder', 'stay at or under'),
+    exceed: promptLabel('StayUnder', 'stay under'),
+    formulaNote: promptLabel('ComparedAsRolled', 'The dice are compared as rolled.'),
+    targetBase: promptLabel('TargetBase', 'Base {value}'),
+    targetValueOf: promptLabel('TargetValueOf', '{source} {value}'),
+    targetAdjustment: promptLabel('TargetAdjustment', '{label} {value}'),
+    targetDifficulty: promptLabel('TargetDifficulty', 'difficulty {value}'),
+    targetTools: promptLabel('TargetTools', 'tools {value}'),
+    targetModifiers: promptLabel('TargetModifiers', 'modifiers {value}'),
+    eachAdds: promptLabel('EachRaises', 'Each raises the target.'),
+    bonusHelp: promptLabel(
+      'BonusHelpUnder',
+      'A bonus raises the target. A rolled bonus such as 1d4 is rolled first, and its result is applied.'
+    ),
+  };
+}
+
+/** A count check's wording: every modifier and bonus adds dice or moves the threshold. */
+function countCopy(destination) {
+  const threshold = destination === 'threshold';
+  return {
+    eachAdds: threshold
+      ? promptLabel('EachMovesThreshold', 'Each moves the threshold.')
+      : promptLabel('EachAddsDice', 'Each adds dice.'),
+    bonusHelp: threshold
+      ? promptLabel(
+          'BonusHelpThreshold',
+          'A bonus moves the threshold by that much. A rolled bonus such as 1d4 is rolled first, and its result is applied.'
+        )
+      : promptLabel(
+          'BonusHelpDice',
+          'A bonus adds that many dice. A rolled bonus such as 1d4 is rolled first, and its result is applied.'
+        ),
+  };
+}
+
 function needText(need, labels) {
   if (need?.kind === 'dc') return fill(labels.dcValue, { dc: need.dc });
+  if (need?.kind === 'target') return fill(labels.targetValue, { target: need.target });
+  if (need?.kind === 'successes') return fill(labels.countNeed, { count: need.count });
   return need?.kind === 'noSingleTarget' ? labels.noSingleTarget : labels.noCheck;
 }
 
-/** The DC, bulk-need and pick-cap copy, formatted here so the component renders strings only. */
-function formatCopy(data, choicePlan) {
-  const labels = copy();
-  const formatted = {
-    labels: { ...labels, pickUpTo: fill(labels.pickUpTo, { count: choicePlan.maxPicks }) },
-    dcText: Number.isFinite(data.dc) ? fill(labels.dcValue, { dc: data.dc }) : '',
+/** The count formula line, `{pool}d{die} · each ≥ {threshold}`, its rules line and successes chip. */
+function countText(data) {
+  const { pool, die, threshold, required } = data.count;
+  const resolved = [pool, die, threshold].every(Number.isFinite);
+  const { direction, comparison } = data;
+  let neededText = '';
+  if (required === 1) neededText = promptLabel('CountNeededOne', '1 success needed');
+  else if (required !== null) {
+    neededText = fill(promptLabel('CountNeeded', '{count} successes needed'), { count: required });
+  }
+  const values = countFormulaValues({ dice: pool, die, threshold, direction, comparison });
+  return {
+    formula: resolved
+      ? fill(
+          // The chat card's own pool line, so the two cannot word it differently.
+          localize(
+            'FABRICATE.Check.CountRoll.Pool',
+            '{pool}d{die} · each {comparison} {threshold}'
+          ),
+          values
+        )
+      : '',
+    formulaNote: resolved ? countRules(data.count, values, direction) : '',
+    dcText: '',
+    neededText,
   };
+}
+
+/** Frames 30 and 35: `Success on ≥ 8 · best face explodes · worst face cancels`. */
+function countRules({ die, thresholdSource, ...rules }, values, direction) {
+  const clauses = [
+    thresholdSource
+      ? fill(promptLabel('CountRuleSource', 'Success on {comparison} {threshold} ({source})'), {
+          ...values,
+          source: thresholdSource,
+        })
+      : fill(promptLabel('CountRule', 'Success on {comparison} {threshold}'), values),
+  ];
+  const { explode, cancel } = describedFaceRules({ die, direction, ...rules });
+  if (explode) {
+    clauses.push(faceRuleText(explode, direction, explode.once ? 'ExplodeOnce' : 'Explode'));
+  }
+  if (cancel) {
+    clauses.push(faceRuleText(cancel, direction === 'under' ? 'over' : 'under', 'Cancel'));
+  }
+  return clauses.join(' · ');
+}
+
+const FACE_RULES = {
+  Explode: ['CountExplodeBest', 'best face explodes', 'CountExplodeFrom', 'faces {faces} explode'],
+  ExplodeOnce: [
+    'CountExplodeBestOnce',
+    'best face explodes once',
+    'CountExplodeFromOnce',
+    'faces {faces} explode once',
+  ],
+  Cancel: ['CountCancelWorst', 'worst face cancels', 'CountCancelFrom', 'faces {faces} cancel'],
+};
+
+function faceRuleText({ kind, value }, direction, rule) {
+  const [extremeKey, extremeText, fromKey, fromText] = FACE_RULES[rule];
+  if (kind !== 'from') return promptLabel(extremeKey, extremeText);
+  return fill(promptLabel(fromKey, fromText), { faces: `${faceSign(direction)} ${value}` });
+}
+
+function targetText(data, labels) {
+  if (!Number.isFinite(data.dc)) return '';
+  return data.direction === 'under'
+    ? fill(labels.targetValue, { target: data.dc })
+    : fill(labels.dcValue, { dc: data.dc });
+}
+
+/** The labels a check's product and direction word the prompt with. */
+function labelsFor(data) {
+  if (data.count) return { ...copy(), ...countCopy(data.count.destination) };
+  if (data.countDestination) return { ...copy(), ...countCopy(data.countDestination) };
+  return data.direction === 'under' ? { ...copy(), ...underCopy() } : copy();
+}
+
+/** The target, bulk-need and pick-cap copy, formatted here so the component renders strings only. */
+function formatCopy(data, choicePlan) {
+  const labels = labelsFor(data);
+  const { formulaNote, ...counted } = data.count ? countText(data) : {};
+  const formatted = {
+    labels: {
+      ...labels,
+      pickUpTo: fill(labels.pickUpTo, { count: choicePlan.maxPicks }),
+      ...(formulaNote && { formulaNote }),
+    },
+    ...(data.count ? counted : { dcText: targetText(data, labels) }),
+  };
+  // The one target chip: a count's successes needed, else the DC or target and its comparison.
+  formatted.chipText = data.count
+    ? formatted.neededText
+    : formatted.dcText &&
+      `${formatted.dcText} · ${data.comparison === 'exceed' ? labels.exceed : labels.meet}`;
   if (Array.isArray(data.subjects)) {
     formatted.subjects = data.subjects.map((subject) => ({
       ...subject,
@@ -173,12 +303,58 @@ export async function waitForPrompt(data, allowAdvantage, choicePlan, open = res
   return translatePromptAnswer(answer, { defaultRollMode, choicePlan });
 }
 
-/** `displayFormula` is the producer's base without the itemised modifier terms, shown as chips. */
+/** A bulk row's need rolls under when it names a target or reads an under character value. */
+function rollsUnder(need) {
+  return need?.kind === 'target' || (need?.kind === 'noSingleTarget' && need.direction === 'under');
+}
+
+/** A count check's view: the pre-modifier pool, per-die threshold and required count. */
+function countPromptView({
+  pool,
+  die,
+  threshold,
+  thresholdSource,
+  explode,
+  cancel,
+  required,
+  modifierDestination,
+}) {
+  return {
+    pool: Number.isFinite(pool) ? pool : null,
+    die: Number.isFinite(die) ? die : null,
+    threshold: Number.isFinite(threshold) ? threshold : null,
+    thresholdSource:
+      typeof thresholdSource === 'string' && thresholdSource ? thresholdSource : null,
+    explode: faceRule(explode),
+    cancel: faceRule(cancel),
+    required: Number.isInteger(required) ? required : null,
+    destination: modifierDestination === 'threshold' ? 'threshold' : 'pool',
+  };
+}
+
+function faceRule(rule) {
+  if (!rule || typeof rule !== 'object') return null;
+  if (rule.kind === 'from' && !Number.isInteger(rule.value)) return null;
+  return {
+    kind: rule.kind === 'from' ? 'from' : 'extreme',
+    value: rule.value ?? null,
+    once: rule.once === true,
+  };
+}
+
+/**
+ * `displayFormula` is the producer's base without the itemised modifier terms, shown as chips.
+ * `target` (else `dc`) is the pre-modifier number; `direction: 'under'` names it a target, which
+ * `targetBasis` and `toolBonus` explain (see `rollPromptTarget`). A `product: 'count'` check shows
+ * its pool line and required count instead of any formula or DC.
+ */
 export function buildSinglePromptData({
   formula,
   resolvedFormula,
   displayFormula,
   dc,
+  target,
+  direction,
   name,
   actorName,
   activity,
@@ -186,10 +362,22 @@ export function buildSinglePromptData({
   selectedModifiers,
   thresholdMode,
   comparison,
+  targetBasis = null,
+  toolBonus = 0,
+  product,
+  pool,
+  die,
+  threshold,
+  thresholdSource,
+  explode,
+  cancel,
+  required,
+  modifierDestination,
 } = {}) {
   const title = fill(promptLabel('CheckTitle', '{activity} check'), {
     activity: activity || promptLabel('roll', 'Roll'),
   });
+  const value = Number.isFinite(target) ? target : dc;
   const subtitle =
     actorName && name
       ? fill(promptLabel('ActorSubject', '{actor} · {subject}'), {
@@ -197,13 +385,39 @@ export function buildSinglePromptData({
           subject: name,
         })
       : actorName || name || '';
+  if (product === 'count') {
+    return {
+      kind: 'single',
+      title,
+      subtitle,
+      img: img || '',
+      formula: '',
+      dc: null,
+      direction: direction === 'under' ? 'under' : 'over',
+      comparison: (comparison ?? thresholdMode) === 'exceed' ? 'exceed' : 'meet',
+      selectedModifiers: Array.isArray(selectedModifiers) ? selectedModifiers : [],
+      count: countPromptView({
+        pool,
+        die,
+        threshold,
+        thresholdSource,
+        explode,
+        cancel,
+        required,
+        modifierDestination,
+      }),
+    };
+  }
+  const under = direction === 'under' && Number.isFinite(value);
   return {
     kind: 'single',
     title,
     subtitle,
     img: img || '',
     formula: displayFormula || resolvedFormula || formula || '',
-    dc: Number.isFinite(dc) ? dc : null,
+    dc: Number.isFinite(value) ? value : null,
+    direction: under ? 'under' : 'over',
+    ...(under && { targetBasis, toolBonus }),
     comparison:
       comparison === undefined ? (thresholdMode === 'exceed' ? 'exceed' : 'meet') : comparison,
     selectedModifiers: Array.isArray(selectedModifiers) ? selectedModifiers : [],
@@ -216,8 +430,17 @@ export function buildBulkPromptData({ count, subjects, activity, actorName } = {
   const items = fill(promptLabel('BulkHeading', '{count} items'), {
     count: Number.isFinite(count) ? count : rows.length,
   });
+  const destinations = new Set(rows.map((row) => row?.need?.destination));
   return {
     kind: 'bulk',
+    // Every row rolling under (a fixed target or a character value) gets the roll-under bonus
+    // help; any other row (or an empty batch) keeps the roll-over copy.
+    direction: rows.length > 0 && rows.every((row) => rollsUnder(row?.need)) ? 'under' : 'over',
+    // Likewise every row a count check with one modifier destination gets that count's help.
+    countDestination:
+      destinations.size === 1 && rows.every((row) => row?.need?.kind === 'successes')
+        ? ([...destinations].find((entry) => entry === 'pool' || entry === 'threshold') ?? null)
+        : null,
     title: activity
       ? fill(promptLabel('CheckTitlePlural', '{activity} checks'), { activity })
       : promptLabel('BulkTitle', 'Bulk check'),
@@ -267,7 +490,7 @@ export async function promptBulkCheckRoll({
 }
 
 export function buildInteractiveRollOptions(
-  { interactive, actor, name, activity, dc, img, modifierChoice, ...input },
+  { interactive, actor, name, activity, dc, img, modifierChoice, targetBasis, ...input },
   prompt = promptCheckRoll
 ) {
   const dcLabel = dcFlavorSuffix(dc, input.evaluation);
@@ -283,5 +506,6 @@ export function buildInteractiveRollOptions(
     img,
   };
   if (modifierChoice) rollOptions.modifierChoice = modifierChoice;
+  if (targetBasis) rollOptions.targetBasis = targetBasis;
   return rollOptions;
 }

@@ -150,9 +150,11 @@ export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
 // Issue 1512: the retired stage-row box (8px) and rocker buttons (4px) took four with them.
 // #1510: the Tool library's sort select took its 8px corner with it; the `inline` rung draws 7px.
 // Issue 1973: the Travel Realms pane dropped its retired card chrome's 8px corner.
+// Epic 1997: the Stepper group's 8px corner takes the specimen's r7 (ruling 2026-09-28), 266 -> 265.
+// Epic 1997: the retired unbanded ManagerModal panel took its 12px corner with it, 265 -> 264.
 // Issue 2005: the config option cards take the library's 11px, which the Checks override now
-// inherits (two 10px corners), and the outcome swatch's 4px corner becomes a 50% circle.
-export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 263;
+// inherits (two 10px corners), and the outcome swatch's 4px corner becomes a 50% circle, 264 -> 261.
+export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 261;
 
 /** A Svelte SCOPED STYLE reading an area-scoped `--fab-*` property, keyed `file | property`. */
 export const KNOWN_AREA_SCOPED_STYLE_READS = knownDebt('areaScopedStyleReads');

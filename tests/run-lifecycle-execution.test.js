@@ -19,8 +19,12 @@ import {
   postCheckRollHandoff,
 } from '../src/systems/checkRoll.js';
 import { transitionExecutionJournal } from '../src/systems/runExecutionJournal.js';
+import { promptJournalStageCheck } from '../src/bootstrap/journalOperations.js';
+import { buildSinglePromptData } from '../src/ui/svelte/apps/crafting/rollPrompt.js';
+import { rollPromptTarget } from '../src/ui/svelte/apps/crafting/rollPromptTarget.js';
 import { installCountDice } from './helpers/countEngineDice.js';
 import { countEvaluation } from './helpers/countFixtures.js';
+import { stubPromptSurface } from './helpers/rollPromptDialogStub.js';
 import { createPersistedCraftingHistory, mergeHistoryFlag } from './helpers/journal-fixtures.js';
 import { gatheringFixture } from './helpers/real-gathering-attempt.js';
 
@@ -2264,6 +2268,111 @@ test('the versioned crafting descriptor refuses its target before the Tool roll 
   }
 });
 
+test('a roll-under versioned prompt names its pre-modifier target through the Journal adapter', async () => {
+  const tool = { id: 'hammer', label: 'Hammer', bonus: { enabled: true, expression: '2' } };
+  const under = { product: 'sum', direction: 'under' };
+  const { describe } = await startToolSuppliedRun(tool, {
+    check: { rollFormula: '1d20', dc: 12, thresholdMode: 'exceed', evaluation: under },
+  });
+  const { restore } = installPreparedRolls([], []);
+  try {
+    const { publicPrompt } = await describe();
+    assert.deepEqual([publicPrompt.target, publicPrompt.direction, publicPrompt.comparison], [12, 'under', 'exceed']);
+    assert.equal(publicPrompt.displayFormula, '1d20', 'the Tool scalar raises the target, not the roll');
+    let received;
+    await promptJournalStageCheck(publicPrompt, async (options) => {
+      received = options;
+    });
+    const view = buildSinglePromptData(received);
+    assert.deepEqual([view.dc, view.direction, view.comparison], [12, 'under', 'exceed']);
+    assert.deepEqual([publicPrompt.targetBasis, publicPrompt.toolBonus], [null, 2]);
+    const surface = stubPromptSurface(() => null);
+    try {
+      await promptJournalStageCheck(publicPrompt);
+    } finally {
+      surface.restore();
+    }
+    assert.deepEqual(rollPromptTarget(surface.view, []), {
+      chipText: 'Target 14 · stay under', source: 'Base 12 · tools +2',
+    }, 'the chip names the target the rolled Tool bonus already raised');
+  } finally {
+    restore();
+  }
+});
+
+test('a roll-under versioned prompt explains a character-value target through the Journal adapter', async () => {
+  const tool = { id: 'hammer', label: 'Hammer', bonus: { enabled: true, expression: '2' } };
+  const target = { source: 'attribute', expression: '@bonus', baseAdjustment: -90 };
+  const { describe } = await startToolSuppliedRun(tool, {
+    check: { rollFormula: '1d20', dc: 12, evaluation: { product: 'sum', direction: 'under', target } },
+  });
+  const { restore } = installPreparedRolls([], []);
+  const surface = stubPromptSurface(() => null);
+  try {
+    const { publicPrompt } = await describe();
+    assert.equal(publicPrompt.target, 9);
+    assert.deepEqual(publicPrompt.targetBasis, {
+      expression: '@bonus', value: 99, adjustment: { kind: 'add', value: -90, label: '' },
+    });
+    await promptJournalStageCheck(publicPrompt);
+    assert.deepEqual(rollPromptTarget(surface.view, []), {
+      chipText: 'Target 11 · stay at or under', source: '@bonus 99 · difficulty -90 · tools +2',
+    });
+  } finally {
+    surface.restore();
+    restore();
+  }
+});
+
+test('a count versioned prompt shows its pre-modifier pool line and successes through the Journal adapter', async () => {
+  const tool = { id: 'hammer', label: 'Hammer', bonus: { enabled: true, expression: '1d4' } };
+  const evaluation = countEvaluation({
+    direction: 'under', die: 20, base: '@skill', threshold: '13', required: 2, modifierDestination: 'threshold',
+  });
+  const { actor, describe } = await startToolSuppliedRun(tool, {
+    check: { rollFormula: '1d20', dc: 12, thresholdMode: 'exceed', evaluation },
+  });
+  actor.getRollData = () => ({ skill: 3.7 });
+  const dice = installCountDice({ faces: [4] });
+  const surface = stubPromptSurface(() => null);
+  try {
+    const { publicPrompt } = await describe();
+    await promptJournalStageCheck(publicPrompt);
+    const { view } = surface;
+    assert.equal(view.formula, '3d20 · each < 13', 'the pool 3.7 rounded down, before the Tool die');
+    assert.equal(view.neededText, '2 successes needed');
+    assert.deepEqual([view.dc, view.dcText, view.allowAdvantage], [null, '', false]);
+    assert.equal(view.labels.eachAdds, 'Each moves the threshold.');
+  } finally {
+    surface.restore();
+    dice.restore();
+  }
+});
+
+test('a fixed-range routed count versioned prompt names no required count', async () => {
+  const tool = { id: 'hammer', label: 'Hammer', bonus: { enabled: true, expression: '1' } };
+  const ranges = [{ id: 'plain', name: 'Plain', success: true, start: 0, end: 9 }];
+  const described = async (type) => {
+    const check = {
+      rollFormula: '', dc: 12, type, thresholdMode: 'meet', fixedOutcomes: ranges,
+      relativeOutcomes: [{ id: 'fine', name: 'Fine', success: true, dc: 0 }],
+      evaluation: countEvaluation({ base: '2', required: 3 }),
+    };
+    const { describe } = await startToolSuppliedRun(tool, {
+      resolutionMode: 'routedByCheck', slot: 'routed', check,
+    });
+    return (await describe()).publicPrompt;
+  };
+  const dice = installCountDice({ faces: [] });
+  try {
+    const fixed = await described('fixed');
+    assert.deepEqual([fixed.product, fixed.pool, fixed.required], ['count', 2, null], 'the pre-Tool pool');
+    assert.equal((await described('relative')).required, 3);
+  } finally {
+    dice.restore();
+  }
+});
+
 test('the versioned count descriptor refuses before the Tool roll and captures its policy privately', async () => {
   const tool = { id: 'hammer', label: 'Hammer', bonus: { enabled: true, expression: '1d4' } };
   const check = (pool) => ({
@@ -2473,6 +2582,8 @@ test('versioned Journal preparation freezes modifier contributions across actor 
         assert.deepEqual(descriptor.publicPrompt.selectedModifiers, []);
         assert.deepEqual(descriptor.publicPrompt.modifierChoice.modifiers.map(({ id }) => id), ['focus', 'spark']);
         assert.ok(!Object.hasOwn(descriptor.publicPrompt.modifierChoice.modifiers[1], 'formula'));
+        assert.deepEqual(descriptor.publicPrompt.modifierChoice.modifiers.map(({ value }) => value), [3, null],
+          'a flat pick carries the number a roll-under prompt adds to its target; a rolled one none');
       } else {
         assert.equal(descriptor.publicPrompt.formula, '1d20 + 2[Tool] + 3[Modifiers] + (1d4+1)[Modifiers]');
         assert.equal(descriptor.publicPrompt.displayFormula, '1d20 + 2[Tool]', 'Tool terms stay, chips do not');
@@ -2480,6 +2591,7 @@ test('versioned Journal preparation freezes modifier contributions across actor 
           { label: 'Focus', display: '+3' },
           { label: 'Spark', display: '+1d4+1' },
         ]);
+        assert.deepEqual(descriptor.publicPrompt.selectedModifiers.map(({ value }) => value), [3, null]);
       }
       actor.system.focus = 9;
       actor.system.spark = 8;

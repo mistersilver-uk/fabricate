@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { tick } from '../../node_modules/svelte/src/index-client.js';
 import {
+  CHECK_TARGET_RAW_MODULES,
   MARKS_AND_NOTICES_COMPILED_MODULES,
   PLAYER_APP_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
@@ -40,6 +41,8 @@ const harness = createMountedComponentHarness({
     'src/config/stackQuantityPathPresets.js',
     'src/gatheringImageDefaults.js',
     'src/ui/presenters/CraftingListingBuilder.js',
+    ...CHECK_TARGET_RAW_MODULES,
+    'src/systems/countEvaluation.js',
     'src/systems/characterLibraries.js',
     'src/systems/checkModifierResolver.js',
     'src/systems/checkModifierRouter.js',

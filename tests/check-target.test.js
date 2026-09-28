@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 
 import { compareToTarget } from '../src/systems/checkEvaluation.js';
 import {
+  attributeTargetBasis,
   CHECK_TARGET_REFUSALS,
   checkRefusalMessage,
   isValidTargetAdjustment,
@@ -288,4 +289,27 @@ test('a refusal reads as a localized sentence whose English fallback matches en.
   }
   assert.equal(keys.size, CHECK_TARGET_REFUSALS.length + 1, 'one sentence per reason, plus a fallback');
   assert.equal(keys.size, Object.keys(TargetRefusal).length, 'every en.json sentence is used');
+});
+
+test('a summed character-value target names its value and the adjustment that moved it', () => {
+  const rollData = { skills: { smith: { level: 12 } } };
+  const config = (evaluation, type) => ({ type, evaluation });
+  const basis = (evaluation, override, type) =>
+    attributeTargetBasis(config(evaluation, type), {
+      override,
+      label: 'Hard Work',
+      readRollData: () => rollData,
+    });
+  const smith = attribute(' @skills.smith.level ', 'add', 1);
+  assert.deepEqual(basis(smith, -2), {
+    expression: '@skills.smith.level',
+    value: 12,
+    adjustment: { kind: 'add', value: -2, label: 'Hard Work' },
+  });
+  assert.deepEqual(basis(smith, null).adjustment, { kind: 'add', value: 1, label: '' });
+  assert.equal(basis(attribute('@skills.smith.level'), undefined).adjustment, null);
+  assert.equal(basis({ ...smith, product: 'count' }, -2), null, 'a count check reads a pool');
+  assert.equal(basis({ ...smith, target: { source: 'fixed' } }, -2), null);
+  assert.equal(basis(smith, -2, 'fixed'), null, 'a fixed-range routed check reads no target');
+  assert.equal(basis(attribute('@skills.lore.level'), -2), null, 'an unresolved value');
 });

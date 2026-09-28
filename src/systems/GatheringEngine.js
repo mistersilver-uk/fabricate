@@ -18,9 +18,11 @@ import { matchResultGroupsByName, normalizeRoutedName } from '../utils/routedOut
 
 import { buildCheckModifierContext } from './checkModifierResolver.js';
 import { evaluateSituationalBonus, runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
+import { countPromptFields } from './checkRollDecision.js';
 import {
   activeCheckEvaluation,
   actorRollData,
+  attributeTargetBasis,
   checkTargetRefusal,
   dcFlavorSuffix,
   progressiveTargetRefusal,
@@ -777,6 +779,14 @@ export class GatheringEngine {
         offerSituationalBonus: config?.offerSituationalBonus !== false,
         // A count check offers no advantage until it is mode-aware (issue 2007).
         allowAdvantage: !count && Boolean(rollFormula && /(?:^|\W)d20(?:\W|$)/i.test(rollFormula)),
+        // A hidden task's prompt keeps the count wording but shows no pool or required count,
+        // and fixed ranges grade the net, so they name no required count either.
+        ...(count &&
+          countPromptFields(
+            evaluation,
+            secret ? null : target.policy,
+            secret || config?.type === 'fixed' ? null : target.target
+          )),
       },
       privateEvaluation: {
         secret,
@@ -3803,6 +3813,11 @@ export class GatheringEngine {
           activity: 'Gathering',
           img: task?.img,
           dc: target.target,
+          targetBasis: attributeTargetBasis(routed, {
+            override: task?.adjustmentOverride,
+            label: '',
+            readRollData: () => actorRollData(actor),
+          }),
           evaluation,
         }),
         offerSituationalBonus: routed?.offerSituationalBonus !== false,

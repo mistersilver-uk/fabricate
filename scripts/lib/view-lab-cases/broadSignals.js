@@ -252,10 +252,12 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-tool-parity-04-requirements-1280x720',
     'player-salvage',
   ]),
-  // The modal chrome's banded variant (issue 2021), which only the roll prompt draws.
+  // The modal chrome's banded frame (issue 2021), which every dialog draws since epic 1997.
   'src/ui/svelte/apps/manager/ManagerModal.svelte': Object.freeze([
     'player-crafting-roll-prompt-basic',
     'player-crafting-roll-prompt-compact',
+    'manager-import-report',
+    'manager-components-add-from-catalogue',
   ]),
   // The sheet itself, and the first entry here whose key is not a component (issue 1515).
   'styles/fabricate.css': Object.freeze([

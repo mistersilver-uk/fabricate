@@ -133,8 +133,9 @@ it('Journal prompt adapter forwards only named, permitted display fields', async
   const descriptor = {
     label: 'Old subject label', subject: 'Steep tea', activity: 'Crafting', actorName: 'Tinker',
     img: 'icons/tea.webp', formula: '1d20 + 3[Modifiers]',
-    resolvedFormula: '1d20 + 3[Modifiers]', displayFormula: '1d20', target: 14, comparison: 'exceed',
-    selectedModifiers: [{ label: 'Focus', display: '+3' }],
+    resolvedFormula: '1d20 + 3[Modifiers]', displayFormula: '1d20', target: 14, direction: 'under',
+    comparison: 'exceed', selectedModifiers: [{ label: 'Focus', display: '+3' }],
+    targetBasis: { expression: '@skills.brew', value: 16, adjustment: null }, toolBonus: 1,
     allowAdvantage: true, allowsSituationalModifier: true, offerSituationalBonus: false,
     modifierChoice: null, privateEvaluation: { rollFormula: 'SECRET' },
   };
@@ -143,7 +144,8 @@ it('Journal prompt adapter forwards only named, permitted display fields', async
   assert.deepEqual(received, {
     name: 'Steep tea', actorName: 'Tinker', activity: 'Crafting', img: 'icons/tea.webp',
     formula: '1d20 + 3', resolvedFormula: '1d20 + 3', displayFormula: '1d20',
-    dc: 14, comparison: 'exceed', thresholdMode: 'exceed',
+    dc: 14, direction: 'under', comparison: 'exceed', thresholdMode: 'exceed',
+    targetBasis: { expression: '@skills.brew', value: 16, adjustment: null }, toolBonus: 1,
     selectedModifiers: [{ label: 'Focus', display: '+3' }],
     allowAdvantage: true, offerSituationalBonus: false, modifierChoice: null,
   });
@@ -383,6 +385,51 @@ describe('journal run command protocol', () => {
       assert.equal(denied.response.reason, 'owner-required');
       assert.equal(JSON.stringify(denied).includes(canary), false);
       assert.equal(publicPrompt.label, canary, 'redaction must not mutate the engine descriptor');
+    } finally {
+      globalThis.game = originalGame;
+      globalThis.fromUuid = originalFromUuid;
+    }
+  });
+
+  it('lets only a count check\'s wording keys through a redacted prompt, never its numbers (issue 2004)', async () => {
+    const originalGame = globalThis.game;
+    const originalFromUuid = globalThis.fromUuid;
+    try {
+      globalThis.game = { user: { id: 'gm', isGM: true } };
+      const canary = 'PROTECTED-COUNT-CANARY';
+      const run = { id: 'run-1', recipeId: 'recipe', lifecycleVersion: 1, runRevision: 3 };
+      const publicPrompt = {
+        label: canary, subject: canary, actorName: canary, activity: 'Crafting', img: canary,
+        formula: '', target: null, mode: 'simple', allowsSituationalModifier: true, allowAdvantage: false,
+        selectedModifiers: [{ label: canary, display: '+987' }],
+        product: 'count', direction: 'under', comparison: 'exceed', modifierDestination: 'threshold',
+        pool: 987, threshold: 986, thresholdSource: `@${canary} + 985`, die: 984, required: 983,
+        explode: { kind: 'from', value: 982, once: true }, cancel: { kind: 'from', value: 981 },
+      };
+      const fabricate = {
+        craftingRunManager: { getRun: () => run },
+        craftingEngine: {
+          describeVersionedStageCheck: async () => ({ required: true, publicPrompt, privateEvaluation: { recipeId: 'recipe' } }),
+        },
+        recipeManager: { getRecipe: () => ({ id: 'recipe', craftingSystemId: 'system' }) },
+        recipeVisibilityService: { getVisibleRecipes: () => [] },
+      };
+      const operations = loadCraftingOperations()(fabricate, () => harness.service);
+      const harness = commandHarness({ currentUserId: 'gm', operations: { crafting: operations } });
+      const { service, actor } = harness;
+      actor.isOwner = true;
+      globalThis.fromUuid = async () => actor;
+      const hidden = await service.handleSocketMessage({
+        kind: JOURNAL_RUN_SOCKET_KIND.REQUEST, requestId: 'count-prompt', sessionId: 'player-tab',
+        actorUuid: actor.uuid, runType: 'crafting', runId: run.id, expectedRevision: 3,
+        action: 'execute', senderId: 'gm', payload: {},
+      }, 'player');
+      assert.deepEqual(hidden.response.promptDescriptor, {
+        allowsSituationalModifier: true, allowAdvantage: false, offerSituationalBonus: true,
+        product: 'count', direction: 'under', comparison: 'exceed', modifierDestination: 'threshold',
+      });
+      assert.equal(JSON.stringify(hidden).includes(canary), false);
+      assert.equal(/98\d/.test(JSON.stringify(hidden.response.promptDescriptor)), false, 'no pool, threshold, die, rule or required number');
     } finally {
       globalThis.game = originalGame;
       globalThis.fromUuid = originalFromUuid;

@@ -55,9 +55,11 @@ import {
   runFormulaProgressive,
   runFormulaRouted,
 } from './checkRoll.js';
+import { countPromptFields, underTargetPromptFields } from './checkRollDecision.js';
 import {
   activeCheckEvaluation,
   actorRollData,
+  attributeTargetBasis,
   checkTargetRefusal,
   dcFlavorSuffix,
   progressiveTargetRefusal,
@@ -476,9 +478,10 @@ export class CraftingEngine {
         actor,
         rollFormula,
         dc,
-        evaluation,
+        checkTarget,
         modifierContext,
         modifierChoice,
+        toolContributions: preparedTools.contributions,
       }),
       privateEvaluation: {
         actorUuid: actor?.uuid ?? null,
@@ -5623,6 +5626,7 @@ export class CraftingEngine {
           activity: 'Crafting',
           img: this._resolveRecipePromptImg(recipe),
           dc,
+          targetBasis: promptTargetBasis(checkConfig, recipe, craftingActor, target, dc),
           evaluation,
           modifierChoice: this._buildInteractiveModifierChoice(
             formula,
@@ -5699,6 +5703,7 @@ export class CraftingEngine {
           img: this._resolveRecipePromptImg(recipe),
           // Fixed-type checks match by value range, so no DC chip or flavor is shown.
           dc: routed.type === 'fixed' ? undefined : dc,
+          targetBasis: promptTargetBasis(routed, recipe, craftingActor, target, dc),
           evaluation,
           modifierChoice: this._buildInteractiveModifierChoice(
             formula,
@@ -6921,11 +6926,13 @@ export class CraftingEngine {
    * pre-resolved `rollDecision` only when truthy (issue 859), so a single-item bag is unchanged.
    * `modifierChoice` (issue 1095) comes from
    * {@link CraftingEngine#_buildInteractiveModifierChoice}, so `playerPicks` matches crafting.
+   * A targeted runner passes its `check`, so a character-value target names its basis.
    */
   _salvageRollOptions({
     interactive,
     actor,
     component,
+    check = null,
     dc,
     evaluation,
     rollDecision = null,
@@ -6939,6 +6946,13 @@ export class CraftingEngine {
       activity: 'Salvage',
       img: component?.img,
       dc,
+      targetBasis:
+        check &&
+        attributeTargetBasis(check, {
+          override: component?.salvage?.adjustmentOverride,
+          label: '',
+          readRollData: () => actorRollData(actor),
+        }),
       evaluation,
       modifierChoice: this._buildInteractiveModifierChoice(
         formula,
@@ -6985,6 +6999,7 @@ export class CraftingEngine {
           interactive,
           actor,
           component,
+          check: simple,
           dc,
           evaluation,
           rollDecision,
@@ -7079,6 +7094,7 @@ export class CraftingEngine {
           interactive,
           actor,
           component,
+          check: routed,
           dc,
           evaluation,
           rollDecision,
@@ -7295,6 +7311,18 @@ function versionedDecisionPolicy(activeCheck, recipe, dc, checkTarget) {
   };
 }
 
+/** The character-value basis a roll prompt names its target by, unless a DC macro moved the
+ * target off what that basis resolves to. */
+function promptTargetBasis(config, recipe, actor, target, dc) {
+  if (dc !== target.target) return null;
+  const tier = selectedCheckTier(config, recipe);
+  return attributeTargetBasis(config, {
+    override: tier?.adjustment,
+    label: tier?.name ?? '',
+    readRollData: () => actorRollData(actor),
+  });
+}
+
 /** The recipe's selected difficulty tier on a check config, while it still exists. */
 function selectedCheckTier(config, recipe) {
   const tierId = recipe?.checkTierId;
@@ -7325,10 +7353,12 @@ function versionedCheckPrompt({
   actor,
   rollFormula,
   dc,
-  evaluation,
+  checkTarget,
   modifierContext,
   modifierChoice,
+  toolContributions,
 }) {
+  const { evaluation, policy: countPolicy } = checkTarget;
   const selectedModifiers = modifierChoice
     ? []
     : resolveCheckModifierContribution(modifierContext, makeRollDataExpressionResolver(actor))
@@ -7341,6 +7371,7 @@ function versionedCheckPrompt({
     ? shown
     : resolveRolledFormula(shown, actor, modifierContext, undefined, evaluation);
   const target = !counts && activeCheck.slot === 'simple' && Number.isFinite(dc) ? dc : null;
+  const routedFixed = activeCheck.slot === 'routed' && activeCheck.config?.type === 'fixed';
   const comparison = activeCheck.config?.thresholdMode === 'exceed' ? 'exceed' : 'meet';
   const activityKey = 'FABRICATE.App.Nav.Crafting';
   const localizedActivity = globalThis.game?.i18n?.localize?.(activityKey);
@@ -7360,6 +7391,11 @@ function versionedCheckPrompt({
     target,
     direction: target === null ? null : evaluation.direction,
     comparison: target === null ? null : comparison,
+    ...(target !== null &&
+      underTargetPromptFields(evaluation, {
+        targetBasis: promptTargetBasis(activeCheck.config, recipe, actor, checkTarget, dc),
+        toolContributions,
+      })),
     selectedModifiers,
     mode: activeCheck.mode,
     allowsSituationalModifier: activeCheck.checkUsable,
@@ -7367,11 +7403,15 @@ function versionedCheckPrompt({
     // A count check offers no advantage until it is mode-aware (issue 2007).
     allowAdvantage: !counts && hasPlainD20(activeCheck.rollFormula),
     modifierChoice: publicModifierChoice(modifierChoice),
+    // The pool resolved before any Tool roll, and the required count the macro settled, which
+    // fixed ranges never read.
+    ...(counts && countPromptFields(evaluation, countPolicy, routedFixed ? null : dc)),
   };
 }
 
-function publicModifierDisplay({ label, icon, display }) {
-  return { label, icon, display };
+/** `value` is the flat number `display` already shows, so a roll-under prompt can add it up. */
+function publicModifierDisplay({ label, icon, display, value }) {
+  return { label, icon, display, value: Number.isFinite(value) ? value : null };
 }
 
 function publicModifierChoice(choice) {

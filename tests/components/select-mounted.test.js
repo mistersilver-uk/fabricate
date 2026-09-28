@@ -147,6 +147,29 @@ describe('1504 Select — the select every screen renders', () => {
   before(harness.setup);
   after(harness.teardown);
 
+  describe('the trigger glyphs (epic 1997)', () => {
+    it('draws the leading glyph and the chevron at the specimen’s 12px on every rung', async () => {
+      // Maintainer ruling 2026-09-28: the library's `.k-field .i` is 12px whatever the rung's
+      // type, where the glyphs used to inherit 12.5px, 11.5px and 0.72rem.
+      const moduleSheet = document.createElement('style');
+      moduleSheet.textContent = sheetSource;
+      document.head.append(moduleSheet);
+      try {
+        for (const size of ['form', 'inline', 'toolbar']) {
+          await mountSelect({ size, icon: 'fas fa-bolt' });
+          const glyphs = [...trigger().querySelectorAll(':scope > i')];
+          assert.equal(glyphs.length, 2, `${size}: a leading glyph and a chevron`);
+          for (const glyph of glyphs) {
+            assert.equal(getComputedStyle(glyph).fontSize, '12px', `${size}: ${glyph.className}`);
+          }
+          harness.remount();
+        }
+      } finally {
+        moduleSheet.remove();
+      }
+    });
+  });
+
   describe('the trigger is the combobox, and the holder', () => {
     it('announces a listbox, renders no query field, and holds focus itself', async () => {
       await mountSelect({});

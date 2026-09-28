@@ -624,6 +624,43 @@ test('the gathering descriptor refuses a count pool and captures its resolved po
   assert.equal(described.publicPrompt.allowsSituationalModifier, true);
   assert.equal(described.privateEvaluation.flavor, 'Forage — Gathering check', 'no DC suffix');
   assert.equal(JSON.stringify(described.publicPrompt).includes('skills'), false);
+  const { product, direction, comparison, pool, threshold, die, required, modifierDestination } =
+    described.publicPrompt;
+  assert.deepEqual(
+    { product, direction, comparison, pool, threshold, die, required, modifierDestination },
+    {
+      product: 'count',
+      direction: 'under',
+      comparison: 'meet',
+      pool: 4,
+      threshold: 8,
+      die: 10,
+      required: 0,
+      modifierDestination: 'threshold',
+    },
+    'the prompt shows the resolved pool line and the override required count'
+  );
+});
+
+test('a hidden gathering task prompts with count wording but no pool or required count', () => {
+  const engine = new GatheringEngine({ localize: (key) => key });
+  const { system, environment, task } = gatheringFixture({ mode: 'routed' });
+  system.gatheringCraftingCheck.routed = routedCheck(countEvaluation({ modifierDestination: 'threshold' }));
+  const describeFor = (taskId) =>
+    engine._versionedCheckDescriptor({
+      actor: { uuid: 'Actor.g', system: {} },
+      run: { taskId },
+      system,
+      environment,
+      task: { ...task, resolutionMode: 'routed' },
+    }).publicPrompt;
+  const hidden = describeFor('blind:1');
+  assert.deepEqual(
+    [hidden.product, hidden.modifierDestination, hidden.pool, hidden.threshold, hidden.required],
+    ['count', 'threshold', null, null, null]
+  );
+  const visible = describeFor(task.id);
+  assert.deepEqual([visible.pool, visible.threshold, visible.required], [2, 8, 1]);
 });
 
 // ── the prepared evaluator ────────────────────────────────────────────────────
@@ -989,6 +1026,72 @@ test('count/under fixed ranges rank and gate by higher net, and a net below ever
     [-1, null, false],
     'a net of −1 below ranges starting at 0 is never clamped to 0'
   );
+});
+
+test('the interactive count prompt reads the pre-modifier pool and each runner\'s required count', async () => {
+  const prompted = [];
+  const rollOptions = {
+    interactive: true,
+    prompt: async (input) => {
+      prompted.push(input);
+      return { confirmed: true, bonus: '1' };
+    },
+  };
+  const actor = { getRollData: () => ({ skills: { smith: { rank: 3.6 } } }) };
+  const evaluation = normalized({ base: '@skills.smith.rank', threshold: '5', modifierDestination: 'threshold' }, 'under');
+  const shared = { formula: '1d20', actor, evaluation, rollOptions, thresholdMode: 'exceed' };
+  const routing = { type: 'relative', relativeOutcomes: LADDER, fixedOutcomes: [], clampToNearest: true };
+  await withDice([1, 2, 3, 1, 2, 3, 1, 2, 3], async (dice) => {
+    await runFormulaPassFail({ ...shared, dc: 2 });
+    await runFormulaRouted({ ...shared, dc: 4, ...routing });
+    await runFormulaProgressive({ ...shared, dc: 7 });
+    assert.deepEqual(dice.formulas(), ['3d10', '3d10', '3d10'], 'the bonus moved the threshold, not the pool');
+  });
+  const fields = ({ product, direction, comparison, pool, threshold, die, required, modifierDestination }) => ({
+    product, direction, comparison, pool, threshold, die, required, modifierDestination,
+  });
+  const expected = {
+    product: 'count', direction: 'under', comparison: 'exceed', pool: 3, threshold: 5, die: 10,
+    modifierDestination: 'threshold',
+  };
+  assert.deepEqual(prompted.map(fields), [
+    { ...expected, required: 2 },
+    { ...expected, required: 4 },
+    // The progressive runner takes no threshold mode, so it compares as it rolls: met.
+    { ...expected, comparison: 'meet', required: null },
+  ], 'the pool 3.6 shows rounded down, and a progressive check needs no count');
+  for (const input of prompted) {
+    assert.deepEqual([input.dc, input.target, input.formula, input.allowAdvantage], [null, null, '', false]);
+  }
+});
+
+test('a fixed-range routed count prompt names no required count, since ranges grade the net', async () => {
+  const prompted = [];
+  const rollOptions = { interactive: true, prompt: async (input) => prompted.push(input) && null };
+  const routed = (type) =>
+    runFormulaRouted({
+      formula: '', dc: 1, type, relativeOutcomes: LADDER, fixedOutcomes: RANGES, clampToNearest: true,
+      actor: ACTOR, evaluation: normalized({ base: '3', threshold: '5' }, 'under'), rollOptions,
+    });
+  await withDice([], async () => {
+    await routed('fixed');
+    await routed('relative');
+  });
+  assert.deepEqual(prompted.map(({ required }) => required), [null, 1]);
+
+  const engine = new GatheringEngine({ localize: (key) => key });
+  const { system, environment, task } = gatheringFixture({ mode: 'routed' });
+  const describe = (type) => {
+    system.gatheringCraftingCheck.routed = routedCheck(countEvaluation({ required: 2 }), {
+      type, fixedOutcomes: RANGES,
+    });
+    return engine._versionedCheckDescriptor({
+      actor: { uuid: 'Actor.g', system: {} }, run: { taskId: task.id }, system, environment,
+      task: { ...task, resolutionMode: 'routed' },
+    }).publicPrompt;
+  };
+  assert.deepEqual([describe('fixed').required, describe('relative').required], [null, 2]);
+  assert.equal(describe('fixed').pool, 2, 'the pool line still shows');
 });
 
 test('a zero pool fails in every mode with no Roll and no triggers, even needing nothing', async () => {

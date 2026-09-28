@@ -26,6 +26,13 @@ import {
   resolveModifierPolicy,
 } from '../src/systems/checkModifierResolver.js';
 import { resolveModifierLibrary } from '../src/systems/characterLibraries.js';
+import { CraftingEngine } from '../src/systems/CraftingEngine.js';
+import { installCountDice } from './helpers/countEngineDice.js';
+import { evaluateCountCheckRoll } from '../src/systems/countCheckRoll.js';
+import { findCountRoll } from '../src/systems/countRoll.js';
+import { normalizeCheckEvaluation } from '../src/systems/normalize/checkEvaluation.js';
+import { stubInteractiveRollEnvironment, stubPromptSurface } from './helpers/rollPromptDialogStub.js';
+import { rollPromptTarget } from '../src/ui/svelte/apps/crafting/rollPromptTarget.js';
 
 test('roll-prompt View Lab variants project valid checks and long world modifier labels', async () => {
   const content = buildLabContent();
@@ -43,18 +50,111 @@ test('roll-prompt View Lab variants project valid checks and long world modifier
     listModifiers() { return this.entries; },
     async saveModifiers(entries) { this.entries = entries; },
   };
-  const world = { fabricate: { craftingSystemManager: manager, characterLibrariesStore: store } };
+  const recipes = new Map(content.recipes.map((recipe) => [recipe.id, recipe]));
+  const recipeManager = {
+    getRecipe: (id) => recipes.get(id),
+    updateRecipe: async (id, updates) => recipes.set(id, { ...recipes.get(id), ...updates }),
+  };
+  const world = {
+    actorList: buildLabActors(content),
+    fabricate: { craftingSystemManager: manager, characterLibrariesStore: store, recipeManager },
+  };
   await seedRollPromptFixture(world, 'basic');
   assert.equal(resolveActiveCraftingCheckFormula(manager.getSystem('lab-smithing')).rollFormula, '2d6 + @abilities.int.mod');
   await seedRollPromptFixture(world, 'advantage');
   assert.equal(resolveActiveCraftingCheckFormula(manager.getSystem('lab-smithing')).rollFormula, '1d20 + @abilities.int.mod');
   await seedRollPromptFixture(world, 'pick-one');
   assert.equal(manager.getSystem('lab-herbalism').craftingCheck.maxModifierPicks, 1);
+  await underPromptView(world);
+  await countPromptView(world);
   await seedRollPromptFixture(world, 'overflow');
   const herbalism = manager.getSystem('lab-herbalism');
   assert.equal(herbalism.craftingCheck.maxModifierPicks, 2);
   assert.ok(resolveModifierLibrary(herbalism, store).some((entry) => entry.id === 'hb-mod-luck' && entry.label.length > 40));
 });
+
+/**
+ * The `under` state is frame 29: the real engine prompt names Sera Vane's target after the
+ * applied modifier, and explains it from the Smithing level and the Hard Work tier.
+ */
+async function underPromptView(world) {
+  const manager = world.fabricate.craftingSystemManager;
+  await seedRollPromptFixture(world, 'under');
+  const system = manager.getSystem('lab-smithing');
+  const store = world.fabricate.characterLibrariesStore;
+  assert.equal(system.craftingCheck.defaultModifierPolicy, 'addAll');
+  assert.deepEqual(system.craftingCheck.defaultModifierIds, ['lab-mod-steady-hands']);
+  const steady = resolveModifierLibrary(system, store).find((entry) => entry.id === 'lab-mod-steady-hands');
+  assert.deepEqual([steady?.label, steady?.expression], ['Steady hands', '1'], "frame 29's applied modifier");
+  const recipe = world.fabricate.recipeManager.getRecipe('sm-r-horseshoe');
+  const crafter = world.actorList.find((actor) => actor.id === 'lab-actor-brenna');
+  assert.deepEqual([crafter.name, recipe.name], ['Sera Vane', 'Hard Work'], "frame 29's subtitle");
+  const stub = stubInteractiveRollEnvironment();
+  const previousGame = globalThis.game;
+  globalThis.game = { fabricate: { getCharacterLibrariesStore: () => store } };
+  try {
+    const engine = new CraftingEngine(null);
+    await engine._runPassFailCheck(system, system.craftingCheck.simple, recipe, null, crafter, {
+      interactive: true,
+    });
+    const view = stub.surface.view;
+    assert.deepEqual([view.formula, view.direction, view.dc, view.subtitle], ['1d20', 'under', 10, 'Sera Vane · Hard Work']);
+    assert.deepEqual(rollPromptTarget(view, []), {
+      chipText: 'Target 11 · stay at or under',
+      source: '@skills.smith.level 12 · Hard Work -2 · modifiers +1',
+    });
+    engine._resolveSimpleCheckDc = async () => 14;
+    await engine._runPassFailCheck(system, system.craftingCheck.simple, recipe, null, crafter, {
+      interactive: true,
+    });
+    assert.deepEqual(rollPromptTarget(stub.surface.view, []), {
+      chipText: 'Target 15 · stay at or under', source: 'Base 14 · modifiers +1',
+    }, 'a DC macro that moved the target leaves no character value to explain it');
+  } finally {
+    if (previousGame === undefined) delete globalThis.game;
+    else globalThis.game = previousGame;
+    stub.restore();
+  }
+}
+
+/** The `count` and `count-threshold` states: the horseshoe's real engine prompt, frames 35 and 30. */
+async function countPromptView(world) {
+  const manager = world.fabricate.craftingSystemManager;
+  const frames = {
+    count: ['6d10 · each ≥ 8', 'Success on ≥ 8 · best face explodes · worst face cancels', 'Each adds dice.', 'Fine Craft'],
+    'count-threshold': [
+      '2d20 · each ≤ 14', 'Success on ≤ 14 (@abilities.int.mod + 11)', 'Each moves the threshold.', 'Complex Work',
+    ],
+  };
+  for (const [state, [formula, rules, eachAdds, recipeName]] of Object.entries(frames)) {
+    await seedRollPromptFixture(world, state);
+    const recipe = world.fabricate.recipeManager.getRecipe('sm-r-horseshoe');
+    const crafter = world.actorList.find((actor) => actor.id === 'lab-actor-brenna');
+    assert.deepEqual([crafter.name, recipe.name], ['Sera Vane', recipeName], `${state}: the frame's subtitle`);
+    const system = manager.getSystem('lab-smithing');
+    assert.deepEqual(system.craftingCheck.defaultModifierIds, ['lab-mod-steady-hands'], 'the frames\' one modifier');
+    const dice = installCountDice();
+    const surface = stubPromptSurface(() => null);
+    try {
+      await new CraftingEngine(null)._runPassFailCheck(
+        system, system.craftingCheck.simple, recipe, null,
+        crafter,
+        { interactive: true }
+      );
+      const { view } = surface;
+      assert.equal(view.subtitle, `Sera Vane · ${recipeName}`);
+      assert.equal(view.formula, formula, `${state}: the pool line, not the retained formula`);
+      assert.equal(view.labels.formulaNote, rules);
+      assert.equal(view.neededText, '2 successes needed');
+      assert.equal(view.labels.eachAdds, eachAdds);
+      assert.deepEqual([view.dc, view.allowAdvantage], [null, false]);
+      assert.deepEqual(dice.constructed, [], 'a dismissed prompt rolls nothing');
+    } finally {
+      surface.restore();
+      dice.restore();
+    }
+  }
+}
 
 /** The two statics the shim hands through, reproduced verbatim from `installFoundryShim.js`. */
 const STATICS = {
@@ -423,6 +523,45 @@ test('the statics behave exactly as the object they replaced', () => {
   assert.equal(Roll.validate('1d20 + 3'), true);
   assert.equal(Roll.validate('1d20 + @x'), false);
   assert.equal(Roll.validate('1d20 + NaN'), false);
+});
+
+test('the shim registers the count Roll over its Roll, so a count check reaches its prompt', async () => {
+  const content = buildLabContent();
+  const previous = { Roll: globalThis.Roll, CONFIG: globalThis.CONFIG };
+  const shim = installFoundryShim({
+    seed: LIVE_SEED,
+    actorList: buildLabActors(content),
+    scenes: [],
+    settings: new Map(),
+    i18n: { localize: (key) => key, format: (key) => key },
+    worldTime: 0,
+    documents: new Map(),
+  });
+  try {
+    const CountRoll = findCountRoll(globalThis.CONFIG);
+    assert.equal(CountRoll?.name, 'FabricateCountRoll', 'registered through the production factory');
+    assert.ok(CountRoll.prototype instanceof globalThis.Roll, 'over the lab Roll, never replacing it');
+    assert.equal(globalThis.CONFIG.Dice.rolls[0], globalThis.Roll);
+    let prompted = null;
+    const result = await evaluateCountCheckRoll(
+      { getRollData: () => ({}) },
+      {
+        interactive: true,
+        evaluation: normalizeCheckEvaluation({ product: 'count', pool: { die: 10, base: '6', threshold: '8', required: 2 } }),
+        required: 2,
+        prompt: async (input) => {
+          prompted = input;
+          return { confirmed: false };
+        },
+      }
+    );
+    assert.equal(result.cancelled, true);
+    assert.deepEqual([prompted.product, prompted.pool, prompted.die, prompted.threshold], ['count', 6, 10, 8]);
+  } finally {
+    shim.restore();
+    globalThis.Roll = previous.Roll;
+  }
+  assert.equal(globalThis.CONFIG, previous.CONFIG, 'restore puts CONFIG back');
 });
 
 test('the shim installs a Roll CONSTRUCTOR, so evaluateCheckRoll reaches the prompt', async () => {
