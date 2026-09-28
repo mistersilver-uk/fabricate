@@ -488,7 +488,8 @@ describe('CHECK_READINESS_ISSUE_IDS is the source of truth for every issue id', 
     // instead of them: it proves the registry is not merely consistent with itself.
     const emitted = new Set();
     const collect = (check, options) => {
-      for (const issue of evaluateCheckReadiness(check, options).issues) emitted.add(issue.id);
+      const { issues, transient } = evaluateCheckReadiness(check, options);
+      for (const issue of [...issues, ...transient]) emitted.add(issue.id);
     };
     const catalogue = [
       { id: 'ok', label: 'Ok', expression: '@a' },
@@ -565,6 +566,44 @@ describe('CHECK_READINESS_ISSUE_IDS is the source of truth for every issue id', 
       }
     );
     collect({ rollFormula: '1d20' }, { mode: 'simple', modifierContext: context(['broken']) });
+    // Targets and adjustments (issue 2003), the two transient warnings naming the Preview-as actor.
+    const attribute = (expression, extra = {}) => ({
+      product: 'sum',
+      direction: 'under',
+      target: { source: 'attribute', expression, adjustmentKind: 'multiply', ...extra },
+    });
+    const actor = { name: 'Vosk', rollData: { skills: { craft: { value: 'high' } } } };
+    collect({ rollFormula: '1d100', evaluation: attribute('') }, { mode: 'simple' });
+    collect(
+      {
+        rollFormula: '1d100',
+        evaluation: attribute('1d6', { baseAdjustment: 0 }),
+        tiers: [{ id: 't', name: 'Hard', adjustment: null }],
+      },
+      { mode: 'simple', activity: 'crafting' }
+    );
+    collect(
+      {
+        rollFormula: '1d100',
+        evaluation: attribute('@skills.craft.value'),
+        type: 'relative',
+        relativeOutcomes: [{ id: 'a', name: 'Regular', adjustment: 1, success: true }],
+      },
+      { mode: 'routed', previewActor: { name: 'Idrin', rollData: {} } }
+    );
+    collect(
+      {
+        rollFormula: '1d100',
+        evaluation: attribute('@skills.craft.value'),
+        type: 'relative',
+        relativeOutcomes: [
+          { id: 'a', name: 'Failure', adjustment: null, success: false },
+          { id: 'b', name: 'Botch', adjustment: null, success: false },
+        ],
+      },
+      { mode: 'routed', previewActor: actor }
+    );
+    collect({ rollFormula: '1d20', evaluation: attribute('@x') }, { mode: 'progressive' });
     for (const id of emitted) {
       assert.ok(
         CHECK_READINESS_ISSUE_IDS.includes(id),

@@ -2371,17 +2371,19 @@
   font-weight: 600;
 }
 
-/* The rail's PANEL COPY. Two scales, and they are the prototype's own: a panel with nothing in it yet states its subject at 11px in the subtle ink, and the activation card's hint — which qualifies a control right above it — is one step up in the muted ink. */
+/* The rail's PANEL COPY. Two treatments: a panel's hint is the library's `k-hint` (10.5px at 1.5, subtle ink), and the activation card's hint — which qualifies a control right above it — keeps its tighter leading in the muted ink. */
 .fabricate-manager .manager-checks-rail .manager-muted {
   margin: 0;
   color: var(--fab-text-subtle);
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 400;
+  line-height: 1.5;
 }
 
 .fabricate-manager .manager-checks-active-card .manager-muted {
   color: var(--fab-text-muted);
   font-size: 10.5px;
+  line-height: 1.35;
 }
 
 /* ── The rail's LISTS ── `THIS CHECK` and `ALL CHECKS` are ONE card of compact rows each, not a stack of bordered cards. */

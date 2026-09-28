@@ -381,6 +381,19 @@ export function classifyCheckTotal({
   };
 }
 
+/** A routed check's tier ids, worst first, by the one ranking {@link classifyCheckTotal} uses. */
+export function routedOutcomeOrder({ type, dc, evaluation, relativeOutcomes, fixedOutcomes }) {
+  const routing = routingOf({
+    type,
+    dc,
+    evaluation,
+    targetDelta: 0,
+    relativeOutcomes,
+    fixedOutcomes,
+  });
+  return rankedRoutedOutcomes(routing).map((outcome) => outcome.id);
+}
+
 function routingOf({ type, dc, evaluation, targetDelta, relativeOutcomes, fixedOutcomes }) {
   const grading = sumGrading(evaluation);
   return {

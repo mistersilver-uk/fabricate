@@ -279,6 +279,7 @@ function checksActivityIsOff(activation, activity) {
 
 function checksIssueCount({ activation, draftSystem, activity, slot, drafts }) {
   if (checksActivityIsOff(activation, activity)) return 0;
+  // No `previewActor`, deliberately: a transient warning must never reach the nav badge.
   return evaluateCheckReadiness(draftForSlot(slot, drafts) || {}, {
     mode: readinessModeForSlot(slot),
     modifierContext: buildCheckModifierContext(draftSystem, activity, null),

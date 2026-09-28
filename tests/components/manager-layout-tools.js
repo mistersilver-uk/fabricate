@@ -9,6 +9,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
+import { BAND_TONES } from '../../src/ui/svelte/apps/manager/checks/checkBandModel.js';
 import { openLayoutContext, renderWithCascade } from '../helpers/layout-harness.js';
 
 import {
@@ -1254,11 +1255,8 @@ test('a squeezed breadcrumb crumb ellipsises from its left edge under the core b
 });
 
 test('every outcome band name clears WCAG AA in every shipped theme', async () => {
-  // The ramp is READ OUT OF the editor rather than restated.
-  const toneNames = /const BAND_TONES = \[([^\]]+)\];/
-    .exec(checkEditorSource)?.[1]
-    .split(',')
-    .map((name) => name.trim().replace(/^'|'$/g, ''));
+  // The ramp is the shared band model's, which the editor and the odds bars both read.
+  const toneNames = [...BAND_TONES];
   const toneMix = Number(/const BAND_TONE_MIX = (\d+);/.exec(checkEditorSource)?.[1]);
   const toneBase = /const BAND_TONE_BASE = '([^']+)';/.exec(checkEditorSource)?.[1];
   assert.ok(toneNames?.length >= 2, 'the ramp tones are readable');
@@ -1916,8 +1914,8 @@ test('an odds row keeps its bar between a bounded label and a pinned percentage'
     assert.equal(geometry.display, 'grid', 'the grid rule still matches this row');
     assert.equal(geometry.overflow, 'hidden', 'and the label truncates rather than wrapping');
     assert.ok(
-      geometry.label <= 90,
-      `a long tier name is bounded at the 5.5rem track (got ${geometry.label}px)`
+      geometry.label <= 80,
+      `a long tier name is bounded at the 80px track (got ${geometry.label}px)`
     );
     assert.ok(geometry.bar > 40, `the bar keeps real width beside it (got ${geometry.bar}px)`);
   } finally {

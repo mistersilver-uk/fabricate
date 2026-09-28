@@ -129,7 +129,7 @@ src/ui/svelte/apps/manager/SystemEditView.svelte	600
 src/ui/svelte/apps/manager/ToolsBrowserView.svelte	950
 src/ui/svelte/apps/manager/checks/CheckTriggers.svelte	900
 src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte	650
-src/ui/svelte/apps/manager/checks/ChecksView.svelte	2000
+src/ui/svelte/apps/manager/checks/ChecksView.svelte	1850
 src/ui/svelte/apps/manager/checks/CraftingCheckEditor.svelte	700
 src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte	750
 src/ui/svelte/apps/manager/checks/checksReadiness.js::evaluateCheckReadiness	130

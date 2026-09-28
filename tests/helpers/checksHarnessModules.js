@@ -67,6 +67,7 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   // The outcome simulator and the odds enumerator (issue 1097), plus the engine modules they drive.
   'src/ui/svelte/apps/manager/checks/checkPreview.js',
   'src/ui/svelte/apps/manager/checks/checkOdds.js',
+  'src/ui/svelte/apps/manager/checks/checkPreviewModel.js',
   // The Studio's adjustment labels and read-only band pictures (issue 2005).
   'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
   'src/ui/svelte/apps/manager/checks/checkBandModel.js',
