@@ -16177,16 +16177,23 @@
   font-size: 0.85em;
 }
 
+/* Core styles every `dl dt` and `dl dd` (a shadowed emphatic ink and an indent), so each resets to the card's own chat ink. */
 .fabricate-craft-chat__evidence-label {
   margin: 0;
+  padding: 0;
+  color: inherit;
   font-weight: 600;
+  text-shadow: none;
   opacity: 0.58;
 }
 
 .fabricate-craft-chat__evidence-value {
   margin: 0;
+  padding: 0;
+  color: inherit;
   font-weight: 500;
   line-height: 1.45;
+  text-shadow: none;
   overflow-wrap: anywhere;
 }
 

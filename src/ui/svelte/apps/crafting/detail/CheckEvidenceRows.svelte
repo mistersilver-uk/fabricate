@@ -48,15 +48,21 @@
     background: var(--fab-bg-2);
   }
 
-  .check-evidence-label {
+  /* Core styles every `dl dt` and `dd` (a shadowed ink and an indent); each resets here. */
+  .check-evidence-label,
+  .check-evidence-value {
     margin: 0;
+    padding: 0;
+    text-shadow: none;
+  }
+
+  .check-evidence-label {
     color: var(--fab-text-subtle);
     font-size: 10.5px;
     font-weight: 600;
   }
 
   .check-evidence-value {
-    margin: 0;
     color: var(--fab-text-secondary);
     font-size: 11px;
     font-weight: 500;
