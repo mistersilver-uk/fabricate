@@ -442,6 +442,8 @@ Recipe difficulty tiers retain finite nullable `adjustment` and integer nullable
 Component salvage and gathering task overrides retain `adjustmentOverride` and `successesOverride` beside `dcOverride`, including through their save projections.
 Under an attribute target source the runtime reads these sibling adjustments: the selected recipe tier's `adjustment`, the component's `salvage.adjustmentOverride` or the task's `adjustmentOverride` applies when non-null, and a null one inherits `target.baseAdjustment` (see `resolution-modes/spec.md` § Check Target Resolution).
 An added adjustment is any finite number and a multiplier is a finite number above zero; a relative outcome tier's `adjustment` is its multiplier under an attribute/multiply check, where a null one marks the Otherwise tier and a non-finite imported multiplier normalizes to null and so becomes Otherwise.
+A `product: "count"` check ignores the target and adjustment fields entirely and reads its required count from the selected recipe tier's non-null `successes`, the component's non-null `salvage.successesOverride` or the task's non-null `successesOverride`; each falls back to `pool.required` when null, and 0 is a valid required count.
+It also never reads `dc` or any adjustment field, fixed or attribute.
 
 ### Requirements
 
@@ -3439,6 +3441,9 @@ CraftingRunStepState = {
    A target refusal returns `success: false` with `misconfigured: true` and `data.targetRefusal` naming its reason, and carries no executed fields.
    An executed result's `data.preRolls`, when present, is an ordered array of `{ source, label, expression, total, destination }` for separately evaluated modifiers; the main `total` and `diceGroups` still describe only the authored check roll and its appended terms.
    Error, prompt cancellation and unrolled exits do not fabricate pre-roll evidence, and a secret prepared check omits it.
+   A `product: "count"` result's `data.dc` is always null, `data.target` is the effective per-die threshold (never null, even for a fixed-range or progressive result), `data.comparison` is the per-die comparison, `data.successes` and numeric `data.cancelled` count qualifying and cancelling dice, `total` is the raw net (qualified minus cancelled), and `margin` is `total` minus the required count of the tier the roll matched — simple: the required count; relative: required plus `outcome.dc`; null for a fixed-range, progressive or zero-pool result, all before forcing or stepping.
+   A zero-pool count result carries `zeroPool: true` with a null `total`, `successes`, `cancelled` and `margin`, no main Roll, and the same populated `target` and `comparison` a rolled result on the same check would carry.
+   A count refusal carries `misconfigured: true`, `data.targetRefusal` naming the reason and `data.refusedInput` naming the input (`'base' | 'threshold' | 'die' | 'explode' | 'cancel' | 'pool'`), and no executed evidence, exactly as a sum target refusal does.
 6. `failureReason` is required when `status` is `failed`.
 7. `preparedConsumption.currencySpends` records what was actually deducted, never what was intended.
    It is the sole input to the cancel reversal's refund, so a spend that did not settle must not appear in it; an empty array is the correct record for a step whose currency deduction settled nothing.

@@ -292,7 +292,7 @@ After actor resolution, eligibility, bounds, ranking and selection, one immutabl
 Sum/over appends in this exact order: authored post-shim formula, numeric Tool terms in Tool order, combined library scalar, library rolling fragments in eligible order, authored-prefix advantage rewrite and parenthesized situational bonus.
 Sum/under routes scalars and separately evaluated expressions to the target; count routes them to the pool or threshold according to `pool.modifierDestination`, while count advantage always changes the pool.
 Under sum/under the authored-prefix advantage rewrite keeps the lowest d20 and disadvantage keeps the highest, because a sum that must come in under its target benefits from the lower die.
-The plan retains fractional and negative benefits without rounding; the count-mode integer policy belongs to its behavior child, after pool benefits aggregate.
+The plan retains fractional and negative benefits without rounding; a count check's effective pool floors, with float noise rounded away first, only after every pool benefit aggregates, and its effective threshold stays fractional or out of range without clamping.
 `targetDelta`, `thresholdDelta` and `poolDelta` are amounts to add to the effective target, per-die threshold and pool; a count/over threshold benefit is therefore stored negated and a count/under one unchanged.
 A pre-roll `destination` is one of `target`, `threshold` or `pool`.
 Under sum/over a dice-bearing Tool bonus contributes only its numeric result, appended exactly as before, and adds no pre-roll evidence to the plan, the message or the handoff.
@@ -312,14 +312,36 @@ Under sum/under the settled `targetDelta` raises or lowers the effective target 
 
 Shared comparison accepts meet or strict exceed with over or under direction; ranking returns a new best-first array, ranks non-finite values last, and retains the first authored member of each tie without mutating its input.
 Effective margin follows the selected direction and is benefit-positive: `total − target` over and `target − total` under.
-The formula runners, the routed classifier and the prepared evaluator grade a summed total over or under a fixed or character-value target; how a count evaluation executes belongs to its own behavior child.
-The Checks Studio preview and odds enumerator grade every record by its own authored `sum` over-or-under direction and fixed-or-attribute target, agreeing with the runtime.
+The formula runners, the routed classifier and the prepared evaluator grade a summed total over or under a fixed or character-value target; § Structured Count Evaluation below governs a `product: 'count'` record instead.
+The Checks Studio preview and odds enumerator grade every record by its own product, agreeing with the runtime: a `sum` record by its authored over-or-under direction and fixed-or-attribute target, and a `count` record per § Structured Count Evaluation.
 The authored evaluation record, including fields the selected mode does not read, survives normalization and export/import.
 A deterministic expression accepts finite numbers, roll-data paths, arithmetic, parentheses and floor, ceil and round without rolling dice.
 A roll-data path reads only the roll data's own keys and resolves a finite number or a decimal numeric string; a missing, null or blank value is an unresolved path, and a boolean, array, object or non-decimal string is refused as non-finite rather than coerced.
 A path token is never read as dice, so `@dc` and `@d20` resolve as paths while `1d%` is refused as dice.
-It reports unresolved paths, dice syntax, invalid syntax and non-finite results distinctly and never substitutes zero for a missing path; count-specific integer policy belongs to the later behavior child.
-That strict own-key reader stays the default for every caller.
+It reports unresolved paths, dice syntax, invalid syntax and non-finite results distinctly and never substitutes zero for a missing path.
+That strict own-key reader stays the default for every caller that grades a check; `checkTarget.js` and `countEvaluation.js` are the two runtime resolvers that pass the Foundry path mode instead, matched by their own preview and readiness counterparts in the Studio so a previewed reading agrees with a rolled one.
+
+### Structured Count Evaluation
+
+A `product: 'count'` evaluation rolls a `pool.die`-sided dice pool sized by `pool.base`, and grades it against `pool.required` rather than any `dc` or `target`.
+`pool.base` and `pool.threshold` resolve as deterministic expressions in the Foundry path mode, and an unresolved or non-numeric result never reads as 0.
+Each active die, explosion-generated dice included, independently **qualifies** against `pool.threshold` in the check's direction and comparison and independently **cancels** on the worst face or a named face; a die's contribution is qualified minus cancelled, so an overlapping face contributes 0 while carrying both marks.
+Net is the sum of every active die's contribution, and grading is always `net >= required` whatever the per-die direction.
+`pool.explode` re-rolls an extra die on the best qualifying face for the direction, or a named face onward, once or recursively; a recursive rule that holds on every face refuses `explode-unbounded` before any roll.
+A named explode or cancel face beyond the die is a readiness concern, not a refusal: it never explodes, and it cancels every face or no face by direction.
+`pool.modifierDestination` sends every applied Check Modifier and benefit to the pool ("Each adds dice") or the threshold ("Each moves the threshold") exactly once each, per § Modifier Placement and Pre-roll Evidence above; the effective pool floors, with float noise rounded away first, only after every benefit aggregates, and the effective threshold stays fractional or out of range without clamping.
+An effective pool at or below zero fails automatically under `pool.zeroPoolFails` (the default) with no main Roll constructed; with it off the pool floors to one die instead, and no fraction ever refuses as not-an-integer.
+An effective pool above 999 dice, Foundry's own `DiceTerm` limit, refuses `pool-too-large` once a placement has settled and before the main roll.
+A malformed `die`, `explode`, `cancel` or the settled pool itself refuses before any Roll is constructed, each naming its own input; nothing unusable is ever read as 0.
+The registered count Roll (`FabricateCountRoll`) captures a versioned, reconstructable, rerollable numeric policy on its options, and it refuses `evaluateSync()` and `evaluate({minimize|maximize})` before any RNG, because Foundry skips every Die modifier under those modes.
+
+Routing, ranking, clamping, forcing, stepping and the minimum gate treat a higher net as better whatever the check's per-die direction; the per-die direction never reaches them.
+A routed count check's relative threshold is `required + outcome.dc`, has no Otherwise tier and applies no D3 `total − targetDelta` shift.
+A progressive count check spends `max(0, net)` as its budget; `progressiveValue` reads that clamped budget while `rollTotal` reads the raw net, so the two can resolve a trigger differently on the same roll, and a count/under progressive slot is valid.
+Gathering's legacy progressive mode executes a `product: 'count'` evaluation through the same progressive runner as every other activity; its d100 drop roll is untouched.
+Every usability gate and the one active-check predicate, `hasActiveCheck` (a count evaluation, or the trimmed post-shim formula each resolver already computes), recognize a structured count as active with no retained formula, and a count check never enters the formula path.
+A versioned crafting or gathering descriptor privately captures `decisionPolicy.count = { die, direction, base, threshold, required, comparison, explode, cancel, zeroPoolFails, modifierDestination }`, resolved before Tool preparation, with `decisionPolicy.dc` staying null; the prepared evaluator grades from that policy and the settled placement alone and never re-resolves the pool or threshold from the live actor, and the secret projection keeps the count projection and settled placement inside the authority only.
+`checkResolutionEvidence` accepts an agreeing count snapshot and result, returning `{ product: 'count', direction }` only when the snapshot and the executed `data` agree and the result carries a finite `total` or `zeroPool: true`.
 
 ### Check Target Resolution
 
