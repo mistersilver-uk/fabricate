@@ -1155,6 +1155,13 @@ The normalized check policy of product, direction, target and pool settings that
 
 [Notes](docs/domain/terms.md#check-evaluation)
 
+#### Count Check
+
+A `product: 'count'` **Check Evaluation** rolls a `pool.die`-sided dice pool sized by `pool.base`, counts dice that qualify against `pool.threshold` net of any the cancel rule removed, and grades that net **successes** count against `pool.required`, reading neither `dc` nor `target`.
+The explode rule adds and re-rolls a die when the best qualifying face for the check's direction comes up (or a named face), and the cancel rule removes a success when the worst face comes up (or a named face); `pool.modifierDestination` sends every applied modifier and bonus to the pool ("Each adds dice") or the threshold ("Each moves the threshold").
+
+[Notes](docs/domain/terms.md#count-check)
+
 #### Target Source
 
 Where a check's pre-modifier target comes from: `fixed` keeps the activity's DC, and `attribute` reads a character value from the acting actor's roll data.
