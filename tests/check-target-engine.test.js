@@ -902,7 +902,7 @@ test('a Journal-prompted roll-under gathering check shows its target chip and ro
   }
   const { chipText, source } = rollPromptTarget(surface.view, []);
   assert.equal(chipText, 'Target 12 · stay at or under');
-  assert.equal(source, '@skills.craft.value 14 · difficulty -2');
+  assert.equal(source, 'Scavenger @skills.craft.value 14 · difficulty −2', 'the ruled form');
   assert.equal(
     surface.view.labels.bonusHelp,
     'A bonus raises the target. A rolled bonus such as 1d4 is rolled first, and its result is applied.'
