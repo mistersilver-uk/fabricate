@@ -937,3 +937,83 @@ describe('the common-trigger presets author a trigger when CLICKED', () => {
     assert.equal(root.querySelector('[data-check-trigger-presets]'), null);
   });
 });
+
+// ── Preset polarity through the rendered control (issue 2005, Q15) ──────────────────────
+describe('the common-trigger presets follow the check direction', () => {
+  const UNDER = { product: 'sum', direction: 'under' };
+  const OVER = { product: 'sum', direction: 'over' };
+  const naturalOne = {
+    id: 'n1',
+    condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 20 },
+    outcome: 'none',
+    breakTools: false,
+    tierStep: { mode: 'up', steps: 1, tierId: null }
+  };
+
+  it('a roll-under check labels and authors its best preset on face 1', async () => {
+    const emitted = [];
+    const root = await harness.mount({
+      value: triggerBlock([]),
+      rollFormula: '1d20',
+      kind: 'routed',
+      outcomeOptions: ROUTED_TIERS,
+      evaluation: UNDER,
+      onChange: (next) => emitted.push(next)
+    });
+    const labels = [...root.querySelectorAll('[data-add-trigger-preset]')].map((button) =>
+      button.textContent.trim()
+    );
+    assert.deepEqual(labels, [
+      'Natural 1 on 1d20 → step up a tier',
+      'Natural 20 on 1d20 → step down a tier'
+    ]);
+    root.querySelector('[data-add-trigger-preset="high"]').click();
+    const best = emitted.at(-1).triggers.at(-1);
+    assert.equal(best.condition.value, 1, 'the best face under is 1');
+    assert.deepEqual(best.tierStep, { mode: 'up', steps: 1, tierId: null });
+    root.querySelector('[data-add-trigger-preset="low"]').click();
+    assert.equal(emitted.at(-1).triggers.at(-1).condition.value, 20, 'the worst face is 20');
+  });
+
+  it('a roll-high check keeps the legacy labels', async () => {
+    const root = await harness.mount({
+      value: triggerBlock([]),
+      rollFormula: '1d20',
+      kind: 'simple',
+      evaluation: OVER
+    });
+    const labels = [...root.querySelectorAll('[data-add-trigger-preset]')].map((button) =>
+      button.textContent.trim()
+    );
+    assert.deepEqual(labels, [
+      'Natural 20 on 1d20 → automatic success',
+      'Natural 1 on 1d20 → automatic failure'
+    ]);
+  });
+
+  it('switching the direction rewrites no existing trigger and relabels only the presets', async () => {
+    const emitted = [];
+    const root = await harness.mount({
+      value: triggerBlock([naturalOne]),
+      rollFormula: '1d20',
+      kind: 'routed',
+      outcomeOptions: ROUTED_TIERS,
+      evaluation: OVER,
+      onChange: (next) => emitted.push(next)
+    });
+    await harness.setProps({ evaluation: UNDER });
+    assert.equal(emitted.length, 0, 'an evaluation change emits nothing');
+    assert.equal(naturalOne.condition.value, 20, 'the authored face is untouched');
+    assert.match(
+      root.querySelector('[data-add-trigger-preset="high"]').textContent,
+      /Natural 1 on 1d20/,
+      'only the offered preset changes'
+    );
+    root.querySelector('[data-add-trigger-preset="high"]').click();
+    assert.deepEqual(
+      emitted.at(-1).triggers.map((trigger) => trigger.condition.value),
+      [20, 1],
+      'a new preset appends after the kept trigger'
+    );
+  });
+});

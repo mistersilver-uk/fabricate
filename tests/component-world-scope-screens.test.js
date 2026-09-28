@@ -91,6 +91,8 @@ describe('requirement 7 correction — the reopened gateways grew seams, not scr
             './ComponentEditView.svelte',
             './ComponentsBrowserView.svelte',
             // `./component/ComponentEditorHeader.svelte` left in issue 1720 with the action ladder.
+            // The salvage preset tiers' one seam (issue 2005), a pure leaf and not a screen.
+            './component/salvageDcPresets.js',
             './components/ComponentBrowserInspector.svelte',
             './components/ComponentBulkEditPanel.svelte',
             // THE `Add from catalogue` PICKER (revision 8, M9).

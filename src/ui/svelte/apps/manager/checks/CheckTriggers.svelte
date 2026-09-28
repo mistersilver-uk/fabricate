@@ -42,6 +42,8 @@
     kind = 'simple',
     outcomeOptions = [],
     showBreakTools = false,
+    // The check's evaluation: a roll-under check's best face is 1, so the presets follow it.
+    evaluation = null,
     onChange = () => {},
   } = $props();
 
@@ -380,7 +382,7 @@
 
   // The preset row, withheld when the formula rolls no dice: a preset offered against one
   // would author a condition pointing at a group that does not exist.
-  const presets = $derived(checkTriggerPresets({ kind, diceGroups }));
+  const presets = $derived(checkTriggerPresets({ kind, diceGroups, evaluation }));
 
   function addPreset(presetId) {
     const trigger = buildPresetTrigger({
@@ -389,6 +391,7 @@
       diceGroups,
       showBreakTools,
       newId,
+      evaluation,
     });
     if (!trigger) return;
     // Open and scroll to it for `addTrigger`'s reason, and MORE so: a preset's card lands at

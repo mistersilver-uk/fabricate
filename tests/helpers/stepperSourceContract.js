@@ -288,10 +288,24 @@ export const UNSET_VALUE_CALL_SITES = Object.freeze(
     },
     {
       id: 'salvage dcOverride',
-      path: 'src/ui/svelte/apps/manager/ComponentEditView.svelte',
+      path: 'src/ui/svelte/apps/manager/component/CheckOverrideField.svelte',
       anchor: ['data-salvage-dc-custom'],
       kind: 'genuine-absence',
       evidence: 'same canonical type as the gathering DC override; empty inherits the system DC',
+    },
+    {
+      id: 'salvage adjustmentOverride',
+      path: 'src/ui/svelte/apps/manager/component/CheckOverrideField.svelte',
+      anchor: ['data-salvage-adjustment-custom'],
+      kind: 'genuine-absence',
+      evidence: 'data-models spec: adjustmentOverride is `number | null`; empty reads the base',
+    },
+    {
+      id: 'gathering task adjustmentOverride',
+      path: 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte',
+      anchor: ['data-gathering-task-adjustment-override'],
+      kind: 'genuine-absence',
+      evidence: 'data-models spec: adjustmentOverride is `number | null`; empty reads the base',
     },
     {
       id: 'gathering task staminaCost',

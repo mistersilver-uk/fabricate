@@ -7,7 +7,46 @@ import {
   ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB,
   GATHERING_ROUTE_MODEL_PATTERN,
 } from './caseConstants.js';
-import { chooseSelectOption, managerCase } from './caseFactories.js';
+import { chooseSelectOption, managerCase, previewAsActor } from './caseFactories.js';
+
+/**
+ * The gathering task check override (issue 2005, R3), one per state of the approved prototype's
+ * frames 23 and 24, on Smithing's Prospect task under `checkOverride`. `sees` is the Player sees
+ * state; a `resolved` case chooses a character in the task's own Preview-as picker.
+ */
+const OPEN_PROSPECT_TASK = Object.freeze([
+  { selector: '#manager-gathering-nav-tasks' },
+  {
+    selector:
+      '[data-gathering-task-id="sm-task-prospect"] .manager-icon-button[aria-label^="Edit"]',
+  },
+]);
+const TASK_PREVIEW = '[data-gathering-task-dc] [data-override-preview-actor]';
+const taskOverrideCase = ({ id, label, field, frame, sees }) =>
+  managerCase({
+    id,
+    label: `Manager — Gathering task check override, ${label} (prototype state ${frame})`,
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: {
+      system: 'lab-smithing',
+      checkOverride: id.slice('manager-gathering-task-editor-check-'.length),
+    },
+    steps: [
+      'Gathering',
+      ...OPEN_PROSPECT_TASK,
+      { selector: '[data-gathering-task-dc]', scroll: true },
+      ...(sees === 'resolved' ? previewAsActor('lab-actor-idrin', TASK_PREVIEW) : []),
+    ],
+    expectView: 'gathering-task-edit',
+    expectSelector: `.fabricate-manager [data-gathering-task-dc][data-gathering-task-override-field="${field}"] [data-override-player-sees="${sees}"]`,
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/component\/(OverridePlayerSees\.svelte|overridePlayerSees\.js)$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/PreviewAsPicker\.svelte$/,
+    ],
+  });
 
 export const CASES = Object.freeze([
   // The state it would show is reached by flipping an inherit switch, and in the View Lab that write never reaches the screen.
@@ -704,5 +743,40 @@ export const CASES = Object.freeze([
       // And the rail that renders that leaf, since phase 3 moved it out of the root too.
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
     ],
+  }),
+  taskOverrideCase({
+    id: 'manager-gathering-task-editor-check-fixed-over',
+    label: 'higher is better, fixed DC',
+    field: 'dcOverride',
+    frame: 23,
+    sees: 'fixed',
+  }),
+  taskOverrideCase({
+    id: 'manager-gathering-task-editor-check-fixed-under',
+    label: 'lower is better, fixed target',
+    field: 'dcOverride',
+    frame: 23,
+    sees: 'fixed',
+  }),
+  taskOverrideCase({
+    id: 'manager-gathering-task-editor-check-add',
+    label: 'character value, added adjustment, a character chosen',
+    field: 'adjustmentOverride',
+    frame: 24,
+    sees: 'resolved',
+  }),
+  taskOverrideCase({
+    id: 'manager-gathering-task-editor-check-multiply',
+    label: 'character value, multiplied adjustment, a character chosen',
+    field: 'adjustmentOverride',
+    frame: 24,
+    sees: 'resolved',
+  }),
+  taskOverrideCase({
+    id: 'manager-gathering-task-editor-check-default',
+    label: 'character value, system default, no character chosen',
+    field: 'adjustmentOverride',
+    frame: 24,
+    sees: 'no-character',
   }),
 ]);

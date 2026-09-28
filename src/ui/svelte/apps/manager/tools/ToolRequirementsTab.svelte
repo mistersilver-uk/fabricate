@@ -42,12 +42,13 @@
   import { prerequisitePreview } from '../../../../../systems/characterPrerequisites.js';
   import Callout from '../../../components/Callout.svelte';
   import Field from '../../../components/Field.svelte';
+  import Kicker from '../../../components/Kicker.svelte';
   import SelectionCheckbox from '../../../components/SelectionCheckbox.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
   import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
   import ModifierLibraryRow from '../ModifierLibraryRow.svelte';
   import ToolInheritCard from './ToolInheritCard.svelte';
-  import { toolWorldDefaultFact } from './toolStudio.js';
+  import { projectToolBonusBehaviour, toolWorldDefaultFact } from './toolStudio.js';
 
   // The row standing for an authored expression the library does not contain: a RADIO VALUE, never
   // a persisted id, spelled so no library entry can collide with it.
@@ -91,7 +92,7 @@
     const template = localize(key);
     if (template && template !== key) return localize(key, data);
     return Object.entries(data).reduce(
-      (copy, [name, value]) => copy.replace(`{${name}}`, String(value)),
+      (copy, [name, value]) => copy.replaceAll(`{${name}}`, String(value)),
       fallback
     );
   }
@@ -162,13 +163,15 @@
       ? formattedText(
           'FABRICATE.Admin.Manager.Tools.Editor.BonusApplied',
           { expression: bonus.expression },
-          'Applied to the crafting check as {expression}.'
+          'Applies {expression} to any check this tool is used for, in the way that check applies bonuses.'
         )
       : text(
           'FABRICATE.Admin.Manager.Tools.Editor.BonusUnset',
           'Nothing is added to the check until you pick a modifier.'
         )
   );
+  const bonusBehaviour = $derived(projectToolBonusBehaviour(bonus.expression, text, formattedText));
+
   function chooseBonusModifier(value) {
     // The custom row is already the selected one, so re-selecting it is a no-op rather than a
     // write: it carries no library entry to read an expression off.
@@ -395,7 +398,7 @@
     title={text('FABRICATE.Admin.Manager.Tools.Editor.BonusToCheck', 'Bonus to the check')}
     subtitle={text(
       'FABRICATE.Admin.Manager.Tools.Editor.BonusToCheckHint',
-      'What using this Tool adds to the crafting check, if anything.'
+      'What using this Tool contributes to a check, if anything.'
     )}
     control={member ? undefined : bonusSwitch}
     inheritable={member}
@@ -497,12 +500,27 @@
           </Field>
         {/if}
         <p class="manager-tool-requirements-summary" data-tool-bonus-note>{bonusNote}</p>
+        {#if bonusBehaviour.length > 0}
+          <div class="manager-tool-bonus-behaviour-block">
+            <Kicker>
+              {text('FABRICATE.Admin.Manager.Tools.Editor.BehaviourPreview', 'Behaviour preview')}
+            </Kicker>
+            <dl class="manager-tool-bonus-behaviour" data-tool-bonus-behaviour>
+              {#each bonusBehaviour as entry (entry.id)}
+                <div
+                  class="manager-tool-bonus-behaviour-row"
+                  data-tool-bonus-behaviour-row={entry.id}
+                >
+                  <dt>{entry.label}</dt>
+                  <dd>{entry.value}</dd>
+                </div>
+              {/each}
+            </dl>
+          </div>
+        {/if}
       {:else}
         <p class="manager-tool-requirements-summary" data-tool-bonus-off>
-          {text(
-            'FABRICATE.Admin.Manager.Tools.Editor.PreviewNoBonus',
-            'Adds nothing to the crafting check'
-          )}
+          {text('FABRICATE.Admin.Manager.Tools.Editor.PreviewNoBonus', 'Adds nothing to any check')}
         </p>
       {/if}
       {#if sectionNotes.bonus}
@@ -543,8 +561,48 @@
     border-top: 1px solid var(--fab-border);
   }
 
-  /* THE `World modifiers` EYEBROW AND ITS HAIRLINE. The eyebrow's type stays `manager-kicker`'s,
-     so this tab has one heading voice; only the rule is added, on THIS eyebrow alone, because it
+  /* Checks Studio frame 26: the kicker over a hairline table of `bg-1` rows, a 150px label track. */
+  .manager-tool-bonus-behaviour-block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-chip);
+  }
+
+  .manager-tool-bonus-behaviour {
+    margin: 0;
+    border: 1px solid var(--fab-border);
+    border-radius: 9px;
+    overflow: hidden;
+  }
+
+  .manager-tool-bonus-behaviour-row {
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1fr);
+    gap: var(--fab-space-3);
+    padding: var(--fab-space-2) var(--fab-space-3);
+    background: var(--fab-bg-1);
+  }
+
+  .manager-tool-bonus-behaviour-row + .manager-tool-bonus-behaviour-row {
+    border-top: 1px solid var(--fab-border);
+  }
+
+  .manager-tool-bonus-behaviour-row dt {
+    margin: 0;
+    color: var(--fab-text-subtle);
+    font-weight: 600;
+    font-size: 0.66rem;
+  }
+
+  .manager-tool-bonus-behaviour-row dd {
+    margin: 0;
+    color: var(--fab-text-secondary);
+    font-weight: 500;
+    font-size: 0.69rem;
+  }
+
+  /* The `World modifiers` eyebrow and its hairline. The eyebrow's type stays `manager-kicker`'s,
+     so this tab has one heading voice; only the rule is added, on this eyebrow alone, because it
      marks where the world's library begins rather than heading a question the way
      `Which prerequisites` does. `margin: 0` stays, because the section's own flex gap is already
      the reference's step and the shared class adds to it. */

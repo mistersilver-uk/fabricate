@@ -6,6 +6,8 @@
  * ceiling. Localized copy arrives through an injected `text`, so this stays a pure leaf.
  */
 
+import { formatCheckAdjustment } from '../checks/checkAdjustmentLabel.js';
+
 import { buildSalvageDcOptions } from './salvageDcPresets.js';
 
 /** The inherit row, where `inheritValue` is non-empty, then one row per effective category. */
@@ -28,18 +30,28 @@ export function buildSalvageRouteOptions(resultGroups, unroutedLabel, groupFallb
 }
 
 /**
- * System default, each usable tier, then Custom… — `buildSalvageDcOptions` with this screen's four
- * label keys bound to it, which is why the binding has a home here rather than in that pure leaf.
+ * System default, each usable tier, then Custom… — `buildSalvageDcOptions` with this screen's label
+ * keys bound to it, which is why the binding has a home here rather than in that pure leaf. A
+ * roll-under fixed target names a Target, and a character-value target names adjustments.
  */
-export function buildSalvageDcSelectOptions(tiers, dcMode, systemDc, text) {
+export function buildSalvageDcSelectOptions(tiers, dcMode, systemDc, text, evaluation = null) {
+  const under = evaluation?.direction === 'under';
+  const kind = evaluation?.target?.adjustmentKind === 'multiply' ? 'multiply' : 'add';
   return buildSalvageDcOptions({
     tiers,
     dcMode,
     systemDc,
+    evaluation,
     systemDefaultLabel: (dc) =>
-      text(
-        'FABRICATE.Admin.Manager.Component.SalvageEditor.DcSystemDefault',
-        'System default — DC {dc}'
+      (under
+        ? text(
+            'FABRICATE.Admin.Manager.Component.SalvageEditor.DcSystemDefaultTarget',
+            'System default — Target {dc}'
+          )
+        : text(
+            'FABRICATE.Admin.Manager.Component.SalvageEditor.DcSystemDefault',
+            'System default — DC {dc}'
+          )
       ).replace('{dc}', String(dc)),
     systemDefaultDynamicLabel: () =>
       text(
@@ -47,9 +59,27 @@ export function buildSalvageDcSelectOptions(tiers, dcMode, systemDc, text) {
         'System default — set by macro'
       ),
     tierLabel: (name, dc) =>
-      text('FABRICATE.Admin.Manager.Component.SalvageEditor.DcTier', '{name} — DC {dc}')
+      (under
+        ? text(
+            'FABRICATE.Admin.Manager.Component.SalvageEditor.DcTierTarget',
+            '{name} — Target {dc}'
+          )
+        : text('FABRICATE.Admin.Manager.Component.SalvageEditor.DcTier', '{name} — DC {dc}')
+      )
         .replace('{name}', name)
         .replace('{dc}', String(dc)),
+    adjustmentDefaultLabel: () =>
+      text(
+        'FABRICATE.Admin.Manager.Component.SalvageEditor.AdjustmentSystemDefault',
+        'System default — base adjustment'
+      ),
+    adjustmentTierLabel: (name, value) =>
+      text(
+        'FABRICATE.Admin.Manager.Component.SalvageEditor.AdjustmentTier',
+        '{name} — {adjustment}'
+      )
+        .replace('{name}', name)
+        .replace('{adjustment}', formatCheckAdjustment(kind, value)),
     customLabel: () => text('FABRICATE.Admin.Manager.Component.SalvageEditor.DcCustom', 'Custom…'),
   });
 }

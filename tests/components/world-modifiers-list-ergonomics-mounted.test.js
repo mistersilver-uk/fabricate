@@ -354,6 +354,18 @@ describe('world modifiers list ergonomics (mounted, issue 768)', () => {
     assert.ok(!counted.includes('ranked by its average'), 'and is not said to be ranked by one');
   });
 
+  it('states where a rolled modifier lands as a benefit, in both directions (issue 2005)', async () => {
+    const root = await harness.mount({
+      library: [{ id: 'mod-roll', label: 'Rolled', icon: 'fa-solid fa-b', expression: '1d6' }],
+    });
+    const row = root.querySelector('[data-world-modifier="mod-roll"]');
+    row.querySelector('[data-toggle-modifier]').dispatchEvent(clickEvent());
+    await flushRender();
+    const note = row.querySelector('[data-world-modifier-roll-note="mod-roll"]').textContent;
+    assert.ok(note.includes('a check that adds to its total appends the dice'), note);
+    assert.ok(note.includes('a roll-under check rolls them first and raises its target'), note);
+  });
+
   // An inverted or unrollable pair makes the entry contribute nothing.
   it('flags a blocking bounds fault on the collapsed row, naming the cause', async () => {
     const root = await harness.mount({
