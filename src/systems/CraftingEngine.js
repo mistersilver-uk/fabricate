@@ -6896,11 +6896,13 @@ export class CraftingEngine {
    * pre-resolved `rollDecision` only when truthy (issue 859), so a single-item bag is unchanged.
    * `modifierChoice` (issue 1095) comes from
    * {@link CraftingEngine#_buildInteractiveModifierChoice}, so `playerPicks` matches crafting.
+   * A targeted runner passes its `check`, so a character-value target names its basis.
    */
   _salvageRollOptions({
     interactive,
     actor,
     component,
+    check = null,
     dc,
     evaluation,
     rollDecision = null,
@@ -6914,6 +6916,13 @@ export class CraftingEngine {
       activity: 'Salvage',
       img: component?.img,
       dc,
+      targetBasis:
+        check &&
+        attributeTargetBasis(check, {
+          override: component?.salvage?.adjustmentOverride,
+          label: '',
+          readRollData: () => actorRollData(actor),
+        }),
       evaluation,
       modifierChoice: this._buildInteractiveModifierChoice(
         formula,
@@ -6959,6 +6968,7 @@ export class CraftingEngine {
           interactive,
           actor,
           component,
+          check: simple,
           dc,
           evaluation,
           rollDecision,
@@ -7050,6 +7060,7 @@ export class CraftingEngine {
           interactive,
           actor,
           component,
+          check: routed,
           dc,
           evaluation,
           rollDecision,
