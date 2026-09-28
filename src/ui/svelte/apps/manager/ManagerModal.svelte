@@ -274,6 +274,7 @@
     color: var(--fab-text-subtle);
     font-size: 10.5px;
     font-weight: 500;
+    line-height: normal;
   }
 
   /* Paint only, at (0,3,0): above the family's resting paint and below its hover. */
@@ -290,6 +291,7 @@
   .manager-modal-body {
     display: flex;
     flex-direction: column;
+    gap: calc(var(--fab-space-3) + var(--fab-space-2xs));
     min-height: 0;
     padding: calc(var(--fab-space-3) + var(--fab-space-2xs)) var(--fab-space-4);
   }

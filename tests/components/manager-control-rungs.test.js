@@ -366,7 +366,7 @@ describe('M12a — the inspector rail’s action button takes the corner its hei
   });
 });
 
-describe('epic 1997 — the banded Modal close and the inline Select glyph (ruling 2026-09-28)', () => {
+describe('epic 1997 — the banded Modal frame and the Select glyph (rulings 2026-09-28)', () => {
   const MODAL = 'src/ui/svelte/apps/manager/ManagerModal.svelte';
 
   function modalRule(selector) {
@@ -391,9 +391,17 @@ describe('epic 1997 — the banded Modal close and the inline Select glyph (ruli
     assert.equal(pixels(valueOf(paint, 'font-size')), 11, 'and draws an 11px glyph');
   });
 
-  it('draws the inline rung’s glyphs at the specimen’s 12px `.k-field .i`', () => {
-    const [body] = bodiesOf('.fabricate-select .fabricate-select-trigger-inline > i');
+  it('draws every rung’s glyphs at the specimen’s 12px `.k-field .i`, never at the rung’s type', () => {
+    const [body] = bodiesOf('.fabricate-select-trigger > i');
     assert.equal(pixels(valueOf(body, 'font-size')), 12);
+    const restated = rules().filter(
+      (rule) => /fabricate-select-trigger[^,]*> i\b/.test(rule.selector) && valueOf(rule.body, 'font-size')
+    );
+    assert.deepEqual(
+      restated.map((rule) => rule.selector),
+      ['.fabricate-select-trigger > i'],
+      'no rung or call site restates the glyph size'
+    );
     const library = readFileSync(resolve(repoRoot, 'openspec/specs/design-system/library.html'), 'utf8');
     assert.match(library, /\.k-field \.i\{width:12px;height:12px;/, 'the specimen still states 12px');
   });

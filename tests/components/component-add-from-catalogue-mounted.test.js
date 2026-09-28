@@ -586,6 +586,13 @@ describe('ComponentAddFromCatalogueDialog (mounted, issue 1371 M9)', () => {
     await open();
     const root = panel();
     assert.ok(root.hasAttribute('data-manager-modal'), 'it IS the shared chrome');
+    // Maintainer ruling 2026-09-28 ("Move them too"): every Fabricate dialog is banded.
+    assert.ok(root.classList.contains('is-banded'), 'in the banded library Modal frame');
+    assert.ok(root.querySelector('.manager-modal-body [data-component-add-from-catalogue-search]'));
+    assert.ok(
+      document.querySelector('[data-manager-modal-close]').classList.contains('is-size-26'),
+      'with the banded frame’s 26px close'
+    );
     assert.equal(root.getAttribute('role'), 'dialog');
     assert.equal(root.getAttribute('aria-modal'), 'true');
     assert.match(root.querySelector('h3').textContent, /Add from catalogue to Forge/);

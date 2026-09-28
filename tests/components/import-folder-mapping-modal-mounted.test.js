@@ -239,6 +239,9 @@ describe('ImportFolderMappingModal (mounted)', () => {
     const root = dialog();
     assert.ok(root, 'expected the dialog root');
     assert.ok(root.hasAttribute('data-manager-modal'), 'renders through the shared chrome');
+    // Maintainer ruling 2026-09-28 ("Move them too"): every Fabricate dialog is banded.
+    assert.ok(root.classList.contains('is-banded'), 'in the banded library Modal frame');
+    assert.ok(root.querySelector('.manager-modal-body > [data-import-mapping-match]'), 'in a padded body');
     assert.equal(root.getAttribute('role'), 'dialog');
   });
 });

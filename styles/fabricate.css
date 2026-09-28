@@ -17265,11 +17265,6 @@
   font-weight: 500;
 }
 
-/* The specimen's `.k-field .i` draws the inline rung's glyphs at 12px, not at the 11.5px type (ruling 2026-09-28). */
-.fabricate-select .fabricate-select-trigger-inline > i {
-  font-size: 12px;
-}
-
 /* THE LITERAL IS THE POINT. `--fab-recipe-control-font` has exactly one declaration site, inside the `.fabricate-manager` block, so it is area-scoped: read from a player surface it is undefined and the size falls back to inheritance. */
 .fabricate-select .fabricate-select-trigger-toolbar {
   min-height: 34px;
@@ -17320,10 +17315,11 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* The leading glyph and the chevron are both quiet, as the specimen draws them. */
+/* The leading glyph and the chevron are both quiet, as the specimen draws them, and at its 12px (`.k-field .i`) on every rung rather than at the rung's type (ruling 2026-09-28). */
 .fabricate-select-trigger > i {
   flex: none;
   color: var(--fab-text-subtle);
+  font-size: 12px;
 }
 
 .fabricate-select-trigger > i:last-child {

@@ -18,7 +18,7 @@ tests/components/chance-slider-keyboard-mounted.test.js	1
 tests/components/check-preview-mounted.test.js	5
 tests/components/checks-must-not-regress-characterization.test.js	16
 tests/components/chip-removable-mounted.test.js	11
-tests/components/chip-tone-matrix-characterization.test.js	31
+tests/components/chip-tone-matrix-characterization.test.js	32
 tests/components/component-complications-root-wiring.test.js	12
 tests/components/component-complications-section-mounted.test.js	18
 tests/components/component-editor-layout.test.js	8
@@ -56,7 +56,7 @@ tests/components/journal-source.test.js	64
 tests/components/knowledge-view-mounted.test.js	7
 tests/components/manager-browse-views-are-lists.test.js	10
 tests/components/manager-button-cascade-inventory.test.js	5
-tests/components/manager-control-rungs.test.js	7
+tests/components/manager-control-rungs.test.js	8
 tests/components/manager-launch-readiness.test.js	4
 tests/components/manager-layout-browsers.js	2
 tests/components/manager-layout-downtime-fixtures.js	4

@@ -212,8 +212,9 @@ describe('ImportReportModal (mounted)', () => {
     const root = modal();
     assert.ok(!root.querySelector('form'), 'no form wraps body and footer without onSubmit');
     assert.ok(!root.querySelector('.manager-modal-footer').classList.contains('is-equal'));
-    assert.ok(!root.classList.contains('is-banded'), 'the panel is not banded');
-    assert.ok(!root.querySelector('.manager-modal-body'), 'the body keeps no padded wrapper');
+    // Maintainer ruling 2026-09-28 ("Move them too"): every Fabricate dialog is banded.
+    assert.ok(root.classList.contains('is-banded'), 'the report draws the banded library Modal');
+    assert.ok(root.querySelector('.manager-modal-body > .manager-import-report-list'), 'in a padded body');
     assert.ok(document.activeElement === opener, 'focus stays where it was without trapFocus');
     const seen = [];
     const onWindowKey = (event) => seen.push([event.key, event.defaultPrevented]);
