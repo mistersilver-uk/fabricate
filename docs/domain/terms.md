@@ -1557,6 +1557,18 @@ Canonical mapping: `normalizeCheckEvaluation`/`normalizeNullableAdjustment`/`nor
 
 Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-modes/spec.md
 
+## Count Check
+
+`evaluation.product === 'count'` rolls a dice pool of `pool.die`-sided dice sized by `pool.base`, counts how many individually qualify against `pool.threshold` in the check's `direction`, subtracts any the cancel rule removed, and grades that net **successes** count against `pool.required`, reading neither `dc` nor `target`.
+A zero-or-negative pool fails outright under `pool.zeroPoolFails` (the default) with no `Roll` constructed, distinct from a pool that rolls and comes up short.
+`pool.explode` re-rolls an extra die when the best qualifying face for the check's `direction` comes up, or a named face onward (once or every time), and `pool.cancel` removes a success on the worst face instead, or a named face onward; the player-visible copy is "best face explodes" and "worst face cancels".
+`pool.modifierDestination` routes every applied Check Modifier and situational bonus to the pool ("Each adds dice") or the threshold ("Each moves the threshold"), never onto a summed total, because a count check keeps none.
+A **Standalone Check Roll** names an unresolved or non-numeric `pool.base`/`pool.threshold` `poolUnresolved`, and an invalid `die`, `explode`, `cancel`, or the settled pool itself `evaluationInvalid`; every other activity resolves the same failure through its own misconfigured **Target Refusal** answer instead, naming the input in `data.refusedInput`.
+
+Canonical mapping: `resolvePool`/`countFacePredicates`/`projectCountResults`/`describedFaceRules` in `src/systems/countEvaluation.js`; `evaluateCountCheckRoll` in `src/systems/countCheckRoll.js`; the registered `CountRoll` in `src/systems/countRoll.js`; `countPromptFields` in `src/systems/checkRollDecision.js`; `FABRICATE.Check.CountRoll.*`/`FABRICATE.Check.CountRefusal.*`/`FABRICATE.App.RollPrompt.Count*` in `lang/en.json`
+
+Spec reference: openspec/specs/companion-api/spec.md, openspec/specs/resolution-modes/spec.md, openspec/specs/ui-crafting-app/spec.md
+
 ## Target Source
 
 `evaluation.target.source` is `fixed` or `attribute`.
@@ -1617,10 +1629,11 @@ Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-mo
 It is therefore NOT a **Check**: a Check is taken on a subject inside a Crafting System and carries that system's **Check Modifier** catalogue, combination rule, tool bonuses, **Check Breakage** triggers, **Tier Stepping** and failure-result policy, none of which a Standalone Check Roll has a system or a subject to derive.
 A companion wanting those routes a real craft or salvage instead.
 Its optional evaluation is strictly validated after the existing authorization and roll-decision gates: malformed records refuse `evaluationInvalid`, and valid modes absent from `game.fabricate.api.companion.features.checkEvaluation` refuse `evaluationUnsupported` before rolling or prompting.
-The version-1 capability descriptor advertises `sum/over/fixed` (including interactive use), `sum/over/attribute` and `sum/under` with either target source, the last two non-interactively; count choices remain valid authored data with no standalone execution route yet.
+The version-1 capability descriptor advertises `sum/over/fixed` (including interactive use), `sum/over/attribute`, `sum/under` and both directions of `count`, each with either target source and every row but the first non-interactively.
 On the `sum/over/fixed` row the evaluation only selects the mode: the roll still grades `formula` against `dc` through `compare`, so `target.expression` and the pool settings are validated but never change the roll.
 An attribute row ignores `dc` and resolves its **Target Source** from the actor, answering `targetUnresolved` when it cannot, and a `sum/under` fixed request without a finite `dc` refuses `evaluationInvalid`.
-A graded answer against a resolved target reports through the auxiliary `PassedTarget`/`FailedTarget` message keys with `{ label, total, target }`, while `sum/over/fixed` keeps `Passed`/`Failed` with `{ dc }`.
+A `count` row ignores both `dc` and `target` and grades a **Count Check** exclusively against `evaluation.pool.required`, answering `poolUnresolved` for an unresolved pool `base`/`threshold` and `evaluationInvalid` for any other invalid pool setting, both before a `Roll` is constructed, and a zero pool answers `checkFailed` with no `Roll` at all.
+A graded answer against a resolved target reports through the auxiliary `PassedTarget`/`FailedTarget` message keys with `{ label, total, target }`, while `sum/over/fixed` keeps `Passed`/`Failed` with `{ dc }`, and a graded count row reports through `PassedCount`/`FailedCount` with `{ label, total, required }`, or `FailedZeroPool` with `{ label }` alone for a zero pool.
 A rolled standalone answer projects **Executed Check Evidence** from the shared runner, while every refusal omits those execution fields.
 
 Canonical mapping: `src/systems/companionCheckRoll.js` (`rollActorCheck`, `resolveBulkCheckDecision`); `src/systems/companionCheckEvaluation.js`; `src/systems/companionContract.js` (`COMPANION_CONTRACT`); published as `game.fabricate.rollActorCheck` / `game.fabricate.resolveBulkCheckDecision` on the `companion` contract (issue 1293)

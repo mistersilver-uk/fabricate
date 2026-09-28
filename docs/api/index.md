@@ -728,13 +728,15 @@ This additive `features` field leaves `schemaVersion` at `1`.
 Its shape is `{ version, modes, additionalDice }`: each `modes` row is `{ product, direction, targetSources, interactive }`, and an evaluation is executable when one row matches its `product` and `direction`, lists its `target.source` in `targetSources`, and has `interactive: true` when the roll is interactive.
 `version` names this descriptor's shape, not its rows.
 Activating a mode appends a row without changing it, so match rows rather than comparing versions.
-At version 1 the descriptor publishes three rows: `{ product: 'sum', direction: 'over', targetSources: ['fixed'], interactive: true }`, `{ product: 'sum', direction: 'over', targetSources: ['attribute'], interactive: false }`, and `{ product: 'sum', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: false }`.
+At version 1 the descriptor publishes five rows: `{ product: 'sum', direction: 'over', targetSources: ['fixed'], interactive: true }`, `{ product: 'sum', direction: 'over', targetSources: ['attribute'], interactive: false }`, `{ product: 'sum', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: false }`, `{ product: 'count', direction: 'over', targetSources: ['fixed', 'attribute'], interactive: false }`, and `{ product: 'count', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: false }`.
 `additionalDice` stays `false`, so additional dice have no standalone execution route.
 On the fixed sum-over row the evaluation only selects the mode, `target.expression` and the pool settings are validated but never change the roll, and Fabricate still grades `formula` against `dc` through `compare`, so a request without a finite `dc` rolls ungraded.
 On an attribute row Fabricate ignores `dc` entirely and resolves the target from `target.expression` against the actor's roll data instead, using the same lookup Foundry's own `Roll.replaceFormulaData` uses, plus the row's `baseAdjustment`.
 An unresolved or non-numeric target refuses the outcome `targetUnresolved` before any roll, and an invalid multiplier refuses `evaluationInvalid`.
 A sum-under request against a fixed target with no finite `dc` also refuses `evaluationInvalid` rather than rolling ungraded.
-Count evaluations remain authored data without a standalone route until Fabricate advertises and executes them.
+On a count row Fabricate ignores both `formula` and `dc` and grades the rolled dice pool's net successes against `evaluation.pool.required` alone.
+An unresolved or non-numeric `pool.base` or `pool.threshold` refuses the outcome `poolUnresolved` before any roll, and any other invalid pool setting (`die`, `explode`, `cancel`, or the settled pool itself) refuses `evaluationInvalid` before Fabricate constructs a Roll.
+A pool that resolves to zero or fewer dice answers `checkFailed` with no Roll constructed at all.
 
 A malformed evaluation returns `evaluationInvalid`.
 A valid evaluation whose mode is absent from the advertised rows returns `evaluationUnsupported`.
@@ -745,8 +747,12 @@ Every refusal omits those fields, including evaluation refusals.
 
 A graded answer against a resolved target, meaning an attribute row or any sum-under row, reports through `FABRICATE.Check.Roll.PassedTarget` or `FailedTarget` instead of the plain `Passed`/`Failed` keys, with `messageData` `{ label, total, target }` taken from the roll's own executed target, never from the request `dc`.
 Only the fixed sum-over row keeps `Passed`/`Failed` with `{ label, total, dc }`.
+A graded count row reports through `FABRICATE.Check.Roll.PassedCount`/`FailedCount` instead, with `messageData` `{ label, total, required }`, where `total` is the net successes the pool rolled.
+A zero pool reports through `FailedCount`'s sibling `FailedZeroPool` with `messageData` `{ label }` alone, since neither a total nor a required count means anything with no dice rolled.
 An attribute target Fabricate could not read as a number answers the outcome `targetUnresolved`.
 Its message key is `FABRICATE.Check.Roll.TargetUnresolved`, whose English text is "{label} check could not read a number for its target from this character."
+A count's `pool.base` or `pool.threshold` Fabricate could not read as a number answers the outcome `poolUnresolved`.
+Its message key is `FABRICATE.Check.Roll.PoolUnresolved`, whose English text is "{label} check could not read a number for its dice pool from this character."
 
 **`callSite` is required and has no default.**
 Nothing in the request or the environment distinguishes your deliberate click from a synced `updateWorldTime` tick, so Fabricate refuses `invalidCallSite` rather than guessing.
