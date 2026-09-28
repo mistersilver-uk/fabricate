@@ -124,7 +124,7 @@ export function isExemptSpacingPixels(pixels) {
 // tier's name field and the Checks option cards take the spacing tokens, paying one occupancy
 // each of `gap 6`, `padding 4`, `padding 9`, `padding 10`, `padding 12` and `padding 13`.
 // Measured on the tree, not subtracted.
-export const KNOWN_RAW_SPACING_TOTAL = 800;
+export const KNOWN_RAW_SPACING_TOTAL = 799;
 
 /** The per-corpus spacing-declaration counts the floors were CHOSEN AGAINST. */
 export const FLOOR_REFERENCE_STYLESHEET_SPACING_DECLARATIONS = 1445;

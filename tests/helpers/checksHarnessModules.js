@@ -192,6 +192,9 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/SegmentedControl.svelte',
   'src/ui/svelte/apps/manager/checks/CheckOddsPanel.svelte',
   'src/ui/svelte/apps/manager/checks/CheckOutcomePreview.svelte',
+  // The rolled readout's eyebrow and a count roll's tiles, the #2006 seam (issue 2080).
+  'src/ui/svelte/components/Kicker.svelte',
+  'src/ui/svelte/apps/manager/checks/CheckSimulatorFaces.svelte',
   // THE manager's editor tab strip (issue 1362).
   'src/ui/svelte/components/EditorTabs.svelte',
   'src/ui/svelte/apps/manager/checks/ChecksEditorTabs.svelte',

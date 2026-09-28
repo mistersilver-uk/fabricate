@@ -154,7 +154,7 @@ export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
 // Epic 1997: the retired unbanded ManagerModal panel took its 12px corner with it, 265 -> 264.
 // Issue 2005: the config option cards take the library's 11px, which the Checks override now
 // inherits (two 10px corners), and the outcome swatch's 4px corner becomes a 50% circle, 264 -> 261.
-export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 261;
+export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 260;
 
 /** A Svelte SCOPED STYLE reading an area-scoped `--fab-*` property, keyed `file | property`. */
 export const KNOWN_AREA_SCOPED_STYLE_READS = knownDebt('areaScopedStyleReads');

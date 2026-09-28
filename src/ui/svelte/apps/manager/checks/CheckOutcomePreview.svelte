@@ -2,8 +2,10 @@
 <!--
   The Checks Studio's OUTCOME PREVIEW readout. It renders values already on the runner's own
   result object and nothing else, so a readout that disagreed with a real craft would need the
-  engine to disagree with itself: a `Medallion` die face, the TERSE breakdown line, the total
-  against its target with its margin, the matched band card and a "What happens" list.
+  engine to disagree with itself. The rolled readout is the prototype's, announced politely as one
+  region: a `Medallion` holding the rolled number, the terse breakdown, the total against its
+  target line, a success-counting roll's tiles, the toned result card with its one note, and the
+  "What happens" rows. `checkReadoutModel.js` builds every string it shows.
 
   Five states are not the readout, each saying why: no formula; a dynamic DC, which the engine
   resolves by running the linked macro and a preview must not, so it previews the static fallback
@@ -11,16 +13,14 @@
   actor lacks into a plausible wrong total, the signal being `resolved === false`; abstaining,
   where the check reads a value it cannot resolve, so Roll is disabled and no target or margin is
   shown; and no check.
-
-  A success-counting check renders one tile per active face, explosion dice included, each with its
-  marks as a glyph and in its accessible name, so colour is never the only signal; a zero pool
-  renders no tile and no total.
 -->
 <script>
   import IconFactRow from '../IconFactRow.svelte';
+  import Kicker from '../../../components/Kicker.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import { localize } from '../../../util/foundryBridge.js';
+  import CheckSimulatorFaces from './CheckSimulatorFaces.svelte';
 
   let {
     /** The readout view-model built by the route. */
@@ -33,31 +33,10 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  const result = $derived(preview?.result ?? null);
-  const rolled = $derived(Boolean(result));
-  const facts = $derived(Array.isArray(preview?.facts) ? preview.facts : []);
+  const rolled = $derived(Boolean(preview?.result));
+  const rows = $derived(Array.isArray(preview?.rows) ? preview.rows : []);
   const count = $derived(preview?.count ?? null);
-  // A summed roll's first face, the breakdown line beside it carrying the rest; a count roll's every one.
-  const faces = $derived(
-    count
-      ? count.faces
-      : [{ index: 0, face: result?.data?.diceGroups?.[0]?.results?.[0] ?? '', marks: null }]
-  );
-  const MARK_GLYPHS = {
-    qualified: 'fas fa-check',
-    cancelled: 'fas fa-xmark',
-    exploded: 'fas fa-rotate',
-  };
-  // A count face is toned by what it did: a cancel reads danger, a success or explosion success.
-  function faceTone(marks) {
-    if (!marks) return '';
-    if (marks.includes('cancelled')) return 'danger';
-    return marks.includes('qualified') || marks.includes('exploded') ? 'success' : '';
-  }
-  const marginLabel = $derived.by(() => {
-    if (preview?.marginLabel) return preview.marginLabel;
-    return Number.isFinite(preview?.margin) ? preview.gradeLabel : '';
-  });
+  const card = $derived(preview?.card ?? null);
   const abstain = $derived(preview?.abstain ?? null);
   const DYNAMIC_NOTES = {
     'dynamic-dc': [
@@ -75,32 +54,6 @@
   };
   const dynamicNote = $derived(DYNAMIC_NOTES[preview?.dynamicNote] ?? null);
 </script>
-
-<!-- One rolled face: the digit is the subject and the medallion its art, so the medallion renders no
-     glyph; a count face's marks replace the die caption. -->
-{#snippet faceTile(tile)}
-  <span
-    class={`manager-checks-simulator-face ${tile.marks ? `is-count is-${faceTone(tile.marks) || 'plain'}` : ''}`}
-    data-checks-simulator-face={tile.index}
-    data-checks-simulator-face-marks={tile.marks?.join(' ')}
-    role={tile.marks ? 'img' : undefined}
-    aria-label={tile.marks ? tile.label : undefined}
-  >
-    <Medallion icon="" size={38} tone={faceTone(tile.marks)} />
-    <small data-checks-simulator-face-value aria-hidden={tile.marks ? 'true' : undefined}>
-      <strong>{tile.face}</strong>
-      {#if tile.marks}
-        <span class="manager-checks-simulator-marks">
-          {#each tile.marks as mark (mark)}
-            <i class={MARK_GLYPHS[mark]} aria-hidden="true"></i>
-          {/each}
-        </span>
-      {:else}
-        <span>{preview.dieLabel}</span>
-      {/if}
-    </small>
-  </span>
-{/snippet}
 
 <div class="manager-checks-simulator" data-checks-simulator-panel>
   {#if !preview || preview.kind === null}
@@ -131,11 +84,7 @@
       onclick={() => onRoll()}
     >
       <i class="fas fa-dice-d20" aria-hidden="true"></i>
-      <span
-        >{rolled
-          ? text('FABRICATE.Admin.Manager.Checks.Simulator.RollAgain', 'Roll again')
-          : text('FABRICATE.Admin.Manager.Checks.Simulator.Roll', 'Roll a test check')}</span
-      >
+      <span>{preview.rollLabel}</span>
     </ManagerButton>
 
     {#if dynamicNote}
@@ -162,89 +111,93 @@
 
     <!-- An abstention's hint above is the whole state: no total, target or margin. -->
     {#if rolled && !abstain}
-      {#if count?.zeroPool}
-        <p class="manager-muted" data-checks-simulator-note="zero-pool">
-          {text(
-            'FABRICATE.Admin.Manager.Checks.Simulator.ZeroPool',
-            'A pool reduced to zero fails automatically. Nothing was rolled.'
-          )}
-        </p>
-      {:else}
-        <div
-          class={`manager-checks-simulator-readout ${count ? 'is-count' : ''}`}
-          data-checks-simulator-readout
-          data-checks-simulator-direction={preview.direction}
-          data-checks-simulator-product={preview.product}
-          data-checks-simulator-botch={count?.botch ? '' : undefined}
-        >
-          <!-- The legend sits under the tiles it explains, as the player's result box draws it. -->
-          <span class="manager-checks-simulator-dice">
-            <span class="manager-checks-simulator-faces">
-              {#each faces as tile (tile.index)}
-                {@render faceTile(tile)}
-              {/each}
-            </span>
-            {#if count}
-              <span class="manager-muted" data-checks-simulator-legend>
-                {text(
-                  'FABRICATE.Admin.Manager.Checks.Simulator.CountLegend',
-                  '✓ qualified · ✕ cancelled · ↻ exploded'
-                )}
+      <div
+        class="manager-checks-simulator-readout"
+        aria-live="polite"
+        data-checks-simulator-readout
+        data-checks-simulator-direction={preview.direction}
+        data-checks-simulator-product={preview.product}
+        data-checks-simulator-botch={count?.botch ? '' : undefined}
+      >
+        <div class="manager-checks-simulator-head">
+          {#if preview.medallion}
+            <!-- The number is the SUBJECT of this tile, so the medallion renders no glyph. -->
+            <span class="manager-checks-simulator-medallion" data-checks-simulator-medallion>
+              <Medallion icon="" size={38} />
+              <span class="manager-checks-simulator-medallion-value">
+                <strong>{preview.medallion.value}</strong>
+                <small data-checks-simulator-medallion-caption>{preview.medallion.caption}</small>
               </span>
-            {/if}
-          </span>
+            </span>
+          {/if}
           <span class="manager-checks-simulator-numbers">
             <small data-checks-simulator-breakdown>{preview.breakdown}</small>
-            <strong data-checks-simulator-total={preview.total ?? ''}
-              >{count ? count.shownTotal : preview.total}</strong
-            >
-            {#if marginLabel}
-              <small data-checks-simulator-margin data-checks-simulator-target={preview.target}
-                >{marginLabel}</small
+            <span class="manager-checks-simulator-total-line">
+              <strong data-checks-simulator-total={preview.totalValue ?? ''}>{preview.total}</strong
               >
+              {#if preview.targetLine}
+                <small
+                  data-checks-simulator-margin={preview.marginKind}
+                  data-checks-simulator-target={preview.target ?? ''}>{preview.targetLine}</small
+                >
+              {/if}
+            </span>
+          </span>
+        </div>
+
+        {#if count && !count.zeroPool}
+          <CheckSimulatorFaces faces={count.faces} />
+        {/if}
+
+        {#if card}
+          <div
+            class={`manager-checks-simulator-band is-${card.tone}`}
+            data-checks-simulator-band={card.tone === 'success' ? 'success' : 'failure'}
+          >
+            <div class="manager-checks-simulator-band-head">
+              <Medallion icon={card.icon} size={30} glyph={12} ink={card.tone} />
+              <span class="manager-checks-simulator-band-text">
+                <strong data-checks-simulator-band-name>{card.title}</strong>
+                <small data-checks-simulator-band-detail>{card.detail}</small>
+              </span>
+            </div>
+            {#if preview.note}
+              <p
+                class="manager-checks-simulator-note"
+                data-checks-simulator-note={preview.note.kind}
+              >
+                <i class="fas fa-bolt" aria-hidden="true"></i>
+                <span>{preview.note.text}</span>
+              </p>
             {/if}
-          </span>
-        </div>
-      {/if}
+          </div>
+        {/if}
 
-      {#if preview.bandName || preview.bandDetail}
-        <div
-          class={`manager-checks-simulator-band ${preview.bandSuccess ? 'is-success' : 'is-failure'}`}
-          data-checks-simulator-band={preview.bandSuccess ? 'success' : 'failure'}
-        >
-          <i
-            class={preview.bandSuccess ? 'fas fa-circle-check' : 'fas fa-circle-xmark'}
-            aria-hidden="true"
-          ></i>
-          <span>
-            <strong data-checks-simulator-band-name>{preview.bandName}</strong>
-            <small>{preview.bandDetail}</small>
-          </span>
-        </div>
-      {/if}
-
-      {#if facts.length > 0}
-        <p class="manager-kicker" data-checks-simulator-facts-heading>
-          {text('FABRICATE.Admin.Manager.Checks.Simulator.WhatHappens', 'What happens')}
-        </p>
-        <div class="manager-checks-flag-list">
-          {#each facts as fact (fact.id)}
-            <IconFactRow
-              icon={fact.icon}
-              dataAttr="data-checks-simulator-fact"
-              dataValue={fact.id}
-              title={fact.title}
-              subtitle={fact.subtitle}
-            />
-          {/each}
-        </div>
-      {/if}
+        {#if rows.length > 0}
+          <div class="manager-checks-simulator-facts">
+            <Kicker dataAttr="data-checks-simulator-facts-heading">
+              {text('FABRICATE.Admin.Manager.Checks.Simulator.WhatHappens', 'What happens')}
+            </Kicker>
+            <div class="manager-checks-flag-list">
+              {#each rows as row (row.id)}
+                <IconFactRow
+                  icon={row.icon}
+                  density="line"
+                  tone={row.tone}
+                  dataAttr="data-checks-simulator-fact"
+                  dataValue={row.id}
+                  metaAttr="data-checks-simulator-fact-meta"
+                  title={row.label}
+                  subtitle={row.meta}
+                />
+              {/each}
+            </div>
+          </div>
+        {/if}
+      </div>
     {:else if !abstain}
       <p class="manager-muted manager-checks-simulator-hint" data-checks-simulator-state="pre-roll">
-        {text(
-          'FABRICATE.Admin.Manager.Checks.Simulator.Hint',
-          'Roll a test check to see exactly which outcome a record lands on and what it costs the character.'
-        )}
+        {preview.waitingHint}
       </p>
     {/if}
   {/if}
@@ -264,154 +217,163 @@
     text-align: center;
   }
 
+  /* The prototype's 12px under Roll is the panel's gap plus this. */
   .manager-checks-simulator-readout {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-3);
+    min-width: 0;
+    margin-top: var(--fab-space-1);
+  }
+
+  .manager-checks-simulator-head {
     display: flex;
     gap: var(--fab-space-2);
     align-items: center;
     min-width: 0;
   }
 
-  /* A count roll's tiles wrap inside the rail rather than scrolling it sideways. */
-  .manager-checks-simulator-readout.is-count {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .manager-checks-simulator-faces {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--fab-space-chip);
-    min-width: 0;
-  }
-
-  .manager-checks-simulator-dice {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-chip);
-    min-width: 0;
-  }
-
-  /* A mark takes its tile's ink, so the tile's tone is the one colour a face carries; this beats
-     the die caption's rule below, which would otherwise reach the marks too. */
-  .manager-checks-simulator-face small .manager-checks-simulator-marks {
-    display: flex;
-    gap: var(--fab-space-2xs);
-    color: inherit;
-    font-size: 9px;
-  }
-
-  .manager-checks-simulator-face {
+  .manager-checks-simulator-medallion {
     position: relative;
     display: inline-flex;
     flex: 0 0 auto;
-    align-items: center;
-    justify-content: center;
   }
 
-  /* The digit is the SUBJECT of this tile, so the medallion renders no competing glyph: an icon
-       and a numeral centred on one square overlap into an unreadable blob. */
-  .manager-checks-simulator-face small {
+  .manager-checks-simulator-medallion-value {
     position: absolute;
     inset: 0;
-    z-index: 1;
     display: flex;
     flex-direction: column;
-    gap: 1px;
+    gap: var(--fab-space-2xs);
     align-items: center;
     justify-content: center;
-    font-family: var(--fab-font-mono);
-    line-height: 1;
   }
 
-  .manager-checks-simulator-face small strong {
+  .manager-checks-simulator-medallion-value strong {
     color: var(--fab-text);
-    font-size: 1rem;
+    font-family: var(--fab-font-mono);
+    font-size: 19px;
     font-weight: 500;
+    line-height: 1;
     font-variant-numeric: tabular-nums;
   }
 
-  .manager-checks-simulator-face.is-count small {
-    color: var(--fab-text-muted);
-  }
-
-  .manager-checks-simulator-face.is-success small {
-    color: var(--fab-success-text);
-  }
-
-  .manager-checks-simulator-face.is-danger small {
-    color: var(--fab-danger-text);
-  }
-
-  .manager-checks-simulator-face.is-count small strong {
-    color: inherit;
-    font-size: 14px;
-  }
-
-  .manager-checks-simulator-face small span {
-    color: var(--fab-text-muted);
-    font-size: 0.55rem;
+  .manager-checks-simulator-medallion-value small {
+    color: var(--fab-text-subtle);
+    font-size: 8px;
+    font-weight: 500;
+    line-height: 1;
   }
 
   .manager-checks-simulator-numbers {
     display: grid;
+    flex: 1;
     min-width: 0;
   }
 
-  .manager-checks-simulator-numbers small {
+  .manager-checks-simulator-numbers [data-checks-simulator-breakdown] {
     overflow: hidden;
-    color: var(--fab-text-muted);
+    margin-bottom: var(--fab-space-1);
+    color: var(--fab-text-subtle);
     font-family: var(--fab-font-mono);
-    font-size: 0.66rem;
+    font-size: 9.5px;
+    line-height: 1.4;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .manager-checks-simulator-numbers strong {
-    color: var(--fab-text);
-    font-family: var(--fab-font-mono);
-    font-size: 1.1rem;
-    font-variant-numeric: tabular-nums;
-  }
-
-  /* The matched band card mixes into an OPAQUE base for the reason the band ramp records: a
-       translucent token makes the mix an OPACITY ramp and drops the label below WCAG AA. */
-  .manager-checks-simulator-band {
+  .manager-checks-simulator-total-line {
     display: flex;
-    gap: var(--fab-space-2);
-    align-items: flex-start;
-    padding: var(--fab-space-2);
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: color-mix(in srgb, var(--fab-success) 14%, var(--fab-bg-0));
-  }
-
-  .manager-checks-simulator-band.is-failure {
-    background: color-mix(in srgb, var(--fab-danger) 14%, var(--fab-bg-0));
-  }
-
-  .manager-checks-simulator-band > i {
-    margin-top: 2px;
-    color: var(--fab-success);
-    font-size: 0.8rem;
-  }
-
-  .manager-checks-simulator-band.is-failure > i {
-    color: var(--fab-danger);
-  }
-
-  .manager-checks-simulator-band span {
-    display: grid;
+    gap: var(--fab-space-chip);
+    align-items: baseline;
     min-width: 0;
   }
 
-  .manager-checks-simulator-band strong {
+  .manager-checks-simulator-total-line strong {
     color: var(--fab-text);
-    font-size: 0.78rem;
+    font-family: var(--fab-font-mono);
+    font-size: 22px;
+    font-weight: 500;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
   }
 
-  .manager-checks-simulator-band small {
+  .manager-checks-simulator-total-line small {
+    overflow: hidden;
     color: var(--fab-text-muted);
-    font-size: 0.66rem;
-    line-height: 1.4;
+    font-family: var(--fab-font-mono);
+    font-size: 10px;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* The result card, toned by the graded result on its family's own tokens, as `Notice` is. */
+  .manager-checks-simulator-band {
+    padding: var(--fab-space-3);
+    border: 1px solid var(--fab-success-border);
+    border-radius: 9px;
+    background: var(--fab-success-soft);
+  }
+
+  .manager-checks-simulator-band.is-danger {
+    border-color: var(--fab-danger-border);
+    background: var(--fab-danger-soft);
+  }
+
+  .manager-checks-simulator-band-head {
+    display: flex;
+    gap: var(--fab-space-2);
+    align-items: center;
+  }
+
+  .manager-checks-simulator-band-text {
+    display: grid;
+    flex: 1;
+    gap: var(--fab-space-2xs);
+    min-width: 0;
+  }
+
+  /* The serif face names the outcome, per the design system's type rule. */
+  .manager-checks-simulator-band-text strong {
+    color: var(--fab-success-text);
+    font-family: var(--fab-font-serif);
+    font-size: 13.5px;
+    font-weight: 600;
+  }
+
+  .manager-checks-simulator-band.is-danger .manager-checks-simulator-band-text strong {
+    color: var(--fab-danger-text);
+  }
+
+  .manager-checks-simulator-band-text small {
+    color: var(--fab-text-muted);
+    font-size: 10.5px;
+    line-height: 1.45;
+  }
+
+  /* The card's one note, recessed a rung below the card; the prototype's `--bg1` is `--fab-bg-0`. */
+  .manager-checks-simulator-note {
+    display: flex;
+    gap: var(--fab-space-2);
+    margin: var(--fab-space-2) 0 0;
+    padding: var(--fab-space-2);
+    border-radius: 9px;
+    background: var(--fab-bg-0);
+    color: var(--fab-text-secondary);
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 1.45;
+  }
+
+  .manager-checks-simulator-note i {
+    margin-top: var(--fab-space-2xs);
+    color: var(--fab-warning-text);
+    font-size: 9px;
+  }
+
+  /* The prototype's 5px row gap snaps to 6; the shared list keeps its own gap everywhere else. */
+  [data-checks-simulator-panel] .manager-checks-flag-list {
+    gap: var(--fab-space-chip);
   }
 </style>
