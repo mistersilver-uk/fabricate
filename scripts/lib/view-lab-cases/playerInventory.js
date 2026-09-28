@@ -235,8 +235,13 @@ export const CASES = Object.freeze([
       },
       { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
       { selector: '[data-inventory-salvage-action]' },
-      { selector: '.fabricate-app .manager-modal[data-roll-prompt="single"] button[type="submit"]' },
-      { selector: '[data-inventory-salvage-summary="success"] [data-check-evidence-rows]', scroll: true },
+      {
+        selector: '.fabricate-app .manager-modal[data-roll-prompt="single"] button[type="submit"]',
+      },
+      {
+        selector: '[data-inventory-salvage-summary="success"] [data-check-evidence-rows]',
+        scroll: true,
+      },
     ],
     expectSelector:
       '[data-inventory-salvage-summary="success"] [data-check-evidence-rows]' +
