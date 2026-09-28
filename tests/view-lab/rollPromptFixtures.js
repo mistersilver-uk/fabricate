@@ -18,6 +18,7 @@ export async function seedRollPromptFixture(world, state) {
     });
   }
   if (state === 'under') await seedRollUnder(world);
+  if (Object.hasOwn(EVIDENCE_STATES, state)) await seedCheckEvidence(world, EVIDENCE_STATES[state]);
   if (Object.hasOwn(SALVAGE_CHECKS, state)) await seedSalvageChecks(world, state);
   if (state === 'count' || state === 'count-threshold') await seedCount(world, state);
   if (state === 'pick-one' || state === 'overflow') {
@@ -82,6 +83,86 @@ async function seedRollUnder(world) {
   await nameFrameSubject(world, { name: 'Hard Work', checkTierId: 'lab-tier-hard-work' });
 }
 
+/**
+ * Issue 2005's player result box, chat card and prompt states. Each outcome is forced by formula
+ * rather than by seed: frame 29's target of 11 holds any `1d4` and no `1d4 + 20`. `chatOutput`
+ * narrates the craft or salvage so a `chatLog=1` case can photograph its result card.
+ */
+const EVIDENCE_STATES = {
+  'under-evidence': { rollFormula: '1d4' },
+  'under-evidence-fail': { rollFormula: '1d4 + 20' },
+  'under-bonus-off': { rollFormula: '1d20', offerSituationalBonus: false },
+  // Strictly under the target, and the player picking one modifier rather than every one applying.
+  'under-strict': { rollFormula: '1d20', thresholdMode: 'exceed' },
+  'under-picks': { rollFormula: '1d20', picks: true },
+  'over-attribute': { rollFormula: '1d20', direction: 'over' },
+  // A path the crafter has no value at, so the check card says so rather than name a target.
+  'under-unresolved': { rollFormula: '1d20', expression: '@skills.missing.level' },
+  'over-evidence': { control: true },
+  'salvage-under-evidence': { salvage: true },
+};
+
+async function seedCheckEvidence(
+  world,
+  { rollFormula, offerSituationalBonus, direction, expression, control, salvage, thresholdMode, picks }
+) {
+  const manager = world.fabricate.craftingSystemManager;
+  if (!control && !salvage) await seedRollUnder(world);
+  if (picks) await seedPlayerPicks(world);
+  const system = manager.getSystem('lab-smithing');
+  const simple = system.craftingCheck.simple;
+  const evaluation =
+    direction || expression
+      ? normalizeCheckEvaluation({
+          ...simple.evaluation,
+          ...(direction && { direction }),
+          ...(expression && { target: { ...simple.evaluation.target, expression } }),
+        })
+      : simple.evaluation;
+  await manager.updateSystem(system.id, {
+    features: { ...system.features, chatOutput: true },
+    ...(!control &&
+      !salvage && {
+        craftingCheck: {
+          ...system.craftingCheck,
+          simple: {
+            ...simple,
+            rollFormula,
+            evaluation,
+            ...(offerSituationalBonus === false && { offerSituationalBonus }),
+            ...(thresholdMode && { thresholdMode }),
+          },
+        },
+      }),
+    ...(salvage && {
+      salvageCraftingCheck: {
+        ...system.salvageCraftingCheck,
+        enabled: true,
+        simple: { rollFormula: '1d4', dc: 12, thresholdMode: 'meet', evaluation: under() },
+      },
+    }),
+  });
+}
+
+/** Frame 29's modifier and a second, "Sure grip +2", of which the player picks one. */
+async function seedPlayerPicks(world) {
+  const store = world.fabricate.characterLibrariesStore;
+  await store.saveModifiers([
+    { id: 'lab-mod-sure-grip', label: 'Sure grip', icon: 'fa-solid fa-hand-fist', expression: '2' },
+    ...store.listModifiers(),
+  ]);
+  const manager = world.fabricate.craftingSystemManager;
+  const system = manager.getSystem('lab-smithing');
+  await manager.updateSystem(system.id, {
+    craftingCheck: {
+      ...system.craftingCheck,
+      defaultModifierPolicy: 'playerPicks',
+      maxModifierPicks: 1,
+      defaultModifierIds: ['lab-mod-steady-hands', 'lab-mod-sure-grip'],
+    },
+  });
+}
+
 /** The frames' "Sera Vane · {recipe}" subtitle: the crafter the player app opens, and the horseshoe. */
 async function nameFrameSubject(world, recipeUpdates) {
   world.actorList.find((actor) => actor.id === 'lab-actor-brenna').name = 'Sera Vane';
@@ -105,6 +186,11 @@ const SALVAGE_CHECKS = {
     under({ source: 'attribute', expression: '@abilities.int.value' }),
   ],
   'salvage-count': () => [pooled(2), pooled(1)],
+  // Smithing stays at or under the salvager's Smithing level, so its Salvage tab names a source.
+  'salvage-under-skill': () => [
+    under({ source: 'attribute', expression: '@skills.smith.level' }),
+    under(),
+  ],
 };
 
 /**
@@ -114,6 +200,8 @@ const SALVAGE_CHECKS = {
  */
 async function seedSalvageChecks(world, state) {
   const [smithingEvaluation, runeworkEvaluation] = SALVAGE_CHECKS[state]();
+  const salvager = world.actorList.find((actor) => actor.id === 'lab-actor-brenna');
+  salvager.system.skills = { ...salvager.system.skills, smith: { level: 12 } };
   const rollFormula = smithingEvaluation.product === 'count' ? '' : '1d20';
   const manager = world.fabricate.craftingSystemManager;
   const smithing = manager.getSystem('lab-smithing');

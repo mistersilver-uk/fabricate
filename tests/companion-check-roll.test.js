@@ -11,7 +11,10 @@ import {
   CHECK_ROLL_MESSAGE_KEYS,
   COMPANION_OUTCOMES,
 } from '../src/systems/companionContract.js';
-import { buildInteractiveRollOptions } from '../src/ui/svelte/apps/crafting/rollPrompt.js';
+import {
+  buildInteractiveRollOptions,
+  promptCheckRoll,
+} from '../src/ui/svelte/apps/crafting/rollPrompt.js';
 
 import {
   assertLocalizationKey,
@@ -20,6 +23,7 @@ import {
 } from './helpers/companionContractOutcomes.js';
 import { installCountDice } from './helpers/countEngineDice.js';
 import { countEvaluation } from './helpers/countFixtures.js';
+import { stubPromptSurface } from './helpers/rollPromptDialogStub.js';
 import { defineStructureContract } from './helpers/structureContract.js';
 
 // Stubs
@@ -803,8 +807,7 @@ describe('evaluation dispatch and executed evidence', () => {
     const cases = [
       [{ product: 'count', pool: { die: '6' } }, 'evaluationInvalid'],
       [{ product: 'count' }, 'evaluationUnsupported'],
-      [{ direction: 'under' }, 'evaluationUnsupported'],
-      [{ target: { source: 'attribute' } }, 'evaluationUnsupported'],
+      [{ product: 'count', direction: 'under' }, 'evaluationUnsupported'],
     ];
     for (const [evaluation, outcome] of cases) {
       const { seams, calls } = makeSeams({ hasDiceEngine: () => { throw new Error('engine read'); } });
@@ -1029,11 +1032,7 @@ describe('attribute dispatch and roll-under (QE15, F1, D10)', () => {
   });
 
   it('refuses an interactive request for a non-interactive row, before any prompt', async () => {
-    for (const evaluation of [
-      { direction: 'under' },
-      { target: { source: 'attribute' } },
-      { product: 'count' },
-    ]) {
+    for (const evaluation of [{ product: 'count' }, { product: 'count', direction: 'under' }]) {
       installChat();
       installRoll();
       const { seams, calls } = makeSeams({ real: true });
@@ -1724,5 +1723,74 @@ describe('the call-site rule refuses both a missing and an unrecognised declarat
     const broadcast = makeSeams();
     await rollActorCheck(request({ dc: 15, callSite: 'broadcast' }), broadcast.seams);
     assert.equal(broadcast.calls.elected, 1);
+  });
+});
+
+describe('interactive summed rows compose with the shared prompt and a forwarded decision (issue 2005)', () => {
+  /** Each published interactive summed row and source, with the chip its prompt must show. */
+  const CHIPS = {
+    'over/fixed': 'DC 15 · meet or beat',
+    'over/attribute': 'Target 55 · meet or beat',
+    'under/fixed': 'Target 15 · stay at or under',
+    'under/attribute': 'Target 55 · stay at or under',
+  };
+  const cells = CHECK_EVALUATION_CAPABILITIES.modes
+    .filter((mode) => mode.product === 'sum')
+    .flatMap((mode) => mode.targetSources.map((source) => ({ mode, source })));
+  const evaluationOf = ({ mode, source }) => ({
+    product: 'sum',
+    direction: mode.direction,
+    target:
+      source === 'attribute' ? { source, expression: '@skills.craft.value' } : { source: 'fixed' },
+  });
+  const roll = (cell, extra) =>
+    rollActorCheck(
+      request({ actor: SKILLED_ACTOR, formula: '1d20', dc: 15, evaluation: evaluationOf(cell), ...extra }),
+      extra.seams
+    );
+
+  it('publishes every summed row as interactive, and every one opens the real prompt (Q17)', async () => {
+    assert.deepEqual(Object.keys(CHIPS), cells.map(({ mode, source }) => `${mode.direction}/${source}`));
+    for (const cell of cells) {
+      const key = `${cell.mode.direction}/${cell.source}`;
+      assert.equal(cell.mode.interactive, true, key);
+      installChat();
+      installRoll({ total: 10 });
+      const surface = stubPromptSurface(() => ({ confirmed: true, rollMode: 'gmroll', advantage: 'normal' }));
+      try {
+        const { seams } = makeSeams({ real: true, prompt: promptCheckRoll });
+        const result = await roll(cell, { interactive: true, seams });
+        assert.equal(surface.views.length, 1, `${key}: one prompt`);
+        assert.equal(surface.view.chipText, CHIPS[key], key);
+        assert.equal(surface.view.offerSituationalBonus, true, `${key}: a companion always offers the field`);
+        const passes = cell.mode.direction === 'under';
+        assert.equal(result.outcome, passes ? 'checkPassed' : 'checkFailed', `${key}: a roll of 10`);
+      } finally {
+        surface.restore();
+      }
+    }
+  });
+
+  it('forwards a decision: the bonus lands by direction and advantage keeps the better die', async () => {
+    const EXPECTED = {
+      'over/fixed': { formula: '2d20kh1 + (2)', target: 15 },
+      'over/attribute': { formula: '2d20kh1 + (2)', target: 55 },
+      'under/fixed': { formula: '2d20kl1', target: 17 },
+      'under/attribute': { formula: '2d20kl1', target: 57 },
+    };
+    for (const cell of cells) {
+      const key = `${cell.mode.direction}/${cell.source}`;
+      installChat();
+      const rolled = installRoll({ total: 10 });
+      const { seams, calls } = makeSeams({ real: true });
+      const result = await roll(cell, {
+        interactive: true,
+        rollDecision: { bonus: '2', rollMode: 'gmroll', advantage: 'advantage' },
+        seams,
+      });
+      assert.equal(calls.prompt.length, 0, `${key}: a forwarded decision opens no prompt`);
+      assert.ok(rolled.constructions.includes(EXPECTED[key].formula), `${key}: ${rolled.constructions}`);
+      assert.equal(result.target, EXPECTED[key].target, key);
+    }
   });
 });

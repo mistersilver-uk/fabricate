@@ -19,6 +19,10 @@
  * wrapper, so a card that has none is byte-identical — asserted, not assumed.
  */
 
+import { checkDiceLine } from './checkDiceLine.js';
+import { isPublicCheckDisplay } from './checkDisplay.js';
+import { checkEvidenceRows, pathBreakSegments } from './checkEvidenceRows.js';
+
 const ITEM_FALLBACK_IMG = 'icons/svg/item-bag.svg';
 
 /**
@@ -96,6 +100,8 @@ export const CRAFTING_CHAT_KEYS = Object.freeze({
   consumedOnFailure: 'FABRICATE.Chat.ConsumedOnFailure',
   producedOnFailure: 'FABRICATE.Chat.ProducedOnFailure',
   complications: COMPLICATIONS_HEADING_KEY,
+  checkSuccess: 'FABRICATE.Check.Evidence.Success',
+  checkFailure: 'FABRICATE.Check.Evidence.Failure',
 });
 
 /** Escape text destined for HTML so user-authored names cannot inject markup. */
@@ -166,6 +172,60 @@ export function renderRollTotal(value, label) {
     `<span class="fabricate-craft-chat__roll-value">${esc(value)}</span>`,
     '</div>',
   ].join('');
+}
+
+/**
+ * Escaped text in which no `[[` or `@` survives, so neither Foundry enrichment pass, inline rolls at
+ * creation nor `enrichHTML` with roll data at render, can match inside it: a word joiner (U+2060)
+ * follows every `@` and every `[` that opens a second.
+ */
+export function inertText(value) {
+  return esc(value)
+    .replaceAll(/\[(?=\[)/g, '[\u{2060}')
+    .replaceAll('@', '@\u{2060}');
+}
+
+/** Evidence text with a zero-width space after each inner `@path` dot, its only break points. */
+function withPathBreaks(text) {
+  return pathBreakSegments(text).join('\u{200B}');
+}
+
+/**
+ * The executed check's Target, Pre-rolled and Margin rows (issue 2005), or '' for a check that is
+ * not public and non-secret, a sum/over/fixed check or no check. Text only: never a Roll or a flag.
+ */
+export function renderCheckEvidenceRows(check, localize = (key) => key) {
+  const rows = isPublicCheckDisplay(check) ? checkEvidenceRows(check, localize) : [];
+  if (rows.length === 0) return '';
+  return [
+    '<dl class="fabricate-craft-chat__evidence">',
+    ...rows.map(
+      ({ id, label, text }) =>
+        `<div class="fabricate-craft-chat__evidence-row" data-check-evidence="${id}">` +
+        `<dt class="fabricate-craft-chat__evidence-label">${inertText(label)}</dt>` +
+        `<dd class="fabricate-craft-chat__evidence-value">${inertText(withPathBreaks(text))}</dd></div>`
+    ),
+    '</dl>',
+  ].join('');
+}
+
+/**
+ * The rolled check's head (issue 2005, frames 37 and 38): a key map naming `checkSuccess` adds the
+ * Success or Failure pill, and a public check's dice line replaces the bare total. Without a
+ * rolled total, or for another card's keys, it is {@link renderRollTotal} unchanged.
+ */
+function renderCheckHead(model, keys, loc) {
+  const total = renderRollTotal(model.rollValue, loc(keys.roll));
+  if (!total || !keys.checkSuccess) return total;
+  const succeeded = model.status === 'succeeded';
+  const pill =
+    `<div class="fabricate-craft-chat__result fabricate-craft-chat__result--${succeeded ? 'success' : 'failure'}">` +
+    `<i class="fa-solid ${succeeded ? 'fa-circle-check' : 'fa-circle-xmark'}" aria-hidden="true"></i>` +
+    `${esc(loc(succeeded ? keys.checkSuccess : keys.checkFailure))}</div>`;
+  const diceLine = isPublicCheckDisplay(model.check) ? checkDiceLine(model.check, loc) : '';
+  return diceLine
+    ? `${pill}<div class="fabricate-craft-chat__dice">${inertText(withPathBreaks(diceLine))}</div>`
+    : `${pill}${total}`;
 }
 
 /**
@@ -424,6 +484,8 @@ export function renderComplications({
  *   finite (a no-check "Guaranteed" craft/salvage omits it).
  * @param {{mode:'target'|'up'|'down',steps:number}} [model.tierStep] - Realized routed
  *   tier-step evidence (`data.tierStepApplied`), present only on an actual tier change.
+ * @param {object|null} [model.check] - The executed check's display projection, whose evidence
+ *   rows render only for a public, non-secret check (issue 2005).
  * @param {string}  [model.failureReason]
  * @param {Array<{name:string,description:string,severity:string,componentName:string}>}
  *   [model.complications] - Component complications this resolution FIRED, already
@@ -444,8 +506,9 @@ export function buildResultCard(model = {}, keys, localize = (key) => key) {
     subtitleParts.push(`${esc(loc(keys.subject))}: ${esc(model.subjectName)}`);
   }
 
-  const rollTotal = renderRollTotal(model.rollValue, loc(keys.roll));
+  const rollTotal = renderCheckHead(model, keys, loc);
   const tierStep = renderTierStep(model.tierStep, keys, loc);
+  const evidence = renderCheckEvidenceRows(model.check, loc);
 
   const notice =
     !succeeded && model.failureReason
@@ -510,6 +573,7 @@ export function buildResultCard(model = {}, keys, localize = (key) => key) {
     `<div class="fabricate-craft-chat__subtitle">${subtitleParts.join(' · ')}</div>`,
     '</header>',
     rollTotal,
+    evidence,
     tierStep,
     notice,
     ...sections,
@@ -541,6 +605,7 @@ export function buildCraftingChatContent(model = {}, localize = (key) => key) {
       tools: model.tools,
       rollValue: model.rollValue,
       tierStep: model.tierStep,
+      check: model.check,
       failureReason: model.failureReason,
       complications: model.complications,
     },

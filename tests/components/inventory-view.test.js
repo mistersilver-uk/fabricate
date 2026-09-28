@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 
 import {
+  CHECK_EVIDENCE_RAW_MODULES,
   MARKS_AND_NOTICES_COMPILED_MODULES,
   PLAYER_APP_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
@@ -45,6 +46,7 @@ const harness = createMountedComponentHarness({
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...CHECK_EVIDENCE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
     'src/ui/svelte/util/craftingArtResolution.js',
@@ -82,6 +84,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
     'src/ui/svelte/components/RowDisclosure.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageRollSummary.svelte',
+    'src/ui/svelte/apps/crafting/detail/CheckEvidenceRows.svelte',
+    'src/ui/svelte/apps/journal/JournalFactRow.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageSimpleBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageRoutedBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageProgressiveBody.svelte',
@@ -1357,6 +1361,42 @@ describe('InventoryView (mounted) — player salvage surface', () => {
       /Salvage\.ActionRoll$/,
       'a usable check makes the gesture a roll'
     );
+  });
+
+  it('a roll-under salvage states its target, source and rule in place of the DC (issue 2005, R4)', async () => {
+    const rule = 'Roll to break this down. The total must stay at or under the target to recover the materials below.';
+    const target = {
+      rule,
+      direction: 'under',
+      text: 'Target 10 · stay at or under',
+      source: 'Akra @skills.craft.value 12 · difficulty −2',
+    };
+    const { services } = salvageServices(salvageItem({ checkUsable: true, dc: null, target }));
+    const root = await openSalvage(services);
+    const line = root.querySelector('[data-inventory-salvage-target="under"]');
+    assert.equal(line.textContent.trim(), 'Target 10 · stay at or under');
+    assert.equal(
+      root.querySelector('[data-inventory-salvage-target-source]').textContent.trim(),
+      'Akra @skills.craft.value 12 · difficulty −2'
+    );
+    assert.ok(!root.querySelector('[data-inventory-salvage-dc]'), 'no DC beside a target');
+    assert.match(root.querySelector('[data-inventory-salvage-banner]').textContent, /stay at or under the target/);
+    assert.doesNotMatch(root.querySelector('[data-inventory-salvage-banner]').textContent, /Meet the DC/);
+  });
+
+  it('a relative routed roll-under salvage states its base target in place of the DC', async () => {
+    const target = { rule: 'unused', direction: 'under', text: 'Target 50 · stay at or under', source: '' };
+    const { services } = salvageServices(
+      salvageItem({ mode: 'routed', checkUsable: true, routedType: 'relative', dc: null, target })
+    );
+    const root = await openSalvage(services);
+    assert.equal(
+      root.querySelector('[data-inventory-salvage-body="routed"] [data-inventory-salvage-target="under"]')
+        .textContent.trim(),
+      'Target 50 · stay at or under'
+    );
+    assert.ok(!root.querySelector('[data-inventory-salvage-dc]'));
+    assert.doesNotMatch(root.querySelector('[data-inventory-salvage-banner]').textContent, /unused/);
   });
 
   // AC2, rendering half. The builder decides the numbers.

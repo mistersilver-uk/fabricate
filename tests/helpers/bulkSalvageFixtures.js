@@ -115,8 +115,9 @@ export function cardSubject({
   rollValue = null,
   tierStep = null,
   message = '',
+  check,
 } = {}) {
-  return { name, img, outcome, rollValue, tierStep, message };
+  return { name, img, outcome, rollValue, tierStep, message, ...(check && { check }) };
 }
 
 /**

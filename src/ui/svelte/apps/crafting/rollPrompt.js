@@ -5,9 +5,9 @@ import {
   describedFaceRules,
   faceSign,
 } from '../../../../systems/countEvaluation.js';
+import { fill } from '../../../../utils/fillPlaceholders.js';
 
 import { openRollPromptModal } from './rollPromptHost.js';
-import { fill } from './rollPromptTarget.js';
 
 // Legacy tokens on both versions (issue 1043): V14 maps them in Roll#toMessage, and core.messageMode is unregistered on V13, where reading it throws.
 const ROLL_MODES = [
@@ -136,11 +136,13 @@ function underCopy() {
     exceed: promptLabel('StayUnder', 'stay under'),
     formulaNote: promptLabel('ComparedAsRolled', 'The dice are compared as rolled.'),
     targetBase: promptLabel('TargetBase', 'Base {value}'),
-    targetValueOf: promptLabel('TargetValueOf', '{source} {value}'),
+    targetValueOf: promptLabel('TargetValueOf', '{actor} {source} {value}'),
     targetAdjustment: promptLabel('TargetAdjustment', '{label} {value}'),
     targetDifficulty: promptLabel('TargetDifficulty', 'difficulty {value}'),
     targetTools: promptLabel('TargetTools', 'tools {value}'),
     targetModifiers: promptLabel('TargetModifiers', 'modifiers {value}'),
+    targetSituational: promptLabel('TargetSituational', 'situational {value}'),
+    targetPending: promptLabel('TargetPending', '{target} + {formula}'),
     eachAdds: promptLabel('EachRaises', 'Each raises the target.'),
     bonusHelp: promptLabel(
       'BonusHelpUnder',
@@ -242,7 +244,7 @@ function faceRuleText({ kind, value }, direction, rule) {
 
 function targetText(data, labels) {
   if (!Number.isFinite(data.dc)) return '';
-  return data.direction === 'under'
+  return data.direction === 'under' || data.targetSource === 'attribute'
     ? fill(labels.targetValue, { target: data.dc })
     : fill(labels.dcValue, { dc: data.dc });
 }
@@ -373,7 +375,10 @@ export function buildSinglePromptData({
   cancel,
   required,
   modifierDestination,
+  offerSituationalBonus,
+  targetSource,
 } = {}) {
+  const offer = offerSituationalBonus !== false;
   const title = fill(promptLabel('CheckTitle', '{activity} check'), {
     activity: activity || promptLabel('roll', 'Roll'),
   });
@@ -396,6 +401,7 @@ export function buildSinglePromptData({
       direction: direction === 'under' ? 'under' : 'over',
       comparison: (comparison ?? thresholdMode) === 'exceed' ? 'exceed' : 'meet',
       selectedModifiers: Array.isArray(selectedModifiers) ? selectedModifiers : [],
+      offerSituationalBonus: offer,
       count: countPromptView({
         pool,
         die,
@@ -417,16 +423,23 @@ export function buildSinglePromptData({
     formula: displayFormula || resolvedFormula || formula || '',
     dc: Number.isFinite(value) ? value : null,
     direction: under ? 'under' : 'over',
-    ...(under && { targetBasis, toolBonus }),
+    ...(under && { targetBasis, toolBonus, actorName: actorName || '' }),
+    // A character value is a target to name in either direction, never a DC (issue 2005).
+    ...(targetSource === 'attribute' && Number.isFinite(value) && { targetSource }),
     comparison:
       comparison === undefined ? (thresholdMode === 'exceed' ? 'exceed' : 'meet') : comparison,
     selectedModifiers: Array.isArray(selectedModifiers) ? selectedModifiers : [],
+    offerSituationalBonus: offer,
   };
 }
 
-/** The bulk heading names the activity and the one actor when the caller knows them. */
+/**
+ * The bulk heading names the activity and the one actor when the caller knows them. The bonus
+ * field is hidden only when every row with a check has its offer off; a row without one says nothing.
+ */
 export function buildBulkPromptData({ count, subjects, activity, actorName } = {}) {
   const rows = Array.isArray(subjects) ? subjects : [];
+  const checked = rows.filter((row) => row?.need && row.need.kind !== 'noCheck');
   const items = fill(promptLabel('BulkHeading', '{count} items'), {
     count: Number.isFinite(count) ? count : rows.length,
   });
@@ -451,6 +464,8 @@ export function buildBulkPromptData({ count, subjects, activity, actorName } = {
         })
       : items,
     subjects: rows,
+    offerSituationalBonus:
+      checked.length === 0 || checked.some((row) => row.offerSituationalBonus !== false),
   };
 }
 

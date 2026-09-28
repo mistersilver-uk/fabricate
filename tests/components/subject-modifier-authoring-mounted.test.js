@@ -316,6 +316,7 @@ const gatheringHarness = createMountedComponentHarness({
     // The task check override reads the evaluation and formats an adjustment (issue 2005).
     'src/systems/normalize/checkEvaluation.js',
     'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
+    'src/utils/checkAdjustmentFormat.js',
     'src/utils/scalars.js',
     'src/ui/svelte/apps/manager/checks/checksCopy.js',
     // Its Player sees line, which resolves the target and names the Preview-as character.

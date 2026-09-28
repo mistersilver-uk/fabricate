@@ -220,8 +220,9 @@ test('the inputs every property below quantifies over are alive', () => {
   // 48 as of issue 1392, which promoted `apps/manager/VocabularyPanel.svelte`: the World Vocabulary
   // screen is its second independent caller, and property (e) below reported it as a component that
   // had crossed the membership bar with nobody adjudicating it.
-  // 67 as of issue 2005, which promoted the shared Preview-as picker and the Player sees block.
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 67, 'the shipped primitive set changed size');
+  // 68 as of issue 2005, which promoted the shared Preview-as picker, the Player sees block and the
+  // executed check evidence rows.
+  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 68, 'the shipped primitive set changed size');
   assert.equal(NOT_A_PRIMITIVE.length, 16, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(
@@ -804,13 +805,14 @@ test('(e) every registered path is a real, unadjudicated component', () => {
   );
 });
 
-test('(e) exactly two shared member rows still live outside the primitive directory', () => {
+test('(e) exactly three shared member rows live outside the primitive directory', () => {
   assert.deepEqual(
     MANIFEST_ROWS.filter(
       (row) => row.scope === 'shared' && !row.path.startsWith(PRIMITIVE_DIRECTORY)
     ).map((row) => row.path),
     [
       'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
+      'src/ui/svelte/apps/crafting/detail/CheckEvidenceRows.svelte',
       'src/ui/svelte/apps/manager/ManagerModal.svelte',
     ],
     'the design-system spec names this set; a promotion or a new shared row outside ' +

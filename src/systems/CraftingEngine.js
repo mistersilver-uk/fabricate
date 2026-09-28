@@ -55,7 +55,11 @@ import {
   runFormulaProgressive,
   runFormulaRouted,
 } from './checkRoll.js';
-import { countPromptFields, underTargetPromptFields } from './checkRollDecision.js';
+import {
+  attributeTargetPromptField,
+  countPromptFields,
+  underTargetPromptFields,
+} from './checkRollDecision.js';
 import {
   activeCheckEvaluation,
   actorRollData,
@@ -155,6 +159,7 @@ import {
   resolvedComponentsFor,
   resolvedEssencesFor,
   resolvedToolsFor,
+  salvageToolsFor,
 } from './scopedEntityReads.js';
 import { SignatureValidator, signatureDominates } from './SignatureValidator.js';
 import {
@@ -5978,6 +5983,7 @@ export class CraftingEngine {
     return resolveActivityCheck(config, {
       anchor: this._resolveCheckAnchorDc(config, recipe),
       override: selectedCheckTier(config, recipe)?.adjustment,
+      label: selectedCheckTier(config, recipe)?.name ?? '',
       required: this._resolveCountRequired(config, recipe),
       readRollData: () => actorRollData(actor),
     });
@@ -6821,18 +6827,7 @@ export class CraftingEngine {
   /** Resolve a component's salvage `toolIds` to library Tool objects from the owning system.
    * Unknown ids are skipped rather than throwing, and ids are deduped. */
   _resolveSalvageTools(system, salvage) {
-    const ids = Array.isArray(salvage?.toolIds) ? salvage.toolIds : [];
-    const library = resolvedToolsFor(system);
-    const seen = new Set();
-    const tools = [];
-    for (const rawId of ids) {
-      const id = String(rawId ?? '').trim();
-      if (!id || seen.has(id)) continue;
-      seen.add(id);
-      const tool = library.find((entry) => entry?.id === id);
-      if (tool) tools.push(tool);
-    }
-    return tools;
+    return salvageToolsFor(system, salvage);
   }
 
   /**
@@ -7391,6 +7386,7 @@ function versionedCheckPrompt({
     target,
     direction: target === null ? null : evaluation.direction,
     comparison: target === null ? null : comparison,
+    ...(target !== null && attributeTargetPromptField(evaluation)),
     ...(target !== null &&
       underTargetPromptFields(evaluation, {
         targetBasis: promptTargetBasis(activeCheck.config, recipe, actor, checkTarget, dc),

@@ -1,5 +1,5 @@
 /** Issue 2005 — the check display projection is an allowlist of plain, frozen, executed data. */
-import { describe, it } from 'node:test';
+import test, { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
@@ -7,8 +7,10 @@ import {
   executedCheckDisplay,
   executedCheckEvidence,
   foldTargetTerms,
+  isPublicCheckDisplay,
   sanitizeTargetTerms,
 } from '../src/ui/presenters/checkDisplay.js';
+import { pathBreakSegments } from '../src/ui/presenters/checkEvidenceRows.js';
 
 const PRIVATE = /SECRET_PATH|SECRET_LABEL|SECRET_POLICY|@skills/;
 
@@ -156,4 +158,95 @@ describe('buildCheckDisplay', () => {
     assert.equal(over.visibility, null, 'an unknown visibility is never read as public');
     assert.ok(!Object.hasOwn(over.evidence, 'targetTerms'));
   });
+});
+
+describe('isPublicCheckDisplay', () => {
+  it('admits only a public, non-secret roll; an unknown visibility is never public', () => {
+    const display = (visibility) => executedCheckDisplay({ data: EXECUTED, visibility });
+    assert.equal(isPublicCheckDisplay(display({ rollMode: 'publicroll', secret: false })), true);
+    for (const visibility of [
+      { rollMode: 'publicroll', secret: true },
+      { rollMode: 'gmroll' },
+      { rollMode: 'blindroll' },
+      { rollMode: 'selfroll' },
+      { rollMode: 'public' },
+      null,
+    ]) {
+      assert.equal(isPublicCheckDisplay(display(visibility)), false, JSON.stringify(visibility));
+    }
+    assert.equal(isPublicCheckDisplay(null), false);
+  });
+
+  it('keeps the executed target source beside its terms, and only there', () => {
+    const withSource = executedCheckEvidence({ ...EXECUTED, targetSource: 'attribute' });
+    assert.equal(withSource.targetSource, 'attribute');
+    const { targetTerms: _terms, ...untermed } = EXECUTED;
+    assert.ok(!Object.hasOwn(executedCheckEvidence({ ...untermed, targetSource: 'fixed' }), 'targetSource'));
+    assert.ok(!Object.hasOwn(executedCheckEvidence({ ...EXECUTED, targetSource: '@x' }), 'targetSource'));
+  });
+});
+
+describe('executedCheckEvidence (maintainer rulings, #2088 r1)', () => {
+  it('keeps a difficulty step tier label, and a character value formula and name, only there', () => {
+    const evidence = executedCheckEvidence({
+      ...EXECUTED,
+      targetSource: 'attribute',
+      targetExpression: ' @skills.smith.level ',
+      targetActor: 'Sera Vane',
+      targetTerms: [
+        { kind: 'anchor', value: 12, label: 'SECRET_LABEL' },
+        { kind: 'adjustment', value: -2, label: 'Hard Work' },
+        { kind: 'multiplier', value: 0.5, label: 7 },
+        { kind: 'benefit', value: 1, source: 'library', label: 'SECRET_LABEL' },
+      ],
+    });
+    assert.deepEqual(evidence.targetTerms, [
+      { kind: 'anchor', value: 12 },
+      { kind: 'adjustment', value: -2, label: 'Hard Work' },
+      { kind: 'multiplier', value: 0.5 },
+      { kind: 'benefit', value: 1, source: 'library' },
+    ]);
+    assert.equal(evidence.targetExpression, '@skills.smith.level');
+    assert.equal(evidence.targetActor, 'Sera Vane');
+    const fixed = executedCheckEvidence({
+      ...EXECUTED,
+      targetSource: 'fixed',
+      targetExpression: '@x',
+      targetActor: 'A',
+    });
+    assert.ok(!Object.hasOwn(fixed, 'targetExpression') && !Object.hasOwn(fixed, 'targetActor'));
+  });
+
+  it('keeps the executed formula and each die group kept faces for the dice line', () => {
+    const evidence = executedCheckEvidence({
+      ...EXECUTED,
+      resolvedFormula: '3d6',
+      diceGroups: [{ groupId: 0, group: '3d6', sum: 9, results: [2, 4, 'x', 3] }, { group: 7 }],
+    });
+    assert.equal(evidence.formula, '3d6');
+    assert.deepEqual(evidence.dice, [{ group: '3d6', results: [2, 4, 3] }]);
+    const legacy = executedCheckEvidence(EXECUTED);
+    assert.ok(!Object.hasOwn(legacy, 'formula') && !Object.hasOwn(legacy, 'dice'));
+  });
+});
+
+test('executedCheckEvidence drops a non-string or blank typed formula (QE r3 6)', () => {
+  for (const rollFormula of [{ x: 1 }, 7, '  ']) {
+    const evidence = executedCheckEvidence({ ...EXECUTED, resolvedFormula: '1d20', rollFormula });
+    assert.equal(evidence.formula, '1d20', 'positive control: the resolved formula is kept');
+    assert.ok(!Object.hasOwn(evidence, 'rollFormula'), JSON.stringify(rollFormula));
+  }
+});
+
+test('pathBreakSegments splits only after an @path inner dot (item 7 ruling)', () => {
+  const text = '15 · Sera Vane @skills.smith.level 12, Hard Work −2, modifiers 1.5. Done.';
+  const segments = pathBreakSegments(text);
+  assert.deepEqual(segments, [
+    '15 · Sera Vane @skills.',
+    'smith.',
+    'level 12, Hard Work −2, modifiers 1.5. Done.',
+  ]);
+  assert.equal(segments.join(''), text, 'joined, the pieces are the text');
+  assert.deepEqual(pathBreakSegments('ends at @path.'), ['ends at @path.'], 'no break after a final dot');
+  assert.deepEqual(pathBreakSegments(''), ['']);
 });

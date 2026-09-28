@@ -4,7 +4,10 @@
   icon + muted label + value layout). Factored into one component so StepDetails
   and AboutThisRun reuse the same markup + CSS rather than pasting it (keeping new
   code under the SonarCloud duplication budget). A `danger` flag tints the value
-  with the danger token (used for a step's failure copy).
+  with the danger token (used for a step's failure copy). A `null` icon draws none, and
+  `keyed` sets the label as a key column (`--journal-fact-key-width`, default 120px)
+  beside a left-aligned, wrapping 13px value: recorded check evidence (issue 2005). An array
+  `value` renders its segments with a `<wbr>` break opportunity between them.
 -->
 <script>
   let {
@@ -13,13 +16,23 @@
     value = '',
     danger = false,
     inline = false,
+    keyed = false,
   } = $props();
 </script>
 
-<div class="journal-fact-row" class:is-danger={danger} class:is-inline={inline} data-journal-fact>
-  <i class={`fas ${icon} journal-fact-icon`} aria-hidden="true"></i>
+<div
+  class="journal-fact-row"
+  class:is-danger={danger}
+  class:is-inline={inline}
+  class:is-keyed={keyed}
+  data-journal-fact
+>
+  {#if icon}<i class={`fas ${icon} journal-fact-icon`} aria-hidden="true"></i>{/if}
   <span class="journal-fact-label">{label}</span>
-  <span class="journal-fact-value">{value}</span>
+  <span class="journal-fact-value"
+    >{#if Array.isArray(value)}{#each value as segment, index (index)}{#if index > 0}<wbr
+          />{/if}{segment}{/each}{:else}{value}{/if}</span
+  >
 </div>
 
 <style>
@@ -58,6 +71,18 @@
     display: inline-flex;
     gap: var(--fab-space-1);
     font-size: 10.5px;
+  }
+  .journal-fact-row.is-keyed {
+    grid-template-columns: var(--journal-fact-key-width, 120px) minmax(0, 1fr);
+    padding: 0;
+  }
+  /* The keyed value takes the `.k-fact` atom's 13px mono (design system), as the inline form does. */
+  .journal-fact-row.is-keyed .journal-fact-value {
+    font-size: 13px;
+    line-height: 1.45;
+    /* A typed path breaks at a space first, and only mid-word when a word alone overflows. */
+    overflow-wrap: break-word;
+    text-align: left;
   }
   .journal-fact-row.is-inline .journal-fact-value {
     margin-left: var(--fab-space-1);

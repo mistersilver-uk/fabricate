@@ -6,7 +6,7 @@
   the roll mode and the advantage disposition, then posts to chat).
 
   It reports only what the engine actually returned: the outcome, the engine's own
-  message, and the materials awarded. It NEVER renders a formula: the formula is
+  message, the executed check's evidence rows, and the materials awarded. It NEVER renders a formula: the formula is
   system-authored, the prompt already displayed the (optionally @-resolved) one,
   and inventing "d20 + 6" here would print a number no world necessarily uses.
 
@@ -21,6 +21,7 @@
 -->
 <script>
   import Medallion from '../../../../components/Medallion.svelte';
+  import CheckEvidenceRows from '../../../crafting/detail/CheckEvidenceRows.svelte';
   import { resolveCraftingArt } from '../../../../util/craftingArtResolution.js';
   import { localize } from '../../../../util/foundryBridge.js';
 
@@ -60,11 +61,11 @@
     </p>
     {#if message}
       <p class="salvage-summary-message" data-inventory-salvage-message>
-        {message}{#if hasRoll}
-          {localize('FABRICATE.App.Inventory.Salvage.SummaryWithRoll')}
+        {message}{#if hasRoll}{` ${localize('FABRICATE.App.Inventory.Salvage.SummaryWithRoll')}`}
           <span class="salvage-summary-roll" data-inventory-salvage-roll>{rollValue}</span>{/if}
       </p>
     {/if}
+    <CheckEvidenceRows check={result.check ?? null} />
     {#if awarded.length > 0}
       <ul class="salvage-summary-awarded" data-inventory-salvage-awarded>
         {#each awarded as entry, index (entry.name + ':' + index)}

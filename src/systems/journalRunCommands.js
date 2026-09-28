@@ -1,3 +1,4 @@
+import { checkDisplayForCard } from './craftCardFields.js';
 import { applyGuardedRunMutation } from './runLifecycleState.js';
 
 /** Request/reply discriminators multiplexed on the existing module socket. */
@@ -618,6 +619,48 @@ function serializedOperationResult(result, { secret = false, runId = '' } = {}) 
 }
 
 /**
+ * A crafting reply's executed check projection for the player's result box (issue 2005), or null:
+ * a blind roll, which the roller never sees, a non-crafting run and a stage with no rolled check
+ * have none. The caller attaches it only for an entitled initiator.
+ */
+function executedCheckFor(runType, checkResult) {
+  const check = runType === 'crafting' ? checkDisplayForCard(checkResult) : null;
+  return check?.evidence && check.visibility?.rollMode !== 'blindroll' ? check : null;
+}
+
+/**
+ * Whether the attested initiator may receive a visible roll's private facts (its handoff and its
+ * executed evidence), re-read against the fresh actor, sender and run after the commit.
+ */
+async function initiatorEntitled({ operation, request, resolveUuid, getUser, ...authorization }) {
+  if (typeof operation.authorizeRollHandoff !== 'function') return true;
+  try {
+    const freshActor = await resolveUuid(request.actorUuid);
+    const freshSender = getUser?.(request.senderId) ?? null;
+    const freshRun =
+      freshActor && validText(request.runId)
+        ? await operation.getRun?.({
+            actor: freshActor,
+            runId: request.runId,
+            includeHistory: true,
+          })
+        : null;
+    return Boolean(
+      freshActor &&
+      freshSender &&
+      (await operation.authorizeRollHandoff({
+        actor: freshActor,
+        run: freshRun,
+        sender: freshSender,
+        ...authorization,
+      }))
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Server-attested commands revalidate identity, ownership, revision and expected stage under a claim.
  * Player checks use one-use tokens, local prompts and GM resolution; adapters own disclosure.
  * Replies correlate recipients/user/session/request/run/revision; dismissal preserves actor history.
@@ -854,37 +897,24 @@ export function createJournalRunCommandService({
       secret: secretCheck,
       runId: request.runId,
     });
-    if (response.success && responseRollHandoff && !secretCheck) {
-      let rollEntitled = true;
-      if (typeof operation.authorizeRollHandoff === 'function') {
-        try {
-          const freshActor = await resolveUuid(request.actorUuid);
-          const freshSender = getUser?.(request.senderId) ?? null;
-          const freshRun =
-            freshActor && validText(request.runId)
-              ? await operation.getRun?.({
-                  actor: freshActor,
-                  runId: request.runId,
-                  includeHistory: true,
-                })
-              : null;
-          rollEntitled = Boolean(
-            freshActor &&
-            freshSender &&
-            (await operation.authorizeRollHandoff({
-              actor: freshActor,
-              run: freshRun,
-              payload,
-              sender: freshSender,
-              privateEvaluation,
-              result,
-            }))
-          );
-        } catch {
-          rollEntitled = false;
-        }
-      }
-      if (rollEntitled) return { ...response, rollHandoff: responseRollHandoff };
+    const check = secretCheck
+      ? null
+      : executedCheckFor(request.runType, trustedContext.resolvedCheckResult);
+    const handoff = response.success && !secretCheck ? responseRollHandoff : null;
+    // Evidence and the handoff share one entitlement: an unentitled initiator receives neither.
+    if (
+      (handoff || check) &&
+      (await initiatorEntitled({
+        operation,
+        request,
+        resolveUuid,
+        getUser,
+        payload,
+        privateEvaluation,
+        result,
+      }))
+    ) {
+      return { ...response, ...(check && { check }), ...(handoff && { rollHandoff: handoff }) };
     }
     return response;
   }
