@@ -51,4 +51,5 @@ export const TARGET_LIBRARY_NAME_TOTAL = 56;
 export const TARGET_MANIFEST_ROWS = rows('manifestTargetRows');
 
 /** @see TARGET_MANIFEST_ROWS */
-export const TARGET_MANIFEST_ROW_TOTAL = 50;
+// Issue 2005 adds the executed check evidence rows, a new member at `target`.
+export const TARGET_MANIFEST_ROW_TOTAL = 51;
