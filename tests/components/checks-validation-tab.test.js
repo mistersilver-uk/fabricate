@@ -137,6 +137,45 @@ describe('ChecksValidationTab (mounted)', () => {
     harness.remount();
   });
 
+  it('names an invalid salvage override and an invalid gathering task override (issue 2078)', async () => {
+    const attributeMultiply = {
+      product: 'sum',
+      direction: 'under',
+      target: { source: 'attribute', expression: '@skills.craft.value', adjustmentKind: 'multiply' },
+    };
+    const target = await harness.mount({
+      sections: [
+        {
+          subsystem: 'salvage',
+          mode: 'simple',
+          check: { rollFormula: '1d20', evaluation: attributeMultiply },
+          components: [
+            { id: 'c1', name: 'Iron Longsword', salvage: { enabled: true, adjustmentOverride: -2 } },
+          ],
+        },
+        {
+          subsystem: 'gathering',
+          mode: 'routed',
+          check: { rollFormula: '1d20', evaluation: attributeMultiply },
+          gatheringTasks: [
+            { id: 't1', name: 'Prospect for Ore', resolutionMode: 'routed', adjustmentOverride: -2 },
+          ],
+        },
+      ],
+    });
+    const salvageIssue = target.querySelector(
+      '[data-checks-validation-section="salvage"] [data-issue="adjustmentInvalidForKind"]'
+    );
+    assert.ok(Boolean(salvageIssue), 'the salvage section lists the fault');
+    assert.match(salvageIssue.textContent, /Iron Longsword/);
+    const gatheringIssue = target.querySelector(
+      '[data-checks-validation-section="gathering"] [data-issue="adjustmentInvalidForKind"]'
+    );
+    assert.ok(Boolean(gatheringIssue), 'the gathering section lists the fault');
+    assert.match(gatheringIssue.textContent, /Prospect for Ore/);
+    harness.remount();
+  });
+
   it('lists routed outcome-tier issues (unnamed tier, no Success) as critical', async () => {
     const target = await harness.mount({
       sections: [unfinishedRoutedSection('crafting', '1d20', '  ')],

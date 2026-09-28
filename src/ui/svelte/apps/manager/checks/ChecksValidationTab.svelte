@@ -62,6 +62,8 @@
         modifierContext: section.modifierContext ?? null,
         activity: section.subsystem,
         previewActor,
+        components: section.components,
+        gatheringTasks: section.gatheringTasks,
       }),
     }))
   );
