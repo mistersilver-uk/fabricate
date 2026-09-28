@@ -8,6 +8,7 @@ import test from 'node:test';
 import {
   buildPresetTrigger,
   checkTriggerPresets,
+  presetPolarity,
 } from '../src/ui/svelte/apps/manager/checks/checkTriggerPresets.js';
 
 const D20 = [{ groupId: 0, label: '1d20', sides: 20, count: 1 }];
@@ -135,8 +136,76 @@ test('an unknown preset id builds nothing', () => {
 
 test('the offered labels carry the die and the faces they promise', () => {
   const [high, low] = checkTriggerPresets({ kind: 'routed', diceGroups: D20 });
-  assert.equal(high.data.max, '20');
-  assert.equal(low.data.min, '1');
+  assert.equal(high.data.face, '20');
+  assert.equal(low.data.face, '1');
   assert.equal(high.data.effect.fallback, 'step up a tier');
   assert.equal(low.data.effect.fallback, 'step down a tier');
+});
+
+// ── Preset polarity (issue 2005): the best face follows the check's direction ──────────────
+const OVER = { product: 'sum', direction: 'over' };
+const UNDER = { product: 'sum', direction: 'under' };
+const COUNT_OVER = { product: 'count', direction: 'over' };
+const COUNT_UNDER = { product: 'count', direction: 'under' };
+
+test('presetPolarity names the best face: low under, high over, for sums and counts', () => {
+  assert.equal(presetPolarity(OVER), 'high');
+  assert.equal(presetPolarity(UNDER), 'low');
+  assert.equal(presetPolarity(COUNT_OVER), 'high');
+  assert.equal(presetPolarity(COUNT_UNDER), 'low');
+  assert.equal(presetPolarity(null), 'high', 'an absent evaluation is the legacy roll-high check');
+  assert.equal(presetPolarity({}), 'high');
+});
+
+test('a roll-under best preset fires on face 1 and its worst preset on the maximum', () => {
+  const best = buildPresetTrigger({
+    presetId: 'high',
+    kind: 'routed',
+    diceGroups: D20,
+    newId: () => 'b',
+    evaluation: UNDER,
+  });
+  const worst = buildPresetTrigger({
+    presetId: 'low',
+    kind: 'routed',
+    diceGroups: D20,
+    newId: () => 'w',
+    evaluation: UNDER,
+  });
+  assert.equal(best.condition.value, 1, 'the best face under is 1');
+  assert.deepEqual(best.tierStep, { mode: 'up', steps: 1, tierId: null }, 'and it still helps');
+  assert.equal(worst.condition.value, 20, 'the worst face under is the maximum');
+  assert.deepEqual(worst.tierStep, { mode: 'down', steps: 1, tierId: null });
+  const [high, low] = checkTriggerPresets({ kind: 'routed', diceGroups: D20, evaluation: UNDER });
+  assert.deepEqual([high.data.face, low.data.face], ['1', '20']);
+});
+
+test('a counted check keeps the net ranking: the best preset still helps in both directions', () => {
+  for (const evaluation of [COUNT_OVER, COUNT_UNDER]) {
+    const best = buildPresetTrigger({
+      presetId: 'high',
+      kind: 'simple',
+      diceGroups: D20,
+      newId: () => 'c',
+      evaluation,
+    });
+    assert.equal(best.outcome, 'success', `${evaluation.direction}: the best face forces success`);
+    assert.equal(best.condition.value, evaluation.direction === 'under' ? 1 : 20);
+  }
+});
+
+test('a roll-high evaluation authors exactly the legacy trigger, field for field', () => {
+  for (const presetId of ['high', 'low']) {
+    for (const kind of ['routed', 'simple', 'progressive']) {
+      const legacy = buildPresetTrigger({ presetId, kind, diceGroups: MIXED, newId: () => 'x' });
+      const over = buildPresetTrigger({
+        presetId,
+        kind,
+        diceGroups: MIXED,
+        newId: () => 'x',
+        evaluation: OVER,
+      });
+      assert.deepEqual(over, legacy, `${presetId}/${kind}`);
+    }
+  }
 });

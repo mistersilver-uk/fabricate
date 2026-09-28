@@ -480,6 +480,7 @@
       kind="routed"
       outcomeOptions={breakageOutcomeOptions}
       showBreakTools={checkDriven}
+      {evaluation}
       onChange={(checkBreakage) => emit({ checkBreakage })}
     />
   {/if}
