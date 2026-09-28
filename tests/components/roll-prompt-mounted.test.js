@@ -25,6 +25,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/overlayBounds.js',
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/util/pickerOptionModel.js',
+    'src/ui/svelte/apps/crafting/rollPromptTarget.js',
   ],
   compiledModules: [
     'src/ui/svelte/components/Field.svelte',
@@ -38,6 +39,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/SelectionCheckbox.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/apps/manager/ManagerModal.svelte',
+    'src/ui/svelte/apps/crafting/RollPromptTarget.svelte',
     PROMPT,
   ],
   rootClass: 'fabricate fabricate-app',
@@ -61,7 +63,7 @@ const choices = [
 const noChoice = { options: [], maxPicks: 1, defaultSelectedIds: [] };
 const base = {
   kind: 'single', title: 'Crafting check', subtitle: 'Brenna · Forge rivets', formula: '2d6 + 3',
-  dc: 12, dcText: 'DC 12', comparison: 'meet', selectedModifiers: [], labels, rollModes: modes,
+  dc: 12, dcText: 'DC 12', chipText: 'DC 12 · meet or beat', comparison: 'meet', selectedModifiers: [], labels, rollModes: modes,
   defaultRollMode: 'publicroll', choicePlan: noChoice, allowAdvantage: false,
 };
 const bulk = {
@@ -131,9 +133,8 @@ describe('mounted roll prompt', () => {
     assert.match(chip.textContent, /DC 12 · meet or beat/);
     assert.ok(chip.classList.contains('is-info'), chip.className);
     assert.ok(!chip.classList.contains('is-mono'), 'the DC chip is not mono');
-    assert.ok(dialog.classList.contains('is-banded'), 'the prompt draws the banded library Modal');
     assert.ok(dialog.querySelector('.manager-modal-body > .fabricate-roll-prompt'), 'in a padded body');
-    assert.ok(dialog.querySelector('[data-manager-modal-close]').classList.contains('is-size-24'));
+    assert.ok(dialog.querySelector('[data-manager-modal-close]').classList.contains('is-size-26'));
     assert.ok(!dialog.querySelector('select'), 'no native select remains');
     const mode = modeTrigger(dialog);
     assert.equal(mode.getAttribute('name'), 'rollMode');
@@ -144,7 +145,7 @@ describe('mounted roll prompt', () => {
 
   it('shows the exact selected modifiers, naming an unlabelled one and zeroing a non-finite value', async () => {
     const root = await harness.mount({ data: {
-      ...base, comparison: 'exceed',
+      ...base, comparison: 'exceed', chipText: 'DC 12 · beat',
       selectedModifiers: [choices[1], { value: 3 }, { label: 'Odd', value: 'n/a' }],
     } });
     assert.match(root.textContent, /DC 12 · beat/);
@@ -437,6 +438,177 @@ describe('mounted roll prompt', () => {
     dialog.querySelector('button[data-action="roll"]').click();
     const answer = await pending;
     assert.deepEqual(answer.chosenModifierIds, ['a', 'c']);
+  });
+
+  it('names a roll-under target to stay under, and raises it with every modifier and bonus', async () => {
+    const focus = [{ label: 'Focus', display: '+2' }];
+    for (const [thresholdMode, text] of [['meet', 'Target 15 · stay at or under'], ['exceed', 'Target 15 · stay under']]) {
+      document.body.replaceChildren();
+      const view = buildSinglePromptData({
+        displayFormula: '1d20', dc: 15, target: 15, direction: 'under', thresholdMode, selectedModifiers: focus,
+      });
+      const { dialog, pending } = await openThroughHost(view, false, noChoice);
+      const chip = dialog.querySelector('.formula-content .manager-chip');
+      assert.equal(chip.textContent.trim(), text);
+      assert.equal(chip.dataset.rollPromptTarget, 'under');
+      assert.ok(chip.classList.contains('is-info'), 'the DC chip primitive, retoned nowhere');
+      assert.equal(chip.parentElement.className.split(' ')[0], 'formula-content', 'a fixed, unraised target: a bare chip');
+      const note = dialog.querySelector('.formula-content .formula + .formula-note');
+      assert.equal(note.textContent, 'The dice are compared as rolled.');
+      assert.equal(dialog.querySelector('.static-modifiers .help').textContent, 'Each raises the target.');
+      assert.equal(
+        dialog.querySelector('.bonus-group .help').textContent,
+        'A bonus raises the target. A rolled bonus such as 1d4 is rolled first, and its result is applied.'
+      );
+      dialog.querySelector('[data-manager-modal-close]').click();
+      await pending;
+    }
+  });
+
+  it('explains a roll-under target beside its chip, and moves both with the picked modifiers', async () => {
+    const targetBasis = {
+      expression: '@skills.smith.level', value: 12, adjustment: { kind: 'add', value: -2, label: 'Hard Work' },
+    };
+    const view = buildSinglePromptData({
+      displayFormula: '1d20', dc: 10, target: 10, direction: 'under', targetBasis,
+      selectedModifiers: [{ label: 'Steady hands', value: 1, display: '+1' }],
+    });
+    const frame = await openThroughHost(view, false, noChoice);
+    const row = frame.dialog.querySelector('.formula-content > .target-row');
+    assert.deepEqual([...row.children].map((child) => child.textContent.trim()), [
+      'Target 11 · stay at or under', '@skills.smith.level 12 · Hard Work -2 · modifiers +1',
+    ], 'frame 29: the chip, then its explanation on the same row');
+    assert.equal(row.querySelector('.manager-chip').dataset.rollPromptTarget, 'under');
+    frame.dialog.querySelector('[data-manager-modal-close]').click();
+    await frame.pending;
+
+    document.body.replaceChildren();
+    const options = [
+      { id: 'a', label: 'A', value: 1, display: '+1' },
+      { id: 'b', label: 'B', value: null, display: '+1d4' },
+      { id: 'c', label: 'C', value: 3, display: '+3' },
+    ];
+    const picks = { options, maxPicks: 1, defaultSelectedIds: ['a'] };
+    const { dialog, pending } = await openThroughHost({ ...view, selectedModifiers: [] }, false, picks);
+    const shown = () => [...dialog.querySelectorAll('.target-row > *')].map((child) => child.textContent.trim());
+    assert.deepEqual(shown(), ['Target 11 · stay at or under', '@skills.smith.level 12 · Hard Work -2 · modifiers +1']);
+    dialog.querySelector('input[type="radio"][value="c"]').click();
+    flushSync();
+    assert.deepEqual(shown(), ['Target 13 · stay at or under', '@skills.smith.level 12 · Hard Work -2 · modifiers +3']);
+    dialog.querySelector('input[type="radio"][value="b"]').click();
+    flushSync();
+    assert.deepEqual(shown(), ['Target 10 · stay at or under', '@skills.smith.level 12 · Hard Work -2'], 'a rolled pick adds nothing yet');
+    dialog.querySelector('input[name="situationalBonus"]').value = '4';
+    dialog.querySelector('input[name="situationalBonus"]').dispatchEvent(new document.defaultView.Event('input', { bubbles: true }));
+    flushSync();
+    assert.equal(shown()[0], 'Target 10 · stay at or under', 'a typed bonus is applied once rolled, not before');
+    dialog.querySelector('[data-manager-modal-close]').click();
+    await pending;
+  });
+
+  it('keeps a roll-over prompt byte-identical, whether or not it names a direction', async () => {
+    const focus = [{ label: 'Focus', display: '+2' }];
+    const rendered = [];
+    for (const extra of [{}, { target: 12, direction: 'over' }]) {
+      document.body.replaceChildren();
+      const view = buildSinglePromptData({ displayFormula: '1d20', dc: 12, selectedModifiers: focus, ...extra });
+      const { dialog, pending } = await openThroughHost(view, false, noChoice);
+      const chip = dialog.querySelector('.formula-content .manager-chip');
+      assert.equal(chip.textContent.trim(), 'DC 12 · meet or beat');
+      assert.ok(!chip.hasAttribute('data-roll-prompt-target'), 'no target hook on a roll-over chip');
+      assert.equal(dialog.querySelector('.target-row, .target-source'), null, 'no target explanation over');
+      assert.equal(dialog.querySelector('.formula-note'), null, 'no compared-as-rolled note over');
+      assert.ok(!chip.hasAttribute('data-roll-prompt-required'), 'no successes hook on a DC chip');
+      assert.ok(!dialog.querySelector('[data-roll-prompt-count]'), 'no count hook on a summed formula');
+      assert.equal(dialog.querySelector('.static-modifiers .help').textContent, 'Each adds to the total.');
+      assert.equal(
+        dialog.querySelector('.bonus-group .help').textContent,
+        'A bonus adds to the total. A rolled bonus such as 1d4 is rolled with the check.'
+      );
+      rendered.push(dialog.querySelector('.fabricate-roll-prompt').innerHTML.replaceAll(/id="[^"]*"|aria-labelledby="[^"]*"/g, ''));
+      dialog.querySelector('[data-manager-modal-close]').click();
+      await pending;
+    }
+    assert.equal(rendered[1], rendered[0], 'a named roll-over direction renders the same markup as none');
+  });
+
+  it('shows a count check its pool line and successes chip, in both directions and destinations', async () => {
+    const focus = [{ label: 'Focus', display: '+2', value: 2 }];
+    const cases = [
+      {
+        input: {
+          direction: 'over', comparison: 'meet', pool: 6, die: 10, threshold: 8, required: 2, modifierDestination: 'pool',
+          explode: { kind: 'best', value: null, once: false }, cancel: { kind: 'worst', value: null },
+        },
+        formula: '6d10 · each ≥ 8', chip: '2 successes needed', note: 'Each adds dice.',
+        rules: 'Success on ≥ 8 · best face explodes · worst face cancels',
+        help: 'A bonus adds that many dice. A rolled bonus such as 1d4 is rolled first, and its result is applied.',
+      },
+      {
+        input: {
+          direction: 'under', comparison: 'exceed', pool: 3, die: 20, threshold: 13, required: 1, modifierDestination: 'threshold',
+          thresholdSource: '@abilities.int.mod + 10',
+        },
+        formula: '3d20 · each < 13', chip: '1 success needed', note: 'Each moves the threshold.',
+        rules: 'Success on < 13 (@abilities.int.mod + 10)',
+        help: 'A bonus moves the threshold by that much. A rolled bonus such as 1d4 is rolled first, and its result is applied.',
+      },
+    ];
+    for (const { input, formula, chip: chipText, note, rules, help } of cases) {
+      document.body.replaceChildren();
+      const view = buildSinglePromptData({
+        product: 'count', displayFormula: '1d20 + 3', dc: 12, target: 12, selectedModifiers: focus, ...input,
+      });
+      const { dialog, pending } = await openThroughHost(view, false, noChoice);
+      const line = dialog.querySelector('.formula-content .formula');
+      assert.equal(line.textContent, formula, 'the pool line, never the retained 1d20 + 3');
+      assert.equal(line.dataset.rollPromptCount, input.direction);
+      const ruleLine = line.nextElementSibling;
+      assert.ok(ruleLine.matches('p.help.formula-note'), 'frames 30 and 35: the rule sits under the pool line');
+      assert.equal(ruleLine.textContent.trim(), rules);
+      assert.ok(ruleLine.nextElementSibling.matches('.manager-chip'), 'and above the successes chip');
+      const chips = [...dialog.querySelectorAll('.formula-content .manager-chip')];
+      assert.equal(chips.length, 1);
+      assert.equal(chips[0].textContent.trim(), chipText);
+      assert.equal(chips[0].dataset.rollPromptRequired, String(input.required));
+      assert.ok(chips[0].classList.contains('is-info'), 'the DC chip primitive, retoned nowhere');
+      assert.ok(!chips[0].hasAttribute('data-roll-prompt-target'));
+      assert.equal(dialog.querySelector('.target-row, .target-source'), null, 'a count explains no target');
+      assert.ok(!/DC|meet or beat|beat/.test(dialog.querySelector('.formula-row').textContent), 'no DC');
+      assert.equal(dialog.querySelector('.static-modifiers .help').textContent, note);
+      assert.equal(dialog.querySelector('.bonus-group .help').textContent, help);
+      assert.ok(!dialog.querySelector('button[data-action="advantage"]'), 'no advantage until issue 2007');
+      dialog.querySelector('[data-manager-modal-close]').click();
+      await pending;
+    }
+  });
+
+  it('shows a count prompt whose pool is hidden no pool line, rule or chip, only its wording', async () => {
+    const view = buildSinglePromptData({
+      product: 'count', direction: 'under', comparison: 'exceed', modifierDestination: 'threshold',
+      displayFormula: '1d20 + 3', dc: 12,
+    });
+    const { dialog, pending } = await openThroughHost(view, false, noChoice);
+    assert.equal(dialog.querySelector('.formula-row'), null, 'no pool, threshold or count to show');
+    assert.ok(!/\d/.test(dialog.querySelector('.fabricate-roll-prompt').textContent.replace('1d4', '')), 'no number');
+    assert.equal(
+      dialog.querySelector('.bonus-group .help').textContent,
+      'A bonus moves the threshold by that much. A rolled bonus such as 1d4 is rolled first, and its result is applied.'
+    );
+    dialog.querySelector('[data-manager-modal-close]').click();
+    await pending;
+  });
+
+  it('shows a progressive count check its pool line and no successes chip', async () => {
+    const view = buildSinglePromptData({
+      product: 'count', direction: 'over', pool: 4, die: 6, threshold: 5, required: null, modifierDestination: 'pool',
+    });
+    const { dialog, pending } = await openThroughHost(view, false, noChoice);
+    assert.equal(dialog.querySelector('.formula-content .formula').textContent, '4d6 · each ≥ 5');
+    assert.equal(dialog.querySelector('.formula-note').textContent.trim(), 'Success on ≥ 5');
+    assert.ok(!dialog.querySelector('.formula-content .manager-chip'), 'a budget has no count to reach');
+    dialog.querySelector('[data-manager-modal-close]').click();
+    await pending;
   });
 
   it('shows the base formula once and itemises each applied modifier as a chip', async () => {

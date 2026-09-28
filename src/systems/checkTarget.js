@@ -238,6 +238,32 @@ export function resolveActivityTarget(config, { anchor, override = null, readRol
   });
 }
 
+/**
+ * What a summed character-value target is made of, for the roll prompt to name: the authored
+ * expression, its value before adjustment, and the adjustment with its tier's `label` when that
+ * tier supplied it. Null for any other target, or when the value does not resolve.
+ */
+export function attributeTargetBasis(config, { override = null, label = '', readRollData }) {
+  const evaluation = activeCheckEvaluation(config);
+  const { source, expression, adjustmentKind } = evaluation.target;
+  if (config?.type === 'fixed' || evaluation.product !== 'sum' || source !== 'attribute') {
+    return null;
+  }
+  const resolved = resolveDeterministicExpression(expression, readRollData(), {
+    pathMode: 'foundry',
+  });
+  if (!resolved.ok) return null;
+  const adjustment = selectTargetAdjustment(evaluation, override);
+  return {
+    expression: expression.trim(),
+    value: resolved.value,
+    adjustment:
+      adjustment === null
+        ? null
+        : { kind: adjustmentKind, value: adjustment, label: override == null ? '' : label },
+  };
+}
+
 /** An added adjustment is any finite number; a multiplier is a finite number above zero. */
 export function isValidTargetAdjustment(kind, value) {
   return Number.isFinite(value) && (kind !== 'multiply' || value > 0);

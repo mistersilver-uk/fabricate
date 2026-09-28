@@ -10529,6 +10529,17 @@
   flex: 0 0 24px;
 }
 
+/* The banded Modal's close (maintainer ruling 2026-09-28); its paint is `ManagerModal`'s. */
+.fabricate-icon-button.manager-icon-button.is-size-26 {
+  box-sizing: border-box;
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  min-height: 26px;
+  padding: 0;
+  flex: 0 0 26px;
+}
+
 /* The strip half, for the reason spelled out on `.fabricate-button:focus` above: core's orange
    `button:focus` outline and 4px glow survive in any host carrying no Fabricate root, so the
    repaint below would sit on top of them rather than replace them. Above the repaint because the
@@ -17385,10 +17396,11 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* The leading glyph and the chevron are both quiet, as the specimen draws them. */
+/* The leading glyph and the chevron are both quiet, as the specimen draws them, and at its 12px (`.k-field .i`) on every rung rather than at the rung's type (ruling 2026-09-28). */
 .fabricate-select-trigger > i {
   flex: none;
   color: var(--fab-text-subtle);
+  font-size: 12px;
 }
 
 .fabricate-select-trigger > i:last-child {

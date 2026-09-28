@@ -45,7 +45,10 @@
  */
 
 import { buildCheckModifierContext } from '../../systems/checkModifierResolver.js';
+import { activeCheckEvaluation, actorRollData, isFixedSumOver } from '../../systems/checkTarget.js';
+import { countFormulaValues, resolvePool } from '../../systems/countEvaluation.js';
 import { buildPassInventorySnapshot } from '../../systems/passInventorySnapshot.js';
+import { hasActiveCheck } from '../../systems/salvageCheckUsability.js';
 import { resolvedComponentsFor } from '../../systems/scopedEntityReads.js';
 import { activeRunStepState, buildStepRecipeView } from '../../systems/stepRecipeView.js';
 // The player-visible per-stage complication forecast (issue 1286), attached to the stage
@@ -104,6 +107,7 @@ const BLOCKING_REASON_KEYS = {
 
 const DEFAULT_TEASER_HIDDEN_FIELDS = ['ingredients', 'results', 'description'];
 const UNKNOWN_COMPONENT_KEY = 'FABRICATE.Labels.UnknownComponent';
+const COUNT_FORMULA_KEY = 'FABRICATE.Check.CountRoll.Pool';
 const TIME_REQUIREMENT_FIELDS = ['minutes', 'hours', 'days', 'months', 'years'];
 
 /**
@@ -850,7 +854,8 @@ export class CraftingListingBuilder {
   /**
    * The crafting-check descriptor for the recipe's resolution mode, or null when
    * the system configures no check block for that mode. `usable` is true iff an
-   * authored, non-empty roll formula exists — NOT the legacy `enabled` flag.
+   * authored, non-empty roll formula or an active count check exists — NOT the legacy
+   * `enabled` flag. A count check shows its pool line in place of its retained formula.
    *
    * The displayed `dc` is resolved per-recipe (not per-system) with the same
    * precedence the engine (`CraftingEngine._resolveSimpleCheckDc`) and the GM
@@ -908,8 +913,10 @@ export class CraftingListingBuilder {
     }
     if (!config) return null;
 
+    const evaluation = activeCheckEvaluation(config);
     const rollFormula = typeof config.rollFormula === 'string' ? config.rollFormula.trim() : '';
-    const usable = rollFormula.length > 0;
+    // An active structured count check is usable, and its retained formula is inert.
+    const usable = hasActiveCheck(config, rollFormula);
     // "Mandatory" reflects whether the engine will actually roll this check and a
     // failure fails the craft (CraftingEngine._runCraftingCheck) — NOT merely whether
     // the mode requires a check to be configured. Otherwise a routed-by-ingredients
@@ -936,6 +943,34 @@ export class CraftingListingBuilder {
       : mode === 'routedByIngredients'
         ? usable
         : usable && checksEnabled;
+    const formula =
+      evaluation.product === 'count'
+        ? this._countFormulaDisplay(config, evaluation, craftingActor)
+        : this._sumFormulaDisplay({ rollFormula, craftingActor, system, recipe, evaluation });
+    // A routed fixed check (routedByCheck, or alchemy tiered) matches by value
+    // range, not DC, so it has no meaningful DC — null it so the player card hides
+    // its DC chip (its `hasDc` gate).
+    const routedFixed =
+      (mode === 'routedByCheck' || (mode === 'alchemy' && alchemyCheckMode === 'tiered')) &&
+      config.type === 'fixed';
+    // Resolve the displayed DC AFTER the issue 765 suppression guard above (never
+    // reorder it there). See the method JSDoc and `_chipDc`.
+    const dc = this._chipDc(config, recipe, routedFixed, evaluation);
+    return {
+      dc,
+      ...formula,
+      skill: stringOrNull(config.skill),
+      optional: !mandatory,
+      mandatory,
+      usable,
+    };
+  }
+
+  /**
+   * A summed check's authored formula and its display resolved for the acting character.
+   * @private
+   */
+  _sumFormulaDisplay({ rollFormula, craftingActor, system, recipe, evaluation }) {
     // Resolve the formula's @-placeholders against the acting character for display
     // (e.g. "1d20 + 3 + 2"). `resolvedFormula` is null when not attempted (no actor /
     // no dice engine), so the UI falls back to the raw formula; `formulaResolved` is
@@ -958,31 +993,57 @@ export class CraftingListingBuilder {
           this._resolveCheckFormula(
             rollFormula,
             craftingActor,
-            buildCheckModifierContext(system, 'crafting', recipe)
+            buildCheckModifierContext(system, 'crafting', recipe),
+            evaluation
           )
         : null;
-    // A routed fixed check (routedByCheck, or alchemy tiered) matches by value
-    // range, not DC, so it has no meaningful DC — null it so the player card hides
-    // its DC chip (its `hasDc` gate).
-    const routedFixed =
-      (mode === 'routedByCheck' || (mode === 'alchemy' && alchemyCheckMode === 'tiered')) &&
-      config.type === 'fixed';
-    // Resolve the displayed DC AFTER the issue 765 suppression guard above (never
-    // reorder it there): routed-fixed and dynamic-DC checks surface no chip
-    // (`null`); otherwise the recipe's tier DC wins over the static fallback. See
-    // the method JSDoc and `_resolveDisplayDc`.
-    const dc =
-      routedFixed || config.dcMode === 'dynamic' ? null : this._resolveDisplayDc(config, recipe);
     return {
-      dc,
       rollFormula: rollFormula.length > 0 ? rollFormula : null,
       resolvedFormula: resolution?.display ?? null,
       formulaResolved: resolution ? resolution.resolved === true : null,
-      skill: stringOrNull(config.skill),
-      optional: !mandatory,
-      mandatory,
-      usable,
     };
+  }
+
+  /**
+   * A count check's formula line in place of its inert retained formula: the authored pool and
+   * threshold, each bracketed when read from the character, else null when either is blank; and
+   * for the acting character the pool resolved and floored, or `false` when a value cannot be read.
+   * @private
+   */
+  _countFormulaDisplay(config, evaluation, craftingActor) {
+    const { pool, direction } = evaluation;
+    const comparison = config.thresholdMode;
+    const line = (values) => this.localize(COUNT_FORMULA_KEY, countFormulaValues(values));
+    const base = pool.base.trim();
+    const threshold = pool.threshold.trim();
+    const bracketed = (text, number) => (number.test(text) ? text : `(${text})`);
+    const rollFormula =
+      base && threshold
+        ? line({
+            dice: bracketed(base, /^\d+$/),
+            die: pool.die,
+            direction,
+            comparison,
+            threshold: bracketed(threshold, /^[+-]?\d+(?:\.\d+)?$/),
+          })
+        : null;
+    if (!craftingActor) return { rollFormula, resolvedFormula: null, formulaResolved: null };
+    const rollData = actorRollData(craftingActor);
+    const resolved = resolvePool({ evaluation, thresholdMode: comparison, rollData });
+    return {
+      rollFormula,
+      resolvedFormula: resolved.ok ? line(resolved.policy) : null,
+      formulaResolved: resolved.ok,
+    };
+  }
+
+  /**
+   * The DC chip's value: null for a routed-fixed or dynamic-DC check, and for every evaluation
+   * but a summed roll-over fixed DC, whose target is no single DC to meet or beat.
+   */
+  _chipDc(config, recipe, routedFixed, evaluation) {
+    if (routedFixed || config.dcMode === 'dynamic' || !isFixedSumOver(evaluation)) return null;
+    return this._resolveDisplayDc(config, recipe);
   }
 
   /**

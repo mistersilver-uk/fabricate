@@ -10,6 +10,7 @@
   | `onclick` | function | no-op | Forwarded verbatim, so a call site keeps its `event.stopPropagation()`. |
   | `children` | snippet | `undefined` | The glyph, an `<i class="fas fa-…" aria-hidden="true">`. A snippet rather than an `icon` string, because the sites interleave Font Awesome class sets this component has no vocabulary for. |
   | `class` | class string | `''` | An EXTRA class, appended to the primitive's own, never a replacement. |
+  | `size` | `'default'` \| `24` \| `26` | `'default'` | An opt-in numeric square owning its box, both minimums, zero padding and its flex basis; 26 is the banded Modal's close. |
   | `element` | bindable | `null` | The rendered `<button>`, which `ActionMenu` measures its portaled panel against and returns focus to. |
 
   Rest spread:
@@ -45,7 +46,12 @@
   } = $props();
 
   const classes = $derived(
-    ['fabricate-icon-button', 'manager-icon-button', size === 24 ? 'is-size-24' : '', extraClass]
+    [
+      'fabricate-icon-button',
+      'manager-icon-button',
+      { 24: 'is-size-24', 26: 'is-size-26' }[size] || '',
+      extraClass,
+    ]
       .filter(Boolean)
       .join(' ')
   );

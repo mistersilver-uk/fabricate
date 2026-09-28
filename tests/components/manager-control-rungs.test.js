@@ -365,3 +365,27 @@ describe('M12a — the inspector rail’s action button takes the corner its hei
     assert.equal(valueOf(body, 'border-radius'), null, 'and it states no corner, so it takes the 9 above');
   });
 });
+
+describe('epic 1997 — the banded Modal frame and the Select glyph (rulings 2026-09-28)', () => {
+  it('pins the rung rule the close takes: IconButton’s 26px square in the module sheet', () => {
+    const [box] = bodiesOf('.fabricate-icon-button.manager-icon-button.is-size-26');
+    for (const property of ['width', 'height', 'min-width', 'min-height']) {
+      assert.equal(pixels(valueOf(box, property)), 26, `the rung states a 26px ${property}`);
+    }
+  });
+
+  it('draws every rung’s glyphs at the specimen’s 12px `.k-field .i`, never at the rung’s type', () => {
+    const [body] = bodiesOf('.fabricate-select-trigger > i');
+    assert.equal(pixels(valueOf(body, 'font-size')), 12);
+    const restated = rules().filter(
+      (rule) => /fabricate-select-trigger[^,]*> i\b/.test(rule.selector) && valueOf(rule.body, 'font-size')
+    );
+    assert.deepEqual(
+      restated.map((rule) => rule.selector),
+      ['.fabricate-select-trigger > i'],
+      'no rung or call site restates the glyph size'
+    );
+    const library = readFileSync(resolve(repoRoot, 'openspec/specs/design-system/library.html'), 'utf8');
+    assert.match(library, /\.k-field \.i\{width:12px;height:12px;/, 'the specimen still states 12px');
+  });
+});

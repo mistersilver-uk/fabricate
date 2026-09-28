@@ -6,8 +6,12 @@
 import { isPlainObject } from '../utils/scalars.js';
 
 import {
+  countFormulaValues,
+  describedFaceRules,
   explodesOnEveryFace,
   extremeFace,
+  faceBeyondDie,
+  faceSign,
   MAX_COUNT_POOL,
   projectCountResults,
 } from './countEvaluation.js';
@@ -49,7 +53,7 @@ export function countReplayPolicy({ direction, comparison, threshold, explode, c
 /** `${dice}d${die}` plus the one explosion token; a digit never follows `x`/`xo` directly. */
 export function countRollFormula({ dice, die, direction, explode }) {
   const pool = `${dice}d${die}`;
-  if (!explode || beyondDie(explode, die)) return pool;
+  if (!explode || faceBeyondDie(explode, die)) return pool;
   const token = explode.once ? 'xo' : 'x';
   if (explode.kind !== 'from') return `${pool}${token}=${extremeFace(die, direction)}`;
   return `${pool}${token}${direction === 'under' ? '<=' : '>='}${explode.value}`;
@@ -205,39 +209,26 @@ function markResult(result, { qualified, cancelled, contribution }) {
   result.count = contribution;
 }
 
-const COMPARISON_SIGNS = { over: { meet: '≥', exceed: '>' }, under: { meet: '≤', exceed: '<' } };
-
 function describeCountRoll({ policy }, i18n) {
-  const { dice, die, direction, comparison, threshold, explode, cancel } = policy;
-  const clauses = [
-    format(i18n, 'FABRICATE.Check.CountRoll.Pool', {
-      pool: dice,
-      die,
-      comparison: COMPARISON_SIGNS[direction][comparison],
-      threshold: Number(threshold.toFixed(2)),
-    }),
-  ];
-  if (explode && !beyondDie(explode, die)) {
+  const { die, direction } = policy;
+  const { explode, cancel } = describedFaceRules(policy);
+  const clauses = [format(i18n, 'FABRICATE.Check.CountRoll.Pool', countFormulaValues(policy))];
+  if (explode) {
     const key = explode.once
       ? 'FABRICATE.Check.CountRoll.ExplodeOnce'
       : 'FABRICATE.Check.CountRoll.Explode';
     clauses.push(format(i18n, key, { faces: faceLabel(explode, die, direction) }));
   }
-  // A `from` cancel face beyond the die cancels every face over and none under.
-  if (cancel && !(direction === 'under' && beyondDie(cancel, die))) {
+  if (cancel) {
     const faces = faceLabel(cancel, die, direction === 'under' ? 'over' : 'under');
     clauses.push(format(i18n, 'FABRICATE.Check.CountRoll.Cancel', { faces }));
   }
   return clauses.join(' · ');
 }
 
-function beyondDie({ kind, value }, die) {
-  return kind === 'from' && value > die;
-}
-
 function faceLabel({ kind, value }, die, direction) {
   if (kind !== 'from') return String(extremeFace(die, direction));
-  return `${direction === 'under' ? '≤' : '≥'} ${value}`;
+  return `${faceSign(direction)} ${value}`;
 }
 
 // Core pairs `success failure` on an overlap, and its CSS lets `.failure` win; name both instead.

@@ -239,6 +239,14 @@ describe('ImportFolderMappingModal (mounted)', () => {
     const root = dialog();
     assert.ok(root, 'expected the dialog root');
     assert.ok(root.hasAttribute('data-manager-modal'), 'renders through the shared chrome');
+    // Maintainer rulings 2026-09-28: ManagerModal draws one frame, the library's banded Modal.
+    assert.ok(root.querySelector('.manager-modal-body > [data-import-mapping-match]'), 'in a padded body');
+    const close = document.querySelector('[data-manager-modal-close]');
+    assert.ok(close.classList.contains('is-size-26'), 'with the banded frame’s 26px close');
+    const paint = getComputedStyle(close);
+    assert.equal(paint.borderRadius, '7px', 'on the radius ladder’s 26-32px corner');
+    assert.equal(paint.backgroundColor, 'transparent', 'unfilled');
+    assert.equal(paint.fontSize, '11px', 'with an 11px glyph');
     assert.equal(root.getAttribute('role'), 'dialog');
   });
 });
