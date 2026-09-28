@@ -38,6 +38,7 @@ manager-checks-under-fixed-rolled
 manager-checks-under-attribute-odds
 manager-checks-under-attribute-rolled
 manager-checks-under-no-actor
+manager-checks-under-actorless-literal
 manager-checks-under-missing-path
 manager-checks-under-missing-path-validation
 manager-checks-under-readiness

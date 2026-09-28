@@ -1031,6 +1031,23 @@ export const CASES = Object.freeze([
       ':has([data-checks-simulator-state="needs-preview-actor"])',
   }),
   underCase({
+    id: 'manager-checks-under-actorless-literal',
+    label: 'literal character value, no character chosen',
+    frame: 10,
+    query: { system: 'lab-runework' },
+    steps: [
+      ...parityFormula('1d20'),
+      ...PARITY_UNDER,
+      ...parityAttribute('12'),
+      { selector: '[data-check-adjustment-kind-option="add"]' },
+      ...SCROLL_ODDS,
+    ],
+    expectSelector:
+      '.fabricate-manager' +
+      ':has([data-checks-odds-state="enumerated"][data-checks-odds-direction="under"] [data-checks-odds-bar])' +
+      ':not(:has([data-checks-simulator-state="needs-preview-actor"]))',
+  }),
+  underCase({
     id: 'manager-checks-under-missing-path',
     label: 'character value the character lacks',
     frame: 19,
@@ -1056,8 +1073,11 @@ export const CASES = Object.freeze([
       { selector: '[data-issue="attributePathUnresolvedForPreview"]', scroll: true },
     ],
     expectView: 'checks-validation',
+    // A transient warning puts no badge on the nav.
     expectSelector:
-      '.fabricate-manager [data-issue="attributePathUnresolvedForPreview"][data-issue-transient]',
+      '.fabricate-manager' +
+      ':has([data-issue="attributePathUnresolvedForPreview"][data-issue-transient])' +
+      ':not(:has([data-checks-nav-issues]))',
   }),
   underCase({
     id: 'manager-checks-under-readiness',
