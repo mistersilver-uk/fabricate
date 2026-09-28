@@ -92,6 +92,9 @@ const EVIDENCE_STATES = {
   'under-evidence': { rollFormula: '1d4' },
   'under-evidence-fail': { rollFormula: '1d4 + 20' },
   'under-bonus-off': { rollFormula: '1d20', offerSituationalBonus: false },
+  // Strictly under the target, and the player picking one modifier rather than every one applying.
+  'under-strict': { rollFormula: '1d20', thresholdMode: 'exceed' },
+  'under-picks': { rollFormula: '1d20', picks: true },
   'over-attribute': { rollFormula: '1d20', direction: 'over' },
   // A path the crafter has no value at, so the check card says so rather than name a target.
   'under-unresolved': { rollFormula: '1d20', expression: '@skills.missing.level' },
@@ -101,10 +104,11 @@ const EVIDENCE_STATES = {
 
 async function seedCheckEvidence(
   world,
-  { rollFormula, offerSituationalBonus, direction, expression, control, salvage }
+  { rollFormula, offerSituationalBonus, direction, expression, control, salvage, thresholdMode, picks }
 ) {
   const manager = world.fabricate.craftingSystemManager;
   if (!control && !salvage) await seedRollUnder(world);
+  if (picks) await seedPlayerPicks(world);
   const system = manager.getSystem('lab-smithing');
   const simple = system.craftingCheck.simple;
   const evaluation =
@@ -121,7 +125,13 @@ async function seedCheckEvidence(
       !salvage && {
         craftingCheck: {
           ...system.craftingCheck,
-          simple: { ...simple, rollFormula, evaluation, ...(offerSituationalBonus === false && { offerSituationalBonus }) },
+          simple: {
+            ...simple,
+            rollFormula,
+            evaluation,
+            ...(offerSituationalBonus === false && { offerSituationalBonus }),
+            ...(thresholdMode && { thresholdMode }),
+          },
         },
       }),
     ...(salvage && {
@@ -131,6 +141,25 @@ async function seedCheckEvidence(
         simple: { rollFormula: '1d4', dc: 12, thresholdMode: 'meet', evaluation: under() },
       },
     }),
+  });
+}
+
+/** Frame 29's modifier and a second, "Sure grip +2", of which the player picks one. */
+async function seedPlayerPicks(world) {
+  const store = world.fabricate.characterLibrariesStore;
+  await store.saveModifiers([
+    { id: 'lab-mod-sure-grip', label: 'Sure grip', icon: 'fa-solid fa-hand-fist', expression: '2' },
+    ...store.listModifiers(),
+  ]);
+  const manager = world.fabricate.craftingSystemManager;
+  const system = manager.getSystem('lab-smithing');
+  await manager.updateSystem(system.id, {
+    craftingCheck: {
+      ...system.craftingCheck,
+      defaultModifierPolicy: 'playerPicks',
+      maxModifierPicks: 1,
+      defaultModifierIds: ['lab-mod-steady-hands', 'lab-mod-sure-grip'],
+    },
   });
 }
 

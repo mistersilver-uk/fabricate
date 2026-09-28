@@ -3,6 +3,8 @@ player-crafting-roll-prompt-advantage
 player-crafting-roll-prompt-under
 player-crafting-check-under
 player-crafting-roll-prompt-under-bonus-off
+player-crafting-roll-prompt-under-strict
+player-crafting-roll-prompt-under-picks
 player-crafting-roll-prompt-under-rolled-bonus
 player-crafting-roll-prompt-over-attribute
 player-crafting-check-descriptor-under-resolved

@@ -170,6 +170,39 @@ export const CASES = Object.freeze([
     kinds: ['player', 'crafting'],
     sourceMatches: PROMPT_SOURCES,
   }),
+  // Strictly under: the chip and its explanation name a target the total must stay under.
+  playerCase({
+    id: 'player-crafting-roll-prompt-under-strict',
+    label: 'Player app — roll-under crafting roll prompt, strictly under the target',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', dialog: 'open', rollPromptState: 'under-strict' },
+    steps: [...CRAFT_HORSESHOE],
+    expectSelector:
+      `${SINGLE_PROMPT} .target-row > .manager-chip[data-roll-prompt-target="under"]` +
+      ':has-text("Target 11 · stay under")',
+    kinds: ['player', 'crafting'],
+    sourceMatches: PROMPT_SOURCES,
+  }),
+  // The player picks one of two modifiers, and the chip and its explanation follow the pick.
+  playerCase({
+    id: 'player-crafting-roll-prompt-under-picks',
+    label: 'Player app — roll-under crafting roll prompt with a modifier to pick',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', dialog: 'open', rollPromptState: 'under-picks' },
+    steps: [
+      ...CRAFT_HORSESHOE,
+      {
+        selector: `${SINGLE_PROMPT} input[type="radio"][name="craftingModifier"][value="lab-mod-sure-grip"]`,
+      },
+    ],
+    expectSelector:
+      `${SINGLE_PROMPT}:has(input[type="radio"][name="craftingModifier"])` +
+      ':has(.target-row > .manager-chip[data-roll-prompt-target="under"]:has-text("Target 12 · stay at or under"))',
+    kinds: ['player', 'crafting'],
+    sourceMatches: PROMPT_SOURCES,
+  }),
   // A typed rolled bonus is pending: the chip names it beside the settled target, never an average.
   playerCase({
     id: 'player-crafting-roll-prompt-under-rolled-bonus',
