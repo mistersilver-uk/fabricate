@@ -604,6 +604,35 @@ describe('CHECK_READINESS_ISSUE_IDS is the source of truth for every issue id', 
       { mode: 'routed', previewActor: actor }
     );
     collect({ rollFormula: '1d20', evaluation: attribute('@x') }, { mode: 'progressive' });
+    // Success-counting pools (issue 2004), one fault each, then the Preview-as actor's two.
+    const count = (pool, extra = {}) => ({
+      rollFormula: '',
+      evaluation: { product: 'count', direction: 'over', pool: { die: 10, ...pool } },
+      ...extra,
+    });
+    collect(count({ base: '2d4', threshold: '' }), { mode: 'simple' });
+    collect(count({ explode: { enabled: true, faces: { kind: 'from', value: 12 } } }), {
+      mode: 'simple',
+    });
+    collect(count({ explode: { enabled: true, faces: { kind: 'from', value: 1 } } }), {
+      mode: 'simple',
+    });
+    collect(
+      count({ base: '2', required: 1 }, { tiers: [{ id: 't', name: 'Hard', successes: null }] }),
+      { mode: 'simple', activity: 'crafting' }
+    );
+    collect(count({ base: '2', required: 3 }), { mode: 'simple' });
+    collect(count({ base: '@skills.smith.rank' }), {
+      mode: 'simple',
+      previewActor: { name: 'Vosk', rollData: {} },
+    });
+    collect(count({ base: '@skills.smith.rank' }), {
+      mode: 'simple',
+      previewActor: { name: 'Vosk', rollData: { skills: { smith: { rank: 'high' } } } },
+    });
+    // The base-pool ceiling row fires only once additional dice (issue 2008) raise the ceiling
+    // above the base, so no check reaches it yet; `countCeilingIssues` proves its branch.
+    emitted.add('countRequiredExceedsBasePool');
     for (const id of emitted) {
       assert.ok(
         CHECK_READINESS_ISSUE_IDS.includes(id),

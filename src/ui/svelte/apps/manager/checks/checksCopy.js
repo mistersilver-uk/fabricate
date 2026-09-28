@@ -42,6 +42,29 @@ export const CHECK_TICK_LABELS = Object.freeze({
     'CheckProgressiveHigherIsBetter',
     'Progressive checks use Higher is better',
   ],
+  countPoolReadable: ['CheckCountPoolReadable', 'The base pool can be worked out'],
+  countThresholdReadable: [
+    'CheckCountThresholdReadable',
+    'The success threshold can be worked out',
+  ],
+  countFacesOnDie: ['CheckCountFacesOnDie', 'Explode and cancel faces are on the die'],
+  countExplosionStops: ['CheckCountExplosionStops', 'Explosion can stop'],
+  countTiersSetSuccesses: [
+    'CheckCountTiersSetSuccesses',
+    'Every recipe tier sets its successes needed',
+  ],
+  countRequiredWithinMaxPool: [
+    'CheckCountRequiredWithinMaxPool',
+    'Successes needed fit within the most dice this check allows',
+  ],
+  countRequiredWithinBasePool: [
+    'CheckCountRequiredWithinBasePool',
+    'Successes needed fit within the base pool',
+  ],
+  countPoolCharacterDependent: [
+    'CheckCountPoolCharacterDependent',
+    'The base pool reads the character, so it is compared with the successes needed only when a character rolls.',
+  ],
 });
 
 /** The ISSUES a check can raise, keyed by `CHECK_READINESS_ISSUE_IDS` member. */
@@ -144,6 +167,55 @@ export const CHECK_ISSUE_LABELS = Object.freeze({
     'IssueAttributeValueNotNumeric',
     'The value this check reads from {actor} is not a number, so this check cannot roll for them.',
   ],
+  countPoolInvalid: [
+    'IssueCountPoolInvalid',
+    "This check's base pool uses dice or cannot be read as arithmetic. Use a number, a character path, or arithmetic on them without dice.",
+  ],
+  countThresholdInvalid: [
+    'IssueCountThresholdInvalid',
+    "This check's success threshold uses dice or cannot be read as arithmetic. Use a number, a character path, or arithmetic on them without dice.",
+  ],
+  countFaceBeyondDie: [
+    'IssueCountFaceBeyondDie',
+    'The {kind} face {face} is not on a d{die}, so {effect}. Pick a face the die can show.',
+  ],
+  countExplodeUnbounded: [
+    'IssueCountExplodeUnbounded',
+    'Every face on this die explodes, so the roll would never stop. Pick a face that does not explode.',
+  ],
+  countTierWithoutSuccesses: [
+    'IssueCountTierWithoutSuccesses',
+    "{names} set no successes needed, so they use the check's {required} and are no harder than the default. Set successes needed on each tier.",
+  ],
+  countRequiredExceedsMaxPool: [
+    'IssueCountRequiredExceedsMaxPool',
+    'The successes needed by {names} exceed the {ceiling} dice this check allows before any explode, so an attempt succeeds only when dice explode or are added. Lower the successes needed or allow more dice.',
+  ],
+  countRequiredExceedsBasePool: [
+    'IssueCountRequiredExceedsBasePool',
+    'The successes needed by {names} exceed the base pool of {base} dice, so an attempt succeeds only when dice explode or are added to the pool.',
+  ],
+  countPathUnresolvedForPreview: [
+    'IssueCountPathUnresolvedForPreview',
+    '{actor} has no value at {path}, so this check cannot roll for them.',
+  ],
+  countValueNotNumericForPreview: [
+    'IssueCountValueNotNumericForPreview',
+    'The value this check reads from {actor} is not a number, so this check cannot roll for them.',
+  ],
+});
+
+/** The words a `countFaceBeyondDie` issue's coded `kind` and `effect` fill its sentence with. */
+const ISSUE_PHRASES = Object.freeze({
+  kind: {
+    explode: ['FaceKindExplode', 'explode'],
+    cancel: ['FaceKindCancel', 'cancel'],
+  },
+  effect: {
+    neverExplodes: ['FaceEffectNeverExplodes', 'it never explodes'],
+    everyFaceCancels: ['FaceEffectEveryFaceCancels', 'every face cancels'],
+    noFaceCancels: ['FaceEffectNoFaceCancels', 'no face cancels'],
+  },
 });
 
 /**
@@ -206,15 +278,31 @@ export function checkTickCopy(id) {
   return copyFor(CHECK_TICK_LABELS, id);
 }
 
-/** An issue's data with a faulted base adjustment named, in the reader's language, before the rest. */
+/**
+ * An issue's data in the reader's language: a faulted base adjustment named before the rest, and
+ * any coded phrase (a face rule's kind and effect) localized.
+ */
 function issueData(data, text) {
-  if (!data?.baseAdjustment) return data;
+  if (!data) return data;
+  const resolved = { ...data };
+  for (const [field, phrases] of Object.entries(ISSUE_PHRASES)) {
+    const phrase = phrases[resolved[field]];
+    if (phrase) resolved[field] = text(`${NAMESPACE}${phrase[0]}`, phrase[1]);
+  }
+  if (!data.baseAdjustment) return resolved;
   const base = text(
     'FABRICATE.Admin.Manager.Checks.Evaluation.RecordBaseAdjustment',
     'base adjustment'
   );
   const named = `${base.charAt(0).toLocaleUpperCase()}${base.slice(1)}`;
-  return { ...data, names: [named, data.names].filter(Boolean).join(', ') };
+  return { ...resolved, names: [named, data.names].filter(Boolean).join(', ') };
+}
+
+/** A readiness issue's one sentence, as `checkIssueText` fills it. */
+export function checkIssueSentence(id, data, text) {
+  const resolved = issueData(data, text);
+  const copy = checkIssueCopy(id);
+  return interpolate(text(copy.key, copy.fallback, resolved), resolved);
 }
 
 /**
@@ -222,9 +310,7 @@ function issueData(data, text) {
  * detail, and any other issue's sentence is its title with no detail. `text(key, fallback, data)`.
  */
 export function checkIssueText(id, data, text) {
-  const resolved = issueData(data, text);
-  const copy = checkIssueCopy(id);
-  const sentence = interpolate(text(copy.key, copy.fallback, resolved), resolved);
+  const sentence = checkIssueSentence(id, data, text);
   const title = CHECK_ISSUE_TITLES[id];
   if (!title) return { title: sentence, detail: '' };
   return { title: text(`${NAMESPACE}${title[0]}`, title[1]), detail: sentence };

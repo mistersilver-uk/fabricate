@@ -21,6 +21,13 @@ import {
   targetExpressionFault,
   targetRefusalSentence,
 } from './checkTargetStatus.js';
+import {
+  buildCountOddsModel,
+  buildCountReadout,
+  countAbstention,
+  countPreviewEnumeration,
+  countRecordReading,
+} from './countPreviewModel.js';
 
 /** Why a preview charts and rolls nothing although its check has a formula. */
 export const PREVIEW_ABSTENTIONS = Object.freeze({
@@ -33,8 +40,12 @@ export const PREVIEW_ABSTENTIONS = Object.freeze({
 
 const NOT_NUMERIC = new Set(['dice', 'invalid', 'non-finite']);
 
-/** What a record grades against: its adjustment under a character value, else `target n` or `DC n`. */
+/**
+ * What a record grades against: its required count under a count check, its adjustment under a
+ * character value, else `target n` or `DC n`.
+ */
 function recordReading(record, evaluation, text) {
+  if (evaluation.product === 'count') return countRecordReading(record, evaluation, text);
   if (evaluation.target.source === 'attribute') {
     if (record.adjustment === null) {
       return text(
@@ -72,9 +83,10 @@ function readsAttributeTarget(plan) {
   );
 }
 
-/** Whether the plan grades as roll-over against a fixed DC, an inert character value included. */
+/** Whether the plan sums roll-over against a fixed DC, an inert character value included. */
 function gradesLikeFixedOver(plan) {
-  return plan.evaluation.direction === 'over' && !readsAttributeTarget(plan);
+  const { product = 'sum', direction } = plan.evaluation;
+  return product === 'sum' && direction === 'over' && !readsAttributeTarget(plan);
 }
 
 /** A static fault or a missing adjustment is the check's own; anything else is the actor's value. */
@@ -101,6 +113,9 @@ function targetAbstention(plan, character) {
  */
 export function previewAbstention(plan, character) {
   if (!plan?.kind || gradesLikeFixedOver(plan)) return null;
+  if (plan.evaluation.product === 'count') {
+    return countAbstention(plan, character, PREVIEW_ABSTENTIONS);
+  }
   if (String(plan.formula ?? '').trim() === '') return null;
   const attribute = readsAttributeTarget(plan);
   const expression = attribute ? plan.evaluation.target.expression : '';
@@ -117,6 +132,9 @@ export function previewAbstention(plan, character) {
 /** The enumerated outcome space the odds, the track window and the strips read. */
 export function previewEnumeration(plan, abstention, { Roll = globalThis.Roll } = {}) {
   if (abstention) return { enumerable: false, reason: abstention.reason };
+  if (plan.kind && plan.evaluation.product === 'count') {
+    return countPreviewEnumeration(plan, { Roll });
+  }
   const formula = String(plan.formula ?? '').trim();
   if (formula === '') return { enumerable: false, reason: 'no-dice' };
   return describeFormulaEnumerability(formula, plan.actor, {
@@ -129,7 +147,7 @@ export function previewEnumeration(plan, abstention, { Roll = globalThis.Roll } 
 
 /** The reachable total range a strip is drawn across, or nulls when nothing enumerates. */
 export function previewTrack(enumeration) {
-  if (!enumeration.enumerable) return { min: null, max: null };
+  if (!enumeration.enumerable || enumeration.product === 'count') return { min: null, max: null };
   const totals = enumeration.outcomes.map((outcome) => outcome.total);
   return { min: Math.min(...totals), max: Math.max(...totals) };
 }
@@ -194,10 +212,13 @@ export function buildOddsModel({ plan, enumeration, abstention = null, sandbox }
   const { kind } = plan;
   if (!kind) return { kind: null };
   const direction = plan.evaluation.direction;
+  const count = plan.evaluation.product === 'count';
   if (enumeration.enumerable !== true) {
     const reasonData = abstention?.data ?? null;
-    return { kind, direction, enumerable: false, reason: enumeration.reason, reasonData };
+    const refused = { kind, direction, enumerable: false, reason: enumeration.reason, reasonData };
+    return count ? { ...refused, product: 'count' } : refused;
   }
+  if (count) return buildCountOddsModel(plan, enumeration, sandbox, text);
   const { faces, combinations, outcomes } = enumeration;
   if (kind === 'progressive') return progressiveOdds(enumeration, sandbox, text);
   const caption = exactCaption(plan, enumeration, text);
@@ -397,7 +418,49 @@ function abstentionHint(abstention, text) {
 /** The dynamic-target note a check taking its target from a macro shows, or `''`. */
 function dynamicNote(plan) {
   if (!plan.dynamicDc) return '';
+  if (plan.evaluation.product === 'count') return 'dynamic-required';
   return readsAttributeTarget(plan) ? 'dynamic-target' : 'dynamic-dc';
+}
+
+/**
+ * A count readout's own fields over the shared ones: per-die tiles, the net breakdown, the required
+ * count and margin, and a zero pool's absent total. Its policy stands in for a roll formula.
+ */
+function countReadoutFields(plan, result, band, text) {
+  const count = result ? buildCountReadout(plan, result, text) : null;
+  return {
+    product: 'count',
+    hasFormula: true,
+    count,
+    total: result && !count.zeroPool ? result.data.total : null,
+    target: null,
+    margin: null,
+    gradeLabel: '',
+    marginLabel: count?.marginLabel ?? '',
+    breakdown: count?.breakdown ?? '',
+    dieLabel: count?.dieLabel ?? '',
+    bandDetail: countBandDetail(plan, count, band, text),
+  };
+}
+
+/** A botch says so; a pass/fail count names no DC; routed and progressive keep their own. */
+function countBandDetail(plan, count, band, text) {
+  if (count?.botch) {
+    return text(
+      'FABRICATE.Admin.Manager.Checks.Simulator.BandBotch',
+      'Botched. Nothing is produced; the failure policy applies.'
+    );
+  }
+  if (plan.kind !== 'passFail') return band.detail;
+  return band.success
+    ? text(
+        'FABRICATE.Admin.Manager.Checks.Simulator.BandSuccessCount',
+        'The result group is produced.'
+      )
+    : text(
+        'FABRICATE.Admin.Manager.Checks.Simulator.BandFailureCount',
+        'Nothing is produced; the failure policy applies.'
+      );
 }
 
 /**
@@ -434,6 +497,7 @@ export function buildReadoutModel(
     bandDetail: band.detail,
     bandSuccess: band.success,
     facts,
+    ...(plan.evaluation.product === 'count' && countReadoutFields(plan, result, band, text)),
   };
 }
 

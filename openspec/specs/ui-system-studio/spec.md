@@ -266,6 +266,29 @@ With a Preview-as actor chosen it raises two TRANSIENT warnings naming that acto
 Each of these nine issues carries a short title over its sentence: its Validation row shows the title with the sentence as its detail, and its section opens with the shared amber `Notice` carrying both.
 The notice's Review action focuses the control the issue names, the character-value field for the target issues and the transient warnings, and otherwise focuses the section, as a Validation row's View does.
 
+#### Success-counting preview and readiness
+
+While a check's evaluation is `count`, its retained `rollFormula` is inert on every Studio surface: readiness raises no `noRollFormula`, `modifiersInertNoFormula` or retired-placeholder issue and reports no `hasRollFormula` tick, the simulator reads its pool rather than the formula, and the digest's roll row reads `Roll · {base}d{die} · each {comparison} {threshold}` with the authored expressions (`Digest.CountFormula`).
+Preview records are labelled with their required count, `{name} · {count} successes` or `{name} · 1 success`, read from the recipe tier's `successes` or else the pool's `required`; a progressive record carries no suffix.
+The pool resolves through `countEvaluation.js` exactly as the runtime resolves it, before any roll, and no macro runs: a dynamic required count previews against the successes needed set on the check, and the simulator says so (`Simulator.DynamicRequired`).
+
+The odds panel charts OUTCOMES, never a net-count histogram, from `countOdds.js` over the runner's own modifier placement, with every separately rolled benefit mixed in exactly.
+Each outcome is graded by the runtime's count graders, so pass/fail, routed tiers and progressive award counts are the ones a real roll would produce, and rows run worst to best.
+An any-die or all-dice trigger on the pool is enumerated jointly with the net; any other per-die trigger abstains as `count-face-trigger-not-enumerable`, and explosions that leave material mass unexpanded abstain as `count-residual-too-large`.
+With cancelling on, the mass below zero net is split out of the bucket it grades into as a first `Botch` row (danger tone), only when every such outcome grades as a non-success; for a progressive check it comes out of the rows that award nothing.
+The heading adjunct reads `exact · expected {expected}`, or `nearly exact · expected {expected}` when recursion left a residual, with the expected net to two decimals mirrored on `data-checks-odds-expected`; an abstaining panel shows neither.
+The panel root carries `data-checks-odds-product="count"`.
+
+The preview abstains with no actor when the pool reads the character (`needs-preview-actor`), and names the actor for a path they lack (`count-path-unresolved`) or a value that is not a number (`count-value-not-numeric`); an actorless literal pool stays previewable, a pool fault of the check's own abstains as `target-invalid`, and Roll is disabled while abstaining.
+The simulator renders one tile per active face, explosion dice included, each marked `qualified`, `cancelled` or `exploded` by a glyph, a `data-checks-simulator-face-marks` value and its accessible name, so colour is never the only signal, above a legend, the breakdown `{qualified} qualified − {cancelled} cancelled = {net} net`, the signed net and `{required} needed · margin {margin}` from the executed `data.margin`.
+A net below zero marks the readout `data-checks-simulator-botch` and the band reads `Botched. Nothing is produced; the failure policy applies.`; a zero pool renders no tile and no total, only `A pool reduced to zero fails automatically. Nothing was rolled.`; a progressive check shows its raw net and awards `max(0, net)`.
+Negative counts use the true minus sign.
+
+Readiness raises, in The roll: `countPoolInvalid` and `countThresholdInvalid` (critical: blank, dice or not arithmetic once every path is neutralized), `countFaceBeyondDie` (warning: an enabled explode or cancel face beyond the die, naming what follows), `countExplodeUnbounded` (critical: a recursive explosion on every face), `countTierWithoutSuccesses` (a warning until issue 2006 adds the control: a crafting recipe tier with no successes needed), and, for a literal base, `countRequiredExceedsMaxPool` (critical) and `countRequiredExceedsBasePool` (warning) against the authored ceiling, which is the base alone until additional dice (issue 2008) raise it.
+A base reading the character raises no ceiling issue and ticks `countPoolCharacterDependent`; fixed ranges and progressive checks grade no required count.
+These rows are route-only until issue 2006 adds the controls that clear them.
+With a Preview-as actor chosen it raises the TRANSIENT `countPathUnresolvedForPreview` and `countValueNotNumericForPreview`, which follow the same rule as the roll-under transient warnings: a section callout and a Validation row, and never a badge, dot, tally or enable gate.
+
 #### Check Trigger Controls
 
 All three check editors (simple, routed, and progressive) ALWAYS render a single unified `CheckTriggers` editor (issue 419 recombine) — one trigger list per check, replacing the former separate per-die crit table and tool-breakage trigger card.
