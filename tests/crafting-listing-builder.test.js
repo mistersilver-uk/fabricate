@@ -1500,8 +1500,9 @@ describe('CraftingListingBuilder — the check card names a roll-under or charac
         entries: [{ recipe: makeRecipe({ ingredientSets: sets }), access: { reason: 'ok' } }],
         localize: format,
       });
-      builder.recipeManager.getToolsForSet = (_view, set) => [set?.id ?? 'none'];
-      builder.recipeManager.resolveToolStates = (_view, [setId]) => statesBySet[setId] ?? [];
+      // The per-set evaluation the detail already runs answers each set's tool states.
+      builder.recipeManager.evaluateCraftability = (_sources, view) =>
+        makeCraftability({ toolStates: statesBySet[view.ingredientSets?.[0]?.id] ?? [] });
       return builder.buildRecipeDetail({ recipeId: 'recipe-1', craftingActor: SERA, viewer: PLAYER }).check.target;
     };
 

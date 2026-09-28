@@ -40,22 +40,3 @@ export function heldToolBonus(stateLists) {
   if (rest.some((bonus) => key(bonus) !== key(first))) return null;
   return first.flat !== 0 || first.pending.length > 0 ? first : null;
 }
-
-/**
- * A recipe's held Tool bonus over its first step's ingredient sets (`scope`: `{ view, sets,
- * craftSources }`), resolved as the engine resolves each set's tools; null without a scope.
- */
-export function recipeHeldToolBonus(recipeManager, primaryActor, scope) {
-  if (!scope || typeof recipeManager?.resolveToolStates !== 'function') return null;
-  const sets = scope.sets.length > 0 ? scope.sets : [null];
-  return heldToolBonus(
-    sets.map((set) =>
-      recipeManager.resolveToolStates(
-        scope.view,
-        recipeManager.getToolsForSet?.(scope.view, set) ?? [],
-        scope.craftSources,
-        { primaryActor }
-      )
-    )
-  );
-}
