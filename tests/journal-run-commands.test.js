@@ -16,6 +16,7 @@ import { installCountDice } from './helpers/countEngineDice.js';
 import { preparedCountCheck } from './helpers/countFixtures.js';
 import { mergeHistoryFlag } from './helpers/journal-fixtures.js';
 import { gatheringFixture } from './helpers/real-gathering-attempt.js';
+import { UNDER_DATA } from './helpers/checkEvidenceFixtures.js';
 
 import {
   JOURNAL_RUN_SOCKET_KIND,
@@ -2068,6 +2069,47 @@ describe('journal run command protocol', () => {
       0,
       'a check evaluated as secret stays secret even if visibility is gained during execution'
     );
+  });
+
+  it('hands a visible crafting reply its executed check projection, and a secret one none (issue 2005)', async () => {
+    const reply = async (secret) => {
+      const run = { id: 'run-1', lifecycleVersion: 1, runRevision: 3, status: 'waiting' };
+      const { service } = commandHarness({
+        currentUserId: 'gm',
+        run,
+        promptCheck: async () => ({ confirmed: true }),
+        operations: {
+          crafting: {
+            getRun: () => run,
+            describeCheck: async () => ({
+              required: true,
+              publicPrompt: { label: 'Known recipe' },
+              privateEvaluation: { rollFormula: '3d6' },
+            }),
+            evaluateCheck: async () => ({
+              engineEvaluated: true,
+              success: true,
+              secret,
+              data: { ...UNDER_DATA, targetTerms: [{ kind: 'anchor', value: 14, path: '@x' }] },
+              visibility: { rollMode: 'publicroll', secret },
+            }),
+            execute: async () => ({ success: true, runId: run.id, runRevision: 4 }),
+          },
+        },
+      });
+      return service.executeJournalRunCommand({
+        actorUuid: 'Actor.a',
+        runType: 'crafting',
+        runId: run.id,
+        expectedRevision: 3,
+        action: 'execute',
+      });
+    };
+    const visible = await reply(false);
+    assert.equal(visible.check.evidence.target, 14);
+    assert.deepEqual(visible.check.visibility, { rollMode: 'publicroll', secret: false });
+    assert.doesNotMatch(JSON.stringify(visible.check), /@x|path/, 'the projection is an allowlist');
+    assert.ok(!Object.hasOwn(await reply(true), 'check'), 'a secret reply carries no evidence');
   });
 
   it('accepts replies only from the elected GM for this recipient/session/correlation', async () => {

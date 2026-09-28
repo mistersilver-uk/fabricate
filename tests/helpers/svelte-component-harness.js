@@ -250,6 +250,14 @@ export const CHECK_TARGET_RAW_MODULES = Object.freeze([
   'src/utils/localizeWithFallback.js',
 ]);
 
+/** The result boxes' executed check evidence rows (issue 2005) and their import closure. */
+export const CHECK_EVIDENCE_RAW_MODULES = Object.freeze([
+  'src/ui/presenters/checkEvidenceRows.js',
+  'src/ui/svelte/apps/crafting/rollPromptTarget.js',
+  'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
+  'src/utils/scalars.js',
+]);
+
 export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`, spread
   // from the roster above rather than copied so the two cannot drift.
@@ -346,7 +354,8 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/utils/scalars.js',
   'src/systems/scopedDefinitions.js',
   'src/systems/worldScopeEntityGrouping.js',
-  'src/ui/svelte/actions/dismissOnOutsideClick.js'
+  'src/ui/svelte/actions/dismissOnOutsideClick.js',
+  ...CHECK_EVIDENCE_RAW_MODULES
 ]);
 
 // Every transitive `.svelte` module in the player Crafting tab tree (plus the shared Pagination
@@ -388,6 +397,7 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/crafting/detail/EssenceContribution.svelte',
   'src/ui/svelte/apps/crafting/detail/OutcomeTierTable.svelte',
   'src/ui/svelte/apps/crafting/detail/RollResultBox.svelte',
+  'src/ui/svelte/apps/crafting/detail/CheckEvidenceRows.svelte',
   'src/ui/svelte/apps/crafting/detail/RecipeBodyShell.svelte',
   'src/ui/svelte/apps/crafting/detail/SimpleRecipeBody.svelte',
   // SimpleRecipeBody renders this for an explicit multi-step recipe (issue 765).

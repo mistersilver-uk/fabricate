@@ -1593,3 +1593,45 @@ describe('craftingStore detail hydration', () => {
     );
   });
 });
+
+describe('craftingStore check evidence (issue 2005)', () => {
+  let compiler;
+  let createCraftingStore;
+
+  before(async () => {
+    ({ compiler, createCraftingStore } = await setupCraftingStoreCompiler('fabricate-craft-evidence-'));
+  });
+  after(() => compiler.cleanup());
+
+  it('records the executed projection, and a check that cannot roll clears it (Q10)', async () => {
+    const check = { evidence: { total: 9, target: 14 } };
+    const replies = [
+      { success: true, results: [], check },
+      { success: false, reason: 'roll-unavailable', message: 'The check cannot roll.' },
+    ];
+    const { services, calls } = makeServices({ craftRecipe: async () => replies.shift() });
+    const store = createCraftingStore({ services });
+
+    await store.craft({ id: 'r1' });
+    flushSync();
+    assert.deepEqual(store.lastRollResult.r1.check, check, 'the reply projection reaches the box');
+
+    await store.craft({ id: 'r1' });
+    flushSync();
+    assert.ok(!Object.hasOwn(store.lastRollResult, 'r1'), 'no stale roll stands beside the refusal');
+    assert.deepEqual(calls.notify, ['The check cannot roll.'], 'the refusal is what is shown');
+  });
+
+  it('keeps the last result through an unrelated refusal', async () => {
+    const replies = [
+      { success: true, results: [] },
+      { success: false, message: 'Missing materials' },
+    ];
+    const { services } = makeServices({ craftRecipe: async () => replies.shift() });
+    const store = createCraftingStore({ services });
+    await store.craft({ id: 'r1' });
+    await store.craft({ id: 'r1' });
+    flushSync();
+    assert.ok(Boolean(store.lastRollResult.r1), 'a refusal that is not the check changes nothing');
+  });
+});

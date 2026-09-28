@@ -3,11 +3,12 @@
   RollResultBox shows the outcome of the player's most recent craft of the current
   recipe (store.lastRollResult[recipeId]). It is defensive about the result shape:
   it surfaces a success/failure tone, the rolled total and outcome label when
-  present, an optional message, and any awarded items. Renders nothing when there
-  is no recorded result.
+  present, an optional message, the executed check's evidence rows, and any awarded
+  items. Renders nothing when there is no recorded result.
 -->
 <script>
   import Medallion from '../../../components/Medallion.svelte';
+  import CheckEvidenceRows from './CheckEvidenceRows.svelte';
   import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
   import { localize } from '../../../util/foundryBridge.js';
 
@@ -51,6 +52,7 @@
     {#if message}
       <p class="crafting-roll-message">{message}</p>
     {/if}
+    <CheckEvidenceRows check={result.check ?? null} />
     {#if items.length > 0}
       <ul class="crafting-roll-awards">
         {#each items as item, index (item.name + index)}

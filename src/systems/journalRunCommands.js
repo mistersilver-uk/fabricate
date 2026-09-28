@@ -1,3 +1,4 @@
+import { checkDisplayForCard } from './craftCardFields.js';
 import { applyGuardedRunMutation } from './runLifecycleState.js';
 
 /** Request/reply discriminators multiplexed on the existing module socket. */
@@ -618,6 +619,15 @@ function serializedOperationResult(result, { secret = false, runId = '' } = {}) 
 }
 
 /**
+ * A crafting reply carries the executed check's display projection for the player's result box
+ * (issue 2005); a secret check hands over nothing, and a stage without a rolled check adds no key.
+ */
+function withExecutedCheck(response, runType, checkResult) {
+  const check = runType === 'crafting' ? checkDisplayForCard(checkResult) : null;
+  return check?.evidence ? { ...response, check } : response;
+}
+
+/**
  * Server-attested commands revalidate identity, ownership, revision and expected stage under a claim.
  * Player checks use one-use tokens, local prompts and GM resolution; adapters own disclosure.
  * Replies correlate recipients/user/session/request/run/revision; dismissal preserves actor history.
@@ -850,10 +860,11 @@ export function createJournalRunCommandService({
       senderId: request.senderId,
       sender: context.sender,
     });
-    const response = serializedOperationResult(result, {
-      secret: secretCheck,
-      runId: request.runId,
-    });
+    const response = withExecutedCheck(
+      serializedOperationResult(result, { secret: secretCheck, runId: request.runId }),
+      request.runType,
+      secretCheck ? null : trustedContext.resolvedCheckResult
+    );
     if (response.success && responseRollHandoff && !secretCheck) {
       let rollEntitled = true;
       if (typeof operation.authorizeRollHandoff === 'function') {
