@@ -460,7 +460,8 @@ describe('mounted roll prompt', () => {
       assert.equal(chip.textContent.trim(), text);
       assert.equal(chip.dataset.rollPromptTarget, 'under');
       assert.ok(chip.classList.contains('is-info'), 'the DC chip primitive, retoned nowhere');
-      assert.equal(chip.parentElement.className.split(' ')[0], 'formula-content', 'a fixed, unraised target: a bare chip');
+      assert.equal(chip.parentElement.className.split(' ')[0], 'target-live', 'a bare chip in its live region');
+      assert.equal(chip.parentElement.parentElement.className.split(' ')[0], 'formula-content');
       const note = dialog.querySelector('.formula-content .formula + .formula-note');
       assert.equal(note.textContent, 'The dice are compared as rolled.');
       assert.equal(dialog.querySelector('.static-modifiers .help').textContent, 'Each raises the target.');
@@ -482,7 +483,7 @@ describe('mounted roll prompt', () => {
       selectedModifiers: [{ label: 'Steady hands', value: 1, display: '+1' }],
     });
     const frame = await openThroughHost(view, false, noChoice);
-    const row = frame.dialog.querySelector('.formula-content > .target-row');
+    const row = frame.dialog.querySelector('.formula-content .target-row');
     assert.deepEqual([...row.children].map((child) => child.textContent.trim()), [
       'Target 11 · stay at or under', 'Sera Vane @skills.smith.level 12 · Hard Work −2 · modifiers +1',
     ], 'frame 29: the chip, then its explanation naming the character, on the same row');
@@ -499,6 +500,11 @@ describe('mounted roll prompt', () => {
     const picks = { options, maxPicks: 1, defaultSelectedIds: ['a'] };
     const { dialog, pending } = await openThroughHost({ ...view, selectedModifiers: [] }, false, picks);
     const shown = () => [...dialog.querySelectorAll('.target-row > *')].map((child) => child.textContent.trim());
+    assert.equal(
+      dialog.querySelector('.modifier-group .help').textContent.trim(),
+      'Each raises the target.',
+      'a roll-under pick says what it does, as an applied modifier does (F14)'
+    );
     assert.deepEqual(shown(), ['Target 11 · stay at or under', 'Sera Vane @skills.smith.level 12 · Hard Work −2 · modifiers +1']);
     dialog.querySelector('input[type="radio"][value="c"]').click();
     flushSync();
@@ -526,7 +532,9 @@ describe('mounted roll prompt', () => {
     const view = buildSinglePromptData({ displayFormula: '1d20', dc: 12, target: 12, direction: 'under' });
     const { dialog, pending } = await openThroughHost(view, false, noChoice);
     const chip = () => dialog.querySelector('.formula-content .manager-chip');
-    assert.equal(chip().getAttribute('aria-live'), 'polite', 'the bare roll-under chip announces');
+    const region = dialog.querySelector('.formula-content [aria-live]');
+    assert.equal(region.getAttribute('aria-live'), 'polite', 'the roll-under target announces');
+    assert.ok(region.contains(chip()), 'from one region around the chip');
     const bonus = dialog.querySelector('input[name="situationalBonus"]');
     for (const [typed, text] of [
       ['1d4', 'Target 12 + 1d4 · stay at or under'],
@@ -543,8 +551,13 @@ describe('mounted roll prompt', () => {
     bonus.value = '2';
     bonus.dispatchEvent(new document.defaultView.Event('input', { bubbles: true }));
     flushSync();
-    assert.equal(dialog.querySelector('.target-row').getAttribute('aria-live'), 'polite');
     assert.ok(!row, 'an unraised fixed target starts as a bare chip');
+    assert.ok(dialog.querySelector('.target-row'), 'a raised one gains its line');
+    assert.ok(
+      dialog.querySelector('.formula-content [aria-live]') === region,
+      'the live region is the same node before and after typing, so it announces the change (R2)'
+    );
+    assert.equal(dialog.querySelectorAll('[aria-live]').length, 1, 'and it is the only one');
     dialog.querySelector('[data-manager-modal-close]').click();
     await pending;
   });
@@ -593,6 +606,16 @@ describe('mounted roll prompt', () => {
       dialog.querySelector('[data-manager-modal-close]').click();
       await pending;
     }
+  });
+
+  it('gives a roll-over pick no help line (F14 leaves roll-high unchanged)', async () => {
+    const picks = { options: [{ id: 'a', label: 'A', value: 1, display: '+1' }], maxPicks: 1, defaultSelectedIds: ['a'] };
+    const view = buildSinglePromptData({ displayFormula: '1d20', dc: 12, target: 12, direction: 'over' });
+    const { dialog, pending } = await openThroughHost(view, false, picks);
+    assert.ok(dialog.querySelector('.modifier-group'), 'positive control: the picks render');
+    assert.ok(!dialog.querySelector('.modifier-group .help'));
+    dialog.querySelector('[data-manager-modal-close]').click();
+    await pending;
   });
 
   it('keeps a roll-over prompt byte-identical, whether or not it names a direction', async () => {

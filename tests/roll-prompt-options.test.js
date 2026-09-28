@@ -477,6 +477,19 @@ describe('roll prompt adapter', () => {
     ], 'the picked choices, not the offered ones, raise the target');
   });
 
+  it('names only a typed bonus the dice engine accepts as pending (R9)', async () => {
+    const { view } = await open({ dc: 12, target: 12, direction: 'under' }, null);
+    const original = globalThis.Roll;
+    globalThis.Roll = { validate: (formula) => /^\d*d\d+$/.test(formula) };
+    try {
+      assert.equal(rollPromptTarget(view, [], 'abc').chipText, 'Target 12 · stay at or under');
+      assert.equal(rollPromptTarget(view, [], '1d4').chipText, 'Target 12 + 1d4 · stay at or under');
+    } finally {
+      if (original === undefined) delete globalThis.Roll;
+      else globalThis.Roll = original;
+    }
+  });
+
   it('keeps the roll-over chip text and gives it no explanation', async () => {
     const { view } = await open({ dc: 12, target: 12, direction: 'over', toolBonus: 2, selectedModifiers: [{ value: 1 }] }, null);
     assert.deepEqual(rollPromptTarget(view, []), { chipText: 'DC 12 · meet or beat', source: '' });

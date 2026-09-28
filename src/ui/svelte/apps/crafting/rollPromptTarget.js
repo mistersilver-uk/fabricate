@@ -41,7 +41,8 @@ function contributions(data, selectedIds, bonus) {
     .replace(/^\s*\+/, '')
     .trim();
   const flat = typed !== '' && Number.isFinite(Number(typed));
-  if (typed !== '' && !flat) pending.push(typed);
+  // Text the dice engine rejects rolls nothing, so it is never named as a pending contribution.
+  if (typed !== '' && !flat && globalThis.Roll?.validate?.(typed) !== false) pending.push(typed);
   const situational = flat ? Number(typed) : 0;
   return { modifiers: flatModifierTotal(applied), situational, pending };
 }
