@@ -300,6 +300,12 @@ describe('1371 Chip — density scale matrix', () => {
     assert.match(rule, /font-weight:\s*600/);
   });
 
+  it('draws the tag-run leading glyph at the 9px the library leaves open (ruling 2026-09-28)', () => {
+    // Epic 1997: the prototype's value, since the library draws no tag-run glyph. A `fa-circle`
+    // mark keeps the primitive's own mark size.
+    assert.match(ruleFor('is-tag-run > i:not(.fa-circle)'), /font-size:\s*9px/);
+  });
+
   it('states the INSPECTOR band in tokens, at the reference values (issue 1371)', () => {
     // `proto:5663`/`proto:5665` draw the browser inspector's `Tags in effect` run.
     const rule = ruleFor('is-inspector');

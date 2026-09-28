@@ -365,3 +365,36 @@ describe('M12a — the inspector rail’s action button takes the corner its hei
     assert.equal(valueOf(body, 'border-radius'), null, 'and it states no corner, so it takes the 9 above');
   });
 });
+
+describe('epic 1997 — the banded Modal close and the inline Select glyph (ruling 2026-09-28)', () => {
+  const MODAL = 'src/ui/svelte/apps/manager/ManagerModal.svelte';
+
+  function modalRule(selector) {
+    const source = readFileSync(resolve(repoRoot, MODAL), 'utf8');
+    const block = stripCssComments(source.slice(source.search(/^<style>$/m) + '<style>'.length));
+    const found = [...block.matchAll(/([^{}]+)\{([^{}]*)\}/g)].filter(
+      ([, head]) => head.trim().replaceAll(/\s+/g, ' ') === selector
+    );
+    assert.equal(found.length, 1, `${MODAL} still declares exactly one \`${selector}\` rule`);
+    return found[0][2];
+  }
+
+  it('sizes the close as IconButton’s 26px rung and corners it on the 26-32px band’s 7', () => {
+    const [box] = bodiesOf('.fabricate-icon-button.manager-icon-button.is-size-26');
+    for (const property of ['width', 'height', 'min-width', 'min-height']) {
+      assert.equal(pixels(valueOf(box, property)), 26, `the rung states a 26px ${property}`);
+    }
+    const paint = modalRule('.is-banded :global([data-manager-modal-close])');
+    assert.equal(pixels(valueOf(paint, 'border-radius')), 7, 'the radius ladder’s 26-32px corner');
+    assert.equal(valueOf(paint, 'background'), 'transparent', 'the prototype’s close is unfilled');
+    assert.equal(valueOf(paint, 'color'), 'var(--fab-text-muted)');
+    assert.equal(pixels(valueOf(paint, 'font-size')), 11, 'and draws an 11px glyph');
+  });
+
+  it('draws the inline rung’s glyphs at the specimen’s 12px `.k-field .i`', () => {
+    const [body] = bodiesOf('.fabricate-select .fabricate-select-trigger-inline > i');
+    assert.equal(pixels(valueOf(body, 'font-size')), 12);
+    const library = readFileSync(resolve(repoRoot, 'openspec/specs/design-system/library.html'), 'utf8');
+    assert.match(library, /\.k-field \.i\{width:12px;height:12px;/, 'the specimen still states 12px');
+  });
+});
