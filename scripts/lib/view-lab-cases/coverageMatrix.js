@@ -79,7 +79,7 @@ export const CASES = Object.freeze([
     smokeLabels: [],
     reaches: 'beyond',
     query: { system: 'lab-runework' },
-    // The frame that shows the whole ramp (issue 1096).
+    // The frame that shows the whole ramp (issue 1096). A signed offset commits on Enter or blur.
     steps: [
       'Checks',
       { selector: '#manager-checks-nav-crafting' },
@@ -88,9 +88,11 @@ export const CASES = Object.freeze([
       { selector: '[data-add-outcome-tier]' },
       { selector: ':nth-match([data-outcome-name], 4)', fill: 'Flawless' },
       { selector: ':nth-match([data-outcome-dc], 4)', fill: '10' },
+      { selector: ':nth-match([data-outcome-dc], 4)', press: 'Enter' },
       { selector: ':nth-match([data-outcome-success], 4)' },
       { selector: ':nth-match([data-outcome-name], 5)', fill: 'Slag' },
       { selector: ':nth-match([data-outcome-dc], 5)', fill: '-10' },
+      { selector: ':nth-match([data-outcome-dc], 5)', press: 'Enter' },
       { selector: '[data-outcome-band-strip-hint]', scroll: true },
     ],
     expectView: 'checks-crafting',
