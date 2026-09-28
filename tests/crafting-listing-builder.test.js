@@ -824,6 +824,14 @@ describe('CraftingListingBuilder — success-counting check (issue 2004)', () =>
       ['3d20 · each ≤ 13', null, null]
     );
   });
+
+  it('brackets a threshold read from the character, and shows no line for a blank pool or threshold', () => {
+    const line = (pool) => checkFor(countSystem(pool)).rollFormula;
+    assert.equal(line({ base: '2', threshold: '@abilities.int.mod + 11' }), '2d20 · each ≤ (@abilities.int.mod + 11)');
+    assert.equal(line({ base: '2', threshold: '-1.5' }), '2d20 · each ≤ -1.5');
+    assert.equal(line({ base: '', threshold: '8' }), null, 'never "()d20"');
+    assert.equal(line({ base: '2', threshold: ' ' }), null);
+  });
 });
 
 describe('CraftingListingBuilder — outcome tiers', () => {

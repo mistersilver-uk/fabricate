@@ -1006,8 +1006,8 @@ export class CraftingListingBuilder {
 
   /**
    * A count check's formula line in place of its inert retained formula: the authored pool and
-   * threshold, and for the acting character the pool resolved and floored, or `false` when a
-   * value cannot be read.
+   * threshold, each bracketed when read from the character, else null when either is blank; and
+   * for the acting character the pool resolved and floored, or `false` when a value cannot be read.
    * @private
    */
   _countFormulaDisplay(config, evaluation, craftingActor) {
@@ -1015,13 +1015,18 @@ export class CraftingListingBuilder {
     const comparison = config.thresholdMode;
     const line = (values) => this.localize(COUNT_FORMULA_KEY, countFormulaValues(values));
     const base = pool.base.trim();
-    const rollFormula = line({
-      dice: /^\d+$/.test(base) ? base : `(${base})`,
-      die: pool.die,
-      direction,
-      comparison,
-      threshold: pool.threshold.trim(),
-    });
+    const threshold = pool.threshold.trim();
+    const bracketed = (text, number) => (number.test(text) ? text : `(${text})`);
+    const rollFormula =
+      base && threshold
+        ? line({
+            dice: bracketed(base, /^\d+$/),
+            die: pool.die,
+            direction,
+            comparison,
+            threshold: bracketed(threshold, /^[+-]?\d+(?:\.\d+)?$/),
+          })
+        : null;
     if (!craftingActor) return { rollFormula, resolvedFormula: null, formulaResolved: null };
     const rollData = actorRollData(craftingActor);
     const resolved = resolvePool({ evaluation, thresholdMode: comparison, rollData });
