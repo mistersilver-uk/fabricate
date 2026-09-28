@@ -11,6 +11,7 @@ import {
   CHECKS_TREE_COMPILED_MODULES,
 } from '../helpers/checksHarnessModules.js';
 import { installCountDice } from '../helpers/countEngineDice.js';
+import { forceTrigger, MARGIN_NOTES, readReadout } from '../helpers/checkReadoutDom.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -169,14 +170,17 @@ describe('count odds and the simulator readout', () => {
     assert.equal(tiles[1].getAttribute('aria-label'), '10, qualified and exploded');
     assert.equal(tiles[1].querySelectorAll('i.fa-check, i.fa-rotate').length, 2, 'a glyph per mark');
     assert.equal(readout.querySelector('[data-checks-simulator-total]').dataset.checksSimulatorTotal, '2');
-    assert.equal(
-      readout.querySelector('[data-checks-simulator-breakdown]').textContent.trim(),
-      '4 qualified − 2 cancelled = 2 net'
-    );
-    assert.equal(
-      readout.querySelector('[data-checks-simulator-margin]').textContent.trim(),
-      '2 needed · margin +0'
-    );
+    assert.deepEqual(readReadout(root), {
+      medallion: ['2', 'net'],
+      breakdown: '4 qualified − 2 cancelled = 2 net · Idrin',
+      total: '2',
+      line: ['needs 2 · margin +0', 'margin'],
+      card: ['success', 'Success', 'The recipe’s result group is produced'],
+      note: MARGIN_NOTES.count,
+      rows: [['result-group', 'Result group produced', 'Success']],
+    });
+    // The tiles sit in their own component under the medallion row, the #2006 seam.
+    assert.ok(Boolean(readout.querySelector('.manager-checks-simulator-head + .manager-checks-simulator-dice')));
     // The tile's tone is the face's result: success for a qualifier, danger for a cancel.
     const tone = (tile) => tile.querySelector('.fab-medallion').className;
     assert.match(tone(tiles[0]), /is-tone-success/);
@@ -250,9 +254,17 @@ describe('count odds and the simulator readout', () => {
       tiers: [],
     });
     await roll(root);
-    assert.ok(root.querySelector('[data-checks-simulator-note="zero-pool"]'));
-    assert.equal(root.querySelector('[data-checks-simulator-band]').dataset.checksSimulatorBand, 'failure');
+    assert.deepEqual(readReadout(root), {
+      medallion: ['0', 'net'],
+      breakdown: 'pool reduced to 0',
+      total: '0',
+      line: ['needs 1 · margin −1', 'margin'],
+      card: ['failure', 'Failure', 'Nothing is produced'],
+      note: ['zero-pool', 'The pool was reduced to zero, so the check fails automatically.'],
+      rows: [['failure-result', 'Failure policy applies', 'per recipe']],
+    });
     assert.ok(!root.querySelector('[data-checks-simulator-face]'), 'no tile');
+    assert.ok(!root.querySelector('[data-checks-simulator-legend]'), 'and no legend');
     assert.equal(counted.constructed.length, 0, 'no Roll was constructed');
   });
 
@@ -275,12 +287,15 @@ describe('count odds and the simulator readout', () => {
     assert.ok(Boolean(readout), 'the readout is marked a botch');
     const total = readout.querySelector('[data-checks-simulator-total]');
     assert.equal(total.dataset.checksSimulatorTotal, '-3');
-    assert.equal(total.textContent.trim(), '−3');
-    assert.match(root.querySelector('[data-checks-simulator-band]').textContent, /Botched/);
-    assert.equal(
-      root.querySelector('[data-checks-simulator-band-name]').textContent.trim(),
-      'Botch'
-    );
+    assert.deepEqual(readReadout(root), {
+      medallion: ['−3', 'net'],
+      breakdown: '0 qualified − 3 cancelled = −3 net',
+      total: '−3',
+      line: ['needs 1 · a net below zero is a botch', 'botch'],
+      card: ['failure', 'Botch', 'Net below zero'],
+      note: MARGIN_NOTES.count,
+      rows: [['failure-result', 'Failure policy applies', 'per recipe']],
+    });
   });
 
   it('states that a dynamic required count is not previewed by running its macro', async () => {
@@ -303,6 +318,120 @@ describe('count odds and the simulator readout', () => {
       'Simple Work · 1 success',
       'Masterwork · 4 successes',
     ]);
+  });
+});
+
+describe('the count readout per outcome (issue 2080)', () => {
+  const BOTCHING = pool({
+    die: 6,
+    base: '3',
+    threshold: '7',
+    required: 1,
+    cancel: { enabled: true, faces: { kind: 'from', value: 6 } },
+  });
+  const ROUTED_COUNT = {
+    rollFormula: '',
+    dc: 0,
+    type: 'relative',
+    thresholdMode: 'meet',
+    evaluation: SMITHING.evaluation,
+    relativeOutcomes: [
+      { id: 'ruined', name: 'Ruined', dc: -1, success: false },
+      { id: 'success', name: 'Success', dc: 0, success: true },
+      { id: 'fine', name: 'Fine', dc: 1, success: true },
+      { id: 'masterwork', name: 'Masterwork', dc: 3, success: true },
+    ],
+    checkBreakage: { triggers: [] },
+    tiers: [],
+  };
+  const mountRouted = (check) =>
+    harness.mount({
+      activity: 'crafting',
+      resolutionMode: 'routedByCheck',
+      craftingCheck: check,
+      activation: { crafting: { enabled: true, optional: false } },
+      features: { salvage: true },
+    });
+  const rolled = async (root, actor = 'idrin') => {
+    if (actor) await choosePreviewActor(root, actor);
+    await roll(root);
+    return readReadout(root);
+  };
+
+  it('fails short of the count with no botch', async () => {
+    script([8, 3, 4, 5, 6, 2]);
+    const root = await mountSimple(SMITHING);
+    const readout = await rolled(root);
+    assert.deepEqual([readout.medallion, readout.line, readout.card, readout.note], [
+      ['1', 'net'],
+      ['needs 2 · margin −1', 'margin'],
+      ['failure', 'Failure', 'Nothing is produced'],
+      MARGIN_NOTES.count,
+    ]);
+    assert.ok(!root.querySelector('[data-checks-simulator-botch]'), 'a net of 1 is no botch');
+  });
+
+  it('names the routed tier the net lands on', async () => {
+    script([8, 9, 9, 3, 4, 5]);
+    const readout = await rolled(await mountRouted(ROUTED_COUNT));
+    assert.deepEqual([readout.line, readout.card, readout.rows], [
+      ['needs 3 · margin +0', 'margin'],
+      ['success', 'Fine', 'The recipe’s result group is produced'],
+      [['result-group', 'Result group produced', 'Fine']],
+    ]);
+  });
+
+  it('notes a routed count a trigger forced, in place of the margin note (M17b)', async () => {
+    script([8, 9, 9, 3, 4, 5]);
+    const check = { ...ROUTED_COUNT, checkBreakage: { triggers: [forceTrigger('failure')] } };
+    const readout = await rolled(await mountRouted(check));
+    assert.deepEqual([readout.card[1], readout.note], [
+      'Ruined',
+      ['forced', 'Trigger fired — forced to the worst failing tier.'],
+    ]);
+  });
+
+  it('reads a botch a trigger rescued as a success on the normal margin line (M8, M17b)', async () => {
+    script([2, 4, 6]);
+    const rescued = { ...SMITHING, evaluation: BOTCHING, tiers: [] };
+    const root = await mountSimple({ ...rescued, checkBreakage: { triggers: [forceTrigger('success')] } });
+    const readout = await rolled(root, null);
+    assert.ok(root.querySelector('[data-checks-simulator-readout][data-checks-simulator-botch]'), 'still a net below zero');
+    assert.deepEqual([readout.total, readout.line, readout.card, readout.note], [
+      '−3',
+      ['needs 1 · margin −4', 'margin'],
+      ['success', 'Success', 'The recipe’s result group is produced'],
+      ['forced', 'Trigger fired — automatic success.'],
+    ]);
+  });
+
+  it('spends a progressive net down the sandbox order (R8)', async () => {
+    script([8, 9, 3, 4, 5, 6]);
+    const root = await harness.mount({
+      activity: 'crafting',
+      resolutionMode: 'progressive',
+      craftingCheckProgressive: {
+        awardMode: 'equal',
+        rollFormula: '',
+        evaluation: pool({ base: '6', required: undefined }),
+        checkBreakage: { triggers: [] },
+        preview: { difficulties: [1, 1, 2] },
+      },
+      activation: { crafting: { enabled: true, optional: false } },
+      features: { salvage: true },
+    });
+    assert.deepEqual(await rolled(root, null), {
+      medallion: ['2', 'net'],
+      breakdown: '2 qualified − 0 cancelled = 2 net',
+      total: '2',
+      line: ['value spent', ''],
+      card: ['success', '2 of 3 awarded', 'The value is fully spent'],
+      note: null,
+      rows: [
+        ['result-1', 'Result 1', 'awarded'],
+        ['result-2', 'Result 2', 'awarded'],
+      ],
+    });
   });
 });
 
