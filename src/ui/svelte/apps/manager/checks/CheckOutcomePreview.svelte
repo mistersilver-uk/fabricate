@@ -96,7 +96,12 @@
     {/if}
 
     {#if abstain}
-      <p class="manager-muted" data-checks-simulator-state={abstain.reason}>{abstain.hint}</p>
+      <p
+        class="manager-muted manager-checks-simulator-hint"
+        data-checks-simulator-state={abstain.reason}
+      >
+        {abstain.hint}
+      </p>
     {:else if preview.resolved === false}
       <p class="manager-muted" data-checks-simulator-note="unresolved">
         {text(
@@ -167,7 +172,7 @@
         </div>
       {/if}
     {:else if !abstain}
-      <p class="manager-muted" data-checks-simulator-state="pre-roll">
+      <p class="manager-muted manager-checks-simulator-hint" data-checks-simulator-state="pre-roll">
         {text(
           'FABRICATE.Admin.Manager.Checks.Simulator.Hint',
           'Roll a test check to see exactly which outcome a record lands on and what it costs the character.'
@@ -183,6 +188,12 @@
     flex-direction: column;
     gap: var(--fab-space-2);
     min-width: 0;
+  }
+
+  /* The waiting hint under Roll: centred in its own space, as the prototype draws it. */
+  .manager-checks-simulator-hint {
+    padding: var(--fab-space-4) var(--fab-space-2);
+    text-align: center;
   }
 
   .manager-checks-simulator-readout {

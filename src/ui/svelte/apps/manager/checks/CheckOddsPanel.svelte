@@ -14,6 +14,7 @@
 <script>
   import FillBar from '../../../components/FillBar.svelte';
   import { localize } from '../../../util/foundryBridge.js';
+  import { bandToneFor } from './checkBandModel.js';
   import { ODDS_REASONS, SANDBOX_ABSENT } from './checkOdds.js';
   import { PREVIEW_ABSTENTIONS } from './checkPreviewModel.js';
   import { interpolate } from './checksCopy.js';
@@ -119,6 +120,10 @@
   });
 
   const rows = $derived(Array.isArray(odds?.rows) ? odds.rows : []);
+  // Rows run worst to best, so each bar takes its rank's hue on the tier strip's ramp; the
+  // unrouted bucket is the hazard whatever its position.
+  const toneOf = (row, index) =>
+    row.id === 'unrouted' ? 'danger' : bandToneFor(index, rows.length);
 </script>
 
 {#if !odds || odds.kind === null}
@@ -150,13 +155,13 @@
     data-checks-odds-direction={odds.direction}
   >
     <ul class="manager-checks-odds-list">
-      {#each rows as row (row.id)}
+      {#each rows as row, index (row.id)}
         <li class="manager-checks-odds-row" data-checks-odds-row={row.id}>
           <span class="manager-checks-odds-label">{row.label}</span>
           <FillBar
             value={row.percent}
             size="sm"
-            tone={row.success ? 'success' : 'danger'}
+            tone={toneOf(row, index)}
             dataAttr="data-checks-odds-bar"
             dataValue={row.id}
           />
@@ -173,7 +178,7 @@
   .manager-checks-odds-list {
     display: flex;
     flex-direction: column;
-    gap: var(--fab-space-2xs);
+    gap: var(--fab-space-chip);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -183,24 +188,28 @@
      squeeze the bar to nothing, and the percentage column is pinned so the numbers align. */
   .manager-checks-odds-row {
     display: grid;
-    grid-template-columns: minmax(0, 5.5rem) 1fr 2.6rem;
+    grid-template-columns: minmax(0, 80px) 1fr 34px;
     gap: var(--fab-space-2);
     align-items: center;
     min-width: 0;
+    margin: 0;
   }
 
+  /* The library's banded-bar row: an 11px name and a `k-count` reading. */
   .manager-checks-odds-label {
     overflow: hidden;
-    color: var(--fab-text);
-    font-size: 0.7rem;
+    color: var(--fab-text-secondary);
+    font-size: 11px;
+    font-weight: 500;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .manager-checks-odds-percent {
-    color: var(--fab-text-muted);
+    color: var(--fab-text-subtle);
     font-family: var(--fab-font-mono);
-    font-size: 0.68rem;
+    font-size: 10.5px;
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
     text-align: right;
   }

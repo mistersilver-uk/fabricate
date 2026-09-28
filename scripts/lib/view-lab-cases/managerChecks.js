@@ -1010,9 +1010,14 @@ export const CASES = Object.freeze([
     label: 'multiplied character value, rolled',
     frame: 5,
     query: { system: 'lab-runework' },
-    steps: [...underMultiplySteps('@skills.med.mod + 51'), ...ROLL_PREVIEW],
+    // The lab's first roll lands on Otherwise, which has no target; the second lands on Hard.
+    steps: [
+      ...underMultiplySteps('@skills.med.mod + 51'),
+      { selector: '[data-checks-simulator-roll]' },
+      ...ROLL_PREVIEW,
+    ],
     expectSelector:
-      '.fabricate-manager [data-checks-simulator-readout][data-checks-simulator-direction="under"]',
+      '.fabricate-manager [data-checks-simulator-readout][data-checks-simulator-direction="under"] [data-checks-simulator-target]',
   }),
   underCase({
     id: 'manager-checks-under-no-actor',
