@@ -763,7 +763,7 @@ describe('CraftingListingBuilder — check evaluation (issue 2003)', () => {
 
 describe('CraftingListingBuilder — success-counting check (issue 2004)', () => {
   const format = (key, data) =>
-    key === 'FABRICATE.App.RollPrompt.CountFormula'
+    key === 'FABRICATE.Check.CountRoll.Pool'
       ? `${data.pool}d${data.die} · each ${data.comparison} ${data.threshold}`
       : key;
   const countSystem = (pool, extra = {}, features = { craftingChecks: true }) =>

@@ -107,7 +107,7 @@ const BLOCKING_REASON_KEYS = {
 
 const DEFAULT_TEASER_HIDDEN_FIELDS = ['ingredients', 'results', 'description'];
 const UNKNOWN_COMPONENT_KEY = 'FABRICATE.Labels.UnknownComponent';
-const COUNT_FORMULA_KEY = 'FABRICATE.App.RollPrompt.CountFormula';
+const COUNT_FORMULA_KEY = 'FABRICATE.Check.CountRoll.Pool';
 const TIME_REQUIREMENT_FIELDS = ['minutes', 'hours', 'days', 'months', 'years'];
 
 /**

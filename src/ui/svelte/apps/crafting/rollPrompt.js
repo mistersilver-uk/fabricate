@@ -1,6 +1,10 @@
 /** The single and bulk check prompt: view preparation, the modal surface and answer translation. */
 import { dcFlavorSuffix } from '../../../../systems/checkTarget.js';
-import { countFormulaValues } from '../../../../systems/countEvaluation.js';
+import {
+  countFormulaValues,
+  describedFaceRules,
+  faceSign,
+} from '../../../../systems/countEvaluation.js';
 
 import { openRollPromptModal } from './rollPromptHost.js';
 import { fill } from './rollPromptTarget.js';
@@ -184,7 +188,14 @@ function countText(data) {
   const values = countFormulaValues({ dice: pool, die, threshold, direction, comparison });
   return {
     formula: resolved
-      ? fill(promptLabel('CountFormula', '{pool}d{die} · each {comparison} {threshold}'), values)
+      ? fill(
+          // The chat card's own pool line, so the two cannot word it differently.
+          localize(
+            'FABRICATE.Check.CountRoll.Pool',
+            '{pool}d{die} · each {comparison} {threshold}'
+          ),
+          values
+        )
       : '',
     formulaNote: resolved ? countRules(data.count, values, direction) : '',
     dcText: '',
@@ -193,7 +204,7 @@ function countText(data) {
 }
 
 /** Frames 30 and 35: `Success on ≥ 8 · best face explodes · worst face cancels`. */
-function countRules({ die, thresholdSource, explode, cancel }, values, direction) {
+function countRules({ die, thresholdSource, ...rules }, values, direction) {
   const clauses = [
     thresholdSource
       ? fill(promptLabel('CountRuleSource', 'Success on {comparison} {threshold} ({source})'), {
@@ -202,13 +213,12 @@ function countRules({ die, thresholdSource, explode, cancel }, values, direction
         })
       : fill(promptLabel('CountRule', 'Success on {comparison} {threshold}'), values),
   ];
-  // A `from` face beyond the die never explodes, and cancels every face over and none under.
-  if (explode && !(explode.kind === 'from' && explode.value > die)) {
+  const { explode, cancel } = describedFaceRules({ die, direction, ...rules });
+  if (explode) {
     clauses.push(faceRuleText(explode, direction, explode.once ? 'ExplodeOnce' : 'Explode'));
   }
-  const against = direction === 'under' ? 'over' : 'under';
-  if (cancel && !(direction === 'under' && cancel.kind === 'from' && cancel.value > die)) {
-    clauses.push(faceRuleText(cancel, against, 'Cancel'));
+  if (cancel) {
+    clauses.push(faceRuleText(cancel, direction === 'under' ? 'over' : 'under', 'Cancel'));
   }
   return clauses.join(' · ');
 }
@@ -227,9 +237,7 @@ const FACE_RULES = {
 function faceRuleText({ kind, value }, direction, rule) {
   const [extremeKey, extremeText, fromKey, fromText] = FACE_RULES[rule];
   if (kind !== 'from') return promptLabel(extremeKey, extremeText);
-  return fill(promptLabel(fromKey, fromText), {
-    faces: `${direction === 'under' ? '≤' : '≥'} ${value}`,
-  });
+  return fill(promptLabel(fromKey, fromText), { faces: `${faceSign(direction)} ${value}` });
 }
 
 function targetText(data, labels) {

@@ -59,7 +59,7 @@ export function countFacePredicates({ die, threshold, direction, comparison, exp
       Boolean(explode) &&
       !(generated && explode.once) &&
       (explode.kind === 'from'
-        ? explode.value <= die && compareToTarget(face, explode.value, 'meet', direction)
+        ? !faceBeyondDie(explode, die) && compareToTarget(face, explode.value, 'meet', direction)
         : face === extremeFace(die, direction)),
     cancels: (face) =>
       Boolean(cancel) &&
@@ -110,6 +110,27 @@ export function countCheckPasses({ policy, net, required }) {
 }
 
 const COMPARISON_SIGNS = { over: { meet: '≥', exceed: '>' }, under: { meet: '≤', exceed: '<' } };
+
+/** Whether a `from` face rule names a face beyond the die. */
+export function faceBeyondDie({ kind, value }, die) {
+  return kind === 'from' && value > die;
+}
+
+/** The sign a `from` face rule's faces read with: the face and beyond it in `direction`. */
+export function faceSign(direction) {
+  return COMPARISON_SIGNS[direction === 'under' ? 'under' : 'over'].meet;
+}
+
+/**
+ * The explode and cancel rules a description names, else null: a `from` explosion beyond the die
+ * never fires, and a `from` cancel beyond it cancels no face under and every face over.
+ */
+export function describedFaceRules({ die, direction, explode, cancel }) {
+  return {
+    explode: explode && !faceBeyondDie(explode, die) ? explode : null,
+    cancel: cancel && !(direction === 'under' && faceBeyondDie(cancel, die)) ? cancel : null,
+  };
+}
 
 /** The values a `{pool}d{die} · each {comparison} {threshold}` formula line shows. */
 export function countFormulaValues({ dice, die, direction, comparison, threshold }) {

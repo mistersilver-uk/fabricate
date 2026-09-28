@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 
 import { registerModuleHooks } from '../src/bootstrap/hooks.js';
+import { countPromptFields } from '../src/systems/checkRollDecision.js';
 import { resolvePool } from '../src/systems/countEvaluation.js';
 import {
   COUNT_POLICY_VERSION,
@@ -15,9 +16,12 @@ import {
   registerCountRoll,
 } from '../src/systems/countRoll.js';
 
+import { promptCheckRoll } from '../src/ui/svelte/apps/crafting/rollPrompt.js';
+
 import { createCoreDice, renderCoreTemplate, TOOLTIP_TEMPLATE } from './helpers/coreDice.js';
 import { countEvaluation, deepFreeze } from './helpers/countFixtures.js';
 import { createLangBackedI18n } from './helpers/langBackedI18n.js';
+import { stubPromptSurface } from './helpers/rollPromptDialogStub.js';
 import { repoRoot } from './helpers/sourceScan.js';
 
 const i18n = createLangBackedI18n(repoRoot);
@@ -623,4 +627,39 @@ test('the minified bundle keeps the serialized class name and reconstructs from 
   assert.equal(roll.total, 1);
   assert.deepEqual(tooltipTotals(await roll.getTooltip()), ['1']);
   assert.equal(createCountRollClass({ BaseRoll: dice.Roll }).name, COUNT_ROLL_CLASS);
+});
+
+test("the roll prompt's rule line names the same face rules as the chat card", async () => {
+  // Past the leading pool clauses: the card's `2d10 · each ≥ 8`, the prompt's `Success on ≥ 8`.
+  const faceRules = (text, lead) =>
+    text
+      .split(' · ')
+      .slice(lead)
+      .map((clause) => [
+        /explode/.test(clause) ? 'explode' : 'cancel',
+        /once/.test(clause),
+        /[≥≤] \d+/.exec(clause)?.[0] ?? 'extreme',
+      ]);
+  const cases = [
+    { explode: explodeRule(BEST), cancel: cancelRule(WORST) },
+    { explode: explodeRule({ kind: 'from', value: 9 }, true), cancel: cancelRule({ kind: 'from', value: 2 }) },
+    { explode: explodeRule({ kind: 'from', value: 12 }), cancel: cancelRule({ kind: 'from', value: 12 }) },
+    { direction: 'under', threshold: '5', explode: explodeRule(BEST), cancel: cancelRule({ kind: 'from', value: 12 }) },
+    { direction: 'under', threshold: '5', explode: explodeRule({ kind: 'from', value: 3 }), cancel: cancelRule({ kind: 'from', value: 8 }) },
+  ];
+  const surface = stubPromptSurface(() => null);
+  try {
+    for (const pool of cases) {
+      const policy = settledPolicy({ die: 10, base: '2', ...pool });
+      const dice = countDice({ faces: [5, 5] });
+      const html = await (await dice.CountRoll.fromPolicy(policy).evaluate()).render();
+      const card = /dice-formula">([^<]*)</.exec(html)[1];
+      await promptCheckRoll(countPromptFields(countEvaluation(pool), policy, 1));
+      const label = JSON.stringify(pool);
+      assert.deepEqual(faceRules(surface.view.labels.formulaNote, 1), faceRules(card, 2), label);
+    }
+  } finally {
+    surface.restore();
+  }
+  assert.equal(surface.views.length, cases.length);
 });
