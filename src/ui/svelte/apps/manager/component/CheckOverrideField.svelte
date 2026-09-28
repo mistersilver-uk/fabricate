@@ -3,7 +3,7 @@
   One component's salvage check override: a preset Select over the system's own tiers, a Custom…
   Stepper and Manage presets. It edits `dcOverride` under a fixed target and `adjustmentOverride`
   under a character value, clears only that field for System default, and never rewrites the other;
-  a kept dormant value is named in a notice. A roll-high fixed DC keeps the legacy card as it was.
+  a kept dormant value is named in a notice. Every check shows what its player sees.
 
   Props:
   | prop | values | default | contract |
@@ -11,7 +11,7 @@
   | `config` | the active salvage check sub-object \| `null` | `null` | Supplies `evaluation` and `thresholdMode`; absent reads as a roll-high fixed DC. |
   | `dcOverride` / `adjustmentOverride` | number \| `null` | `null` | The component's two persisted overrides, both passed so the dormant one can be named. |
   | `tiers` / `dcMode` / `systemDc` | `simple.tiers` / `'static'` \| `'dynamic'` / number | `[]` / `'static'` / `0` | The preset source in every resolution mode, and the system default's number. |
-  | `previewCharacter` | `{ name, rollData }` \| `null` | `null` | Whom the Player sees line resolves a character value for; without one it names the expression. |
+  | `previewActors` / `resolvePreviewCharacter(id)` | `[{ id, name, img }]` / `{ name, rollData }` \| `null` | `[]` / `() => null` | The Preview-as roster and lookup for the Player sees line. |
   | `instanceId` / `disabled` | string / boolean | `''` / `false` | The id stem for the title, and the whole control's disabled state. |
 
   Callbacks:
@@ -32,16 +32,13 @@
   import { localize } from '../../../util/foundryBridge.js';
   import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
   import {
-    resolveCheckTarget,
-    selectTargetAdjustment,
-  } from '../../../../../systems/checkTarget.js';
-  import {
     MULTIPLIER_STOPS,
     formatCheckAdjustment,
     parseCheckAdjustment,
   } from '../checks/checkAdjustmentLabel.js';
   import { interpolate, underComparisonPhrase } from '../checks/checksCopy.js';
   import { buildSalvageDcSelectOptions } from './componentEditSelectOptions.js';
+  import OverridePlayerSees from './OverridePlayerSees.svelte';
   import {
     SALVAGE_DC_CUSTOM,
     resolveSalvageDcSelection,
@@ -56,7 +53,8 @@
     tiers = [],
     dcMode = 'static',
     systemDc = 0,
-    previewCharacter = null,
+    previewActors = [],
+    resolvePreviewCharacter = () => null,
     instanceId = '',
     disabled = false,
     onChange = () => {},
@@ -72,7 +70,7 @@
   const attribute = $derived(evaluation.target.source === 'attribute');
   const under = $derived(evaluation.direction === 'under');
   const kind = $derived(evaluation.target.adjustmentKind);
-  // The roll-high fixed DC is the legacy card, byte for byte: no hint, notice or Player sees.
+  // The roll-high fixed DC keeps its legacy title, hint and notice.
   const legacy = $derived(!attribute && !under);
   const field = $derived(salvageOverrideField(evaluation));
   const activeValue = $derived(attribute ? adjustmentOverride : dcOverride);
@@ -170,98 +168,6 @@
     }
     return '';
   });
-
-  function characterSource(resolved, adjustment) {
-    const value = interpolate(
-      text(
-        'FABRICATE.Admin.Manager.Checks.Evaluation.ScaleSourceValue',
-        '{actor} {expression} {value}'
-      ),
-      {
-        actor: previewCharacter.name,
-        expression: evaluation.target.expression.trim(),
-        value: resolved,
-      }
-    );
-    return [value, formatCheckAdjustment(kind, adjustment)].filter(Boolean).join(', ');
-  }
-
-  function attributePlayerLine() {
-    const adjustment = selectTargetAdjustment(evaluation, adjustmentOverride);
-    const expression = evaluation.target.expression.trim();
-    if (!previewCharacter) {
-      const source = [expression, formatCheckAdjustment(kind, adjustment)]
-        .filter(Boolean)
-        .join(', ');
-      return under
-        ? interpolate(
-            text(
-              'FABRICATE.Admin.Manager.Component.SalvageEditor.PlayerSeesUnderNoCharacter',
-              'Salvage check · stay {cmp} the character value ({source})'
-            ),
-            { cmp, source }
-          )
-        : interpolate(
-            text(
-              'FABRICATE.Admin.Manager.Component.SalvageEditor.PlayerSeesOverNoCharacter',
-              'Salvage check · reach the character value ({source})'
-            ),
-            { source }
-          );
-    }
-    const base = resolveCheckTarget({ evaluation, rollData: previewCharacter.rollData ?? {} });
-    const resolved = resolveCheckTarget({
-      evaluation,
-      rollData: previewCharacter.rollData ?? {},
-      adjustment,
-    });
-    if (!base.ok || !resolved.ok) {
-      return interpolate(
-        text(
-          'FABRICATE.Admin.Manager.Checks.Evaluation.ValueUnresolved',
-          '{actor} has no value at {path}. The check cannot resolve for them.'
-        ),
-        { actor: previewCharacter.name, path: expression }
-      );
-    }
-    const source = characterSource(base.target, adjustment);
-    return under
-      ? interpolate(
-          text(
-            'FABRICATE.Admin.Manager.Component.SalvageEditor.PlayerSeesUnder',
-            'Salvage check · stay {cmp} {target} ({source})'
-          ),
-          {
-            cmp,
-            target: resolved.target,
-            source,
-          }
-        )
-      : interpolate(
-          text(
-            'FABRICATE.Admin.Manager.Component.SalvageEditor.PlayerSeesOver',
-            'Salvage check · reach {target} ({source})'
-          ),
-          {
-            target: resolved.target,
-            source,
-          }
-        );
-  }
-
-  // What a player is shown for this component; empty where a macro supplies the number.
-  const playerLine = $derived.by(() => {
-    if (legacy || dcMode === 'dynamic') return '';
-    if (attribute) return attributePlayerLine();
-    const dc = isSet(dcOverride) ? Math.trunc(Number(dcOverride)) : Number(config?.dc ?? systemDc);
-    return interpolate(
-      text(
-        'FABRICATE.Admin.Manager.Component.SalvageEditor.PlayerSeesFixed',
-        'Salvage check · stay {cmp} {dc}'
-      ),
-      { cmp, dc }
-    );
-  });
 </script>
 
 <Field
@@ -337,57 +243,22 @@
       <Notice tone="info" title={keptNotice} dataAttr="data-salvage-override-kept" />
     </div>
   {/if}
-  {#if playerLine}
-    <div class="manager-salvage-override-row manager-salvage-player-sees">
-      <span class="manager-salvage-player-sees-label">
-        {text('FABRICATE.Admin.Manager.Component.SalvageEditor.PlayerSees', 'Player sees')}
-      </span>
-      <p class="manager-salvage-player-sees-line" data-salvage-player-sees>
-        <i class="fas fa-dice" aria-hidden="true"></i>
-        <span>{playerLine}</span>
-      </p>
-    </div>
-  {/if}
+  <OverridePlayerSees
+    subject={text('FABRICATE.Admin.Manager.Checks.PlayerSees.SalvageSubject', 'Salvage check')}
+    {evaluation}
+    thresholdMode={config?.thresholdMode}
+    {dcMode}
+    {dcOverride}
+    {adjustmentOverride}
+    anchorDc={Number(config?.dc ?? systemDc)}
+    actors={previewActors}
+    resolveCharacter={resolvePreviewCharacter}
+  />
 </Field>
 
 <style>
   .manager-salvage-override-row {
     flex: 1 1 100%;
     min-width: 0;
-  }
-
-  .manager-salvage-player-sees {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-2xs);
-    padding-top: var(--fab-space-3);
-    border-top: 1px solid var(--fab-border);
-  }
-
-  .manager-salvage-player-sees-label {
-    color: var(--fab-text-subtle);
-    font-weight: 700;
-    font-size: 0.53rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  .manager-salvage-player-sees-line {
-    display: flex;
-    gap: var(--fab-space-2);
-    align-items: center;
-    margin: 0;
-    padding: var(--fab-space-2) var(--fab-space-3);
-    border: 1px solid var(--fab-border);
-    border-radius: 9px;
-    background: var(--fab-bg-1);
-    color: var(--fab-text-secondary);
-    font-weight: 500;
-    font-size: 0.72rem;
-  }
-
-  .manager-salvage-player-sees-line i {
-    color: var(--fab-accent);
-    font-size: 0.69rem;
   }
 </style>

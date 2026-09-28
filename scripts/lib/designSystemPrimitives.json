@@ -278,7 +278,7 @@
       "status": "target",
       "evidence": "targeted",
       "scope": "manager-only",
-      "why": "The gathering modifier panel issue 1707 wrote once (two callers, phase 1): `src/ui/svelte/apps/manager/environment/GatheringTaskInspector.svelte` renders it for a task's drop and `src/ui/svelte/apps/manager/environment/GatheringEventInspector.svelte` for a gathering event, parameterised by `subject`. It was authored twice in `CraftingSystemManagerRoot.svelte` and the de-duplication is what put it over the two-caller bar, so it arrived on the unadjudicated register and is adjudicated here rather than left there. The two callers are sibling leaves of one inspector rail, and independent is worth stating rather than assuming: each passes a different subject, a different modifier collection and a different set of `data-*` hooks, so a change made for one is a change the other has to survive. `library: null` is the adjudication, not an omission. `library.html:1486` specifies `<RuleRow>` and `<RuleSentence>` as the condition editor behind \"triggers, gates and modifiers\", and this panel attaches world-library condition and character modifiers to a gathering drop or event \u2014 a domain composition of the shared card, field, select, icon-button and picker primitives rather than a generic entry the library names. It is a recorded shared composition with its existing geometry, on the same reading as `environment/CompositionList.svelte` and `recipe/RecipeResultsSection.svelte`. Scoped `manager-only`: it authors a world's gathering rules, which only the GM manager does. Targeted: `manager-gathering-event-editor-normal` draws the event half and `manager-gathering-task-drop-modifiers-normal` the drop half, and both claim it by `sourceMatches`."
+      "why": "The gathering modifier panel issue 1707 wrote once (two callers, phase 1): `src/ui/svelte/apps/manager/environment/GatheringTaskInspector.svelte` renders it for a task's drop and `src/ui/svelte/apps/manager/environment/GatheringEventInspector.svelte` for a gathering event, parameterised by `subject`. It was authored twice in `CraftingSystemManagerRoot.svelte` and the de-duplication is what put it over the two-caller bar, so it arrived on the unadjudicated register and is adjudicated here rather than left there. The two callers are sibling leaves of one inspector rail, and independent is worth stating rather than assuming: each passes a different subject, a different modifier collection and a different set of `data-*` hooks, so a change made for one is a change the other has to survive. `library: null` is the adjudication, not an omission. `library.html:1486` specifies `<RuleRow>` and `<RuleSentence>` as the condition editor behind \"triggers, gates and modifiers\", and this panel attaches world-library condition and character modifiers to a gathering drop or event — a domain composition of the shared card, field, select, icon-button and picker primitives rather than a generic entry the library names. It is a recorded shared composition with its existing geometry, on the same reading as `environment/CompositionList.svelte` and `recipe/RecipeResultsSection.svelte`. Scoped `manager-only`: it authors a world's gathering rules, which only the GM manager does. Targeted: `manager-gathering-event-editor-normal` draws the event half and `manager-gathering-task-drop-modifiers-normal` the drop half, and both claim it by `sourceMatches`."
     },
     {
       "path": "src/ui/svelte/components/ActionMenu.svelte",
@@ -519,6 +519,22 @@
       "evidence": "targeted",
       "scope": "manager-only",
       "why": "The two callers, `WorldComponentEntryPage.svelte` and `WorldEssenceEntryPage.svelte`, share one manager composition for system-membership search, filters, navigation, add and armed removal. `library: null` records that <DataTable> compares sortable fields down columns and <ListRow> can own row geometry, while neither owns card-level relationship queries and commands. Targeted evidence is `world-component-entry-systems` and `world-essence-entry-systems`; the scope is manager-only because this edits GM world catalogue participation."
+    },
+    {
+      "path": "src/ui/svelte/apps/manager/checks/PreviewAsPicker.svelte",
+      "library": null,
+      "status": "target",
+      "evidence": "targeted",
+      "scope": "manager-only",
+      "why": "Promoted at issue 2005 on its second independent caller. The Checks Studio rail (`checks/ChecksRightMenu.svelte`) and the salvage and task check overrides' Player sees block (`component/OverridePlayerSees.svelte`) both choose whose value a preview resolves with it: `SearchablePopover` over the player-character roster, led by an explicit No actor option. The library names no character picker, so `library: null`. Targeted: the Checks cases claim it through the `checks/` pattern and the override cases by name. Scoped `manager-only`: both callers are manager authoring screens."
+    },
+    {
+      "path": "src/ui/svelte/apps/manager/component/OverridePlayerSees.svelte",
+      "library": null,
+      "status": "target",
+      "evidence": "targeted",
+      "scope": "manager-only",
+      "why": "Promoted at issue 2005 on its second independent caller: the component editor's salvage check override (`component/CheckOverrideField.svelte`) and the gathering task editor's check override (`GatheringTaskEditView.svelte`) both show what a player sees for their check through it, with the Preview-as picker where the target reads a character value. The library names no such line, so `library: null`. Targeted: the `manager-component-edit-salvage-override-*` and `manager-gathering-task-editor-check-*` cases claim it by `sourceMatches`. Scoped `manager-only`: both callers are manager editors."
     }
   ],
   "notAPrimitive": [

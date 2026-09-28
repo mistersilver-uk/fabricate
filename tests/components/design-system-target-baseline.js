@@ -51,4 +51,4 @@ export const TARGET_LIBRARY_NAME_TOTAL = 56;
 export const TARGET_MANIFEST_ROWS = rows('manifestTargetRows');
 
 /** @see TARGET_MANIFEST_ROWS */
-export const TARGET_MANIFEST_ROW_TOTAL = 50;
+export const TARGET_MANIFEST_ROW_TOTAL = 52;

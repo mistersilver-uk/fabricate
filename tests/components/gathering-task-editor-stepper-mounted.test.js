@@ -63,6 +63,12 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
     'src/utils/scalars.js',
     'src/ui/svelte/apps/manager/checks/checksCopy.js',
+    // Its Player sees line, which resolves the target and names the Preview-as character.
+    'src/systems/checkTarget.js',
+    'src/systems/checkEvaluation.js',
+    'src/utils/localizeWithFallback.js',
+    'src/ui/svelte/apps/manager/checks/previewActorId.js',
+    'src/ui/svelte/apps/manager/component/overridePlayerSees.js',
   ],
   // A component missing here does not fail this suite — it HANGS it, reported as `# cancelled`.
   compiledModules: [
@@ -91,6 +97,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/components/ManagerSearchField.svelte',
     'src/ui/svelte/components/Notice.svelte',
+    'src/ui/svelte/apps/manager/checks/PreviewAsPicker.svelte',
+    'src/ui/svelte/apps/manager/component/OverridePlayerSees.svelte',
     EDITOR_PATH,
   ],
   componentPath: EDITOR_PATH,
@@ -538,6 +546,11 @@ describe('the task check override follows the routed check evaluation (issue 200
       task: current,
       resolutionMode: 'routed',
       checkConfig: { thresholdMode: 'meet', ...config },
+      previewActors: [{ id: 'actor-sera', name: 'Sera Vane', img: '' }],
+      resolvePreviewCharacter: (id) =>
+        id === 'actor-sera'
+          ? { name: 'Sera Vane', rollData: { skills: { smith: { level: 12 } } } }
+          : null,
       onUpdateTask: (patch) => {
         updates.push(patch);
         current = { ...current, ...patch };
@@ -558,6 +571,16 @@ describe('the task check override follows the routed check evaluation (issue 200
         ),
       kept: () =>
         root.querySelector('[data-gathering-task-override-kept]')?.textContent.trim() ?? '',
+      sees: () =>
+        card().querySelector('[data-override-player-sees-line]')?.textContent.trim() ?? '',
+      note: () =>
+        card().querySelector('[data-override-player-sees-note]')?.textContent.trim() ?? '',
+      previewAs: async (actorId) => {
+        card().querySelector('[data-override-preview-actor]').click();
+        await harness.setProps({});
+        root.querySelector(`[data-popover-option="${actorId}"]`).click();
+        await harness.setProps({});
+      },
     };
   }
 
@@ -591,6 +614,10 @@ describe('the task check override follows the routed check evaluation (issue 200
     view.input().value = '12';
     view.input().dispatchEvent(new globalThis.Event('input', { bubbles: true }));
     assert.deepEqual(view.updates.at(-1), { dcOverride: 12 }, 'it writes only the DC override');
+    assert.equal(view.sees(), 'Riverbed Ore · stay at or under 15', 'the line read the system target');
+    await view.sync();
+    assert.equal(view.sees(), 'Riverbed Ore · stay at or under 12', 'and follows the override');
+    assert.ok(!view.card().querySelector('[data-override-preview-actor]'), 'a fixed target reads no one');
     clear(view.input());
     assert.deepEqual(view.updates.at(-1), { dcOverride: null }, 'clearing restores the default');
   });
@@ -611,9 +638,23 @@ describe('the task check override follows the routed check evaluation (issue 200
       'A DC override of 15 is kept on this task. This system does not read it, so it is not shown for editing.'
     );
 
+    assert.equal(
+      view.sees(),
+      'Riverbed Ore · stay at or under the character value (@skills.smith.level)'
+    );
+    assert.equal(view.note(), 'Choose a character in Preview as to see what this resolves to.');
+    await view.previewAs('actor-sera');
+    assert.equal(view.sees(), 'Riverbed Ore · stay at or under 12 (Sera Vane @skills.smith.level 12)');
+    assert.equal(view.note(), '');
+
     commit(view.input(), '−2');
     assert.deepEqual(view.updates.at(-1), { adjustmentOverride: -2 });
     await view.sync();
+    assert.equal(
+      view.sees(),
+      'Riverbed Ore · stay at or under 10 (Sera Vane @skills.smith.level 12, −2)',
+      'the chosen character survives the edit'
+    );
     assert.equal(view.input().value, '−2', 'the saved value reopens formatted');
     assert.ok(
       view.updates.every((patch) => !('dcOverride' in patch)),
@@ -650,5 +691,6 @@ describe('the task check override follows the routed check evaluation (issue 200
     assert.equal(view.label(), 'DC');
     assert.equal(view.input().value, '14');
     assert.equal(view.kept(), '');
+    assert.equal(view.sees(), 'Riverbed Ore · DC 14', 'frame 23: every check shows the line');
   });
 });

@@ -35,6 +35,12 @@ const TIERS = [
   { id: 'h', name: 'Hard', dc: 20, adjustment: -2 },
 ];
 const SERA = { name: 'Sera Vane', rollData: { skills: { smith: { level: 12 } } } };
+const IDRIN = { name: 'Idrin Ashfall', rollData: {} };
+const ROSTER = [
+  { id: 'actor-sera', name: 'Sera Vane', img: '' },
+  { id: 'actor-idrin', name: 'Idrin Ashfall', img: '' },
+];
+const CHARACTERS = { 'actor-sera': SERA, 'actor-idrin': IDRIN };
 
 const evaluation = ({ direction = 'under', source = 'attribute', kind = 'add' } = {}) => ({
   product: 'sum',
@@ -60,7 +66,8 @@ function mountOverride({ salvage = {}, config = {}, ...rest } = {}) {
     salvageCheckDcMode: 'static',
     salvageCheckDc: 15,
     salvageCheckConfig: { dc: 15, thresholdMode: 'meet', evaluation: evaluation(), ...config },
-    salvagePreviewCharacter: SERA,
+    previewActors: ROSTER,
+    resolvePreviewCharacter: (id) => CHARACTERS[id] ?? null,
     onDraftChange: (summary) => drafts.push(summary),
     onDirtyChange: (value) => dirty.push(value),
     ...rest,
@@ -73,7 +80,9 @@ const card = (target) => target.querySelector('[data-salvage-dc-override]');
 const title = (target) => card(target).querySelector('.manager-salvage-dc-title').textContent.trim();
 const hint = (target) => target.querySelector('[data-salvage-override-hint]').textContent.trim();
 const playerSees = (target) =>
-  target.querySelector('[data-salvage-player-sees]')?.textContent.trim() ?? '';
+  target.querySelector('[data-override-player-sees-line]')?.textContent.trim() ?? '';
+const note = (target) =>
+  target.querySelector('[data-override-player-sees-note]')?.textContent.trim() ?? '';
 const kept = (target) =>
   target.querySelector('[data-salvage-override-kept]')?.textContent.trim() ?? '';
 const lastSalvage = (drafts) => drafts.at(-1).updates.salvage;
@@ -86,6 +95,18 @@ function presetLabels(target) {
 
 async function choose(target, value) {
   chooseSelectOption(target, PRESET, value);
+  await flush();
+}
+
+/** Choose whose value the Player sees line previews, through the Preview-as picker itself. */
+async function previewAs(target, actorId) {
+  const trigger = target.querySelector('[data-salvage-dc-override] [data-override-preview-actor]');
+  assert.ok(Boolean(trigger), 'the override offers its Preview-as picker');
+  trigger.click();
+  await flush();
+  const option = target.querySelector(`[data-popover-option="${actorId}"]`);
+  assert.ok(Boolean(option), `the picker offers ${actorId}`);
+  option.click();
   await flush();
 }
 
@@ -168,8 +189,16 @@ describe('ComponentEditView — the salvage override follows the evaluation (iss
       kept(target),
       'A DC override of 15 is kept on this component. This system does not read it, so it is not shown for editing.'
     );
+    assert.equal(
+      playerSees(target),
+      'Salvage check · stay at or under the character value (@skills.smith.level)',
+      'with no character chosen the line names the formula'
+    );
+    assert.equal(note(target), 'Choose a character in Preview as to see what this resolves to.');
+    await previewAs(target, 'actor-sera');
     assert.equal(playerSees(target), 'Salvage check · stay at or under 12 (Sera Vane @skills.smith.level 12)');
-    assert.ok(!dirty.includes(true), 'rendering a dormant override is not an edit');
+    assert.equal(note(target), '', 'a chosen character needs no note');
+    assert.ok(!dirty.includes(true), 'rendering a dormant override, or previewing it, is not an edit');
 
     await choose(target, 'adj:-2');
     assert.equal(lastSalvage(drafts).adjustmentOverride, -2);
@@ -202,6 +231,7 @@ describe('ComponentEditView — the salvage override follows the evaluation (iss
     assert.equal(selectTriggerText(target, PRESET), 'Custom…');
     const input = target.querySelector('[data-salvage-adjustment-custom]');
     assert.equal(input.value, '×0.7', 'never snapped or truncated');
+    await previewAs(target, 'actor-sera');
     assert.equal(
       playerSees(target),
       'Salvage check · stay at or under 8 (Sera Vane @skills.smith.level 12, ×0.7)'
@@ -231,24 +261,30 @@ describe('ComponentEditView — the salvage override follows the evaluation (iss
       config: { evaluation: evaluation({ direction: 'over' }) },
     });
     assert.equal(title(target), 'Difficulty adjustment override');
+    await previewAs(target, 'actor-sera');
     assert.equal(playerSees(target), 'Salvage check · reach 14 (Sera Vane @skills.smith.level 12, +2)');
   });
 
-  it('without a character the Player sees line names the expression, never a zero', async () => {
-    const { target } = await mountOverride({
-      salvage: { adjustmentOverride: -2 },
-      salvagePreviewCharacter: null,
-    });
+  it('without a character the Player sees line names the formula and says none is chosen', async () => {
+    const { target } = await mountOverride({ salvage: { adjustmentOverride: -2 } });
+    assert.equal(
+      target.querySelector('[data-override-preview-actor]').textContent.trim(),
+      'No actor',
+      'the picker starts on No actor'
+    );
     assert.equal(
       playerSees(target),
       'Salvage check · stay at or under the character value (@skills.smith.level, −2)'
     );
+    assert.equal(note(target), 'Choose a character in Preview as to see what this resolves to.');
+    await previewAs(target, 'actor-sera');
+    await previewAs(target, 'no-actor');
+    assert.match(playerSees(target), /the character value/, 'choosing No actor returns to the formula');
   });
 
   it('a character missing the value is named rather than read as zero', async () => {
-    const { target } = await mountOverride({
-      salvagePreviewCharacter: { name: 'Idrin Ashfall', rollData: {} },
-    });
+    const { target } = await mountOverride();
+    await previewAs(target, 'actor-idrin');
     assert.equal(
       playerSees(target),
       'Idrin Ashfall has no value at @skills.smith.level. The check cannot resolve for them.'
@@ -286,14 +322,30 @@ describe('ComponentEditView — the salvage override follows the evaluation (iss
     assert.ok(!reopened.dirty.includes(true), 'reopening the saved record is clean');
   });
 
-  it('a roll-high fixed DC keeps the legacy card: no Player sees line or notice', async () => {
-    const { target } = await mountOverride({
-      salvage: { dcOverride: 12, adjustmentOverride: -2 },
+  it('a roll-high fixed DC keeps its legacy card and still shows what the player sees', async () => {
+    const { target, drafts } = await mountOverride({
+      salvage: { dcOverride: null, adjustmentOverride: -2 },
       config: { evaluation: evaluation({ direction: 'over', source: 'fixed' }) },
     });
     assert.equal(title(target), 'Salvage check DC');
     assert.equal(hint(target), 'Preset tiers come from this system’s Checks screen.');
-    assert.equal(playerSees(target), '');
+    assert.equal(playerSees(target), 'Salvage check · DC 15', 'frame 23: every check shows it');
+    assert.ok(
+      !target.querySelector('[data-override-preview-actor]'),
+      'a fixed DC reads no character, so it offers no Preview-as picker'
+    );
     assert.equal(kept(target), '');
+    await choose(target, 'custom');
+    await typeCommit(target.querySelector('[data-salvage-dc-custom]'), '12');
+    assert.equal(lastSalvage(drafts).dcOverride, 12);
+    assert.equal(playerSees(target), 'Salvage check · DC 12', 'the line follows the override');
+  });
+
+  it('a dynamic system DC shows no Player sees line, since a macro sets the number', async () => {
+    const { target } = await mountOverride({
+      salvageCheckDcMode: 'dynamic',
+      config: { evaluation: evaluation({ direction: 'over', source: 'fixed' }) },
+    });
+    assert.equal(playerSees(target), '');
   });
 });

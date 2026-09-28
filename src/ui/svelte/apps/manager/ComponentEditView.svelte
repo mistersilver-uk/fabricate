@@ -80,9 +80,10 @@
     salvageCheckDcMode = 'static',
     salvageCheckDc = 0,
     // The active salvage check sub-object, whose `evaluation` decides which override is edited,
-    // and the character its Player sees line resolves against (issue 2005).
+    // and the Preview-as roster and lookup its Player sees line resolves with (issue 2005).
     salvageCheckConfig = null,
-    salvagePreviewCharacter = null,
+    previewActors = [],
+    resolvePreviewCharacter = () => null,
     // The SYSTEM's check-modifier catalogue and the SALVAGE check's selection over it (issue 1095).
     // The picker renders only under `bySubject` and only over a non-empty catalogue.
     // `salvageModifierMaxPicks` is NOT coerced on the way here; `resolveMaxModifierPicks` owns
@@ -2207,7 +2208,8 @@
                   tiers={salvageCheckTiers}
                   dcMode={salvageCheckDcMode}
                   systemDc={salvageCheckDc}
-                  previewCharacter={salvagePreviewCharacter}
+                  {previewActors}
+                  {resolvePreviewCharacter}
                   {instanceId}
                   disabled={saving}
                   onChange={setSalvage}

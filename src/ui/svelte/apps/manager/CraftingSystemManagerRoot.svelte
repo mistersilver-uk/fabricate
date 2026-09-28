@@ -614,12 +614,16 @@
       salvageResolutionMode === 'routed' ? 'routed' : 'simple'
     ] ?? null
   );
-  // Whom the salvage override's Player sees line resolves for: the first player character, by name.
-  const salvagePreviewCharacter = $derived.by(() => {
-    if (currentView !== 'component-edit') return null;
-    const actor = resolvePreviewActor(listPreviewActors()[0]?.id);
+  // The Preview-as roster the salvage and task check overrides offer, and its roll-data lookup.
+  const overridePreviewActors = $derived(
+    currentView === 'component-edit' || currentView === 'gathering-task-edit'
+      ? listPreviewActors()
+      : []
+  );
+  function resolveOverrideCharacter(actorId) {
+    const actor = resolvePreviewActor(actorId);
     return actor ? { name: actor.name, rollData: cloneRollData(actor) } : null;
-  });
+  }
   // System components offered to the salvage yield picker.
   const salvageComponentOptions = $derived(selectedSystem?.managedItemOptions || []);
 
@@ -5440,6 +5444,8 @@
         resolutionMode={gathering.gatheringTaskResolutionMode}
         routedOutcomeTiers={gathering.gatheringTaskRoutedOutcomeTiers}
         checkConfig={selectedSystem?.gatheringCraftingCheck?.routed ?? null}
+        previewActors={overridePreviewActors}
+        resolvePreviewCharacter={resolveOverrideCharacter}
         resultValidationErrors={gathering.gatheringTaskValidation.resultErrors || []}
         {itemCards}
         managedItemOptions={selectedSystem.managedItemOptions || []}
@@ -5609,7 +5615,8 @@
           {salvageCheckDcMode}
           {salvageCheckDc}
           {salvageCheckConfig}
-          {salvagePreviewCharacter}
+          previewActors={overridePreviewActors}
+          resolvePreviewCharacter={resolveOverrideCharacter}
           componentOptions={salvageComponentOptions}
           {complicationActivities}
           {complicationTriggerOptions}

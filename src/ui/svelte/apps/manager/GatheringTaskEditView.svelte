@@ -31,6 +31,7 @@
   import RecipeResultsSection from './recipe/RecipeResultsSection.svelte';
   import RecipeResultGroupCard from './recipe/RecipeResultGroupCard.svelte';
   import Notice from '../../components/Notice.svelte';
+  import OverridePlayerSees from './component/OverridePlayerSees.svelte';
   import { normalizeCheckEvaluation } from '../../../../systems/normalize/checkEvaluation.js';
   import {
     MULTIPLIER_STOPS,
@@ -45,8 +46,11 @@
     nodesEnabled = false,
     resolutionMode = null,
     routedOutcomeTiers = [],
-    // The routed gathering check, whose evaluation picks the override field (issue 2005).
+    // The routed gathering check, whose evaluation picks the override field, and the Preview-as
+    // roster and lookup its Player sees line resolves with (issue 2005).
     checkConfig = null,
+    previewActors = [],
+    resolvePreviewCharacter = () => null,
     resultValidationErrors = [],
     itemCards = [],
     managedItemOptions = [],
@@ -1541,6 +1545,16 @@
             dataAttr="data-gathering-task-override-kept"
           />
         {/if}
+        <OverridePlayerSees
+          subject={task?.name || ''}
+          evaluation={checkEvaluation}
+          thresholdMode={checkConfig?.thresholdMode}
+          dcOverride={dcOverrideValue}
+          adjustmentOverride={adjustmentOverrideValue}
+          anchorDc={Number(checkConfig?.dc ?? 15)}
+          actors={previewActors}
+          resolveCharacter={resolvePreviewCharacter}
+        />
       </section>
     {/if}
 

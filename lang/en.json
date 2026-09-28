@@ -3402,12 +3402,6 @@
             "OverrideMultiplyHint": "Adjusts the character value this component is salvaged against. Multiplied, rounded down.",
             "OverrideKeptDc": "A DC override of {dc} is kept on this component. This system does not read it, so it is not shown for editing.",
             "OverrideKeptAdjustment": "A difficulty adjustment override of {adjustment} is kept on this component. This system does not read it, so it is not shown for editing.",
-            "PlayerSees": "Player sees",
-            "PlayerSeesFixed": "Salvage check · stay {cmp} {dc}",
-            "PlayerSeesUnder": "Salvage check · stay {cmp} {target} ({source})",
-            "PlayerSeesOver": "Salvage check · reach {target} ({source})",
-            "PlayerSeesUnderNoCharacter": "Salvage check · stay {cmp} the character value ({source})",
-            "PlayerSeesOverNoCharacter": "Salvage check · reach the character value ({source})",
             "EnabledMicro": "Enabled",
             "RollBudget": "Roll budget flows down the list: each result is claimed in order while the check total still covers its DC.",
             "Results": "Results",
@@ -6481,6 +6475,16 @@
             "Difficulties": "Result difficulties",
             "DifficultiesPlaceholder": "e.g. 6, 9, 14, 40",
             "DifficultiesHint": "A try-it-out order for this check only. The roll is spent down it in the order you type, and nothing else reads these numbers."
+          },
+          "PlayerSees": {
+            "Title": "Player sees",
+            "SalvageSubject": "Salvage check",
+            "FixedOver": "{subject} · DC {dc}",
+            "FixedUnder": "{subject} · stay {cmp} {dc}",
+            "Under": "{subject} · stay {cmp} {target} ({source})",
+            "Over": "{subject} · reach {target} ({source})",
+            "UnderNoCharacter": "{subject} · stay {cmp} the character value ({source})",
+            "OverNoCharacter": "{subject} · reach the character value ({source})"
           },
           "Simulator": {
             "Title": "Outcome preview",

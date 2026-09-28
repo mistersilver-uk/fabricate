@@ -40,6 +40,8 @@ export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
   'src/utils/scalars.js',
   'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
   'src/ui/svelte/apps/manager/checks/checksCopy.js',
+  'src/ui/svelte/apps/manager/checks/previewActorId.js',
+  'src/ui/svelte/apps/manager/component/overridePlayerSees.js',
   // The three converted selects' option vocabularies (issue 1510), mapped beside the view.
   'src/ui/svelte/apps/manager/component/componentEditSelectOptions.js',
   // The salvage mode pill's label source (issue 676) — it already carries 'Routed by
@@ -141,6 +143,9 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/components/EssenceChip.svelte',
   // The salvage check override (issue 2005) and the notice it names a kept override with.
   'src/ui/svelte/components/Notice.svelte',
+  // Its Player sees block and the Checks Studio's own Preview-as picker it reuses.
+  'src/ui/svelte/apps/manager/checks/PreviewAsPicker.svelte',
+  'src/ui/svelte/apps/manager/component/OverridePlayerSees.svelte',
   'src/ui/svelte/apps/manager/component/CheckOverrideField.svelte',
   'src/ui/svelte/apps/manager/ComponentEditView.svelte',
 ]);

@@ -317,6 +317,12 @@ const gatheringHarness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
     'src/utils/scalars.js',
     'src/ui/svelte/apps/manager/checks/checksCopy.js',
+    // Its Player sees line, which resolves the target and names the Preview-as character.
+    'src/systems/checkTarget.js',
+    'src/systems/checkEvaluation.js',
+    'src/utils/localizeWithFallback.js',
+    'src/ui/svelte/apps/manager/checks/previewActorId.js',
+    'src/ui/svelte/apps/manager/component/overridePlayerSees.js',
   ],
   compiledModules: [
     'src/ui/svelte/components/Stepper.svelte',
@@ -342,6 +348,8 @@ const gatheringHarness = createMountedComponentHarness({
     'src/ui/svelte/components/ModifierPillSelect.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/components/Notice.svelte',
+    'src/ui/svelte/apps/manager/checks/PreviewAsPicker.svelte',
+    'src/ui/svelte/apps/manager/component/OverridePlayerSees.svelte',
     GATHERING_PATH,
   ],
   componentPath: GATHERING_PATH,
