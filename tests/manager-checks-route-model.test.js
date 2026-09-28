@@ -349,6 +349,29 @@ describe('checksRouteModel', () => {
     assert.equal(gathering.checksGatheringTasks.length, 1);
   });
 
+  it('memoizes the always-visible nav badge, so an unchanged re-read walks components/gatheringTasks once (issue 2078)', () => {
+    let componentCalls = 0;
+    let taskCalls = 0;
+    const { model } = openModel({
+      components: () => {
+        componentCalls += 1;
+        return [];
+      },
+      gatheringTasks: () => {
+        taskCalls += 1;
+        return [];
+      },
+    });
+    // The rail's nav badge is read on EVERY view, not only a checks-* route — reading it twice
+    // with nothing changed must not re-walk either thunk a second time.
+    void model.checksNavCount;
+    void model.checksNavItems;
+    void model.checksNavCount;
+    void model.checksNavItems;
+    assert.equal(componentCalls, 1, 'the components thunk is walked once, not once per read');
+    assert.equal(taskCalls, 1, 'the gatheringTasks thunk is walked once, not once per read');
+  });
+
   it('opens the tab the route names, and counts each deep-link request', () => {
     const { model, live } = openModel();
     live.set('view', 'checks-salvage');

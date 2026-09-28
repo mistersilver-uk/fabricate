@@ -315,6 +315,27 @@ describe('readiness validates only what the active mode reads', () => {
     );
     assert.deepEqual([ids(fixedRanges.issues), ids(fixedRanges.transient)], [[], []]);
   });
+
+  it('a progressive mode is inert to an invalid kept salvage or gathering task override too', () => {
+    const check = { rollFormula: '1d20', evaluation: attribute('@x', { baseAdjustment: 1 }) };
+    const salvage = evaluateCheckReadiness(check, {
+      mode: 'progressive',
+      activity: 'salvage',
+      components: [
+        { id: 'c1', name: 'Iron Longsword', salvage: { enabled: true, adjustmentOverride: -2 } },
+      ],
+    });
+    assert.equal(issue(salvage, 'adjustmentInvalidForKind'), undefined);
+
+    const gathering = evaluateCheckReadiness(check, {
+      mode: 'progressive',
+      activity: 'gathering',
+      gatheringTasks: [
+        { id: 't1', name: 'Prospect for Ore', resolutionMode: 'routed', adjustmentOverride: -2 },
+      ],
+    });
+    assert.equal(issue(gathering, 'adjustmentInvalidForKind'), undefined);
+  });
 });
 
 describe('the new issues render a title over their sentence', () => {
