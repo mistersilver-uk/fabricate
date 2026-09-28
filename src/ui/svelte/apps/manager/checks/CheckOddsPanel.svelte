@@ -15,6 +15,8 @@
   import FillBar from '../../../components/FillBar.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { ODDS_REASONS, SANDBOX_ABSENT } from './checkOdds.js';
+  import { PREVIEW_ABSTENTIONS } from './checkPreviewModel.js';
+  import { interpolate } from './checksCopy.js';
 
   let {
     /**
@@ -79,12 +81,37 @@
       'FABRICATE.Admin.Manager.Checks.Odds.ReasonNoSandboxOrder',
       'A progressive check is counted in results awarded. Type an order of result difficulties under “Preview as” to see how often each count comes up.',
     ],
+    [ODDS_REASONS.preRollNotEnumerable]: [
+      'FABRICATE.Admin.Manager.Checks.Odds.ReasonModifierPrerollNotEnumerable',
+      'A bonus on this check is rolled separately in a way that cannot be charted exactly, so no odds are shown.',
+    ],
+    // The preview abstains before enumerating: the check reads a value it cannot chart.
+    [PREVIEW_ABSTENTIONS.needsPreviewActor]: [
+      'FABRICATE.Admin.Manager.Checks.Odds.ReasonNeedsPreviewActor',
+      'This check reads the character, so there is nothing to chart without one. Choose a character in Preview as.',
+    ],
+    [PREVIEW_ABSTENTIONS.pathUnresolved]: [
+      'FABRICATE.Admin.Manager.Checks.Odds.ReasonAttributePathUnresolved',
+      '{actor} is missing a value this check reads ({path}), so it cannot resolve for them.',
+    ],
+    [PREVIEW_ABSTENTIONS.valueNotNumeric]: [
+      'FABRICATE.Admin.Manager.Checks.Odds.ReasonAttributeValueNotNumeric',
+      'The value this check reads from {actor} is not a number, so there is nothing to chart for them.',
+    ],
+    [PREVIEW_ABSTENTIONS.targetInvalid]: [
+      'FABRICATE.Admin.Manager.Checks.Odds.ReasonTargetInvalid',
+      "This check's target cannot be worked out, so there is nothing to chart. Fix it under The roll.",
+    ],
+    [PREVIEW_ABSTENTIONS.progressiveUnder]: [
+      'FABRICATE.Admin.Manager.Checks.Odds.ReasonProgressiveUnderUnsupported',
+      'A progressive check spends its total as a budget, so Lower is better cannot apply and there is nothing to chart.',
+    ],
   };
 
   const reasonNote = $derived.by(() => {
     const entry = REASON_COPY[odds?.reason];
     return entry
-      ? text(entry[0], entry[1])
+      ? interpolate(text(entry[0], entry[1]), odds?.reasonData)
       : text(
           'FABRICATE.Admin.Manager.Checks.Odds.ReasonUnknown',
           'The chances for this formula cannot be worked out.'
@@ -117,7 +144,11 @@
     )}
   </p>
 {:else}
-  <div class="manager-checks-odds" data-checks-odds-state="enumerated">
+  <div
+    class="manager-checks-odds"
+    data-checks-odds-state="enumerated"
+    data-checks-odds-direction={odds.direction}
+  >
     <ul class="manager-checks-odds-list">
       {#each rows as row (row.id)}
         <li class="manager-checks-odds-row" data-checks-odds-row={row.id}>

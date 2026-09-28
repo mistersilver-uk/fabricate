@@ -5,11 +5,12 @@
   engine to disagree with itself: a `Medallion` die face, the TERSE breakdown line, the total
   against the DC with its margin, the matched band card and a "What happens" list.
 
-  FOUR STATES THAT ARE NOT THE READOUT, each saying why: NO FORMULA; DYNAMIC DC, which the engine
+  FIVE STATES THAT ARE NOT THE READOUT, each saying why: NO FORMULA; DYNAMIC DC, which the engine
   resolves by RUNNING the linked macro and a preview must not, so it previews the static fallback
   and states so; UNRESOLVED ROLL DATA, where `Roll.parse`'s `missing: "0"` turns an `@` key the
   actor lacks into a plausible WRONG total that "renders only values present on the result"
-  cannot catch, the signal being `resolved === false`; and NO CHECK.
+  cannot catch, the signal being `resolved === false`; ABSTAINING, where the check reads a value
+  it cannot resolve, so Roll is disabled and no target or margin is shown; and NO CHECK.
 -->
 <script>
   import IconFactRow from '../IconFactRow.svelte';
@@ -34,13 +35,22 @@
   // The FIRST rolled face, the breakdown line beside it carrying the rest.
   const face = $derived(result?.data?.diceGroups?.[0]?.results?.[0] ?? null);
   const marginLabel = $derived.by(() => {
-    if (!Number.isFinite(preview?.margin)) return '';
+    if (!Number.isFinite(preview?.margin) || !preview.vsLabel) return '';
     const margin = preview.margin;
-    return `${text('FABRICATE.Admin.Manager.Checks.Simulator.VsDc', 'vs DC {dc}').replace(
-      '{dc}',
-      String(preview.dc)
-    )} · ${margin >= 0 ? `+${margin}` : String(margin)}`;
+    return `${preview.vsLabel} · ${margin >= 0 ? `+${margin}` : String(margin)}`;
   });
+  const abstain = $derived(preview?.abstain ?? null);
+  const DYNAMIC_NOTES = {
+    'dynamic-dc': [
+      'FABRICATE.Admin.Manager.Checks.Simulator.DynamicDc',
+      'This check takes its DC from a macro at craft time. The preview never runs that macro, so it reads against the static fallback DC instead.',
+    ],
+    'dynamic-target': [
+      'FABRICATE.Admin.Manager.Checks.Simulator.DynamicTarget',
+      "This check's target comes from a macro at craft time. The preview never runs that macro, so it reads against the adjusted character value instead.",
+    ],
+  };
+  const dynamicNote = $derived(DYNAMIC_NOTES[preview?.dynamicNote] ?? null);
 </script>
 
 <div class="manager-checks-simulator" data-checks-simulator-panel>
@@ -68,7 +78,7 @@
       role="primary"
       class="manager-checks-simulator-roll"
       data-checks-simulator-roll
-      disabled={preview.rolling === true}
+      disabled={preview.rolling === true || Boolean(abstain)}
       onclick={() => onRoll()}
     >
       <i class="fas fa-dice-d20" aria-hidden="true"></i>
@@ -79,16 +89,15 @@
       >
     </ManagerButton>
 
-    {#if preview.dynamicDc}
-      <p class="manager-muted" data-checks-simulator-note="dynamic-dc">
-        {text(
-          'FABRICATE.Admin.Manager.Checks.Simulator.DynamicDc',
-          'This check takes its DC from a macro at craft time. The preview never runs that macro, so it reads against the static fallback DC instead.'
-        )}
+    {#if dynamicNote}
+      <p class="manager-muted" data-checks-simulator-note={preview.dynamicNote}>
+        {text(dynamicNote[0], dynamicNote[1])}
       </p>
     {/if}
 
-    {#if preview.resolved === false}
+    {#if abstain}
+      <p class="manager-muted" data-checks-simulator-state={abstain.reason}>{abstain.hint}</p>
+    {:else if preview.resolved === false}
       <p class="manager-muted" data-checks-simulator-note="unresolved">
         {text(
           'FABRICATE.Admin.Manager.Checks.Simulator.Unresolved',
@@ -97,8 +106,13 @@
       </p>
     {/if}
 
-    {#if rolled}
-      <div class="manager-checks-simulator-readout" data-checks-simulator-readout>
+    <!-- An abstention's hint above is the whole state: no total, target or margin. -->
+    {#if rolled && !abstain}
+      <div
+        class="manager-checks-simulator-readout"
+        data-checks-simulator-readout
+        data-checks-simulator-direction={preview.direction}
+      >
         <!-- The rolled face, ON the medallion: the digit is the subject and the glyph behind it the
                      tile's art, so an absolutely-positioned child with no offsets would sit at its STATIC
                      position, right of the tile. `inset: 0` is what makes "on the medallion" true. -->
@@ -113,7 +127,9 @@
           <small data-checks-simulator-breakdown>{preview.breakdown}</small>
           <strong data-checks-simulator-total>{preview.total}</strong>
           {#if marginLabel}
-            <small data-checks-simulator-margin>{marginLabel}</small>
+            <small data-checks-simulator-margin data-checks-simulator-target={preview.target}
+              >{marginLabel}</small
+            >
           {/if}
         </span>
       </div>
@@ -150,7 +166,7 @@
           {/each}
         </div>
       {/if}
-    {:else}
+    {:else if !abstain}
       <p class="manager-muted" data-checks-simulator-state="pre-roll">
         {text(
           'FABRICATE.Admin.Manager.Checks.Simulator.Hint',

@@ -188,7 +188,8 @@
       if (odds.enumerable !== true) return '';
       // TWO SENTENCES, two different facts: one die has FACES, a formula carrying a rolling
       // modifier has a joint SPACE, and calling 160 assignments "faces" names a die nothing rolls.
-      const faces = Number(odds.faces);
+      // A joint space reports `faces: null`, which is not a die with 0 faces.
+      const faces = odds.faces == null ? NaN : Number(odds.faces);
       if (Number.isFinite(faces)) {
         return text('FABRICATE.Admin.Manager.Checks.Odds.Faces', 'all {faces} faces').replace(
           '{faces}',

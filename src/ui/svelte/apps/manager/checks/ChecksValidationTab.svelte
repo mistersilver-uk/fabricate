@@ -8,7 +8,8 @@
   THE HERO STATES THE UNSAVED CONDITION: the badges, dots and counters are a DRAFT PREVIEW while
   the ENABLE gate reads COMMITTED state, so a draft that clears every blocking issue must NOT be
   reported as "Ready to enable". `sections` is the list of in-play subsystem checks `ChecksView`
-  resolves; a subsystem that is switched off is omitted upstream.
+  resolves; a subsystem that is switched off is omitted upstream. A TRANSIENT warning names the
+  Preview-as actor: it renders as a row but is never counted in the tally or the hero.
 -->
 <script>
   import EditorValidationSurface from '../../../components/EditorValidationSurface.svelte';
@@ -16,7 +17,14 @@
   import { checkIssueCopy, checkTickCopy, interpolate } from './checksCopy.js';
   import { evaluateCheckReadiness, sectionForIssue } from './checksReadiness.js';
 
-  let { sections = [], dirty = false, dirtyActivities = [], onSelectIssue = () => {} } = $props();
+  let {
+    sections = [],
+    // The Preview-as character `{ name, rollData }`, or null.
+    previewActor = null,
+    dirty = false,
+    dirtyActivities = [],
+    onSelectIssue = () => {},
+  } = $props();
 
   function text(key, fallback, data) {
     const translated = localize(key, data);
@@ -55,6 +63,7 @@
         mode: section.mode,
         modifierContext: section.modifierContext ?? null,
         activity: section.subsystem,
+        previewActor,
       }),
     }))
   );
@@ -92,6 +101,25 @@
   // A group with NEITHER still states its result, which is reachable: a gathering check in
   // `d100` mode with no eligible modifiers reports no tick and no issue, and dropping the group
   // would read as "gathering was not evaluated", a different and equally wrong claim.
+  function issueRow(subsystem, issue, transient) {
+    return {
+      id: issue.id,
+      title: issueTitle(issue.id, issue.data),
+      status: issue.severity === 'critical' ? 'block' : 'warn',
+      transient,
+      target: { activity: subsystem, section: sectionForIssue(issue.id) },
+      // NO KEY rather than an empty one for a route-only row: the host resolves any non-empty
+      // string, so `focusTarget: ''` would report as focus-wired while focusing nothing.
+      ...(CHECK_ISSUE_CONTROLS[issue.id] ? { focusTarget: CHECK_ISSUE_CONTROLS[issue.id] } : {}),
+      dataAttrs: {
+        'data-subsystem': subsystem,
+        'data-issue': issue.id,
+        'data-issue-severity': issue.severity,
+        ...(transient && { 'data-issue-transient': '' }),
+      },
+    };
+  }
+
   function rowsFor(subsystem, readiness) {
     const rows = [
       ...readiness.checks.map((check) => ({
@@ -100,20 +128,8 @@
         status: check.satisfied ? 'pass' : 'warn',
         dataAttrs: { 'data-subsystem': subsystem, 'data-satisfied': String(check.satisfied) },
       })),
-      ...readiness.issues.map((issue) => ({
-        id: issue.id,
-        title: issueTitle(issue.id, issue.data),
-        status: issue.severity === 'critical' ? 'block' : 'warn',
-        target: { activity: subsystem, section: sectionForIssue(issue.id) },
-        // NO KEY rather than an empty one for a route-only row: the host resolves any non-empty
-        // string, so `focusTarget: ''` would report as focus-wired while focusing nothing.
-        ...(CHECK_ISSUE_CONTROLS[issue.id] ? { focusTarget: CHECK_ISSUE_CONTROLS[issue.id] } : {}),
-        dataAttrs: {
-          'data-subsystem': subsystem,
-          'data-issue': issue.id,
-          'data-issue-severity': issue.severity,
-        },
-      })),
+      ...readiness.issues.map((issue) => issueRow(subsystem, issue, false)),
+      ...(readiness.transient ?? []).map((issue) => issueRow(subsystem, issue, true)),
     ];
     if (rows.length > 0) return rows;
     return [
@@ -143,6 +159,7 @@
     const tally = { passing: 0, warnings: 0, blocking: 0 };
     for (const group of groups) {
       for (const row of group.rows) {
+        if (row.transient) continue;
         if (row.status === 'pass') tally.passing += 1;
         else if (row.status === 'block') tally.blocking += 1;
         else tally.warnings += 1;

@@ -55,21 +55,23 @@
     listPreviewActors,
     resolvePreviewActor,
     runCheckPreview,
-    terseBreakdown,
   } from './checkPreview.js';
   import {
-    describeFormulaEnumerability,
-    enumeratePassFailOdds,
-    enumerateProgressiveOdds,
-    enumerateRoutedOdds,
-    SANDBOX_ABSENT,
-  } from './checkOdds.js';
+    buildOddsModel,
+    buildPreviewFacts,
+    buildReadoutModel,
+    labelPreviewRecords,
+    previewAbstention,
+    previewActorNote,
+    previewEnumeration,
+    previewSignature,
+    previewTrack,
+  } from './checkPreviewModel.js';
   import {
     formatPreviewDifficulties,
     parsePreviewDifficulties,
   } from '../../../../../systems/progressiveCheckSandbox.js';
   import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
-  import { formatCheckAdjustment } from './checkAdjustmentLabel.js';
 
   // `resolutionMode` picks the crafting editor; the three `craftingCheck*` props are its drafts.
   let {
@@ -465,14 +467,23 @@
     'data-checks-adjustment-kind': activeEvaluation.target.adjustmentKind,
   });
 
+  // The Preview-as actor, route-independent so the Validation route names it too.
+  let previewActorId = $state(NO_ACTOR_ID);
+  const previewActor = $derived(resolvePreviewActor(previewActorId));
+  // The Preview-as actor as the editors' character-value fields and strips read it: a copy.
+  const previewCharacter = $derived(
+    previewActor ? { name: previewActor.name, rollData: cloneRollData(previewActor) } : null
+  );
+
   const activeReadiness = $derived(
     activeActivity
       ? evaluateCheckReadiness(activeCheck || {}, {
           mode: activeMode,
           modifierContext: activeActivity.modifierContext,
           activity: activeActivity.subsystem,
+          previewActor: previewCharacter,
         })
-      : { checks: [], issues: [] }
+      : { checks: [], issues: [], transient: [] }
   );
 
   const issuesBySection = $derived.by(() => {
@@ -798,8 +809,9 @@
     return resolutionMode;
   });
 
+  // Transient warnings explain themselves here but never feed a dot, badge or tally.
   const activeSectionIssues = $derived(
-    activeReadiness.issues
+    [...activeReadiness.issues, ...activeReadiness.transient]
       .filter((issue) => sectionForIssue(issue.id) === activeSection)
       .map((issue) => ({
         id: issue.id,
@@ -810,20 +822,11 @@
 
   // ONE previewed record, three readers, so it lives HERE; two copies is how two surfaces
   // disagree about which record is previewed.
-  let previewActorId = $state(NO_ACTOR_ID);
   let previewRecordId = $state(DEFAULT_RECORD_ID);
   let previewResult = $state(null);
   let previewRolling = $state(false);
 
-  const dcWord = text('FABRICATE.Admin.Manager.Checks.Crafting.TierDc', 'DC');
-  const unroutedLabel = text('FABRICATE.Admin.Manager.Checks.Odds.Unrouted', 'No outcome');
-
   const previewActors = $derived(activity === 'validation' ? [] : listPreviewActors());
-  const previewActor = $derived(resolvePreviewActor(previewActorId));
-  // The Preview-as actor as the editors' character-value fields and strips read it: a copy.
-  const previewCharacter = $derived(
-    previewActor ? { name: previewActor.name, rollData: cloneRollData(previewActor) } : null
-  );
 
   // THE PROGRESSIVE PREVIEW SANDBOX: a progressive histogram needs an ORDERED list of result
   // difficulties, and that list is SANDBOX STATE ON THE CHECK rather than a record's. Read
@@ -850,40 +853,16 @@
     update({ ...activeCheck, preview: { difficulties: parsePreviewDifficulties(raw) } });
   }
 
-  // A progressive check has no DC, so labelling its records with one would invent a number.
-  const recordsCarryDc = $derived(!isProgressive);
   const previewRecords = $derived(
-    buildPreviewRecords({
-      check: activeCheck,
-      defaultLabel: text('FABRICATE.Admin.Manager.Checks.PreviewAs.DefaultRecord', 'Default'),
-    }).map((record) => ({
-      ...record,
-      label: [record.name, recordsCarryDc ? recordReading(record) : ''].filter(Boolean).join(' · '),
-    }))
+    labelPreviewRecords(
+      buildPreviewRecords({
+        check: activeCheck,
+        defaultLabel: text('FABRICATE.Admin.Manager.Checks.PreviewAs.DefaultRecord', 'Default'),
+      }),
+      { evaluation: activeEvaluation, progressive: isProgressive },
+      text
+    )
   );
-
-  // What a record grades against, in the evaluation's own terms: its adjustment under a character
-  // value, `target n` under a fixed roll-under, and `DC n` otherwise.
-  function recordReading(record) {
-    const evaluation = normalizeCheckEvaluation(activeCheck?.evaluation);
-    if (evaluation.target.source === 'attribute') {
-      const tier = (activeCheck?.tiers ?? []).find((entry) => String(entry?.id) === record.id);
-      if (!tier) {
-        return text(
-          'FABRICATE.Admin.Manager.Checks.Evaluation.RecordBaseAdjustment',
-          'base adjustment'
-        );
-      }
-      return formatCheckAdjustment(evaluation.target.adjustmentKind, tier.adjustment) || '—';
-    }
-    if (evaluation.direction === 'under') {
-      return text('FABRICATE.Admin.Manager.Checks.Evaluation.RecordTarget', 'target {dc}').replace(
-        '{dc}',
-        String(record.dc)
-      );
-    }
-    return `${dcWord} ${record.dc}`;
-  }
   const previewRecord = $derived(
     previewRecords.find((record) => record.id === previewRecordId) ?? previewRecords[0] ?? null
   );
@@ -899,8 +878,8 @@
       record: previewRecord,
     })
   );
-  const previewFormula = $derived(String(previewPlan.formula ?? '').trim());
-  // THE SAME CONTEXT THE RUNNER IS HANDED: it appends the scalar, so a histogram computed
+  const previewAbstaining = $derived(previewAbstention(previewPlan, previewCharacter));
+  // THE SAME CONTEXT THE RUNNER IS HANDED: it places the modifiers, so a histogram computed
   // without this describes a formula nothing rolls.
   const previewModifier = $derived(previewPlan.args?.craftingModifier ?? null);
   // The previewed actor's flat check-modifier total, which a roll-under strip adds to its target.
@@ -913,255 +892,66 @@
     return Number.isFinite(scalar) ? scalar : 0;
   });
 
-  const enumeration = $derived(
-    previewFormula === ''
-      ? { enumerable: false, reason: 'no-dice' }
-      : describeFormulaEnumerability(previewFormula, previewActor, {
-          craftingModifier: previewModifier,
-        })
-  );
+  const enumeration = $derived(previewEnumeration(previewPlan, previewAbstaining));
   // `resolved === false` is EXACTLY the unresolved-roll-data refusal, from one signal.
   const previewResolved = $derived(enumeration.reason !== 'unresolved-roll-data');
-
   // The reachable total range the two-band strip is drawn across; null when the formula is not
   // enumerable, the editor falling back to a window around the DC.
-  const previewTrack = $derived.by(() => {
-    if (!enumeration.enumerable) return { min: null, max: null };
-    // THE REACHABLE TOTALS, off the enumeration: a bounded rolling modifier clamps its die.
-    const totals = enumeration.outcomes.map((outcome) => outcome.total);
-    return { min: Math.min(...totals), max: Math.max(...totals) };
-  });
+  const previewTrackRange = $derived(previewTrack(enumeration));
 
-  /** The odds view-model, every branch either enumerating or stating why it did not.
-   *  @returns {object} The model `CheckOddsPanel` renders. */
-  function buildOddsModel() {
-    const kind = previewPlan.kind;
-    if (!kind) return { kind: null };
-    if (enumeration.enumerable !== true) {
-      return { kind, enumerable: false, reason: enumeration.reason };
-    }
-    const { faces, combinations, outcomes } = enumeration;
-    if (kind === 'routed') {
-      const rows = enumerateRoutedOdds({ outcomes, args: previewPlan.args }).map((row) => ({
-        id: row.id || 'unrouted',
-        label: row.name || unroutedLabel,
-        percent: row.percent,
-        success: row.success,
-      }));
-      return { kind, enumerable: true, faces, combinations, rows };
-    }
-    if (kind === 'progressive') return buildProgressiveOdds(outcomes, faces, combinations);
-    const rows = enumeratePassFailOdds({
-      outcomes,
-      args: {
-        dc: previewPlan.dc,
-        comparison: previewPlan.args.thresholdMode === 'exceed' ? 'exceed' : 'meet',
-        triggers: previewPlan.args.triggers,
+  const oddsModel = $derived(
+    buildOddsModel(
+      {
+        plan: previewPlan,
+        enumeration,
+        abstention: previewAbstaining,
+        sandbox: {
+          difficulties: previewDifficulties,
+          awardMode: activeCheck?.awardMode || 'equal',
+        },
       },
-    }).map((row) => ({
-      id: row.id,
-      label: row.success
-        ? text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccess', 'Success')
-        : text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeFailure', 'Failure'),
-      percent: row.percent,
-      success: row.success,
-    }));
-    return { kind, enumerable: true, faces, combinations, rows };
-  }
+      text
+    )
+  );
 
-  /**
-   * Progressive bucketing, by AWARD COUNT rather than by tier. An empty sandbox is a stated
-   * absence with the control named, never an invented sample.
-   * @param {Array<object>} outcomes The enumerated outcome space.
-   * @param {?number} faces The die's face count, for a single-die formula.
-   * @param {number} combinations How many assignments the space holds.
-   * @returns {object} The model.
-   */
-  function buildProgressiveOdds(outcomes, faces, combinations) {
-    if (previewDifficulties.length === 0) {
-      return { kind: 'progressive', enumerable: false, reason: SANDBOX_ABSENT };
-    }
-    const rows = enumerateProgressiveOdds({
-      outcomes,
-      difficulties: previewDifficulties,
-      awardMode: activeCheck?.awardMode || 'equal',
-    }).map((row) => ({
-      id: row.id,
-      label: text('FABRICATE.Admin.Manager.Checks.Odds.AwardCount', '{awarded} of {of}')
-        .replace('{awarded}', String(row.awarded))
-        .replace('{of}', String(row.of)),
-      percent: row.percent,
-      success: row.awarded > 0,
-    }));
-    return { kind: 'progressive', enumerable: true, faces, combinations, rows };
-  }
-
-  const oddsModel = $derived(buildOddsModel());
-
-  /** The matched band card: the tier the result object actually names. */
-  function buildBandCard(result) {
-    if (!result) return { name: '', detail: '', success: false };
-    const success = result.success === true;
-    if (previewPlan.kind === 'routed') {
-      return {
-        name:
-          result.outcome ||
-          text('FABRICATE.Admin.Manager.Checks.Simulator.NoOutcome', 'No outcome tier'),
-        detail: success
-          ? text(
-              'FABRICATE.Admin.Manager.Checks.Simulator.BandSuccess',
-              'Counts as a success · the result group bound to this tier is produced.'
-            )
-          : text(
-              'FABRICATE.Admin.Manager.Checks.Simulator.BandFailure',
-              'Counts as a failure · nothing is produced.'
-            ),
-        success,
-      };
-    }
-    if (previewPlan.kind === 'progressive') {
-      return {
-        name: text('FABRICATE.Admin.Manager.Checks.Simulator.AwardValue', 'Awards {value}').replace(
-          '{value}',
-          String(result.value ?? 0)
+  const previewModel = $derived(
+    buildReadoutModel(
+      {
+        plan: previewPlan,
+        result: previewResult,
+        rolling: previewRolling,
+        resolved: previewResolved,
+        abstention: previewAbstaining,
+        actorName: previewActor?.name ?? '',
+        facts: buildPreviewFacts(
+          {
+            result: previewResult,
+            plan: previewPlan,
+            activity,
+            consumption: { consumeIngredientsOnFail, breakToolsOnFail },
+          },
+          text
         ),
-        detail: text(
-          'FABRICATE.Admin.Manager.Checks.Simulator.AwardDetail',
-          'The value is spent down the recipe’s ordered results, each costing its own difficulty.'
-        ),
-        success: true,
-      };
-    }
-    return {
-      name: success
-        ? text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccess', 'Success')
-        : text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeFailure', 'Failure'),
-      detail: success
-        ? text(
-            'FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccessDesc',
-            'The roll reaches the DC, and the recipe’s result group is produced in full.'
-          )
-        : text(
-            'FABRICATE.Admin.Manager.Checks.Crafting.OutcomeFailureDesc',
-            'The roll misses the DC; nothing is produced, and the failure policy decides the cost.'
-          ),
-      success,
-    };
-  }
+      },
+      text
+    )
+  );
 
-  /** The "What happens" rows, each read off the SAME result object the engine would act on.
-   *  @param {object|null} result The runner result.
-   *  @returns {Array<object>} `IconFactRow` inputs. */
-  function buildPreviewFacts(result) {
-    if (!result) return [];
-    const facts = [];
-    const success = result.success === true;
-    facts.push({
-      id: 'result-group',
-      icon: 'fas fa-box-open',
-      title: text('FABRICATE.Admin.Manager.Checks.Simulator.FactResults', 'Result group produced'),
-      subtitle: success
-        ? buildBandCard(result).name
-        : text('FABRICATE.Admin.Manager.Checks.Simulator.FactResultsNone', 'None'),
-    });
-    if (activity !== 'gathering') {
-      const consumes = success || consumeIngredientsOnFail;
-      facts.push({
-        id: 'ingredients',
-        icon: 'fas fa-fire-flame-curved',
-        title: text(
-          'FABRICATE.Admin.Manager.Checks.Simulator.FactIngredients',
-          'Ingredients consumed'
-        ),
-        subtitle: consumes
-          ? text('FABRICATE.Admin.Manager.Checks.Simulator.FactAsListed', 'as listed')
-          : text('FABRICATE.Admin.Manager.Checks.Simulator.FactNotConsumed', 'kept'),
-      });
-    }
-    if (result.data?.breakTools === true || (!success && breakToolsOnFail)) {
-      facts.push({
-        id: 'tools',
-        icon: 'fas fa-hammer',
-        title: text('FABRICATE.Admin.Manager.Checks.Simulator.FactTools', 'Required tools break'),
-        subtitle: '',
-      });
-    }
-    if (result.data?.tierStepApplied) {
-      const step = result.data.tierStepApplied;
-      facts.push({
-        id: 'tier-step',
-        icon: 'fas fa-arrow-up-right-dots',
-        title: text(
-          'FABRICATE.Admin.Manager.Checks.Simulator.FactTierStep',
-          'A trigger moved the tier by {steps}'
-        ).replace('{steps}', String(step.steps)),
-        subtitle: step.stepClamped
-          ? text(
-              'FABRICATE.Admin.Manager.Checks.Simulator.FactTierStepClamped',
-              'clamped at the end of the tier list'
-            )
-          : '',
-      });
-    }
-    if (result.data?.minTierFailed) {
-      facts.push({
-        id: 'min-tier',
-        icon: 'fas fa-ban',
-        title: text(
-          'FABRICATE.Admin.Manager.Checks.Simulator.FactMinTier',
-          'Blocked by the recipe’s minimum success tier'
-        ),
-        subtitle: '',
-      });
-    }
-    return facts;
-  }
-
-  const previewModel = $derived.by(() => {
-    const total = Number(previewResult?.data?.total);
-    const band = buildBandCard(previewResult);
-    return {
-      kind: previewPlan.kind,
-      hasFormula: previewFormula !== '',
-      dynamicDc: previewPlan.dynamicDc === true,
-      resolved: previewResolved,
-      rolling: previewRolling,
-      result: previewResult,
-      total: Number.isFinite(total) ? total : null,
-      dc: previewPlan.dc,
-      margin:
-        previewPlan.kind === 'progressive' || !Number.isFinite(total)
-          ? null
-          : total - previewPlan.dc,
-      breakdown: terseBreakdown(previewResult, previewActor?.name ?? ''),
-      // The die the medallion is captioned with, off the result's own dice bag.
-      dieLabel: previewResult?.data?.diceGroups?.[0]?.group
-        ? `d${String(previewResult.data.diceGroups[0].group).split('d')[1]}`
-        : '',
-      bandName: band.name,
-      bandDetail: band.detail,
-      bandSuccess: band.success,
-      facts: buildPreviewFacts(previewResult),
-    };
-  });
-
-  // A rolled result describes ONE (formula, actor, record) tuple, so any move drops it.
-  const previewSignature = $derived(
-    [
+  // A rolled result describes ONE (formula, actor, record, target) tuple, so any move drops it.
+  const previewSignatureNow = $derived(
+    previewSignature({
       activity,
-      activeMode,
-      previewFormula,
-      previewActorId,
-      previewRecord?.id ?? '',
-      previewPlan.dc,
-      JSON.stringify(activeEvaluation),
-      JSON.stringify(activeCheck?.tiers?.find((tier) => tier.id === previewRecord?.id) ?? null),
-    ].join('\0')
+      mode: activeMode,
+      plan: previewPlan,
+      actorId: previewActorId,
+      record: previewRecord,
+      tier: activeCheck?.tiers?.find((tier) => tier.id === previewRecord?.id),
+    })
   );
   let adoptedPreviewSignature = $state('');
   $effect(() => {
-    if (previewSignature === adoptedPreviewSignature) return;
-    adoptedPreviewSignature = previewSignature;
+    if (previewSignatureNow === adoptedPreviewSignature) return;
+    adoptedPreviewSignature = previewSignatureNow;
     previewResult = null;
   });
   // A record the check no longer offers must not stay selected.
@@ -1172,10 +962,13 @@
   });
 
   async function rollPreview() {
-    if (previewRolling) return;
+    if (previewRolling || previewAbstaining) return;
+    const rolledFor = previewSignatureNow;
     previewRolling = true;
     try {
-      previewResult = await runCheckPreview(previewPlan);
+      const result = await runCheckPreview(previewPlan);
+      // A result from inputs that have since changed never publishes.
+      if (previewSignatureNow === rolledFor) previewResult = result;
     } finally {
       previewRolling = false;
     }
@@ -1193,27 +986,22 @@
     previewLabel: previewRecord?.name ?? '',
     previewCharacter,
     previewModifierTotal,
-    trackMin: previewTrack.min,
-    trackMax: previewTrack.max,
+    trackMin: previewTrackRange.min,
+    trackMax: previewTrackRange.max,
     onSelectPreviewRecord: selectPreviewRecord,
   });
   const simplePreviewProps = $derived({
     previewRecords,
     previewRecordId: previewRecord?.id ?? '',
     previewLabel: previewRecord?.name ?? '',
-    trackMin: previewTrack.min,
-    trackMax: previewTrack.max,
+    trackMin: previewTrackRange.min,
+    trackMax: previewTrackRange.max,
     previewCharacter,
     previewModifierTotal,
     onSelectPreviewRecord: selectPreviewRecord,
   });
   const previewActorSummary = $derived(
-    previewActor
-      ? ''
-      : text(
-          'FABRICATE.Admin.Manager.Checks.PreviewAs.NoActorHint',
-          'With no actor selected every roll-data key reads as 0.'
-        )
+    previewActorNote({ plan: previewPlan, actor: previewActor }, text)
   );
 </script>
 
@@ -1436,6 +1224,7 @@
       {#if activity === 'validation'}
         <ChecksValidationTab
           sections={validationSections}
+          previewActor={previewCharacter}
           {dirty}
           {dirtyActivities}
           onSelectIssue={selectIssue}

@@ -1,3 +1,4 @@
+import { resolveDeterministicExpression } from '../../../../../systems/checkEvaluation.js';
 import {
   classifyModifierExpression,
   modifierExpressionResolves,
@@ -6,11 +7,18 @@ import {
   resolveModifierBounds,
   resolveModifierPolicy,
 } from '../../../../../systems/checkModifierResolver.js';
+import { isValidTargetAdjustment } from '../../../../../systems/checkTarget.js';
+import {
+  normalizeCheckEvaluation,
+  normalizeNullableAdjustment,
+} from '../../../../../systems/normalize/checkEvaluation.js';
 import {
   findRangeConflicts,
   planRetiredPlaceholderStrip,
 } from '../../../../../utils/craftingCheckExpression.js';
 import { trimString as trimmed } from '../../../../../utils/scalars.js';
+
+import { missingTargetPaths, targetExpressionFault } from './checkTargetStatus.js';
 
 /**
  * Pure readiness evaluator for one subsystem check, mirroring `recipeReadiness.js`: it returns
@@ -46,6 +54,17 @@ export const CHECK_READINESS_ISSUE_IDS = Object.freeze([
   'modifiersInertNoCheck',
   'modifiersInertNoModifierSupport',
   'modifiersInertNoFormula',
+  // Targets and adjustments
+  'attributeTargetMissing',
+  'attributeTargetInvalid',
+  'attributeTierWithoutAdjustment',
+  'adjustmentInvalidForKind',
+  'otherwiseTierMissing',
+  'multipleOtherwiseTiers',
+  'progressiveUnderUnsupported',
+  // Transient: they name the Preview-as actor and feed no badge, dot, tally or enable gate.
+  'attributePathUnresolvedForPreview',
+  'attributeValueNotNumeric',
 ]);
 
 const REGISTERED_ISSUE_IDS = new Set(CHECK_READINESS_ISSUE_IDS);
@@ -85,6 +104,15 @@ export const CHECK_ISSUE_SECTIONS = Object.freeze({
   modifiersInertNoCheck: 'modifiers',
   modifiersInertNoModifierSupport: 'modifiers',
   modifiersInertNoFormula: 'modifiers',
+  attributeTargetMissing: 'roll',
+  attributeTargetInvalid: 'roll',
+  attributeTierWithoutAdjustment: 'roll',
+  adjustmentInvalidForKind: 'roll',
+  otherwiseTierMissing: 'outcomes',
+  multipleOtherwiseTiers: 'outcomes',
+  progressiveUnderUnsupported: 'roll',
+  attributePathUnresolvedForPreview: 'roll',
+  attributeValueNotNumeric: 'roll',
 });
 
 /**
@@ -292,6 +320,120 @@ function checkModifierReadiness(modifierContext, { rollsNoCheck, hasRollFormula,
   return { checks, issues };
 }
 
+/** The name a base adjustment is listed under beside tier and outcome names. */
+const BASE_ADJUSTMENT_NAME = 'Base adjustment';
+
+/** The two transient warnings: the Preview-as actor's value at the target cannot be read. */
+function previewActorTargetWarnings(transient, expression, previewActor) {
+  const rollData = previewActor.rollData ?? {};
+  const read = resolveDeterministicExpression(expression, rollData, { pathMode: 'foundry' });
+  if (read.ok) return;
+  const actor = previewActor.name ?? '';
+  if (read.reason === 'unresolved-path') {
+    const path = missingTargetPaths(expression, rollData).join(', ');
+    pushIssue(transient, 'attributePathUnresolvedForPreview', 'warning', { actor, path });
+  } else {
+    pushIssue(transient, 'attributeValueNotNumeric', 'warning', { actor });
+  }
+}
+
+/** The character-value expression's own rules, and the Preview-as actor's reading of it. */
+function attributeExpressionReadiness(result, expression, previewActor) {
+  const hasExpression = expression !== '';
+  result.checks.push({ id: 'attributeTargetSet', satisfied: hasExpression });
+  if (!hasExpression) {
+    pushIssue(result.issues, 'attributeTargetMissing', 'critical');
+    return;
+  }
+  const fault = targetExpressionFault(expression);
+  result.checks.push({ id: 'attributeTargetReadable', satisfied: !fault });
+  if (fault) pushIssue(result.issues, 'attributeTargetInvalid', 'critical');
+  else if (previewActor) previewActorTargetWarnings(result.transient, expression, previewActor);
+}
+
+/** Named entries whose adjustment is set, as `{ name, value }`; null adjustments are skipped. */
+function setAdjustments(entries) {
+  return entries
+    .map((entry) => ({
+      name: trimmed(entry?.name) || String(entry?.id ?? ''),
+      value: normalizeNullableAdjustment(entry?.adjustment),
+    }))
+    .filter((entry) => entry.value !== null);
+}
+
+/** Under a character value every crafting recipe tier sets its own adjustment. */
+function recipeTierReadiness(result, tiers) {
+  if (tiers.length === 0) return;
+  const unset = tiers.filter((tier) => normalizeNullableAdjustment(tier?.adjustment) === null);
+  result.checks.push({ id: 'recipeTiersSetAdjustment', satisfied: unset.length === 0 });
+  if (unset.length > 0) {
+    const names = unset.map((tier) => trimmed(tier?.name) || tier?.id).join(', ');
+    pushIssue(result.issues, 'attributeTierWithoutAdjustment', 'critical', { names });
+  }
+}
+
+/** The base and every set tier adjustment suit the target's adjustment kind. */
+function adjustmentKindReadiness(result, { adjustmentKind: kind, baseAdjustment }, set) {
+  const adjusted = [
+    ...(baseAdjustment === null ? [] : [{ name: BASE_ADJUSTMENT_NAME, value: baseAdjustment }]),
+    ...set,
+  ];
+  const invalid = adjusted.filter((entry) => !isValidTargetAdjustment(kind, entry.value));
+  result.checks.push({ id: 'adjustmentsSuitKind', satisfied: invalid.length === 0 });
+  if (invalid.length > 0) {
+    const names = invalid.map((entry) => entry.name).join(', ');
+    pushIssue(result.issues, 'adjustmentInvalidForKind', 'critical', { names });
+  }
+}
+
+/** A multiply check's relative tiers: exactly one leaves its multiplier unset as Otherwise. */
+function otherwiseReadiness(result, outcomes) {
+  if (outcomes.length === 0) return;
+  const otherwise = outcomes.filter(
+    (outcome) => normalizeNullableAdjustment(outcome?.adjustment) === null
+  );
+  result.checks.push({ id: 'singleOtherwiseTier', satisfied: otherwise.length === 1 });
+  if (otherwise.length === 0) pushIssue(result.issues, 'otherwiseTierMissing', 'critical');
+  if (otherwise.length > 1) {
+    const names = otherwise.map((outcome) => trimmed(outcome?.name) || outcome?.id).join(', ');
+    pushIssue(result.issues, 'multipleOtherwiseTiers', 'critical', { names });
+  }
+}
+
+/**
+ * Readiness of a summed check's target, read only where the active activity and mode read it: a
+ * progressive check's direction, and a character-value target's expression and adjustments. A
+ * progressive or fixed-range target source is inert, so nothing about it is validated.
+ * @returns {{ checks: CheckReadinessCheck[], issues: CheckReadinessIssue[],
+ *   transient: CheckReadinessIssue[] }} */
+function targetReadiness(check, { mode, activity, previewActor }) {
+  const result = { checks: [], issues: [], transient: [] };
+  const evaluation = normalizeCheckEvaluation(check?.evaluation);
+  if (evaluation.product !== 'sum') return result;
+  if (mode === 'progressive') {
+    if (evaluation.direction === 'under') {
+      result.checks.push({ id: 'progressiveHigherIsBetter', satisfied: false });
+      pushIssue(result.issues, 'progressiveUnderUnsupported', 'critical');
+    }
+    return result;
+  }
+  const { type, outcomes } = routedOutcomes(check);
+  if (evaluation.target.source !== 'attribute' || (mode === 'routed' && type === 'fixed')) {
+    return result;
+  }
+  attributeExpressionReadiness(result, evaluation.target.expression.trim(), previewActor);
+  const tiers = activity === 'crafting' && Array.isArray(check?.tiers) ? check.tiers : [];
+  recipeTierReadiness(result, tiers);
+  const multiplyTiers =
+    mode === 'routed' && evaluation.target.adjustmentKind === 'multiply' ? outcomes : [];
+  adjustmentKindReadiness(result, evaluation.target, [
+    ...setAdjustments(tiers),
+    ...setAdjustments(multiplyTiers),
+  ]);
+  if (multiplyTiers.length > 0) otherwiseReadiness(result, multiplyTiers);
+  return result;
+}
+
 /**
  * Evaluate one subsystem check's readiness.
  * @param {object} check Plain check draft (the active draft for its mode).
@@ -301,8 +443,11 @@ function checkModifierReadiness(modifierContext, { rollsNoCheck, hasRollFormula,
  *   than defaulting: a caller handing through a raw resolution mode skipped every rule silently.
  * @param {object|null} [options.modifierContext] A `buildCheckModifierContext` bag, or null.
  * @param {'crafting'|'salvage'|'gathering'} [options.activity] Which activity's check this is;
- *   it changes one answer — WHY a no-check mode's selection reaches no roll.
- * @returns {{ checks: CheckReadinessCheck[], issues: CheckReadinessIssue[] }} */
+ *   it decides WHY a no-check mode's selection reaches no roll, and whether recipe tiers apply.
+ * @param {?{name: string, rollData: object}} [options.previewActor] The Preview-as character,
+ *   whose unreadable target value raises a `transient` warning naming them.
+ * @returns {{ checks: CheckReadinessCheck[], issues: CheckReadinessIssue[],
+ *   transient: CheckReadinessIssue[] }} */
 export function evaluateCheckReadiness(check = {}, options = {}) {
   const mode = options.mode || 'simple';
   if (!SUPPORTED_MODES.has(mode)) {
@@ -326,7 +471,7 @@ export function evaluateCheckReadiness(check = {}, options = {}) {
       hasRollFormula: false,
       activity: options.activity || '',
     });
-    return { checks: modifiers.checks, issues: modifiers.issues };
+    return { checks: modifiers.checks, issues: modifiers.issues, transient: [] };
   }
 
   // Every authored check needs a roll formula to resolve, READ POST-SHIM, which is the whole
@@ -410,6 +555,14 @@ export function evaluateCheckReadiness(check = {}, options = {}) {
     issues.push(...tierStep.issues);
   }
 
+  const target = targetReadiness(check, {
+    mode,
+    activity: options.activity || '',
+    previewActor: options.previewActor ?? null,
+  });
+  checks.push(...target.checks);
+  issues.push(...target.issues);
+
   // The check-modifier selection, last: it reads `hasRollFormula` above to decide whether
   // an eligible selection reaches a roll at all.
   const modifiers = checkModifierReadiness(modifierContext, {
@@ -419,5 +572,5 @@ export function evaluateCheckReadiness(check = {}, options = {}) {
   checks.push(...modifiers.checks);
   issues.push(...modifiers.issues);
 
-  return { checks, issues };
+  return { checks, issues, transient: target.transient };
 }

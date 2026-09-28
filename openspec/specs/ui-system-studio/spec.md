@@ -240,6 +240,28 @@ The DC-hiding note applies to `routedByCheck + fixed` in the `CraftingCheckEdito
 Mode semantics are defined in `resolution-modes/spec.md`.
 There is no check-wide tier-stepping toggle: stepping is authored per trigger in the `CheckTriggers` editor below, and the retired routed `natStepping` card has been removed from the crafting and salvage editors.
 
+#### Roll-under and character-value preview and readiness
+
+Every check the Studio previews other than a summed roll-over against a fixed DC resolves its target as the runtime does: a character value is read from the Preview-as actor with Foundry path semantics, the record's adjustment applies (a recipe tier with none inherits the base), and no macro runs.
+A dynamic target therefore previews against the adjusted character value, and the simulator states that its macro is never run (`Simulator.DynamicTarget`).
+The odds and the track window use the check's own modifier placement from the shared `deriveCheckRoll` derivation: roll-over appends the modifiers to the roll, and roll-under places their `targetDelta` on the target.
+Each separately rolled modifier is enumerated JOINTLY with the main dice under the same positive whitelist and the shared 50,000-outcome cap; one the whitelist rejects abstains as `modifier-preroll-not-enumerable`, a joint space above the cap as `too-many-outcomes`, and no average is ever substituted.
+A joint space is captioned by its combination count, never as faces.
+Routed rows list the unrouted bucket first and then the tiers worst to best by the routing's own ranking; summed roll-over against a fixed DC keeps the order totals reach them in.
+
+The preview ABSTAINS — no odds, no target, no margin, no bar and Roll disabled — with one reason shared by the odds panel and the simulator.
+With no actor chosen, a check whose target or formula reads the character abstains first as `needs-preview-actor`, with the no-actor note `PreviewAs.NoActorCharacter` and the simulator hint `Simulator.NeedsCharacter`.
+An actorless literal target and formula stay previewable, and summed roll-over against a fixed DC keeps its own no-actor note.
+Otherwise the reasons are `progressive-under-unsupported`, `attribute-path-unresolved` (naming the actor and path), `attribute-value-not-numeric` and `target-invalid`.
+The simulator reads the executed `data.target` and `data.margin` ("vs target {target}"), and shows neither for a result with no target (an Otherwise tier or a fixed range); summed roll-over against a fixed DC keeps its total-minus-DC reading.
+A roll-under pass/fail band reads "The roll stays at or under the target…" or "The roll goes over the target…".
+A rolled result is dropped when any input it describes changes, and a deferred result publishes only if the inputs it was rolled for still hold.
+
+Readiness validates only what the active mode reads: a progressive or fixed-range target source is inert.
+It raises, as critical issues, `attributeTargetMissing` and `attributeTargetInvalid` (dice or non-arithmetic once every path is neutralized), `attributeTierWithoutAdjustment` (crafting recipe tiers), `adjustmentInvalidForKind` (a multiplier at or below zero), `otherwiseTierMissing` and `multipleOtherwiseTiers` (relative tiers under a multiplied character value) and `progressiveUnderUnsupported` (summed checks only).
+The target and adjustment issues belong to The roll, the Otherwise issues to Outcomes.
+With a Preview-as actor chosen it raises two TRANSIENT warnings naming that actor, `attributePathUnresolvedForPreview` and `attributeValueNotNumeric`; they are explained by the section callout and listed on the Validation route, and they never feed a rail or nav badge, a section dot, the Validation tally or the enable gate.
+
 #### Check Trigger Controls
 
 All three check editors (simple, routed, and progressive) ALWAYS render a single unified `CheckTriggers` editor (issue 419 recombine) — one trigger list per check, replacing the former separate per-die crit table and tool-breakage trigger card.
