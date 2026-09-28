@@ -89,7 +89,7 @@ The shipped Essences rail item and the `.manager-rail-toggle` collapse control b
 
 Each activity route renders FIVE sections — The roll / Outcomes / Triggers / Modifiers / On failure — each with a count badge and a warning dot fed from the same readiness evaluation that feeds the rail badge and the Validation route, so the three can never disagree.
 The warning dot carries a text accessible name, and a section carrying both a count and an issue renders both; a count of zero renders unbadged, because five sections each wearing a `0` is chrome rather than information.
-The dot is EXPLAINED IN THE PANEL: the open section renders the shared `Callout` for each of its own issues, carrying the same sentence the Validation route renders for that issue id from one exported copy map, toned `warning` for an issue that blocks enabling and `info` for one that does not.
+The dot is EXPLAINED IN THE PANEL: the open section renders the shared `Callout` for each of its own issues, carrying the same sentence the Validation route renders for that issue id from one exported copy map, toned `warning` for an issue that blocks enabling and `info` for one that does not; an issue with its own title renders instead as the notice described under "Roll-under and character-value preview and readiness".
 A dot whose only explanation is on another route is a signal with no legend, and two surfaces describing one issue from two copies of the sentence is how they come to describe it differently.
 When ranking leaves an entry out — `highest` over two or more eligible entries, or `playerPicks` whose pick cap is below the number of eligible entries — Modifiers readiness emits one non-blocking `warning`-severity issue, `modifierAverageUnavailable`, naming every eligible transformed-quantity entry with sound bounds and a resolving expression, whose average cannot be compared; the entry remains selectable and rollable, and the warning never becomes `modifierExpressionInvalid`.
 The section strip is a real ARIA tablist driven by Arrow, Home and End, and only the SELECTED tab carries `aria-controls`, because only the selected section's panel is in the document.
@@ -114,7 +114,7 @@ Crafting (non-alchemy), salvage and gathering stage their check's `enabled` flag
 Each activity's save writes its Active flag before its slot draft and ANDs both answers, and each slot write is guarded on that slot's own dirty flag so a switch-only save does not rewrite an untouched formula block.
 The reading is derived from the MODE rather than from the persisted `enabled` flag, since a mandatory check runs whatever that flag says; it reads on for every locked mode except alchemy `none`, which rolls nothing.
 The Preview-as panel carries an ACTOR selector and a RECORD selector, and both are real controls with a simulator behind them.
-"Preview as" offers UNFILTERED `game.actors` — the Studio is GM-only and a GM's `Document#isOwner` is true for every actor, so the player-side "assigned character OR owner" union would hide actors a GM can legitimately preview against — plus an explicit "No actor" option, under which every `@` key resolves to `0` and the panel renders the unresolved warning rather than a total.
+"Preview as" offers UNFILTERED `game.actors` — the Studio is GM-only and a GM's `Document#isOwner` is true for every actor, so the player-side "assigned character OR owner" union would hide actors a GM can legitimately preview against — plus an explicit "No actor" option, under which every `@` key resolves to `0` and the panel renders the unresolved warning rather than a total, for a summed roll-over against a fixed DC; every other evaluation follows "Roll-under and character-value preview and readiness".
 The RECORD is the same selection the Outcomes section's band strip is drawn against: a check's own default DC first, then every authored recipe tier.
 In PROGRESSIVE mode the record selector is replaced by the progressive preview sandbox's ordered-difficulty field, because a record's whole contribution is a DC and a progressive check has none.
 
@@ -129,10 +129,10 @@ For `dcMode: 'dynamic'` it resolves the STATIC fallback DC and renders a stated 
 The engine reaches a dynamic DC by calling `MacroExecutor.run`, which compiles `macro.command` into an `AsyncFunction` and executes it with the current user's authority, guarded only by `typeof command === 'string'` — which is NOT a script-type check, because Foundry declares `type` with `initial: CONST.MACRO_TYPES.CHAT` and `command` as `required: true, blank: true` on both types, and the shipped `ItemDropZone documentType="Macro"` accepts any Macro.
 A DC macro that creates a `ChatMessage`, updates an Actor or writes a flag must not be able to do so from a preview button.
 
-It renders only values present on the returned result, never a parallel model: the rolled die face on a `Medallion`, the TERSE breakdown line (`d20 9 +10 · Sera Vane` — the full resolved formula is the `THIS CHECK` digest's row), the total against the DC with its margin, the matched band card with its disposition, and a "What happens" list of icon fact rows including tier-step and minimum-tier evidence.
+It renders only values present on the returned result, never a parallel model: the rolled die face on a `Medallion`, the TERSE breakdown line (`d20 9 +10 · Sera Vane` — the full resolved formula is the `THIS CHECK` digest's row), the total against the DC or, for a roll-under or character-value check, the executed target (see "Roll-under and character-value preview and readiness" below), with its margin, the matched band card with its disposition, and a "What happens" list of icon fact rows including tier-step and minimum-tier evidence.
 It surfaces `resolved === false` — the signal `resolveCheckFormulaDisplay` already produces by re-resolving with `missing: 'NaN'` — as a stated "does not reduce to a number for this actor" warning, because `Roll.parse`'s own `missing: "0"` silently turns an unresolved `@` key into a plausible WRONG total, and "renders only values present on the result" does not catch that, since the wrong number IS on the result.
 It treats `Actor#getRollData()`'s live `system` object as read-only and clones before any local augmentation.
-A rolled readout describes ONE (formula, actor, record) tuple and is DROPPED when any of the three changes, because a total no current configuration produces must not stay on screen.
+A rolled readout describes ONE (formula, actor, record, evaluation, target) tuple and is dropped when any of them changes, because a total no current configuration produces must not stay on screen.
 
 #### Per-outcome odds histogram
 
@@ -149,11 +149,11 @@ A string scan admits formulas face enumeration cannot describe — `2d6` is one 
 (3) **Determinism must recurse, and a `StringTerm` lies.** `RollParser.flattenTree` only recurses into `node.class === "Node"`, so a parenthetical, function or pool term is pushed whole and `Roll.parse('1d20 + (2d6)')` yields exactly one top-level die term with hidden randomness inside; a top-level class scan would call it enumerable and draw a histogram that lies.
 Determinism is therefore judged by Foundry's own recursive `term.isDeterministic` — but `StringTerm#isDeterministic` returns `true` for an unresolvable string that then throws at evaluate, so a `StringTerm` is refused explicitly, and it is told apart from a `ParentheticalTerm` (which also carries a string `term`) by the fields only a parenthetical has.
 
-**Every refusal carries a discriminated reason code** — `parse-threw`, `no-dice`, `multiple-die-groups`, `die-modifiers`, `non-unit-count`, `non-integer-faces`, `non-numeric-denomination`, `non-deterministic-remainder`, `string-term`, `unresolved-roll-data` — so a refuse-everything predicate is distinguishable from a correct one and the panel can say WHY rather than only that it abstained.
+**Every refusal carries a discriminated reason code** — `parse-threw`, `no-dice`, `multiple-die-groups`, `die-modifiers`, `non-unit-count`, `non-integer-faces`, `non-numeric-denomination`, `non-deterministic-remainder`, `string-term`, `unresolved-roll-data` — so a refuse-everything predicate is distinguishable from a correct one and the panel can say WHY rather than only that it abstained; the roll-under reasons are listed under "Roll-under and character-value preview and readiness".
 `non-numeric-denomination` is stated separately from `non-integer-faces` because a `FateDie` reports `faces: 3` and a `Coin` reports `faces: 2`: both are integers, and calling either "not an integer" would be a false statement in the panel.
 A formula whose only die sits inside a parenthetical, function or pool term refuses as `non-deterministic-remainder` rather than `no-dice`, which is reserved for a formula that really is all arithmetic.
 Anything outside the shape renders a stated note rather than an approximation: a histogram that lies is worse than one that abstains.
-The caption is COMPUTED from the enumerated space, never hard-coded — a `1d12` check reads "all 12 faces".
+For a summed roll-over against a fixed DC the caption is COMPUTED from the enumerated space, never hard-coded — a `1d12` check reads "all 12 faces"; a roll-under or character-value check names its formula instead, as "Roll-under and character-value preview and readiness" states.
 
 **The histogram and the simulator MUST describe ONE formula, and it is the formula the RUNNER rolls.**
 The formula field's `avg` annotation is not a third reader of that formula: it reads the authored free-text formula alone, with no modifier contribution appended (below).
@@ -163,6 +163,7 @@ A second composition is free to drift, and drift here is a histogram spanning `1
 It is applied exactly ONCE: the appended formula is then resolved for display with the context omitted, exactly as the runner does, so the scalar cannot land twice.
 
 The TOOL bonus is appended ABOVE the runner — by the engine on a real craft and by the preview arg-builder on a preview — and the runner appends none of its own, so the preview matches the engine's shape and the enumerator layers only the modifier on top.
+Under roll-under the preview arg-builder appends no Tool term; it hands the terms to the runner as contributions placed on the target.
 The SITUATIONAL bonus is unreachable from a preview at all: it lives behind `interactive === true`, and a null roll-options bag spreads to `{}`.
 Because a system with an empty catalogue resolves a ZERO scalar and makes the append a no-op, this rule MUST be exercised with a non-empty catalogue and a non-zero resolved scalar or it is graded vacuously.
 Progressive checks bucket by AWARD COUNT and OMIT a count no face can reach, while an award of nothing is listed wherever it is reachable.
@@ -246,7 +247,7 @@ Every check the Studio previews other than a summed roll-over against a fixed DC
 A dynamic target therefore previews against the adjusted character value, and the simulator states that its macro is never run (`Simulator.DynamicTarget`).
 The odds and the track window use the check's own modifier placement from the shared `deriveCheckRoll` derivation: roll-over appends the modifiers to the roll, and roll-under places their `targetDelta` on the target.
 Each separately rolled modifier is enumerated JOINTLY with the main dice under the same positive whitelist and the shared 50,000-outcome cap; one the whitelist rejects abstains as `modifier-preroll-not-enumerable`, a joint space above the cap as `too-many-outcomes`, and no average is ever substituted.
-A joint space is captioned by its combination count, never as faces.
+The odds heading of a roll-under or character-value check reads "exact · {formula}" with the authored formula, and a joint space also names each separately rolled bonus it crosses in ("exact · 1d20 with 1d4").
 Routed rows list the unrouted bucket first and then the tiers worst to best by the routing's own ranking; summed roll-over against a fixed DC keeps the order totals reach them in.
 Each bar takes its row's hue on the tier strip's five-stop ramp (danger, warning, success, info, accent) by position, worst first, and the unrouted bucket is always danger.
 
@@ -254,14 +255,16 @@ The preview ABSTAINS — no odds, no target, no margin, no bar and Roll disabled
 With no actor chosen, a check whose target or formula reads the character abstains first as `needs-preview-actor`, with the no-actor note `PreviewAs.NoActorCharacter` and the simulator hint `Simulator.NeedsCharacter`.
 An actorless literal target and formula stay previewable, and summed roll-over against a fixed DC keeps its own no-actor note.
 Otherwise the reasons are `progressive-under-unsupported`, `attribute-path-unresolved` (naming the actor and path), `attribute-value-not-numeric` and `target-invalid`.
-The simulator reads the executed `data.target` and `data.margin` ("vs target {target}"), and shows neither for a result with no target (an Otherwise tier or a fixed range); summed roll-over against a fixed DC keeps its total-minus-DC reading.
+The simulator reads the executed `data.target` and `data.margin` ("target {target} · margin {margin}"), and shows neither for a result with no target (an Otherwise tier or a fixed range); summed roll-over against a fixed DC keeps its total-minus-DC reading.
 A roll-under pass/fail band reads "The roll stays at or under the target…" or "The roll goes over the target…".
 A rolled result is dropped when any input it describes changes, and a deferred result publishes only if the inputs it was rolled for still hold.
 
 Readiness validates only what the active mode reads: a progressive or fixed-range target source is inert.
 It raises, as critical issues, `attributeTargetMissing` and `attributeTargetInvalid` (dice or non-arithmetic once every path is neutralized), `attributeTierWithoutAdjustment` (crafting recipe tiers), `adjustmentInvalidForKind` (a multiplier at or below zero), `otherwiseTierMissing` and `multipleOtherwiseTiers` (relative tiers under a multiplied character value) and `progressiveUnderUnsupported` (summed checks only).
-The target and adjustment issues belong to The roll, the Otherwise issues to Outcomes.
-With a Preview-as actor chosen it raises two TRANSIENT warnings naming that actor, `attributePathUnresolvedForPreview` and `attributeValueNotNumeric`; they are explained by the section callout and listed on the Validation route, and they never feed a rail or nav badge, a section dot, the Validation tally or the enable gate.
+The target, adjustment and progressive-direction issues belong to The roll, the Otherwise issues to Outcomes.
+With a Preview-as actor chosen it raises two TRANSIENT warnings naming that actor, `attributePathUnresolvedForPreview` and `attributeValueNotNumeric`; they are explained by the section notice and listed on the Validation route, and they never feed a rail or nav badge, a section dot, the Validation tally or the enable gate.
+Each of these nine issues carries a short title over its sentence: its Validation row shows the title with the sentence as its detail, and its section opens with the shared amber `Notice` carrying both.
+The notice's Review action focuses the control the issue names, the character-value field for the target issues and the transient warnings, and otherwise focuses the section, as a Validation row's View does.
 
 #### Check Trigger Controls
 
