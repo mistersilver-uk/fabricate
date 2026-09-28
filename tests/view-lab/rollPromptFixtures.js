@@ -18,6 +18,9 @@ export async function seedRollPromptFixture(world, state) {
     });
   }
   if (state === 'under') await seedRollUnder(world);
+  if (state === 'salvage-under' || state === 'salvage-under-attribute') {
+    await seedSalvageUnder(world, state);
+  }
   if (state === 'pick-one' || state === 'overflow') {
     const system = manager.getSystem('lab-herbalism');
     await manager.updateSystem(system.id, {
@@ -81,6 +84,37 @@ async function seedRollUnder(world) {
   await world.fabricate.recipeManager.updateRecipe('sm-r-horseshoe', {
     name: 'Hard Work',
     checkTierId: 'lab-tier-hard-work',
+  });
+}
+
+/**
+ * Bulk salvage rows against roll-under checks: Smithing's simple salvage stays at or under a fixed
+ * 12, and Runework's routed one under a fixed target (the slag's own override, 11) or, in
+ * `salvage-under-attribute`, under the salvager's Intelligence score, which differs per actor.
+ */
+async function seedSalvageUnder(world, state) {
+  const under = (target) =>
+    normalizeCheckEvaluation({ product: 'sum', direction: 'under', ...(target && { target }) });
+  const manager = world.fabricate.craftingSystemManager;
+  const smithing = manager.getSystem('lab-smithing');
+  await manager.updateSystem(smithing.id, {
+    salvageCraftingCheck: {
+      ...smithing.salvageCraftingCheck,
+      enabled: true,
+      simple: { rollFormula: '1d20', dc: 12, thresholdMode: 'meet', evaluation: under() },
+    },
+  });
+  const runework = manager.getSystem('lab-runework');
+  const attribute = state === 'salvage-under-attribute';
+  await manager.updateSystem(runework.id, {
+    salvageCraftingCheck: {
+      ...runework.salvageCraftingCheck,
+      routed: {
+        ...runework.salvageCraftingCheck.routed,
+        rollFormula: '1d20',
+        evaluation: under(attribute && { source: 'attribute', expression: '@abilities.int.value' }),
+      },
+    },
   });
 }
 

@@ -86,6 +86,29 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
     ],
   }),
+  // The recipe detail behind that prompt: the bare roll, and no DC chip for a roll-under target.
+  playerCase({
+    id: 'player-crafting-check-under',
+    label: 'Player app — roll-under crafting check in the recipe detail',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', rollPromptState: 'under' },
+    steps: [
+      { selector: '.crafting-recipe-row[data-recipe-id="sm-r-horseshoe"]' },
+      { selector: '[data-recipe-section="check"]', scroll: true },
+    ],
+    expectSelector:
+      '[data-recipe-section="check"][data-check-usable="true"]' +
+      ':has([data-check-formula] code:text-is("1d20"))' +
+      ':not(:has([data-check-dc]))',
+    kinds: ['player', 'crafting'],
+    sourceMatches: [
+      CRAFTING_SHARED,
+      CRAFTING_SIMPLE,
+      /^src\/ui\/presenters\/CraftingListingBuilder\.js$/,
+      /^src\/ui\/svelte\/stores\/craftingStore/,
+    ],
+  }),
   playerCase({
     id: 'player-crafting-roll-prompt-light',
     label: 'Player app — light frame crafting roll prompt',

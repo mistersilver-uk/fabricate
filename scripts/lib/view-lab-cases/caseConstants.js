@@ -125,6 +125,9 @@ export const BULK_DEFAULTS = Object.freeze({
     /^src\/ui\/svelte\/stores\/playerResultOrder/,
     /^src\/ui\/svelte\/util\/salvageYieldRows\.js$/,
     /^src\/utils\/progressiveResultOrder\.js$/,
+    // What a bulk row needs, and the two consumers that read it.
+    /^src\/ui\/presenters\/(?:salvageCheckNeed|InventoryListingBuilder)\.js$/,
+    /^src\/systems\/BulkSalvageService\.js$/,
   ],
 });
 

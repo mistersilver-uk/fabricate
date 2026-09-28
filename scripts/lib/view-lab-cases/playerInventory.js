@@ -17,6 +17,27 @@ import {
   responsiveLayout,
 } from './caseFactories.js';
 
+/** The bulk roll prompt: Fabricate's own modal over the player window. */
+const BULK_PROMPT = '.fabricate-app .manager-modal[data-roll-prompt="bulk"]';
+/** The help line under the bonus field, then the batch list holding each `[name, need]` row. */
+const BULK_PROMPT_ROWS = (help, rows) =>
+  `${BULK_PROMPT}:has(.bonus-group > .help:text-is("${help}")) .bulk-list` +
+  rows
+    .map(
+      ([name, need]) =>
+        `:has(> .bulk-row > .bulk-name:text-is("${name}") + .bulk-need:text-is("${need}"))`
+    )
+    .join('');
+const UNDER_BONUS_HELP =
+  'A bonus raises the target. A rolled bonus such as 1d4 is rolled first, and its result is applied.';
+const OVER_BONUS_HELP =
+  'A bonus adds to the total. A rolled bonus such as 1d4 is rolled with the check.';
+const BULK_PROMPT_SOURCES = [
+  ...BULK_DEFAULTS.sourceMatches,
+  /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/,
+  /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/,
+];
+
 export const CASES = Object.freeze([
   playerCase({
     id: 'player-gathering-environments',
@@ -423,6 +444,42 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/,
       /^src\/ui\/svelte\/apps\/crafting\/rollPromptHost\.js$/,
     ],
+  }),
+  // A roll-under batch names each row's target, and the bonus help says a bonus raises it.
+  playerCase({
+    ...BULK_DEFAULTS,
+    id: 'player-inventory-bulk-roll-prompt-under',
+    label: 'Player app — Inventory bulk roll prompt, roll-under targets',
+    query: { tab: 'inventory', dialog: 'open', rollPromptState: 'salvage-under' },
+    steps: [
+      ...chooseSelectOption('.inventory-grid-pagination [data-pagination-size]', '75'),
+      SHIFT_CLICK('lab-smithing:sm-air-shard'),
+      SHIFT_CLICK('lab-runework:rw-slag'),
+      { selector: '[data-inventory-bulk-salvage]' },
+    ],
+    expectSelector: BULK_PROMPT_ROWS(UNDER_BONUS_HELP, [
+      ['Air Shard', 'Target 12'],
+      ['Ruined Slag', 'Target 11'],
+    ]),
+    sourceMatches: BULK_PROMPT_SOURCES,
+  }),
+  // A character-value row has no single target, so the mixed batch keeps the roll-over help.
+  playerCase({
+    ...BULK_DEFAULTS,
+    id: 'player-inventory-bulk-roll-prompt-under-attribute',
+    label: 'Player app — Inventory bulk roll prompt, a roll-under row with no single target',
+    query: { tab: 'inventory', dialog: 'open', rollPromptState: 'salvage-under-attribute' },
+    steps: [
+      ...chooseSelectOption('.inventory-grid-pagination [data-pagination-size]', '75'),
+      SHIFT_CLICK('lab-smithing:sm-air-shard'),
+      SHIFT_CLICK('lab-runework:rw-slag'),
+      { selector: '[data-inventory-bulk-salvage]' },
+    ],
+    expectSelector: BULK_PROMPT_ROWS(OVER_BONUS_HELP, [
+      ['Air Shard', 'Target 12'],
+      ['Ruined Slag', 'No single target'],
+    ]),
+    sourceMatches: BULK_PROMPT_SOURCES,
   }),
   playerCase({
     ...BULK_DEFAULTS,

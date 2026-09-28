@@ -19,6 +19,8 @@ player-inventory-bulk-all-modes
 player-inventory-bulk-complications-reordered
 player-inventory-bulk-tools-blocked
 player-inventory-bulk-roll-prompt
+player-inventory-bulk-roll-prompt-under
+player-inventory-bulk-roll-prompt-under-attribute
 player-inventory-bulk-destroy-confirm
 player-inventory-bulk-broken-queued
 player-inventory-bulk-report
