@@ -11,6 +11,7 @@ import {
   LAB_SYSTEM_IDS,
   seedJournalNoCheckFixture,
 } from './labContent.js';
+import { seedCheckPreviewState } from './labCheckPreviews.js';
 import { seedLabInteractables } from './labInteractables.js';
 import { stockJournalPrototype } from './labJournalPrototype.js';
 import { installUpdateSemantics, makeGetFlag } from './labFlags.js';
@@ -342,6 +343,7 @@ export async function buildLabWorld({
   gatheringTaskMode = null,
   checkOverride = null,
   journalCaseState = null,
+  checkPreviewState = null,
 } = {}) {
   const content = buildLabContent({ journalCaseState });
   if (
@@ -356,6 +358,7 @@ export async function buildLabWorld({
   // A real Manager refresh resolves an empty selection to the first available crafting system.
   if (clearSystem) content.systems = [];
   const actors = buildLabActors(content);
+  seedCheckPreviewState(content, actors, checkPreviewState);
   const documents = buildDocumentIndex(content, actors);
   const shippedLocalize = await createLocalizer();
   const localize = (key) =>

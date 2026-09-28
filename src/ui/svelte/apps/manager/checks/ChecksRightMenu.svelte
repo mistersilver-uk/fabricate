@@ -27,6 +27,8 @@
   import StatusToggle from '../../../components/StatusToggle.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import { NO_ACTOR_ID } from './checkPreview.js';
+  import { countDigestFormula } from './countPreviewModel.js';
+  import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
   import { previewRecordSelectOptions } from './checksSelectOptions.js';
   import {
     formatPreviewDifficulties,
@@ -143,12 +145,17 @@
     return list.filter((outcome) => outcome?.success === true).length;
   });
 
-  const hasFormula = $derived(Boolean(activeCheck?.rollFormula));
-  const formulaFact = $derived(
-    hasFormula
-      ? `${text('FABRICATE.Admin.Manager.Checks.Digest.Formula', 'Formula')} · ${activeCheck.rollFormula}`
-      : text('FABRICATE.Admin.Manager.Checks.Digest.NoFormula', 'No roll formula yet')
+  // A count check rolls its pool, so its retained formula is inert here too.
+  const countFormula = $derived(
+    countDigestFormula(activeCheck, normalizeCheckEvaluation(activeCheck?.evaluation), text)
   );
+  const hasFormula = $derived(Boolean(countFormula || activeCheck?.rollFormula));
+  const formulaFact = $derived.by(() => {
+    if (countFormula) return countFormula;
+    return hasFormula
+      ? `${text('FABRICATE.Admin.Manager.Checks.Digest.Formula', 'Formula')} · ${activeCheck.rollFormula}`
+      : text('FABRICATE.Admin.Manager.Checks.Digest.NoFormula', 'No roll formula yet');
+  });
 
   // The odds heading's adjunct names the DOMAIN the enumerator walks, so it is DERIVED. IT IS
   // THE ENUMERATOR'S OWN NUMBER WHERE THERE IS ONE: the regex below reads the AUTHORED
@@ -158,6 +165,7 @@
   const oddsDomain = $derived.by(() => {
     if (odds) {
       if (odds.enumerable !== true) return '';
+      if (odds.product === 'count') return odds.domain;
       // A roll-under or character-value check names its formula, as the prototype does.
       if (odds.caption) return odds.caption;
       // TWO SENTENCES, two different facts: one die has FACES, a formula carrying a rolling
@@ -497,7 +505,11 @@
           text('FABRICATE.Admin.Manager.Checks.Odds.Title', 'Chance per outcome')
         )}
         {#if oddsDomain}
-          <span class="manager-checks-rail-head-note" data-checks-odds-domain>{oddsDomain}</span>
+          <span
+            class="manager-checks-rail-head-note"
+            data-checks-odds-domain
+            data-checks-odds-expected={odds?.expected}>{oddsDomain}</span
+          >
         {/if}
       </div>
       <InspectorCard data-checks-odds="">
