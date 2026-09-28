@@ -1622,6 +1622,22 @@ describe('craftingStore check evidence (issue 2005)', () => {
     assert.deepEqual(calls.notify, ['The check cannot roll.'], 'the refusal is what is shown');
   });
 
+  it('clears the last result for a misconfigured check too (QE8 R5)', async () => {
+    const replies = [
+      { success: true, results: [], check: { evidence: { total: 9, target: 14 } } },
+      { success: false, misconfigured: true, message: 'The check is misconfigured.' },
+    ];
+    const { services, calls } = makeServices({ craftRecipe: async () => replies.shift() });
+    const store = createCraftingStore({ services });
+    await store.craft({ id: 'r1' });
+    flushSync();
+    assert.ok(Boolean(store.lastRollResult.r1), 'positive control: the first craft recorded a result');
+    await store.craft({ id: 'r1' });
+    flushSync();
+    assert.ok(!Object.hasOwn(store.lastRollResult, 'r1'), 'no stale roll beside a misconfiguration');
+    assert.deepEqual(calls.notify, ['The check is misconfigured.']);
+  });
+
   it('keeps the last result through an unrelated refusal', async () => {
     const replies = [
       { success: true, results: [] },

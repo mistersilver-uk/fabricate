@@ -1182,3 +1182,17 @@ test('a label naming a placeholder is stated literally, never substituted (QE6)'
   );
   assert.equal(evidenceRowsOf(html)[1][2], 'Lucky {total} 1d4 rolled 3, raising the target');
 });
+
+test('an evidence label reaches a public card escaped, never as markup (QE2)', () => {
+  const data = {
+    ...UNDER_DATA,
+    preRolls: [{ ...UNDER_DATA.preRolls[0], label: '<img src=x onerror=alert(1)>&' }],
+  };
+  const html = buildCraftingChatContent(
+    successModel({ check: executedCheck(data) }),
+    shippedKeyLocalize
+  );
+  const evidence = html.slice(html.indexOf('<dl'), html.indexOf('</dl>'));
+  assert.ok(evidence.includes('&lt;img src=x onerror=alert(1)&gt;&amp;'));
+  assert.doesNotMatch(evidence, /<img/);
+});

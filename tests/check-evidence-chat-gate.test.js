@@ -9,6 +9,8 @@ import assert from 'node:assert/strict';
 import { shippedLocalize } from './helpers/checkEvidenceFixtures.js';
 import { craftProbe, probeResolutionService, salvageProbe } from './helpers/craftPipelineProbe.js';
 import { stubPromptSurface } from './helpers/rollPromptDialogStub.js';
+import { stubRoll } from './helpers/routedCheckEngine.js';
+import { salvageRunProbe } from './helpers/salvagePipelineProbe.js';
 
 const ROLL_MODES = ['publicroll', 'gmroll', 'blindroll', 'selfroll'];
 const HOSTILE_LABEL = '[[1d20]] @abilities.str.value';
@@ -194,3 +196,32 @@ for (const version of [13, 14]) {
     });
   }
 }
+
+test('a failed bulk subject states its own evidence rows on the aggregate card (QE8 G8)', async () => {
+  const world = salvageRunProbe({
+    salvageCraftingCheck: {
+      simple: {
+        rollFormula: '1d20',
+        dc: 10,
+        thresholdMode: 'meet',
+        evaluation: { product: 'sum', direction: 'under' },
+      },
+    },
+    targets: [
+      {
+        id: 'ore',
+        name: 'Iron Ore',
+        quantity: 3,
+        ingredientQuantity: 1,
+        resultGroups: [{ id: 'sg-1', results: [{ id: 'sr-1', componentId: 'shard', quantity: 2 }] }],
+      },
+    ],
+    awards: [{ id: 'shard', name: 'Shard' }],
+  });
+  stubRoll(17, [{ number: 1, faces: 20, total: 17 }]);
+  await world.bulkSalvage(['ore']);
+  delete globalThis.Roll;
+  const [, { text }] = world.journal.entries.find(([name]) => name === 'chat.bulk');
+  assert.match(text, /BulkSalvageOutcomeFailed/, 'positive control: the 17 fails a target of 10');
+  assert.match(text, /Evidence\.Target .*Evidence\.Margin/, 'the failure publishes its check');
+});

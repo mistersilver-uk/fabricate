@@ -2262,6 +2262,14 @@ test('the versioned crafting descriptor refuses its target before the Tool roll 
     assert.deepEqual({ dc, target, targetSource }, { dc: null, target: 16, targetSource: 'attribute' });
     assert.equal(privateEvaluation.flavor, 'Sun Tea — Crafting check', 'no DC names a character value');
     assert.deepEqual([publicPrompt.target, publicPrompt.direction], [16, 'over']);
+    assert.equal(publicPrompt.targetSource, 'attribute', 'the prompt names a target, not a DC (QE4)');
+    const surface = stubPromptSurface(() => null);
+    try {
+      await promptJournalStageCheck(publicPrompt);
+    } finally {
+      surface.restore();
+    }
+    assert.equal(surface.view.chipText, 'Target 16 · meet or beat');
     assert.equal(JSON.stringify(publicPrompt).includes('@skill'), false, 'the expression stays private');
   } finally {
     restore();
