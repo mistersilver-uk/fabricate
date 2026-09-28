@@ -37,6 +37,28 @@ const BENEFIT_GROUPS = Object.freeze([
   ['situational', ['situational']],
 ]);
 
+/** A typed `@path`'s inner dots, each followed by a word character. */
+const PATH_DOT = /@[\w.]+/g;
+
+/**
+ * `text` split after each inner dot of every `@path`, so a path too wide for its column breaks at
+ * `@skills.smith.` / `level` rather than mid-word (maintainer ruling); joined, the pieces are `text`.
+ */
+export function pathBreakSegments(text) {
+  const value = String(text ?? '');
+  const segments = [];
+  let cursor = 0;
+  for (const { 0: path, index } of value.matchAll(PATH_DOT)) {
+    for (const dot of path.matchAll(/\.(?=\w)/g)) {
+      const end = index + dot.index + 1;
+      segments.push(value.slice(cursor, end));
+      cursor = end;
+    }
+  }
+  segments.push(value.slice(cursor));
+  return segments;
+}
+
 /** Whether a projection's surfaces gain evidence rows: a summed check that rolled for a target. */
 export function statesEvidence(display) {
   const evidence = display?.evidence;

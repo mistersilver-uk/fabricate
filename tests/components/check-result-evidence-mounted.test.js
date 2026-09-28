@@ -84,6 +84,17 @@ describe('RollResultBox evidence rows', () => {
     ]);
   });
 
+  it('offers a break only after each @path dot, with the text unchanged (item 7 ruling)', async () => {
+    const root = await harness.mount({ result: result(executedCheck()) });
+    const value = root.querySelector('[data-check-evidence="target"] .journal-fact-value');
+    assert.equal(value.textContent, UNDER_ROWS[0][2], 'copy and read-out carry no stray characters');
+    const html = value.innerHTML.replaceAll('<!---->', '');
+    assert.equal((html.match(/<wbr>/g) ?? []).length, 2, 'two dots in the path, two breaks');
+    assert.ok(html.includes('@skills.<wbr>smith.<wbr>level 12'), 'each directly after a path dot');
+    const margin = root.querySelector('[data-check-evidence="margin"] .journal-fact-value');
+    assert.ok(!margin.innerHTML.includes('<wbr'), 'a value without a path has none');
+  });
+
   it('reads only the executed record, never what changed after it (Q9)', async () => {
     const data = structuredClone(UNDER_DATA);
     const check = executedCheck(data);

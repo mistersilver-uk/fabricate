@@ -6,7 +6,8 @@
   code under the SonarCloud duplication budget). A `danger` flag tints the value
   with the danger token (used for a step's failure copy). A `null` icon draws none, and
   `keyed` sets the label as a key column (`--journal-fact-key-width`, default 120px)
-  beside a left-aligned, wrapping 13px value: recorded check evidence (issue 2005).
+  beside a left-aligned, wrapping 13px value: recorded check evidence (issue 2005). An array
+  `value` renders its segments with a `<wbr>` break opportunity between them.
 -->
 <script>
   let {
@@ -28,7 +29,10 @@
 >
   {#if icon}<i class={`fas ${icon} journal-fact-icon`} aria-hidden="true"></i>{/if}
   <span class="journal-fact-label">{label}</span>
-  <span class="journal-fact-value">{value}</span>
+  <span class="journal-fact-value"
+    >{#if Array.isArray(value)}{#each value as segment, index (index)}{#if index > 0}<wbr
+          />{/if}{segment}{/each}{:else}{value}{/if}</span
+  >
 </div>
 
 <style>

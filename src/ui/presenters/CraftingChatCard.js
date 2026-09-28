@@ -21,7 +21,7 @@
 
 import { checkDiceLine } from './checkDiceLine.js';
 import { isPublicCheckDisplay } from './checkDisplay.js';
-import { checkEvidenceRows } from './checkEvidenceRows.js';
+import { checkEvidenceRows, pathBreakSegments } from './checkEvidenceRows.js';
 
 const ITEM_FALLBACK_IMG = 'icons/svg/item-bag.svg';
 
@@ -185,6 +185,11 @@ export function inertText(value) {
     .replaceAll('@', '@\u{2060}');
 }
 
+/** Evidence text with a zero-width space after each inner `@path` dot, its only break points. */
+function withPathBreaks(text) {
+  return pathBreakSegments(text).join('\u{200B}');
+}
+
 /**
  * The executed check's Target, Pre-rolled and Margin rows (issue 2005), or '' for a check that is
  * not public and non-secret, a sum/over/fixed check or no check. Text only: never a Roll or a flag.
@@ -198,7 +203,7 @@ export function renderCheckEvidenceRows(check, localize = (key) => key) {
       ({ id, label, text }) =>
         `<div class="fabricate-craft-chat__evidence-row" data-check-evidence="${id}">` +
         `<dt class="fabricate-craft-chat__evidence-label">${inertText(label)}</dt>` +
-        `<dd class="fabricate-craft-chat__evidence-value">${inertText(text)}</dd></div>`
+        `<dd class="fabricate-craft-chat__evidence-value">${inertText(withPathBreaks(text))}</dd></div>`
     ),
     '</dl>',
   ].join('');
@@ -219,7 +224,7 @@ function renderCheckHead(model, keys, loc) {
     `${esc(loc(succeeded ? keys.checkSuccess : keys.checkFailure))}</div>`;
   const diceLine = isPublicCheckDisplay(model.check) ? checkDiceLine(model.check, loc) : '';
   return diceLine
-    ? `${pill}<div class="fabricate-craft-chat__dice">${inertText(diceLine)}</div>`
+    ? `${pill}<div class="fabricate-craft-chat__dice">${inertText(withPathBreaks(diceLine))}</div>`
     : `${pill}${total}`;
 }
 

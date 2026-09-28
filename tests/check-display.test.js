@@ -10,6 +10,7 @@ import {
   isPublicCheckDisplay,
   sanitizeTargetTerms,
 } from '../src/ui/presenters/checkDisplay.js';
+import { pathBreakSegments } from '../src/ui/presenters/checkEvidenceRows.js';
 
 const PRIVATE = /SECRET_PATH|SECRET_LABEL|SECRET_POLICY|@skills/;
 
@@ -235,4 +236,17 @@ test('executedCheckEvidence drops a non-string or blank typed formula (QE r3 6)'
     assert.equal(evidence.formula, '1d20', 'positive control: the resolved formula is kept');
     assert.ok(!Object.hasOwn(evidence, 'rollFormula'), JSON.stringify(rollFormula));
   }
+});
+
+test('pathBreakSegments splits only after an @path inner dot (item 7 ruling)', () => {
+  const text = '15 · Sera Vane @skills.smith.level 12, Hard Work −2, modifiers 1.5. Done.';
+  const segments = pathBreakSegments(text);
+  assert.deepEqual(segments, [
+    '15 · Sera Vane @skills.',
+    'smith.',
+    'level 12, Hard Work −2, modifiers 1.5. Done.',
+  ]);
+  assert.equal(segments.join(''), text, 'joined, the pieces are the text');
+  assert.deepEqual(pathBreakSegments('ends at @path.'), ['ends at @path.'], 'no break after a final dot');
+  assert.deepEqual(pathBreakSegments(''), ['']);
 });

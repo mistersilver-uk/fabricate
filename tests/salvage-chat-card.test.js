@@ -179,7 +179,7 @@ test('a salvage card states public roll-under evidence and nothing for a private
   const shown = buildSalvageChatContent(
     successModel({ check: executedCheck() }),
     shippedLocalize
-  ).replaceAll('\u2060', '');
+  ).replaceAll(/[\u2060\u200B]/g, '');
   assert.ok(shown.includes('<dl class="fabricate-craft-chat__evidence">'));
   for (const [, label, text] of UNDER_ROWS) {
     assert.ok(shown.includes(label) && shown.includes(text), text);

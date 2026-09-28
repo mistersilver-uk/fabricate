@@ -992,7 +992,7 @@ function evidenceRowsOf(html) {
     ...html.matchAll(
       /data-check-evidence="(\w+)"><dt[^>]*>([^<]*)<\/dt><dd[^>]*>([^<]*)<\/dd>/g
     ),
-  ].map(([, id, label, text]) => [id, label.replaceAll('⁠', ''), text.replaceAll('⁠', '')]);
+  ].map(([, id, label, text]) => [id, label.replaceAll(/[\u2060\u200B]/g, ''), text.replaceAll(/[\u2060\u200B]/g, '')]);
 }
 
 test('a public sum/under card states the executed Target, Pre-rolled and Margin rows', () => {
@@ -1160,7 +1160,7 @@ test('labels carrying [[ or @ reach the card with neither enrichment pattern lef
   };
   const html = buildCraftingChatContent(successModel({ check: executedCheck(data) }), shippedKeyLocalize);
   const evidence = html.slice(html.indexOf('<dl'), html.indexOf('</dl>'));
-  assert.ok(evidence.includes('abilities.str.value'), 'the label is still stated');
+  assert.ok(evidence.replaceAll('\u200B', '').includes('abilities.str.value'), 'the label is still stated');
   // Foundry's inline-roll opener and its `@path` / `@Type[` reference forms.
   assert.doesNotMatch(evidence, /\[\[/);
   assert.doesNotMatch(evidence, /@\w/);
@@ -1195,4 +1195,16 @@ test('an evidence label reaches a public card escaped, never as markup (QE2)', (
   const evidence = html.slice(html.indexOf('<dl'), html.indexOf('</dl>'));
   assert.ok(evidence.includes('&lt;img src=x onerror=alert(1)&gt;&amp;'));
   assert.doesNotMatch(evidence, /<img/);
+});
+
+test('an evidence @path breaks only after its inner dots, and its @ stays inert (item 7 ruling)', () => {
+  const html = buildCraftingChatContent(
+    successModel({ rollValue: 9, check: executedCheck() }),
+    shippedKeyLocalize
+  );
+  const target = html.slice(html.indexOf('data-check-evidence="target"'), html.indexOf('</dd>'));
+  assert.ok(target.includes('@\u2060skills.\u200Bsmith.\u200Blevel 12'), 'a break after each path dot');
+  assert.equal((target.match(/\u200B/g) ?? []).length, 2, 'and nowhere else');
+  assert.doesNotMatch(target, /@\w/, 'the @ is still neutralized');
+  assert.equal(evidenceRowsOf(html)[0][2], UNDER_ROWS[0][2], 'the text reads unchanged');
 });

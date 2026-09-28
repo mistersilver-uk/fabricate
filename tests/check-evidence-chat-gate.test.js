@@ -117,7 +117,7 @@ for (const version of [13, 14]) {
         // 12 − 2, raised by the rolled 1d4 of 3, against the 3d6 of 9.
         assert.ok(
           content
-            .replaceAll('\u2060', '')
+            .replaceAll(/[\u2060\u200B]/g, '')
             .includes('13 · Salvager @skills.craft.value 12, difficulty −2, modifiers +3')
         );
         assert.ok(content.includes('+4 under the target'));
@@ -131,7 +131,10 @@ for (const version of [13, 14]) {
 test('a hostile label posts with no inline-roll opener and no @ reference left to enrich', async () => {
   const { cards } = await salvageAs(14, 'publicroll');
   const content = String(cards[0].content);
-  assert.ok(content.includes('abilities.str.value'), 'positive control: the label was posted');
+  assert.ok(
+    content.replaceAll('\u200B', '').includes('abilities.str.value'),
+    'positive control: the label was posted'
+  );
   assert.doesNotMatch(content, /\[\[/);
   assert.doesNotMatch(content, /@\w/);
 });
@@ -172,7 +175,7 @@ async function craftAs(version, rollMode) {
 }
 
 /** The card with its invisible enrichment joiners removed. */
-const readable = (card) => String(card.content).replaceAll('\u2060', '');
+const readable = (card) => String(card.content).replaceAll(/[\u2060\u200B]/g, '');
 
 for (const version of [13, 14]) {
   test(`V${version}: a public craft card states the pill, dice line and ruled rows (QE3)`, async () => {

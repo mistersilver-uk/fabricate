@@ -9,7 +9,10 @@
   | `check` | an `executedCheckDisplay` projection, or `null` | `null` | Renders nothing for a secret or blind roll, a check with no target, or no check. |
 -->
 <script>
-  import { checkEvidenceRows } from '../../../../presenters/checkEvidenceRows.js';
+  import {
+    checkEvidenceRows,
+    pathBreakSegments,
+  } from '../../../../presenters/checkEvidenceRows.js';
   import { localize } from '../../../util/foundryBridge.js';
   import JournalFactRow from '../../journal/JournalFactRow.svelte';
 
@@ -26,7 +29,7 @@
   <div class="check-evidence" data-check-evidence-rows>
     {#each rows as row (row.id)}
       <div class="check-evidence-row" data-check-evidence={row.id}>
-        <JournalFactRow icon={null} keyed label={row.label} value={row.text} />
+        <JournalFactRow icon={null} keyed label={row.label} value={pathBreakSegments(row.text)} />
       </div>
     {/each}
   </div>
