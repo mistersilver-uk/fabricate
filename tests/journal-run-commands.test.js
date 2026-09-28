@@ -2080,6 +2080,7 @@ describe('journal run command protocol', () => {
     entitled = null,
     data = { ...UNDER_DATA, targetTerms: [{ kind: 'anchor', value: 14, path: '@x' }] },
     success = true,
+    handoff = false,
   } = {}) => {
     const run = { id: 'run-1', lifecycleVersion: 1, runRevision: 3, status: 'waiting' };
     const { service } = commandHarness({
@@ -2103,9 +2104,15 @@ describe('journal run command protocol', () => {
             secret,
             data,
             visibility: { rollMode, secret },
+            ...(handoff && { rollHandoff: { serializedRoll: { formula: '3d6', total: 9 } } }),
           }),
           execute: async () => ({ success: true, runId: run.id, runRevision: 4 }),
-          ...(entitled !== null && { authorizeRollHandoff: async () => entitled }),
+          ...(entitled !== null && {
+            authorizeRollHandoff: async () => {
+              if (entitled === 'throws') throw new Error('lookup failed');
+              return entitled;
+            },
+          }),
         },
       },
     });
@@ -2151,6 +2158,15 @@ describe('journal run command protocol', () => {
     assert.equal((await evidenceReply({ entitled: true })).check.evidence.target, 14);
     const failedRoll = await evidenceReply({ entitled: true, success: false });
     assert.equal(failedRoll.check.evidence.target, 14, 'a resolved failure shows its rows too');
+  });
+
+  it('fails closed when the entitlement lookup throws: no evidence and no handoff (QE r3 2)', async () => {
+    const entitledReply = await evidenceReply({ entitled: true, handoff: true });
+    assert.ok(Object.hasOwn(entitledReply, 'check'), 'positive control: evidence when entitled');
+    assert.ok(Object.hasOwn(entitledReply, 'rollHandoff'), 'positive control: and the handoff');
+    const errored = await evidenceReply({ entitled: 'throws', handoff: true });
+    assert.equal(errored.success, true);
+    assert.ok(!Object.hasOwn(errored, 'check') && !Object.hasOwn(errored, 'rollHandoff'));
   });
 
   it('never lets a seeded private marker reach an unentitled reply (G1)', async () => {

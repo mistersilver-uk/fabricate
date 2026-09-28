@@ -1,5 +1,5 @@
 /** Issue 2005 — the check display projection is an allowlist of plain, frozen, executed data. */
-import { describe, it } from 'node:test';
+import test, { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
@@ -227,4 +227,12 @@ describe('executedCheckEvidence (maintainer rulings, #2088 r1)', () => {
     const legacy = executedCheckEvidence(EXECUTED);
     assert.ok(!Object.hasOwn(legacy, 'formula') && !Object.hasOwn(legacy, 'dice'));
   });
+});
+
+test('executedCheckEvidence drops a non-string or blank typed formula (QE r3 6)', () => {
+  for (const rollFormula of [{ x: 1 }, 7, '  ']) {
+    const evidence = executedCheckEvidence({ ...EXECUTED, resolvedFormula: '1d20', rollFormula });
+    assert.equal(evidence.formula, '1d20', 'positive control: the resolved formula is kept');
+    assert.ok(!Object.hasOwn(evidence, 'rollFormula'), JSON.stringify(rollFormula));
+  }
 });

@@ -125,3 +125,30 @@ test('a character value is labelled with its typed path, matched by position (G7
   const { rollFormula: _typed, formula: _authored, ...legacy } = typed('1d20 + 3', '1d20 + @x');
   assert.equal(line(legacy), '1d20 (14) + 3 = 24', 'a record without its typed formula stays bare');
 });
+
+test('a path whose operand resolved to a flavoured total gets no path label (QE r3 4)', () => {
+  assert.equal(
+    line({
+      ...summed('over', '1d20 + 7[Modifiers]', [{ group: '1d20', results: [14] }], 20),
+      rollFormula: '1d20 + @prof',
+    }),
+    '1d20 (14) + 7 modifiers = 20'
+  );
+});
+
+test('a die named inside a flavour does not take the next term`s faces (QE r3 5)', () => {
+  assert.equal(
+    line(
+      summed(
+        'over',
+        '1d20[Smithing 1d4 bonus] + 1d6',
+        [
+          { group: '1d20', results: [14] },
+          { group: '1d6', results: [5] },
+        ],
+        20
+      )
+    ),
+    '1d20 (14) Smithing 1d4 bonus + 1d6 (5) = 20'
+  );
+});
