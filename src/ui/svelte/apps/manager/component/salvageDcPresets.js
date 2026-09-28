@@ -10,13 +10,17 @@
  *  3. `_normalizeSimpleTier` permits `name: ''` and coerces a non-finite `dc` to `0`, which would
  *     render an unlabelled "— DC 0". Such tiers are not authored presets, so they are skipped.
  *  4. Duplicate-DC tiers make "match by DC" ambiguous; the FIRST match wins, and the ambiguity is
- *     immaterial because the stored value is the DC rather than the tier id.
+ *     immaterial because the stored value is the DC rather than the tier id. The option list
+ *     keeps only that first tier, so every option value is unique.
  *  5. Tiers hang off `salvageCraftingCheck.simple.tiers` in EVERY resolution mode, routed included.
  *
  * Under a character-value target the same tiers supply ADJUSTMENTS instead: the control edits
  * `adjustmentOverride`, lists only named tiers whose adjustment is valid for the kind, and matches
  * by adjustment (`adj:<n>`). Every function below takes that `evaluation` and defaults to fixed.
  */
+
+import { isValidTargetAdjustment } from '../../../../../systems/checkTarget.js';
+import { numberOrNull } from '../../../../../utils/scalars.js';
 
 export const SALVAGE_DC_SYSTEM_DEFAULT = 'system';
 export const SALVAGE_DC_CUSTOM = 'custom';
@@ -39,9 +43,18 @@ export function salvageOverrideField(evaluation) {
 
 /** An added adjustment is any finite number; a multiplier must also be above zero. */
 function usableAdjustment(kind, value) {
-  if ([null, undefined, ''].includes(value)) return false;
-  const number = Number(value);
-  return Number.isFinite(number) && (kind !== 'multiply' || number > 0);
+  const number = numberOrNull(value);
+  return number !== null && isValidTargetAdjustment(kind, number);
+}
+
+/** Case 4: the first option per value, as {@link resolveSalvageDcSelection} matches the first. */
+function firstPerValue(options) {
+  const seen = new Set();
+  return options.filter(({ value }) => {
+    if (seen.has(value)) return false;
+    seen.add(value);
+    return true;
+  });
 }
 
 /** Named tiers whose `adjustment` is valid for `kind`; the attribute counterpart of case 3. */
@@ -116,10 +129,12 @@ export function buildSalvageDcOptions({
   if (readsAdjustment(evaluation)) {
     return [
       { value: SALVAGE_DC_SYSTEM_DEFAULT, label: adjustmentDefaultLabel() },
-      ...usableSalvageAdjustmentTiers(tiers, adjustmentKind(evaluation)).map((tier) => ({
-        value: `adj:${Number(tier.adjustment)}`,
-        label: adjustmentTierLabel(String(tier.name).trim(), Number(tier.adjustment)),
-      })),
+      ...firstPerValue(
+        usableSalvageAdjustmentTiers(tiers, adjustmentKind(evaluation)).map((tier) => ({
+          value: `adj:${Number(tier.adjustment)}`,
+          label: adjustmentTierLabel(String(tier.name).trim(), Number(tier.adjustment)),
+        }))
+      ),
       { value: SALVAGE_DC_CUSTOM, label: customLabel() },
     ];
   }
@@ -138,7 +153,7 @@ export function buildSalvageDcOptions({
   }
 
   options.push({ value: SALVAGE_DC_CUSTOM, label: customLabel() });
-  return options;
+  return firstPerValue(options);
 }
 
 /**

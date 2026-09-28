@@ -81,6 +81,20 @@ describe('salvage DC presets (issue 676, decision 7)', () => {
     assert.equal(salvageDcOverrideForSelection('dc:12', null), 12);
   });
 
+  it('case 4: lists one option per DC or adjustment, keeping the first tier, so ids stay unique', () => {
+    const duplicates = [
+      { id: 't1', name: 'Standard', dc: 12, adjustment: -2 },
+      { id: 't2', name: 'Also Standard', dc: 12, adjustment: -2 },
+      { id: 't3', name: 'Hard', dc: 16, adjustment: -4 },
+    ];
+    const fixed = buildSalvageDcOptions({ tiers: duplicates });
+    assert.deepEqual(values(fixed), ['system', 'dc:12', 'dc:16', 'custom']);
+    assert.equal(fixed[1].label, 'Standard — DC 12', 'the first tier names the option');
+    const adjusted = buildSalvageDcOptions({ tiers: duplicates, evaluation: attribute() });
+    assert.deepEqual(values(adjusted), ['system', 'adj:-2', 'adj:-4', 'custom']);
+    assert.equal(adjusted[1].label, 'Standard — -2');
+  });
+
   it('an override matching no tier selects Custom… and is never snapped to a tier', () => {
     assert.equal(resolveSalvageDcSelection(14, TIERS), SALVAGE_DC_CUSTOM);
     assert.equal(resolveSalvageDcSelection(99, TIERS), SALVAGE_DC_CUSTOM);
