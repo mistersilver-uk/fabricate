@@ -122,6 +122,10 @@ and the browse half is the one that scales with the corpus.
   A dismissed interactive prompt returns `{ success: false, cancelled: true, results: null }`
   with zero mutation, and any phantom run created by that call is discarded — the same
   interactive/cancelled contract as salvage (see the path-agnostic §Interactive Roll Prompt).
+- A misconfigured required check returns `{ success: false, results: null, message, misconfigured: true }`,
+  the discriminator salvage carries, and a check target refusal adds `data.targetRefusal`
+  naming its reason (`resolution-modes/spec.md` § Check Target Resolution); a timed FINISH
+  returns the same shape and leaves the run resumable.
 - A non-GM crafts directly against owned actors; there is no GM relay for player
   crafting.
 - Time-based countdowns are driven by world time only: a new `subscribeWorldTime`
@@ -145,6 +149,7 @@ Stated as its own section, a sibling of §Craft Execution, because the outcome s
   Treating `success` as "done" would show a success state for a run that gave the player nothing, and the flag exists so no caller has to re-derive that from `results == null` — which is also what a no-result success looks like.
   The flag is additive and `success` is unchanged, and it is present only when a salvage run manager is available to arm the time gate: a runless salvage carrying a `timeRequirement` never returns `waiting`.
 - A misconfigured required check (routed or progressive with no authored roll formula) returns `{ success: false, misconfigured: true }` with zero mutation and a GM-config message.
+  A check target refusal returns the same shape with `data.targetRefusal` naming its reason.
   Like a dismissed roll prompt, it **discards a run created by that call**, so a misconfigured abort never leaves a persisted `inProgress` salvage run; a reused pre-existing run is left untouched.
   The **salvage-configuration validation abort carries the same `misconfigured: true` discriminator**, and it is the branch that actually fires in a wired world: validation runs before the check does, so a GM-side config error (an unsupported salvage mode, a routed success tier routing nowhere, a `simple` mode with two success groups) never reaches the check's own misconfigured return.
   Without the flag there, a caller reads a broken config as a rolled failure and tells the player "nothing recovered" about a config only their GM can fix.
@@ -232,6 +237,7 @@ The roll mode is the shared `Select`, whose options are Fabricate's own labels o
 Advantage-eligible checks offer Disadvantage, Roll and Advantage in that order, each outer action naming what it keeps; other checks offer one Roll.
 Roll is the form's only submit button, so Enter from any field rolls normally and never with Advantage or Disadvantage.
 Displayed comparison and applied modifiers come from the actual normalized runner and the selected formula contributions, and existing result keys and advantage eligibility are unchanged.
+The posted roll's chat flavor, on the direct and versioned paths alike, carries the `(DC n)` suffix only for a summed roll-over check against a fixed DC; any other evaluation posts no DC in its flavor.
 Count and pool controls belong to their evaluation-mode requirements and do not appear as inactive controls in this summing baseline.
 
 - **The companion path opens the SAME dialog, on the EXECUTING GM's client.**
@@ -255,7 +261,7 @@ On a direct runner the formula line ends in a trailing `+ (modifier)[Modifiers]`
 A versioned Journal prompt shows its prepared formula without the slot or any flavour label, with the choice offered beneath it.
 On both paths the formula line omits the terms of the modifiers the prompt itemises as chips: the producer passes a display formula, the base with any Tool terms and the deferred slot, beside the rolled formula, which is unchanged.
 After confirmation, the selected legal modifiers and any valid situational bonus enter the shared placement plan; under the active sum/over evaluation they keep their existing appended formula order.
-When another evaluation becomes active, rolling contributions evaluate once outside the main check and share its chat visibility, while cancellation still creates no new modifier roll, check roll or message.
+Under any other evaluation, rolling contributions evaluate once outside the main check and share its chat visibility, while cancellation still creates no new modifier roll, check roll or message.
 - **Pre-resolved roll decisions.**
 A caller MAY supply a `rollDecision` (`{ bonus, rollMode, advantage }` — the prompt's own return shape minus `confirmed`).
 The evaluator then treats it as an already-answered choice and **never opens the modal**, running the identical downstream code: the check-modifier append, the advantage transform, the situational-bonus append, the formula-validity net and the effective roll mode.

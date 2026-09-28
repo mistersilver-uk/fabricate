@@ -642,7 +642,7 @@ GatheringTaskDefinition = {
   staminaCost?: number,
   gatheringModifier?: ModifierProvider,
   dcOverride: number | null,        // default null; per-task override of the system-level gatheringCraftingCheck default DC at gather time
-  adjustmentOverride: number | null, // default null; retained per-task adjustment for an attribute target
+  adjustmentOverride: number | null, // default null; per-task adjustment for an attribute target, else the evaluation's baseAdjustment
   successesOverride: number | null,  // default null; retained per-task required count, clamped 0–20
 }
 ```
@@ -726,7 +726,7 @@ The blocking `modifierRollExpression` readiness issue issue 1117 raised is RETIR
 The GM-facing section label on a Checks route is **"Check modifiers"** because what that route authors is a selection; the drop-row and event sections keep **"Character modifiers"** because what they author is a reference with its own arithmetic; and the one authoring surface is labelled simply **"Modifiers"**, because it is neither — it is the library both read.
 
 The check-modifier seam applies to task-owned formula modes (`routed` and legacy `progressive`).
-These formula checks use the shared modifier placement plan; their active sum/over evaluation still appends the selected library terms to the check roll.
+These formula checks use the shared modifier placement plan, placed by the check's own evaluation: sum/over still appends the selected library terms to the check roll, and sum/under moves the target instead.
 The separate drop-row and event chance references, the `d100` situational-bonus path, and gathering's absence of numeric Tool bonuses retain their own behavior.
 Both library normalizers preserve `GatheringTask.checkModifierIds`, `resolutionMode` and `resultGroups`, and `_libraryTaskToRuntimeTask` forwards them to the engine.
 An absent task mode defaults to `d100`; the economy's compatibility mode never overrides it.
@@ -1722,12 +1722,21 @@ The system routed gathering check
 (`system.gatheringCraftingCheck.routed.rollFormula`, with the routed check's
 threshold/outcome-tier configuration) drives resolution:
 
-1. Roll the routed `rollFormula` against the effective DC — the task's
-   `dcOverride` when finite, otherwise the routed check's own `dc` (default 15).
+1. Resolve the routed target through `GatheringEngine._resolveGatheringRoutedTarget`,
+   then roll the routed `rollFormula` against it in the check's direction (over or under).
+   A fixed target is the effective DC — the task's `dcOverride` when finite, otherwise the
+   routed check's own `dc` (default 15).
+   An attribute target reads the gathering actor's character value and applies the task's
+   non-null `adjustmentOverride`, else the evaluation's `target.baseAdjustment`, with no macro
+   (see `resolution-modes/spec.md` § Check Target Resolution).
+   A target refusal answers `misconfiguredOutcome` with code `CHECK_TARGET_INVALID` and the
+   check result's `data.targetRefusal`, before any roll, so it resolves nothing.
+   A fixed-range routed check reads no target, so its target source is inert.
 2. The roll yields a named outcome tier and a success disposition.
-   With **relative** outcome tiers, a total below every threshold clamps to the
-   lowest (closest) tier rather than yielding no tier name, so a `dcOverride` that
-   raises the difficulty never leaves a rolled task unrouted.
+   With **relative** outcome tiers, a total that meets no threshold routes to the
+   Otherwise tier of an attribute/multiply check, else clamps to the least demanding
+   tier rather than yielding no tier name, so a `dcOverride` that raises the difficulty
+   never leaves a rolled task unrouted.
    **Fixed** tiers keep the "outside every range → no tier name" behaviour.
 3. A trigger's `tierStep` effect may then move that rolled tier — routed gathering
    checks step exactly as crafting and salvage do, in both tier types (issue 975).
@@ -1866,6 +1875,8 @@ The check is formula-only — there is no provider discriminator and no macro su
 Value-only check results are neutral and remain eligible for progressive award evaluation.
 They do not force a terminal success or failure status.
 Diagnostics from the check evaluator (missing formula or a malformed numeric result) abort resolution as misconfiguration/evaluation errors; they do not create failed gathering history, failure feedback, tool usage, or result items.
+A summed roll-under progressive check refuses before any roll through the same diagnostic path, with `reasonCode` and diagnostic code `CHECK_TARGET_INVALID` and the check result's `data.targetRefusal` (`progressive-under`); a progressive target source is otherwise inert.
+The shared d100 drop roll is never graded by a check evaluation.
 
 ### Validation
 

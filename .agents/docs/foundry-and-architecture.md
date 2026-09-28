@@ -107,6 +107,22 @@ For BOTH compendium cases, read folder membership from `pack.index[].folder` —
 Do **NOT** use `Folder#getSubfolders` for a packed folder: it filters `game.folders` (world-only) and returns `[]` for an in-pack folder, silently dropping nested items; derive the in-pack subtree from the `pack.folders` parent links instead (`descendantFolderIdSet` in `src/ui/svelte/util/importFolderGroups.js`).
 A compendium-**directory** world folder (resolved `folder.documentType === 'Compendium'`) groups packs, not items, and has no item-level grouping — skip it with a notice.
 - Foundry `DiceTerm#total` is the post-modifier, active-only sum; `DiceTerm#number`/`#faces` may be undefined until evaluated — read `results[].result` for raw per-die logic.
+`DiceTerm#total` sums `result.count` when present (`DiceTerm#total` in `client/dice/terms/dice.mjs`, V13.351 and V14.367), so writing `count` makes the tooltip part total and `Roll#result` report that value; a defined `success` or `failure` on a result suppresses the `min`/`max` CSS classes (`DiceTerm#getResultCSS`).
+- **Foundry's explosion limit is a cap on total checked results, recursive `x` only; `xo` never trips it.**
+Core throws the fixed English string "Maximum recursion depth for exploding dice roll exceeded" once more than 1000 results are checked across all faces (`Die#explode` in `client/dice/terms/die.mjs`); `checked` counts the initial dice and every explosion together (V13.351 and V14.367).
+One-use `xo` exits at `checked === initial` and cannot hit the limit for 999 dice or fewer (the same method, identical in both versions).
+- **`Roll.replaceFormulaData` converts value types differently on V13.351 and V14.367.**
+Booleans write as `String(value)` (`"true"`/`"false"`) on V13 and `String(Number(value))` (`"1"`/`"0"`) on V14 (`Roll.replaceFormulaData` in `client/dice/roll.mjs`); both read as non-numeric and refuse as `invalid` when Fabricate's local reader encounters them.
+Arrays, Sets, Maps and plain objects write as `ᚖjsonᚖ` on both, accepted only as function-term arguments, never as numbers.
+V14 honours an overridden `toString()` on plain or null-prototype objects; V13 writes them as JSON regardless.
+Braces in `@{path}` form are V14-only — V13.351's pattern `/@([a-z.0-9_-]+)/gi` leaves them as literal text.
+- **Fabricate's `resolveDeterministicExpression` refuses an unresolved path instead of reading it as zero.**
+`Roll.parse` replaces unresolved references with `"0"` (`missing: "0"`, V13.351 and V14.367), so target and threshold resolution use Fabricate's own reader, which witnesses only the paths the code passes to it, never Foundry's silent substitution.
+- **`getProperty` tries the whole key first, then walks with property-in tests, stopping at falsy values and primitives.**
+The walk is identical in V13.351 and V14.367 (`getProperty` in `common/utils/helpers.mjs`): the whole key is tried first (`'skills.sur'` wins over the nested value `skills['sur']`); prototype getters resolve (a `DataModel`-like class with a getter works); inherited values resolve; array index and `.length` resolve; the walk stops at a falsy value (`0` is terminal, `@a.0` unresolved) and at a string (`@a.length` on a string unresolved); a trailing dot is unresolved; and hyphenated keys like `@x-1` read as-is, matching Foundry's own token pattern.
+- **`tooltip.hbs` renders `result` as raw HTML but escapes `classes`.**
+The template writes `{{{this.result}}}` (triple braces, unescaped) and `class="{{this.classes}}"` (double braces, escaped), so a span's role and aria-label survive unmodified, but CSS class names are safe from injection.
+An empty `data-tooltip` attribute falls back to `aria-label` in both versions (`TooltipManager` in `client/helpers/interaction/tooltip-manager.mjs`).
 - **A hand-rolled `@path` reference pattern narrower than core's own silently misses references core recognises, and a maximised-total helper does not need to neutralise paths itself before rolling.**
 `Roll.parse` already substitutes every roll-data reference it recognises with `0` (`missing: "0"`) before evaluating, and V14 recognises a braced `@{…}` form that a bare `@[-.\w]+` pattern misses.
 `ROLL_DATA_PATH` in `src/utils/rollFormulaRollability.js` matches core's own wider pattern (`/@\{[-.\w]+\}|@[-.\w]+/g`) for exactly this reason, and `maximisedTotal` rolls the formula verbatim rather than hand-neutralising it first (issue 1645).
