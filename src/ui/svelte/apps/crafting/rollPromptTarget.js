@@ -1,4 +1,5 @@
 /** The roll prompt's target chip text, and a summed roll-under target's explanation line. */
+import { formatCheckAdjustment } from '../manager/checks/checkAdjustmentLabel.js';
 
 // A function replacer, so a `$&` or `$1` in a user-authored name is inserted literally.
 export function fill(template, values) {
@@ -9,6 +10,8 @@ export function fill(template, values) {
 }
 
 const signed = (value) => (value < 0 ? String(value) : `+${value}`);
+/** The explanation line's signed step, with the true minus sign the check card and results use. */
+const signedStep = (value) => (value < 0 ? `−${-value}` : `+${value}`);
 
 /** A modifier's chip value: its prepared display, else its signed flat value. */
 export function modifierValue(modifier) {
@@ -52,12 +55,20 @@ function contributions(data, selectedIds, bonus) {
   return { modifiers: flatModifierTotal(applied), situational, pending };
 }
 
-function basisParts(basis, labels) {
-  const parts = [fill(labels.targetValueOf, { source: basis.expression, value: basis.value })];
+/** `{actor} {expression} {value}`: the typed formula, named for the character it read. */
+function basisParts(basis, labels, actorName) {
+  const fact = fill(labels.targetValueOf, {
+    actor: actorName,
+    source: basis.expression,
+    value: basis.value,
+  });
+  const parts = [fact.trim()];
   const adjustment = basis.adjustment;
   if (adjustment) {
     const value =
-      adjustment.kind === 'multiply' ? `×${adjustment.value}` : signed(adjustment.value);
+      adjustment.kind === 'multiply'
+        ? formatCheckAdjustment('multiply', adjustment.value)
+        : signedStep(adjustment.value);
     parts.push(
       adjustment.label
         ? fill(labels.targetAdjustment, { label: adjustment.label, value })
@@ -80,11 +91,13 @@ export function rollPromptTarget(data, selectedIds, bonus = '') {
   const tools = Number.isFinite(data.toolBonus) ? data.toolBonus : 0;
   const { modifiers, situational, pending } = contributions(data, selectedIds, bonus);
   const parts = data.targetBasis
-    ? basisParts(data.targetBasis, labels)
+    ? basisParts(data.targetBasis, labels, data.actorName ?? '')
     : [fill(labels.targetBase, { value: data.dc })];
-  if (tools) parts.push(fill(labels.targetTools, { value: signed(tools) }));
-  if (modifiers) parts.push(fill(labels.targetModifiers, { value: signed(modifiers) }));
-  if (situational) parts.push(fill(labels.targetSituational, { value: signed(situational) }));
+  if (tools) parts.push(fill(labels.targetTools, { value: signedStep(tools) }));
+  if (modifiers) parts.push(fill(labels.targetModifiers, { value: signedStep(modifiers) }));
+  if (situational) {
+    parts.push(fill(labels.targetSituational, { value: signedStep(situational) }));
+  }
   const settled = fill(labels.targetValue, { target: data.dc + tools + modifiers + situational });
   const target =
     pending.length > 0

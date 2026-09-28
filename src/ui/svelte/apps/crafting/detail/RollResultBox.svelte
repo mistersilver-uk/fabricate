@@ -136,6 +136,12 @@
     color: var(--fab-text-muted);
   }
 
+  /* The outcome sentence is set as frame 38's player result box sets it. */
+  .crafting-roll-summary {
+    font-size: 11px;
+    line-height: 1.5;
+  }
+
   .crafting-roll-awards {
     margin: 0;
     padding: 0;

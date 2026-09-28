@@ -30,6 +30,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/util/pickerOptionModel.js',
     'src/ui/svelte/apps/crafting/rollPromptTarget.js',
+    'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
+    'src/utils/scalars.js',
   ],
   compiledModules: [
     'src/ui/svelte/components/Field.svelte',
@@ -474,14 +476,14 @@ describe('mounted roll prompt', () => {
       expression: '@skills.smith.level', value: 12, adjustment: { kind: 'add', value: -2, label: 'Hard Work' },
     };
     const view = buildSinglePromptData({
-      displayFormula: '1d20', dc: 10, target: 10, direction: 'under', targetBasis,
+      displayFormula: '1d20', dc: 10, target: 10, direction: 'under', targetBasis, actorName: 'Sera Vane',
       selectedModifiers: [{ label: 'Steady hands', value: 1, display: '+1' }],
     });
     const frame = await openThroughHost(view, false, noChoice);
     const row = frame.dialog.querySelector('.formula-content > .target-row');
     assert.deepEqual([...row.children].map((child) => child.textContent.trim()), [
-      'Target 11 · stay at or under', '@skills.smith.level 12 · Hard Work -2 · modifiers +1',
-    ], 'frame 29: the chip, then its explanation on the same row');
+      'Target 11 · stay at or under', 'Sera Vane @skills.smith.level 12 · Hard Work −2 · modifiers +1',
+    ], 'frame 29: the chip, then its explanation naming the character, on the same row');
     assert.equal(row.querySelector('.manager-chip').dataset.rollPromptTarget, 'under');
     frame.dialog.querySelector('[data-manager-modal-close]').click();
     await frame.pending;
@@ -495,15 +497,15 @@ describe('mounted roll prompt', () => {
     const picks = { options, maxPicks: 1, defaultSelectedIds: ['a'] };
     const { dialog, pending } = await openThroughHost({ ...view, selectedModifiers: [] }, false, picks);
     const shown = () => [...dialog.querySelectorAll('.target-row > *')].map((child) => child.textContent.trim());
-    assert.deepEqual(shown(), ['Target 11 · stay at or under', '@skills.smith.level 12 · Hard Work -2 · modifiers +1']);
+    assert.deepEqual(shown(), ['Target 11 · stay at or under', 'Sera Vane @skills.smith.level 12 · Hard Work −2 · modifiers +1']);
     dialog.querySelector('input[type="radio"][value="c"]').click();
     flushSync();
-    assert.deepEqual(shown(), ['Target 13 · stay at or under', '@skills.smith.level 12 · Hard Work -2 · modifiers +3']);
+    assert.deepEqual(shown(), ['Target 13 · stay at or under', 'Sera Vane @skills.smith.level 12 · Hard Work −2 · modifiers +3']);
     dialog.querySelector('input[type="radio"][value="b"]').click();
     flushSync();
     assert.deepEqual(
       shown(),
-      ['Target 10 + 1d4 · stay at or under', '@skills.smith.level 12 · Hard Work -2'],
+      ['Target 10 + 1d4 · stay at or under', 'Sera Vane @skills.smith.level 12 · Hard Work −2'],
       'a rolled pick is pending, never averaged into the target (issue 2005)'
     );
     dialog.querySelector('input[name="situationalBonus"]').value = '4';
@@ -511,7 +513,7 @@ describe('mounted roll prompt', () => {
     flushSync();
     assert.deepEqual(
       shown(),
-      ['Target 14 + 1d4 · stay at or under', '@skills.smith.level 12 · Hard Work -2 · situational +4'],
+      ['Target 14 + 1d4 · stay at or under', 'Sera Vane @skills.smith.level 12 · Hard Work −2 · situational +4'],
       'a typed number raises the target as it is typed'
     );
     dialog.querySelector('[data-manager-modal-close]').click();

@@ -2316,7 +2316,7 @@ test('a roll-under versioned prompt explains a character-value target through th
     });
     await promptJournalStageCheck(publicPrompt);
     assert.deepEqual(rollPromptTarget(surface.view, []), {
-      chipText: 'Target 11 · stay at or under', source: '@bonus 99 · difficulty -90 · tools +2',
+      chipText: 'Target 11 · stay at or under', source: '@bonus 99 · difficulty −90 · tools +2',
     });
   } finally {
     surface.restore();

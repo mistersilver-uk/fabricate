@@ -499,7 +499,7 @@
         "StayUnder": "stay under",
         "ComparedAsRolled": "The dice are compared as rolled.",
         "TargetBase": "Base {value}",
-        "TargetValueOf": "{source} {value}",
+        "TargetValueOf": "{actor} {source} {value}",
         "TargetAdjustment": "{label} {value}",
         "TargetDifficulty": "difficulty {value}",
         "TargetTools": "tools {value}",

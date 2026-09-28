@@ -437,9 +437,9 @@ test('salvage and gathering roll-under prompts name the character value, never a
     }),
   };
   const expected = {
-    'salvage simple': ['Target 12 · stay at or under', '@skill 14 · difficulty -4 · tools +2'],
-    'salvage routed': ['Target 12 · stay at or under', '@skill 14 · difficulty -4 · tools +2'],
-    'gathering routed': ['Target 10 · stay at or under', '@skill 14 · difficulty -4'],
+    'salvage simple': ['Target 12 · stay at or under', 'Scavenger @skill 14 · difficulty −4 · tools +2'],
+    'salvage routed': ['Target 12 · stay at or under', 'Scavenger @skill 14 · difficulty −4 · tools +2'],
+    'gathering routed': ['Target 10 · stay at or under', 'Scavenger @skill 14 · difficulty −4'],
   };
   for (const [site, run] of Object.entries(runs)) {
     installCountingRoll();

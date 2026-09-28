@@ -136,7 +136,7 @@ function underCopy() {
     exceed: promptLabel('StayUnder', 'stay under'),
     formulaNote: promptLabel('ComparedAsRolled', 'The dice are compared as rolled.'),
     targetBase: promptLabel('TargetBase', 'Base {value}'),
-    targetValueOf: promptLabel('TargetValueOf', '{source} {value}'),
+    targetValueOf: promptLabel('TargetValueOf', '{actor} {source} {value}'),
     targetAdjustment: promptLabel('TargetAdjustment', '{label} {value}'),
     targetDifficulty: promptLabel('TargetDifficulty', 'difficulty {value}'),
     targetTools: promptLabel('TargetTools', 'tools {value}'),
@@ -423,7 +423,7 @@ export function buildSinglePromptData({
     formula: displayFormula || resolvedFormula || formula || '',
     dc: Number.isFinite(value) ? value : null,
     direction: under ? 'under' : 'over',
-    ...(under && { targetBasis, toolBonus }),
+    ...(under && { targetBasis, toolBonus, actorName: actorName || '' }),
     // A character value is a target to name in either direction, never a DC (issue 2005).
     ...(targetSource === 'attribute' && Number.isFinite(value) && { targetSource }),
     comparison:

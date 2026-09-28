@@ -122,7 +122,8 @@ export const CASES = Object.freeze([
       ':has(.manager-modal-subtitle:text-is("Sera Vane · Hard Work"))' +
       ':has(.formula-content .formula:text-is("1d20") + .formula-note:text-is("The dice are compared as rolled."))' +
       ':has(.target-row > .manager-chip[data-roll-prompt-target="under"]:has-text("Target 11 · stay at or under"))' +
-      ':has(.target-row > .target-source:has-text("12 · Hard Work -2 · modifiers +1"))' +
+      ':has(.target-row > .target-source:has-text("Sera Vane @skills")' +
+      ':has-text("level 12 · Hard Work −2 · modifiers +1"))' +
       ':has(.static-modifiers .manager-chip:has-text("Steady hands +1"))' +
       ':has(.static-modifiers > .help:text-is("Each raises the target."))',
     kinds: ['player', 'crafting'],
@@ -191,8 +192,7 @@ export const CASES = Object.freeze([
     reaches: 'beyond',
     query: { tab: 'crafting', dialog: 'open', rollPromptState: 'over-attribute' },
     steps: [...CRAFT_HORSESHOE],
-    expectSelector:
-      `${SINGLE_PROMPT} .formula-content .manager-chip:has-text("Target 10 · meet or beat")`,
+    expectSelector: `${SINGLE_PROMPT} .formula-content .manager-chip:has-text("Target 10 · meet or beat")`,
     kinds: ['player', 'crafting'],
     sourceMatches: PROMPT_SOURCES,
   }),

@@ -447,23 +447,23 @@ describe('roll prompt adapter', () => {
     };
     const hardWork = { expression: '@skills.smith.level', value: 12, adjustment: { kind: 'add', value: -2, label: 'Hard Work' } };
     assert.deepEqual(await target({ targetBasis: hardWork, selectedModifiers: [{ label: 'Steady hands', value: 1 }] }), {
-      chipText: 'Target 11 · stay at or under', source: '@skills.smith.level 12 · Hard Work -2 · modifiers +1',
-    }, 'frame 29');
+      chipText: 'Target 11 · stay at or under', source: '@skills.smith.level 12 · Hard Work −2 · modifiers +1',
+    }, 'frame 29, with the true minus sign');
     assert.deepEqual(await target({ targetBasis: hardWork, thresholdMode: 'exceed' }), {
-      chipText: 'Target 10 · stay under', source: '@skills.smith.level 12 · Hard Work -2',
+      chipText: 'Target 10 · stay under', source: '@skills.smith.level 12 · Hard Work −2',
     }, 'a character-value target explains itself with no modifier applied');
     const halved = { ...hardWork, adjustment: { kind: 'multiply', value: 0.5, label: '' } };
-    assert.equal((await target({ targetBasis: halved, dc: 6, target: 6 })).source, '@skills.smith.level 12 · difficulty ×0.5');
+    assert.equal((await target({ targetBasis: halved, dc: 6, target: 6 })).source, '@skills.smith.level 12 · difficulty ×½');
     const floored = { expression: '@skills.lore.level', value: 9, adjustment: { kind: 'multiply', value: 0.5, label: '' } };
     assert.deepEqual(await target({ targetBasis: floored, dc: 4, target: 4 }), {
-      chipText: 'Target 4 · stay at or under', source: '@skills.lore.level 9 · difficulty ×0.5',
+      chipText: 'Target 4 · stay at or under', source: '@skills.lore.level 9 · difficulty ×½',
     }, 'the line names the value and multiplier before the floor; the chip names the floored target');
     const bare = { expression: '@skills.smith.level', value: 12, adjustment: null };
     assert.deepEqual(await target({ targetBasis: bare, dc: 12, target: 12 }), {
       chipText: 'Target 12 · stay at or under', source: '@skills.smith.level 12',
     }, 'an unadjusted character value still names itself, with no difficulty part');
     assert.deepEqual(await target({ dc: 15, target: 15, toolBonus: 2, selectedModifiers: [{ value: 1 }, { value: -4 }] }), {
-      chipText: 'Target 14 · stay at or under', source: 'Base 15 · tools +2 · modifiers -3',
+      chipText: 'Target 14 · stay at or under', source: 'Base 15 · tools +2 · modifiers −3',
     }, 'a fixed target names its base once something raised it');
     assert.deepEqual(await target({ dc: 15, target: 15, selectedModifiers: [{ label: 'Die', display: '+1d4', value: null }] }), {
       chipText: 'Target 15 + 1d4 · stay at or under', source: '',
