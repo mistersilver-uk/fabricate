@@ -55,7 +55,13 @@ describe('checksRouteModel', () => {
   });
 
   /** One model over a live system, gathering mode and route, with every store save logged. */
-  function openModel({ system = SYSTEM, gatheringMode = 'routed', results = {} } = {}) {
+  function openModel({
+    system = SYSTEM,
+    gatheringMode = 'routed',
+    results = {},
+    components = () => [],
+    gatheringTasks = () => [],
+  } = {}) {
     const live = new SvelteMap([
       ['system', system],
       ['gatheringMode', gatheringMode],
@@ -80,6 +86,8 @@ describe('checksRouteModel', () => {
       gatheringResolutionMode: () => live.get('gatheringMode'),
       selectedSystemModifiers: () => [],
       currentView: () => live.get('view'),
+      components,
+      gatheringTasks,
     });
     return { model, live, calls, store };
   }
@@ -291,6 +299,55 @@ describe('checksRouteModel', () => {
       assert.equal(other.checkActivation[row.activity].optional, row.other.optional);
     });
   }
+
+  it('grades a kept salvage or gathering task override, badging the rail and the nav total (issue 2078)', () => {
+    const attributeMultiply = {
+      product: 'sum',
+      direction: 'under',
+      target: { source: 'attribute', expression: '@x', adjustmentKind: 'multiply' },
+    };
+    const system = {
+      ...SYSTEM,
+      salvageCraftingCheck: {
+        enabled: true,
+        simple: { rollFormula: '1d12', dc: 10, evaluation: attributeMultiply },
+      },
+      gatheringCraftingCheck: {
+        enabled: true,
+        routed: {
+          rollFormula: '2d6',
+          relativeOutcomes: [{ id: 'g', name: 'Vein', success: true }],
+          evaluation: attributeMultiply,
+        },
+      },
+    };
+    const clean = openModel({ system }).model;
+    const cleanSalvage = () => clean.checksNavItems.find((item) => item.id === 'salvage');
+    assert.equal(cleanSalvage().issueCount, 0, 'no override, no fault');
+
+    const dirty = openModel({
+      system,
+      components: () => [
+        { id: 'c1', name: 'Iron Longsword', salvage: { enabled: true, adjustmentOverride: -2 } },
+      ],
+    }).model;
+    const dirtySalvage = () => dirty.checksNavItems.find((item) => item.id === 'salvage');
+    assert.ok(dirtySalvage().issueCount > 0, 'the invalid kept override is reported');
+    assert.equal(dirty.checksNavCount, dirtySalvage().issueCount, 'the total badge agrees');
+    assert.deepEqual(dirty.checksComponents, [
+      { id: 'c1', name: 'Iron Longsword', salvage: { enabled: true, adjustmentOverride: -2 } },
+    ]);
+
+    const gathering = openModel({
+      system,
+      gatheringTasks: () => [
+        { id: 't1', name: 'Prospect for Ore', resolutionMode: 'routed', adjustmentOverride: -2 },
+      ],
+    }).model;
+    const gatheringRow = () => gathering.checksNavItems.find((item) => item.id === 'gathering');
+    assert.ok(gatheringRow().issueCount > 0, 'the invalid kept task override is reported');
+    assert.equal(gathering.checksGatheringTasks.length, 1);
+  });
 
   it('opens the tab the route names, and counts each deep-link request', () => {
     const { model, live } = openModel();
