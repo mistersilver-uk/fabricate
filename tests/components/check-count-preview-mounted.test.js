@@ -8,6 +8,7 @@ import { createMountedComponentHarness } from '../helpers/svelte-component-harne
 import {
   CHECK_EDITOR_COMPILED_MODULES,
   CHECK_EDITOR_RAW_MODULES,
+  CHECKS_TREE_COMPILED_MODULES,
 } from '../helpers/checksHarnessModules.js';
 import { installCountDice } from '../helpers/countEngineDice.js';
 
@@ -17,7 +18,9 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-check-count-preview-',
   rawModules: CHECK_EDITOR_RAW_MODULES,
+  // The tree's own list is spread by name: the primitive allowlist guard reads one spread deep.
   compiledModules: [
+    ...CHECKS_TREE_COMPILED_MODULES,
     ...CHECK_EDITOR_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/checks/CheckModeCallout.svelte',
     'src/ui/svelte/apps/manager/checks/ChecksView.svelte',
