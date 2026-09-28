@@ -110,6 +110,7 @@ function readParams() {
     // Which crafting system the manager opens on.
     system: params.get('system') ?? null,
     gatheringTaskMode: params.get('gatheringTaskMode') ?? null,
+    checkOverride: params.get('checkOverride') ?? null,
     rollPromptState: params.get('rollPromptState') ?? null,
     journalCaseState: params.get('journalCaseState') ?? null,
     // TWO things, and the name says only the second: a world seeded with NO crafting systems, and
@@ -890,6 +891,7 @@ async function boot() {
         noInteractables: params.noInteractables,
         noSceneRegions: params.noSceneRegions,
         gatheringTaskMode: params.gatheringTaskMode,
+        checkOverride: params.checkOverride,
         journalCaseState: params.journalCaseState,
       });
   await seedRollPromptFixture(world, params.rollPromptState);

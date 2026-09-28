@@ -9,6 +9,32 @@ import {
 } from './caseConstants.js';
 import { chooseSelectOption, managerCase } from './caseFactories.js';
 
+/**
+ * The salvage check override states (issue 2005), one per state the approved prototype's frames 23
+ * and 24 depict, on Smithing's Longsword under `checkOverride` (`tests/view-lab/world/labWorld.js`).
+ */
+const overrideCase = (state, label, field, frame) =>
+  managerCase({
+    id: `manager-component-edit-salvage-override-${state}`,
+    label: `Manager — Component edit salvage override, ${label} (prototype state ${frame})`,
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-smithing', checkOverride: state },
+    steps: [
+      { selector: '#manager-nav-component-rules' },
+      {
+        selector: '.manager-component-row[data-component-id="sm-longsword"] [data-component-edit]',
+      },
+      { selector: '[data-salvage-dc-override]', scroll: true },
+    ],
+    expectView: 'component-edit',
+    expectSelector: `.fabricate-manager [data-salvage-dc-override][data-salvage-override-field="${field}"] [data-salvage-player-sees]`,
+    kinds: ['manager', 'components'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/component\/(CheckOverrideField\.svelte|salvageDcPresets\.js|componentEditSelectOptions\.js)$/,
+    ],
+  });
+
 export const CASES = Object.freeze([
   managerCase({
     id: 'manager-components-normal',
@@ -685,4 +711,9 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/ComplicationSummaryRow\.svelte$/,
     ],
   }),
+  overrideCase('fixed-under', 'lower is better, fixed target', 'dcOverride', 23),
+  overrideCase('add', 'character value, added adjustment', 'adjustmentOverride', 24),
+  overrideCase('multiply', 'character value, multiplied adjustment', 'adjustmentOverride', 24),
+  overrideCase('default', 'character value, system default', 'adjustmentOverride', 24),
+  overrideCase('custom', 'character value, custom multiplier', 'adjustmentOverride', 24),
 ]);

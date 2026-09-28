@@ -9,6 +9,35 @@ import {
 } from './caseConstants.js';
 import { chooseSelectOption, managerCase } from './caseFactories.js';
 
+/**
+ * The gathering task check override (issue 2005, R3), one per state of the approved prototype's
+ * frames 23 and 24, on Smithing's Prospect task under `checkOverride`.
+ */
+const OPEN_PROSPECT_TASK = Object.freeze([
+  { selector: '#manager-gathering-nav-tasks' },
+  {
+    selector:
+      '[data-gathering-task-id="sm-task-prospect"] .manager-icon-button[aria-label^="Edit"]',
+  },
+]);
+const taskOverrideCase = (state, label, field, frame) =>
+  managerCase({
+    id: `manager-gathering-task-editor-check-${state}`,
+    label: `Manager — Gathering task check override, ${label} (prototype state ${frame})`,
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-smithing', checkOverride: state },
+    steps: [
+      'Gathering',
+      ...OPEN_PROSPECT_TASK,
+      { selector: '[data-gathering-task-dc]', scroll: true },
+    ],
+    expectView: 'gathering-task-edit',
+    expectSelector: `.fabricate-manager [data-gathering-task-dc][data-gathering-task-override-field="${field}"]`,
+    kinds: ['manager', 'environments'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/],
+  });
+
 export const CASES = Object.freeze([
   // The state it would show is reached by flipping an inherit switch, and in the View Lab that write never reaches the screen.
   managerCase({
@@ -705,4 +734,8 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
     ],
   }),
+  taskOverrideCase('fixed-under', 'lower is better, fixed target', 'dcOverride', 23),
+  taskOverrideCase('add', 'character value, added adjustment', 'adjustmentOverride', 24),
+  taskOverrideCase('multiply', 'character value, multiplied adjustment', 'adjustmentOverride', 24),
+  taskOverrideCase('default', 'character value, system default', 'adjustmentOverride', 24),
 ]);

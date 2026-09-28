@@ -59,6 +59,68 @@ function seedGatheringTaskMode(content, mode) {
   content.gatheringConfig.tasks = content.gatheringConfig.tasks.map(replaceTask);
 }
 
+/**
+ * The salvage and gathering-task check override states (issue 2005, prototype frames 23-24):
+ * Smithing's salvage and routed gathering checks read `evaluation`, and the Longsword and the
+ * Prospect task carry the overrides each state shows, with the other field kept dormant.
+ */
+const CHECK_OVERRIDE_STATES = Object.freeze({
+  'fixed-under': { source: 'fixed', kind: 'add', salvage: [15, null], task: [12, null] },
+  add: { source: 'attribute', kind: 'add', salvage: [15, -2], task: [15, 0] },
+  multiply: { source: 'attribute', kind: 'multiply', salvage: [15, 0.5], task: [15, 0.5] },
+  default: { source: 'attribute', kind: 'add', salvage: [15, null], task: [15, null] },
+  custom: { source: 'attribute', kind: 'multiply', salvage: [15, 0.7], task: [15, 0.7] },
+});
+
+function seedCheckOverride(content, state) {
+  const spec = CHECK_OVERRIDE_STATES[state];
+  if (!spec) return;
+  const evaluation = {
+    product: 'sum',
+    direction: 'under',
+    target: {
+      source: spec.source,
+      expression: '@skills.med.mod + 8',
+      adjustmentKind: spec.kind,
+      baseAdjustment: null,
+    },
+  };
+  const multiply = spec.kind === 'multiply';
+  const tiers = [
+    ['Easy', 10, multiply ? 1 : 2],
+    [spec.source === 'fixed' ? 'Medium' : 'Standard', 15, multiply ? 0.5 : 0],
+    ['Hard', 20, multiply ? 0.2 : -2],
+  ].map(([name, dc, adjustment]) => ({ id: `lab-ov-${name.toLowerCase()}`, name, dc, adjustment }));
+  const system = content.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.SMITHING);
+  system.salvageCraftingCheck = {
+    enabled: true,
+    simple: { rollFormula: '1d20', dc: 15, dcMode: 'static', thresholdMode: 'meet', tiers, evaluation },
+  };
+  system.gatheringCraftingCheck = {
+    routed: {
+      rollFormula: '1d20',
+      dc: 15,
+      type: 'relative',
+      thresholdMode: 'meet',
+      relativeOutcomes: [
+        { id: 'lab-ov-found', name: 'Found', success: true, dc: 0 },
+        { id: 'lab-ov-missed', name: 'Missed', success: false, dc: -15 },
+      ],
+      evaluation,
+    },
+  };
+  const overrides = ([dcOverride, adjustmentOverride]) => ({ dcOverride, adjustmentOverride });
+  const sword = content.components.find((entry) => entry.id === 'sm-longsword');
+  sword.salvage = { ...sword.salvage, ...overrides(spec.salvage) };
+  const retask = (entry) =>
+    entry.id === 'sm-task-prospect'
+      ? { ...entry, resolutionMode: 'routed', ...overrides(spec.task) }
+      : entry;
+  const slice = content.gatheringConfig.systems[LAB_SYSTEM_IDS.SMITHING];
+  slice.tasks = slice.tasks.map(retask);
+  content.gatheringConfig.tasks = content.gatheringConfig.tasks.map(retask);
+}
+
 /** 14 days into the world's calendar, so relative timestamps render as something. */
 export const LAB_WORLD_TIME = 1_209_600;
 
@@ -255,6 +317,7 @@ export async function buildLabWorld({
   noInteractables = false,
   noSceneRegions = false,
   gatheringTaskMode = null,
+  checkOverride = null,
   journalCaseState = null,
 } = {}) {
   const content = buildLabContent({ journalCaseState });
@@ -264,6 +327,7 @@ export async function buildLabWorld({
     seedJournalNoCheckFixture(content);
   }
   seedGatheringTaskMode(content, gatheringTaskMode);
+  seedCheckOverride(content, checkOverride);
   if (noTools) stripTools(content);
   if (noAuthoredWorldComponents) stripAuthoredWorldComponents(content);
   // A real Manager refresh resolves an empty selection to the first available crafting system.
