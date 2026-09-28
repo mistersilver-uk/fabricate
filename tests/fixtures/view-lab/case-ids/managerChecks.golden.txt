@@ -45,3 +45,5 @@ manager-checks-under-readiness
 manager-checks-under-progressive
 manager-checks-under-preroll-joint
 manager-checks-under-preroll-abstain
+manager-checks-under-attribute-narrow
+manager-checks-under-progressive-salvage
