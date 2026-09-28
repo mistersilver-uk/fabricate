@@ -300,10 +300,15 @@ describe('1371 Chip — density scale matrix', () => {
     assert.match(rule, /font-weight:\s*600/);
   });
 
-  it('draws the tag-run leading glyph at the 9px the library leaves open (ruling 2026-09-28)', () => {
+  it('draws the tag-run leading glyph at the 9px the library leaves open (ruling 2026-09-28)', async () => {
     // Epic 1997: the prototype's value, since the library draws no tag-run glyph. A `fa-circle`
     // mark keeps the primitive's own mark size.
-    assert.match(ruleFor('is-tag-run > i:not(.fa-circle)'), /font-size:\s*9px/);
+    const glyphPx = async (icon) => {
+      const target = await harness.mount({ density: 'tag-run', icon });
+      return Number.parseFloat(getComputedStyle(target.querySelector('.manager-chip > i')).fontSize);
+    };
+    assert.equal(await glyphPx('fa-solid fa-bullseye'), 9);
+    assert.notEqual(await glyphPx('fa-solid fa-circle'), 9, 'a status dot stays a mark');
   });
 
   it('states the INSPECTOR band in tokens, at the reference values (issue 1371)', () => {

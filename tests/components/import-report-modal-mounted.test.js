@@ -215,6 +215,12 @@ describe('ImportReportModal (mounted)', () => {
     // Maintainer ruling 2026-09-28 ("Move them too"): every Fabricate dialog is banded.
     assert.ok(root.classList.contains('is-banded'), 'the report draws the banded library Modal');
     assert.ok(root.querySelector('.manager-modal-body > .manager-import-report-list'), 'in a padded body');
+    const close = root.querySelector('[data-manager-modal-close]');
+    assert.ok(close.classList.contains('is-size-26'), 'the banded frame’s 26px close');
+    const paint = getComputedStyle(close);
+    assert.equal(paint.borderRadius, '7px', 'on the radius ladder’s 26-32px corner');
+    assert.equal(paint.backgroundColor, 'transparent', 'unfilled');
+    assert.equal(paint.fontSize, '11px', 'with an 11px glyph');
     assert.ok(document.activeElement === opener, 'focus stays where it was without trapFocus');
     const seen = [];
     const onWindowKey = (event) => seen.push([event.key, event.defaultPrevented]);

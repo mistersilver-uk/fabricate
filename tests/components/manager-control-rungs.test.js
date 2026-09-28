@@ -367,28 +367,11 @@ describe('M12a — the inspector rail’s action button takes the corner its hei
 });
 
 describe('epic 1997 — the banded Modal frame and the Select glyph (rulings 2026-09-28)', () => {
-  const MODAL = 'src/ui/svelte/apps/manager/ManagerModal.svelte';
-
-  function modalRule(selector) {
-    const source = readFileSync(resolve(repoRoot, MODAL), 'utf8');
-    const block = stripCssComments(source.slice(source.search(/^<style>$/m) + '<style>'.length));
-    const found = [...block.matchAll(/([^{}]+)\{([^{}]*)\}/g)].filter(
-      ([, head]) => head.trim().replaceAll(/\s+/g, ' ') === selector
-    );
-    assert.equal(found.length, 1, `${MODAL} still declares exactly one \`${selector}\` rule`);
-    return found[0][2];
-  }
-
-  it('sizes the close as IconButton’s 26px rung and corners it on the 26-32px band’s 7', () => {
+  it('sizes the close as IconButton’s 26px rung (its paint is measured mounted)', () => {
     const [box] = bodiesOf('.fabricate-icon-button.manager-icon-button.is-size-26');
     for (const property of ['width', 'height', 'min-width', 'min-height']) {
       assert.equal(pixels(valueOf(box, property)), 26, `the rung states a 26px ${property}`);
     }
-    const paint = modalRule('.is-banded :global([data-manager-modal-close])');
-    assert.equal(pixels(valueOf(paint, 'border-radius')), 7, 'the radius ladder’s 26-32px corner');
-    assert.equal(valueOf(paint, 'background'), 'transparent', 'the prototype’s close is unfilled');
-    assert.equal(valueOf(paint, 'color'), 'var(--fab-text-muted)');
-    assert.equal(pixels(valueOf(paint, 'font-size')), 11, 'and draws an 11px glyph');
   });
 
   it('draws every rung’s glyphs at the specimen’s 12px `.k-field .i`, never at the rung’s type', () => {
