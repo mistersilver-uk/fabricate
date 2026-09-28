@@ -13,12 +13,28 @@ const KEYS = Object.freeze({
 /** A dice term and any modifiers it carries (`2d20kh1`), in formula order. */
 const DICE_TERM = /(\d*)d(\d+)((?:[a-z]+\d*)*)/gi;
 
-/** The formula with each dice term followed by its faces, `3d6 (2 + 4 + 3)`, in `roll.dice` order. */
+/** How deep in brackets `offset` sits: a function's arguments and a parenthesised fragment count. */
+function depthAt(formula, offset) {
+  let depth = 0;
+  for (const character of formula.slice(0, offset)) {
+    if (character === '(') depth += 1;
+    if (character === ')') depth -= 1;
+  }
+  return depth;
+}
+
+/**
+ * The formula, without its `[flavor]` tags, with each top-level dice term followed by its faces,
+ * `3d6 (2 + 4 + 3)`, in `roll.dice` order. A term inside brackets (`min(1d4, 3)`, `(1d4)`) keeps
+ * its place in that order but is never annotated, so no face lands inside a fragment.
+ */
 function withFaces(formula, dice) {
+  const bare = formula.replaceAll(/\[[^\]]*\]/g, '');
   let index = 0;
-  return formula.replaceAll(DICE_TERM, (term, count, faces) => {
+  return bare.replaceAll(DICE_TERM, (term, count, faces, _modifiers, offset) => {
     const rolled = dice[index];
     index += 1;
+    if (depthAt(bare, offset) !== 0) return term;
     const matches = rolled?.group === `${count || 1}d${faces}` && rolled.results.length > 0;
     return matches ? `${term} (${rolled.results.join(' + ')})` : term;
   });

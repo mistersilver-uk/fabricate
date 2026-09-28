@@ -52,3 +52,21 @@ test('a die the record cannot match, and a record without a formula, invent noth
   assert.equal(line(summed('over', '1d20', [], 9)), '1d20 = 9');
   assert.equal(line({ ...summed('over', '', [], 9), resolvedFormula: undefined }), '');
 });
+
+test('a flavor tag is dropped and a bracketed or clamped term is never annotated (G4)', () => {
+  assert.equal(
+    line(summed('over', '1d20[attack] + (1d4[fire])', [
+      { group: '1d20', results: [14] },
+      { group: '1d4', results: [3] },
+    ], 17)),
+    '1d20 (14) + (1d4) = 17'
+  );
+  assert.equal(
+    line(summed('over', 'max(1d4, 2) + 1d6', [
+      { group: '1d4', results: [1] },
+      { group: '1d6', results: [5] },
+    ], 7)),
+    'max(1d4, 2) + 1d6 (5) = 7',
+    'the clamped die keeps its place in dice order, so the later die still matches'
+  );
+});
