@@ -17,9 +17,27 @@ test('prompt need distinguishes usable DC, no check, and no single target', () =
 });
 
 test('a count check shows no DC: it grades successes, not its retained DC (issue 2004)', () => {
-  const config = { dc: 15, evaluation: { product: 'count', direction: 'over', pool: {} } };
+  const config = { dc: 15, evaluation: { product: 'count', direction: 'over', pool: { required: 3 } } };
   assert.equal(salvageDisplayDc({ mode: 'simple', config, component: { salvage: { dcOverride: 9 } } }), null);
-  assert.deepEqual(salvageCheckNeed({ mode: 'simple', config, checkUsable: true }), { kind: 'noSingleTarget' });
+  const need = (mode, component, extra = {}) =>
+    salvageCheckNeed({ mode, config: { ...config, ...extra }, checkUsable: true, component });
+  assert.deepEqual(need('simple'), { kind: 'successes', count: 3, destination: 'pool' }, "the pool's required count");
+  assert.deepEqual(
+    need('simple', { salvage: { dcOverride: 9, successesOverride: 5 } }),
+    { kind: 'successes', count: 5, destination: 'pool' },
+    "the component's successes override wins, and its DC override is never read"
+  );
+  assert.deepEqual(need('simple', { salvage: { successesOverride: 0 } }), { kind: 'successes', count: 0, destination: 'pool' });
+  assert.deepEqual(need('simple', { salvage: { successesOverride: null } }), { kind: 'successes', count: 3, destination: 'pool' });
+  assert.deepEqual(need('routed', null, { type: 'relative' }), { kind: 'successes', count: 3, destination: 'pool' });
+  assert.deepEqual(need('routed', null, { type: 'fixed' }), { kind: 'noSingleTarget' }, 'net ranges');
+  assert.deepEqual(need('progressive'), { kind: 'noSingleTarget' }, 'a budget, not a count to reach');
+  assert.deepEqual(salvageCheckNeed({ mode: 'simple', config, checkUsable: false }), { kind: 'noCheck' });
+  assert.deepEqual(
+    need('simple', null, { evaluation: { ...config.evaluation, pool: { required: 3, modifierDestination: 'threshold' } } }),
+    { kind: 'successes', count: 3, destination: 'threshold' },
+    'the row names where its modifiers go, so an all-count batch can word its bonus help'
+  );
 });
 
 test('a summed roll-under row names its fixed target, and a character value has no single one', () => {
@@ -42,7 +60,11 @@ test('a summed roll-under row names its fixed target, and a character value has 
     );
   }
   assert.deepEqual(need({ direction: 'over' }), { kind: 'dc', dc: 12 }, 'sum/over fixed is unchanged');
-  assert.deepEqual(need({ product: 'count', direction: 'under' }), { kind: 'noSingleTarget' }, 'a count row shows no DC (issue 2004)');
+  assert.deepEqual(
+    need({ product: 'count', direction: 'under', pool: { required: 2 } }),
+    { kind: 'successes', count: 2, destination: 'pool' },
+    'a count row names its successes, not a DC (issue 2004)'
+  );
   assert.deepEqual(
     salvageCheckNeed({ mode: 'progressive', config: { evaluation: { direction: 'under' } }, checkUsable: true }),
     { kind: 'noSingleTarget' }

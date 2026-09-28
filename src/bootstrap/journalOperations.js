@@ -49,6 +49,17 @@ export function promptJournalStageCheck(descriptor, prompt = promptCheckRoll) {
     selectedModifiers: descriptor?.selectedModifiers,
     allowAdvantage: descriptor?.allowAdvantage === true,
     modifierChoice: descriptor?.modifierChoice ?? null,
+    ...(descriptor?.product === 'count' && {
+      product: 'count',
+      pool: descriptor.pool,
+      threshold: descriptor.threshold,
+      thresholdSource: descriptor.thresholdSource,
+      die: descriptor.die,
+      explode: descriptor.explode,
+      cancel: descriptor.cancel,
+      required: descriptor.required,
+      modifierDestination: descriptor.modifierDestination,
+    }),
   });
 }
 
@@ -236,6 +247,20 @@ function buildRunStartOperations(fabricate) {
   };
 }
 
+/**
+ * A count check's wording keys, which choose the bonus help and modifier note; its pool,
+ * threshold, die, face rules and required count stay out of a redacted prompt.
+ */
+function countPromptWording(prompt) {
+  if (prompt?.product !== 'count') return {};
+  return {
+    product: 'count',
+    direction: prompt.direction === 'under' ? 'under' : 'over',
+    comparison: prompt.comparison === 'exceed' ? 'exceed' : 'meet',
+    modifierDestination: prompt.modifierDestination === 'threshold' ? 'threshold' : 'pool',
+  };
+}
+
 /** The check legs: what the GM describes to the initiator, and how a decision is graded. */
 function buildCheckOperations(fabricate, authorizeRollHandoff) {
   return {
@@ -271,6 +296,7 @@ function buildCheckOperations(fabricate, authorizeRollHandoff) {
         publicPrompt: {
           allowsSituationalModifier: descriptor.publicPrompt?.allowsSituationalModifier === true,
           allowAdvantage: descriptor.publicPrompt?.allowAdvantage === true,
+          ...countPromptWording(descriptor.publicPrompt),
         },
       };
     },

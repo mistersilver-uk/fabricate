@@ -1,4 +1,4 @@
-/** The roll prompt's target chip text, and a roll-under target's explanation line. */
+/** The roll prompt's target chip text, and a summed roll-under target's explanation line. */
 
 // A function replacer, so a `$&` or `$1` in a user-authored name is inserted literally.
 export function fill(template, values) {
@@ -39,14 +39,15 @@ function basisParts(basis, labels) {
 }
 
 /**
- * The chip names a summed roll-under target after its flat modifiers and Tool bonus, which raise
- * it, so it follows the player's picks; the situational bonus is applied only once rolled. The
- * line names a character-value basis always, and a fixed target only when something raised it.
+ * Any other chip keeps its prepared `chipText`. A summed roll-under chip names the target after
+ * its flat modifiers and Tool bonus, which raise it, so it follows the player's picks; the
+ * situational bonus is applied only once rolled. The line names a character-value basis always,
+ * and a fixed target only when something raised it.
  */
 export function rollPromptTarget(data, selectedIds) {
+  if (data.count || data.direction !== 'under') return { chipText: data.chipText, source: '' };
   const { labels } = data;
   const comparison = data.comparison === 'exceed' ? labels.exceed : labels.meet;
-  if (data.direction !== 'under') return { chipText: `${data.dcText} · ${comparison}`, source: '' };
   const tools = Number.isFinite(data.toolBonus) ? data.toolBonus : 0;
   const modifiers = flatModifierTotal(data, selectedIds);
   const parts = data.targetBasis

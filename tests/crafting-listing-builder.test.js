@@ -92,6 +92,7 @@ function makeBuilder({
   isSystemBlockedForRecipes = null,
   recipeItemDefinition = null,
   resolveCheckFormula = null,
+  localize = (key) => key,
 } = {}) {
   const craftingSystemManager = {
     getSystem: (id) => (id === system.id ? system : null),
@@ -119,7 +120,7 @@ function makeBuilder({
     recipeVisibility,
     resolutionModeService,
     craftingSystemManager,
-    localize: (key) => key,
+    localize,
     nowWorldTime: () => 1000,
     ...(isSystemBlockedForRecipes ? { isSystemBlockedForRecipes } : {}),
     ...(resolveCheckFormula ? { resolveCheckFormula } : {}),
@@ -757,6 +758,79 @@ describe('CraftingListingBuilder — check evaluation (issue 2003)', () => {
     assert.equal(dc({ direction: 'over', target: skill }), null, 'a character value is no single DC');
     assert.equal(dc({ direction: 'under', target: skill }), null);
     assert.equal(dc({ product: 'count' }), null);
+  });
+});
+
+describe('CraftingListingBuilder — success-counting check (issue 2004)', () => {
+  const format = (key, data) =>
+    key === 'FABRICATE.Check.CountRoll.Pool'
+      ? `${data.pool}d${data.die} · each ${data.comparison} ${data.threshold}`
+      : key;
+  const countSystem = (pool, extra = {}, features = { craftingChecks: true }) =>
+    makeSystem({
+      features,
+      craftingCheck: {
+        simple: {
+          rollFormula: '1d20 + @prof',
+          dc: 15,
+          evaluation: { product: 'count', direction: 'under', pool: { die: 20, ...pool } },
+          ...extra,
+        },
+        routed: {},
+        progressive: {},
+      },
+    });
+  const checkFor = (system, craftingActor = null, opts = {}) => {
+    const builder = makeBuilder({ system, localize: format, ...opts });
+    const { summaries } = builder.buildListing({ craftingActor, viewer: PLAYER });
+    return builder.buildRecipeDetail({ recipeId: summaries[0].id, craftingActor, viewer: PLAYER }).check;
+  };
+
+  it('is usable, and so mandatory by the existing rules, with no retained formula, and shows no DC', () => {
+    const actor = { id: 'a', items: [], system: {} };
+    const check = checkFor(countSystem({ base: '2', threshold: '13' }, { rollFormula: '' }), actor);
+    assert.deepEqual([check.usable, check.mandatory, check.optional, check.dc], [true, true, false, null]);
+    const disabled = checkFor(countSystem({ base: '2', threshold: '13' }, { rollFormula: '' }, {}), actor);
+    assert.ok(disabled, 'an active count check still surfaces its card with checks disabled');
+    assert.deepEqual([disabled.usable, disabled.mandatory], [true, false]);
+  });
+
+  it('shows the pool line in place of the retained formula, resolved for the acting character', () => {
+    const seen = [];
+    const system = countSystem({ base: '@skills.smith.rank + 2.8', threshold: '13' }, { thresholdMode: 'exceed' });
+    const actor = { id: 'a', items: [], getRollData: () => ({ skills: { smith: { rank: 4 } } }) };
+    const check = checkFor(system, actor, { resolveCheckFormula: (formula) => seen.push(formula) });
+    assert.deepEqual(
+      [check.rollFormula, check.resolvedFormula, check.formulaResolved],
+      ['(@skills.smith.rank + 2.8)d20 · each < 13', '6d20 · each < 13', true],
+      'the authored line, then the pool 6.8 rounded down'
+    );
+    assert.deepEqual(seen, [], 'the inert 1d20 + @prof is never resolved or shown');
+  });
+
+  it('flags a pool the character cannot read, and shows the authored line without an actor', () => {
+    const system = countSystem({ base: '@skills.smith.rank', threshold: '13' });
+    const missing = checkFor(system, { id: 'a', items: [], getRollData: () => ({}) });
+    assert.deepEqual(
+      [missing.rollFormula, missing.resolvedFormula, missing.formulaResolved],
+      ['(@skills.smith.rank)d20 · each ≤ 13', null, false]
+    );
+    const literal = countSystem({ base: '3', threshold: '13' });
+    const builder = makeBuilder({ system: literal, localize: format });
+    const summary = builder.buildListing({ craftingActor: null, viewer: PLAYER }).summaries[0];
+    const teaserFree = builder.buildRecipeDetail({ recipeId: summary.id, craftingActor: null, viewer: PLAYER });
+    assert.deepEqual(
+      [teaserFree.check.rollFormula, teaserFree.check.resolvedFormula, teaserFree.check.formulaResolved],
+      ['3d20 · each ≤ 13', null, null]
+    );
+  });
+
+  it('brackets a threshold read from the character, and shows no line for a blank pool or threshold', () => {
+    const line = (pool) => checkFor(countSystem(pool)).rollFormula;
+    assert.equal(line({ base: '2', threshold: '@abilities.int.mod + 11' }), '2d20 · each ≤ (@abilities.int.mod + 11)');
+    assert.equal(line({ base: '2', threshold: '-1.5' }), '2d20 · each ≤ -1.5');
+    assert.equal(line({ base: '', threshold: '8' }), null, 'never "()d20"');
+    assert.equal(line({ base: '2', threshold: ' ' }), null);
   });
 });
 

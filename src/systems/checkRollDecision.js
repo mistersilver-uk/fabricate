@@ -78,6 +78,36 @@ export function underTargetPromptFields(
   };
 }
 
+/**
+ * A count prompt's fields: the pre-modifier pool, threshold and face rules from the pool resolved
+ * before the prompt opens (`policy`, or null), and the required count, or null when nothing grades
+ * against it: a progressive or fixed-range routed check, or a hidden gathering task.
+ * `thresholdSource` is the authored threshold when it is not a plain number.
+ */
+export function countPromptFields(evaluation, policy, required) {
+  return {
+    product: 'count',
+    direction: evaluation.direction === 'under' ? 'under' : 'over',
+    comparison: policy?.comparison ?? null,
+    pool: policy?.dice ?? null,
+    threshold: policy?.threshold ?? null,
+    thresholdSource: policy ? authoredThreshold(evaluation.pool?.threshold) : null,
+    die: policy?.die ?? null,
+    explode: policy?.explode
+      ? { kind: policy.explode.kind, value: policy.explode.value, once: policy.explode.once }
+      : null,
+    cancel: policy?.cancel ? { kind: policy.cancel.kind, value: policy.cancel.value } : null,
+    required: Number.isFinite(required) ? required : null,
+    modifierDestination:
+      evaluation.pool?.modifierDestination === 'threshold' ? 'threshold' : 'pool',
+  };
+}
+
+function authoredThreshold(expression) {
+  const text = String(expression ?? '').trim();
+  return text && !/^[+-]?\d+(?:\.\d+)?$/.test(text) ? text : null;
+}
+
 function promptInput({
   authoredFormula,
   actor,
@@ -86,6 +116,7 @@ function promptInput({
   resolvedCheck,
   displayFormula,
   deferred,
+  countPolicy,
 }) {
   // A count check shows no formula, so no bare deferred slot either (issue 2004).
   const formula =
@@ -113,6 +144,8 @@ function promptInput({
     thresholdMode: options.thresholdMode === 'exceed' ? 'exceed' : 'meet',
     // A count check offers no advantage until it is mode-aware (issue 2007).
     allowAdvantage: evaluation.product !== 'count' && hasPlainD20(authoredFormula.trim()),
+    ...(evaluation.product === 'count' &&
+      countPromptFields(evaluation, countPolicy, options.required)),
   };
 }
 
@@ -153,7 +186,8 @@ function applySituationalBonus(formula, rawBonus, evaluation, Roll) {
 
 /**
  * The prompt returns a decision, but never determines the selected modifier data directly.
- * `deferred` means the offered `modifierChoice` is selected by that decision.
+ * `deferred` means the offered `modifierChoice` is selected by that decision; a count check
+ * passes the `countPolicy` its pool resolved to before the prompt.
  */
 export async function resolveCheckDecision({
   authoredFormula,
@@ -164,6 +198,7 @@ export async function resolveCheckDecision({
   resolvedCheck,
   displayFormula,
   Roll,
+  countPolicy = null,
 }) {
   let formula = resolvedCheck.formula;
   let flavor = options?.flavor;
@@ -185,6 +220,7 @@ export async function resolveCheckDecision({
           resolvedCheck,
           displayFormula,
           deferred,
+          countPolicy,
         })
       ));
     if (!choice || choice.confirmed === false) return { cancelled: true };

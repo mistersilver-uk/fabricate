@@ -30,6 +30,8 @@ const BULK_PROMPT_ROWS = (help, rows) =>
     .join('');
 const UNDER_BONUS_HELP =
   'A bonus raises the target. A rolled bonus such as 1d4 is rolled first, and its result is applied.';
+const COUNT_BONUS_HELP =
+  'A bonus adds that many dice. A rolled bonus such as 1d4 is rolled first, and its result is applied.';
 const BULK_PROMPT_SOURCES = [
   ...BULK_DEFAULTS.sourceMatches,
   /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/,
@@ -476,6 +478,24 @@ export const CASES = Object.freeze([
     expectSelector: BULK_PROMPT_ROWS(UNDER_BONUS_HELP, [
       ['Air Shard', 'Target 12'],
       ['Ruined Slag', 'No single target'],
+    ]),
+    sourceMatches: BULK_PROMPT_SOURCES,
+  }),
+  // A count batch names each row's successes needed, and the help says a bonus adds dice.
+  playerCase({
+    ...BULK_DEFAULTS,
+    id: 'player-inventory-bulk-roll-prompt-count',
+    label: 'Player app — Inventory bulk roll prompt, success-counting rows',
+    query: { tab: 'inventory', dialog: 'open', rollPromptState: 'salvage-count' },
+    steps: [
+      ...chooseSelectOption('.inventory-grid-pagination [data-pagination-size]', '75'),
+      SHIFT_CLICK('lab-smithing:sm-air-shard'),
+      SHIFT_CLICK('lab-runework:rw-slag'),
+      { selector: '[data-inventory-bulk-salvage]' },
+    ],
+    expectSelector: BULK_PROMPT_ROWS(COUNT_BONUS_HELP, [
+      ['Air Shard', '2 needed'],
+      ['Ruined Slag', '1 needed'],
     ]),
     sourceMatches: BULK_PROMPT_SOURCES,
   }),

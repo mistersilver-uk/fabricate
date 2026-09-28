@@ -90,15 +90,20 @@
           <div class="formula-row">
             <span class="die-glyph" aria-hidden="true"><i class="fa-solid fa-dice"></i></span>
             <div class="formula-content">
-              {#if data.formula}<span class="formula">{data.formula}</span>{/if}
+              {#if data.formula}<span
+                  class="formula"
+                  data-roll-prompt-count={data.count ? data.direction : undefined}
+                  >{data.formula}</span
+                >{/if}
               {#if data.labels.formulaNote}<p class="help formula-note">
                   {data.labels.formulaNote}
                 </p>{/if}
-              {#if data.dc !== null}
+              {#if data.chipText}
                 <RollPromptTarget
                   text={target.chipText}
                   source={target.source}
-                  data-roll-prompt-target={data.direction === 'under' ? 'under' : undefined}
+                  under={!data.count && data.direction === 'under'}
+                  data-roll-prompt-required={data.count?.required}
                 />
               {/if}
             </div>

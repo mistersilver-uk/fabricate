@@ -42,6 +42,7 @@ const harness = createMountedComponentHarness({
     'src/gatheringImageDefaults.js',
     'src/ui/presenters/CraftingListingBuilder.js',
     ...CHECK_TARGET_RAW_MODULES,
+    'src/systems/countEvaluation.js',
     'src/systems/characterLibraries.js',
     'src/systems/checkModifierResolver.js',
     'src/systems/checkModifierRouter.js',

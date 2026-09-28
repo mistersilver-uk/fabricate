@@ -386,6 +386,51 @@ describe('journal run command protocol', () => {
     }
   });
 
+  it('lets only a count check\'s wording keys through a redacted prompt, never its numbers (issue 2004)', async () => {
+    const originalGame = globalThis.game;
+    const originalFromUuid = globalThis.fromUuid;
+    try {
+      globalThis.game = { user: { id: 'gm', isGM: true } };
+      const canary = 'PROTECTED-COUNT-CANARY';
+      const run = { id: 'run-1', recipeId: 'recipe', lifecycleVersion: 1, runRevision: 3 };
+      const publicPrompt = {
+        label: canary, subject: canary, actorName: canary, activity: 'Crafting', img: canary,
+        formula: '', target: null, mode: 'simple', allowsSituationalModifier: true, allowAdvantage: false,
+        selectedModifiers: [{ label: canary, display: '+987' }],
+        product: 'count', direction: 'under', comparison: 'exceed', modifierDestination: 'threshold',
+        pool: 987, threshold: 986, thresholdSource: `@${canary} + 985`, die: 984, required: 983,
+        explode: { kind: 'from', value: 982, once: true }, cancel: { kind: 'from', value: 981 },
+      };
+      const fabricate = {
+        craftingRunManager: { getRun: () => run },
+        craftingEngine: {
+          describeVersionedStageCheck: async () => ({ required: true, publicPrompt, privateEvaluation: { recipeId: 'recipe' } }),
+        },
+        recipeManager: { getRecipe: () => ({ id: 'recipe', craftingSystemId: 'system' }) },
+        recipeVisibilityService: { getVisibleRecipes: () => [] },
+      };
+      const operations = loadCraftingOperations()(fabricate, () => harness.service);
+      const harness = commandHarness({ currentUserId: 'gm', operations: { crafting: operations } });
+      const { service, actor } = harness;
+      actor.isOwner = true;
+      globalThis.fromUuid = async () => actor;
+      const hidden = await service.handleSocketMessage({
+        kind: JOURNAL_RUN_SOCKET_KIND.REQUEST, requestId: 'count-prompt', sessionId: 'player-tab',
+        actorUuid: actor.uuid, runType: 'crafting', runId: run.id, expectedRevision: 3,
+        action: 'execute', senderId: 'gm', payload: {},
+      }, 'player');
+      assert.deepEqual(hidden.response.promptDescriptor, {
+        allowsSituationalModifier: true, allowAdvantage: false,
+        product: 'count', direction: 'under', comparison: 'exceed', modifierDestination: 'threshold',
+      });
+      assert.equal(JSON.stringify(hidden).includes(canary), false);
+      assert.equal(/98\d/.test(JSON.stringify(hidden.response.promptDescriptor)), false, 'no pool, threshold, die, rule or required number');
+    } finally {
+      globalThis.game = originalGame;
+      globalThis.fromUuid = originalFromUuid;
+    }
+  });
+
   /**
    * `source-owner-required` was spelled, localized and vocabulary-tested, but nothing proved it
    * FIRES (issue 1648, Q-H5): deleting the gate, or making `journalSourcesOwnedBy` return `true`,

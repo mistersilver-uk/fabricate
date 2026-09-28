@@ -110,6 +110,79 @@ export const CASES = Object.freeze([
     ],
   }),
   playerCase({
+    id: 'player-crafting-roll-prompt-count',
+    label: 'Player app — success-counting crafting roll prompt, modifiers add dice',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', dialog: 'open', rollPromptState: 'count' },
+    steps: [
+      { selector: '.crafting-recipe-row[data-recipe-id="sm-r-horseshoe"]' },
+      { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
+    ],
+    expectSelector:
+      `${SINGLE_PROMPT}:not(:has(button[data-action="advantage"]))` +
+      ':has(.manager-modal-subtitle:text-is("Sera Vane · Fine Craft"))' +
+      ':has(.formula-content .formula[data-roll-prompt-count="over"]:text-is("6d10 · each ≥ 8"))' +
+      ':has(.formula-content .formula-note:text-is("Success on ≥ 8 · best face explodes · worst face cancels"))' +
+      ':has(.formula-content .manager-chip[data-roll-prompt-required="2"]:has-text("2 successes needed"))' +
+      ':has(.static-modifiers .manager-chip:has-text("Steady hands +1"))' +
+      ':has(.static-modifiers > .help:text-is("Each adds dice."))',
+    kinds: ['player', 'crafting'],
+    sourceMatches: [
+      CRAFTING_SIMPLE,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target)?\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
+    ],
+  }),
+  playerCase({
+    id: 'player-crafting-roll-prompt-count-threshold',
+    label: 'Player app — success-counting crafting roll prompt, modifiers move the threshold',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', dialog: 'open', rollPromptState: 'count-threshold' },
+    steps: [
+      { selector: '.crafting-recipe-row[data-recipe-id="sm-r-horseshoe"]' },
+      { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
+    ],
+    expectSelector:
+      `${SINGLE_PROMPT}:not(:has(button[data-action="advantage"]))` +
+      ':has(.manager-modal-subtitle:text-is("Sera Vane · Complex Work"))' +
+      ':has(.formula-content .formula[data-roll-prompt-count="under"]:text-is("2d20 · each ≤ 14"))' +
+      ':has(.formula-content .formula-note:text-is("Success on ≤ 14 (@abilities.int.mod + 11)"))' +
+      ':has(.formula-content .manager-chip[data-roll-prompt-required="2"]:has-text("2 successes needed"))' +
+      ':has(.static-modifiers .manager-chip:has-text("Steady hands +1"))' +
+      ':has(.static-modifiers > .help:text-is("Each moves the threshold."))',
+    kinds: ['player', 'crafting'],
+    sourceMatches: [
+      CRAFTING_SIMPLE,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target)?\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
+    ],
+  }),
+  // The recipe detail behind the count prompt: the pool line in place of a formula, and no DC chip.
+  playerCase({
+    id: 'player-crafting-check-count',
+    label: 'Player app — success-counting crafting check in the recipe detail',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', rollPromptState: 'count' },
+    steps: [
+      { selector: '.crafting-recipe-row[data-recipe-id="sm-r-horseshoe"]' },
+      { selector: '[data-recipe-section="check"]', scroll: true },
+    ],
+    expectSelector:
+      '[data-recipe-section="check"][data-check-usable="true"]' +
+      ':has([data-check-formula] code:text-is("6d10 · each ≥ 8"))' +
+      ':not(:has([data-check-dc]))',
+    kinds: ['player', 'crafting'],
+    sourceMatches: [
+      CRAFTING_SHARED,
+      CRAFTING_SIMPLE,
+      /^src\/ui\/presenters\/CraftingListingBuilder\.js$/,
+      /^src\/ui\/svelte\/stores\/craftingStore/,
+    ],
+  }),
+  playerCase({
     id: 'player-crafting-roll-prompt-light',
     label: 'Player app — light frame crafting roll prompt',
     smokeLabels: [],
