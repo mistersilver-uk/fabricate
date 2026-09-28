@@ -80,8 +80,9 @@ export function underTargetPromptFields(
 
 /**
  * A count prompt's fields: the pre-modifier pool, threshold and face rules from the pool resolved
- * before the prompt opens (`policy`, or null), and the required count, or null for a progressive
- * check. `thresholdSource` is the authored threshold when it is not a plain number.
+ * before the prompt opens (`policy`, or null), and the required count, or null when nothing grades
+ * against it: a progressive or fixed-range routed check, or a hidden gathering task.
+ * `thresholdSource` is the authored threshold when it is not a plain number.
  */
 export function countPromptFields(evaluation, policy, required) {
   return {
