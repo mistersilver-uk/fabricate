@@ -38,6 +38,7 @@
 {#snippet field()}
   <input
     type="text"
+    class:is-plain={!sigil}
     value={displayValue}
     {placeholder}
     {disabled}
@@ -55,3 +56,13 @@
 {:else}
   {@render field()}
 {/if}
+
+<style>
+  /* THE PLAIN FIELD IS THE LIBRARY'S MONO FIELD (`<ExprInput>`): an expression is typed in the mono
+     face every number a GM compares or tunes takes. The affixed branch keeps its wrapper's type. */
+  .is-plain {
+    font-family: var(--fab-font-mono);
+    font-size: 11.5px;
+    font-weight: 500;
+  }
+</style>
