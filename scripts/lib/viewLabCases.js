@@ -541,38 +541,53 @@ const RUN_STATE_KEY_PATTERN = /^(?:'([^']+)'|([A-Za-z_$][\w$]*)):/;
 /** A state named alone on a line of a spread list, as the history states are. */
 const RUN_STATE_LIST_ENTRY_PATTERN = /^\s+'([^']+)',$/;
 
-/** The 1-based, inclusive span of every entry in one run-state table, keyed by state. */
-function runStateTableRegions(sourceLines, { within, open, close, indent }) {
+/** A bracket that closes an entry when it sits at the entry's own indent. */
+const RUN_STATE_CLOSE_PATTERN = /^[)\]}]/;
+
+/** The 0-based bounds of one run-state table, or null when the file no longer carries it. */
+function runStateTableSpan(sourceLines, { within, open, close }) {
   const from = sourceLines.indexOf(within);
   const start = from === -1 ? -1 : sourceLines.indexOf(open, from);
   const end = start === -1 ? -1 : sourceLines.indexOf(close, start + 1);
-  if (end === -1) return null;
+  return end === -1 ? null : { start, end };
+}
 
-  const regions = [];
-  const entryIndent = ' '.repeat(indent);
-  let entry = null;
-  for (let index = start + 1; index < end; index += 1) {
-    const line = sourceLines[index];
-    if (line.startsWith(`${entryIndent} `)) {
-      if (entry) entry.end = index + 1;
-      const listed = entry ? null : RUN_STATE_LIST_ENTRY_PATTERN.exec(line);
-      if (listed) regions.push({ key: listed[1], start: index + 1, end: index + 1 });
-      continue;
-    }
-    // A bracket at the entry's own indent closes it; anything else there — a comment, a spread —
-    // ends it without belonging to it.
-    if (entry && /^[)\]}]/.test(line.slice(indent))) {
-      entry.end = index + 1;
-      entry = null;
-      continue;
-    }
-    const keyed = line.startsWith(entryIndent)
-      ? RUN_STATE_KEY_PATTERN.exec(line.slice(indent))
-      : null;
-    entry = keyed ? { key: keyed[1] ?? keyed[2], start: index + 1, end: index + 1 } : null;
-    if (entry) regions.push(entry);
+/** The state a line at the entry indent opens, or null. */
+function runStateKeyAt(line, indent) {
+  if (!line.startsWith(' '.repeat(indent))) return null;
+  const keyed = RUN_STATE_KEY_PATTERN.exec(line.slice(indent));
+  return keyed ? (keyed[1] ?? keyed[2]) : null;
+}
+
+/** Fold one table line into the walk: extend, close or open an entry, or record a listed state. */
+function consumeRunStateLine(walk, line, lineNumber, indent) {
+  if (line.startsWith(' '.repeat(indent + 1))) {
+    const listed = walk.entry ? null : RUN_STATE_LIST_ENTRY_PATTERN.exec(line);
+    if (walk.entry) walk.entry.end = lineNumber;
+    if (listed) walk.regions.push({ key: listed[1], start: lineNumber, end: lineNumber });
+    return;
   }
-  return regions;
+  // A bracket at the entry's own indent closes it; anything else there — a comment, a spread —
+  // ends it without belonging to it.
+  if (walk.entry && RUN_STATE_CLOSE_PATTERN.test(line.slice(indent))) {
+    walk.entry.end = lineNumber;
+    walk.entry = null;
+    return;
+  }
+  const key = runStateKeyAt(line, indent);
+  walk.entry = key ? { key, start: lineNumber, end: lineNumber } : null;
+  if (walk.entry) walk.regions.push(walk.entry);
+}
+
+/** The 1-based, inclusive span of every entry in one run-state table, keyed by state. */
+function runStateTableRegions(sourceLines, table) {
+  const span = runStateTableSpan(sourceLines, table);
+  if (!span) return null;
+  const walk = { regions: [], entry: null };
+  for (let index = span.start + 1; index < span.end; index += 1) {
+    consumeRunStateLine(walk, sourceLines[index], index + 1, table.indent);
+  }
+  return walk.regions;
 }
 
 /**
