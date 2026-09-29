@@ -16,14 +16,13 @@
 <script>
   import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
   import { localize } from '../../../util/foundryBridge.js';
-  import RollDataExpressionInput from '../RollDataExpressionInput.svelte';
   import {
     MULTIPLIER_STOPS,
     formatCheckAdjustment,
     parseCheckAdjustment,
   } from './checkAdjustmentLabel.js';
+  import CheckCharacterValueField from './CheckCharacterValueField.svelte';
   import { interpolate, underComparisonPhrase } from './checksCopy.js';
-  import { targetValueStatus } from './checkTargetStatus.js';
   import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
   import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import Stepper from '../../../components/Stepper.svelte';
@@ -210,12 +209,7 @@
   ];
   const COMPARISON_OPTIONS = $derived(under ? COMPARISON_UNDER : COMPARISON_OVER);
 
-  // What the character value resolves to for the Preview-as actor, never read as zero.
   const expression = $derived(normalized.target.expression);
-  const resolution = $derived(targetValueStatus(expression, character, text));
-  const uid = $props.id();
-  const hintId = `${uid}-target-expression-hint`;
-  const resolutionId = `${uid}-target-resolution`;
 
   const formatAdjustment = (value) => formatCheckAdjustment(adjustmentKind, value);
   const parseAdjustment = (value) => parseCheckAdjustment(adjustmentKind, value);
@@ -273,37 +267,17 @@
           <span class="manager-checks-difficulty-label">
             {text('FABRICATE.Admin.Manager.Checks.Evaluation.SourceAttribute', 'Character value')}
           </span>
-          <RollDataExpressionInput
-            sigil={false}
-            dataField="check-target-expression"
-            inputAttrs={{
-              'data-check-target-expression': '',
-              'data-validation-target': 'checks-target-expression',
-              'aria-label': text(
-                'FABRICATE.Admin.Manager.Checks.Evaluation.SourceAttribute',
-                'Character value'
-              ),
-              'aria-describedby': resolution ? `${hintId} ${resolutionId}` : hintId,
-            }}
+          <CheckCharacterValueField
             value={expression}
-            placeholder="@skills.craft.value"
+            {character}
+            label={text(
+              'FABRICATE.Admin.Manager.Checks.Evaluation.SourceAttribute',
+              'Character value'
+            )}
+            hook="check-target"
+            inputAttrs={{ 'data-validation-target': 'checks-target-expression' }}
             onChange={(next) => emitTarget({ expression: next })}
           />
-          <!-- The path syntax stays the field's description for assistive tech; the prototype
-               draws only the live reading beneath the field. -->
-          <small class="visually-hidden" id={hintId} data-check-target-expression-hint>
-            {text(
-              'FABRICATE.Admin.Manager.Checks.Evaluation.ValueHint',
-              'A character path with its leading @, or arithmetic on paths without dice, such as @skills.craft.value - 2.'
-            )}
-          </small>
-          {#if resolution}
-            <small
-              class="manager-muted"
-              id={resolutionId}
-              data-check-target-resolution={resolution.tone}>{resolution.text}</small
-            >
-          {/if}
         </div>
         <div class="manager-checks-difficulty-field is-comparison">
           <span class="manager-checks-difficulty-label">
@@ -363,27 +337,30 @@
           />
         {/if}
       </div>
-      <div class="manager-checks-difficulty-field is-comparison">
-        <span class="manager-checks-difficulty-label">
-          {text('FABRICATE.Admin.Manager.Checks.Crafting.ThresholdComparison', 'Comparison')}
-        </span>
-        <!-- A SEGMENTED CONTROL rather than a `<select>`: two options is not a list to open, both
+      <!-- Under count `thresholdMode` is the per-die test, edited only under `Success on`. -->
+      {#if normalized.product !== 'count'}
+        <div class="manager-checks-difficulty-field is-comparison">
+          <span class="manager-checks-difficulty-label">
+            {text('FABRICATE.Admin.Manager.Checks.Crafting.ThresholdComparison', 'Comparison')}
+          </span>
+          <!-- A SEGMENTED CONTROL rather than a `<select>`: two options is not a list to open, both
              readings are on screen at once, and the one in force is lit. -->
-        <SegmentedControl
-          fill
-          density="field"
-          options={COMPARISON_OPTIONS}
-          value={comparison}
-          groupName="check-threshold-mode"
-          ariaLabel={text(
-            'FABRICATE.Admin.Manager.Checks.Crafting.ThresholdComparison',
-            'Comparison'
-          )}
-          dataAttr="data-threshold-mode"
-          optionDataAttr="data-threshold-mode-option"
-          onChange={(next) => onChange({ thresholdMode: next })}
-        />
-      </div>
+          <SegmentedControl
+            fill
+            density="field"
+            options={COMPARISON_OPTIONS}
+            value={comparison}
+            groupName="check-threshold-mode"
+            ariaLabel={text(
+              'FABRICATE.Admin.Manager.Checks.Crafting.ThresholdComparison',
+              'Comparison'
+            )}
+            dataAttr="data-threshold-mode"
+            optionDataAttr="data-threshold-mode-option"
+            onChange={(next) => onChange({ thresholdMode: next })}
+          />
+        </div>
+      {/if}
     </div>
   </div>
 </InspectorCard>
@@ -413,23 +390,5 @@
   .manager-checks-difficulty-fields[data-check-attribute-fields]
     + .manager-checks-difficulty-fields {
     margin-top: var(--fab-space-3);
-  }
-
-  [data-check-attribute-fields] small {
-    font-size: 10px;
-    font-weight: 500;
-    line-height: 1.45;
-  }
-
-  [data-check-target-resolution='muted'] {
-    color: var(--fab-text-subtle);
-  }
-
-  [data-check-target-resolution='resolved'] {
-    color: var(--fab-text-secondary);
-  }
-
-  [data-check-target-resolution='unresolved'] {
-    color: var(--fab-danger-text);
   }
 </style>

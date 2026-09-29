@@ -36,7 +36,12 @@
   import CheckFormulaFields from './CheckFormulaFields.svelte';
   import CheckRecipeTiers from './CheckRecipeTiers.svelte';
   import CheckTriggers from './CheckTriggers.svelte';
-  import { checkTargetChip, checkTypeOptions, outcomeThresholdLabels } from './checksCopy.js';
+  import {
+    checkTargetChip,
+    checkTypeOptions,
+    formulaCardLead,
+    outcomeThresholdLabels,
+  } from './checksCopy.js';
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import Select from '../../../components/Select.svelte';
   import { previewRecordSelectOptions } from './checksSelectOptions.js';
@@ -79,6 +84,8 @@
     previewModifierTotal = 0,
     trackMin = null,
     trackMax = null,
+    // The preview's `{ placement, odds }` a counting Formula card composes from (issue 2006).
+    countPreview = null,
     onSelectPreviewRecord = () => {},
     onChange = () => {},
   } = $props();
@@ -421,7 +428,9 @@
             {text('FABRICATE.Admin.Manager.Checks.Crafting.FormulaTitle', 'Formula')}
           </h3>
           <p class="manager-checks-card-description">
-            {text(
+            {formulaCardLead(
+              evaluation,
+              text,
               'FABRICATE.Admin.Manager.Checks.Crafting.FormulaLead',
               'Rolled once per attempt. Modifiers from the Modifiers tab are applied by the check; they never appear in the formula.'
             )}
@@ -441,6 +450,8 @@
           {targetChip}
           underTier={previewTierAdjustment(evaluation, previewedTier)}
           offerSituationalBonus={value?.offerSituationalBonus !== false}
+          character={previewCharacter}
+          {countPreview}
           onChange={emit}
         />
       </div>

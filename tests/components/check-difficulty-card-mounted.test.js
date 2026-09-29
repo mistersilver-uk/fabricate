@@ -35,6 +35,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
+    'src/ui/svelte/apps/manager/checks/CheckCharacterValueField.svelte',
     'src/ui/svelte/apps/manager/checks/CheckDifficultyCard.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/checks/CheckDifficultyCard.svelte',

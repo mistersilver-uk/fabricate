@@ -470,3 +470,83 @@ describe('count readiness on the route', () => {
     assert.ok(!root.querySelector('[data-checks-section-notice="noRollFormula"]'));
   });
 });
+
+// The Formula card's reading and actor line are composed by ChecksView from the same preview the
+// odds panel reads, so this needs the whole view (issue 2006, N6).
+describe('the Formula card reads the odds panel and the preview placement (issue 2006)', () => {
+  const reading = (root) => root.querySelector('[data-check-count-expected]');
+  const expected = (root) =>
+    root.querySelector('[data-checks-odds-domain]')?.dataset.checksOddsExpected ?? null;
+  const KNACK = (expression) => ({
+    modifiers: [{ id: 'knack', label: 'Knack', expression }],
+    craftingDefaultModifierPolicy: 'addAll',
+    craftingDefaultModifierIds: ['knack'],
+  });
+
+  it('crafting: expected successes equals the odds heading, and the actor line composes', async () => {
+    script([]);
+    const root = await mountSimple(SMITHING);
+    assert.ok(!reading(root), 'no reading while the odds wait for an actor');
+    await choosePreviewActor(root, 'idrin');
+    assert.equal(expected(root), '1.33');
+    assert.equal(reading(root).dataset.checkCountExpected, expected(root));
+    assert.equal(reading(root).dataset.checkCountExpectedStatus, 'nearly-exact');
+    assert.equal(
+      root.querySelector('[data-check-count-actor-line]').textContent.trim(),
+      'For Idrin: 6d10, each ≥ 8.'
+    );
+  });
+
+  it('salvage: a literal pool reads 1.30 with no actor, as the odds panel does', async () => {
+    script([]);
+    const root = await harness.mount({
+      activity: 'salvage',
+      salvageResolutionMode: 'simple',
+      salvageCheckSimple: {
+        ...SMITHING,
+        evaluation: pool({ die: 20, base: '2', threshold: '8', required: 1 }),
+        tiers: [],
+      },
+      activation: { salvage: { enabled: true, optional: false } },
+      features: { salvage: true },
+    });
+    await settle();
+    assert.equal(expected(root), '1.30');
+    assert.equal(reading(root).dataset.checkCountExpected, '1.30');
+    assert.equal(reading(root).dataset.checkCountExpectedStatus, 'exact');
+  });
+
+  it('a library benefit grows the pool once in the actor line and the odds', async () => {
+    script([]);
+    const root = await mountSimple(SMITHING, KNACK('1'));
+    await choosePreviewActor(root, 'idrin');
+    assert.equal(
+      root.querySelector('[data-check-count-actor-line]').textContent.trim(),
+      'For Idrin: 7d10, each ≥ 8 (pool 6 grown by 1).'
+    );
+    assert.equal(reading(root).dataset.checkCountExpected, expected(root));
+  });
+
+  it('both readings vanish when a rolled benefit cannot be enumerated', async () => {
+    // The core double rolls one `NdX` term only, so a library fragment `(1d2x)` is proved rollable
+    // by a Roll with no synchronous evaluation, which the rollability check accepts.
+    const previous = globalThis.Roll;
+    globalThis.Roll = class ParseOnlyRoll {
+      static replaceFormulaData(formula) {
+        return formula;
+      }
+    };
+    try {
+      const root = await mountSimple(SMITHING, KNACK('1d2x'));
+      await choosePreviewActor(root, 'idrin');
+      assert.equal(odds(root).dataset.checksOddsReason, 'modifier-preroll-not-enumerable');
+      assert.ok(!reading(root), 'the reading abstains with the odds, never showing 0');
+      assert.equal(
+        root.querySelector('[data-check-count-actor-line]').textContent.trim(),
+        'For Idrin: 6d10 + (1d2x) dice, each ≥ 8.'
+      );
+    } finally {
+      globalThis.Roll = previous;
+    }
+  });
+});

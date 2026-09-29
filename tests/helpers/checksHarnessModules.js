@@ -80,6 +80,7 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/checks/checkReadoutModel.js',
   // The success-counting preview the model delegates to (issue 2004).
   'src/ui/svelte/apps/manager/checks/countPreviewModel.js',
+  'src/ui/svelte/apps/manager/checks/countInsetModel.js',
   // The Studio's adjustment labels and read-only band pictures (issue 2005).
   'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
   'src/utils/checkAdjustmentFormat.js',
@@ -193,6 +194,10 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/checks/CheckFailurePolicy.svelte',
   // The Formula card's `In the roll prompt` group and the routed outcome row (issue 2005).
   'src/ui/svelte/apps/manager/checks/CheckPromptOptions.svelte',
+  'src/ui/svelte/apps/manager/checks/CheckCharacterValueField.svelte',
+  'src/ui/svelte/apps/manager/checks/CheckCountInputField.svelte',
+  'src/ui/svelte/apps/manager/checks/CheckCountInset.svelte',
+  'src/ui/svelte/apps/manager/checks/CheckCountPoolFields.svelte',
   'src/ui/svelte/apps/manager/checks/CheckOutcomeRow.svelte',
   // The progressive editor's roll-under refusal (issue 2005).
   'src/ui/svelte/components/Notice.svelte',

@@ -13,6 +13,7 @@
   import Notice from '../../../components/Notice.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { targetRefusalSentence } from './checkTargetStatus.js';
+  import { formulaCardLead } from './checksCopy.js';
   import CheckFormulaFields from './CheckFormulaFields.svelte';
   import CheckAwardMode from './CheckAwardMode.svelte';
   import CheckTriggers from './CheckTriggers.svelte';
@@ -29,6 +30,9 @@
     appliedModifiers = [],
     modifierPolicy = 'addAll',
     recordNoun = 'recipe',
+    // The Preview-as actor and the preview's `{ placement, odds }` a counting Formula card reads.
+    previewCharacter = null,
+    countPreview = null,
     onChange = () => {},
   } = $props();
 
@@ -56,7 +60,9 @@
             {text('FABRICATE.Admin.Manager.Checks.Crafting.FormulaTitle', 'Formula')}
           </h3>
           <p class="manager-checks-card-description">
-            {text(
+            {formulaCardLead(
+              value?.evaluation,
+              text,
               'FABRICATE.Admin.Manager.Checks.Crafting.ProgressiveLead',
               'Resolves to a numeric value, not a pass or fail. Modifiers from the Modifiers tab are applied by the check; they never appear in the formula.'
             )}
@@ -73,6 +79,8 @@
           evaluation={value?.evaluation ?? null}
           underNote={!refusal}
           offerSituationalBonus={value?.offerSituationalBonus !== false}
+          character={previewCharacter}
+          {countPreview}
           onChange={emit}
         />
       </div>

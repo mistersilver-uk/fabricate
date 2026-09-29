@@ -61,6 +61,7 @@
   import {
     buildOddsModel,
     buildReadoutModel,
+    countPreviewPlacement,
     labelPreviewRecords,
     previewAbstention,
     previewActorNote,
@@ -464,6 +465,7 @@
   // The evaluation the active editor stack authors, stated on the stack for its captures.
   const activeEvaluation = $derived(normalizeCheckEvaluation(activeCheck?.evaluation));
   const evaluationAttrs = $derived({
+    'data-checks-evaluation-product': activeEvaluation.product,
     'data-checks-evaluation-direction': activeEvaluation.direction,
     'data-checks-target-source': activeEvaluation.target.source,
     'data-checks-adjustment-kind': activeEvaluation.target.adjustmentKind,
@@ -1019,6 +1021,9 @@
     previewRecordId = id;
   }
 
+  // A counting Formula card's inset and reading: this preview's placement and its own odds model.
+  const countPreview = $derived({ placement: countPreviewPlacement(previewPlan), odds: oddsModel });
+
   // Spread rather than restated at ten call sites: the prop list IS the contract.
   const routedPreviewProps = $derived({
     previewRecords,
@@ -1029,6 +1034,7 @@
     previewModifierTotal,
     trackMin: previewTrackRange.min,
     trackMax: previewTrackRange.max,
+    countPreview,
     onSelectPreviewRecord: selectPreviewRecord,
   });
   const simplePreviewProps = $derived({
@@ -1039,6 +1045,7 @@
     trackMax: previewTrackRange.max,
     previewCharacter,
     previewModifierTotal,
+    countPreview,
     onSelectPreviewRecord: selectPreviewRecord,
   });
   const previewActorSummary = $derived(
@@ -1501,6 +1508,8 @@
             />
           {:else}
             <ProgressiveCraftingCheckEditor
+              {previewCharacter}
+              {countPreview}
               {recordNoun}
               {appliedModifiers}
               modifierPolicy={appliedModifierPolicy}
@@ -1594,6 +1603,8 @@
             />
           {:else if salvageProgressive}
             <ProgressiveCraftingCheckEditor
+              {previewCharacter}
+              {countPreview}
               {recordNoun}
               {appliedModifiers}
               modifierPolicy={appliedModifierPolicy}
@@ -1712,6 +1723,8 @@
         <div class="manager-checks-editor-stack" data-checks-panel="gathering" {...evaluationAttrs}>
           {#if gatheringProgressive}
             <ProgressiveCraftingCheckEditor
+              {previewCharacter}
+              {countPreview}
               {recordNoun}
               {appliedModifiers}
               modifierPolicy={appliedModifierPolicy}

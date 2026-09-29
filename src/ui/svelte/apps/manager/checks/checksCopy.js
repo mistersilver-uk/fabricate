@@ -391,6 +391,25 @@ export function underComparisonPhrase(thresholdMode, text) {
     : text('FABRICATE.Admin.Manager.Checks.Evaluation.CmpMeet', 'at or under');
 }
 
+/** A count's per-die comparison word: `at or above` / `above` over, `at or under` / `under` under. */
+export function countComparisonPhrase(direction, thresholdMode, text) {
+  if (direction === 'under') return underComparisonPhrase(thresholdMode, text);
+  return thresholdMode === 'exceed'
+    ? text('FABRICATE.Admin.Manager.Checks.Count.CmpOverExceed', 'above')
+    : text('FABRICATE.Admin.Manager.Checks.Count.CmpOverMeet', 'at or above');
+}
+
+/** The Formula card's lead: a counting check is built from controls, not typed. */
+export function formulaCardLead(evaluation, text, key, fallback) {
+  if (evaluation?.product === 'count') {
+    return text(
+      'FABRICATE.Admin.Manager.Checks.Count.FormulaLead',
+      'Built from the controls below, so every part of the roll can be checked.'
+    );
+  }
+  return text(key, fallback);
+}
+
 /**
  * The Formula inset's target chip: `Target {dc}` for a fixed source, else the character expression,
  * or `Character value` while none is written.

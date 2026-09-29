@@ -79,6 +79,15 @@ const harness = createMountedComponentHarness({
     // An issue 1097 addition, and ONLY the dependency manifest.
     'src/ui/svelte/components/ThresholdBandStrip.svelte',
     'src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte',
+    // The counting pool and the shared character-value field (issue 2006). Manifest only.
+    'src/ui/svelte/components/Select.svelte',
+    'src/ui/svelte/components/SearchablePopover.svelte',
+    'src/ui/svelte/components/SearchablePopoverPanel.svelte',
+    'src/ui/svelte/components/EmptyState.svelte',
+    'src/ui/svelte/apps/manager/checks/CheckCharacterValueField.svelte',
+    'src/ui/svelte/apps/manager/checks/CheckCountInputField.svelte',
+    'src/ui/svelte/apps/manager/checks/CheckCountInset.svelte',
+    'src/ui/svelte/apps/manager/checks/CheckCountPoolFields.svelte',
     // The tier card renders the product's ONE ordered list (issue 1512), which draws its controls
     // through the icon button and its opener through the row disclosure.
     'src/ui/svelte/components/SortableList.svelte',

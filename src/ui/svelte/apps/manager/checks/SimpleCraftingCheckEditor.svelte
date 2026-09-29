@@ -26,7 +26,7 @@
   import { previewRecordSelectOptions } from './checksSelectOptions.js';
   import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
   import { activeCheckEvaluation } from '../../../../../systems/checkTarget.js';
-  import { checkTargetChip } from './checksCopy.js';
+  import { checkTargetChip, formulaCardLead } from './checksCopy.js';
   import { previewTierAdjustment } from './checkAdjustmentLabel.js';
   import {
     bandsAreEditable,
@@ -63,6 +63,8 @@
     previewCharacter = null,
     // The previewed actor's flat check-modifier total; a roll-under strip adds it to the target.
     previewModifierTotal = 0,
+    // The preview's `{ placement, odds }` a counting Formula card composes from (issue 2006).
+    countPreview = null,
     onSelectPreviewRecord = () => {},
     onChange = () => {},
   } = $props();
@@ -189,7 +191,9 @@
             {text('FABRICATE.Admin.Manager.Checks.Crafting.FormulaTitle', 'Formula')}
           </h3>
           <p class="manager-checks-card-description">
-            {text(
+            {formulaCardLead(
+              evaluation,
+              text,
               'FABRICATE.Admin.Manager.Checks.Crafting.FormulaLead',
               'Rolled once per attempt. Modifiers from the Modifiers tab are applied by the check; they never appear in the formula.'
             )}
@@ -208,6 +212,8 @@
           {targetChip}
           underTier={previewTierAdjustment(evaluation, previewedTier)}
           offerSituationalBonus={value?.offerSituationalBonus !== false}
+          character={previewCharacter}
+          {countPreview}
           onChange={emit}
         />
       </div>

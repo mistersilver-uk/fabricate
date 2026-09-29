@@ -105,6 +105,12 @@ function countPlacement(plan, Roll) {
   return planDecisionPlacement({ evaluation, toolContributions, selected }).placementPlan;
 }
 
+/** The Formula inset's placement for a count preview with an actor (issue 2006), else null. */
+export function countPreviewPlacement(plan, { Roll = globalThis.Roll } = {}) {
+  if (!plan?.kind || plan.evaluation?.product !== 'count' || !plan.actor) return null;
+  return countPlacement(plan, Roll);
+}
+
 const FACE_AGGREGATES = new Set(['anyDie', 'allDice']);
 
 /**
@@ -305,7 +311,8 @@ export function buildCountOddsModel(plan, enumeration, sandbox, text) {
   }
   const rows = countRows(plan, enumeration, sandbox, text);
   const { expected, domain } = countDomain(enumeration.odds, text);
-  return { kind, direction, product: 'count', enumerable: true, rows, expected, domain };
+  const { status } = enumeration.odds;
+  return { kind, direction, product: 'count', enumerable: true, rows, expected, domain, status };
 }
 
 const MARKS = Object.freeze([
