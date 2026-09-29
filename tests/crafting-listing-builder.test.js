@@ -1529,6 +1529,10 @@ describe('CraftingListingBuilder — the check card names a roll-under or charac
       }
     });
 
+    it('treats an unresolvable non-dice bonus as absent, not pending (issue 2098 F1)', () => {
+      assert.equal(cardWith({ 'set-1': [toolState('@skills.missing + 2')] }).text, 'Target 11 · stay at or under');
+    });
+
     it('omits the bonus when it depends on which set the prompt is given (an ambiguous choice)', () => {
       const sets = [{ id: 'set-1' }, { id: 'set-2' }];
       assert.equal(cardWith({ 'set-1': [toolState('2')], 'set-2': [toolState('3')] }, sets).text, 'Target 11 · stay at or under');
@@ -1537,6 +1541,18 @@ describe('CraftingListingBuilder — the check card names a roll-under or charac
         'Target 13 · stay at or under',
         'the same bonus whichever set is used is no choice at all'
       );
+    });
+
+    it('omits an ambiguous rolled bonus rather than merging different dice into one pending value (issue 2098)', () => {
+      const sets = [{ id: 'set-1' }, { id: 'set-2' }];
+      assert.equal(
+        cardWith({ 'set-1': [toolState('1d4')], 'set-2': [toolState('1d6')] }, sets).text,
+        'Target 11 · stay at or under'
+      );
+    });
+
+    it('reads the whole-recipe tool states when the recipe has no ingredient sets (issue 2098)', () => {
+      assert.equal(cardWith({ undefined: [toolState('2')] }, []).text, 'Target 13 · stay at or under');
     });
   });
 
