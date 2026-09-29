@@ -20,6 +20,7 @@
     evaluateCheckReadiness,
     sectionForIssue,
   } from './checksReadiness.js';
+  import { checksValidationRowStates } from './checksValidationRows.js';
 
   let {
     sections = [],
@@ -68,19 +69,20 @@
     }))
   );
 
-  // ONE row per check tick and per issue, BUILT in that order, so a group reads as "what holds"
-  // then "what does not"; an issue's row carries the deep-link target and a satisfied tick has
-  // nowhere to go. BUILT IS NOT RENDERED: `EditorValidationSurface` sorts each group with
-  // `block` first and a `critical` issue maps to `block`, so it RISES ABOVE EVERY TICK — the
-  // requirement being met, not a defect — and everything else is one rank, so below the
-  // criticals the order authored here is the order drawn.
+  // ONE ROW PER FAULT (issue 2083): `checksValidationRowStates` pairs a failing check with the
+  // issue it owns, so the readiness checklist line keeps its tick or cross on the SAME row the
+  // issue's severity and sentence render on, rather than adding a second "Warning" row beside it.
+  // BUILT IS NOT RENDERED: `EditorValidationSurface` sorts each group with `block` first and a
+  // `critical` issue maps to `block`, so it RISES ABOVE EVERY TICK — the requirement being met,
+  // not a defect — and everything else is one rank, so below the criticals the order authored
+  // here is the order drawn.
   //
   // A group with NEITHER still states its result, which is reachable: a gathering check in
   // `d100` mode with no eligible modifiers reports no tick and no issue, and dropping the group
   // would read as "gathering was not evaluated", a different and equally wrong claim.
-  function issueRow(subsystem, issue, transient) {
+  function issueRow(subsystem, issue, { transient = false, checkId = '' } = {}) {
     return {
-      id: issue.id,
+      id: checkId || issue.id,
       ...checkIssueText(issue.id, issue.data, text),
       status: issue.severity === 'critical' ? 'block' : 'warn',
       transient,
@@ -92,21 +94,27 @@
         'data-subsystem': subsystem,
         'data-issue': issue.id,
         'data-issue-severity': issue.severity,
+        ...(checkId && { 'data-satisfied': 'false' }),
         ...(transient && { 'data-issue-transient': '' }),
       },
     };
   }
 
+  function passRow(subsystem, checkId) {
+    return {
+      id: checkId,
+      title: checkLabel(checkId),
+      status: 'pass',
+      dataAttrs: { 'data-subsystem': subsystem, 'data-satisfied': 'true' },
+    };
+  }
+
   function rowsFor(subsystem, readiness) {
     const rows = [
-      ...readiness.checks.map((check) => ({
-        id: check.id,
-        title: checkLabel(check.id),
-        status: check.satisfied ? 'pass' : 'warn',
-        dataAttrs: { 'data-subsystem': subsystem, 'data-satisfied': String(check.satisfied) },
-      })),
-      ...readiness.issues.map((issue) => issueRow(subsystem, issue, false)),
-      ...(readiness.transient ?? []).map((issue) => issueRow(subsystem, issue, true)),
+      ...checksValidationRowStates(readiness).map(({ checkId, issue }) =>
+        issue ? issueRow(subsystem, issue, { checkId }) : passRow(subsystem, checkId)
+      ),
+      ...(readiness.transient ?? []).map((issue) => issueRow(subsystem, issue, { transient: true })),
     ];
     if (rows.length > 0) return rows;
     return [

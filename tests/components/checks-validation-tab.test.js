@@ -380,6 +380,59 @@ describe('ChecksValidationTab (mounted)', () => {
     harness.remount();
   });
 
+  it('shows a fault once, as its issue, when several success-counting checks fail at once (issue 2083)', async () => {
+    // Four checks fail together here (issue 2004's success-counting pools can fail up to seven
+    // ways at once): before this fix each one drew a generic checklist row AND its own issue
+    // row, so a single set of real faults read as double its own count.
+    const from = (value) => ({ enabled: true, faces: { kind: 'from', value } });
+    const target = await harness.mount({
+      sections: [
+        {
+          subsystem: 'crafting',
+          mode: 'simple',
+          check: {
+            rollFormula: '',
+            evaluation: {
+              product: 'count',
+              direction: 'over',
+              pool: { die: 20, base: '2', threshold: '13', required: 2, cancel: from(25), explode: from(1) },
+            },
+            tiers: [
+              { id: 'arcane', name: 'Arcane Work', successes: 3 },
+              { id: 'unset', name: 'Unset Work', successes: null },
+            ],
+          },
+        },
+      ],
+    });
+    for (const [id, checkId] of [
+      ['countFaceBeyondDie', 'countFacesOnDie'],
+      ['countExplodeUnbounded', 'countExplosionStops'],
+      ['countTierWithoutSuccesses', 'countTiersSetSuccesses'],
+      ['countRequiredExceedsMaxPool', 'countRequiredWithinMaxPool'],
+    ]) {
+      const rows = target.querySelectorAll(`[data-issue="${id}"]`);
+      assert.equal(rows.length, 1, `${id} reads once, not as a checklist row plus an issue row`);
+      assert.equal(
+        rows[0].dataset.check,
+        checkId,
+        `${id}'s row carries its owning check's tick/cross, on the SAME row`
+      );
+      assert.equal(rows[0].dataset.satisfied, 'false');
+    }
+    assert.deepEqual(
+      railCounts(target),
+      { passing: 2, warnings: 2, blocking: 2 },
+      'two real warnings and two real blockers — not four of each'
+    );
+    assert.deepEqual(
+      tallyMatchingRail(target),
+      railCounts(target),
+      'the rail is a tally of the rows, so a fault counted twice would disagree with itself'
+    );
+    harness.remount();
+  });
+
   it('deep-links each issue to the ACTIVITY and the SECTION that owns its control', async () => {
     // The whole point of rebuilding on the shared surface. A GM who reads "no roll formula"
     // on this route has to get to the control that fixes it, and the section is half of
