@@ -623,6 +623,34 @@ test('a Journal pass/fail roll hands back its final target, localized, and a sec
   }
 });
 
+test('the direct gathering prompt shows no DC for a fixed-range routed check, as crafting', async () => {
+  const gathering = Object.create(GatheringEngine.prototype);
+  const actor = { name: 'Ranger', system: {}, getRollData: () => ({}) };
+  const fixed = {
+    ...routedCheck(undefined),
+    type: 'fixed',
+    relativeOutcomes: [],
+    fixedOutcomes: [{ id: 'all', name: 'All', start: 1, end: 20, success: true }],
+  };
+  const seen = {};
+  for (const [site, routed] of Object.entries({ fixed, relative: routedCheck(undefined) })) {
+    installCountingRoll();
+    const surface = stubPromptSurface(() => null);
+    try {
+      await gathering._rollRoutedFormula({
+        routed, rollFormula: '1d20', actor, task: { name: 'Forage' }, interactive: true,
+      });
+      seen[site] = [surface.view.dc ?? null, surface.view.chipText];
+    } finally {
+      surface.restore();
+    }
+  }
+  assert.deepEqual(seen, {
+    fixed: [null, ''],
+    relative: [10, 'DC 10 · meet or beat'],
+  });
+});
+
 test('crafting takes the selected recipe tier adjustment over the base', async () => {
   const engine = Object.create(CraftingEngine.prototype);
   installCountingRoll();

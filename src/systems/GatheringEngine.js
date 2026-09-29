@@ -3854,7 +3854,8 @@ export class GatheringEngine {
           name: task?.name,
           activity: 'Gathering',
           img: task?.img,
-          dc: target.target,
+          // Fixed-type checks match by value range, so no DC chip or flavor is shown.
+          dc: routed.type === 'fixed' ? undefined : target.target,
           targetBasis: attributeTargetBasis(routed, {
             override: task?.adjustmentOverride,
             label: '',
