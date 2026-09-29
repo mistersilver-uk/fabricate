@@ -5,10 +5,10 @@
  */
 
 /** Past this, each runner's fixed setup (install, build, harvest) outweighs the frames it saves. */
-export const MAX_CAPTURE_SHARDS = 6;
+export const MAX_CAPTURE_SHARDS = 8;
 
 /** Below this many cases per runner a second runner costs more setup than it saves rendering. */
-export const CASES_PER_SHARD = 60;
+export const CASES_PER_SHARD = 45;
 
 /**
  * @param {number} size How many cases the selection holds.
@@ -58,8 +58,24 @@ export function sliceSelection(cases, count) {
   return slices
     .filter((slice) => slice.length > 0)
     .map((slice) =>
-      slice.sort((left, right) => left - right).map((position) => cases[position].id)
+      slice.toSorted((left, right) => left - right).map((position) => cases[position].id)
     );
+}
+
+/**
+ * The render matrix the capture workflow runs: none when the gate is unarmed, since nothing is
+ * rendered then and the chrome is verified by its own job either way.
+ *
+ * @param {Array<{id: string, distinctEvidenceGroup?: string}>} cases The selection, in order.
+ * @param {boolean} armed Whether the changed set arms `check-screenshots`.
+ * @returns {Array<{shard: number, ids: string}>} One entry per shard, numbered from 1.
+ */
+export function renderMatrix(cases, armed) {
+  const count = armed ? shardCountFor(cases.length) : 0;
+  return sliceSelection(cases, count).map((ids, index) => ({
+    shard: index + 1,
+    ids: ids.join(','),
+  }));
 }
 
 /**
@@ -97,7 +113,7 @@ export function mergeShardManifests(ids, manifests) {
   return {
     foundryVersion: first.foundryVersion,
     head: first.head,
-    frames: [...frames].sort((left, right) => left.id.localeCompare(right.id)),
-    failures: [...failures].sort((left, right) => ids.indexOf(left.id) - ids.indexOf(right.id)),
+    frames: frames.toSorted((left, right) => left.id.localeCompare(right.id)),
+    failures: failures.toSorted((left, right) => ids.indexOf(left.id) - ids.indexOf(right.id)),
   };
 }

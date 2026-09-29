@@ -17,7 +17,7 @@ import {
 import { join } from 'node:path';
 
 import { getCaseById } from './lib/viewLabCases.js';
-import { mergeShardManifests, shardCountFor, sliceSelection } from './lib/viewLabShards.js';
+import { mergeShardManifests, renderMatrix } from './lib/viewLabShards.js';
 
 const splitIds = (text) =>
   String(text ?? '')
@@ -30,13 +30,7 @@ function commandPlan([idText, hasUi]) {
     if (!viewCase) throw new Error(`no publishable case matches: ${id}`);
     return viewCase;
   });
-  // An unarmed gate renders nothing, so one runner does the chrome verification alone.
-  const count = hasUi === 'true' ? shardCountFor(cases.length) : Math.min(1, cases.length);
-  const matrix = sliceSelection(cases, count).map((ids, index) => ({
-    shard: index + 1,
-    ids: ids.join(','),
-  }));
-  process.stdout.write(JSON.stringify(matrix));
+  process.stdout.write(JSON.stringify(renderMatrix(cases, hasUi === 'true')));
 }
 
 function commandMerge([idText, shardsDir, outputDir]) {

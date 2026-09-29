@@ -3057,6 +3057,12 @@ test('adding one run state to labRunStates selects only the cases that render it
     selectedIds([LAB_RUN_STATES_PATH], labRunStatesFile.patches(runStateLines(state))),
     expected
   );
+  // A line inside a multi-line factory entry belongs to that entry, not to shared code.
+  const continuation = labRunStatesFile.lineOf("        waiting('lab-v1-paused', single(), {");
+  assert.deepEqual(
+    selectedIds([LAB_RUN_STATES_PATH], labRunStatesFile.patches([continuation])),
+    expected
+  );
 });
 
 test('an unattributable labRunStates patch widens to surface coverage, by union', () => {
@@ -5133,11 +5139,21 @@ test('the capture workflow renders and publishes the one id list it computed', (
     /path: \|\n\s+ui-screenshot-artifact\/apps\/\*\.png\n\s+ui-screenshot-artifact\/apps\/manifest\.json\n/
   );
   assert.doesNotMatch(workflow, /path:[^\n]*foundry-chrome/);
-  // The chrome-dependent suites verify one harvest, so they run on one shard rather than on all.
-  assert.match(
-    workflow,
-    /- name: Run every chrome-dependent suite[^\n]*\n(?:\s+#[^\n]*\n)*\s+if: matrix\.shard == 1\n/
-  );
+  // The chrome-dependent suites verify one harvest, so they run once, in their own job beside the
+  // shards, and the publish still waits for them.
+  const jobOf = (name) => {
+    const start = workflow.indexOf(`\n  ${name}:\n`);
+    assert.notEqual(start, -1, `pr-screenshots.yml has no ${name} job`);
+    const next = workflow.slice(start + 1).search(/\n {2}[a-z-]+:\n/);
+    return workflow.slice(start, next === -1 ? undefined : start + 1 + next);
+  };
+  assert.match(jobOf('verify-chrome'), /- name: Run every chrome-dependent suite/);
+  assert.doesNotMatch(jobOf('render'), /chrome-dependent suite, where/);
+  assert.match(jobOf('verify-chrome'), /\n {4}needs: select\n/);
+  assert.match(jobOf('capture'), /\n {4}needs: \[select, render, verify-chrome]\n/);
+  for (const name of ['render', 'verify-chrome']) {
+    assert.match(jobOf(name), /uses: \.\/\.github\/actions\/prepare-view-lab\n/);
+  }
 
   // The publish step names the directory the renderer writes. Derived from the runner rather than
   // trusted twice, so a moved output directory fails here instead of publishing an empty set.

@@ -55,20 +55,20 @@ concurrency:
   group: pr-screenshots-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
+# Read-only here; each write is granted on the one job that needs it (SonarCloud: capture alone
+# holds the PR write and the OIDC token, and no render shard holds any write at all).
 permissions:
   contents: read
-  pull-requests: write # to update the managed screenshot block
 
 jobs:
   # ONE selection, computed once, then split across parallel runners (issue 2119). A 357-frame
   # selection took 40 minutes and more on one runner; the maintainer's ruling is that no change may
   # wait that long. `render` is the matrix of shards and `capture` merges and publishes once.
   #
-  # THE THREE TIMEOUTS ARE ONE BUDGET. `check-screenshots` waits on this workflow's whole run,
-  # and its `--capture-timeout-minutes` in `ci.yml` must equal select + render + capture below;
-  # `tests/ci-workflow-semantics.test.js` asserts that sum. The render ceiling is the old single
-  # job's history re-derived for a shard: the full registry, split six ways, is about a hundred
-  # frames a runner.
+  # THE TIMEOUTS ARE ONE BUDGET. `check-screenshots` waits on this workflow's whole run, and its
+  # `--capture-timeout-minutes` in `ci.yml` must equal select + the longer of render and
+  # verify-chrome (which run side by side) + capture; `tests/ci-workflow-semantics.test.js`
+  # asserts that sum. The full registry, split eight ways, is about eighty frames a runner.
   select:
     # Same-repo PRs only. A fork PR has no secrets to harvest with and no write token to publish
     # with, so running it would produce a guaranteed red that its author cannot clear.
@@ -153,15 +153,14 @@ jobs:
             echo "No render file changed; check-screenshots is unarmed, so frames are verified but not rendered or published."
           fi
           # The shards: balanced, each in selection order, every distinct-evidence group on one
-          # runner so the renderer's byte-identity check still sees the whole group. One runner
-          # when the gate is unarmed, since it only verifies the chrome.
+          # runner so the renderer's byte-identity check still sees the whole group. None when
+          # the gate is unarmed; verify-chrome still verifies the harvest.
           MATRIX=$(node scripts/view-lab-shards.mjs plan "$IDS" "$HAS_UI")
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
 
-
   render:
     needs: select
-    if: needs.select.outputs.ids != ''
+    if: needs.select.outputs.ids != '' && needs.select.outputs.has_ui == 'true'
     name: Render shard ${{ matrix.shard }}
     runs-on: ubuntu-latest
     timeout-minutes: 50
@@ -182,103 +181,52 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
+      - name: Prepare the View Lab
+        uses: ./.github/actions/prepare-view-lab
+
+      - name: Render the selected frames
+        env:
+          CASE_IDS: ${{ matrix.ids }}
+        run: node scripts/view-lab-screenshots.mjs apps "$CASE_IDS"
+
+      # The PNGs and the manifest BY NAME, never the directory or a parent of it: see LICENSING
+      # above. A day is enough for `capture` to read them.
+      - name: Upload this shard's frames
+        uses: actions/upload-artifact@v6
         with:
-          node-version: 22
-          cache: npm
+          name: view-lab-shard-${{ matrix.shard }}
+          path: |
+            ui-screenshot-artifact/apps/*.png
+            ui-screenshot-artifact/apps/manifest.json
+          if-no-files-found: error
+          retention-days: 1
 
-      - name: Install dependencies
-        # `--ignore-scripts` (SonarCloud S6505): a dependency's install script would otherwise run
-        # arbitrary code on a runner that holds an OIDC role and a PR write token. Playwright's
-        # browser download is invoked explicitly below, so nothing here needs a lifecycle script.
-        run: npm ci --ignore-scripts
+  # The chrome-dependent suites verify the one harvest every shard draws from, so they run ONCE,
+  # beside the shards rather than ahead of any of them; `capture` needs this job, so a failed
+  # verification still withholds the publish.
+  verify-chrome:
+    needs: select
+    if: needs.select.outputs.ids != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
+      FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
+      FOUNDRY_LICENSE_KEY: ${{ secrets.FOUNDRY_LICENSE_KEY }}
+      FOUNDRY_ADMIN_KEY: fabricate-test-admin
+      FOUNDRY_TELEMETRY: "false"
 
-      - name: Cache Playwright Chromium
-        id: cache-playwright
-        uses: actions/cache@v5
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+    steps:
+      - uses: actions/checkout@v6
 
-      - name: Install Playwright Chromium
-        if: steps.cache-playwright.outputs.cache-hit != 'true'
-        run: npm run test:foundry:install
+      - name: Prepare the View Lab
+        uses: ./.github/actions/prepare-view-lab
 
-      # Caches the Foundry release ARCHIVE, which the harvest reads. This is the same cache entry
-      # the smoke workflow already maintains, reused rather than duplicated — deliberately, because
-      # a second entry holding licensed material is a second exposure.
-      - name: Cache Foundry binary
-        uses: actions/cache@v5
-        with:
-          path: .foundry-e2e/cache
-          key: foundry-binary-${{ runner.os }}-${{ hashFiles('docker-compose.foundry.yml') }}
-
-      # BEFORE the archive step, not after the harvest. On a cold cache that step boots Foundry, and
-      # `foundry-test-up.mjs` refuses to assemble a data directory without `dist/`. Building later
-      # worked only for as long as the cache probe was a `foundryvtt-*.zip` glob that a stale entry
-      # could satisfy; the moment the probe became exact, the first genuinely cold run failed here.
-      - name: Build module
-        run: npm run build
-
-      # The felddy image does NOT bundle Foundry; it authenticates and downloads on first boot. So
-      # on a cold archive cache there is no way to obtain the chrome without a credentialed boot,
-      # and the lab's "seconds, no Docker" property does not transfer to CI. This step pays that
-      # cost only when the cache missed.
-      #
-      # The probe names the EXACT archive the pinned image will download, not `foundryvtt-*.zip`.
-      # A glob is satisfied by whatever the cache happens to hold, so a restored entry carrying the
-      # previous major reported "warm", skipped the boot, and harvested the wrong Foundry's chrome —
-      # caught only by the provenance gate below, a whole CI cycle later.
-      - name: Obtain the Foundry release archive
-        run: |
-          VERSION=$(node --input-type=module -e "
-            import { readPinnedFoundryImage, foundryVersionFromTag } from './scripts/lib/foundryImagePin.js';
-            const { tag } = readPinnedFoundryImage('docker-compose.foundry.yml');
-            const version = foundryVersionFromTag(tag);
-            if (!version) throw new Error('the pinned image tag ' + tag + ' names no exact Foundry build');
-            process.stdout.write(version);
-          ")
-          ARCHIVE=".foundry-e2e/cache/foundryvtt-${VERSION}.zip"
-          if [ ! -f "$ARCHIVE" ]; then
-            echo "No cached $ARCHIVE — booting Foundry once to populate it."
-            npm run test:foundry:up
-            npm run test:foundry:down
-          else
-            echo "Archive cache is warm for $ARCHIVE; no boot required."
-          fi
-
-      - name: Harvest window chrome
-        run: npm run viewlab:chrome:harvest
-
-      # The chrome and the frame builder are two halves of one artefact: `foundryChromeSpec.js` is
-      # a hand transcription of `_renderFrame`/`_updateFrame`/`#applyPosition`, pinned by the
-      # `applicationMjsSha256` in committed provenance. A newer stylesheet rendered through markup
-      # transcribed from an older build gives genuine CSS around a stale DOM, and the PNG cannot
-      # tell you which — strictly worse than no frame, because a wrong frame is believed.
-      #
-      # CI never rewrites the provenance. That file is a human attestation that someone re-read
-      # `application.mjs` and confirmed the transcription still holds; a bot that refreshes it on
-      # mismatch converts the drift gate into a rubber stamp.
-      - name: Verify chrome matches committed provenance
-        run: |
-          PINNED=$(node -p "require('./tests/view-lab/chrome-provenance.json').foundryVersion")
-          HARVESTED=$(node -e "
-            import('./scripts/lib/foundryChromeCache.js').then(({ resolveChromeCache }) => {
-              const cache = resolveChromeCache(process.cwd());
-              process.stdout.write(cache ? cache.version : '');
-            });
-          ")
-          echo "pinned=$PINNED harvested=$HARVESTED"
-          if [ "$PINNED" != "$HARVESTED" ]; then
-            echo "::error::Harvested Foundry $HARVESTED does not match the pinned $PINNED."
-            echo "::error::Re-read client/applications/api/application.mjs, confirm the frame builder still transcribes it, and commit the refreshed provenance."
-            exit 1
-          fi
-
-      # Run the chrome-dependent suites ON THE RUNNER THAT DRAWS. `VIEWLAB_REQUIRE_CHROME=1` turns
-      # "no cache, skip" into a failure — but only for a process that actually runs them, which is
-      # why it is set here on the test command rather than on the job. Setting it as a job env var
+      # Run the chrome-dependent suites against the same harvest the shards draw with.
+      # `VIEWLAB_REQUIRE_CHROME=1` turns "no cache, skip" into a failure — but only for a process
+      # that actually runs them, which is why it is set here on the test command rather than on the job. Setting it as a job env var
       # alongside a job that never runs `npm test` reads as a safety control and is not one; this
       # file did exactly that until review caught it.
       #
@@ -323,8 +271,6 @@ jobs:
       # because it was transcribed in more places than that, which is the mirror rot this collapse
       # ends. No colon inside the name: a plain YAML scalar cannot carry one.
       - name: Run every chrome-dependent suite, where a missing harvest fails instead of skipping
-        # Once per run, not once per shard: every shard harvests the same chrome.
-        if: matrix.shard == 1
         env:
           VIEWLAB_REQUIRE_CHROME: '1'
         run: |
@@ -335,30 +281,11 @@ jobs:
             tests/components/component-edit-frame-rendered.test.js \
             tests/components/world-component-entry-frame-rendered.test.js
 
-      - name: Render the selected frames
-        if: needs.select.outputs.has_ui == 'true'
-        env:
-          CASE_IDS: ${{ matrix.ids }}
-        run: node scripts/view-lab-screenshots.mjs apps "$CASE_IDS"
-
-      # The PNGs and the manifest BY NAME, never the directory or a parent of it: see LICENSING
-      # above. A day is enough for `capture` to read them.
-      - name: Upload this shard's frames
-        if: needs.select.outputs.has_ui == 'true'
-        uses: actions/upload-artifact@v6
-        with:
-          name: view-lab-shard-${{ matrix.shard }}
-          path: |
-            ui-screenshot-artifact/apps/*.png
-            ui-screenshot-artifact/apps/manifest.json
-          if-no-files-found: error
-          retention-days: 1
-
-  # Runs only when every shard succeeded: a failed shard fails the run unpublished, as a failed
-  # render always has.
+  # Runs only when every shard and the chrome verification succeeded: a failure there fails the
+  # run unpublished, as a failed render always has.
   capture:
     if: github.event.pull_request.head.repo.full_name == github.repository
-    needs: [select, render]
+    needs: [select, render, verify-chrome]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # Declared at JOB level as well as workflow level (SonarCloud S8264): a job that writes to a PR
@@ -381,6 +308,8 @@ jobs:
 
       - name: Install dependencies
         if: needs.select.outputs.has_ui == 'true'
+        # `--ignore-scripts` (SonarCloud S6505): a dependency's install script would otherwise run
+        # arbitrary code on a runner that holds an OIDC role and a PR write token, as this one does.
         run: npm ci --ignore-scripts
 
       - name: Download every shard's frames

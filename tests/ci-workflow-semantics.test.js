@@ -231,21 +231,21 @@ test('the screenshot gate awaits the capture run for its own head, within pinned
   assert.match(gateStep.run, /--head-sha "\$HEAD_SHA"/);
   assert.equal(gateStep.env.HEAD_SHA, '${{ github.event.pull_request.head.sha }}');
 
-  // The capture deadline is READ from the producer, never restated. The producer is a chain —
-  // select, the render shards (which run side by side), then capture — so its budget is the sum.
+  // The capture deadline is READ from the producer, never restated. The producer is a chain of
+  // stages — select, then the render shards beside the chrome verification, then capture — so its
+  // budget is the sum over stages of each stage's longest job.
   const declaredCaptureMinutes = Number(flagValue(gateStep.run, '--capture-timeout-minutes'));
   const producerJobs = parseJobs(captureSource);
-  const chain = ['select', 'render', 'capture'];
-  for (const name of chain) {
-    assert.ok(
-      Number(producerJobs[name]?.['timeout-minutes']) > 0,
-      `pr-screenshots.yml's ${name} job declares no timeout-minutes`
-    );
-  }
+  const stages = [['select'], ['render', 'verify-chrome'], ['capture']];
+  const minutesOf = (name) => {
+    const minutes = Number(producerJobs[name]?.['timeout-minutes']);
+    assert.ok(minutes > 0, `pr-screenshots.yml's ${name} job declares no timeout-minutes`);
+    return minutes;
+  };
   assert.equal(
     declaredCaptureMinutes,
-    chain.reduce((sum, name) => sum + Number(producerJobs[name]['timeout-minutes']), 0),
-    "the gate's --capture-timeout-minutes must equal the producer chain's summed timeout-minutes"
+    stages.reduce((sum, stage) => sum + Math.max(...stage.map(minutesOf)), 0),
+    "the gate's --capture-timeout-minutes must equal the producer's summed stage timeouts"
   );
   assert.equal(flagValue(gateStep.run, '--capture-workflow'), 'pr-screenshots.yml');
 
@@ -288,6 +288,27 @@ test('the screenshot gate awaits the capture run for its own head, within pinned
   assert.ok(publishStep, 'capture no longer publishes screenshot evidence');
   assert.match(publishStep.run, /--head-sha "\$HEAD_SHA"/);
   assert.equal(publishStep.env.HEAD_SHA, '${{ github.event.pull_request.head.sha }}');
+});
+
+test('the capture workflow grants each write only on the one job that needs it', () => {
+  // SonarCloud: a workflow-level write reaches every job, render shards included, and those run
+  // the PR's own code with Foundry credentials in scope.
+  const source = readFileSync('.github/workflows/pr-screenshots.yml', 'utf8');
+  const topLevel = /^permissions:\n((?: {2}.*\n)+)/m.exec(source);
+  assert.ok(topLevel, 'pr-screenshots.yml declares no workflow-level permissions');
+  assert.doesNotMatch(topLevel[1], /:\s*write/, 'workflow-level permissions must be read-only');
+
+  const jobs = parseJobs(source);
+  for (const [name, job] of Object.entries(jobs)) {
+    assert.ok(job.permissions, `${name} inherits permissions instead of declaring its own`);
+  }
+  const writers = Object.entries(jobs)
+    .filter(([, job]) => Object.values(job.permissions).some((grant) => /\bwrite\b/.test(grant)))
+    .map(([name]) => name);
+  assert.deepEqual(writers, ['capture'], 'only the publishing job may hold a write permission');
+  for (const name of ['render', 'verify-chrome']) {
+    assert.deepEqual(jobs[name].permissions, { contents: 'read' }, `${name} must be read-only`);
+  }
 });
 
 // The release config and the workflows that carry its secrets (issue #1761).

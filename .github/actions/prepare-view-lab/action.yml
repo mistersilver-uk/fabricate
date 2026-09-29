@@ -1,0 +1,112 @@
+name: "Prepare the View Lab"
+description: >-
+  Everything a View Lab runner needs before it draws or verifies anything: Node.js and npm ci, the
+  cached Playwright Chromium, the cached Foundry release archive, the module build, the harvested
+  window chrome and the committed-provenance check. Shared by pr-screenshots.yml's render shards
+  and its chrome verification job, which run side by side.
+
+# The caller checks out first (a local composite is only resolvable after checkout) and sets the
+# FOUNDRY_* credentials as job env, which composite steps inherit. Composite actions have no
+# `secrets` context, so nothing here may read one directly.
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v6
+      with:
+        node-version: 22
+        cache: npm
+
+    - name: Install dependencies
+      # `--ignore-scripts` (SonarCloud S6505): a dependency's install script would otherwise run
+      # arbitrary code on a runner that holds the Foundry credentials. Playwright's browser download
+      # is invoked explicitly below, so nothing here needs a lifecycle script.
+      shell: bash
+      run: npm ci --ignore-scripts
+
+    - name: Cache Playwright Chromium
+      id: cache-playwright
+      uses: actions/cache@v5
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-chromium-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+    - name: Install Playwright Chromium
+      if: steps.cache-playwright.outputs.cache-hit != 'true'
+      shell: bash
+      run: npm run test:foundry:install
+
+    # Caches the Foundry release ARCHIVE, which the harvest reads. This is the same cache entry
+    # the smoke workflow already maintains, reused rather than duplicated — deliberately, because
+    # a second entry holding licensed material is a second exposure.
+    - name: Cache Foundry binary
+      uses: actions/cache@v5
+      with:
+        path: .foundry-e2e/cache
+        key: foundry-binary-${{ runner.os }}-${{ hashFiles('docker-compose.foundry.yml') }}
+
+    # BEFORE the archive step, not after the harvest. On a cold cache that step boots Foundry, and
+    # `foundry-test-up.mjs` refuses to assemble a data directory without `dist/`. Building later
+    # worked only for as long as the cache probe was a `foundryvtt-*.zip` glob that a stale entry
+    # could satisfy; the moment the probe became exact, the first genuinely cold run failed here.
+    - name: Build module
+      shell: bash
+      run: npm run build
+
+    # The felddy image does NOT bundle Foundry; it authenticates and downloads on first boot. So
+    # on a cold archive cache there is no way to obtain the chrome without a credentialed boot,
+    # and the lab's "seconds, no Docker" property does not transfer to CI. This step pays that
+    # cost only when the cache missed.
+    #
+    # The probe names the EXACT archive the pinned image will download, not `foundryvtt-*.zip`.
+    # A glob is satisfied by whatever the cache happens to hold, so a restored entry carrying the
+    # previous major reported "warm", skipped the boot, and harvested the wrong Foundry's chrome —
+    # caught only by the provenance gate below, a whole CI cycle later.
+    - name: Obtain the Foundry release archive
+      shell: bash
+      run: |
+        VERSION=$(node --input-type=module -e "
+          import { readPinnedFoundryImage, foundryVersionFromTag } from './scripts/lib/foundryImagePin.js';
+          const { tag } = readPinnedFoundryImage('docker-compose.foundry.yml');
+          const version = foundryVersionFromTag(tag);
+          if (!version) throw new Error('the pinned image tag ' + tag + ' names no exact Foundry build');
+          process.stdout.write(version);
+        ")
+        ARCHIVE=".foundry-e2e/cache/foundryvtt-${VERSION}.zip"
+        if [ ! -f "$ARCHIVE" ]; then
+          echo "No cached $ARCHIVE — booting Foundry once to populate it."
+          npm run test:foundry:up
+          npm run test:foundry:down
+        else
+          echo "Archive cache is warm for $ARCHIVE; no boot required."
+        fi
+
+    - name: Harvest window chrome
+      shell: bash
+      run: npm run viewlab:chrome:harvest
+
+    # The chrome and the frame builder are two halves of one artefact: `foundryChromeSpec.js` is
+    # a hand transcription of `_renderFrame`/`_updateFrame`/`#applyPosition`, pinned by the
+    # `applicationMjsSha256` in committed provenance. A newer stylesheet rendered through markup
+    # transcribed from an older build gives genuine CSS around a stale DOM, and the PNG cannot
+    # tell you which — strictly worse than no frame, because a wrong frame is believed.
+    #
+    # CI never rewrites the provenance. That file is a human attestation that someone re-read
+    # `application.mjs` and confirmed the transcription still holds; a bot that refreshes it on
+    # mismatch converts the drift gate into a rubber stamp.
+    - name: Verify chrome matches committed provenance
+      shell: bash
+      run: |
+        PINNED=$(node -p "require('./tests/view-lab/chrome-provenance.json').foundryVersion")
+        HARVESTED=$(node -e "
+          import('./scripts/lib/foundryChromeCache.js').then(({ resolveChromeCache }) => {
+            const cache = resolveChromeCache(process.cwd());
+            process.stdout.write(cache ? cache.version : '');
+          });
+        ")
+        echo "pinned=$PINNED harvested=$HARVESTED"
+        if [ "$PINNED" != "$HARVESTED" ]; then
+          echo "::error::Harvested Foundry $HARVESTED does not match the pinned $PINNED."
+          echo "::error::Re-read client/applications/api/application.mjs, confirm the frame builder still transcribes it, and commit the refreshed provenance."
+          exit 1
+        fi

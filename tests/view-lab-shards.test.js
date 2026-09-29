@@ -6,6 +6,7 @@ import {
   CASES_PER_SHARD,
   MAX_CAPTURE_SHARDS,
   mergeShardManifests,
+  renderMatrix,
   shardCountFor,
   sliceSelection,
 } from '../scripts/lib/viewLabShards.js';
@@ -20,6 +21,8 @@ test('a small selection renders on one runner, and an empty one on none', () => 
   assert.equal(shardCountFor(CASES_PER_SHARD), 1);
   assert.equal(shardCountFor(CASES_PER_SHARD + 1), 2);
   assert.equal(shardCountFor(10_000), MAX_CAPTURE_SHARDS);
+  // Sized so a selection like the 357 frames that prompted sharding runs as eight shards of 45.
+  assert.equal(shardCountFor(357), 8);
   assert.deepEqual(sliceSelection(plain(12), shardCountFor(12)), [plain(12).map(({ id }) => id)]);
   assert.deepEqual(sliceSelection([], 4), []);
 });
@@ -119,4 +122,15 @@ test('a merge refuses shards that lose, repeat or invent a case, or disagree abo
     /disagree about head/
   );
   assert.throws(() => mergeShardManifests(ids, []), /no shard manifest/);
+});
+
+test('an unarmed gate renders no shard, and an armed one numbers its shards from one', () => {
+  const cases = plain(100);
+  assert.deepEqual(renderMatrix(cases, false), []);
+  const matrix = renderMatrix(cases, true);
+  assert.deepEqual(
+    matrix.map((entry) => entry.shard),
+    [1, 2, 3]
+  );
+  assert.deepEqual(matrix.flatMap((entry) => entry.ids.split(',')).sort(), cases.map(({ id }) => id));
 });
