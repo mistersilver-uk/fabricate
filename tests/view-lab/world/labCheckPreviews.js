@@ -251,6 +251,29 @@ const GATHERING_OVER = {
   },
 };
 
+/**
+ * A summed gathering check routed Found to Missed against a literal character-value target (issue
+ * 2087): the attribute expression is a bare `14`, so it resolves the same for every actor, and the
+ * `-2` base adjustment lowers it to 12. Both tiers' thresholds (7 and 12) sit under the lab's
+ * deterministic first roll of 20, so it clamps to the worst tier, Missed, whose own threshold is
+ * the anchor unadjusted by a tier offset (`dc: 0`) — exactly the literal-14-minus-2 target; the
+ * crafting and salvage checks stay.
+ */
+const GATHERING_UNDER_ADD = {
+  gathering: {
+    rollFormula: '1d20',
+    relativeOutcomes: [
+      outcome('lab-under-found', 'Found', 5, true),
+      outcome('lab-under-missed', 'Missed', 0, false),
+    ],
+    evaluation: {
+      product: 'sum',
+      direction: 'under',
+      target: { source: 'attribute', expression: '14', adjustmentKind: 'add', baseAdjustment: -2 },
+    },
+  },
+};
+
 /** The `checkPreviewState` query values and the checks each seeds. */
 export const LAB_CHECK_PREVIEW_STATES = Object.freeze({
   'dice-pool': DICE_POOL,
@@ -263,6 +286,7 @@ export const LAB_CHECK_PREVIEW_STATES = Object.freeze({
   'dice-pool-forced': DICE_POOL_FORCED,
   'dice-pool-rescued': DICE_POOL_RESCUED,
   'gathering-over': GATHERING_OVER,
+  'gathering-under-add': GATHERING_UNDER_ADD,
 });
 
 /** Karrun Forgecraft's crafting and salvage checks as `state` authors them, formula blank. */

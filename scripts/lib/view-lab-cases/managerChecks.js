@@ -1391,6 +1391,17 @@ export const CASES = Object.freeze([
     steps: IDRIN,
     expectSelector: `${READOUT}:has([data-checks-simulator-band="failure"]) [data-checks-simulator-fact="tools"]`,
   }),
+  // Issue 2087: the routed gathering roll-under target, a literal character value of 14 added to
+  // a -2 base, resolving to 12 for every previewed actor.
+  rolledCase({
+    id: 'manager-checks-under-attribute-add',
+    label: 'gathering, routed, lower is better, character value added',
+    frame: '04 gathering + Roll',
+    state: 'gathering-under-add',
+    nav: 'gathering',
+    steps: IDRIN,
+    expectSelector: `${READOUT}[data-checks-simulator-direction="under"] [data-checks-simulator-target="12"]`,
+  }),
   rolledCase({
     id: 'manager-checks-over-routed-fixed-rolled',
     label: 'routed fixed ranges',
