@@ -46,6 +46,12 @@
   }
 
   const macroHint = $derived.by(() => {
+    if (evaluation?.product === 'count') {
+      return text(
+        'FABRICATE.Admin.Manager.Checks.Count.Difficulty.MacroHint',
+        'The macro runs with the ingredient set, the recipe and the actor, and must return the number of successes needed.'
+      );
+    }
     if (evaluation?.target?.source !== 'attribute') {
       return text(
         'FABRICATE.Admin.Manager.Checks.Crafting.MacroHint',

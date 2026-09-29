@@ -6870,7 +6870,21 @@
             "ActorPendingThreshold": "{threshold} + {formula}",
             "NoActor": "Choose a character in Preview as to see the composed pool and threshold.",
             "OfferPool": "The player can type a flat or rolled bonus, such as +2 or 1d4. It adds that many dice.",
-            "OfferThreshold": "The player can type a flat or rolled bonus, such as +2 or 1d4. It moves the threshold by that much."
+            "OfferThreshold": "The player can type a flat or rolled bonus, such as +2 or 1d4. It moves the threshold by that much.",
+            "Difficulty": {
+              "Lead": "How many successes the roll must reach, and where that number comes from.",
+              "Required": "Successes needed",
+              "SourceTitle": "How the successes needed are set",
+              "StaticDesc": "Successes needed, set here and per recipe tier. The intended route for counting checks.",
+              "DynamicDesc": "A macro returns the successes needed. Use it only when no recipe tier can express the rule.",
+              "ZeroPool": "This pool is reduced to zero, so the check fails automatically unless modifiers add dice.",
+              "MacroHint": "The macro runs with the ingredient set, the recipe and the actor, and must return the number of successes needed."
+            },
+            "Tiers": {
+              "Lead": "A recipe picks one of these; it sets how many successes the roll needs.",
+              "Unit": "Successes",
+              "Missing": "Set successes needed"
+            }
           },
           "Digest": {
             "Title": "This check",

@@ -81,6 +81,8 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   // The success-counting preview the model delegates to (issue 2004).
   'src/ui/svelte/apps/manager/checks/countPreviewModel.js',
   'src/ui/svelte/apps/manager/checks/countInsetModel.js',
+  // The Difficulty card's count callouts, read from the readiness evaluator (issue 2006).
+  'src/ui/svelte/apps/manager/checks/countDifficultyModel.js',
   // The Studio's adjustment labels and read-only band pictures (issue 2005).
   'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
   'src/utils/checkAdjustmentFormat.js',
