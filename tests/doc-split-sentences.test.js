@@ -17,7 +17,6 @@ import {
   withoutCounts,
   withoutLinkTargets,
 } from '../scripts/lib/docSentences.js';
-import { TOTALS_DOCUMENT, totalsRegion } from '../scripts/view-lab-registry-totals.mjs';
 
 const REPOSITORY_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FIXTURES = 'tests/fixtures/doc-split';
@@ -90,15 +89,11 @@ const RENUMBERED = [
 /** Pinned for the same reason as DEDUPLICATED_COUNT and RETARGETED_COUNT. */
 const RENUMBERED_COUNT = 1;
 
-/** The region the retired View Lab counts are generated into, read from the writer that owns it. */
-const TOTALS_REGION_LINES = totalsRegion().split('\n');
-const TOTALS_DELIMITERS = [TOTALS_REGION_LINES[0], TOTALS_REGION_LINES.at(-1)];
-
 /**
  * Sentences a count LEFT rather than changed (issue #1937). A RENUMBERED entry keeps its number and
  * must be re-edited whenever the registry grows; these stopped quoting one, so `removed` names the
- * clause deleted from `before`, and `after` is `null` when the whole sentence was retired into the
- * generated region `derivedIn` carries.
+ * clause deleted from `before`, and `after` is `null` when the whole sentence was retired. No
+ * document states the registry's counts any more; the registry is their only record.
  */
 const DECOUNTED = [
   {
@@ -107,7 +102,6 @@ const DECOUNTED = [
     after:
       'For a view covered by the canonical registry (`scripts/lib/viewLabCases.js`) — which is the normal case — the **View Lab** is the producer, and it is what CI runs on every PR push: `node scripts/view-lab-screenshots.mjs apps` renders every case, or pass a comma-separated id list to render a subset, into `ui-screenshot-artifact/apps/`.',
     removed: ', at 379 cases across five windows',
-    derivedIn: TOTALS_DOCUMENT,
   },
   {
     before:
@@ -115,7 +109,6 @@ const DECOUNTED = [
     after:
       "Selection is targeted, and no single changed file selects the whole registry: a render file selects the cases whose `sourceMatches` claim it, a broad shared primitive or stylesheet selects a small representative set, and a change to one of the lab's OWN inputs (fixture world, capture driver, registry shared code) selects **surface coverage** — one frame of every route and tab the lab renders — rather than every state of every screen.",
     removed: ', 48 cases',
-    derivedIn: TOTALS_DOCUMENT,
   },
   {
     before:
@@ -123,7 +116,6 @@ const DECOUNTED = [
     after: null,
     removed:
       'As of this writing the registry holds 379 cases: 148 `exact`, 8 `window`, 223 `beyond`.',
-    derivedIn: TOTALS_DOCUMENT,
   },
   {
     before:
@@ -131,7 +123,6 @@ const DECOUNTED = [
     after:
       'By default a PR touching the case registry, `labActors.js`, `labRunStates.js`, or any other file the lab depends on selects **surface coverage**: one frame of every route and tab the lab renders — every manager route, every player tab, one per single-screen canvas window, plus the light-theme pair.',
     removed: ' — which is 48 of the 379 publishable cases',
-    derivedIn: TOTALS_DOCUMENT,
   },
 ];
 
@@ -744,7 +735,7 @@ test('every decount claim really is a decount and nothing more', () => {
   );
 
   const surviving = survivingSentences();
-  for (const { before, after, removed, derivedIn } of DECOUNTED) {
+  for (const { before, after, removed } of DECOUNTED) {
     // 1. A clause with no number in it is an ordinary deletion wearing a decount's name.
     assert.ok(/\d/u.test(removed), `DECOUNTED names a clause that states no count:\n  ${removed}`);
     // 2. It must not be stale: an entry whose `before` still exists excuses nothing.
@@ -753,19 +744,7 @@ test('every decount claim really is a decount and nothing more', () => {
       0,
       `DECOUNTED still lists this sentence, which is present after all — remove the entry:\n  ${before}`
     );
-    // 3. The count must still be somewhere, which is the region that generates it.
-    assert.ok(
-      DESTINATIONS.includes(derivedIn),
-      `${derivedIn} is not in DESTINATIONS, so nothing checks it`
-    );
-    const derived = readFileSync(path.join(REPOSITORY_ROOT, derivedIn), 'utf8');
-    for (const delimiter of TOTALS_DELIMITERS) {
-      assert.ok(
-        derived.includes(delimiter),
-        `DECOUNTED derives this count in ${derivedIn}, which has no ${delimiter}`
-      );
-    }
-    // 4. A retired sentence is done here; otherwise ONLY the named clause may have gone.
+    // 3. A retired sentence is done here; otherwise ONLY the named clause may have gone.
     if (after === null) continue;
     assert.equal(
       before.replace(removed, '').replaceAll(/\s+/gu, ' ').trim(),
