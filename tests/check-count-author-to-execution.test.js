@@ -240,14 +240,7 @@ test('#861: 2d20 at or under INT + Repair, needing the tier\'s 2 successes, roll
 });
 
 test('a six-die pool that explodes tens and cancels ones botches as authored', async () => {
-  const botch = {
-    id: 'botch',
-    condition: { type: 'rollTotal', operator: '<', value: 0 },
-    outcome: 'failure',
-    breakTools: false,
-    tierStep: { mode: 'none', steps: 1, tierId: null },
-  };
-  await openSystem({ checkBreakage: { triggers: [botch] } });
+  await openSystem({});
   const model = openRouteModel();
   const { root, act } = await mountEditor(model);
 
@@ -260,6 +253,9 @@ test('a six-die pool that explodes tens and cancels ones botches as authored', a
   await act(() => choose(root, 'data-check-count-explode-repeat-option', 'keeps'));
   await act(() => choose(root, 'data-check-count-cancel-option', 'extreme'));
   await act(() => choose(root, 'data-check-count-destination-option', 'pool'));
+  // The Botch preset, offered once cancelling is on, from the Triggers section.
+  await harness.setProps({ section: 'triggers' });
+  await act(() => root.querySelector('[data-add-trigger-preset="botch"]').click());
 
   const reloaded = await saveAndReload(model);
   const { pool } = reloaded.simple.evaluation;
@@ -267,7 +263,11 @@ test('a six-die pool that explodes tens and cancels ones botches as authored', a
     [pool.base, pool.threshold, pool.explode.enabled, pool.explode.once, pool.cancel.enabled],
     ['@a + @b', '8', true, false, true]
   );
-  assert.deepEqual(reloaded.simple.checkBreakage.triggers[0].condition, botch.condition);
+  const [botch] = reloaded.simple.checkBreakage.triggers;
+  assert.deepEqual(
+    [botch.condition, botch.outcome],
+    [{ type: 'rollTotal', operator: '<', value: 0 }, 'failure']
+  );
 
   // 6 + library 2 = 8 dice: the 10 qualifies and explodes into a 5, three 1s cancel, net −2.
   const result = await execute(reloaded, {
@@ -281,7 +281,16 @@ test('a six-die pool that explodes tens and cancels ones botches as authored', a
     [1, 3, -2]
   );
   assert.equal(result.check.success, false, 'the Botch trigger fails the attempt');
+  assert.equal(result.check.data.forcedOutcome, 'failure', 'the Botch fired');
   assert.equal(result.awarded, 0);
+
+  // A net of −1 botches; a qualifying 10 against one cancelled 1 is a net of 0, which does not.
+  const nets = [];
+  for (const faces of [[1, 2, 3, 4, 5, 6, 7, 7], [10, 1, 2, 3, 4, 5, 6, 7, 5]]) {
+    const { check } = await execute(reloaded, { rollData: { a: 4, b: 2 }, faces, library: 2 });
+    nets.push([check.data.total, check.data.forcedOutcome ?? null]);
+  }
+  assert.deepEqual(nets, [[-1, 'failure'], [0, null]]);
 });
 
 test('a pool of zero fails without constructing a Roll', async () => {
