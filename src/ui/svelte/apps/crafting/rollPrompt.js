@@ -515,11 +515,23 @@ export function checkFlavorSuffix(dc, evaluation, { withheld = false } = {}) {
   return ` (${fill(localize('FABRICATE.Check.Roll.FlavorTarget', 'Target {target}'), { target: dc })})`;
 }
 
+/** `flavorWithheld` drops a Target suffix for a caller that grades no target (a fixed range). */
 export function buildInteractiveRollOptions(
-  { interactive, actor, name, activity, dc, img, modifierChoice, targetBasis, ...input },
+  {
+    interactive,
+    actor,
+    name,
+    activity,
+    dc,
+    img,
+    modifierChoice,
+    targetBasis,
+    flavorWithheld = false,
+    ...input
+  },
   prompt = promptCheckRoll
 ) {
-  const dcLabel = checkFlavorSuffix(dc, input.evaluation);
+  const dcLabel = checkFlavorSuffix(dc, input.evaluation, { withheld: flavorWithheld });
   const rollOptions = {
     interactive: interactive === true,
     prompt: (rollOptions) => prompt({ ...rollOptions, actorName: actor?.name }),

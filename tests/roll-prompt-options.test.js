@@ -60,6 +60,16 @@ describe('roll prompt adapter', () => {
     assert.equal(flavor({ product: 'count', direction: 'under' }, 2), 'Rope — Crafting check', 'a count names neither');
   });
 
+  it('withholds only a Target flavor when the caller grades no target', () => {
+    const flavor = (evaluation) => buildInteractiveRollOptions(
+      { actor: null, name: 'Rope', activity: 'Gathering', dc: 9, evaluation, flavorWithheld: true },
+      () => null
+    );
+    assert.equal(flavor({ direction: 'under' }).flavor, 'Rope — Gathering check');
+    assert.equal(flavor(undefined).flavor, 'Rope — Gathering check (DC 9)');
+    assert.ok(!Object.hasOwn(flavor(undefined), 'flavorWithheld'), 'no stray key reaches the bag');
+  });
+
   it('localizes the Target flavor suffix', () => {
     const restore = stubI18n({ 'FABRICATE.Check.Roll.FlavorTarget': 'Ziel {target}' });
     try {

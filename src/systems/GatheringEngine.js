@@ -3855,6 +3855,8 @@ export class GatheringEngine {
           activity: 'Gathering',
           img: task?.img,
           dc: target.target,
+          // A fixed range grades the raw roll, so its flavor names no Target (issue 2005).
+          flavorWithheld: routed.type === 'fixed',
           targetBasis: attributeTargetBasis(routed, {
             override: task?.adjustmentOverride,
             label: '',

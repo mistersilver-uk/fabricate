@@ -458,6 +458,41 @@ test('salvage and gathering roll-under prompts name the character value, never a
   }
 });
 
+test('an ordinary gathering roll withholds the Target flavor for a fixed-range check (T6)', async () => {
+  const gathering = Object.create(GatheringEngine.prototype);
+  const flavors = [];
+  const originalChat = globalThis.ChatMessage;
+  globalThis.ChatMessage = { create: async () => null, getSpeaker: () => null };
+  const surface = stubPromptSurface(() => ({ confirmed: true }));
+  const flavorOf = async (routed) => {
+    installCountingRoll();
+    globalThis.Roll.prototype.toMessage = async (data) => {
+      flavors.push(data.flavor);
+    };
+    await gathering._rollRoutedFormula({
+      routed, rollFormula: '1d20', actor: { name: 'Scavenger', system: {} },
+      task: { name: 'Forage' }, interactive: true,
+    });
+    return flavors.at(-1);
+  };
+  const fixedRange = (evaluation) => ({
+    ...routedCheck(evaluation), type: 'fixed',
+    fixedOutcomes: [{ id: 'all', name: 'All', success: true, start: 1, end: 20 }],
+  });
+  try {
+    assert.equal(await flavorOf(routedCheck(SUM_UNDER)), 'Forage — Gathering check (Target 10)');
+    assert.equal(await flavorOf(fixedRange(SUM_UNDER)), 'Forage — Gathering check');
+    assert.equal(
+      await flavorOf(fixedRange({ product: 'sum', direction: 'over' })),
+      'Forage — Gathering check (DC 10)',
+      'roll-high keeps its flavor byte-identical'
+    );
+  } finally {
+    surface.restore();
+    globalThis.ChatMessage = originalChat;
+  }
+});
+
 test('crafting takes the selected recipe tier adjustment over the base', async () => {
   const engine = Object.create(CraftingEngine.prototype);
   installCountingRoll();
