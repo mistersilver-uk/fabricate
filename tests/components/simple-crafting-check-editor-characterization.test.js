@@ -76,6 +76,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
     'src/ui/svelte/apps/manager/checks/CheckPromptOptions.svelte',
     'src/ui/svelte/apps/manager/checks/CheckDifficultyCard.svelte',
+    // The Difficulty card's count callouts (issue 2006). Manifest only.
+    'src/ui/svelte/components/Callout.svelte',
     // An issue 1097 addition, and ONLY the dependency manifest.
     'src/ui/svelte/components/ThresholdBandStrip.svelte',
     'src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte',

@@ -515,7 +515,7 @@ const raisesAny = (group) => group.defaultRecord === true || group.names !== '';
  * The dice a literal base rolls, as the runtime settles it with no benefit applied, or the refusal.
  * The threshold and face rules are neutralized, so only the base decides.
  */
-function literalBaseDice(evaluation, thresholdMode) {
+export function literalBaseDice(evaluation, thresholdMode) {
   const off = { enabled: false };
   const pool = { ...evaluation.pool, threshold: '1', explode: off, cancel: off };
   const placement = { preRolls: [], poolDelta: 0, thresholdDelta: 0 };
@@ -523,12 +523,11 @@ function literalBaseDice(evaluation, thresholdMode) {
 }
 
 /**
- * Recipe tiers set their own successes, and a literal base pool can meet every required count.
- * `literal` is the base's settled read, or null when the base reads the character or is faulted.
+ * Recipe `tiers` set their own successes, and a literal base pool can meet every required count;
+ * the Difficulty card states these rows too (issue 2006). `literal` is the base's settled read.
  */
-function countRequiredReadiness(result, check, evaluation, { activity, literal }) {
+export function countRequiredReadiness(result, evaluation, { tiers, literal }) {
   const { pool } = evaluation;
-  const tiers = activity === 'crafting' && Array.isArray(check?.tiers) ? check.tiers : [];
   const tierRequired = tiers.map((tier) => ({
     name: trimmed(tier?.name) || String(tier?.id ?? ''),
     successes: normalizeNullableSuccesses(tier?.successes),
@@ -607,7 +606,8 @@ function countReadiness(result, check, evaluation, { mode, activity, previewActo
     pushIssue(result.issues, 'countPoolTooLarge', 'critical', { max: MAX_COUNT_POOL });
   }
   const gradesRequired = mode === 'simple' || (mode === 'routed' && check?.type !== 'fixed');
-  if (gradesRequired) countRequiredReadiness(result, check, evaluation, { activity, literal });
+  const tiers = activity === 'crafting' && Array.isArray(check?.tiers) ? check.tiers : [];
+  if (gradesRequired) countRequiredReadiness(result, evaluation, { tiers, literal });
   if (previewActor && !baseFault && !thresholdFault) {
     previewActorPoolWarnings(result.transient, evaluation, thresholdMode, previewActor);
   }

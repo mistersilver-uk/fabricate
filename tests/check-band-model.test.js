@@ -1,10 +1,14 @@
-/** Issue 2005 — the read-only band pictures, drawn from the runtime's own grading. */
+/** Issues 2005 and 2006 — the read-only band pictures, drawn from the runtime's own grading. */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
   bandsAreEditable,
+  buildCountBands,
+  countBandScale,
+  countPoolSettlesToZero,
   describeBandScale,
+  describeCountBandRange,
   describeBandsUnavailable,
   buildPassFailBands,
   buildRoutedBands,
@@ -387,5 +391,136 @@ describe('targetValueStatus', () => {
       text: 'This check cannot roll: its target formula rolls dice, but a target must be a fixed number.',
     });
     assert.deepEqual(missingTargetPaths('@a + @{b.c} + @a', { a: 1 }), ['@{b.c}']);
+  });
+});
+
+describe('count bands (issue 2006)', () => {
+  const COUNT_NAMES = { ...NAMES, botch: 'Botch' };
+  const counting = ({ cancel = true, direction = 'over', ...pool } = {}) => ({
+    product: 'count',
+    direction,
+    pool: { die: 10, base: '4', threshold: '8', cancel: { enabled: cancel }, ...pool },
+  });
+  // Authored best first: the ladder is ranked by threshold, never by list order.
+  const FORGE = [
+    { id: 'masterwork', name: 'Masterwork', success: true, dc: 3 },
+    { id: 'fine', name: 'Fine', success: true, dc: 1 },
+    { id: 'success', name: 'Success', success: true, dc: 0 },
+    { id: 'ruined', name: 'Ruined', success: false, dc: -2 },
+  ];
+  const countSummary = (bands) =>
+    bands.map((band) => `${band.name}: ${describeCountBandRange(band, fallback)}`).join('; ');
+
+  it('N11: states the ladder in net successes at required + dc, a Botch first while cancelling', () => {
+    const bands = buildCountBands({
+      evaluation: counting(),
+      required: 2,
+      outcomes: FORGE,
+      names: COUNT_NAMES,
+    });
+    assert.equal(
+      countSummary(bands),
+      'Botch: below 0; Ruined: 0–1; Success: 2; Fine: 3–4; Masterwork: 5 or more'
+    );
+    assert.deepEqual(
+      bands.map((band) => band.tone),
+      ['danger', 'danger', 'warning', 'info', 'accent'],
+      'the botch is the worst hue and the tiers walk the ramp by net'
+    );
+  });
+
+  it('N11: drops the Botch band only when cancelling is off', () => {
+    const bands = buildCountBands({
+      evaluation: counting({ cancel: false }),
+      required: 2,
+      outcomes: FORGE,
+      names: COUNT_NAMES,
+    });
+    assert.equal(countSummary(bands), 'Ruined: 0–1; Success: 2; Fine: 3–4; Masterwork: 5 or more');
+  });
+
+  it('agrees with the routed grading the runner uses at every net it draws', () => {
+    const bands = buildCountBands({
+      evaluation: counting({ cancel: false }),
+      required: 2,
+      outcomes: FORGE,
+      names: COUNT_NAMES,
+    });
+    for (let net = 0; net <= 8; net += 1) {
+      const { matched } = classifyCheckTotal({
+        type: 'relative',
+        total: net,
+        dc: 2,
+        comparison: 'meet',
+        relativeOutcomes: FORGE,
+        fixedOutcomes: [],
+        triggers: [],
+        clampToNearest: true,
+      });
+      const band = bands.findLast((entry) => entry.from <= net);
+      assert.equal(band.id, matched.id, `net ${net}`);
+    }
+  });
+
+  it('never reverses the ladder for a per-die test under the threshold', () => {
+    const under = buildCountBands({
+      evaluation: counting({ direction: 'under' }),
+      required: 2,
+      outcomes: FORGE,
+      names: COUNT_NAMES,
+    });
+    assert.equal(
+      countSummary(under),
+      'Botch: below 0; Ruined: 0–1; Success: 2; Fine: 3–4; Masterwork: 5 or more'
+    );
+  });
+
+  it('draws a simple check as Failure and Success at its successes needed', () => {
+    const bands = buildCountBands({ evaluation: counting(), required: 3, names: COUNT_NAMES });
+    assert.equal(countSummary(bands), 'Botch: below 0; Failure: 0–2; Success: 3 or more');
+  });
+
+  it('draws fixed ranges as authored, with a Botch only where the lowest range starts at 0', () => {
+    const ranges = [
+      { id: 'bad', name: 'Bad', success: false, start: 0, end: 1 },
+      { id: 'good', name: 'Good', success: true, start: 2, end: 6 },
+    ];
+    const names = COUNT_NAMES;
+    const fixed = buildCountBands({ evaluation: counting(), type: 'fixed', outcomes: ranges, names });
+    assert.equal(countSummary(fixed), 'Botch: below 0; Bad: 0–1; Good: 2–6');
+    const shifted = ranges.map((range) => ({ ...range, start: range.start + 1, end: range.end + 1 }));
+    const noBotch = buildCountBands({ evaluation: counting(), type: 'fixed', outcomes: shifted, names });
+    assert.equal(countSummary(noBotch), 'Bad: 1–2; Good: 3–7');
+  });
+
+  it('draws nothing for a routed check with no tiers', () => {
+    const bands = buildCountBands({ evaluation: counting(), required: 2, outcomes: [], names: COUNT_NAMES });
+    assert.deepEqual(bands, []);
+  });
+
+  it('states the scale in successes, with the zero-pool and botch clauses', () => {
+    assert.equal(
+      countBandScale({ required: 2 }, fallback),
+      'Measured in successes. The count must reach 2.'
+    );
+    assert.equal(
+      countBandScale({ required: 2, zeroPool: true, cancels: true }, fallback),
+      'Measured in successes. The count must reach 2; this pool is reduced to zero, so the check fails automatically. A net below zero is a botch.'
+    );
+  });
+
+  it("reads a zero pool from the actor's settled pool, never a refusal", () => {
+    const zero = (pool, extra = {}) =>
+      countPoolSettlesToZero({ evaluation: counting(pool), thresholdMode: 'meet', ...extra });
+    assert.equal(zero({ base: '0', zeroPoolFails: true }), true);
+    assert.equal(zero({ base: '0', zeroPoolFails: false }), false);
+    assert.equal(zero({ base: '@a.b', zeroPoolFails: true }), false, 'no actor is not zero');
+    const actor = { name: 'Idrin', rollData: { a: { b: 1 } } };
+    assert.equal(zero({ base: '@a.b', zeroPoolFails: true }, { character: actor }), false);
+    const penalty = { poolDelta: -1, thresholdDelta: 0, preRolls: [] };
+    assert.equal(
+      zero({ base: '@a.b', zeroPoolFails: true }, { character: actor, placement: penalty }),
+      true
+    );
   });
 });

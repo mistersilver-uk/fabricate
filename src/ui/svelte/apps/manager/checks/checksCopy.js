@@ -480,6 +480,9 @@ export function outcomeThresholdLabels(type, column, text) {
   if (column === 'benefit') {
     return [text('FABRICATE.Admin.Manager.Checks.Evaluation.OutcomeBenefit', 'Benefit ±')];
   }
+  if (column === 'successes') {
+    return [text('FABRICATE.Admin.Manager.Checks.Count.Bands.ExtraSuccesses', 'Extra successes')];
+  }
   return [text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeDc', 'DC ±')];
 }
 

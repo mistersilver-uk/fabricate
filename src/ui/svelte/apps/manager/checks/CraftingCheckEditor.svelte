@@ -11,12 +11,16 @@
 
   Controlled; range parsing lives in `utils/craftingCheckExpression.js`. Outside summed roll-over
   against a fixed DC (issue 2005, ruling R2) the strip is a read-only picture from
-  `checkBandModel.js`, and each row edits the field its evaluation reads through `CheckOutcomeRow`.
+  `checkBandModel.js`, and each row edits the field its evaluation reads through `CheckOutcomeRow`:
+  a counting check's (issue 2006) are `Extra successes`, drawn in net successes.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import { findRangeConflicts } from '../../../../../utils/craftingCheckExpression.js';
-  import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
+  import {
+    normalizeCheckEvaluation,
+    normalizeNullableSuccesses,
+  } from '../../../../../systems/normalize/checkEvaluation.js';
   import { activeCheckEvaluation } from '../../../../../systems/checkTarget.js';
   import { routedOutcomeOrder } from '../../../../../systems/checkRouting.js';
   import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
@@ -25,8 +29,12 @@
   import {
     bandToneFor,
     bandsAreEditable,
+    buildCountBands,
     buildRoutedBands,
+    countBandScale,
+    countPoolSettlesToZero,
     describeBandRange,
+    describeCountBandRange,
     describeBandsUnavailable,
     previewBandTarget,
     previewScaleSentence,
@@ -47,6 +55,7 @@
   import Select from '../../../components/Select.svelte';
   import { previewRecordSelectOptions } from './checksSelectOptions.js';
   import { previewTierAdjustment } from './checkAdjustmentLabel.js';
+  import { countRequired } from '../../../../../systems/countCheck.js';
 
   // `showTiers` (default true) renders the per-recipe tier table, relative type only;
   // salvage/gathering reuse this editor with it off, having no records to pick a tier from.
@@ -138,12 +147,14 @@
   const lowestTierId = $derived(routedOutcomeOrder({ ...value, type, evaluation })[0] ?? null);
   const graded = $derived(activeCheckEvaluation(value));
   const editableBands = $derived(bandsAreEditable(value?.evaluation));
+  const counts = $derived(graded.product === 'count');
   const multiplyTiers = $derived(
-    graded.target.source === 'attribute' && graded.target.adjustmentKind === 'multiply'
+    !counts && graded.target.source === 'attribute' && graded.target.adjustmentKind === 'multiply'
   );
   // Which field a relative row's threshold edits: the offset reads `DC ±` only for roll-over against
-  // a fixed DC, and a multiply row edits its multiplier instead.
+  // a fixed DC, `Extra successes` for a count, and a multiply row edits its multiplier instead.
   const outcomeColumn = $derived.by(() => {
+    if (counts) return 'successes';
     if (multiplyTiers) return 'adjustment';
     return editableBands ? 'dc' : 'benefit';
   });
@@ -269,7 +280,7 @@
     recipeTiers.find((tier) => tier.id === selectedPreviewRecordId) ?? null
   );
   const readonlyTarget = $derived(
-    editableBands || type === 'fixed'
+    editableBands || counts || type === 'fixed'
       ? null
       : previewBandTarget(
           {
@@ -282,7 +293,24 @@
           text
         )
   );
+  // A count grades the previewed record's successes needed, its own when the tier sets none.
+  const countTarget = $derived(
+    counts ? countRequired(graded, normalizeNullableSuccesses(previewedTier?.successes)) : null
+  );
+  const paintBand = (band, tone, range) => ({
+    ...band,
+    range,
+    color: bandFill(tone),
+    ink: `var(--fab-${tone}-text)`,
+    swatch: `var(--fab-${tone})`,
+  });
   const readonlyBands = $derived.by(() => {
+    if (counts) {
+      const names = { botch: text('FABRICATE.Admin.Manager.Checks.Odds.Botch', 'Botch') };
+      const input = { evaluation: graded, required: countTarget, type, outcomes, names };
+      const paint = (band) => paintBand(band, band.tone, describeCountBandRange(band, text));
+      return buildCountBands(input).map(paint);
+    }
     if (editableBands || (type !== 'fixed' && readonlyTarget?.state !== 'ok')) return [];
     const bands = buildRoutedBands({
       evaluation: graded,
@@ -296,18 +324,19 @@
     });
     return bands.map((band, position) => {
       const rank = graded.direction === 'under' ? bands.length - 1 - position : position;
-      const tone = bandToneFor(rank, bands.length);
-      return {
-        ...band,
-        range: describeBandRange(band, text),
-        color: bandFill(tone),
-        ink: `var(--fab-${tone}-text)`,
-        swatch: `var(--fab-${tone})`,
-      };
+      return paintBand(band, bandToneFor(rank, bands.length), describeBandRange(band, text));
     });
   });
+  const countScale = $derived.by(() => {
+    if (!counts || type === 'fixed') return '';
+    const pool = { evaluation: graded, thresholdMode: comparison, character: previewCharacter };
+    const zeroPool = countPoolSettlesToZero({ ...pool, placement: countPreview?.placement });
+    const cancels = graded.pool.cancel.enabled;
+    return countBandScale({ required: countTarget, zeroPool, cancels }, text);
+  });
   const readonlyScale = $derived(
-    previewScaleSentence(readonlyTarget, { direction: graded.direction, comparison }, text)
+    countScale ||
+      previewScaleSentence(readonlyTarget, { direction: graded.direction, comparison }, text)
   );
   const bandsFallback = $derived.by(() => {
     if (readonlyTarget && readonlyTarget.state !== 'ok') {
@@ -473,6 +502,7 @@
         {recordNoun}
         {evaluation}
         character={previewCharacter}
+        countTiers={type === 'fixed' ? null : showTiers ? recipeTiers : []}
         onChange={emit}
       />
     {/if}

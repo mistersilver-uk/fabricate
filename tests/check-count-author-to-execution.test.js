@@ -176,7 +176,7 @@ after(() => harness.teardown());
 const REPAIR = Object.freeze({ abilities: { int: { value: 6 } }, skills: { repair: { value: 4 } } });
 
 test('#861: 2d20 at or under INT + Repair, needing the tier\'s 2 successes, rolls once as authored', async () => {
-  await openSystem({ tiers: [{ id: 't-repair', name: 'Repair work', dc: 12, successes: 2 }] });
+  await openSystem({ tiers: [{ id: 't-repair', name: 'Repair work', dc: 12 }] });
   const model = openRouteModel();
   const { root, act } = await mountEditor(model);
 
@@ -190,6 +190,12 @@ test('#861: 2d20 at or under INT + Repair, needing the tier\'s 2 successes, roll
     typeInto(root, '[data-check-count-threshold-expression]', '@abilities.int.value + @skills.repair.value')
   );
   await act(() => choose(root, 'data-check-count-destination-option', 'threshold'));
+  // The tier's DC of 12 is never its count: it asks for successes, and the GM steps them to 2.
+  assert.equal(root.querySelector('[data-tier-successes]').value, '', 'the DC is not a count');
+  assert.ok(root.querySelector('[data-tier-successes-missing]'), 'Set successes needed');
+  await act(() => stepper(root, 'data-tier-successes').increment.click());
+  await act(() => stepper(root, 'data-tier-successes').increment.click());
+  assert.equal(root.querySelector('[data-tier-successes]').value, '2');
 
   const reloaded = await saveAndReload(model);
   const { evaluation } = reloaded.simple;
@@ -201,7 +207,11 @@ test('#861: 2d20 at or under INT + Repair, needing the tier\'s 2 successes, roll
     [evaluation.pool.die, evaluation.pool.base, evaluation.pool.threshold, evaluation.pool.modifierDestination],
     [20, '2', '@abilities.int.value + @skills.repair.value', 'threshold']
   );
-  assert.equal(reloaded.simple.tiers[0].successes, 2, 'the tier successes survive the save');
+  assert.deepEqual(
+    [reloaded.simple.tiers[0].successes, reloaded.simple.tiers[0].dc],
+    [2, 12],
+    'the stepped successes survive the save beside the kept DC'
+  );
   assert.equal(reloaded.simple.rollFormula, '1d20', 'the retained formula is kept');
 
   harness.remount();

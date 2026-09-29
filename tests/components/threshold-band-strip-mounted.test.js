@@ -4,6 +4,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  buildCountBands,
+  describeCountBandRange,
+} from '../../src/ui/svelte/apps/manager/checks/checkBandModel.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -660,6 +664,32 @@ describe('ThresholdBandStrip: readonly', () => {
     assert.deepEqual(
       handles(root).map((handle) => [handle.getAttribute('role'), handle.getAttribute('tabindex')]),
       Array.from({ length: 4 }, () => ['slider', '0'])
+    );
+  });
+
+  it("N11: draws a counting check's ladder in net successes, read-only, Botch first", async () => {
+    const english = (_key, text) => text;
+    const bands = buildCountBands({
+      evaluation: { product: 'count', pool: { cancel: { enabled: true } } },
+      required: 2,
+      outcomes: [
+        { id: 'ruined', name: 'Ruined', success: false, dc: -2 },
+        { id: 'success', name: 'Success', success: true, dc: 0 },
+        { id: 'fine', name: 'Fine', success: true, dc: 1 },
+        { id: 'masterwork', name: 'Masterwork', success: true, dc: 3 },
+      ],
+      names: { botch: 'Botch' },
+    }).map((band) => ({ ...band, range: describeCountBandRange(band, english) }));
+    const root = await harness.mount({ bands, readonly: true });
+    assert.ok(!root.querySelector('[role="slider"]'), 'no slider role on a count strip');
+    assert.deepEqual(
+      [...root.querySelectorAll('[data-band-strip-band-list] li')].map((item) => item.textContent.trim()),
+      ['Botch: below 0', 'Ruined: 0–1', 'Success: 2', 'Fine: 3–4', 'Masterwork: 5 or more']
+    );
+    assert.deepEqual(
+      [...root.querySelectorAll('.fab-band-strip-tick')].map((tick) => tick.textContent),
+      ['0', '2', '3', '5'],
+      'the ticks mark each threshold in successes'
     );
   });
 });
