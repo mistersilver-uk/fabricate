@@ -348,6 +348,16 @@ function markerFor(entry, family, readFile) {
   };
 }
 
+/**
+ * The reasoned `family` marker on `line` of `text` or in the comments right above it, or `null`:
+ * for a family that exempts one site of many rather than a whole entry.
+ */
+export function siteMarker(file, text, family, line) {
+  const sites = new Set(anchorLines(text.split('\n'), line));
+  const markers = parseMarkers(file, text);
+  return markers.find((m) => m.family === family && m.reason !== '' && sites.has(m.line)) ?? null;
+}
+
 function validEntry(entry, family) {
   const ok =
     typeof entry?.file === 'string' &&

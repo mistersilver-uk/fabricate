@@ -1,21 +1,29 @@
 /**
- * Bounds the source-text pin sites per test file (issue 1658) as a ceiling with no headroom, so a
- * new pin needs a reason and a conversion that removes one is banked by deleting its row. Every
- * non-test module that reads files is listed with a reviewed kind (issue 1933).
+ * Bounds the source-text pin sites per test file (issue 1658) against the base commit: a file may
+ * not pin more than it did there. Text followed across imports (issue 1933) makes the whole
+ * `tests/**` corpus one measurement. Every non-test module that reads files is listed with a
+ * reviewed kind, and no helper may become `legacy-scan`.
  */
 import assert from 'node:assert/strict';
-import { resolve } from 'node:path';
-import { test } from 'node:test';
+import { createHash } from 'node:crypto';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { after, test } from 'node:test';
 
-import { parseModule } from './helpers/moduleAst.js';
-import { ceilingLedgerGate } from './helpers/ratchetBaseline.js';
 import { byCodePoint } from './helpers/codePointOrder.js';
+import { compareToBase, reportComparison, siteMarker } from './helpers/mergeBaseRatchet.js';
+import { parseModule } from './helpers/moduleAst.js';
 import { countCorpusPinSites, countPinSites } from './helpers/sourcePinSites.js';
 import { collectSources, repoRoot } from './helpers/sourceScan.js';
+import { createTempGitRepo } from './helpers/temp-git-repo.js';
 
-const LEDGER_PATH = resolve(import.meta.dirname, 'source-pin-ledger.txt');
+const FAMILY = 'source-pin';
 
-const RUN = 'node --conditions=browser --test tests/source-pin-ratchet.test.js';
+/** This file, whose `SCAN_HELPERS` is read on each side to compare the `legacy-scan` rows. */
+const SELF = 'tests/source-pin-ratchet.test.js';
+
+const PIN_ID = 'source-text pin sites';
+const LEGACY_ID = 'legacy-scan helper';
 
 /** Below this the scan is truncated rather than clean; `tests/` holds ~1,160 modules. */
 const SCAN_FLOOR = 901;
@@ -33,7 +41,7 @@ const TEST_MODULE = /\.test\.m?js$/u;
  * Every non-test module under `tests/` that reads files, raw or through an exported wrapper, with
  * the reviewed reason it may: `ast` hands back structure, never text; `corpus` is a deliberate
  * whole-tree scan; `fixture` reads data, a ledger, or a file to compile or mount; `legacy-scan`
- * hands out raw text that tests pin, and is retired by #1932 and the #1933 conversions.
+ * hands out raw text that tests pin, and may only be retired, never added.
  */
 const SCAN_HELPERS = Object.freeze({
   'tests/components/design-system-known-debt.js': 'fixture',
@@ -103,43 +111,134 @@ const SCAN_HELPERS = Object.freeze({
 
 const HELPER_KINDS = Object.freeze(['ast', 'corpus', 'fixture', 'legacy-scan']);
 
-/** The `legacy-scan` entries, as a ceiling that may only fall: lower it as each one is retired. */
-const LEGACY_SCAN_CEILING = 19;
+const inCorpus = (file) =>
+  file.startsWith(`${CORPUS_ROOT}/`) && SCANNED_EXTENSIONS.some((ext) => file.endsWith(ext));
 
-/** `{path: text or lines}` parsed the way the gate parses the tree. */
-function parseCorpus(modules) {
-  const parsed = new Map();
-  for (const [file, text] of Object.entries(modules)) {
+/** Parsed modules by text: base and head share nearly every file, so each is parsed once. */
+const parsedByText = new Map();
+
+function parseText(file, text) {
+  if (!parsedByText.has(text)) {
     try {
-      parsed.set(file, parseModule(Array.isArray(text) ? text.join('\n') : text));
+      parsedByText.set(text, parseModule(text));
     } catch (error) {
       // `parseModule` names its probe path, never the real one, so attribute it here.
       throw new Error(`${file} failed to parse: ${error.message}`, { cause: error });
     }
   }
+  return parsedByText.get(text);
+}
+
+/** `{path: text or lines}` parsed the way the gate parses the tree. */
+function parseCorpus(modules) {
+  const parsed = new Map();
+  for (const [file, text] of Object.entries(modules)) {
+    parsed.set(file, parseText(file, Array.isArray(text) ? text.join('\n') : text));
+  }
   return parsed;
 }
 
-let analysis;
+/** Corpus analyses by content, so an identical tree is analysed once per run. */
+const analyses = new Map();
 
-/**
- * The tree parsed and counted once for every gate here: parsing a thousand modules twice inside
- * `npm test` starves the browser-backed suites running beside it.
- */
-function analyseTree() {
-  if (analysis === undefined) {
-    const corpus = collectSources(resolve(repoRoot, CORPUS_ROOT), {
-      extensions: [...SCANNED_EXTENSIONS],
-    });
-    analysis = { ...countCorpusPinSites(parseCorpus(corpus)), scanned: Object.keys(corpus).length };
+/** Every file's pin sites and which modules read files, over `files` as `readFile` gives them. */
+function analyseCorpus(files, readFile) {
+  const texts = new Map();
+  const digest = createHash('sha256');
+  for (const file of [...files].sort(byCodePoint)) {
+    const text = readFile(file);
+    if (text === undefined) continue;
+    texts.set(file, text);
+    digest.update(`${file}\0${text}\0`);
   }
-  return analysis;
+  const key = digest.digest('hex');
+  if (!analyses.has(key)) {
+    const parsed = new Map([...texts].map(([file, text]) => [file, parseText(file, text)]));
+    analyses.set(key, { ...countCorpusPinSites(parsed), texts });
+  }
+  return analyses.get(key);
 }
 
-function buildLedger() {
-  const { sites, scanned } = analyseTree();
-  const counted = [...sites].sort(([left], [right]) => byCodePoint(left, right));
-  return { observed: Object.fromEntries(counted), scanned };
+/** The `SCAN_HELPERS` rows `text` declares, each with its 1-based line; none when it has none. */
+function scanHelperRows(text) {
+  const { ast } = parseText(SELF, text);
+  for (const statement of ast.body) {
+    for (const declarator of statement.declarations ?? []) {
+      if (declarator.id?.name !== 'SCAN_HELPERS') continue;
+      const object = declarator.init?.arguments?.[0] ?? declarator.init;
+      return (object?.properties ?? []).map((property) => ({
+        file: property.key.value,
+        kind: property.value.value,
+        line: property.loc.start.line,
+      }));
+    }
+  }
+  return [];
+}
+
+/**
+ * One entry per file counting its pin sites, less any site a reasoned marker exempts, and one per
+ * `legacy-scan` row, netted on the kind so the rows may only fall in number.
+ */
+function measureSourcePins(readFile, listFiles) {
+  const { siteLines, texts } = analyseCorpus(listFiles(), readFile);
+  const entries = [];
+  for (const [file, lines] of siteLines) {
+    const text = texts.get(file);
+    const counted = text.includes('ratchet-exempt(')
+      ? lines.filter((line) => !siteMarker(file, text, FAMILY, line))
+      : lines;
+    if (counted.length > 0) entries.push({ file, id: PIN_ID, amount: counted.length });
+  }
+  const self = texts.get(SELF);
+  for (const row of self === undefined ? [] : scanHelperRows(self)) {
+    if (row.kind !== 'legacy-scan') continue;
+    const id = `${LEGACY_ID} ${row.file}`;
+    entries.push({ file: SELF, id, value: 'legacy-scan', lines: [row.line] });
+  }
+  return entries;
+}
+
+const compareSourcePins = (options = {}) =>
+  compareToBase({
+    family: FAMILY,
+    corpusRoot: CORPUS_ROOT,
+    include: inCorpus,
+    measure: measureSourcePins,
+    scope: 'corpus',
+    ...options,
+  });
+
+const GUIDANCE =
+  'A pin asserts how the code is written rather than what it does; assert the behaviour instead. ' +
+  'Text followed across imports counts where it is pinned, so a helper that starts handing out ' +
+  'source text raises the tests that use it. A new legacy-scan helper should hand structure back ' +
+  "through `parsedSource.js` instead. A pin's exemption goes on its line or the comment line " +
+  "right above it, or in the file head; a legacy-scan row's goes above the row.";
+
+test('no test file pins more source text, and no helper turns legacy-scan, than at base', (t) => {
+  const listed = [];
+  const measure = (readFile, listFiles) => {
+    const files = listFiles();
+    listed.push(files.length);
+    return measureSourcePins(readFile, () => files);
+  };
+  const result = reportComparison(t, compareSourcePins({ measure }), GUIDANCE);
+  if (!result.compared) return;
+  t.diagnostic(`compared ${listed.join(' and ')} modules with base ${result.base.slice(0, 12)}`);
+  assert.ok(
+    Math.min(...listed) >= SCAN_FLOOR,
+    `expected at least ${SCAN_FLOOR} scanned modules on each side; scanned ${listed.join(' and ')}`
+  );
+});
+
+/** The working tree; the same content as the gate's head side, so it is not analysed again. */
+function analyseTree() {
+  const corpus = collectSources(resolve(repoRoot, CORPUS_ROOT), {
+    extensions: [...SCANNED_EXTENSIONS],
+  });
+  const files = Object.keys(corpus);
+  return { ...analyseCorpus(files, (file) => corpus[file]), scanned: files.length };
 }
 
 /** How the non-test modules that read files disagree with a helper map. */
@@ -154,29 +253,22 @@ function scanHelperFindings(fileReaders, helpers) {
   };
 }
 
-const gate = ceilingLedgerGate({
-  test,
-  assert,
-  title: 'no test file pins more source text than its ledger ceiling',
-  ledgerPath: LEDGER_PATH,
-  updateEnv: 'UPDATE_SOURCE_PIN_LEDGER',
-  tightenEnv: 'TIGHTEN_SOURCE_PIN_LEDGER',
-  build: buildLedger,
-  // No headroom: a pin is discrete, so there is no size at which one more is the same debt.
-  ceiling: (_key, sites) => sites,
-  shrink: 'fail',
-  floor: SCAN_FLOOR,
-  wording: {
-    subject: 'source-pin counts',
-    update: `UPDATE_SOURCE_PIN_LEDGER=1 ${RUN}`,
-    tighten: `TIGHTEN_SOURCE_PIN_LEDGER=1 ${RUN}`,
-    addedHint:
-      'A new pin asserts how the code is written rather than what it does; assert the behaviour ' +
-      'instead, or say in the PR why the text is the contract.',
-    staleHint:
-      'A file that stopped pinning source text has paid the debt down, and a row nobody is using ' +
-      'is a standing permission for whoever finds it next.',
-  },
+test('every non-test module under tests/ that reads files is listed with a reviewed kind', () => {
+  const { fileReaders, scanned } = analyseTree();
+  assert.ok(scanned >= SCAN_FLOOR, `expected ${SCAN_FLOOR}+ modules; scanned ${scanned}`);
+  assert.deepEqual(
+    scanHelperFindings(fileReaders, SCAN_HELPERS),
+    { unlisted: [], stale: [], unknownKind: [] },
+    'A helper that reads files is where a raw scan hides from the pin gate, since its pins land ' +
+      'in whichever test imports it. List a new one in SCAN_HELPERS with the kind a review ' +
+      `agreed (${HELPER_KINDS.join(', ')}), and drop the entry of one that stopped reading.`
+  );
+});
+
+test("the gate reads this file's SCAN_HELPERS row for row, so its legacy-scan leg is live", () => {
+  const rows = scanHelperRows(readFileSync(import.meta.filename, 'utf8'));
+  assert.deepEqual(rows.map(({ file, kind }) => [file, kind]), Object.entries(SCAN_HELPERS));
+  assert.ok(rows.some(({ kind }) => kind === 'legacy-scan'));
 });
 
 /** The counter's behaviour, as a table. */
@@ -530,31 +622,6 @@ for (const probe of CORPUS_PROBES) {
   });
 }
 
-test('every non-test module under tests/ that reads files is listed with a reviewed kind', () => {
-  const findings = scanHelperFindings(analyseTree().fileReaders, SCAN_HELPERS);
-  assert.deepEqual(
-    findings,
-    { unlisted: [], stale: [], unknownKind: [] },
-    'A helper that reads files is where a raw scan hides from the pin ledger, since its pins ' +
-      'land in whichever test imports it. List a new one in SCAN_HELPERS with the kind a review ' +
-      `agreed (${HELPER_KINDS.join(', ')}), and drop the entry of one that stopped reading.`
-  );
-});
-
-test('the legacy-scan helpers only fall', () => {
-  const legacy = Object.values(SCAN_HELPERS).filter((kind) => kind === 'legacy-scan').length;
-  assert.ok(
-    legacy <= LEGACY_SCAN_CEILING,
-    `${legacy} legacy-scan helpers, over the ceiling of ${LEGACY_SCAN_CEILING}: hand structure ` +
-      'back through `parsedSource.js` instead of adding a helper that hands out raw text.'
-  );
-  assert.equal(
-    legacy,
-    LEGACY_SCAN_CEILING,
-    `Bank the retirement: lower LEGACY_SCAN_CEILING to ${legacy}.`
-  );
-});
-
 test('a helper reading files raw, aliased, keyed or via a wrapper chain is flagged until listed', () => {
   const { fileReaders } = countCorpusPinSites(
     parseCorpus({
@@ -602,4 +669,129 @@ test('a helper reading files raw, aliased, keyed or via a wrapper chain is flagg
     stale: ['tests/helpers/pure.js'],
     unknownKind: ['tests/helpers/pure.js'],
   });
+});
+
+const repos = [];
+after(() => repos.forEach((repo) => repo.dispose()));
+
+/** A throwaway repository whose one commit holds `files`, compared by this gate's own wiring. */
+function repoWith(files) {
+  const repo = createTempGitRepo('source-pin-');
+  repos.push(repo);
+  const write = (entries) => {
+    for (const [file, rows] of Object.entries(entries)) {
+      mkdirSync(dirname(join(repo.dir, file)), { recursive: true });
+      writeFileSync(join(repo.dir, file), `${rows.join('\n')}\n`);
+    }
+  };
+  write(files);
+  repo.git('add', '-A');
+  const first = repo.commit('base');
+  const compare = () => compareSourcePins({ cwd: repo.dir, env: { RATCHET_BASE: first } });
+  return { write, compare };
+}
+
+/** A test reading `src/a.js` and pinning it once: two sites. */
+const PINNING = [
+  "import { readFileSync } from 'node:fs';",
+  "const source = readFileSync('src/a.js', 'utf8');",
+  "export const ok = source.includes('x');",
+];
+
+const BASE_CORPUS = Object.freeze({
+  'tests/a.test.js': PINNING,
+  'tests/helpers/names.js': ["export const NAMES = ['x'];"],
+  'tests/b.test.js': [
+    "import { NAMES } from './helpers/names.js';",
+    "export const ok = NAMES.includes('x');",
+  ],
+});
+
+const MARKER = '// ratchet-exempt(source-pin):';
+
+test('a new pinning file and a file pinning more both fail against base', () => {
+  const repo = repoWith(BASE_CORPUS);
+  repo.write({
+    'tests/c.test.js': PINNING,
+    'tests/a.test.js': [...PINNING, "export const also = source.includes('y');"],
+  });
+  const result = repo.compare();
+  assert.deepEqual(result.failures, [
+    `tests/a.test.js: ${PIN_ID} rose from 2 to 3`,
+    `tests/c.test.js: ${PIN_ID} is new (2)`,
+  ]);
+  assert.throws(() => reportComparison(null, result, GUIDANCE), /source-pin: 2 regression/);
+});
+
+test('a helper that starts handing out source raises the unchanged test that pins it', () => {
+  const repo = repoWith(BASE_CORPUS);
+  repo.write({
+    'tests/helpers/names.js': [
+      "import { readFileSync } from 'node:fs';",
+      "export const NAMES = readFileSync('src/names.js', 'utf8');",
+    ],
+  });
+  assert.deepEqual(repo.compare().failures, [
+    `tests/b.test.js: ${PIN_ID} is new (1)`,
+    `tests/helpers/names.js: ${PIN_ID} is new (1)`,
+  ]);
+});
+
+test('a change to any scanned module compares, helpers included; any other change skips', () => {
+  const repo = repoWith({ ...BASE_CORPUS, 'tests/data.json': ['{}'], 'src/a.js': ['x'] });
+  repo.write({ 'tests/data.json': ['[]'], 'src/a.js': ['y'] });
+  assert.equal(repo.compare().skipped, 'corpus-unchanged');
+  repo.write({ 'tests/helpers/names.js': ["export const NAMES = ['y'];"] });
+  const result = repo.compare();
+  assert.deepEqual([result.compared, result.failures], [true, []]);
+});
+
+test('a reasoned marker at a pin or the file head exempts it; an empty one fails', () => {
+  const repo = repoWith(BASE_CORPUS);
+  const reasoned = `${MARKER} the emitted text is the contract under test`;
+  repo.write({
+    'tests/a.test.js': [...PINNING, reasoned, "export const also = source.includes('y');"],
+    'tests/c.test.js': [reasoned, ...PINNING],
+  });
+  const exempt = repo.compare();
+  assert.deepEqual([exempt.failures, exempt.exempted], [
+    [],
+    [`tests/c.test.js: ${PIN_ID} is new (2): the emitted text is the contract under test`],
+  ]);
+  repo.write({
+    'tests/a.test.js': [
+      ...PINNING,
+      reasoned,
+      "export const also = source.includes('y');",
+      MARKER,
+      "export const more = source.includes('z');",
+    ],
+    'tests/c.test.js': [MARKER, ...PINNING],
+  });
+  const empty = (file, line) =>
+    `${file}:${line} has a ratchet-exempt(source-pin) marker with no reason; write why the ` +
+    'regression is legitimate after the colon';
+  assert.deepEqual(repo.compare().failures, [
+    `tests/a.test.js: ${PIN_ID} rose from 2 to 3`,
+    `tests/c.test.js: ${PIN_ID} is new (2); its ratchet-exempt marker gives no reason`,
+    empty('tests/a.test.js', 6),
+    empty('tests/c.test.js', 1),
+  ]);
+});
+
+test('a legacy-scan row may be retired or swapped but not added, unless a reason marks it', () => {
+  const helpers = (...rows) => ['const SCAN_HELPERS = Object.freeze({', ...rows, '});'];
+  const row = (file, kind) => `  'tests/helpers/${file}.js': '${kind}',`;
+  const repo = repoWith({ [SELF]: helpers(row('a', 'legacy-scan'), row('b', 'fixture')) });
+  repo.write({ [SELF]: helpers(row('a', 'legacy-scan'), row('b', 'legacy-scan')) });
+  const id = (file) => `${SELF}: ${LEGACY_ID} tests/helpers/${file}.js`;
+  assert.deepEqual(repo.compare().failures, [`${id('b')} is new (1)`]);
+  repo.write({ [SELF]: helpers(row('a', 'fixture'), row('b', 'legacy-scan')) });
+  const swapped = repo.compare();
+  assert.deepEqual([swapped.failures, swapped.netted.length], [[], 1]);
+  const marked = `  ${MARKER} a reason`;
+  repo.write({ [SELF]: helpers(row('a', 'legacy-scan'), marked, row('b', 'legacy-scan')) });
+  assert.deepEqual(repo.compare().failures, []);
+  repo.write({ [SELF]: helpers(row('a', 'fixture'), row('b', 'fixture')) });
+  assert.deepEqual(repo.compare().shrank, [`${id('a')} is gone (was 1)`]);
 });

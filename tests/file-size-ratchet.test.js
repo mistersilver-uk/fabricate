@@ -179,6 +179,7 @@ test('no file or function under `src/` became oversized or grew against the base
 
 test('the measurement still sees the oversized units of the whole tree', (t) => {
   // Fixed floors, not a ledger: a scan that stopped matching would otherwise read as a clean tree.
+  // ratchet-exempt(source-pin): measures every src/ unit's size and asserts nothing about its text
   const corpus = collectSources(resolve(repoRoot, CORPUS_ROOT), {
     extensions: [...SCANNED_EXTENSIONS],
   });

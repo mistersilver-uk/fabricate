@@ -825,7 +825,7 @@ const APP_DIRECTORY = 'src/ui/svelte/apps/';
 
 test('(f) no file under components/ imports from the application tree', () => {
   // The dependency graph inverted rather than a source pin: `importersOf` is measured, so this adds
-  // no `tests/source-pin-ledger.txt` row and no specifier's spelling can satisfy it.
+  // no pin to `tests/source-pin-ratchet.test.js` and no specifier's spelling can satisfy it.
   const appRenderFiles = RENDER_FILES.filter((file) => file.startsWith(APP_DIRECTORY));
   assert.ok(
     appRenderFiles.length >= 200,
