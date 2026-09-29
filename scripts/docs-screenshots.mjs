@@ -68,6 +68,9 @@ async function renderCases(caseIds) {
   const result = spawnSync(process.execPath, [join(ROOT, RENDERER), 'apps', caseIds.join(',')], {
     cwd: ROOT,
     stdio: 'inherit',
+    // Serial: the comparison's noise tolerance was measured on serial renders, and a loaded
+    // machine moves raster-image resampling further (see `scripts/README.md`).
+    env: { ...process.env, VIEW_LAB_CONCURRENCY: '1' },
   });
   if (result.error) {
     throw new DocsScreenshotError(`could not run the renderer: ${result.error.message}`);
