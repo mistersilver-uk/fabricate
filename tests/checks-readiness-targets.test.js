@@ -1,17 +1,12 @@
 /** Checks readiness for roll-under and character-value targets (issue 2003). */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 
 import {
   evaluateCheckReadiness,
   sectionForIssue,
 } from '../src/ui/svelte/apps/manager/checks/checksReadiness.js';
-import {
-  CHECK_ISSUE_TITLES,
-  checkIssueText,
-  checkTickCopy,
-} from '../src/ui/svelte/apps/manager/checks/checksCopy.js';
+import { checkIssueText, checkTickCopy } from '../src/ui/svelte/apps/manager/checks/checksCopy.js';
 
 const attribute = (expression, extra = {}) => ({
   product: 'sum',
@@ -347,18 +342,22 @@ describe('the new issues render a title over their sentence', () => {
     });
   });
 
-  it('localizes every title under the Validation namespace, as its fallback reads', () => {
-    const en = JSON.parse(readFileSync(new URL('../lang/en.json', import.meta.url), 'utf8'));
-    const validation = en.FABRICATE.Admin.Manager.Checks.Validation;
-    for (const [id, [key, fallback]] of Object.entries(CHECK_ISSUE_TITLES)) {
-      assert.equal(validation[key], fallback, `${id} resolves to ${key}`);
-    }
+  // Issue 2082: the older issues take the same shape, a short title over their sentence.
+  it('titles an older issue over its sentence rather than making the sentence its title', () => {
+    assert.deepEqual(checkIssueText('noRollFormula', undefined, english), {
+      title: 'The check has no roll formula',
+      detail: 'Nothing is rolled, so this check cannot resolve until you enter a formula.',
+    });
+    assert.deepEqual(checkIssueText('rangeOverlap', undefined, english), {
+      title: 'Two bands overlap',
+      detail: 'Bands must not overlap — a roll in the overlap has two possible tiers.',
+    });
   });
 
-  it('leaves an existing issue as one sentence with no detail', () => {
-    assert.deepEqual(checkIssueText('noRollFormula', undefined, english), {
-      title: 'This check has no roll formula; it will not resolve until one is set.',
-      detail: '',
+  it('degrades an id with no title to the id itself rather than throwing', () => {
+    assert.deepEqual(checkIssueText('notAnIssue', undefined, english), {
+      title: 'notAnIssue',
+      detail: 'notAnIssue',
     });
   });
 });

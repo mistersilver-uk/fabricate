@@ -5,6 +5,9 @@ manager-checks-validation-average-unavailable
 manager-checks-rail-group
 manager-checks-rail-dirty
 manager-checks-section-badged-and-dotted
+manager-checks-roll-notices
+manager-checks-outcomes-range-notices
+manager-checks-triggers-notice
 manager-checks-off
 manager-checks-stacked-floor
 manager-checks-trigger-operator-list
@@ -15,6 +18,7 @@ manager-checks-gathering-on-failure
 manager-recipe-edit-results-failure-tier
 manager-checks-crafting-modifiers
 manager-checks-crafting-modifier-max-picks
+manager-checks-crafting-modifiers-multi-name-notice
 manager-checks-crafting-modifier-entries
 manager-checks-salvage-modifiers
 manager-checks-gathering-modifiers
@@ -84,4 +88,5 @@ manager-checks-count-forced
 manager-checks-count-botch-rescued
 manager-checks-count-odds-refused
 manager-checks-count-callouts
+manager-checks-roll-notices-floor
 manager-checks-count-readiness
