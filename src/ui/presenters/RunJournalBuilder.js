@@ -52,6 +52,12 @@ function recordedNumber(value) {
   return typeof value === 'string' && value.trim() === '' ? null : numberOrNull(value);
 }
 
+/** Whether a routed check ranks its ladder roll-under: lower totals reach the better tiers. */
+function laddersUnder(routed) {
+  const evaluation = activeCheckEvaluation(routed);
+  return evaluation.product === 'sum' && evaluation.direction === 'under';
+}
+
 /** Outside sum/over/fixed a roll names its executed target and margin, never a DC (issue 2005). */
 function executedTargetFields(data) {
   if (data.direction !== 'under' && data.targetSource !== 'attribute') return null;
@@ -2252,6 +2258,11 @@ export class RunJournalBuilder {
         mode === 'routed'
           ? this._routedYieldTiers(context.task, system, stringOrNull(run.craftingSystemId))
           : [],
+      // A roll-under ladder states its selection rule the other way up (issue 2005).
+      ...(mode === 'routed' &&
+        laddersUnder(system?.gatheringCraftingCheck?.routed) && {
+          direction: 'under',
+        }),
     };
   }
 

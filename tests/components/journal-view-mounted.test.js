@@ -689,6 +689,17 @@ describe('JournalView mounted behavior', () => {
     assert.equal(routedTarget.querySelectorAll('[data-outcome-tier]').length, 2);
     assert.match(routedTarget.querySelector('.journal-detail-meta').textContent, /Mode\.routed/u);
     assert.doesNotMatch(routedTarget.querySelector('.journal-detail-meta').textContent, /null/u);
+    const ruleHint = (root) => root.querySelector('[data-outcome-ladder] .fab-outcome-hint').textContent;
+    assert.match(ruleHint(routedTarget), /Yields\.RoutedRule$/u);
+
+    // Issue 2005: a roll-under ladder states its selection rule the other way up.
+    harness.remount();
+    const under = makeGatheringRun({ gatheringYield: { ...routed.gatheringYield, direction: 'under' } });
+    const { store: underStore } = makeJournal({ selectedRun: under, selectedRunKey: under.key });
+    assert.match(
+      ruleHint(await harness.mount({ services: makeServices(underStore) })),
+      /Yields\.RoutedRuleUnder$/u
+    );
 
     harness.remount();
     const straight = makeGatheringRun({

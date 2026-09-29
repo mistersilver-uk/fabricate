@@ -372,12 +372,12 @@
       hint: () =>
         text(
           'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierHintAdjustment',
-          "The adjustment these recipes apply to the character value — not the check's outcome tiers."
+          "The adjustment these recipes roll with — not the check's outcome tiers."
         ),
       defaultHint: () =>
         text(
           'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierDefaultHintAdjustment',
-          "Clears every selected recipe to the system's base adjustment."
+          'Clears every selected recipe to the base adjustment.'
         ),
     },
   };

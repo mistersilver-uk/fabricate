@@ -3532,6 +3532,7 @@ test('the gathering ladder names an attribute adjustment through the builder, lo
     run.gatheringYield.tiers.map((tier) => tier.band),
     ['FABRICATE.App.Journal.StepDetails.BandOtherwise', '×½']
   );
+  assert.equal(run.gatheringYield.direction, 'under', 'the ladder states its rule the other way up');
 });
 
 test('the step label names a roll-under Target, and a character value no number', () => {

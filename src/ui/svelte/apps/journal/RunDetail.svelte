@@ -567,7 +567,11 @@
         tiers={outcomeTiers}
         emptyTierText={localize('FABRICATE.App.Journal.Yields.None')}
         label={localize('FABRICATE.App.Journal.Yields.PreviewTitle')}
-        hint={localize('FABRICATE.App.Journal.Yields.RoutedRule')}
+        hint={localize(
+          gatheringYield.direction === 'under'
+            ? 'FABRICATE.App.Journal.Yields.RoutedRuleUnder'
+            : 'FABRICATE.App.Journal.Yields.RoutedRule'
+        )}
       />
     {:else if gatheringYield && displayedYieldEntries.length > 0}
       {#if yieldPreviewLoading}
