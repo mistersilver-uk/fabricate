@@ -142,6 +142,19 @@ describe('the target line', () => {
       'Nothing is produced',
       'danger',
     ]);
+    assert.deepEqual(forced.note, {
+      kind: 'forced',
+      text: 'Trigger fired — forced to success, but no succeeding tier exists, so nothing is produced.',
+    });
+    const forcedFailure = readout(routed(failing), {
+      ...result(false, { total: 15, diceGroups: d20(12), forcedOutcome: 'failure' }),
+      outcome: null,
+    });
+    assert.equal(
+      forcedFailure.note.text,
+      'Trigger fired — forced to the worst failing tier.',
+      'every other forced note is unchanged'
+    );
     assert.deepEqual(forced.rows.map((row) => [row.id, row.label, row.meta]), [
       ['failure-result', 'Failure result if this recipe defines one', 'per recipe'],
       ['ingredients', 'Ingredients consumed', 'policy on'],

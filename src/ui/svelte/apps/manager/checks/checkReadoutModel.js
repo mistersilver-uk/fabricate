@@ -149,6 +149,12 @@ const FORCED_NOTES = Object.freeze({
   },
 });
 
+/** A routed success forced where no succeeding tier exists, so no tier caught it. */
+const FORCED_UNCAUGHT = Object.freeze([
+  'FABRICATE.Admin.Manager.Checks.Simulator.NoteForcedNoSucceedingTier',
+  'Trigger fired — forced to success, but no succeeding tier exists, so nothing is produced.',
+]);
+
 const ROWS = Object.freeze({
   produced: ['FABRICATE.Admin.Manager.Checks.Simulator.FactResults', 'Result group produced'],
   full: ['FABRICATE.Admin.Manager.Checks.Simulator.FactFull', 'full'],
@@ -241,6 +247,7 @@ function readoutFacts(input, text) {
     data,
     count,
     success,
+    unrouted,
     total: finite(data.total),
     recordNoun: input.recordNoun || say(text, COPY.record),
     fixedRanges: plan.kind === 'routed' && plan.args?.type === 'fixed',
@@ -454,6 +461,9 @@ function marginNote(facts, grading, text) {
 function readoutNote(facts, grading, text) {
   const { data, plan, count, family } = facts;
   if (count?.zeroPool) return { kind: 'zero-pool', text: say(text, NOTES.zeroPool) };
+  if (facts.unrouted && data.forcedOutcome === 'success') {
+    return { kind: 'forced', text: say(text, FORCED_UNCAUGHT) };
+  }
   const forced = FORCED_NOTES[plan.kind]?.[data.forcedOutcome];
   if (forced) return { kind: 'forced', text: say(text, forced) };
   if (family === 'fixedOver') return stepNote(facts, text);

@@ -6662,6 +6662,7 @@
             "NoteForcedNoneAwarded": "Trigger fired — nothing is awarded.",
             "NoteForcedBest": "Trigger fired — forced to the best succeeding tier.",
             "NoteForcedWorst": "Trigger fired — forced to the worst failing tier.",
+            "NoteForcedNoSucceedingTier": "Trigger fired — forced to success, but no succeeding tier exists, so nothing is produced.",
             "FactFull": "full",
             "FactIngredientsReturned": "Ingredients returned",
             "FactItemConsumed": "Item consumed",
