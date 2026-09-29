@@ -77,17 +77,35 @@ function operandSpans(formula) {
   return spans;
 }
 
+/** Whether a formula operand carries a flavour bracket, the mark of a composed modifier/tool term
+ *  appended AFTER the typed formula resolves, never a typed operand itself. */
+function isFlavouredOperand(operand) {
+  return /\[[^\]]*\]/.test(operand);
+}
+
 /**
  * The resolved formula with each character value flavoured by its typed path, matched by position
  * (`1d20 + @abilities.int.mod` resolves `1d20 + 3`, which reads `3[@abilities.int.mod]`). Only a
- * typed operand that is exactly one path, resolved to a bare number, is named.
+ * typed operand that is exactly one path, resolved to a bare number, is named. Positional matching
+ * is trusted only once trailing appended terms (flavoured modifier/tool operands) are set aside and
+ * the remaining counts still line up; any other drift between the typed and resolved formulas (a
+ * stripped placeholder, a path that resolves to more than one operand) mislabels nothing instead.
  */
 function withPathNames(formula, typed) {
   if (!typed) return formula;
   const paths = operandSpans(typed).map(({ start, end }) => typed.slice(start, end).trim());
+  const spans = operandSpans(formula);
+  let matched = spans.length;
+  while (
+    matched > 0 &&
+    isFlavouredOperand(formula.slice(spans[matched - 1].start, spans[matched - 1].end))
+  ) {
+    matched -= 1;
+  }
+  if (matched !== paths.length) return formula;
   let named = '';
   let cursor = 0;
-  for (const [index, { start, end }] of operandSpans(formula).entries()) {
+  for (const [index, { start, end }] of spans.entries()) {
     const path = paths[index];
     const operand = formula.slice(start, end);
     if (!/^@[\w.]+$/.test(path ?? '') || !/^\s*-?\d+(?:\.\d+)?\s*$/.test(operand)) continue;

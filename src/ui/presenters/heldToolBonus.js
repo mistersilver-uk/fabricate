@@ -22,7 +22,7 @@ function bonusOf(states) {
     const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
     const resolved = resolveDeterministicExpression(expression, rollData, { pathMode: 'foundry' });
     if (resolved.ok) flat += resolved.value;
-    else pending.push(expression);
+    else if (resolved.reason === 'dice') pending.push(expression);
   }
   return { flat, pending };
 }
