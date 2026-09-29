@@ -530,15 +530,14 @@ Fabricate uses [ESLint](https://eslint.org/) (flat config in `eslint.config.js`)
 All of these run as a **required CI check** (`lint` job in `.github/workflows/ci.yml`).
 
 ```bash
-npm run lint           # ESLint over the whole repository (fails on any warning)
-npm run lint:fix       # …and auto-fix what can be fixed
-npm run lint:debt      # what is still wrong in the files eslint.debt.js carries (what CI runs)
+npm run lint           # ESLint over the whole repository, compared with the base commit (what CI runs)
+npm run lint:fix       # …and auto-fix the rules your change made worse
 npm run lint:svelte    # ESLint over every src/**/*.svelte (what CI runs)
 npm run lint:svelte:warnings  # Svelte COMPILER warnings, every component (what CI runs)
 npm run lint:css       # Stylelint over styles/**/*.{css,scss} (what CI runs)
 npm run lint:css:fix   # …and auto-fix what can be fixed
-npm run format         # Prettier-format the whole repository
-npm run format:check   # verify formatting (what CI runs)
+npm run format         # Prettier-format the files format:check fails
+npm run format:check   # verify formatting against the base commit (what CI runs)
 npm run lint:md        # markdownlint over all Markdown (what CI runs)
 npm run lint:md:fix    # …and auto-fix (splits prose to one sentence per line)
 ```
@@ -558,13 +557,13 @@ Stylelint still excludes `.svelte` (scoped `<style>` blocks are not linted) and 
 **But SonarCloud's DUPLICATION detector does read `.svelte`, and that distinction is not academic** — issue 1050 read this sentence as "Svelte is invisible to SonarCloud", concluded the duplication risk lived in `tests/**`, and shipped a PR whose quality gate failed at 5.3% on new code with 93 of its 98 duplicated lines in a single `.svelte` file.
 A token-level CPD run at SonarJS's 100-token minimum reproduces the gate closely; a line-based approximation does not, and neither does reasoning from the rule surface.
 So a change that repeats a component's markup — the same field pair written for two scopes, one row rendered per case — is a duplication risk exactly like repeated `.js`, and the remedy is the same: render it once from one component.
-`npm run lint` is `eslint .` and `npm run format:check` is `prettier --check .` — the whole repository, as of issue #1660.
+`npm run lint` runs ESLint and `npm run format:check` runs Prettier over `.` — the whole repository, as of issue #1660.
 They used to enumerate about eighty paths each, so a new file was linted by nothing until somebody remembered to add it, which is the trap that let a new BUG and a new VULNERABILITY reach SonarCloud in issue 933.
-The not-yet-clean files are carried by `eslint.debt.js`, which switches off **per file** only the rules that file fails and leaves every other rule armed on it — deliberately not an `ignores` entry, which would take the file out of ESLint's reach entirely, `no-undef` included, while the linted-file count went up.
-Formatting debt is the marked section of `.prettierignore`.
-`npm run lint:debt` reports what is left in a baselined file and fails on an entry that reports nothing any more; it runs as a step of the `lint` CI job rather than from `npm test`, because answering that means linting the largest files in the tree.
-`tests/lint-coverage.test.js` pins each debt group's size exactly (not as a ceiling — a ceiling banks a free slot on every payment), asserts the glob still reaches everything the old enumeration did, and asserts `no-undef` is never baselined.
-When you bring a file to green, delete its entry and lower the pinned count in the same commit; widen nothing else in the same PR, since reformatting counts as new code and surfaces pre-existing Sonar findings.
+The not-yet-clean files are held at the base commit's findings rather than listed: a changed file fails on a `(file, rule)` count above its base content's, and every rule stays armed on it — deliberately not an `ignores` entry, which would take the file out of ESLint's reach entirely, `no-undef` included, while the linted-file count went up.
+Formatting debt is held the same way: a file Prettier-clean at base, or new, must stay clean.
+`npm run lint` compares with `RATCHET_BASE` when it is set and with the merge base of `origin/main` otherwise, so run `git fetch origin main` if it names code you did not touch; it runs as a step of the `lint` CI job rather than from `npm test`, because answering that means linting the largest files in the tree.
+`tests/new-violations.test.js` proves both comparisons against a temporary repository, including that `no-undef` and a parse error fail at any count.
+When you bring a file to green there is nothing to update, because the comparison reports the fall; widen nothing else in the same PR, since reformatting counts as new code and surfaces pre-existing Sonar findings.
 The `scripts/**` debt is fifteen of its thirty-three files, and stays that way for a measured reason: the Foundry smoke harness alone accounts for 844 of the roughly one thousand ESLint findings there and pins its Phase D0 selectors by class, index and button text with no unit coverage, so clearing it is a large triage against the least-covered file here rather than a tidy-up.
 A new `.sh` under `scripts/` is the one thing still added by hand — to `SHELL_SCRIPTS` in `tests/scripts-lint-gate-coverage.test.js`, which with its `bash -n` parse is the only gate shell gets anywhere in this repository.
 `npm run lint:css` (Stylelint, config in `stylelint.config.js`) gates `styles/**/*.{css,scss}` and enforces quality, reliability, duplication, reuse/shorthand, and cross-browser support (against the `browserslist` in `package.json`); Svelte scoped `<style>` blocks are out of scope.
@@ -612,31 +611,33 @@ Stylelint has **no** robust rule for detecting two near-identical rule blocks th
 A handful of standard rules are deliberately turned off with justification in `stylelint.config.js` (e.g. `no-descending-specificity` — reordering the single large global sheet is regression-prone and unreviewable; the cosmetic `selector-not-notation` / `media-feature-range-notation` modernizers — pure churn for no enforcement value).
 The Svelte components' scoped `<style>` blocks are not linted here (they compile to hashed classes and are owned by the Svelte toolchain).
 
-### The gate is a glob, and the debt is a list
+### The gate is a glob, and the debt is the base commit
 
-`npm run lint` is `eslint .` and `npm run format:check` is `prettier --check .`, over the whole repository, as of issue #1660.
+`npm run lint` runs ESLint and `npm run format:check` runs Prettier over `.`, the whole repository, as of issue #1660.
 
 They used to enumerate about eighty paths each.
 Linting had been introduced path by path so each step landed green, and the cost of that was a gate that could only be widened by hand: a file left off the list was linted by nothing, and the miss surfaced at SonarCloud after push rather than at any local gate (issue #933).
-The glob inverts it — a new file is gated the moment it lands — and the not-yet-clean files are carried explicitly instead.
+The glob inverts it — a new file is gated the moment it lands — and the not-yet-clean files are held at their base findings instead.
 
-`eslint.debt.js` records, **per file**, the rules that file fails today, and `eslint.config.js` switches off exactly those.
-Every other rule stays armed on it.
+`npm run lint` (`scripts/lint.mjs`) lints the base content of each changed file with the same config, and fails on a `(file, rule)` count above it.
+Every rule stays armed on every file.
 That is deliberately not an `ignores` entry: ignoring a file takes it out of ESLint's reach entirely, `no-undef` included, while the linted-file *count* goes up — which reads as progress in a diff and is a regression in fact.
 `src/main.js` is the file that settles the point; `tests/main-undefined-identifiers.test.js` exists because a `ReferenceError` shipped in it past lint, tests and build.
 
-So the debt shrinks along two axes: a rule leaves a file when that rule is fixed, and a file leaves when its last rule does.
+So the debt only shrinks: a finding fixed in a file lowers the base the next change to that file is compared with.
 
-- `npm run lint:debt` shows what is left in a baselined file, and **fails** when an entry reports nothing any more — an entry paid off and left in place is how "the baseline only shrinks" quietly stops being true.
+- `npm run lint` fails `no-undef` and a parse error at any count, and excuses a regression only where a `// ratchet-exempt(lint): <reason>` comment sits on the finding's line or in the comment lines right above it; an empty reason fails.
   It is a step of the `lint` CI job rather than a unit test because answering it means linting the largest files in the tree, and twenty-three CPU-bound seconds do not belong in the unit-test job.
-- `tests/lint-coverage.test.js` pins each group's size **exactly** (not as a ceiling — a ceiling banks a free slot on every debt payment), asserts the glob still covers everything the old enumeration reached, and asserts `no-undef` is never baselined.
-- Formatting debt is the marked section of `.prettierignore`, pinned and staleness-checked the same way.
+- `tests/lint-coverage.test.js` asserts `no-undef` is armed in every part of the tree and pins both ignore lists.
+- Formatting debt is held by `npm run format:check` (`scripts/format-check.mjs`) the same way, and `npm run format` formats exactly the files it fails.
 
-When you bring a file to green, delete its entry and lower the pinned count in the same commit.
+When you bring a file to green, commit it; there is no entry to delete and no count to lower.
+The debt is visible, not hidden: an editor shows it as errors, and a bare `npx eslint .` or `npx prettier --check .` exits non-zero, so the gate is the npm script and never the bare tool.
+`npm run lint:fix` fixes only the rules your change made worse, and `npm run format` formats only the files `format:check` fails, so neither rewrites debt you did not touch.
 
 A **second** gated script, `npm run lint:svelte`, covers every `*.svelte` file under `src/` and runs as its own step of the same required `lint` job.
 It is separate because components need the Svelte parser and their own rule set, not because they are optional.
-Note what this means for `src/ui/**`: that directory holds both halves and `npm run lint` now covers both, so the 394 plain `.js` files there that are clean are gated outright; only the 60 listed in `eslint-debt.txt` carry any exclusion, and only for the rules they fail.
+Note what this means for `src/ui/**`: that directory holds both halves and `npm run lint` now covers both, so the 394 plain `.js` files there that are clean are gated outright; the 60 that were not are held at their base findings, rule by rule.
 
 `lint:svelte` runs with `--max-warnings=0`, so the two WARN-level rules in `svelte.configs.recommended` (`svelte/no-at-debug-tags`, `svelte/no-inspect`) fail the build rather than printing and exiting 0 — a `{@debug}` tag or an `$inspect()` call left in a component is a CI failure.
 A finding has three legitimate dispositions: fix the code, tune the rule in `eslint.config.js`, or suppress it.
@@ -674,16 +675,16 @@ A warning worth keeping is suppressed at its site with `<!-- svelte-ignore <code
 SonarCloud still indexes no `.svelte` at all (SonarJS ships no Svelte parser), so components contribute nothing to the quality gate's duplication or issue counts, and Stylelint still excludes their scoped `<style>` blocks.
 Both are tracked as their own follow-ups.
 
-Carried as debt rather than gated away (see `eslint.debt.js`, and `npm run lint:debt` to see what is left):
+Carried as debt rather than gated away (held at their base findings; `npx eslint <file>` shows what is left):
 
-- the `tests/` suite — one rule list across the tree rather than a per-file table, because 887 of its 1,040 files report something.
-  Every rule *not* on that list is now enforced there for the first time, `no-undef` among them.
+- the `tests/` suite — held per file and rule like the rest, where 887 of its 1,040 files reported something when the glob landed.
+  Every rule is now enforced there, `no-undef` at any count.
 - 60 of the 454 plain `.js` files under `src/ui/**`; the other 394 are gated outright, as are the `.svelte` components beside them
 - `src/main.js` and three root `src/gathering*.js` modules
 - 15 of the 33 files under `scripts/**`
 - the `examples/macros/*.js` documentation macros, and two root config files
 
-`scripts/**` is worth understanding before you add a script, because the reason its fifteen are still listed is a measurement rather than an oversight.
+`scripts/**` is worth understanding before you add a script, because the reason its fifteen still carry debt is a measurement rather than an oversight.
 The Foundry smoke harness alone accounts for 844 of the roughly one thousand ESLint findings across that directory, and it pins its Phase D0 selectors by class, index and button text with no unit coverage over any of them.
 Adding a script now lints it — that is the whole point of the glob — so the only thing left to remember is that a new `.sh` file joins `SHELL_SCRIPTS` in `tests/scripts-lint-gate-coverage.test.js` by hand.
 Shell is parsed by no linter and formatted by no formatter here, and that list plus its `bash -n` parse is the only gate a shell script gets.

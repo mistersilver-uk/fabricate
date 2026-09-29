@@ -526,11 +526,11 @@ const RENAMED = [
     before:
       'The four ratchet ledgers issue #1656 added — `tests/comment-share-ledger.txt`, `tests/file-size-ledger.txt`, `tests/source-pin-ledger.txt` and `tests/foundry-global-reads-ledger.txt` — are ceiling gates whose rows change only when a unit crosses its ceiling, so lanes that share them no longer need one rail (issue #1914).',
     after:
-      'The ratchet ledgers issue #1656 added — `tests/file-size-ratchet.test.js`, `tests/source-pin-ratchet.test.js` and `tests/foundry-global-reads-ledger.txt` — are ceiling gates whose rows change only when a unit crosses its ceiling, so lanes that share them no longer need one rail (issue #1914).',
+      'The ratchet ledgers issue #1656 added — `tests/file-size-ratchet.test.js`, `tests/source-pin-ratchet.test.js` and `npm run lint` — are ceiling gates whose rows change only when a unit crosses its ceiling, so lanes that share them no longer need one rail (issue #1914).',
     identifiers: [
       [
-        'The ratchet ledgers issue #1656 added — `tests/file-size-ratchet.test.js`, `tests/source-pin-ratchet.test.js`',
-        'The four ratchet ledgers issue #1656 added — `tests/comment-share-ledger.txt`, `tests/file-size-ledger.txt`, `tests/source-pin-ledger.txt`',
+        'The ratchet ledgers issue #1656 added — `tests/file-size-ratchet.test.js`, `tests/source-pin-ratchet.test.js` and `npm run lint`',
+        'The four ratchet ledgers issue #1656 added — `tests/comment-share-ledger.txt`, `tests/file-size-ledger.txt`, `tests/source-pin-ledger.txt` and `tests/foundry-global-reads-ledger.txt`',
       ],
     ],
   },
@@ -547,13 +547,166 @@ const RENAMED = [
     before:
       '`tests/source-pin-ledger.txt` and `tests/foundry-global-reads-ledger.txt` carry no headroom, because one more pin or bare read is never the same debt as the last one, so there the gate enforces that obligation itself: a row left above the unit it bounds fails as `SLACK` and is banked with the tighten mode in the same PR that earned it.',
     after:
-      '`tests/source-pin-ratchet.test.js` and `tests/foundry-global-reads-ledger.txt` carry no headroom, because one more pin or bare read is never the same debt as the last one, so there the gate enforces that obligation itself: a row left above the unit it bounds fails as `SLACK` and is banked with the tighten mode in the same PR that earned it.',
-    identifiers: [['`tests/source-pin-ratchet.test.js`', '`tests/source-pin-ledger.txt`']],
+      '`tests/source-pin-ratchet.test.js` and `npm run lint` carry no headroom, because one more pin or bare read is never the same debt as the last one, so there the gate enforces that obligation itself: a row left above the unit it bounds fails as `SLACK` and is banked with the tighten mode in the same PR that earned it.',
+    identifiers: [
+      [
+        '`tests/source-pin-ratchet.test.js` and `npm run lint`',
+        '`tests/source-pin-ledger.txt` and `tests/foundry-global-reads-ledger.txt`',
+      ],
+    ],
+  },
+  // Issue 2118 replaced the ESLint and Prettier debt lists with a comparison against the base commit.
+  {
+    before:
+      '`npm run lint` is `eslint .` and `npm run format:check` is `prettier --check .` — the whole repository, as of issue #1660.',
+    after:
+      '`npm run lint` runs ESLint and `npm run format:check` runs Prettier over `.` — the whole repository, as of issue #1660.',
+    identifiers: [['runs ESLint and `npm run format:check` runs Prettier over `.`', 'is `eslint .` and `npm run format:check` is `prettier --check .`']],
+  },
+  {
+    before:
+      "The not-yet-clean files are carried by `eslint.debt.js`, which switches off **per file** only the rules that file fails and leaves every other rule armed on it — deliberately not an `ignores` entry, which would take the file out of ESLint's reach entirely, `no-undef` included, while the linted-file count went up.",
+    after:
+      "The not-yet-clean files are held at the base commit's findings rather than listed: a changed file fails on a `(file, rule)` count above its base content's, and every rule stays armed on it — deliberately not an `ignores` entry, which would take the file out of ESLint's reach entirely, `no-undef` included, while the linted-file count went up.",
+    identifiers: [["held at the base commit's findings rather than listed: a changed file fails on a `(file, rule)` count above its base content's, and every rule stays", 'carried by `eslint.debt.js`, which switches off **per file** only the rules that file fails and leaves every other rule']],
+  },
+  {
+    before:
+      'Formatting debt is the marked section of `.prettierignore`.',
+    after:
+      'Formatting debt is held the same way: a file Prettier-clean at base, or new, must stay clean.',
+    identifiers: [['held the same way: a file Prettier-clean at base, or new, must stay clean.', 'the marked section of `.prettierignore`.']],
+  },
+  {
+    before:
+      '`npm run lint:debt` reports what is left in a baselined file and fails on an entry that reports nothing any more; it runs as a step of the `lint` CI job rather than from `npm test`, because answering that means linting the largest files in the tree.',
+    after:
+      '`npm run lint` compares with `RATCHET_BASE` when it is set and with the merge base of `origin/main` otherwise, so run `git fetch origin main` if it names code you did not touch; it runs as a step of the `lint` CI job rather than from `npm test`, because answering that means linting the largest files in the tree.',
+    identifiers: [['lint` compares with `RATCHET_BASE` when it is set and with the merge base of `origin/main` otherwise, so run `git fetch origin main` if it names code you did not touch;', 'lint:debt` reports what is left in a baselined file and fails on an entry that reports nothing any more;']],
+  },
+  {
+    before:
+      "`tests/lint-coverage.test.js` pins each debt group's size exactly (not as a ceiling — a ceiling banks a free slot on every payment), asserts the glob still reaches everything the old enumeration did, and asserts `no-undef` is never baselined.",
+    after:
+      '`tests/new-violations.test.js` proves both comparisons against a temporary repository, including that `no-undef` and a parse error fail at any count.',
+    identifiers: [['`tests/new-violations.test.js` proves both comparisons against a temporary repository, including that `no-undef` and a parse error fail at any count.', "`tests/lint-coverage.test.js` pins each debt group's size exactly (not as a ceiling — a ceiling banks a free slot on every payment), asserts the glob still reaches everything the old enumeration did, and asserts `no-undef` is never baselined."]],
+  },
+  {
+    before:
+      'When you bring a file to green, delete its entry and lower the pinned count in the same commit; widen nothing else in the same PR, since reformatting counts as new code and surfaces pre-existing Sonar findings.',
+    after:
+      'When you bring a file to green there is nothing to update, because the comparison reports the fall; widen nothing else in the same PR, since reformatting counts as new code and surfaces pre-existing Sonar findings.',
+    identifiers: [['green there is nothing to update, because the comparison reports the fall;', 'green, delete its entry and lower the pinned count in the same commit;']],
+  },
+  {
+    before:
+      'The gate is a glob, and the debt is a list',
+    after:
+      'The gate is a glob, and the debt is the base commit',
+    identifiers: [['the base commit', 'a list']],
+  },
+  {
+    before:
+      '`npm run lint` is `eslint .` and `npm run format:check` is `prettier --check .`, over the whole repository, as of issue #1660.',
+    after:
+      '`npm run lint` runs ESLint and `npm run format:check` runs Prettier over `.`, the whole repository, as of issue #1660.',
+    identifiers: [['runs ESLint and `npm run format:check` runs Prettier over `.`,', 'is `eslint .` and `npm run format:check` is `prettier --check .`, over']],
+  },
+  {
+    before:
+      'The glob inverts it — a new file is gated the moment it lands — and the not-yet-clean files are carried explicitly instead.',
+    after:
+      'The glob inverts it — a new file is gated the moment it lands — and the not-yet-clean files are held at their base findings instead.',
+    identifiers: [['held at their base findings', 'carried explicitly']],
+  },
+  {
+    before:
+      '`eslint.debt.js` records, **per file**, the rules that file fails today, and `eslint.config.js` switches off exactly those.',
+    after:
+      '`npm run lint` (`scripts/lint.mjs`) lints the base content of each changed file with the same config, and fails on a `(file, rule)` count above it.',
+    identifiers: [['`npm run lint` (`scripts/lint.mjs`) lints the base content of each changed file with the same config, and fails on a `(file, rule)` count above it.', '`eslint.debt.js` records, **per file**, the rules that file fails today, and `eslint.config.js` switches off exactly those.']],
+  },
+  {
+    before:
+      'Every other rule stays armed on it.',
+    after:
+      'Every rule stays armed on every file.',
+    identifiers: [['rule stays armed on every file.', 'other rule stays armed on it.']],
+  },
+  {
+    before:
+      'So the debt shrinks along two axes: a rule leaves a file when that rule is fixed, and a file leaves when its last rule does.',
+    after:
+      'So the debt only shrinks: a finding fixed in a file lowers the base the next change to that file is compared with.',
+    identifiers: [['only shrinks: a finding fixed in a file lowers the base the next change to that file is compared with.', 'shrinks along two axes: a rule leaves a file when that rule is fixed, and a file leaves when its last rule does.']],
+  },
+  {
+    before:
+      '`npm run lint:debt` shows what is left in a baselined file, and **fails** when an entry reports nothing any more — an entry paid off and left in place is how "the baseline only shrinks" quietly stops being true.',
+    after:
+      "`npm run lint` fails `no-undef` and a parse error at any count, and excuses a regression only where a `// ratchet-exempt(lint): <reason>` comment sits on the finding's line or in the comment lines right above it; an empty reason fails.",
+    identifiers: [["lint` fails `no-undef` and a parse error at any count, and excuses a regression only where a `// ratchet-exempt(lint): <reason>` comment sits on the finding's line or in the comment lines right above it; an empty reason fails.", 'lint:debt` shows what is left in a baselined file, and **fails** when an entry reports nothing any more — an entry paid off and left in place is how "the baseline only shrinks" quietly stops being true.']],
+  },
+  {
+    before:
+      "`tests/lint-coverage.test.js` pins each group's size **exactly** (not as a ceiling — a ceiling banks a free slot on every debt payment), asserts the glob still covers everything the old enumeration reached, and asserts `no-undef` is never baselined.",
+    after:
+      '`tests/lint-coverage.test.js` asserts `no-undef` is armed in every part of the tree and pins both ignore lists.',
+    identifiers: [['asserts `no-undef` is armed in every part of the tree and pins both ignore lists.', "pins each group's size **exactly** (not as a ceiling — a ceiling banks a free slot on every debt payment), asserts the glob still covers everything the old enumeration reached, and asserts `no-undef` is never baselined."]],
+  },
+  {
+    before:
+      'Formatting debt is the marked section of `.prettierignore`, pinned and staleness-checked the same way.',
+    after:
+      'Formatting debt is held by `npm run format:check` (`scripts/format-check.mjs`) the same way, and `npm run format` formats exactly the files it fails.',
+    identifiers: [['held by `npm run format:check` (`scripts/format-check.mjs`) the same way, and `npm run format` formats exactly the files it fails.', 'the marked section of `.prettierignore`, pinned and staleness-checked the same way.']],
+  },
+  {
+    before:
+      'When you bring a file to green, delete its entry and lower the pinned count in the same commit.',
+    after:
+      'When you bring a file to green, commit it; there is no entry to delete and no count to lower.',
+    identifiers: [['commit it; there is no entry to delete and no count to lower.', 'delete its entry and lower the pinned count in the same commit.']],
+  },
+  {
+    before:
+      'Note what this means for `src/ui/**`: that directory holds both halves and `npm run lint` now covers both, so the 394 plain `.js` files there that are clean are gated outright; only the 60 listed in `eslint-debt.txt` carry any exclusion, and only for the rules they fail.',
+    after:
+      'Note what this means for `src/ui/**`: that directory holds both halves and `npm run lint` now covers both, so the 394 plain `.js` files there that are clean are gated outright; the 60 that were not are held at their base findings, rule by rule.',
+    identifiers: [['the 60 that were not are held at their base findings, rule by rule.', 'only the 60 listed in `eslint-debt.txt` carry any exclusion, and only for the rules they fail.']],
+  },
+  {
+    before:
+      'Carried as debt rather than gated away (see `eslint.debt.js`, and `npm run lint:debt` to see what is left):',
+    after:
+      'Carried as debt rather than gated away (held at their base findings; `npx eslint <file>` shows what is left):',
+    identifiers: [['(held at their base findings; `npx eslint <file>` shows', '(see `eslint.debt.js`, and `npm run lint:debt` to see']],
+  },
+  {
+    before:
+      'the `tests/` suite — one rule list across the tree rather than a per-file table, because 887 of its 1,040 files report something.',
+    after:
+      'the `tests/` suite — held per file and rule like the rest, where 887 of its 1,040 files reported something when the glob landed.',
+    identifiers: [['held per file and rule like the rest, where 887 of its 1,040 files reported something when the glob landed.', 'one rule list across the tree rather than a per-file table, because 887 of its 1,040 files report something.']],
+  },
+  {
+    before:
+      'Every rule *not* on that list is now enforced there for the first time, `no-undef` among them.',
+    after:
+      'Every rule is now enforced there, `no-undef` at any count.',
+    identifiers: [['is now enforced there, `no-undef` at any count.', '*not* on that list is now enforced there for the first time, `no-undef` among them.']],
+  },
+  {
+    before:
+      '`scripts/**` is worth understanding before you add a script, because the reason its fifteen are still listed is a measurement rather than an oversight.',
+    after:
+      '`scripts/**` is worth understanding before you add a script, because the reason its fifteen still carry debt is a measurement rather than an oversight.',
+    identifiers: [['still carry debt', 'are still listed']],
   },
 ];
 
 /** Pinned for the same reason as DEDUPLICATED_COUNT. */
-const RENAMED_COUNT = 32;
+const RENAMED_COUNT = 53;
 
 /** Everything `extract` yields from the post-split set, as one multiset. */
 function survivingLines(extract) {
