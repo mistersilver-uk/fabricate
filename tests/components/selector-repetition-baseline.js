@@ -8,7 +8,7 @@
  * not a thing that can be done. Keyed on the selector ALONE the sheet holds 215 repeated selectors
  * rather than these 106, and both figures are published so a reader can tell which produced a pin.
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 3,050 `(at-context, selector)` keys, of which 2,944 appear exactly
+ * Unfiltered, the sheet holds 3,051 `(at-context, selector)` keys, of which 2,945 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
@@ -19,7 +19,7 @@
  * variant and adds ListRow name/detail truncation, by `the sheet's cross-list selector repetition
  * does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
- * printed from. The sheet holds 2,550 rules at that head, 106 repeated keys and 217 appearances
+ * printed from. The sheet holds 2,551 rules at that head, 106 repeated keys and 217 appearances
  * between them; five keys appear three times and none appears four or more.
  * ISSUE 1510 PHASE 2 moves both the contextual figures and one repeated row. The component
  * studio conversion is already in main; the checks conversion adds two net rules and one net
@@ -201,6 +201,12 @@
  * the option cards' checked radio, the formula card's body, the inset glyphs and the quick tokens'
  * kind glyph — leaving 2,540 rules, 3,040 keys and 2,934 singletons once merged with epic 1997's;
  * the repeated table is unmoved. Re-derived by running the same census command.
+ * Issue 2097 adds one singleton rule, `.fabricate-manager .manager-muted.is-danger`, so the
+ * formula-validation line on the world Tool entry screen and the validation line on the Tool
+ * browser inspector both resolve to `--fab-danger-text` instead of falling back to the ordinary
+ * muted rule beside it. One rule, one new key, one new singleton: 2,551 rules, 3,051 keys and
+ * 2,945 singletons; the repeated table is unmoved. Re-derived by running
+ * `node scripts/stylesheet-selector-census.mjs`.
  */
 import { readFileSync } from 'node:fs';
 

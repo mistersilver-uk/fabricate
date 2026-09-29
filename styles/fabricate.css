@@ -6409,6 +6409,10 @@
   word-break: normal;
 }
 
+.fabricate-manager .manager-muted.is-danger {
+  color: var(--fab-danger-text);
+}
+
 .fabricate-manager .manager-system-copy,
 .fabricate-manager .manager-inspector-copy {
   min-width: 0;
