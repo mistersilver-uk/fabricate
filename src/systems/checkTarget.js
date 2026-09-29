@@ -174,11 +174,6 @@ export function isFixedSumOver(evaluation) {
   );
 }
 
-/** The ` (DC n)` chat-flavor suffix, which names only a summed roll-over fixed DC. */
-export function dcFlavorSuffix(dc, evaluation) {
-  return Number.isFinite(dc) && isFixedSumOver(evaluation) ? ` (DC ${dc})` : '';
-}
-
 /** A progressive check spends its total as a budget, so summed roll-under refuses; count/under rolls. */
 export function progressiveTargetRefusal(evaluation) {
   return evaluation?.product === 'sum' && evaluation?.direction === 'under'

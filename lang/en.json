@@ -1045,12 +1045,16 @@
           "Check": "Check",
           "Failure": "Failure",
           "CheckWithDc": "{formula} vs DC {dc}",
+          "CheckWithTarget": "{formula} · Target {target} · {comparison}",
+          "BandOtherwise": "Otherwise",
           "FailureGeneric": "The crafting attempt failed.",
           "RollLabel": "Roll",
           "RollResult": "{formula} = {total}",
           "RollResultWithDc": "{formula} = {total} vs DC {dc}",
+          "RollResultWithTarget": "{formula} = {total} · target {target} · margin {margin}",
           "RollResultValue": "Rolled {value}",
           "RollResultValueWithDc": "Rolled {value} vs DC {dc}",
+          "RollResultValueWithTarget": "Rolled {value} · target {target} · margin {margin}",
           "ConsumedTitle": "Consumed"
         },
         "Redacted": {
@@ -1842,7 +1846,8 @@
         "GMOnly": "Only a GM can roll a check for an actor.",
         "NoActor": "No such actor to roll a check for.",
         "NotReady": "Fabricate is still starting up, so no check can be rolled yet.",
-        "DefaultLabel": "Fabricate"
+        "DefaultLabel": "Fabricate",
+        "FlavorTarget": "Target {target}"
       },
       "BulkDecision": {
         "Decided": "One roll decision was settled, covering {count} of {total} checks.",
@@ -6682,6 +6687,8 @@
             "DirectionUnder": "Lower is better",
             "UnderNote": "The total must stay {cmp} the target. Modifiers raise the target; the dice stay as rolled.",
             "UnderRule": "The dice are compared raw. Every modifier that applies raises the target instead of being added to the roll.",
+            "UnderResolvedAddAll": "Apply all — every applied modifier raises the target.",
+            "UnderResolvedHighest": "Highest — only one applied modifier raises the target: the one with the highest average, or, when none has an ordinary average, the first listed.",
             "UnderRuleWithTier": "The dice are compared raw. Every modifier that applies raises the target instead of being added to the roll; the {tier} adjustment ({adjustment}) is applied first.",
             "UnderRuleWithUnnamedTier": "The dice are compared raw. Every modifier that applies raises the target instead of being added to the roll; the tier's adjustment ({adjustment}) is applied first.",
             "RecordTarget": "target {dc}",

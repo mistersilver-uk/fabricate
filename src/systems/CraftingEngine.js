@@ -18,7 +18,10 @@ import {
 } from '../toolBreakageRuntime.js';
 import { buildCraftingChatContent } from '../ui/presenters/CraftingChatCard.js';
 import { buildSalvageChatContent } from '../ui/presenters/SalvageChatCard.js';
-import { buildInteractiveRollOptions } from '../ui/svelte/apps/crafting/rollPrompt.js';
+import {
+  buildInteractiveRollOptions,
+  checkFlavorSuffix,
+} from '../ui/svelte/apps/crafting/rollPrompt.js';
 import { resolveRecipeImage } from '../ui/svelte/util/craftingImageDefaults.js';
 import { canonicalSignatureKey } from '../utils/alchemySignatureKey.js';
 import { resolveAlchemySubmissionComponent } from '../utils/alchemySubmissions.js';
@@ -65,7 +68,6 @@ import {
   actorRollData,
   attributeTargetBasis,
   checkTargetRefusal,
-  dcFlavorSuffix,
   progressiveTargetRefusal,
   refusalMessage,
 } from './checkTarget.js';
@@ -490,7 +492,7 @@ export class CraftingEngine {
       }),
       privateEvaluation: {
         actorUuid: actor?.uuid ?? null,
-        flavor: `${recipe.name ? `${recipe.name} — ` : ''}Crafting check${dcFlavorSuffix(dc, evaluation)}`,
+        flavor: `${recipe.name ? `${recipe.name} — ` : ''}Crafting check${checkFlavorSuffix(dc, evaluation)}`,
         speaker: cloneJsonValue(globalThis.ChatMessage?.getSpeaker?.({ actor })) ?? null,
         componentSourceActorUuids: (componentSourceActors || [])
           .map((source) => source?.uuid)

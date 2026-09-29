@@ -9,6 +9,7 @@ import { buildGatheringChatContent } from '../ui/presenters/GatheringChatCard.js
 import { GatheringListingBuilder } from '../ui/presenters/GatheringListingBuilder.js';
 import {
   buildInteractiveRollOptions,
+  checkFlavorSuffix,
   promptCheckRoll,
 } from '../ui/svelte/apps/crafting/rollPrompt.js';
 import { planComplications, publicComplications } from '../utils/complicationPlan.js';
@@ -34,7 +35,6 @@ import {
   actorRollData,
   attributeTargetBasis,
   checkTargetRefusal,
-  dcFlavorSuffix,
   progressiveTargetRefusal,
   refusalMessage,
 } from './checkTarget.js';
@@ -833,7 +833,7 @@ export class GatheringEngine {
       privateEvaluation: {
         secret,
         actorUuid: stringOrNull(actor?.uuid),
-        flavor: `${label ? `${label} — ` : ''}Gathering check${dcFlavorSuffix(dc, evaluation)}`,
+        flavor: `${label ? `${label} — ` : ''}Gathering check${checkFlavorSuffix(dc, evaluation, { withheld: !showTarget })}`,
         speaker: cloneJson(globalThis.ChatMessage?.getSpeaker?.({ actor })) ?? null,
         craftingSystemId: stringOrNull(system?.id),
         environmentId: stringOrNull(environment?.id),

@@ -5,6 +5,7 @@
  * Extracted from `RunDetail.svelte` so the component keeps its reactive state and markup and
  * nothing else; `localize` is injected so this module stays UI-free.
  */
+import { formatSignedStep } from '../../../../utils/checkAdjustmentFormat.js';
 
 /** `NaN` for an absent value, so `Number.isFinite` alone decides whether it was recorded. */
 export function numberOrNaN(raw) {
@@ -54,12 +55,35 @@ export function applyPersonalizedDrops(entries, breakdown) {
   });
 }
 
-/** The recorded roll, preferring the resolved formula and total over a bare value. */
+/** A roll graded against an executed target: `… · target {target} · margin {margin}`, or `''`. */
+function formatGradedRoll({ formula, total, value, target, margin }, localize) {
+  if (!Number.isFinite(target) || !Number.isFinite(margin)) return '';
+  const graded = { target, margin: formatSignedStep(margin) };
+  if (formula !== '' && Number.isFinite(total)) {
+    return localize('FABRICATE.App.Journal.StepDetails.RollResultWithTarget', {
+      formula,
+      total,
+      ...graded,
+    });
+  }
+  return Number.isFinite(value)
+    ? localize('FABRICATE.App.Journal.StepDetails.RollResultValueWithTarget', { value, ...graded })
+    : '';
+}
+
+/**
+ * The recorded roll, preferring the resolved formula and total over a bare value. Outside
+ * sum/over/fixed it names the executed target and margin, never a DC (issue 2005).
+ */
 export function formatRoll(check, localize) {
   const formula = String(check?.formula ?? '');
   const total = numberOrNaN(check?.total);
   const value = numberOrNaN(check?.value);
   const dc = numberOrNaN(check?.dc);
+  const target = numberOrNaN(check?.target);
+  const margin = numberOrNaN(check?.margin);
+  const graded = formatGradedRoll({ formula, total, value, target, margin }, localize);
+  if (graded) return graded;
   if (formula !== '' && Number.isFinite(total)) {
     return Number.isFinite(dc)
       ? localize('FABRICATE.App.Journal.StepDetails.RollResultWithDc', { formula, total, dc })

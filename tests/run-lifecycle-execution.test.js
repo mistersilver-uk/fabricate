@@ -2260,7 +2260,7 @@ test('the versioned crafting descriptor refuses its target before the Tool roll 
     assert.deepEqual(evaluations.map(({ formula }) => formula), ['1d4+@bonus']);
     const { dc, target, targetSource } = privateEvaluation.decisionPolicy;
     assert.deepEqual({ dc, target, targetSource }, { dc: null, target: 16, targetSource: 'attribute' });
-    assert.equal(privateEvaluation.flavor, 'Sun Tea — Crafting check', 'no DC names a character value');
+    assert.equal(privateEvaluation.flavor, 'Sun Tea — Crafting check (Target 16)', 'a Target, never a DC');
     assert.deepEqual([publicPrompt.target, publicPrompt.direction], [16, 'over']);
     assert.equal(publicPrompt.targetSource, 'attribute', 'the prompt names a target, not a DC (QE4)');
     const surface = stubPromptSurface(() => null);

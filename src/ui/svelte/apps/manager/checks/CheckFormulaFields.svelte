@@ -163,9 +163,12 @@
   }
 
   // ONE sentence naming the rule in force, restating what the Modifiers section authors. Under,
-  // the dice are compared raw, so the sentence names where the modifiers land instead.
-  const ruleSentence = $derived.by(() => {
-    if (underInset) return underRuleSentence();
+  // modifiers raise the target, so the policy says so and the raw-dice rule follows it.
+  const ruleSentence = $derived(
+    underInset ? `${policySentence(true)} ${underRuleSentence()}` : policySentence(false)
+  );
+
+  function policySentence(under) {
     if (applied.length === 0) {
       return text(
         'FABRICATE.Admin.Manager.Checks.Crafting.ResolvedNoModifiers',
@@ -173,10 +176,15 @@
       );
     }
     if (modifierPolicy === 'highest') {
-      return text(
-        'FABRICATE.Admin.Manager.Checks.Crafting.ResolvedHighest',
-        'Highest — only one applied modifier reaches the roll: the one with the highest average, or, when none has an ordinary average, the first listed.'
-      );
+      return under
+        ? text(
+            'FABRICATE.Admin.Manager.Checks.Evaluation.UnderResolvedHighest',
+            'Highest — only one applied modifier raises the target: the one with the highest average, or, when none has an ordinary average, the first listed.'
+          )
+        : text(
+            'FABRICATE.Admin.Manager.Checks.Crafting.ResolvedHighest',
+            'Highest — only one applied modifier reaches the roll: the one with the highest average, or, when none has an ordinary average, the first listed.'
+          );
     }
     if (modifierPolicy === 'bySubject') {
       return text(
@@ -190,11 +198,16 @@
         'Player picks — the crafter chooses from these at roll time, and the picks are summed.'
       );
     }
-    return text(
-      'FABRICATE.Admin.Manager.Checks.Crafting.ResolvedAddAll',
-      'Apply all — every applied modifier is summed into the roll.'
-    );
-  });
+    return under
+      ? text(
+          'FABRICATE.Admin.Manager.Checks.Evaluation.UnderResolvedAddAll',
+          'Apply all — every applied modifier raises the target.'
+        )
+      : text(
+          'FABRICATE.Admin.Manager.Checks.Crafting.ResolvedAddAll',
+          'Apply all — every applied modifier is summed into the roll.'
+        );
+  }
 </script>
 
 <div class="manager-checks-formula">

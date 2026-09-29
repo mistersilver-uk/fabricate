@@ -682,7 +682,7 @@ test('the gathering versioned descriptor refuses a target and captures a resolve
   const described = describe(VALID, { uuid: 'Actor.g', getRollData: () => ({ skills: SKILLS }) });
   const policy = described.privateEvaluation.decisionPolicy;
   assert.deepEqual([policy.dc, policy.target, policy.targetSource], [null, 12, 'attribute']);
-  assert.equal(described.privateEvaluation.flavor, 'Forage — Gathering check');
+  assert.equal(described.privateEvaluation.flavor, 'Forage — Gathering check (Target 12)');
 
   const fixed = describe(undefined, bare).privateEvaluation;
   assert.deepEqual(
@@ -738,14 +738,16 @@ test('the gathering versioned descriptor keeps a hidden task and a fixed-range c
   Object.assign(system.gatheringCraftingCheck.routed, { evaluation: SUM_UNDER });
   const bare = { uuid: 'Actor.g', system: {} };
 
-  const hidden = engine._versionedCheckDescriptor({
+  const hiddenDescriptor = engine._versionedCheckDescriptor({
     actor: bare,
     run: { taskId: `blind:${environment.id}` },
     system,
     environment,
     task: { ...task, resolutionMode: 'routed' },
-  }).publicPrompt;
+  });
+  const hidden = hiddenDescriptor.publicPrompt;
   assert.equal(hidden.target, null, 'a hidden task names no target');
+  assert.doesNotMatch(hiddenDescriptor.privateEvaluation.flavor, /Target|\d/, 'nor does its flavor');
   assert.equal(hidden.direction, null);
   assert.equal(hidden.comparison, null);
   assert.ok(!Object.hasOwn(hidden, 'targetBasis'), 'a hidden task carries no basis field either');
@@ -757,14 +759,16 @@ test('the gathering versioned descriptor keeps a hidden task and a fixed-range c
       routed: { ...system.gatheringCraftingCheck.routed, type: 'fixed' },
     },
   };
-  const fixedRange = engine._versionedCheckDescriptor({
+  const fixedRangeDescriptor = engine._versionedCheckDescriptor({
     actor: bare,
     run: { taskId: task.id },
     system: fixedRangeSystem,
     environment,
     task: { ...task, resolutionMode: 'routed' },
-  }).publicPrompt;
+  });
+  const fixedRange = fixedRangeDescriptor.publicPrompt;
   assert.equal(fixedRange.target, null, 'a fixed-range routed check grades the raw roll, not a target');
+  assert.doesNotMatch(fixedRangeDescriptor.privateEvaluation.flavor, /Target/);
   assert.equal(fixedRange.direction, null);
   assert.equal(fixedRange.comparison, null);
 });
