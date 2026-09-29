@@ -375,7 +375,8 @@ test('ESLint ignores every tree git ignores', async () => {
   )
     .split('\n')
     .map((line) => line.trim())
-    .filter((line) => line.endsWith('/'));
+    .filter((line) => line.endsWith('/') || line === 'node_modules')
+    .map((line) => line.endsWith('/') ? line : `${line}/`);
 
   assert.ok(
     ignoredTrees.includes('node_modules/'),
