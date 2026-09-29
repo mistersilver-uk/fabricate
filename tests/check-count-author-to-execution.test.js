@@ -3,8 +3,7 @@
  * authored. The real simple editor writes through the real route model and store into a real
  * `CraftingSystemManager`; the reloaded record reopens unchanged, and a real `CraftingEngine` rolls
  * it with the registered count Roll over the face-scripting core double, which counts every Roll it
- * constructs. Tier successes and the Botch trigger are seeded data until their editors (issue 2006
- * T2, T4) act on them here too.
+ * constructs. Tier successes and the Botch trigger are authored through their own controls too.
  */
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
