@@ -145,7 +145,7 @@ describe('1093 must-not-regress — the states the prototype never depicts', () 
     harness.remount();
   });
 
-  it('renders all THREE alchemy behaviour flags as real controls', async () => {
+  it('renders all FOUR alchemy behaviour flags as real controls', async () => {
     const target = await mountChecks(
       {
         resolutionMode: 'alchemy',
@@ -153,6 +153,7 @@ describe('1093 must-not-regress — the states the prototype never depicts', () 
         alchemyLearnOnCraft: true,
         alchemyConsumeOnFail: false,
         alchemyShowAttemptHistory: true,
+        craftingConsumption: { breakToolsOnFail: false },
       },
       'on-failure'
     );
@@ -161,6 +162,7 @@ describe('1093 must-not-regress — the states the prototype never depicts', () 
     for (const [field, expected] of [
       ['learnOnCraft', true],
       ['consumeOnFail', false],
+      ['breakToolsOnFail', false],
       ['showAttemptHistoryToPlayers', true],
     ]) {
       // `ToggleCard` renders a real `<button aria-pressed>` rather than a checkbox.
@@ -172,6 +174,32 @@ describe('1093 must-not-regress — the states the prototype never depicts', () 
         `${field} reflects the stored value`
       );
     }
+    harness.remount();
+  });
+
+  // issue 2100 (maintainer ruling): alchemy shares the crafting-check consumption policy, not a
+  // separate alchemy-owned flag, so toggling it must call the SAME update seam crafting uses.
+  it('toggling "break tools on a failed brew" writes the shared crafting-check consumption policy', async () => {
+    const patches = [];
+    const target = await mountChecks(
+      {
+        resolutionMode: 'alchemy',
+        alchemyCheckMode: 'simple',
+        craftingConsumption: { breakToolsOnFail: false },
+        onUpdateCraftingConsumption: (patch) => patches.push(patch),
+      },
+      'on-failure'
+    );
+    const behaviour = target.querySelector('[data-alchemy-behaviour]');
+    const toggle = behaviour.querySelector('[data-recipe-field="breakToolsOnFail"]');
+    assert.ok(toggle, 'the break-tools toggle renders in the alchemy behaviour card');
+    toggle.click();
+    flushSync();
+    assert.deepEqual(
+      patches,
+      [{ breakToolsOnFail: true }],
+      'toggling ON calls the shared crafting-check consumption update'
+    );
     harness.remount();
   });
 

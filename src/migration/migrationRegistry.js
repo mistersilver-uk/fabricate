@@ -4,6 +4,7 @@
  */
 
 import { mergeEquivalentWorldEssences } from './mergeEquivalentWorldEssences.js';
+import { migrateAlchemyBreakToolsOnFail } from './migrateAlchemyBreakToolsOnFail.js';
 import { migrateCharacterLibrariesToWorldScope } from './migrateCharacterLibrariesToWorldScope.js';
 import { migrateComponentEssenceSections } from './migrateComponentEssenceSections.js';
 import { migrateCurrencyToWorldScope } from './migrateCurrencyToWorldScope.js';
@@ -358,6 +359,23 @@ const CURRENT_MIGRATIONS = [
     downgradeLosesData: false,
     // Reports merged, refused, declined and orphaned through `_worldEssenceMergeReport`.
     migrate: (data) => mergeEquivalentWorldEssences(data),
+  },
+  {
+    version: '1.35.0',
+    label:
+      'Add a "break tools on a failed check" switch to alchemy in the Checks Studio (issue ' +
+      '2100). Before this release a failed simple or tiered alchemy check always broke every ' +
+      'required tool, ignoring `craftingCheck.consumption.breakToolsOnFail`. That setting now ' +
+      'genuinely gates alchemy breakage the same as crafting, so every existing alchemy system ' +
+      'with no explicit value for it is stamped `true` here, keeping its brews breaking tools ' +
+      'on a failed check exactly as they always did. An alchemy system that already authored ' +
+      'the field, and every non-alchemy system, is left untouched. A NEW alchemy system still ' +
+      'gets the normal off default.',
+    downgradeTo: '1.34.0',
+    // Lossless: 1.34.0 never read `breakToolsOnFail` for alchemy, so the stamped value is inert
+    // on downgrade and the field simply survives for a re-upgrade.
+    downgradeLosesData: false,
+    migrate: (data) => migrateAlchemyBreakToolsOnFail(data),
   },
 ];
 
