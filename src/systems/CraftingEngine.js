@@ -5879,10 +5879,8 @@ export class CraftingEngine {
 
   /** The system for a recipe or a salvage synthetic recipe. */
   _getRecipeSystem(recipe) {
-    const system = game.fabricate
-      ?.getCraftingSystemManager?.()
-      ?.getSystem(recipe?.craftingSystemId);
-    return withAcceptedCraftingCheck(system ?? null, recipe);
+    const manager = game.fabricate?.getCraftingSystemManager?.();
+    return withAcceptedCraftingCheck(manager?.getSystem(recipe?.craftingSystemId) ?? null, recipe);
   }
 
   /** Whether the recipe's system applies time requirements; only an explicit `false` disables. */
