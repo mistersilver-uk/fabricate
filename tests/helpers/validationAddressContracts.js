@@ -46,7 +46,8 @@ export function readManagerSource(relativePath) {
 function spellingsOf(source, address) {
   return {
     written: source.includes(`data-validation-target="${address}"`),
-    bagged: source.includes(`'data-validation-target': '${address}'`),
+    // An attribute bag, or a quoted literal handed to a prop the primitive stamps (issue 2006).
+    bagged: new RegExp(`['"]${address}['"]`, 'u').test(source),
   };
 }
 

@@ -402,7 +402,7 @@ test("the View button's name is a translatable key, in a shared namespace, resol
   assert.equal(children.length, 1, 'the button renders exactly one expression as its name');
   assert.equal(
     source.slice(children[0].expression.start, children[0].expression.end),
-    'localize(row.viewLabel ?? viewLabel)',
+    'localize(rowVerb(row))',
     'the button must RESOLVE its name. A key default interpolated raw is worse than the ' +
       'English one it replaced — every one of these buttons then reads as a dotted path — and ' +
       'the `??` is what lets one site draw two different verbs down one list ("View task" ' +
@@ -416,13 +416,20 @@ test("the View button's name is a translatable key, in a shared namespace, resol
   // every surface that renders this primitive can be installed.
   assert.equal(
     expressionAttribute(button, 'aria-label', source)?.replaceAll(/\s+/gu, ' '),
-    'localize(VIEW_NAMED_LABEL, { action: localize(row.viewLabel ?? viewLabel), subject: row.title, })',
+    'localize(VIEW_NAMED_LABEL, { action: localize(rowVerb(row)), subject: row.title, })',
     "the row action must name itself by its row's title, AND by the verb it visibly renders. " +
       '`action` is fed from the same expression as the visible child on purpose: hard-coding ' +
       '"View" there makes the accessible name of an overriding row ("View: Gather herbs") one ' +
       'that does not contain its visible label ("View task"), which is a WCAG 2.5.3 ' +
       'label-in-name failure and is unreachable for a speech-input user. Composing the resolved ' +
       'verb makes containment true by construction.'
+  );
+  // One verb per row: a row's own action (issue 2006) in place of View, else the `??` chain.
+  assert.match(
+    source,
+    /const rowVerb = \(row\) => row\?\.action\?\.labelKey \?\? row\?\.viewLabel \?\? viewLabel;/u,
+    'the verb the button shows and names itself by is the row action, else the row override, ' +
+      'else the surface default'
   );
   const named = constants.get('VIEW_NAMED_LABEL');
   assert.match(

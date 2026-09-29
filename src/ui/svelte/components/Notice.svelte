@@ -8,7 +8,7 @@
   | --- | --- | --- | --- |
   | `tone` | `'danger'` \| `'warning'` \| `'info'` \| `'success'` \| `'accent'` | `'danger'` | Changes the edge, the fill, the glyph's ink and the title's ink, NEVER the geometry or type scale. An unknown tone falls back to `danger`, the unmodified specimen. |
   | `title` / `detail` / `icon` | already-localized strings / Font Awesome classes | `''` | The sentence that names what happened, the optional second line saying what to do next, and a leading glyph whose per-tone default is used when unset. |
-  | `action` | `{ label, onClick }` | `null` | Rendered as one button; the handler is called with the click event. |
+  | `action` | `{ label, onClick, description? }` | `null` | Rendered as one button; the handler is called with the click event, and an already-localized `description` becomes the button's accessible description. |
   | `dismissable` / `dismissLabel` / `blocking` | boolean / string / boolean | `false` / `''` / `false` | An opt-in dismiss control and its accessible name, where dismissal is this component's own state and the notice leaves the DOM; and `role="alert"` when `blocking`, `role="status"` with `aria-live="polite"` otherwise. |
   | `dataAttr` / `dataValue` / `stateDataAttr` / `stateDataValue` | strings | `''` | TWO hook pairs on the same root, because one shipped caller carries two — its own name and the state it is reporting — and a wrapper invented to hold the second would be layout minted for a hook. Both are spread, so an unset hook is ABSENT, and both values pass through as written per the `data-*` spelling rule in `openspec/specs/design-system/spec.md`. |
 
@@ -26,7 +26,8 @@
     wrapper. `align-items: flex-start` is declared explicitly, because the specimen declares no
     `align-items` and renders top-aligned only through its glyph's fixed box and top margin.
 
-  Four recorded deviations from the specimen's stated API: the `accent` tone, whose title and glyph
+  Five recorded deviations from the specimen's stated API: `action.description` (issue 2006), for
+  an action whose effect its verb alone does not state; the `accent` tone, whose title and glyph
   take `--fab-accent-text` because the accent itself measures 4.48:1 in `ironblood-forge`, under AA;
   `font-variant-numeric: tabular-nums` on the detail; `icon`, load-bearing because two shipped states
   resolve to the SAME tone; and the hook props, which carry no behaviour.
@@ -63,6 +64,9 @@
 
   let dismissed = $state(false);
 
+  const uid = $props.id();
+  const descriptionId = `${uid}-action-description`;
+
   const hookAttributes = $derived({
     ...(dataAttr ? { [dataAttr]: dataValue } : {}),
     ...(stateDataAttr ? { [stateDataAttr]: stateDataValue } : {}),
@@ -88,8 +92,12 @@
         class="fab-notice-button"
         data-keyboard-focus="true"
         data-notice-action
+        aria-describedby={action.description ? descriptionId : undefined}
         onclick={(event) => action.onClick?.(event)}>{action.label}</button
       >
+      {#if action.description}<span class="visually-hidden" id={descriptionId}
+          >{action.description}</span
+        >{/if}
     {/if}
     {#if dismissable}
       <button

@@ -25,19 +25,20 @@
   import CraftingModifierCatalogueCard from './CraftingModifierCatalogueCard.svelte';
   import ChecksValidationTab from './ChecksValidationTab.svelte';
   import {
-    CHECK_ISSUE_CONTROLS,
     CHECK_SECTION_IDS,
     evaluateCheckReadiness,
+    issueControl,
     readinessModeForSlot,
     sectionForIssue,
   } from './checksReadiness.js';
+  import { convertCountingFormula } from './countFormulaConversion.js';
   import Callout from '../../../components/Callout.svelte';
   import Notice from '../../../components/Notice.svelte';
   import CheckModeCallout from './CheckModeCallout.svelte';
   import { focusValidationTarget } from '../validationFocus.js';
   import { announceValidationOutcome } from '../validationAnnouncement.js';
   import InspectorCard from '../../../components/InspectorCard.svelte';
-  import { checkIssueText } from './checksCopy.js';
+  import { checkIssueText, convertActionCopy } from './checksCopy.js';
   import { issueRowStatus } from './checksValidationRows.js';
   import {
     buildCheckModifierContext,
@@ -649,8 +650,9 @@
    *
    * @param {{activity?: string, section?: string}} target the ROUTE the row carries.
    * @param {string} [focusTarget] the CONTROL's `data-validation-target` value, if it named one.
+   * @param {string} [status] A sentence announced ahead of the destination, as Convert's is.
    */
-  function selectIssue(target, focusTarget) {
+  function selectIssue(target, focusTarget, status = '') {
     if (!target?.activity) return;
     const section = target.section || 'roll';
     onOpenActivity(target.activity, section);
@@ -662,7 +664,7 @@
       focus: () => focusValidationTarget(checksRoot, focusTarget),
       fallbackPanel: sectionPanel,
       announce: (sentence) => {
-        issueAnnouncement = sentence;
+        issueAnnouncement = sentence && status ? `${status} ${sentence}` : sentence;
       },
     });
   }
@@ -855,7 +857,11 @@
     [...activeReadiness.issues, ...activeReadiness.transient]
       .filter((issue) => sectionForIssue(issue.id) === activeSection)
       .sort((a, b) => blockingRank(a) - blockingRank(b))
-      .map((issue) => ({ id: issue.id, ...checkIssueText(issue.id, issue.data, text) }))
+      .map((issue) => ({
+        id: issue.id,
+        ...checkIssueText(issue.id, issue.data, text),
+        action: noticeAction(issue),
+      }))
   );
   function blockingRank(issue) {
     return issueRowStatus(issue) === 'block' ? 0 : 1;
@@ -863,8 +869,49 @@
   const reviewLabel = text('FABRICATE.Admin.Manager.Checks.Validation.Review', 'Review');
 
   /** A notice's Review: the control its issue names, else its section, as a Validation row's View. */
-  function reviewIssue(id) {
-    selectIssue({ activity, section: activeSection }, CHECK_ISSUE_CONTROLS[id]);
+  function reviewIssue(issue) {
+    selectIssue({ activity, section: activeSection }, issueControl(issue));
+  }
+
+  /** The draft writer of the check an activity rolls, chosen as `validationSections` chooses it. */
+  function checkWriterFor(subsystem) {
+    if (subsystem === 'salvage') {
+      if (salvageRouted) return onUpdateSalvageCheckRouted;
+      return salvageProgressive ? onUpdateSalvageCheckProgressive : onUpdateSalvageCheckSimple;
+    }
+    if (subsystem === 'gathering') {
+      return gatheringProgressive
+        ? onUpdateGatheringCheckProgressive
+        : onUpdateGatheringCheckRouted;
+    }
+    if (craftingRouted) return onUpdateCraftingCheck;
+    return craftingProgressive ? onUpdateCraftingCheckProgressive : onUpdateCraftingCheckSimple;
+  }
+
+  /**
+   * Convert a summing counting formula (issue 2006): STAGED into the draft, so Save applies it and
+   * Discard restores the summing check, then the roll section opens on `Count successes`.
+   */
+  function convertCheck(subsystem) {
+    const section = validationSections.find((row) => row.subsystem === subsystem);
+    if (!section?.check) return;
+    checkWriterFor(subsystem)(convertCountingFormula(section.check));
+    const status = text(
+      'FABRICATE.Admin.Manager.Checks.Count.Convert.Status',
+      'Converted to count successes. The original formula and DCs are kept.'
+    );
+    selectIssue({ activity: subsystem, section: 'roll' }, 'checks-product', status);
+  }
+
+  /** A notice's one action: Convert where its issue converts, else Review. */
+  function noticeAction(issue) {
+    const copy = convertActionCopy(issue);
+    if (!copy) return { label: reviewLabel, onClick: () => reviewIssue(issue) };
+    return {
+      label: text(...copy.label),
+      description: text(...copy.description),
+      onClick: () => convertCheck(activity),
+    };
   }
 
   // ONE previewed record, three readers, so it lives HERE; two copies is how two surfaces
@@ -1237,7 +1284,7 @@
               tone="warning"
               title={issue.title}
               detail={issue.detail}
-              action={{ label: reviewLabel, onClick: () => reviewIssue(issue.id) }}
+              action={issue.action}
               dataAttr="data-checks-section-notice"
               dataValue={issue.id}
             />
@@ -1270,6 +1317,7 @@
           {dirty}
           {dirtyActivities}
           onSelectIssue={selectIssue}
+          onConvert={convertCheck}
         />
       {:else if routeIsOff}
         <!-- The check is optional and the GM turned it off, so the way back on is IN the panel. -->

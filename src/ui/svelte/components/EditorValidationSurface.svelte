@@ -10,7 +10,8 @@
   | `title` / `intro` | strings | `'Validation'` / `''` | The tab heading and its explanation; passing neither renders no head block. |
   | `summary` | `{ status, icon, title, sub }` | `{}` | `status` is the site's own domain word and reaches the DOM verbatim on the site's summary hook; the CLASS it resolves to is one of this surface's three, through `SUMMARY_STATUS_ALIASES`. |
   | `counts` / `countLabels` | `{ passing, warnings, blocking }` | zeros / localized | A site draws the tiles it REPORTS: the rail renders `COUNT_ORDER` filtered to the keys present in `counts`. |
-  | `groups` | `{ id, icon, label, rows, dataAttrs? }[]`, each row `{ id, status, title, detail?, target?, focusTarget?, recordId?, viewLabel?, dataAttrs? }` | `[]` | ROWS ARE RE-ORDERED — blocking first, within each group — so an authored sequence is a tiebreak rather than a guarantee. THE ROW ACTION IS A TWO-FIELD CONTRACT: `target` is the ROUTE, opaque here, and beside it ONE ADDRESS the row names for what it holds — `focusTarget`, the `data-validation-target` value the offending CONTROL carries, or `recordId`, a RECORD the route selects. Two names for one argument is the point: the producer says which kind it emitted. `target` could not simply become the control id — for one host it is a TAB id consumed by a whitelist and for another an `{ activity, section }` object. |
+  | `groups` | `{ id, icon, label, rows, dataAttrs? }[]`, each row `{ id, status, title, detail?, target?, focusTarget?, recordId?, viewLabel?, action?, dataAttrs? }` | `[]` | ROWS ARE RE-ORDERED — blocking first, within each group — so an authored sequence is a tiebreak rather than a guarantee. THE ROW ACTION IS A TWO-FIELD CONTRACT: `target` is the ROUTE, opaque here, and beside it ONE ADDRESS the row names for what it holds — `focusTarget`, the `data-validation-target` value the offending CONTROL carries, or `recordId`, a RECORD the route selects. Two names for one argument is the point: the producer says which kind it emitted. `target` could not simply become the control id — for one host it is a TAB id consumed by a whitelist and for another an `{ activity, section }` object. |
+  | `row.action` | `{ labelKey, descriptionKey?, onAction }` | absent | A row's OWN verb, drawn by the same button IN PLACE OF View: `labelKey` is its visible verb and composes the accessible name as View's does, `descriptionKey` its accessible description, and `onAction()` runs instead of `onSelectIssue`. The button carries `data-validation-row-action`. |
   | `statusLabels` / `rowDataAttr` / `viewDataAttr` | `{ pass, warn, block }` / attribute names | localized / `''` | The per-status pill word, one attribute carrying the row id on every row, and the same idea for the View button carrying the row's ROUTE. |
   | `viewLabel` | localization KEY | `FABRICATE.Admin.Manager.Validation.View` | The View button's visible verb; a row may override it with `row.viewLabel`, also a key, because one caller draws two different verbs down one list. |
   | `hookAttrs` / `countAttrs` | bags keyed by REGION / by COUNT | `{}` | The host's own `data-*` hooks, over a CLOSED region set — `root`, `summaryRow`, `summary`, `counts` — because the hooks are one decision per call site rather than four props to look at. A typo in a key is SILENT, so it is guarded: `tests/components/editor-validation-surface-source-contract.js` reads the region names out of THIS file's own `hooksFor('…')` call sites and refuses anything else, and guards `countAttrs` against `COUNT_ORDER` the same way. Every hook the primitive emits is emitted ALONGSIDE a site's own, never instead of it. |
@@ -119,6 +120,17 @@
   function rowAddress(row) {
     return row?.focusTarget ?? row?.recordId;
   }
+
+  // A row's own action replaces View on the same button, so each row still draws one verb.
+  const rowVerb = (row) => row?.action?.labelKey ?? row?.viewLabel ?? viewLabel;
+
+  function activateRow(row) {
+    if (row.action) row.action.onAction?.();
+    else onSelectIssue(row.target, rowAddress(row));
+  }
+
+  const uid = $props.id();
+  const descriptionId = (group, index) => `${uid}-${group.id}-${index}-action`;
 </script>
 
 <section class={classes} data-editor-validation-surface="" {...hooksFor('root')}>
@@ -187,18 +199,25 @@
                   >{row.detail}</span
                 >{/if}
             </div>
-            {#if row.target || rowAddress(row)}
+            {#if row.action || row.target || rowAddress(row)}
               <ManagerButton
                 role="ghost"
                 class="manager-recipe-val-view"
                 aria-label={localize(VIEW_NAMED_LABEL, {
-                  action: localize(row.viewLabel ?? viewLabel),
+                  action: localize(rowVerb(row)),
                   subject: row.title,
                 })}
+                aria-describedby={row.action?.descriptionKey
+                  ? descriptionId(group, index)
+                  : undefined}
+                data-validation-row-action={row.action ? '' : undefined}
                 {...namedAttr(viewDataAttr, row.target)}
-                onclick={() => onSelectIssue(row.target, rowAddress(row))}
-                >{localize(row.viewLabel ?? viewLabel)}</ManagerButton
+                onclick={() => activateRow(row)}>{localize(rowVerb(row))}</ManagerButton
               >
+              {#if row.action?.descriptionKey}<span
+                  class="visually-hidden"
+                  id={descriptionId(group, index)}>{localize(row.action.descriptionKey)}</span
+                >{/if}
             {/if}
             <Chip class={`manager-recipe-val-pill is-${row.status}`}
               >{statusLabels[row.status]}</Chip

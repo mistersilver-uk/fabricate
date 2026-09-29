@@ -118,7 +118,7 @@ tests/helpers/primitiveAdoptionContract.js	3
 tests/helpers/primitiveSourceContract.js	4
 tests/helpers/screenshot-gate-fakes.js	2
 tests/helpers/sourcePinSites.js	1
-tests/helpers/validationAddressContracts.js	6
+tests/helpers/validationAddressContracts.js	5
 tests/helpers/worldScopeCorpus.js	2
 tests/icon-button-source-contract.test.js	2
 tests/iconCatalogueGenerator.test.js	1

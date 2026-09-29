@@ -6483,7 +6483,16 @@
             "FaceKindCancel": "cancel",
             "FaceEffectNeverExplodes": "it never explodes",
             "FaceEffectEveryFaceCancels": "every face cancels",
-            "FaceEffectNoFaceCancels": "no face cancels"
+            "FaceEffectNoFaceCancels": "no face cancels",
+            "CheckSummedFormulaCountsNothing": "No summing formula counts successes",
+            "CheckCountFacesSet": "Explode and cancel faces are set",
+            "CheckCountTriggersReachable": "Every dice trigger can fire on the pool",
+            "IssueFreeTextCountingFormula": "The total of {formula} is a count, so every bonus and DC here is measured against the wrong number.",
+            "IssueFreeTextCountingFormulaTitle": "This formula counts successes, but the check adds the dice",
+            "IssueCountFaceMissing": "Choose the face to {kind} from. Without one, this check cannot roll.",
+            "IssueCountFaceMissingTitle": "A face to explode or cancel from is not chosen",
+            "IssueCountTriggerGroupUnreachable": "{names} read dice this pool never rolls, so they cannot fire while the check counts successes. They are kept and work again if the check adds the dice.",
+            "IssueCountTriggerGroupUnreachableTitle": "A trigger reads dice the pool never rolls"
           },
           "Breakage": {
             "LeadOutcomeOnly": "Each trigger can force the check outcome. Switch the tool-breakage authority to check-driven to let triggers break tools.",
@@ -6934,6 +6943,15 @@
               "PlayerSeesOne": "{subject} · 1 success needed",
               "PlayerSeesPool": "{subject} · {count} successes needed · d{die}s, success on {symbol} {threshold}",
               "PlayerSeesPoolOne": "{subject} · 1 success needed · d{die}s, success on {symbol} {threshold}"
+            },
+            "Convert": {
+              "Action": "Convert to count successes",
+              "Description": "Copies the DCs into successes needed. The formula and DCs are kept.",
+              "DescriptionExceed": "Copies each DC plus one into successes needed, because this check passes only above its DC. The formula and DCs are kept.",
+              "Status": "Converted to count successes. The original formula and DCs are kept.",
+              "DynamicNote": "Converting keeps the macro, and its return is then read as the successes needed.",
+              "OverridesNote": "{names} override the DC but not the successes needed, so after converting they use the check's successes needed.",
+              "OutOfRange": "It cannot be converted: it would need {value} successes, outside 0 to 20."
             }
           },
           "Digest": {
