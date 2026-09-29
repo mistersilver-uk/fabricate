@@ -1221,6 +1221,13 @@ test('inertText neutralizes a &Name[...] system-enricher shape as well as @Name[
 test('inertText leaves plain & and @ text reading unchanged', () => {
   assert.equal(inertText('Salt & Pepper'), 'Salt &amp; Pepper', 'no joiner: & is not followed by Name[');
   assert.equal(inertText('a@b'), 'a@\u{2060}b', 'the @ is inert but the text still reads as a@b');
+  assert.equal(
+    inertText('&amp;Reference[prone]'),
+    '&amp;amp;Reference[prone]',
+    'a literal &amp; in the input is not a real & and is left alone'
+  );
+  assert.equal(inertText('&nbsp;Reference[x]'), '&amp;nbsp;Reference[x]', 'nbsp; breaks the lookahead');
+  assert.equal(inertText('Ends with &'), 'Ends with &amp;', 'a trailing & has nothing to look ahead into');
 });
 
 /** A minimal stand-in for dnd5e 5.3.3's own `TextEditor` reference enricher (issue 2093). */
