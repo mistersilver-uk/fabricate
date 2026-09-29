@@ -325,6 +325,10 @@ const gatheringHarness = createMountedComponentHarness({
     'src/utils/localizeWithFallback.js',
     'src/ui/svelte/apps/manager/checks/previewActorId.js',
     'src/ui/svelte/apps/manager/component/overridePlayerSees.js',
+    // A count check's override and line (issue 2006): its copy, and the count description.
+    'src/ui/svelte/apps/manager/component/taskOverrideCopy.js',
+    'src/systems/countCheck.js',
+    'src/systems/countEvaluation.js',
   ],
   compiledModules: [
     'src/ui/svelte/components/Stepper.svelte',
