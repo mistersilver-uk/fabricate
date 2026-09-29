@@ -1183,7 +1183,8 @@ describe('the rolled readout, per check type and mode (issue 2080)', () => {
       rows: SUCCESS_ROWS,
     });
     const readout = root.querySelector('[data-checks-simulator-readout]');
-    assert.equal(readout.getAttribute('aria-live'), 'polite', 'the whole announcement is one region');
+    const live = readout.closest('[data-checks-simulator-live]');
+    assert.equal(live.getAttribute('aria-live'), 'polite', 'the whole announcement is one region');
     for (const part of ['medallion', 'band', 'facts-heading', 'fact']) {
       assert.ok(Boolean(readout.querySelector(`[data-checks-simulator-${part}]`)), `${part} is inside it`);
     }
@@ -1260,11 +1261,12 @@ describe('the rolled readout, per check type and mode (issue 2080)', () => {
   });
 
   it('lists no ingredients or tool policy for gathering, only tools a trigger breaks (M11)', async () => {
-    const gathering = (check) =>
+    const gathering = (check, props = {}) =>
       mountChecks({
         activity: 'gathering',
         gatheringResolutionMode: 'routed',
         gatheringCheckRouted: check,
+        ...props,
         craftingConsumption: { consumeIngredientsOnFail: true, breakToolsOnFail: true },
         activation: { gathering: { enabled: true, optional: false } },
         features: { gathering: true },
@@ -1283,8 +1285,68 @@ describe('the rolled readout, per check type and mode (issue 2080)', () => {
     ]);
     harness.remount();
     const breaking = { ...stepTrigger('none', 1), id: 'break', tierStep: undefined, breakTools: true };
-    const broken = await gathering(withTriggers(failing, [breaking]));
-    assert.deepEqual((await rolledAs(broken)).rows.at(-1), ['tools', 'Required tools break', 'by trigger']);
+    const broken = await gathering(withTriggers(failing, [breaking]), {
+      gatheringFailureResultPolicy: 'never',
+    });
+    assert.deepEqual((await rolledAs(broken)).rows, [
+      ['failure-result', 'Nothing produced', 'never'],
+      ['tools', 'Required tools break', 'by trigger'],
+    ], 'gathering’s own failure-result policy, and tools only a trigger breaks');
+  });
+
+  it('reads alchemy’s own consume flag on its simple check, not crafting’s', async () => {
+    const root = await simple(
+      { ...SIMPLE_CHECK, dc: 15 },
+      {
+        resolutionMode: 'alchemy',
+        alchemyCheckMode: 'simple',
+        alchemyConsumeOnFail: false,
+        craftingConsumption: { consumeIngredientsOnFail: true, breakToolsOnFail: false },
+      }
+    );
+    const { rows } = await rolledAs(root);
+    assert.deepEqual(
+      rows.find((row) => row[0] === 'ingredients'),
+      ['ingredients', 'Ingredients returned', 'policy off']
+    );
+  });
+
+  it('announces from one polite region that exists before the first roll (F10)', async () => {
+    const root = await simple(SIMPLE_CHECK);
+    await choosePreviewActor(root, 'sera');
+    const live = root.querySelector('[data-checks-simulator-live]');
+    assert.equal(live.getAttribute('aria-live'), 'polite');
+    assert.ok(Boolean(live.querySelector('[data-checks-simulator-state="pre-roll"]')), 'it holds the hint');
+    await rollAndSettle(root);
+    assert.ok(root.querySelector('[data-checks-simulator-live]') === live, 'the same region');
+    assert.ok(Boolean(live.querySelector('[data-checks-simulator-readout]')), 'it holds the readout');
+    assert.ok(!live.querySelector('[aria-live]'), 'no region nests inside it');
+  });
+
+  it('keeps the Roll button focusable while rolling, marked aria-disabled (F11)', async () => {
+    let release;
+    const gate = new Promise((resolveGate) => {
+      release = resolveGate;
+    });
+    const evaluate = globalThis.Roll.prototype.evaluate;
+    globalThis.Roll.prototype.evaluate = async function deferred(...args) {
+      await gate;
+      return evaluate.apply(this, args);
+    };
+    try {
+      const root = await simple(SIMPLE_CHECK);
+      await choosePreviewActor(root, 'sera');
+      const button = root.querySelector('[data-checks-simulator-roll]');
+      button.click();
+      await settle();
+      assert.equal(button.disabled, false, 'a disabled button would drop focus mid-roll');
+      assert.equal(button.getAttribute('aria-disabled'), 'true');
+      release();
+      for (let attempt = 0; attempt < 12; attempt += 1) await settle();
+      assert.ok(!button.hasAttribute('aria-disabled'), 'and it clears once the roll lands');
+    } finally {
+      globalThis.Roll.prototype.evaluate = evaluate;
+    }
   });
 
   it('notes a routed tier a trigger stepped, by direction and count', async () => {
@@ -1361,6 +1423,14 @@ describe('the rolled readout, per check type and mode (issue 2080)', () => {
         note: null,
         rows: [['result-1', 'Result 1', 'awarded']],
       });
+    });
+
+    it('marks a partial award under a non-equal award mode', async () => {
+      const check = { ...PROGRESSIVE, awardMode: 'partial', preview: { difficulties: [6, 9] } };
+      assert.deepEqual((await rolledAs(await progressive(check))).rows, [
+        ['result-1', 'Result 1', 'awarded'],
+        ['result-2', 'Result 2', 'partial'],
+      ]);
     });
 
     it('notes a forced award either way, in progressive terms (M17b)', async () => {

@@ -788,13 +788,12 @@
         : craftingFailureResultPolicy
   );
 
-  // The readout's consumption rows read the ACTIVITY'S OWN failure policy: salvage its item pair,
-  // alchemy's simple check its own flag, and gathering none, having no consumption block.
+  // The readout's consumption rows read the ACTIVITY'S OWN failure policy: salvage its item pair
+  // and alchemy's simple check its own flag; gathering's rows ignore it (checkReadoutModel.js).
   const previewConsumption = $derived.by(() => {
     if (activity === 'salvage') {
       return { consumeOnFail: consumeComponentOnFail, breakToolsOnFail: salvageBreakToolsOnFail };
     }
-    if (activity === 'gathering') return {};
     const alchemySimple = craftingAlchemy && alchemyCheckMode === 'simple';
     const consumeOnFail = alchemySimple ? alchemyConsumeOnFail !== false : consumeIngredientsOnFail;
     return { consumeOnFail, breakToolsOnFail };

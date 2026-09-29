@@ -80,7 +80,8 @@
       role="primary"
       class="manager-checks-simulator-roll"
       data-checks-simulator-roll
-      disabled={preview.rolling === true || Boolean(abstain)}
+      disabled={Boolean(abstain)}
+      aria-disabled={preview.rolling === true ? 'true' : undefined}
       onclick={() => onRoll()}
     >
       <i class="fas fa-dice-d20" aria-hidden="true"></i>
@@ -109,97 +110,103 @@
       </p>
     {/if}
 
-    <!-- An abstention's hint above is the whole state: no total, target or margin. -->
-    {#if rolled && !abstain}
-      <div
-        class="manager-checks-simulator-readout"
-        aria-live="polite"
-        data-checks-simulator-readout
-        data-checks-simulator-direction={preview.direction}
-        data-checks-simulator-product={preview.product}
-        data-checks-simulator-botch={count?.botch ? '' : undefined}
-      >
-        <div class="manager-checks-simulator-head">
-          {#if preview.medallion}
-            <!-- The number is the SUBJECT of this tile, so the medallion renders no glyph. -->
-            <span class="manager-checks-simulator-medallion" data-checks-simulator-medallion>
-              <Medallion icon="" size={38} />
-              <span class="manager-checks-simulator-medallion-value">
-                <strong>{preview.medallion.value}</strong>
-                <small data-checks-simulator-medallion-caption>{preview.medallion.caption}</small>
+    <!-- One polite region from before the first roll, so a roll's arrival is announced: the
+         waiting hint, then the readout. An abstention's hint above is the whole state instead. -->
+    <div class="manager-checks-simulator-live" aria-live="polite" data-checks-simulator-live>
+      {#if rolled && !abstain}
+        <div
+          class="manager-checks-simulator-readout"
+          data-checks-simulator-readout
+          data-checks-simulator-direction={preview.direction}
+          data-checks-simulator-product={preview.product}
+          data-checks-simulator-botch={count?.botch ? '' : undefined}
+        >
+          <div class="manager-checks-simulator-head">
+            {#if preview.medallion}
+              <!-- The number is the SUBJECT of this tile, so the medallion renders no glyph. -->
+              <span class="manager-checks-simulator-medallion" data-checks-simulator-medallion>
+                <Medallion icon="" size={38} />
+                <span class="manager-checks-simulator-medallion-value">
+                  <strong>{preview.medallion.value}</strong>
+                  <small data-checks-simulator-medallion-caption>{preview.medallion.caption}</small>
+                </span>
               </span>
-            </span>
-          {/if}
-          <span class="manager-checks-simulator-numbers">
-            <small data-checks-simulator-breakdown>{preview.breakdown}</small>
-            <span class="manager-checks-simulator-total-line">
-              <strong data-checks-simulator-total={preview.totalValue ?? ''}>{preview.total}</strong
-              >
-              {#if preview.targetLine}
-                <small
-                  data-checks-simulator-margin={preview.marginKind}
-                  data-checks-simulator-target={preview.target ?? ''}>{preview.targetLine}</small
-                >
-              {/if}
-            </span>
-          </span>
-        </div>
-
-        {#if count && !count.zeroPool}
-          <CheckSimulatorFaces faces={count.faces} />
-        {/if}
-
-        {#if card}
-          <div
-            class={`manager-checks-simulator-band is-${card.tone}`}
-            data-checks-simulator-band={card.tone === 'success' ? 'success' : 'failure'}
-          >
-            <div class="manager-checks-simulator-band-head">
-              <Medallion icon={card.icon} size={30} glyph={12} ink={card.tone} />
-              <span class="manager-checks-simulator-band-text">
-                <strong data-checks-simulator-band-name>{card.title}</strong>
-                <small data-checks-simulator-band-detail>{card.detail}</small>
-              </span>
-            </div>
-            {#if preview.note}
-              <p
-                class="manager-checks-simulator-note"
-                data-checks-simulator-note={preview.note.kind}
-              >
-                <i class="fas fa-bolt" aria-hidden="true"></i>
-                <span>{preview.note.text}</span>
-              </p>
             {/if}
+            <span class="manager-checks-simulator-numbers">
+              <small data-checks-simulator-breakdown>{preview.breakdown}</small>
+              <span class="manager-checks-simulator-total-line">
+                <strong data-checks-simulator-total={preview.totalValue ?? ''}
+                  >{preview.total}</strong
+                >
+                {#if preview.targetLine}
+                  <small
+                    data-checks-simulator-margin={preview.marginKind}
+                    data-checks-simulator-target={preview.target ?? ''}>{preview.targetLine}</small
+                  >
+                {/if}
+              </span>
+            </span>
           </div>
-        {/if}
 
-        {#if rows.length > 0}
-          <div class="manager-checks-simulator-facts">
-            <Kicker dataAttr="data-checks-simulator-facts-heading">
-              {text('FABRICATE.Admin.Manager.Checks.Simulator.WhatHappens', 'What happens')}
-            </Kicker>
-            <div class="manager-checks-flag-list">
-              {#each rows as row (row.id)}
-                <IconFactRow
-                  icon={row.icon}
-                  density="line"
-                  tone={row.tone}
-                  dataAttr="data-checks-simulator-fact"
-                  dataValue={row.id}
-                  metaAttr="data-checks-simulator-fact-meta"
-                  title={row.label}
-                  subtitle={row.meta}
-                />
-              {/each}
+          {#if count && !count.zeroPool}
+            <CheckSimulatorFaces faces={count.faces} />
+          {/if}
+
+          {#if card}
+            <div
+              class={`manager-checks-simulator-band is-${card.tone}`}
+              data-checks-simulator-band={card.tone === 'success' ? 'success' : 'failure'}
+            >
+              <div class="manager-checks-simulator-band-head">
+                <Medallion icon={card.icon} size={30} glyph={12} ink={card.tone} />
+                <span class="manager-checks-simulator-band-text">
+                  <strong data-checks-simulator-band-name>{card.title}</strong>
+                  <small data-checks-simulator-band-detail>{card.detail}</small>
+                </span>
+              </div>
+              {#if preview.note}
+                <p
+                  class="manager-checks-simulator-note"
+                  data-checks-simulator-note={preview.note.kind}
+                >
+                  <i class="fas fa-bolt" aria-hidden="true"></i>
+                  <span>{preview.note.text}</span>
+                </p>
+              {/if}
             </div>
-          </div>
-        {/if}
-      </div>
-    {:else if !abstain}
-      <p class="manager-muted manager-checks-simulator-hint" data-checks-simulator-state="pre-roll">
-        {preview.waitingHint}
-      </p>
-    {/if}
+          {/if}
+
+          {#if rows.length > 0}
+            <div class="manager-checks-simulator-facts">
+              <Kicker dataAttr="data-checks-simulator-facts-heading">
+                {text('FABRICATE.Admin.Manager.Checks.Simulator.WhatHappens', 'What happens')}
+              </Kicker>
+              <div class="manager-checks-flag-list">
+                {#each rows as row (row.id)}
+                  <IconFactRow
+                    icon={row.icon}
+                    density="line"
+                    tone={row.tone}
+                    dataAttr="data-checks-simulator-fact"
+                    dataValue={row.id}
+                    metaAttr="data-checks-simulator-fact-meta"
+                    title={row.label}
+                    subtitle={row.meta}
+                  />
+                {/each}
+              </div>
+            </div>
+          {/if}
+        </div>
+      {:else if !abstain}
+        <p
+          class="manager-muted manager-checks-simulator-hint"
+          data-checks-simulator-state="pre-roll"
+        >
+          {preview.waitingHint}
+        </p>
+      {/if}
+    </div>
   {/if}
 </div>
 
@@ -215,6 +222,18 @@
   .manager-checks-simulator-hint {
     padding: var(--fab-space-4) var(--fab-space-2);
     text-align: center;
+  }
+
+  .manager-checks-simulator-live {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-2);
+    min-width: 0;
+  }
+
+  /* While abstaining it holds nothing, and an empty column must not add the panel's gap. */
+  .manager-checks-simulator-live:empty {
+    display: none;
   }
 
   /* The prototype's 12px under Roll is the panel's gap plus this. */
@@ -262,7 +281,7 @@
     color: var(--fab-text-subtle);
     font-size: 8px;
     font-weight: 500;
-    line-height: 1;
+    line-height: normal;
   }
 
   .manager-checks-simulator-numbers {
@@ -337,6 +356,7 @@
     font-family: var(--fab-font-serif);
     font-size: 13.5px;
     font-weight: 600;
+    line-height: normal;
   }
 
   .manager-checks-simulator-band.is-danger .manager-checks-simulator-band-text strong {

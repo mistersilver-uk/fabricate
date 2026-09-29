@@ -2,8 +2,9 @@
 <!--
   A success-counting roll's dice in the Checks Studio simulator: one tile per active face, explosion
   dice included, each with its marks as a glyph and in its accessible name, so colour is never the
-  only signal, and the legend under them. The tiles, legend and hooks moved here verbatim from
-  `CheckOutcomePreview.svelte` (issue 2080) as the seam #2006 T6 converts to the multi-face die tile.
+  only signal, and the legend under them. The count tiles, legend and hooks moved here from
+  CheckOutcomePreview.svelte (issue 2080); the summed roll's first-face tile became the readout's
+  medallion, so this draws count faces only. It is the seam #2006 T6 converts.
 -->
 <script>
   import Medallion from '../../../components/Medallion.svelte';
