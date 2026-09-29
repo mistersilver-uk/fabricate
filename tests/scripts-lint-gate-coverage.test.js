@@ -12,8 +12,6 @@ import { fileURLToPath } from 'node:url';
 
 import { ESLint } from 'eslint';
 
-import { ESLINT_DEBT } from '../eslint.debt.js';
-
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SCRIPTS_DIRECTORY = 'scripts';
 
@@ -71,11 +69,6 @@ function parseWithBash(file) {
   return { status: result.status, stderr: result.stderr ?? '', error: result.error };
 }
 
-/** The `scripts/` files `eslint.debt.js` records as not yet clean. */
-function baselinedScriptFiles() {
-  return Object.keys(ESLINT_DEBT.scripts);
-}
-
 /**
  * The extensions `eslint.config.js` block 6 configures for `scripts/**`, read back from the config.
  */
@@ -97,12 +90,6 @@ test('the scripts/ enumeration and the parsed gate list are both alive', () => {
     nested.length > 0,
     `enumerated ${enumerated.length} file(s) under ${SCRIPTS_DIRECTORY}/ but not one in a` +
       ' subdirectory, so the walk is no longer recursive and every nested script is invisible here'
-  );
-
-  assert.ok(
-    baselinedScriptFiles().length > 0,
-    'eslint.debt.js records no scripts/ debt at all. If that is real, delete this guard along' +
-      ' with the baseline; while it is not, the assertions below are measuring nothing.'
   );
 });
 
@@ -136,34 +123,14 @@ test('every scripts/ file ESLint configures is a file ESLint actually reaches', 
   assert.deepEqual(
     unreachable,
     [],
-    'these scripts/ files are excluded from `npm run lint` entirely. Record the file in' +
-      ' ESLINT_DEBT instead, which disables only the rules it fails.'
+    'these scripts/ files are excluded from `npm run lint` entirely. The gate holds a file at its' +
+      ' base findings, so an exclusion is never the fix for existing debt.'
   );
 });
 
-test('every baselined scripts/ entry names a file this enumeration can see', () => {
-  // Two ways an entry goes invisible, both silent: a path that is not on disk any more, and a
-  // path whose extension LINTED_EXTENSIONS does not carry — the second would be ungated,
-  // unacknowledged and outside this guard all at once, which is the hole the mirror test below
-  // exists to keep shut.
-  const enumerated = new Set(enumerateScriptFiles());
-  const invisible = baselinedScriptFiles().filter((file) => !enumerated.has(file));
-  assert.deepEqual(
-    invisible,
-    [],
-    'these ESLINT_DEBT.scripts entries are not in the scripts/ enumeration. Either the file is' +
-      ' gone — remove the entry and lower DEBT_COUNTS.scripts in tests/lint-coverage.test.js in' +
-      ' the same commit — or its extension is missing from LINTED_EXTENSIONS.'
-  );
-});
-
-test('the baselined scripts/ list is distinct and POSIX-separated', () => {
-  const baselined = baselinedScriptFiles();
-  assert.equal(new Set(baselined).size, baselined.length, 'ESLINT_DEBT.scripts has a duplicate');
-
-  // The enumeration half is the load-bearing one: it is what would carry `lib\zip.js` on Windows if
-  // the normalisation above were dropped.
-  const backslashed = [...baselined, ...enumerateScriptFiles()].filter((file) =>
+test('the scripts/ enumeration is POSIX-separated', () => {
+  // It is what would carry `lib\zip.js` on Windows if the normalisation above were dropped.
+  const backslashed = enumerateScriptFiles().filter((file) =>
     file.includes(String.fromCodePoint(92))
   );
   assert.deepEqual(

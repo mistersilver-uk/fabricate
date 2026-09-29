@@ -18,7 +18,6 @@ import { ESLint } from 'eslint';
 // `getFileInfo`. `prettier/index.mjs` is the Node build.
 import { getFileInfo } from 'prettier/index.mjs';
 
-import { ESLINT_DEBT } from '../eslint.debt.js';
 import { listSvelteComponents } from '../scripts/lib/svelteComponentFiles.js';
 import {
   BUILD_COMPILER_OPTIONS,
@@ -172,19 +171,19 @@ describe('the gate is wired into CI and into npm', () => {
 
   // `lint` and `format:check` are globs over the repository since issue #1660, so these two files
   // are covered by default rather than by being named.
-  it('keeps its own scripts/ files inside the lint and format gates', async () => {
+  it('keeps its own scripts/ files inside the lint and format gates, and clean', async () => {
     const eslint = new ESLint();
-    const baselined = new Set(Object.keys(ESLINT_DEBT.scripts));
     for (const file of [sweepScript, 'scripts/lib/svelteCompilerWarnings.js']) {
       assert.equal(
         await eslint.isPathIgnored(file),
         false,
         `${file} is excluded from \`npm run lint\` entirely`
       );
-      assert.equal(
-        baselined.has(file),
-        false,
-        `${file} has been recorded as lint debt in eslint.debt.js rather than kept clean`
+      const [result] = await eslint.lintFiles([file]);
+      assert.deepEqual(
+        result.messages.map((message) => `${message.line} ${message.ruleId}`),
+        [],
+        `${file} carries lint debt rather than being kept clean`
       );
       const info = await getFileInfo(path.join(repoRoot, file), {
         ignorePath: [path.join(repoRoot, '.gitignore'), path.join(repoRoot, '.prettierignore')],

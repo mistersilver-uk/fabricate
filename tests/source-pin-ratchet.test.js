@@ -88,7 +88,6 @@ const SCAN_HELPERS = Object.freeze({
   'tests/helpers/interactablesSmokeLocators.js': 'legacy-scan',
   'tests/helpers/interactablesWindowContract.js': 'ast',
   'tests/helpers/langBackedI18n.js': 'fixture',
-  'tests/helpers/legacyLintGate.js': 'fixture',
   'tests/helpers/manager-button-cascade.js': 'legacy-scan',
   'tests/helpers/manager/managerCompile.js': 'fixture',
   'tests/helpers/manager/managerLocalization.js': 'fixture',
@@ -267,7 +266,10 @@ test('every non-test module under tests/ that reads files is listed with a revie
 
 test("the gate reads this file's SCAN_HELPERS row for row, so its legacy-scan leg is live", () => {
   const rows = scanHelperRows(readFileSync(import.meta.filename, 'utf8'));
-  assert.deepEqual(rows.map(({ file, kind }) => [file, kind]), Object.entries(SCAN_HELPERS));
+  assert.deepEqual(
+    rows.map(({ file, kind }) => [file, kind]),
+    Object.entries(SCAN_HELPERS)
+  );
   assert.ok(rows.some(({ kind }) => kind === 'legacy-scan'));
 });
 
@@ -672,7 +674,9 @@ test('a helper reading files raw, aliased, keyed or via a wrapper chain is flagg
 });
 
 const repos = [];
-after(() => repos.forEach((repo) => repo.dispose()));
+after(() => {
+  for (const repo of repos) repo.dispose();
+});
 
 /** A throwaway repository whose one commit holds `files`, compared by this gate's own wiring. */
 function repoWith(files) {
@@ -754,10 +758,10 @@ test('a reasoned marker at a pin or the file head exempts it; an empty one fails
     'tests/c.test.js': [reasoned, ...PINNING],
   });
   const exempt = repo.compare();
-  assert.deepEqual([exempt.failures, exempt.exempted], [
-    [],
-    [`tests/c.test.js: ${PIN_ID} is new (2): the emitted text is the contract under test`],
-  ]);
+  assert.deepEqual(
+    [exempt.failures, exempt.exempted],
+    [[], [`tests/c.test.js: ${PIN_ID} is new (2): the emitted text is the contract under test`]]
+  );
   repo.write({
     'tests/a.test.js': [
       ...PINNING,

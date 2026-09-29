@@ -140,9 +140,8 @@ jobs:
     # hosted runner is commonly 1.5-2x slower than a dev machine on CPU-bound Node work, so 10
     # no longer leaves room for a slow install on top. 15 does, and still bounds a genuine hang.
     #
-    # `npm run lint:debt` is deliberately NOT a step here — it lints the repository a second
-    # time with the debt baseline lifted, which would serialise two full ESLint passes into one
-    # job's budget. It has its own job below so the two run in parallel.
+    # `npm run lint` and `npm run format:check` compare with the base commit below: a changed
+    # file fails on a finding its base content did not have, so existing debt needs no list.
     timeout-minutes: 15
     env:
       # The base every merge-base ratchet compares with (tests/helpers/mergeBaseRatchet.js): on a
@@ -188,36 +187,6 @@ jobs:
 
       - name: Lint markdown (markdownlint)
         run: npm run lint:md
-
-  lint-debt:
-    # The ratchet half of the glob gate (issue #1660). `npm run lint` passes on the baselined
-    # files by construction — their failing rules are switched off per file in `eslint-debt.txt` —
-    # so this runs the same config with the baseline LIFTED and fails on an entry that reports
-    # nothing any more. Without it the baseline never shrinks, and "only shrinks" is a property
-    # nothing enforces. It is not hypothetical: the `tests/**` list shipped its first stale entry
-    # within an hour of being generated.
-    #
-    # Its own job rather than a step of `lint`, because it is a second full ESLint pass (~272s
-    # locally) and running the two in sequence would put both inside one budget. Not a unit test
-    # either: `npm test` shares its runner with browser-backed suites that starve beside a
-    # CPU-bound job. The cheap half of the ratchet is `tests/lint-coverage.test.js`.
-    if: github.event_name != 'pull_request' || github.event.action != 'edited'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci --ignore-scripts
-
-      - name: Check the lint debt baseline is not stale
-        run: npm run lint:debt
 
   validate-bindings:
     # Pure-Node consistency check for the agent role bindings (skills <-> Codex
