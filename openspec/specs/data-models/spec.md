@@ -493,6 +493,7 @@ It also never reads `dc` or any adjustment field, fixed or attribute.
     It defaults to `false` (tools are not broken on failure unless enabled).
     It was renamed from the legacy catalyst-era key `consumeCatalystsOnFail` (retained by name only to defer a persisted-key migration) by the 1.7.0 migration, which rewrites persisted worlds to the new key.
     Normalization reads `breakToolsOnFail` then falls back to the legacy `consumeCatalystsOnFail`, so a pre-migration import/export still loads correctly.
+    Before 1.35.0 a failed alchemy check ignored this field and always broke tools; the 1.35.0 migration stamps `true` onto every existing alchemy system with no explicit value so that behaviour does not change (`destructive-changes-and-migrations/spec.md` § Alchemy Break-Tools-on-Fail Default), and `ui-system-studio/spec.md` § The On-failure section documents the Checks Studio switch that now reads and writes it for alchemy.
 14. When `features.gathering` is true, a crafting system may carry `gatheringRealmSettings`, which holds the participation flag `enabled` (default `false`) and nothing else.
     A system does NOT own a realm library: realms, the reveal mode and the modifier visibility are world scope (see _TravelConfig_).
     `enabled` decides consumption only — whether the party's current location gates this system's environments, what its UI shows, and whether its environments offer the realm controls — so the world's realms stay authorable and resolvable whether or not any system has opted in.

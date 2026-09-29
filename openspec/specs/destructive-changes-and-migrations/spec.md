@@ -1046,6 +1046,21 @@ It mutates no input, throws no `FatalMigrationError`, and returns the ORIGINAL o
     The leg is attached on EVERY publish, so a world that never merged reads as an empty array rather than an absent one and no caller has to tell the two apart.
     Reissuing one turns requirement 9's deliberately-unremapped `flags.fabricate.fabricate.essences` key from a reference that contributes NOTHING into one that contributes the WRONG ESSENCE, which is the one outcome the decision to leave an ambiguous key alone was safe because of.
 
+### Alchemy Break-Tools-on-Fail Default (`1.35.0`, `downgradeTo: '1.34.0'`, pure, clone-first, idempotent)
+
+Issue 2100's maintainer ruling "add switch, keep old default": before this release a failed simple or tiered alchemy check unconditionally broke every required tool, ignoring `craftingCheck.consumption.breakToolsOnFail`.
+That setting now genuinely gates alchemy breakage the same as crafting (`data-models/spec.md` requirement 13, `resolution-modes/spec.md` § Alchemy Mode), so an existing alchemy system with no explicit value for it would silently switch from always-break to never-break the moment this release lands.
+The `1.35.0` settings-data migration (`src/migration/migrateAlchemyBreakToolsOnFail.js`) stamps `breakToolsOnFail = true` onto every such system, keeping its brews breaking tools on a failed check exactly as they always did.
+
+1. **An "alchemy system" is `resolutionMode === 'alchemy'`, OR an `alchemy.checkMode` of `simple` or `tiered` left behind by a mode switch.** The second arm exists because a system can carry a live alchemy check-mode config while its `resolutionMode` has since moved elsewhere, and that config still governs a reachable failure path.
+   A system whose `alchemy.checkMode` is `none` is still stamped when its `resolutionMode` is `alchemy`, defensively: the field is inert today (no check ever runs under `none`), but a GM can flip `checkMode` to `simple` or `tiered` later without any further migration running.
+2. **The stamp is conditional on the field's PRESENCE, not its value.** It fires only when `craftingCheck.consumption.breakToolsOnFail` is absent, so an alchemy system that already authored `false` — meaning a GM deliberately turned it off before this release shipped the switch that reads it — is left exactly as authored, and a system already authored `true` is a no-op write.
+   A non-alchemy system is never touched, whether or not it carries a `consumption` block.
+3. **`craftingCheck` and `craftingCheck.consumption` are seeded when absent**, unlike the Modifier Pick Cap Migration above: that migration's absent block meant "no library, nothing to pick from and no cap to observe," but an alchemy system with no `craftingCheck` block still runs its check off the shared `craftingCheck.simple` slot (`data-models/spec.md` requirement 26) and still needs the old always-break behaviour preserved.
+4. **Mutated setting key:** `craftingSystems`, and only it.
+5. **Mirrored on import**, the same as the Modifier Pick Cap Migration: `migrateExportPayload` applies the identical per-system transform (`applyAlchemyBreakToolsOnFailDefault`, shared with the settings-data migration) to an imported bundle, branch-independently, for the same reason — the field's absence is orthogonal to the export envelope's schema version.
+6. **Lossless downgrade.** `downgradeTo: '1.34.0'` is lossless: the pre-change build never read `breakToolsOnFail` for an alchemy check at all, so the stamped value is inert on downgrade and simply survives, unread, for a re-upgrade.
+
 ### Subject Modifier Mark Seed (`1.33.0`, `downgradeTo: '1.32.0'`, pure, clone-first, idempotent)
 
 Records the mark that keeps every existing subject check-modifier pick rolling, now that under `bySubject` an activity check's `defaultModifierIds` BOUNDS the subject's pick rather than merely defaulting it (`resolution-modes/spec.md`, issue 1608).
