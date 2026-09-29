@@ -84,6 +84,20 @@
     written = String(next);
     onChange(written);
   }
+
+  // Spelled out per field, so each hook a test or capture names is greppable in source.
+  const VALUE_HOOKS = {
+    base: {
+      expression: 'data-check-count-base-expression',
+      hint: 'data-check-count-base-expression-hint',
+      resolution: 'data-check-count-base-resolution',
+    },
+    threshold: {
+      expression: 'data-check-count-threshold-expression',
+      hint: 'data-check-count-threshold-expression-hint',
+      resolution: 'data-check-count-threshold-resolution',
+    },
+  };
 </script>
 
 <span class="manager-checks-count-mode">
@@ -119,7 +133,7 @@
       value={valueShown}
       {character}
       {label}
-      hook={`check-count-${field}`}
+      hooks={VALUE_HOOKS[field]}
       inputAttrs={{ 'data-validation-target': validationTarget }}
       onChange={(next) => write('value', next)}
     />

@@ -529,6 +529,14 @@
       "why": "The two callers, `WorldComponentEntryPage.svelte` and `WorldEssenceEntryPage.svelte`, share one manager composition for system-membership search, filters, navigation, add and armed removal. `library: null` records that <DataTable> compares sortable fields down columns and <ListRow> can own row geometry, while neither owns card-level relationship queries and commands. Targeted evidence is `world-component-entry-systems` and `world-essence-entry-systems`; the scope is manager-only because this edits GM world catalogue participation."
     },
     {
+      "path": "src/ui/svelte/apps/manager/checks/CheckCharacterValueField.svelte",
+      "library": null,
+      "status": "target",
+      "evidence": "targeted",
+      "scope": "manager-only",
+      "why": "Promoted at issue 2006 on its second independent caller: the Difficulty card's roll-under target (`checks/CheckDifficultyCard.svelte`) and the success-counting pool's base and threshold (`checks/CheckCountInputField.svelte`) author a character-value expression through this one field, with its live reading for the Preview-as character. `library: null` stands: `<ExprInput>` (`RollDataExpressionInput.svelte`) is the library entry it wraps, and this adds only the reading beneath it. Scoped `manager-only`: it authors a check in the Checks Studio."
+    },
+    {
       "path": "src/ui/svelte/apps/manager/checks/PreviewAsPicker.svelte",
       "library": null,
       "status": "target",
@@ -550,7 +558,9 @@
       "path": "src/ui/svelte/apps/manager/VocabularyPanel.svelte",
       "library": null,
       "evidence": "targeted",
-      "callers": ["src/ui/svelte/apps/manager/VocabularyShellPanel.svelte"],
+      "callers": [
+        "src/ui/svelte/apps/manager/VocabularyShellPanel.svelte"
+      ],
       "why": "The vocabulary EDITOR panel: the add form, the search field, the entry count, the row list and its two empty states, which the row’s own delete confirm is armed from. It was a MEMBER from issue 1392, when the world Tags & Categories screen became its second independent caller, until issue 1915 converged the two screens on one shell: both now reach it through `VocabularyShellPanel.svelte`, which is its ONE caller, so it is below the bar by the same measurement that put it over it. Nothing about the component changed and nothing about its reach did either — it still draws both screens, three times each — but the capability sets the bar by caller count, and a single caller is what the tree holds. The two screens it serves are named on the shell panel’s own row, which carries the pair. `library: null` stands, and the nearest entry rules itself out on the same sentence that makes it near. `<SetPicker>` (`library.html:1539`) is \"editing membership of a set too large to render inline\" — one RECORD’s tags — and this edits the vocabulary those tags are drawn FROM, a world-level list with no record in the frame at all; it also renders every entry, which is what that entry says it never does. No other entry names a vocabulary editor, so this is the ordinary undocumented kind rather than an adjudicated divergence. Its own add field is `InlineVocabularyAdd.svelte`, a member, and `library: null` there for the same reason. Targeted: `manager-tags-categories-normal`, `manager-tags-categories-tags-tab`, `manager-tags-categories-stacked` and `world-vocabulary` all claim this path in `sourceMatches`, so a change here publishes both screens."
     },
     {

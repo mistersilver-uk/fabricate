@@ -274,7 +274,11 @@
               'FABRICATE.Admin.Manager.Checks.Evaluation.SourceAttribute',
               'Character value'
             )}
-            hook="check-target"
+            hooks={{
+              expression: 'data-check-target-expression',
+              hint: 'data-check-target-expression-hint',
+              resolution: 'data-check-target-resolution',
+            }}
             inputAttrs={{ 'data-validation-target': 'checks-target-expression' }}
             onChange={(next) => emitTarget({ expression: next })}
           />

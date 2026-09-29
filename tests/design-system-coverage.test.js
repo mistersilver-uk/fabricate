@@ -634,6 +634,7 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/apps/manager/VocabularyShellPanel.svelte',
   // Issue 2005's Preview-as picker and the check overrides' Player sees block: no specimen names a
   // character picker or a player-view line, and each composes entries that do exist.
+  'src/ui/svelte/apps/manager/checks/CheckCharacterValueField.svelte',
   'src/ui/svelte/apps/manager/checks/PreviewAsPicker.svelte',
   'src/ui/svelte/apps/manager/component/OverridePlayerSees.svelte',
   'src/ui/svelte/apps/manager/downtime/WorldDowntimeTabs.svelte',

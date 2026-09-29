@@ -9,7 +9,7 @@
   | `value` | string | `''` | The stored expression, shown byte for byte. |
   | `character` | `{ name, rollData }` \| `null` | `null` | The Preview-as actor the reading resolves against. |
   | `label` | localized string | `''` | The input's accessible name; the field draws no visible caption. |
-  | `hook` | string | `''` | Names the hooks: `data-{hook}-expression` on the input, `-expression-hint` and `-resolution` on the lines. |
+  | `hooks` | `{ expression, hint, resolution }` | `{}` | Full attribute names for the input, the hint line and the reading line, spelled out so each stays greppable. |
   | `inputAttrs` | plain object | `{}` | Attributes for the input, such as its `data-validation-target`; never event handlers. |
   | `placeholder` | string | `'@skills.craft.value'` | The input's placeholder. |
 
@@ -29,7 +29,7 @@
     value = '',
     character = null,
     label = '',
-    hook = '',
+    hooks = {},
     inputAttrs = {},
     placeholder = '@skills.craft.value',
     onChange = () => {},
@@ -44,15 +44,15 @@
   const uid = $props.id();
   const hintId = `${uid}-value-hint`;
   const resolutionId = `${uid}-value-resolution`;
-  const attr = (suffix) => (hook ? { [`data-${hook}${suffix}`]: '' } : {});
+  const attr = (name) => (name ? { [name]: '' } : {});
 </script>
 
 <div class="manager-checks-value-field">
   <RollDataExpressionInput
     sigil={false}
-    dataField={hook ? `${hook}-expression` : ''}
+    dataField={hooks.expression ? hooks.expression.replace(/^data-/u, '') : ''}
     inputAttrs={{
-      ...attr('-expression'),
+      ...attr(hooks.expression),
       ...inputAttrs,
       'aria-label': label,
       'aria-describedby': resolution ? `${hintId} ${resolutionId}` : hintId,
@@ -63,7 +63,7 @@
   />
   <!-- The path syntax stays the field's description for assistive tech; the prototype draws only
        the live reading beneath the field. -->
-  <small class="visually-hidden" id={hintId} {...attr('-expression-hint')}>
+  <small class="visually-hidden" id={hintId} {...attr(hooks.hint)}>
     {text(
       'FABRICATE.Admin.Manager.Checks.Evaluation.ValueHint',
       'A character path with its leading @, or arithmetic on paths without dice, such as @skills.craft.value - 2.'
@@ -73,7 +73,7 @@
     <small
       class={`manager-checks-value-resolution is-${resolution.tone}`}
       id={resolutionId}
-      {...hook ? { [`data-${hook}-resolution`]: resolution.tone } : {}}>{resolution.text}</small
+      {...hooks.resolution ? { [hooks.resolution]: resolution.tone } : {}}>{resolution.text}</small
     >
   {/if}
 </div>
