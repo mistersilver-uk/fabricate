@@ -160,7 +160,7 @@ A summed roll-over against a fixed DC:
 
 Every other evaluation:
 
-- always states the benefit-positive margin note
+- states the benefit-positive margin note whenever the line shows a margin, unless a trigger-forced outcome takes the note slot
 - lists one row, "Result group produced" or "Failure policy applies", plus a tool-breakage row when the result breaks tools
 
 A progressive check spends its rolled value down the sandbox order through `resolveProgressiveAward` and reads "{awarded} of {of} awarded".
@@ -292,7 +292,6 @@ An actorless literal target and formula stay previewable, and summed roll-over a
 Otherwise the reasons are `progressive-under-unsupported`, `attribute-path-unresolved` (naming the actor and path), `attribute-value-not-numeric` and `target-invalid`.
 The simulator reads the executed `data.target` and `data.margin` ("target {target} · margin {margin}"), and shows neither for a result with no target (an Otherwise tier or a fixed range); summed roll-over against a fixed DC keeps its total-minus-DC reading.
 It notes "Margin is shown so that higher is always better: how far under the target the total landed." (or "…over the target…" when higher is better).
-A roll-under pass/fail band reads "The roll stays at or under the target…" or "The roll goes over the target…".
 A rolled result is dropped when any input it describes changes, and a deferred result publishes only if the inputs it was rolled for still hold.
 
 Readiness validates only what the active mode reads: a progressive or fixed-range target source is inert.
@@ -319,7 +318,7 @@ The preview abstains with no actor when the pool reads the character (`needs-pre
 The simulator renders one tile per active face, explosion dice included, each marked `qualified`, `cancelled` or `exploded` by a glyph, a `data-checks-simulator-face-marks` value and its accessible name, so colour is never the only signal; the tile takes the success tone for a qualifying or exploding face and the danger tone for a cancelling one.
 The tiles and legend sit directly under the medallion row.
 The breakdown reads `{qualified} qualified − {cancelled} cancelled = {net} net` and then the actor.
-The target line reads `needs {required} · margin {margin}`, from the executed `data.margin`, whose margin is always signed (`+0`).
+The target line reads `needs {required} · margin {margin}`: `{required}` is the check's own required count, on a routed check too, and the margin is the net minus it, always signed (`+0`).
 A net below zero marks the readout `data-checks-simulator-botch`.
 Only when the graded result is not a success does the readout read `needs {required} · a net below zero is a botch`, title the card `Botch` and read `Net below zero`; a trigger-rescued botch keeps the normal margin line and its success title and sub-line, with `data-checks-simulator-botch` still set.
 A zero pool rolls nothing: it shows `0` captioned `net` and `pool reduced to 0`, and notes "The pool was reduced to zero, so the check fails automatically."
