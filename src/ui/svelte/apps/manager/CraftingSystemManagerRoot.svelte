@@ -612,9 +612,6 @@
   // DC presets come from `salvageCraftingCheck.simple.tiers` in EVERY resolution mode,
   // routed included (decision 7, case 5) — there is no `.routed.tiers` sibling.
   const salvageCheckTiers = $derived(salvagePresetTiers(selectedSystem?.salvageCraftingCheck));
-  const salvageCheckDcMode = $derived(
-    selectedSystem?.salvageCraftingCheck?.simple?.dcMode || 'static'
-  );
   // The sub-object the salvage mode rolls, whose evaluation picks the override field and whose DC
   // is the system default (issue 2005).
   const salvageCheckConfig = $derived(
@@ -5623,7 +5620,6 @@
             'addAll'}
           salvageModifierMaxPicks={selectedSystem?.salvageCraftingCheck?.maxModifierPicks ?? null}
           salvageModifierDefaultIds={selectedSystem?.salvageCraftingCheck?.defaultModifierIds || []}
-          {salvageCheckDcMode}
           {salvageCheckDc}
           {salvageCheckConfig}
           previewActors={overridePreviewActors}

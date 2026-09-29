@@ -54,7 +54,6 @@
     dcOverride = null,
     adjustmentOverride = null,
     tiers = [],
-    dcMode = 'static',
     systemDc = 0,
     previewActors = [],
     resolvePreviewCharacter = () => null,
@@ -83,9 +82,7 @@
   // The sub-object salvage rolls owns the default, so the Select and the line name one number.
   const systemDefaultDc = $derived(Number(config?.dc ?? systemDc));
 
-  const options = $derived(
-    buildSalvageDcSelectOptions(tiers, dcMode, systemDefaultDc, text, evaluation)
-  );
+  const options = $derived(buildSalvageDcSelectOptions(tiers, systemDefaultDc, text, evaluation));
   // Custom… and System default both persist null, so the GM's choice of Custom… is staged here.
   let customSelected = $state(false);
   const selection = $derived(
