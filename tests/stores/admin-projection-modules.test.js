@@ -309,6 +309,32 @@ describe('adminRecipeRowProjection.buildRecipeList (direct, no store)', () => {
     assert.deepEqual(sortedKeys(result.recipes[0]), RECIPE_ROW_FIELDS);
   });
 
+  it('names a roll-under Target and a character value in the check pill, never a DC (issue 2005)', () => {
+    const recipes = [
+      makeRecipe({ id: 'r-tier', checkTierId: 'tier-hard' }),
+      makeRecipe({ id: 'r-default' }),
+    ];
+    const pills = (evaluation) => {
+      const system = makeSystem();
+      system.craftingCheck.routed.evaluation = evaluation;
+      return buildRecipeList(null, makeRecipeManager(recipes), system, '').recipes.map(
+        (row) => row.checkSummary
+      );
+    };
+    assert.deepEqual(pills({ product: 'sum', direction: 'under', target: { source: 'fixed' } }), [
+      { kind: 'target', dc: 18 },
+      { kind: 'target', dc: 15 },
+    ]);
+    for (const direction of ['over', 'under']) {
+      const attribute = { product: 'sum', direction, target: { source: 'attribute', expression: '@a' } };
+      assert.deepEqual(pills(attribute), [
+        { kind: 'attribute', dc: null },
+        { kind: 'attribute', dc: null },
+      ], `${direction}: a character value sorts with the number-less rows`);
+    }
+    assert.deepEqual(pills({ product: 'sum', direction: 'over' })[0], { kind: 'dc', dc: 18 });
+  });
+
   it('derives the structure, counts, check pill and membership a row cannot compute', () => {
     const recipes = [
       makeRecipe({ id: 'r-ok', checkTierId: 'tier-hard' }),

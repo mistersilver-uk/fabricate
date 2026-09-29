@@ -342,6 +342,9 @@
   // working configuration, not a gap.
   const CHECK_PILLS = {
     dc: ['FABRICATE.Admin.Manager.Recipe.CheckDc', 'DC {dc}', 'fas fa-dice-d20'],
+    // Issue 2005: a roll-under fixed number is a Target, and a character value has no number.
+    target: ['FABRICATE.Admin.Manager.Recipe.CheckTarget', 'Target {dc}', 'fas fa-dice-d20'],
+    attribute: ['FABRICATE.Admin.Manager.Recipe.CheckAttribute', 'Character value', 'fas fa-user'],
     dynamic: ['FABRICATE.Admin.Manager.Recipe.CheckDynamic', 'Dynamic DC', 'fas fa-dice-d20'],
     progressive: [
       'FABRICATE.Admin.Manager.Recipe.CheckProgressive',
@@ -737,7 +740,7 @@
                            kinds stay in the UI face. -->
                       <Chip
                         class={`manager-recipe-check is-${check.kind}`}
-                        mono={check.kind === 'dc'}
+                        mono={check.kind === 'dc' || check.kind === 'target'}
                         icon={check.icon}
                         data-recipe-check={check.kind}
                         title={check.title || undefined}

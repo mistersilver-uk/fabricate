@@ -534,6 +534,10 @@
   const recipeCheckTierOptions = $derived(
     resolveRecipeCheckTierOptions(selectedSystem?.craftingCheck, checks.craftingCheckMode)
   );
+  // The same mode's evaluation, which names each tier's DC, Target or adjustment (issue 2005).
+  const recipeCheckTierEvaluation = $derived(
+    selectedSystem?.craftingCheck?.[checks.craftingCheckMode]?.evaluation ?? null
+  );
   // Fixed-type routed success tiers offered to the recipe's "Minimum success tier" override; empty
   // (control hidden) unless the system's real resolution mode is `routedByCheck` + fixed.
   const recipeMinSuccessTierOptions = $derived(
@@ -5699,6 +5703,7 @@
           : []}
         itemTags={selectedSystem?.itemTags || []}
         checkTierOptions={recipeCheckTierOptions}
+        checkEvaluation={recipeCheckTierEvaluation}
         minSuccessTierOptions={recipeMinSuccessTierOptions}
         craftingModifierOptions={selectedSystemModifiers}
         craftingModifierPolicy={selectedSystem?.craftingCheck?.defaultModifierPolicy || 'addAll'}
@@ -6305,6 +6310,7 @@
               categoryOptions={recipeBulkCategoryOptions}
               checkTierAxis={recipeBulkCheckTierAxis}
               checkTierOptions={recipeCheckTierOptions}
+              checkEvaluation={recipeCheckTierEvaluation}
               books={recipeItemDefinitions}
               bookMembership={recipeBulkBookMembership}
               blockedCount={recipeBulkBlockedCount}

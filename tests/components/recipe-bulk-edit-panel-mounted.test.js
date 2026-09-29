@@ -33,7 +33,11 @@ const panel = createMountedComponentHarness({
     // component under test, and the shared harness's closure validator throws loudly on an
     // omission — the hand-rolled suites are the ones that hang instead.
     'src/ui/model/recipeBulkEditModel.js',
-    'src/utils/bulkSelectionModel.js'
+    'src/utils/bulkSelectionModel.js',
+    // The tier labels the single-recipe editor shares, which name a DC, a Target or an adjustment.
+    'src/ui/svelte/apps/manager/recipe/recipeOverviewSelectOptions.js',
+    'src/utils/checkAdjustmentFormat.js',
+    'src/utils/scalars.js'
   ],
   compiledModules: [
     'src/ui/svelte/components/Callout.svelte',
@@ -758,6 +762,38 @@ describe('RecipeBulkEditPanel check-tier axis (issue 1010)', () => {
       selectOptionLabels(root, TIER_HOOK).map((text) => text.replace(HINT_JOIN, '')),
       ['Leave unchanged', 'Default DC', 'Easy (DC 8)', 'Unnamed tier (DC 18)']
     );
+  });
+
+  it('names a roll-under Target and a character-value adjustment instead of a DC (issue 2005)', async () => {
+    const HINT_JOIN = / (?:Every|Clears) .*$/;
+    const evaluation = (direction, source = 'fixed', adjustmentKind = 'add') => ({
+      product: 'sum',
+      direction,
+      target: { source, expression: '@skills.smith.value', adjustmentKind },
+    });
+    const tiers = [
+      { id: 'tier-easy', name: 'Easy', dc: 8, adjustment: 1 },
+      { id: 'tier-hard', name: 'Hard', dc: 18, adjustment: 0.5 }
+    ];
+    const cases = [
+      [evaluation('under'), ['Default target', 'Easy (Target 8)', 'Hard (Target 18)'], /default target\.$/, /^The target/],
+      [
+        evaluation('under', 'attribute', 'multiply'),
+        ['Default · base adjustment', 'Easy (×1)', 'Hard (×½)'],
+        /base adjustment\.$/,
+        /^The adjustment/
+      ]
+    ];
+    for (const [checkEvaluation, labels, defaultHint, subhint] of cases) {
+      panel.remount();
+      const { root } = await mountPanel({ checkEvaluation, checkTierOptions: tiers });
+      const rows = selectOptionLabels(root, TIER_HOOK);
+      assert.deepEqual(rows.slice(1).map((text) => text.replace(HINT_JOIN, '')), labels);
+      assert.match(rows[1], defaultHint, 'the Default row hint names what it clears to');
+      assert.ok(rows.every((text) => !/\bDC\b/.test(text)), 'no row says DC');
+      const hints = [...root.querySelectorAll('.fab-bulk-edit-subhint')].map((node) => node.textContent);
+      assert.ok(hints.some((text) => subhint.test(text)), 'the section hint names the same unit');
+    }
   });
 
   it('groups the two instructions above the authored tiers, and hints each of them', async () => {

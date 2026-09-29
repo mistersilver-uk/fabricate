@@ -114,6 +114,19 @@ describe('recipeBrowserModel — sorting', () => {
     assert.deepEqual(names(sortRecipes(rows, { key: 'results' })), ['Beta', 'Gamma', 'Alpha']);
   });
 
+  it('sorts a character-value pill with the number-less dynamic rows, in both directions (issue 2005)', () => {
+    const mixed = [
+      makeRecipe({ name: 'Skill', checkSummary: { kind: 'attribute', dc: null } }),
+      makeRecipe({ name: 'Target', checkSummary: { kind: 'target', dc: 12 } }),
+      makeRecipe({ name: 'Macro', checkSummary: { kind: 'dynamic', dc: null } }),
+      makeRecipe({ name: 'Fixed', checkSummary: { kind: 'dc', dc: 20 } })
+    ];
+    const order = (direction) => names(sortRecipes(mixed, { key: 'dc', direction }));
+    assert.deepEqual(order('asc').slice(2), ['Target', 'Fixed']);
+    assert.deepEqual(order('desc').slice(0, 2), ['Fixed', 'Target']);
+    assert.deepEqual([...order('asc').slice(0, 2)].sort(), ['Macro', 'Skill']);
+  });
+
   // The non-grouped path is the byte-identical pre-issue-801 order.
   it('pins each sort key in both directions (the flat, non-grouped path)', () => {
     assert.deepEqual(names(sortRecipes(rows, { key: 'ingredients', direction: 'asc' })), ['Gamma', 'Beta', 'Alpha']);

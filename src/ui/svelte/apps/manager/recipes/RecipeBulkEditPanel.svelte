@@ -90,12 +90,19 @@
     setBulkRecipeLock,
     setBulkRecipeStatus,
   } from '../../../../model/recipeBulkEditModel.js';
+  import {
+    checkTierDefaultLabel,
+    checkTierLabel,
+    checkTierUnit,
+  } from '../recipe/recipeOverviewSelectOptions.js';
 
   let {
     count = 0,
     categoryOptions = [],
     checkTierAxis = { available: false, reason: 'noTiers' },
     checkTierOptions = [],
+    // The active crafting check's evaluation, which names each tier's DC, Target or adjustment.
+    checkEvaluation = null,
     books = [],
     bookMembership = new Map(),
     blockedCount = 0,
@@ -321,19 +328,59 @@
     },
     {
       value: RECIPE_CHECK_TIER_DEFAULT,
-      label: text('FABRICATE.Admin.Manager.Recipe.CheckTierDefault', 'Default DC'),
-      hint: text(
-        'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierDefaultHint',
-        "Clears every selected recipe to the system's default DC."
-      ),
+      label: checkTierDefaultLabel(checkEvaluation, text),
+      hint: CHECK_TIER_COPY[checkTierCopyUnit].defaultHint(),
       group: checkTierInstructionsGroup,
     },
     ...checkTierOptions.map((tier) => ({
       value: tier.id,
-      label: `${tier.name || text('FABRICATE.Admin.Manager.Recipe.CheckTierUnnamed', 'Unnamed tier')} (DC ${tier.dc})`,
+      label: checkTierLabel(tier, checkEvaluation, text),
       group: checkTierTiersGroup,
     })),
   ]);
+
+  // What the axis sets, by what a tier names: a DC, a Target, or an adjustment (issue 2005).
+  const checkTierCopyUnit = $derived(
+    { dc: 'dc', target: 'target' }[checkTierUnit(checkEvaluation)] ?? 'adjustment'
+  );
+  const CHECK_TIER_COPY = {
+    dc: {
+      hint: () =>
+        text(
+          'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierHint',
+          "The DC these recipes roll against — not the check's outcome tiers."
+        ),
+      defaultHint: () =>
+        text(
+          'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierDefaultHint',
+          "Clears every selected recipe to the system's default DC."
+        ),
+    },
+    target: {
+      hint: () =>
+        text(
+          'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierHintTarget',
+          "The target these recipes roll against — not the check's outcome tiers."
+        ),
+      defaultHint: () =>
+        text(
+          'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierDefaultHintTarget',
+          "Clears every selected recipe to the system's default target."
+        ),
+    },
+    adjustment: {
+      hint: () =>
+        text(
+          'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierHintAdjustment',
+          "The adjustment these recipes apply to the character value — not the check's outcome tiers."
+        ),
+      defaultHint: () =>
+        text(
+          'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierDefaultHintAdjustment',
+          "Clears every selected recipe to the system's base adjustment."
+        ),
+    },
+  };
 
   // The section heading and the staged list's accessible name, so both read as one string.
   // `recipe item` remains the canonical spec noun; this is the display name the rail already uses.
@@ -831,12 +878,7 @@
        saying there is no recipe-level check tier at all. -->
   <BulkEditSection
     label={text('FABRICATE.Admin.Manager.Recipe.CheckTier', 'Check tier')}
-    subhint={checkTierAvailable
-      ? text(
-          'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierHint',
-          "The DC these recipes roll against — not the check's outcome tiers."
-        )
-      : ''}
+    subhint={checkTierAvailable ? CHECK_TIER_COPY[checkTierCopyUnit].hint() : ''}
   />
   {#if checkTierAvailable}
     <!-- GROUPED, HINTED AND TICKED: two rows are INSTRUCTIONS and the rest are authored tiers.

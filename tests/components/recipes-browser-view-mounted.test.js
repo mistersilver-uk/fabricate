@@ -528,6 +528,26 @@ describe('RecipesBrowserView row readout (issue 643 §9)', () => {
     );
   });
 
+  it('names a roll-under Target in the mono face, and a character value by its source (issue 2005)', async () => {
+    const target = await browser.mount({
+      recipes: [makeRecipe({ checkSummary: { kind: 'target', dc: 12 } })]
+    });
+    const targetPill = target.querySelector('[data-recipe-check]');
+    assert.equal(targetPill.dataset.recipeCheck, 'target');
+    assert.equal(targetPill.textContent.trim(), 'Target 12');
+    assert.ok(targetPill.classList.contains('is-mono'), 'a target is a numeric like a DC');
+    browser.remount();
+
+    const attribute = await browser.mount({
+      recipes: [makeRecipe({ checkSummary: { kind: 'attribute', dc: null } })]
+    });
+    const attributePill = attribute.querySelector('[data-recipe-check]');
+    assert.equal(attributePill.dataset.recipeCheck, 'attribute');
+    assert.equal(attributePill.textContent.trim(), 'Character value');
+    assert.ok(attributePill.querySelector('i.fa-user'), 'the Target source card glyph');
+    assert.equal(attributePill.classList.contains('is-mono'), false, 'a phrase is not a number');
+  });
+
   // The two check-LESS states are not the same fact.
   it('warns when the system cannot roll for a recipe, and stays neutral when it need not', async () => {
     const noCheck = await browser.mount({
@@ -1004,6 +1024,13 @@ describe('RecipeBrowserInspector (mounted)', () => {
     assert.equal(stat('results').textContent, '3');
     assert.equal(stat('steps').textContent, '2');
     assert.equal(stat('check').textContent, 'DC 17', 'the store already projects the resolved DC');
+    for (const [checkSummary, text] of [
+      [{ kind: 'target', dc: 12 }, 'Target 12'],
+      [{ kind: 'attribute', dc: null }, 'Character value'],
+    ]) {
+      await inspector.setProps({ selectedRecipe: makeRecipe({ id: 'r1', checkSummary }) });
+      assert.equal(stat('check').textContent, text, 'issue 2005: no DC outside roll-high fixed');
+    }
     assert.equal(
       root.querySelector('[data-recipe-fact="structure"]'),
       null,
