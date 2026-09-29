@@ -199,7 +199,9 @@ describe('roll prompt adapter', () => {
       });
       return input;
     };
-    const policy = { dice: 4, die: 6, threshold: 5, comparison: 'exceed', resolved: { base: 4.9 } };
+    const policy = {
+      dice: 4, die: 6, threshold: 5, comparison: 'exceed', direction: 'under', resolved: { base: 4.9, threshold: 5 },
+    };
     const input = await received(
       { direction: 'under', pool: { modifierDestination: 'threshold' } },
       { countPolicy: policy, thresholdMode: 'exceed' }
@@ -208,10 +210,10 @@ describe('roll prompt adapter', () => {
     assert.deepEqual(
       { product, direction, comparison, pool, threshold, die, required, modifierDestination },
       {
-        product: 'count', direction: 'under', comparison: 'exceed', pool: 4, threshold: 5, die: 6,
+        product: 'count', direction: 'under', comparison: 'exceed', pool: 4.9, threshold: 5, die: 6,
         required: 3, modifierDestination: 'threshold',
       },
-      'the floored pool the policy resolved, never the unfloored base'
+      'the resolved base unfloored, so the prompt floors it once after every benefit (issue 2006)'
     );
     assert.deepEqual([input.dc, input.target, input.formula, input.allowAdvantage], [null, null, '', false]);
     assert.equal(input.thresholdMode, 'exceed');
@@ -234,8 +236,8 @@ describe('roll prompt adapter', () => {
     assert.equal(view.formula, '6d10 · each ≥ 8');
     assert.deepEqual([view.dc, view.dcText, view.neededText, view.chipText], [null, '', '2 successes needed', '2 successes needed']);
     assert.deepEqual(view.count, {
-      pool: 6, die: 10, threshold: 8, thresholdSource: null, explode: null, cancel: null, required: 2,
-      destination: 'pool',
+      pool: 6, die: 10, threshold: 8, thresholdAnchor: null, thresholdSource: null, explode: null, cancel: null,
+      zeroPoolFails: true, required: 2, destination: 'pool',
     });
     assert.equal(view.labels.formulaNote, 'Success on ≥ 8');
     assert.equal(view.labels.eachAdds, 'Each adds dice.');
@@ -266,60 +268,59 @@ describe('roll prompt adapter', () => {
     assert.equal((await count({ comparison: undefined, thresholdMode: 'exceed' })).view.comparison, 'exceed');
   });
 
-  it('states a count prompt\'s qualifying rule under its pool line, frames 30 and 35', async () => {
+  it('states a count prompt\'s qualifying rule with its actual faces (N30, frames 30 and 35)', async () => {
     const note = async (fields) => (await open({
-      product: 'count', pool: 6, die: 10, threshold: 8, required: 2, comparison: 'meet', direction: 'over',
-      formula: '1d20 + 4', displayFormula: '1d20 + 4', dc: 15, ...fields,
+      product: 'count', pool: 6, die: 10, threshold: 8, thresholdAnchor: 8, thresholdSource: 'fixed', required: 2,
+      comparison: 'meet', direction: 'over', formula: '1d20 + 4', displayFormula: '1d20 + 4', dc: 15, ...fields,
     }, null)).view.labels.formulaNote;
-    const best = { kind: 'best', value: null, once: false };
-    const worst = { kind: 'worst', value: null };
+    const best = { kind: 'best', face: 10, once: false };
+    const worst = { kind: 'worst', face: 1 };
     assert.equal(
       await note({ explode: best, cancel: worst }),
-      'Success on ≥ 8 · best face explodes · worst face cancels',
-      'frame 35'
+      'Success on ≥ 8 · explodes on 10 · 1 cancels a success',
+      'frame 35, naming the faces rather than best and worst'
     );
     assert.equal(
       await note({
-        pool: 2, die: 20, threshold: 14, direction: 'under', thresholdSource: '@abilities.int.mod + 11',
+        pool: 2, die: 20, threshold: 14, thresholdAnchor: 14, direction: 'under', thresholdSource: 'character',
       }),
-      'Success on ≤ 14 (@abilities.int.mod + 11)',
-      'frame 30: the threshold and the expression it was read from'
+      'Success on ≤ 14 (character value 14)',
+      'frame 30: the threshold and the character value it was read from, never the expression'
     );
     assert.equal(
       await note({ comparison: 'exceed', explode: { ...best, once: true } }),
-      'Success on > 8 · best face explodes once'
+      'Success on > 8 · explodes on 10 once'
     );
     assert.equal(
-      await note({ explode: { kind: 'from', value: 9 }, cancel: { kind: 'from', value: 2 } }),
-      'Success on ≥ 8 · faces ≥ 9 explode · faces ≤ 2 cancel'
+      await note({ explode: { kind: 'from', face: 9 }, cancel: { kind: 'from', face: 2 } }),
+      'Success on ≥ 8 · explodes on 9 or above · 2 or under cancels a success',
+      'an authored from-face, never the default best or worst face'
     );
     assert.equal(
-      await note({ die: 20, direction: 'under', explode: { kind: 'from', value: 2, once: true }, cancel: { kind: 'from', value: 19 } }),
-      'Success on ≤ 8 · faces ≤ 2 explode once · faces ≥ 19 cancel'
+      await note({
+        die: 20, direction: 'under', explode: { kind: 'from', face: 2, once: true }, cancel: { kind: 'from', face: 19 },
+      }),
+      'Success on ≤ 8 · explodes on 2 or under once · 19 or above cancels a success'
     );
     assert.equal(
-      await note({ explode: { kind: 'from', value: 11 }, cancel: { kind: 'from', value: 12 } }),
-      'Success on ≥ 8 · faces ≤ 12 cancel',
-      'a face beyond the die never explodes, and over it cancels every face'
-    );
-    assert.equal(
-      await note({ direction: 'under', cancel: { kind: 'from', value: 12 } }),
-      'Success on ≤ 8',
-      'under, a cancel face beyond the die cancels none'
+      await note({ threshold: 6.5, thresholdAnchor: 8 }),
+      'Success on ≥ 6.5, moved −1.5 by modifiers',
+      'a Tool benefit settled before the prompt moved the fixed threshold'
     );
     assert.equal(await note({ pool: null, threshold: null, die: null, explode: best }), undefined,
       'a hidden or redacted pool states no rule');
     const { view } = await open({
-      product: 'count', pool: 6, die: 10, threshold: 8, required: 2, direction: 'over',
-      explode: best, cancel: worst, formula: '1d20 + 4', displayFormula: '1d20 + 4', dc: 15,
+      product: 'count', pool: 6, die: 10, threshold: 8, thresholdAnchor: 8, thresholdSource: 'character',
+      required: 2, direction: 'over', explode: best, cancel: worst, formula: '1d20 + 4', displayFormula: '1d20 + 4',
+      dc: 15,
     }, null);
     const shown = JSON.stringify([view.formula, view.labels.formulaNote, view.neededText, view.dcText]);
-    assert.ok(!shown.includes('1d20') && !shown.includes('DC') && !shown.includes('15'),
-      'never the retained roll formula or a DC');
+    assert.ok(!shown.includes('1d20') && !shown.includes('DC') && !shown.includes('15') && !shown.includes('@'),
+      'never the retained roll formula, a DC, an expression or a path');
   });
 
-  it('carries the threshold source and face rules only from a resolved pool', async () => {
-    const received = async (pool, countPolicy) => {
+  it('hands the prompt the threshold source, anchor and actual faces, never an expression (issue 2006)', async () => {
+    const received = async (pool, countPolicy, toolContributions) => {
       let input;
       await resolveCheckDecision({
         authoredFormula: '', actor: null, deferred: false, Roll: null,
@@ -327,21 +328,109 @@ describe('roll prompt adapter', () => {
         resolvedCheck: { formula: '', selected: [] },
         displayFormula: () => null,
         countPolicy,
-        options: { interactive: true, dc: null, required: 2, prompt: async (payload) => { input = payload; return null; } },
+        options: {
+          interactive: true, dc: null, required: 2, toolContributions,
+          prompt: async (payload) => { input = payload; return null; },
+        },
       });
-      return [input.thresholdSource, input.explode, input.cancel];
+      return input;
     };
     const policy = {
-      dice: 6, die: 10, threshold: 14, comparison: 'meet',
+      dice: 6, die: 10, threshold: 14, comparison: 'meet', direction: 'over', resolved: { base: 6, threshold: 14 },
       explode: { kind: 'best', value: null, once: false }, cancel: { kind: 'from', value: 2 },
     };
-    assert.deepEqual(await received({ threshold: ' @abilities.int.mod + 11 ' }, policy), [
-      '@abilities.int.mod + 11', { kind: 'best', value: null, once: false }, { kind: 'from', value: 2 },
+    const fields = (input) => [
+      input.thresholdSource, input.thresholdAnchor, input.explode, input.cancel, input.zeroPoolFails,
+    ];
+    const character = await received({ threshold: ' @abilities.int.mod + 11 ', zeroPoolFails: false }, policy);
+    assert.deepEqual(fields(character), [
+      'character', 14, { kind: 'best', face: 10, once: false }, { kind: 'from', face: 2 }, false,
     ]);
-    assert.deepEqual(await received({ threshold: '8' }, { ...policy, explode: null, cancel: null }), [null, null, null],
-      'a plain number names no source');
-    assert.deepEqual(await received({ threshold: '@abilities.int.mod' }, null), [null, null, null],
-      'no resolved pool, no source or rules');
+    assert.ok(!JSON.stringify(character).includes('@'), 'no expression or path reaches the prompt');
+    const fixed = await received({ threshold: '8' }, { ...policy, explode: null, cancel: null });
+    assert.deepEqual(fields(fixed), ['fixed', 14, null, null, true], 'a plain number is a fixed threshold');
+    const under = await received(
+      { threshold: '8' },
+      { ...policy, direction: 'under', explode: { kind: 'best', value: null, once: true }, cancel: { kind: 'worst', value: null } }
+    );
+    assert.deepEqual([under.explode, under.cancel], [{ kind: 'best', face: 1, once: true }, { kind: 'worst', face: 10 }],
+      'the faces a roll-under pool explodes and cancels on');
+    assert.deepEqual(fields(await received({ threshold: '@abilities.int.mod' }, null)), [null, null, null, null, null],
+      'no resolved pool, no source, anchor or rules');
+  });
+
+  it('settles the Tool benefits rolled before the prompt onto its pool or threshold (issue 2006)', async () => {
+    let input;
+    const received = async (modifierDestination, direction = 'over') => {
+      await resolveCheckDecision({
+        authoredFormula: '', actor: null, deferred: false, Roll: null,
+        evaluation: normalizeCheckEvaluation({ product: 'count', direction, pool: { modifierDestination } }),
+        resolvedCheck: { formula: '', selected: [] },
+        displayFormula: () => null,
+        countPolicy: { dice: 2, die: 6, threshold: 5, comparison: 'meet', direction, resolved: { base: 2.5, threshold: 5 } },
+        options: {
+          interactive: true, dc: null, required: 1,
+          toolContributions: [
+            { source: 'tool', label: 'Hammer', form: 'scalar', value: 1.5, preRoll: { expression: '1d2', total: 1.5 } },
+            { source: 'tool', label: 'Rasp', form: 'expression', expression: '1d4' },
+          ],
+          prompt: async (payload) => { input = payload; return null; },
+        },
+      });
+      return [input.pool, input.threshold, input.thresholdAnchor];
+    };
+    assert.deepEqual(await received('pool'), [4, 5, 5], 'the pool grows by the settled Tool benefit');
+    assert.deepEqual(await received('threshold'), [2.5, 3.5, 5], 'an over threshold falls by it');
+    assert.deepEqual(await received('threshold', 'under'), [2.5, 6.5, 5], 'an under threshold rises by it');
+  });
+
+  it('settles a count prompt\'s picks and typed bonus onto its line without rolling (issue 2006)', async () => {
+    const picks = {
+      modifiers: [
+        { id: 'a', label: 'Steady', value: 1, display: '+1' },
+        { id: 'b', label: 'Luck', value: null, display: '+1d4' },
+        { id: 'c', label: 'Half', value: 0.5, display: '+0.5' },
+      ],
+      maxPicks: 3,
+      defaultSelectedIds: ['a'],
+    };
+    const promptFor = async (fields) => (await open({
+      product: 'count', pool: 6, die: 10, threshold: 8, thresholdAnchor: 8, thresholdSource: 'fixed', required: 2,
+      comparison: 'meet', direction: 'over', modifierDestination: 'pool', modifierChoice: picks, ...fields,
+    }, null)).view;
+    const line = (view, ids, bonus) => {
+      const settled = rollPromptTarget(view, ids, bonus);
+      return [settled.formula, settled.note, settled.zeroPool];
+    };
+    const pool = await promptFor({});
+    assert.equal(pool.formula, '7d10 · each ≥ 8', 'it opens settled on the default pick');
+    assert.deepEqual(line(pool, ['a'], '2'), ['9d10 · each ≥ 8', 'Success on ≥ 8', '']);
+    assert.deepEqual(line(pool, ['a', 'b'], ''), ['7d10 + 1d4 dice · each ≥ 8', 'Success on ≥ 8', ''],
+      'a rolled pick is named as pending dice, never averaged in');
+    assert.deepEqual(line(pool, [], '1d6'), ['6d10 + 1d6 dice · each ≥ 8', 'Success on ≥ 8', '']);
+    assert.equal(line({ ...pool, count: { ...pool.count, pool: 2.5 } }, ['c'], '')[0], '3d10 · each ≥ 8',
+      'the pool floors once, after every benefit');
+
+    const threshold = await promptFor({ modifierDestination: 'threshold' });
+    assert.equal(threshold.labels.formulaNote, 'Success on ≥ 7, moved −1 by modifiers');
+    assert.deepEqual(line(threshold, ['a'], '+2'), ['6d10 · each ≥ 5', 'Success on ≥ 5, moved −3 by modifiers', '']);
+    assert.deepEqual(line(threshold, [], '1d4'), ['6d10 · each ≥ 8 + 1d4', 'Success on ≥ 8', '']);
+    const under = await promptFor({
+      direction: 'under', modifierDestination: 'threshold', thresholdSource: 'character', thresholdAnchor: 8,
+    });
+    assert.deepEqual(line(under, ['a'], '-3'), [
+      '6d10 · each ≤ 6', 'Success on ≤ 6 (character value 8), moved −2 by modifiers', '',
+    ]);
+
+    const zero = await promptFor({ pool: 1, die: 6, modifierChoice: null });
+    const notice = 'This roll fails automatically: the pool is reduced to zero.';
+    assert.deepEqual(line(zero, [], '-1'), ['0d6 · each ≥ 8', 'Success on ≥ 8', notice]);
+    assert.deepEqual(line(zero, [], '-1.5'), ['0d6 · each ≥ 8', 'Success on ≥ 8', notice]);
+    assert.equal(line(zero, [], '')[2], '', 'no notice while the pool holds a die');
+    assert.equal(line({ ...zero, count: { ...zero.count, zeroPoolFails: false } }, [], '-3')[0], '1d6 · each ≥ 8',
+      'a pool that does not fail at zero still rolls one die');
+    assert.equal(line({ ...zero, count: { ...zero.count, pool: 0 } }, [], '1d4')[2], '',
+      'pending dice may lift a pool above zero, so no automatic failure is claimed');
   });
 
   it('names a summed roll-under target to stay under, and leaves roll-over copy unchanged', async () => {

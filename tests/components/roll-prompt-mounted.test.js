@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { flushSync } from 'svelte';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  CHECK_TARGET_RAW_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import { stubI18n } from '../helpers/rollPromptDialogStub.js';
 import {
@@ -30,6 +33,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/util/pickerOptionModel.js',
     'src/ui/svelte/apps/crafting/rollPromptTarget.js',
+    // The count line settles through the router and the pool's own floor (issue 2006).
+    'src/systems/checkModifierRouter.js',
+    'src/systems/countEvaluation.js',
+    ...CHECK_TARGET_RAW_MODULES,
     'src/utils/fillPlaceholders.js',
     'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
     'src/utils/checkAdjustmentFormat.js',
@@ -39,6 +46,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Field.svelte',
     'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/components/EmptyState.svelte',
+    'src/ui/svelte/components/Notice.svelte',
     'src/ui/svelte/components/ManagerButton.svelte',
     // The roll mode is the shared `Select`, which renders the popover pair behind it.
     'src/ui/svelte/components/SearchablePopover.svelte',
@@ -650,19 +658,19 @@ describe('mounted roll prompt', () => {
       {
         input: {
           direction: 'over', comparison: 'meet', pool: 6, die: 10, threshold: 8, required: 2, modifierDestination: 'pool',
-          explode: { kind: 'best', value: null, once: false }, cancel: { kind: 'worst', value: null },
+          explode: { kind: 'best', face: 10, once: false }, cancel: { kind: 'worst', face: 1 },
         },
-        formula: '6d10 · each ≥ 8', chip: '2 successes needed', note: 'Each adds dice.',
-        rules: 'Success on ≥ 8 · best face explodes · worst face cancels',
+        formula: '8d10 · each ≥ 8', chip: '2 successes needed', note: 'Each adds dice.',
+        rules: 'Success on ≥ 8 · explodes on 10 · 1 cancels a success',
         help: 'A bonus adds that many dice. A rolled bonus such as 1d4 is rolled first, and its result is applied.',
       },
       {
         input: {
           direction: 'under', comparison: 'exceed', pool: 3, die: 20, threshold: 13, required: 1, modifierDestination: 'threshold',
-          thresholdSource: '@abilities.int.mod + 10',
+          thresholdSource: 'character', thresholdAnchor: 13,
         },
-        formula: '3d20 · each < 13', chip: '1 success needed', note: 'Each moves the threshold.',
-        rules: 'Success on < 13 (@abilities.int.mod + 10)',
+        formula: '3d20 · each < 15', chip: '1 success needed', note: 'Each moves the threshold.',
+        rules: 'Success on < 15 (character value 13), moved +2 by modifiers',
         help: 'A bonus moves the threshold by that much. A rolled bonus such as 1d4 is rolled first, and its result is applied.',
       },
     ];
@@ -673,7 +681,7 @@ describe('mounted roll prompt', () => {
       });
       const { dialog, pending } = await openThroughHost(view, false, noChoice);
       const line = dialog.querySelector('.formula-content .formula');
-      assert.equal(line.textContent, formula, 'the pool line, never the retained 1d20 + 3');
+      assert.equal(line.textContent, formula, 'the pool line settled by Focus +2, never the retained 1d20 + 3');
       assert.equal(line.dataset.rollPromptCount, input.direction);
       const ruleLine = line.nextElementSibling;
       assert.ok(ruleLine.matches('p.help.formula-note'), 'frames 30 and 35: the rule sits under the pool line');
@@ -721,6 +729,73 @@ describe('mounted roll prompt', () => {
     assert.ok(!dialog.querySelector('.formula-content .manager-chip'), 'a budget has no count to reach');
     dialog.querySelector('[data-manager-modal-close]').click();
     await pending;
+  });
+
+  it('settles the count line and its note as the player picks and types, never naming a default face (N30)', async () => {
+    const picks = {
+      options: [
+        { id: 'a', label: 'Steady', value: 1, display: '+1' },
+        { id: 'b', label: 'Luck', value: null, display: '+1d4' },
+      ],
+      maxPicks: 2,
+      defaultSelectedIds: ['a'],
+    };
+    const view = buildSinglePromptData({
+      product: 'count', direction: 'over', comparison: 'meet', pool: 6, die: 10, threshold: 8, thresholdAnchor: 8,
+      thresholdSource: 'fixed', required: 2, modifierDestination: 'threshold',
+      explode: { kind: 'from', face: 9, once: true }, displayFormula: '1d20 + @skills.smith.rank', dc: 15,
+    });
+    const { dialog, pending } = await openThroughHost(view, false, picks);
+    const line = () => dialog.querySelector('.formula-content .formula');
+    const note = () => dialog.querySelector('.formula-content .formula-note').textContent.trim();
+    assert.equal(line().getAttribute('aria-live'), 'polite', 'the settled line announces each change');
+    assert.equal(line().textContent, '6d10 · each ≥ 7', 'the default pick already moved the threshold');
+    assert.equal(note(), 'Success on ≥ 7, moved −1 by modifiers · explodes on 9 or above once');
+    dialog.querySelectorAll('input[name="craftingModifier"]')[1].click();
+    flushSync();
+    assert.equal(line().textContent, '6d10 · each ≥ 7 + 1d4', 'a rolled pick is pending, never averaged');
+    const bonus = dialog.querySelector('input[name="situationalBonus"]');
+    bonus.value = '+2';
+    bonus.dispatchEvent(new document.defaultView.Event('input', { bubbles: true }));
+    flushSync();
+    assert.equal(line().textContent, '6d10 · each ≥ 5 + 1d4');
+    assert.equal(note(), 'Success on ≥ 5, moved −3 by modifiers · explodes on 9 or above once');
+    dialog.querySelectorAll('input[name="craftingModifier"]')[0].click();
+    flushSync();
+    assert.equal(line().textContent, '6d10 · each ≥ 6 + 1d4', 'unpicking a flat modifier gives its step back');
+    const shown = dialog.querySelector('.formula-row').textContent;
+    assert.ok(!/explodes on 10|@|DC|1d20|15/.test(shown), 'no default face, expression, path, DC or formula');
+    dialog.querySelector('[data-manager-modal-close]').click();
+    await pending;
+  });
+
+  it('warns that a pool reduced to zero fails, and still rolls (issue 2006)', async () => {
+    const view = buildSinglePromptData({
+      product: 'count', direction: 'over', comparison: 'meet', pool: 1, die: 6, threshold: 5, thresholdAnchor: 5,
+      thresholdSource: 'fixed', required: null, modifierDestination: 'pool', zeroPoolFails: true,
+    });
+    const { dialog, pending } = await openThroughHost(view, false, noChoice);
+    const notice = () => dialog.querySelector('[data-roll-prompt-zero-pool]');
+    assert.ok(!notice(), 'a pool holding a die claims no automatic failure');
+    const bonus = dialog.querySelector('input[name="situationalBonus"]');
+    const type = (value) => {
+      bonus.value = value;
+      bonus.dispatchEvent(new document.defaultView.Event('input', { bubbles: true }));
+      flushSync();
+    };
+    type('-1');
+    assert.equal(dialog.querySelector('.formula-content .formula').textContent, '0d6 · each ≥ 5');
+    assert.ok(Boolean(notice()), 'the zero-pool notice shows');
+    assert.equal(notice().textContent.trim(), 'This roll fails automatically: the pool is reduced to zero.');
+    assert.deepEqual([notice().dataset.noticeTone, notice().getAttribute('role')], ['warning', 'status']);
+    const roll = dialog.querySelector('button[type="submit"]');
+    assert.equal(roll.disabled, false, 'Roll stays enabled');
+    type('');
+    assert.ok(!notice(), 'and it leaves once the pool holds a die again');
+    type('-3');
+    dialog.querySelector('form').requestSubmit();
+    const answer = await pending;
+    assert.deepEqual([answer.confirmed, answer.bonus], [true, '-3'], 'the player can still roll it');
   });
 
   it('shows the base formula once and itemises each applied modifier as a chip', async () => {
