@@ -535,18 +535,26 @@ const RENAMED = [
     before:
       'The four ratchet ledgers issue #1656 added — `tests/comment-share-ledger.txt`, `tests/file-size-ledger.txt`, `tests/source-pin-ledger.txt` and `tests/foundry-global-reads-ledger.txt` — are ceiling gates whose rows change only when a unit crosses its ceiling, so lanes that share them no longer need one rail (issue #1914).',
     after:
-      'The ratchet ledgers issue #1656 added — `tests/file-size-ratchet.test.js`, `tests/source-pin-ledger.txt` and `tests/foundry-global-reads-ledger.txt` — are ceiling gates whose rows change only when a unit crosses its ceiling, so lanes that share them no longer need one rail (issue #1914).',
+      'The ratchet ledgers issue #1656 added — `tests/file-size-ratchet.test.js`, `tests/source-pin-ratchet.test.js` and `tests/foundry-global-reads-ledger.txt` — are ceiling gates whose rows change only when a unit crosses its ceiling, so lanes that share them no longer need one rail (issue #1914).',
     identifiers: [
       [
-        'The ratchet ledgers issue #1656 added — `tests/file-size-ratchet.test.js`',
-        'The four ratchet ledgers issue #1656 added — `tests/comment-share-ledger.txt`, `tests/file-size-ledger.txt`',
+        'The ratchet ledgers issue #1656 added — `tests/file-size-ratchet.test.js`, `tests/source-pin-ratchet.test.js`',
+        'The four ratchet ledgers issue #1656 added — `tests/comment-share-ledger.txt`, `tests/file-size-ledger.txt`, `tests/source-pin-ledger.txt`',
       ],
     ],
+  },
+  // Issue 2118 replaced the source-pin ledger with a merge-base ratchet test.
+  {
+    before:
+      'Pinning how code is written with a `Source.includes(` assertion, answered by `tests/source-pin-ledger.txt`.',
+    after:
+      'Pinning how code is written with a `Source.includes(` assertion, answered by `tests/source-pin-ratchet.test.js`.',
+    identifiers: [['`tests/source-pin-ratchet.test.js`', '`tests/source-pin-ledger.txt`']],
   },
 ];
 
 /** Pinned for the same reason as DEDUPLICATED_COUNT. */
-const RENAMED_COUNT = 30;
+const RENAMED_COUNT = 31;
 
 /** Everything `extract` yields from the post-split set, as one multiset. */
 function survivingLines(extract) {

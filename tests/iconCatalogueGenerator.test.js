@@ -96,7 +96,7 @@ function decodeRow(row) {
   return { iconCode, label, aliases: aliases === undefined ? [] : aliases.split(',') };
 }
 
-/** The one read of a `src/` file here; `tests/source-pin-ledger.txt` pins this module at one. */
+/** The one read of a `src/` file here, the one pin `tests/source-pin-ratchet.test.js` counts. */
 function readCommittedCatalogue() {
   return fs.readFileSync(CATALOGUE_PATH, 'utf8');
 }

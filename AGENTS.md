@@ -128,7 +128,7 @@ This workflow produced each of these shapes repeatedly, and each already has a r
 
 - Comments that argue a case, retell history, or shout in ALL-CAPS, answered by the comment rules above and measured per directory by `tests/comment-share-ratchet.test.js`.
 - Adding to the nearest large file or function instead of extracting a unit, answered by `tests/file-size-ratchet.test.js`.
-- Pinning how code is written with a `Source.includes(` assertion, answered by `tests/source-pin-ledger.txt`.
+- Pinning how code is written with a `Source.includes(` assertion, answered by `tests/source-pin-ratchet.test.js`.
 - Redeclaring a shared helper locally, answered by `tests/scalar-helper-duplicates.test.js` and `tests/category-shim-bindings.test.js`.
 - An issue delta, lane brief, or handover that runs to tens of kilobytes, answered by stating the decision rather than how it was reached.
 - A file or component header longer than [`.agents/component-header-template.md`](.agents/component-header-template.md).
