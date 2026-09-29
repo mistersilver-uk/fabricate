@@ -216,6 +216,27 @@ describe('SalvageRollSummary evidence rows', () => {
     const message = root.querySelector('[data-inventory-salvage-message]').textContent;
     assert.match(message.trim(), /^Salvaged\. with a roll of\s+9$/);
   });
+
+  // Issue 2092: a failed single salvage shows the same Target/Margin evidence rows as a
+  // failed craft, under a failure box rather than the cleared ribbon it showed before.
+  it('states a failed roll-under salvage evidence rows, like a failed craft', async () => {
+    const root = await harness.mount({
+      result: { state: 'failure', message: 'Salvage check failed.', check: executedCheck() },
+    });
+    assert.deepEqual(rowsOf(root), UNDER_ROWS);
+    assert.ok(root.querySelector('[data-inventory-salvage-summary="failure"]'));
+  });
+
+  it('withholds a failed salvage evidence for a blind or secret roll', async () => {
+    for (const visibility of [{ rollMode: 'blindroll' }, { rollMode: 'publicroll', secret: true }]) {
+      const check = executedCheck(UNDER_DATA, visibility);
+      const root = await harness.mount({
+        result: { state: 'failure', message: 'Salvage check failed.', check },
+      });
+      assert.ok(!root.querySelector('.check-evidence'), JSON.stringify(visibility));
+      harness.remount();
+    }
+  });
 });
 
 describe('CraftingCheckCard target line', () => {

@@ -51,12 +51,17 @@
         class="fas"
         class:fa-circle-check={state === 'success'}
         class:fa-hourglass-half={state === 'waiting'}
+        class:fa-circle-xmark={state === 'failure'}
         aria-hidden="true"
       ></i>
       <span>
-        {state === 'success'
-          ? localize('FABRICATE.App.Inventory.Salvage.OutcomeSuccess')
-          : localize('FABRICATE.App.Inventory.Salvage.OutcomeWaiting')}
+        {#if state === 'success'}
+          {localize('FABRICATE.App.Inventory.Salvage.OutcomeSuccess')}
+        {:else if state === 'waiting'}
+          {localize('FABRICATE.App.Inventory.Salvage.OutcomeWaiting')}
+        {:else}
+          {localize('FABRICATE.App.Inventory.Salvage.OutcomeFailure')}
+        {/if}
       </span>
     </p>
     {#if message}
@@ -98,6 +103,16 @@
   .salvage-summary.is-waiting {
     border-color: var(--fab-info-border);
     background: var(--fab-info-soft);
+  }
+
+  /* A failed check (issue 2092), the same danger ramp RollResultBox gives a failed craft. */
+  .salvage-summary.is-failure {
+    border-color: var(--fab-danger-border);
+    background: var(--fab-danger-soft);
+  }
+
+  .salvage-summary.is-failure .salvage-summary-outcome {
+    color: var(--fab-danger-text);
   }
 
   /* RollResultBox's head: a title beside its glyph, sentence case. */

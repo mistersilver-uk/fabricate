@@ -261,6 +261,42 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/stores\/inventorySalvageExecution/,
     ],
   }),
+  // Issue 2092: a failed single salvage states the same Target/Margin rows, in a failure box.
+  playerCase({
+    id: 'player-salvage-under-result-fail',
+    label: 'Player app — Salvage summary after a failed roll-under salvage, with its evidence rows',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'inventory', dialog: 'open', rollPromptState: 'salvage-under-evidence-fail' },
+    // The failure toast the player is shown, which the lab reports as a console warning.
+    allowedConsoleErrors: [/Salvage check failed/],
+    steps: [
+      { selector: '.inventory-filters input', fill: 'Longsword' },
+      {
+        selector:
+          '.inventory-card[data-inventory-card="lab-smithing:sm-longsword"] .inventory-card-button',
+      },
+      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+      { selector: '[data-inventory-salvage-action]' },
+      {
+        selector: '.fabricate-app .manager-modal[data-roll-prompt="single"] button[type="submit"]',
+      },
+      {
+        selector: '[data-inventory-salvage-summary="failure"] [data-check-evidence-rows]',
+        scroll: true,
+      },
+    ],
+    expectSelector:
+      '[data-inventory-salvage-summary="failure"] [data-check-evidence-rows]' +
+      ':has([data-check-evidence="target"]):has([data-check-evidence="margin"])',
+    kinds: ['player', 'inventory'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/inventory\/detail\/salvage\/SalvageRollSummary\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/detail\/CheckEvidenceRows\.svelte$/,
+      /^src\/ui\/presenters\/check(?:Display|EvidenceRows)\.js$/,
+      /^src\/ui\/svelte\/stores\/inventorySalvageExecution/,
+    ],
+  }),
   playerCase({
     id: 'player-inventory-multi-system',
     label: 'Player app — Inventory multi system',
