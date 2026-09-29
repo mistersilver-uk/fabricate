@@ -364,6 +364,32 @@ test('Simple check FAIL with a FIRED breakTools trigger and breakToolsOnFail OFF
   );
 });
 
+test('Simple check FAIL with breakToolsOnFail ON and a FIRED trigger: evidence shows broken + triggerId', async () => {
+  const { engine, validator } = setup('simple', true, true);
+  engine._runCraftingCheck = async () => ({
+    success: false,
+    outcome: 'fail',
+    value: 4,
+    data: { total: 4 },
+    engineEvaluated: true,
+  });
+  const inputs = brewInputs();
+
+  let toolsEvidence = null;
+  const originalApplyToolBreakage = engine._applyToolBreakage;
+  engine._applyToolBreakage = async (...args) => {
+    toolsEvidence = await originalApplyToolBreakage.call(engine, ...args);
+    return toolsEvidence;
+  };
+
+  const result = await brew(engine, validator, inputs);
+
+  assert.equal(result.success, false, 'the check failed');
+  assert.equal(toolsEvidence.length, 1, 'exactly one tool was evaluated');
+  assert.equal(toolsEvidence[0].broken, true, 'the fired trigger forces the tool to break');
+  assert.equal(toolsEvidence[0].triggerId, 'break-on-fail', 'the evidence names the trigger that fired');
+});
+
 // Crafting control (non-alchemy): identical trigger + policy setup, proving parity with the
 // alchemy assertion above rather than merely asserting alchemy in isolation.
 
@@ -456,6 +482,33 @@ test('Crafting control: check FAIL with a FIRED breakTools trigger and breakTool
   );
 });
 
+test('Crafting control: check FAIL with breakToolsOnFail ON and a FIRED trigger: evidence shows broken + triggerId', async () => {
+  const { engine, recipe, ingredientItem, toolItem } = craftingControlFixture(true);
+  engine._runCraftingCheck = async () => ({
+    success: false,
+    outcome: 'fail',
+    value: 4,
+    data: { total: 4 },
+    engineEvaluated: true,
+  });
+
+  let toolsEvidence = null;
+  const originalApplyToolBreakage = engine._applyToolBreakage;
+  engine._applyToolBreakage = async (...args) => {
+    toolsEvidence = await originalApplyToolBreakage.call(engine, ...args);
+    return toolsEvidence;
+  };
+
+  const sourceActor = { id: 'a1', name: 'Crafter', items: [ingredientItem, toolItem] };
+  const craftingActor = { id: 'a1', name: 'Crafter', uuid: 'Actor.a1', items: { contents: [] } };
+  const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+
+  assert.equal(result.success, false, 'the check failed');
+  assert.equal(toolsEvidence.length, 1, 'exactly one tool was evaluated');
+  assert.equal(toolsEvidence[0].broken, true, 'the fired trigger forces the tool to break');
+  assert.equal(toolsEvidence[0].triggerId, 'break-on-fail', 'the evidence names the trigger that fired');
+});
+
 // Versioned/Journal path (`executeVersionedStage` -> `_buildVersionedStageOperation`): the
 // `apply-tools` effect is only PLANNED when `shouldUseTools` is true, so its presence in the
 // committed journal is itself the assertion (module docblock at CraftingEngine.js:1941).
@@ -478,7 +531,7 @@ class VersionedRunActor {
   }
 }
 
-function setupVersionedAlchemy(breakToolsOnFail) {
+function setupVersionedAlchemy(breakToolsOnFail, withTrigger = false) {
   const system = {
     id: 'sys-versioned',
     resolutionMode: 'alchemy',
@@ -487,6 +540,12 @@ function setupVersionedAlchemy(breakToolsOnFail) {
     craftingCheck: { simple: { rollFormula: '1d20', dc: 15 }, consumption: { breakToolsOnFail } },
     components: [],
   };
+  if (withTrigger) {
+    system.toolBreakage = { authority: 'checkDriven' };
+    system.craftingCheck.simple.checkBreakage = {
+      triggers: [{ id: 'break-on-fail', breakTools: true, condition: { type: 'rollTotal', operator: '<=', value: 10 } }],
+    };
+  }
   const ingredientSet = { id: 'set-1', matchIngredients: () => [], toJSON() { return { id: this.id }; } };
   const recipe = {
     id: 'recipe-versioned',
@@ -530,19 +589,28 @@ function setupVersionedAlchemy(breakToolsOnFail) {
   return { engine, runManager, recipe };
 }
 
-async function runVersionedAlchemyFailure(breakToolsOnFail) {
-  const { engine, runManager, recipe } = setupVersionedAlchemy(breakToolsOnFail);
+async function runVersionedAlchemyFailure(breakToolsOnFail, { withTrigger = false, delegate = false } = {}) {
+  const { engine, runManager, recipe } = setupVersionedAlchemy(breakToolsOnFail, withTrigger);
   const actor = new VersionedRunActor('alchemist');
   const source = new VersionedRunActor('source', [{ id: 'tool-item-1', uuid: 'Actor.source.Item.tool-item-1' }]);
   let applyToolBreakageCalled = false;
-  engine._applyToolBreakage = async () => {
+  const originalApplyToolBreakage = engine._applyToolBreakage;
+  engine._applyToolBreakage = async (...args) => {
     applyToolBreakageCalled = true;
+    if (delegate) return originalApplyToolBreakage.call(engine, ...args);
     return [];
   };
   engine.installVersionedRunAuthority({
     consumeExecutionGrant: async (_grant, context) => ({
       operationId: `${context.operation}-operation`,
-      resolvedCheckResult: { success: false, message: 'Alchemy check failed', outcome: 'fail', value: 4, data: {} },
+      resolvedCheckResult: {
+        success: false,
+        message: 'Alchemy check failed',
+        outcome: 'fail',
+        value: 4,
+        data: { total: 4 },
+        engineEvaluated: true,
+      },
       activityKind: 'alchemy',
       alchemySubmittedItems: [],
     }),
@@ -583,4 +651,12 @@ test('Versioned/Journal alchemy simple FAIL with breakToolsOnFail ON: apply-tool
   const { applyToolBreakageCalled, applyToolsEffect } = await runVersionedAlchemyFailure(true);
   assert.ok(applyToolsEffect, 'the apply-tools effect is journalled when the policy is on');
   assert.equal(applyToolBreakageCalled, true, '_applyToolBreakage runs the breakage decision');
+});
+
+test('Versioned/Journal alchemy simple FAIL with breakToolsOnFail ON and a FIRED trigger: evidence shows broken + triggerId', async () => {
+  const { applyToolsEffect } = await runVersionedAlchemyFailure(true, { withTrigger: true, delegate: true });
+  const evidence = applyToolsEffect?.receipt?.tools ?? [];
+  assert.equal(evidence.length, 1, 'exactly one tool was evaluated');
+  assert.equal(evidence[0].broken, true, 'the fired trigger forces the tool to break');
+  assert.equal(evidence[0].triggerId, 'break-on-fail', 'the evidence names the trigger that fired');
 });
