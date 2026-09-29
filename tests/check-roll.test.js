@@ -134,7 +134,7 @@ test('resolveCheckFormulaDisplay substitutes @-placeholders inline against the a
   stubResolvingRoll();
   const actor = { getRollData: () => ({ abilities: { str: { mod: 3 } }, prof: 2 }) };
   const result = resolveCheckFormulaDisplay('1d20 + @abilities.str.mod + @prof', actor);
-  assert.deepEqual(result, { display: '1d20 + 3 + 2', resolved: true });
+  assert.deepEqual(result, { display: '1d20 + 3 + 2', resolved: true, modifiers: [] });
 });
 
 test('resolveCheckFormulaDisplay flags an unresolved key as not resolved', () => {
@@ -347,7 +347,7 @@ test('a forced routed roll-under keeps the rolled tier in terms that fold to its
   assert.equal(result.data.target, 45, 'the rolled Good tier: 50 − 10, then +2 and the 3 pre-rolled');
   assert.deepEqual(result.data.targetTerms, [
     { kind: 'anchor', value: 50 },
-    { kind: 'adjustment', value: -10 },
+    { kind: 'adjustment', value: -10, label: 'Good' },
     { kind: 'benefit', value: 2, source: 'tool' },
   ]);
   assert.equal(foldTargetTerms(result.data.targetTerms, result.data.preRolls), 45);

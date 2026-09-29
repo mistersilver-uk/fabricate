@@ -2,6 +2,9 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { InventoryListingBuilder } from '../src/ui/presenters/InventoryListingBuilder.js';
+import { fill } from '../src/utils/fillPlaceholders.js';
+
+import { shippedLocalize } from './helpers/checkEvidenceFixtures.js';
 import {
   REPORTER_ENRICHER_DESCRIPTION,
   REPORTER_RESOLVED_EXPECTED,
@@ -2182,5 +2185,115 @@ describe('InventoryListingBuilder — item-sourced tools (issue 1119)', () => {
     assert.equal(whetstone.isTool, true, 'and it is badged as a tool');
     assert.equal(whetstone.isToolOnly, false);
     assert.equal(whetstone.systems.length, 1, 'one systems[] entry, not two');
+  });
+});
+
+describe('InventoryListingBuilder - a roll-under or character-value salvage target (issue 2005, R4)', () => {
+  const format = (key, data = {}) => fill(shippedLocalize(key), data);
+  const salvageFor = (
+    mode,
+    check,
+    { salvage = {}, skills = null, modifiers = null, tools, toolStates = null } = {}
+  ) => {
+    const system = salvageSystem({ mode, check, salvage, tools });
+    if (modifiers) system.modifiers = modifiers;
+    const { builder } = makeBuilder({ systems: [system] });
+    builder.localize = format;
+    if (toolStates) builder.recipeManager.resolveToolStates = toolStates;
+    const akra = actor('a1', 'Akra', [item('Iron', 1)], skills ? { system: { skills } } : {});
+    const listing = builder.buildListing({ craftingActor: akra, viewer: { isGM: true, id: 'gm' } });
+    return rowByComponent(listing, 'c1').salvage;
+  };
+  const under = { direction: 'under' };
+  const skill = { source: 'attribute', expression: '@skills.craft.value' };
+
+  it('states a fixed roll-under target and rule in place of the DC', () => {
+    const salvage = salvageFor('simple', { simple: { rollFormula: '3d6', dc: 12, evaluation: under } }, {
+      salvage: { dcOverride: 13 },
+    });
+    assert.equal(salvage.dc, null, 'no DC to meet on a roll-under check');
+    assert.deepEqual(salvage.target, {
+      rule: 'Roll to break this down. The total must stay at or under the target to recover the materials below.',
+      direction: 'under',
+      text: 'Target 13 · stay at or under',
+      source: '',
+    });
+  });
+
+  it("names a character value by the salvager's name, the typed formula and the adjustment", () => {
+    const salvage = salvageFor(
+      'simple',
+      { simple: { rollFormula: '3d6', thresholdMode: 'exceed', evaluation: { ...under, target: skill } } },
+      { salvage: { adjustmentOverride: -2 }, skills: { craft: { value: 12 } } }
+    );
+    assert.equal(salvage.dc, null);
+    assert.equal(salvage.target.text, 'Target 10 · stay under');
+    assert.equal(salvage.target.source, 'Akra @skills.craft.value 12 · difficulty −2');
+  });
+
+  it('states the base target of a relative routed roll-under check, and none for a fixed range', () => {
+    const outcomes = { relativeOutcomes: [{ id: 'ok', name: 'Ok', success: true, dc: 0 }] };
+    const relative = salvageFor('routed', {
+      routed: { type: 'relative', rollFormula: '1d100', dc: 50, evaluation: under, ...outcomes },
+    });
+    assert.equal(relative.dc, null);
+    assert.equal(relative.target.text, 'Target 50 · stay at or under');
+    const fixed = salvageFor('routed', {
+      routed: { type: 'fixed', rollFormula: '1d100', evaluation: under, fixedOutcomes: [] },
+    });
+    assert.equal(fixed.target, null);
+  });
+
+  it('names the modifiers the salvage prompt applies, flat or pending (G2)', () => {
+    const original = globalThis.Roll;
+    // Display resolution only: `@path` reads roll data and every fragment validates.
+    globalThis.Roll = { replaceFormulaData: (formula) => String(formula), validate: () => true };
+    try {
+      const check = (ids) => ({
+        defaultModifierPolicy: 'addAll',
+        defaultModifierIds: ids,
+        simple: { rollFormula: '3d6', dc: 12, evaluation: under },
+      });
+      const modifiers = [
+        { id: 'steady', label: 'Steady hands', expression: '1' },
+        { id: 'luck', label: 'Luck', expression: '1d4' },
+      ];
+      const flat = salvageFor('simple', check(['steady']), { modifiers }).target;
+      assert.equal(flat.text, 'Target 13 · stay at or under');
+      assert.equal(flat.source, 'Base 12 · modifiers +1');
+      const rolled = salvageFor('simple', check(['steady', 'luck']), { modifiers }).target;
+      assert.equal(rolled.text, 'Target 13 + 1d4 · stay at or under', 'a rolled one is pending');
+    } finally {
+      if (original === undefined) delete globalThis.Roll;
+      else globalThis.Roll = original;
+    }
+  });
+
+  it("adds the salvager's held Tool bonus, and none for a tool it does not hold (G3)", () => {
+    const tongs = { id: 't-tongs', name: 'Tongs', bonus: { enabled: true, expression: '2' } };
+    const states = (available) => (_recipe, tools, actors) =>
+      tools.map((tool) => ({
+        available,
+        bonusEligible: true,
+        contributionInput: { tool, primaryActor: actors[0] },
+      }));
+    const held = salvageFor('simple', { simple: { rollFormula: '3d6', dc: 12, evaluation: under } }, {
+      salvage: { toolIds: ['t-tongs'] },
+      tools: [tongs],
+      toolStates: states(true),
+    }).target;
+    assert.deepEqual([held.text, held.source], ['Target 14 · stay at or under', 'Base 12 · tools +2']);
+    const missing = salvageFor('simple', { simple: { rollFormula: '3d6', dc: 12, evaluation: under } }, {
+      salvage: { toolIds: ['t-tongs'] },
+      tools: [tongs],
+      toolStates: states(false),
+    }).target;
+    assert.equal(missing.text, 'Target 12 · stay at or under');
+  });
+
+  it('leaves a sum/over fixed salvage its DC and no target', () => {
+    const salvage = salvageFor('simple', { simple: { rollFormula: '1d20', dc: 12 } });
+    assert.equal(salvage.dc, 12);
+    assert.equal(salvage.target, null);
   });
 });

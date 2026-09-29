@@ -132,6 +132,17 @@ describe('createSalvageExecution', () => {
     assert.equal(execution.salvageResult.rollValue, 7);
   });
 
+  it('carries the executed check projection onto the summary (issue 2005, QE8 R7)', async () => {
+    const check = Object.freeze({ evidence: { total: 9, target: 14, margin: 5 } });
+    const { execution } = setup({
+      result: { success: true, message: 'done', results: [], value: 9, check },
+    });
+    await execution.salvage('sys', 'c1');
+    flushSync();
+    assert.equal(execution.salvageResult.state, 'success');
+    assert.deepEqual(execution.salvageResult.check, check);
+  });
+
   it('prefers the FRESH live row when copies remain, rather than the pre-roll snapshot', async () => {
     const live = card({ totalQuantity: 2 });
     const { execution } = setup({ liveRows: [live] });

@@ -101,7 +101,7 @@ async function underPromptView(world) {
     assert.deepEqual([view.formula, view.direction, view.dc, view.subtitle], ['1d20', 'under', 10, 'Sera Vane · Hard Work']);
     assert.deepEqual(rollPromptTarget(view, []), {
       chipText: 'Target 11 · stay at or under',
-      source: '@skills.smith.level 12 · Hard Work -2 · modifiers +1',
+      source: 'Sera Vane @skills.smith.level 12 · Hard Work −2 · modifiers +1',
     });
     engine._resolveSimpleCheckDc = async () => 14;
     await engine._runPassFailCheck(system, system.craftingCheck.simple, recipe, null, crafter, {

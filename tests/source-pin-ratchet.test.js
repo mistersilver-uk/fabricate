@@ -67,6 +67,7 @@ const SCAN_HELPERS = Object.freeze({
   'tests/components/manager-world-scope-mounted.js': 'fixture',
   'tests/components/selector-repetition-baseline.js': 'fixture',
   'tests/components/spacing-known-literals.js': 'fixture',
+  'tests/helpers/checkEvidenceFixtures.js': 'fixture',
   'tests/helpers/chipTone.js': 'legacy-scan',
   'tests/helpers/companionContractOutcomes.js': 'fixture',
   'tests/helpers/compile-svelte-module.js': 'fixture',

@@ -1565,7 +1565,7 @@ describe('journal run authority ledger', () => {
     }
   });
 
-  it('replies with executed check evidence that carries no private path, label or policy (Q5)', async () => {
+  it('replies with executed evidence naming the typed formula only in its ruled field (Q5)', async () => {
     const originalRoll = globalThis.Roll;
     globalThis.Roll = class EvidenceRoll {
       constructor(formula) {
@@ -1610,6 +1610,10 @@ describe('journal run authority ledger', () => {
       ]);
       const hidden = await evaluatePreparedRunCheck(preparation(), actor, {}, { secret: true });
       assert.ok(!Object.hasOwn(hidden.data, 'targetTerms'), 'a secret projection omits them');
+      assert.equal(visible.data.resolvedFormula, '3d6', 'the dice line has its formula (M1)');
+      assert.equal(visible.data.rollFormula, '3d6', 'and its typed formula (G7)');
+      assert.ok(!Object.hasOwn(hidden.data, 'resolvedFormula'), 'a secret roll hands back none');
+      assert.ok(!Object.hasOwn(hidden.data, 'rollFormula'), 'nor its typed formula');
 
       const world = sharedAuthorityWorld();
       const authority = world.realm();
@@ -1619,11 +1623,15 @@ describe('journal run authority ledger', () => {
         () => ({ success: true, check: executedCheckDisplay(visible) })
       );
       assert.equal(reply.check.evidence.target, 11, 'anchor 12, adjustment −2, library +1');
+      // The typed formula is the player-visible fact the prompt already states (maintainer ruling).
+      const { targetExpression, ...evidence } = reply.check.evidence;
+      assert.equal(targetExpression, '@skills.SECRET_PATH.value');
       const sentinels = /SECRET_PATH|SECRET_LABEL|SECRET_POLICY/;
-      assert.doesNotMatch(JSON.stringify(reply), sentinels);
+      assert.doesNotMatch(JSON.stringify({ ...reply, check: { ...reply.check, evidence } }), sentinels);
       assert.doesNotMatch(JSON.stringify(visible.data.targetTerms), sentinels);
+      const ruledField = '"targetExpression":"@skills.SECRET_PATH.value"';
       for (const [, document] of world.log.filter(([kind]) => ['create', 'write'].includes(kind))) {
-        assert.doesNotMatch(JSON.stringify(document), sentinels);
+        assert.doesNotMatch(JSON.stringify(document).replaceAll(ruledField, ''), sentinels);
       }
     } finally {
       if (originalRoll === undefined) delete globalThis.Roll;

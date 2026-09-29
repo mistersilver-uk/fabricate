@@ -74,6 +74,7 @@ import {
   resolvedComponentsFor,
   resolvedEssencesFor,
   resolvedToolsFor,
+  salvageToolsFor,
 } from '../../systems/scopedEntityReads.js';
 import { computeSystemVisibility } from '../../systems/systemValidation.js';
 import { effectiveToolBreakageAuthority } from '../../systems/toolBreakageAuthority.js';
@@ -96,7 +97,7 @@ import { matchRecipeItemDefinition, resolveToolForItem } from '../../utils/sourc
 // item-bag literal (the "treat as no image" sentinel).
 import { GENERIC_ITEM_IMAGE } from '../svelte/util/craftingImageDefaults.js';
 
-import { salvageDisplayDc } from './salvageCheckNeed.js';
+import { salvageCheckTarget, salvageDisplayDc } from './salvageCheckNeed.js';
 
 // A shared empty set for the GM path, where no entity is visibility-hidden — avoids
 // allocating a throwaway Set per system on every listing build.
@@ -1557,12 +1558,19 @@ export class InventoryListingBuilder {
       // re-deriving tool matching (issue 777).
       toolStates,
       toolsAvailable,
-      // simple / routed+relative: the base DC, per-component override applied.
-      // routed+FIXED and progressive: null — there is no DC to show. A fixed outcome
-      // matches on an absolute [start, end] segment of the roll range and `checkRoll`
-      // never reads a DC for it (the GM editor hides the field outright); progressive
-      // has no DC at all.
+      // simple / routed+relative sum/over/fixed: the base DC, per-component override applied.
+      // A fixed range matches on its [start, end] segment and progressive has stages, so
+      // neither has a DC; a roll-under or character-value check states `target` instead.
       dc: salvageDisplayDc({ mode, routedType, config, component }),
+      target: salvageCheckTarget({
+        mode,
+        config,
+        component,
+        system,
+        recipeManager: this.recipeManager,
+        actor: targetActor,
+        localize: this.localize,
+      }),
       // Default TRUE: an absent key reads as permitted; only an explicit false pins the
       // GM's authored order.
       allowPlayerResultReorder: salvage.allowPlayerResultReorder !== false,
@@ -1629,18 +1637,7 @@ export class InventoryListingBuilder {
    * @private
    */
   _salvageToolStates({ system, salvage, componentById, targetActor }) {
-    const ids = Array.isArray(salvage?.toolIds) ? salvage.toolIds : [];
-    if (ids.length === 0) return [];
-    const library = resolvedToolsFor(system);
-    const seen = new Set();
-    const tools = [];
-    for (const rawId of ids) {
-      const id = String(rawId ?? '').trim();
-      if (!id || seen.has(id)) continue;
-      seen.add(id);
-      const tool = library.find((entry) => entry?.id === id);
-      if (tool) tools.push(tool);
-    }
+    const tools = salvageToolsFor(system, salvage);
     if (tools.length === 0) return [];
 
     const systemId = stringOrNull(system?.id);

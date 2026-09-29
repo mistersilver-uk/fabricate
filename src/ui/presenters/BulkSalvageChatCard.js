@@ -42,6 +42,7 @@
 
 import {
   esc,
+  renderCheckEvidenceRows,
   renderComplications,
   renderRollTotal,
   renderSection,
@@ -159,12 +160,17 @@ function renderSubject(subject, loc) {
   // has to say in its outcome copy and its recovered items, so the message would only
   // repeat them.
   if (subject?.outcome !== 'succeeded' && subject?.message) parts.push(esc(subject.message));
+  // The subject's own executed evidence, gated on its own visibility (issue 2005).
+  const evidence = renderCheckEvidenceRows(subject?.check, loc);
 
   return [
-    '<li class="fabricate-craft-chat__item">',
+    evidence
+      ? '<li class="fabricate-craft-chat__item fabricate-craft-chat__item--evidence">'
+      : '<li class="fabricate-craft-chat__item">',
     `<img class="fabricate-craft-chat__icon" src="${esc(subject?.img || ITEM_FALLBACK_IMG)}" alt="" />`,
     `<span class="fabricate-craft-chat__label">${parts.join(' — ')}</span>`,
     renderRollTotal(subject?.rollValue, loc(SALVAGE_CHAT_KEYS.roll)),
+    evidence,
     '</li>',
   ]
     .filter(Boolean)
@@ -186,8 +192,8 @@ function renderSubject(subject, loc) {
  * @param {Record<string, number>} [model.counts] Offered to the summary sentence as
  *   `{name}` placeholders; `total`, `succeeded` and `failed` are always present.
  * @param {Array<{name:string,img:string,outcome:string,rollValue:number|null,
- *   tierStep:object|null,message:string}>} [model.subjects] One row per salvaged
- *   source, in execution order.
+ *   tierStep:object|null,check:object|null,message:string}>} [model.subjects] One row per
+ *   salvaged source, in execution order; `check` is its executed display projection.
  * @param {Array<{name:string,img:string,quantity:number}>} [model.results] Everything
  *   recovered across the run, summed per component.
  * @param {Array<{name:string,img:string,quantity:number}>} [model.consumed] Every

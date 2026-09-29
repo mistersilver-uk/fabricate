@@ -6,9 +6,26 @@ import {
   CRAFTING_BROWSE_STATUS,
 } from '../src/ui/presenters/CraftingListingBuilder.js';
 import { ResolutionModeService } from '../src/systems/ResolutionModeService.js';
+import { resolveCheckFormulaDisplay } from '../src/systems/checkRoll.js';
+import { describeCheckTarget } from '../src/ui/presenters/checkDescriptor.js';
+import { underTargetPromptFields } from '../src/systems/checkRollDecision.js';
+import { promptJournalStageCheck } from '../src/bootstrap/journalOperations.js';
+import { rollPromptTarget } from '../src/ui/svelte/apps/crafting/rollPromptTarget.js';
+import { shippedLocalize } from './helpers/checkEvidenceFixtures.js';
+import { stubPromptSurface } from './helpers/rollPromptDialogStub.js';
+
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { DEFAULT_RECIPE_IMAGE } from '../src/models/Recipe.js';
 import { authoredComplication } from './helpers/complicationFixtures.js';
+
+/** A `Roll` for display resolution: `@path` reads roll data and every formula validates. */
+const FORMULA_ROLL = {
+  replaceFormulaData: (formula, data) =>
+    String(formula).replaceAll(/@([\w.]+)/g, (_match, path) =>
+      String(path.split('.').reduce((node, key) => node?.[key], data) ?? 'NaN')
+    ),
+  validate: () => true,
+};
 
 // A minimal CraftingEngine used ONLY to pin the player-listing DC to the number the engine actually
 // rolls against (`_resolveSimpleCheckDc`), so the parity assertions bind to real engine behaviour
@@ -1379,5 +1396,182 @@ describe('CraftingListingBuilder — progressive complication forecast (1286)', 
       ],
     });
     assert.deepEqual(recipe.progressiveStages, []);
+  });
+});
+
+describe('CraftingListingBuilder — the check card names a roll-under or character-value target (issue 2005)', () => {
+  const format = (key, data = {}) =>
+    String(shippedLocalize(key)).replace(/\{(\w+)\}/g, (whole, token) =>
+      Object.hasOwn(data, token) ? String(data[token]) : whole
+    );
+  const skill = { source: 'attribute', expression: '@skills.smith.level' };
+  const SERA = { id: 'actor-1', name: 'Sera Vane', items: [], getRollData: () => ({ skills: { smith: { level: 12 } } }) };
+  const checkOf = (simple, { actor = SERA, recipe = makeRecipe(), ...options } = {}) => {
+    const builder = makeBuilder({
+      system: makeSystem({ craftingCheck: { simple: { rollFormula: '1d20', dc: 12, ...simple }, routed: {}, progressive: {} } }),
+      entries: [{ recipe, access: { reason: 'ok' } }],
+      localize: format,
+      ...options,
+    });
+    return builder.buildRecipeDetail({ recipeId: recipe.id, craftingActor: actor, viewer: PLAYER }).check;
+  };
+
+  it('states a fixed roll-under target with its comparison, and a sum/over card keeps its DC chip alone', () => {
+    const under = checkOf({ evaluation: { direction: 'under' } });
+    assert.deepEqual(under.target, { direction: 'under', text: 'Target 12 · stay at or under', source: '' });
+    assert.equal(under.dc, null);
+    assert.equal(checkOf({ evaluation: { direction: 'under' }, thresholdMode: 'exceed' }).target.text, 'Target 12 · stay under');
+    const over = checkOf({});
+    assert.equal(over.dc, 12);
+    assert.ok(!Object.hasOwn(over, 'target'), 'a sum/over fixed card is unchanged');
+  });
+
+  it("names a character value by the character's name, the typed formula and the tier's adjustment", () => {
+    const recipe = makeRecipe({ checkTierId: 'hard' });
+    const tiers = [{ id: 'hard', name: 'Hard Work', adjustment: -2 }];
+    assert.deepEqual(checkOf({ evaluation: { direction: 'under', target: skill }, tiers }, { recipe }).target, {
+      direction: 'under',
+      text: 'Target 10 · stay at or under',
+      source: 'Sera Vane @skills.smith.level 12 · Hard Work −2',
+    });
+    const multiplied = { ...skill, adjustmentKind: 'multiply', baseAdjustment: 0.5 };
+    assert.deepEqual(checkOf({ evaluation: { direction: 'over', target: multiplied } }).target, {
+      direction: 'over',
+      text: 'Target 6 · meet or beat',
+      source: 'Sera Vane @skills.smith.level 12 · difficulty ×½',
+    });
+  });
+
+  it('names no target for a routed or progressive slot, whatever its source (R1)', () => {
+    const slotCheck = (resolutionMode, slots) =>
+      makeBuilder({
+        system: makeSystem({
+          resolutionMode,
+          craftingCheck: { simple: {}, routed: {}, progressive: {}, ...slots },
+        }),
+        localize: format,
+      }).buildRecipeDetail({ recipeId: 'recipe-1', craftingActor: SERA, viewer: PLAYER }).check;
+    const outcomes = {
+      relativeOutcomes: [{ id: 'ok', name: 'Ok', success: true, dc: 0 }],
+      fixedOutcomes: [{ id: 'ok', name: 'Ok', success: true, start: 1, end: 100 }],
+    };
+    for (const type of ['fixed', 'relative']) {
+      const routed = { type, rollFormula: '1d100', dc: 50, ...outcomes };
+      for (const evaluation of [{ direction: 'under', target: skill }, { direction: 'under' }]) {
+        const check = slotCheck('routedByCheck', { routed: { ...routed, evaluation } });
+        assert.ok(check, `${type}: the routed card renders`);
+        assert.ok(!Object.hasOwn(check, 'target'), `${type} ${JSON.stringify(evaluation)}`);
+      }
+    }
+    for (const evaluation of [{ direction: 'over', target: skill }, { direction: 'under' }]) {
+      const progressive = slotCheck('progressive', {
+        progressive: { rollFormula: '1d20', evaluation },
+      });
+      assert.ok(progressive && !Object.hasOwn(progressive, 'target'), JSON.stringify(evaluation));
+    }
+  });
+
+  it('describes no fixed-range check even when handed one directly (R1 backstop)', () => {
+    const target = describeCheckTarget({
+      config: { type: 'fixed', rollFormula: '1d100' },
+      recipe: makeRecipe(),
+      evaluation: { product: 'sum', direction: 'under', target: skill },
+      anchor: NaN,
+      actor: SERA,
+      localize: format,
+    });
+    assert.equal(target, null);
+  });
+
+  it('names no target for a dynamic (macro) roll-under check (D6)', () => {
+    assert.ok(!Object.hasOwn(checkOf({ evaluation: { direction: 'under' }, dcMode: 'dynamic' }), 'target'));
+  });
+
+  describe('a held Tool bonus on the card (G3, maintainer ruling 2026-09-28)', () => {
+    const toolState = (expression, extra = {}) => ({
+      available: true,
+      bonusEligible: true,
+      contributionInput: { tool: { id: `t-${expression}`, bonus: { enabled: true, expression } }, primaryActor: SERA },
+      ...extra,
+    });
+    const cardWith = (statesBySet, sets = [{ id: 'set-1' }]) => {
+      const builder = makeBuilder({
+        system: makeSystem({ craftingCheck: { simple: { rollFormula: '1d20', dc: 11, evaluation: { direction: 'under' } }, routed: {}, progressive: {} } }),
+        entries: [{ recipe: makeRecipe({ ingredientSets: sets }), access: { reason: 'ok' } }],
+        localize: format,
+      });
+      // The per-set evaluation the detail already runs answers each set's tool states.
+      builder.recipeManager.evaluateCraftability = (_sources, view) =>
+        makeCraftability({ toolStates: statesBySet[view.ingredientSets?.[0]?.id] ?? [] });
+      return builder.buildRecipeDetail({ recipeId: 'recipe-1', craftingActor: SERA, viewer: PLAYER }).check.target;
+    };
+
+    it('adds a held flat Tool bonus exactly as the prompt chip does', async () => {
+      const card = cardWith({ 'set-1': [toolState('2')] });
+      assert.deepEqual(card, { direction: 'under', text: 'Target 13 · stay at or under', source: 'Base 11 · tools +2' });
+      const surface = stubPromptSurface(() => null);
+      try {
+        await promptJournalStageCheck({
+          label: 'Iron Sword', displayFormula: '1d20', target: 11, direction: 'under', comparison: 'meet',
+          ...underTargetPromptFields({ product: 'sum', direction: 'under' }, { toolContributions: [{ value: 2 }] }),
+        });
+      } finally {
+        surface.restore();
+      }
+      const chip = rollPromptTarget(surface.view, []);
+      assert.deepEqual([card.text, card.source], [chip.chipText, chip.source], 'the card agrees with the chip');
+    });
+
+    it('names a rolled Tool bonus as pending, and omits an unheld, ineligible or absent one', () => {
+      assert.equal(cardWith({ 'set-1': [toolState('1d4')] }).text, 'Target 11 + 1d4 · stay at or under');
+      for (const states of [[], [toolState('2', { available: false })], [toolState('2', { bonusEligible: false })]]) {
+        assert.equal(cardWith({ 'set-1': states }).text, 'Target 11 · stay at or under');
+      }
+    });
+
+    it('omits the bonus when it depends on which set the prompt is given (an ambiguous choice)', () => {
+      const sets = [{ id: 'set-1' }, { id: 'set-2' }];
+      assert.equal(cardWith({ 'set-1': [toolState('2')], 'set-2': [toolState('3')] }, sets).text, 'Target 11 · stay at or under');
+      assert.equal(
+        cardWith({ 'set-1': [toolState('2')], 'set-2': [toolState('2')] }, sets).text,
+        'Target 13 · stay at or under',
+        'the same bonus whichever set is used is no choice at all'
+      );
+    });
+  });
+
+  it('says a character value cannot be read rather than invent one, and names none with no character', () => {
+    const missing = checkOf({ evaluation: { direction: 'under', target: { ...skill, expression: '@skills.gone' } } });
+    assert.deepEqual(missing.target, {
+      unresolved: 'Crafting check could not read a number for its target from this character.',
+    });
+    assert.ok(!Object.hasOwn(checkOf({ evaluation: { target: skill } }, { actor: null }), 'target'));
+  });
+
+  it('never appends a roll-under benefit to the formula, and names it in the target as the prompt does (Q7, M6)', () => {
+    const resolveCheckFormula = (formula, actor, craftingModifier, evaluation) =>
+      resolveCheckFormulaDisplay(formula, actor, craftingModifier, FORMULA_ROLL, evaluation);
+    const system = (direction) => ({
+      craftingCheck: {
+        simple: { rollFormula: '1d20', dc: 12, evaluation: { direction } },
+        routed: {},
+        progressive: {},
+        defaultModifierPolicy: 'addAll',
+        defaultModifierIds: ['steady'],
+      },
+      modifiers: [{ id: 'steady', label: 'Steady hands', expression: '2' }],
+    });
+    const shown = (direction) => {
+      const builder = makeBuilder({ system: makeSystem(system(direction)), localize: format, resolveCheckFormula });
+      return builder.buildRecipeDetail({ recipeId: 'recipe-1', craftingActor: SERA, viewer: PLAYER }).check;
+    };
+    assert.match(shown('over').resolvedFormula, /\+ 2/, 'positive control: over appends the modifier');
+    const under = shown('under');
+    assert.equal(under.resolvedFormula, '1d20', 'under, the benefit raises the target instead');
+    assert.deepEqual(
+      under.target,
+      { direction: 'under', text: 'Target 14 · stay at or under', source: 'Base 12 · modifiers +2' },
+      'the card target includes the applied modifier, as the prompt chip does'
+    );
   });
 });

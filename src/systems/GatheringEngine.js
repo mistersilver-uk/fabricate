@@ -24,7 +24,11 @@ import {
   runFormulaProgressive,
   runFormulaRouted,
 } from './checkRoll.js';
-import { countPromptFields, underTargetPromptFields } from './checkRollDecision.js';
+import {
+  attributeTargetPromptField,
+  countPromptFields,
+  underTargetPromptFields,
+} from './checkRollDecision.js';
 import {
   activeCheckEvaluation,
   actorRollData,
@@ -808,6 +812,7 @@ export class GatheringEngine {
         target: showTarget ? dc : null,
         direction: showTarget ? evaluation.direction : null,
         comparison: showTarget ? (config?.thresholdMode === 'exceed' ? 'exceed' : 'meet') : null,
+        ...(showTarget && attributeTargetPromptField(evaluation)),
         ...(showTarget &&
           underTargetPromptFields(evaluation, {
             targetBasis: attributeTargetBasis(config, {

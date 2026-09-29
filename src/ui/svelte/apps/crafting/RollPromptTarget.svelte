@@ -7,7 +7,7 @@
   | --- | --- | --- | --- |
   | `text` | string | none | The chip's prepared text, from `rollPromptTarget`. |
   | `source` | string | `''` | The prepared explanation; blank renders the bare chip with no row around it. |
-  | `under` | boolean | `false` | A summed roll-under target, which the chip's `data-roll-prompt-target` hook names. |
+  | `under` | boolean | `false` | A summed roll-under target: the chip's `data-roll-prompt-target` hook names it, and one persistent `aria-live="polite"` region (`display: contents`) holds the chip and its line. |
 
   Rest spread:
   - `{...rest}` lands on the `Chip`, so its `data-roll-prompt-*` hooks forward.
@@ -28,15 +28,25 @@
   >
 {/snippet}
 
-{#if source}
-  <div class="target-row">
-    {@render chip()}<span class="target-source">{source}</span>
-  </div>
+{#snippet target()}
+  {#if source}
+    <div class="target-row">{@render chip()}<span class="target-source">{source}</span></div>
+  {:else}
+    {@render chip()}
+  {/if}
+{/snippet}
+
+<!-- A roll-under target follows the picks and the typed bonus: one region announces it throughout. -->
+{#if under}
+  <div class="target-live" aria-live="polite">{@render target()}</div>
 {:else}
-  {@render chip()}
+  {@render target()}
 {/if}
 
 <style>
+  .target-live {
+    display: contents;
+  }
   .target-row {
     display: flex;
     align-self: stretch;

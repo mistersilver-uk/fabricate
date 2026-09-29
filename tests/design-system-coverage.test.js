@@ -611,6 +611,8 @@ const UNDOCUMENTED_ROWS = [
   // the set that no `library.html` specimen names (issue 1458).
   'src/ui/svelte/apps/ActorSelectTopBar.svelte',
   'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',
+  // Issue 2005's executed check evidence rows: no specimen names a key-and-value evidence list.
+  'src/ui/svelte/apps/crafting/detail/CheckEvidenceRows.svelte',
   'src/ui/svelte/apps/manager/BulkDeleteCard.svelte',
   'src/ui/svelte/apps/manager/BulkEditSection.svelte',
   'src/ui/svelte/apps/manager/BulkEditSelect.svelte',

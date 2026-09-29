@@ -217,9 +217,13 @@ export function actorRollData(actor) {
  * An activity's target from its check config. `anchor` is its fixed DC, `override` its non-null
  * adjustment override, and `readRollData` is called only for an attribute source. A fixed-range
  * routed check reads no target, so its target source is inert, as a progressive one is. A resolved
- * target also carries `terms`, the arithmetic its executed `targetTerms` evidence begins with.
+ * target also carries `terms`, the arithmetic its executed `targetTerms` evidence begins with;
+ * `label` names the tier an override came from.
  */
-export function resolveActivityTarget(config, { anchor, override = null, readRollData }) {
+export function resolveActivityTarget(
+  config,
+  { anchor, override = null, label = '', readRollData }
+) {
   if (config?.type === 'fixed') {
     return {
       ok: true,
@@ -235,6 +239,7 @@ export function resolveActivityTarget(config, { anchor, override = null, readRol
     rollData: attribute ? readRollData() : {},
     anchor,
     adjustment: selectTargetAdjustment(evaluation, override),
+    label: override == null ? '' : label,
   });
 }
 
@@ -289,9 +294,16 @@ export function resolveCheckTarget(input) {
 
 /**
  * {@link resolveCheckTarget} plus the `terms` that fold back to its target: the anchor, then the
- * adjustment it applied. With no adjustment the anchor is the floored value, so the fold is exact.
+ * adjustment it applied, named by its tier's `label` when it has one. With no adjustment the
+ * anchor is the floored value, so the fold is exact.
  */
-function resolveTargetWithTerms({ evaluation, rollData = {}, anchor, adjustment = null }) {
+function resolveTargetWithTerms({
+  evaluation,
+  rollData = {},
+  anchor,
+  adjustment = null,
+  label = '',
+}) {
   const target = evaluation?.target ?? {};
   if (target.source !== 'attribute') {
     return Number.isFinite(anchor)
@@ -315,7 +327,11 @@ function resolveTargetWithTerms({ evaluation, rollData = {}, anchor, adjustment 
       ? [{ kind: 'anchor', value }]
       : [
           { kind: 'anchor', value: resolved.value },
-          { kind: kind === 'multiply' ? 'multiplier' : 'adjustment', value: factor },
+          {
+            kind: kind === 'multiply' ? 'multiplier' : 'adjustment',
+            value: factor,
+            ...(label && { label }),
+          },
         ];
   return { ok: true, target: value, source: 'attribute', terms };
 }

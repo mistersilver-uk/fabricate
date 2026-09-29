@@ -13,6 +13,7 @@ import {
 } from './labInjectedLayoutGuard.js';
 import { LAB_INTERACTABLE_REFS } from './world/labInteractables.js';
 import { buildLabWorld } from './world/labWorld.js';
+import { installLabChatLog } from './labChatLog.js';
 import { seedRollPromptFixture } from './rollPromptFixtures.js';
 
 const READY_ATTRIBUTE = 'data-view-lab-ready';
@@ -192,6 +193,8 @@ function readParams() {
     // `enter` (the default) to press whichever button Foundry marks default, or a button action by
     // name.
     dialog: params.get('dialog') ?? DEFAULT_LAB_DIALOG_ANSWER,
+    // Dock a chat log in the window, so a case can photograph the result card it posts.
+    chatLog: params.get('chatLog') === '1',
   };
 }
 
@@ -927,6 +930,7 @@ async function boot() {
     if (params.manyPlayers) world.shim.seedPlayerRoster();
     // Before any step can click something that confirms.
     world.shim.setDialogAnswer(params.dialog);
+    if (params.chatLog) installLabChatLog(built.frame);
     mounted = await mountAppFor(built.content, params);
     await settle([built.frame], mounted?.services ?? null);
     // After settle, because the check needs the populated tree — an empty window has nothing

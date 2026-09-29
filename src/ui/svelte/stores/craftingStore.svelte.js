@@ -725,6 +725,12 @@ export function createCraftingStore({ services } = {}) {
         services?.notify?.(
           journalRefusalMessage(result, services?.localize, services?.craftErrorMessage?.())
         );
+        // A check that cannot roll shows its refusal, never the last attempt's facts (issue 2005).
+        if (result.misconfigured === true || result.reason === 'roll-unavailable') {
+          lastRollResult = Object.fromEntries(
+            Object.entries(lastRollResult).filter(([id]) => id !== recipeId)
+          );
+        }
         return result;
       }
       // A resolved failure falls THROUGH to the success tail on purpose: the check ran, the

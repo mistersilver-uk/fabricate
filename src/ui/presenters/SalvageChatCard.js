@@ -51,6 +51,7 @@ export const SALVAGE_CHAT_KEYS = Object.freeze({
  * @param {number}  [model.rollValue] - The rolled check total; rendered only when finite.
  * @param {{mode:'target'|'up'|'down',steps:number}} [model.tierStep] - Realized routed
  *   tier-step evidence (`data.tierStepApplied`), present only on an actual tier change.
+ * @param {object|null} [model.check] - The executed check's display projection (issue 2005).
  * @param {string}  [model.failureReason]
  * @param {Array<{name:string,description:string,severity:string,componentName:string}>}
  *   [model.complications] - Fired component complications, already redacted to the
@@ -69,6 +70,7 @@ export function buildSalvageChatContent(model = {}, localize = (key) => key) {
       tools: model.tools,
       rollValue: model.rollValue,
       tierStep: model.tierStep,
+      check: model.check,
       failureReason: model.failureReason,
       complications: model.complications,
     },

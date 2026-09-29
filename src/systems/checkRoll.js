@@ -47,9 +47,20 @@ export { rolledDiceGroups } from './checkRollOutput.js';
 /**
  * `data.targetTerms` outside sum/over/fixed (issue 2005): the resolved target's terms, else its
  * anchor, then the rolled tier's step, then the settled scalar benefits. Folded in order with
- * `preRolls` they reproduce `data.target`. A term is `{ kind, value, source? }` and nothing else.
+ * `preRolls` they reproduce `data.target`. A term is `{ kind, value, source?, label? }`, `label`
+ * naming the tier of an adjustment. `data.targetSource` names the anchor's source; a character
+ * value also records its typed formula and the character's name, so results never re-read them.
  */
-function targetTermsEvidence({ grading, target, anchor, baseTerms, tierTerm = null, rolled }) {
+function targetTermsEvidence({
+  grading,
+  target,
+  anchor,
+  baseTerms,
+  tierTerm = null,
+  rolled,
+  evaluation,
+  actor,
+}) {
   if (target === null || (grading.direction === 'over' && grading.source === 'fixed')) return {};
   const base =
     Array.isArray(baseTerms) && baseTerms.length > 0
@@ -57,11 +68,24 @@ function targetTermsEvidence({ grading, target, anchor, baseTerms, tierTerm = nu
       : [{ kind: 'anchor', value: anchor }];
   const benefits = grading.direction === 'under' ? (rolled?.benefitTerms ?? []) : [];
   return {
+    targetSource: grading.source,
+    ...attributeTargetFacts(grading, evaluation, actor),
     targetTerms: [
-      ...base.map(({ kind, value }) => ({ kind, value })),
+      ...base.map(({ kind, value, label }) => ({ kind, value, ...(label && { label }) })),
       ...(tierTerm ? [tierTerm] : []),
       ...benefits.map(({ kind, value, source }) => ({ kind, value, source })),
     ],
+  };
+}
+
+/** A character-value target's typed formula and the name of the character it was read from. */
+function attributeTargetFacts(grading, evaluation, actor) {
+  if (grading.source !== 'attribute') return {};
+  const expression = String(evaluation?.target?.expression ?? '').trim();
+  const name = typeof actor?.name === 'string' ? actor.name.trim() : '';
+  return {
+    ...(expression && { targetExpression: expression }),
+    ...(name && { targetActor: name }),
   };
 }
 
@@ -70,9 +94,18 @@ function targetTermsEvidence({ grading, target, anchor, baseTerms, tierTerm = nu
 function rolledTierTerm(grading, classifyInput) {
   const { matched } = classifyCheckTotal({ ...classifyInput, triggers: [], minOutcomeId: null });
   if (!matched) return null;
-  if (grading.multiply) return { kind: 'multiplier', value: Number(matched.adjustment) };
+  const label = typeof matched.name === 'string' && matched.name ? { label: matched.name } : {};
+  if (grading.multiply) return { kind: 'multiplier', value: Number(matched.adjustment), ...label };
   const step = Number(matched.dc);
-  return { kind: 'adjustment', value: grading.direction === 'under' ? 0 - step : step };
+  return { kind: 'adjustment', value: grading.direction === 'under' ? 0 - step : step, ...label };
+}
+
+/** A routed result's trigger evidence: a forced disposition (issue 2080) and a real tier step. */
+function routedTriggerEvidence({ forcedDisposition, tierStepApplied }) {
+  return {
+    ...(forcedDisposition && { forcedOutcome: forcedDisposition }),
+    ...(tierStepApplied && { tierStepApplied }),
+  };
 }
 
 /** The executed roll mode, on a result whose caller asked for it; never persisted. */
@@ -340,7 +373,7 @@ function preparedCheckRefusal(kind, evaluation, formula) {
 /** Grades a prepared total as the matching runner does, against the captured anchor. */
 function gradePreparedTotal(
   kind,
-  { config, evaluation, anchor, rolled, total, diceGroups, secret }
+  { config, evaluation, anchor, rolled, total, diceGroups, secret, actor }
 ) {
   const grading = sumGrading(evaluation);
   const targetDelta = rolled.modifierPlacement?.targetDelta;
@@ -356,6 +389,8 @@ function gradePreparedTotal(
           baseTerms: config.targetTerms,
           tierTerm,
           rolled,
+          evaluation,
+          actor,
         });
   if (kind === 'routed') {
     const classifyInput = {
@@ -385,8 +420,7 @@ function gradePreparedTotal(
         outcomeId: classified.matched?.id ?? null,
         success: classified.success,
         breakTools: classified.breakTools,
-        ...(classified.forcedDisposition && { forcedOutcome: classified.forcedDisposition }),
-        ...(classified.tierStepApplied && { tierStepApplied: classified.tierStepApplied }),
+        ...routedTriggerEvidence(classified),
         ...(classified.minTierFailed && {
           minTierFailed: true,
           blockedOutcomeId: classified.blockedOutcomeId,
@@ -512,6 +546,7 @@ export async function evaluatePreparedRunCheck(
     total,
     diceGroups,
     secret,
+    actor,
   });
   return {
     success: graded.success,
@@ -520,6 +555,11 @@ export async function evaluatePreparedRunCheck(
     data: {
       dc: config.resolvedDc ?? config.dc,
       total,
+      // The formulas the dice line states, typed and resolved; a secret roll hands back neither.
+      ...(rolled.resolvedFormula && {
+        rollFormula: stripRetiredModifierPlaceholder(String(preparation.rollFormula ?? '')).trim(),
+        resolvedFormula: rolled.resolvedFormula,
+      }),
       diceGroups,
       ...(!secret && preRollEvidence(rolled)),
       ...graded.data,
@@ -619,8 +659,8 @@ export async function evaluateSideRoll(formula, actor, options = {}) {
  * Resolve a check formula's `@` placeholders for display without rolling (`1d20 + @prof` to
  * `1d20 + 2`), through the same shim and modifier append the roll uses, so display equals eval.
  * `null` with no formula or no engine; `resolved` is false when the formula does not reduce for
- * this actor, detected through `missing: 'NaN'`. `Roll` is a parameter so the Checks Studio's
- * odds enumerator drives one injected engine (issue 1097).
+ * this actor, detected through `missing: 'NaN'`; `modifiers` are the library entries it applied.
+ * `Roll` is a parameter so the Checks Studio's odds enumerator drives one injected engine.
  */
 export function resolveCheckFormulaDisplay(
   formula,
@@ -631,7 +671,8 @@ export function resolveCheckFormulaDisplay(
 ) {
   if (typeof formula !== 'string' || formula.trim() === '') return null;
   if (typeof Roll?.replaceFormulaData !== 'function') return null;
-  const substituted = resolveRolledFormula(formula, actor, craftingModifier, Roll, evaluation);
+  const rolled = resolveRolledCheck(formula, actor, craftingModifier, Roll, evaluation);
+  const substituted = rolled.formula;
   if (substituted.trim() === '') return null;
   const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
   const display = Roll.replaceFormulaData(substituted, rollData, {
@@ -642,7 +683,7 @@ export function resolveCheckFormulaDisplay(
     !/NaN/.test(display) &&
     !/@/.test(display) &&
     (typeof Roll.validate !== 'function' || Roll.validate(display) === true);
-  return { display, resolved };
+  return { display, resolved, modifiers: rolled.selected };
 }
 
 /**
@@ -756,13 +797,22 @@ export async function runFormulaPassFail({
     value: total,
     data: {
       dc: data.dc,
-      formula,
+      // Typed, after the retired-placeholder shim, so its operands align with the resolved one.
+      formula: stripRetiredModifierPlaceholder(formula),
       resolvedFormula,
       total,
       comparison,
       ...(formula && executedSumEvidence(total, target, comparison, grading.direction)),
       ...(formula &&
-        targetTermsEvidence({ grading, target, anchor: dc, baseTerms: targetTerms, rolled })),
+        targetTermsEvidence({
+          grading,
+          target,
+          anchor: dc,
+          baseTerms: targetTerms,
+          rolled,
+          evaluation,
+          actor,
+        })),
       diceGroups,
       ...preRollEvidence(rolled),
       ...(forced && { forcedOutcome: forced.disposition }),
@@ -894,8 +944,7 @@ export async function runFormulaRouted({
     label,
     kind: 'routed ',
     data,
-    // No `dc` here: `evaluateCheckRoll` uses it for the prompt only, and callers already put
-    // the prompt-facing DC on `rollOptions` (none for a fixed check).
+    // No `dc`: callers already put the prompt-facing DC on `rollOptions` (none for fixed).
     options: { ...rollOptions, evaluation, thresholdMode, craftingModifier },
     headless: { success: true, outcome: null, value: null, data, message: null },
   });
@@ -927,7 +976,7 @@ export async function runFormulaRouted({
     value: total,
     data: {
       dc: data.dc,
-      formula,
+      formula: stripRetiredModifierPlaceholder(formula),
       resolvedFormula,
       total,
       type,
@@ -941,15 +990,16 @@ export async function runFormulaRouted({
           baseTerms: targetTerms,
           tierTerm,
           rolled,
+          evaluation,
+          actor,
         })),
       ...preRollEvidence(rolled),
       outcomeId: matched?.id ?? null,
       success,
       breakTools: classified.breakTools,
       diceGroups,
-      ...(classified.forcedDisposition && { forcedOutcome: classified.forcedDisposition }),
-      ...(classified.tierStepApplied && { tierStepApplied: classified.tierStepApplied }),
-      // Only on a min-tier failure: the post-step tier the gate blocked.
+      // Only on a real tier change (issue 975), and on a min-tier failure the tier it blocked.
+      ...routedTriggerEvidence(classified),
       ...(classified.minTierFailed && {
         minTierFailed: true,
         blockedOutcomeId: classified.blockedOutcomeId,

@@ -7,7 +7,10 @@ player-inventory-sort-list
 player-salvage
 player-salvage-no-check
 player-salvage-tools
+player-salvage-under-result
 player-inventory-multi-system
+player-salvage-under-simple
+player-salvage-under-routed
 player-salvage-misconfigured
 player-inventory-bulk-mixed
 player-inventory-bulk-mixed-narrow

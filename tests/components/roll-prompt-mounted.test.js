@@ -6,7 +6,11 @@ import { flushSync } from 'svelte';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import { stubI18n } from '../helpers/rollPromptDialogStub.js';
-import { buildSinglePromptData, waitForPrompt } from '../../src/ui/svelte/apps/crafting/rollPrompt.js';
+import {
+  buildBulkPromptData,
+  buildSinglePromptData,
+  waitForPrompt,
+} from '../../src/ui/svelte/apps/crafting/rollPrompt.js';
 import { openRollPromptModal } from '../../src/ui/svelte/apps/crafting/rollPromptHost.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -26,6 +30,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/util/pickerOptionModel.js',
     'src/ui/svelte/apps/crafting/rollPromptTarget.js',
+    'src/utils/fillPlaceholders.js',
+    'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
+    'src/utils/checkAdjustmentFormat.js',
+    'src/utils/scalars.js',
   ],
   compiledModules: [
     'src/ui/svelte/components/Field.svelte',
@@ -452,7 +460,8 @@ describe('mounted roll prompt', () => {
       assert.equal(chip.textContent.trim(), text);
       assert.equal(chip.dataset.rollPromptTarget, 'under');
       assert.ok(chip.classList.contains('is-info'), 'the DC chip primitive, retoned nowhere');
-      assert.equal(chip.parentElement.className.split(' ')[0], 'formula-content', 'a fixed, unraised target: a bare chip');
+      assert.equal(chip.parentElement.className.split(' ')[0], 'target-live', 'a bare chip in its live region');
+      assert.equal(chip.parentElement.parentElement.className.split(' ')[0], 'formula-content');
       const note = dialog.querySelector('.formula-content .formula + .formula-note');
       assert.equal(note.textContent, 'The dice are compared as rolled.');
       assert.equal(dialog.querySelector('.static-modifiers .help').textContent, 'Each raises the target.');
@@ -470,14 +479,14 @@ describe('mounted roll prompt', () => {
       expression: '@skills.smith.level', value: 12, adjustment: { kind: 'add', value: -2, label: 'Hard Work' },
     };
     const view = buildSinglePromptData({
-      displayFormula: '1d20', dc: 10, target: 10, direction: 'under', targetBasis,
+      displayFormula: '1d20', dc: 10, target: 10, direction: 'under', targetBasis, actorName: 'Sera Vane',
       selectedModifiers: [{ label: 'Steady hands', value: 1, display: '+1' }],
     });
     const frame = await openThroughHost(view, false, noChoice);
-    const row = frame.dialog.querySelector('.formula-content > .target-row');
+    const row = frame.dialog.querySelector('.formula-content .target-row');
     assert.deepEqual([...row.children].map((child) => child.textContent.trim()), [
-      'Target 11 · stay at or under', '@skills.smith.level 12 · Hard Work -2 · modifiers +1',
-    ], 'frame 29: the chip, then its explanation on the same row');
+      'Target 11 · stay at or under', 'Sera Vane @skills.smith.level 12 · Hard Work −2 · modifiers +1',
+    ], 'frame 29: the chip, then its explanation naming the character, on the same row');
     assert.equal(row.querySelector('.manager-chip').dataset.rollPromptTarget, 'under');
     frame.dialog.querySelector('[data-manager-modal-close]').click();
     await frame.pending;
@@ -491,17 +500,120 @@ describe('mounted roll prompt', () => {
     const picks = { options, maxPicks: 1, defaultSelectedIds: ['a'] };
     const { dialog, pending } = await openThroughHost({ ...view, selectedModifiers: [] }, false, picks);
     const shown = () => [...dialog.querySelectorAll('.target-row > *')].map((child) => child.textContent.trim());
-    assert.deepEqual(shown(), ['Target 11 · stay at or under', '@skills.smith.level 12 · Hard Work -2 · modifiers +1']);
+    assert.equal(
+      dialog.querySelector('.modifier-group .help').textContent.trim(),
+      'Each raises the target.',
+      'a roll-under pick says what it does, as an applied modifier does (F14)'
+    );
+    assert.deepEqual(shown(), ['Target 11 · stay at or under', 'Sera Vane @skills.smith.level 12 · Hard Work −2 · modifiers +1']);
     dialog.querySelector('input[type="radio"][value="c"]').click();
     flushSync();
-    assert.deepEqual(shown(), ['Target 13 · stay at or under', '@skills.smith.level 12 · Hard Work -2 · modifiers +3']);
+    assert.deepEqual(shown(), ['Target 13 · stay at or under', 'Sera Vane @skills.smith.level 12 · Hard Work −2 · modifiers +3']);
     dialog.querySelector('input[type="radio"][value="b"]').click();
     flushSync();
-    assert.deepEqual(shown(), ['Target 10 · stay at or under', '@skills.smith.level 12 · Hard Work -2'], 'a rolled pick adds nothing yet');
+    assert.deepEqual(
+      shown(),
+      ['Target 10 + 1d4 · stay at or under', 'Sera Vane @skills.smith.level 12 · Hard Work −2'],
+      'a rolled pick is pending, never averaged into the target (issue 2005)'
+    );
     dialog.querySelector('input[name="situationalBonus"]').value = '4';
     dialog.querySelector('input[name="situationalBonus"]').dispatchEvent(new document.defaultView.Event('input', { bubbles: true }));
     flushSync();
-    assert.equal(shown()[0], 'Target 10 · stay at or under', 'a typed bonus is applied once rolled, not before');
+    assert.deepEqual(
+      shown(),
+      ['Target 14 + 1d4 · stay at or under', 'Sera Vane @skills.smith.level 12 · Hard Work −2 · situational +4'],
+      'a typed number raises the target as it is typed'
+    );
+    dialog.querySelector('[data-manager-modal-close]').click();
+    await pending;
+  });
+
+  it('names a typed rolled bonus as pending, in a live region, and draws no number for it (Q8)', async () => {
+    const view = buildSinglePromptData({ displayFormula: '1d20', dc: 12, target: 12, direction: 'under' });
+    const { dialog, pending } = await openThroughHost(view, false, noChoice);
+    const chip = () => dialog.querySelector('.formula-content .manager-chip');
+    const region = dialog.querySelector('.formula-content [aria-live]');
+    assert.equal(region.getAttribute('aria-live'), 'polite', 'the roll-under target announces');
+    assert.ok(region.contains(chip()), 'from one region around the chip');
+    const bonus = dialog.querySelector('input[name="situationalBonus"]');
+    for (const [typed, text] of [
+      ['1d4', 'Target 12 + 1d4 · stay at or under'],
+      ['+2', 'Target 14 · stay at or under'],
+      ['', 'Target 12 · stay at or under'],
+    ]) {
+      bonus.value = typed;
+      bonus.dispatchEvent(new document.defaultView.Event('input', { bubbles: true }));
+      flushSync();
+      assert.equal(chip().textContent.trim(), text, `typed ${JSON.stringify(typed)}`);
+    }
+    assert.doesNotMatch(chip().textContent, /meet or beat/, 'never the roll-over comparison under');
+    const row = dialog.querySelector('.target-row');
+    bonus.value = '2';
+    bonus.dispatchEvent(new document.defaultView.Event('input', { bubbles: true }));
+    flushSync();
+    assert.ok(!row, 'an unraised fixed target starts as a bare chip');
+    assert.ok(dialog.querySelector('.target-row'), 'a raised one gains its line');
+    assert.ok(
+      dialog.querySelector('.formula-content [aria-live]') === region,
+      'the live region is the same node before and after typing, so it announces the change (R2)'
+    );
+    assert.equal(dialog.querySelectorAll('[aria-live]').length, 1, 'and it is the only one');
+    dialog.querySelector('[data-manager-modal-close]').click();
+    await pending;
+  });
+
+  it('shows no bonus field, caption or help when the check offers none, and focus lands on Roll (Q6)', async () => {
+    for (const offer of [undefined, false]) {
+      document.body.replaceChildren();
+      const view = buildSinglePromptData({ displayFormula: '1d20', dc: 12, offerSituationalBonus: offer });
+      const { dialog, pending } = await openThroughHost(view, false, noChoice);
+      const input = dialog.querySelector('input[name="situationalBonus"]');
+      if (offer === false) {
+        assert.ok(!input, 'no bonus input');
+        assert.ok(!dialog.querySelector('.bonus-group'), 'and no group around one');
+        assert.doesNotMatch(dialog.textContent, /Situational bonus|A bonus adds/, 'no caption or help');
+        assert.equal(document.activeElement, dialog.querySelector('button[type="submit"]'));
+      } else {
+        assert.equal(document.activeElement, input, 'positive control: the offer focuses the field');
+      }
+      dialog.querySelector('form').requestSubmit();
+      const answer = await pending;
+      assert.equal(answer.confirmed, true, 'Enter still rolls');
+      assert.equal(answer.bonus, null);
+    }
+  });
+
+  it('hides a bulk bonus only when every row with a check declines the offer (Q6)', async () => {
+    const rows = (offers) =>
+      offers.map((offerSituationalBonus, index) => ({
+        name: `Row ${index}`,
+        need: { kind: 'dc', dc: 10 + index },
+        offerSituationalBonus,
+      }));
+    for (const [offers, shown] of [
+      [[false, false], false],
+      [[false, true], true],
+      [[false, undefined], true],
+    ]) {
+      document.body.replaceChildren();
+      const view = buildBulkPromptData({
+        count: offers.length,
+        subjects: [...rows(offers), { name: 'Scrap', need: { kind: 'noCheck' }, offerSituationalBonus: true }],
+      });
+      const { dialog, pending } = await openThroughHost(view, false, noChoice);
+      assert.equal(Boolean(dialog.querySelector('input[name="situationalBonus"]')), shown, JSON.stringify(offers));
+      if (!shown) assert.equal(document.activeElement, dialog.querySelector('button[type="submit"]'));
+      dialog.querySelector('[data-manager-modal-close]').click();
+      await pending;
+    }
+  });
+
+  it('gives a roll-over pick no help line (F14 leaves roll-high unchanged)', async () => {
+    const picks = { options: [{ id: 'a', label: 'A', value: 1, display: '+1' }], maxPicks: 1, defaultSelectedIds: ['a'] };
+    const view = buildSinglePromptData({ displayFormula: '1d20', dc: 12, target: 12, direction: 'over' });
+    const { dialog, pending } = await openThroughHost(view, false, picks);
+    assert.ok(dialog.querySelector('.modifier-group'), 'positive control: the picks render');
+    assert.ok(!dialog.querySelector('.modifier-group .help'));
     dialog.querySelector('[data-manager-modal-close]').click();
     await pending;
   });

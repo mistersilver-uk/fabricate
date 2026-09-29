@@ -377,6 +377,8 @@ export async function publishSalvageFailure(engine, ctx) {
       results: failureResultItems.length > 0 ? failureResultItems : null,
       message: checkResult.message || 'Salvage check failed',
       salvageRun: ctx.salvageRun,
+      // The executed projection, whose visibility the run record never persists (issue 2005).
+      check: checkDisplayForCard(checkResult),
     },
   };
 }
@@ -540,6 +542,7 @@ export async function publishSalvageSuccess(engine, ctx) {
       // a no-check simple salvage (nothing was rolled); a finite number otherwise.
       value: checkResult.value ?? null,
       salvageRun: ctx.salvageRun,
+      check: checkDisplayForCard(checkResult),
     },
   };
 }

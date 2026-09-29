@@ -13,7 +13,8 @@
                          component (the system's failure-consumption policy decides).
 
   The DC shown is the effective one: the per-component `dcOverride` when set, else the
-  salvage check's default — resolved builder-side, exactly as the engine resolves it.
+  salvage check's default — resolved builder-side, exactly as the engine resolves it. A
+  roll-under or character-value check states its target and source instead (issue 2005).
 -->
 <script>
   import Medallion from '../../../../components/Medallion.svelte';
@@ -28,6 +29,7 @@
   const checkUsable = $derived(salvage?.checkUsable === true);
   const results = $derived(Array.isArray(salvage?.results) ? salvage.results : []);
   const dc = $derived(Number.isFinite(salvage?.dc) ? salvage.dc : null);
+  const target = $derived(checkUsable ? (salvage?.target ?? null) : null);
 </script>
 
 <div class="salvage-body" data-inventory-salvage-body={checkUsable ? 'simple-check' : 'no-check'}>
@@ -37,12 +39,21 @@
         ? localize('FABRICATE.App.Inventory.Salvage.OnASuccess')
         : localize('FABRICATE.App.Inventory.Salvage.YouWillRecover')}</Kicker
     >
-    {#if checkUsable && dc !== null}
+    {#if target?.text}
+      <span class="salvage-dc" data-inventory-salvage-target={target.direction}>{target.text}</span>
+    {:else if checkUsable && dc !== null}
       <span class="salvage-dc" data-inventory-salvage-dc={String(dc)}>
         {localize('FABRICATE.App.Inventory.Salvage.Dc', { dc })}
       </span>
     {/if}
   </p>
+  {#if target?.source}
+    <p class="salvage-target-source" data-inventory-salvage-target-source>{target.source}</p>
+  {:else if target?.unresolved}
+    <p class="salvage-target-source" data-inventory-salvage-target-unresolved>
+      {target.unresolved}
+    </p>
+  {/if}
 
   {#if results.length === 0}
     <EmptyState note hint={localize('FABRICATE.App.Inventory.Salvage.NoResults')} />
@@ -104,6 +115,12 @@
     font-weight: 700;
     letter-spacing: 0;
     color: var(--fab-text-secondary);
+  }
+
+  .salvage-target-source {
+    margin: 0;
+    font-size: 11px;
+    color: var(--fab-text-muted);
   }
 
   .salvage-result-list {

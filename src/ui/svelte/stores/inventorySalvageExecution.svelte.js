@@ -68,6 +68,8 @@ function successSnapshot(result, systemId, componentId) {
       .map((entry) => entry?.componentId)
       .filter(Boolean),
     outcomeId: result?.salvageRun?.checkResult?.data?.outcomeId ?? null,
+    // The executed check's display projection, for the summary's evidence rows (issue 2005).
+    check: result?.check ?? null,
     // What the resolution FIRED, per stage occurrence (issue 1286), published
     // VERBATIM from the run record.
     //

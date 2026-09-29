@@ -15,6 +15,52 @@ import { playerCase, responsiveLayout } from './caseFactories.js';
 /** The single-subject roll prompt: Fabricate's own modal, mounted over the player window. */
 const SINGLE_PROMPT = '.fabricate-app .manager-modal[data-roll-prompt="single"]';
 
+/** Issue 2005's player-rendering states: open the horseshoe and press Craft, prompting. */
+const CRAFT_HORSESHOE = Object.freeze([
+  { selector: '.crafting-recipe-row[data-recipe-id="sm-r-horseshoe"]' },
+  { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
+]);
+/** Type a rolled situational bonus into the standing prompt, which the pre-roll row then states. */
+const TYPE_ROLLED_BONUS = Object.freeze({
+  selector: `${SINGLE_PROMPT} input[name="situationalBonus"]`,
+  fill: '1d4',
+});
+const ROLL = Object.freeze({ selector: `${SINGLE_PROMPT} button[type="submit"]` });
+/** Choose a roll mode on the standing prompt the way a player does, through the shared Select. */
+const ROLL_MODE = (mode) => [
+  { selector: `${SINGLE_PROMPT} .mode-field .fabricate-select-trigger` },
+  { selector: `.fabricate-app > .fabricate-select-popover [data-popover-option="${mode}"]` },
+];
+const RESULT_BOX = '[data-crafting-run-summary] [data-recipe-section="roll-result"]';
+const EVIDENCE_ROWS = (...ids) =>
+  `[data-check-evidence-rows]${ids.map((id) => `:has([data-check-evidence="${id}"])`).join('')}`;
+/** The result card a `chatLog=1` lab docks beside the window; it never whispers to hide a check. */
+const CHAT_CARD = '.fabricate-craft-chat';
+/** The lab's own docked log, asserted visibly rather than as UI the product emits. */
+const LAB_CHAT = (visibility) =>
+  `[data-view-lab-chat-log] > .chat-message[data-view-lab-chat-visibility="${visibility}"]`;
+const PROMPT_SOURCES = [
+  CRAFTING_SIMPLE,
+  /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target)?\.svelte$/,
+  /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
+];
+const RESULT_SOURCES = [
+  CRAFTING_SHARED,
+  CRAFTING_SIMPLE,
+  /^src\/ui\/svelte\/apps\/crafting\/detail\/(?:RollResultBox|CheckEvidenceRows)\.svelte$/,
+  /^src\/ui\/presenters\/check(?:Display|EvidenceRows)\.js$/,
+  /^src\/ui\/svelte\/stores\/craftingStore/,
+];
+const DESCRIPTOR_SOURCES = [
+  CRAFTING_SHARED,
+  CRAFTING_SIMPLE,
+  /^src\/ui\/presenters\/(?:CraftingListingBuilder|checkDescriptor)\.js$/,
+];
+const CHAT_SOURCES = [
+  /^src\/ui\/presenters\/(?:CraftingChatCard|checkDisplay|checkEvidenceRows)\.js$/,
+  /^src\/systems\/craftCardFields\.js$/,
+];
+
 export const CASES = Object.freeze([
   playerCase({
     id: 'player-crafting-roll-prompt-basic',
@@ -76,7 +122,8 @@ export const CASES = Object.freeze([
       ':has(.manager-modal-subtitle:text-is("Sera Vane · Hard Work"))' +
       ':has(.formula-content .formula:text-is("1d20") + .formula-note:text-is("The dice are compared as rolled."))' +
       ':has(.target-row > .manager-chip[data-roll-prompt-target="under"]:has-text("Target 11 · stay at or under"))' +
-      ':has(.target-row > .target-source:has-text("12 · Hard Work -2 · modifiers +1"))' +
+      ':has(.target-row > .target-source:has-text("Sera Vane @skills")' +
+      ':has-text("level 12 · Hard Work −2 · modifiers +1"))' +
       ':has(.static-modifiers .manager-chip:has-text("Steady hands +1"))' +
       ':has(.static-modifiers > .help:text-is("Each raises the target."))',
     kinds: ['player', 'crafting'],
@@ -108,6 +155,196 @@ export const CASES = Object.freeze([
       /^src\/ui\/presenters\/CraftingListingBuilder\.js$/,
       /^src\/ui\/svelte\/stores\/craftingStore/,
     ],
+  }),
+  // Issue 2005: a check that offers no situational bonus shows no field, and focus falls to Roll.
+  playerCase({
+    id: 'player-crafting-roll-prompt-under-bonus-off',
+    label: 'Player app — roll-under crafting roll prompt with no bonus offer',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', dialog: 'open', rollPromptState: 'under-bonus-off' },
+    steps: [...CRAFT_HORSESHOE],
+    expectSelector:
+      `${SINGLE_PROMPT}:has(.target-row > .manager-chip[data-roll-prompt-target="under"])` +
+      ':not(:has(input[name="situationalBonus"])):not(:has(.bonus-group))',
+    kinds: ['player', 'crafting'],
+    sourceMatches: PROMPT_SOURCES,
+  }),
+  // Strictly under: the chip and its explanation name a target the total must stay under.
+  playerCase({
+    id: 'player-crafting-roll-prompt-under-strict',
+    label: 'Player app — roll-under crafting roll prompt, strictly under the target',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', dialog: 'open', rollPromptState: 'under-strict' },
+    steps: [...CRAFT_HORSESHOE],
+    expectSelector:
+      `${SINGLE_PROMPT} .target-row > .manager-chip[data-roll-prompt-target="under"]` +
+      ':has-text("Target 11 · stay under")',
+    kinds: ['player', 'crafting'],
+    sourceMatches: PROMPT_SOURCES,
+  }),
+  // The player picks one of two modifiers, and the chip and its explanation follow the pick.
+  playerCase({
+    id: 'player-crafting-roll-prompt-under-picks',
+    label: 'Player app — roll-under crafting roll prompt with a modifier to pick',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', dialog: 'open', rollPromptState: 'under-picks' },
+    steps: [
+      ...CRAFT_HORSESHOE,
+      {
+        selector: `${SINGLE_PROMPT} input[type="radio"][name="craftingModifier"][value="lab-mod-sure-grip"]`,
+      },
+    ],
+    expectSelector:
+      `${SINGLE_PROMPT}:has(input[type="radio"][name="craftingModifier"])` +
+      ':has(.target-row > .manager-chip[data-roll-prompt-target="under"]:has-text("Target 12 · stay at or under"))',
+    kinds: ['player', 'crafting'],
+    sourceMatches: PROMPT_SOURCES,
+  }),
+  // A typed rolled bonus is pending: the chip names it beside the settled target, never an average.
+  playerCase({
+    id: 'player-crafting-roll-prompt-under-rolled-bonus',
+    label: 'Player app — roll-under crafting roll prompt with a rolled bonus typed',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', dialog: 'open', rollPromptState: 'under' },
+    steps: [...CRAFT_HORSESHOE, TYPE_ROLLED_BONUS],
+    expectSelector:
+      `${SINGLE_PROMPT} .target-live[aria-live="polite"] .target-row` +
+      ' > .manager-chip:has-text("Target 11 + 1d4 · stay at or under")',
+    kinds: ['player', 'crafting'],
+    sourceMatches: PROMPT_SOURCES,
+  }),
+  // A character-value target read over is a target to meet or beat, never a DC.
+  playerCase({
+    id: 'player-crafting-roll-prompt-over-attribute',
+    label: 'Player app — roll-over crafting roll prompt against a character value',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', dialog: 'open', rollPromptState: 'over-attribute' },
+    steps: [...CRAFT_HORSESHOE],
+    expectSelector: `${SINGLE_PROMPT} .formula-content .manager-chip:has-text("Target 10 · meet or beat")`,
+    kinds: ['player', 'crafting'],
+    sourceMatches: PROMPT_SOURCES,
+  }),
+  // The recipe's check card names the target and its source fact, or why the target cannot be read.
+  playerCase({
+    id: 'player-crafting-check-descriptor-under-resolved',
+    label: 'Player app — roll-under check card naming its character-value target',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', rollPromptState: 'under' },
+    steps: [CRAFT_HORSESHOE[0], { selector: '[data-recipe-section="check"]', scroll: true }],
+    expectSelector:
+      '[data-recipe-section="check"]:not(:has([data-check-dc]))' +
+      ':has([data-check-target="under"]:has-text("Target 11 · stay at or under"))' +
+      ':has([data-check-target-source]:has-text("Sera Vane @skills")' +
+      ':has-text("level 12 · Hard Work −2 · modifiers +1"))',
+    kinds: ['player', 'crafting'],
+    sourceMatches: DESCRIPTOR_SOURCES,
+  }),
+  playerCase({
+    id: 'player-crafting-check-descriptor-under-unresolved',
+    label: 'Player app — roll-under check card whose character value cannot be read',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', rollPromptState: 'under-unresolved' },
+    steps: [CRAFT_HORSESHOE[0], { selector: '[data-recipe-section="check"]', scroll: true }],
+    expectSelector:
+      '[data-recipe-section="check"]:not(:has([data-check-target]))' +
+      ' [data-check-target-unresolved]:has-text("could not read a number for its target")',
+    kinds: ['player', 'crafting'],
+    sourceMatches: DESCRIPTOR_SOURCES,
+  }),
+  // The player result box's Target, Pre-rolled and Margin rows for a passed and a failed roll-under.
+  playerCase({
+    id: 'player-crafting-roll-result-under-pass',
+    label: 'Player app — roll-under crafting result box, passed, with its evidence rows',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', dialog: 'open', rollPromptState: 'under-evidence' },
+    steps: [...CRAFT_HORSESHOE, TYPE_ROLLED_BONUS, ROLL, { selector: RESULT_BOX, scroll: true }],
+    expectSelector:
+      `${RESULT_BOX}[data-roll-success="true"]` +
+      ':has([data-roll-summary]:text-is("The result group is produced.")) ' +
+      EVIDENCE_ROWS('target', 'preRolled', 'margin'),
+    kinds: ['player', 'crafting'],
+    sourceMatches: RESULT_SOURCES,
+  }),
+  playerCase({
+    id: 'player-crafting-roll-result-under-fail',
+    label: 'Player app — roll-under crafting result box, failed, with its evidence rows',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', dialog: 'open', rollPromptState: 'under-evidence-fail' },
+    steps: [...CRAFT_HORSESHOE, TYPE_ROLLED_BONUS, ROLL, { selector: RESULT_BOX, scroll: true }],
+    // The resolved-failure toast the player is shown, which the lab reports as a console warning.
+    allowedConsoleErrors: [/Your crafting check failed/],
+    expectSelector:
+      `${RESULT_BOX}[data-roll-success="false"]` +
+      ':has([data-roll-summary]:text-is("Nothing is produced; the failure policy applies.")) ' +
+      EVIDENCE_ROWS('target', 'preRolled', 'margin'),
+    kinds: ['player', 'crafting'],
+    sourceMatches: RESULT_SOURCES,
+  }),
+  // The posted result card, docked in a lab chat log: public states its rows, private and blind none.
+  playerCase({
+    id: 'player-crafting-chat-card-under-public',
+    label: 'Player app — roll-under crafting result card, public roll, with its evidence rows',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', dialog: 'open', rollPromptState: 'under-evidence', chatLog: '1' },
+    steps: [...CRAFT_HORSESHOE, TYPE_ROLLED_BONUS, ROLL],
+    expectSelector:
+      `${CHAT_CARD}:has(.fabricate-craft-chat__result):has(.fabricate-craft-chat__dice) ` +
+      '.fabricate-craft-chat__evidence:has([data-check-evidence="preRolled"])',
+    expectVisible: `${LAB_CHAT('public')} .fabricate-craft-chat__evidence`,
+    kinds: ['player', 'crafting'],
+    sourceMatches: CHAT_SOURCES,
+  }),
+  playerCase({
+    id: 'player-crafting-chat-card-under-whispered',
+    label: 'Player app — roll-under crafting result card after a private GM roll, no evidence rows',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', dialog: 'open', rollPromptState: 'under-evidence', chatLog: '1' },
+    steps: [...CRAFT_HORSESHOE, TYPE_ROLLED_BONUS, ...ROLL_MODE('gmroll'), ROLL],
+    expectSelector:
+      `${CHAT_CARD}:has(.fabricate-craft-chat__result):has(.fabricate-craft-chat__roll)` +
+      ':not(:has(.fabricate-craft-chat__dice)):not(:has(.fabricate-craft-chat__evidence))',
+    expectVisible: LAB_CHAT('whisper'),
+    kinds: ['player', 'crafting'],
+    sourceMatches: CHAT_SOURCES,
+  }),
+  playerCase({
+    id: 'player-crafting-chat-card-under-blind',
+    label: 'Player app — roll-under crafting result card after a blind roll, no evidence rows',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', dialog: 'open', rollPromptState: 'under-evidence', chatLog: '1' },
+    steps: [...CRAFT_HORSESHOE, TYPE_ROLLED_BONUS, ...ROLL_MODE('blindroll'), ROLL],
+    expectSelector:
+      `${CHAT_CARD}:has(.fabricate-craft-chat__result):has(.fabricate-craft-chat__roll)` +
+      ':not(:has(.fabricate-craft-chat__dice)):not(:has(.fabricate-craft-chat__evidence))',
+    expectVisible: LAB_CHAT('blind'),
+    kinds: ['player', 'crafting'],
+    sourceMatches: CHAT_SOURCES,
+  }),
+  // The control: a sum/over fixed card gains the pill, dice line, and Needed and Margin rows (M1, M3).
+  playerCase({
+    id: 'player-crafting-chat-card-over-control',
+    label: 'Player app — roll-over crafting result card, with its Needed and Margin rows',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', rollPromptState: 'over-evidence', chatLog: '1' },
+    steps: [...CRAFT_HORSESHOE],
+    expectSelector:
+      `${CHAT_CARD}:has(.fabricate-craft-chat__result)` +
+      ':has([data-check-evidence="needed"]):has([data-check-evidence="margin"])',
+    kinds: ['player', 'crafting'],
+    sourceMatches: CHAT_SOURCES,
   }),
   playerCase({
     id: 'player-crafting-roll-prompt-count',

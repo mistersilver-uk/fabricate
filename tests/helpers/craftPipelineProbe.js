@@ -866,7 +866,9 @@ export function salvageProbe({
     sourceItem,
     async salvage(options = {}) {
       const result = await engine.salvage(actor.uuid, systemId, componentId, options);
-      journal.push('returned', { ...result, salvageRun: result.salvageRun ?? null });
+      // The display projection (issue 2005) is pinned by the evidence suites, not this journal.
+      const { check: _check, ...returned } = result;
+      journal.push('returned', { ...returned, salvageRun: result.salvageRun ?? null });
       return result;
     },
   };

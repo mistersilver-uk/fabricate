@@ -69,3 +69,19 @@ export function resolvedEssencesFor(system, corpus) {
 export function resolvedToolsFor(system, corpus) {
   return resolveScopedEntityRead(system, corpus, 'tools');
 }
+
+/** A salvage's required Tools: its `toolIds`, trimmed and deduplicated, in the system's scope. */
+export function salvageToolsFor(system, salvage, corpus) {
+  const ids = Array.isArray(salvage?.toolIds) ? salvage.toolIds : [];
+  const library = resolvedToolsFor(system, corpus);
+  const seen = new Set();
+  const tools = [];
+  for (const rawId of ids) {
+    const id = String(rawId ?? '').trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    const tool = library.find((entry) => entry?.id === id);
+    if (tool) tools.push(tool);
+  }
+  return tools;
+}

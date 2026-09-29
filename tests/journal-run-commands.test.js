@@ -16,6 +16,7 @@ import { installCountDice } from './helpers/countEngineDice.js';
 import { preparedCountCheck } from './helpers/countFixtures.js';
 import { mergeHistoryFlag } from './helpers/journal-fixtures.js';
 import { gatheringFixture } from './helpers/real-gathering-attempt.js';
+import { UNDER_DATA } from './helpers/checkEvidenceFixtures.js';
 
 import {
   JOURNAL_RUN_SOCKET_KIND,
@@ -2068,6 +2069,129 @@ describe('journal run command protocol', () => {
       0,
       'a check evaluated as secret stays secret even if visibility is gained during execution'
     );
+  });
+
+  /** A crafting (or other) execute reply over a check the operations describe and evaluate. */
+  const evidenceReply = async ({
+    secret = false,
+    rollMode = 'publicroll',
+    runType = 'crafting',
+    required = true,
+    entitled = null,
+    data = { ...UNDER_DATA, targetTerms: [{ kind: 'anchor', value: 14, path: '@x' }] },
+    success = true,
+    handoff = false,
+  } = {}) => {
+    const run = { id: 'run-1', lifecycleVersion: 1, runRevision: 3, status: 'waiting' };
+    const { service } = commandHarness({
+      currentUserId: 'gm',
+      run,
+      promptCheck: async () => ({ confirmed: true }),
+      operations: {
+        [runType]: {
+          getRun: () => run,
+          describeCheck: async () =>
+            required
+              ? {
+                  required: true,
+                  publicPrompt: { label: 'Known recipe' },
+                  privateEvaluation: { rollFormula: '3d6' },
+                }
+              : { required: false },
+          evaluateCheck: async () => ({
+            engineEvaluated: true,
+            success,
+            secret,
+            data,
+            visibility: { rollMode, secret },
+            ...(handoff && { rollHandoff: { serializedRoll: { formula: '3d6', total: 9 } } }),
+          }),
+          execute: async () => ({ success: true, runId: run.id, runRevision: 4 }),
+          ...(entitled !== null && {
+            authorizeRollHandoff: async () => {
+              if (entitled === 'throws') throw new Error('lookup failed');
+              return entitled;
+            },
+          }),
+        },
+      },
+    });
+    return service.executeJournalRunCommand({
+      actorUuid: 'Actor.a',
+      runType,
+      runId: run.id,
+      expectedRevision: 3,
+      action: 'execute',
+    });
+  };
+
+  it('hands a visible crafting reply its executed check projection, and a secret one none (issue 2005)', async () => {
+    const visible = await evidenceReply();
+    assert.equal(visible.check.evidence.target, 14);
+    assert.deepEqual(visible.check.visibility, { rollMode: 'publicroll', secret: false });
+    assert.doesNotMatch(JSON.stringify(visible.check), /@x|path/, 'the projection is an allowlist');
+    assert.ok(!Object.hasOwn(await evidenceReply({ secret: true }), 'check'), 'a secret reply carries no evidence');
+  });
+
+  it('hands a blind roll no evidence, and the roller its own private roll (R8)', async () => {
+    const blind = await evidenceReply({ rollMode: 'blindroll' });
+    assert.equal(blind.success, true, 'positive control: the command still succeeds');
+    assert.ok(!Object.hasOwn(blind, 'check'), 'the roller never sees a blind roll');
+    for (const rollMode of ['gmroll', 'selfroll']) {
+      assert.equal((await evidenceReply({ rollMode })).check.evidence.target, 14, rollMode);
+    }
+  });
+
+  it('adds no check key for a stage with no rolled check, or for a gathering run (QE8 P3, P4)', async () => {
+    const unrolled = await evidenceReply({ required: false });
+    assert.equal(unrolled.success, true);
+    assert.ok(!Object.hasOwn(unrolled, 'check'), 'no rolled check, no key');
+    const gathering = await evidenceReply({ runType: 'gathering' });
+    assert.equal(gathering.success, true);
+    assert.ok(!Object.hasOwn(gathering, 'check'), 'the projection is a crafting reply field');
+  });
+
+  it('hands executed evidence only to an initiator the post-commit entitlement admits (G1)', async () => {
+    const hidden = await evidenceReply({ entitled: false });
+    assert.equal(hidden.success, true, 'positive control: the command still succeeds');
+    assert.ok(!Object.hasOwn(hidden, 'check'), 'an unentitled initiator receives no evidence');
+    assert.equal((await evidenceReply({ entitled: true })).check.evidence.target, 14);
+    const failedRoll = await evidenceReply({ entitled: true, success: false });
+    assert.equal(failedRoll.check.evidence.target, 14, 'a resolved failure shows its rows too');
+  });
+
+  it('fails closed when the entitlement lookup throws: no evidence and no handoff (QE r3 2)', async () => {
+    const entitledReply = await evidenceReply({ entitled: true, handoff: true });
+    assert.ok(Object.hasOwn(entitledReply, 'check'), 'positive control: evidence when entitled');
+    assert.ok(Object.hasOwn(entitledReply, 'rollHandoff'), 'positive control: and the handoff');
+    const errored = await evidenceReply({ entitled: 'throws', handoff: true });
+    assert.equal(errored.success, true);
+    assert.ok(!Object.hasOwn(errored, 'check') && !Object.hasOwn(errored, 'rollHandoff'));
+  });
+
+  it('never lets a seeded private marker reach an unentitled reply (G1)', async () => {
+    const data = {
+      ...UNDER_DATA,
+      resolvedFormula: '3d6 + 7',
+      rollFormula: '3d6 + @secret.formula',
+      targetExpression: '@secret.sentinel',
+      targetActor: 'Hidden NPC',
+      targetTerms: [
+        { kind: 'anchor', value: 12 },
+        { kind: 'adjustment', value: -2, label: 'PRIVATE-TIER' },
+      ],
+      preRolls: [
+        { source: 'library', label: 'PRIVATE-LABEL', expression: '1d4+@priv', total: 3, destination: 'target' },
+      ],
+    };
+    const markers = /PRIVATE-LABEL|PRIVATE-TIER|@secret\.sentinel|@secret\.formula|Hidden NPC|@priv|3d6 \+ 7/;
+    for (const rollMode of ['publicroll', 'gmroll', 'selfroll']) {
+      const hidden = await evidenceReply({ entitled: false, rollMode, data });
+      assert.doesNotMatch(JSON.stringify(hidden), markers, rollMode);
+    }
+    const shown = await evidenceReply({ entitled: true, data });
+    assert.match(JSON.stringify(shown), /PRIVATE-LABEL/, 'positive control: the markers were seeded');
+    assert.equal(shown.check.evidence.rollFormula, '3d6 + @secret.formula', 'an entitled reply has it');
   });
 
   it('accepts replies only from the elected GM for this recipient/session/correlation', async () => {

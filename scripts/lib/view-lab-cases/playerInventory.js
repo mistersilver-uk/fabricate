@@ -38,6 +38,13 @@ const BULK_PROMPT_SOURCES = [
   /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/,
 ];
 
+/** The Salvage tab's roll-under target line (issue 2005): its presenter and the bodies drawing it. */
+const SALVAGE_TARGET_SOURCES = Object.freeze([
+  /^src\/ui\/svelte\/apps\/inventory\/detail\/salvage\/Salvage(?:Simple|Routed)Body\.svelte$/,
+  /^src\/ui\/svelte\/apps\/inventory\/detail\/InventorySalvagePanel\.svelte$/,
+  /^src\/ui\/presenters\/(?:salvageCheckNeed|checkDescriptor)\.js$/,
+]);
+
 export const CASES = Object.freeze([
   playerCase({
     id: 'player-gathering-environments',
@@ -220,6 +227,40 @@ export const CASES = Object.freeze([
       /^src\/utils\/progressiveResultOrder\.js$/,
     ],
   }),
+  // Issue 2005: a salvage rolled under a fixed target states its evidence rows in the summary.
+  playerCase({
+    id: 'player-salvage-under-result',
+    label: 'Player app — Salvage summary after a roll-under salvage, with its evidence rows',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'inventory', dialog: 'open', rollPromptState: 'salvage-under-evidence' },
+    steps: [
+      { selector: '.inventory-filters input', fill: 'Longsword' },
+      {
+        selector:
+          '.inventory-card[data-inventory-card="lab-smithing:sm-longsword"] .inventory-card-button',
+      },
+      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+      { selector: '[data-inventory-salvage-action]' },
+      {
+        selector: '.fabricate-app .manager-modal[data-roll-prompt="single"] button[type="submit"]',
+      },
+      {
+        selector: '[data-inventory-salvage-summary="success"] [data-check-evidence-rows]',
+        scroll: true,
+      },
+    ],
+    expectSelector:
+      '[data-inventory-salvage-summary="success"] [data-check-evidence-rows]' +
+      ':has([data-check-evidence="target"]):has([data-check-evidence="margin"])',
+    kinds: ['player', 'inventory'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/inventory\/detail\/salvage\/SalvageRollSummary\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/detail\/CheckEvidenceRows\.svelte$/,
+      /^src\/ui\/presenters\/check(?:Display|EvidenceRows)\.js$/,
+      /^src\/ui\/svelte\/stores\/inventorySalvageExecution/,
+    ],
+  }),
   playerCase({
     id: 'player-inventory-multi-system',
     label: 'Player app — Inventory multi system',
@@ -236,6 +277,49 @@ export const CASES = Object.freeze([
     ],
     kinds: ['player', 'inventory'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/inventory\//, /^src\/ui\/svelte\/stores\/inventory/],
+  }),
+  // Issue 2005: a roll-under salvage names its target and source in place of a DC, and its banner
+  // says the total must stay at or under the target.
+  playerCase({
+    id: 'player-salvage-under-simple',
+    label: 'Player app — Salvage roll-under against a character value',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'inventory', rollPromptState: 'salvage-under-skill' },
+    steps: [
+      { selector: '.inventory-filters input', fill: 'Air Shard' },
+      {
+        selector:
+          '.inventory-card[data-inventory-card="lab-smithing:sm-air-shard"] .inventory-card-button',
+      },
+      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+    ],
+    expectSelector:
+      '[data-inventory-salvage-panel="simple"]' +
+      ':has([data-inventory-salvage-banner]:has-text("stay at or under the target"))' +
+      ':has([data-inventory-salvage-target="under"]):has([data-inventory-salvage-target-source])',
+    kinds: ['player', 'inventory'],
+    sourceMatches: SALVAGE_TARGET_SOURCES,
+  }),
+  playerCase({
+    id: 'player-salvage-under-routed',
+    label: 'Player app — Routed salvage roll-under, its base target in place of a DC',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'inventory', rollPromptState: 'salvage-under' },
+    steps: [
+      { selector: '.inventory-filters input', fill: 'Ruined Slag' },
+      {
+        selector:
+          '.inventory-card[data-inventory-card="lab-runework:rw-slag"] .inventory-card-button',
+      },
+      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+    ],
+    expectSelector:
+      '[data-inventory-salvage-body="routed"]:has([data-inventory-salvage-target="under"])' +
+      ':not(:has([data-inventory-salvage-dc]))',
+    kinds: ['player', 'inventory'],
+    sourceMatches: SALVAGE_TARGET_SOURCES,
   }),
   playerCase({
     id: 'player-salvage-misconfigured',
