@@ -51,5 +51,5 @@ export const TARGET_LIBRARY_NAME_TOTAL = 57;
  */
 export const TARGET_MANIFEST_ROWS = rows('manifestTargetRows');
 
-/** @see TARGET_MANIFEST_ROWS */
-export const TARGET_MANIFEST_ROW_TOTAL = 54;
+/** @see TARGET_MANIFEST_ROWS; 55 as of issue 2006, whose result boxes promoted the die tiles. */
+export const TARGET_MANIFEST_ROW_TOTAL = 55;

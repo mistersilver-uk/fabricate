@@ -13,12 +13,17 @@ import {
 } from '../helpers/svelte-component-harness.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import {
+  COUNT_DISPLAY,
+  COUNT_ROWS,
   OVER_FIXED_DATA,
   UNDER_DATA,
   UNDER_ROWS,
+  ZERO_COUNT_DISPLAY,
   executedCheck,
+  executedCountCheck,
   shippedLocalize,
 } from '../helpers/checkEvidenceFixtures.js';
+import { tileModel } from '../../src/ui/presenters/countDiceTiles.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const SHARED = {
@@ -33,6 +38,7 @@ const SHARED = {
 };
 const FACT_ROW = 'src/ui/svelte/apps/journal/JournalFactRow.svelte';
 const EVIDENCE = 'src/ui/svelte/apps/crafting/detail/CheckEvidenceRows.svelte';
+const TILES = 'src/ui/svelte/components/DiceTiles.svelte';
 const MEDALLION = 'src/ui/svelte/components/Medallion.svelte';
 const RESULT_BOX = 'src/ui/svelte/apps/crafting/detail/RollResultBox.svelte';
 const SALVAGE_SUMMARY = 'src/ui/svelte/apps/inventory/detail/salvage/SalvageRollSummary.svelte';
@@ -47,6 +53,17 @@ function rowsOf(root) {
   ]);
 }
 
+/** `[face, marks]` for every die tile the box draws, in order. */
+const tilesOf = (root) =>
+  [...root.querySelectorAll('[data-dice-tile-face]')].map((tile) => [
+    Number(tile.dataset.diceTileFace),
+    tile.dataset.diceTileMarks,
+  ]);
+
+/** The same, straight from the tile model of the executed dice. */
+const modelTiles = (countDisplay) =>
+  tileModel(countDisplay).tiles.map((tile) => [tile.face, tile.marks.join(' ')]);
+
 /** The box's markup without Svelte's block anchors, for a byte comparison. */
 const markupOf = (root) => root.innerHTML.replaceAll('<!---->', '');
 
@@ -58,7 +75,7 @@ describe('RollResultBox evidence rows', () => {
   const harness = createMountedComponentHarness({
     ...SHARED,
     tmpPrefix: 'fabricate-roll-result-evidence-',
-    compiledModules: [MEDALLION, FACT_ROW, EVIDENCE, RESULT_BOX],
+    compiledModules: [MEDALLION, FACT_ROW, TILES, EVIDENCE, RESULT_BOX],
     componentPath: RESULT_BOX,
   });
   before(async () => {
@@ -171,6 +188,77 @@ describe('RollResultBox evidence rows', () => {
     );
   });
 
+  it("states a count check's tiles and legend above its count rows (issue 2006)", async () => {
+    const root = await harness.mount({ result: { ...result(executedCountCheck()), total: 2 } });
+    assert.deepEqual(tilesOf(root), [
+      [10, 'qualified exploded'],
+      [5, ''],
+      [1, 'cancelled'],
+      [8, 'qualified'],
+      [9, 'qualified'],
+    ]);
+    assert.deepEqual(tilesOf(root), modelTiles(COUNT_DISPLAY), 'the one tile model (N29)');
+    assert.ok(root.querySelector('[data-dice-tiles-legend]'), 'the result box draws the legend');
+    assert.deepEqual(rowsOf(root), COUNT_ROWS);
+    assert.equal(root.querySelector('[data-roll-summary]').textContent, 'The result group is produced.');
+    const order = [...root.querySelector('[data-recipe-section]').children].map(
+      (child) => child.className.split(' ')[0]
+    );
+    assert.deepEqual(order, [
+      'crafting-roll-head',
+      'crafting-roll-summary',
+      'check-count-tiles',
+      'check-evidence',
+      'crafting-roll-awards',
+    ]);
+  });
+
+  it('states a count only from its executed dice, never what changed after (N31)', async () => {
+    const countDisplay = structuredClone(COUNT_DISPLAY);
+    const check = executedCountCheck(countDisplay);
+    countDisplay.threshold.effective = 3;
+    countDisplay.results[1].cancelled = false;
+    const root = await harness.mount({ result: result(check) });
+    assert.deepEqual(rowsOf(root), COUNT_ROWS);
+    assert.deepEqual(tilesOf(root), modelTiles(COUNT_DISPLAY));
+  });
+
+  it('withholds a secret or blind count, tiles and rows alike', async () => {
+    for (const visibility of [{ rollMode: 'blindroll' }, { rollMode: 'publicroll', secret: true }]) {
+      const root = await harness.mount({ result: result(executedCountCheck(COUNT_DISPLAY, visibility)) });
+      assert.ok(!root.querySelector('[data-dice-tile-face], .check-evidence'), JSON.stringify(visibility));
+      harness.remount();
+    }
+  });
+
+  it('gives a zero pool no total and no tile, only why nothing was rolled (N32)', async () => {
+    const zero = executedCountCheck(ZERO_COUNT_DISPLAY);
+    const root = await harness.mount({
+      result: { success: false, total: 0, items: [], check: zero, checkResult: { total: 0 } },
+    });
+    assert.ok(!root.querySelector('[data-roll-total]'), 'no roll of 0');
+    assert.ok(!root.querySelector('[data-dice-tile-face], [data-check-count-tiles]'));
+    assert.deepEqual(rowsOf(root), [
+      ['pool', 'Pool', 'Reduced to zero by a situational penalty of −6'],
+      ['result', 'Result', 'A pool reduced to zero fails automatically. Nothing was rolled.'],
+    ]);
+    harness.remount();
+    const rolled = await harness.mount({ result: { ...result(executedCountCheck()), total: 2 } });
+    assert.equal(rolled.querySelector('[data-roll-total]').textContent, '2', 'positive control');
+  });
+
+  it('says a failed count that netted below zero botched', async () => {
+    const botch = { ...COUNT_DISPLAY, net: -1, margin: -3, qualified: 0, cancelled: 1 };
+    const root = await harness.mount({
+      result: { success: false, items: [], check: executedCountCheck(botch) },
+    });
+    assert.equal(
+      root.querySelector('[data-roll-summary]').textContent,
+      'Botched. Nothing is produced; the failure policy applies.'
+    );
+    assert.ok(root.querySelector('[data-check-evidence="count"] .journal-fact-row.is-danger'));
+  });
+
   it('renders nothing at all without a recorded result, which a refusal leaves (Q10)', async () => {
     const root = await harness.mount({ result: null });
     assert.ok(!root.querySelector('[data-recipe-section="roll-result"]'));
@@ -185,7 +273,7 @@ describe('SalvageRollSummary evidence rows', () => {
     // The shared salvage-failure fallback literal (issue 2092); an omission HANGS this
     // suite (# cancelled) rather than failing it.
     rawModules: [...SHARED.rawModules, 'src/systems/salvageMessages.js'],
-    compiledModules: [MEDALLION, FACT_ROW, EVIDENCE, SALVAGE_SUMMARY],
+    compiledModules: [MEDALLION, FACT_ROW, TILES, EVIDENCE, SALVAGE_SUMMARY],
     componentPath: SALVAGE_SUMMARY,
   });
   before(async () => {
@@ -210,6 +298,26 @@ describe('SalvageRollSummary evidence rows', () => {
       ['margin', 'Margin', '+3'],
     ]);
     assert.ok(!markupOf(root).includes('result group'), 'the outcome sentence is crafting-only');
+  });
+
+  it("states a count salvage's tiles and rows, and no roll for a zero pool (issue 2006)", async () => {
+    const root = await harness.mount({
+      result: { state: 'success', message: 'Salvaged.', rollValue: 2, check: executedCountCheck() },
+    });
+    assert.deepEqual(tilesOf(root), modelTiles(COUNT_DISPLAY));
+    assert.ok(root.querySelector('[data-dice-tiles-legend]'));
+    assert.deepEqual(rowsOf(root), COUNT_ROWS);
+    harness.remount();
+    const zero = await harness.mount({
+      result: {
+        state: 'success',
+        message: 'Salvaged.',
+        rollValue: 0,
+        check: executedCountCheck(ZERO_COUNT_DISPLAY),
+      },
+    });
+    assert.ok(!zero.querySelector('[data-inventory-salvage-roll]'), 'no roll of 0');
+    assert.ok(!zero.querySelector('[data-dice-tile-face]'));
   });
 
   it('keeps the space between the message and the roll it names (F5)', async () => {

@@ -223,10 +223,10 @@ test('the inputs every property below quantifies over are alive', () => {
   // screen is its second independent caller, and property (e) below reported it as a component that
   // had crossed the membership bar with nobody adjudicating it.
   // 68 as of issue 2005, which promoted the shared Preview-as picker, the Player sees block and the
-  // executed check evidence rows.
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 69, 'the shipped primitive set changed size');
-  // 17 as of issue 2006, which records the die tiles at one importer until its result boxes land.
-  assert.equal(NOT_A_PRIMITIVE.length, 17, 'the recorded non-member set changed size');
+  // executed check evidence rows; 70 as of issue 2006, whose result boxes promoted the die tiles.
+  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 70, 'the shipped primitive set changed size');
+  // 16 as of issue 2006, which promoted the die tiles once the result boxes drew them.
+  assert.equal(NOT_A_PRIMITIVE.length, 16, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(
     PUBLISHING_CASE_IDS.size > 0,

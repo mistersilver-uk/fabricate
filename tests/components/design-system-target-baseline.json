@@ -88,6 +88,7 @@
     "src/ui/svelte/components/ArmedDangerButton.svelte | 1",
     "src/ui/svelte/components/ChanceSlider.svelte | 1",
     "src/ui/svelte/components/CollapsibleGroupHeader.svelte | 1",
+    "src/ui/svelte/components/DiceTiles.svelte | 1",
     "src/ui/svelte/components/EditorTabs.svelte | 1",
     "src/ui/svelte/components/EditorValidationSurface.svelte | 1",
     "src/ui/svelte/components/EssencePool.svelte | 1",

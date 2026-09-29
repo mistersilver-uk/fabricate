@@ -1,7 +1,8 @@
 <!--
   The executed check's evidence rows in a player result box (issue 2005), read from the result's
   display projection and never from later actor or config state. Each row is the shared fact row
-  in its keyed form; a box narrower than 360px sets the chat card's 88px key column.
+  in its keyed form; a box narrower than 360px sets the chat card's 88px key column. A count check
+  states its die tiles with their legend above its count rows (issue 2006).
 
   Props:
   | prop | values | default | contract |
@@ -13,6 +14,11 @@
     checkEvidenceRows,
     pathBreakSegments,
   } from '../../../../presenters/checkEvidenceRows.js';
+  import {
+    countEvidenceRows,
+    statesCountEvidence,
+  } from '../../../../presenters/countEvidenceRows.js';
+  import DiceTiles from '../../../components/DiceTiles.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import JournalFactRow from '../../journal/JournalFactRow.svelte';
 
@@ -22,20 +28,46 @@
   const withheld = $derived(
     check?.visibility?.secret === true || check?.visibility?.rollMode === 'blindroll'
   );
-  const rows = $derived(withheld ? [] : checkEvidenceRows(check, (key) => localize(key)));
+  const counted = $derived(!withheld && statesCountEvidence(check));
+  // A pool reduced to zero rolled no die, so it draws no tile row at all.
+  const tiles = $derived(
+    counted && check.count.tiles.tiles.length + check.count.tiles.more > 0
+      ? check.count.tiles
+      : null
+  );
+  const rows = $derived.by(() => {
+    if (withheld) return [];
+    const loc = (key) => localize(key);
+    return counted ? countEvidenceRows(check, loc) : checkEvidenceRows(check, loc);
+  });
 </script>
 
+{#if tiles}
+  <div class="check-count-tiles" data-check-count-tiles>
+    <DiceTiles model={tiles} legend />
+  </div>
+{/if}
 {#if rows.length > 0}
   <div class="check-evidence" data-check-evidence-rows>
     {#each rows as row (row.id)}
       <div class="check-evidence-row" data-check-evidence={row.id}>
-        <JournalFactRow icon={null} keyed label={row.label} value={pathBreakSegments(row.text)} />
+        <JournalFactRow
+          icon={null}
+          keyed
+          danger={row.tone === 'danger'}
+          label={row.label}
+          value={pathBreakSegments(row.text)}
+        />
       </div>
     {/each}
   </div>
 {/if}
 
 <style>
+  .check-count-tiles {
+    min-width: 0;
+  }
+
   .check-evidence {
     --journal-fact-key-width: 120px;
     container-type: inline-size;

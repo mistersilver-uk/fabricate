@@ -49,7 +49,12 @@
   // printing "with a roll of 0/null". The connective is prose (it inherits the muted
   // message treatment); only the NUMBER is set mono, honouring the box's rule that
   // mono is for roll totals and DC values.
-  const rollValue = $derived(Number.isFinite(result?.rollValue) ? result.rollValue : null);
+  // A pool reduced to zero rolled nothing, so it has no roll to name either (issue 2006).
+  const rollValue = $derived(
+    Number.isFinite(result?.rollValue) && result?.check?.count?.zeroPool !== true
+      ? result.rollValue
+      : null
+  );
   const hasRoll = $derived(rollValue !== null);
 </script>
 
