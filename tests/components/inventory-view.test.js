@@ -55,6 +55,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/bookRecipeBrowse.js',
     'src/ui/svelte/util/disclosurePhrase.js',
     'src/ui/svelte/util/recipeItemAccessBadge.js',
+    // The shared salvage-failure fallback literal (issue 2092), read by SalvageRollSummary.
+    'src/systems/salvageMessages.js',
     // NOTE: `progressiveStageThresholds.js` / `progressiveResultOrder.js` are NOT needed
     // here. `ProgressiveStageList.svelte` imports neither (only `foundryBridge`); the
     // real importer is `inventoryStore.svelte.js`, which this suite mocks with a POJO.

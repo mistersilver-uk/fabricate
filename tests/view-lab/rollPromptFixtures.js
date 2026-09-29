@@ -100,6 +100,9 @@ const EVIDENCE_STATES = {
   'under-unresolved': { rollFormula: '1d20', expression: '@skills.missing.level' },
   'over-evidence': { control: true },
   'salvage-under-evidence': { salvage: true },
+  // Issue 2092: the same fixed target, missed by a wide margin, so the panel's failure box
+  // states its evidence rows instead of clearing to a toast.
+  'salvage-under-evidence-fail': { salvage: true, rollFormula: '1d4 + 20' },
 };
 
 async function seedCheckEvidence(
@@ -138,7 +141,14 @@ async function seedCheckEvidence(
       salvageCraftingCheck: {
         ...system.salvageCraftingCheck,
         enabled: true,
-        simple: { rollFormula: '1d4', dc: 12, thresholdMode: 'meet', evaluation: under() },
+        // The passed formula overrides the default `1d4` (issue 2092's failing case forces a
+        // wide miss against the fixed target); every other salvage evidence case keeps `1d4`.
+        simple: {
+          rollFormula: rollFormula || '1d4',
+          dc: 12,
+          thresholdMode: 'meet',
+          evaluation: under(),
+        },
       },
     }),
   });
