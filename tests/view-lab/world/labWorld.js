@@ -28,7 +28,19 @@ const FABRICATE_NAMESPACE = 'fabricate';
 // These variants change persisted authoring before the real services initialize. The default
 // world remains unchanged, including every existing d100 editor and gathering screenshot.
 function seedGatheringTaskMode(content, mode) {
-  if (!['straight', 'routed', 'routed-under', 'routed-unmatched'].includes(mode)) return;
+  // Roll-under evaluations: `routed-under` reads Brenna's Intelligence (issue 2073), and
+  // `routed-under-fixed` is the fixed ladder whose Journal bands read `≤` (issue 2005). Declared
+  // here because a fixture test evaluates this function's text on its own.
+  const underEvaluations = {
+    'routed-under': {
+      product: 'sum',
+      direction: 'under',
+      target: { source: 'attribute', expression: '@abilities.int.mod' },
+    },
+    'routed-under-fixed': { product: 'sum', direction: 'under', target: { source: 'fixed' } },
+  };
+  const modes = ['straight', 'routed', 'routed-unmatched', ...Object.keys(underEvaluations)];
+  if (!modes.includes(mode)) return;
   const system = content.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.HERBALISM);
   const slice = content.gatheringConfig.systems[LAB_SYSTEM_IDS.HERBALISM];
   const task = structuredClone(slice.tasks.find((entry) => entry.id === 'hb-task-slowbloom'));
@@ -43,40 +55,54 @@ function seedGatheringTaskMode(content, mode) {
   // `routed-under`: issue 2073, a roll-under target read from Brenna's Intelligence, difficulty -1.
   if (mode === 'routed-under') task.adjustmentOverride = -1;
   if (mode !== 'straight') {
+    const evaluation = underEvaluations[mode];
     system.gatheringCraftingCheck = {
       ...system.gatheringCraftingCheck,
-      routed:
-        mode === 'routed-under'
-          ? {
-              rollFormula: '1d20',
-              dc: 15,
-              type: 'relative',
-              thresholdMode: 'meet',
-              evaluation: {
-                product: 'sum',
-                direction: 'under',
-                target: { source: 'attribute', expression: '@abilities.int.mod' },
-              },
-              relativeOutcomes: [
-                { id: 'lab-abundant', name: 'Abundant', success: true, dc: 0 },
-                { id: 'lab-failed', name: 'Failed', success: false, dc: -15 },
-              ],
-            }
-          : {
-              rollFormula: '1d20',
-              dc: 15,
-              type: 'relative',
-              thresholdMode: 'meet',
-              relativeOutcomes: [
-                { id: 'lab-abundant', name: 'Abundant', success: true, dc: 0 },
-                { id: 'lab-failed', name: 'Failed', success: false, dc: -15 },
-              ],
-            },
+      routed: {
+        rollFormula: '1d20',
+        dc: 15,
+        type: 'relative',
+        thresholdMode: 'meet',
+        ...(evaluation && { evaluation }),
+        relativeOutcomes: [
+          { id: 'lab-abundant', name: 'Abundant', success: true, dc: 0 },
+          { id: 'lab-failed', name: 'Failed', success: false, dc: -15 },
+        ],
+      },
     };
   }
   const replaceTask = (entry) => (entry.id === task.id ? task : entry);
   slice.tasks = slice.tasks.map(replaceTask);
   content.gatheringConfig.tasks = content.gatheringConfig.tasks.map(replaceTask);
+}
+
+/**
+ * Ashfall Runework's routed crafting check graded roll-under (issue 2005): `routed-under` against
+ * its fixed DC 12, and `routed-under-multiply` against a character value whose Ruined tier is
+ * Otherwise, so the Journal ladder states `≤` bands or labelled multipliers.
+ */
+function seedRuneworkCheckMode(content, mode) {
+  const system = content.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.RUNEWORK);
+  const routed = system?.craftingCheck?.routed;
+  if (!routed || !['routed-under', 'routed-under-multiply'].includes(mode)) return;
+  const multiply = mode === 'routed-under-multiply';
+  const adjustments = { 'rw-masterwork': 0.2, 'rw-standard': 0.5, 'rw-ruined': null };
+  system.craftingCheck = {
+    ...system.craftingCheck,
+    routed: {
+      ...routed,
+      evaluation: {
+        product: 'sum',
+        direction: 'under',
+        target: multiply
+          ? { source: 'attribute', expression: '@abilities.int.value', adjustmentKind: 'multiply' }
+          : { source: 'fixed' },
+      },
+      relativeOutcomes: routed.relativeOutcomes.map((outcome) =>
+        multiply ? { ...outcome, adjustment: adjustments[outcome.id] } : outcome
+      ),
+    },
+  };
 }
 
 /**
@@ -363,6 +389,7 @@ export async function buildLabWorld({
   noInteractables = false,
   noSceneRegions = false,
   gatheringTaskMode = null,
+  runeworkCheckMode = null,
   checkOverride = null,
   journalCaseState = null,
   checkPreviewState = null,
@@ -374,6 +401,7 @@ export async function buildLabWorld({
     seedJournalNoCheckFixture(content);
   }
   seedGatheringTaskMode(content, gatheringTaskMode);
+  seedRuneworkCheckMode(content, runeworkCheckMode);
   seedCheckOverride(content, checkOverride);
   if (noTools) stripTools(content);
   if (noAuthoredWorldComponents) stripAuthoredWorldComponents(content);

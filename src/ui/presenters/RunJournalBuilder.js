@@ -1,4 +1,5 @@
 import { resolveActiveCraftingCheckFormula } from '../../systems/checkModifierResolver.js';
+import { activeCheckEvaluation, isFixedSumOver } from '../../systems/checkTarget.js';
 import { craftingStepHistoryEvidence } from '../../systems/CraftingRunManager.js';
 import {
   actorToOption,
@@ -18,7 +19,11 @@ import {
 import { readStackQuantity } from '../../systems/itemStackQuantity.js';
 import { buildPassInventorySnapshot } from '../../systems/passInventorySnapshot.js';
 import { historyEvidenceFields } from '../../systems/runHistoryEvidence.js';
-import { craftingOutcomeBand, routedOutcomeBand } from '../../systems/runJournalOutcomeBands.js';
+import {
+  craftingOutcomeBand,
+  ladderRule,
+  routedOutcomeBand,
+} from '../../systems/runJournalOutcomeBands.js';
 import { getRunLifecycleContract } from '../../systems/runLifecycleState.js';
 import { resolvedComponentsFor, resolvedEssencesFor } from '../../systems/scopedEntityReads.js';
 import {
@@ -37,6 +42,8 @@ import { activityPermitsFailureResults } from '../../utils/failureResultPolicy.j
 import { cloneJson } from '../../utils/scalars.js';
 import { resolveRecipeImage } from '../svelte/util/craftingImageDefaults.js';
 
+import { comparisonText } from './checkDescriptor.js';
+
 const DEFAULT_RUN_IMAGE = 'icons/svg/item-bag.svg';
 const DEFAULT_GATHERING_IMAGE = 'icons/containers/bags/pouch-leather-brown-green.webp';
 // Generic player-facing label for a blind gathering run, shared with the
@@ -47,6 +54,14 @@ const DAY_SECONDS = 24 * 60 * 60;
 function recordedNumber(value) {
   if (typeof value !== 'number' && typeof value !== 'string') return null;
   return typeof value === 'string' && value.trim() === '' ? null : numberOrNull(value);
+}
+
+/** Outside sum/over/fixed a roll names its executed target and margin, never a DC (issue 2005). */
+function executedTargetFields(data) {
+  // A count's `target` is a per-die face, so its line keeps its wording until issue 2006.
+  if (data.product === 'count') return null;
+  if (data.direction !== 'under' && data.targetSource !== 'attribute') return null;
+  return { target: recordedNumber(data.target), margin: recordedNumber(data.margin) };
 }
 
 /** What a surface states about a ROLLED amount, or null for a fixed one (issue 1645): an award's
@@ -1239,7 +1254,7 @@ export class RunJournalBuilder {
         return {
           id: stringOrNull(outcome?.id) || `tier-${index + 1}`,
           name: stringOrEmpty(outcome?.name).trim(),
-          band: craftingOutcomeBand(outcome, routed, dc),
+          band: craftingOutcomeBand(outcome, routed, dc, this._bandLabels()),
           fail,
           yields: results.map((result, resultIndex) =>
             this._tierYield(result, systemId, resultIndex)
@@ -1790,6 +1805,7 @@ export class RunJournalBuilder {
     // not just the authored requirement.
     const data =
       lastCheckResult.data && typeof lastCheckResult.data === 'object' ? lastCheckResult.data : {};
+    const executed = executedTargetFields(data);
     return {
       success: lastCheckResult.success === true,
       outcome: stringOrNull(lastCheckResult.outcome),
@@ -1797,8 +1813,23 @@ export class RunJournalBuilder {
       reason: stringOrNull(lastCheckResult.reason),
       formula: stringOrNull(data.resolvedFormula) || stringOrNull(data.formula),
       total: recordedNumber(data.total) ?? recordedNumber(lastCheckResult.value),
-      dc: recordedNumber(data.dc),
+      dc: executed ? null : recordedNumber(data.dc),
+      ...executed,
     };
+  }
+
+  /** The ladder's localized words: a multiply ladder's tier with no adjustment is Otherwise. */
+  _bandLabels() {
+    return {
+      otherwise: this.localize('FABRICATE.App.Journal.StepDetails.BandOtherwise'),
+      named: (tier, adjustment) =>
+        this.localize('FABRICATE.App.Journal.StepDetails.BandAdjustment', { tier, adjustment }),
+    };
+  }
+
+  _ladderRuleField(routed) {
+    const rule = ladderRule(routed);
+    return rule ? { ladderRule: rule } : null;
   }
 
   /**
@@ -1807,7 +1838,8 @@ export class RunJournalBuilder {
    * (`simple`/`progressive`/`routed`); the DC resolves from the recipe's selected
    * tier, else the config's static DC. A dynamic-DC macro and progressive
    * (value-budget) checks have no statically resolvable DC, so the formula is
-   * surfaced without a number rather than a hardcoded default.
+   * surfaced without a number rather than a hardcoded default. Outside sum/over/fixed
+   * a fixed target is named a Target, and a character value names no number.
    * @private
    */
   _checkLabel({ system, recipe }) {
@@ -1820,9 +1852,19 @@ export class RunJournalBuilder {
     const formula = stringOrNull(rollFormula);
     if (!formula) return null;
     const dc = this._resolveCheckDc({ config, recipe, mode });
-    return dc === null
-      ? formula
-      : this.localize('FABRICATE.App.Journal.StepDetails.CheckWithDc', { formula, dc });
+    if (dc === null) return formula;
+    const evaluation = activeCheckEvaluation(config);
+    // A count keeps its DC wording until issue 2006.
+    if (isFixedSumOver(evaluation) || evaluation.product === 'count') {
+      return this.localize('FABRICATE.App.Journal.StepDetails.CheckWithDc', { formula, dc });
+    }
+    // A character value states no number, and a fixed range grades the raw roll against no target.
+    if (evaluation.target.source === 'attribute' || config?.type === 'fixed') return formula;
+    return this.localize('FABRICATE.App.Journal.StepDetails.CheckWithTarget', {
+      formula,
+      target: dc,
+      comparison: comparisonText(evaluation, config, this.localize),
+    });
   }
 
   _activeCheckKind({ system, recipe }) {
@@ -2227,6 +2269,8 @@ export class RunJournalBuilder {
         mode === 'routed'
           ? this._routedYieldTiers(context.task, system, stringOrNull(run.craftingSystemId))
           : [],
+      // A roll-under or character-value ladder states its own selection rule (issue 2005).
+      ...(mode === 'routed' && this._ladderRuleField(system?.gatheringCraftingCheck?.routed)),
     };
   }
 
@@ -2353,7 +2397,7 @@ export class RunJournalBuilder {
       return {
         id: stringOrNull(outcome?.id) || `tier-${index + 1}`,
         name: stringOrEmpty(outcome?.name).trim(),
-        band: routedOutcomeBand(outcome, routed, task),
+        band: routedOutcomeBand(outcome, routed, task, this._bandLabels()),
         fail,
         yields: results.map((result, resultIndex) =>
           this._tierYield(result, systemId, resultIndex)

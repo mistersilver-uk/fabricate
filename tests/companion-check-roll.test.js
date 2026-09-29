@@ -1612,6 +1612,35 @@ describe('AC-18 — the default label composes with the template that appends " 
     assert.equal(flavor, 'Fabricate check (DC 15)');
   });
 
+  it('names a roll-under final target, never a DC, and a count neither (issue 2005)', async () => {
+    installChat();
+    installRoll({ total: 9 });
+    const { seams } = makeSeams({ real: true });
+    await rollActorCheck(
+      request({
+        dc: 15,
+        formula: '1d20',
+        interactive: true,
+        rollDecision: { bonus: '2' },
+        evaluation: { product: 'sum', direction: 'under', target: { source: 'fixed' } },
+      }),
+      seams
+    );
+    const flavors = chatPosts.map((post) => post.messageData?.flavor ?? post.flavor);
+    assert.deepEqual(flavors, ['Fabricate check (Target 17)'], '15 raised by the bonus of 2');
+
+    const counted = makeSeams();
+    await rollActorCheck(
+      request({
+        dc: 1,
+        evaluation: { product: 'count', direction: 'over', pool: { base: '2', threshold: '8', required: 1 } },
+      }),
+      counted.seams
+    );
+    const bag = counted.calls.runPassFail[0] ?? counted.calls.runProgressive[0];
+    assert.equal(bag.rollOptions.flavor, 'Fabricate check', 'a count names no DC');
+  });
+
   it('uses the caller label when one is supplied', async () => {
     installChat();
     installRoll();

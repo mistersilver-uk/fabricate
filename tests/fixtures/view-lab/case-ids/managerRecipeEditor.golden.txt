@@ -1,4 +1,6 @@
 manager-recipe-edit-normal
+manager-recipe-edit-check-tier-under
+manager-recipe-edit-check-tier-under-attribute
 manager-recipe-edit-crafting-modifier-inherit
 manager-recipe-edit-crafting-modifier-custom-set
 manager-recipe-edit-crafting-modifier-suppressed

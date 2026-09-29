@@ -174,9 +174,17 @@ export function isFixedSumOver(evaluation) {
   );
 }
 
-/** The ` (DC n)` chat-flavor suffix, which names only a summed roll-over fixed DC. */
-export function dcFlavorSuffix(dc, evaluation) {
-  return Number.isFinite(dc) && isFixedSumOver(evaluation) ? ` (DC ${dc})` : '';
+const foundryLocalize = (key) => globalThis.game?.i18n?.localize?.(key);
+
+/** The ` (Target n)` chat-flavor suffix, localized, naming the final target once benefits settle. */
+export function targetFlavorSuffix(target, localize = foundryLocalize) {
+  const template = localizeWith(
+    localize,
+    'FABRICATE.Check.Roll.FlavorTarget',
+    undefined,
+    'Target {target}'
+  );
+  return ` (${template.replaceAll('{target}', String(target))})`;
 }
 
 /** A progressive check spends its total as a budget, so summed roll-under refuses; count/under rolls. */

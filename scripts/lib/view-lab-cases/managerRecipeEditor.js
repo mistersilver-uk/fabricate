@@ -29,6 +29,46 @@ export const CASES = Object.freeze([
       CHECKS_ROUTE_MODEL_PATTERN,
     ],
   }),
+  // Issue 2005 (T6): the Check tier select names a roll-under Target, or a character value's adjustment.
+  ...[
+    [
+      'manager-recipe-edit-check-tier-under',
+      'roll-under-fixed',
+      'Masterwork (Target 8)',
+      'Target 12',
+    ],
+    [
+      'manager-recipe-edit-check-tier-under-attribute',
+      'roll-under-add',
+      'Masterwork (−2)',
+      'Character value',
+    ],
+  ].map(([id, state, text, subline]) =>
+    managerCase({
+      id,
+      label: `Manager — Recipe edit check tier list, ${state.replaceAll('-', ' ')}`,
+      smokeLabels: [],
+      reaches: 'beyond',
+      query: { system: 'lab-smithing', checkPreviewState: state },
+      steps: [
+        'Crafting',
+        { selector: '.manager-icon-button[aria-label^="Edit"]' },
+        { selector: '#recipe-tab-overview' },
+        { selector: '[data-recipe-field="checkTierId"]' },
+      ],
+      expectView: 'recipe-edit',
+      // The header subline names the check as the browser pill does, never a DC.
+      expectSelector:
+        `.fabricate-manager:has([data-recipe-edit-subline]:has-text("· ${subline}")) ` +
+        `.fabricate-select-popover [data-popover-option="sm-tier-masterwork"]:has-text("${text}")`,
+      kinds: ['manager', 'recipes'],
+      sourceMatches: [
+        /^src\/ui\/svelte\/apps\/manager\/recipe\/(?:RecipeOverviewTab\.svelte|recipeOverviewSelectOptions\.js)$/,
+        /^src\/ui\/model\/recipeBrowserModel\.js$/,
+        /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      ],
+    })
+  ),
   // Every frame below reaches its state by clicking the rule group rather than by authoring a second catalogued system.
   managerCase({
     id: 'manager-recipe-edit-crafting-modifier-inherit',

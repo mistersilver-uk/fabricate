@@ -34,12 +34,11 @@ export function buildSalvageRouteOptions(resultGroups, unroutedLabel, groupFallb
  * keys bound to it, which is why the binding has a home here rather than in that pure leaf. A
  * roll-under fixed target names a Target, and a character-value target names adjustments.
  */
-export function buildSalvageDcSelectOptions(tiers, dcMode, systemDc, text, evaluation = null) {
+export function buildSalvageDcSelectOptions(tiers, systemDc, text, evaluation = null) {
   const under = evaluation?.direction === 'under';
   const kind = evaluation?.target?.adjustmentKind === 'multiply' ? 'multiply' : 'add';
   return buildSalvageDcOptions({
     tiers,
-    dcMode,
     systemDc,
     evaluation,
     systemDefaultLabel: (dc) =>
@@ -53,11 +52,6 @@ export function buildSalvageDcSelectOptions(tiers, dcMode, systemDc, text, evalu
             'System default — DC {dc}'
           )
       ).replace('{dc}', String(dc)),
-    systemDefaultDynamicLabel: () =>
-      text(
-        'FABRICATE.Admin.Manager.Component.SalvageEditor.DcSystemDefaultDynamic',
-        'System default — set by macro'
-      ),
     tierLabel: (name, dc) =>
       (under
         ? text(
