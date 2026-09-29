@@ -1,4 +1,5 @@
 <!-- Svelte 5 runes mode -->
+<!-- Throwaway comment that arms the View Lab capture for issue 2119; the next commit reverts it. -->
 <script>
   import { choiceDialog, localize } from '../../util/foundryBridge.js';
   import { formatAuthoredDuration, formatDurationHMS } from '../../util/formatDuration.js';
