@@ -24,12 +24,26 @@
   import CheckEvidenceRows from '../../../crafting/detail/CheckEvidenceRows.svelte';
   import { resolveCraftingArt } from '../../../../util/craftingArtResolution.js';
   import { localize } from '../../../../util/foundryBridge.js';
+  import { SALVAGE_CHECK_FAILED_FALLBACK } from '../../../../../../systems/salvageMessages.js';
 
   let { result = null } = $props();
 
   const state = $derived(result?.state ?? null);
   const message = $derived(String(result?.message ?? '').trim());
   const awarded = $derived(Array.isArray(result?.awarded) ? result.awarded : []);
+  // The engine's undifferentiated fallback for a failed salvage check
+  // (`salvagePipeline.js`'s `checkResult.message || SALVAGE_CHECK_FAILED_FALLBACK`) says
+  // nothing the evidence rows below don't already state more precisely. Swapped for the
+  // crafting box's own "nothing produced" sentence (issue 2092): silent when the failure
+  // still awarded something — the list speaks for itself, matching RollResultBox's F9 —
+  // stated otherwise. A system-authored custom check message is never replaced.
+  const displayMessage = $derived(
+    state === 'failure' && message === SALVAGE_CHECK_FAILED_FALLBACK
+      ? awarded.length === 0
+        ? localize('FABRICATE.App.Inventory.Salvage.NothingRecovered')
+        : ''
+      : message
+  );
   // The rolled total, present only when a roll actually happened. A no-check
   // "Guaranteed" salvage has none (null), so the roll phrase is omitted rather than
   // printing "with a roll of 0/null". The connective is prose (it inherits the muted
@@ -51,17 +65,22 @@
         class="fas"
         class:fa-circle-check={state === 'success'}
         class:fa-hourglass-half={state === 'waiting'}
+        class:fa-circle-xmark={state === 'failure'}
         aria-hidden="true"
       ></i>
       <span>
-        {state === 'success'
-          ? localize('FABRICATE.App.Inventory.Salvage.OutcomeSuccess')
-          : localize('FABRICATE.App.Inventory.Salvage.OutcomeWaiting')}
+        {#if state === 'success'}
+          {localize('FABRICATE.App.Inventory.Salvage.OutcomeSuccess')}
+        {:else if state === 'waiting'}
+          {localize('FABRICATE.App.Inventory.Salvage.OutcomeWaiting')}
+        {:else}
+          {localize('FABRICATE.App.Inventory.Salvage.OutcomeFailure')}
+        {/if}
       </span>
     </p>
-    {#if message}
+    {#if displayMessage}
       <p class="salvage-summary-message" data-inventory-salvage-message>
-        {message}{#if hasRoll}{` ${localize('FABRICATE.App.Inventory.Salvage.SummaryWithRoll')}`}
+        {displayMessage}{#if hasRoll}{` ${localize('FABRICATE.App.Inventory.Salvage.SummaryWithRoll')}`}
           <span class="salvage-summary-roll" data-inventory-salvage-roll>{rollValue}</span>{/if}
       </p>
     {/if}
@@ -98,6 +117,16 @@
   .salvage-summary.is-waiting {
     border-color: var(--fab-info-border);
     background: var(--fab-info-soft);
+  }
+
+  /* A failed check (issue 2092), the same danger ramp RollResultBox gives a failed craft. */
+  .salvage-summary.is-failure {
+    border-color: var(--fab-danger-border);
+    background: var(--fab-danger-soft);
+  }
+
+  .salvage-summary.is-failure .salvage-summary-outcome {
+    color: var(--fab-danger-text);
   }
 
   /* RollResultBox's head: a title beside its glyph, sentence case. */

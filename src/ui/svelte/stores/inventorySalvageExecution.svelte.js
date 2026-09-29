@@ -102,6 +102,27 @@ function successSnapshot(result, systemId, componentId) {
 }
 
 /**
+ * Project one failed salvage check onto the ribbon's read-only summary (issue 2092), mirroring the
+ * crafting result box: the failure state, the engine's message, the executed check's evidence
+ * rows — `CheckEvidenceRows` itself withholds those rows for a blind or secret roll — and any
+ * reserved failure award (`publishSalvageFailure`'s `results`, issue 1098's `perRecord` policy),
+ * so the box never contradicts the chat card it stands beside.
+ */
+function failureSnapshot(result, systemId, componentId) {
+  return {
+    systemId,
+    componentId,
+    state: 'failure',
+    message: result?.message ?? '',
+    check: result.check,
+    awarded: (Array.isArray(result?.results) ? result.results : []).map((entry) => ({
+      name: String(entry?.name ?? ''),
+      img: typeof entry?.img === 'string' ? entry.img : null,
+    })),
+  };
+}
+
+/**
  * @param {object} deps
  * @param {() => ?object} deps.selectedItem the inspected card, the held row included.
  * @param {() => ?object} deps.selectedParticipation the acting participation of that card.
@@ -284,7 +305,11 @@ export function createSalvageExecution({
       await holdSalvagedRow(result, row, systemId, componentId);
       return result;
     }
-    salvageResult = null;
+    // A rolled failure (issue 2092) carries the executed `check` projection
+    // (`publishSalvageFailure`, issue 2005); a refusal before any roll — missing
+    // materials, missing tools, misconfigured — never sets that key, and stays
+    // toast-only exactly as before.
+    salvageResult = result?.check ? failureSnapshot(result, systemId, componentId) : null;
     if (result?.message) services?.notify?.(result.message);
     return result ?? { success: false };
   }
