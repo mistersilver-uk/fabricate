@@ -28,6 +28,7 @@ import {
   runFormulaProgressive,
   runFormulaRouted,
 } from '../src/systems/checkRoll.js';
+import { buildInteractiveRollOptions } from '../src/ui/svelte/apps/crafting/rollPrompt.js';
 import {
   resolveActiveCraftingCheckFormula,
   resolveActiveGatheringCheckFormula,
@@ -920,6 +921,44 @@ test('QE5: salvage simple and gathering routed place the same benefits the same 
   assert.deepEqual(pooled.formulas, ['4d6']);
   const lowered = await gather('threshold', [3, 2]);
   assert.deepEqual([lowered.formulas, lowered.result.data.target], [['2d6'], 3]);
+});
+
+test('a fixed-type routed gathering roll passes no dc to buildInteractiveRollOptions, while relative keeps it (issue 2091)', () => {
+  // Direct test of buildInteractiveRollOptions behavior with different dc values
+  // This proves that when dc is undefined vs. a number, the flavor differs
+  const evaluation = { product: 'sum', direction: 'over', target: { source: 'fixed' } };
+
+  // When dc is undefined, the flavor should not include "(DC ...)"
+  const fixedTypeOptions = buildInteractiveRollOptions({
+    interactive: true,
+    actor: { name: 'Ranger' },
+    name: 'Forage',
+    activity: 'Gathering',
+    dc: undefined,
+    evaluation,
+  });
+  assert.equal(
+    fixedTypeOptions.flavor,
+    'Forage — Gathering check',
+    'dc: undefined results in no "(DC ...)" in flavor'
+  );
+  assert.equal(fixedTypeOptions.dc, undefined, 'dc property is undefined');
+
+  // When dc is a number, the flavor should include "(DC ...)"
+  const relativeTypeOptions = buildInteractiveRollOptions({
+    interactive: true,
+    actor: { name: 'Ranger' },
+    name: 'Forage',
+    activity: 'Gathering',
+    dc: 15,
+    evaluation,
+  });
+  assert.equal(
+    relativeTypeOptions.flavor,
+    'Forage — Gathering check (DC 15)',
+    'dc: 15 results in "(DC 15)" in flavor'
+  );
+  assert.equal(relativeTypeOptions.dc, 15, 'dc property is 15');
 });
 
 // ── grading, routing, progressive and evidence ───────────────────────────────
