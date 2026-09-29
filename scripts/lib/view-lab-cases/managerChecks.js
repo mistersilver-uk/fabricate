@@ -1227,6 +1227,25 @@ export const CASES = Object.freeze([
       ':has([data-checks-section-notice="progressiveUnderUnsupported"])' +
       ':has([data-checks-odds-reason="progressive-under-unsupported"])',
   }),
+  // The false-green regression (issue 2106 review): `progressiveHigherIsBetter` had no owning
+  // issue, so the Validation tab showed both this blocker AND a pass tick for the same check.
+  underCase({
+    id: 'manager-checks-under-progressive-validation',
+    label: 'progressive check set to lower is better, on Validation',
+    frame: 20,
+    query: { system: 'lab-herbalism' },
+    steps: [
+      ...previewAsActor('lab-actor-idrin'),
+      ...PARITY_UNDER,
+      { selector: '#manager-checks-nav-validation' },
+      { selector: '[data-issue="progressiveUnderUnsupported"]', scroll: true },
+    ],
+    expectView: 'checks-validation',
+    expectSelector:
+      '.fabricate-manager' +
+      ':has([data-issue="progressiveUnderUnsupported"][data-issue-severity="critical"])' +
+      ':not(:has([data-check="progressiveHigherIsBetter"][data-satisfied="true"]))',
+  }),
   managerCase({
     id: 'manager-checks-under-preroll-joint',
     label:
