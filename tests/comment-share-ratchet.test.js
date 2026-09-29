@@ -4,12 +4,12 @@
  * `src/systems` file is capped at the same share outright (issue 1934).
  */
 import assert from 'node:assert/strict';
-import { mkdirSync, readdirSync, statSync, writeFileSync } from 'node:fs';
-import { dirname, join, relative, resolve } from 'node:path';
+import { readdirSync, statSync } from 'node:fs';
+import { join, relative, resolve } from 'node:path';
 import { after, test } from 'node:test';
 
 import { byCodePoint } from './helpers/codePointOrder.js';
-import { compareToBase, parseMarkers, reportComparison } from './helpers/mergeBaseRatchet.js';
+import { compareToBase, headMarker, reportComparison } from './helpers/mergeBaseRatchet.js';
 import { collectWorkingTreeSources, repoRoot } from './helpers/sourceScan.js';
 import { createTempGitRepo } from './helpers/temp-git-repo.js';
 
@@ -188,17 +188,6 @@ function countCommentLines(text, extension) {
   return count;
 }
 
-/** The number of leading lines that are blank, comment, a Svelte region tag or a shebang. */
-function fileHeadLength(text, extension) {
-  let length = 0;
-  for (const [line, kind] of lineKinds(text, extension)) {
-    const shebang = length === 0 && line.startsWith('#!');
-    if (kind === 'code' && line.trim() !== '' && !shebang) break;
-    length += 1;
-  }
-  return length;
-}
-
 function directoryOf(file) {
   const idx = file.lastIndexOf('/');
   return idx === -1 ? '.' : file.slice(0, idx);
@@ -220,14 +209,9 @@ const inCorpus = (file) =>
   SCAN_ROOTS.some((root) => file.startsWith(`${root}/`)) &&
   SCAN_EXTENSIONS.includes(extensionOf(file));
 
-/** Whether `text` carries a reasoned `ratchet-exempt(comment-share)` marker in its file head. */
+/** The reason a `ratchet-exempt(comment-share)` marker in `text`'s file head gives, or `null`. */
 function exemptsItsDirectory(file, text) {
-  const markers = parseMarkers(file, text).filter(
-    (marker) => marker.family === FAMILY && marker.reason !== ''
-  );
-  if (markers.length === 0) return false;
-  const head = fileHeadLength(text, extensionOf(file));
-  return markers.some((marker) => marker.line <= head);
+  return headMarker(file, text, FAMILY)?.reason ?? null;
 }
 
 /** Per extension, each text's tally; base and head share most files, so each is counted once. */
@@ -257,7 +241,7 @@ function tallyDirectories(files, readFile) {
     const text = readFile(file);
     if (text === undefined) continue;
     const dir = directoryOf(file);
-    const bucket = buckets.get(dir) ?? { commentLines: 0, totalLines: 0, exempt: false };
+    const bucket = buckets.get(dir) ?? { commentLines: 0, totalLines: 0, exempt: null };
     const tally = tallyFile(file, text);
     bucket.commentLines += tally.commentLines;
     bucket.totalLines += tally.totalLines;
@@ -299,6 +283,13 @@ const GUIDANCE =
   "A directory's share counts the files directly in it, so moving a file moves its lines. Trim " +
   "the comments under AGENTS.md's comment rules. A reasoned exemption goes in the file head of " +
   'any file directly in that directory.';
+
+/** Name every directory a file-head marker exempts, since an exempt directory is never measured. */
+function reportExemptDirectories(t, buckets) {
+  for (const [dir, bucket] of buckets) {
+    if (bucket.exempt) t.diagnostic(`exempt: ${dir}/*: ${bucket.exempt}`);
+  }
+}
 
 test('no directory crosses the comment-share cap or, already over it, rises above base', (t) => {
   const listed = [];
@@ -347,11 +338,13 @@ const readCorpus = () => (corpus ??= collectWorkingTreeSources(SCAN_ROOTS, SCAN_
 
 /** Prints the roll-up epic 1656's definition of done reads; percentages are not summable, so it
  * is derived from the scan's own line counts and never pinned. */
-test('the scan reports the root-level roll-up epic 1656 tracks', (t) => {
+test('the scan reports the root-level roll-up epic 1656 tracks and every exempt directory', (t) => {
   const files = Object.keys(readCorpus());
   assert.ok(files.length >= SCAN_FLOOR, `expected ${SCAN_FLOOR}+ files; scanned ${files.length}`);
   const rollup = {};
-  for (const [dir, bucket] of tallyDirectories(files, (file) => readCorpus()[file])) {
+  const buckets = tallyDirectories(files, (file) => readCorpus()[file]);
+  reportExemptDirectories(t, buckets);
+  for (const [dir, bucket] of buckets) {
     const into = (rollup[dir.split('/', 1)[0]] ??= { commentLines: 0, totalLines: 0 });
     into.commentLines += bucket.commentLines;
     into.totalLines += bucket.totalLines;
@@ -440,18 +433,10 @@ after(() => repos.forEach((repo) => repo.dispose()));
 function repoWith(files) {
   const repo = createTempGitRepo('comment-share-');
   repos.push(repo);
-  const write = (entries) => {
-    for (const [file, text] of Object.entries(entries)) {
-      mkdirSync(dirname(join(repo.dir, file)), { recursive: true });
-      writeFileSync(join(repo.dir, file), text);
-    }
-  };
-  write(files);
-  repo.git('add', '-A');
-  const first = repo.commit('base');
-  const compare = () =>
-    compareCommentShare({ cwd: repo.dir, env: { RATCHET_BASE: first } });
-  return { write, compare };
+  repo.write(files);
+  const first = repo.commitAll('base');
+  const compare = () => compareCommentShare({ cwd: repo.dir, env: { RATCHET_BASE: first } });
+  return { write: repo.write, compare };
 }
 
 /** A JS file of `comments` comment lines then `code` code lines. */
@@ -499,18 +484,17 @@ test('a change to any file of the corpus compares rather than skips, and one out
   }
 });
 
-test('the file head runs through blank, comment, shebang and Svelte tag lines to the first code', () => {
-  assert.equal(fileHeadLength('#!/usr/bin/env node\n// a\n\nconst x = 1;\n// b\n', '.mjs'), 3);
-  assert.equal(fileHeadLength('<!-- a -->\n<script>\n  // b\n  import x from "y";\n', '.svelte'), 3);
-  assert.equal(fileHeadLength('/* a\n b */\n.x {}\n', '.css'), 2);
-});
-
 test('a reasoned marker in the file head of a file in the directory exempts it; an empty fails', () => {
   const marker = (reason) => `// ratchet-exempt(comment-share):${reason}`;
   const repo = repoWith({ 'src/d/one.js': jsFile(1, 9), 'src/e/one.js': jsFile(1, 9) });
-  const exempt = { 'src/d/two.js': jsFile(9, 1, [marker(' a generated API reference')]) };
-  repo.write(exempt);
+  const reasoned = jsFile(9, 1, [marker(' a generated API reference')]);
+  repo.write({ 'src/d/two.js': reasoned });
   assert.deepEqual(repo.compare().failures, []);
+  const notes = [];
+  const spy = { diagnostic: (line) => notes.push(line) };
+  const texts = { 'lib/d/two.js': reasoned, 'lib/e/one.js': jsFile(1, 9) };
+  reportExemptDirectories(spy, tallyDirectories(Object.keys(texts), (file) => texts[file]));
+  assert.deepEqual(notes, ['exempt: lib/d/*: a generated API reference']);
   repo.write({
     'src/d/two.js': `${jsFile(9, 1)}${marker(' below the file head')}\n`,
     'src/e/two.svelte': ['<script>', marker(' in a Svelte script head'), '// a', '// b', '// c', '// d', '// e', '// f', '// g', '// h', '// i', '</script>', ''].join('\n'),

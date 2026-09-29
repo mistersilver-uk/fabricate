@@ -69,8 +69,8 @@ function isCi(env) {
 
 /**
  * The commit every ratchet compares with: `RATCHET_BASE` when set, else the merge base of HEAD and
- * `origin/main`. `RATCHET_BASE=none` opts out; an unresolvable `RATCHET_BASE`, or no base in CI,
- * throws; locally with no base the result is a skip naming the fix.
+ * `origin/main`. `RATCHET_BASE=none` opts out; an unresolvable `RATCHET_BASE`, or in CI no base or
+ * a merge base that is HEAD itself, throws; locally with no base the result is a skip naming the fix.
  *
  * @returns {{sha: string, head: string, source: string, equalsHead: boolean}
  *   | {skipped: string, reason: string}}
@@ -95,6 +95,13 @@ export function resolveRatchetBase({ cwd = REPO_ROOT, env = process.env } = {}) 
   }
   const main = tryCommit(cwd, 'origin/main');
   const sha = main && tryMergeBase(cwd, head, main);
+  if (sha === head && isCi(env)) {
+    throw new Error(
+      'the merge base with origin/main is HEAD itself, so a CI ratchet would compare nothing. Set ' +
+        'RATCHET_BASE (ci.yml sets HEAD^1), or RATCHET_BASE=none on a job that deliberately runs ' +
+        'without one.'
+    );
+  }
   if (sha) return { sha, head, source: 'merge-base', equalsHead: sha === head };
   const why = main ? 'HEAD and origin/main share no merge base' : 'origin/main does not resolve';
   if (isCi(env)) {
@@ -332,8 +339,8 @@ function anchorLines(lines, anchor) {
   return accepted;
 }
 
-/** The marker that exempts an entry: at the file head, or at or right above one of its lines. */
-function markerFor(entry, family, readFile) {
+/** The marker that exempts an entry: at the file head if `headMarkers`, or at one of its lines. */
+function markerFor(entry, family, readFile, headMarkers) {
   const text = readFile(entry.file);
   if (text === undefined) return { exempt: null, empty: null };
   const markers = parseMarkers(entry.file, text).filter((marker) => marker.family === family);
@@ -341,11 +348,21 @@ function markerFor(entry, family, readFile) {
   const lines = text.split('\n');
   const head = fileHeadLength(lines);
   const sites = new Set(entry.lines.flatMap((line) => anchorLines(lines, line)));
-  const applicable = markers.filter((marker) => marker.line <= head || sites.has(marker.line));
+  const applicable = markers.filter(
+    (marker) => (headMarkers && marker.line <= head) || sites.has(marker.line)
+  );
   return {
     exempt: applicable.find((marker) => marker.reason !== '') ?? null,
     empty: applicable.find((marker) => marker.reason === '') ?? null,
   };
+}
+
+/** The reasoned `family` marker in the file head of `text`, or `null`: for a whole-file exemption. */
+export function headMarker(file, text, family) {
+  const markers = parseMarkers(file, text).filter((m) => m.family === family && m.reason !== '');
+  if (markers.length === 0) return null;
+  const head = fileHeadLength(String(text).split('\n'));
+  return markers.find((marker) => marker.line <= head) ?? null;
 }
 
 /**
@@ -472,11 +489,11 @@ function emptyMarkerFailures(files, family, readFile) {
   );
 }
 
-function judge(remaining, family, readHead) {
+function judge(remaining, family, readHead, headMarkers) {
   const failures = [];
   const exempted = [];
   for (const offence of remaining) {
-    const { exempt, empty } = markerFor(offence.entry, family, readHead);
+    const { exempt, empty } = markerFor(offence.entry, family, readHead, headMarkers);
     if (exempt) exempted.push(`${offence.text}: ${exempt.reason}`);
     else if (empty) failures.push(`${offence.text}; its ratchet-exempt marker gives no reason`);
     else failures.push(offence.text);
@@ -516,7 +533,8 @@ function skipped(code, reason, corpusRoot, changedCount) {
  * `undefined`. It returns `{file, id, amount = 1, value?, lines?}` entries, summed per
  * `(file, id)`; `value` nets a move within a file, `lines` are the head lines a marker may sit at.
  * `pair(base, head)` sees both sides' entries, base paths already renamed, and returns
- * `{base, head}`: a family's own cross-side matching, such as a function rename.
+ * `{base, head}`: a family's own cross-side matching, such as a function rename. `headMarkers:
+ * false` stops a file-head marker exempting an entry, for a family whose markers excuse one site.
  *
  * @returns {{compared: true, family: string, base: string, changedCount: number,
  *   failures: string[], shrank: string[], netted: string[], exempted: string[]}
@@ -530,6 +548,7 @@ export function compareToBase({
   scope = 'changed',
   ceiling = (was) => was.amount,
   pair = (baseEntries, headEntries) => ({ base: baseEntries, head: headEntries }),
+  headMarkers = true,
   cwd = REPO_ROOT,
   env = process.env,
   base = resolveRatchetBase({ cwd, env }),
@@ -559,7 +578,7 @@ export function compareToBase({
   const headIndex = tally(paired.head, family);
   const { offences, falls } = difference(baseIndex, headIndex, ceiling);
   const { remaining, netted, shrank } = netByValue(offences, falls);
-  const { failures, exempted } = judge(remaining, family, readHead);
+  const { failures, exempted } = judge(remaining, family, readHead, headMarkers);
   failures.push(...emptyMarkerFailures(files.headChanged, family, readHead));
   return {
     compared: true,

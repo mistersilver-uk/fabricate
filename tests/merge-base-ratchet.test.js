@@ -5,9 +5,9 @@
  */
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import test, { after } from 'node:test';
 
 import { resolveExecutable } from '../scripts/lib/resolveExecutable.js';
@@ -16,6 +16,7 @@ import {
   basePathOf,
   changedPaths,
   compareToBase,
+  headMarker,
   parseMarkers,
   readBaseCorpus,
   readBaseFiles,
@@ -41,19 +42,9 @@ function repoWith(files) {
   const repo = createTempGitRepo('merge-base-ratchet-');
   repos.push(repo);
   repo.git('checkout', '-q', '-b', 'main');
-  const write = (entries) => {
-    for (const [file, text] of Object.entries(entries)) {
-      mkdirSync(dirname(join(repo.dir, file)), { recursive: true });
-      writeFileSync(join(repo.dir, file), text);
-    }
-  };
-  const commitAll = (message) => {
-    repo.git('add', '-A');
-    return repo.commit(message);
-  };
-  write(files);
-  const first = commitAll('first');
-  return { ...repo, write, commitAll, first, remove: (file) => unlinkSync(join(repo.dir, file)) };
+  repo.write(files);
+  const first = repo.commitAll('first');
+  return { ...repo, first, remove: (file) => unlinkSync(join(repo.dir, file)) };
 }
 
 /** `git clone` into a fresh directory, returning its path; `file://` makes `--depth` apply. */
@@ -157,6 +148,20 @@ test('no base skips locally with the fix named, and fails closed in CI', () => {
     assert.throws(() => compareToy(repo, { env }), { message: /never skips a ratchet/ });
   }
   assert.equal(resolveRatchetBase({ cwd: repo.dir, env: { CI: 'false' } }).skipped, 'no-base');
+});
+
+test('a merge base that is HEAD itself fails closed in CI and compares the working tree locally', () => {
+  const repo = repoWith({ 'a.txt': 'a\n' });
+  repo.git('update-ref', 'refs/remotes/origin/main', repo.first);
+  assert.throws(() => resolveRatchetBase({ cwd: repo.dir, env: { CI: 'true' } }), {
+    message: /merge base with origin\/main is HEAD itself[\s\S]*RATCHET_BASE=none/,
+  });
+  assert.deepEqual(resolveRatchetBase({ cwd: repo.dir, env: LOCAL }), {
+    sha: repo.first,
+    head: repo.first,
+    source: 'merge-base',
+    equalsHead: true,
+  });
 });
 
 test('a git error after the base resolves throws instead of reading as no change', () => {
@@ -297,6 +302,19 @@ test('the marker grammar is per file type, and a marker without a reason is read
   assert.deepEqual(found('a.json', '// ratchet-exempt(toy): no comments in JSON'), []);
 });
 
+test('the file head runs through blank, comment, shebang and script or style tag lines', () => {
+  const at = (file, rows) => headMarker(file, `${rows.join('\n')}\n`, 'toy')?.line ?? null;
+  const js = '// ratchet-exempt(toy): generated';
+  assert.equal(at('a.mjs', ['#!/usr/bin/env node', '// a', '', js, 'const x = 1;']), 4);
+  assert.equal(at('a.mjs', ['#!/usr/bin/env node', '// a', 'const x = 1;', js]), null);
+  assert.equal(at('a.svelte', ['<!-- a -->', '<script>', `  ${js}`, '  import x from "y";']), 3);
+  assert.equal(at('a.svelte', ['<script>', '  import x from "y";', `  ${js}`]), null);
+  const css = '/* ratchet-exempt(toy): tokens */';
+  assert.equal(at('a.css', ['/* a', ' b */', css, '.x {}']), 3);
+  assert.equal(at('a.css', ['/* a', ' b */', '.x {}', css]), null);
+  assert.equal(at('a.js', ['// ratchet-exempt(toy):', '// ratchet-exempt(other): x', 'y;']), null);
+});
+
 test('an appeared entry fails naming it, a worse one names its base value, and a shrink passes', () => {
   const repo = repoWith({
     'corpus/a.js': lines('alpha x', 'beta y 5', 'gamma z 9'),
@@ -371,6 +389,9 @@ test('a reasoned marker at the line, above it or at the file head exempts; an em
     'corpus/c.js: kappa r is new (1)',
     'corpus/c.js:2 has a ratchet-exempt(toy) marker with no reason; write why the regression is legitimate after the colon',
   ]);
+  const siteOnly = compareToy(repo, { headMarkers: false });
+  assert.deepEqual(siteOnly.exempted, ['corpus/a.js: beta y is new (1): the spec banks it']);
+  assert.ok(siteOnly.failures.includes('corpus/b.js: beta y is new (3)'));
 });
 
 test('a gate skips without reading base when its corpus is untouched, and compares when it is', () => {

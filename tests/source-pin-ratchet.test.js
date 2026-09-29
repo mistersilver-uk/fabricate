@@ -6,7 +6,7 @@
  */
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { after, test } from 'node:test';
 
@@ -206,6 +206,7 @@ const compareSourcePins = (options = {}) =>
     include: inCorpus,
     measure: measureSourcePins,
     scope: 'corpus',
+    headMarkers: false,
     ...options,
   });
 
@@ -214,7 +215,7 @@ const GUIDANCE =
   'Text followed across imports counts where it is pinned, so a helper that starts handing out ' +
   'source text raises the tests that use it. A new legacy-scan helper should hand structure back ' +
   "through `parsedSource.js` instead. A pin's exemption goes on its line or the comment line " +
-  "right above it, or in the file head; a legacy-scan row's goes above the row.";
+  "right above it; a legacy-scan row's goes above the row.";
 
 test('no test file pins more source text, and no helper turns legacy-scan, than at base', (t) => {
   const listed = [];
@@ -678,15 +679,12 @@ after(() => repos.forEach((repo) => repo.dispose()));
 function repoWith(files) {
   const repo = createTempGitRepo('source-pin-');
   repos.push(repo);
-  const write = (entries) => {
-    for (const [file, rows] of Object.entries(entries)) {
-      mkdirSync(dirname(join(repo.dir, file)), { recursive: true });
-      writeFileSync(join(repo.dir, file), `${rows.join('\n')}\n`);
-    }
-  };
+  const write = (entries) =>
+    repo.write(
+      Object.fromEntries(Object.entries(entries).map(([file, rows]) => [file, `${rows.join('\n')}\n`]))
+    );
   write(files);
-  repo.git('add', '-A');
-  const first = repo.commit('base');
+  const first = repo.commitAll('base');
   const compare = () => compareSourcePins({ cwd: repo.dir, env: { RATCHET_BASE: first } });
   return { write, compare };
 }
@@ -746,18 +744,20 @@ test('a change to any scanned module compares, helpers included; any other chang
   assert.deepEqual([result.compared, result.failures], [true, []]);
 });
 
-test('a reasoned marker at a pin or the file head exempts it; an empty one fails', () => {
+test('a reasoned marker above each pin exempts it, one in the file head does not, and an empty one fails', () => {
   const repo = repoWith(BASE_CORPUS);
   const reasoned = `${MARKER} the emitted text is the contract under test`;
   repo.write({
     'tests/a.test.js': [...PINNING, reasoned, "export const also = source.includes('y');"],
-    'tests/c.test.js': [reasoned, ...PINNING],
+    'tests/c.test.js': [PINNING[0], reasoned, PINNING[1], reasoned, PINNING[2]],
+    'tests/d.test.js': [reasoned, ...PINNING],
   });
   const exempt = repo.compare();
-  assert.deepEqual([exempt.failures, exempt.exempted], [
-    [],
-    [`tests/c.test.js: ${PIN_ID} is new (2): the emitted text is the contract under test`],
-  ]);
+  assert.deepEqual(
+    [exempt.failures, exempt.exempted],
+    [[`tests/d.test.js: ${PIN_ID} is new (2)`], []]
+  );
+  repo.write({ 'tests/d.test.js': ['export const none = 1;'] });
   repo.write({
     'tests/a.test.js': [
       ...PINNING,
@@ -766,16 +766,16 @@ test('a reasoned marker at a pin or the file head exempts it; an empty one fails
       MARKER,
       "export const more = source.includes('z');",
     ],
-    'tests/c.test.js': [MARKER, ...PINNING],
+    'tests/c.test.js': [PINNING[0], MARKER, PINNING[1], PINNING[2]],
   });
   const empty = (file, line) =>
     `${file}:${line} has a ratchet-exempt(source-pin) marker with no reason; write why the ` +
     'regression is legitimate after the colon';
   assert.deepEqual(repo.compare().failures, [
     `tests/a.test.js: ${PIN_ID} rose from 2 to 3`,
-    `tests/c.test.js: ${PIN_ID} is new (2); its ratchet-exempt marker gives no reason`,
+    `tests/c.test.js: ${PIN_ID} is new (2)`,
     empty('tests/a.test.js', 6),
-    empty('tests/c.test.js', 1),
+    empty('tests/c.test.js', 2),
   ]);
 });
 

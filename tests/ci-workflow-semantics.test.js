@@ -859,13 +859,14 @@ test('every inline tester-segment resolution words its refusal through describeM
 });
 
 test('the ratchet jobs check out and name their base, and a release test run opts out', () => {
-  const ci = readFileSync('.github/workflows/ci.yml', 'utf8');
+  const ci = readFileSync(path.join(WORKFLOWS, 'ci.yml'), 'utf8');
   const jobs = parseJobs(ci);
   const before = 'b'.repeat(40);
   for (const name of ['unit-tests', 'lint']) {
     const { steps } = jobs[name];
     const checkout = steps.find((step) => step.uses.startsWith('actions/checkout@'));
     assert.equal(checkout?.with['fetch-depth'], '2', `${name} must check out the merge ref's parents`);
+    assert.equal(checkout.with.ref, undefined, `${name} must check out the merge ref, whose HEAD^1 is the base tip`);
     const base = unwrap(jobEnv(ci, name).RATCHET_BASE ?? '');
     const resolved = (github) => evaluate(base, { github });
     assert.equal(resolved({ event_name: 'pull_request', event: { before } }), 'HEAD^1', name);
@@ -883,8 +884,8 @@ test('the ratchet jobs check out and name their base, and a release test run opt
     assert.equal(evaluate(fetchIf, { github: { event_name: 'pull_request' } }), false, name);
   }
 
-  for (const file of ['.github/workflows/beta.yml', '.github/workflows/release.yml']) {
-    const source = readFileSync(file, 'utf8');
+  for (const file of ['beta.yml', 'release.yml']) {
+    const source = readFileSync(path.join(WORKFLOWS, file), 'utf8');
     const testing = Object.entries(parseJobs(source)).filter(([, job]) =>
       job.steps.some((step) => /\bnpm test\b/.test(step.run))
     );
