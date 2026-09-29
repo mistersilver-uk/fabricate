@@ -4,7 +4,7 @@
   dice included, each with its marks as a glyph and in its accessible name, so colour is never the
   only signal, and the legend under them. The count tiles, legend and hooks moved here from
   CheckOutcomePreview.svelte (issue 2080); the summed roll's first-face tile became the readout's
-  medallion, so this draws count faces only. It is the seam #2006 T6 converts.
+  medallion, so this draws count faces only. It is the seam issue 2006 (Task 6) converts.
 -->
 <script>
   import Medallion from '../../../components/Medallion.svelte';
