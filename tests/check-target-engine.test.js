@@ -10,6 +10,7 @@ import { craftProbe, probeResolutionService, salvageProbe } from './helpers/craf
 import { promptJournalStageCheck } from '../src/bootstrap/journalOperations.js';
 import { BulkSalvageService } from '../src/systems/BulkSalvageService.js';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
+import { buildCheckModifierContext } from '../src/systems/checkModifierResolver.js';
 import { GatheringEngine } from '../src/systems/GatheringEngine.js';
 import { evaluatePreparedRunCheck, runFormulaPassFail } from '../src/systems/checkRoll.js';
 import { checkDiceLine } from '../src/ui/presenters/checkDiceLine.js';
@@ -523,6 +524,47 @@ test('a pass/fail roll-under flavor names the final target, as the chip and data
     })
   );
   assert.deepEqual(over.flavors, ['Scrap — Salvage check (DC 10)'], 'roll-high byte-identical');
+});
+
+test('the Target suffix sits before a picked modifier label, as the DC suffix does', async () => {
+  const actor = { name: 'Scavenger', system: {}, getRollData: () => ({}) };
+  const system = {
+    modifiers: [
+      { id: 'steady', label: 'Steady hands', expression: '1', enabled: true },
+      { id: 'keen', label: 'Keen eye', expression: '2', enabled: true },
+    ],
+    salvageCraftingCheck: {
+      defaultModifierPolicy: 'playerPicks',
+      defaultModifierIds: ['steady', 'keen'],
+      maxModifierPicks: 1,
+    },
+  };
+  const component = { name: 'Scrap' };
+  const salvage = Object.create(CraftingEngine.prototype);
+  const { flavors } = await postedFlavors(() =>
+    salvage._runSalvageSimpleCheck(simpleCheck(SUM_UNDER), component, actor, {
+      interactive: true,
+      craftingModifier: buildCheckModifierContext(system, 'salvage', component),
+    })
+  );
+  assert.equal(flavors.length, 1);
+  assert.match(flavors[0], /^Scrap — Salvage check \(Target \d+\) · /);
+});
+
+test('a Journal pass/fail roll with no anchor names no Target, never Target 0', async () => {
+  installCountingRoll();
+  const prepared = {
+    mode: 'simple',
+    slot: 'simple',
+    rollFormula: '1d20',
+    flavor: 'Sun Tea — Crafting check',
+    checkConfig: { rollFormula: '1d20', thresholdMode: 'meet', dc: null, evaluation: SUM_UNDER },
+    decisionPolicy: { target: null },
+  };
+  const rolled = await evaluatePreparedRunCheck(prepared, { getRollData: () => ({}) }, {
+    rollMode: 'publicroll',
+  });
+  assert.equal(rolled.rollHandoff?.flavor, 'Sun Tea — Crafting check');
 });
 
 test('a Journal pass/fail roll hands back its final target, localized, and a secret one none', async () => {

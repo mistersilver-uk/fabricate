@@ -525,7 +525,7 @@ export async function evaluatePreparedRunCheck(
         speaker: preparation?.speaker ?? config.speaker ?? null,
         ...(count && { evaluation: count.evaluation, thresholdMode: count.thresholdMode }),
         // A pass/fail roll names its final target; a secret one never carries it.
-        ...(kind === 'simple' && !secret && { flavorTarget: Number(anchor) }),
+        ...(kind === 'simple' && !secret && { flavorTarget: anchor }),
         reportVisibility: true,
       },
     },

@@ -1342,7 +1342,7 @@
           "RoutedRule": "One outcome is selected: the highest matching threshold, or the lowest outcome below every relative threshold. Fixed ranges include both ends; gaps match nothing. Critical outcomes and the configured minimum success outcome still apply.",
           "RoutedRuleUnder": "One outcome is selected: the tier with the lowest threshold the roll stays at or under, or, if the roll is above every threshold, the tier with the highest threshold.",
           "RoutedRuleUnderStrict": "One outcome is selected: the tier with the lowest threshold the roll stays under, or, if the roll is at or above every threshold, the tier with the highest threshold.",
-          "RoutedRuleAdjustment": "Each tier adjusts the character's value before the roll; one outcome is selected: the most demanding tier the roll meets, or, if it meets none, the least demanding tier or Otherwise. Critical outcomes and the configured minimum success outcome still apply.",
+          "RoutedRuleAdjustment": "Each tier adjusts the character's value before the roll; one outcome is selected: the most demanding tier the roll meets, or, if it meets none, the least demanding tier. Critical outcomes and the configured minimum success outcome still apply.",
           "Awarded": "Awarded at {chance}%",
           "Missed": "Not awarded at {chance}%",
           "CraftingPreviewHint": "Current stage preview; received items are recorded after execution.",
