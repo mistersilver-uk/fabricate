@@ -378,11 +378,11 @@ describe('ChecksValidationTab (mounted)', () => {
     assert.deepEqual(
       calls.map(([route, focusTarget]) => [route.section, focusTarget]),
       [
-        ['roll', undefined],
-        ['roll', undefined],
-        ['roll', undefined],
+        ['roll', 'checks-count-base'],
+        ['roll', 'checks-count-threshold'],
+        ['roll', 'checks-count-tier-successes'],
       ],
-      'no count control exists to focus until #2006, so each row changes route alone'
+      'each count row addresses the control that clears it (issue 2006)'
     );
     harness.remount();
 
@@ -448,8 +448,8 @@ describe('ChecksValidationTab (mounted)', () => {
     }
     assert.deepEqual(
       railCounts(target),
-      { passing: 2, warnings: 2, blocking: 2 },
-      'two real warnings and two real blockers — not four of each'
+      { passing: 3, warnings: 1, blocking: 3 },
+      'one real warning and three real blockers (the unset tier blocks since issue 2006) — each once'
     );
     assert.deepEqual(
       tallyMatchingRail(target),
@@ -566,23 +566,127 @@ describe('ChecksValidationTab (mounted)', () => {
   });
 });
 
+// ── A SUMMING FORMULA THAT COUNTS, AND ITS CONVERT (issue 2006, N21, N24) ─────────────────────
+describe('the free-text counting formula row (issue 2006)', () => {
+  before(async () => {
+    await harness.setup();
+  });
+  after(() => {
+    harness.teardown();
+  });
+
+  const summed = (rollFormula, extra = {}) => ({
+    subsystem: 'crafting',
+    mode: 'simple',
+    check: {
+      rollFormula,
+      dc: 12,
+      thresholdMode: 'meet',
+      evaluation: { product: 'sum', direction: 'over', target: { source: 'fixed' } },
+      ...extra,
+    },
+  });
+  const row = (root) => root.querySelector('[data-issue="freeTextCountingFormula"]');
+  const button = (root) => row(root).querySelector('.manager-recipe-val-view');
+
+  it('carries Convert in place of View, named and described, and stages nothing itself', async () => {
+    const converts = [];
+    const selected = [];
+    const target = await harness.mount({
+      sections: [summed('2d20cs<=@skills.survival.value')],
+      onConvert: (subsystem) => converts.push(subsystem),
+      onSelectIssue: (route) => selected.push(route),
+    });
+    assert.equal(row(target).dataset.issueSeverity, 'warning');
+    assert.equal(row(target).querySelectorAll('.manager-recipe-val-view').length, 1, 'one verb');
+    const action = button(target);
+    assert.ok(action.hasAttribute('data-validation-row-action'), 'the row action, not View');
+    // The harness resolves no lang file, so the surface's localized words read as their keys.
+    assert.equal(action.textContent.trim(), 'FABRICATE.Admin.Manager.Checks.Count.Convert.Action');
+    assert.equal(action.dataset.keyboardFocus, 'true');
+    const description = target.querySelector(`#${action.getAttribute('aria-describedby')}`);
+    assert.equal(
+      description.textContent.trim(),
+      'FABRICATE.Admin.Manager.Checks.Count.Convert.Description'
+    );
+    action.click();
+    assert.deepEqual(converts, ['crafting'], 'the host is asked to stage the conversion');
+    assert.deepEqual(selected, [], 'Convert replaces View, it does not also route');
+    assert.deepEqual(railCounts(target).blocking, 0, 'the warning feeds no blocking tally');
+    harness.remount();
+  });
+
+  it('describes the exceed copy, and draws View alone for a formula that does not convert', async () => {
+    const exceed = await harness.mount({ sections: [summed('6d10cs>=8', { thresholdMode: 'exceed' })] });
+    const describedBy = button(exceed).getAttribute('aria-describedby');
+    assert.equal(
+      exceed.querySelector(`#${describedBy}`).textContent.trim(),
+      'FABRICATE.Admin.Manager.Checks.Count.Convert.DescriptionExceed'
+    );
+    harness.remount();
+
+    const calls = [];
+    const target = await harness.mount({
+      sections: [summed('6d10cs>=8df<=8')],
+      onSelectIssue: (route, focusTarget) => calls.push([route.section, focusTarget]),
+    });
+    const view = button(target);
+    assert.ok(!view.hasAttribute('data-validation-row-action'), 'no action, only View');
+    assert.equal(view.textContent.trim(), 'FABRICATE.Admin.Manager.Validation.View');
+    assert.ok(!view.hasAttribute('aria-describedby'));
+    view.click();
+    assert.deepEqual(calls, [['roll', 'checks-roll-formula']]);
+    harness.remount();
+  });
+
+  it('is absent while the check counts, and for a formula that does not count', async () => {
+    const counting = summed('2d20cs<=10', {
+      evaluation: { product: 'count', direction: 'under', pool: { die: 20, base: '2', threshold: '10' } },
+    });
+    for (const section of [counting, summed('2d20kh1'), summed('1d20 + 5')]) {
+      const target = await harness.mount({ sections: [section] });
+      assert.ok(!row(target), JSON.stringify(section.check.rollFormula));
+      harness.remount();
+    }
+  });
+});
+
 // ── THE PAIR, AND THE HOST THAT JOINS IT (issue 1517) ───────────────────────────────────────
 describeValidationAddressPairing({
   title: 'every Checks address the producer emits is carried by a real control',
   producerFile: 'checks/checksReadiness.js',
   tableName: 'CHECK_ISSUE_CONTROLS',
-  tablePattern: /const CHECK_ISSUE_CONTROLS = Object\.freeze\(\{([\s\S]*?)\n\}\);/u,
-  addressPattern: /'([^']+)',/gu,
-  expectedAddressCount: 3,
-  expectation: 'the roll field, the character-value field and the trigger list',
+  // From the two per-kind maps through the table, which names them by reference (issue 2006).
+  tablePattern: /(const FACE_CONTROLS[\s\S]*?const CHECK_ISSUE_CONTROLS = Object\.freeze\(\{[\s\S]*?\n\}\);)/u,
+  addressPattern: /'(checks-[^']+)'/gu,
+  expectedAddressCount: 10,
+  expectation:
+    'the roll field, the character-value field, the trigger list and the seven count controls',
   // WHICH FILE IS SUPPOSED TO CARRY WHICH ADDRESS. This is the half a producer cannot check.
   destinations: {
     'checks-roll-formula': 'checks/CheckFormulaFields.svelte',
     'checks-target-expression': 'checks/CheckDifficultyCard.svelte',
     'checks-triggers': 'checks/CheckTriggers.svelte',
+    'checks-count-base': 'checks/CheckCountPoolFields.svelte',
+    'checks-count-threshold': 'checks/CheckCountPoolFields.svelte',
+    'checks-count-explode': 'checks/CheckCountPoolFields.svelte',
+    'checks-count-explode-face': 'checks/CheckCountPoolFields.svelte',
+    'checks-count-cancel-face': 'checks/CheckCountPoolFields.svelte',
+    'checks-count-required': 'checks/CheckDifficultyCard.svelte',
+    'checks-count-tier-successes': 'checks/CheckRecipeTiers.svelte',
   },
-  // Stamped through `RollDataExpressionInput`'s `inputAttrs`; the mounted Review test focuses it.
-  focusProvenElsewhere: ['checks-target-expression'],
+  // Stamped through a primitive's attribute bag or prop; the mounted Review tests focus each one
+  // (`check-preview-mounted`, `check-count-readiness-mounted`).
+  focusProvenElsewhere: [
+    'checks-target-expression',
+    'checks-count-base',
+    'checks-count-threshold',
+    'checks-count-explode',
+    'checks-count-explode-face',
+    'checks-count-cancel-face',
+    'checks-count-required',
+    'checks-count-tier-successes',
+  ],
   routeNoun: 'route',
   destinationNoun: 'section',
 });

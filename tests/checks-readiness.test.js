@@ -234,10 +234,13 @@ describe('evaluateCheckReadiness: tier-step targets (issue 975)', () => {
 // nothing else gates them: an id with no entry renders its own raw id to the GM, and an entry whose
 // lang key is missing renders the fallback forever.
 describe('checks readiness label maps do not drift', () => {
-  const readinessSource = readFileSync(
-    resolve(repoRoot, 'src/ui/svelte/apps/manager/checks/checksReadiness.js'),
-    'utf8'
-  );
+  // The count rules live in their own module since issue 2006, raising through this registry.
+  const readinessSource = [
+    'src/ui/svelte/apps/manager/checks/checksReadiness.js',
+    'src/ui/svelte/apps/manager/checks/countReadiness.js',
+  ]
+    .map((path) => readFileSync(resolve(repoRoot, path), 'utf8'))
+    .join('\n');
   const en = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
 
   // A check literal is `{ id, satisfied }` — the discriminator is the SECOND key, so this finds
@@ -487,7 +490,11 @@ describe('CHECK_READINESS_ISSUE_IDS is the source of truth for every issue id', 
   // The other half: nothing may build an issue by direct `push`, bypassing the funnel.
   // A source scan is what catches an id on a branch no fixture reaches.
   it('builds no issue literal outside the registry declaration', () => {
-    const body = source.slice(source.indexOf('const REGISTERED_ISSUE_IDS'));
+    const countSource = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/apps/manager/checks/countReadiness.js'),
+      'utf8'
+    );
+    const body = source.slice(source.indexOf('const REGISTERED_ISSUE_IDS')) + countSource;
     const literals = [...body.matchAll(/\{\s*id:\s*'([^']+)',\s*severity:/g)].map((m) => m[1]);
     assert.deepEqual(
       literals,
@@ -637,6 +644,22 @@ describe('CHECK_READINESS_ISSUE_IDS is the source of truth for every issue id', 
     );
     collect(count({ base: '2', required: 3 }), { mode: 'simple' });
     collect(count({ base: '1000', required: 1 }), { mode: 'simple' });
+    // Issue 2006: a summing formula that counts, a from face with none, a dead dice trigger.
+    collect({ rollFormula: '6d10cs>=8', dc: 2 }, { mode: 'simple' });
+    collect(count({ cancel: { enabled: true, faces: { kind: 'from', value: null } } }), {
+      mode: 'simple',
+    });
+    collect(
+      count(
+        {},
+        {
+          checkBreakage: {
+            triggers: [{ condition: { type: 'diceGroup', groupId: 1, aggregate: 'anyDie' } }],
+          },
+        }
+      ),
+      { mode: 'simple' }
+    );
     collect(count({ base: '@skills.smith.rank' }), {
       mode: 'simple',
       previewActor: { name: 'Vosk', rollData: {} },

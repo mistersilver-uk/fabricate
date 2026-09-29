@@ -3,8 +3,11 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  CHECK_ISSUE_CONTROLS,
+  CHECK_READINESS_ISSUE_IDS,
   countCeilingIssues,
   evaluateCheckReadiness,
+  issueControl,
   sectionForIssue,
 } from '../src/ui/svelte/apps/manager/checks/checksReadiness.js';
 import {
@@ -168,7 +171,7 @@ describe('count readiness raises each id with its copy, section and severity', (
   it('countTierWithoutSuccesses, for crafting recipe tiers only', () => {
     const result = evaluateCheckReadiness(FAULTS, { mode: 'simple', activity: 'crafting' });
     assert.deepEqual(described(result, 'countTierWithoutSuccesses', 'countTiersSetSuccesses'), {
-      severity: 'warning',
+      severity: 'critical',
       section: 'roll',
       tick: 'Every recipe tier sets its successes needed',
       satisfied: false,
@@ -349,5 +352,188 @@ describe('the count transient warnings name the Preview-as actor and nothing cou
     const broken = check({ base: '@skills.smith.rank + 1d4' });
     const vosk = { name: 'Vosk', rollData: {} };
     assert.deepEqual(ids(evaluateCheckReadiness(broken, { mode: 'simple', previewActor: vosk }).transient), []);
+  });
+});
+
+// ── Issue 2006: the count ids' controls, and the three new rules ─────────────────────────────
+
+describe('every count id names the control that clears it (N25)', () => {
+  it('maps each registered count id, by kind or input where it has two', () => {
+    const counted = CHECK_READINESS_ISSUE_IDS.filter((id) => id.startsWith('count'));
+    assert.deepEqual(
+      counted.filter((id) => !CHECK_ISSUE_CONTROLS[id]),
+      [],
+      'a count id with no control stays route-only once its control exists'
+    );
+    const control = (id, data) => issueControl({ id, data });
+    assert.equal(control('countPoolInvalid'), 'checks-count-base');
+    assert.equal(control('countPoolTooLarge'), 'checks-count-base');
+    assert.equal(control('countThresholdInvalid'), 'checks-count-threshold');
+    assert.equal(control('countExplodeUnbounded'), 'checks-count-explode');
+    assert.equal(control('countFaceBeyondDie', { kind: 'explode' }), 'checks-count-explode-face');
+    assert.equal(control('countFaceBeyondDie', { kind: 'cancel' }), 'checks-count-cancel-face');
+    assert.equal(control('countFaceMissing', { kind: 'cancel' }), 'checks-count-cancel-face');
+    assert.equal(control('countTierWithoutSuccesses'), 'checks-count-tier-successes');
+    assert.equal(control('countRequiredExceedsMaxPool'), 'checks-count-required');
+    assert.equal(control('countRequiredExceedsBasePool'), 'checks-count-required');
+    assert.equal(control('countPathUnresolvedForPreview', { input: 'threshold' }), 'checks-count-threshold');
+    assert.equal(control('countValueNotNumericForPreview', { input: 'base' }), 'checks-count-base');
+    assert.equal(control('countTriggerGroupUnreachable'), 'checks-triggers');
+    assert.equal(control('freeTextCountingFormula'), 'checks-roll-formula');
+    assert.equal(control('unnamedOutcome'), undefined, 'an Outcomes tier stays route-only');
+  });
+
+  it('names the field a Preview-as actor cannot read', () => {
+    const vosk = { name: 'Vosk', rollData: {} };
+    const read = (pool) =>
+      evaluateCheckReadiness(check(pool), { mode: 'simple', previewActor: vosk }).transient[0];
+    assert.equal(issueControl(read({ base: '@skills.smith.rank' })), 'checks-count-base');
+    assert.equal(issueControl(read({ threshold: '@abilities.int.value' })), 'checks-count-threshold');
+  });
+});
+
+describe('countTierWithoutSuccesses blocks, and only with a tier present (N25)', () => {
+  it('is critical with one null tier and silent with none', () => {
+    const tiers = [{ id: 'unset', name: 'Unset Work', successes: null }];
+    const routed = (list) => ({
+      ...check({ required: 1 }),
+      type: 'relative',
+      relativeOutcomes: [{ id: 'a', name: 'Pass', success: true, dc: 0 }],
+      tiers: list,
+    });
+    const one = evaluateCheckReadiness(routed(tiers), { mode: 'routed', activity: 'crafting' });
+    assert.equal(issue(one, 'countTierWithoutSuccesses').severity, 'critical');
+    const none = evaluateCheckReadiness(routed([]), { mode: 'routed', activity: 'crafting' });
+    assert.equal(issue(none, 'countTierWithoutSuccesses'), undefined);
+    assert.equal(tick(none, 'countTiersSetSuccesses'), undefined, 'no tick without a tier');
+  });
+});
+
+describe('countFaceMissing blocks a from face with no value (ruling R2, N26)', () => {
+  const missing = { enabled: true, faces: { kind: 'from', value: null } };
+
+  it('is critical, names the rule and reads the approved sentence', () => {
+    const explode = evaluateCheckReadiness(check({ explode: missing }), { mode: 'simple' });
+    assert.deepEqual(described(explode, 'countFaceMissing', 'countFacesSet'), {
+      severity: 'critical',
+      section: 'roll',
+      tick: 'Explode and cancel faces are set',
+      satisfied: false,
+      sentence: 'Choose the face to explode from. Without one, this check cannot roll.',
+    });
+    assert.deepEqual(issue(explode, 'countFaceMissing').data, { kind: 'explode' });
+    const cancel = evaluateCheckReadiness(check({ cancel: missing }), { mode: 'simple' });
+    assert.equal(
+      described(cancel, 'countFaceMissing').sentence,
+      'Choose the face to cancel from. Without one, this check cannot roll.'
+    );
+  });
+
+  it('is silent for a set face, an extreme face or a rule switched off', () => {
+    for (const rule of [
+      from(9),
+      { enabled: true, faces: { kind: 'best', value: null } },
+      { ...missing, enabled: false },
+    ]) {
+      const result = evaluateCheckReadiness(check({ explode: rule }), { mode: 'simple' });
+      assert.equal(issue(result, 'countFaceMissing'), undefined, JSON.stringify(rule));
+    }
+    const set = evaluateCheckReadiness(check({ explode: from(9) }), { mode: 'simple' });
+    assert.equal(tick(set, 'countFacesSet').satisfied, true);
+    const extreme = evaluateCheckReadiness(check({}), { mode: 'simple' });
+    assert.equal(tick(extreme, 'countFacesSet'), undefined, 'no tick without a from face');
+  });
+});
+
+describe('countTriggerGroupUnreachable warns about dead dice triggers (ruling R3, N27)', () => {
+  const dice = (id, groupId, aggregate, operator, value) => ({
+    id,
+    condition: { type: 'diceGroup', groupId, aggregate, operator, value },
+    outcome: 'failure',
+  });
+  const withTriggers = (triggers, evaluation = count({ die: 10 })) => ({
+    rollFormula: '1d20 + 1d6',
+    evaluation,
+    checkBreakage: { triggers },
+  });
+  const triggers = [
+    dice('second', 1, 'anyDie', '==', 6),
+    dice('twelve', 0, 'anyDie', '>=', 12),
+    dice('ten', 0, 'anyDie', '==', 10),
+    dice('sum', 0, 'total', '>=', 30),
+    { id: 'net', condition: { type: 'rollTotal', operator: '<', value: 0 }, outcome: 'failure' },
+  ];
+
+  it('names each trigger that cannot fire, as its card is titled, outside the enable gate', () => {
+    const draft = withTriggers(triggers);
+    const before = structuredClone(draft);
+    const result = evaluateCheckReadiness(draft, { mode: 'simple' });
+    assert.deepEqual(described(result, 'countTriggerGroupUnreachable', 'countTriggersReachable'), {
+      severity: 'warning',
+      section: 'triggers',
+      tick: 'Every dice trigger can fire on the pool',
+      satisfied: false,
+      sentence:
+        'Any die of 1 is exactly 6, Any die of d10 is at least 12 read dice this pool never rolls, so they cannot fire while the check counts successes. They are kept and work again if the check adds the dice.',
+    });
+    assert.deepEqual(draft, before, 'the triggers are neither rewritten nor removed');
+    assert.ok(
+      result.issues.every((entry) => entry.id !== 'countTriggerGroupUnreachable' || entry.severity !== 'critical'),
+      'it never feeds the blocking tally'
+    );
+  });
+
+  it('is silent while the check adds the dice, and for triggers the pool can fire', () => {
+    const summing = withTriggers(triggers, { product: 'sum' });
+    assert.equal(issue(evaluateCheckReadiness(summing, { mode: 'simple' }), 'countTriggerGroupUnreachable'), undefined);
+    const live = withTriggers(triggers.slice(2));
+    const result = evaluateCheckReadiness(live, { mode: 'simple' });
+    assert.equal(issue(result, 'countTriggerGroupUnreachable'), undefined);
+    assert.equal(tick(result, 'countTriggersReachable').satisfied, true);
+  });
+});
+
+describe('freeTextCountingFormula is a summing warning only (N24)', () => {
+  const summed = (rollFormula, evaluation = { product: 'sum' }) => ({ rollFormula, dc: 2, evaluation });
+
+  it('warns on a summing counting formula, never while the check counts', () => {
+    const result = evaluateCheckReadiness(summed('6d10cs>=8'), { mode: 'simple' });
+    assert.deepEqual(described(result, 'freeTextCountingFormula', 'summedFormulaCountsNothing'), {
+      severity: 'warning',
+      section: 'roll',
+      tick: 'No summing formula counts successes',
+      satisfied: false,
+      sentence:
+        'The total of 6d10cs>=8 is a count, so every bonus and DC here is measured against the wrong number.',
+    });
+    const counting = evaluateCheckReadiness(summed('6d10cs>=8', count()), { mode: 'simple' });
+    assert.equal(issue(counting, 'freeTextCountingFormula'), undefined);
+  });
+
+  it('raises nothing, not even a tick, for a formula that does not count', () => {
+    for (const formula of ['2d20kh1', '1d20 + 5']) {
+      const result = evaluateCheckReadiness(summed(formula), { mode: 'simple' });
+      assert.equal(issue(result, 'freeTextCountingFormula'), undefined, formula);
+      assert.equal(tick(result, 'summedFormulaCountsNothing'), undefined, formula);
+    }
+  });
+
+  it('says what Convert keeps, leaves behind and cannot copy', () => {
+    const sentence = (data) => checkIssueSentence('freeTextCountingFormula', { formula: '2d20cs<=10', ...data }, text);
+    assert.match(sentence({ convertible: true, dynamic: true }), /Converting keeps the macro, and its return is then read as the successes needed\.$/);
+    assert.match(
+      sentence({ convertible: true, overrides: 'Iron, Tin' }),
+      /Iron, Tin override the DC but not the successes needed, so after converting they use the check's successes needed\.$/
+    );
+    assert.match(sentence({ convertible: false, outOfRange: 21 }), /It cannot be converted: it would need 21 successes, outside 0 to 20\.$/);
+    assert.match(sentence({ convertible: false, outOfRange: -1 }), /need −1 successes/);
+  });
+});
+
+describe('the three new ids carry titles', () => {
+  it('titles each over its sentence', () => {
+    assert.equal(checkIssueText('freeTextCountingFormula', { formula: 'x' }, text).title, 'This formula counts successes, but the check adds the dice');
+    assert.equal(checkIssueText('countFaceMissing', { kind: 'cancel' }, text).title, 'A face to explode or cancel from is not chosen');
+    assert.equal(checkIssueText('countTriggerGroupUnreachable', { triggers: [] }, text).title, 'A trigger reads dice the pool never rolls');
   });
 });

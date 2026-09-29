@@ -265,14 +265,17 @@ describe('count odds and the simulator readout', () => {
     );
     assert.match(
       notice.querySelector('.fab-notice-detail').textContent,
-      /IssueCountPathUnresolvedForPreview:\{"actor":"Vosk","path":"@skills\.smith\.rank"\}/u,
+      /IssueCountPathUnresolvedForPreview:\{"actor":"Vosk","path":"@skills\.smith\.rank","input":"base"\}/u,
       'the detail is the Validation sentence, naming the actor and the path'
     );
     const panel = root.querySelector('[role="tabpanel"]');
     assert.ok(panel.firstElementChild.matches('[data-checks-section-notices="roll"]'), 'it opens the pane');
     notice.querySelector('[data-notice-action]').click();
     await settle();
-    assert.ok(root.ownerDocument.activeElement === panel, 'no count control exists yet, so Review focuses the section');
+    assert.ok(
+      root.ownerDocument.activeElement === root.querySelector('[data-validation-target="checks-count-base"]'),
+      'Review focuses the base pool the actor cannot read (issue 2006)'
+    );
     assert.equal(dots(), before, 'a transient warning puts no dot on a section');
   });
 
@@ -502,11 +505,11 @@ describe('count readiness on the route', () => {
       evaluation: pool({ base: '2', threshold: '1d4 + 6', required: 3 }),
       tiers: [{ id: 'unset', name: 'Unset Work', dc: 12, successes: null }],
     });
-    // Blocking issues first, as Validation orders its rows (issue 2082); the warning was pushed between them.
+    // Blocking issues first, as Validation orders its rows (issue 2082); all three block since issue 2006.
     const ids = [...root.querySelectorAll('[data-checks-section-notices="roll"] > [data-checks-section-notice]')].map(
       (notice) => notice.getAttribute('data-checks-section-notice')
     );
-    assert.deepEqual(ids, ['countThresholdInvalid', 'countRequiredExceedsMaxPool', 'countTierWithoutSuccesses']);
+    assert.deepEqual(ids, ['countThresholdInvalid', 'countTierWithoutSuccesses', 'countRequiredExceedsMaxPool']);
     assert.ok(!root.querySelector('[data-checks-section-notice="noRollFormula"]'));
   });
 
