@@ -1,28 +1,27 @@
 /**
- * Bounds the comment-line share per directory (issue 1657) as a ceiling, so a sweep that trims
- * comments costs no ledger edit and only a directory that grows materially does (issue 1914),
- * and caps each `src/systems` file at a 30% comment share (issue 1934).
+ * Bounds the comment-line share of each directory against the base commit: no directory may cross
+ * `COMMENT_SHARE_CAP`, and one already over it may not rise above its base share. Each
+ * `src/systems` file is capped at the same share outright (issue 1934).
  */
 import assert from 'node:assert/strict';
-import { readdirSync, statSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
-import { test } from 'node:test';
+import { mkdirSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
+import { after, test } from 'node:test';
 
-import { ceilingLedgerGate } from './helpers/ratchetBaseline.js';
 import { byCodePoint } from './helpers/codePointOrder.js';
+import { compareToBase, parseMarkers, reportComparison } from './helpers/mergeBaseRatchet.js';
 import { collectWorkingTreeSources, repoRoot } from './helpers/sourceScan.js';
+import { createTempGitRepo } from './helpers/temp-git-repo.js';
 
-const LEDGER_PATH = resolve(import.meta.dirname, 'comment-share-ledger.txt');
+const FAMILY = 'comment-share';
 
-const RUN = 'node --conditions=browser --test tests/comment-share-ratchet.test.js';
+/** A directory or `src/systems` file is over its cap above this whole-percent comment share. */
+const COMMENT_SHARE_CAP = 30;
 
-/** Below this the scan is truncated rather than clean; the four roots hold ~2,100 files. */
+/** Below this the scan is truncated rather than clean; the four roots hold ~2,400 files. */
 const SCAN_FLOOR = 451;
 
-/** The headroom every row carries, in comment lines a directory may add before it crosses. */
-const HEADROOM_LINES = 25;
-
-/** The corpus this gate polices. `.json` is excluded on purpose — see the ledger note below. */
+/** The corpus this gate polices; `.json` is left out because it cannot hold a comment. */
 const SCAN_ROOTS = Object.freeze(['src', 'tests', 'scripts', 'styles']);
 const SCAN_EXTENSIONS = Object.freeze(['.js', '.mjs', '.svelte', '.css']);
 
@@ -153,39 +152,51 @@ function regionAfterTag(region, trimmed) {
 }
 
 /**
- * Two gaps are accepted, not fixed: a JS comment inside a `{...}` mustache expression in markup
- * is not detected, and a `<style lang="scss">` block would undercount `//` (no `.svelte` file
- * uses `lang="scss"` today).
+ * Each line of a file as `[line, kind]`, where `kind` is `comment`, `code`, or `tag` for a Svelte
+ * line that switches region. Two Svelte gaps are accepted, not fixed: a JS comment inside a `{...}`
+ * mustache expression in markup is not detected, and a `<style lang="scss">` block would undercount
+ * `//` (no `.svelte` file uses `lang="scss"` today).
  */
-function countSvelteCommentLines(text) {
+function* lineKinds(text, extension) {
+  const kindOf = (isComment) => (isComment ? 'comment' : 'code');
+  if (extension !== '.svelte') {
+    const syntax = extension === '.css' ? CSS_SYNTAX : JS_SYNTAX;
+    const state = { inBlock: false, quote: null };
+    for (const line of text.split('\n')) yield [line, kindOf(classifyLine(line, state, syntax))];
+    return;
+  }
   const states = {
     markup: { inBlock: false, quote: null },
     js: { inBlock: false, quote: null },
     css: { inBlock: false, quote: null },
   };
   let region = 'markup';
-  let count = 0;
   for (const line of text.split('\n')) {
     const switched = regionAfterTag(region, line.trim());
     if (switched) {
       region = switched;
-      continue;
+      yield [line, 'tag'];
+    } else {
+      yield [line, kindOf(classifyLine(line, states[region], REGION_SYNTAX[region]))];
     }
-    if (classifyLine(line, states[region], REGION_SYNTAX[region])) count += 1;
   }
+}
+
+function countCommentLines(text, extension) {
+  let count = 0;
+  for (const [, kind] of lineKinds(text, extension)) if (kind === 'comment') count += 1;
   return count;
 }
 
-/** Count comment lines in one file, dispatching purely on extension — no per-type branch below this. */
-function countCommentLines(text, extension) {
-  if (extension === '.svelte') return countSvelteCommentLines(text);
-  const syntax = extension === '.css' ? CSS_SYNTAX : JS_SYNTAX;
-  const state = { inBlock: false, quote: null };
-  let count = 0;
-  for (const line of text.split('\n')) {
-    if (classifyLine(line, state, syntax)) count += 1;
+/** The number of leading lines that are blank, comment, a Svelte region tag or a shebang. */
+function fileHeadLength(text, extension) {
+  let length = 0;
+  for (const [line, kind] of lineKinds(text, extension)) {
+    const shebang = length === 0 && line.startsWith('#!');
+    if (kind === 'code' && line.trim() !== '' && !shebang) break;
+    length += 1;
   }
-  return count;
+  return length;
 }
 
 function directoryOf(file) {
@@ -203,49 +214,107 @@ function totalLines(text) {
   return lines.length - (lines.at(-1) === '' ? 1 : 0);
 }
 
-/** A whole-percent share, so `100 * commentLines / totalLines` is what each row bounds. */
 const shareOf = ({ commentLines, totalLines: total }) => (100 * commentLines) / total;
 
-/** The share the directory would hold after `HEADROOM_LINES` more comment lines. */
-function ceilingFor(key, _share, detail) {
-  const { commentLines, totalLines: total } = detail[key];
-  return Math.ceil((100 * (commentLines + HEADROOM_LINES)) / (total + HEADROOM_LINES));
+const inCorpus = (file) =>
+  SCAN_ROOTS.some((root) => file.startsWith(`${root}/`)) &&
+  SCAN_EXTENSIONS.includes(extensionOf(file));
+
+/** Whether `text` carries a reasoned `ratchet-exempt(comment-share)` marker in its file head. */
+function exemptsItsDirectory(file, text) {
+  const markers = parseMarkers(file, text).filter(
+    (marker) => marker.family === FAMILY && marker.reason !== ''
+  );
+  if (markers.length === 0) return false;
+  const head = fileHeadLength(text, extensionOf(file));
+  return markers.some((marker) => marker.line <= head);
+}
+
+/** Per extension, each text's tally; base and head share most files, so each is counted once. */
+const tallies = new Map();
+
+function tallyFile(file, text) {
+  const extension = extensionOf(file);
+  if (!tallies.has(extension)) tallies.set(extension, new Map());
+  const byText = tallies.get(extension);
+  if (!byText.has(text)) {
+    byText.set(text, {
+      commentLines: countCommentLines(text, extension),
+      totalLines: totalLines(text),
+      exempt: exemptsItsDirectory(file, text),
+    });
+  }
+  return byText.get(text);
 }
 
 /**
- * Keyed by every directory directly holding a scanned file, counting only files directly in it —
- * not the coarser one-child-per-root key a redistribution inside a subtree could hide behind.
+ * Comment and total lines per directory, counting only the files directly in it, so a
+ * redistribution inside a subtree cannot hide behind a coarser key.
  */
-function buildLedger(corpus) {
+function tallyDirectories(files, readFile) {
   const buckets = new Map();
-  for (const [file, text] of Object.entries(corpus)) {
+  for (const file of files) {
+    const text = readFile(file);
+    if (text === undefined) continue;
     const dir = directoryOf(file);
-    const bucket = buckets.get(dir) ?? { commentLines: 0, totalLines: 0 };
-    bucket.commentLines += countCommentLines(text, extensionOf(file));
-    bucket.totalLines += totalLines(text);
+    const bucket = buckets.get(dir) ?? { commentLines: 0, totalLines: 0, exempt: false };
+    const tally = tallyFile(file, text);
+    bucket.commentLines += tally.commentLines;
+    bucket.totalLines += tally.totalLines;
+    bucket.exempt ||= tally.exempt;
     buckets.set(dir, bucket);
   }
-  const sorted = [...buckets]
-    .filter(([, bucket]) => bucket.totalLines > 0)
-    .sort(([a], [b]) => byCodePoint(a, b));
-  return {
-    observed: Object.fromEntries(sorted.map(([dir, bucket]) => [dir, shareOf(bucket)])),
-    detail: Object.fromEntries(sorted),
-    scanned: Object.keys(corpus).length,
-  };
+  return buckets;
 }
 
-/** Comment and total lines per top-level root, which is the figure epic 1656's roll-up reads. */
-function rollUpByRoot(detail) {
-  const rollup = {};
-  for (const [dir, bucket] of Object.entries(detail)) {
-    const [root] = dir.split('/', 1);
-    const into = (rollup[root] ??= { commentLines: 0, totalLines: 0 });
-    into.commentLines += bucket.commentLines;
-    into.totalLines += bucket.totalLines;
+const ENTRY_ID = `comment-line share over ${COMMENT_SHARE_CAP}%`;
+
+/**
+ * One entry per directory over the cap, keyed `<dir>/*`, so a directory newly over it is new and
+ * one already over it fails on any rise; four decimal places resolve one line in any directory
+ * here. A directory holding a file with a reasoned marker in its file head is not measured.
+ */
+function measureCommentShare(readFile, listFiles) {
+  const entries = [];
+  for (const [dir, bucket] of tallyDirectories(listFiles(), readFile)) {
+    if (bucket.exempt || bucket.totalLines === 0) continue;
+    const share = shareOf(bucket);
+    if (share <= COMMENT_SHARE_CAP) continue;
+    entries.push({ file: `${dir}/*`, id: ENTRY_ID, amount: Math.round(share * 1e4) / 1e4 });
   }
-  return rollup;
+  return entries;
 }
+
+const compareCommentShare = (options = {}) =>
+  compareToBase({
+    family: FAMILY,
+    corpusRoot: '.',
+    include: inCorpus,
+    measure: measureCommentShare,
+    scope: 'corpus',
+    ...options,
+  });
+
+const GUIDANCE =
+  "A directory's share counts the files directly in it, so moving a file moves its lines. Trim " +
+  "the comments under AGENTS.md's comment rules. A reasoned exemption goes in the file head of " +
+  'any file directly in that directory.';
+
+test('no directory crosses the comment-share cap or, already over it, rises above base', (t) => {
+  const listed = [];
+  const measure = (readFile, listFiles) => {
+    const files = listFiles();
+    listed.push(files.length);
+    return measureCommentShare(readFile, () => files);
+  };
+  const result = reportComparison(t, compareCommentShare({ measure }), GUIDANCE);
+  if (!result.compared) return;
+  t.diagnostic(`compared ${listed.join(' and ')} files with base ${result.base.slice(0, 12)}`);
+  assert.ok(
+    Math.min(...listed) >= SCAN_FLOOR,
+    `expected at least ${SCAN_FLOOR} scanned files on each side; scanned ${listed.join(' and ')}`
+  );
+});
 
 /** Every symlink under `root` whose target is a directory, repo-relative. */
 function findSymlinkedDirectories(root) {
@@ -273,37 +342,22 @@ function findSymlinkedDirectories(root) {
 }
 
 let corpus;
-/** The one read of the corpus; the per-file `src/systems` cap below filters it too. */
+/** The one working-tree read, for the roll-up and the per-file `src/systems` cap. */
 const readCorpus = () => (corpus ??= collectWorkingTreeSources(SCAN_ROOTS, SCAN_EXTENSIONS));
-
-const gate = ceilingLedgerGate({
-  test,
-  assert,
-  title: 'no directory is past its comment-share ceiling',
-  ledgerPath: LEDGER_PATH,
-  updateEnv: 'UPDATE_COMMENT_SHARE_LEDGER',
-  tightenEnv: 'TIGHTEN_COMMENT_SHARE_LEDGER',
-  build: () => buildLedger(readCorpus()),
-  ceiling: ceilingFor,
-  shrink: 'allow',
-  floor: SCAN_FLOOR,
-  wording: {
-    subject: 'comment-line share per directory',
-    update: `UPDATE_COMMENT_SHARE_LEDGER=1 ${RUN}`,
-    tighten: `TIGHTEN_COMMENT_SHARE_LEDGER=1 ${RUN}`,
-    addedHint:
-      'A directory appears as its first scanned file is created. One key rising while another ' +
-      'falls by a comparable share is a file moved between directories, not new prose.',
-    staleHint: 'A directory vanishes when its files are moved, renamed or emptied.',
-  },
-});
 
 /** Prints the roll-up epic 1656's definition of done reads; percentages are not summable, so it
  * is derived from the scan's own line counts and never pinned. */
 test('the scan reports the root-level roll-up epic 1656 tracks', (t) => {
-  const rollup = rollUpByRoot(gate.current().detail);
+  const files = Object.keys(readCorpus());
+  assert.ok(files.length >= SCAN_FLOOR, `expected ${SCAN_FLOOR}+ files; scanned ${files.length}`);
+  const rollup = {};
+  for (const [dir, bucket] of tallyDirectories(files, (file) => readCorpus()[file])) {
+    const into = (rollup[dir.split('/', 1)[0]] ??= { commentLines: 0, totalLines: 0 });
+    into.commentLines += bucket.commentLines;
+    into.totalLines += bucket.totalLines;
+  }
   for (const [root, bucket] of Object.entries(rollup).sort(([a], [b]) => byCodePoint(a, b))) {
-    const share = ((100 * bucket.commentLines) / bucket.totalLines).toFixed(2);
+    const share = shareOf(bucket).toFixed(2);
     t.diagnostic(`${root}: ${bucket.commentLines}/${bucket.totalLines} lines comment (${share}%)`);
   }
   assert.deepStrictEqual(
@@ -311,15 +365,6 @@ test('the scan reports the root-level roll-up epic 1656 tracks', (t) => {
     [...SCAN_ROOTS].sort(byCodePoint),
     'every scanned root still contributes a directory'
   );
-});
-
-test('a row absorbs at least twenty-five comment lines before it is crossed', () => {
-  // A bare `ceil(share)` leaves a row tripping on one added line, which is the churn the ceiling
-  // exists to remove; the rule is stated over the directory's own denominator instead.
-  const detail = { small: { commentLines: 20, totalLines: 100 } };
-  assert.equal(ceilingFor('small', shareOf(detail.small), detail), 36);
-  const grown = { commentLines: 45, totalLines: 125 };
-  assert.ok(shareOf(grown) <= 36, 'twenty-five more comment lines still fit under the ceiling');
 });
 
 test('none of the four scanned roots contains a symlinked directory', () => {
@@ -331,8 +376,6 @@ test('none of the four scanned roots contains a symlinked directory', () => {
   );
 });
 
-/** A `src/systems` file is over its cap above this whole-percent comment share (issue 1934). */
-const SYSTEMS_FILE_SHARE_CAP = 30;
 /** A file with this many comment lines or fewer is never over, whatever its share. */
 const SYSTEMS_FILE_COMMENT_FLOOR = 10;
 /** Below this the `src/systems` scan is truncated rather than clean; it holds ~150 files. */
@@ -341,7 +384,7 @@ const SYSTEMS_SCAN_FLOOR = 100;
 /** The one predicate both the scan and the boundary test call. */
 function overSystemsCap({ commentLines, totalLines: total }) {
   return (
-    shareOf({ commentLines, totalLines: total }) > SYSTEMS_FILE_SHARE_CAP &&
+    shareOf({ commentLines, totalLines: total }) > COMMENT_SHARE_CAP &&
     commentLines > SYSTEMS_FILE_COMMENT_FLOOR
   );
 }
@@ -377,7 +420,7 @@ test('no src/systems file is over the comment-share cap', () => {
   assert.deepStrictEqual(
     scanSystemsFiles().filter(overSystemsCap).map(describeCounts),
     [],
-    `over ${SYSTEMS_FILE_SHARE_CAP}% comment share with more than ${SYSTEMS_FILE_COMMENT_FLOOR} ` +
+    `over ${COMMENT_SHARE_CAP}% comment share with more than ${SYSTEMS_FILE_COMMENT_FLOOR} ` +
       'comment lines: trim the file under the comment policy (issue 1657)'
   );
 });
@@ -388,4 +431,95 @@ test('the cap is exclusive at 30% and exempts ten or fewer comment lines', () =>
   assert.equal(over(31, 100), true, '31/100 is over');
   assert.equal(over(10, 20), false, '10/20 is at the floor');
   assert.equal(over(11, 20), true, '11/20 is over');
+});
+
+const repos = [];
+after(() => repos.forEach((repo) => repo.dispose()));
+
+/** A throwaway repository whose one commit holds `files`, compared by this gate's own wiring. */
+function repoWith(files) {
+  const repo = createTempGitRepo('comment-share-');
+  repos.push(repo);
+  const write = (entries) => {
+    for (const [file, text] of Object.entries(entries)) {
+      mkdirSync(dirname(join(repo.dir, file)), { recursive: true });
+      writeFileSync(join(repo.dir, file), text);
+    }
+  };
+  write(files);
+  repo.git('add', '-A');
+  const first = repo.commit('base');
+  const compare = () =>
+    compareCommentShare({ cwd: repo.dir, env: { RATCHET_BASE: first } });
+  return { write, compare };
+}
+
+/** A JS file of `comments` comment lines then `code` code lines. */
+const jsFile = (comments, code, head = []) =>
+  [
+    ...head,
+    ...Array.from({ length: comments }, (_, index) => `// note ${index}`),
+    ...Array.from({ length: code }, (_, index) => `export const v${index} = ${index};`),
+  ].join('\n') + '\n';
+
+test('a directory newly over the cap fails, and one under it may rise to the cap', () => {
+  const repo = repoWith({ 'src/a/one.js': jsFile(1, 9), 'tests/b/one.js': jsFile(1, 9) });
+  repo.write({ 'src/a/two.js': jsFile(9, 1), 'tests/b/one.js': jsFile(3, 7) });
+  const result = repo.compare();
+  assert.equal(result.compared, true);
+  assert.deepEqual(result.failures, [`src/a/*: ${ENTRY_ID} is new (50)`]);
+  assert.throws(() => reportComparison(null, result, GUIDANCE), /comment-share: 1 regression/);
+});
+
+test('a directory already over the cap fails on any rise and passes a fall, reported', () => {
+  const repo = repoWith({ 'src/c/over.js': jsFile(4, 6) });
+  repo.write({ 'src/c/over.js': jsFile(5, 6) });
+  assert.deepEqual(repo.compare().failures, [`src/c/*: ${ENTRY_ID} rose from 40 to 45.4545`]);
+  repo.write({ 'src/c/over.js': jsFile(4, 7) });
+  const fell = repo.compare();
+  assert.deepEqual(fell.failures, []);
+  assert.deepEqual(fell.shrank, [`src/c/*: ${ENTRY_ID} fell from 40 to 36.3636`]);
+  repo.write({ 'src/c/over.js': jsFile(4, 16) });
+  assert.deepEqual(repo.compare().shrank, [`src/c/*: ${ENTRY_ID} is gone (was 40)`]);
+});
+
+test('a change to any file of the corpus compares rather than skips, and one outside it skips', () => {
+  const files = ['src/x/a.svelte', 'tests/x/a.mjs', 'scripts/x/a.js', 'styles/x/a.css'];
+  const repo = repoWith({
+    ...Object.fromEntries(files.map((file) => [file, 'x\n'])),
+    'docs/readme.md': 'x\n',
+    'src/x/data.json': '{}\n',
+  });
+  repo.write({ 'docs/readme.md': 'y\n', 'src/x/data.json': '[]\n' });
+  assert.equal(repo.compare().skipped, 'corpus-unchanged');
+  for (const file of files) {
+    repo.write({ [file]: 'y\n' });
+    assert.equal(repo.compare().compared, true, `${file} is in the corpus`);
+    repo.write({ [file]: 'x\n' });
+  }
+});
+
+test('the file head runs through blank, comment, shebang and Svelte tag lines to the first code', () => {
+  assert.equal(fileHeadLength('#!/usr/bin/env node\n// a\n\nconst x = 1;\n// b\n', '.mjs'), 3);
+  assert.equal(fileHeadLength('<!-- a -->\n<script>\n  // b\n  import x from "y";\n', '.svelte'), 3);
+  assert.equal(fileHeadLength('/* a\n b */\n.x {}\n', '.css'), 2);
+});
+
+test('a reasoned marker in the file head of a file in the directory exempts it; an empty fails', () => {
+  const marker = (reason) => `// ratchet-exempt(comment-share):${reason}`;
+  const repo = repoWith({ 'src/d/one.js': jsFile(1, 9), 'src/e/one.js': jsFile(1, 9) });
+  const exempt = { 'src/d/two.js': jsFile(9, 1, [marker(' a generated API reference')]) };
+  repo.write(exempt);
+  assert.deepEqual(repo.compare().failures, []);
+  repo.write({
+    'src/d/two.js': `${jsFile(9, 1)}${marker(' below the file head')}\n`,
+    'src/e/two.svelte': ['<script>', marker(' in a Svelte script head'), '// a', '// b', '// c', '// d', '// e', '// f', '// g', '// h', '// i', '</script>', ''].join('\n'),
+  });
+  assert.deepEqual(repo.compare().failures, [`src/d/*: ${ENTRY_ID} is new (52.381)`]);
+  repo.write({ 'src/d/two.js': jsFile(9, 1, [marker('')]) });
+  assert.deepEqual(repo.compare().failures, [
+    `src/d/*: ${ENTRY_ID} is new (52.381)`,
+    'src/d/two.js:1 has a ratchet-exempt(comment-share) marker with no reason; write why the ' +
+      'regression is legitimate after the colon',
+  ]);
 });
