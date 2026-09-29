@@ -126,7 +126,7 @@ A change does not rewrite comments in files it is not otherwise editing, unless 
 
 This workflow produced each of these shapes repeatedly, and each already has a rule that answers it; naming them together is what stops review approving them one at a time.
 
-- Comments that argue a case, retell history, or shout in ALL-CAPS, answered by the comment rules above and measured per directory by `tests/comment-share-ledger.txt`.
+- Comments that argue a case, retell history, or shout in ALL-CAPS, answered by the comment rules above and measured per directory by `tests/comment-share-ratchet.test.js`.
 - Adding to the nearest large file or function instead of extracting a unit, answered by `tests/file-size-ledger.txt`.
 - Pinning how code is written with a `Source.includes(` assertion, answered by `tests/source-pin-ledger.txt`.
 - Redeclaring a shared helper locally, answered by `tests/scalar-helper-duplicates.test.js` and `tests/category-shim-bindings.test.js`.
