@@ -134,6 +134,11 @@ describe('recipeBrowserModel — sorting', () => {
     const rows = (kind, dc) => [makeRecipe({ checkSummary: { kind, dc } })];
     assert.equal(recipeCheckSortLabel(rows('dc', 12), english), 'Check DC');
     assert.equal(recipeCheckSortLabel([], english), 'Check DC');
+    // With no rows the system's own evaluation names the unit (QE Q7).
+    const under = { product: 'sum', direction: 'under', target: { source: 'fixed' } };
+    assert.equal(recipeCheckSortLabel([], english, under), 'Check target');
+    assert.equal(recipeCheckSortLabel([], english, { ...under, direction: 'over' }), 'Check DC');
+    assert.equal(recipeCheckSortLabel([], english, { product: 'count', direction: 'under' }), 'Check DC');
     assert.equal(recipeCheckSortLabel(rows('target', 12), english), 'Check target');
     assert.equal(recipeCheckSortLabel(rows('attribute', null), english), 'Check target');
     assert.equal(recipeCheckSortLabel(rows('dynamicTarget', null), english), 'Check target');

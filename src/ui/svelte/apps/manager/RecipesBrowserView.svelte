@@ -52,6 +52,8 @@
     selectedSystemId = '',
     showRecipeCategories = false,
     resolutionMode = 'simple',
+    // The system's crafting-check evaluation, which names the check sort key with no rows.
+    checkEvaluation = null,
     onSearchChange = () => {},
     onSelectRecipe = () => {},
     onEditRecipe = () => {},
@@ -212,7 +214,7 @@
 
   function sortLabel(key) {
     // A roll-under or character-value check sorts by its Target, never a DC (issue 2005).
-    if (key === 'dc') return recipeCheckSortLabel(recipes, text);
+    if (key === 'dc') return recipeCheckSortLabel(recipes, text, checkEvaluation);
     const [labelKey, fallback] = SORT_LABELS[key] || SORT_LABELS.name;
     return text(labelKey, fallback);
   }

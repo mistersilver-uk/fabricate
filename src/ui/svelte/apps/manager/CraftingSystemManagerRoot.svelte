@@ -5803,6 +5803,7 @@
         {selectedSystemId}
         {showRecipeCategories}
         resolutionMode={selectedSystem?.resolutionMode || 'simple'}
+        checkEvaluation={recipeCheckTierEvaluation}
         bind:browserState={recipeBrowserState}
         onSearchChange={(term) => store.setRecipeSearch?.(term)}
         onSelectRecipe={(id) => selectRecipe(id)}

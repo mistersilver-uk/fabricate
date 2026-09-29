@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import {
+  CHECK_TARGET_RAW_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
   STATUS_TONE_RAW_MODULES,
@@ -45,6 +46,8 @@ const RECIPE_RAW_MODULES = [
   // The lifted browse state's default page size, which the browse-list composable reads.
   'src/ui/model/managerBrowserViewState.js',
   'src/ui/model/recipeBrowserModel.js',
+  // ... which names its check sort key from the system's evaluation (issue 2005) ...
+  ...CHECK_TARGET_RAW_MODULES,
   // ... which since issue 1688 runs on the shared adapter-driven pipeline.
   'src/ui/model/entityBrowserModel.js',
   // entityBrowserModel imports the shared category totals (issue 676).
@@ -553,6 +556,13 @@ describe('RecipesBrowserView row readout (issue 643 §9)', () => {
       recipes: [makeRecipe({ checkSummary: { kind: 'dynamicTarget', dc: null } })]
     });
     assert.equal(macro.querySelector('[data-recipe-check]').textContent.trim(), 'Dynamic target');
+    browser.remount();
+
+    const empty = await browser.mount({
+      recipes: [],
+      checkEvaluation: { product: 'sum', direction: 'under', target: { source: 'fixed' } }
+    });
+    assert.ok(selectOptionLabels(empty, '[data-recipe-sort]').includes('Check target'), 'no rows (QE Q7)');
     browser.remount();
 
     const roll = await browser.mount({ recipes: [makeRecipe({ checkSummary: { kind: 'dc', dc: 12 } })] });

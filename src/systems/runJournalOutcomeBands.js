@@ -70,12 +70,31 @@ function tierThreshold(base, outcome, grading) {
   return grading.direction === 'under' ? base - step : base + step;
 }
 
-/** A character-value tier's adjustment, or Otherwise for a multiply tier with none. */
-function adjustmentBand(outcome, grading, { otherwise = 'Otherwise' } = {}) {
-  if (!grading.multiply) return formatCheckAdjustment('add', numberOrNull(outcome?.dc) ?? 0);
-  return outcome?.adjustment == null
-    ? otherwise
-    : formatCheckAdjustment('multiply', outcome.adjustment);
+const namedBand = (tier, adjustment) => `${tier} · ${adjustment}`;
+
+/**
+ * A character-value tier's adjustment, or Otherwise for a multiply tier with none, labelled with
+ * its tier's name (`Failed · −15`) by `labels.named(tier, adjustment)`.
+ */
+function adjustmentBand(outcome, grading, { otherwise = 'Otherwise', named = namedBand } = {}) {
+  let adjustment;
+  if (!grading.multiply) adjustment = formatCheckAdjustment('add', numberOrNull(outcome?.dc) ?? 0);
+  else if (outcome?.adjustment == null) adjustment = otherwise;
+  else adjustment = formatCheckAdjustment('multiply', outcome.adjustment);
+  const tier = String(outcome?.name ?? '').trim();
+  return tier ? named(tier, adjustment) : adjustment;
+}
+
+/**
+ * Which selection rule a routed relative ladder states: `adjustment` for a character value, else
+ * `under` or `underStrict` for roll-under; `null` keeps the roll-high rule.
+ */
+export function ladderRule(routed) {
+  if (!routed || routed.type === 'fixed') return null;
+  const grading = ladderGrading(routed);
+  if (grading.source === 'attribute') return 'adjustment';
+  if (grading.direction !== 'under') return null;
+  return routed.thresholdMode === 'exceed' ? 'underStrict' : 'under';
 }
 
 /**

@@ -39,6 +39,12 @@
 
   let { run = null, journal = null, now = 0, services = null } = $props();
 
+  // The selection-rule hint a roll-under or character-value ladder states (issue 2005).
+  const LADDER_RULE_KEYS = {
+    under: 'FABRICATE.App.Journal.Yields.RoutedRuleUnder',
+    underStrict: 'FABRICATE.App.Journal.Yields.RoutedRuleUnderStrict',
+    adjustment: 'FABRICATE.App.Journal.Yields.RoutedRuleAdjustment',
+  };
   const status = $derived(String(run?.derivedStatus ?? run?.status ?? 'inProgress'));
   const statusView = $derived(
     runStatusPresentation(run?.recoveryEvidence?.status === 'planned' ? 'inProgress' : status)
@@ -568,9 +574,7 @@
         emptyTierText={localize('FABRICATE.App.Journal.Yields.None')}
         label={localize('FABRICATE.App.Journal.Yields.PreviewTitle')}
         hint={localize(
-          gatheringYield.direction === 'under'
-            ? 'FABRICATE.App.Journal.Yields.RoutedRuleUnder'
-            : 'FABRICATE.App.Journal.Yields.RoutedRule'
+          LADDER_RULE_KEYS[gatheringYield.ladderRule] ?? 'FABRICATE.App.Journal.Yields.RoutedRule'
         )}
       />
     {:else if gatheringYield && displayedYieldEntries.length > 0}

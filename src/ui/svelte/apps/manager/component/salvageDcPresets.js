@@ -5,7 +5,8 @@
  * system default, else an integer. The five cases, each referenced by number below:
  *
  *  1. Salvage never runs a DC macro (it grades the override, else the slot's DC, else 15), so the
- *     system-default label names that static DC whatever the crafting check's `dcMode` (#2081).
+ *     system-default label names that static DC whatever the crafting check's `dcMode`
+ *     (issue 2081).
  *  2. Zero authored tiers, the COMMON case: System default + Custom… only, plus "Manage presets".
  *  3. `_normalizeSimpleTier` permits `name: ''` and coerces a non-finite `dc` to `0`, which would
  *     render an unlabelled "— DC 0". Such tiers are not authored presets, so they are skipped.

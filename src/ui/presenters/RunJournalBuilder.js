@@ -19,7 +19,11 @@ import {
 import { readStackQuantity } from '../../systems/itemStackQuantity.js';
 import { buildPassInventorySnapshot } from '../../systems/passInventorySnapshot.js';
 import { historyEvidenceFields } from '../../systems/runHistoryEvidence.js';
-import { craftingOutcomeBand, routedOutcomeBand } from '../../systems/runJournalOutcomeBands.js';
+import {
+  craftingOutcomeBand,
+  ladderRule,
+  routedOutcomeBand,
+} from '../../systems/runJournalOutcomeBands.js';
 import { getRunLifecycleContract } from '../../systems/runLifecycleState.js';
 import { resolvedComponentsFor, resolvedEssencesFor } from '../../systems/scopedEntityReads.js';
 import {
@@ -52,14 +56,10 @@ function recordedNumber(value) {
   return typeof value === 'string' && value.trim() === '' ? null : numberOrNull(value);
 }
 
-/** Whether a routed check ranks its ladder roll-under: lower totals reach the better tiers. */
-function laddersUnder(routed) {
-  const evaluation = activeCheckEvaluation(routed);
-  return evaluation.product === 'sum' && evaluation.direction === 'under';
-}
-
 /** Outside sum/over/fixed a roll names its executed target and margin, never a DC (issue 2005). */
 function executedTargetFields(data) {
+  // A count's `target` is a per-die face, so its line keeps its wording until issue 2006.
+  if (data.product === 'count') return null;
   if (data.direction !== 'under' && data.targetSource !== 'attribute') return null;
   return { target: recordedNumber(data.target), margin: recordedNumber(data.margin) };
 }
@@ -1820,7 +1820,16 @@ export class RunJournalBuilder {
 
   /** The ladder's localized words: a multiply ladder's tier with no adjustment is Otherwise. */
   _bandLabels() {
-    return { otherwise: this.localize('FABRICATE.App.Journal.StepDetails.BandOtherwise') };
+    return {
+      otherwise: this.localize('FABRICATE.App.Journal.StepDetails.BandOtherwise'),
+      named: (tier, adjustment) =>
+        this.localize('FABRICATE.App.Journal.StepDetails.BandAdjustment', { tier, adjustment }),
+    };
+  }
+
+  _ladderRuleField(routed) {
+    const rule = ladderRule(routed);
+    return rule ? { ladderRule: rule } : null;
   }
 
   /**
@@ -1845,10 +1854,12 @@ export class RunJournalBuilder {
     const dc = this._resolveCheckDc({ config, recipe, mode });
     if (dc === null) return formula;
     const evaluation = activeCheckEvaluation(config);
-    if (isFixedSumOver(evaluation)) {
+    // A count keeps its DC wording until issue 2006.
+    if (isFixedSumOver(evaluation) || evaluation.product === 'count') {
       return this.localize('FABRICATE.App.Journal.StepDetails.CheckWithDc', { formula, dc });
     }
-    if (evaluation.product !== 'sum' || evaluation.target.source === 'attribute') return formula;
+    // A character value states no number, and a fixed range grades the raw roll against no target.
+    if (evaluation.target.source === 'attribute' || config?.type === 'fixed') return formula;
     return this.localize('FABRICATE.App.Journal.StepDetails.CheckWithTarget', {
       formula,
       target: dc,
@@ -2258,11 +2269,8 @@ export class RunJournalBuilder {
         mode === 'routed'
           ? this._routedYieldTiers(context.task, system, stringOrNull(run.craftingSystemId))
           : [],
-      // A roll-under ladder states its selection rule the other way up (issue 2005).
-      ...(mode === 'routed' &&
-        laddersUnder(system?.gatheringCraftingCheck?.routed) && {
-          direction: 'under',
-        }),
+      // A roll-under or character-value ladder states its own selection rule (issue 2005).
+      ...(mode === 'routed' && this._ladderRuleField(system?.gatheringCraftingCheck?.routed)),
     };
   }
 

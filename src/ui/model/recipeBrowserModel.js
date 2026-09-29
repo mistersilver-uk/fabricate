@@ -3,6 +3,8 @@
  * per-row derivations the rich row renders.
  */
 
+import { isFixedSumOver } from '../../systems/checkTarget.js';
+
 import {
   buildEntityBrowserModel,
   canonicalBrowserOptions,
@@ -122,12 +124,15 @@ const TARGET_CHECK_KINDS = new Set(['target', 'attribute', 'dynamicTarget']);
 
 /**
  * The `dc` sort key's label. Every row carries the system's one check, so any row's pill kind
- * says whether it grades a DC or a Target; `text(key, fallback)` localizes.
+ * says whether it grades a DC or a Target; with no rows the system's `evaluation` says, a summed
+ * check other than roll-over fixed naming a Target. `text(key, fallback)` localizes.
  */
-export function recipeCheckSortLabel(recipes, text) {
-  const target = (recipes ?? []).some((recipe) =>
-    TARGET_CHECK_KINDS.has(recipe?.checkSummary?.kind)
-  );
+export function recipeCheckSortLabel(recipes, text, evaluation = null) {
+  const rows = Array.isArray(recipes) ? recipes : [];
+  const target =
+    rows.length > 0
+      ? rows.some((recipe) => TARGET_CHECK_KINDS.has(recipe?.checkSummary?.kind))
+      : (evaluation?.product ?? 'sum') === 'sum' && !isFixedSumOver(evaluation);
   return target
     ? text('FABRICATE.Admin.Manager.Recipe.SortTarget', 'Check target')
     : text('FABRICATE.Admin.Manager.Recipe.SortDc', 'Check DC');

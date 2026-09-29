@@ -231,7 +231,6 @@ describe('the routed editor authors an under check losslessly (Q13)', () => {
   it("states the under rule, naming the previewed tier's adjustment when it has one", async () => {
     const underAdd = evaluation({}, { adjustmentKind: 'add' });
     const raw =
-      'No check modifiers apply, so the roll is exactly the formula above. ' +
       'The dice are compared raw. Every modifier that applies raises the target instead of being added to the roll';
     const rule = (root) => root.querySelector('[data-check-formula-rule]').textContent.trim();
     const state = await mount(routedCheck(underAdd));

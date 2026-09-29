@@ -305,32 +305,24 @@ describe('the formula card under a roll-under check (issue 2005, Q14)', () => {
     assert.ok(!target.querySelector('[data-check-formula-target]'));
   });
 
-  it('says the policy raises the target, then states the raw-dice rule (T6)', async () => {
+  it('states only the raw-dice rule under, with or without modifiers (maintainer ruling M2)', async () => {
     const raw = lookup('FABRICATE.Admin.Manager.Checks.Evaluation.UnderRule');
-    const expected = {
-      addAll: 'Apply all — every applied modifier raises the target.',
-      highest:
-        'Highest — only one applied modifier raises the target: the one with the highest average, or, when none has an ordinary average, the first listed.',
-      playerPicks: lookup('FABRICATE.Admin.Manager.Checks.Crafting.ResolvedPlayerPicks'),
-    };
-    for (const [policy, sentence] of Object.entries(expected)) {
+    for (const [policy, appliedModifiers] of [
+      ['addAll', MODIFIERS],
+      ['highest', MODIFIERS],
+      ['playerPicks', MODIFIERS],
+      ['addAll', []],
+    ]) {
       harness.remount();
       const target = await harness.mount({
         rollFormula: '1d100',
-        appliedModifiers: MODIFIERS,
+        appliedModifiers,
         modifierPolicy: policy,
         evaluation: under(),
       });
-      const rule = target.querySelector(`[data-check-formula-rule="${policy}"]`).textContent.trim();
-      assert.equal(rule, `${sentence} ${raw}`, policy);
-      assert.doesNotMatch(rule, /summed into the roll|reaches the roll/, policy);
+      const rule = target.querySelector('[data-check-formula-rule]').textContent.trim();
+      assert.equal(rule, raw, `${policy} with ${appliedModifiers.length} modifiers`);
     }
-    harness.remount();
-    const none = await harness.mount({ rollFormula: '1d100', evaluation: under() });
-    assert.equal(
-      none.querySelector('[data-check-formula-rule]').textContent.trim(),
-      `${lookup('FABRICATE.Admin.Manager.Checks.Crafting.ResolvedNoModifiers')} ${raw}`
-    );
   });
 
   it('omits the under note where the runtime refuses a roll-under check', async () => {

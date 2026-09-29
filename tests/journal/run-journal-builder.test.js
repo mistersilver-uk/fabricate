@@ -11,6 +11,7 @@ import { ResolutionModeService } from '../../src/systems/ResolutionModeService.j
 import { RunJournalBuilder } from '../../src/ui/presenters/RunJournalBuilder.js';
 import {
   craftingOutcomeBand,
+  ladderRule,
   routedOutcomeBand,
 } from '../../src/systems/runJournalOutcomeBands.js';
 import { IngredientSet } from '../../src/models/IngredientSet.js';
@@ -3481,6 +3482,11 @@ test('an attribute ladder states each tier adjustment and Otherwise, never an in
       evaluation: attributeEvaluation(direction, 'add'),
     };
     assert.deepEqual(bands(routedOutcomeBand, add, task), ['−15', '0', '+4'], direction);
+    assert.equal(
+      routedOutcomeBand({ name: ' Failed ', dc: -15 }, add, task),
+      'Failed · −15',
+      'maintainer ruling M3: a named tier labels its adjustment'
+    );
     assert.deepEqual(bands(craftingOutcomeBand, add, 12), ['−15', '0', '+4'], direction);
     const multiply = {
       ...add,
@@ -3528,11 +3534,56 @@ test('the gathering ladder names an attribute adjustment through the builder, lo
     ],
     getGatheringTask: () => task,
   }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0];
+  const band = (tier, adjustment) =>
+    `FABRICATE.App.Journal.StepDetails.BandAdjustment|${JSON.stringify({ tier, adjustment })}`;
   assert.deepEqual(
     run.gatheringYield.tiers.map((tier) => tier.band),
-    ['FABRICATE.App.Journal.StepDetails.BandOtherwise', '×½']
+    [band('Failure', 'FABRICATE.App.Journal.StepDetails.BandOtherwise'), band('Hard', '×½')]
   );
-  assert.equal(run.gatheringYield.direction, 'under', 'the ladder states its rule the other way up');
+  assert.equal(run.gatheringYield.ladderRule, 'adjustment', 'the ladder states its adjustment rule');
+});
+
+test('the crafting ladder localizes a multiply tier with no adjustment as Otherwise', () => {
+  const system = {
+    ...SYSTEM,
+    resolutionMode: 'routedByCheck',
+    craftingCheck: {
+      routed: {
+        type: 'relative',
+        dc: 12,
+        thresholdMode: 'meet',
+        evaluation: attributeEvaluation('under', 'multiply'),
+        relativeOutcomes: [
+          { id: 'failed', name: 'Failed', success: false, adjustment: null },
+          { id: 'hard', name: 'Hard', success: true, adjustment: 0.5 },
+        ],
+      },
+    },
+  };
+  const recipe = { ...SINGLE_STEP_RECIPE, getExecutionSteps: () => [{ id: 's0', resultGroups: [] }] };
+  const preview = makeBuilder({
+    active: [activeSingleStepRun({ steps: [{ stepId: 's0', status: 'inProgress' }] })],
+    recipe,
+    system,
+    resolutionModeService: new ResolutionModeService({ getSystem: () => system }),
+  }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0].craftingYield;
+  const band = (tier, adjustment) =>
+    `FABRICATE.App.Journal.StepDetails.BandAdjustment|${JSON.stringify({ tier, adjustment })}`;
+  assert.deepEqual(
+    preview.tiers.map((tier) => tier.band),
+    [band('Failed', 'FABRICATE.App.Journal.StepDetails.BandOtherwise'), band('Hard', '×½')]
+  );
+});
+
+test('a routed relative ladder names its selection rule by direction, comparison and source', () => {
+  const routed = (evaluation, thresholdMode = 'meet', type = 'relative') => ({
+    type, thresholdMode, evaluation, relativeOutcomes: LADDER,
+  });
+  assert.equal(ladderRule(routed(UNDER_FIXED)), 'under');
+  assert.equal(ladderRule(routed(UNDER_FIXED, 'exceed')), 'underStrict');
+  assert.equal(ladderRule(routed(attributeEvaluation('over', 'add'))), 'adjustment');
+  assert.equal(ladderRule(routed({ product: 'sum', direction: 'over' })), null, 'roll-high unchanged');
+  assert.equal(ladderRule(routed(UNDER_FIXED, 'meet', 'fixed')), null, 'fixed ranges keep their rule');
 });
 
 test('the step label names a roll-under Target, and a character value no number', () => {
@@ -3552,6 +3603,24 @@ test('the step label names a roll-under Target, and a character value no number'
     label({ rollFormula: '1d20', dc: 15, tiers: [] }),
     'FABRICATE.App.Journal.StepDetails.CheckWithDc|{"formula":"1d20","dc":15}'
   );
+  // A count keeps its DC wording until issue 2006.
+  for (const direction of ['over', 'under']) {
+    assert.equal(
+      label({ rollFormula: '1d20', dc: 3, tiers: [], evaluation: { product: 'count', direction } }),
+      'FABRICATE.App.Journal.StepDetails.CheckWithDc|{"formula":"1d20","dc":3}',
+      direction
+    );
+  }
+});
+
+test('the step label names no Target for a fixed-range routed check, which grades no target', () => {
+  const routed = { rollFormula: '1d20', dc: 12, type: 'fixed', tiers: [], evaluation: UNDER_FIXED };
+  const detail = makeBuilder({
+    active: [activeCraftingRun()],
+    system: { ...SYSTEM, resolutionMode: 'routedByCheck', craftingCheck: { routed } },
+    resolutionModeService: { getMode: () => 'routedByCheck' },
+  }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0].steps[1].detail;
+  assert.equal(detail.checkLabel, '1d20');
 });
 
 test('the roll line reads the executed target and margin outside sum/over/fixed', () => {
@@ -3568,6 +3637,9 @@ test('the roll line reads the executed target and margin outside sum/over/fixed'
   assert.deepEqual([under.dc, under.target, under.margin], [null, 14, 3]);
   const attribute = recorded({ direction: 'over', targetSource: 'attribute', dc: null, target: 16, margin: -5 });
   assert.deepEqual([attribute.dc, attribute.target, attribute.margin], [null, 16, -5]);
+  // A count keeps its roll line until issue 2006: its target is a per-die face, not a total's.
+  const count = recorded({ product: 'count', direction: 'under', dc: null, target: 4, total: 3, margin: 1 });
+  assert.ok(!Object.hasOwn(count, 'target') && !Object.hasOwn(count, 'margin'), 'a count names no target');
   const legacy = recorded({ dc: 16 });
   assert.equal(legacy.dc, 16);
   assert.ok(!Object.hasOwn(legacy, 'target') && !Object.hasOwn(legacy, 'margin'), 'roll-high adds no keys');
@@ -3577,9 +3649,11 @@ test('the roll line reads the executed target and margin outside sum/over/fixed'
       'FABRICATE.App.Journal.StepDetails.RollResultWithTarget': '{formula} = {total} · target {target} · margin {margin}',
       'FABRICATE.App.Journal.StepDetails.RollResultValueWithTarget': 'Rolled {value} · target {target} · margin {margin}',
       'FABRICATE.App.Journal.StepDetails.RollResultWithDc': '{formula} = {total} vs DC {dc}',
+      'FABRICATE.App.Journal.StepDetails.RollResultValue': 'Rolled {value}',
     })[key].replaceAll(/\{(\w+)\}/g, (_whole, token) => String(data[token]));
   assert.equal(formatRoll({ ...under, formula: '1d20' }, english), '1d20 = 11 · target 14 · margin +3');
   assert.equal(formatRoll({ ...attribute, formula: '' }, english), 'Rolled 11 · target 16 · margin −5');
   assert.equal(formatRoll({ ...legacy, formula: '1d20' }, english), '1d20 = 11 vs DC 16');
   assert.doesNotMatch(formatRoll({ ...under, formula: '1d20' }, english), /DC/);
+  assert.equal(formatRoll({ ...count, formula: '' }, english), 'Rolled 11');
 });

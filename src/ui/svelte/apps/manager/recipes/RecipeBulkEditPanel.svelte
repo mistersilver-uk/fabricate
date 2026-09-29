@@ -343,6 +343,11 @@
   const checkTierCopyUnit = $derived(
     { dc: 'dc', target: 'target' }[checkTierUnit(checkEvaluation)] ?? 'adjustment'
   );
+  const dynamicTargetMessage = () =>
+    text(
+      'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierDynamicTarget',
+      "This system's crafting check resolves its target dynamically at craft time, so recipes carry no tier to select."
+    );
   const CHECK_TIER_COPY = {
     dc: {
       hint: () =>
@@ -367,11 +372,7 @@
           'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierDefaultHintTarget',
           "Clears every selected recipe to the system's default target."
         ),
-      dynamic: () =>
-        text(
-          'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierDynamicTarget',
-          "This system's crafting check resolves its target dynamically at craft time, so recipes carry no tier to select."
-        ),
+      dynamic: dynamicTargetMessage,
       noTiers: () =>
         text(
           'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierNoTiersTarget',
@@ -382,7 +383,7 @@
       hint: () =>
         text(
           'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierHintAdjustment',
-          "The adjustment these recipes roll with — not the check's outcome tiers."
+          "The adjustment these recipes apply — not the check's outcome tiers."
         ),
       defaultHint: () =>
         text(
@@ -390,11 +391,7 @@
           'Clears every selected recipe to the base adjustment.'
         ),
       // A macro adjusts a character value's target, so the target is what resolves dynamically.
-      dynamic: () =>
-        text(
-          'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierDynamicTarget',
-          "This system's crafting check resolves its target dynamically at craft time, so recipes carry no tier to select."
-        ),
+      dynamic: dynamicTargetMessage,
       noTiers: () =>
         text(
           'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierNoTiersAdjustment',

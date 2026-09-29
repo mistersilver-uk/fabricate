@@ -56,7 +56,7 @@ export function applyPersonalizedDrops(entries, breakdown) {
 }
 
 /** A roll graded against an executed target: `… · target {target} · margin {margin}`, or `''`. */
-function formatGradedRoll({ formula, total, value, target, margin }, localize) {
+export function formatGradedRoll({ formula, total, value, target, margin }, localize) {
   if (!Number.isFinite(target) || !Number.isFinite(margin)) return '';
   const graded = { target, margin: formatSignedStep(margin) };
   if (formula !== '' && Number.isFinite(total)) {
