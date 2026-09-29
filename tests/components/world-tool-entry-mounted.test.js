@@ -653,6 +653,17 @@ describe('the world Tool entry (issue 1373)', () => {
       const empty = await mountWithDice('');
       assert.ok(!empty.querySelector('[data-world-tool-entry-formula-error]'));
     });
+
+    it('renders the formula error message with danger styling classes', async () => {
+      const target = await mountWithDice('1000d6 + junk');
+      const errorMessage = target.querySelector('[data-world-tool-entry-formula-error]');
+      assert.ok(Boolean(errorMessage), 'error message is present');
+      assert.ok(
+        errorMessage.classList.contains('manager-muted'),
+        'error message has manager-muted class'
+      );
+      assert.ok(errorMessage.classList.contains('is-danger'), 'error message has is-danger class');
+    });
   });
 
   // THE LINKED-ITEM CARD, RELOCATED FROM THE SYSTEM EDITOR (issue 1373)
