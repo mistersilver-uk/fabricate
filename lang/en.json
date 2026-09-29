@@ -7810,6 +7810,8 @@
           "LearnOnCraftDesc": "A matched brew records the recipe as discovered for that player, whether the check passes or fails. On by default, and under Global visibility the only source of discovery a player can reach for themselves; a GM can still grant a recipe directly.",
           "ConsumeOnFail": "Consume ingredients on a failed brew",
           "ConsumeOnFailDesc": "A matched brew that fails its check consumes the submitted ingredients, the same as an unmatched fizzle. On by default.",
+          "BreakToolsOnFail": "Break tools on a failed brew",
+          "BreakToolsOnFailDesc": "A matched brew that fails its check breaks the tools it uses, the same as a failed crafting check. Off by default.",
           "ShowAttemptHistory": "Show attempt history to players",
           "ShowAttemptHistoryDesc": "Record dead-end attempts so a player sees which ingredient combinations produced no reaction. On by default."
         }

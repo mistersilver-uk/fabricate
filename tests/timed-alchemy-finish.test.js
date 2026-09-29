@@ -129,7 +129,7 @@ function buildIngredientSet(id, ingredientDefs) {
   };
 }
 
-function buildRecipeManager(ingredientSet) {
+function buildRecipeManager(ingredientSet, { tools = [], toolItem = null } = {}) {
   return {
     canCraft() {
       return {
@@ -139,10 +139,10 @@ function buildRecipeManager(ingredientSet) {
       };
     },
     getToolsForSet() {
-      return [];
+      return tools;
     },
-    toolMatchesItem() {
-      return false;
+    toolMatchesItem(_recipe, _tool, item) {
+      return toolItem !== null && item === toolItem;
     },
     ingredientMatchesItem(_recipe, ingredient, item) {
       return item.id === (ingredient.componentId || ingredient.systemItemId);
@@ -196,13 +196,13 @@ const FAILURE_GROUP = {
   results: [{ id: 'r-2', componentId: 'sludge', quantity: 1 }],
 };
 
-function buildAlchemySystem({ id, checkMode = 'none' }) {
+function buildAlchemySystem({ id, checkMode = 'none', breakToolsOnFail = false }) {
   return {
     id,
     resolutionMode: 'alchemy',
     visibilityMode: 'global',
     features: { craftingChecks: false, essences: false, multiStepRecipes: false },
-    craftingCheck: { enabled: false, consumption: {} },
+    craftingCheck: { enabled: false, consumption: { breakToolsOnFail } },
     alchemy: { checkMode, learnOnCraft: true, consumeOnFail: true },
     components: [
       { id: 'herb', name: 'Herb' },
@@ -212,7 +212,7 @@ function buildAlchemySystem({ id, checkMode = 'none' }) {
   };
 }
 
-function buildTimedAlchemyRecipe(craftingSystemId, resultGroups) {
+function buildTimedAlchemyRecipe(craftingSystemId, resultGroups, toolIds = []) {
   const set = buildIngredientSet('set-1', [{ componentId: 'herb', quantity: 2 }]);
   const step = {
     // `implicit-step` is the id a real Recipe gives the single derived step; the
@@ -221,7 +221,7 @@ function buildTimedAlchemyRecipe(craftingSystemId, resultGroups) {
     name: 'Brew',
     ingredientSets: [set],
     resultGroups,
-    toolIds: [],
+    toolIds,
     outcomeRouting: null,
     timeRequirement: { hours: 1 },
   };
@@ -231,7 +231,7 @@ function buildTimedAlchemyRecipe(craftingSystemId, resultGroups) {
     craftingSystemId,
     ingredientSets: [set],
     resultGroups,
-    toolIds: [],
+    toolIds,
     outcomeRouting: null,
     resultSelection: null,
     transferEffects: false,
@@ -384,6 +384,65 @@ test('a matured Simple brew that fails its check produces the reserved failure r
     1,
     'discovery is on a matched signature, independent of the check outcome'
   );
+});
+
+// 4b. The timed twin's tool breakage respects `breakToolsOnFail` (issue 2100 HIGH finding): tools
+// are re-validated at FINISH (never consumed at START), so a failed matured Simple check must
+// gate `_finishAlchemySimpleFailure` -> `_produceAlchemyFailureResults` exactly like the
+// immediate path, not force-break unconditionally.
+
+async function runMaturedSimpleFailureWithTool(breakToolsOnFail) {
+  const system = buildAlchemySystem({ id: `sys-brew-tool-${breakToolsOnFail}`, checkMode: 'simple', breakToolsOnFail });
+  const spy = buildVisibilitySpy();
+  const resolutionService = setupGame(system, spy.service, 1000);
+
+  const { recipe, set } = buildTimedAlchemyRecipe(system.id, [SUCCESS_GROUP, FAILURE_GROUP], ['tool-1']);
+  const herb = new FakeItem('herb', 'Herb', 5);
+  const toolItem = new FakeItem('tool-item-1', 'Alembic', 1);
+  const crafter = new FakeActor('Crafter');
+  const source = new FakeActor('Source', [herb, toolItem]);
+
+  const runManager = new CraftingRunManager();
+  const recipeManager = buildRecipeManager(set, { tools: [{ id: 'tool-1', name: 'Alembic' }], toolItem });
+  const engine = new CraftingEngine(recipeManager, runManager, resolutionService);
+  let applyToolBreakageCalled = false;
+  engine._applyToolBreakage = async () => {
+    applyToolBreakageCalled = true;
+    return [{ toolId: 'tool-1', broken: true }];
+  };
+  let checkPasses = true;
+  engine._runCraftingCheck = async () => ({
+    success: checkPasses,
+    outcome: null,
+    value: null,
+    data: {},
+    message: checkPasses ? 'Success' : 'The brew curdles',
+  });
+
+  await engine.craft(crafter, [source], recipe, null, { isAlchemyAttempt: true });
+  const runId = runManager.getActiveRuns(crafter)[0].id;
+
+  checkPasses = false;
+  game.time.worldTime = 1000 + 3600;
+  const finished = await engine.craft(crafter, [source], recipe, null, { runId });
+
+  return { finished, applyToolBreakageCalled };
+}
+
+test('a matured Simple FAILURE with breakToolsOnFail OFF does not break tools', async () => {
+  const { finished, applyToolBreakageCalled } = await runMaturedSimpleFailureWithTool(false);
+  assert.equal(finished.success, false, 'a failed check is still a failure');
+  assert.equal(
+    applyToolBreakageCalled,
+    false,
+    '_applyToolBreakage must not run when the policy is off, matching the immediate path'
+  );
+});
+
+test('a matured Simple FAILURE with breakToolsOnFail ON breaks tools', async () => {
+  const { finished, applyToolBreakageCalled } = await runMaturedSimpleFailureWithTool(true);
+  assert.equal(finished.success, false, 'a failed check is still a failure');
+  assert.equal(applyToolBreakageCalled, true, '_applyToolBreakage runs when the policy is on');
 });
 
 // 5. A matured NON-ALCHEMY timed craft awards its failure result too (issue 1098). The alchemy twin

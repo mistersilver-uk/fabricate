@@ -85,7 +85,7 @@ test('the runner applies 1.19.0 and bumps the migration version', async () => {
   const result = await runner.run();
 
   assert.equal(result.aborted, false);
-  assert.equal(store.get('migrationVersion'), '1.34.0');
+  assert.equal(store.get('migrationVersion'), '1.35.0');
   assert.ok(!('enabled' in store.get('craftingSystems')[0].requirements.time));
 });
 
@@ -93,7 +93,7 @@ test('1.19.0 is version-gated — a later deliberate opt-out is NOT flipped back
   // The gate is the whole point: once the world is at or past 1.19.0, a GM who turns the new toggle
   // OFF (persisting a deliberate `false` under 714) must keep it off across reloads.
   const store = new Map([
-    ['migrationVersion', '1.34.0'],
+    ['migrationVersion', '1.35.0'],
     ['craftingSystems', [{ id: 'sys', requirements: { time: { enabled: false } } }]],
   ]);
   const runner = new MigrationRunner({

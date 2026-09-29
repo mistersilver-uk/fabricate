@@ -9,6 +9,7 @@ manager-checks-off
 manager-checks-stacked-floor
 manager-checks-trigger-operator-list
 manager-checks-crafting-consumption
+manager-checks-alchemy-behaviour
 manager-checks-salvage-on-failure
 manager-checks-gathering-on-failure
 manager-recipe-edit-results-failure-tier
