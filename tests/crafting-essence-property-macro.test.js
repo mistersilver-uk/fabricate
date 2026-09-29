@@ -13,6 +13,7 @@ import {
   makeScriptMacro,
   publishSystem,
 } from './helpers/essenceFixtures.js';
+import { createPersistedCraftingHistory } from './helpers/journal-fixtures.js';
 
 const SYSTEM_ID = 'sys-1036';
 const INGOT = { id: 'ingot', name: 'Iron Ingot' };
@@ -495,4 +496,45 @@ test('1036: the essence macro context names the invoking essence and its contrib
     'fire:4',
     'a shared macro can find its OWN essence and its own contributed quantity'
   );
+});
+
+test('a versioned timed finish hands the property macro the start snapshot\'s name and flags', async () => {
+  const seen = [];
+  globalThis.__versionedMacroProbe = seen;
+  const probe = makeScriptMacro(
+    'globalThis.__versionedMacroProbe.push(...context.resolvedIngredients.map(({ item }) => ({ name: item.name, flags: item.flags }))); return null;'
+  );
+  globalThis.fromUuid = async (uuid) => (uuid === 'Macro.probe' ? probe : null);
+  const fixture = await createPersistedCraftingHistory({
+    stageCount: 1,
+    checked: false,
+    prepare: ({ system, steps, items }) => {
+      system.features.propertyMacros = true;
+      steps[0].resultGroups[0].results[0].propertyMacroUuid = 'Macro.probe';
+      items.forEach((item, index) => {
+        item.name = `Heartwood ${index + 1}`;
+        item.flags = { mythwright: { grove: index } };
+        item.toObject = () => ({ name: item.name, img: item.img, type: 'loot', system: { ...item.system }, flags: structuredClone(item.flags) });
+      });
+    },
+    drive: async (context) => {
+      const remainingAfterStart = context.remaining();
+      game.time.worldTime += 60;
+      const resolved = await context.engine.executeVersionedStage({
+        viewer: context.gm, actor: context.actor, componentSourceActors: context.sources, runId: context.runId,
+        expectedRevision: context.manager().getRun(context.actor, context.runId).runRevision,
+        requestId: 'finish', executionGrant: 'grant',
+      });
+      return { remainingAfterStart, resolved };
+    },
+  });
+  delete globalThis.__versionedMacroProbe;
+  delete globalThis.fromUuid;
+
+  assert.deepEqual(fixture.remainingAfterStart, [0, 0], 'the start consumed both inputs');
+  assert.equal(fixture.resolved.success, true, JSON.stringify(fixture.resolved));
+  assert.deepEqual(seen, [
+    { name: 'Heartwood 1', flags: { mythwright: { grove: 0 } } },
+    { name: 'Heartwood 2', flags: { mythwright: { grove: 1 } } },
+  ]);
 });

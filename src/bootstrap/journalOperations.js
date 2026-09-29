@@ -14,6 +14,7 @@ import {
   createManagerMutation,
   installCraftingJournalRunAuthority,
 } from '../systems/journalRunCommands.js';
+import { resolveRunRecipe } from '../systems/runTerms.js';
 import { resolvedComponentsFor } from '../systems/scopedEntityReads.js';
 import { promptCheckRoll } from '../ui/svelte/apps/crafting/rollPrompt.js';
 import { resolveAlchemySubmissions } from '../utils/alchemySubmissions.js';
@@ -427,7 +428,7 @@ function buildRunMutationOperations(fabricate, managerMutation) {
         )
       ),
     setSelection: (args) => {
-      const recipe = fabricate.recipeManager?.getRecipe?.(args.run.recipeId);
+      const recipe = resolveRunRecipe(args.run, fabricate.recipeManager);
       const step = recipe?.getExecutionSteps?.()?.[args.payload.stepIndex];
       const selection = args.payload.selectionPlan ?? {};
       const selectedId = String(selection.selectedIngredientSetId ?? '').trim();

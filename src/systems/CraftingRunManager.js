@@ -94,12 +94,28 @@ export class CraftingRunManager extends RunContainerManagerBase {
     }));
   }
 
+  /** Every recipe id an active run of these actors resolves against, so a prune can spare it. */
+  activeRunRecipeIds(actors = []) {
+    const ids = new Set();
+    for (const actor of actors || []) {
+      for (const run of this.getActiveRuns(actor)) if (run?.recipeId) ids.add(String(run.recipeId));
+    }
+    return ids;
+  }
+
   findActiveRunForRecipe(actor, recipeId) {
     const runs = this.getActiveRuns(actor);
     return runs.find((run) => run.recipeId === recipeId) || null;
   }
 
-  async createRun(actor, recipe, componentSourceActors = [], userId = null, lifecycle = {}) {
+  /** `termsSnapshot` is the run's accepted terms (see `runTerms.js`), kept while it is active. */
+  async createRun(
+    actor,
+    recipe,
+    componentSourceActors = [],
+    userId = null,
+    { termsSnapshot = null, ...lifecycle } = {}
+  ) {
     const container = this._getContainer(actor);
     const runId = foundry.utils.randomID();
     const stepStates = this._buildStepStates(recipe);
@@ -118,6 +134,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
       steps: stepStates,
       componentSourceActorUuids: componentSourceActors.map((a) => a.uuid),
       ...lifecycleFields,
+      ...(termsSnapshot && { termsSnapshot }),
     };
 
     container.active[runId] = run;
@@ -339,6 +356,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
     incrementRunRevision(run);
 
     delete container.active[run.id];
+    delete run.termsSnapshot;
     // A duplicate history id would crash the Journal's keyed each, so a run lingering in `active`
     // after its twin was recorded is never archived again.
     const alreadyArchived =

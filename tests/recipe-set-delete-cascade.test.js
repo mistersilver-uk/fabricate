@@ -505,7 +505,7 @@ describe('the routed callers', () => {
     };
     const summary = { recipes: { pruned: 0 }, orphans: [] };
     await CompendiumImporter.prototype._pruneOrphanedRecipes.call(
-      { _recipeManager: recipeManager },
+      { _recipeManager: recipeManager, _activeRunRecipeIds: () => [] },
       { id: SYSTEM_ID },
       [{ id: 'kept' }],
       'pack-sys',
