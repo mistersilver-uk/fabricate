@@ -182,6 +182,9 @@ describe('SalvageRollSummary evidence rows', () => {
   const harness = createMountedComponentHarness({
     ...SHARED,
     tmpPrefix: 'fabricate-salvage-summary-evidence-',
+    // The shared salvage-failure fallback literal (issue 2092); an omission HANGS this
+    // suite (# cancelled) rather than failing it.
+    rawModules: [...SHARED.rawModules, 'src/systems/salvageMessages.js'],
     compiledModules: [MEDALLION, FACT_ROW, EVIDENCE, SALVAGE_SUMMARY],
     componentPath: SALVAGE_SUMMARY,
   });
@@ -215,6 +218,77 @@ describe('SalvageRollSummary evidence rows', () => {
     });
     const message = root.querySelector('[data-inventory-salvage-message]').textContent;
     assert.match(message.trim(), /^Salvaged\. with a roll of\s+9$/);
+  });
+
+  // Issue 2092: a failed single salvage shows the same Target/Margin evidence rows as a
+  // failed craft, under a failure box rather than the cleared ribbon it showed before.
+  it('states a failed roll-under salvage evidence rows, like a failed craft', async () => {
+    const root = await harness.mount({
+      result: { state: 'failure', message: 'Salvage check failed.', check: executedCheck() },
+    });
+    assert.deepEqual(rowsOf(root), UNDER_ROWS);
+    assert.ok(root.querySelector('[data-inventory-salvage-summary="failure"]'));
+  });
+
+  it('withholds a failed salvage evidence for a blind or secret roll', async () => {
+    for (const visibility of [{ rollMode: 'blindroll' }, { rollMode: 'publicroll', secret: true }]) {
+      const check = executedCheck(UNDER_DATA, visibility);
+      const root = await harness.mount({
+        result: { state: 'failure', message: 'Salvage check failed.', check },
+      });
+      assert.ok(!root.querySelector('.check-evidence'), JSON.stringify(visibility));
+      harness.remount();
+    }
+  });
+
+  // QE fix round 1 (issue 2092): a `perRecord` failure policy can still award items on a
+  // failed salvage (`publishSalvageFailure`'s `results`), so the box must not contradict
+  // the chat card beside it by dropping them.
+  it('renders items a reserved failure award produced (QE)', async () => {
+    const root = await harness.mount({
+      result: {
+        state: 'failure',
+        message: 'Salvage check failed',
+        awarded: [{ name: 'Slag', img: null }],
+      },
+    });
+    const award = root.querySelector('[data-inventory-salvage-awarded]');
+    assert.ok(award, 'the awarded list renders');
+    assert.equal(award.textContent.trim(), 'Slag');
+  });
+
+  // Fix round 1: the box no longer states the engine's generic fallback verbatim; it takes
+  // the crafting box's own pattern (RollResultBox F9) instead.
+  it('states "nothing recovered" only when the generic fallback fired and nothing awarded', async () => {
+    const nothing = await harness.mount({
+      result: { state: 'failure', message: 'Salvage check failed', awarded: [] },
+    });
+    assert.equal(
+      nothing.querySelector('[data-inventory-salvage-message]').textContent.trim(),
+      'Nothing is recovered; the failure policy applies.'
+    );
+    harness.remount();
+    const awarded = await harness.mount({
+      result: {
+        state: 'failure',
+        message: 'Salvage check failed',
+        awarded: [{ name: 'Slag', img: null }],
+      },
+    });
+    assert.ok(
+      !awarded.querySelector('[data-inventory-salvage-message]'),
+      'the awarded list speaks for itself'
+    );
+  });
+
+  it('keeps a system-authored custom failure message instead of the generic sentence', async () => {
+    const root = await harness.mount({
+      result: { state: 'failure', message: 'The blade shattered beyond use.', awarded: [] },
+    });
+    assert.equal(
+      root.querySelector('[data-inventory-salvage-message]').textContent.trim(),
+      'The blade shattered beyond use.'
+    );
   });
 });
 
