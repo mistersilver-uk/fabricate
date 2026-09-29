@@ -33,6 +33,7 @@ import {
   normalizePath,
   parseLabActorTableRegions,
   parseMountRegions,
+  parseRunStateRegions,
   partitionConsoleErrors,
   publishableCases,
   WORLD_PARTIES_SEARCH_TERM,
@@ -55,6 +56,8 @@ import { emittingHalfOf } from './helpers/interactablesSmokeLocators.js';
 import { collectWorkingTreeSources } from './helpers/sourceScan.js';
 import { SOURCES, walkTemplate } from './helpers/primitiveAdoptionContract.js';
 import { buildLabContent } from './view-lab/world/labContent.js';
+import { LAB_HISTORY_DATA_STATES } from './view-lab/world/labHistoryEvidence.js';
+import { LAB_JOURNAL_CASE_STATE_RUN_IDS } from './view-lab/world/labRunStates.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -2212,7 +2215,8 @@ test('system Travel Map evidence is populated and long-label focus cannot duplic
   assert.equal(longLabel.distinctEvidenceGroup, stacked.distinctEvidenceGroup);
   assert.match(mountSource, /longTravelLabels: params\.get\('longTravelLabels'\) === '1'/);
   assert.match(worldSource, /Map Region Links Across the Active Scene/);
-  assert.match(runnerSource, /evidence frame is byte-identical to/);
+  // The check itself is exercised in `tests/view-lab-render-pool.test.js`; this pins that it runs.
+  assert.match(runnerSource, /rejectDuplicateEvidence\(cases, outcomes\)/);
 });
 
 test('system Travel Map no-regions evidence reaches its world through the lab flag', () => {
@@ -3012,30 +3016,68 @@ function caseLiteralLines(id) {
   return Array.from({ length: end - start + 1 }, (_, offset) => start + offset);
 }
 
-test('a labRunStates change selects the player windows that render runs — not none, not all', () => {
-  // Its whole output is the three actor run containers and the `gatheringBlindRuns` world setting,
-  // and only the player window reads either: the Journal in its entirety, the Crafting tab's run
-  // summary, the Gathering tab's in-flight rows.
-  const selected = selectedIds(['tests/view-lab/world/labRunStates.js']);
-  const everything = publishableCases();
-  const players = everything.filter((viewCase) => viewCase.app === 'fabricate-app');
+const LAB_RUN_STATES_PATH = 'tests/view-lab/world/labRunStates.js';
+const labRunStatesFile = fileAt(LAB_RUN_STATES_PATH);
 
-  assert.ok(selected.length > 0, 'a run-state change must select evidence, not none');
-  assert.ok(
-    selected.length < everything.length,
-    'a run-state change must not still select every frame'
+/** Every line of one run state's entries, in both of the fixture's tables. */
+function runStateLines(state) {
+  const regions = parseRunStateRegions(labRunStatesFile.source).filter(
+    (region) => region.key === state
   );
+  assert.equal(regions.length, 2, `"${state}" must have a run-id entry and a factory entry`);
+  return regions.flatMap(({ start, end }) =>
+    Array.from({ length: end - start + 1 }, (_, offset) => start + offset)
+  );
+}
 
-  // Derived, not listed: EVERY player case and ONLY player cases, so a player case added tomorrow
-  // is covered without anyone remembering to add its id anywhere.
+/** The publishable cases whose query names one run state, derived rather than listed. */
+const casesOfRunState = (state) =>
+  publishableCases()
+    .filter((viewCase) => viewCase.query?.journalCaseState === state)
+    .map((viewCase) => viewCase.id);
+
+test('the run-state fixture parses into an entry for every state its run table names', () => {
+  const regions = parseRunStateRegions(labRunStatesFile.source);
+  assert.ok(regions, `${LAB_RUN_STATES_PATH} no longer parses into its run-state tables`);
+  // The spread history-data states are defined in their own module, which a patch names instead.
+  const named = Object.keys(LAB_JOURNAL_CASE_STATE_RUN_IDS).filter(
+    (state) => !LAB_HISTORY_DATA_STATES.includes(state)
+  );
+  assert.deepEqual([...new Set(regions.map((region) => region.key))].sort(), named.sort());
+});
+
+test('adding one run state to labRunStates selects only the cases that render it', () => {
+  const state = 'paused';
+  const expected = casesOfRunState(state);
+  const players = publishableCases().filter((viewCase) => viewCase.app === 'fabricate-app');
+  assert.ok(expected.length > 0, `no case renders "${state}", so this proves nothing`);
+  assert.ok(expected.length < players.length, 'one state must be narrower than every player case');
+
   assert.deepEqual(
-    selected,
-    players.map((viewCase) => viewCase.id)
+    selectedIds([LAB_RUN_STATES_PATH], labRunStatesFile.patches(runStateLines(state))),
+    expected
   );
-  assert.ok(
-    selected.includes('fabricate-journal'),
-    'the Journal is the run browser; it cannot be outside a run-state selection'
+});
+
+test('an unattributable labRunStates patch widens to surface coverage, by union', () => {
+  const helper = labRunStatesFile.lineOf('function stageBrowserRun(context, recipe, pastCheck = null) {');
+  const importLine = labRunStatesFile.lineOf("} from './labJournalPrototype.js';");
+
+  assert.deepEqual(selectedIds([LAB_RUN_STATES_PATH]), coverageIds(), 'no patch at all');
+  for (const line of [helper, importLine]) {
+    assert.deepEqual(
+      selectedIds([LAB_RUN_STATES_PATH], labRunStatesFile.patches([line])),
+      coverageIds(),
+      `line ${line} sits outside every run state's entry`
+    );
+  }
+
+  const withState = new Set(
+    selectedIds([LAB_RUN_STATES_PATH], labRunStatesFile.patches([helper, ...runStateLines('paused')]))
   );
+  for (const id of [...coverageIds(), ...casesOfRunState('paused')]) {
+    assert.ok(withState.has(id), `the union dropped "${id}"`);
+  }
 });
 
 test('every lab input the registry cannot attribute selects surface coverage', () => {
