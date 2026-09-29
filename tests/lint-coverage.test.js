@@ -1,5 +1,5 @@
 /**
- * WHAT `npm run lint` AND `npm run format:check` REACH (issue #1660). Both cover the repository;
+ * WHAT `npm run lint` AND `npm run format:check` REACH (issue 1660). Both cover the repository;
  * `scripts/lib/newViolations.js` compares each with the base commit and is proved by
  * `tests/new-violations.test.js`.
  */

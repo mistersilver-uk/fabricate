@@ -582,7 +582,7 @@ export default [
   },
 
   // 8. Svelte components (Svelte 5 runes). This block IS gated, twice over as of
-  //    issue #1660: `npm run lint` lints `.`, and `**/*.svelte` below is what
+  //    issue 1660: `npm run lint` lints `.`, and `**/*.svelte` below is what
   //    makes ESLint SELECT that extension at all during directory expansion — a
   //    `.js`/`.mjs`/`.cjs` file is selected by default, a `.svelte` one only
   //    because some block names it here. Remove this `files` pattern and 329

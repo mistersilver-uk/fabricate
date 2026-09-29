@@ -23,6 +23,7 @@ const CONFIG = [
     files: ['**/*.js'],
     plugins: { unicorn },
     languageOptions: { ecmaVersion: 2025, sourceType: 'module' },
+    linterOptions: { reportUnusedDisableDirectives: 'error' },
     rules: {
       'no-undef': 'error',
       'no-var': 'error',
@@ -147,6 +148,20 @@ test('the gate compares once a file changes, and skips only when the base is opt
     );
     await assert.rejects(() => repo.lint({ patterns: ['nothing-here'] }), /No files matching/u);
   }));
+
+test('a new unused disable directive fails against a base that had none', () =>
+  withFixture(
+    { 'used.js': '// eslint-disable-next-line no-var\nvar a = 1;\nexport { a };\n' },
+    async (repo) => {
+      const unused = '// eslint-disable-next-line no-var\nexport const b = 2;\n';
+      repo.write({
+        'used.js': `// eslint-disable-next-line no-var\nvar a = 1;\nexport { a };\n${unused}`,
+      });
+      assert.deepEqual((await repo.lint()).failures, [
+        'used.js: unused-disable-directive rose from 0 to 1 (line 4)',
+      ]);
+    }
+  ));
 
 test('--fix applies the fixes of the regressed rule only, leaving untouched debt alone', () =>
   withFixture({ 'fix.js': 'let kept = 1;\nexport { kept };\n' }, async (repo) => {

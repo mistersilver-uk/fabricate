@@ -35,7 +35,8 @@ const PRETTIER_BIN = path.join(REPO_ROOT, 'node_modules/prettier/bin/prettier.cj
 const CLI_BUFFER = 64 * 1024 * 1024;
 
 const posix = (file) => file.split(path.sep).join('/');
-const ruleOf = (message) => message.ruleId ?? (message.fatal ? 'parse-error' : 'eslint');
+const ruleOf = (message) =>
+  message.ruleId ?? (message.fatal ? 'parse-error' : 'unused-disable-directive');
 const isAbsolute = (message) => message.fatal || ABSOLUTE_RULES.includes(message.ruleId);
 
 function absoluteFailures(file, messages) {
@@ -120,8 +121,21 @@ async function baseMessagesFor(eslint, scope, file, filePath, baseTexts) {
   return result?.messages ?? [];
 }
 
+/**
+ * The linter for base contents: the head config, running only the rules a changed file reports,
+ * since no other rule's count is compared. ESLint reports no directive for a rule it filtered out.
+ */
+function baseLinter({ cwd, eslintOptions, results, changed }) {
+  const rules = new Set();
+  for (const result of results) {
+    if (!changed.has(posix(path.relative(cwd, result.filePath)))) continue;
+    for (const message of result.messages) rules.add(message.ruleId);
+  }
+  return new ESLint({ cwd, ...eslintOptions, ruleFilter: ({ ruleId }) => rules.has(ruleId) });
+}
+
 /** Compare every linted file: absolute rules everywhere, counts in the files the change touched. */
-async function compareResults({ eslint, results, scope, cwd }) {
+async function compareResults({ eslintOptions, results, scope, cwd }) {
   const tally = emptyTally();
   const changed = new Set(scope.changes ? scope.changes.changed : []);
   const touched = results
@@ -131,6 +145,7 @@ async function compareResults({ eslint, results, scope, cwd }) {
     .map((file) => basePathOf(scope.changes, file))
     .filter((file) => file !== null);
   const baseTexts = readBaseFiles(scope.base, basePaths, { cwd });
+  const eslint = baseLinter({ cwd, eslintOptions, results, changed });
   for (const result of results) {
     const file = posix(path.relative(cwd, result.filePath));
     tally.findings += result.messages.length;
@@ -187,10 +202,10 @@ export async function lintAgainstBase({
   let results = await eslint.lintFiles(patterns);
   if (results.length === 0) throw new Error(`ESLint linted no file for ${patterns.join(' ')}`);
   const scope = comparisonScope(cwd, env, base);
-  let tally = await compareResults({ eslint, results, scope, cwd });
+  let tally = await compareResults({ eslintOptions, results, scope, cwd });
   if (fix && tally.regressed.size > 0) {
     results = await fixRegressions({ cwd, eslintOptions, regressed: tally.regressed, results });
-    tally = await compareResults({ eslint, results, scope, cwd });
+    tally = await compareResults({ eslintOptions, results, scope, cwd });
   }
   const { regressed: _regressed, ...counts } = tally;
   return { ...counts, base: scope.base?.sha ?? null, ...skipOf(scope), linted: results.length };
