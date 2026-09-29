@@ -13,6 +13,7 @@
   | `tint` | bare `--fab-tag-*` key | `''` | Recolours the GLYPH and nothing else. Unset is byte-identical to the shipped render, because the glyph reads the token through a `var()` fallback. |
   | `variant` | `''` \| `'glyph-chip'` | `''` | The tile as an UNBORDERED slate chip. Anything else resolves to `''`, so a medallion that does not ask for it is byte-identical to what shipped. |
   | `tone` | `''` \| `'success'` \| `'danger'` | `''` | Paints the edge, ground and glyph in that family's `-border`, `-soft` and `-text` tokens, as the library's toned `<IconChip>` specimens do; a rolled die face reads qualified or cancelled by it. Anything else resolves to `''`. |
+  | `ink` | `''` \| `'success'` \| `'danger'` | `''` | Inks the GLYPH alone in that family's `-text` token on the unchanged slate ground, as the Checks simulator's result-card icon reads success or failure. Anything else resolves to `''`. |
 
   Invariants:
   - FLAT BY CONTRACT: the surface is `--fab-bg-3`, or a `tone`'s flat `-soft` token, never a gradient
@@ -35,9 +36,11 @@
     glyph = 0,
     variant = '',
     tone = '',
+    ink = '',
   } = $props();
 
   const safeTone = $derived(['success', 'danger'].includes(tone) ? tone : '');
+  const safeInk = $derived(['success', 'danger'].includes(ink) ? ink : '');
 
   const isGlyphChip = $derived(String(variant ?? '') === 'glyph-chip');
 
@@ -63,6 +66,8 @@
   class:is-glyph-chip={isGlyphChip}
   class:is-tone-success={safeTone === 'success'}
   class:is-tone-danger={safeTone === 'danger'}
+  class:is-ink-success={safeInk === 'success'}
+  class:is-ink-danger={safeInk === 'danger'}
   data-medallion={artPath ? 'image' : 'glyph'}
   data-medallion-tint={safeTint || undefined}
   style={boxStyle}
@@ -103,6 +108,14 @@
     border-color: var(--fab-danger-border);
     color: var(--fab-danger-text);
     background: var(--fab-danger-soft);
+  }
+
+  .fab-medallion.is-ink-success {
+    color: var(--fab-success-text);
+  }
+
+  .fab-medallion.is-ink-danger {
+    color: var(--fab-danger-text);
   }
 
   .fab-medallion-img {

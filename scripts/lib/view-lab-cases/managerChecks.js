@@ -138,11 +138,12 @@ const runeworkRollingModifier = (expression) => [
   },
   { selector: '[data-world-modifier-done="rw-mod-chisel"]' },
 ];
-const UNDER_OUTCOMES_FIXED = Object.freeze([
+/** Frame 12's fixed-target outcome ladder, against a Standard Work tier at `target`. */
+const underOutcomesFixed = (target) => [
   ...parityFormula('1d20'),
   ...previewAsActor('lab-actor-idrin'),
   ...PARITY_UNDER,
-  ...parityTiers(0, ['Standard Work'], '[data-tier-dc]', ['10']),
+  ...parityTiers(0, ['Standard Work'], '[data-tier-dc]', [target]),
   ...parityPreview(1),
   ...parityOutcomes(
     ['Botched', 'Flawed', 'Success', 'Fine'],
@@ -155,7 +156,8 @@ const UNDER_OUTCOMES_FIXED = Object.freeze([
     ],
     ['failure', 'failure', 'success', 'success']
   ),
-]);
+];
+const UNDER_OUTCOMES_FIXED = Object.freeze(underOutcomesFixed('10'));
 const underCase = ({ id, label, frame, query = {}, steps, expectView, expectSelector, nav }) =>
   managerCase({
     id,
@@ -191,6 +193,57 @@ const countCase = ({ id, label, frame, state = 'dice-pool', nav = 'crafting', st
     steps: ['Checks', { selector: `#manager-checks-nav-${nav}` }, ...steps],
     expectView: `checks-${nav}`,
     kinds: ['manager', 'checks'],
+    sourceMatches: PARITY_SOURCES,
+    ...rest,
+  });
+
+/*
+ * The rolled readout states (issue 2080): each rolled state of the prototype parity matrix, rolled
+ * once. The lab's d20 shows 20 first, so each DC or target is chosen to land its named outcome.
+ */
+const IDRIN = Object.freeze(previewAsActor('lab-actor-idrin'));
+const overFixed = (dc) => [
+  ...parityFormula('1d20 + @prof'),
+  ...IDRIN,
+  ...parityType('[data-check-dc]', 1, dc),
+];
+const triggerPreset = (preset) => [
+  { selector: '#checks-section-triggers' },
+  { selector: `[data-add-trigger-preset="${preset}"]` },
+];
+/** Two fixed ranges, Spoiled 1–20 and Sound 21–30, typed onto Runework's fresh fixed list. */
+const FIXED_RANGES = Object.freeze([
+  { selector: '#checks-section-outcomes' },
+  { selector: '[data-check-type-option="fixed"]' },
+  { selector: '[data-add-outcome-tier]' },
+  { selector: '[data-add-outcome-tier]' },
+  { selector: nthMatch('[data-outcome-name]', 1), fill: 'Spoiled' },
+  { selector: nthMatch('[data-outcome-name]', 2), fill: 'Sound' },
+  ...parityType('[data-outcome-end]', 1, '20'),
+  ...parityType('[data-outcome-start]', 2, '21'),
+  ...parityType('[data-outcome-end]', 2, '30'),
+  { selector: `${nthMatch('[data-outcome-row]', 2)} [data-outcome-success-option="success"]` },
+]);
+const READOUT = '.fabricate-manager [data-checks-simulator-readout]';
+const rolledCase = ({
+  id,
+  label,
+  frame,
+  system = 'lab-smithing',
+  state,
+  nav = 'crafting',
+  steps,
+  ...rest
+}) =>
+  managerCase({
+    id,
+    label: `Manager — Checks rolled readout, ${label} (prototype state ${frame})`,
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: state ? { system, checkPreviewState: state } : { system },
+    steps: ['Checks', { selector: `#manager-checks-nav-${nav}` }, ...steps, ...ROLL_PREVIEW],
+    expectView: `checks-${nav}`,
+    kinds: rest.position ? ['manager', 'checks', 'responsive'] : ['manager', 'checks'],
     sourceMatches: PARITY_SOURCES,
     ...rest,
   });
@@ -1232,6 +1285,153 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'checks'],
     sourceMatches: PARITY_SOURCES,
   }),
+  rolledCase({
+    id: 'manager-checks-over-fixed-rolled',
+    label: 'higher is better, fixed DC, success',
+    frame: '01 + Roll',
+    steps: overFixed('12'),
+    expectSelector: `${READOUT}:not(:has([data-checks-simulator-note])) [data-checks-simulator-band="success"]`,
+  }),
+  rolledCase({
+    id: 'manager-checks-over-fixed-rolled-failure',
+    label: 'higher is better, fixed DC, failure',
+    frame: '01 + Roll',
+    steps: overFixed('25'),
+    expectSelector: `${READOUT}:has([data-checks-simulator-band="failure"]) [data-checks-simulator-fact="tools"]`,
+  }),
+  rolledCase({
+    id: 'manager-checks-over-fixed-rolled-narrow',
+    label: 'higher is better, fixed DC, success at 1024x640',
+    frame: '01 + Roll',
+    steps: overFixed('12'),
+    position: { width: 1024, height: 640 },
+    expectSelector: `${READOUT} [data-checks-simulator-band="success"]`,
+  }),
+  rolledCase({
+    id: 'manager-checks-over-routed-stepped',
+    label: 'routed tier stepped up by a natural 20',
+    frame: '12 + trigger',
+    system: 'lab-runework',
+    // Runework's modifiers take the natural 20 to 29, Standard at DC 27, which the 20 steps up.
+    steps: [...IDRIN, ...parityType('[data-check-dc]', 1, '27')],
+    expectSelector: `${READOUT} [data-checks-simulator-band="success"] [data-checks-simulator-note="trigger"]`,
+  }),
+  rolledCase({
+    id: 'manager-checks-over-fixed-forced',
+    label: 'fixed DC forced to success by a trigger',
+    frame: '01 + trigger',
+    steps: [...overFixed('25'), ...triggerPreset('high')],
+    expectSelector: `${READOUT} [data-checks-simulator-band="success"] [data-checks-simulator-note="forced"]`,
+  }),
+  rolledCase({
+    id: 'manager-checks-over-progressive-forced',
+    label: 'progressive, every result awarded by a trigger',
+    frame: '09 + trigger',
+    system: 'lab-herbalism',
+    steps: [...IDRIN, ...triggerPreset('high')],
+    expectSelector: `${READOUT} [data-checks-simulator-band="success"] [data-checks-simulator-note="forced"]`,
+  }),
+  rolledCase({
+    id: 'manager-checks-over-routed-forced',
+    label: 'routed tier forced to the worst failing tier by a trigger',
+    frame: '12 + trigger',
+    system: 'lab-runework',
+    steps: [...IDRIN, ...triggerPreset('high'), { selector: '[data-trigger-outcome="failure"]' }],
+    expectSelector: `${READOUT} [data-checks-simulator-band="failure"] [data-checks-simulator-note="forced"]`,
+  }),
+  rolledCase({
+    id: 'manager-checks-gathering-over-rolled-failure',
+    label: 'gathering, routed failure breaking tools by trigger',
+    frame: '01 gathering + Roll',
+    state: 'gathering-over',
+    nav: 'gathering',
+    steps: IDRIN,
+    expectSelector: `${READOUT}:has([data-checks-simulator-band="failure"]) [data-checks-simulator-fact="tools"]`,
+  }),
+  rolledCase({
+    id: 'manager-checks-over-routed-fixed-rolled',
+    label: 'routed fixed ranges',
+    frame: 'routed fixed + Roll',
+    system: 'lab-runework',
+    steps: [...IDRIN, ...FIXED_RANGES],
+    expectSelector: `${READOUT}:has([data-checks-simulator-margin=""]) [data-checks-simulator-band="success"]`,
+  }),
+  rolledCase({
+    id: 'manager-checks-over-progressive-rolled',
+    label: 'progressive awards down the sandbox order',
+    frame: '09 + Roll',
+    system: 'lab-herbalism',
+    steps: IDRIN,
+    expectSelector: `${READOUT} [data-checks-simulator-fact="result-1"]`,
+  }),
+  rolledCase({
+    id: 'manager-checks-over-unresolved-rolled',
+    label: 'unresolved roll data, no actor',
+    frame: '01, no actor',
+    steps: [...parityFormula('1d20 + @prof'), ...parityType('[data-check-dc]', 1, '12')],
+    expectSelector: `.fabricate-manager:has([data-checks-simulator-note="unresolved"]) [data-checks-simulator-readout] [data-checks-simulator-band]`,
+  }),
+  rolledCase({
+    id: 'manager-checks-over-dynamic-dc-rolled',
+    label: 'dynamic DC against its static fallback',
+    frame: '01 Dynamic',
+    steps: [...overFixed('12'), { selector: '[data-dc-mode-option="dynamic"] input' }],
+    expectSelector: `.fabricate-manager:has([data-checks-simulator-note="dynamic-dc"]) [data-checks-simulator-readout] [data-checks-simulator-band]`,
+  }),
+  rolledCase({
+    id: 'manager-checks-under-fixed-rolled-success',
+    label: 'lower is better, fixed target, success',
+    frame: '03 + Roll',
+    steps: [
+      ...parityFormula('1d20'),
+      ...IDRIN,
+      ...PARITY_UNDER,
+      ...parityType('[data-check-dc]', 1, '20'),
+    ],
+    expectSelector: `${READOUT}[data-checks-simulator-direction="under"]:has([data-checks-simulator-band="success"]) [data-checks-simulator-note="margin"]`,
+  }),
+  rolledCase({
+    id: 'manager-checks-under-routed-rolled',
+    label: 'lower is better, routed tiers against a fixed target',
+    frame: '12 + Roll',
+    system: 'lab-runework',
+    steps: underOutcomesFixed('20'),
+    expectSelector: `${READOUT}[data-checks-simulator-direction="under"] [data-checks-simulator-band="success"]`,
+  }),
+  rolledCase({
+    id: 'manager-checks-over-attribute-rolled',
+    label: 'higher is better, character value added',
+    frame: '02 + Roll',
+    steps: [
+      ...parityFormula('1d20 + @prof'),
+      ...IDRIN,
+      ...parityAttribute('@skills.med.mod + 8'),
+      ...parityType('[data-check-base-adjustment]', 1, '0'),
+    ],
+    expectSelector: `${READOUT}[data-checks-simulator-direction="over"] [data-checks-simulator-note="margin"]`,
+  }),
+  rolledCase({
+    id: 'manager-checks-under-attribute-add-rolled',
+    label: 'lower is better, character value added',
+    frame: '04 + Roll',
+    steps: [
+      ...parityFormula('1d20'),
+      ...IDRIN,
+      ...PARITY_UNDER,
+      ...parityAttribute('@skills.med.mod + 8'),
+      ...parityType('[data-check-base-adjustment]', 1, '0'),
+    ],
+    expectSelector: `${READOUT}[data-checks-simulator-direction="under"] [data-checks-simulator-target]`,
+  }),
+  rolledCase({
+    id: 'manager-checks-under-attribute-rolled-otherwise',
+    label: 'lower is better, multiplied character value, Otherwise',
+    frame: '05 + Roll',
+    system: 'lab-runework',
+    // The lab's first roll lands on Otherwise, which has no target to read a margin from.
+    steps: underMultiplySteps('@skills.med.mod + 51'),
+    expectSelector: `${READOUT}[data-checks-simulator-direction="under"]:not(:has([data-checks-simulator-target])) [data-checks-simulator-band="failure"]`,
+  }),
   countCase({
     id: 'manager-checks-count-over',
     label: 'six d10s, odds',
@@ -1339,7 +1539,42 @@ export const CASES = Object.freeze([
     nav: 'gathering',
     steps: COUNT_ROLL,
     expectSelector:
-      '.fabricate-manager [data-checks-simulator-readout][data-checks-simulator-botch] [data-checks-simulator-total="-3"]',
+      '.fabricate-manager [data-checks-simulator-readout][data-checks-simulator-botch]:has([data-checks-simulator-margin="botch"]) [data-checks-simulator-total="-3"]',
+  }),
+  rolledCase({
+    id: 'manager-checks-count-over-rolled-failure',
+    label: 'six d10s short of Masterwork, no botch',
+    frame: '06 + Roll',
+    state: 'dice-pool',
+    steps: [...IDRIN, ...parityPreview(3)],
+    expectSelector: `${READOUT}[data-checks-simulator-product="count"]:not([data-checks-simulator-botch]) [data-checks-simulator-band="failure"]`,
+  }),
+  rolledCase({
+    id: 'manager-checks-count-routed-rolled',
+    label: 'six d10s routed to a tier',
+    frame: '13 + Roll',
+    state: 'dice-pool',
+    nav: 'gathering',
+    steps: [],
+    expectSelector: `${READOUT}[data-checks-simulator-product="count"] [data-checks-simulator-band-name]`,
+  }),
+  rolledCase({
+    id: 'manager-checks-count-forced',
+    label: 'six d10s forced to the worst failing tier by a trigger',
+    frame: '13 + trigger',
+    state: 'dice-pool-forced',
+    nav: 'gathering',
+    steps: [],
+    expectSelector: `${READOUT}[data-checks-simulator-product="count"] [data-checks-simulator-band="failure"] [data-checks-simulator-note="forced"]`,
+  }),
+  rolledCase({
+    id: 'manager-checks-count-botch-rescued',
+    label: 'a botch rescued by a trigger',
+    frame: 'ruling 3',
+    state: 'dice-pool-rescued',
+    nav: 'gathering',
+    steps: [],
+    expectSelector: `${READOUT}[data-checks-simulator-botch]:has([data-checks-simulator-margin="margin"]) [data-checks-simulator-band="success"]`,
   }),
   countCase({
     id: 'manager-checks-count-odds-refused',

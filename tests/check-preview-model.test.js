@@ -409,11 +409,11 @@ describe('the simulator readout reads the executed target', () => {
       text
     );
     assert.deepEqual(
-      [readout.target, readout.margin, readout.gradeLabel],
+      [readout.target, readout.margin, readout.targetLine],
       [14, 5, 'target 14 · margin +5']
     );
     assert.equal(readout.direction, 'under');
-    assert.match(readout.bandDetail, /stays at or under the target/);
+    assert.equal(readout.card.detail, 'The recipe’s result group is produced');
   });
 
   it('shows no target or margin for an Otherwise result, never a target of 0', () => {
@@ -426,10 +426,10 @@ describe('the simulator readout reads the executed target', () => {
       },
       text
     );
-    assert.deepEqual([readout.target, readout.margin, readout.gradeLabel], [null, null, '']);
+    assert.deepEqual([readout.target, readout.margin, readout.targetLine], [null, null, '']);
   });
 
-  it('keeps roll-over against a fixed DC reading total − DC', () => {
+  it('keeps roll-over against a fixed DC reading total − DC, its pass/fail line naming the DC alone', () => {
     const previewPlan = plan({ draft: { rollFormula: '1d20', dc: 12 } });
     const readout = buildReadoutModel(
       {
@@ -440,7 +440,7 @@ describe('the simulator readout reads the executed target', () => {
       },
       text
     );
-    assert.deepEqual([readout.target, readout.margin, readout.gradeLabel], [12, 3, 'vs DC 12 · +3']);
+    assert.deepEqual([readout.target, readout.margin, readout.targetLine], [12, 3, 'vs DC 12']);
   });
 
   it('states the dynamic target, not the dynamic DC, for a character value', () => {

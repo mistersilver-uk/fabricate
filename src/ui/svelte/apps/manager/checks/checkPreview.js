@@ -31,6 +31,7 @@ import {
 } from '../../../../../systems/normalize/checkEvaluation.js';
 import { appendToolBonusTerms } from '../../../../../systems/toolCheckBonus.js';
 
+import { formatSigned, interpolate, MINUS } from './checksCopy.js';
 import { NO_ACTOR_ID } from './previewActorId.js';
 
 export { NO_ACTOR_ID } from './previewActorId.js';
@@ -278,26 +279,98 @@ export async function runCheckPreview(plan) {
   return runFormulaPassFail(plan.args);
 }
 
+/** Whether the plan grades against a character value the target resolution reads. */
+export function readsAttributeTarget(plan) {
+  return (
+    plan.kind !== 'progressive' &&
+    plan.args?.type !== 'fixed' &&
+    plan.evaluation.target.source === 'attribute'
+  );
+}
+
+/** Whether the plan sums roll-over against a fixed DC, an inert character value included. */
+export function gradesLikeFixedOver(plan) {
+  const { product = 'sum', direction } = plan.evaluation;
+  return product === 'sum' && direction === 'over' && !readsAttributeTarget(plan);
+}
+
+/**
+ * Which readout a plan draws: `count` for success-counting, `fixedOver` for a summed roll-over
+ * against a fixed DC, and `target` for a roll-under or a character value.
+ */
+export function readoutFamily(plan) {
+  if (plan.evaluation.product === 'count') return 'count';
+  return gradesLikeFixedOver(plan) ? 'fixedOver' : 'target';
+}
+
+/** `+3`, `−3` or, with `always`, `+0`: the signed remainder a breakdown ends on. */
+function remainderTerm(remainder, always) {
+  if (remainder === 0 && !always) return '';
+  return formatSigned(remainder, { plus: true });
+}
+
+/** `d20 9 +3`: each group's die and faces, then the remainder, signed even at `+0`. */
+function fixedOverBody(groups, remainder) {
+  const parts = groups.map((group) => {
+    const [, sides] = String(group.group ?? '').split('d');
+    return `d${sides} ${(group.results ?? []).join(' ')}`.trim();
+  });
+  return [...parts, remainderTerm(remainder, true)].join(' ');
+}
+
+/** `5 + 5 + 3`, a non-zero remainder joined as one more term, and ` · raw` under a roll-under. */
+function targetBody(faces, remainder, direction, text) {
+  let line = faces.join(' + ');
+  if (remainder !== 0) {
+    const joiner = remainder > 0 ? ' + ' : ` ${MINUS} `;
+    line = line ? `${line}${joiner}${Math.abs(remainder)}` : formatSigned(remainder);
+  }
+  if (direction !== 'under') return line;
+  return `${line} · ${text('FABRICATE.Admin.Manager.Checks.Simulator.Raw', 'raw')}`;
+}
+
+/** `4 qualified − 2 cancelled = 2 net`, or `pool reduced to 0` for a pool that rolled nothing. */
+function countBody(data, text) {
+  if (data.zeroPool === true) {
+    return text('FABRICATE.Admin.Manager.Checks.Simulator.PoolZero', 'pool reduced to 0');
+  }
+  const net = data.total === null ? NaN : Number(data.total);
+  if (!Number.isFinite(net)) return '';
+  const copy = text(
+    'FABRICATE.Admin.Manager.Checks.Simulator.CountNet',
+    '{qualified} qualified − {cancelled} cancelled = {net} net'
+  );
+  return interpolate(copy, {
+    qualified: data.successes,
+    cancelled: data.cancelled,
+    net: formatSigned(net),
+  });
+}
+
 /**
  * The TERSE breakdown line the readout shows — NOT the full resolved formula, which is the
- * `THIS CHECK` digest's job — so it reduces the result to the faces rolled, the signed remainder
- * they were added to, and who rolled them.
+ * `THIS CHECK` digest's job. It reduces a result to its faces and signed remainder, or a count to
+ * its qualified and cancelled dice, and ends on the previewed actor's name.
  * @param {object|null} result A runner result.
- * @param {string} [actorName] The previewed actor's name.
+ * @param {{plan: object, actorName?: string}} context The plan rolled and who rolled it.
+ * @param {(key: string, fallback: string) => string} text Localizes.
  * @returns {string} The breakdown line, or '' when there is nothing to describe. */
-export function terseBreakdown(result, actorName = '') {
-  const groups = Array.isArray(result?.data?.diceGroups) ? result.data.diceGroups : [];
-  const total = Number(result?.data?.total);
-  if (!Number.isFinite(total)) return '';
-  const faces = groups.flatMap((group) => group.results ?? []);
-  const rolled = faces.reduce((sum, face) => sum + Number(face || 0), 0);
-  const remainder = total - rolled;
-  const parts = [];
-  for (const group of groups) {
-    const [, sides] = String(group.group ?? '').split('d');
-    parts.push(`d${sides} ${(group.results ?? []).join(' ')}`.trim());
-  }
-  if (remainder !== 0) parts.push(remainder > 0 ? `+${remainder}` : String(remainder));
-  const line = parts.join(' ');
+export function readoutBreakdown(result, { plan, actorName = '' }, text) {
+  const data = result?.data;
+  if (!data) return '';
+  const line = checkBreakdownBody(data, plan, text);
+  if (!line) return '';
   return actorName ? `${line} · ${actorName}` : line;
+}
+
+function checkBreakdownBody(data, plan, text) {
+  const family = readoutFamily(plan);
+  if (family === 'count') return countBody(data, text);
+  const total = Number(data.total);
+  if (data.total === null || !Number.isFinite(total)) return '';
+  const groups = Array.isArray(data.diceGroups) ? data.diceGroups : [];
+  const faces = groups.flatMap((group) => group.results ?? []);
+  const remainder = total - faces.reduce((sum, face) => sum + Number(face || 0), 0);
+  if (family === 'fixedOver') return fixedOverBody(groups, remainder);
+  return targetBody(faces, remainder, plan.evaluation.direction, text);
 }

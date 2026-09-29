@@ -102,6 +102,14 @@ function rolledTierTerm(grading, classifyInput) {
   return { kind: 'adjustment', value: grading.direction === 'under' ? 0 - step : step, ...label };
 }
 
+/** A routed result's trigger evidence: a forced disposition (issue 2080) and a real tier step. */
+function routedTriggerEvidence({ forcedDisposition, tierStepApplied }) {
+  return {
+    ...(forcedDisposition && { forcedOutcome: forcedDisposition }),
+    ...(tierStepApplied && { tierStepApplied }),
+  };
+}
+
 /** The executed roll mode, on a result whose caller asked for it; never persisted. */
 function reportedVisibility(rolled) {
   return rolled && Object.hasOwn(rolled, 'rollMode')
@@ -423,7 +431,7 @@ function gradePreparedTotal(
         outcomeId: classified.matched?.id ?? null,
         success: classified.success,
         breakTools: classified.breakTools,
-        ...(classified.tierStepApplied && { tierStepApplied: classified.tierStepApplied }),
+        ...routedTriggerEvidence(classified),
         ...(classified.minTierFailed && {
           minTierFailed: true,
           blockedOutcomeId: classified.blockedOutcomeId,
@@ -440,7 +448,11 @@ function gradePreparedTotal(
       success: true,
       outcome: null,
       value,
-      data: { ...executedSumEvidence(total, null, null), value },
+      data: {
+        ...executedSumEvidence(total, null, null),
+        value,
+        ...(forced && { forcedOutcome: forced.disposition }),
+      },
     };
   }
   const target = effectiveTarget(Number(anchor), grading, targetDelta);
@@ -454,6 +466,7 @@ function gradePreparedTotal(
     data: {
       ...executedSumEvidence(total, target, comparison, grading.direction),
       ...terms(target, null),
+      ...(forced && { forcedOutcome: forced.disposition }),
     },
   };
 }
@@ -823,6 +836,7 @@ export async function runFormulaPassFail({
         })),
       diceGroups,
       ...preRollEvidence(rolled),
+      ...(forced && { forcedOutcome: forced.disposition }),
     },
     message: success ? null : `${label} check failed`,
     ...reportedVisibility(rolled),
@@ -892,6 +906,7 @@ export async function runFormulaProgressive({
       diceGroups,
       ...(formula && executedSumEvidence(total, null, null)),
       ...preRollEvidence(rolled),
+      ...(forced && { forcedOutcome: forced.disposition }),
     },
     ...reportedVisibility(rolled),
   };
@@ -1005,7 +1020,7 @@ export async function runFormulaRouted({
       breakTools: classified.breakTools,
       diceGroups,
       // Only on a real tier change (issue 975), and on a min-tier failure the tier it blocked.
-      ...(classified.tierStepApplied && { tierStepApplied: classified.tierStepApplied }),
+      ...routedTriggerEvidence(classified),
       ...(classified.minTierFailed && {
         minTierFailed: true,
         blockedOutcomeId: classified.blockedOutcomeId,
