@@ -31,17 +31,9 @@ export function resolvePool({ evaluation, thresholdMode, rollData = {}, placemen
   const threshold = resolveCountInput(pool.threshold, rollData);
   if (!threshold.ok) return refusal(threshold.reason, 'threshold');
   if (!Number.isInteger(pool.die) || pool.die < 2) return refusal('die-invalid', 'die');
-  const explode = faceRule(pool.explode, 'best');
-  if (explode === INVALID_FACE) return refusal('faces-invalid', 'explode');
-  const cancel = faceRule(pool.cancel, 'worst');
-  if (cancel === INVALID_FACE) return refusal('faces-invalid', 'cancel');
-  const rules = {
-    die: pool.die,
-    direction: evaluation?.direction === 'under' ? 'under' : 'over',
-    comparison: thresholdMode === 'exceed' ? 'exceed' : 'meet',
-    explode: explode && { ...explode, once: pool.explode.once === true },
-    cancel,
-  };
+  const rules = authoredRules(evaluation, thresholdMode);
+  if (rules.explode === INVALID_FACE) return refusal('faces-invalid', 'explode');
+  if (rules.cancel === INVALID_FACE) return refusal('faces-invalid', 'cancel');
   if (explodesOnEveryFace(rules)) return refusal('explode-unbounded', 'explode');
   const resolved = { base: base.value, threshold: threshold.value };
   return settlePool(rules, resolved, pool.zeroPoolFails !== false, placement);
@@ -140,6 +132,64 @@ export function countFormulaValues({ dice, die, direction, comparison, threshold
     die,
     comparison: signs[comparison === 'exceed' ? 'exceed' : 'meet'],
     threshold: Number.isFinite(threshold) ? Number(threshold.toFixed(2)) : threshold,
+  };
+}
+
+/**
+ * The one description every count surface formats with its own keys: `{ pool, die, symbol,
+ * threshold, explode, cancel }`, each face rule `{ from, face, sign }` (plus `once`) or null.
+ * `policy` is a `resolvePool` policy, or any `{ dice, die, direction, comparison, threshold,
+ * explode, cancel }` whose pool and threshold may be authored text.
+ */
+export function describeCountPolicy(policy) {
+  const { pool, die, comparison, threshold } = countFormulaValues(policy);
+  const { explode, cancel } = describedFaceRules(policy);
+  const against = policy.direction === 'under' ? 'over' : 'under';
+  return {
+    pool,
+    die,
+    symbol: comparison,
+    threshold,
+    explode: explode && { ...describedFace(explode, die, policy.direction), once: explode.once },
+    cancel: cancel && describedFace(cancel, die, against),
+  };
+}
+
+/**
+ * `describeCountPolicy` of an authored pool before any roll data: its expressions stand for the
+ * pool and threshold, and an enabled `from` face with no value is left undescribed.
+ */
+export function describeAuthoredCountPolicy({ evaluation, thresholdMode }) {
+  const pool = evaluation?.pool ?? {};
+  const rules = authoredRules(evaluation, thresholdMode);
+  const usable = (rule) => (rule === INVALID_FACE ? null : rule);
+  return describeCountPolicy({
+    ...rules,
+    explode: usable(rules.explode),
+    cancel: usable(rules.cancel),
+    dice: pool.base,
+    threshold: pool.threshold,
+  });
+}
+
+function describedFace({ kind, value }, die, direction) {
+  if (kind === 'from') return { from: true, face: value, sign: faceSign(direction) };
+  return { from: false, face: extremeFace(die, direction), sign: null };
+}
+
+// The per-die rules an authored pool names; an enabled `from` face with no value is INVALID_FACE.
+function authoredRules(evaluation, thresholdMode) {
+  const pool = evaluation?.pool ?? {};
+  const explode = faceRule(pool.explode, 'best');
+  return {
+    die: pool.die,
+    direction: evaluation?.direction === 'under' ? 'under' : 'over',
+    comparison: thresholdMode === 'exceed' ? 'exceed' : 'meet',
+    explode:
+      explode && explode !== INVALID_FACE
+        ? { ...explode, once: pool.explode.once === true }
+        : explode,
+    cancel: faceRule(pool.cancel, 'worst'),
   };
 }
 
