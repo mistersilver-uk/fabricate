@@ -37,6 +37,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/recipeItemAccessBadge.js',
     // The pure yield projection the bulk sub-store reads (issue 1695).
     'src/ui/svelte/util/salvageYieldRows.js',
+    // The shared salvage-failure fallback literal (issue 2092), read by SalvageRollSummary.
+    'src/systems/salvageMessages.js',
     // The REAL store imports these two leaves (unlike the mocked-store suite).
     'src/utils/progressiveResultOrder.js',
     'src/utils/progressiveStageThresholds.js',

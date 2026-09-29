@@ -224,13 +224,48 @@ describe('createSalvageExecution', () => {
     assert.deepEqual(log.at(-1), ['reload', true]);
   });
 
-  it('surfaces a failed salvage through notify and holds no ribbon', async () => {
+  it('surfaces a pre-roll refusal through notify and holds no ribbon (no check ran)', async () => {
     const { execution, log } = setup({ result: { success: false, message: 'no tools' } });
     await execution.salvage('sys', 'c1');
     flushSync();
 
-    assert.ok(!execution.salvageResult);
+    assert.ok(!execution.salvageResult, 'a refusal carries no `check`, so there is nothing to show');
     assert.deepEqual(log.at(-1), ['notify', 'no tools']);
+  });
+
+  it('shows a failure box with the executed check when a rolled salvage fails (issue 2092)', async () => {
+    const check = Object.freeze({ evidence: { total: 9, target: 8, margin: -1 } });
+    const { execution, log } = setup({
+      result: { success: false, message: 'Salvage check failed', check },
+    });
+    await execution.salvage('sys', 'c1');
+    flushSync();
+
+    assert.deepEqual(execution.salvageResult, {
+      systemId: 'sys',
+      componentId: 'c1',
+      state: 'failure',
+      message: 'Salvage check failed',
+      check,
+      awarded: [],
+    });
+    assert.deepEqual(log.at(-1), ['notify', 'Salvage check failed'], 'the toast still fires');
+  });
+
+  it('carries a reserved failure award onto the box (QE: perRecord policy, issue 2092)', async () => {
+    const check = Object.freeze({ evidence: { total: 9, target: 8, margin: -1 } });
+    const { execution } = setup({
+      result: {
+        success: false,
+        message: 'Salvage check failed',
+        check,
+        results: [{ name: 'Slag', img: 'icons/slag.webp' }],
+      },
+    });
+    await execution.salvage('sys', 'c1');
+    flushSync();
+
+    assert.deepEqual(execution.salvageResult.awarded, [{ name: 'Slag', img: 'icons/slag.webp' }]);
   });
 
   it('returns a cancelled prompt to the pre-roll state, calling NO notify', async () => {
