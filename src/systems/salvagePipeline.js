@@ -15,6 +15,7 @@ import {
   mapConsumedIngredientRef,
 } from './runHistoryEvidence.js';
 import { resolveSalvageCheck } from './salvageCheckUsability.js';
+import { SALVAGE_CHECK_FAILED_FALLBACK } from './salvageMessages.js';
 
 /** The five-key shape every salvage refusal returns, here and at `salvage()`'s own gates. */
 export const salvageRefusal = (message, extras = {}) => ({
@@ -340,7 +341,7 @@ export async function publishSalvageFailure(engine, ctx) {
         value: checkResult.value,
         data: checkResult.data || {},
       },
-      failureReason: checkResult.message || 'Salvage check failed',
+      failureReason: checkResult.message || SALVAGE_CHECK_FAILED_FALLBACK,
     });
   }
 
@@ -361,7 +362,7 @@ export async function publishSalvageFailure(engine, ctx) {
     // an empty list leaves every existing failure card byte-for-byte unchanged.
     results: failureResultItems,
     usedTools,
-    failureReason: checkResult.message || 'Salvage check failed',
+    failureReason: checkResult.message || SALVAGE_CHECK_FAILED_FALLBACK,
     rollValue: rollTotalForCard(checkResult),
     tierStep: tierStepForCard(checkResult),
     check: checkDisplayForCard(checkResult),
@@ -375,7 +376,7 @@ export async function publishSalvageFailure(engine, ctx) {
       // "a failed salvage produced nothing", and the bulk-salvage surfaces read THIS
       // value rather than the run record or the card (issue 1098, AF5/CF9).
       results: failureResultItems.length > 0 ? failureResultItems : null,
-      message: checkResult.message || 'Salvage check failed',
+      message: checkResult.message || SALVAGE_CHECK_FAILED_FALLBACK,
       salvageRun: ctx.salvageRun,
       // The executed projection, whose visibility the run record never persists (issue 2005).
       check: checkDisplayForCard(checkResult),
