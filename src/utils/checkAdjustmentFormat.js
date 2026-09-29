@@ -26,7 +26,8 @@ export function formatCheckAdjustment(kind, value) {
   if (number === null) return '';
   if (kind === 'multiply') {
     const named = FRACTIONS.find(([fraction]) => Math.abs(fraction - number) < EPSILON);
-    return `${TIMES}${named ? named[1] : decimal(number)}`;
+    if (named) return `${TIMES}${named[1]}`;
+    return number < 0 ? `${TIMES}${MINUS}${decimal(-number)}` : `${TIMES}${decimal(number)}`;
   }
   if (number > 0) return `+${decimal(number)}`;
   if (number < 0) return `${MINUS}${decimal(-number)}`;

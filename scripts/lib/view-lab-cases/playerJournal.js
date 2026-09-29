@@ -164,6 +164,86 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/crafting\/(?:RollPrompt(?:Target)?\.svelte|rollPrompt(?:Target)?\.js)$/,
     ],
   }),
+  // Issue 2005 (T6): a fixed roll-under ladder states `≤` bands, in ladder order.
+  playerCase({
+    id: 'player-journal-routed-bands-under',
+    label: 'Player Journal — roll-under routed gathering ladder bands',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: {
+      tab: 'journal',
+      journalCaseState: 'gathering-journal-check-prompt',
+      gatheringTaskMode: 'routed-under-fixed',
+    },
+    steps: [{ selector: '[data-run-id="lab-v1-gathering-journal-check-prompt"]' }],
+    expectTab: 'journal',
+    expectSelector:
+      '[data-journal-detail] [data-outcome-ladder]' +
+      ':has([data-outcome-tier="lab-abundant"] .manager-chip:text-is("≤15"))' +
+      ':has([data-outcome-tier="lab-failed"] .manager-chip:text-is(">15"))',
+    kinds: ['player', 'journal', 'gathering'],
+    sourceMatches: [
+      JOURNAL_SOURCES,
+      /^src\/ui\/presenters\/RunJournalBuilder\.js$/,
+      /^src\/systems\/runJournalOutcomeBands\.js$/,
+    ],
+  }),
+  // Issue 2005 fix round 1: the crafting ladder, the labelled character-value and Otherwise chips,
+  // and the executed roll-under roll line, each on the surface it changes.
+  ...[
+    [
+      'player-journal-routed-bands-under-crafting',
+      { journalCaseState: 'journal-check-prompt', runeworkCheckMode: 'routed-under' },
+      'lab-v1-journal-check-prompt',
+      ':has([data-outcome-tier="rw-masterwork"] .manager-chip:text-is("≤7"))' +
+        ':has([data-outcome-tier="rw-ruined"] .manager-chip:text-is(">12"))',
+    ],
+    [
+      'player-journal-routed-bands-under-attribute',
+      { journalCaseState: 'gathering-journal-check-prompt', gatheringTaskMode: 'routed-under' },
+      'lab-v1-gathering-journal-check-prompt',
+      ':has([data-outcome-tier="lab-failed"] .manager-chip:text-is("Failed · −15"))',
+    ],
+    [
+      'player-journal-routed-bands-under-multiply',
+      { journalCaseState: 'journal-check-prompt', runeworkCheckMode: 'routed-under-multiply' },
+      'lab-v1-journal-check-prompt',
+      ':has([data-outcome-tier="rw-ruined"] .manager-chip:text-is("Ruined · Otherwise"))' +
+        ':has([data-outcome-tier="rw-standard"] .manager-chip:text-is("Standard · ×½"))',
+    ],
+  ].map(([id, query, runId, ladder]) =>
+    playerCase({
+      id,
+      label: `Player Journal — ${id.replace('player-journal-', '').replaceAll('-', ' ')}`,
+      smokeLabels: [],
+      reaches: 'beyond',
+      query: { tab: 'journal', ...query },
+      steps: [{ selector: `[data-run-id="${runId}"]` }],
+      expectTab: 'journal',
+      expectSelector: `[data-journal-detail] [data-outcome-ladder]${ladder}`,
+      kinds: ['player', 'journal'],
+      sourceMatches: [
+        JOURNAL_SOURCES,
+        /^src\/ui\/presenters\/RunJournalBuilder\.js$/,
+        /^src\/systems\/runJournalOutcomeBands\.js$/,
+      ],
+    })
+  ),
+  playerCase({
+    id: 'player-journal-roll-line-under',
+    label: 'Player Journal — past stage rolled roll-under, target and margin',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'journal', journalCaseState: 'past-stage-under' },
+    steps: [
+      { selector: '[data-run-id="lab-v1-stage-browser"]' },
+      { selector: '[data-stage-nav-index="0"]' },
+    ],
+    expectTab: 'journal',
+    expectSelector: '[data-journal-detail]:has-text("1d20 = 11 · target 14 · margin +3")',
+    kinds: ['player', 'journal'],
+    sourceMatches: [JOURNAL_SOURCES, /^src\/ui\/presenters\/RunJournalBuilder\.js$/],
+  }),
   ...journalBlindRunCases(),
   ...journalLifecycleCases(),
   ...journalHistoryBatchCases(),

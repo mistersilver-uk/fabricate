@@ -1,5 +1,5 @@
 /** The single and bulk check prompt: view preparation, the modal surface and answer translation. */
-import { dcFlavorSuffix } from '../../../../systems/checkTarget.js';
+import { isFixedSumOver } from '../../../../systems/checkTarget.js';
 import {
   countFormulaValues,
   describedFaceRules,
@@ -504,11 +504,19 @@ export async function promptBulkCheckRoll({
   );
 }
 
+/**
+ * The chat flavor's ` (DC n)` suffix, which names only a summed roll-over fixed DC. Any other
+ * target is named once its benefits settle, by the pass/fail runner (`flavorTarget`).
+ */
+export function checkFlavorSuffix(dc, evaluation) {
+  return Number.isFinite(dc) && isFixedSumOver(evaluation) ? ` (DC ${dc})` : '';
+}
+
 export function buildInteractiveRollOptions(
   { interactive, actor, name, activity, dc, img, modifierChoice, targetBasis, ...input },
   prompt = promptCheckRoll
 ) {
-  const dcLabel = dcFlavorSuffix(dc, input.evaluation);
+  const dcLabel = checkFlavorSuffix(dc, input.evaluation);
   const rollOptions = {
     interactive: interactive === true,
     prompt: (rollOptions) => prompt({ ...rollOptions, actorName: actor?.name }),

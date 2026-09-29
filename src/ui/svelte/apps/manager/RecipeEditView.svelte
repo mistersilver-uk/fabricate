@@ -59,6 +59,7 @@
     essenceOptions = [],
     itemTags = [],
     checkTierOptions = [],
+    checkEvaluation = null,
     minSuccessTierOptions = [],
     // Per-recipe crafting-check modifier selection (issue 770, reshaped by issue 1055).
     craftingModifierOptions = [],
@@ -496,6 +497,7 @@
             {categories}
             {onSetCategory}
             {checkTierOptions}
+            {checkEvaluation}
             {minSuccessTierOptions}
             {craftingModifierOptions}
             {craftingModifierPolicy}

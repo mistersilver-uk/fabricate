@@ -25,6 +25,13 @@ describe('formatCheckAdjustment', () => {
     );
   });
 
+  it('writes a negative multiplier with the true minus, as the Player sees line quotes it (#2081)', () => {
+    assert.deepEqual(
+      [-2, -0.5, -0.7].map((value) => formatCheckAdjustment('multiply', value)),
+      ['×−2', '×−0.5', '×−0.7']
+    );
+  });
+
   it('labels nothing for an absent or non-finite value', () => {
     for (const value of [null, undefined, '', Number.NaN, Infinity]) {
       assert.equal(formatCheckAdjustment('add', value), '');

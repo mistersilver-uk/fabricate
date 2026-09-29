@@ -40,13 +40,14 @@ describe('salvage DC presets (issue 676, decision 7)', () => {
     ]);
   });
 
-  it('case 1: dynamic dcMode renders the system default with NO DC suffix', () => {
-    // A macro computes the DC, so there is no static number to name.
+  it('case 1: names the static system DC even when the crafting check is macro-driven (#2081)', () => {
+    // Salvage never runs a DC macro: it grades the override, else the slot's DC, else 15.
     const options = buildSalvageDcOptions({ tiers: TIERS, dcMode: 'dynamic', systemDc: 15 });
-    assert.equal(options[0].label, 'System default — set by macro');
-    assert.ok(!options[0].label.includes('15'));
-    // Presets and Custom… remain available.
+    assert.equal(options[0].label, 'System default — DC 15');
     assert.deepEqual(values(options), ['system', 'dc:12', 'dc:17', 'custom']);
+    const bound = buildSalvageDcSelectOptions(TIERS, 15, englishText, null);
+    assert.equal(bound[0].label, 'System default — DC 15');
+    assert.ok(!labels(bound).some((label) => /macro/.test(label)), 'no option names a macro');
   });
 
   it('case 2: zero authored tiers — the COMMON case — degrades to System default + Custom…', () => {
@@ -176,7 +177,7 @@ describe('salvage override presets under a character value (issue 2005)', () => 
   });
 
   it('labels adjustment presets with the true minus and the base adjustment default', () => {
-    const options = buildSalvageDcSelectOptions(ADJUSTED_TIERS, 'static', 15, englishText, attribute());
+    const options = buildSalvageDcSelectOptions(ADJUSTED_TIERS, 15, englishText, attribute());
     assert.deepEqual(labels(options), [
       'System default — base adjustment',
       'Easy — +2',
@@ -186,7 +187,6 @@ describe('salvage override presets under a character value (issue 2005)', () => 
     ]);
     const multiply = buildSalvageDcSelectOptions(
       [{ id: 'd', name: 'Demanding', adjustment: 0.5 }],
-      'static',
       15,
       englishText,
       attribute('multiply')
@@ -195,14 +195,14 @@ describe('salvage override presets under a character value (issue 2005)', () => 
   });
 
   it('names a roll-under fixed preset as a Target, and leaves a roll-high one on DC', () => {
-    const under = buildSalvageDcSelectOptions(TIERS, 'static', 15, englishText, FIXED_UNDER);
+    const under = buildSalvageDcSelectOptions(TIERS, 15, englishText, FIXED_UNDER);
     assert.deepEqual(labels(under), [
       'System default — Target 15',
       'Standard — Target 12',
       'Hard — Target 17',
       'Custom…',
     ]);
-    const over = buildSalvageDcSelectOptions(TIERS, 'static', 15, englishText, null);
+    const over = buildSalvageDcSelectOptions(TIERS, 15, englishText, null);
     assert.deepEqual(labels(over), [
       'System default — DC 15',
       'Standard — DC 12',

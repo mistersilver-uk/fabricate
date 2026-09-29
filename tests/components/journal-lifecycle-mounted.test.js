@@ -57,6 +57,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/journal/historyPresentation.js',
     'src/ui/svelte/apps/journal/runStateNotice.js',
     'src/ui/svelte/apps/journal/runDetailPresentation.js',
+    // The roll line signs an executed margin with the shared formatter (issue 2005).
+    'src/utils/checkAdjustmentFormat.js',
+    'src/utils/scalars.js',
     'src/ui/svelte/apps/journal/stageHeading.js',
     'src/ui/svelte/apps/journal/runRecovery.js',
   ],

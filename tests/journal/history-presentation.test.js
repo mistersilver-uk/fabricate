@@ -105,6 +105,24 @@ describe('recorded Journal presentation', () => {
     assert.equal(summary.value, `RollResult${JSON.stringify({ formula, total, value: total })}`);
   });
 
+  it('names a roll-under stage roll by its executed target and margin, never a DC (issue 2005)', () => {
+    const stage = (lastCheckResult) => presentStage({ lastCheckResult }, text).check;
+    const under = { formula: '1d20', total: 11, value: 11, dc: null, target: 14, margin: 3 };
+    assert.equal(
+      stage(under),
+      `RollResultWithTarget${JSON.stringify({ formula: '1d20', total: 11, target: 14, margin: '+3' })}`
+    );
+    assert.equal(
+      stage({ ...under, formula: null }),
+      `RollResultValueWithTarget${JSON.stringify({ value: 11, target: 14, margin: '+3' })}`
+    );
+    assert.equal(
+      stage({ formula: '1d20', total: 11, value: 11, dc: 16 }),
+      `RollResultWithDc${JSON.stringify({ formula: '1d20', total: 11, value: 11, dc: 16 })}`,
+      'roll-high keeps its DC line byte-identical'
+    );
+  });
+
   for (const [checked, kind] of [[true, 'check'], [false, 'none']]) {
     it(`classifies persisted ${kind} after live configuration changed`, async () => {
       const { deletedRecipeModel } = await createPersistedCraftingHistory({ stageCount: 1, checked });

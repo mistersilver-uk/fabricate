@@ -74,6 +74,8 @@ async function runStandaloneCheck(
     actor,
     activity: label,
     dc: graded ? dc : undefined,
+    // The flavor names a DC only for sum/over/fixed; a roll-under target is named once it settles.
+    evaluation,
   });
   // Fabricate's own prompt owns dismissal, since Foundry's RollResolver fulfils rather than aborts on close; set after the builder so a test seam can inject a dismissing prompt.
   rollOptions.prompt = seams.prompt;
