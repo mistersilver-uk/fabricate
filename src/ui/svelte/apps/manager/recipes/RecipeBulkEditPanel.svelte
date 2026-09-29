@@ -367,6 +367,16 @@
           'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierDefaultHintTarget',
           "Clears every selected recipe to the system's default target."
         ),
+      dynamic: () =>
+        text(
+          'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierDynamicTarget',
+          "This system's crafting check resolves its target dynamically at craft time, so recipes carry no tier to select."
+        ),
+      noTiers: () =>
+        text(
+          'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierNoTiersTarget',
+          "This system's crafting check authors no tiers, so every recipe uses its default target. Add tiers under Checks to assign them here."
+        ),
     },
     adjustment: {
       hint: () =>
@@ -378,6 +388,17 @@
         text(
           'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierDefaultHintAdjustment',
           'Clears every selected recipe to the base adjustment.'
+        ),
+      // A macro adjusts a character value's target, so the target is what resolves dynamically.
+      dynamic: () =>
+        text(
+          'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierDynamicTarget',
+          "This system's crafting check resolves its target dynamically at craft time, so recipes carry no tier to select."
+        ),
+      noTiers: () =>
+        text(
+          'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierNoTiersAdjustment',
+          "This system's crafting check authors no tiers, so every recipe uses its base adjustment. Add tiers under Checks to assign them here."
         ),
     },
   };
@@ -449,6 +470,9 @@
   const checkTierAvailable = $derived(checkTierAxis?.available === true);
   const checkTierReason = $derived(String(checkTierAxis?.reason || ''));
   const checkTierMessage = $derived.by(() => {
+    // A Target or an adjustment check words its own dynamic and no-tier reasons (issue 2005).
+    const worded = CHECK_TIER_COPY[checkTierCopyUnit][checkTierReason];
+    if (worded) return worded();
     const message = CHECK_TIER_REASON_MESSAGES[checkTierReason];
     return message ? text(message[0], message[1]) : '';
   });

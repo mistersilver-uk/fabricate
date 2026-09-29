@@ -31,9 +31,19 @@ export const CASES = Object.freeze([
   }),
   // Issue 2005 (T6): the Check tier select names a roll-under Target, or a character value's adjustment.
   ...[
-    ['manager-recipe-edit-check-tier-under', 'roll-under-fixed', 'Masterwork (Target 8)'],
-    ['manager-recipe-edit-check-tier-under-attribute', 'roll-under-add', 'Masterwork (−2)'],
-  ].map(([id, state, text]) =>
+    [
+      'manager-recipe-edit-check-tier-under',
+      'roll-under-fixed',
+      'Masterwork (Target 8)',
+      'Target 12',
+    ],
+    [
+      'manager-recipe-edit-check-tier-under-attribute',
+      'roll-under-add',
+      'Masterwork (−2)',
+      'Character value',
+    ],
+  ].map(([id, state, text, subline]) =>
     managerCase({
       id,
       label: `Manager — Recipe edit check tier list, ${state.replaceAll('-', ' ')}`,
@@ -47,10 +57,14 @@ export const CASES = Object.freeze([
         { selector: '[data-recipe-field="checkTierId"]' },
       ],
       expectView: 'recipe-edit',
-      expectSelector: `.fabricate-manager .fabricate-select-popover [data-popover-option="sm-tier-masterwork"]:has-text("${text}")`,
+      // The header subline names the check as the browser pill does, never a DC.
+      expectSelector:
+        `.fabricate-manager:has([data-recipe-edit-subline]:has-text("· ${subline}")) ` +
+        `.fabricate-select-popover [data-popover-option="sm-tier-masterwork"]:has-text("${text}")`,
       kinds: ['manager', 'recipes'],
       sourceMatches: [
         /^src\/ui\/svelte\/apps\/manager\/recipe\/(?:RecipeOverviewTab\.svelte|recipeOverviewSelectOptions\.js)$/,
+        /^src\/ui\/model\/recipeBrowserModel\.js$/,
       ],
     })
   ),

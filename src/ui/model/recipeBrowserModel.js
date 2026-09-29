@@ -117,6 +117,39 @@ export const describeActiveFilters = (filters) =>
 export const groupRecipesByCategory = (rows, totals) =>
   groupEntitiesByCategory(rows, totals, RECIPE_ADAPTER);
 
+/** Pill kinds whose number is a Target, or which name a character value: never a DC (issue 2005). */
+const TARGET_CHECK_KINDS = new Set(['target', 'attribute', 'dynamicTarget']);
+
+/**
+ * The `dc` sort key's label. Every row carries the system's one check, so any row's pill kind
+ * says whether it grades a DC or a Target; `text(key, fallback)` localizes.
+ */
+export function recipeCheckSortLabel(recipes, text) {
+  const target = (recipes ?? []).some((recipe) =>
+    TARGET_CHECK_KINDS.has(recipe?.checkSummary?.kind)
+  );
+  return target
+    ? text('FABRICATE.Admin.Manager.Recipe.SortTarget', 'Check target')
+    : text('FABRICATE.Admin.Manager.Recipe.SortDc', 'Check DC');
+}
+
+/** The recipe editor subline's check part, from the row's pill: ` · DC 12`, ` · Target 12`, …. */
+export function recipeCheckSubtitleSuffix(summary, text) {
+  const dcWord = () => text('FABRICATE.Admin.Manager.Recipe.CheckDcShort', 'DC');
+  if (summary?.kind === 'dc' && Number.isFinite(Number(summary.dc))) {
+    return ` · ${dcWord()} ${summary.dc}`;
+  }
+  if (summary?.kind === 'none') return ` · ${dcWord()} —`;
+  if (summary?.kind === 'target' && Number.isFinite(Number(summary.dc))) {
+    const target = text('FABRICATE.Admin.Manager.Recipe.CheckTarget', 'Target {dc}');
+    return ` · ${target.replace('{dc}', String(summary.dc))}`;
+  }
+  if (summary?.kind === 'attribute') {
+    return ` · ${text('FABRICATE.Admin.Manager.Recipe.CheckAttribute', 'Character value')}`;
+  }
+  return '';
+}
+
 /** The row's I/O readout (issue 643 §9 — resolved there, do not re-derive). */
 export function deriveRecipeIo(recipe, resolutionMode) {
   const inCount = numeric(recipe?.ingredientCount);

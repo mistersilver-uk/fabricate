@@ -365,7 +365,7 @@ function _recipeCheckContext(system) {
   const unit = checkTierUnit(config.evaluation);
   if (unit === 'add' || unit === 'multiply') return constantOf('attribute');
   // A dynamic DC is macro-resolved at craft time; there is no static number to show.
-  if (config.dcMode === 'dynamic') return constantOf('dynamic');
+  if (config.dcMode === 'dynamic') return constantOf(unit === 'target' ? 'dynamicTarget' : 'dynamic');
 
   const tierDcById = new Map();
   for (const entry of Array.isArray(config.tiers) ? config.tiers : []) {
@@ -390,8 +390,8 @@ function _recipeCheckContext(system) {
  *
  * @param {{constant: object|null, tierDcById: Map<string, number>, defaultDc: number}} context
  * @param {object} recipe the Recipe model.
- * @returns {{kind: 'none' | 'ingredients' | 'progressive' | 'dynamic' | 'attribute' | 'dc' |
- *   'target', dc: number | null}}
+ * @returns {{kind: 'none' | 'ingredients' | 'progressive' | 'dynamic' | 'dynamicTarget' |
+ *   'attribute' | 'dc' | 'target', dc: number | null}}
  * @private
  */
 function _recipeCheckSummary(context, recipe) {

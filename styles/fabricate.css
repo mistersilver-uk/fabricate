@@ -4762,6 +4762,7 @@
 .fabricate-manager .manager-recipe-check.is-dc,
 .fabricate-manager .manager-recipe-check.is-target,
 .fabricate-manager .manager-recipe-check.is-attribute,
+.fabricate-manager .manager-recipe-check.is-dynamicTarget,
 .fabricate-manager .manager-recipe-check.is-dynamic {
   border-color: var(--fab-info-border);
   color: var(--fab-info-text);

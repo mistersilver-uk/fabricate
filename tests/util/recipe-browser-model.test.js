@@ -16,6 +16,8 @@ import {
   filterRecipes,
   groupRecipesByCategory,
   paginateRecipes,
+  recipeCheckSortLabel,
+  recipeCheckSubtitleSuffix,
   sortRecipes
 } from '../../src/ui/model/recipeBrowserModel.js';
 import { buildInterleavedCategoryOrder } from '../helpers/interleavedCategoryLibrary.js';
@@ -125,6 +127,23 @@ describe('recipeBrowserModel — sorting', () => {
     assert.deepEqual(order('asc').slice(2), ['Target', 'Fixed']);
     assert.deepEqual(order('desc').slice(0, 2), ['Fixed', 'Target']);
     assert.deepEqual([...order('asc').slice(0, 2)].sort(), ['Macro', 'Skill']);
+  });
+
+  it('names the check sort key and the editor subline by the pill kind (issue 2005, T6)', () => {
+    const english = (_key, fallback) => fallback;
+    const rows = (kind, dc) => [makeRecipe({ checkSummary: { kind, dc } })];
+    assert.equal(recipeCheckSortLabel(rows('dc', 12), english), 'Check DC');
+    assert.equal(recipeCheckSortLabel([], english), 'Check DC');
+    assert.equal(recipeCheckSortLabel(rows('target', 12), english), 'Check target');
+    assert.equal(recipeCheckSortLabel(rows('attribute', null), english), 'Check target');
+    assert.equal(recipeCheckSortLabel(rows('dynamicTarget', null), english), 'Check target');
+    const suffix = (kind, dc) => recipeCheckSubtitleSuffix({ kind, dc }, english);
+    assert.equal(suffix('dc', 12), ' · DC 12');
+    assert.equal(suffix('none', null), ' · DC —');
+    assert.equal(suffix('target', 12), ' · Target 12');
+    assert.equal(suffix('attribute', null), ' · Character value');
+    assert.equal(suffix('dynamic', null), '');
+    assert.equal(recipeCheckSubtitleSuffix(null, english), '');
   });
 
   // The non-grouped path is the byte-identical pre-issue-801 order.

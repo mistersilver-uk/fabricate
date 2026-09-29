@@ -796,6 +796,32 @@ describe('RecipeBulkEditPanel check-tier axis (issue 1010)', () => {
     }
   });
 
+  it('words the dynamic and no-tier callouts for a Target or an adjustment, keeping DC roll-high (T6)', async () => {
+    const evaluation = (direction, source = 'fixed') => ({
+      product: 'sum',
+      direction,
+      target: { source, expression: '@skills.smith.value', adjustmentKind: 'add' },
+    });
+    const callout = async (reason, checkEvaluation) => {
+      panel.remount();
+      const { root } = await mountPanel({
+        checkEvaluation,
+        checkTierAxis: { available: false, reason },
+      });
+      return root.querySelector('[data-recipe-bulk-check-tier-unavailable]').textContent.trim();
+    };
+    assert.match(await callout('dynamic', null), /resolves its DC dynamically/);
+    assert.match(await callout('noTiers', null), /its default DC\./);
+    for (const checkEvaluation of [evaluation('under'), evaluation('over', 'attribute')]) {
+      assert.match(await callout('dynamic', checkEvaluation), /resolves its target dynamically/);
+    }
+    assert.match(await callout('noTiers', evaluation('under')), /its default target\./);
+    assert.match(await callout('noTiers', evaluation('under', 'attribute')), /its base adjustment\./);
+    for (const reason of ['dynamic', 'noTiers']) {
+      assert.doesNotMatch(await callout(reason, evaluation('under')), /\bDC\b/, reason);
+    }
+  });
+
   it('groups the two instructions above the authored tiers, and hints each of them', async () => {
     // THE ONE LIST IN THIS PANEL THAT IS NOT A FLAT VOCABULARY (issue 1504). `Leave unchanged`
     // and `Default DC` are INSTRUCTIONS and the rest are the system's authored tiers, so the

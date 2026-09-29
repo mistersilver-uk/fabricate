@@ -32,6 +32,7 @@
   import { createBrowserListState } from './browserListState.svelte.js';
   import {
     RECIPE_SORT_KEYS,
+    recipeCheckSortLabel,
     buildRecipeBrowserModel,
     createRecipeBrowserState,
     deriveRecipeIo,
@@ -198,7 +199,6 @@
   const SORT_LABELS = {
     name: ['FABRICATE.Admin.Manager.Recipe.SortName', 'Name'],
     attention: ['FABRICATE.Admin.Manager.Recipe.SortAttention', 'Needs attention'],
-    dc: ['FABRICATE.Admin.Manager.Recipe.SortDc', 'Check DC'],
     ingredients: ['FABRICATE.Admin.Manager.Recipe.SortIngredients', 'Ingredients'],
     results: ['FABRICATE.Admin.Manager.Recipe.SortResults', 'Results'],
   };
@@ -211,6 +211,8 @@
   };
 
   function sortLabel(key) {
+    // A roll-under or character-value check sorts by its Target, never a DC (issue 2005).
+    if (key === 'dc') return recipeCheckSortLabel(recipes, text);
     const [labelKey, fallback] = SORT_LABELS[key] || SORT_LABELS.name;
     return text(labelKey, fallback);
   }
@@ -345,6 +347,11 @@
     // Issue 2005: a roll-under fixed number is a Target, and a character value has no number.
     target: ['FABRICATE.Admin.Manager.Recipe.CheckTarget', 'Target {dc}', 'fas fa-dice-d20'],
     attribute: ['FABRICATE.Admin.Manager.Recipe.CheckAttribute', 'Character value', 'fas fa-user'],
+    dynamicTarget: [
+      'FABRICATE.Admin.Manager.Recipe.CheckDynamicTarget',
+      'Dynamic target',
+      'fas fa-dice-d20',
+    ],
     dynamic: ['FABRICATE.Admin.Manager.Recipe.CheckDynamic', 'Dynamic DC', 'fas fa-dice-d20'],
     progressive: [
       'FABRICATE.Admin.Manager.Recipe.CheckProgressive',

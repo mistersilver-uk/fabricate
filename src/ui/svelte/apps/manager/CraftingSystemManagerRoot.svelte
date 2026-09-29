@@ -36,7 +36,10 @@
   import { cloneRollData, listPreviewActors, resolvePreviewActor } from './checks/checkPreview.js';
   import { salvagePresetTiers } from './component/salvageDcPresets.js';
   import { buildVocabularyUsage, dedupeVocabularyEntries } from '../../../model/vocabularyUsage.js';
-  import { createRecipeBrowserState } from '../../../model/recipeBrowserModel.js';
+  import {
+    createRecipeBrowserState,
+    recipeCheckSubtitleSuffix,
+  } from '../../../model/recipeBrowserModel.js';
   import {
     componentCategoryOptions,
     createComponentBrowserState,
@@ -2235,16 +2238,10 @@
       localize
     );
     const mode = resolutionModeLabel(selectedSystem?.resolutionMode);
-    // "⟨category⟩ · ⟨mode⟩ · DC ⟨n⟩" (§F4): resolve the check DC from the same projected
-    // `checkSummary` the browser row's check pill reads.
-    const summary = selectedRecipe?.checkSummary || null;
-    let dcSuffix = '';
-    if (summary?.kind === 'dc' && Number.isFinite(Number(summary.dc))) {
-      dcSuffix = ` · ${text('FABRICATE.Admin.Manager.Recipe.CheckDcShort', 'DC')} ${summary.dc}`;
-    } else if (summary?.kind === 'none') {
-      dcSuffix = ` · ${text('FABRICATE.Admin.Manager.Recipe.CheckDcShort', 'DC')} —`;
-    }
-    return `${category} · ${mode}${dcSuffix}`;
+    // "⟨category⟩ · ⟨mode⟩ · DC ⟨n⟩" (§F4): resolve the check from the same projected
+    // `checkSummary` the browser row's check pill reads, naming a Target as the pill does.
+    const suffix = recipeCheckSubtitleSuffix(selectedRecipe?.checkSummary || null, text);
+    return `${category} · ${mode}${suffix}`;
   }
 
   // The component editor's header subline: "<category> · Linked <source>" (issue 676, decision 4).

@@ -546,6 +546,18 @@ describe('RecipesBrowserView row readout (issue 643 §9)', () => {
     assert.equal(attributePill.textContent.trim(), 'Character value');
     assert.ok(attributePill.querySelector('i.fa-user'), 'the Target source card glyph');
     assert.equal(attributePill.classList.contains('is-mono'), false, 'a phrase is not a number');
+    assert.ok(selectOptionLabels(attribute, '[data-recipe-sort]').includes('Check target'));
+    browser.remount();
+
+    const macro = await browser.mount({
+      recipes: [makeRecipe({ checkSummary: { kind: 'dynamicTarget', dc: null } })]
+    });
+    assert.equal(macro.querySelector('[data-recipe-check]').textContent.trim(), 'Dynamic target');
+    browser.remount();
+
+    const roll = await browser.mount({ recipes: [makeRecipe({ checkSummary: { kind: 'dc', dc: 12 } })] });
+    const sortLabels = selectOptionLabels(roll, '[data-recipe-sort]');
+    assert.ok(sortLabels.includes('Check DC') && !sortLabels.includes('Check target'), 'roll-high keeps DC');
   });
 
   // The two check-LESS states are not the same fact.
@@ -1027,6 +1039,7 @@ describe('RecipeBrowserInspector (mounted)', () => {
     for (const [checkSummary, text] of [
       [{ kind: 'target', dc: 12 }, 'Target 12'],
       [{ kind: 'attribute', dc: null }, 'Character value'],
+      [{ kind: 'dynamicTarget', dc: null }, 'Dynamic'],
     ]) {
       await inspector.setProps({ selectedRecipe: makeRecipe({ id: 'r1', checkSummary }) });
       assert.equal(stat('check').textContent, text, 'issue 2005: no DC outside roll-high fixed');

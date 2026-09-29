@@ -333,6 +333,17 @@ describe('adminRecipeRowProjection.buildRecipeList (direct, no store)', () => {
       ], `${direction}: a character value sorts with the number-less rows`);
     }
     assert.deepEqual(pills({ product: 'sum', direction: 'over' })[0], { kind: 'dc', dc: 18 });
+
+    const dynamic = (evaluation) => {
+      const system = makeSystem();
+      Object.assign(system.craftingCheck.routed, { evaluation, dcMode: 'dynamic' });
+      return buildRecipeList(null, makeRecipeManager(recipes), system, '').recipes[0].checkSummary;
+    };
+    assert.deepEqual(dynamic({ product: 'sum', direction: 'under', target: { source: 'fixed' } }), {
+      kind: 'dynamicTarget',
+      dc: null,
+    });
+    assert.deepEqual(dynamic({ product: 'sum', direction: 'over' }), { kind: 'dynamic', dc: null });
   });
 
   it('derives the structure, counts, check pill and membership a row cannot compute', () => {
