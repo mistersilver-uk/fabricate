@@ -10,6 +10,7 @@ import { craftProbe, probeResolutionService, salvageProbe } from './helpers/craf
 import { promptJournalStageCheck } from '../src/bootstrap/journalOperations.js';
 import { BulkSalvageService } from '../src/systems/BulkSalvageService.js';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
+import { buildCheckModifierContext } from '../src/systems/checkModifierResolver.js';
 import { GatheringEngine } from '../src/systems/GatheringEngine.js';
 import {
   evaluatePreparedRunCheck,
@@ -21,7 +22,7 @@ import { executedCheckDisplay } from '../src/ui/presenters/checkDisplay.js';
 import { shippedLocalize } from './helpers/checkEvidenceFixtures.js';
 import { MacroExecutor } from '../src/utils/MacroExecutor.js';
 import { rollPromptTarget } from '../src/ui/svelte/apps/crafting/rollPromptTarget.js';
-import { stubPromptSurface } from './helpers/rollPromptDialogStub.js';
+import { stubI18n, stubPromptSurface } from './helpers/rollPromptDialogStub.js';
 import { foldTargetTerms } from '../src/ui/presenters/checkDisplay.js';
 import {
   GatheringDocumentActor,
@@ -462,6 +463,172 @@ test('salvage and gathering roll-under prompts name the character value, never a
   }
 });
 
+/** Capture every posted check-roll flavor while `run` executes, with the prompt confirming. */
+async function postedFlavors(run) {
+  const flavors = [];
+  const originalChat = globalThis.ChatMessage;
+  globalThis.ChatMessage = { create: async () => null, getSpeaker: () => null };
+  const surface = stubPromptSurface(() => ({ confirmed: true }));
+  try {
+    installCountingRoll();
+    globalThis.Roll.prototype.toMessage = async (data) => {
+      flavors.push(data.flavor);
+    };
+    const result = await run();
+    return { flavors, result, view: surface.view };
+  } finally {
+    surface.restore();
+    globalThis.ChatMessage = originalChat;
+  }
+}
+
+test('a routed roll names no Target in its flavor, fixed range or not; relative roll-high keeps its DC', async () => {
+  const gathering = Object.create(GatheringEngine.prototype);
+  const salvage = Object.create(CraftingEngine.prototype);
+  const actor = { name: 'Scavenger', system: {} };
+  const fixedRange = (evaluation) => ({
+    ...routedCheck(evaluation), type: 'fixed',
+    fixedOutcomes: [{ id: 'all', name: 'All', success: true, start: 1, end: 20 }],
+  });
+  const gather = (routed) => gathering._rollRoutedFormula({
+    routed, rollFormula: '1d20', actor, task: { name: 'Forage' }, interactive: true,
+  });
+  const salvageRouted = (routed) =>
+    salvage._runSalvageRoutedCheck(routed, { name: 'Scrap', salvage: {} }, actor, { interactive: true });
+  const flavorOf = async (run) => (await postedFlavors(run)).flavors.at(-1);
+  assert.equal(await flavorOf(() => gather(routedCheck(SUM_UNDER))), 'Forage — Gathering check');
+  assert.equal(await flavorOf(() => gather(fixedRange(SUM_UNDER))), 'Forage — Gathering check');
+  assert.equal(await flavorOf(() => salvageRouted(fixedRange(SUM_UNDER))), 'Scrap — Salvage check');
+  const sumOver = { product: 'sum', direction: 'over' };
+  assert.equal(
+    await flavorOf(() => gather(routedCheck(sumOver))),
+    'Forage — Gathering check (DC 10)',
+    'roll-high keeps its flavor byte-identical'
+  );
+  assert.equal(
+    await flavorOf(() => gather(fixedRange(sumOver))),
+    'Forage — Gathering check',
+    'a fixed-range roll-high check has no DC, as crafting shows none'
+  );
+});
+
+test('a pass/fail roll-under flavor names the final target, as the chip and data.target do (M1)', async () => {
+  const actor = { name: 'Scavenger', system: {}, getRollData: () => ({}) };
+  const tool = { ...HAMMER, bonus: { enabled: true, expression: '2' } };
+  const toolItems = [{ tool: HAMMER, contributionInput: { tool, primaryActor: actor } }];
+  const salvage = Object.create(CraftingEngine.prototype);
+  const { flavors, result, view } = await postedFlavors(() =>
+    salvage._runSalvageSimpleCheck(simpleCheck(SUM_UNDER), { name: 'Scrap' }, actor, {
+      interactive: true,
+      toolItems,
+    })
+  );
+  assert.equal(result.data.target, 12, '10 raised by the Tool bonus of 2');
+  assert.equal(rollPromptTarget(view, []).chipText, 'Target 12 · stay at or under');
+  assert.deepEqual(flavors, ['Scrap — Salvage check (Target 12)']);
+
+  const over = await postedFlavors(() =>
+    salvage._runSalvageSimpleCheck(simpleCheck({ product: 'sum', direction: 'over' }), { name: 'Scrap' }, actor, {
+      interactive: true,
+      toolItems,
+    })
+  );
+  assert.deepEqual(over.flavors, ['Scrap — Salvage check (DC 10)'], 'roll-high byte-identical');
+});
+
+test('the Target suffix sits before a picked modifier label, as the DC suffix does', async () => {
+  const actor = { name: 'Scavenger', system: {}, getRollData: () => ({}) };
+  const system = {
+    modifiers: [
+      { id: 'steady', label: 'Steady hands', expression: '1', enabled: true },
+      { id: 'keen', label: 'Keen eye', expression: '2', enabled: true },
+    ],
+    salvageCraftingCheck: {
+      defaultModifierPolicy: 'playerPicks',
+      defaultModifierIds: ['steady', 'keen'],
+      maxModifierPicks: 1,
+    },
+  };
+  const component = { name: 'Scrap' };
+  const salvage = Object.create(CraftingEngine.prototype);
+  const { flavors } = await postedFlavors(() =>
+    salvage._runSalvageSimpleCheck(simpleCheck(SUM_UNDER), component, actor, {
+      interactive: true,
+      craftingModifier: buildCheckModifierContext(system, 'salvage', component),
+    })
+  );
+  assert.equal(flavors.length, 1);
+  assert.match(flavors[0], /^Scrap — Salvage check \(Target \d+\) · /);
+});
+
+test('a Journal pass/fail roll with no anchor names no Target, never Target 0', async () => {
+  installCountingRoll();
+  const prepared = {
+    mode: 'simple',
+    slot: 'simple',
+    rollFormula: '1d20',
+    flavor: 'Sun Tea — Crafting check',
+    checkConfig: { rollFormula: '1d20', thresholdMode: 'meet', dc: null, evaluation: SUM_UNDER },
+    decisionPolicy: { target: null },
+  };
+  const rolled = await evaluatePreparedRunCheck(prepared, { getRollData: () => ({}) }, {
+    rollMode: 'publicroll',
+  });
+  assert.equal(rolled.rollHandoff?.flavor, 'Sun Tea — Crafting check');
+});
+
+test('a Journal pass/fail roll hands back its final target, localized, and a secret one none', async () => {
+  const prepared = {
+    mode: 'simple',
+    slot: 'simple',
+    rollFormula: '1d20',
+    flavor: 'Sun Tea — Crafting check',
+    checkConfig: { rollFormula: '1d20', thresholdMode: 'meet', dc: 10, evaluation: SUM_UNDER },
+    decisionPolicy: { target: 10, allowsSituationalModifier: true },
+  };
+  const decision = { rollMode: 'publicroll', bonus: '2', allowsSituationalModifier: true };
+  const actor = { getRollData: () => ({}) };
+  installCountingRoll();
+  const originalChat = globalThis.ChatMessage;
+  const restore = stubI18n({ 'FABRICATE.Check.Roll.FlavorTarget': 'Ziel {target}' });
+  try {
+    const open = await evaluatePreparedRunCheck(prepared, actor, decision);
+    assert.equal(open.data.target, 12);
+    assert.equal(open.rollHandoff.flavor, 'Sun Tea — Crafting check (Ziel 12)');
+    const posted = [];
+    globalThis.ChatMessage = { create: async () => null };
+    globalThis.Roll.prototype.toMessage = async (data) => {
+      posted.push(data.flavor);
+    };
+    const secret = await evaluatePreparedRunCheck(prepared, actor, decision, { secret: true });
+    assert.ok(!secret.rollHandoff, 'a secret roll hands nothing back');
+    assert.deepEqual(posted, ['Sun Tea — Crafting check'], 'nor does its private post name a target');
+
+    // A routed Journal roll names no Target: its tiers grade their own, and a fixed range none.
+    for (const type of ['relative', 'fixed']) {
+      const routed = await evaluatePreparedRunCheck(
+        {
+          ...prepared,
+          mode: 'routedByCheck',
+          slot: 'routed',
+          checkConfig: {
+            ...prepared.checkConfig,
+            type,
+            relativeOutcomes: TIERS,
+            fixedOutcomes: [{ id: 'all', name: 'All', success: true, start: 1, end: 20 }],
+          },
+        },
+        actor,
+        decision
+      );
+      assert.equal(routed.rollHandoff.flavor, 'Sun Tea — Crafting check', type);
+    }
+  } finally {
+    restore();
+    globalThis.ChatMessage = originalChat;
+  }
+});
+
 test('the direct gathering prompt shows no DC for a fixed-range routed check, as crafting', async () => {
   const gathering = Object.create(GatheringEngine.prototype);
   const actor = { name: 'Ranger', system: {}, getRollData: () => ({}) };
@@ -714,7 +881,7 @@ test('the gathering versioned descriptor refuses a target and captures a resolve
   const described = describe(VALID, { uuid: 'Actor.g', getRollData: () => ({ skills: SKILLS }) });
   const policy = described.privateEvaluation.decisionPolicy;
   assert.deepEqual([policy.dc, policy.target, policy.targetSource], [null, 12, 'attribute']);
-  assert.equal(described.privateEvaluation.flavor, 'Forage — Gathering check');
+  assert.equal(described.privateEvaluation.flavor, 'Forage — Gathering check', 'named at roll time');
 
   const fixed = describe(undefined, bare).privateEvaluation;
   assert.deepEqual(
@@ -770,14 +937,16 @@ test('the gathering versioned descriptor keeps a hidden task and a fixed-range c
   Object.assign(system.gatheringCraftingCheck.routed, { evaluation: SUM_UNDER });
   const bare = { uuid: 'Actor.g', system: {} };
 
-  const hidden = engine._versionedCheckDescriptor({
+  const hiddenDescriptor = engine._versionedCheckDescriptor({
     actor: bare,
     run: { taskId: `blind:${environment.id}` },
     system,
     environment,
     task: { ...task, resolutionMode: 'routed' },
-  }).publicPrompt;
+  });
+  const hidden = hiddenDescriptor.publicPrompt;
   assert.equal(hidden.target, null, 'a hidden task names no target');
+  assert.doesNotMatch(hiddenDescriptor.privateEvaluation.flavor, /Target|\d/, 'nor does its flavor');
   assert.equal(hidden.direction, null);
   assert.equal(hidden.comparison, null);
   assert.ok(!Object.hasOwn(hidden, 'targetBasis'), 'a hidden task carries no basis field either');
@@ -789,14 +958,16 @@ test('the gathering versioned descriptor keeps a hidden task and a fixed-range c
       routed: { ...system.gatheringCraftingCheck.routed, type: 'fixed' },
     },
   };
-  const fixedRange = engine._versionedCheckDescriptor({
+  const fixedRangeDescriptor = engine._versionedCheckDescriptor({
     actor: bare,
     run: { taskId: task.id },
     system: fixedRangeSystem,
     environment,
     task: { ...task, resolutionMode: 'routed' },
-  }).publicPrompt;
+  });
+  const fixedRange = fixedRangeDescriptor.publicPrompt;
   assert.equal(fixedRange.target, null, 'a fixed-range routed check grades the raw roll, not a target');
+  assert.doesNotMatch(fixedRangeDescriptor.privateEvaluation.flavor, /Target/);
   assert.equal(fixedRange.direction, null);
   assert.equal(fixedRange.comparison, null);
 });

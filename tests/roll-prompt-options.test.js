@@ -43,15 +43,22 @@ describe('roll prompt adapter', () => {
     ]);
   });
 
-  it('names a DC in the chat flavor only for a summed roll-over fixed target', () => {
-    const flavor = (evaluation) => buildInteractiveRollOptions(
-      { interactive: true, actor: null, name: 'Rope', activity: 'Crafting', dc: 14, evaluation },
+  it('names only a summed roll-over fixed DC in the options flavor; a Target waits for its benefits (Q20)', () => {
+    const flavor = (evaluation, dc = 14) => buildInteractiveRollOptions(
+      { interactive: true, actor: null, name: 'Rope', activity: 'Crafting', dc, evaluation },
       () => null
     ).flavor;
     const skill = { product: 'sum', direction: 'over', target: { source: 'attribute', expression: '@skill' } };
     assert.equal(flavor(undefined), 'Rope — Crafting check (DC 14)');
-    assert.equal(flavor({ product: 'sum', direction: 'under', target: { source: 'fixed' } }), 'Rope — Crafting check');
-    assert.equal(flavor(skill), 'Rope — Crafting check');
+    for (const evaluation of [
+      { product: 'sum', direction: 'under', target: { source: 'fixed' } },
+      skill,
+      { ...skill, direction: 'under' },
+      { product: 'count', direction: 'under' },
+    ]) {
+      assert.equal(flavor(evaluation), 'Rope — Crafting check', JSON.stringify(evaluation));
+    }
+    assert.equal(flavor(undefined, null), 'Rope — Crafting check', 'an unresolved DC names no number');
   });
 
   it('builds localized activity and actor-subject labels without inventing a missing subject', () => {

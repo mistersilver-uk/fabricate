@@ -3694,6 +3694,23 @@ export function registerChecksCases() {
     );
   });
 
+  it('hides the section notices while the check is switched off, and restores them when it is on', async () => {
+    // Off is the GM's choice, so an off check reports nothing to fix until it is back on.
+    await mountChecks([], { alchemyResolutionMode: 'simple', craftingCheck: { enabled: true, simple: { rollFormula: '' } } });
+    await openChecksActivity('crafting');
+    assert.deepEqual(noticeIds(), ['noRollFormula'], 'an on check explains its missing formula');
+    const toggle = () => target.querySelector('[data-checks-active="crafting"] [data-checks-active-toggle]');
+    toggle().click();
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector('[data-checks-panel="crafting"][data-checks-off]'), 'the check reads off');
+    assert.ok(!target.querySelector('[data-checks-section-notices]'), 'and states no notice');
+    toggle().click();
+    await tick();
+    flushSync();
+    assert.deepEqual(noticeIds(), ['noRollFormula'], 'switched back on, the notice returns');
+  });
+
   it('sorts a section’s blocking notices above its warnings, as Validation orders its rows', async () => {
     // A refused placement raises the warning `noRollFormula` BEFORE the critical it causes.
     await mountChecks([], routedCraftingOptions('1d20 * @craftingmod'));

@@ -32,6 +32,7 @@
   import { createBrowserListState } from './browserListState.svelte.js';
   import {
     RECIPE_SORT_KEYS,
+    recipeCheckSortLabel,
     buildRecipeBrowserModel,
     createRecipeBrowserState,
     deriveRecipeIo,
@@ -51,6 +52,8 @@
     selectedSystemId = '',
     showRecipeCategories = false,
     resolutionMode = 'simple',
+    // The system's crafting-check evaluation, which names the check sort key with no rows.
+    checkEvaluation = null,
     onSearchChange = () => {},
     onSelectRecipe = () => {},
     onEditRecipe = () => {},
@@ -198,7 +201,6 @@
   const SORT_LABELS = {
     name: ['FABRICATE.Admin.Manager.Recipe.SortName', 'Name'],
     attention: ['FABRICATE.Admin.Manager.Recipe.SortAttention', 'Needs attention'],
-    dc: ['FABRICATE.Admin.Manager.Recipe.SortDc', 'Check DC'],
     ingredients: ['FABRICATE.Admin.Manager.Recipe.SortIngredients', 'Ingredients'],
     results: ['FABRICATE.Admin.Manager.Recipe.SortResults', 'Results'],
   };
@@ -211,6 +213,8 @@
   };
 
   function sortLabel(key) {
+    // A roll-under or character-value check sorts by its Target, never a DC (issue 2005).
+    if (key === 'dc') return recipeCheckSortLabel(recipes, text, checkEvaluation);
     const [labelKey, fallback] = SORT_LABELS[key] || SORT_LABELS.name;
     return text(labelKey, fallback);
   }
@@ -342,6 +346,14 @@
   // working configuration, not a gap.
   const CHECK_PILLS = {
     dc: ['FABRICATE.Admin.Manager.Recipe.CheckDc', 'DC {dc}', 'fas fa-dice-d20'],
+    // Issue 2005: a roll-under fixed number is a Target, and a character value has no number.
+    target: ['FABRICATE.Admin.Manager.Recipe.CheckTarget', 'Target {dc}', 'fas fa-dice-d20'],
+    attribute: ['FABRICATE.Admin.Manager.Recipe.CheckAttribute', 'Character value', 'fas fa-user'],
+    dynamicTarget: [
+      'FABRICATE.Admin.Manager.Recipe.CheckDynamicTarget',
+      'Dynamic target',
+      'fas fa-dice-d20',
+    ],
     dynamic: ['FABRICATE.Admin.Manager.Recipe.CheckDynamic', 'Dynamic DC', 'fas fa-dice-d20'],
     progressive: [
       'FABRICATE.Admin.Manager.Recipe.CheckProgressive',
@@ -737,7 +749,7 @@
                            kinds stay in the UI face. -->
                       <Chip
                         class={`manager-recipe-check is-${check.kind}`}
-                        mono={check.kind === 'dc'}
+                        mono={check.kind === 'dc' || check.kind === 'target'}
                         icon={check.icon}
                         data-recipe-check={check.kind}
                         title={check.title || undefined}

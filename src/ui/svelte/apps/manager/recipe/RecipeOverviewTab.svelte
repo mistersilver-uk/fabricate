@@ -62,6 +62,8 @@
     categories = [],
     onSetCategory = () => {},
     checkTierOptions = [],
+    // The active crafting check's evaluation, which names each tier's DC, Target or adjustment.
+    checkEvaluation = null,
     // Success outcome tiers of a fixed-type routed check, ranked low→high. Non-empty only for a
     // routed+fixed system, so the "Minimum success tier" control below auto-hides elsewhere.
     minSuccessTierOptions = [],
@@ -421,7 +423,9 @@
   const categorySelectOptions = $derived(
     buildCategoryOptions(categoryOptions, (category) => getRecipeCategoryLabel(category, localize))
   );
-  const checkTierSelectOptions = $derived(buildCheckTierOptions(checkTierOptions, text));
+  const checkTierSelectOptions = $derived(
+    buildCheckTierOptions(checkTierOptions, text, checkEvaluation)
+  );
   const minSuccessTierSelectOptions = $derived(
     buildMinSuccessTierOptions(minSuccessTierOptions, text)
   );

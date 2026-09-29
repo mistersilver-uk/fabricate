@@ -305,6 +305,26 @@ describe('the formula card under a roll-under check (issue 2005, Q14)', () => {
     assert.ok(!target.querySelector('[data-check-formula-target]'));
   });
 
+  it('states only the raw-dice rule under, with or without modifiers (maintainer ruling M2)', async () => {
+    const raw = lookup('FABRICATE.Admin.Manager.Checks.Evaluation.UnderRule');
+    for (const [policy, appliedModifiers] of [
+      ['addAll', MODIFIERS],
+      ['highest', MODIFIERS],
+      ['playerPicks', MODIFIERS],
+      ['addAll', []],
+    ]) {
+      harness.remount();
+      const target = await harness.mount({
+        rollFormula: '1d100',
+        appliedModifiers,
+        modifierPolicy: policy,
+        evaluation: under(),
+      });
+      const rule = target.querySelector('[data-check-formula-rule]').textContent.trim();
+      assert.equal(rule, raw, `${policy} with ${appliedModifiers.length} modifiers`);
+    }
+  });
+
   it('omits the under note where the runtime refuses a roll-under check', async () => {
     const target = await harness.mount({ rollFormula: '1d20', evaluation: under(), underNote: false });
     assert.ok(!target.querySelector('[data-check-direction-note]'));

@@ -4,8 +4,9 @@
  * never a hard-coded list, which would misreport the world's real DCs; storage is `null` for the
  * system default, else an integer. The five cases, each referenced by number below:
  *
- *  1. `dcMode === 'dynamic'` — the DC is macro-computed, so the system-default label carries no DC
- *     suffix, while presets and Custom… stay available.
+ *  1. Salvage never runs a DC macro (it grades the override, else the slot's DC, else 15), so the
+ *     system-default label names that static DC whatever the crafting check's `dcMode`
+ *     (issue 2081).
  *  2. Zero authored tiers, the COMMON case: System default + Custom… only, plus "Manage presets".
  *  3. `_normalizeSimpleTier` permits `name: ''` and coerces a non-finite `dc` to `0`, which would
  *     render an unlabelled "— DC 0". Such tiers are not authored presets, so they are skipped.
@@ -116,11 +117,9 @@ export function resolveSalvageDcSelection(dcOverride, tiers, evaluation = null) 
  */
 export function buildSalvageDcOptions({
   tiers = [],
-  dcMode = 'static',
   systemDc = 0,
   evaluation = null,
   systemDefaultLabel = (dc) => `System default — DC ${dc}`,
-  systemDefaultDynamicLabel = () => 'System default — set by macro',
   tierLabel = (name, dc) => `${name} — DC ${dc}`,
   adjustmentDefaultLabel = () => 'System default — base adjustment',
   adjustmentTierLabel = (name, value) => `${name} — ${value}`,
@@ -138,13 +137,8 @@ export function buildSalvageDcOptions({
       { value: SALVAGE_DC_CUSTOM, label: customLabel() },
     ];
   }
-  const options = [
-    {
-      value: SALVAGE_DC_SYSTEM_DEFAULT,
-      // Case 1: no static number exists in dynamic mode, so no DC suffix.
-      label: dcMode === 'dynamic' ? systemDefaultDynamicLabel() : systemDefaultLabel(systemDc),
-    },
-  ];
+  // Case 1: the static DC salvage grades, whatever the crafting check's DC mode.
+  const options = [{ value: SALVAGE_DC_SYSTEM_DEFAULT, label: systemDefaultLabel(systemDc) }];
 
   // Case 2: with no usable tiers this contributes nothing, which is why "Manage presets" exists.
   for (const tier of usableSalvageDcTiers(tiers)) {
