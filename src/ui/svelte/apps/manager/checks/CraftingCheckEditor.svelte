@@ -18,6 +18,7 @@
   import { findRangeConflicts } from '../../../../../utils/craftingCheckExpression.js';
   import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
   import { activeCheckEvaluation } from '../../../../../systems/checkTarget.js';
+  import { routedOutcomeOrder } from '../../../../../systems/checkRouting.js';
   import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import ThresholdBandStrip from '../../../components/ThresholdBandStrip.svelte';
@@ -133,6 +134,8 @@
   // `evaluation` is the authored record every control writes back losslessly; `graded` is the one
   // the runtime grades with, which gates the strip, its direction and the outcome column.
   const evaluation = $derived(normalizeCheckEvaluation(value?.evaluation));
+  // The tier a count Botch preset targets, by the engine's own ranking.
+  const lowestTierId = $derived(routedOutcomeOrder({ ...value, type, evaluation })[0] ?? null);
   const graded = $derived(activeCheckEvaluation(value));
   const editableBands = $derived(bandsAreEditable(value?.evaluation));
   const multiplyTiers = $derived(
@@ -483,6 +486,7 @@
       outcomeOptions={breakageOutcomeOptions}
       showBreakTools={checkDriven}
       {evaluation}
+      {lowestTierId}
       onChange={(checkBreakage) => emit({ checkBreakage })}
     />
   {/if}

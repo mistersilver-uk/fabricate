@@ -7,8 +7,10 @@
  * special, the engine, the readiness pass and the summariser would each need to know about it.
  * THEY ADAPT TO WHAT THE CHECK CAN DO through its `kind` and its evaluation's polarity, and are
  * withheld entirely when the formula rolls no dice, a preset offered against one authoring a
- * condition pointing at a group that does not exist. `tests/check-trigger-presets.test.js` pins
- * what each preset authors. */
+ * condition pointing at a group that does not exist. A counting check is offered its own presets
+ * on its pool. `tests/check-trigger-presets.test.js` pins what each preset authors. */
+
+import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
 
 const NAMESPACE = 'FABRICATE.Admin.Manager.Checks.Breakage.';
 
@@ -75,11 +77,19 @@ function effectKind(kind) {
  * @param {string} args.kind `routed` | `progressive` | `simple`.
  * @param {Array<{groupId: number, label: string, sides: number}>} args.diceGroups Groups parsed
  *   from the roll formula, in evaluated-term order.
- * @param {object|null} [args.evaluation] The check's evaluation, which sets the best face.
+ * @param {object|null} [args.evaluation] The check's evaluation, which sets the best face; a
+ *   counting one is offered the count presets on its pool instead.
+ * @param {string|null} [args.lowestTierId] A routed check's lowest-ranked tier, which Botch targets.
  * @returns {Array<{id: string, icon: string, key: string, fallback: string, data: object}>} Each
  *   a `{ key, fallback, data }` fragment in `checkTriggerSummary`'s shape.
  */
-export function checkTriggerPresets({ kind = 'simple', diceGroups = [], evaluation = null } = {}) {
+export function checkTriggerPresets({
+  kind = 'simple',
+  diceGroups = [],
+  evaluation = null,
+  lowestTierId = null,
+} = {}) {
+  if (evaluation?.product === 'count') return countPresets({ kind, evaluation, lowestTierId });
   const groups = Array.isArray(diceGroups) ? diceGroups : [];
   // The LEADING d20 if the formula has one, else the first group: a system rolling `2d6 + 1d20`
   // means the d20 by "natural 20", where index order alone picks the 2d6.
@@ -110,6 +120,7 @@ export function checkTriggerPresets({ kind = 'simple', diceGroups = [], evaluati
  * @param {boolean} [args.showBreakTools] Whether tool breakage is reachable on this check.
  * @param {() => string} args.newId The caller's id generator, so ids come from one source.
  * @param {object|null} [args.evaluation] The check's evaluation, which sets the best face.
+ * @param {string|null} [args.lowestTierId] A routed check's lowest-ranked tier, which Botch targets.
  * @returns {object|null} The trigger, or `null` when no preset can be built.
  */
 export function buildPresetTrigger({
@@ -119,7 +130,18 @@ export function buildPresetTrigger({
   showBreakTools = false,
   newId,
   evaluation = null,
+  lowestTierId = null,
 }) {
+  if (evaluation?.product === 'count') {
+    return buildCountPresetTrigger({
+      presetId,
+      kind,
+      evaluation,
+      lowestTierId,
+      showBreakTools,
+      newId,
+    });
+  }
   const groups = Array.isArray(diceGroups) ? diceGroups : [];
   const group = groups.find((entry) => entry.sides === 20) ?? groups[0];
   if (!group || (presetId !== 'high' && presetId !== 'low')) return null;
@@ -143,6 +165,114 @@ export function buildPresetTrigger({
     breakTools: showBreakTools === true,
     tierStep: routed
       ? { mode: presetId === 'high' ? 'up' : 'down', steps: 1, tierId: null }
+      : { mode: 'none', steps: 1, tierId: null },
+  };
+}
+
+/**
+ * The one die group a counting check's triggers read (issue 2006): its pool, as group 0, never the
+ * retained formula's groups. `null` for a summing check.
+ */
+export function countPoolDiceGroup(evaluation) {
+  if (evaluation?.product !== 'count') return null;
+  const { die } = normalizeCheckEvaluation(evaluation).pool;
+  return { groupId: 0, raw: `d${die}`, count: null, sides: die, label: `d${die}` };
+}
+
+const COUNT_PRESETS = Object.freeze({
+  high: [
+    'FABRICATE.Admin.Manager.Checks.Count.Triggers.PresetBest',
+    'Any die shows its best face ({face}) → {effect}',
+  ],
+  low: [
+    'FABRICATE.Admin.Manager.Checks.Count.Triggers.PresetWorst',
+    'Every die shows its worst face ({face}) → {effect}',
+  ],
+  botch: [
+    'FABRICATE.Admin.Manager.Checks.Count.Triggers.PresetBotch',
+    'Botch (net below zero) → {effect}',
+  ],
+});
+
+const COUNT_EFFECTS = Object.freeze({
+  routed: {
+    ...EFFECT_COPY.routed,
+    botch: ['FABRICATE.Admin.Manager.Checks.Count.Triggers.EffectLowestTier', 'lowest tier'],
+  },
+  progressive: { low: EFFECT_COPY.progressive.low, botch: EFFECT_COPY.progressive.low },
+  simple: { low: EFFECT_COPY.simple.low, botch: EFFECT_COPY.simple.low },
+});
+
+const COUNT_ICONS = Object.freeze({ high: 'fas fa-arrow-up', low: 'fas fa-arrow-down' });
+
+/**
+ * The count presets a check is offered, in order: routed steps on the best and worst faces, the
+ * others fail on the worst. Botch needs cancelling, since only a cancel takes the net below zero,
+ * and a routed Botch needs a tier to target.
+ */
+function countPresetIds(kind, pool, lowestTierId) {
+  const routed = effectKind(kind) === 'routed';
+  const ids = routed ? ['high', 'low'] : ['low'];
+  if (pool.cancel.enabled && (!routed || lowestTierId)) ids.push('botch');
+  return ids;
+}
+
+function countPresets({ kind, evaluation, lowestTierId }) {
+  const { pool } = normalizeCheckEvaluation(evaluation);
+  const effects = COUNT_EFFECTS[effectKind(kind)];
+  const routed = effectKind(kind) === 'routed';
+  return countPresetIds(kind, pool, lowestTierId).map((id) => {
+    const [key, fallback] = COUNT_PRESETS[id];
+    const effect = { key: effects[id][0], fallback: effects[id][1] };
+    return {
+      id,
+      icon: routed && id !== 'botch' ? COUNT_ICONS[id] : 'fas fa-skull',
+      key,
+      fallback,
+      data:
+        id === 'botch'
+          ? { effect }
+          : { face: String(presetFace(id, pool.die, evaluation)), effect },
+    };
+  });
+}
+
+// Botch is `net < 0`, never `<= 0`: a net of zero is no botch.
+function countPresetCondition(presetId, die, evaluation) {
+  if (presetId === 'botch') return { type: 'rollTotal', operator: '<', value: 0 };
+  return {
+    type: 'diceGroup',
+    groupId: 0,
+    aggregate: presetId === 'high' ? 'anyDie' : 'allDice',
+    operator: '==',
+    value: presetFace(presetId, die, evaluation),
+  };
+}
+
+const COUNT_TIER_STEP_MODES = Object.freeze({ high: 'up', low: 'down', botch: 'target' });
+
+function buildCountPresetTrigger({
+  presetId,
+  kind,
+  evaluation,
+  lowestTierId,
+  showBreakTools,
+  newId,
+}) {
+  const { pool } = normalizeCheckEvaluation(evaluation);
+  if (!countPresetIds(kind, pool, lowestTierId).includes(presetId)) return null;
+  const routed = effectKind(kind) === 'routed';
+  return {
+    id: newId(),
+    condition: countPresetCondition(presetId, pool.die, evaluation),
+    outcome: routed ? 'none' : 'failure',
+    breakTools: showBreakTools === true,
+    tierStep: routed
+      ? {
+          mode: COUNT_TIER_STEP_MODES[presetId],
+          steps: 1,
+          tierId: presetId === 'botch' ? lowestTierId : null,
+        }
       : { mode: 'none', steps: 1, tierId: null },
   };
 }

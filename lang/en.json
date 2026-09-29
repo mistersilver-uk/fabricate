@@ -6870,7 +6870,15 @@
             "ActorPendingThreshold": "{threshold} + {formula}",
             "NoActor": "Choose a character in Preview as to see the composed pool and threshold.",
             "OfferPool": "The player can type a flat or rolled bonus, such as +2 or 1d4. It adds that many dice.",
-            "OfferThreshold": "The player can type a flat or rolled bonus, such as +2 or 1d4. It moves the threshold by that much."
+            "OfferThreshold": "The player can type a flat or rolled bonus, such as +2 or 1d4. It moves the threshold by that much.",
+            "Triggers": {
+              "PresetBest": "Any die shows its best face ({face}) → {effect}",
+              "PresetWorst": "Every die shows its worst face ({face}) → {effect}",
+              "PresetBotch": "Botch (net below zero) → {effect}",
+              "EffectLowestTier": "lowest tier",
+              "TypeNetSuccesses": "Net successes",
+              "SummaryNetSuccesses": "Net successes is {comparison} {value}"
+            }
           },
           "Digest": {
             "Title": "This check",
