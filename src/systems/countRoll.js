@@ -67,6 +67,11 @@ export function createCountRollClass({ BaseRoll, i18n = () => null, renderTempla
   return class FabricateCountRoll extends BaseRoll {
     static name = COUNT_ROLL_CLASS;
 
+    // Pinned: game systems patch the base Roll's own static (dnd5e sets
+    // `Roll.TOOLTIP_TEMPLATE` to its own `roll-breakdown.hbs`), which an inherited lookup would
+    // pick up. Count rolls always render core's tooltip, whatever the active system.
+    static TOOLTIP_TEMPLATE = 'templates/dice/tooltip.hbs';
+
     /** Construct with empty roll data from a settled `resolvePool` policy. */
     static fromPolicy(policy, options = {}) {
       return new this(
