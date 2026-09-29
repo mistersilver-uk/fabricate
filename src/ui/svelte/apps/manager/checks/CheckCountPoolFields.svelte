@@ -69,6 +69,11 @@
   );
 
   const TEST_OPTIONS = $derived(countTestOptions(under));
+  // Spelled out, so each hook a test or capture names is greppable in source.
+  const FACE_HOOKS = {
+    explode: 'data-check-count-explode-face',
+    cancel: 'data-check-count-cancel-face',
+  };
 
   // Off / the extreme face / From a face: three peer choices, the Validation target on the active one.
   function faceOptions(rule, extremeKey, extremeFallback, face, target) {
@@ -143,7 +148,7 @@
         max={pool.die}
         value={pool[key].faces.value}
         {...stepperLabels(label)}
-        inputProps={{ [`data-check-count-${key}-face`]: '', 'data-validation-target': target }}
+        inputProps={{ [FACE_HOOKS[key]]: '', 'data-validation-target': target }}
         onChange={(next) => setFace(key, next)}
       />
     </span>

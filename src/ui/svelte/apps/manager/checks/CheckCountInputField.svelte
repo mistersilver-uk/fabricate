@@ -86,6 +86,14 @@
   }
 
   // Spelled out per field, so each hook a test or capture names is greppable in source.
+  const FIELD_HOOKS = {
+    base: {
+      input: 'data-check-count-base',
+    },
+    threshold: {
+      input: 'data-check-count-threshold',
+    },
+  };
   const VALUE_HOOKS = {
     base: {
       expression: 'data-check-count-base-expression',
@@ -101,17 +109,32 @@
 </script>
 
 <span class="manager-checks-count-mode">
-  <SegmentedControl
-    fill
-    density="field"
-    options={OPTIONS}
-    value={mode}
-    groupName={`check-count-${field}-mode`}
-    ariaLabel={sourceLabel}
-    dataAttr={`data-check-count-${field}-mode`}
-    optionDataAttr={`data-check-count-${field}-mode-option`}
-    onChange={choose}
-  />
+  <!-- One literal call site per field, so the capture-producer scan can read each option hook. -->
+  {#if field === 'base'}
+    <SegmentedControl
+      fill
+      density="field"
+      options={OPTIONS}
+      value={mode}
+      groupName="check-count-base-mode"
+      ariaLabel={sourceLabel}
+      dataAttr="data-check-count-base-mode"
+      optionDataAttr="data-check-count-base-mode-option"
+      onChange={choose}
+    />
+  {:else}
+    <SegmentedControl
+      fill
+      density="field"
+      options={OPTIONS}
+      value={mode}
+      groupName="check-count-threshold-mode"
+      ariaLabel={sourceLabel}
+      dataAttr="data-check-count-threshold-mode"
+      optionDataAttr="data-check-count-threshold-mode-option"
+      onChange={choose}
+    />
+  {/if}
 </span>
 {#if mode === 'number'}
   <span class="manager-checks-count-stepper">
@@ -123,7 +146,7 @@
       {max}
       value={numberShown}
       {...stepperLabels(label)}
-      inputProps={{ [`data-check-count-${field}`]: '', 'data-validation-target': validationTarget }}
+      inputProps={{ [FIELD_HOOKS[field].input]: '', 'data-validation-target': validationTarget }}
       onChange={(next) => next !== null && write('number', next)}
     />
   </span>
