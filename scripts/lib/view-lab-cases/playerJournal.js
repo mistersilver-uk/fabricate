@@ -164,6 +164,30 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/crafting\/(?:RollPrompt(?:Target)?\.svelte|rollPrompt(?:Target)?\.js)$/,
     ],
   }),
+  // Issue 2005 (T6): a fixed roll-under ladder states `≤` bands, in ladder order.
+  playerCase({
+    id: 'player-journal-routed-bands-under',
+    label: 'Player Journal — roll-under routed gathering ladder bands',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: {
+      tab: 'journal',
+      journalCaseState: 'gathering-journal-check-prompt',
+      gatheringTaskMode: 'routed-under-fixed',
+    },
+    steps: [{ selector: '[data-run-id="lab-v1-gathering-journal-check-prompt"]' }],
+    expectTab: 'journal',
+    expectSelector:
+      '[data-journal-detail] [data-outcome-ladder]' +
+      ':has([data-outcome-tier="lab-abundant"] .manager-chip:text-is("≤15"))' +
+      ':has([data-outcome-tier="lab-failed"] .manager-chip:text-is(">15"))',
+    kinds: ['player', 'journal', 'gathering'],
+    sourceMatches: [
+      JOURNAL_SOURCES,
+      /^src\/ui\/presenters\/RunJournalBuilder\.js$/,
+      /^src\/systems\/runJournalOutcomeBands\.js$/,
+    ],
+  }),
   ...journalBlindRunCases(),
   ...journalLifecycleCases(),
   ...journalHistoryBatchCases(),

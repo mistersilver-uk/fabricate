@@ -7,6 +7,7 @@ fabricate-journal
 fabricate-journal-craft-detail
 player-journal-check-roll-prompt
 player-gathering-journal-check-roll-prompt
+player-journal-routed-bands-under
 fabricate-journal-blind-run
 fabricate-journal-blind-run-gm
 fabricate-journal-lifecycle-ready-single

@@ -1,7 +1,8 @@
 /**
- * The success-counting Checks Studio states (issue 2004), each written onto Karrun Forgecraft's
- * crafting, salvage and gathering checks before the runtime boots, so the real normalizer reads
- * them. Count authoring is issue 2006's, so the lab seeds what no control can author yet.
+ * The success-counting Checks Studio states (issue 2004) and the roll-under recipe states (issue
+ * 2005), each written onto Karrun Forgecraft's crafting, salvage and gathering checks before the
+ * runtime boots, so the real normalizer reads them. Count authoring is issue 2006's, so the lab
+ * seeds what no control can author yet.
  */
 import { LAB_SYSTEM_IDS } from './labContent.js';
 
@@ -142,11 +143,52 @@ const DICE_POOL_FAULTS = {
   },
 };
 
+/*
+ * Issue 2005 (T6): the crafting check graded roll-under against a fixed target or a character
+ * value, for the recipe screens' Check tier select and check pill. The tiers keep Smithing's ids.
+ */
+const sumUnder = (target) => ({ product: 'sum', direction: 'under', target });
+const SMITH_RANK = '@skills.smith.rank';
+const underTier = (id, name, dc, adjustment = null) => ({ id, name, dc, adjustment });
+const rollUnder = (target, tiers) => ({
+  resolutionMode: 'simple',
+  crafting: { simple: { rollFormula: '1d20', dc: 12, evaluation: sumUnder(target), tiers } },
+  salvage: sumUnder({ source: 'fixed' }),
+  gathering: {
+    evaluation: sumUnder({ source: 'fixed' }),
+    relativeOutcomes: [
+      outcome('lab-under-failure', 'Failure', -5, false),
+      outcome('lab-under-success', 'Success', 0, true),
+    ],
+  },
+});
+const ROLL_UNDER_FIXED = rollUnder({ source: 'fixed' }, [
+  underTier('sm-tier-apprentice', 'Apprentice work', 14),
+  underTier('sm-tier-masterwork', 'Masterwork', 8),
+]);
+const ROLL_UNDER_ADD = rollUnder(
+  { source: 'attribute', expression: SMITH_RANK, adjustmentKind: 'add', baseAdjustment: 0 },
+  [
+    underTier('sm-tier-apprentice', 'Apprentice work', 10, 2),
+    underTier('sm-tier-masterwork', 'Masterwork', 18, -2),
+  ]
+);
+const ROLL_UNDER_MULTIPLY = rollUnder(
+  { source: 'attribute', expression: SMITH_RANK, adjustmentKind: 'multiply', baseAdjustment: 1 },
+  [
+    underTier('sm-tier-apprentice', 'Apprentice work', 10, 1),
+    underTier('sm-tier-masterwork', 'Masterwork', 18, 0.5),
+  ]
+);
+
 /** The `checkPreviewState` query values and the checks each seeds. */
 export const LAB_CHECK_PREVIEW_STATES = Object.freeze({
   'dice-pool': DICE_POOL,
   'dice-pool-extended': DICE_POOL_EXTENDED,
   'dice-pool-faults': DICE_POOL_FAULTS,
+  'roll-under-fixed': ROLL_UNDER_FIXED,
+  'roll-under-add': ROLL_UNDER_ADD,
+  'roll-under-multiply': ROLL_UNDER_MULTIPLY,
 });
 
 /** Karrun Forgecraft's checks as `state` authors them; the retained roll formula is blank. */

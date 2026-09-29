@@ -11,6 +11,9 @@ manager-recipes-bulk-edit-blocked
 manager-recipes-bulk-edit-picker
 manager-recipes-bulk-edit-pick-card
 manager-recipes-bulk-edit-check-tier
+manager-recipes-check-pill-under
+manager-recipes-check-pill-under-attribute
+manager-recipes-bulk-edit-check-tier-under
 manager-recipes-bulk-delete-idle
 manager-recipes-bulk-delete-armed
 manager-crafting-group-expanded
