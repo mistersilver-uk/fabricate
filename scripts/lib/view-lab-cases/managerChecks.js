@@ -20,6 +20,20 @@ const AUTHOR_TRANSFORMED_MODIFIER = Object.freeze([
   { selector: '[data-world-modifier-done="hb-mod-luck"]' },
 ]);
 
+/** A second library modifier made transformed, so ranking leaves two out at once (issue 2082). */
+const AUTHOR_SECOND_TRANSFORMED_MODIFIER = Object.freeze([
+  { selector: '[data-world-modifier="hb-mod-tools"] [data-toggle-modifier]' },
+  {
+    selector: '[data-world-modifier="hb-mod-tools"] [data-world-modifier-field="label"]',
+    fill: 'A second deliberately long transformed modifier name',
+  },
+  {
+    selector: '[data-world-modifier="hb-mod-tools"] [data-world-modifier-field="expression"]',
+    fill: '2d6cs>4',
+  },
+  { selector: '[data-world-modifier-done="hb-mod-tools"]' },
+]);
+
 /*
  * The roll-under Studio parity states (issue 2005), one per approved-prototype frame that depicts
  * a surface the roll-under authoring changes. Each fixture reproduces its frame's content where the
@@ -224,6 +238,26 @@ const FIXED_RANGES = Object.freeze([
   ...parityType('[data-outcome-end]', 2, '30'),
   { selector: `${nthMatch('[data-outcome-row]', 2)} [data-outcome-success-option="success"]` },
 ]);
+/** Four fixed bands (issue 2082): Spoiled 1–10 overlaps Flawed 8–15, and Sound 16–20 leaves 21–24 before Fine. */
+const FIXED_BANDS = Object.freeze([
+  { selector: '#checks-section-outcomes' },
+  { selector: '[data-check-type-option="fixed"]' },
+  ...Array.from({ length: 4 }, () => ({ selector: '[data-add-outcome-tier]' })),
+  ...['Spoiled', 'Flawed', 'Sound', 'Fine'].map((name, index) => ({
+    selector: nthMatch('[data-outcome-name]', index + 1),
+    fill: name,
+  })),
+  ...[
+    ['1', '10'],
+    ['8', '15'],
+    ['16', '20'],
+    ['25', '30'],
+  ].flatMap(([start, end], index) => [
+    ...parityType('[data-outcome-start]', index + 1, start),
+    ...parityType('[data-outcome-end]', index + 1, end),
+  ]),
+  { selector: `${nthMatch('[data-outcome-row]', 3)} [data-outcome-success-option="success"]` },
+]);
 const READOUT = '.fabricate-manager [data-checks-simulator-readout]';
 const rolledCase = ({
   id,
@@ -295,7 +329,8 @@ export const CASES = Object.freeze([
     ],
     expectView: 'checks-validation',
     // The critical id specifically: a presence-only assertion is satisfied by the warning, which says the opposite.
-    expectSelector: '.fabricate-manager [data-issue="retiredPlaceholderBreaksFormula"]',
+    expectSelector:
+      '.fabricate-manager [data-issue="retiredPlaceholderBreaksFormula"]:has(.manager-recipe-val-detail)',
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
@@ -316,7 +351,8 @@ export const CASES = Object.freeze([
       { selector: '[data-issue="modifierAverageUnavailable"]', scroll: true },
     ],
     expectView: 'checks-validation',
-    expectSelector: '.fabricate-manager [data-issue="modifierAverageUnavailable"]',
+    expectSelector:
+      '.fabricate-manager [data-issue="modifierAverageUnavailable"]:has(.manager-recipe-val-detail)',
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
@@ -375,12 +411,90 @@ export const CASES = Object.freeze([
       { selector: '[data-outcome-name]', fill: '' },
     ],
     expectView: 'checks-crafting',
-    expectSelector: '.fabricate-manager [data-checks-section-dot="outcomes"]',
+    // The dot and the notice explaining it, first in the pane (issue 2082).
+    expectSelector:
+      '.fabricate-manager:has([role="tabpanel"] > [data-checks-section-notices="outcomes"]:first-child' +
+      ' > [data-checks-section-notice="unnamedOutcome"][data-notice-tone="warning"])' +
+      ' [data-checks-section-dot="outcomes"]',
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
     ],
     kinds: ['manager', 'checks'],
+  }),
+  // Every readiness issue opens its section as a titled amber notice, blocking first (issue 2082).
+  managerCase({
+    id: 'manager-checks-roll-notices',
+    label: 'Manager — Checks roll section notices, blocking first',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // A refused placement raises the warning `noRollFormula` BEFORE the critical it causes, so the order is the sort's.
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '[data-check-roll-formula]', fill: '1d20 * @craftingmod' },
+    ],
+    expectView: 'checks-crafting',
+    expectSelector:
+      '.fabricate-manager [role="tabpanel"] > [data-checks-section-notices="roll"]:first-child' +
+      ' > [data-checks-section-notice="retiredPlaceholderBreaksFormula"][data-notice-tone="warning"]:first-child' +
+      ' + [data-checks-section-notice="noRollFormula"][data-notice-tone="warning"]:last-child',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-checks-outcomes-range-notices',
+    label: 'Manager — Checks outcomes notices for overlapping and gapped bands',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // Spoiled and Flawed overlap, and Sound and Fine leave 21 to 24 unclaimed; Sound is the Success tier.
+    query: { system: 'lab-runework' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      ...FIXED_BANDS,
+      { selector: '[data-checks-section-notices="outcomes"]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    expectSelector:
+      '.fabricate-manager [role="tabpanel"] > [data-checks-section-notices="outcomes"]:first-child' +
+      ' > [data-checks-section-notice="rangeOverlap"][data-notice-tone="warning"]:first-child' +
+      ' + [data-checks-section-notice="rangeGap"][data-notice-tone="warning"]:last-child',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-checks-triggers-notice',
+    label: 'Manager — Checks triggers notices for a missing and a shared target tier',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // A new trigger set to a target tier names none yet, and Runework already has one targeting Ruined.
+    query: { system: 'lab-runework' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-triggers' },
+      { selector: '[data-add-trigger]' },
+      { selector: '[data-trigger-tier-step-mode="target"]' },
+      { selector: '[data-checks-section-notices="triggers"]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    expectSelector:
+      '.fabricate-manager [role="tabpanel"] > [data-checks-section-notices="triggers"]:first-child' +
+      ' > [data-checks-section-notice="danglingTierStepTarget"][data-notice-tone="warning"]:first-child' +
+      ' + [data-checks-section-notice="multipleTierStepTargets"][data-notice-tone="warning"]:last-child',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
   }),
   managerCase({
     id: 'manager-checks-off',
@@ -622,6 +736,34 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
     ],
   }),
+  // Two modifiers sharing one fault, so the notice's detail names both and must wrap (issue 2082).
+  managerCase({
+    id: 'manager-checks-crafting-modifiers-multi-name-notice',
+    label: 'Manager — Checks modifiers notice naming two modifiers',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      ...AUTHOR_TRANSFORMED_MODIFIER,
+      ...AUTHOR_SECOND_TRANSFORMED_MODIFIER,
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-modifiers' },
+      { selector: '[data-crafting-modifier-max-picks-input]', fill: '1' },
+      { selector: '[data-checks-section-notices="modifiers"]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    expectSelector:
+      '.fabricate-manager [role="tabpanel"] > [data-checks-section-notices="modifiers"]:first-child' +
+      ' > [data-checks-section-notice="modifierAverageUnavailable"][data-notice-tone="warning"]' +
+      ' .fab-notice-detail:has-text("Lucky find with a deliberately long transformed modifier name")' +
+      ':has-text("A second deliberately long transformed modifier name")',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+  }),
   managerCase({
     id: 'manager-checks-crafting-modifier-entries',
     label: 'Manager — Checks crafting modifier entries',
@@ -699,9 +841,11 @@ export const CASES = Object.freeze([
       { selector: '[data-crafting-modifier-rows]', scroll: true },
     ],
     expectView: 'checks-gathering',
-    // The gathering card's two unique notices are stated against real rows here rather than an empty catalogue.
+    // The gathering card's two unique notices are stated against real rows here rather than an empty catalogue,
+    // and the section's own readiness notice sits above them, off the frame (issue 2082).
     expectSelector:
-      '.fabricate-manager [data-crafting-modifier-catalogue="gathering"]' +
+      '.fabricate-manager:has([data-checks-section-notice="modifiersInertNoModifierSupport"][data-notice-tone="warning"])' +
+      ' [data-crafting-modifier-catalogue="gathering"]' +
       ':has([data-gathering-modifier-disambiguation])' +
       ':has([data-check-modifier-dormant])' +
       ':has([data-crafting-modifier-readonly="expression"])',
@@ -1642,6 +1786,22 @@ export const CASES = Object.freeze([
       '.fabricate-manager' +
       ':has([data-checks-section-notice="countRequiredExceedsMaxPool"])' +
       ':has([data-checks-section-notice="countTierWithoutSuccesses"])',
+  }),
+  // The worst realistic roll pile-up at the declared floor, blocking notices first (issue 2082).
+  countCase({
+    id: 'manager-checks-roll-notices-floor',
+    label: 'four pool notices stacked at 1024x640',
+    frame: '08 and 07, blocking first',
+    state: 'dice-pool-pileup',
+    position: { width: 1024, height: 640 },
+    kinds: ['manager', 'checks', 'responsive'],
+    steps: [{ selector: '[data-checks-section-notices="roll"]', scroll: true }],
+    expectSelector:
+      '.fabricate-manager [data-checks-section-notices="roll"]' +
+      ' > [data-checks-section-notice="countThresholdInvalid"]:nth-child(1)' +
+      ' + [data-checks-section-notice="countExplodeUnbounded"]' +
+      ' + [data-checks-section-notice="countFaceBeyondDie"]' +
+      ' + [data-checks-section-notice="countTierWithoutSuccesses"]:last-child',
   }),
   countCase({
     id: 'manager-checks-count-readiness',

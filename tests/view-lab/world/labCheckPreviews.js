@@ -142,6 +142,30 @@ const DICE_POOL_FAULTS = {
   },
 };
 
+/**
+ * The worst realistic roll-section pile-up (issue 2082): a threshold that rolls dice, a cancel face
+ * off the die, an explosion on every face and a recipe tier with no successes needed.
+ */
+const DICE_POOL_PILEUP = {
+  ...DICE_POOL,
+  crafting: {
+    simple: {
+      evaluation: count('over', {
+        die: 10,
+        base: '3',
+        threshold: '1d4 + 6',
+        required: 2,
+        explode: { enabled: true, faces: { kind: 'from', value: 1 } },
+        cancel: { enabled: true, faces: { kind: 'from', value: 12 } },
+      }),
+      tiers: [
+        tier('lab-tier-fine-craft', 'Fine Craft', 2),
+        tier('lab-tier-unset-work', 'Unset Work', null),
+      ],
+    },
+  },
+};
+
 /** A trigger forcing `outcome`, by default on every roll (issue 2080). */
 const EVERY_ROLL = Object.freeze({ type: 'rollTotal', operator: '>=', value: -1000 });
 const forceOn = (id, outcome, condition = EVERY_ROLL) => ({
@@ -213,6 +237,7 @@ export const LAB_CHECK_PREVIEW_STATES = Object.freeze({
   'dice-pool': DICE_POOL,
   'dice-pool-extended': DICE_POOL_EXTENDED,
   'dice-pool-faults': DICE_POOL_FAULTS,
+  'dice-pool-pileup': DICE_POOL_PILEUP,
   'dice-pool-forced': DICE_POOL_FORCED,
   'dice-pool-rescued': DICE_POOL_RESCUED,
   'gathering-over': GATHERING_OVER,
