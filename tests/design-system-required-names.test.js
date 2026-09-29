@@ -11,14 +11,15 @@ import {
   DESIGN_SYSTEM_PRIMITIVES,
   NOT_A_PRIMITIVE,
 } from '../scripts/lib/designSystemPrimitives.js';
+
 import {
   KNOWN_EMPTY_NAME_BINDINGS,
   KNOWN_EMPTY_NAME_BINDING_TOTAL,
   KNOWN_UNTRANSLATED_NAME_DEFAULTS,
   KNOWN_UNTRANSLATED_NAME_DEFAULT_TOTAL,
 } from './components/design-system-known-debt.js';
-import { assertRatchet } from './helpers/ratchetBaseline.js';
 import { byCodePoint, tallyByKey } from './helpers/codePointOrder.js';
+import { assertRatchet } from './helpers/ratchetBaseline.js';
 import { repoRoot } from './helpers/sourceScan.js';
 import { attributeText, parsedTemplates, walkElements } from './helpers/svelteTemplateScan.js';
 

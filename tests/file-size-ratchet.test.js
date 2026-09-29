@@ -122,13 +122,19 @@ function matchFunctions(baseUnits, headUnits) {
   }
   for (const [name, bases] of baseGroups) if (!headGroups.has(name)) baseLeft.push(...bases);
   const renamed = pairBySize(baseLeft.filter(oversized), headLeft);
-  return { pairs: [...pairs, ...renamed.pairs], added: renamed.headLeft, removed: renamed.baseLeft };
+  return {
+    pairs: [...pairs, ...renamed.pairs],
+    added: renamed.headLeft,
+    removed: renamed.baseLeft,
+  };
 }
 
 /** A new oversized unit in a file whose oversized functions lost lines was split out of them. */
 function addedId(unit, shrunk) {
   const sources = shrunk.filter((was) => was.file === unit.file).map((was) => was.symbol);
-  return sources.length === 0 ? unit.id : `${unit.id} (split from ${sources.join(', ')}: split further)`;
+  return sources.length === 0
+    ? unit.id
+    : `${unit.id} (split from ${sources.join(', ')}: split further)`;
 }
 
 /** Keep the oversized units of both sides, a function keyed by its match on the other side. */
@@ -157,7 +163,9 @@ function pairUnits(baseEntries, headEntries) {
       if (oversized(was)) base.push({ ...was, id });
     }
     base.push(...removed);
-    for (const unit of added.filter(oversized)) head.push({ ...unit, id: addedId(unit, shrunk) });
+    for (const unit of added) {
+      if (oversized(unit)) head.push({ ...unit, id: addedId(unit, shrunk) });
+    }
   }
   return { base, head };
 }
@@ -184,7 +192,10 @@ test('the measurement still sees the oversized units of the whole tree', (t) => 
     extensions: [...SCANNED_EXTENSIONS],
   });
   const files = Object.keys(corpus);
-  const units = measureUnits((file) => corpus[file], () => files).filter(oversized);
+  const units = measureUnits(
+    (file) => corpus[file],
+    () => files
+  ).filter(oversized);
   const oversizedFiles = units.filter((unit) => unit.id === FILE_ID).length;
   t.diagnostic(`${oversizedFiles} oversized files and ${units.length - oversizedFiles} functions`);
   assert.ok(files.length > SCAN_FLOOR, `only ${files.length} files scanned`);
@@ -196,7 +207,9 @@ test('the measurement still sees the oversized units of the whole tree', (t) => 
 });
 
 const repos = [];
-after(() => repos.forEach((repo) => repo.dispose()));
+after(() => {
+  for (const repo of repos) repo.dispose();
+});
 
 /** A repository whose first commit holds `files`; the gate compares its working tree with it. */
 function srcRepo(files) {
@@ -281,7 +294,11 @@ test('a reasoned marker at the unit exempts it, and an empty one fails', () => {
   repo.write({
     'src/a.js': moduleOf(
       fn('kept', 5),
-      fn('table', 140, '// ratchet-exempt(file-size): one lookup table, split it and it reads worse')
+      fn(
+        'table',
+        140,
+        '// ratchet-exempt(file-size): one lookup table, split it and it reads worse'
+      )
     ),
     'src/b.js': moduleOf(fn('b', 5), fn('bare', 110, '// ratchet-exempt(file-size):')),
   });
@@ -323,7 +340,9 @@ test('a same-named sibling added before an oversized one does not renumber it in
   repo.write({ 'src/a.js': moduleOf(hook(4), hook(120)) });
   assert.deepEqual(repo.compare().failures, []);
   repo.write({ 'src/a.js': moduleOf(hook(4), hook(121)) });
-  assert.deepEqual(repo.compare().failures, ['src/a.js: function Hooks.on#2 (was Hooks.on) rose from 120 to 121']);
+  assert.deepEqual(repo.compare().failures, [
+    'src/a.js: function Hooks.on#2 (was Hooks.on) rose from 120 to 121',
+  ]);
 });
 
 test('a piece split out of an oversized function that is still oversized says split further', () => {

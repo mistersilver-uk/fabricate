@@ -5,8 +5,8 @@ import test from 'node:test';
 
 import { compoundClasses, compoundsOf } from '../../scripts/lib/stylesheetLiveClasses.js';
 import { censusRules, selectorAppearances } from '../../scripts/lib/stylesheetSelectorCensus.js';
-import { assertRatchet } from '../helpers/ratchetBaseline.js';
 import { byCodePoint, tallyByKey } from '../helpers/codePointOrder.js';
+import { assertRatchet } from '../helpers/ratchetBaseline.js';
 import { collectWorkingTreeSources, stripComments } from '../helpers/sourceScan.js';
 import {
   collectCustomProperties,

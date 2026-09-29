@@ -434,7 +434,9 @@ test('the cap is exclusive at 30% and exempts ten or fewer comment lines', () =>
 });
 
 const repos = [];
-after(() => repos.forEach((repo) => repo.dispose()));
+after(() => {
+  for (const repo of repos) repo.dispose();
+});
 
 /** A throwaway repository whose one commit holds `files`, compared by this gate's own wiring. */
 function repoWith(files) {
@@ -449,8 +451,7 @@ function repoWith(files) {
   write(files);
   repo.git('add', '-A');
   const first = repo.commit('base');
-  const compare = () =>
-    compareCommentShare({ cwd: repo.dir, env: { RATCHET_BASE: first } });
+  const compare = () => compareCommentShare({ cwd: repo.dir, env: { RATCHET_BASE: first } });
   return { write, compare };
 }
 
@@ -501,7 +502,10 @@ test('a change to any file of the corpus compares rather than skips, and one out
 
 test('the file head runs through blank, comment, shebang and Svelte tag lines to the first code', () => {
   assert.equal(fileHeadLength('#!/usr/bin/env node\n// a\n\nconst x = 1;\n// b\n', '.mjs'), 3);
-  assert.equal(fileHeadLength('<!-- a -->\n<script>\n  // b\n  import x from "y";\n', '.svelte'), 3);
+  assert.equal(
+    fileHeadLength('<!-- a -->\n<script>\n  // b\n  import x from "y";\n', '.svelte'),
+    3
+  );
   assert.equal(fileHeadLength('/* a\n b */\n.x {}\n', '.css'), 2);
 });
 
@@ -513,7 +517,21 @@ test('a reasoned marker in the file head of a file in the directory exempts it; 
   assert.deepEqual(repo.compare().failures, []);
   repo.write({
     'src/d/two.js': `${jsFile(9, 1)}${marker(' below the file head')}\n`,
-    'src/e/two.svelte': ['<script>', marker(' in a Svelte script head'), '// a', '// b', '// c', '// d', '// e', '// f', '// g', '// h', '// i', '</script>', ''].join('\n'),
+    'src/e/two.svelte': [
+      '<script>',
+      marker(' in a Svelte script head'),
+      '// a',
+      '// b',
+      '// c',
+      '// d',
+      '// e',
+      '// f',
+      '// g',
+      '// h',
+      '// i',
+      '</script>',
+      '',
+    ].join('\n'),
   });
   assert.deepEqual(repo.compare().failures, [`src/d/*: ${ENTRY_ID} is new (52.381)`]);
   repo.write({ 'src/d/two.js': jsFile(9, 1, [marker('')]) });

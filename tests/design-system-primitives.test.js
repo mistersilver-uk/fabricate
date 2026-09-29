@@ -22,12 +22,13 @@ import {
   mapChangedFilesToCases,
 } from '../scripts/lib/viewLabCases.js';
 import { VIEW_RECIPES } from '../scripts/ui-pr-screenshot-evidence.mjs';
+
 import {
   KNOWN_UNREGISTERED_SHARED_COMPONENTS,
   KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL,
 } from './components/design-system-known-debt.js';
-import { assertRatchet } from './helpers/ratchetBaseline.js';
 import { tallyByKey } from './helpers/codePointOrder.js';
+import { assertRatchet } from './helpers/ratchetBaseline.js';
 
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 

@@ -1,5 +1,5 @@
-import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 
 import {
   KNOWN_FORMLESS_BUTTONS,
@@ -7,8 +7,8 @@ import {
   KNOWN_ROLE_FOCUS_TARGETS,
   KNOWN_ROLE_FOCUS_TARGET_TOTAL,
 } from './components/design-system-known-debt.js';
-import { assertRatchet } from './helpers/ratchetBaseline.js';
 import { tallyByKey } from './helpers/codePointOrder.js';
+import { assertRatchet } from './helpers/ratchetBaseline.js';
 import {
   UI_TEMPLATE_ROOT,
   attributeText,

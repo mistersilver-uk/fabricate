@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { resolveExecutable } from '../../scripts/lib/resolveExecutable.js';
+
 import { byCodePoint } from './codePointOrder.js';
 import { envWithoutGitLocation } from './temp-git-repo.js';
 
@@ -46,6 +47,7 @@ function tryCommit(cwd, ref) {
     '--verify',
     '--quiet',
     '--end-of-options',
+    // eslint-disable-next-line unicorn/no-incorrect-template-string-interpolation -- git's peel suffix
     `${ref}^{commit}`,
   ];
   const result = spawnSync(GIT, args, gitOptions({ encoding: 'utf8' }));
@@ -231,7 +233,11 @@ function listHeadFiles(root, cwd) {
  * @returns {Map<string, string>} path to UTF-8 text.
  */
 export function readBaseCorpus(base, root, { cwd = REPO_ROOT, include = () => true } = {}) {
-  return readBaseFiles(base, listBaseFiles(base, root, cwd).filter((path) => include(path)), { cwd });
+  return readBaseFiles(
+    base,
+    listBaseFiles(base, root, cwd).filter((path) => include(path)),
+    { cwd }
+  );
 }
 
 function readHeadFile(cwd, file) {
@@ -308,8 +314,8 @@ const COMMENT_LINE = /^(?:\/\/|\/\*|\*|<!--)|(?:\*\/|-->)$/u;
 /** The number of leading lines that are blank, comments, a shebang, or a script or style tag. */
 function fileHeadLength(lines) {
   let close = null;
-  for (let index = 0; index < lines.length; index += 1) {
-    const trimmed = lines[index].trim();
+  for (const [index, line] of lines.entries()) {
+    const trimmed = line.trim();
     if (close) {
       if (trimmed.includes(close)) close = null;
       continue;
@@ -375,7 +381,7 @@ function tally(entries, family) {
   for (const raw of entries) {
     const entry = validEntry(raw, family);
     const file = entry.file;
-    const key = `${file}\u0000${entry.id}`;
+    const key = `${file}\u{0}${entry.id}`;
     const amount = entry.amount ?? 1;
     const lines = Array.isArray(entry.lines) ? entry.lines : [];
     const known = index.get(key);
@@ -430,8 +436,7 @@ function difference(baseIndex, headIndex, ceiling) {
   return { offences: offences.sort(byText), falls: falls.sort(byText) };
 }
 
-const valueKey = (entry) =>
-  entry.value === undefined ? null : `${entry.file}\u0000${entry.value}`;
+const valueKey = (entry) => (entry.value === undefined ? null : `${entry.file}\u{0}${entry.value}`);
 
 /**
  * Net offences against falls of the same `(file, value)`, so a value that moved between ids in one

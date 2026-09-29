@@ -11,7 +11,8 @@ import { dirname, join } from 'node:path';
 import test, { after } from 'node:test';
 
 import { resolveExecutable } from '../scripts/lib/resolveExecutable.js';
-import { tallyByKey } from './helpers/codePointOrder.js';
+
+import { byCodePoint, tallyByKey } from './helpers/codePointOrder.js';
 import {
   basePathOf,
   changedPaths,
@@ -34,7 +35,7 @@ import { createTempGitRepo, envWithoutGitLocation } from './helpers/temp-git-rep
 const GIT = resolveExecutable('git');
 const LOCAL = Object.freeze({});
 const repos = [];
-after(() => repos.forEach((repo) => repo.dispose()));
+after(() => { for (const repo of repos) repo.dispose() });
 
 /** A repository on `main` whose first commit holds `files`, with helpers to edit and commit. */
 function repoWith(files) {
@@ -113,7 +114,7 @@ test('RATCHET_BASE names the base, and an unresolvable one fails closed', () => 
   });
   for (const ref of ['0000000', 'no-such-branch']) {
     assert.throws(() => resolveRatchetBase({ cwd: repo.dir, env: { RATCHET_BASE: ref } }), {
-      message: new RegExp(`RATCHET_BASE=${ref} does not resolve[\\s\\S]*fails rather than passing`),
+      message: new RegExp(String.raw`RATCHET_BASE=${ref} does not resolve[\s\S]*fails rather than passing`),
     });
   }
 });
@@ -123,7 +124,12 @@ test('RATCHET_BASE=none opts out, in CI too, and the gate reports a skip rather 
   const env = { RATCHET_BASE: 'none', CI: 'true' };
   assert.equal(resolveRatchetBase({ cwd: repo.dir, env }).skipped, 'opted-out');
   const result = compareToy(repo, { env });
-  assert.deepEqual(Object.keys(result).sort(), ['changedCount', 'corpusRoot', 'reason', 'skipped']);
+  assert.deepEqual(Object.keys(result).sort(byCodePoint), [
+    'changedCount',
+    'corpusRoot',
+    'reason',
+    'skipped',
+  ]);
   assert.equal(result.skipped, 'opted-out');
   assert.equal(result.corpusRoot, 'corpus');
 });
@@ -211,7 +217,7 @@ test('a rename is detected at 40% similarity, rewritten or not, and not below it
     'gone-renamed.txt': rewrite('gone', 8),
   });
   const changes = changedPaths(repo.first, { cwd: repo.dir });
-  assert.deepEqual([...changes.renames].sort(), [
+  assert.deepEqual([...changes.renames].sort(([left], [right]) => byCodePoint(left, right)), [
     ['edited-renamed.txt', 'edited.txt'],
     ['kept-renamed.txt', 'kept.txt'],
   ]);
@@ -255,7 +261,7 @@ test('a linear depth-2 clone resolves HEAD^1, and HEAD^2 fails closed', () => {
 });
 
 test('base files are read in one batch, byte-exact, with an absent path omitted', () => {
-  const text = 'caf\u00e9 \u{1F600}\nsecond line\n';
+  const text = 'caf\u{E9} \u{1F600}\nsecond line\n';
   const repo = repoWith({ 'corpus/a b.js': text, 'corpus/c.js': 'c\n', 'other/d.js': 'd\n' });
   repo.write({ 'corpus/a b.js': 'changed at head\n' });
   const read = readBaseFiles(repo.first, ['corpus/a b.js', 'missing.js', 'corpus/c.js', 'corpus'], {
@@ -435,8 +441,10 @@ test('a family pair hook sees both sides, base paths renamed, before they are co
   const seen = [];
   const pair = (base, head) => {
     const moved = (entry) => entry.value === 'x';
-    seen.push(...base.filter(moved).map((entry) => `base ${entry.file}: ${entry.id}`));
-    seen.push(...head.filter(moved).map((entry) => `head ${entry.file}: ${entry.id}`));
+    seen.push(
+      ...base.filter(moved).map((entry) => `base ${entry.file}: ${entry.id}`),
+      ...head.filter(moved).map((entry) => `head ${entry.file}: ${entry.id}`)
+    );
     return { base, head: head.map((entry) => (moved(entry) ? { ...entry, id: 'alpha x' } : entry)) };
   };
   const result = compareToy(repo, { pair });
@@ -446,7 +454,11 @@ test('a family pair hook sees both sides, base paths renamed, before they are co
 
 test('reporting throws the failures with the marker and stale-base guidance, and notes the rest', () => {
   const notes = [];
-  const t = { diagnostic: (line) => notes.push(line) };
+  const t = {
+    diagnostic: (line) => {
+      notes.push(line);
+    },
+  };
   const passing = {
     compared: true,
     family: 'toy',
@@ -689,7 +701,10 @@ function ceilingProbe({ rows, observed, scanned = 10, detail, ceiling, shrink = 
 /** A stand-in for the `node:test` context, so a diagnostic is observable rather than printed. */
 function diagnosticSpy() {
   const lines = [];
-  return { context: { diagnostic: (line) => lines.push(line) }, lines };
+  const diagnostic = (line) => {
+    lines.push(line);
+  };
+  return { context: { diagnostic }, lines };
 }
 
 test('a key with no row fails as new debt, naming the ceiling an update would write', () => {
