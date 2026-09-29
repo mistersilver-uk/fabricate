@@ -3774,12 +3774,14 @@ export class CraftingEngine {
         });
         await this._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
       }
-      const breakDecision = this._resolveCraftingBreakageDecision(
-        system,
-        executionRecipe,
-        checkResult
-      );
-      if (failurePolicy.breakToolsOnFail || breakDecision.forceBreak) {
+      if (failurePolicy.breakToolsOnFail) {
+        // Mirrors `resolveCheckFailure`'s crafting-path gate: `breakToolsOnFail` alone decides
+        // whether tools are at risk; a fired trigger only decides the mode within the call.
+        const breakDecision = this._resolveCraftingBreakageDecision(
+          system,
+          executionRecipe,
+          checkResult
+        );
         usedTools = await this._applyToolBreakage(executionRecipe, toolValidation.tools, {
           forceBreak: breakDecision.forceBreak,
           authority: breakDecision.authority,

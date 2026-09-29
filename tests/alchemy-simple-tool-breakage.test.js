@@ -8,10 +8,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
+import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
 import { ResolutionModeService } from '../src/systems/ResolutionModeService.js';
 import { SignatureValidator } from '../src/systems/SignatureValidator.js';
 import { getItemSourceReferences, getItemMatchUuids } from '../src/utils/sourceUuid.js';
 import { toAlchemyRecords } from './helpers/alchemySubmissionRecords.js';
+import { mergeHistoryFlag } from './helpers/journal-fixtures.js';
 
 // Globals
 
@@ -201,15 +203,14 @@ function setup(checkMode, breakToolsOnFail, breakToolsTrigger = false) {
   }
   const recipe = alchemyRecipe(['tool1']);
   if (breakToolsTrigger) {
+    // `checkDriven` authority is required for ANY trigger to force-break (data-models/spec.md
+    // requirement 22); the trigger itself lives on `craftingCheck.simple.checkBreakage.triggers`,
+    // the same shape `evaluateCheckBreakage` reads for crafting.
+    system.toolBreakage = { authority: 'checkDriven' };
     if (!system.craftingCheck.simple) system.craftingCheck.simple = { rollFormula: '1d20', dc: 15 };
-    system.craftingCheck.simple.triggers = [
-      {
-        id: 'break-on-fail',
-        name: 'Break on Fail',
-        matches: { outcomeId: 'fail' },
-        effects: [{ id: 'eff1', breakTools: true }],
-      },
-    ];
+    system.craftingCheck.simple.checkBreakage = {
+      triggers: [{ id: 'break-on-fail', breakTools: true, condition: { type: 'rollTotal', operator: '<=', value: 10 } }],
+    };
   }
   const resolutionService = new ResolutionModeService({ getSystem: (id) => (id === 'sys-a' ? system : null) });
   const recipeManager = {
@@ -332,12 +333,18 @@ test('Simple check PASS: _applyToolBreakage always called', async () => {
   assert.equal(applyToolBreakageCalled, true, '_applyToolBreakage called on success regardless of breakToolsOnFail');
 });
 
-test('Simple check FAIL respects only breakToolsOnFail setting and policy, not triggers', async () => {
-  // Alchemy simple-mode checks do not currently support trigger-based tool breakage.
-  // Tool breakage is gated solely by the `breakToolsOnFail` policy, same as crafting.
-  // This test documents the current behavior: forceBreak from triggers does not apply to alchemy simple.
+test('Simple check FAIL with a FIRED breakTools trigger and breakToolsOnFail OFF: tools do not break', async () => {
+  // A matching `checkDriven` trigger only decides the breakage MODE once the gate is open; the
+  // `breakToolsOnFail` policy alone decides whether tools are at risk on a failed attempt at all
+  // (mirrors `resolveCheckFailure`'s crafting gate and data-models/spec.md requirement 25).
   const { engine, validator } = setup('simple', false, true);
-  engine._runCraftingCheck = async () => ({ success: false, outcome: 'fail', value: 4, data: {} });
+  engine._runCraftingCheck = async () => ({
+    success: false,
+    outcome: 'fail',
+    value: 4,
+    data: { total: 4 },
+    engineEvaluated: true,
+  });
   const inputs = brewInputs();
 
   let applyToolBreakageCalled = false;
@@ -350,5 +357,230 @@ test('Simple check FAIL respects only breakToolsOnFail setting and policy, not t
   const result = await brew(engine, validator, inputs);
 
   assert.equal(result.success, false, 'the check failed');
-  assert.equal(applyToolBreakageCalled, false, 'alchemy simple does not force-break tools via triggers; only breakToolsOnFail setting applies');
+  assert.equal(
+    applyToolBreakageCalled,
+    false,
+    'a fired trigger does not force breakage when breakToolsOnFail is off, same as crafting'
+  );
+});
+
+// Crafting control (non-alchemy): identical trigger + policy setup, proving parity with the
+// alchemy assertion above rather than merely asserting alchemy in isolation.
+
+function craftingControlFixture(breakToolsOnFail) {
+  const ingredientItem = new FakeItem('ing-1', 'Herb', 2);
+  const toolItem = new FakeItem('tool-item-1', 'Tool', 1);
+  const ingredientSet = {
+    id: 'set-1',
+    matchIngredients: (availableItems) => {
+      const matched = availableItems.find((item) => item === ingredientItem);
+      return matched
+        ? [{ item: matched, quantity: 1, ingredient: { quantity: 1, getDescription: () => 'Herb' } }]
+        : [];
+    },
+  };
+  const recipe = {
+    id: 'recipe-craft-control',
+    name: 'Test Recipe',
+    craftingSystemId: 'sys-craft-control',
+    ingredientSets: [ingredientSet],
+    resultGroups: [],
+    toolIds: ['tool-1'],
+    outcomeRouting: null,
+    steps: [],
+    transferEffects: false,
+    getExecutionSteps: null,
+    validate: () => ({ valid: true, errors: [] }),
+    toJSON() {
+      return { id: this.id, name: this.name };
+    },
+  };
+  const system = {
+    id: 'sys-craft-control',
+    toolBreakage: { authority: 'checkDriven' },
+    craftingCheck: {
+      simple: {
+        rollFormula: '1d20',
+        dc: 15,
+        checkBreakage: {
+          triggers: [{ id: 'break-on-fail', breakTools: true, condition: { type: 'rollTotal', operator: '<=', value: 10 } }],
+        },
+      },
+      consumption: { breakToolsOnFail },
+    },
+  };
+  globalThis.game = {
+    fabricate: {
+      getCraftingSystemManager: () => ({ getSystem: () => system }),
+      getResolutionModeService: () => null,
+    },
+    user: { id: 'user-1' },
+    time: { worldTime: 0 },
+  };
+  const recipeManager = {
+    canCraft: () => ({ canCraft: true, satisfiableSet: ingredientSet, missing: { ingredients: [], essences: [], tools: [] } }),
+    getToolsForSet: () => [{ id: 'lib-tool-1', componentId: 'tool-1' }],
+    toolMatchesItem: (_recipe, _tool, item) => item === toolItem,
+    ingredientMatchesItem: (_recipe, _ingredient, item) => item === ingredientItem,
+  };
+  const engine = new CraftingEngine(recipeManager, null, null);
+  return { engine, recipe, ingredientItem, toolItem };
+}
+
+test('Crafting control: check FAIL with a FIRED breakTools trigger and breakToolsOnFail OFF: tools do not break', async () => {
+  const { engine, recipe, ingredientItem, toolItem } = craftingControlFixture(false);
+  engine._runCraftingCheck = async () => ({
+    success: false,
+    outcome: 'fail',
+    value: 4,
+    data: { total: 4 },
+    engineEvaluated: true,
+  });
+
+  let applyToolBreakageCalled = false;
+  const originalApplyToolBreakage = engine._applyToolBreakage;
+  engine._applyToolBreakage = async (...args) => {
+    applyToolBreakageCalled = true;
+    return originalApplyToolBreakage.call(engine, ...args);
+  };
+
+  const sourceActor = { id: 'a1', name: 'Crafter', items: [ingredientItem, toolItem] };
+  const craftingActor = { id: 'a1', name: 'Crafter', uuid: 'Actor.a1', items: { contents: [] } };
+  const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+
+  assert.equal(result.success, false, 'the check failed');
+  assert.equal(
+    applyToolBreakageCalled,
+    false,
+    'crafting also gates trigger-forced breakage behind breakToolsOnFail'
+  );
+});
+
+// Versioned/Journal path (`executeVersionedStage` -> `_buildVersionedStageOperation`): the
+// `apply-tools` effect is only PLANNED when `shouldUseTools` is true, so its presence in the
+// committed journal is itself the assertion (module docblock at CraftingEngine.js:1941).
+
+class VersionedRunActor {
+  constructor(id, items = []) {
+    this.id = id;
+    this.uuid = `Actor.${id}`;
+    this.isOwner = true;
+    this.items = items;
+    this.flags = {};
+  }
+  getFlag(namespace, key) {
+    return this.flags?.[namespace]?.[key];
+  }
+  async setFlag(namespace, key, value) {
+    this.flags[namespace] ||= {};
+    this.flags[namespace][key] = mergeHistoryFlag(this.flags[namespace][key], value);
+    return this;
+  }
+}
+
+function setupVersionedAlchemy(breakToolsOnFail) {
+  const system = {
+    id: 'sys-versioned',
+    resolutionMode: 'alchemy',
+    features: {},
+    alchemy: { checkMode: 'simple', consumeOnFail: false, learnOnCraft: false, showAttemptHistoryToPlayers: false },
+    craftingCheck: { simple: { rollFormula: '1d20', dc: 15 }, consumption: { breakToolsOnFail } },
+    components: [],
+  };
+  const ingredientSet = { id: 'set-1', matchIngredients: () => [], toJSON() { return { id: this.id }; } };
+  const recipe = {
+    id: 'recipe-versioned',
+    name: 'Versioned Brew',
+    craftingSystemId: 'sys-versioned',
+    validate: () => ({ valid: true, errors: [] }),
+    getExecutionSteps: () => [
+      {
+        id: 'step-1',
+        name: 'Brew',
+        ingredientSets: [ingredientSet],
+        resultGroups: [],
+        toolIds: ['tool-1'],
+        timeRequirement: { minutes: 2 },
+      },
+    ],
+  };
+  const recipeManager = {
+    getRecipe: (id) => (id === recipe.id ? recipe : null),
+    canCraft: () => ({ canCraft: true, satisfiableSet: ingredientSet, missing: { ingredients: [], essences: [], tools: [] } }),
+    getToolsForSet: () => [{ id: 'tool-1', name: 'Tool' }],
+    toolMatchesItem: (_recipe, _tool, item) => item.id === 'tool-item-1',
+    ingredientMatchesItem: () => false,
+  };
+  const runManager = new CraftingRunManager();
+  const engine = new CraftingEngine(recipeManager, runManager);
+  globalThis.game = {
+    user: { id: 'gm' },
+    time: { worldTime: 1000 },
+    actors: [],
+    fabricate: {
+      getCraftingSystemManager: () => ({ getSystem: (id) => (id === 'sys-versioned' ? system : null) }),
+      getResolutionModeService: () => null,
+      getRecipeVisibilityService: () => ({
+        guardCraftStart: () => ({ craftable: true }),
+        applyRecipeItemUseOnCraft: async () => {},
+        learnRecipeOnCraft: async () => {},
+      }),
+    },
+  };
+  return { engine, runManager, recipe };
+}
+
+async function runVersionedAlchemyFailure(breakToolsOnFail) {
+  const { engine, runManager, recipe } = setupVersionedAlchemy(breakToolsOnFail);
+  const actor = new VersionedRunActor('alchemist');
+  const source = new VersionedRunActor('source', [{ id: 'tool-item-1', uuid: 'Actor.source.Item.tool-item-1' }]);
+  let applyToolBreakageCalled = false;
+  engine._applyToolBreakage = async () => {
+    applyToolBreakageCalled = true;
+    return [];
+  };
+  engine.installVersionedRunAuthority({
+    consumeExecutionGrant: async (_grant, context) => ({
+      operationId: `${context.operation}-operation`,
+      resolvedCheckResult: { success: false, message: 'Alchemy check failed', outcome: 'fail', value: 4, data: {} },
+      activityKind: 'alchemy',
+      alchemySubmittedItems: [],
+    }),
+  });
+  const started = await engine.startVersionedRun({
+    viewer: game.user,
+    actor,
+    sourceActors: [source],
+    recipeId: recipe.id,
+    selectionPlan: { selectedIngredientSetId: 'set-1' },
+    executionGrant: 'start-grant',
+  });
+  assert.equal(started.success, true, 'the versioned run started');
+  game.time.worldTime += 120;
+  const result = await engine.executeVersionedStage({
+    actor,
+    componentSourceActors: [source],
+    runId: started.runId,
+    expectedRevision: runManager.getActiveRun(actor, started.runId).runRevision,
+    executionGrant: 'execute-grant',
+    requestId: 'execute-request',
+  });
+  assert.equal(result.success, false, 'the alchemy check failed');
+  const history = runManager.getRunHistory(actor)[0];
+  const applyToolsEffect = history?.executionJournal?.effects?.find(
+    (effect) => effect.effectId === 'apply-tools'
+  );
+  return { applyToolBreakageCalled, applyToolsEffect };
+}
+
+test('Versioned/Journal alchemy simple FAIL with breakToolsOnFail OFF: no apply-tools effect', async () => {
+  const { applyToolBreakageCalled, applyToolsEffect } = await runVersionedAlchemyFailure(false);
+  assert.equal(applyToolsEffect, undefined, 'no apply-tools effect is journalled when the policy is off');
+  assert.equal(applyToolBreakageCalled, false, '_applyToolBreakage is never reached');
+});
+
+test('Versioned/Journal alchemy simple FAIL with breakToolsOnFail ON: apply-tools effect applies breakage', async () => {
+  const { applyToolBreakageCalled, applyToolsEffect } = await runVersionedAlchemyFailure(true);
+  assert.ok(applyToolsEffect, 'the apply-tools effect is journalled when the policy is on');
+  assert.equal(applyToolBreakageCalled, true, '_applyToolBreakage runs the breakage decision');
 });
