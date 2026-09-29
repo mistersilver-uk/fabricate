@@ -231,12 +231,21 @@ test('the screenshot gate awaits the capture run for its own head, within pinned
   assert.match(gateStep.run, /--head-sha "\$HEAD_SHA"/);
   assert.equal(gateStep.env.HEAD_SHA, '${{ github.event.pull_request.head.sha }}');
 
-  // The capture deadline is READ from the producer, never restated.
+  // The capture deadline is READ from the producer, never restated. The producer is a chain —
+  // select, the render shards (which run side by side), then capture — so its budget is the sum.
   const declaredCaptureMinutes = Number(flagValue(gateStep.run, '--capture-timeout-minutes'));
+  const producerJobs = parseJobs(captureSource);
+  const chain = ['select', 'render', 'capture'];
+  for (const name of chain) {
+    assert.ok(
+      Number(producerJobs[name]?.['timeout-minutes']) > 0,
+      `pr-screenshots.yml's ${name} job declares no timeout-minutes`
+    );
+  }
   assert.equal(
     declaredCaptureMinutes,
-    Number(capture['timeout-minutes']),
-    "the gate's --capture-timeout-minutes must equal capture's real timeout-minutes"
+    chain.reduce((sum, name) => sum + Number(producerJobs[name]['timeout-minutes']), 0),
+    "the gate's --capture-timeout-minutes must equal the producer chain's summed timeout-minutes"
   );
   assert.equal(flagValue(gateStep.run, '--capture-workflow'), 'pr-screenshots.yml');
 

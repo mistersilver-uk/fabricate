@@ -3101,6 +3101,7 @@ test('every lab input the registry cannot attribute selects surface coverage', (
     'tests/view-lab/world/labNobodyHasAttributedThisYet.js',
     'scripts/lib/foundryChromeSpec.js',
     'scripts/view-lab-screenshots.mjs',
+    'scripts/lib/viewLabRenderPool.js',
   ]) {
     assert.deepEqual(
       selectedIds([file]),
@@ -5106,12 +5107,37 @@ test('the capture workflow renders and publishes the one id list it computed', (
     1,
     'a second id list would let render and publish disagree about what the PR selected'
   );
+  // Sharded (issue 2119): the shard plan is cut from that same list, each render shard consumes
+  // its own slice of it, and the merge is checked against the whole list before anything publishes.
   assert.match(
     workflow,
-    /CASE_IDS: \$\{\{ steps\.select\.outputs\.ids }}/,
-    "the renderer must consume the selection step's own output"
+    /view-lab-shards\.mjs plan "\$IDS" "\$HAS_UI"/,
+    'the shard plan must be cut from the one computed id list'
   );
-  assert.match(workflow, /view-lab-screenshots\.mjs apps "\$CASE_IDS"/);
+  assert.match(workflow, /include: \$\{\{ fromJSON\(needs\.select\.outputs\.matrix\) }}/);
+  assert.match(
+    workflow,
+    /CASE_IDS: \$\{\{ matrix\.ids }}\n\s+run: node scripts\/view-lab-screenshots\.mjs apps "\$CASE_IDS"/,
+    'each render shard must render exactly its own slice'
+  );
+  assert.match(
+    workflow,
+    /CASE_IDS: \$\{\{ needs\.select\.outputs\.ids }}\n\s+run: node scripts\/view-lab-shards\.mjs merge "\$CASE_IDS" ui-screenshot-artifact\/shards ui-screenshot-artifact\/apps/,
+    'the merge must account for the whole selection and write the directory publish reads'
+  );
+  assert.match(workflow, /name: view-lab-shard-\$\{\{ matrix\.shard }}/);
+  assert.match(workflow, /pattern: view-lab-shard-\*\n\s+path: ui-screenshot-artifact\/shards/);
+  // Only PNGs and the manifest leave a shard, named file by file (the LICENSING header).
+  assert.match(
+    workflow,
+    /path: \|\n\s+ui-screenshot-artifact\/apps\/\*\.png\n\s+ui-screenshot-artifact\/apps\/manifest\.json\n/
+  );
+  assert.doesNotMatch(workflow, /path:[^\n]*foundry-chrome/);
+  // The chrome-dependent suites verify one harvest, so they run on one shard rather than on all.
+  assert.match(
+    workflow,
+    /- name: Run every chrome-dependent suite[^\n]*\n(?:\s+#[^\n]*\n)*\s+if: matrix\.shard == 1\n/
+  );
 
   // The publish step names the directory the renderer writes. Derived from the runner rather than
   // trusted twice, so a moved output directory fails here instead of publishing an empty set.

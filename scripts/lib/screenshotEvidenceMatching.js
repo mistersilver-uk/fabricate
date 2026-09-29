@@ -29,8 +29,9 @@ export const POLL_INTERVAL_MS = 20_000;
 export const MAX_POLLS = 360;
 
 /**
- * The producer's own job timeout, as a default. `--capture-timeout-minutes` pins this to
- * `capture`'s real `timeout-minutes` in `pr-screenshots.yml`, and Task 6 asserts the two agree.
+ * The producer's own timeout, as a default. `--capture-timeout-minutes` pins this to the summed
+ * `timeout-minutes` of `pr-screenshots.yml`'s select, render and capture jobs, and Task 6 asserts
+ * the two agree.
  */
 export const CAPTURE_TIMEOUT_MS = 75 * 60_000;
 
