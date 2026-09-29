@@ -419,19 +419,20 @@ test('the runner applies 1.21.0 to craftingSystems and bumps the migration versi
 
   const result = await runnerOver(store).run();
 
-  // TEN migrations run from 1.20.0, not one: `1.22.0` follows this one in the ladder and lifts the
+  // Migrations run from 1.20.0, not one: `1.22.0` follows this one in the ladder and lifts the
   // catalogue to the system level (issue 1095), `1.23.0` merges it with the gathering
   // character-modifier library (issue 1117), `1.24.0` marks the routed DC-source downgrade boundary
   // (issue 1096) as a deliberate no-op, `1.25.0` seeds the failure-result policy to `never` on
   // every existing check (issue 1098), `1.26.0` lifts the currency configuration to world scope
   // (issue 1278), `1.27.0` lifts travel — realms and their map links — to world scope too (issue
   // 1282), `1.28.0` lifts both character libraries (issue 1308), `1.29.0` folds manual force lists
-  // into their picked lists (issue 1315), and `1.30.0` lifts components, essences and tools to
-  // world scope (issue 1363), and `1.31.0` backfills each system's own tool prerequisites and check
-  // bonus as its own override (issue 1373).
-  assert.equal(result.ran, 14);
+  // into their picked lists (issue 1315), `1.30.0` lifts components, essences and tools to
+  // world scope (issue 1363), `1.31.0` backfills each system's own tool prerequisites and check
+  // bonus as its own override (issue 1373), through `1.34.0`'s essence merge and `1.35.0`'s
+  // alchemy break-tools-on-fail default (issue 2100).
+  assert.equal(result.ran, 15);
   assert.equal(store.get('craftingSystems')[0].craftingCheck.simple.rollFormula, '1d20');
-  assert.equal(store.get('migrationVersion'), '1.34.0');
+  assert.equal(store.get('migrationVersion'), '1.35.0');
 });
 
 // THE CHANNEL. The counts reach `main.js` ONLY through a transient field the runner

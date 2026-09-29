@@ -1998,7 +1998,7 @@ export class CraftingEngine {
       ? this._getRecipeSystem(prepared.executionRecipe)?.alchemy?.consumeOnFail !== false
       : failurePolicy.consumeIngredientsOnFail;
     const shouldConsume = succeeded || consumeOnFailure;
-    const shouldUseTools = succeeded || alchemySimpleFailure || failurePolicy.breakToolsOnFail;
+    const shouldUseTools = succeeded || failurePolicy.breakToolsOnFail;
     const state = {
       consumedItems: [],
       usedTools: [],
@@ -3711,6 +3711,9 @@ export class CraftingEngine {
     runManager,
     run,
   }) {
+    // Same gate as `_resolveAlchemySimpleFailure`: `null` tells the shared producer to compute
+    // and apply breakage, so an OFF policy must pre-empty it rather than pass `null` through.
+    const failurePolicy = this._getFailureConsumptionPolicy(executionRecipe);
     return this._produceAlchemyFailureResults({
       craftingActor,
       componentSourceActors,
@@ -3722,7 +3725,7 @@ export class CraftingEngine {
       consumedItems,
       consumedRunRefs,
       toolItems,
-      usedTools: null,
+      usedTools: failurePolicy.breakToolsOnFail ? null : [],
       resolvedEssences,
       resultGroupId: null,
       checkResult,
@@ -3753,6 +3756,7 @@ export class CraftingEngine {
   }) {
     const system = this._getRecipeSystem(executionRecipe);
     const consumeOnFail = system?.alchemy?.consumeOnFail !== false;
+    const failurePolicy = this._getFailureConsumptionPolicy(executionRecipe);
 
     let consumedItems = [];
     let usedTools = [];
@@ -3773,17 +3777,21 @@ export class CraftingEngine {
         });
         await this._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
       }
-      const breakDecision = this._resolveCraftingBreakageDecision(
-        system,
-        executionRecipe,
-        checkResult
-      );
-      usedTools = await this._applyToolBreakage(executionRecipe, toolValidation.tools, {
-        forceBreak: breakDecision.forceBreak,
-        authority: breakDecision.authority,
-        reason: breakDecision.reason,
-        triggerId: breakDecision.triggerId,
-      });
+      if (failurePolicy.breakToolsOnFail) {
+        // Mirrors `resolveCheckFailure`'s crafting-path gate: `breakToolsOnFail` alone decides
+        // whether tools are at risk; a fired trigger only decides the mode within the call.
+        const breakDecision = this._resolveCraftingBreakageDecision(
+          system,
+          executionRecipe,
+          checkResult
+        );
+        usedTools = await this._applyToolBreakage(executionRecipe, toolValidation.tools, {
+          forceBreak: breakDecision.forceBreak,
+          authority: breakDecision.authority,
+          reason: breakDecision.reason,
+          triggerId: breakDecision.triggerId,
+        });
+      }
     } catch (consumptionError) {
       if (consumptionError.code === 'HISTORY_EFFECT_UNCERTAIN') throw consumptionError;
       console.error(
