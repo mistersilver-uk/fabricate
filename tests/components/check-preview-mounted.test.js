@@ -1030,9 +1030,10 @@ describe('roll-under preview, odds and readiness (issue 2003)', () => {
       /IssueAttributePathUnresolvedForPreview:\{"actor":"Bare Hands","path":"@prof"\}/u,
       'the detail is the Validation sentence, naming the actor and the path'
     );
-    assert.ok(
-      !root.querySelector('[data-checks-section-callout="attributePathUnresolvedForPreview"]'),
-      'a titled issue is a notice, not a second callout'
+    assert.equal(
+      root.querySelectorAll('[data-checks-section-notice="attributePathUnresolvedForPreview"]').length,
+      1,
+      'the issue is explained once, by its notice'
     );
     assert.equal(dots(), before, 'a transient warning puts no dot on a section');
   });

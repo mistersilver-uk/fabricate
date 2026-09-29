@@ -615,7 +615,7 @@ export const CASES = Object.freeze([
     expectSelector:
       '.fabricate-manager' +
       ':has([data-crafting-modifier-max-picks="1"])' +
-      ':has([data-checks-section-callout="modifierAverageUnavailable"])',
+      ':has([data-checks-section-notice="modifierAverageUnavailable"][data-notice-tone="warning"])',
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,

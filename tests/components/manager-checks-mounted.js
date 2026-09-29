@@ -3107,32 +3107,32 @@ export function registerChecksCases() {
     await tick();
     flushSync();
     await openChecksSection('modifiers');
-    const calloutSelector = '[data-checks-section-callout="modifierAverageUnavailable"]';
-    assert.ok(!target.querySelector(calloutSelector), 'addAll has no transformed-ranking warning');
+    const noticeSelector = '[data-checks-section-notice="modifierAverageUnavailable"]';
+    assert.ok(!target.querySelector(noticeSelector), 'addAll has no transformed-ranking warning');
 
     const highest = target.querySelector(
       '[data-crafting-modifier-policy-option="highest"] input'
     );
     assert.ok(highest, 'the production highest policy input renders');
     await settleControl(highest);
-    const highestWarning = target.querySelector(calloutSelector);
+    const highestWarning = target.querySelector(noticeSelector);
     assert.ok(highestWarning, 'highest over two entries warns about the transformed one');
-    assert.equal(highestWarning.getAttribute('data-callout-tone'), 'info');
+    assert.equal(highestWarning.getAttribute('data-notice-tone'), 'warning');
     assert.ok(highestWarning.textContent.includes('Medicine'), 'the warning names the entry');
 
     const eligibility = target.querySelector('[data-crafting-modifier-eligibility-input="med"]');
     assert.ok(eligibility, 'the production eligibility control renders');
     await settleControl(eligibility);
-    assert.ok(!target.querySelector(calloutSelector), 'the warning clears when the entry is ineligible');
+    assert.ok(!target.querySelector(noticeSelector), 'the warning clears when the entry is ineligible');
     await settleControl(eligibility);
-    assert.ok(target.querySelector(calloutSelector), 'the warning returns when the entry is eligible');
+    assert.ok(target.querySelector(noticeSelector), 'the warning returns when the entry is eligible');
 
     const playerPicks = target.querySelector(
       '[data-crafting-modifier-policy-option="playerPicks"] input'
     );
     assert.ok(playerPicks, 'the production playerPicks policy input renders');
     await settleControl(playerPicks);
-    assert.ok(!target.querySelector(calloutSelector), 'an uncapped playerPicks ranks nothing out');
+    assert.ok(!target.querySelector(noticeSelector), 'an uncapped playerPicks ranks nothing out');
     const maxPicksInput = target.querySelector('[data-crafting-modifier-max-picks-input]');
     assert.ok(maxPicksInput, 'the selecting policy renders its cap input');
     const typeCap = (value) => {
@@ -3141,10 +3141,10 @@ export function registerChecksCases() {
       flushSync();
     };
     typeCap('1');
-    assert.ok(target.querySelector(calloutSelector), 'a cap below the eligible count warns');
+    assert.ok(target.querySelector(noticeSelector), 'a cap below the eligible count warns');
     assert.ok(Boolean(target.querySelector(selector)), 'the capped, warning state is the frame');
     typeCap('');
-    assert.ok(!target.querySelector(calloutSelector), 'clearing the cap clears the warning');
+    assert.ok(!target.querySelector(noticeSelector), 'clearing the cap clears the warning');
     unmount(mounted);
     mounted = null;
     target.remove();
@@ -3647,24 +3647,114 @@ export function registerChecksCases() {
     );
   });
 
-  it('explains the open section’s warning dot IN the panel', async () => {
+  /** Click a section notice's Review and let the deferred focus move land. */
+  async function reviewNotice(id) {
+    target.querySelector(`[data-checks-section-notice="${id}"] [data-notice-action]`).click();
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      flushSync();
+      await tick();
+    }
+    return target.ownerDocument.activeElement;
+  }
+
+  const noticeIds = () =>
+    [...target.querySelectorAll('[data-checks-section-notice]')].map((notice) =>
+      notice.getAttribute('data-checks-section-notice')
+    );
+
+  it('explains the open section’s warning dot IN the panel, as an amber notice first', async () => {
     // The dot's legend (DN8). Without it the only route to the sentence is to leave for
-    // Validation and deep-link back.
+    // Validation and deep-link back. Issue 2082: every issue is a titled amber notice.
     await mountChecks([], routedCraftingOptions(''));
     await openChecksActivity('crafting');
-    const callout = target.querySelector('[data-checks-section-callout="noRollFormula"]');
-    assert.ok(callout, 'the roll section explains its own dot');
-    assert.match(callout.textContent, /no roll formula/i);
+    const notice = target.querySelector('[data-checks-section-notice="noRollFormula"]');
+    assert.ok(Boolean(notice), 'the roll section explains its own dot');
+    assert.equal(notice.getAttribute('data-notice-tone'), 'warning', 'amber, as the prototype draws it');
+    assert.equal(notice.querySelector('.fab-notice-title').textContent.trim(), 'The check has no roll formula');
     assert.equal(
-      callout.getAttribute('data-callout-tone'),
-      'info',
-      'a non-blocking issue is guidance, not a hazard'
+      notice.querySelector('.fab-notice-detail').textContent.trim(),
+      'Nothing is rolled, so this check cannot resolve until you enter a formula.'
+    );
+    const panel = target.querySelector('[role="tabpanel"]');
+    assert.ok(
+      panel.firstElementChild.matches('[data-checks-section-notices="roll"]'),
+      'the notices open the pane, above its heading and the mode callout'
+    );
+    assert.ok(!target.querySelector('[data-checks-section-callout]'), 'no readiness issue is a callout');
+    const focused = await reviewNotice('noRollFormula');
+    assert.ok(
+      focused === target.querySelector('[data-validation-target="checks-roll-formula"]'),
+      'Review focuses the roll formula the issue names'
     );
     // A section with no issue of its own carries none.
     await openChecksSection('triggers');
     assert.ok(
-      !target.querySelector('[data-checks-section-callout]'),
+      !target.querySelector('[data-checks-section-notices]'),
       'Triggers owns no open issue here, so it states nothing'
+    );
+  });
+
+  it('sorts a section’s blocking notices above its warnings, as Validation orders its rows', async () => {
+    // A refused placement raises the warning `noRollFormula` BEFORE the critical it causes.
+    await mountChecks([], routedCraftingOptions('1d20 * @craftingmod'));
+    await openChecksActivity('crafting');
+    assert.deepEqual(noticeIds(), ['retiredPlaceholderBreaksFormula', 'noRollFormula']);
+    for (const notice of target.querySelectorAll('[data-checks-section-notice]')) {
+      assert.equal(notice.getAttribute('data-notice-tone'), 'warning', 'every notice is amber');
+    }
+  });
+
+  it('focuses the section itself when a notice’s issue names no control', async () => {
+    await mountChecks([], {
+      ...routedCraftingOptions('1d20'),
+      craftingCheck: {
+        enabled: true,
+        routed: {
+          rollFormula: '1d20',
+          type: 'relative',
+          relativeOutcomes: [{ id: 'x', name: '', success: true, dc: 0 }],
+        },
+      },
+    });
+    await openChecksActivity('crafting');
+    await openChecksSection('outcomes');
+    const notice = target.querySelector('[data-checks-section-notice="unnamedOutcome"]');
+    assert.ok(Boolean(notice), 'Outcomes explains its unnamed tier');
+    assert.equal(notice.querySelector('.fab-notice-title').textContent.trim(), 'An outcome tier has no name');
+    const focused = await reviewNotice('unnamedOutcome');
+    assert.ok(focused === target.querySelector('[role="tabpanel"]'), 'Review focuses the Outcomes panel');
+  });
+
+  it('focuses the trigger list when a trigger’s target tier is missing', async () => {
+    await mountChecks([], {
+      ...routedCraftingOptions('1d20'),
+      craftingCheck: {
+        enabled: true,
+        routed: {
+          rollFormula: '1d20',
+          type: 'relative',
+          relativeOutcomes: [{ id: 'x', name: 'Success', success: true, dc: 0 }],
+          checkBreakage: {
+            triggers: [
+              {
+                id: 't1',
+                condition: { type: 'rollTotal', operator: '<=', value: 1 },
+                outcome: 'none',
+                breakTools: false,
+                tierStep: { mode: 'target', steps: 1, tierId: 'gone' },
+              },
+            ],
+          },
+        },
+      },
+    });
+    await openChecksActivity('crafting');
+    await openChecksSection('triggers');
+    assert.deepEqual(noticeIds(), ['danglingTierStepTarget']);
+    const focused = await reviewNotice('danglingTierStepTarget');
+    assert.ok(
+      focused === target.querySelector('[data-validation-target="checks-triggers"]'),
+      'Review focuses the trigger list'
     );
   });
 
