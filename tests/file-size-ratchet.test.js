@@ -4,8 +4,7 @@
  * `ratchet-exempt(file-size): <reason>` marker at the unit says why. Engine: `mergeBaseRatchet.js`.
  */
 import assert from 'node:assert/strict';
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, extname, join, resolve } from 'node:path';
+import { extname, resolve } from 'node:path';
 import test, { after } from 'node:test';
 
 import { byCodePoint } from './helpers/codePointOrder.js';
@@ -215,17 +214,10 @@ after(() => {
 function srcRepo(files) {
   const repo = createTempGitRepo('file-size-ratchet-');
   repos.push(repo);
-  const write = (entries) => {
-    for (const [file, text] of Object.entries(entries)) {
-      mkdirSync(dirname(join(repo.dir, file)), { recursive: true });
-      writeFileSync(join(repo.dir, file), text);
-    }
-  };
-  write(files);
-  repo.git('add', '-A');
-  const first = repo.commit('base');
+  repo.write(files);
+  const first = repo.commitAll('base');
   const compare = () => compareFileSizes({ cwd: repo.dir, env: { RATCHET_BASE: first } });
-  return { write, compare };
+  return { write: repo.write, compare };
 }
 
 /** An exported function spanning exactly `size` physical lines, `marker` on the line above. */

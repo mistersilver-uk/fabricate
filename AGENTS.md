@@ -135,7 +135,8 @@ This workflow produced each of these shapes repeatedly, and each already has a r
 
 Each ledger is a ceiling rather than an exact count, so a unit that stays under its row costs no ledger edit at all; a ceiling is raised in a feature PR only with the reason stated in the PR, and lowered by this epic's sweeps with `TIGHTEN_<X>_LEDGER=1`.
 A ceiling gate cannot tell that a condensation sweep finished, so a PR whose stated purpose is condensation, extraction or pin conversion runs that tighten mode for every ledger it moves and commits the result, and a reviewer treats a sweep PR that leaves those ledgers byte-identical as `NEEDS_CHANGES`.
-`tests/source-pin-ratchet.test.js` and `npm run lint` carry no headroom, because one more pin or bare read is never the same debt as the last one, so there the gate enforces that obligation itself: a row left above the unit it bounds fails as `SLACK` and is banked with the tighten mode in the same PR that earned it.
+`npm run lint` allows no rise in a file's count of bare Foundry-global reads against the base commit, because one more bare read is never the same debt as the last one, so a legitimate new read carries a `ratchet-exempt(lint): <reason>` marker on its line instead of a banked row.
+`tests/source-pin-ratchet.test.js` allows no rise in a file's pin count against the base commit, because one more pin is never the same debt as the last one, so a legitimate new pin carries a `ratchet-exempt(source-pin): <reason>` marker at its site instead of a banked row.
 
 ## FoundryVTT Notes and Architecture Pointers
 

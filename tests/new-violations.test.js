@@ -3,7 +3,7 @@
  * (`scripts/lib/newViolations.js`), proved here against a temporary git repository.
  */
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 
@@ -41,14 +41,8 @@ const CLEAN = 'export const a = 1;\n';
 /** A repository whose first commit holds `files`, and helpers to edit and gate its tree. */
 function fixture(files) {
   const repo = createTempGitRepo('fab-new-violations-');
-  const write = (entries) => {
-    for (const [file, text] of Object.entries(entries)) {
-      writeFileSync(path.join(repo.dir, file), text);
-    }
-  };
-  write(files);
-  repo.git('add', '-A');
-  const base = repo.commit('base');
+  repo.write(files);
+  const base = repo.commitAll('base');
   const env = { RATCHET_BASE: base };
   const lint = (options = {}) =>
     lintAgainstBase({
@@ -58,7 +52,7 @@ function fixture(files) {
       ...options,
     });
   const format = () => formatAgainstBase({ cwd: repo.dir, env });
-  return { ...repo, base, write, lint, format };
+  return { ...repo, base, lint, format };
 }
 
 async function withFixture(files, run) {

@@ -561,7 +561,7 @@ So a change that repeats a component's markup — the same field pair written fo
 They used to enumerate about eighty paths each, so a new file was linted by nothing until somebody remembered to add it, which is the trap that let a new BUG and a new VULNERABILITY reach SonarCloud in issue 933.
 The not-yet-clean files are held at the base commit's findings rather than listed: a changed file fails on a `(file, rule)` count above its base content's, and every rule stays armed on it — deliberately not an `ignores` entry, which would take the file out of ESLint's reach entirely, `no-undef` included, while the linted-file count went up.
 Formatting debt is held the same way: a file Prettier-clean at base, or new, must stay clean.
-`npm run lint` compares with `RATCHET_BASE` when it is set and with the merge base of `origin/main` otherwise, so run `git fetch origin main` if it names code you did not touch; it runs as a step of the `lint` CI job rather than from `npm test`, because answering that means linting the largest files in the tree.
+`npm run lint` compares with `RATCHET_BASE` when it is set and with the merge base of `origin/main` otherwise, so run `git fetch origin main` if it names code you did not touch; it runs as a step of the `lint` CI job rather than from `npm test`, because it lints the whole tree.
 `tests/new-violations.test.js` proves both comparisons against a temporary repository, including that `no-undef` and a parse error fail at any count.
 When you bring a file to green there is nothing to update, because the comparison reports the fall; widen nothing else in the same PR, since reformatting counts as new code and surfaces pre-existing Sonar findings.
 The `scripts/**` debt is fifteen of its thirty-three files, and stays that way for a measured reason: the Foundry smoke harness alone accounts for 844 of the roughly one thousand ESLint findings there and pins its Phase D0 selectors by class, index and button text with no unit coverage, so clearing it is a large triage against the least-covered file here rather than a tidy-up.
@@ -627,7 +627,7 @@ That is deliberately not an `ignores` entry: ignoring a file takes it out of ESL
 So the debt only shrinks: a finding fixed in a file lowers the base the next change to that file is compared with.
 
 - `npm run lint` fails `no-undef` and a parse error at any count, and excuses a regression only where a `// ratchet-exempt(lint): <reason>` comment sits on the finding's line or in the comment lines right above it; an empty reason fails.
-  It is a step of the `lint` CI job rather than a unit test because answering it means linting the largest files in the tree, and twenty-three CPU-bound seconds do not belong in the unit-test job.
+  It is a step of the `lint` CI job rather than a unit test because it lints the whole tree, and more than a minute of CPU-bound work does not belong in the unit-test job.
 - `tests/lint-coverage.test.js` asserts `no-undef` is armed in every part of the tree and pins both ignore lists.
 - Formatting debt is held by `npm run format:check` (`scripts/format-check.mjs`) the same way, and `npm run format` formats exactly the files it fails.
 

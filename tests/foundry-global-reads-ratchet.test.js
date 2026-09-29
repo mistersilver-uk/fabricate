@@ -4,7 +4,7 @@
  * value. The rule sees BARE references alone, so `globalThis.game?.…` reads are out of scope.
  */
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 
@@ -54,11 +54,9 @@ test('npm run lint fails one more bare read in a file that already has some', as
   try {
     const file = 'src/systems/Debted.js';
     const read = (name) => `export function ${name}() {\n  return game.user;\n}\n`;
-    mkdirSync(path.join(repo.dir, 'src/systems'), { recursive: true });
-    writeFileSync(path.join(repo.dir, file), read('first'));
-    repo.git('add', '-A');
-    const base = repo.commit('base');
-    writeFileSync(path.join(repo.dir, file), `${read('first')}${read('second')}`);
+    repo.write({ [file]: read('first') });
+    const base = repo.commitAll('base');
+    repo.write({ [file]: `${read('first')}${read('second')}` });
     const domainBlocks = config.filter((block) => block.rules?.[RULE]);
     assert.ok(domainBlocks.length > 0, 'the real config still arms the rule somewhere');
     const outcome = await lintAgainstBase({

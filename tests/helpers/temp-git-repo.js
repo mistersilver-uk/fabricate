@@ -4,7 +4,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -30,8 +30,10 @@ export function envWithoutGitLocation(base = process.env) {
 
 /**
  * @returns {{dir: string, git: (...args: string[]) => string, commit: (message: string) => string,
+ *   write: (files: Record<string, string>) => void, commitAll: (message: string) => string,
  *   dispose: () => void}} The repository, a git runner returning trimmed stdout, an empty-commit
- *   helper returning the new commit's sha, and a cleanup.
+ *   helper and a commit-everything helper each returning the new sha, a writer of repo-relative
+ *   files, and a cleanup.
  */
 export function createTempGitRepo(prefix = 'fab-git-') {
   if (!GIT) throw new Error('git is not on an absolute PATH entry');
@@ -44,6 +46,16 @@ export function createTempGitRepo(prefix = 'fab-git-') {
     git('commit', '-q', '--allow-empty', '-m', message);
     return git('rev-parse', 'HEAD');
   };
+  const write = (files) => {
+    for (const [file, text] of Object.entries(files)) {
+      mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
+      writeFileSync(path.join(dir, file), text);
+    }
+  };
+  const commitAll = (message) => {
+    git('add', '-A');
+    return commit(message);
+  };
   const dispose = () => rmSync(dir, { recursive: true, force: true });
-  return { dir, git, commit, dispose };
+  return { dir, git, commit, write, commitAll, dispose };
 }
