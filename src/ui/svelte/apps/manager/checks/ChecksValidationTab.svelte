@@ -20,7 +20,7 @@
     evaluateCheckReadiness,
     sectionForIssue,
   } from './checksReadiness.js';
-  import { checksValidationRowStates } from './checksValidationRows.js';
+  import { checksValidationRowStates, issueRowStatus } from './checksValidationRows.js';
 
   let {
     sections = [],
@@ -80,11 +80,11 @@
   // A group with NEITHER still states its result, which is reachable: a gathering check in
   // `d100` mode with no eligible modifiers reports no tick and no issue, and dropping the group
   // would read as "gathering was not evaluated", a different and equally wrong claim.
-  function issueRow(subsystem, issue, { transient = false, checkId = '' } = {}) {
+  function issueRow(subsystem, issue, { transient = false, checkId = '', status } = {}) {
     return {
       id: checkId || issue.id,
       ...checkIssueText(issue.id, issue.data, text),
-      status: issue.severity === 'critical' ? 'block' : 'warn',
+      status: status ?? issueRowStatus(issue),
       transient,
       target: { activity: subsystem, section: sectionForIssue(issue.id) },
       // NO KEY rather than an empty one for a route-only row: the host resolves any non-empty
@@ -100,21 +100,27 @@
     };
   }
 
-  function passRow(subsystem, checkId) {
+  // `status` rides from `checksValidationRowStates` rather than defaulting to 'pass' here: an
+  // unsatisfied check no issue claims is a WARN cross, never a false-green pass (issue 2106 review).
+  function tickRow(subsystem, checkId, satisfied, status) {
     return {
       id: checkId,
       title: checkLabel(checkId),
-      status: 'pass',
-      dataAttrs: { 'data-subsystem': subsystem, 'data-satisfied': 'true' },
+      status,
+      dataAttrs: { 'data-subsystem': subsystem, 'data-satisfied': String(satisfied) },
     };
   }
 
   function rowsFor(subsystem, readiness) {
     const rows = [
-      ...checksValidationRowStates(readiness).map(({ checkId, issue }) =>
-        issue ? issueRow(subsystem, issue, { checkId }) : passRow(subsystem, checkId)
+      ...checksValidationRowStates(readiness).map(({ checkId, satisfied, issue, status }) =>
+        issue
+          ? issueRow(subsystem, issue, { checkId, status })
+          : tickRow(subsystem, checkId, satisfied, status)
       ),
-      ...(readiness.transient ?? []).map((issue) => issueRow(subsystem, issue, { transient: true })),
+      ...(readiness.transient ?? []).map((issue) =>
+        issueRow(subsystem, issue, { transient: true })
+      ),
     ];
     if (rows.length > 0) return rows;
     return [

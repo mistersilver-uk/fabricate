@@ -2,10 +2,12 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  CHECK_NEVER_FAILS,
   CHECK_TO_ISSUES,
   checksValidationRowStates,
 } from '../src/ui/svelte/apps/manager/checks/checksValidationRows.js';
 import { CHECK_READINESS_ISSUE_IDS } from '../src/ui/svelte/apps/manager/checks/checksReadiness.js';
+import { CHECK_TICK_LABELS } from '../src/ui/svelte/apps/manager/checks/checksCopy.js';
 
 const check = (id, satisfied) => ({ id, satisfied });
 const issue = (id, severity = 'warning', data = null) => ({ id, severity, data });
@@ -25,6 +27,37 @@ describe('CHECK_TO_ISSUES', () => {
   });
 });
 
+// THE COMPLETENESS GUARD (issue 2106 review): a check id in neither map fails silently GREEN,
+// exactly the `progressiveHigherIsBetter` defect this round found — `checksValidationRowStates`
+// falls through to `issueRowStatus(null)`, which used to be masked by `ChecksValidationTab`'s
+// `passRow` fallback rather than caught here. `CHECK_TICK_LABELS` is the tick-id source of truth
+// `tests/checks-readiness.test.js` already proves exhaustive against the evaluator's own branches.
+describe('every check id is mapped to an owning issue, or explicitly never fails', () => {
+  const tickIds = Object.keys(CHECK_TICK_LABELS);
+
+  it('is a non-vacuous sweep', () => {
+    assert.ok(tickIds.length >= 20, 'CHECK_TICK_LABELS was read');
+  });
+
+  it('CHECK_TO_ISSUES and CHECK_NEVER_FAILS are disjoint', () => {
+    const overlap = CHECK_NEVER_FAILS.filter((id) => Object.hasOwn(CHECK_TO_ISSUES, id));
+    assert.deepEqual(overlap, [], 'an id in both is a contradiction — it both fails and never does');
+  });
+
+  it('covers every tick id, and FAILS if a mapping is removed', () => {
+    const unmapped = tickIds.filter(
+      (id) => !Object.hasOwn(CHECK_TO_ISSUES, id) && !CHECK_NEVER_FAILS.includes(id)
+    );
+    assert.deepEqual(
+      unmapped,
+      [],
+      'these ids own no issue and are not declared exempt, so an unsatisfied check would ' +
+        'fall through to a bare warn cross with no issue text, or — before issue 2106\'s review ' +
+        'fix — render a false-green pass: ' + unmapped.join(', ')
+    );
+  });
+});
+
 // The behaviour issue 2083 rules on: a fault reads once, as its issue, at that issue's severity;
 // the checklist line keeps its tick/cross on the SAME row rather than adding a second one.
 describe('checksValidationRowStates', () => {
@@ -39,19 +72,24 @@ describe('checksValidationRowStates', () => {
       checkId: 'hasRollFormula',
       satisfied: false,
       issue: readiness.issues[0],
+      status: 'warn',
     });
   });
 
   it('leaves a satisfied check as a pass row with no issue', () => {
     const readiness = { checks: [check('hasRollFormula', true)], issues: [] };
     const rows = checksValidationRowStates(readiness);
-    assert.deepEqual(rows, [{ checkId: 'hasRollFormula', satisfied: true, issue: null }]);
+    assert.deepEqual(rows, [
+      { checkId: 'hasRollFormula', satisfied: true, issue: null, status: 'pass' },
+    ]);
   });
 
   it('gives an issue no check claims its own route-only row', () => {
     const readiness = { checks: [], issues: [issue('modifierAverageUnavailable')] };
     const rows = checksValidationRowStates(readiness);
-    assert.deepEqual(rows, [{ checkId: '', satisfied: false, issue: readiness.issues[0] }]);
+    assert.deepEqual(rows, [
+      { checkId: '', satisfied: false, issue: readiness.issues[0], status: 'warn' },
+    ]);
   });
 
   // A check that can fail two independent ways at once (issue 975): both are real, distinct
@@ -69,8 +107,27 @@ describe('checksValidationRowStates', () => {
       checkId: 'tierStepTargetsResolve',
       satisfied: false,
       issue: dangling,
+      status: 'warn',
     });
-    assert.deepEqual(rows[1], { checkId: '', satisfied: false, issue: ambiguous });
+    assert.deepEqual(rows[1], {
+      checkId: '',
+      satisfied: false,
+      issue: ambiguous,
+      status: 'warn',
+    });
+  });
+
+  // THE FALSE-GREEN REGRESSION (issue 2106 review): an unsatisfied check with NO claimed issue —
+  // whether `CHECK_TO_ISSUES` names an owner the readiness result did not actually raise, or an id
+  // has no owner at all — must never read `pass`. Before this fix `ChecksValidationTab`'s
+  // `issue ? issueRow(...) : passRow(...)` sent every unclaimed row through `passRow`, which
+  // hard-coded `status: 'pass'` regardless of `satisfied`.
+  it('is warn, never a false-green pass, for an unsatisfied check no issue claims', () => {
+    const readiness = { checks: [check('progressiveHigherIsBetter', false)], issues: [] };
+    const rows = checksValidationRowStates(readiness);
+    assert.deepEqual(rows, [
+      { checkId: 'progressiveHigherIsBetter', satisfied: false, issue: null, status: 'warn' },
+    ]);
   });
 
   // THE REGRESSION THIS ISSUE FIXES: success-counting checks (issue 2004) can fail up to seven
