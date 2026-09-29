@@ -515,10 +515,25 @@ const RENAMED = [
       'Domain and runtime logic lives under `src/models/`, `src/systems/`, `src/utils/`, `src/config/`, and related `src/` modules.',
     identifiers: [['`src/utils/`, `src/config/`', '`src/utils/`, `src/integrations/`, `src/config/`']],
   },
+  // Issue 2118 replaced the file-size ledger with a merge-base ratchet test.
+  {
+    before:
+      'Adding to the nearest large file or function instead of extracting a unit, answered by `tests/file-size-ledger.txt`.',
+    after:
+      'Adding to the nearest large file or function instead of extracting a unit, answered by `tests/file-size-ratchet.test.js`.',
+    identifiers: [['`tests/file-size-ratchet.test.js`', '`tests/file-size-ledger.txt`']],
+  },
+  {
+    before:
+      'The four ratchet ledgers issue #1656 added — `tests/comment-share-ledger.txt`, `tests/file-size-ledger.txt`, `tests/source-pin-ledger.txt` and `tests/foundry-global-reads-ledger.txt` — are ceiling gates whose rows change only when a unit crosses its ceiling, so lanes that share them no longer need one rail (issue #1914).',
+    after:
+      'The four ratchet ledgers issue #1656 added — `tests/comment-share-ledger.txt`, `tests/file-size-ratchet.test.js`, `tests/source-pin-ledger.txt` and `tests/foundry-global-reads-ledger.txt` — are ceiling gates whose rows change only when a unit crosses its ceiling, so lanes that share them no longer need one rail (issue #1914).',
+    identifiers: [['`tests/file-size-ratchet.test.js`', '`tests/file-size-ledger.txt`']],
+  },
 ];
 
 /** Pinned for the same reason as DEDUPLICATED_COUNT. */
-const RENAMED_COUNT = 27;
+const RENAMED_COUNT = 29;
 
 /** Everything `extract` yields from the post-split set, as one multiset. */
 function survivingLines(extract) {
