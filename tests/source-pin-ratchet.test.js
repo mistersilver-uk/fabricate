@@ -85,6 +85,7 @@ const SCAN_HELPERS = Object.freeze({
   'tests/helpers/manager/managerCompile.js': 'fixture',
   'tests/helpers/manager/managerLocalization.js': 'fixture',
   'tests/helpers/manager/managerStylesheet.js': 'ast',
+  'tests/helpers/mergeBaseRatchet.js': 'corpus',
   'tests/helpers/parsedSource.js': 'ast',
   'tests/helpers/primitiveAdoptionContract.js': 'legacy-scan',
   'tests/helpers/primitiveSourceContract.js': 'legacy-scan',
