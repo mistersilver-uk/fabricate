@@ -10,6 +10,7 @@ import { subKeyEntries } from '../systems/scopedDefinitionStore.js';
 import { cloneJson, isPlainObject } from '../utils/scalars.js';
 
 import { mergeEquivalentWorldEssences } from './mergeEquivalentWorldEssences.js';
+import { applyAlchemyBreakToolsOnFailDefault } from './migrateAlchemyBreakToolsOnFail.js';
 import {
   buildWorldCharacterLibraries,
   stripSystemCharacterLibraries,
@@ -43,6 +44,14 @@ function deriveMaxModifierPicks(migrated) {
   const system = migrated?.system;
   if (!system || typeof system !== 'object' || Array.isArray(system)) return;
   applyMaxModifierPicks(system);
+}
+
+/** Stamp the old always-break alchemy default through the `1.35.0` transform; an authored
+ * `breakToolsOnFail` always wins (issue 2100). */
+function deriveAlchemyBreakToolsOnFailDefault(migrated) {
+  const system = migrated?.system;
+  if (!system || typeof system !== 'object' || Array.isArray(system)) return;
+  applyAlchemyBreakToolsOnFailDefault(system);
 }
 
 /** Strip the retired placeholder through `1.21.0`; its counts are discarded (issue 1094). */
@@ -335,6 +344,7 @@ export function migrateExportPayload(payload) {
     const current = structuredClone(payload);
     upcastLegacyTools(current);
     deriveMaxModifierPicks(current);
+    deriveAlchemyBreakToolsOnFailDefault(current);
     retireCraftingModToken(current);
     liftCheckModifierCatalogue(current);
     unifyModifierLibraries(current);
@@ -371,6 +381,7 @@ export function migrateExportPayload(payload) {
 
   upcastLegacyTools(migrated);
   deriveMaxModifierPicks(migrated);
+  deriveAlchemyBreakToolsOnFailDefault(migrated);
   retireCraftingModToken(migrated);
   liftCheckModifierCatalogue(migrated);
   unifyModifierLibraries(migrated);

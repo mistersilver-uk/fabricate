@@ -1392,6 +1392,26 @@
                 />
                 <ToggleCard
                   variant="is-info"
+                  icon="fas fa-hammer"
+                  section="alchemy-break-tools-on-fail"
+                  field="breakToolsOnFail"
+                  title={text(
+                    'FABRICATE.Admin.SystemSettings.Alchemy.BreakToolsOnFail',
+                    'Break tools on a failed brew'
+                  )}
+                  sub={text(
+                    'FABRICATE.Admin.SystemSettings.Alchemy.BreakToolsOnFailDesc',
+                    'A matched brew that fails its check breaks the tools it uses, the same as a failed crafting check. Off by default.'
+                  )}
+                  toggleLabel={text(
+                    'FABRICATE.Admin.SystemSettings.Alchemy.BreakToolsOnFail',
+                    'Break tools on a failed brew'
+                  )}
+                  on={breakToolsOnFail}
+                  onToggle={(next) => onUpdateCraftingConsumption({ breakToolsOnFail: next })}
+                />
+                <ToggleCard
+                  variant="is-info"
                   icon="fas fa-clock-rotate-left"
                   section="alchemy-show-attempt-history"
                   field="showAttemptHistoryToPlayers"
