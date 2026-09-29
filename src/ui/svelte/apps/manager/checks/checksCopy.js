@@ -230,120 +230,54 @@ const ISSUE_PHRASES = Object.freeze({
 
 /** Every issue's short title, drawn over its sentence in the Validation row and the section
  *  notice alike (issue 2082). */
-export const CHECK_ISSUE_TITLES = Object.freeze({
-  noRollFormula: ['IssueNoRollFormulaTitle', 'The check has no roll formula'],
-  retiredPlaceholderInFormula: [
-    'IssueRetiredPlaceholderInFormulaTitle',
-    'The formula still uses @craftingmod',
-  ],
-  retiredPlaceholderBreaksFormula: [
-    'IssueRetiredPlaceholderBreaksFormulaTitle',
-    '@craftingmod breaks this formula',
-  ],
-  unnamedOutcome: ['IssueUnnamedOutcomeTitle', 'An outcome tier has no name'],
-  noSuccessOutcome: ['IssueNoSuccessOutcomeTitle', 'No tier counts as a success'],
-  rangeInvalid: ['IssueRangeInvalidTitle', 'A band ends before it starts'],
-  rangeOverlap: ['IssueRangeOverlapTitle', 'Two bands overlap'],
-  rangeGap: ['IssueRangeGapTitle', 'A gap between two bands'],
-  modifierBoundsInverted: [
-    'IssueModifierBoundsInvertedTitle',
-    "A check modifier's minimum is above its maximum",
-  ],
-  modifierBoundsUnsafe: [
-    'IssueModifierBoundsUnsafeTitle',
-    "A check modifier's bounds are out of range",
-  ],
-  modifierExpressionInvalid: [
-    'IssueModifierExpressionInvalidTitle',
-    'A check modifier cannot be rolled',
-  ],
-  modifierAverageUnavailable: [
-    'IssueModifierAverageUnavailableTitle',
-    'A check modifier has no average to rank by',
-  ],
-  modifiersInertNoCheck: [
-    'IssueModifiersInertNoCheckTitle',
-    'Check modifiers have no check to apply to',
-  ],
-  modifiersInertNoModifierSupport: [
-    'IssueModifiersInertNoModifierSupportTitle',
-    'The d100 roll cannot take check modifiers',
-  ],
-  modifiersInertNoFormula: [
-    'IssueModifiersInertNoFormulaTitle',
-    'Check modifiers have no formula to apply to',
-  ],
-  danglingTierStepTarget: [
-    'IssueDanglingTierStepTargetTitle',
-    "A trigger's target tier is missing",
-  ],
-  multipleTierStepTargets: [
-    'IssueMultipleTierStepTargetsTitle',
-    'More than one trigger sets a target tier',
-  ],
-  attributeTargetMissing: [
-    'IssueAttributeTargetMissingTitle',
-    'No character value to measure against',
-  ],
-  attributeTargetInvalid: [
-    'IssueAttributeTargetInvalidTitle',
-    'The character value cannot be worked out',
-  ],
-  attributeTierWithoutAdjustment: [
-    'IssueAttributeTierWithoutAdjustmentTitle',
-    'A recipe tier has no difficulty adjustment',
-  ],
-  adjustmentInvalidForKind: [
-    'IssueAdjustmentInvalidForKindTitle',
-    'An adjustment does not suit its kind',
-  ],
-  otherwiseTierMissing: ['IssueOtherwiseTierMissingTitle', 'No tier is marked Otherwise'],
-  multipleOtherwiseTiers: [
-    'IssueMultipleOtherwiseTiersTitle',
-    'More than one tier is marked Otherwise',
-  ],
-  progressiveUnderUnsupported: [
-    'IssueProgressiveUnderUnsupportedTitle',
-    'Lower is better cannot drive a progressive check',
-  ],
-  attributePathUnresolvedForPreview: [
-    'IssueAttributePathUnresolvedForPreviewTitle',
-    'A character path does not resolve',
-  ],
-  attributeValueNotNumeric: [
-    'IssueAttributeValueNotNumericTitle',
-    'A character value is not a number',
-  ],
-  // Success-counting pools (issue 2004); frames 07, 08 and 19 draw three of these titles.
-  countPoolInvalid: ['IssueCountPoolInvalidTitle', 'The base pool cannot be worked out'],
-  countThresholdInvalid: [
-    'IssueCountThresholdInvalidTitle',
-    'The success threshold cannot be worked out',
-  ],
-  countFaceBeyondDie: ['IssueCountFaceBeyondDieTitle', 'A face is not on the die'],
-  countExplodeUnbounded: ['IssueCountExplodeUnboundedTitle', 'The dice would explode forever'],
-  countTierWithoutSuccesses: [
-    'IssueCountTierWithoutSuccessesTitle',
-    'A recipe tier sets no successes needed',
-  ],
-  countRequiredExceedsMaxPool: [
-    'IssueCountRequiredExceedsMaxPoolTitle',
-    'Successes needed above the most dice that can be rolled',
-  ],
-  countRequiredExceedsBasePool: [
-    'IssueCountRequiredExceedsBasePoolTitle',
-    'Successes needed above the base pool',
-  ],
-  countPoolTooLarge: ['IssueCountPoolTooLargeTitle', 'The base pool is too large to roll'],
-  countPathUnresolvedForPreview: [
-    'IssueCountPathUnresolvedForPreviewTitle',
-    'A character path does not resolve',
-  ],
-  countValueNotNumericForPreview: [
-    'IssueCountValueNotNumericForPreviewTitle',
-    'A character value is not a number',
-  ],
-});
+const TITLE_FALLBACKS = {
+  noRollFormula: 'The check has no roll formula',
+  retiredPlaceholderInFormula: 'The formula still uses @craftingmod',
+  retiredPlaceholderBreaksFormula: '@craftingmod breaks this formula',
+  unnamedOutcome: 'An outcome tier has no name',
+  noSuccessOutcome: 'No tier counts as a success',
+  rangeInvalid: 'A band ends before it starts',
+  rangeOverlap: 'Two bands overlap',
+  rangeGap: 'A gap between two bands',
+  modifierBoundsInverted: "A check modifier's minimum is above its maximum",
+  modifierBoundsUnsafe: "A check modifier's bounds are out of range",
+  modifierExpressionInvalid: 'A check modifier cannot be rolled',
+  modifierAverageUnavailable: 'A check modifier has no average to rank by',
+  modifiersInertNoCheck: 'Check modifiers have no check to apply to',
+  modifiersInertNoModifierSupport: 'The d100 roll cannot take check modifiers',
+  modifiersInertNoFormula: 'Check modifiers have no formula to apply to',
+  danglingTierStepTarget: "A trigger's target tier is missing",
+  multipleTierStepTargets: 'More than one trigger sets a target tier',
+  attributeTargetMissing: 'No character value to measure against',
+  attributeTargetInvalid: 'The character value cannot be worked out',
+  attributeTierWithoutAdjustment: 'A recipe tier has no difficulty adjustment',
+  adjustmentInvalidForKind: 'An adjustment does not suit its kind',
+  otherwiseTierMissing: 'No tier is marked Otherwise',
+  multipleOtherwiseTiers: 'More than one tier is marked Otherwise',
+  progressiveUnderUnsupported: 'Lower is better cannot drive a progressive check',
+  attributePathUnresolvedForPreview: 'A character path does not resolve',
+  attributeValueNotNumeric: 'A character value is not a number',
+  countPoolInvalid: 'The base pool cannot be worked out',
+  countThresholdInvalid: 'The success threshold cannot be worked out',
+  countFaceBeyondDie: 'A face is not on the die',
+  countExplodeUnbounded: 'The dice would explode forever',
+  countTierWithoutSuccesses: 'A recipe tier sets no successes needed',
+  countRequiredExceedsMaxPool: 'Successes needed above the most dice that can be rolled',
+  countRequiredExceedsBasePool: 'Successes needed above the base pool',
+  countPoolTooLarge: 'The base pool is too large to roll',
+  countPathUnresolvedForPreview: 'A character path does not resolve',
+  countValueNotNumericForPreview: 'A character value is not a number',
+};
+
+/** Each title's key is its id's `Issue<Id>Title`, so the table above holds only the fallbacks. */
+export const CHECK_ISSUE_TITLES = Object.freeze(
+  Object.fromEntries(
+    Object.entries(TITLE_FALLBACKS).map(([id, fallback]) => [
+      id,
+      [`Issue${id[0].toUpperCase()}${id.slice(1)}Title`, fallback],
+    ])
+  )
+);
 
 const NAMESPACE = 'FABRICATE.Admin.Manager.Checks.Validation.';
 
