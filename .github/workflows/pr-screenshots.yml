@@ -66,32 +66,34 @@ jobs:
   # wait that long. `render` is the matrix of shards and `capture` merges and publishes once.
   #
   # THE TIMEOUTS ARE ONE BUDGET. `check-screenshots` waits on this workflow's whole run, and its
-  # `--capture-timeout-minutes` in `ci.yml` must equal select + the longer of render and
-  # verify-chrome (which run side by side) + capture; `tests/ci-workflow-semantics.test.js`
-  # asserts that sum. The full registry, split eight ways, is about eighty frames a runner.
+  # `--capture-timeout-minutes` in `ci.yml` must equal select + warm-foundry + the longer of
+  # render and verify-chrome (which run side by side) + capture;
+  # `tests/ci-workflow-semantics.test.js` asserts that sum. The full registry, split eight ways,
+  # is about eighty frames a runner.
   select:
     # Same-repo PRs only. A fork PR has no secrets to harvest with and no write token to publish
     # with, so running it would produce a guaranteed red that its author cannot clear.
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     permissions:
       contents: read
       pull-requests: read
+    # Whether the credentials exist, not the credentials: nothing in this job boots Foundry.
     env:
-      FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
-      FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
+      HAS_FOUNDRY_CREDENTIALS: ${{ secrets.FOUNDRY_USERNAME != '' && secrets.FOUNDRY_PASSWORD != '' }}
     outputs:
       ids: ${{ steps.select.outputs.ids }}
       has_ui: ${{ steps.select.outputs.has_ui }}
       matrix: ${{ steps.select.outputs.matrix }}
+      foundry_cache_hit: ${{ steps.foundry-cache.outputs.cache-hit }}
 
     steps:
       - uses: actions/checkout@v6
 
       - name: Check Foundry credentials
         run: |
-          if [ -z "$FOUNDRY_USERNAME" ] || [ -z "$FOUNDRY_PASSWORD" ]; then
+          if [ "$HAS_FOUNDRY_CREDENTIALS" != "true" ]; then
             echo "::warning::Foundry credentials unavailable; the View Lab cannot harvest chrome."
             echo "::warning::Falling back to the maintainer-pasted evidence path."
             echo "SKIP_CAPTURE=true" >> "$GITHUB_ENV"
@@ -158,12 +160,50 @@ jobs:
           MATRIX=$(node scripts/view-lab-shards.mjs plan "$IDS" "$HAS_UI")
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
 
-  render:
+      # Probe, do not restore: `warm-foundry` fills a cold cache once, so the shards and
+      # verify-chrome never each boot Foundry and download it with the same account at once.
+      - name: Probe the Foundry archive cache
+        if: env.SKIP_CAPTURE != 'true'
+        id: foundry-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: .foundry-e2e/cache
+          key: foundry-binary-${{ runner.os }}-${{ hashFiles('docker-compose.foundry.yml') }}
+          lookup-only: true
+
+  # Boots Foundry once to fill a cold archive cache, and saves it for every later job. On a warm
+  # cache every step skips; the job still runs, so the jobs after it keep a plain success() chain
+  # rather than needing always() to survive a skipped dependency.
+  warm-foundry:
     needs: select
+    if: needs.select.outputs.ids != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
+      FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
+      FOUNDRY_LICENSE_KEY: ${{ secrets.FOUNDRY_LICENSE_KEY }}
+      FOUNDRY_ADMIN_KEY: fabricate-test-admin
+      FOUNDRY_TELEMETRY: "false"
+
+    steps:
+      - uses: actions/checkout@v6
+        if: needs.select.outputs.foundry_cache_hit != 'true'
+
+      - name: Fill the Foundry archive cache
+        if: needs.select.outputs.foundry_cache_hit != 'true'
+        uses: ./.github/actions/prepare-view-lab
+        with:
+          archive-only: 'true'
+
+  render:
+    needs: [select, warm-foundry]
     if: needs.select.outputs.ids != '' && needs.select.outputs.has_ui == 'true'
     name: Render shard ${{ matrix.shard }}
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    timeout-minutes: 45
     permissions:
       contents: read
     strategy:
@@ -205,7 +245,7 @@ jobs:
   # beside the shards rather than ahead of any of them; `capture` needs this job, so a failed
   # verification still withholds the publish.
   verify-chrome:
-    needs: select
+    needs: [select, warm-foundry]
     if: needs.select.outputs.ids != ''
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -287,7 +327,7 @@ jobs:
     if: github.event.pull_request.head.repo.full_name == github.repository
     needs: [select, render, verify-chrome]
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     # Declared at JOB level as well as workflow level (SonarCloud S8264): a job that writes to a PR
     # should state the write it needs where the write happens.
     permissions:
@@ -297,23 +337,19 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
-        if: needs.select.outputs.has_ui == 'true'
 
       - name: Setup Node.js
-        if: needs.select.outputs.has_ui == 'true'
         uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
 
       - name: Install dependencies
-        if: needs.select.outputs.has_ui == 'true'
         # `--ignore-scripts` (SonarCloud S6505): a dependency's install script would otherwise run
         # arbitrary code on a runner that holds an OIDC role and a PR write token, as this one does.
         run: npm ci --ignore-scripts
 
       - name: Download every shard's frames
-        if: needs.select.outputs.has_ui == 'true'
         uses: actions/download-artifact@v7
         with:
           pattern: view-lab-shard-*
@@ -322,7 +358,6 @@ jobs:
       # One manifest, identical to what a single unsharded render writes, and a refusal when the
       # shards lost, repeated or invented a case.
       - name: Merge the shards into one frame set
-        if: needs.select.outputs.has_ui == 'true'
         env:
           CASE_IDS: ${{ needs.select.outputs.ids }}
         run: node scripts/view-lab-shards.mjs merge "$CASE_IDS" ui-screenshot-artifact/shards ui-screenshot-artifact/apps
@@ -344,7 +379,6 @@ jobs:
       # it. The publish step below warns loudly and the maintainer-pasted evidence path is unchanged.
       - name: Configure AWS credentials (OIDC)
         id: aws
-        if: needs.select.outputs.has_ui == 'true'
         continue-on-error: true
         uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
@@ -353,7 +387,6 @@ jobs:
 
       # Scoped to the PNG output directory BY NAME. Never a parent, and never `.foundry-chrome`.
       - name: Publish into the PR's screenshot block
-        if: needs.select.outputs.has_ui == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           S3_RELEASE_BUCKET: ${{ vars.S3_RELEASE_BUCKET }}

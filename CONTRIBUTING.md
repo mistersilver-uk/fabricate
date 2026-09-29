@@ -730,7 +730,7 @@ A patch to `tests/view-lab/mount.js` selects only the cases the marked regions i
 A change to `scripts/lib/viewLabLayoutAssertion.js` selects only the cases declaring `expectLayout`, whole-file, since every path through that helper validates those and no others.
 A patch to `tests/view-lab/world/labActors.js` selects only the cases that can render what the touched fixture table feeds: player cases alone for `INVENTORIES` and `BROKEN_STACKS`, and player cases plus the manager cases whose own `sourceMatches` claim a Knowledge or Books & Scrolls render file for `RECIPE_ITEM_COPIES` and `LEARNED_RECIPES`.
 A patch to `tests/view-lab/world/labRunStates.js` selects only the cases whose `journalCaseState` names a run state the patch touches, found by that state's entry in the run-id table or the factory table.
-A patch to anything else in `labRunStates.js`, such as a shared builder, an import or the default runs, keeps the coverage default.
+A patch to anything else in `labRunStates.js`, such as a shared builder, an import or the default runs, selects every player-window case, as it did before run-state attribution.
 The four patch-narrowed inputs — the case registry, the actor fixture, the run-state fixture and the mount page — locate a hunk by searching the rendered file for its own content instead of trusting the hunk header's line numbers; where that content recurs, the hunk is attributed at every location it could be and the answer is their union, which contains wherever the edit really landed.
 A patch to anything else in `labActors.js`, such as `ACTOR_DEFINITIONS` or a shared builder function, keeps the coverage default.
 So does a patch to any lab input the registry does not attribute, or a hunk whose content cannot be anchored at all.
@@ -762,7 +762,7 @@ The per-frame rate is the durable figure; the whole-corpus total scales with the
 Those are serial figures.
 Cases now render concurrently, `VIEW_LAB_CONCURRENCY` at a time (by default the machine's core count, at most 8), each in its own browser context, and the frames, the manifest's order and the distinct-evidence check do not depend on which render finishes first.
 The speed-up is about twofold rather than proportional to the workers, because Chromium's software GPU process saturates the CPU: 59 cases took 367s serially and 186s six at a time on a six-core machine.
-In CI the selection is also split across runners: `.github/workflows/pr-screenshots.yml` renders up to eight shards of about forty-five cases each side by side (`scripts/lib/viewLabShards.js`), keeps every `distinctEvidenceGroup` on one shard, verifies the harvested chrome once in a job beside them, and merges and publishes once.
+In CI the selection is also split across runners: `.github/workflows/pr-screenshots.yml` renders up to eight shards of about forty-five cases each side by side (`scripts/lib/viewLabShards.js`), keeps every `distinctEvidenceGroup` on one shard, verifies the harvested chrome once in a job beside them, fills a cold Foundry archive cache once before any of them start, and merges and publishes once.
 An unknown case id aborts in a second naming the id, so a typo costs nothing.
 Browse the result at `ui-screenshot-artifact/apps/index.html`, which groups frames by screen and offers a multi-tag filter; `npm run viewlab:index` regenerates it.
 It needs a one-off `npm run viewlab:chrome:harvest` first, which extracts Foundry's real window chrome from the release archive `npm run test:foundry:up` already caches; nothing harvested is ever committed.

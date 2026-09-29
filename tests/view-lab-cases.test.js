@@ -3065,15 +3065,19 @@ test('adding one run state to labRunStates selects only the cases that render it
   );
 });
 
-test('an unattributable labRunStates patch widens to surface coverage, by union', () => {
+test('an unattributable labRunStates patch widens to every player-window case, by union', () => {
   const helper = labRunStatesFile.lineOf('function stageBrowserRun(context, recipe, pastCheck = null) {');
   const importLine = labRunStatesFile.lineOf("} from './labJournalPrototype.js';");
+  // Derived, not listed: every player case, so one added tomorrow is covered unmapped.
+  const players = publishableCases()
+    .filter((viewCase) => viewCase.app === 'fabricate-app')
+    .map((viewCase) => viewCase.id);
 
-  assert.deepEqual(selectedIds([LAB_RUN_STATES_PATH]), coverageIds(), 'no patch at all');
+  assert.deepEqual(selectedIds([LAB_RUN_STATES_PATH]), players, 'no patch at all');
   for (const line of [helper, importLine]) {
     assert.deepEqual(
       selectedIds([LAB_RUN_STATES_PATH], labRunStatesFile.patches([line])),
-      coverageIds(),
+      players,
       `line ${line} sits outside every run state's entry`
     );
   }
@@ -3081,7 +3085,7 @@ test('an unattributable labRunStates patch widens to surface coverage, by union'
   const withState = new Set(
     selectedIds([LAB_RUN_STATES_PATH], labRunStatesFile.patches([helper, ...runStateLines('paused')]))
   );
-  for (const id of [...coverageIds(), ...casesOfRunState('paused')]) {
+  for (const id of [...players, ...casesOfRunState('paused')]) {
     assert.ok(withState.has(id), `the union dropped "${id}"`);
   }
 });
@@ -3108,6 +3112,8 @@ test('every lab input the registry cannot attribute selects surface coverage', (
     'scripts/lib/foundryChromeSpec.js',
     'scripts/view-lab-screenshots.mjs',
     'scripts/lib/viewLabRenderPool.js',
+    'scripts/lib/viewLabShards.js',
+    'scripts/view-lab-shards.mjs',
   ]) {
     assert.deepEqual(
       selectedIds([file]),
@@ -5149,7 +5155,7 @@ test('the capture workflow renders and publishes the one id list it computed', (
   };
   assert.match(jobOf('verify-chrome'), /- name: Run every chrome-dependent suite/);
   assert.doesNotMatch(jobOf('render'), /chrome-dependent suite, where/);
-  assert.match(jobOf('verify-chrome'), /\n {4}needs: select\n/);
+  assert.match(jobOf('verify-chrome'), /\n {4}needs: \[select, warm-foundry]\n/);
   assert.match(jobOf('capture'), /\n {4}needs: \[select, render, verify-chrome]\n/);
   for (const name of ['render', 'verify-chrome']) {
     assert.match(jobOf(name), /uses: \.\/\.github\/actions\/prepare-view-lab\n/);

@@ -8,6 +8,12 @@ description: >-
 # The caller checks out first (a local composite is only resolvable after checkout) and sets the
 # FOUNDRY_* credentials as job env, which composite steps inherit. Composite actions have no
 # `secrets` context, so nothing here may read one directly.
+inputs:
+  archive-only:
+    description: "'true' to stop once the Foundry archive is cached: no Playwright, no harvest."
+    required: false
+    default: "false"
+
 runs:
   using: "composite"
   steps:
@@ -25,6 +31,7 @@ runs:
       run: npm ci --ignore-scripts
 
     - name: Cache Playwright Chromium
+      if: inputs.archive-only != 'true'
       id: cache-playwright
       uses: actions/cache@v5
       with:
@@ -32,7 +39,7 @@ runs:
         key: playwright-chromium-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
     - name: Install Playwright Chromium
-      if: steps.cache-playwright.outputs.cache-hit != 'true'
+      if: inputs.archive-only != 'true' && steps.cache-playwright.outputs.cache-hit != 'true'
       shell: bash
       run: npm run test:foundry:install
 
@@ -82,6 +89,7 @@ runs:
         fi
 
     - name: Harvest window chrome
+      if: inputs.archive-only != 'true'
       shell: bash
       run: npm run viewlab:chrome:harvest
 
@@ -95,6 +103,7 @@ runs:
     # `application.mjs` and confirmed the transcription still holds; a bot that refreshes it on
     # mismatch converts the drift gate into a rubber stamp.
     - name: Verify chrome matches committed provenance
+      if: inputs.archive-only != 'true'
       shell: bash
       run: |
         PINNED=$(node -p "require('./tests/view-lab/chrome-provenance.json').foundryVersion")

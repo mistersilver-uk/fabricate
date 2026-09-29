@@ -261,8 +261,9 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     # 110, raised from 75 (issue 1594; 75 was itself raised from 5 under issue 1133). This job
-    # AWAITS the `capture` job in `pr-screenshots.yml` for the same head SHA before deciding, and
-    # that job's own ceiling is 75 minutes. The script's `maxWaitMs` (100 minutes) fires first by
+    # AWAITS the `pr-screenshots.yml` run for the same head SHA before deciding, and that run's
+    # summed stage ceiling (select, then warm-foundry, then the longer of render and verify-chrome,
+    # then capture) is 75 minutes. The script's `maxWaitMs` (100 minutes) fires first by
     # construction — the bounds inequality in `tests/ci-workflow-semantics.test.js` pins that
     # ordering against this number — so a wait that runs long reports `capture-did-not-conclude`
     # with a diagnosis rather than being killed here with none. Every one of those numbers moves

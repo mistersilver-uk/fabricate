@@ -232,11 +232,11 @@ test('the screenshot gate awaits the capture run for its own head, within pinned
   assert.equal(gateStep.env.HEAD_SHA, '${{ github.event.pull_request.head.sha }}');
 
   // The capture deadline is READ from the producer, never restated. The producer is a chain of
-  // stages — select, then the render shards beside the chrome verification, then capture — so its
-  // budget is the sum over stages of each stage's longest job.
+  // stages — select, the Foundry cache warm-up, the render shards beside the chrome verification,
+  // then capture — so its budget is the sum over stages of each stage's longest job.
   const declaredCaptureMinutes = Number(flagValue(gateStep.run, '--capture-timeout-minutes'));
   const producerJobs = parseJobs(captureSource);
-  const stages = [['select'], ['render', 'verify-chrome'], ['capture']];
+  const stages = [['select'], ['warm-foundry'], ['render', 'verify-chrome'], ['capture']];
   const minutesOf = (name) => {
     const minutes = Number(producerJobs[name]?.['timeout-minutes']);
     assert.ok(minutes > 0, `pr-screenshots.yml's ${name} job declares no timeout-minutes`);
@@ -288,6 +288,79 @@ test('the screenshot gate awaits the capture run for its own head, within pinned
   assert.ok(publishStep, 'capture no longer publishes screenshot evidence');
   assert.match(publishStep.run, /--head-sha "\$HEAD_SHA"/);
   assert.equal(publishStep.env.HEAD_SHA, '${{ github.event.pull_request.head.sha }}');
+});
+
+/** A job's `needs:` as a list, whether written as a scalar or as a flow sequence. */
+const needsOf = (job) =>
+  job.needs
+    .replace(/^\[|\]$/g, '')
+    .split(',')
+    .map((name) => name.trim())
+    .filter(Boolean);
+
+test('the capture workflow publishes only after every shard and the chrome verification pass', () => {
+  const source = readFileSync('.github/workflows/pr-screenshots.yml', 'utf8');
+  const jobs = parseJobs(source);
+
+  assert.deepEqual(needsOf(jobs.capture).sort(), ['render', 'select', 'verify-chrome']);
+  // A status function would let capture publish past a failed or skipped dependency.
+  assert.doesNotMatch(unwrap(jobs.capture.if), /\b(?:always|failure|cancelled)\(/);
+  // capture only runs after render ran, so a step-level has_ui test there is always true.
+  for (const step of jobs.capture.steps) {
+    assert.doesNotMatch(step.if, /has_ui/, `capture's "${step.name || step.uses}" re-tests has_ui`);
+  }
+  // An unarmed gate renders nothing, so no shard starts without it.
+  assert.match(unwrap(jobs.render.if), /needs\.select\.outputs\.has_ui == 'true'/);
+
+  // Only the PNGs and the manifest leave a shard: exactly these two lines, nothing wider.
+  const renderStart = source.indexOf('\n  render:\n');
+  const renderSource = source.slice(renderStart, source.indexOf('\n  verify-chrome:\n'));
+  const upload = /\n( +)path: \|\n((?:\1 {2}.*\n)+)/.exec(renderSource);
+  assert.ok(upload, 'the render job no longer uploads a block-scalar path');
+  assert.deepEqual(
+    upload[2].trim().split('\n').map((line) => line.trim()),
+    ['ui-screenshot-artifact/apps/*.png', 'ui-screenshot-artifact/apps/manifest.json']
+  );
+});
+
+test('a cold Foundry cache is filled once, and select never holds the Foundry credentials', () => {
+  const source = readFileSync('.github/workflows/pr-screenshots.yml', 'utf8');
+  const jobs = parseJobs(source);
+
+  // select only learns whether the credentials exist.
+  const selectSource = source.slice(
+    source.indexOf('\n  select:\n'),
+    source.indexOf('\n  warm-foundry:\n')
+  );
+  assert.doesNotMatch(selectSource, /FOUNDRY_(?:USERNAME|PASSWORD|LICENSE_KEY):/);
+  assert.match(
+    selectSource,
+    /HAS_FOUNDRY_CREDENTIALS: \$\{\{ secrets\.FOUNDRY_USERNAME != '' && secrets\.FOUNDRY_PASSWORD != '' }}/
+  );
+  assert.match(selectSource, /\[ "\$HAS_FOUNDRY_CREDENTIALS" != "true" ]/);
+
+  // It probes the very key the jobs after it restore, without restoring it.
+  const probe = jobs.select.steps.find((step) => step.uses.startsWith('actions/cache/restore@'));
+  assert.ok(probe, 'select no longer probes the Foundry archive cache');
+  assert.equal(probe.with['lookup-only'], 'true');
+  const action = readFileSync('.github/actions/prepare-view-lab/action.yml', 'utf8');
+  const cached = parseActionSteps(action).find((step) => step.with.path === '.foundry-e2e/cache');
+  assert.ok(cached, 'prepare-view-lab no longer caches the Foundry archive');
+  assert.equal(probe.with.key, cached.with.key);
+  assert.equal(probe.with.path, cached.with.path);
+
+  // One warm-up, and both kinds of runner wait for it.
+  assert.deepEqual(needsOf(jobs['warm-foundry']), ['select']);
+  for (const name of ['render', 'verify-chrome']) {
+    assert.ok(needsOf(jobs[name]).includes('warm-foundry'), `${name} must wait for warm-foundry`);
+  }
+  // Skipped at STEP level on a hit, so the jobs after it keep a plain success() chain.
+  const warmSteps = jobs['warm-foundry'].steps;
+  assert.ok(warmSteps.length > 0);
+  for (const step of warmSteps) {
+    assert.equal(unwrap(step.if), "needs.select.outputs.foundry_cache_hit != 'true'");
+  }
+  assert.match(selectSource, /foundry_cache_hit: \$\{\{ steps\.foundry-cache\.outputs\.cache-hit }}/);
 });
 
 test('the capture workflow grants each write only on the one job that needs it', () => {

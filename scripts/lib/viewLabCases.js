@@ -58,7 +58,7 @@ const UI_PATH_PATTERN = /^(src\/ui\/|styles\/)|\.(svelte|css)$/;
  * the case files it reads.
  */
 const LAB_INFRASTRUCTURE_PATTERN =
-  /^(tests\/view-lab\/|scripts\/lib\/view-lab-cases\/|scripts\/lib\/viewLab(?:Cases|LayoutAssertion|RenderPool)\.js$|scripts\/lib\/foundryChromeSpec\.js$|scripts\/view-lab-screenshots\.mjs$)/;
+  /^(tests\/view-lab\/|scripts\/lib\/view-lab-cases\/|scripts\/lib\/viewLab(?:Cases|LayoutAssertion|RenderPool|Shards)\.js$|scripts\/lib\/foundryChromeSpec\.js$|scripts\/view-lab-(?:screenshots|shards)\.mjs$)/;
 
 /** The helper that enforces the opt-in responsive layout contract. */
 const LAYOUT_ASSERTION_PATH = 'scripts/lib/viewLabLayoutAssertion.js';
@@ -746,6 +746,8 @@ const ATTRIBUTED_LAB_INPUTS = Object.freeze([
     sourceLines: runStateSourceLines,
     regions: runStateLineRegions,
     selectsRegion: rendersRunState,
+    // Its whole output is player-only, so an edit it cannot attribute reaches every player frame.
+    widensTo: rendersInPlayerWindow,
   }),
   Object.freeze({
     path: LAB_ACTORS_PATH,
@@ -798,6 +800,10 @@ function casesFromRegionPatch(patch, attribution) {
   const ids = new Set();
   for (const key of keys) {
     for (const id of casesSelecting(attribution.selectsRegion(key))) ids.add(id);
+  }
+  if (unattributable && attribution.widensTo) {
+    for (const id of casesSelecting(attribution.widensTo)) ids.add(id);
+    return ids;
   }
   return widenedByCoverage(ids, unattributable);
 }
