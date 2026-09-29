@@ -54,6 +54,12 @@ test('1.35.0 stamps a checkMode: tiered alchemy system too', () => {
   assert.equal(consumption(systems[0])[FIELD], true);
 });
 
+test('1.35.0 seeds craftingCheck itself when the system has no craftingCheck block at all', () => {
+  const { craftingCheck: _unused, ...withoutCraftingCheck } = alchemySystem();
+  const { systems } = migrateAlchemyBreakToolsOnFail({ systems: [withoutCraftingCheck] });
+  assert.equal(consumption(systems[0])[FIELD], true);
+});
+
 test('1.35.0 seeds craftingCheck.consumption when the system has neither', () => {
   const { systems } = migrateAlchemyBreakToolsOnFail({
     systems: [alchemySystem({ craftingCheck: { simple: { rollFormula: '1d20', dc: 15 } } })],
