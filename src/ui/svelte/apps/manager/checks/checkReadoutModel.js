@@ -233,7 +233,8 @@ function readoutFacts(input, text) {
   const family = readoutFamily(plan);
   const data = result.data ?? {};
   const count = family === 'count' ? buildCountReadout(plan, result, text) : null;
-  const success = count?.zeroPool ? false : result.success === true;
+  const unrouted = plan.kind === 'routed' && !result.outcome;
+  const success = count?.zeroPool || unrouted ? false : result.success === true;
   return {
     ...input,
     family,

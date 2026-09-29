@@ -136,7 +136,17 @@ describe('the target line', () => {
       ...result(true, { total: 15, diceGroups: d20(12), forcedOutcome: 'success' }),
       outcome: null,
     });
-    assert.deepEqual([forced.card.title, forced.card.tone], ['Success', 'success']);
+    // No tier caught it, so no result group is produced, even though a trigger forced success.
+    assert.deepEqual([forced.card.title, forced.card.detail, forced.card.tone], [
+      'Failure',
+      'Nothing is produced',
+      'danger',
+    ]);
+    assert.deepEqual(forced.rows.map((row) => [row.id, row.label, row.meta]), [
+      ['failure-result', 'Failure result if this recipe defines one', 'per recipe'],
+      ['ingredients', 'Ingredients consumed', 'policy on'],
+      ['tools', 'Tools survive', 'policy off'],
+    ]);
     const empty = readout(routed([]), { ...result(false, { total: 15, diceGroups: d20(12) }), outcome: null });
     assert.deepEqual([empty.card.title, empty.card.detail], [
       'No tiers configured',
