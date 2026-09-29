@@ -754,7 +754,7 @@ Where a View Lab frame and a smoke frame of the same view disagree, the smoke fr
 Each case pins the size its smoke counterpart photographs rather than the app's declared `DEFAULT_OPTIONS.position`: the two differ (the smoke shoots the manager at 1280x820, not its declared 1280x940), and responsive cases deliberately pin narrower geometry, so the registry spans twelve sizes and the size is a per-case fact rather than a per-app one.
 
 - For a view covered by the canonical registry (`scripts/lib/viewLabCases.js`) — which is the normal case — the **View Lab** is the producer, and it is what CI runs on every PR push: `node scripts/view-lab-screenshots.mjs apps` renders every case, or pass a comma-separated id list to render a subset, into `ui-screenshot-artifact/apps/`.
-How many cases that is, and how many of them surface coverage selects, are generated into `scripts/README.md` rather than quoted here.
+How many cases that is, and how many of them surface coverage selects, are deliberately not quoted anywhere in prose: `publishableCases()` and `LAB_SURFACE_CASE_IDS` in the registry are the only counts.
 Selection is targeted, and no single changed file selects the whole registry: a render file selects the cases whose `sourceMatches` claim it, a broad shared primitive or stylesheet selects a small representative set, and a change to one of the lab's OWN inputs (fixture world, capture driver, registry shared code) selects **surface coverage** — one frame of every route and tab the lab renders — rather than every state of every screen.
 A detailed state is captured when the files that govern it change; if you need one alongside such a change, name its case id in the run rather than widening the selection.
 Measured at a 155-frame registry: ~5.6s per frame locally (14 min for that whole corpus), a five-case subset in 36s, one case in 22s — against ~31s per frame for the smoke's `screenshots` profile.
@@ -762,6 +762,7 @@ The per-frame rate is the durable figure; the whole-corpus total scales with the
 Those are serial figures.
 Cases now render concurrently, `VIEW_LAB_CONCURRENCY` at a time (by default the machine's core count, at most 8), each in its own browser context, and the frames, the manifest's order and the distinct-evidence check do not depend on which render finishes first.
 The speed-up is about twofold rather than proportional to the workers, because Chromium's software GPU process saturates the CPU: 59 cases took 367s serially and 186s six at a time on a six-core machine.
+In CI the selection is also split across runners: `.github/workflows/pr-screenshots.yml` renders up to six shards of about sixty cases each side by side (`scripts/lib/viewLabShards.js`), keeps every `distinctEvidenceGroup` on one shard, and merges and publishes once.
 An unknown case id aborts in a second naming the id, so a typo costs nothing.
 Browse the result at `ui-screenshot-artifact/apps/index.html`, which groups frames by screen and offers a multi-tag filter; `npm run viewlab:index` regenerates it.
 It needs a one-off `npm run viewlab:chrome:harvest` first, which extracts Foundry's real window chrome from the release archive `npm run test:foundry:up` already caches; nothing harvested is ever committed.

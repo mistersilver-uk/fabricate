@@ -312,10 +312,19 @@ const SUPERSEDED_POLICY = [
       "The four patch-narrowed inputs — the case registry, the actor fixture, the run-state fixture and the mount page — locate a hunk by searching the rendered file for its own content instead of trusting the hunk header's line numbers; where that content recurs, the hunk is attributed at every location it could be and the answer is their union, which contains wherever the edit really landed.",
     survivesIn: 'CONTRIBUTING.md',
   },
+  {
+    // The registry counts stopped being generated into scripts/README.md (issue 2116).
+    issue: '#2119',
+    before:
+      'How many cases that is, and how many of them surface coverage selects, are generated into `scripts/README.md` rather than quoted here.',
+    after:
+      'How many cases that is, and how many of them surface coverage selects, are deliberately not quoted anywhere in prose: `publishableCases()` and `LAB_SURFACE_CASE_IDS` in the registry are the only counts.',
+    survivesIn: 'CONTRIBUTING.md',
+  },
 ];
 
 /** Pinned exactly: every entry excuses one historical sentence. */
-const SUPERSEDED_POLICY_COUNT = 20;
+const SUPERSEDED_POLICY_COUNT = 21;
 
 /**
  * Sentences a deliberate rename forced to change, where the only edit is an identifier (issue
@@ -596,10 +605,11 @@ test('every sentence, table row and fenced line of the pre-#1936 AGENTS.md still
       before.length === count,
       `${PRE_1936.fixture} yields ${before.length} ${kind}, not its pinned ${count}`
     );
-    // A verified rename excuses its sentence here too; `every rename claim` checks each one.
-    const renamed = new Set(RENAMED.map(({ before: was }) => was));
+    // A verified rename or superseded policy excuses its sentence here too; `every rename claim`
+    // and `every superseded policy mapping` check each one.
+    const excused = new Set([...RENAMED, ...SUPERSEDED_POLICY].map(({ before: was }) => was));
     const lost = missingSentences(multiset(before), survivingLines(extract)).filter(
-      ({ sentence }) => !renamed.has(sentence)
+      ({ sentence }) => !excused.has(sentence)
     );
     assert.deepEqual(
       lost.map(({ sentence, before: was, after: now }) => `(${was} -> ${now}) ${sentence}`),
@@ -639,7 +649,7 @@ test('every superseded policy mapping names its frozen source and current replac
   );
 
   const frozen = multiset(
-    SOURCES.flatMap(({ fixture }) =>
+    [...SOURCES, PRE_1936].flatMap(({ fixture }) =>
       sentencesOf(readFileSync(path.join(REPOSITORY_ROOT, fixture), 'utf8'))
     )
   );
