@@ -231,7 +231,7 @@ function listHeadFiles(root, cwd) {
  * @returns {Map<string, string>} path to UTF-8 text.
  */
 export function readBaseCorpus(base, root, { cwd = REPO_ROOT, include = () => true } = {}) {
-  return readBaseFiles(base, listBaseFiles(base, root, cwd).filter(include), { cwd });
+  return readBaseFiles(base, listBaseFiles(base, root, cwd).filter((path) => include(path)), { cwd });
 }
 
 function readHeadFile(cwd, file) {
@@ -476,8 +476,8 @@ function judge(remaining, family, readHead) {
 
 /** The file lists each side is measured over, or `null` when the corpus is untouched. */
 function sides({ base, changes, include, corpusRoot, scope, cwd }) {
-  const headChanged = changes.changed.filter(include);
-  const baseChanged = new Set(changes.removed.filter(include));
+  const headChanged = changes.changed.filter((path) => include(path));
+  const baseChanged = new Set(changes.removed.filter((path) => include(path)));
   for (const file of headChanged) {
     const was = basePathOf(changes, file);
     if (was !== null) baseChanged.add(was);
@@ -487,8 +487,8 @@ function sides({ base, changes, include, corpusRoot, scope, cwd }) {
   if (headChanged.length + baseChanged.size === 0) return null;
   if (scope === 'corpus') {
     return {
-      headFiles: listHeadFiles(corpusRoot, cwd).filter(include),
-      baseFiles: listBaseFiles(base, corpusRoot, cwd).filter(include),
+      headFiles: listHeadFiles(corpusRoot, cwd).filter((path) => include(path)),
+      baseFiles: listBaseFiles(base, corpusRoot, cwd).filter((path) => include(path)),
       headChanged,
     };
   }
