@@ -22,6 +22,8 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/actions/anchoredPopover.js',
   'src/ui/svelte/util/overlayBounds.js',
   'src/ui/svelte/apps/manager/checks/checksReadiness.js',
+  // The Validation tab's row-merging rules (issue 2083): a fault reads once, as its issue.
+  'src/ui/svelte/apps/manager/checks/checksValidationRows.js',
   // `checksReadiness.js` grades a kept salvage/task override through the same rule the
   // component and task editors warn with (issue 2078).
   'src/ui/svelte/apps/manager/checks/checkOverrideReadiness.js',
