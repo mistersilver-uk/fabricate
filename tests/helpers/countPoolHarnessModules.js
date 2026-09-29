@@ -18,6 +18,7 @@ export const COUNT_POOL_RAW_MODULES = Object.freeze([
   'src/utils/scalars.js',
   'src/ui/svelte/apps/manager/checks/checkTargetStatus.js',
   'src/ui/svelte/apps/manager/checks/countInsetModel.js',
+  'src/ui/svelte/apps/manager/checks/countPoolOptions.js',
 ]);
 
 export const COUNT_POOL_COMPILED_MODULES = Object.freeze([

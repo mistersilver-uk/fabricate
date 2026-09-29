@@ -31,7 +31,6 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  const K = 'FABRICATE.Admin.Manager.Checks.Count.';
   const DEFAULT_MODIFIER_ICON = 'fas fa-wand-magic-sparkles';
   const authored = $derived(
     countAuthoredTerms(
@@ -58,10 +57,15 @@
           data-check-count-expected={reading.value}
           data-check-count-expected-status={reading.nearlyExact ? 'nearly-exact' : 'exact'}
         >
-          {text(`${K}Expected`, 'expected successes')}
+          {text('FABRICATE.Admin.Manager.Checks.Count.Expected', 'expected successes')}
           <span class="manager-checks-formula-average-value">{reading.value}</span>
           {#if reading.nearlyExact}
-            <span class="visually-hidden">{text(`${K}ExpectedNearlyExact`, 'nearly exact')}</span>
+            <span class="visually-hidden"
+              >{text(
+                'FABRICATE.Admin.Manager.Checks.Count.ExpectedNearlyExact',
+                'nearly exact'
+              )}</span
+            >
           {/if}
         </span>
       {/if}

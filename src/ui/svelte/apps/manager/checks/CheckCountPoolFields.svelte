@@ -31,6 +31,11 @@
   import { localize } from '../../../util/foundryBridge.js';
   import CheckCountInputField from './CheckCountInputField.svelte';
   import CheckCountInset from './CheckCountInset.svelte';
+  import {
+    COUNT_DESTINATION_OPTIONS,
+    COUNT_REPEAT_OPTIONS,
+    countTestOptions,
+  } from './countPoolOptions.js';
 
   let {
     evaluation,
@@ -47,7 +52,6 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  const K = 'FABRICATE.Admin.Manager.Checks.Count.';
   const pool = $derived(evaluation.pool);
   const under = $derived(evaluation.direction === 'under');
   const best = $derived(extremeFace(pool.die, evaluation.direction));
@@ -64,25 +68,19 @@
       .map((die) => ({ value: String(die), label: `d${die}` }))
   );
 
-  const TEST_OPTIONS = $derived(
-    under
-      ? [
-          { value: 'meet', labelKey: `${K}TestUnderMeet`, fallback: 'At or under' },
-          { value: 'exceed', labelKey: `${K}TestUnderExceed`, fallback: 'Under' },
-        ]
-      : [
-          { value: 'meet', labelKey: `${K}TestOverMeet`, fallback: 'At or above' },
-          { value: 'exceed', labelKey: `${K}TestOverExceed`, fallback: 'Above' },
-        ]
-  );
+  const TEST_OPTIONS = $derived(countTestOptions(under));
 
   // Off / the extreme face / From a face: three peer choices, the Validation target on the active one.
   function faceOptions(rule, extremeKey, extremeFallback, face, target) {
     const active = faceChoice(rule);
     const options = [
-      { value: 'off', labelKey: `${K}FaceOff`, fallback: 'Off' },
+      { value: 'off', labelKey: 'FABRICATE.Admin.Manager.Checks.Count.FaceOff', fallback: 'Off' },
       { value: 'extreme', fallback: text(extremeKey, extremeFallback).replace('{face}', face) },
-      { value: 'from', labelKey: `${K}FaceFrom`, fallback: 'From a face' },
+      {
+        value: 'from',
+        labelKey: 'FABRICATE.Admin.Manager.Checks.Count.FaceFrom',
+        fallback: 'From a face',
+      },
     ];
     return options.map((option) =>
       option.value === active ? { ...option, validationTarget: target } : option
@@ -108,23 +106,19 @@
     emitPool({ [key]: { ...pool[key], faces: { kind: 'from', value: next } } });
   }
   const sideWord = (above) =>
-    above ? text(`${K}OrAbove`, 'or above') : text(`${K}OrUnder`, 'or under');
-
-  const DESTINATION_OPTIONS = [
-    { value: 'threshold', labelKey: `${K}DestinationThreshold`, fallback: 'Move the threshold' },
-    { value: 'pool', labelKey: `${K}DestinationPool`, fallback: 'Add dice to the pool' },
-  ];
-  const REPEAT_OPTIONS = [
-    { value: 'keeps', labelKey: `${K}RepeatKeeps`, fallback: 'Keeps exploding' },
-    { value: 'once', labelKey: `${K}RepeatOnce`, fallback: 'Once' },
-  ];
+    above
+      ? text('FABRICATE.Admin.Manager.Checks.Count.OrAbove', 'or above')
+      : text('FABRICATE.Admin.Manager.Checks.Count.OrUnder', 'or under');
 
   const labels = $derived({
-    base: text(`${K}BaseTitle`, 'Base pool'),
-    threshold: text(`${K}SuccessOnTitle`, 'Success on'),
-    explodeFace: text(`${K}ExplodeFace`, 'Explode from face'),
-    cancelFace: text(`${K}CancelFace`, 'Cancel from face'),
-    zero: text(`${K}ZeroLabel`, 'A pool reduced to zero fails automatically'),
+    base: text('FABRICATE.Admin.Manager.Checks.Count.BaseTitle', 'Base pool'),
+    threshold: text('FABRICATE.Admin.Manager.Checks.Count.SuccessOnTitle', 'Success on'),
+    explodeFace: text('FABRICATE.Admin.Manager.Checks.Count.ExplodeFace', 'Explode from face'),
+    cancelFace: text('FABRICATE.Admin.Manager.Checks.Count.CancelFace', 'Cancel from face'),
+    zero: text(
+      'FABRICATE.Admin.Manager.Checks.Count.ZeroLabel',
+      'A pool reduced to zero fails automatically'
+    ),
   });
 </script>
 
@@ -165,7 +159,7 @@
       icon="fas fa-dice"
       value={String(pool.die)}
       options={dieOptions}
-      ariaLabel={text(`${K}Die`, 'Die')}
+      ariaLabel={text('FABRICATE.Admin.Manager.Checks.Count.Die', 'Die')}
       triggerData={{ 'data-check-count-die': '' }}
       onChange={(next) => emitPool({ die: Number(next) })}
     />
@@ -179,7 +173,7 @@
     min={0}
     max={20}
     label={labels.base}
-    sourceLabel={text(`${K}BaseSource`, 'Base pool source')}
+    sourceLabel={text('FABRICATE.Admin.Manager.Checks.Count.BaseSource', 'Base pool source')}
     validationTarget="checks-count-base"
     {character}
     onChange={(next) => emitPool({ base: next })}
@@ -195,7 +189,10 @@
         min={1}
         max={pool.die}
         label={labels.threshold}
-        sourceLabel={text(`${K}ThresholdSource`, 'Threshold source')}
+        sourceLabel={text(
+          'FABRICATE.Admin.Manager.Checks.Count.ThresholdSource',
+          'Threshold source'
+        )}
         validationTarget="checks-count-threshold"
         {character}
         onChange={(next) => emitPool({ threshold: next })}
@@ -209,7 +206,7 @@
           options={TEST_OPTIONS}
           value={thresholdMode === 'exceed' ? 'exceed' : 'meet'}
           groupName="check-count-test"
-          ariaLabel={text(`${K}TestTitle`, 'Per-die test')}
+          ariaLabel={text('FABRICATE.Admin.Manager.Checks.Count.TestTitle', 'Per-die test')}
           dataAttr="data-check-count-test"
           optionDataAttr="data-check-count-test-option"
           onChange={(next) => onChange({ thresholdMode: next })}
@@ -226,14 +223,14 @@
       density="field"
       options={faceOptions(
         pool.explode,
-        `${K}ExplodeBest`,
+        'FABRICATE.Admin.Manager.Checks.Count.ExplodeBest',
         'Best face ({face})',
         best,
         'checks-count-explode'
       )}
       value={faceChoice(pool.explode)}
       groupName="check-count-explode"
-      ariaLabel={text(`${K}ExplodeTitle`, 'Explode')}
+      ariaLabel={text('FABRICATE.Admin.Manager.Checks.Count.ExplodeTitle', 'Explode')}
       dataAttr="data-check-count-explode"
       optionDataAttr="data-check-count-explode-option"
       onChange={(next) => chooseFace('explode', 'best', best, next)}
@@ -247,10 +244,10 @@
       <SegmentedControl
         fill
         density="field"
-        options={REPEAT_OPTIONS}
+        options={COUNT_REPEAT_OPTIONS}
         value={pool.explode.once ? 'once' : 'keeps'}
         groupName="check-count-explode-repeat"
-        ariaLabel={text(`${K}RepeatTitle`, 'Explode repeat')}
+        ariaLabel={text('FABRICATE.Admin.Manager.Checks.Count.RepeatTitle', 'Explode repeat')}
         dataAttr="data-check-count-explode-repeat"
         optionDataAttr="data-check-count-explode-repeat-option"
         onChange={(next) => emitPool({ explode: { ...pool.explode, once: next === 'once' } })}
@@ -266,14 +263,14 @@
       density="field"
       options={faceOptions(
         pool.cancel,
-        `${K}CancelWorst`,
+        'FABRICATE.Admin.Manager.Checks.Count.CancelWorst',
         'Worst face ({face})',
         worst,
         'checks-count-cancel'
       )}
       value={faceChoice(pool.cancel)}
       groupName="check-count-cancel"
-      ariaLabel={text(`${K}CancelTitle`, 'Cancel')}
+      ariaLabel={text('FABRICATE.Admin.Manager.Checks.Count.CancelTitle', 'Cancel')}
       dataAttr="data-check-count-cancel"
       optionDataAttr="data-check-count-cancel-option"
       onChange={(next) => chooseFace('cancel', 'worst', worst, next)}
@@ -289,10 +286,13 @@
     <SegmentedControl
       fill
       density="field"
-      options={DESTINATION_OPTIONS}
+      options={COUNT_DESTINATION_OPTIONS}
       value={pool.modifierDestination}
       groupName="check-count-destination"
-      ariaLabel={text(`${K}DestinationTitle`, 'Modifiers and bonuses')}
+      ariaLabel={text(
+        'FABRICATE.Admin.Manager.Checks.Count.DestinationTitle',
+        'Modifiers and bonuses'
+      )}
       dataAttr="data-check-count-destination"
       optionDataAttr="data-check-count-destination-option"
       onChange={(next) => emitPool({ modifierDestination: next })}
@@ -313,38 +313,54 @@
 {/snippet}
 
 <div class="manager-checks-count-fields" data-check-count-fields>
-  {@render row(text(`${K}Die`, 'Die'), '', dieBody, 'data-check-count-row-die')}
+  {@render row(
+    text('FABRICATE.Admin.Manager.Checks.Count.Die', 'Die'),
+    '',
+    dieBody,
+    'data-check-count-row-die'
+  )}
   {@render row(
     labels.base,
-    text(`${K}BaseHint`, 'How many dice are rolled.'),
+    text('FABRICATE.Admin.Manager.Checks.Count.BaseHint', 'How many dice are rolled.'),
     baseBody,
     'data-check-count-row-base'
   )}
   {@render row(
     labels.threshold,
-    text(`${K}SuccessOnHint`, 'What each die must roll to count.'),
+    text('FABRICATE.Admin.Manager.Checks.Count.SuccessOnHint', 'What each die must roll to count.'),
     thresholdBody,
     'data-check-count-row-threshold'
   )}
   {@render row(
-    text(`${K}ExplodeTitle`, 'Explode'),
-    text(`${K}ExplodeHint`, 'A die showing this face is rolled again and both count.'),
+    text('FABRICATE.Admin.Manager.Checks.Count.ExplodeTitle', 'Explode'),
+    text(
+      'FABRICATE.Admin.Manager.Checks.Count.ExplodeHint',
+      'A die showing this face is rolled again and both count.'
+    ),
     explodeBody,
     'data-check-count-row-explode'
   )}
   {@render row(
-    text(`${K}CancelTitle`, 'Cancel'),
-    text(`${K}CancelHint`, 'A die showing this face removes one success.'),
+    text('FABRICATE.Admin.Manager.Checks.Count.CancelTitle', 'Cancel'),
+    text(
+      'FABRICATE.Admin.Manager.Checks.Count.CancelHint',
+      'A die showing this face removes one success.'
+    ),
     cancelBody,
     'data-check-count-row-cancel'
   )}
   {@render row(
-    text(`${K}DestinationTitle`, 'Modifiers and bonuses'),
-    text(`${K}DestinationHint`, 'Where a +N lands on this roll.'),
+    text('FABRICATE.Admin.Manager.Checks.Count.DestinationTitle', 'Modifiers and bonuses'),
+    text('FABRICATE.Admin.Manager.Checks.Count.DestinationHint', 'Where a +N lands on this roll.'),
     destinationBody,
     'data-check-count-row-destination'
   )}
-  {@render row(text(`${K}ZeroTitle`, 'Zero pool'), '', zeroBody, 'data-check-count-row-zero')}
+  {@render row(
+    text('FABRICATE.Admin.Manager.Checks.Count.ZeroTitle', 'Zero pool'),
+    '',
+    zeroBody,
+    'data-check-count-row-zero'
+  )}
 </div>
 
 <CheckCountInset {evaluation} {thresholdMode} {character} {modifiers} {placement} {odds} />

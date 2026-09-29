@@ -18,7 +18,6 @@ import {
   targetRefusalSentence,
 } from './checkTargetStatus.js';
 
-const KEY = 'FABRICATE.Admin.Manager.Checks.Count.';
 const SETTLED_NONE = Object.freeze({ poolDelta: 0, thresholdDelta: 0, preRolls: [] });
 
 /** Whether a stored pool input reads as the Number mode: an integer literal. */
@@ -29,7 +28,10 @@ export function isIntegerLiteral(value) {
 /** `{faces}`: the face, or `{v} or above` / `{v} or under` for a from-face. */
 function facesText({ from, face, sign }, text) {
   if (!from) return String(face);
-  const side = sign === '≤' ? text(`${KEY}OrUnder`, 'or under') : text(`${KEY}OrAbove`, 'or above');
+  const side =
+    sign === '≤'
+      ? text('FABRICATE.Admin.Manager.Checks.Count.OrUnder', 'or under')
+      : text('FABRICATE.Admin.Manager.Checks.Count.OrAbove', 'or above');
   return `${face} ${side}`;
 }
 
@@ -39,12 +41,15 @@ export function countFaceClauses(described, text) {
   const { explode, cancel } = described;
   if (explode) {
     const copy = explode.once
-      ? text(`${KEY}InsetExplodesOnce`, 'explodes on {faces} once')
-      : text(`${KEY}InsetExplodes`, 'explodes on {faces}');
+      ? text('FABRICATE.Admin.Manager.Checks.Count.InsetExplodesOnce', 'explodes on {faces} once')
+      : text('FABRICATE.Admin.Manager.Checks.Count.InsetExplodes', 'explodes on {faces}');
     clauses.push(interpolate(copy, { faces: facesText(explode, text) }));
   }
   if (cancel) {
-    const copy = text(`${KEY}InsetCancels`, '{faces} cancels a success');
+    const copy = text(
+      'FABRICATE.Admin.Manager.Checks.Count.InsetCancels',
+      '{faces} cancels a success'
+    );
     clauses.push(interpolate(copy, { faces: facesText(cancel, text) }));
   }
   return clauses;
@@ -81,7 +86,7 @@ export function countAuthoredTerms({ evaluation, thresholdMode, modifiers = [] }
     : [];
   const terms = [
     ...poolTerms,
-    { kind: 'word', text: text(`${KEY}InsetEach`, 'each') },
+    { kind: 'word', text: text('FABRICATE.Admin.Manager.Checks.Count.InsetEach', 'each') },
     { kind: 'term', text: `${described.symbol} ${String(described.threshold ?? '').trim()}` },
     ...thresholdChips,
   ];
@@ -135,7 +140,7 @@ export function countActorLine({ evaluation, thresholdMode, character, placement
     return {
       tone: 'muted',
       text: text(
-        `${KEY}NoActor`,
+        'FABRICATE.Admin.Manager.Checks.Count.NoActor',
         'Choose a character in Preview as to see the composed pool and threshold.'
       ),
     };
@@ -152,16 +157,22 @@ export function countActorLine({ evaluation, thresholdMode, character, placement
   const poolPending = pendingFormula(placement, 'pool');
   const thresholdPending = pendingFormula(placement, 'threshold');
   if (poolPending) {
-    dice = interpolate(text(`${KEY}ActorPendingDice`, '{dice} + {formula} dice'), {
-      dice,
-      formula: poolPending,
-    });
+    dice = interpolate(
+      text('FABRICATE.Admin.Manager.Checks.Count.ActorPendingDice', '{dice} + {formula} dice'),
+      {
+        dice,
+        formula: poolPending,
+      }
+    );
   }
   if (thresholdPending) {
-    threshold = interpolate(text(`${KEY}ActorPendingThreshold`, '{threshold} + {formula}'), {
-      threshold,
-      formula: thresholdPending,
-    });
+    threshold = interpolate(
+      text('FABRICATE.Admin.Manager.Checks.Count.ActorPendingThreshold', '{threshold} + {formula}'),
+      {
+        threshold,
+        formula: thresholdPending,
+      }
+    );
   }
   const data = { actor: character.name ?? '', dice, symbol: described.symbol, threshold };
   return { tone: 'resolved', text: interpolate(actorCopy(read.policy, settled, data, text), data) };
@@ -177,7 +188,7 @@ function actorCopy(policy, settled, data, text) {
       n: formatSigned(settled.poolDelta),
     });
     return text(
-      `${KEY}ActorLineGrown`,
+      'FABRICATE.Admin.Manager.Checks.Count.ActorLineGrown',
       'For {actor}: {dice}, each {symbol} {threshold} (pool {base} grown by {n}).'
     );
   }
@@ -187,11 +198,14 @@ function actorCopy(policy, settled, data, text) {
       n: formatSigned(benefit),
     });
     return text(
-      `${KEY}ActorLineMoved`,
+      'FABRICATE.Admin.Manager.Checks.Count.ActorLineMoved',
       'For {actor}: {dice}, each {symbol} {threshold} (threshold {base} moved by {n}).'
     );
   }
-  return text(`${KEY}ActorLine`, 'For {actor}: {dice}, each {symbol} {threshold}.');
+  return text(
+    'FABRICATE.Admin.Manager.Checks.Count.ActorLine',
+    'For {actor}: {dice}, each {symbol} {threshold}.'
+  );
 }
 
 /**
