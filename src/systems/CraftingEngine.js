@@ -1998,7 +1998,7 @@ export class CraftingEngine {
       ? this._getRecipeSystem(prepared.executionRecipe)?.alchemy?.consumeOnFail !== false
       : failurePolicy.consumeIngredientsOnFail;
     const shouldConsume = succeeded || consumeOnFailure;
-    const shouldUseTools = succeeded || alchemySimpleFailure || failurePolicy.breakToolsOnFail;
+    const shouldUseTools = succeeded || failurePolicy.breakToolsOnFail;
     const state = {
       consumedItems: [],
       usedTools: [],
@@ -3753,6 +3753,7 @@ export class CraftingEngine {
   }) {
     const system = this._getRecipeSystem(executionRecipe);
     const consumeOnFail = system?.alchemy?.consumeOnFail !== false;
+    const failurePolicy = this._getFailureConsumptionPolicy(executionRecipe);
 
     let consumedItems = [];
     let usedTools = [];
@@ -3778,12 +3779,14 @@ export class CraftingEngine {
         executionRecipe,
         checkResult
       );
-      usedTools = await this._applyToolBreakage(executionRecipe, toolValidation.tools, {
-        forceBreak: breakDecision.forceBreak,
-        authority: breakDecision.authority,
-        reason: breakDecision.reason,
-        triggerId: breakDecision.triggerId,
-      });
+      if (failurePolicy.breakToolsOnFail || breakDecision.forceBreak) {
+        usedTools = await this._applyToolBreakage(executionRecipe, toolValidation.tools, {
+          forceBreak: breakDecision.forceBreak,
+          authority: breakDecision.authority,
+          reason: breakDecision.reason,
+          triggerId: breakDecision.triggerId,
+        });
+      }
     } catch (consumptionError) {
       if (consumptionError.code === 'HISTORY_EFFECT_UNCERTAIN') throw consumptionError;
       console.error(
