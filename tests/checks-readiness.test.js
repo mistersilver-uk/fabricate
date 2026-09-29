@@ -272,7 +272,7 @@ describe('checks readiness label maps do not drift', () => {
   }
 
   it('resolves an issue id to the SAME namespaced key both surfaces localize against', () => {
-    // The Validation route and the section Callout each hold their own `text()` bridge, so
+    // The Validation route and the section notice each hold their own `text()` bridge, so
     // the thing that keeps them describing one issue identically is this one resolver.
     const copy = checkIssueCopy('noRollFormula');
     assert.equal(copy.key, 'FABRICATE.Admin.Manager.Checks.Validation.IssueNoRollFormula');
