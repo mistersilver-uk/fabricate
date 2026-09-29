@@ -3,6 +3,8 @@
  * roll, pick its required count, and capture the resolved policy a prepared run replays. It reads
  * no Actor, recipe, component, task or macro: callers pass roll data and the override they select.
  */
+import { hasRollDataPath } from '../utils/rollFormulaRollability.js';
+
 import { firstUnresolvedPath } from './checkEvaluation.js';
 import {
   activeCheckEvaluation,
@@ -10,6 +12,11 @@ import {
   resolveActivityTarget,
 } from './checkTarget.js';
 import { resolvePool } from './countEvaluation.js';
+
+/** Whether a count pool's threshold reads the character (`character`) or is a number (`fixed`). */
+export function countThresholdSource(evaluation) {
+  return hasRollDataPath(evaluation?.pool?.threshold) ? 'character' : 'fixed';
+}
 
 /** The required count: an integer override (a tier's, component's or task's, 0 included), else the pool's. */
 export function countRequired(evaluation, override = null) {
@@ -64,11 +71,13 @@ export function progressiveCheckRefusal(config, readRollData) {
 
 /**
  * The private `decisionPolicy.count` a prepared run replays: the pool resolved before any Tool
- * roll, with the required count the macro already settled. It holds numbers, never expressions.
+ * roll, with the required count the macro already settled, and whether its threshold read the
+ * character. It holds numbers and that one word, never expressions.
  */
 export function countDecisionPolicy(evaluation, policy, required) {
   const { pool } = evaluation;
   return {
+    thresholdSource: countThresholdSource(evaluation),
     die: policy.die,
     direction: policy.direction,
     base: policy.resolved.base,
@@ -83,27 +92,29 @@ export function countDecisionPolicy(evaluation, policy, required) {
 }
 
 /**
- * The evaluation, strictness and required count a captured `decisionPolicy.count` replays, so the
- * prepared evaluator never reads the live actor; `null` when the capture is missing.
+ * The roll options (evaluation, strictness and threshold source) and required count a captured
+ * `decisionPolicy.count` replays, so the prepared evaluator never reads the live actor; `null`
+ * when the capture is missing.
  */
 export function preparedCountEvaluation(count) {
   if (!count || typeof count !== 'object') return null;
-  return {
-    evaluation: {
-      product: 'count',
-      direction: count.direction === 'under' ? 'under' : 'over',
-      pool: {
-        die: count.die,
-        base: count.base,
-        threshold: count.threshold,
-        required: count.required,
-        modifierDestination: count.modifierDestination,
-        zeroPoolFails: count.zeroPoolFails,
-        explode: count.explode,
-        cancel: count.cancel,
-      },
+  const evaluation = {
+    product: 'count',
+    direction: count.direction === 'under' ? 'under' : 'over',
+    pool: {
+      die: count.die,
+      base: count.base,
+      threshold: count.threshold,
+      required: count.required,
+      modifierDestination: count.modifierDestination,
+      zeroPoolFails: count.zeroPoolFails,
+      explode: count.explode,
+      cancel: count.cancel,
     },
-    thresholdMode: count.comparison,
+  };
+  const thresholdSource = count.thresholdSource === 'character' ? 'character' : 'fixed';
+  return {
+    rollOptions: { evaluation, thresholdMode: count.comparison, thresholdSource },
     required: count.required,
   };
 }

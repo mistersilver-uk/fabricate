@@ -107,6 +107,7 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   // `checkRoll.js` rolls and grades a count check through these (issue 2004).
   'src/systems/countCheck.js',
   'src/systems/countCheckRoll.js',
+  'src/systems/countDisplayEvidence.js',
   'src/systems/countRoll.js',
   'src/systems/normalize/checkEvaluation.js',
   'src/systems/checkRollDecision.js',

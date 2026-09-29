@@ -54,6 +54,13 @@ export function preRollEvidence(rolled) {
   };
 }
 
+/** The executed roll mode, on a result whose caller asked for it; never persisted. */
+export function reportedVisibility(rolled) {
+  return rolled && Object.hasOwn(rolled, 'rollMode')
+    ? { visibility: { rollMode: rolled.rollMode, secret: false } }
+    : {};
+}
+
 /** Interactive rolls post to chat, which is what Dice So Nice animates; a failure is swallowed. */
 export async function postCheckRoll({ roll, preRolls, options, flavor, rollMode }) {
   if (

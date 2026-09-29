@@ -1,13 +1,13 @@
 /** Resolves an interactive check decision into a formula and modifier placement plan. */
 
 import { applyD20Advantage, hasPlainD20 } from '../utils/craftingCheckExpression.js';
-import { hasRollDataPath } from '../utils/rollFormulaRollability.js';
 
 import {
   appendPlannedLibraryTerms,
   resolvedLibraryContributions,
 } from './checkModifierResolver.js';
 import { planModifierPlacement } from './checkModifierRouter.js';
+import { countThresholdSource } from './countCheck.js';
 import { describeCountPolicy } from './countEvaluation.js';
 import { CHECK_MODIFIER_TERM_LABEL } from './toolCheckBonus.js';
 
@@ -119,7 +119,7 @@ export function countPromptFields(evaluation, policy, required, toolContribution
     die: policy.die,
     threshold: policy.resolved.threshold + tools.thresholdDelta,
     thresholdAnchor: policy.resolved.threshold,
-    thresholdSource: hasRollDataPath(evaluation.pool?.threshold) ? 'character' : 'fixed',
+    thresholdSource: countThresholdSource(evaluation),
     explode: explode && {
       kind: explode.from ? 'from' : 'best',
       face: explode.face,
@@ -244,7 +244,8 @@ export function planDecisionPlacement({ evaluation, toolContributions, selected,
 /**
  * The prompt returns a decision, but never determines the selected modifier data directly.
  * `deferred` means the offered `modifierChoice` is selected by that decision; a count check
- * passes the `countPolicy` its pool resolved to before the prompt.
+ * passes the `countPolicy` its pool resolved to before the prompt, and gets back the
+ * `contributions` it placed.
  */
 export async function resolveCheckDecision({
   authoredFormula,
@@ -316,6 +317,7 @@ export async function resolveCheckDecision({
     placementPlan,
     benefitTerms: targetBenefitTerms(evaluation, contributions),
     resolvedFormula: displayFormula(formula, actor)?.display ?? null,
+    ...(evaluation.product === 'count' && { contributions }),
   };
 }
 

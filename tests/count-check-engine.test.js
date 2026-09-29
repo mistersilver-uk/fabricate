@@ -609,6 +609,7 @@ test('the gathering descriptor refuses a count pool and captures its resolved po
   const { dc, target, targetSource, count } = described.privateEvaluation.decisionPolicy;
   assert.deepEqual([dc, target, targetSource], [null, null, null], 'no DC or target for count');
   assert.deepEqual(count, {
+    thresholdSource: 'fixed',
     die: 10,
     direction: 'under',
     base: 4,

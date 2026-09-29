@@ -12,11 +12,13 @@ import {
   checkRollHandoff,
   postCheckRoll,
   preRollEvidence,
+  reportedVisibility,
   rolledDiceGroups,
 } from './checkRollOutput.js';
 import { classifyCheckTotal, forcedFailureTier, resolveForcedOutcome } from './checkRouting.js';
 import { actorRollData, checkTargetRefusal } from './checkTarget.js';
 import { namedPoolRefusal } from './countCheck.js';
+import { countRollReport, reportedCountDisplay } from './countDisplayEvidence.js';
 import { COUNT_CHECK_REFUSALS, countCheckPasses, resolvePool } from './countEvaluation.js';
 import { CountRollRefusal, findCountRoll } from './countRoll.js';
 
@@ -60,7 +62,12 @@ export async function evaluateCountCheckRoll(actor, options = {}) {
   });
   const settled = resolvePool({ evaluation, thresholdMode, rollData, placement });
   if (!settled.ok) return { engine: true, refusal: settled, modifierPlacement: placement };
-  const rolled = { engine: true, policy: settled.policy, modifierPlacement: placement };
+  const rolled = {
+    engine: true,
+    policy: settled.policy,
+    modifierPlacement: placement,
+    ...countRollReport(options, { decision, evaluation, placement }),
+  };
   if (settled.policy.zeroPool) {
     return { ...rolled, zeroPool: true, total: null, diceGroups: [], resolvedFormula: null };
   }
@@ -151,6 +158,8 @@ export function gradeCountPassFail(rolled, { required, triggers, label = 'Crafti
       value: 0,
       data: zeroPoolEvidence(rolled),
       message: `${label} check failed`,
+      ...reportedVisibility(rolled),
+      ...reportedCountDisplay(rolled, required),
     };
   }
   const net = rolled.total;
@@ -167,6 +176,8 @@ export function gradeCountPassFail(rolled, { required, triggers, label = 'Crafti
       ...(forced && { forcedOutcome: forced.disposition }),
     },
     message: success ? null : `${label} check failed`,
+    ...reportedVisibility(rolled),
+    ...reportedCountDisplay(rolled, required),
   };
 }
 
@@ -176,6 +187,11 @@ export function gradeCountPassFail(rolled, { required, triggers, label = 'Crafti
  */
 export function gradeCountRouted(rolled, { required, label = 'Crafting', ...routing }) {
   const { type, relativeOutcomes, fixedOutcomes } = routing;
+  // A fixed-range check grades the net itself, so its card states no required count.
+  const reported = {
+    ...reportedVisibility(rolled),
+    ...reportedCountDisplay(rolled, type === 'fixed' ? null : required),
+  };
   if (rolled.zeroPool) {
     const tier = forcedFailureTier({ type, dc: required, relativeOutcomes, fixedOutcomes });
     return {
@@ -190,6 +206,7 @@ export function gradeCountRouted(rolled, { required, label = 'Crafting', ...rout
         breakTools: tier?.breakTools === true,
       },
       message: `${label} check failed`,
+      ...reported,
     };
   }
   const classified = classifyCheckTotal({
@@ -220,6 +237,7 @@ export function gradeCountRouted(rolled, { required, label = 'Crafting', ...rout
       }),
     },
     message: success ? null : `${label} check failed`,
+    ...reported,
   };
 }
 
@@ -234,6 +252,8 @@ export function gradeCountProgressive(rolled, { triggers }) {
       outcome: null,
       value: 0,
       data: { ...zeroPoolEvidence(rolled), value: 0 },
+      ...reportedVisibility(rolled),
+      ...reportedCountDisplay(rolled, null),
     };
   }
   const budget = Math.max(0, rolled.total);
@@ -253,6 +273,8 @@ export function gradeCountProgressive(rolled, { triggers }) {
       value,
       ...(forced && { forcedOutcome: forced.disposition }),
     },
+    ...reportedVisibility(rolled),
+    ...reportedCountDisplay(rolled, null),
   };
 }
 
@@ -369,7 +391,8 @@ function gradePreparedCount(kind, rolled, { config, required, label }) {
 
 /**
  * `evaluatePreparedRunCheck`'s answer for a count check it already rolled from its captured
- * policy. A secret result keeps its pre-roll evidence and projection inside the authority.
+ * policy, with its executed visibility. A secret result keeps its pre-roll evidence, projection
+ * and display evidence inside the authority.
  */
 export function preparedCountResult(kind, rolled, { secret, failureMessage, ...grading }) {
   if (rolled.refusal) return countRefusalResult(rolled.refusal, grading.label);
@@ -394,6 +417,8 @@ export function preparedCountResult(kind, rolled, { secret, failureMessage, ...g
     message: graded.success ? null : failureMessage,
     engineEvaluated: true,
     secret,
+    visibility: { rollMode: secret ? 'gmroll' : (rolled.rollMode ?? null), secret },
+    ...(!secret && graded.countDisplay && { countDisplay: graded.countDisplay }),
     ...(rolled.rollHandoff && { rollHandoff: rolled.rollHandoff }),
   };
 }
