@@ -167,3 +167,58 @@ test('a run begun before accepted terms existed still resolves against the live 
   assert.equal(fixture.resolved.success, true, JSON.stringify(fixture.resolved));
   assert.deepEqual(fixture.record.steps[0].createdResults.map((result) => result.quantity), [2]);
 });
+
+const stageCall = (context, operation, extra) => context.engine[operation]({
+  viewer: context.gm, actor: context.actor, componentSourceActors: context.sources, runId: context.runId,
+  expectedRevision: context.manager().getRun(context.actor, context.runId).runRevision,
+  executionGrant: 'grant', ...extra,
+});
+
+test('the journal offers a begun run only the routes it accepted after an import re-ids them', async () => {
+  const fixture = await createPersistedCraftingHistory({
+    stageCount: 2,
+    recipeModel: true,
+    drive: async (context) => {
+      await reinstall(context, (shipped) => {
+        shipped.steps[1].ingredientSets = [{ id: 'live-route', name: 'Live route', ingredientGroups: [] }];
+        return [shipped];
+      });
+      game.time.worldTime += 60;
+      const first = await execute(context, 'stage-0');
+      const offered = context.project().activeRuns[0].currentStep.selectionAvailability.routes.map((route) => route.id);
+      const begun = await stageCall(context, 'beginVersionedStage', {
+        selectionPlan: { selectedIngredientSetId: offered[0] ?? null }, requestId: 'begin-1',
+      });
+      game.time.worldTime += 60;
+      const second = begun.success ? await execute(context, 'stage-1') : null;
+      return { first, offered, begun, second };
+    },
+  });
+
+  assert.equal(fixture.first.success, true, JSON.stringify(fixture.first));
+  assert.deepEqual(fixture.offered, ['next-route'], 'the card offers the accepted route, not the live one');
+  assert.equal(fixture.begun.success, true, JSON.stringify(fixture.begun));
+  assert.equal(fixture.second?.success, true, JSON.stringify(fixture.second));
+  assert.equal(fixture.record.status, 'succeeded');
+});
+
+test('cancelling a started run after an overwrite refunds through the accepted recipe', async () => {
+  const fixture = await createPersistedCraftingHistory({
+    stageCount: 1,
+    recipeModel: true,
+    stubCurrencySettlement: true,
+    drive: async (context) => {
+      await reinstall(context, (shipped) => [{ ...shipped, name: 'Renamed tonic' }]);
+      const refunds = [];
+      context.engine._refundCraftCurrency = async (_actor, recipe, spends) => {
+        refunds.push({ name: recipe.name, spends });
+        return { valid: true, groups: spends.map(() => ({ refunded: true })) };
+      };
+      const cancelled = await stageCall(context, 'cancelVersionedRun', { requestId: 'cancel' });
+      return { cancelled, refunds };
+    },
+  });
+
+  assert.equal(fixture.cancelled.success, true, JSON.stringify(fixture.cancelled));
+  assert.deepEqual(fixture.refunds, [{ name: 'Recorded tonic', spends: [{ unit: 'gp', amount: 2 }] }]);
+});

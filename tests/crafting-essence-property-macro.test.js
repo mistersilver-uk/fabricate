@@ -508,6 +508,7 @@ test('a versioned timed finish hands the property macro the start snapshot\'s na
   const fixture = await createPersistedCraftingHistory({
     stageCount: 1,
     checked: false,
+    recipeModel: true,
     prepare: ({ system, steps, items }) => {
       system.features.propertyMacros = true;
       steps[0].resultGroups[0].results[0].propertyMacroUuid = 'Macro.probe';
@@ -531,6 +532,7 @@ test('a versioned timed finish hands the property macro the start snapshot\'s na
   delete globalThis.__versionedMacroProbe;
   delete globalThis.fromUuid;
 
+  assert.ok(fixture.armedRecord.termsSnapshot, 'the run resolves against its accepted terms');
   assert.deepEqual(fixture.remainingAfterStart, [0, 0], 'the start consumed both inputs');
   assert.equal(fixture.resolved.success, true, JSON.stringify(fixture.resolved));
   assert.deepEqual(seen, [

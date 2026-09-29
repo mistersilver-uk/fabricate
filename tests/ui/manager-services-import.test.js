@@ -8,6 +8,7 @@ import { describe, it } from 'node:test';
 
 import { buildManagerWorld, installWorld } from '../fixtures/managerServicesCorpus.js';
 import { createManagerServices } from '../../src/ui/managerServices.js';
+import { CompendiumImporter } from '../../src/systems/CompendiumImporter.js';
 
 const KNOWLEDGE_IO = Object.freeze({
   knowledgeSnapshot: () => null,
@@ -90,6 +91,27 @@ describe('the system import service', () => {
         world.journal.some(([channel]) => channel === 'adminStore.refresh'),
         'a completed import refreshes the admin store'
       );
+    });
+  });
+
+  it('builds its importer to spare the recipes the world\'s active runs hold', async () => {
+    await withWorld({}, async () => {
+      globalThis.game.fabricate.getCraftingRunManager = () => ({
+        activeRunRecipeIds: (actors) => new Set(actors === globalThis.game.actors ? ['held-recipe'] : []),
+      });
+      const { importFromPackData } = CompendiumImporter.prototype;
+      const held = [];
+      CompendiumImporter.prototype.importFromPackData = async function capture() {
+        held.push(...this._activeRunRecipeIds());
+        return null;
+      };
+      try {
+        await createManagerServices({ ...KNOWLEDGE_IO, adminStore: () => ({ refresh: async () => {} }) })
+          .renderSystemImportDialog();
+      } finally {
+        CompendiumImporter.prototype.importFromPackData = importFromPackData;
+      }
+      assert.deepEqual(held, ['held-recipe']);
     });
   });
 

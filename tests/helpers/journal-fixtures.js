@@ -1,4 +1,5 @@
 // Shared RunModel fixtures for the Journal mounted-component tests.
+import { Recipe } from '../../src/models/Recipe.js';
 
 /**
  * A crafting RunModel. By default it is a 2-step run gated on world time
@@ -220,7 +221,6 @@ export async function createPersistedCraftingHistory({
     ingredientSets: [index === 0 ? set : emptySet], resultGroups: awardQuantity === null ? [] : [{ id: `outputs-${index}`, results: [{ id: `result-${index}`, componentId: `award-stage-${index}`, quantity: awardQuantity ?? (index === 0 ? 1 : 3) }] }], toolIds: [], timeRequirement: timed ? { minutes: 1 } : null,
   }));
   await prepare?.({ system, steps, items, sources, actor });
-  const { Recipe } = await import('../../src/models/Recipe.js');
   const recipe = recipeModel
     ? Recipe.fromJSON({ id: 'historical-recipe', name: 'Recorded tonic', craftingSystemId: system.id, metadata: { version: '1.0.0' },
       steps: steps.map((step) => ({ ...step, ingredientSets: step.ingredientSets.map((entry) => entry.toJSON()) })) })

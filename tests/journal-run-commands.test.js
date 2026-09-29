@@ -9,7 +9,8 @@ import { GatheringEngine } from '../src/systems/GatheringEngine.js';
 import { RunJournalBuilder } from '../src/ui/presenters/RunJournalBuilder.js';
 import { resolveAlchemySubmissions } from '../src/utils/alchemySubmissions.js';
 import { resolvedComponentsFor } from '../src/systems/scopedEntityReads.js';
-import { resolveRunRecipe } from '../src/systems/runTerms.js';
+import { resolveRunRecipe, snapshotRunTerms } from '../src/systems/runTerms.js';
+import { Recipe } from '../src/models/Recipe.js';
 import { promptJournalStageCheck } from '../src/bootstrap/journalOperations.js';
 import { createJournalRunAuthority } from '../src/systems/journalRunAuthority.js';
 import { evaluatePreparedRunCheck } from '../src/systems/checkRoll.js';
@@ -636,6 +637,54 @@ describe('journal run command protocol', () => {
     it(`captures route B at the actual main command boundary with ${clientSnapshot ? 'forged' : 'absent'} client evidence and retains it after reload and cancellation`, () =>
       assertAuthoritativeRouteSnapshot(clientSnapshot));
   }
+
+  it('selects a route of the accepted recipe after an update re-ids the live one', async () => {
+    const createOperations = loadCraftingOperations();
+    const oldGlobals = { game: globalThis.game, foundry: globalThis.foundry, fromUuid: globalThis.fromUuid };
+    try {
+      globalThis.foundry = { utils: { randomID: () => 'terms-run' } };
+      globalThis.game = { user: { id: 'player' }, time: { worldTime: 1000 } };
+      const authored = (setIds) => new Recipe({ id: 'recipe', craftingSystemId: 'system', name: 'Routes',
+        metadata: { version: '1.0.0' },
+        steps: [{ id: 'step', ingredientSets: setIds.map((id) => ({ id, name: id, ingredientGroups: [] })) }] });
+      let live = authored(['a', 'b']);
+      const fabricate = {
+        craftingRunManager: new CraftingRunManager(),
+        recipeManager: { getRecipe: (id) => (id === 'recipe' ? live : null) },
+      };
+      let harness;
+      const operations = createOperations(fabricate, () => harness.service);
+      harness = commandHarness({ currentUserId: 'gm', operations: { crafting: operations } });
+      const { actor, service } = harness;
+      Object.assign(actor, { id: 'a', isOwner: true, items: [] });
+      const flags = {};
+      actor.getFlag = (scope, key) => flags[scope]?.[key];
+      actor.setFlag = async (scope, key, value) => {
+        flags[scope] ??= {};
+        flags[scope][key] = structuredClone(value);
+        return actor;
+      };
+      globalThis.fromUuid = async (uuid) => (uuid === actor.uuid ? actor : null);
+      const run = await fabricate.craftingRunManager.createRun(actor, live, [actor], 'player', {
+        lifecycleVersion: 1, termsSnapshot: snapshotRunTerms(live, null),
+      });
+      live = authored(['a', 'b-live']);
+      const select = (selectedIngredientSetId, expectedRevision) => service.handleRequest({
+        requestId: `select-${selectedIngredientSetId}`, sessionId: 'player-session', actorUuid: actor.uuid,
+        runType: 'crafting', runId: run.id, expectedRevision, action: 'setSelection',
+        payload: { stepIndex: 0, expectedStage: 0, selectionPlan: { selectedIngredientSetId } },
+      }, 'player');
+
+      assert.equal((await select('b-live', 0)).reason, 'ingredient-set-not-found', 'a live-only route is refused');
+      const accepted = await select('b', 0);
+      assert.equal(accepted.success, true, JSON.stringify(accepted));
+      const step = fabricate.craftingRunManager.getActiveRun(actor, run.id).steps[0];
+      assert.equal(step.selectionPlan.selectedIngredientSetId, 'b');
+      assert.equal(step.selectedRequirementSnapshot.id, 'b');
+    } finally {
+      Object.assign(globalThis, oldGlobals);
+    }
+  });
 
   it('defaults new public crafts to v1 while preserving a persisted legacy continuation', async () => {
     const calls = [];
