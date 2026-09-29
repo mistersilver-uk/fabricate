@@ -13,6 +13,7 @@ import {
 } from '../helpers/svelte-component-harness.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import {
+  COUNT_DATA,
   COUNT_DISPLAY,
   COUNT_ROWS,
   OVER_FIXED_DATA,
@@ -23,6 +24,7 @@ import {
   executedCountCheck,
   shippedLocalize,
 } from '../helpers/checkEvidenceFixtures.js';
+import { executedCheckDisplay } from '../../src/ui/presenters/checkDisplay.js';
 import { tileModel } from '../../src/ui/presenters/countDiceTiles.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -214,8 +216,13 @@ describe('RollResultBox evidence rows', () => {
   });
 
   it('states a count only from its executed dice, never what changed after (N31)', async () => {
+    // The engine's own object, not a copy: a projection holding it would see these edits.
     const countDisplay = structuredClone(COUNT_DISPLAY);
-    const check = executedCountCheck(countDisplay);
+    const check = executedCheckDisplay({
+      data: structuredClone(COUNT_DATA),
+      visibility: { rollMode: 'publicroll', secret: false },
+      countDisplay,
+    });
     countDisplay.threshold.effective = 3;
     countDisplay.results[1].cancelled = false;
     const root = await harness.mount({ result: result(check) });
