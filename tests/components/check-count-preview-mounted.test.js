@@ -293,7 +293,7 @@ describe('count odds and the simulator readout', () => {
       total: '−3',
       line: ['needs 1 · a net below zero is a botch', 'botch'],
       card: ['failure', 'Botch', 'Net below zero'],
-      note: MARGIN_NOTES.count,
+      note: null,
       rows: [['failure-result', 'Failure policy applies', 'per recipe']],
     });
   });
@@ -375,7 +375,7 @@ describe('the count readout per outcome (issue 2080)', () => {
     script([8, 9, 9, 3, 4, 5]);
     const readout = await rolled(await mountRouted(ROUTED_COUNT));
     assert.deepEqual([readout.line, readout.card, readout.rows], [
-      ['needs 3 · margin +0', 'margin'],
+      ['needs 2 · margin +1', 'margin'],
       ['success', 'Fine', 'The recipe’s result group is produced'],
       [['result-group', 'Result group produced', 'Fine']],
     ]);
@@ -388,6 +388,25 @@ describe('the count readout per outcome (issue 2080)', () => {
     assert.deepEqual([readout.card[1], readout.note], [
       'Ruined',
       ['forced', 'Trigger fired — forced to the worst failing tier.'],
+    ]);
+  });
+
+  it('reads a routed botch a trigger rescued against the required count (ruling 3)', async () => {
+    script([2, 4, 6]);
+    const check = {
+      ...ROUTED_COUNT,
+      evaluation: BOTCHING,
+      relativeOutcomes: [
+        { id: 'failure', name: 'Failure', dc: -1, success: false },
+        { id: 'success', name: 'Success', dc: 0, success: true },
+      ],
+      checkBreakage: { triggers: [forceTrigger('success')] },
+    };
+    const readout = await rolled(await mountRouted(check), null);
+    assert.deepEqual([readout.total, readout.line, readout.card[1]], [
+      '−3',
+      ['needs 1 · margin −4', 'margin'],
+      'Success',
     ]);
   });
 

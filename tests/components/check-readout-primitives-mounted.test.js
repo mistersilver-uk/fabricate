@@ -53,7 +53,7 @@ describe('IconFactRow: the line density, row tones and meta hook', () => {
   });
 
   it('takes each row tone as its own state, and none for a tone it does not name', async () => {
-    for (const tone of ['success', 'danger', 'warning', 'muted', 'disabled']) {
+    for (const tone of ['success', 'danger', 'warning', 'neutral', 'muted']) {
       const target = await row.mount({ icon: 'fas fa-flask', title: 'T', tone });
       const node = target.querySelector('.manager-icon-fact-row');
       assert.deepEqual(authored(node), ['manager-icon-fact-row', `is-tone-${tone}`]);

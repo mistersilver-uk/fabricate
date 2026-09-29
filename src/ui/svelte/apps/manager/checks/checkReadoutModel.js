@@ -4,7 +4,7 @@
  * runner's result and the check's own configuration and re-resolves nothing, `text(key,
  * fallback)` localizes, and every negative number carries U+2212.
  */
-import { evaluateCheckBreakageCondition } from '../../../../../toolBreakageRuntime.js';
+import { evaluateCheckBreakage } from '../../../../../toolBreakageRuntime.js';
 import { resolveProgressiveAward } from '../../../../../utils/progressiveAward.js';
 
 import { readoutBreakdown, readoutFamily, readsAttributeTarget } from './checkPreview.js';
@@ -57,14 +57,6 @@ const COPY = Object.freeze({
     'FABRICATE.Admin.Manager.Checks.Simulator.CountsFailure',
     'Counts as a failure · result group bound to this tier',
   ],
-  clampedHigh: [
-    'FABRICATE.Admin.Manager.Checks.Simulator.ClampedHighest',
-    'clamped to the highest band',
-  ],
-  clampedLow: [
-    'FABRICATE.Admin.Manager.Checks.Simulator.ClampedLowest',
-    'clamped to the lowest band',
-  ],
   noTiers: ['FABRICATE.Admin.Manager.Checks.Simulator.NoTiers', 'No tiers configured'],
   noTiersDetail: [
     'FABRICATE.Admin.Manager.Checks.Simulator.NoTiersDetail',
@@ -77,6 +69,7 @@ const COPY = Object.freeze({
   ],
   fullySpent: ['FABRICATE.Admin.Manager.Checks.Simulator.FullySpent', 'The value is fully spent'],
   awards: ['FABRICATE.Admin.Manager.Checks.Simulator.AwardValue', 'Awards {value}'],
+  awardAll: ['FABRICATE.Admin.Manager.Checks.Simulator.AwardAll', 'Awards every result'],
   awardDetail: [
     'FABRICATE.Admin.Manager.Checks.Simulator.AwardDetail',
     'The value is spent down the recipe’s ordered results, each costing its own difficulty.',
@@ -193,7 +186,7 @@ const FAILURE_POLICY_ROWS = Object.freeze({
   },
   perRecord: {
     icon: 'fas fa-scroll',
-    tone: 'muted',
+    tone: 'neutral',
     label: [
       'FABRICATE.Admin.Manager.Checks.Simulator.FactFailurePerRecord',
       'Failure result if this {record} defines one',
@@ -232,14 +225,6 @@ function dynamicNote(plan) {
 /** A number the result carries, or NaN for `null` and `undefined`, which `Number` reads as 0. */
 function finite(value) {
   return value === null || value === undefined ? NaN : Number(value);
-}
-
-/** The tier a routed result landed in, read from the check's own configured tiers. */
-function matchedTier(plan, result) {
-  const outcomeId = result.data?.outcomeId ?? null;
-  if (outcomeId === null) return null;
-  const tiers = plan.args?.type === 'fixed' ? plan.args.fixedOutcomes : plan.args?.relativeOutcomes;
-  return (Array.isArray(tiers) ? tiers : []).find((tier) => tier?.id === outcomeId) ?? null;
 }
 
 /** The facts every part of the readout reads, gathered once. */
@@ -297,15 +282,22 @@ function readoutMedallion(facts, text) {
   return { value: formatSigned(total), caption: say(text, COPY.total) };
 }
 
+/** The fixed range the total fell in, the highest start winning, whatever a trigger stepped to. */
+function rolledBand(plan, total) {
+  const bands = Array.isArray(plan.args?.fixedOutcomes) ? plan.args.fixedOutcomes : [];
+  const holding = bands.filter((band) => Number(band.start) <= total && total <= Number(band.end));
+  return holding.toSorted((left, right) => Number(right.start) - Number(left.start))[0] ?? null;
+}
+
 /** A fixed DC's line: the DC alone, the DC and margin, the band, or the spent value. */
 function fixedOverGrading(facts, text) {
-  const { plan, result, total } = facts;
+  const { plan, total } = facts;
   const none = { target: null, margin: null, marginKind: '' };
   if (plan.kind === 'progressive') return { ...none, targetLine: say(text, COPY.spent) };
   if (facts.fixedRanges) {
-    const tier = matchedTier(plan, result);
-    const targetLine = tier
-      ? say(text, COPY.inBand, { min: tier.start, max: tier.end })
+    const band = rolledBand(plan, total);
+    const targetLine = band
+      ? say(text, COPY.inBand, { min: band.start, max: band.end })
       : say(text, COPY.noBand);
     return { ...none, targetLine };
   }
@@ -349,12 +341,13 @@ function countGrading(facts, text) {
     const targetLine = say(text, COPY.needs, { required, margin: signed });
     return { target: required, margin, marginKind: 'margin', targetLine };
   }
-  const margin = finite(data.margin);
-  if (!Number.isFinite(total) || !Number.isFinite(margin)) {
+  // "needs" is the check's own required count; a routed `data.margin` is measured from the
+  // rolled tier's floor, which is not what the check needs.
+  const required = Number.isFinite(plan.dc) ? plan.dc : total - finite(data.margin);
+  if (!Number.isFinite(total) || !Number.isFinite(required)) {
     return { target: null, margin: null, marginKind: '', targetLine: '' };
   }
-  // A botch reads against the record's own count, a margin against the count it was graded by.
-  const required = botch && Number.isFinite(plan.dc) ? plan.dc : total - margin;
+  const margin = total - required;
   if (botch) {
     const targetLine = say(text, COPY.needsBotch, { required });
     return { target: required, margin, marginKind: 'botch', targetLine };
@@ -370,17 +363,6 @@ const GRADINGS = Object.freeze({
   count: countGrading,
 });
 
-/** The clamp a fixed-range result was routed by, as the card's trailing clause, or `''`. */
-function clampClause(facts, text) {
-  if (!facts.fixedRanges) return '';
-  const bands = Array.isArray(facts.plan.args.fixedOutcomes) ? facts.plan.args.fixedOutcomes : [];
-  if (bands.length === 0 || !Number.isFinite(facts.total)) return '';
-  const top = Math.max(...bands.map((band) => Number(band.end)));
-  const bottom = Math.min(...bands.map((band) => Number(band.start)));
-  if (facts.total > top) return say(text, COPY.clampedHigh);
-  return facts.total < bottom ? say(text, COPY.clampedLow) : '';
-}
-
 /** The card's detail: produced, nothing, or a count's net below zero. */
 function outcomeDetail(facts, text) {
   if (facts.success) return say(text, COPY.produced, { record: facts.recordNoun });
@@ -389,21 +371,30 @@ function outcomeDetail(facts, text) {
 
 /** A routed card: the tier and, for a fixed DC, whether it counts as a success. */
 function routedCard(facts, text) {
-  const { result, success, family } = facts;
-  if (!result.outcome) return [say(text, COPY.noTiers), say(text, COPY.noTiersDetail), false];
+  const { plan, result, success, family } = facts;
+  if (!result.outcome) {
+    const tiers =
+      plan.args?.type === 'fixed' ? plan.args.fixedOutcomes : plan.args?.relativeOutcomes;
+    if (!Array.isArray(tiers) || tiers.length === 0) {
+      return [say(text, COPY.noTiers), say(text, COPY.noTiersDetail), false];
+    }
+    // A result no tier caught still passed or failed, which is what the card states.
+    return [say(text, success ? COPY.success : COPY.failure), outcomeDetail(facts, text), success];
+  }
   const title = facts.botch ? say(text, COPY.botch) : result.outcome;
   if (family !== 'fixedOver') return [title, outcomeDetail(facts, text), success];
-  const detail = [say(text, success ? COPY.countsSuccess : COPY.countsFailure)];
-  const clamp = clampClause(facts, text);
-  if (clamp) detail.push(clamp);
-  return [title, detail.join(' · '), success];
+  return [title, say(text, success ? COPY.countsSuccess : COPY.countsFailure), success];
 }
 
 /** A progressive card: what the value bought down the sandbox order (R8). */
 function progressiveCard({ award, result }, text) {
   if (!award) {
-    const value = String(result.value ?? 0);
-    return [say(text, COPY.awards, { value }), say(text, COPY.awardDetail), true];
+    // A forced success spends MAX_SAFE_INTEGER, which is every result rather than a number.
+    const title =
+      result.data?.forcedOutcome === 'success'
+        ? say(text, COPY.awardAll)
+        : say(text, COPY.awards, { value: String(result.value ?? 0) });
+    return [title, say(text, COPY.awardDetail), true];
   }
   const title = say(text, COPY.awardedOf, { awarded: award.awarded.length, of: award.of });
   const detail =
@@ -449,9 +440,9 @@ function stepNote({ data, result }, text) {
   return { kind: 'trigger', text: say(text, copy, { steps: step.steps }) };
 }
 
-/** The margin note a roll-under, character value or count always carries beside its margin. */
+/** The margin note a roll-under, character value or count carries whenever its line shows one. */
 function marginNote(facts, grading, text) {
-  if (facts.plan.kind === 'progressive' || grading.margin === null) return null;
+  if (facts.plan.kind === 'progressive' || grading.marginKind !== 'margin') return null;
   let copy = NOTES.count;
   if (facts.family === 'target')
     copy = facts.plan.evaluation.direction === 'under' ? NOTES.under : NOTES.over;
@@ -468,15 +459,18 @@ function readoutNote(facts, grading, text) {
   return marginNote(facts, grading, text);
 }
 
-/** How a roll breaks the required tools: `trigger`, `tier`, or `''` when it breaks none. */
-function toolBreak({ plan, result, data }) {
+/**
+ * How a roll breaks the required tools, by the engine's own verdict and precedence: `tier`,
+ * `trigger`, or `''`. The preview's result is the runner's own, which the engine marks evaluated.
+ */
+function toolBreak({ plan, result }) {
   const triggers = Array.isArray(plan.args?.triggers) ? plan.args.triggers : [];
-  const fired = triggers.some(
-    (trigger) =>
-      trigger?.breakTools === true && evaluateCheckBreakageCondition(trigger.condition, result)
-  );
-  if (fired) return 'trigger';
-  return data.breakTools === true ? 'tier' : '';
+  const verdict = evaluateCheckBreakage({
+    checkBreakage: { triggers },
+    checkResult: { ...result, engineEvaluated: true },
+  });
+  if (!verdict.forceBreak) return '';
+  return verdict.triggerId === 'legacyBreakTools' ? 'tier' : 'trigger';
 }
 
 /** A "Required tools break" row naming what broke them, or null when nothing did. */
@@ -508,7 +502,7 @@ function ingredientRow({ activity, success, consumption }, text) {
   const salvage = activity === 'salvage';
   const consumed = say(text, salvage ? ROWS.item : ROWS.ingredients);
   const base = { id: 'ingredients', icon: 'fas fa-flask' };
-  if (success) return { ...base, tone: 'muted', label: consumed, meta: say(text, ROWS.asListed) };
+  if (success) return { ...base, tone: 'neutral', label: consumed, meta: say(text, ROWS.asListed) };
   if (consumption?.consumeOnFail === true) {
     return { ...base, tone: 'danger', label: consumed, meta: say(text, ROWS.on) };
   }
@@ -566,7 +560,7 @@ function progressiveRows({ award }, text) {
   if (!award) return [];
   if (award.awarded.length === 0) {
     const label = say(text, ROWS.recovered);
-    return [{ id: 'nothing', icon: 'fas fa-ban', tone: 'disabled', label, meta: '—' }];
+    return [{ id: 'nothing', icon: 'fas fa-ban', tone: 'muted', label, meta: '—' }];
   }
   return award.awarded.map((entry, index) => ({
     id: `result-${index + 1}`,

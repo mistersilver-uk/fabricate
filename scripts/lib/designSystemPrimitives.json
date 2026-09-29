@@ -158,7 +158,7 @@
       "status": "target",
       "evidence": "broad",
       "scope": "manager-only",
-      "why": "The labelled icon-and-fact row (5 callers). `<StatBox>` (`library.html:860`) is the nearest mark, but a stat box is a boxed value and this is a row of label-plus-fact, so the correspondence is not made. Scoped `manager-only`: every measured importer is a manager inspector or editor. Issue 2080 extends it by prop rather than forking it, for the Checks simulator's \"What happens\" list: an opt-in `density=\"line\"` draws one line with the subtitle trailing as mono meta, the row tones `success`, `danger`, `warning`, `muted` and `disabled` ink the glyph from each family's token, and `metaAttr`/`metaValue` hook the meta span as `titleAttr` hooks the title. A row that asks for none of them renders byte-identical HTML."
+      "why": "The labelled icon-and-fact row (5 callers). `<StatBox>` (`library.html:860`) is the nearest mark, but a stat box is a boxed value and this is a row of label-plus-fact, so the correspondence is not made. Scoped `manager-only`: every measured importer is a manager inspector or editor. Issue 2080 extends it by prop rather than forking it, for the Checks simulator's \"What happens\" list: an opt-in `density=\"line\"` draws one line with the subtitle trailing as mono meta, the row tones `success`, `danger`, `warning`, `neutral` and `muted`, named as the design system's chip tones are, ink the glyph from each family's token, and `metaAttr`/`metaValue` hook the meta span as `titleAttr` hooks the title. A row that asks for none of them renders byte-identical HTML."
     },
     {
       "path": "src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte",

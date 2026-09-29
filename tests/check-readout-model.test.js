@@ -92,10 +92,11 @@ describe('the target line', () => {
     assert.equal(below.targetLine, 'vs DC 12 · −3');
   });
 
-  it('names a fixed range’s band, or none, and never a DC (M12)', () => {
+  it('names the band the total fell in, or none, and never a DC (M12)', () => {
     const bands = [
-      { id: 'low', name: 'Low', start: 1, end: 9, success: false },
+      { id: 'low', name: 'Low', start: 1, end: 11, success: false },
       { id: 'high', name: 'High', start: 10, end: 14, success: true },
+      { id: 'top', name: 'Top', start: 15, end: 20, success: true },
     ];
     const routedPlan = plan(OVER, { kind: 'routed', args: { type: 'fixed', fixedOutcomes: bands } });
     const inBand = readout(routedPlan, {
@@ -104,20 +105,43 @@ describe('the target line', () => {
     });
     assert.equal(inBand.targetLine, 'in the 10–14 band');
     assert.equal(inBand.card.detail, 'Counts as a success · result group bound to this tier');
-    const clamped = readout(routedPlan, {
-      ...result(true, { total: 19, outcomeId: 'high', diceGroups: d20(19) }),
-      outcome: 'High',
+    const stepped = readout(routedPlan, {
+      ...result(true, {
+        total: 11,
+        outcomeId: 'top',
+        diceGroups: d20(11),
+        tierStepApplied: { mode: 'up', steps: 1 },
+      }),
+      outcome: 'Top',
     });
-    assert.equal(
-      clamped.card.detail,
-      'Counts as a success · result group bound to this tier · clamped to the highest band'
-    );
+    assert.equal(stepped.targetLine, 'in the 10–14 band', 'the rolled band, highest start, not the stepped one');
+    assert.equal(stepped.card.title, 'Top');
     const outside = readout(routedPlan, {
       ...result(false, { total: 30, outcomeId: null, diceGroups: d20(20) }),
       outcome: null,
     });
     assert.equal(outside.targetLine, 'outside every band');
-    assert.deepEqual([outside.card.title, outside.card.tone], ['No tiers configured', 'danger']);
+    assert.deepEqual([outside.card.title, outside.card.detail, outside.card.tone], [
+      'Failure',
+      'Nothing is produced',
+      'danger',
+    ]);
+  });
+
+  it('reads "No tiers configured" only when the check has no tiers at all', () => {
+    const failing = [{ id: 'ruined', name: 'Ruined', dc: 0, success: false }];
+    const routed = (relativeOutcomes) =>
+      plan(OVER, { kind: 'routed', args: { type: 'relative', relativeOutcomes } });
+    const forced = readout(routed(failing), {
+      ...result(true, { total: 15, diceGroups: d20(12), forcedOutcome: 'success' }),
+      outcome: null,
+    });
+    assert.deepEqual([forced.card.title, forced.card.tone], ['Success', 'success']);
+    const empty = readout(routed([]), { ...result(false, { total: 15, diceGroups: d20(12) }), outcome: null });
+    assert.deepEqual([empty.card.title, empty.card.detail], [
+      'No tiers configured',
+      'Add at least one outcome tier for this check to resolve',
+    ]);
   });
 
   it('shows no target line for a result graded with no target, never a target of 0', () => {
@@ -149,6 +173,14 @@ describe('the note', () => {
     );
     const fixed = readout(plan(OVER), result(true, { total: 15, diceGroups: d20(12) }));
     assert.equal(fixed.note, null, 'a fixed DC notes only a trigger');
+  });
+
+  it('gives the one note slot to a forced outcome over a tier step (deviation 2)', () => {
+    const routedPlan = plan(OVER, { kind: 'routed', args: { type: 'relative' } });
+    const data = { total: 15, diceGroups: d20(12), tierStepApplied: { mode: 'up', steps: 1 } };
+    const forced = readout(routedPlan, { ...result(true, { ...data, forcedOutcome: 'success' }), outcome: 'Fine' });
+    assert.equal(forced.note.kind, 'forced');
+    assert.equal(readout(routedPlan, { ...result(true, data), outcome: 'Fine' }).note.kind, 'trigger');
   });
 
   it('names a trigger’s step direction and its count, or the tier it placed (M13)', () => {
@@ -244,6 +276,28 @@ describe('the result card', () => {
       [botched.targetLine, botched.marginKind],
       ['needs 2 · a net below zero is a botch', 'botch']
     );
+    assert.equal(botched.note, null, 'the botch line shows no margin, so none is explained');
+  });
+
+  it('reads a routed count against the check’s own required count, not the tier floor (F1)', () => {
+    const routedCount = plan(COUNT, { kind: 'routed', dc: 1, args: { type: 'relative' } });
+    // The engine measures a routed margin from the rolled tier's floor (0 here).
+    const rescued = readout(routedCount, {
+      ...result(true, { total: -3, margin: -3, successes: 0, cancelled: 3, forcedOutcome: 'success' }),
+      outcome: 'Success',
+    });
+    assert.deepEqual([rescued.targetLine, rescued.target, rescued.margin], ['needs 1 · margin −4', 1, -4]);
+    const unforced = readout(routedCount, {
+      ...result(false, { total: 0, margin: 0, successes: 0, cancelled: 0 }),
+      outcome: 'Failure',
+    });
+    assert.equal(unforced.targetLine, 'needs 1 · margin −1');
+  });
+
+  it('titles a routed zero pool "Failure", whatever tier the runner names', () => {
+    const routedCount = plan(COUNT, { kind: 'routed', dc: 1, args: { type: 'relative' } });
+    const model = readout(routedCount, { ...result(false, { total: null, zeroPool: true }), outcome: 'Ruined' });
+    assert.deepEqual([model.card.title, model.card.tone], ['Failure', 'danger']);
   });
 
   it('fails a zero pool with a 0 net, its own breakdown, target line and note (M14)', () => {
@@ -301,7 +355,7 @@ describe('what happens', () => {
     );
     assert.deepEqual(
       [fixed('never').tone, fixed('perRecord').tone, fixed('always').tone],
-      ['danger', 'muted', 'warning']
+      ['danger', 'neutral', 'warning']
     );
   });
 
@@ -329,25 +383,30 @@ describe('what happens', () => {
     ]);
   });
 
-  it('names a breakage trigger over a tier as the cause', () => {
+  it('names the cause of broken tools with the engine’s precedence, the tier first', () => {
     const trigger = {
       id: 'shatter',
       breakTools: true,
       condition: { type: 'rollTotal', operator: '>=', value: 15 },
     };
     const routedPlan = plan(OVER, { kind: 'routed', args: { type: 'relative', triggers: [trigger] } });
-    const model = readout(routedPlan, {
+    const both = readout(routedPlan, {
       ...result(true, { total: 15, diceGroups: d20(12), breakTools: true }),
       outcome: 'Fine',
     });
-    assert.deepEqual(model.rows.at(-1), {
+    assert.deepEqual(both.rows.at(-1), {
       id: 'tools',
       icon: 'fas fa-hammer',
       tone: 'danger',
       label: 'Required tools break',
-      meta: 'by trigger',
+      meta: 'by tier',
     });
-    assert.equal(model.rows[0].meta, 'Fine', 'a routed success names its tier');
+    assert.equal(both.rows[0].meta, 'Fine', 'a routed success names its tier');
+    const triggerOnly = readout(routedPlan, {
+      ...result(true, { total: 15, diceGroups: d20(12), breakTools: false }),
+      outcome: 'Fine',
+    });
+    assert.equal(triggerOnly.rows.at(-1).meta, 'by trigger');
   });
 });
 
@@ -382,7 +441,7 @@ describe('a progressive readout (R8)', () => {
     const none = spend(3, { difficulties: [8], awardMode: 'equal' });
     assert.deepEqual([none.card.title, none.card.tone], ['0 of 1 awarded', 'danger']);
     assert.deepEqual(none.rows, [
-      { id: 'nothing', icon: 'fas fa-ban', tone: 'disabled', label: 'Nothing recovered', meta: '—' },
+      { id: 'nothing', icon: 'fas fa-ban', tone: 'muted', label: 'Nothing recovered', meta: '—' },
     ]);
   });
 
@@ -392,6 +451,8 @@ describe('a progressive readout (R8)', () => {
     const untyped = spend(14, { difficulties: [] });
     assert.equal(untyped.card.title, 'Awards 14');
     assert.deepEqual(untyped.rows, []);
+    const forcedUntyped = spend(Number.MAX_SAFE_INTEGER, { difficulties: [] }, { forcedOutcome: 'success' });
+    assert.equal(forcedUntyped.card.title, 'Awards every result', 'never the sentinel value');
   });
 });
 

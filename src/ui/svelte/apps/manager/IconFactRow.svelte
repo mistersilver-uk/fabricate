@@ -9,7 +9,7 @@
   chip. `tile`, `density="rule"` and `density="line"` (one line, the subtitle trailing as mono
   meta) are OPT-IN, because the design distinguishes them and the call sites were not all in the
   parity pass. `tone="info"` marks a value that came from SOMEWHERE ELSE, on the theme's own
-  `--fab-info`; `success|danger|warning|muted|disabled` ink the glyph by what the row states, each
+  `--fab-info`; `success|danger|warning|neutral|muted` ink the glyph by what the row states, each
   from its token and never a literal. The row owns only its own well; how a container
   STACKS rows stays with the container, and a caller override is not available either —
   `manager-layout.test.js` fails on this row's class token appearing in any other manager `.svelte`.
@@ -51,8 +51,8 @@
   class:is-tone-success={tone === 'success'}
   class:is-tone-danger={tone === 'danger'}
   class:is-tone-warning={tone === 'warning'}
+  class:is-tone-neutral={tone === 'neutral'}
   class:is-tone-muted={tone === 'muted'}
-  class:is-tone-disabled={tone === 'disabled'}
   {...hookAttributes}
 >
   {#if icon}
@@ -134,11 +134,11 @@
     color: var(--fab-warning-text);
   }
 
-  .manager-icon-fact-row.is-tone-muted > i {
+  .manager-icon-fact-row.is-tone-neutral > i {
     color: var(--fab-text-muted);
   }
 
-  .manager-icon-fact-row.is-tone-disabled > i {
+  .manager-icon-fact-row.is-tone-muted > i {
     color: var(--fab-text-disabled);
   }
 
