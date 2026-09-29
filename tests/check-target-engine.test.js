@@ -482,7 +482,7 @@ async function postedFlavors(run) {
   }
 }
 
-test('a routed roll names no Target in its flavor, fixed range or not; roll-high keeps its DC', async () => {
+test('a routed roll names no Target in its flavor, fixed range or not; relative roll-high keeps its DC', async () => {
   const gathering = Object.create(GatheringEngine.prototype);
   const salvage = Object.create(CraftingEngine.prototype);
   const actor = { name: 'Scavenger', system: {} };
@@ -499,10 +499,16 @@ test('a routed roll names no Target in its flavor, fixed range or not; roll-high
   assert.equal(await flavorOf(() => gather(routedCheck(SUM_UNDER))), 'Forage — Gathering check');
   assert.equal(await flavorOf(() => gather(fixedRange(SUM_UNDER))), 'Forage — Gathering check');
   assert.equal(await flavorOf(() => salvageRouted(fixedRange(SUM_UNDER))), 'Scrap — Salvage check');
+  const sumOver = { product: 'sum', direction: 'over' };
   assert.equal(
-    await flavorOf(() => gather(fixedRange({ product: 'sum', direction: 'over' }))),
+    await flavorOf(() => gather(routedCheck(sumOver))),
     'Forage — Gathering check (DC 10)',
     'roll-high keeps its flavor byte-identical'
+  );
+  assert.equal(
+    await flavorOf(() => gather(fixedRange(sumOver))),
+    'Forage — Gathering check',
+    'a fixed-range roll-high check has no DC, as crafting shows none'
   );
 });
 
