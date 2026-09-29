@@ -4,6 +4,7 @@
  */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -236,6 +237,74 @@ describe('SalvageRollSummary evidence rows', () => {
       assert.ok(!root.querySelector('.check-evidence'), JSON.stringify(visibility));
       harness.remount();
     }
+  });
+
+  // QE fix round 1 (issue 2092): a `perRecord` failure policy can still award items on a
+  // failed salvage (`publishSalvageFailure`'s `results`), so the box must not contradict
+  // the chat card beside it by dropping them.
+  it('renders items a reserved failure award produced (QE)', async () => {
+    const root = await harness.mount({
+      result: {
+        state: 'failure',
+        message: 'Salvage check failed',
+        awarded: [{ name: 'Slag', img: null }],
+      },
+    });
+    const award = root.querySelector('[data-inventory-salvage-awarded]');
+    assert.ok(award, 'the awarded list renders');
+    assert.equal(award.textContent.trim(), 'Slag');
+  });
+
+  // Fix round 1: the box no longer states the engine's generic fallback verbatim; it takes
+  // the crafting box's own pattern (RollResultBox F9) instead.
+  it('states "nothing recovered" only when the generic fallback fired and nothing awarded', async () => {
+    const nothing = await harness.mount({
+      result: { state: 'failure', message: 'Salvage check failed', awarded: [] },
+    });
+    assert.equal(
+      nothing.querySelector('[data-inventory-salvage-message]').textContent.trim(),
+      'Nothing is recovered; the failure policy applies.'
+    );
+    harness.remount();
+    const awarded = await harness.mount({
+      result: {
+        state: 'failure',
+        message: 'Salvage check failed',
+        awarded: [{ name: 'Slag', img: null }],
+      },
+    });
+    assert.ok(
+      !awarded.querySelector('[data-inventory-salvage-message]'),
+      'the awarded list speaks for itself'
+    );
+  });
+
+  it('keeps a system-authored custom failure message instead of the generic sentence', async () => {
+    const root = await harness.mount({
+      result: { state: 'failure', message: 'The blade shattered beyond use.', awarded: [] },
+    });
+    assert.equal(
+      root.querySelector('[data-inventory-salvage-message]').textContent.trim(),
+      'The blade shattered beyond use.'
+    );
+  });
+});
+
+// Guard (issue 2092): `SalvageRollSummary`'s hand-maintained copy of the engine's generic
+// salvage-failure fallback text must track `salvagePipeline.js`'s own literal, or the
+// "nothing recovered" substitution silently stops firing.
+describe('SalvageRollSummary generic-failure literal', () => {
+  it('matches the fallback `publishSalvageFailure` returns on a failed check', () => {
+    const pipelineSource = readFileSync(
+      resolve(repoRoot, 'src/systems/salvagePipeline.js'),
+      'utf8'
+    );
+    const componentSource = readFileSync(resolve(repoRoot, SALVAGE_SUMMARY), 'utf8');
+    assert.ok(
+      pipelineSource.includes("checkResult.message || 'Salvage check failed'"),
+      'the engine fallback text moved — update the component literal to match'
+    );
+    assert.ok(componentSource.includes("'Salvage check failed'"), 'the component literal drifted');
   });
 });
 

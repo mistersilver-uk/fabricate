@@ -103,8 +103,10 @@ function successSnapshot(result, systemId, componentId) {
 
 /**
  * Project one failed salvage check onto the ribbon's read-only summary (issue 2092), mirroring the
- * crafting result box: the failure state, the engine's message and the executed check's evidence
- * rows — `CheckEvidenceRows` itself withholds those rows for a blind or secret roll.
+ * crafting result box: the failure state, the engine's message, the executed check's evidence
+ * rows — `CheckEvidenceRows` itself withholds those rows for a blind or secret roll — and any
+ * reserved failure award (`publishSalvageFailure`'s `results`, issue 1098's `perRecord` policy),
+ * so the box never contradicts the chat card it stands beside.
  */
 function failureSnapshot(result, systemId, componentId) {
   return {
@@ -113,6 +115,10 @@ function failureSnapshot(result, systemId, componentId) {
     state: 'failure',
     message: result?.message ?? '',
     check: result.check,
+    awarded: (Array.isArray(result?.results) ? result.results : []).map((entry) => ({
+      name: String(entry?.name ?? ''),
+      img: typeof entry?.img === 'string' ? entry.img : null,
+    })),
   };
 }
 

@@ -247,8 +247,25 @@ describe('createSalvageExecution', () => {
       state: 'failure',
       message: 'Salvage check failed',
       check,
+      awarded: [],
     });
     assert.deepEqual(log.at(-1), ['notify', 'Salvage check failed'], 'the toast still fires');
+  });
+
+  it('carries a reserved failure award onto the box (QE: perRecord policy, issue 2092)', async () => {
+    const check = Object.freeze({ evidence: { total: 9, target: 8, margin: -1 } });
+    const { execution } = setup({
+      result: {
+        success: false,
+        message: 'Salvage check failed',
+        check,
+        results: [{ name: 'Slag', img: 'icons/slag.webp' }],
+      },
+    });
+    await execution.salvage('sys', 'c1');
+    flushSync();
+
+    assert.deepEqual(execution.salvageResult.awarded, [{ name: 'Slag', img: 'icons/slag.webp' }]);
   });
 
   it('returns a cancelled prompt to the pre-roll state, calling NO notify', async () => {
