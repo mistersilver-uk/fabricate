@@ -56,6 +56,7 @@ manager-checks-over-fixed-forced
 manager-checks-over-progressive-forced
 manager-checks-over-routed-forced
 manager-checks-gathering-over-rolled-failure
+manager-checks-under-attribute-add
 manager-checks-over-routed-fixed-rolled
 manager-checks-over-progressive-rolled
 manager-checks-over-unresolved-rolled
