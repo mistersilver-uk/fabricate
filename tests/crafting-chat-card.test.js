@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
 import { buildBulkSalvageChatContent } from '../src/ui/presenters/BulkSalvageChatCard.js';
-import { buildCraftingChatContent } from '../src/ui/presenters/CraftingChatCard.js';
+import { buildCraftingChatContent, inertText } from '../src/ui/presenters/CraftingChatCard.js';
 import { buildGmComplicationCardContent } from '../src/systems/complicationRuntime.js';
 import { buildGatheringChatContent } from '../src/ui/presenters/GatheringChatCard.js';
 import { buildSalvageChatContent } from '../src/ui/presenters/SalvageChatCard.js';
@@ -1207,4 +1207,50 @@ test('an evidence @path breaks only after its inner dots, and its @ stays inert 
   assert.equal((target.match(/\u200B/g) ?? []).length, 2, 'and nowhere else');
   assert.doesNotMatch(target, /@\w/, 'the @ is still neutralized');
   assert.equal(evidenceRowsOf(html)[0][2], UNDER_ROWS[0][2], 'the text reads unchanged');
+});
+
+// ── game-system enricher neutralization (issue 2093) ────────────────────────────
+
+test('inertText neutralizes a &Name[...] system-enricher shape as well as @Name[...] and [[', () => {
+  assert.equal(inertText('&Reference[prone]'), '&amp;\u{2060}Reference[prone]');
+  assert.equal(inertText('&Custom[x]'), '&amp;\u{2060}Custom[x]');
+  assert.equal(inertText('@UUID[Actor.abc]'), '@\u{2060}UUID[Actor.abc]', 'existing @Name[ behaviour holds');
+  assert.equal(inertText('[[1d20]]'), '[\u{2060}[1d20]]', 'existing [[ behaviour holds');
+});
+
+test('inertText leaves plain & and @ text reading unchanged', () => {
+  assert.equal(inertText('Salt & Pepper'), 'Salt &amp; Pepper', 'no joiner: & is not followed by Name[');
+  assert.equal(inertText('a@b'), 'a@\u{2060}b', 'the @ is inert but the text still reads as a@b');
+});
+
+/** A minimal stand-in for dnd5e 5.3.3's own `TextEditor` reference enricher (issue 2093). */
+const dnd5eReferencePattern = () => /&(?<type>Reference)\[(?<config>[^\]]+)]/i;
+
+test('a &Reference[...] label reaches the chat card unmatched by a dnd5e-style enricher, in a real browser', async () => {
+  const data = {
+    ...UNDER_DATA,
+    preRolls: [{ ...UNDER_DATA.preRolls[0], label: '&Reference[prone] &Custom[x]' }],
+  };
+  const html = buildCraftingChatContent(successModel({ check: executedCheck(data) }), shippedKeyLocalize);
+
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  try {
+    await page.setContent(`<div id="root">${html}</div>`);
+    const decoded = await page.evaluate(
+      () => document.querySelector('[data-check-evidence="preRolled"] dd').textContent
+    );
+    assert.ok(
+      decoded.includes('Reference[prone]') && decoded.includes('Custom[x]'),
+      `the label still reads literally: ${decoded}`
+    );
+    assert.doesNotMatch(decoded, dnd5eReferencePattern(), 'the shipped text does not match the enricher shape');
+
+    // Red control: the SAME decoded text, stripped of only its invisible joiners, WOULD match a
+    // dnd5e-style enricher — proving the assertion above is live rather than vacuous.
+    const withoutJoiners = decoded.replaceAll('⁠', '');
+    assert.match(withoutJoiners, dnd5eReferencePattern(), 'control: un-neutralized text matches the enricher');
+  } finally {
+    await context.close();
+  }
 });

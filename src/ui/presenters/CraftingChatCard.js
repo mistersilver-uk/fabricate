@@ -175,13 +175,15 @@ export function renderRollTotal(value, label) {
 }
 
 /**
- * Escaped text in which no `[[` or `@` survives, so neither Foundry enrichment pass, inline rolls at
- * creation nor `enrichHTML` with roll data at render, can match inside it: a word joiner (U+2060)
- * follows every `@` and every `[` that opens a second.
+ * Escaped text in which no `[[`, `@` or game-system enricher shape (`&Name[…]`, `@Name[…]`) survives,
+ * so neither Foundry's own enrichment pass nor a system-registered one (e.g. dnd5e's `&Reference[…]`)
+ * can match inside it: a word joiner (U+2060) follows every `@`, every `[` that opens a second, and
+ * every escaped `&` immediately followed by a word and `[`.
  */
 export function inertText(value) {
   return esc(value)
     .replaceAll(/\[(?=\[)/g, '[\u{2060}')
+    .replaceAll(/&amp;(?=\w+\[)/g, '&amp;\u{2060}')
     .replaceAll('@', '@\u{2060}');
 }
 
