@@ -78,7 +78,6 @@ function props(overrides = {}) {
     salvageResolutionMode: 'simple',
     salvageCheckEnabled: true,
     salvageCheckTiers: TIERS,
-    salvageCheckDcMode: 'static',
     salvageCheckDc: 15,
     ...rest,
   };

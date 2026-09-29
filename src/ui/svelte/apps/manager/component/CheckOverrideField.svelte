@@ -11,7 +11,7 @@
   | --- | --- | --- | --- |
   | `config` | the active salvage check sub-object \| `null` | `null` | Supplies `evaluation`, `thresholdMode`, `type` and `dc`; absent reads as a roll-high fixed DC. |
   | `dcOverride` / `adjustmentOverride` | number \| `null` | `null` | The component's two persisted overrides, both passed so the dormant one can be named. |
-  | `tiers` / `dcMode` / `systemDc` | `simple.tiers` / `'static'` \| `'dynamic'` / number | `[]` / `'static'` / `0` | The preset source in every resolution mode, and the system default's number where `config` has no `dc`. |
+  | `tiers` / `systemDc` | `simple.tiers` / number | `[]` / `0` | The preset source in every resolution mode, and the system default's number where `config` has no `dc`; salvage runs no DC macro, so the default always names that static number. |
   | `previewActors` / `resolvePreviewCharacter(id)` | `[{ id, name, img }]` / `{ name, rollData }` \| `null` | `[]` / `() => null` | The Preview-as roster and lookup for the Player sees line. |
   | `instanceId` / `disabled` | string / boolean | `''` / `false` | The id stem for the title, and the whole control's disabled state. |
 
@@ -54,7 +54,6 @@
     dcOverride = null,
     adjustmentOverride = null,
     tiers = [],
-    dcMode = 'static',
     systemDc = 0,
     previewActors = [],
     resolvePreviewCharacter = () => null,
@@ -83,9 +82,7 @@
   // The sub-object salvage rolls owns the default, so the Select and the line name one number.
   const systemDefaultDc = $derived(Number(config?.dc ?? systemDc));
 
-  const options = $derived(
-    buildSalvageDcSelectOptions(tiers, dcMode, systemDefaultDc, text, evaluation)
-  );
+  const options = $derived(buildSalvageDcSelectOptions(tiers, systemDefaultDc, text, evaluation));
   // Custom… and System default both persist null, so the GM's choice of Custom… is staged here.
   let customSelected = $state(false);
   const selection = $derived(
