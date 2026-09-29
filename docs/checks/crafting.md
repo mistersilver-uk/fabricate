@@ -346,10 +346,15 @@ The panel still charts it by outcome, showing each outcome's percentage and the 
 When cancelling is part of the check, the panel breaks a below-zero result out as its own **Botch** row whenever every below-zero result on that check fails.
 If an authored outcome lets a below-zero result still succeed, there is no separate Botch row, and that result stays counted in its own outcome.
 
-The **Outcome preview** panel rolls a real test check and shows one tile per die, marked qualified, cancelled, or exploded with its own glyph and a legend reading "✓ qualified · ✕ cancelled · ↻ exploded", followed by the net successes and the margin against how many were needed.
-A result below zero successes reads "Botched.
-Nothing is produced; the failure policy applies." and a pool reduced to zero shows no tiles at all, just "A pool reduced to zero fails automatically.
-Nothing was rolled."
+The **Outcome preview** panel rolls a real test check and announces the whole result together.
+A medallion at the top carries the net successes, captioned "net", above a breakdown line reading the qualifying and cancelling dice and the character rolled for, for example "3 qualified − 1 cancelled = 2 net · Sera Vane".
+Beside the total sits a line stating how many successes the check needs and the margin by which the roll cleared or missed that, for example "needs 2 · margin +1".
+Under that sit the dice themselves, one tile per die, marked qualified, cancelled, or exploded with its own glyph, over the legend "✓ qualified · ✕ cancelled · ↻ exploded".
+A card below states the outcome, tinted for success or failure, titled "Success", "Failure", the outcome tier's name, or, only when the net fell below zero and the roll still failed, "Botch", each naming what it does.
+Most results carry a note under the card explaining that the margin is shown so that higher is always better, counting successes over what was needed.
+A trigger that forced or rerouted the result explains that in the note instead, and an unrescued botch shows no note at all.
+A pool reduced to zero rolls no tiles: the medallion reads "0", the breakdown reads "pool reduced to 0", the line still states how many successes were needed and that the roll missed by that whole amount, and the note explains that the pool was reduced to zero so the check fails automatically.
+A **What happens** list closes the readout, naming what the result produces or withholds, and whether it breaks the required Tools.
 
 ### Warnings you may see on Validation
 
