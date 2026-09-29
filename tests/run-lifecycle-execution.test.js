@@ -2356,7 +2356,7 @@ test('a roll-under versioned prompt explains a character-value target through th
   }
 });
 
-test('a count versioned prompt shows its pre-modifier pool line and successes through the Journal adapter', async () => {
+test('a count versioned prompt shows its Tool-settled pool line and successes through the Journal adapter', async () => {
   const tool = { id: 'hammer', label: 'Hammer', bonus: { enabled: true, expression: '1d4' } };
   const evaluation = countEvaluation({
     direction: 'under', die: 20, base: '@skill', threshold: '13', required: 2, modifierDestination: 'threshold',
@@ -2371,7 +2371,13 @@ test('a count versioned prompt shows its pre-modifier pool line and successes th
     const { publicPrompt } = await describe();
     await promptJournalStageCheck(publicPrompt);
     const { view } = surface;
-    assert.equal(view.formula, '3d20 · each < 13', 'the pool 3.7 rounded down, before the Tool die');
+    assert.equal(
+      view.formula,
+      '3d20 · each < 17',
+      'the pool 3.7 rounded down, and the threshold moved by the Tool die rolled before the prompt'
+    );
+    assert.equal(view.labels.formulaNote, 'Success on < 17, moved +4 by modifiers');
+    assert.deepEqual([publicPrompt.threshold, publicPrompt.thresholdAnchor], [17, 13]);
     assert.equal(view.neededText, '2 successes needed');
     assert.deepEqual([view.dc, view.dcText, view.allowAdvantage], [null, '', false]);
     assert.equal(view.labels.eachAdds, 'Each moves the threshold.');
@@ -2398,7 +2404,7 @@ test('a fixed-range routed count versioned prompt names no required count', asyn
   const dice = installCountDice({ faces: [] });
   try {
     const fixed = await described('fixed');
-    assert.deepEqual([fixed.product, fixed.pool, fixed.required], ['count', 2, null], 'the pre-Tool pool');
+    assert.deepEqual([fixed.product, fixed.pool, fixed.required], ['count', 3, null], 'the Tool +1 settled on the pool');
     assert.equal((await described('relative')).required, 3);
   } finally {
     dice.restore();

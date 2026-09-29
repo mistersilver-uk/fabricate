@@ -86,20 +86,20 @@
             <div class="formula-content">
               {#if data.formula}<span
                   class="formula"
+                  aria-live={data.count ? 'polite' : undefined}
                   data-roll-prompt-count={data.count ? data.direction : undefined}
-                  >{data.formula}</span
+                  >{target.formula ?? data.formula}</span
                 >{/if}
-              {#if data.labels.formulaNote}<p class="help formula-note">
-                  {data.labels.formulaNote}
+              {#if target.note ?? data.labels.formulaNote}<p class="help formula-note">
+                  {target.note ?? data.labels.formulaNote}
                 </p>{/if}
-              {#if data.chipText}
-                <RollPromptTarget
-                  text={target.chipText}
-                  source={target.source}
-                  under={!data.count && data.direction === 'under'}
-                  data-roll-prompt-required={data.count?.required}
-                />
-              {/if}
+              <RollPromptTarget
+                text={data.chipText && target.chipText}
+                source={target.source}
+                notice={target.zeroPool}
+                under={!data.count && data.direction === 'under'}
+                data-roll-prompt-required={data.count?.required}
+              />
             </div>
           </div>
         {/if}

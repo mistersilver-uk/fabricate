@@ -121,9 +121,9 @@ async function underPromptView(world) {
 async function countPromptView(world) {
   const manager = world.fabricate.craftingSystemManager;
   const frames = {
-    count: ['6d10 · each ≥ 8', 'Success on ≥ 8 · best face explodes · worst face cancels', 'Each adds dice.', 'Fine Craft'],
+    count: ['6d10 · each ≥ 8', 'Success on ≥ 8 · explodes on 10 · 1 cancels a success', 'Each adds dice.', 'Fine Craft'],
     'count-threshold': [
-      '2d20 · each ≤ 14', 'Success on ≤ 14 (@abilities.int.mod + 11)', 'Each moves the threshold.', 'Complex Work',
+      '2d20 · each ≤ 14', 'Success on ≤ 14 (character value 14)', 'Each moves the threshold.', 'Complex Work',
     ],
   };
   for (const [state, [formula, rules, eachAdds, recipeName]] of Object.entries(frames)) {

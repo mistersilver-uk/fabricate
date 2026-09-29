@@ -63,7 +63,7 @@ import {
 } from '../../utils/scalars.js';
 import { resolveRecipeImage } from '../svelte/util/craftingImageDefaults.js';
 
-import { describeCheckTarget } from './checkDescriptor.js';
+import { countSuccessesNeeded, describeCheckTarget } from './checkDescriptor.js';
 import { CRAFTING_BROWSE_STATUS, deriveBrowseStatus } from './craftingBrowseStatus.js';
 import { heldToolBonus } from './heldToolBonus.js';
 import { SUMMARY_AUDIENCE, projectRecipeSummary } from './summaryProjection.js';
@@ -953,8 +953,7 @@ export class CraftingListingBuilder {
     const routedFixed =
       (mode === 'routedByCheck' || (mode === 'alchemy' && alchemyCheckMode === 'tiered')) &&
       config.type === 'fixed';
-    // Resolve the displayed DC AFTER the issue 765 suppression guard above (never
-    // reorder it there). See the method JSDoc and `_chipDc`.
+    // Resolve the displayed DC AFTER the issue 765 suppression guard above; see `_chipDc`.
     const dc = this._chipDc(config, recipe, routedFixed, evaluation);
     // Only the pass/fail slot names one target: a routed or progressive check has none (R1).
     const target =
@@ -972,6 +971,7 @@ export class CraftingListingBuilder {
     return {
       dc,
       ...(target && { target }),
+      ...countSuccessesNeeded({ config, recipe, evaluation, mode }),
       ...formula,
       skill: stringOrNull(config.skill),
       optional: !mandatory,

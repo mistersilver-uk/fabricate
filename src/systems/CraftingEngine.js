@@ -7411,7 +7411,8 @@ function versionedCheckPrompt({
     modifierChoice: publicModifierChoice(modifierChoice),
     // The pool resolved before any Tool roll, and the required count the macro settled, which
     // fixed ranges never read.
-    ...(counts && countPromptFields(evaluation, countPolicy, routedFixed ? null : dc)),
+    ...(counts &&
+      countPromptFields(evaluation, countPolicy, routedFixed ? null : dc, toolContributions)),
   };
 }
 
