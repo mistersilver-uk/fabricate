@@ -69,6 +69,9 @@ const LAB_ACTORS_PATH = 'tests/view-lab/world/labActors.js';
 /** The page that mounts every frame, as a diff names it. Attributed by marked region — see below. */
 const LAB_MOUNT_PATH = 'tests/view-lab/mount.js';
 
+/** The lab's run-state fixture, as a diff names it. Attributed by run state — see below. */
+const LAB_RUN_STATES_PATH = 'tests/view-lab/world/labRunStates.js';
+
 /** The lab's interactables fixture, as a diff names it. Attributed whole-file — see below. */
 const LAB_INTERACTABLES_PATH = 'tests/view-lab/world/labInteractables.js';
 
@@ -323,6 +326,9 @@ const labActorSourceLines = memoized(() =>
 const mountSourceLines = memoized(() =>
   readSourceLines(new URL(`../../${LAB_MOUNT_PATH}`, import.meta.url))
 );
+const runStateSourceLines = memoized(() =>
+  readSourceLines(new URL(`../../${LAB_RUN_STATES_PATH}`, import.meta.url))
+);
 
 /** One case file's `CASES` array body, with the file line number its first line has. */
 function caseArrayBody(sourceLines) {
@@ -511,6 +517,88 @@ export function parseMountRegions(sourceLines) {
 const mountLineRegions = memoized(() => parseMountRegions(mountSourceLines()));
 
 /**
+ * The two tables in `labRunStates.js` keyed by run state: the run each state selects, and the
+ * factory that builds it. Each is the lines between `open` and `close`, searched from `within`.
+ */
+const RUN_STATE_TABLES = Object.freeze([
+  Object.freeze({
+    within: 'export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({',
+    open: 'export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({',
+    close: '});',
+    indent: 2,
+  }),
+  Object.freeze({
+    within: 'function journalCaseFactories(context) {',
+    open: '  return {',
+    close: '  };',
+    indent: 4,
+  }),
+]);
+
+/** A table entry's opening line, after its indent: `'state':` or `state:`. */
+const RUN_STATE_KEY_PATTERN = /^(?:'([^']+)'|([A-Za-z_$][\w$]*)):/;
+
+/** A state named alone on a line of a spread list, as the history states are. */
+const RUN_STATE_LIST_ENTRY_PATTERN = /^\s+'([^']+)',$/;
+
+/** The 1-based, inclusive span of every entry in one run-state table, keyed by state. */
+function runStateTableRegions(sourceLines, { within, open, close, indent }) {
+  const from = sourceLines.indexOf(within);
+  const start = from === -1 ? -1 : sourceLines.indexOf(open, from);
+  const end = start === -1 ? -1 : sourceLines.indexOf(close, start + 1);
+  if (end === -1) return null;
+
+  const regions = [];
+  const entryIndent = ' '.repeat(indent);
+  let entry = null;
+  for (let index = start + 1; index < end; index += 1) {
+    const line = sourceLines[index];
+    if (line.startsWith(`${entryIndent} `)) {
+      if (entry) entry.end = index + 1;
+      const listed = entry ? null : RUN_STATE_LIST_ENTRY_PATTERN.exec(line);
+      if (listed) regions.push({ key: listed[1], start: index + 1, end: index + 1 });
+      continue;
+    }
+    // A bracket at the entry's own indent closes it; anything else there — a comment, a spread —
+    // ends it without belonging to it.
+    if (entry && /^[)\]}]/.test(line.slice(indent))) {
+      entry.end = index + 1;
+      entry = null;
+      continue;
+    }
+    const keyed = line.startsWith(entryIndent)
+      ? RUN_STATE_KEY_PATTERN.exec(line.slice(indent))
+      : null;
+    entry = keyed ? { key: keyed[1] ?? keyed[2], start: index + 1, end: index + 1 } : null;
+    if (entry) regions.push(entry);
+  }
+  return regions;
+}
+
+/**
+ * The 1-based, inclusive span of every run state's entry in `labRunStates.js`, in both tables. A
+ * factory for a state the run table does not name is a misparse, so the whole file widens.
+ */
+export function parseRunStateRegions(sourceLines) {
+  const [runIds, factories] = RUN_STATE_TABLES.map((table) =>
+    runStateTableRegions(sourceLines, table)
+  );
+  if (!runIds?.length || !factories?.length) return null;
+  const states = runIds.map((region) => region.key);
+  if (states.length !== new Set(states).size) return null;
+  if (factories.some((region) => !states.includes(region.key))) return null;
+  return [...runIds, ...factories];
+}
+
+const runStateLineRegions = memoized(() => parseRunStateRegions(runStateSourceLines()));
+
+/**
+ * @param {string} state A run state `labRunStates.js` defines.
+ * @returns {Function} The predicate accepting the cases whose query selects it.
+ */
+const rendersRunState = (state) => (viewCase) => viewCase.query?.journalCaseState === state;
+
+/**
  * @param {string} text A source line.
  * @returns {boolean} True when changing it cannot change a rendered frame.
  */
@@ -639,8 +727,10 @@ const ATTRIBUTED_LAB_INPUTS = Object.freeze([
     selects: (viewCase) => Boolean(viewCase.expectLayout),
   }),
   Object.freeze({
-    path: 'tests/view-lab/world/labRunStates.js',
-    selects: (viewCase) => viewCase.app === PLAYER,
+    path: LAB_RUN_STATES_PATH,
+    sourceLines: runStateSourceLines,
+    regions: runStateLineRegions,
+    selectsRegion: rendersRunState,
   }),
   Object.freeze({
     path: LAB_ACTORS_PATH,
