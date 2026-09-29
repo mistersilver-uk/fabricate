@@ -1208,3 +1208,27 @@ test('an evidence @path breaks only after its inner dots, and its @ stays inert 
   assert.doesNotMatch(target, /@\w/, 'the @ is still neutralized');
   assert.equal(evidenceRowsOf(html)[0][2], UNDER_ROWS[0][2], 'the text reads unchanged');
 });
+
+test('a dice-line path breaks only after its inner dots, and its @ stays inert (issue 2098 F-b)', () => {
+  const data = {
+    product: 'sum',
+    direction: 'over',
+    comparison: 'meet',
+    dc: 12,
+    total: 26,
+    target: 12,
+    margin: 14,
+    rollFormula: '1d20 + @skills.smith.level',
+    resolvedFormula: '1d20 + 12',
+    diceGroups: [{ groupId: 0, group: '1d20', sum: 14, results: [14] }],
+  };
+  const html = buildCraftingChatContent(
+    successModel({ rollValue: 26, check: executedCheck(data) }),
+    shippedKeyLocalize
+  );
+  const start = html.indexOf('<div class="fabricate-craft-chat__dice">');
+  const dice = html.slice(start, html.indexOf('</div>', start));
+  assert.ok(dice.includes('@\u2060skills.\u200Bsmith.\u200Blevel = 26'), 'a break after each path dot');
+  assert.equal((dice.match(/\u200B/g) ?? []).length, 2, 'and nowhere else');
+  assert.doesNotMatch(dice, /@\w/, 'the @ is still neutralized');
+});
