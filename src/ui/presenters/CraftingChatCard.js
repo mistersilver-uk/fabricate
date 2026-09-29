@@ -22,6 +22,7 @@
 import { checkDiceLine } from './checkDiceLine.js';
 import { isPublicCheckDisplay } from './checkDisplay.js';
 import { checkEvidenceRows, pathBreakSegments } from './checkEvidenceRows.js';
+import { esc } from './htmlEscape.js';
 
 const ITEM_FALLBACK_IMG = 'icons/svg/item-bag.svg';
 
@@ -104,14 +105,7 @@ export const CRAFTING_CHAT_KEYS = Object.freeze({
   checkFailure: 'FABRICATE.Check.Evidence.Failure',
 });
 
-/** Escape text destined for HTML so user-authored names cannot inject markup. */
-export function esc(value) {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;');
-}
+export { esc } from './htmlEscape.js';
 
 /**
  * The localized sentence for an entry whose amount was ROLLED, or '' when it was fixed.

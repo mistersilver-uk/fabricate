@@ -16,11 +16,11 @@
 -->
 <script>
   import IconFactRow from '../IconFactRow.svelte';
+  import DiceTiles from '../../../components/DiceTiles.svelte';
   import Kicker from '../../../components/Kicker.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import { localize } from '../../../util/foundryBridge.js';
-  import CheckSimulatorFaces from './CheckSimulatorFaces.svelte';
 
   let {
     /** The readout view-model built by the route. */
@@ -149,7 +149,13 @@
           </div>
 
           {#if count && !count.zeroPool}
-            <CheckSimulatorFaces faces={count.faces} />
+            <DiceTiles
+              model={count.dice}
+              legend
+              faceDataAttr="data-checks-simulator-face"
+              marksDataAttr="data-checks-simulator-face-marks"
+              legendDataAttr="data-checks-simulator-legend"
+            />
           {/if}
 
           {#if card}

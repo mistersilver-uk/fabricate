@@ -17,6 +17,10 @@
       "Disclosure": {
         "Expand": "Show details for {name}",
         "Collapse": "Hide details for {name}"
+      },
+      "DiceTiles": {
+        "Generated": "rolled by an explosion",
+        "More": "+{count} more"
       }
     },
     "Migration": {

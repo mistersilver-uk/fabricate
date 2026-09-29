@@ -80,6 +80,10 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/checks/checkReadoutModel.js',
   // The success-counting preview the model delegates to (issue 2004).
   'src/ui/svelte/apps/manager/checks/countPreviewModel.js',
+  // The shared die tiles' model and escaped renderer the readout draws through (issue 2006).
+  'src/ui/presenters/countDiceTiles.js',
+  'src/ui/presenters/htmlEscape.js',
+  'src/utils/fillPlaceholders.js',
   'src/ui/svelte/apps/manager/checks/countInsetModel.js',
   'src/ui/svelte/apps/manager/checks/countPoolOptions.js',
   // The Studio's adjustment labels and read-only band pictures (issue 2005).
@@ -205,9 +209,9 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/SegmentedControl.svelte',
   'src/ui/svelte/apps/manager/checks/CheckOddsPanel.svelte',
   'src/ui/svelte/apps/manager/checks/CheckOutcomePreview.svelte',
-  // The rolled readout's eyebrow and a count roll's tiles, the #2006 seam (issue 2080).
+  // The rolled readout's eyebrow (issue 2080) and a count roll's shared die tiles (issue 2006).
   'src/ui/svelte/components/Kicker.svelte',
-  'src/ui/svelte/apps/manager/checks/CheckSimulatorFaces.svelte',
+  'src/ui/svelte/components/DiceTiles.svelte',
   // THE manager's editor tab strip (issue 1362).
   'src/ui/svelte/components/EditorTabs.svelte',
   'src/ui/svelte/apps/manager/checks/ChecksEditorTabs.svelte',

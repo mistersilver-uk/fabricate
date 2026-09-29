@@ -12,6 +12,7 @@ import {
 } from '../helpers/checksHarnessModules.js';
 import { installCountDice } from '../helpers/countEngineDice.js';
 import { forceTrigger, MARGIN_NOTES, readReadout } from '../helpers/checkReadoutDom.js';
+import { renderDiceTilesHtml, tileModel } from '../../src/ui/presenters/countDiceTiles.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -38,6 +39,38 @@ const WORLD_ACTORS = [
   },
   { id: 'vosk', name: 'Vosk', type: 'character', getRollData: () => ({ skills: {} }) },
 ];
+
+/** The executed smithing roll as the count Roll projects it: 8 10 1 3 9 2, then 10 and 1. */
+const SMITHING_PROJECTION = {
+  results: [
+    { index: 0, face: 8, qualified: true },
+    { index: 1, face: 10, qualified: true, exploded: true },
+    { index: 2, face: 1, cancelled: true },
+    { index: 3, face: 3 },
+    { index: 4, face: 9, qualified: true },
+    { index: 5, face: 2 },
+    { index: 6, face: 10, qualified: true, exploded: true, explodedFrom: 1 },
+    { index: 7, face: 1, cancelled: true, explodedFrom: 6 },
+  ],
+};
+
+const tileFacts = (tile, face, marks) => [
+  face,
+  marks,
+  tile.hasAttribute('data-dice-tile-generated'),
+  tile.getAttribute('aria-label'),
+];
+const simulatorTile = (tile) =>
+  tileFacts(tile, tile.dataset.checksSimulatorFace, tile.dataset.checksSimulatorFaceMarks);
+
+/** The tiles the chat renderer writes for a projection, read as the simulator's are. */
+function chatTiles(projection) {
+  const host = document.createElement('div');
+  host.innerHTML = renderDiceTilesHtml(tileModel(projection), (key) => key);
+  return [...host.querySelectorAll('.fabricate-dice-tiles__tile')].map((tile) =>
+    tileFacts(tile, tile.dataset.diceTileFace, tile.dataset.diceTileMarks)
+  );
+}
 
 const BEST = { enabled: true, faces: { kind: 'best' } };
 const WORST = { enabled: true, faces: { kind: 'worst' } };
@@ -154,21 +187,28 @@ describe('count odds and the simulator readout', () => {
     const readout = root.querySelector('[data-checks-simulator-readout]');
     assert.equal(readout.dataset.checksSimulatorProduct, 'count');
     const tiles = [...readout.querySelectorAll('[data-checks-simulator-face]')];
+    // Each explosion's die follows the die that rolled it, as the result card draws it (issue 2006).
     assert.deepEqual(
       tiles.map((tile) => [tile.textContent.trim(), tile.dataset.checksSimulatorFaceMarks]),
       [
         ['8', 'qualified'],
         ['10', 'qualified exploded'],
+        ['10', 'qualified exploded'],
+        ['1', 'cancelled'],
         ['1', 'cancelled'],
         ['3', ''],
         ['9', 'qualified'],
         ['2', ''],
-        ['10', 'qualified exploded'],
-        ['1', 'cancelled'],
       ]
     );
     assert.equal(tiles[1].getAttribute('aria-label'), '10, qualified and exploded');
+    assert.equal(tiles[2].getAttribute('aria-label'), '10, qualified, exploded and rolled by an explosion');
     assert.equal(tiles[1].querySelectorAll('i.fa-check, i.fa-rotate').length, 2, 'a glyph per mark');
+    assert.deepEqual(
+      tiles.map(simulatorTile),
+      chatTiles(SMITHING_PROJECTION),
+      'the simulator draws the tiles the result card renders for the same projection (N29)'
+    );
     assert.equal(readout.querySelector('[data-checks-simulator-total]').dataset.checksSimulatorTotal, '2');
     assert.deepEqual(readReadout(root), {
       medallion: ['2', 'net'],
@@ -179,13 +219,13 @@ describe('count odds and the simulator readout', () => {
       note: MARGIN_NOTES.count,
       rows: [['result-group', 'Result group produced', 'Success']],
     });
-    // The tiles sit in their own component under the medallion row, the #2006 seam.
-    assert.ok(Boolean(readout.querySelector('.manager-checks-simulator-head + .manager-checks-simulator-dice')));
+    // The shared tiles sit under the medallion row (issue 2006).
+    assert.ok(Boolean(readout.querySelector('.manager-checks-simulator-head + .fabricate-dice-tiles')));
     // The tile's tone is the face's result: success for a qualifier, danger for a cancel.
-    const tone = (tile) => tile.querySelector('.fab-medallion').className;
-    assert.match(tone(tiles[0]), /is-tone-success/);
-    assert.match(tone(tiles[2]), /is-tone-danger/);
-    assert.doesNotMatch(tone(tiles[3]), /is-tone-/, 'a face that did nothing is untoned');
+    const tone = (tile) => tile.className;
+    assert.match(tone(tiles[0]), /fabricate-dice-tiles__tile--success/);
+    assert.match(tone(tiles[3]), /fabricate-dice-tiles__tile--danger/);
+    assert.doesNotMatch(tone(tiles[5]), /--/, 'a face that did nothing is untoned');
     assert.ok(root.querySelector('[data-checks-simulator-legend]'));
     assert.equal(root.querySelector('[data-checks-simulator-band]').dataset.checksSimulatorBand, 'success');
   });

@@ -18,6 +18,7 @@ import {
   previewSignature,
 } from '../src/ui/svelte/apps/manager/checks/checkPreviewModel.js';
 import { countDigestFormula } from '../src/ui/svelte/apps/manager/checks/countPreviewModel.js';
+import { tileLabel } from '../src/ui/presenters/countDiceTiles.js';
 import { normalizeCheckEvaluation } from '../src/systems/normalize/checkEvaluation.js';
 import { installCountDice } from './helpers/countEngineDice.js';
 import { recordedRollDouble } from './helpers/recordedRollParse.js';
@@ -373,24 +374,26 @@ describe('count odds', () => {
 
 describe('the count readout', () => {
   it('marks every face the runner rolled, explosions included, and agrees with its net', async () => {
-    // 8 10 1 3 9 2, the 10 explodes into a 10, which explodes into a 1.
+    // 8 10 1 3 9 2, the 10 explodes into a 10, which explodes into a 1: each explosion's die is
+    // drawn straight after the die that rolled it (issue 2006).
     const { result, readout } = await rolled(plan({ draft: SMITHING }), [8, 10, 1, 3, 9, 2, 10, 1]);
     assert.equal(result.data.total, 2);
     assert.deepEqual(
-      readout.count.faces.map((tile) => [tile.face, tile.marks.join(' ')]),
+      readout.count.dice.tiles.map((tile) => [tile.face, tile.marks.join(' '), tile.generated]),
       [
-        [8, 'qualified'],
-        [10, 'qualified exploded'],
-        [1, 'cancelled'],
-        [3, ''],
-        [9, 'qualified'],
-        [2, ''],
-        [10, 'qualified exploded'],
-        [1, 'cancelled'],
+        [8, 'qualified', false],
+        [10, 'qualified exploded', false],
+        [10, 'qualified exploded', true],
+        [1, 'cancelled', true],
+        [1, 'cancelled', false],
+        [3, '', false],
+        [9, 'qualified', false],
+        [2, '', false],
       ]
     );
-    assert.equal(readout.count.faces.length, result.data.diceGroups[0].results.length);
-    assert.equal(readout.count.faces[1].label, '10, qualified and exploded');
+    assert.equal(readout.count.dice.tiles.length, result.data.diceGroups[0].results.length);
+    assert.equal(readout.count.dice.more, 0);
+    assert.equal(tileLabel(readout.count.dice.tiles[1], (key) => key), '10, qualified and exploded');
     assert.deepEqual([readout.total, readout.totalValue], ['2', 2]);
     assert.deepEqual(readout.medallion, { value: '2', caption: 'net' });
     assert.equal(readout.breakdown, '4 qualified − 2 cancelled = 2 net');
@@ -416,7 +419,7 @@ describe('the count readout', () => {
     const { result, readout } = await rolled(plan({ draft, actor: IDRIN, system }), [14, 15]);
     assert.equal(result.data.target, 14, 'the +1 raises the roll-under threshold');
     assert.deepEqual(
-      readout.count.faces.map((tile) => tile.marks.join(' ')),
+      readout.count.dice.tiles.map((tile) => tile.marks.join(' ')),
       ['qualified', ''],
       'a 14 qualifies at or under the executed 14, not the authored 13'
     );
@@ -429,7 +432,7 @@ describe('the count readout', () => {
       checkBreakage: { triggers: [] },
     };
     const { readout } = await rolled(plan({ draft, actor: null }), [1, 4]);
-    assert.equal(readout.count.faces[0].label, '1, qualified and cancelled');
+    assert.equal(tileLabel(readout.count.dice.tiles[0], (key) => key), '1, qualified and cancelled');
     assert.equal(readout.breakdown, '2 qualified − 1 cancelled = 1 net');
   });
 
@@ -455,7 +458,10 @@ describe('the count readout', () => {
     assert.deepEqual([readout.total, readout.totalValue], ['−3', -3]);
     assert.equal(readout.medallion.value, '−3', 'the true minus (M4)');
     assert.equal(readout.count.botch, true);
-    assert.deepEqual(readout.count.faces.map((tile) => tile.marks.join(' ')), ['cancelled', 'cancelled', 'cancelled']);
+    assert.deepEqual(
+      readout.count.dice.tiles.map((tile) => tile.marks.join(' ')),
+      ['cancelled', 'cancelled', 'cancelled']
+    );
     assert.equal(readout.card.detail, 'Net below zero');
     assert.equal(readout.card.title, 'Botch', 'named as the odds panel names it, not as its band');
     assert.equal(
@@ -487,7 +493,7 @@ describe('the count readout', () => {
     const { readout, constructed } = await rolled(plan({ draft, activity: 'salvage', actor: null }), []);
     assert.equal(constructed.length, 0, 'nothing was rolled');
     assert.equal(readout.count.zeroPool, true);
-    assert.deepEqual(readout.count.faces, []);
+    assert.deepEqual(readout.count.dice, { tiles: [], more: 0 });
     assert.deepEqual(readout.medallion, { value: '0', caption: 'net' });
     assert.equal(readout.breakdown, 'pool reduced to 0');
     assert.equal(readout.targetLine, 'needs 1 · margin −1');

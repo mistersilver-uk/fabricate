@@ -78,25 +78,25 @@ test('the library has the exact structure the parser assumes', () => {
   // properties below read as if it were a database, and each moves only when someone edits that
   // file — at which point the edit should be accepted deliberately rather than absorbed (issue
   // 1371).
-  assert.equal(library.blockCount, 59, 'spec-head block count');
+  assert.equal(library.blockCount, 60, 'spec-head block count');
   assert.equal(
     library.headingCount,
-    59,
+    60,
     'the one-heading-per-block relation broke: a block with two h4s double-counts its entry, and ' +
       'a block with none drops it out of the set entirely'
   );
-  assert.equal(library.names.length, 71, 'distinct primitive names');
+  assert.equal(library.names.length, 72, 'distinct primitive names');
   assert.equal(
     library.nameOccurrences,
-    71,
+    72,
     'occurrences no longer equal distinct names, so one primitive is now named by two entries ' +
       'and the set has a duplicate'
   );
-  assert.equal(library.headings.length - library.nonPrimitiveHeadings.length, 39, 'naming blocks');
+  assert.equal(library.headings.length - library.nonPrimitiveHeadings.length, 40, 'naming blocks');
   assert.equal(library.nonPrimitiveHeadings.length, 20, 'section-prose blocks');
 
   // The only pair that pins the ANCHOR as narrower than a file-wide scan.
-  assert.equal(library.fileWideNames.length, 82, 'file-wide primitive-shaped names');
+  assert.equal(library.fileWideNames.length, 83, 'file-wide primitive-shaped names');
   assert.equal(library.namesOutsideHeadings.length, 11, 'names outside every spec-head heading');
 });
 
