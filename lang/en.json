@@ -6884,6 +6884,14 @@
               "Lead": "A recipe picks one of these; it sets how many successes the roll needs.",
               "Unit": "Successes",
               "Missing": "Set successes needed"
+            },
+            "Bands": {
+              "ExtraSuccesses": "Extra successes",
+              "Scale": "Measured in successes. The count must reach {required}.",
+              "ScaleZero": "Measured in successes. The count must reach {required}; this pool is reduced to zero, so the check fails automatically.",
+              "ScaleBotch": "A net below zero is a botch.",
+              "RangeBelow": "below {value}",
+              "RangeOrMore": "{value} or more"
             }
           },
           "Digest": {

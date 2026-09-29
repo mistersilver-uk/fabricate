@@ -113,8 +113,8 @@ function refusalLine(read, evaluation, character, text) {
   );
 }
 
-// The settled scalar part of a placement: a pending rolled benefit shows as an unsettled term.
-function settledPart(placement) {
+/** The settled scalar part of a placement: a pending rolled benefit shows as an unsettled term. */
+export function settledPlacement(placement) {
   if (!placement) return SETTLED_NONE;
   return { poolDelta: placement.poolDelta, thresholdDelta: placement.thresholdDelta, preRolls: [] };
 }
@@ -140,7 +140,7 @@ export function countActorLine({ evaluation, thresholdMode, character, placement
       ),
     };
   }
-  const settled = settledPart(placement);
+  const settled = settledPlacement(placement);
   const rollData = character.rollData ?? {};
   const read = resolvePool({ evaluation, thresholdMode, rollData, placement: settled });
   if (!read.ok) {
