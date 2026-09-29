@@ -44,6 +44,7 @@ import {
   esc,
   renderCheckEvidenceRows,
   renderComplications,
+  renderCountSummary,
   renderRollTotal,
   renderSection,
   tierStepText,
@@ -169,7 +170,9 @@ function renderSubject(subject, loc) {
       : '<li class="fabricate-craft-chat__item">',
     `<img class="fabricate-craft-chat__icon" src="${esc(subject?.img || ITEM_FALLBACK_IMG)}" alt="" />`,
     `<span class="fabricate-craft-chat__label">${parts.join(' — ')}</span>`,
-    renderRollTotal(subject?.rollValue, loc(SALVAGE_CHAT_KEYS.roll)),
+    // A public count subject states its dice as a summary line, never a bare net (issue 2006).
+    renderCountSummary(subject?.check, loc) ||
+      renderRollTotal(subject?.rollValue, loc(SALVAGE_CHAT_KEYS.roll)),
     evidence,
     '</li>',
   ]

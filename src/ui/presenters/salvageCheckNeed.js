@@ -5,6 +5,7 @@ import {
 } from '../../systems/checkModifierResolver.js';
 import { activeCheckEvaluation, isFixedSumOver } from '../../systems/checkTarget.js';
 import { countRequired } from '../../systems/countCheck.js';
+import { countFormulaValues, resolvePool } from '../../systems/countEvaluation.js';
 import { isCountCheck } from '../../systems/salvageCheckUsability.js';
 import { salvageToolsFor } from '../../systems/scopedEntityReads.js';
 
@@ -48,10 +49,38 @@ function salvageBenefits({ system, component, recipeManager, actor }) {
 }
 
 /**
+ * A count check's Salvage line for the salvaging character (issue 2006): the successes needed,
+ * the die and the per-die test at that character's threshold, or `{ unresolved }` when the pool
+ * cannot read them. Null where no single count applies.
+ */
+function countSalvageTarget({ mode, config, component, actor, evaluation, localize }) {
+  const need = salvageCheckNeed({ mode, config, checkUsable: true, component });
+  if (need.kind !== 'successes') return null;
+  const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
+  const pool = resolvePool({ evaluation, thresholdMode: config?.thresholdMode, rollData });
+  if (!pool.ok) {
+    const label = localize('FABRICATE.App.Inventory.Detail.KindSalvage');
+    const key =
+      pool.refusedInput === 'threshold'
+        ? 'FABRICATE.Check.Roll.TargetUnresolved'
+        : 'FABRICATE.Check.Roll.PoolUnresolved';
+    return { unresolved: localize(key, { label }) };
+  }
+  const { die, comparison, threshold } = countFormulaValues(pool.policy);
+  const key =
+    need.count === 1
+      ? 'FABRICATE.Check.CountEvidence.SalvageLineOne'
+      : 'FABRICATE.Check.CountEvidence.SalvageLine';
+  const text = localize(key, { count: need.count, die, symbol: comparison, threshold });
+  return { direction: evaluation.direction, text };
+}
+
+/**
  * The Salvage tab's target for a summed pass/fail or relative check other than sum/over/fixed
  * (issue 2005): the banner's `rule`, and the check card's `{ direction, text, source }` or
  * `{ unresolved }` for the salvaging character, naming the modifiers and held Tool bonus the
- * prompt adds. Null for sum/over/fixed, a count, stages or ranges.
+ * prompt adds. A count check states its successes needed and per-die test instead. Null for
+ * sum/over/fixed, stages or ranges.
  */
 export function salvageCheckTarget({
   mode,
@@ -63,6 +92,9 @@ export function salvageCheckTarget({
   localize,
 }) {
   const evaluation = activeCheckEvaluation(config);
+  if (evaluation.product === 'count') {
+    return countSalvageTarget({ mode, config, component, actor, evaluation, localize });
+  }
   const routedType = config?.type === 'fixed' ? 'fixed' : 'relative';
   if (evaluation.product !== 'sum' || isFixedSumOver(evaluation)) return null;
   if (mode === 'progressive' || (mode === 'routed' && routedType === 'fixed')) return null;

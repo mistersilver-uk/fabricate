@@ -2296,4 +2296,21 @@ describe('InventoryListingBuilder - a roll-under or character-value salvage targ
     assert.equal(salvage.dc, 12);
     assert.equal(salvage.target, null);
   });
+
+  it("states a count check's successes needed at the salvager's threshold (issue 2006)", () => {
+    const evaluation = {
+      product: 'count',
+      direction: 'over',
+      pool: { die: 10, base: '4', threshold: '@skills.craft.value', required: 2 },
+    };
+    const salvage = salvageFor('simple', { simple: { rollFormula: '', dc: 12, evaluation } }, {
+      salvage: { dcOverride: 9, successesOverride: 3 },
+      skills: { craft: { value: 8 } },
+    });
+    assert.equal(salvage.dc, null, 'a count check grades successes, never a DC');
+    assert.deepEqual(salvage.target, {
+      direction: 'over',
+      text: 'Salvage check · 3 successes needed · d10s, success on ≥ 8',
+    });
+  });
 });
