@@ -12,7 +12,11 @@ import { BulkSalvageService } from '../src/systems/BulkSalvageService.js';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { buildCheckModifierContext } from '../src/systems/checkModifierResolver.js';
 import { GatheringEngine } from '../src/systems/GatheringEngine.js';
-import { evaluatePreparedRunCheck, runFormulaPassFail } from '../src/systems/checkRoll.js';
+import {
+  evaluatePreparedRunCheck,
+  runFormulaPassFail,
+  runFormulaRouted,
+} from '../src/systems/checkRoll.js';
 import { checkDiceLine } from '../src/ui/presenters/checkDiceLine.js';
 import { executedCheckDisplay } from '../src/ui/presenters/checkDisplay.js';
 import { shippedLocalize } from './helpers/checkEvidenceFixtures.js';
@@ -1209,6 +1213,17 @@ test('the typed formula is recorded after the retired-placeholder shim (QE r3 3)
       checkDiceLine(executedCheckDisplay(direct), shippedLocalize),
       '1d20 (14) + 12 @skills.smith.level = 26'
     );
+    const routed = await runFormulaRouted({
+      formula: '1d20 + @craftingmod + @skills.smith.level',
+      dc: 20,
+      thresholdMode: 'meet',
+      type: 'relative',
+      relativeOutcomes: [],
+      fixedOutcomes: [],
+      triggers: [],
+      actor: { getRollData: () => ({ skills: { smith: { level: 12 } } }) },
+    });
+    assert.equal(routed.data.formula, '1d20 + @skills.smith.level');
   } finally {
     delete globalThis.Roll;
   }

@@ -152,3 +152,20 @@ test('a die named inside a flavour does not take the next term`s faces (QE r3 5)
     '1d20 (14) Smithing 1d4 bonus + 1d6 (5) = 20'
   );
 });
+
+test('an operand-count drift between the typed and resolved formulas labels nothing (issue 2098 F2)', () => {
+  const typed = (formula, rollFormula) => ({
+    ...summed('over', formula, [{ group: '1d20', results: [14] }], 24),
+    rollFormula,
+  });
+  assert.equal(
+    line(typed('1d20 + 2', '1d20 + @retired + 2')),
+    '1d20 (14) + 2 = 24',
+    'a stripped mid-formula placeholder leaves the typed formula with one operand too many'
+  );
+  assert.equal(
+    line(typed('1d20 + 3 + 4', '1d20 + @multi')),
+    '1d20 (14) + 3 + 4 = 24',
+    'a path that resolves to more than one operand leaves the resolved formula with one too many'
+  );
+});
