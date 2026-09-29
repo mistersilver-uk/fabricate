@@ -326,6 +326,72 @@ export const CASES = Object.freeze([
       CHECKS_ROUTE_MODEL_PATTERN,
     ],
   }),
+  // Issue 2005 (T6): a roll-under check's pill names a Target, and a character value its source.
+  ...[
+    ['manager-recipes-check-pill-under', 'roll-under-fixed', 'target', 'Target 12'],
+    [
+      'manager-recipes-check-pill-under-attribute',
+      'roll-under-add',
+      'attribute',
+      'Character value',
+    ],
+    [
+      'manager-recipes-check-pill-under-dynamic',
+      'roll-under-dynamic',
+      'dynamicTarget',
+      'Dynamic target',
+    ],
+  ].map(([id, state, kind, text]) =>
+    managerCase({
+      id,
+      label: `Manager — Recipes check pill, ${state.replaceAll('-', ' ')}`,
+      smokeLabels: [],
+      reaches: 'beyond',
+      query: { system: 'lab-smithing', checkPreviewState: state },
+      steps: ['Crafting'],
+      expectView: 'recipes',
+      expectSelector: `.fabricate-manager .manager-recipe-row [data-recipe-check="${kind}"]:has-text("${text}")`,
+      kinds: ['manager', 'recipes'],
+      sourceMatches: [
+        /^src\/ui\/svelte\/apps\/manager\/RecipesBrowserView\.svelte$/,
+        /^src\/ui\/svelte\/stores\/adminRecipeRowProjection\.js$/,
+      ],
+    })
+  ),
+  // The bulk axis under a multiplied character value: each tier names its multiplier, never a DC.
+  managerCase({
+    id: 'manager-recipes-bulk-edit-check-tier-under',
+    label: 'Manager — Recipes bulk edit check tier list, character value multiplied',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', checkPreviewState: 'roll-under-multiply' },
+    steps: [
+      'Crafting',
+      { selector: 'label:has(input[data-recipe-select="sm-r-longsword"])' },
+      { selector: 'label:has(input[data-recipe-select="sm-r-greatsword"])' },
+      { selector: '[data-recipe-bulk-check-tier]' },
+      // The list is longer than the panel's room, so the authored tiers sit below its fold.
+      { selector: '[data-popover-option="sm-tier-masterwork"]', scroll: true },
+    ],
+    expectView: 'recipes',
+    expectSelector:
+      '.fabricate-manager .fabricate-select-popover' +
+      ':has([data-popover-option="sm-tier-masterwork"]:has-text("Masterwork (×½)"))' +
+      ':has-text("Default · base adjustment")',
+    expectContained: [
+      { container: '.fabricate-manager', target: '.fabricate-select-popover' },
+      {
+        container: '.fabricate-select-popover',
+        target: '[data-popover-option="sm-tier-masterwork"]',
+      },
+    ],
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      ...RECIPE_BULK_EDIT_MATCHES,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/recipeOverviewSelectOptions\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+    ],
+  }),
   // Both frames run on herbalism rather than the flagship smithing library, which is why they say anything.
   managerCase({
     id: 'manager-recipes-bulk-delete-idle',

@@ -64,7 +64,6 @@ function mountOverride({ salvage = {}, config = {}, ...rest } = {}) {
     salvageResolutionMode: 'simple',
     salvageCheckEnabled: true,
     salvageCheckTiers: TIERS,
-    salvageCheckDcMode: 'static',
     salvageCheckDc: 15,
     salvageCheckConfig: { dc: 15, thresholdMode: 'meet', evaluation: evaluation(), ...config },
     previewActors: ROSTER,
@@ -370,11 +369,11 @@ describe('ComponentEditView — the salvage override follows the evaluation (iss
     assert.equal(keys.DcOverrideHint, 'Replaces the system DC for this component.');
   });
 
-  it('a dynamic system DC still shows its static number, since salvage never runs the DC macro', async () => {
+  it('names the static system DC in the preset and the line, since salvage never runs the DC macro', async () => {
     const { target } = await mountOverride({
-      salvageCheckDcMode: 'dynamic',
       config: { evaluation: evaluation({ direction: 'over', source: 'fixed' }) },
     });
+    assert.equal(presetLabels(target)[0], 'System default — DC 15');
     assert.equal(playerSees(target), 'Salvage check · DC 15');
   });
 
@@ -396,7 +395,7 @@ describe('ComponentEditView — the salvage override follows the evaluation (iss
     await previewAs(target, 'actor-sera');
     assert.equal(
       playerSees(target),
-      'Salvage check cannot resolve: the difficulty adjustment ×-2 is invalid; a multiplier must be above zero.'
+      'Salvage check cannot resolve: the difficulty adjustment ×−2 is invalid; a multiplier must be above zero.'
     );
     assert.equal(
       card(target).querySelector('[data-override-player-sees]').dataset.overridePlayerSees,

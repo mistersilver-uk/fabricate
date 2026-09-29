@@ -33,6 +33,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/journal/historyPresentation.js',
     'src/ui/svelte/apps/journal/runStateNotice.js',
     'src/ui/svelte/apps/journal/runDetailPresentation.js',
+    // The roll line signs an executed margin with the shared formatter (issue 2005).
+    'src/utils/checkAdjustmentFormat.js',
+    'src/utils/scalars.js',
     'src/ui/svelte/apps/journal/stageHeading.js',
     'src/ui/svelte/apps/journal/runRecovery.js',
   ],
@@ -686,6 +689,20 @@ describe('JournalView mounted behavior', () => {
     assert.equal(routedTarget.querySelectorAll('[data-outcome-tier]').length, 2);
     assert.match(routedTarget.querySelector('.journal-detail-meta').textContent, /Mode\.routed/u);
     assert.doesNotMatch(routedTarget.querySelector('.journal-detail-meta').textContent, /null/u);
+    const ruleHint = (root) => root.querySelector('[data-outcome-ladder] .fab-outcome-hint').textContent;
+    assert.match(ruleHint(routedTarget), /Yields\.RoutedRule$/u);
+
+    // Issue 2005: a roll-under or character-value ladder states its own selection rule.
+    for (const [ladderRule, key] of [
+      ['under', /Yields\.RoutedRuleUnder$/u],
+      ['underStrict', /Yields\.RoutedRuleUnderStrict$/u],
+      ['adjustment', /Yields\.RoutedRuleAdjustment$/u],
+    ]) {
+      harness.remount();
+      const under = makeGatheringRun({ gatheringYield: { ...routed.gatheringYield, ladderRule } });
+      const { store: underStore } = makeJournal({ selectedRun: under, selectedRunKey: under.key });
+      assert.match(ruleHint(await harness.mount({ services: makeServices(underStore) })), key);
+    }
 
     harness.remount();
     const straight = makeGatheringRun({

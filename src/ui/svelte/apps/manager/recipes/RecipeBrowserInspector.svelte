@@ -77,6 +77,9 @@
   // producing nothing is a successful craft that makes nothing.
   const CHECK_LABELS = {
     dc: ['FABRICATE.Admin.Manager.Recipe.CheckDcValue', 'DC {dc}'],
+    target: ['FABRICATE.Admin.Manager.Recipe.CheckTarget', 'Target {dc}'],
+    attribute: ['FABRICATE.Admin.Manager.Recipe.CheckAttribute', 'Character value'],
+    dynamicTarget: ['FABRICATE.Admin.Manager.Recipe.CheckDynamicShort', 'Dynamic'],
     dynamic: ['FABRICATE.Admin.Manager.Recipe.CheckDynamicShort', 'Dynamic'],
     progressive: ['FABRICATE.Admin.Manager.Recipe.CheckProgressive', 'Progressive'],
     ingredients: ['FABRICATE.Admin.Manager.Recipe.CheckByIngredients', 'By ingredients'],

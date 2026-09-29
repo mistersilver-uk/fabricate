@@ -77,7 +77,6 @@
     // `salvageCraftingCheck.simple.tiers` — the DC preset source in EVERY resolution mode, routed
     // included (decision 7, case 5). There is no `.routed.tiers` sibling.
     salvageCheckTiers = [],
-    salvageCheckDcMode = 'static',
     salvageCheckDc = 0,
     // The active salvage check sub-object, whose `evaluation` decides which override is edited,
     // and the Preview-as roster and lookup its Player sees line resolves with (issue 2005).
@@ -2206,7 +2205,6 @@
                   dcOverride={salvageDraft.dcOverride}
                   adjustmentOverride={salvageDraft.adjustmentOverride}
                   tiers={salvageCheckTiers}
-                  dcMode={salvageCheckDcMode}
                   systemDc={salvageCheckDc}
                   {previewActors}
                   {resolvePreviewCharacter}

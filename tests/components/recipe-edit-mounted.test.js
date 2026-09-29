@@ -117,6 +117,8 @@ const RAW_MODULES = [
   // The Overview tab resolves the recipe's category label for its Category select, and maps its
   // four converted cells' option lists beside itself (issue 1510).
   'src/ui/svelte/apps/manager/recipe/recipeOverviewSelectOptions.js',
+  // …which names a character-value tier by its adjustment through the shared formatter.
+  'src/utils/checkAdjustmentFormat.js',
   ...SEARCHABLE_POPOVER_RAW_MODULES,
   // A progressive stage row draws its component's complications read-only (issue 1286).
   'src/ui/model/complicationSummary.js',
@@ -574,6 +576,31 @@ describe('RecipeEditView (mounted)', () => {
       'selecting a tier stages checkTierId'
     );
     editHarness.remount();
+  });
+
+  it('names a roll-under Target and a character-value adjustment in the Check tier options (issue 2005)', async () => {
+    const tiers = [
+      { id: 'tier-easy', name: 'Easy', dc: 12, adjustment: -2 },
+      { id: 'tier-hard', name: 'Hard', dc: 8, adjustment: 0.5 },
+    ];
+    const evaluation = (direction, source, adjustmentKind = 'add') => ({
+      product: 'sum',
+      direction,
+      target: { source, expression: '@skills.smith.value', adjustmentKind },
+    });
+    const cases = [
+      [evaluation('under', 'fixed'), ['Default target', 'Easy (Target 12)', 'Hard (Target 8)']],
+      [evaluation('over', 'attribute'), ['Default · base adjustment', 'Easy (−2)', 'Hard (+0.5)']],
+      [evaluation('under', 'attribute', 'multiply'), ['Default · base adjustment', 'Easy (×−2)', 'Hard (×½)']],
+    ];
+    for (const [checkEvaluation, labels] of cases) {
+      const target = await editHarness.mount(
+        identityProps({ checkTierOptions: tiers, checkEvaluation })
+      );
+      assert.deepEqual(selectOptionLabels(target, TIER_TRIGGER), labels);
+      closeSelectPanel(target, TIER_TRIGGER);
+      editHarness.remount();
+    }
   });
 
   it('threads the "Minimum success tier" dropdown through RecipeEditView to the Overview tab', async () => {

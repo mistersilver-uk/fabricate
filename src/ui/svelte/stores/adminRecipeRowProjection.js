@@ -51,6 +51,7 @@ import { normalizeRecipeCategory } from '../../../utils/recipeCategories.js';
 import { recipeItemDefinitionsContaining } from '../../../utils/recipeItemMembership.js';
 import { diceEngine } from '../../../utils/rollFormulaRollability.js';
 import { countRecipeTagPlaceholderUsage } from '../../model/vocabularyUsage.js';
+import { checkTierUnit } from '../apps/manager/recipe/recipeOverviewSelectOptions.js';
 
 /**
  * Build a human-readable visibility summary for a recipe row.
@@ -333,7 +334,7 @@ function _recipeCheckConfig(system) {
  * precedence for a duplicated tier id).
  *
  * @param {object} system the selected crafting system (raw, not projected).
- * @returns {{constant: object|null, tierDcById: Map<string, number>, defaultDc: number}}
+ * @returns {{constant: object|null, kind?: string, tierDcById: Map<string, number>, defaultDc: number}}
  */
 function _recipeCheckContext(system) {
   const mode = system?.resolutionMode || 'simple';
@@ -359,8 +360,12 @@ function _recipeCheckContext(system) {
     return constantOf(mode === 'routedByIngredients' ? 'ingredients' : 'none');
   }
   if (mode === 'progressive') return constantOf('progressive');
+  // A character value resolves per actor, so its pill names the source and sorts with the
+  // number-less rows (issue 2005); a roll-under fixed number is a `target`, never a DC.
+  const unit = checkTierUnit(config.evaluation);
+  if (unit === 'add' || unit === 'multiply') return constantOf('attribute');
   // A dynamic DC is macro-resolved at craft time; there is no static number to show.
-  if (config.dcMode === 'dynamic') return constantOf('dynamic');
+  if (config.dcMode === 'dynamic') return constantOf(unit === 'target' ? 'dynamicTarget' : 'dynamic');
 
   const tierDcById = new Map();
   for (const entry of Array.isArray(config.tiers) ? config.tiers : []) {
@@ -371,6 +376,7 @@ function _recipeCheckContext(system) {
   const defaultDc = Number(config.dc);
   return {
     constant: null,
+    kind: unit === 'target' ? 'target' : 'dc',
     tierDcById,
     defaultDc: Number.isFinite(defaultDc) ? Math.trunc(defaultDc) : 15,
   };
@@ -384,14 +390,15 @@ function _recipeCheckContext(system) {
  *
  * @param {{constant: object|null, tierDcById: Map<string, number>, defaultDc: number}} context
  * @param {object} recipe the Recipe model.
- * @returns {{kind: 'none' | 'ingredients' | 'progressive' | 'dynamic' | 'dc', dc: number | null}}
+ * @returns {{kind: 'none' | 'ingredients' | 'progressive' | 'dynamic' | 'dynamicTarget' |
+ *   'attribute' | 'dc' | 'target', dc: number | null}}
  * @private
  */
 function _recipeCheckSummary(context, recipe) {
   if (context.constant) return context.constant;
   const tierDc = recipe?.checkTierId ? Number(context.tierDcById.get(recipe.checkTierId)) : NaN;
-  if (Number.isFinite(tierDc)) return { kind: 'dc', dc: Math.trunc(tierDc) };
-  return { kind: 'dc', dc: context.defaultDc };
+  if (Number.isFinite(tierDc)) return { kind: context.kind, dc: Math.trunc(tierDc) };
+  return { kind: context.kind, dc: context.defaultDc };
 }
 
 /**

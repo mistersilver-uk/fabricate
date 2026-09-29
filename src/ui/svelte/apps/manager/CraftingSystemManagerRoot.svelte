@@ -36,7 +36,10 @@
   import { cloneRollData, listPreviewActors, resolvePreviewActor } from './checks/checkPreview.js';
   import { salvagePresetTiers } from './component/salvageDcPresets.js';
   import { buildVocabularyUsage, dedupeVocabularyEntries } from '../../../model/vocabularyUsage.js';
-  import { createRecipeBrowserState } from '../../../model/recipeBrowserModel.js';
+  import {
+    createRecipeBrowserState,
+    recipeCheckSubtitleSuffix,
+  } from '../../../model/recipeBrowserModel.js';
   import {
     componentCategoryOptions,
     createComponentBrowserState,
@@ -534,6 +537,10 @@
   const recipeCheckTierOptions = $derived(
     resolveRecipeCheckTierOptions(selectedSystem?.craftingCheck, checks.craftingCheckMode)
   );
+  // The same mode's evaluation, which names each tier's DC, Target or adjustment (issue 2005).
+  const recipeCheckTierEvaluation = $derived(
+    selectedSystem?.craftingCheck?.[checks.craftingCheckMode]?.evaluation ?? null
+  );
   // Fixed-type routed success tiers offered to the recipe's "Minimum success tier" override; empty
   // (control hidden) unless the system's real resolution mode is `routedByCheck` + fixed.
   const recipeMinSuccessTierOptions = $derived(
@@ -612,9 +619,6 @@
   // DC presets come from `salvageCraftingCheck.simple.tiers` in EVERY resolution mode,
   // routed included (decision 7, case 5) — there is no `.routed.tiers` sibling.
   const salvageCheckTiers = $derived(salvagePresetTiers(selectedSystem?.salvageCraftingCheck));
-  const salvageCheckDcMode = $derived(
-    selectedSystem?.salvageCraftingCheck?.simple?.dcMode || 'static'
-  );
   // The sub-object the salvage mode rolls, whose evaluation picks the override field and whose DC
   // is the system default (issue 2005).
   const salvageCheckConfig = $derived(
@@ -2234,16 +2238,10 @@
       localize
     );
     const mode = resolutionModeLabel(selectedSystem?.resolutionMode);
-    // "⟨category⟩ · ⟨mode⟩ · DC ⟨n⟩" (§F4): resolve the check DC from the same projected
-    // `checkSummary` the browser row's check pill reads.
-    const summary = selectedRecipe?.checkSummary || null;
-    let dcSuffix = '';
-    if (summary?.kind === 'dc' && Number.isFinite(Number(summary.dc))) {
-      dcSuffix = ` · ${text('FABRICATE.Admin.Manager.Recipe.CheckDcShort', 'DC')} ${summary.dc}`;
-    } else if (summary?.kind === 'none') {
-      dcSuffix = ` · ${text('FABRICATE.Admin.Manager.Recipe.CheckDcShort', 'DC')} —`;
-    }
-    return `${category} · ${mode}${dcSuffix}`;
+    // "⟨category⟩ · ⟨mode⟩ · DC ⟨n⟩" (§F4): resolve the check from the same projected
+    // `checkSummary` the browser row's check pill reads, naming a Target as the pill does.
+    const suffix = recipeCheckSubtitleSuffix(selectedRecipe?.checkSummary || null, text);
+    return `${category} · ${mode}${suffix}`;
   }
 
   // The component editor's header subline: "<category> · Linked <source>" (issue 676, decision 4).
@@ -5623,7 +5621,6 @@
             'addAll'}
           salvageModifierMaxPicks={selectedSystem?.salvageCraftingCheck?.maxModifierPicks ?? null}
           salvageModifierDefaultIds={selectedSystem?.salvageCraftingCheck?.defaultModifierIds || []}
-          {salvageCheckDcMode}
           {salvageCheckDc}
           {salvageCheckConfig}
           previewActors={overridePreviewActors}
@@ -5703,6 +5700,7 @@
           : []}
         itemTags={selectedSystem?.itemTags || []}
         checkTierOptions={recipeCheckTierOptions}
+        checkEvaluation={recipeCheckTierEvaluation}
         minSuccessTierOptions={recipeMinSuccessTierOptions}
         craftingModifierOptions={selectedSystemModifiers}
         craftingModifierPolicy={selectedSystem?.craftingCheck?.defaultModifierPolicy || 'addAll'}
@@ -5805,6 +5803,7 @@
         {selectedSystemId}
         {showRecipeCategories}
         resolutionMode={selectedSystem?.resolutionMode || 'simple'}
+        checkEvaluation={recipeCheckTierEvaluation}
         bind:browserState={recipeBrowserState}
         onSearchChange={(term) => store.setRecipeSearch?.(term)}
         onSelectRecipe={(id) => selectRecipe(id)}
@@ -6309,6 +6308,7 @@
               categoryOptions={recipeBulkCategoryOptions}
               checkTierAxis={recipeBulkCheckTierAxis}
               checkTierOptions={recipeCheckTierOptions}
+              checkEvaluation={recipeCheckTierEvaluation}
               books={recipeItemDefinitions}
               bookMembership={recipeBulkBookMembership}
               blockedCount={recipeBulkBlockedCount}
