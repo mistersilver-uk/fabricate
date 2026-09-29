@@ -4,7 +4,6 @@
  */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -183,6 +182,9 @@ describe('SalvageRollSummary evidence rows', () => {
   const harness = createMountedComponentHarness({
     ...SHARED,
     tmpPrefix: 'fabricate-salvage-summary-evidence-',
+    // The shared salvage-failure fallback literal (issue 2092); an omission HANGS this
+    // suite (# cancelled) rather than failing it.
+    rawModules: [...SHARED.rawModules, 'src/systems/salvageMessages.js'],
     compiledModules: [MEDALLION, FACT_ROW, EVIDENCE, SALVAGE_SUMMARY],
     componentPath: SALVAGE_SUMMARY,
   });
@@ -287,24 +289,6 @@ describe('SalvageRollSummary evidence rows', () => {
       root.querySelector('[data-inventory-salvage-message]').textContent.trim(),
       'The blade shattered beyond use.'
     );
-  });
-});
-
-// Guard (issue 2092): `SalvageRollSummary`'s hand-maintained copy of the engine's generic
-// salvage-failure fallback text must track `salvagePipeline.js`'s own literal, or the
-// "nothing recovered" substitution silently stops firing.
-describe('SalvageRollSummary generic-failure literal', () => {
-  it('matches the fallback `publishSalvageFailure` returns on a failed check', () => {
-    const pipelineSource = readFileSync(
-      resolve(repoRoot, 'src/systems/salvagePipeline.js'),
-      'utf8'
-    );
-    const componentSource = readFileSync(resolve(repoRoot, SALVAGE_SUMMARY), 'utf8');
-    assert.ok(
-      pipelineSource.includes("checkResult.message || 'Salvage check failed'"),
-      'the engine fallback text moved — update the component literal to match'
-    );
-    assert.ok(componentSource.includes("'Salvage check failed'"), 'the component literal drifted');
   });
 });
 

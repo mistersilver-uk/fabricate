@@ -24,6 +24,7 @@
   import CheckEvidenceRows from '../../../crafting/detail/CheckEvidenceRows.svelte';
   import { resolveCraftingArt } from '../../../../util/craftingArtResolution.js';
   import { localize } from '../../../../util/foundryBridge.js';
+  import { SALVAGE_CHECK_FAILED_FALLBACK } from '../../../../../../systems/salvageMessages.js';
 
   let { result = null } = $props();
 
@@ -31,16 +32,13 @@
   const message = $derived(String(result?.message ?? '').trim());
   const awarded = $derived(Array.isArray(result?.awarded) ? result.awarded : []);
   // The engine's undifferentiated fallback for a failed salvage check
-  // (`salvagePipeline.js`'s `checkResult.message || 'Salvage check failed'`) says nothing
-  // the evidence rows below don't already state more precisely. Swapped for the crafting
-  // box's own "nothing produced" sentence (issue 2092): silent when the failure still
-  // awarded something — the list speaks for itself, matching RollResultBox's F9 — stated
-  // otherwise. A system-authored custom check message is never replaced. The guard test
-  // beside this component's mounted suite fails if the literal below drifts from the
-  // engine's.
-  const GENERIC_FAILURE_MESSAGE = 'Salvage check failed';
+  // (`salvagePipeline.js`'s `checkResult.message || SALVAGE_CHECK_FAILED_FALLBACK`) says
+  // nothing the evidence rows below don't already state more precisely. Swapped for the
+  // crafting box's own "nothing produced" sentence (issue 2092): silent when the failure
+  // still awarded something — the list speaks for itself, matching RollResultBox's F9 —
+  // stated otherwise. A system-authored custom check message is never replaced.
   const displayMessage = $derived(
-    state === 'failure' && message === GENERIC_FAILURE_MESSAGE
+    state === 'failure' && message === SALVAGE_CHECK_FAILED_FALLBACK
       ? awarded.length === 0
         ? localize('FABRICATE.App.Inventory.Salvage.NothingRecovered')
         : ''
