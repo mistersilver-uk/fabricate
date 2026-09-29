@@ -375,9 +375,9 @@
   .manager-checks-count-row {
     display: grid;
     grid-template-columns: 150px minmax(0, 1fr);
-    gap: 14px;
+    gap: var(--fab-space-3);
     align-items: start;
-    padding: 11px 0;
+    padding: var(--fab-space-3) 0;
     border-top: 1px solid var(--fab-border);
   }
 
@@ -388,14 +388,14 @@
 
   .manager-checks-count-row-title {
     margin: 0;
-    padding-top: 7px;
+    padding-top: var(--fab-space-2);
     color: var(--fab-text);
     font-size: 11.5px;
     font-weight: 600;
   }
 
   .manager-checks-count-row-hint {
-    margin: 2px 0 0;
+    margin: var(--fab-space-2xs) 0 0;
     color: var(--fab-text-subtle);
     font-size: 10px;
     line-height: 1.45;
@@ -408,7 +408,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 10px;
+    gap: var(--fab-space-2);
     min-width: 0;
   }
 
@@ -419,7 +419,7 @@
   .manager-checks-count-stack {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--fab-space-2);
     min-width: 0;
   }
 

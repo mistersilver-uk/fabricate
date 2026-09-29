@@ -102,7 +102,7 @@
   .manager-checks-count-inset-head {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--fab-space-2);
   }
 
   .manager-checks-count-inset-head .manager-checks-formula-average {

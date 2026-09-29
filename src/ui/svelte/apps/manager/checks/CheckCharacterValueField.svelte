@@ -82,7 +82,7 @@
   .manager-checks-value-field {
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: var(--fab-space-1);
     min-width: 0;
   }
 
