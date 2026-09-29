@@ -74,6 +74,8 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/checks/previewActorId.js',
   'src/ui/svelte/apps/manager/checks/checkOdds.js',
   'src/ui/svelte/apps/manager/checks/checkPreviewModel.js',
+  // The simulator's rolled readout the preview model re-exports (issue 2080).
+  'src/ui/svelte/apps/manager/checks/checkReadoutModel.js',
   // The success-counting preview the model delegates to (issue 2004).
   'src/ui/svelte/apps/manager/checks/countPreviewModel.js',
   // The Studio's adjustment labels and read-only band pictures (issue 2005).
@@ -195,6 +197,9 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/SegmentedControl.svelte',
   'src/ui/svelte/apps/manager/checks/CheckOddsPanel.svelte',
   'src/ui/svelte/apps/manager/checks/CheckOutcomePreview.svelte',
+  // The rolled readout's eyebrow and a count roll's tiles, the #2006 seam (issue 2080).
+  'src/ui/svelte/components/Kicker.svelte',
+  'src/ui/svelte/apps/manager/checks/CheckSimulatorFaces.svelte',
   // THE manager's editor tab strip (issue 1362).
   'src/ui/svelte/components/EditorTabs.svelte',
   'src/ui/svelte/apps/manager/checks/ChecksEditorTabs.svelte',

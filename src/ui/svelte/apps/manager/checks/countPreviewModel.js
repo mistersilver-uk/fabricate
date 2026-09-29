@@ -24,17 +24,8 @@ import { evaluateCheckBreakageCondition } from '../../../../../toolBreakageRunti
 import { resolveProgressiveAward } from '../../../../../utils/progressiveAward.js';
 
 import { enumeratePreRollTotals, ODDS_REASONS, percentOf, SANDBOX_ABSENT } from './checkOdds.js';
-import { interpolate } from './checksCopy.js';
+import { interpolate, MINUS } from './checksCopy.js';
 import { missingTargetPaths, readsCharacter, targetExpressionFault } from './checkTargetStatus.js';
-
-/** U+2212, the minus the Studio writes a negative count with. */
-const MINUS = '−';
-
-/** A signed count with the true minus; `plus` adds `+` to zero and above, as `margin +0` reads. */
-function formatCount(value, { plus = false } = {}) {
-  if (value < 0) return `${MINUS}${Math.abs(value)}`;
-  return plus ? `+${value}` : String(value);
-}
 
 /**
  * The digest's roll row for a count check, `Roll · {base}d{die} · each {comparison} {threshold}`,
@@ -363,59 +354,17 @@ function countFaces(plan, data, text) {
   });
 }
 
-/** A number, or NaN for `null` and `undefined`, which `Number` would read as 0. */
-function finiteOrNaN(value) {
-  return value === null || value === undefined ? NaN : Number(value);
-}
-
 /**
- * The simulator readout's count fields: tiles, the qualified-minus-cancelled breakdown, the
- * required count and margin the runner executed, and the botch and zero-pool states. `success` is
- * the graded result's: a botch the grader rescued reads the normal margin line.
+ * The simulator's count tiles and states: every active face marked, whether the pool was reduced to
+ * zero, and whether the net fell below zero. The readout's lines are `checkReadoutModel.js`'s.
  */
-export function buildCountReadout(plan, result, text, { success = false } = {}) {
+export function buildCountReadout(plan, result, text) {
   const data = result?.data ?? {};
   const zeroPool = data.zeroPool === true;
-  const faces = zeroPool ? [] : countFaces(plan, data, text);
-  const net = finiteOrNaN(data.total);
-  const breakdown = Number.isFinite(net)
-    ? interpolate(
-        text(
-          'FABRICATE.Admin.Manager.Checks.Simulator.CountNet',
-          '{qualified} qualified − {cancelled} cancelled = {net} net'
-        ),
-        { qualified: data.successes, cancelled: data.cancelled, net: formatCount(net) }
-      )
-    : '';
-  const margin = finiteOrNaN(data.margin);
-  const botch = Number.isFinite(net) && net < 0;
-  // A botch states why instead of a margin, against the record's own count, as the player's
-  // result box does; a margin reads against the count the runner graded it by.
-  const botchLine = botch && !success;
-  const required = botchLine && Number.isFinite(plan.dc) ? plan.dc : net - margin;
-  const marginCopy = botchLine
-    ? [
-        'FABRICATE.Admin.Manager.Checks.Simulator.VsRequiredBotch',
-        '{required} needed · a net below zero is a botch',
-      ]
-    : [
-        'FABRICATE.Admin.Manager.Checks.Simulator.VsRequired',
-        '{required} needed · margin {margin}',
-      ];
-  const marginLabel =
-    Number.isFinite(net) && Number.isFinite(margin)
-      ? interpolate(text(...marginCopy), {
-          required,
-          margin: formatCount(margin, { plus: true }),
-        })
-      : '';
+  const net = data.total === null || data.total === undefined ? NaN : Number(data.total);
   return {
-    faces,
+    faces: zeroPool ? [] : countFaces(plan, data, text),
     zeroPool,
-    botch,
-    breakdown,
-    marginLabel,
-    shownTotal: Number.isFinite(net) ? formatCount(net) : '',
-    dieLabel: `d${plan.evaluation.pool.die}`,
+    botch: Number.isFinite(net) && net < 0,
   };
 }

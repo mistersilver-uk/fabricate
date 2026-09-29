@@ -12,8 +12,8 @@ import {
   cloneRollData,
   listPreviewActors,
   resolvePreviewActor,
+  readoutBreakdown,
   runCheckPreview,
-  terseBreakdown,
 } from '../src/ui/svelte/apps/manager/checks/checkPreview.js';
 import {
   resolveRolledFormula,
@@ -415,7 +415,21 @@ describe('checkPreview: the actor and record selection', () => {
 });
 
 describe('checkPreview: the terse breakdown line', () => {
-  it('reads the faces and the signed remainder, not the full resolved formula', () => {
+  const words = (_key, fallback) => fallback;
+  const plan = (evaluation, extra = {}) => ({ kind: 'passFail', evaluation, args: {}, ...extra });
+  const OVER = plan({ product: 'sum', direction: 'over', target: { source: 'fixed' } });
+  const UNDER = plan({ product: 'sum', direction: 'under', target: { source: 'fixed' } });
+  const CHARACTER_OVER = plan({ product: 'sum', direction: 'over', target: { source: 'attribute' } });
+  const COUNT = plan({ product: 'count', direction: 'over', pool: {} });
+  const d20 = (total, face = 9) => ({
+    data: { total, diceGroups: [{ groupId: 0, group: '1d20', results: [face] }] },
+  });
+  const threeD6 = (total) => ({
+    data: { total, diceGroups: [{ groupId: 0, group: '3d6', results: [5, 5, 3] }] },
+  });
+  const breakdown = (result, context) => readoutBreakdown(result, context, words);
+
+  it('reads a fixed DC’s faces and signed remainder, not the full resolved formula', () => {
     const result = {
       data: {
         total: 19,
@@ -423,19 +437,35 @@ describe('checkPreview: the terse breakdown line', () => {
         diceGroups: [{ groupId: 0, group: '1d20', sum: 9, results: [9] }],
       },
     };
-    assert.equal(terseBreakdown(result, 'Sera Vane'), 'd20 9 +10 · Sera Vane');
-    assert.equal(terseBreakdown(result), 'd20 9 +10', 'the actor name is optional');
+    assert.equal(breakdown(result, { plan: OVER, actorName: 'Sera Vane' }), 'd20 9 +10 · Sera Vane');
+    assert.equal(breakdown(result, { plan: OVER }), 'd20 9 +10', 'the actor name is optional');
   });
 
-  it('omits a zero remainder rather than printing "+0"', () => {
-    const result = {
-      data: { total: 9, diceGroups: [{ groupId: 0, group: '1d20', sum: 9, results: [9] }] },
-    };
-    assert.equal(terseBreakdown(result), 'd20 9');
+  it('always signs a fixed DC’s remainder, "+0" included, with the true minus below zero (M4, M5)', () => {
+    assert.equal(breakdown(d20(9), { plan: OVER }), 'd20 9 +0');
+    assert.equal(breakdown(d20(6), { plan: OVER }), 'd20 9 −3');
+    assert.equal(breakdown(d20(12), { plan: OVER }), 'd20 9 +3', 'positive control');
+  });
+
+  it('joins roll-under faces with " + " and marks them raw, while a character over is not (M3)', () => {
+    assert.equal(breakdown(threeD6(13), { plan: UNDER, actorName: 'Sera Vane' }), '5 + 5 + 3 · raw · Sera Vane');
+    assert.equal(breakdown(threeD6(13), { plan: CHARACTER_OVER }), '5 + 5 + 3');
+    assert.equal(breakdown(threeD6(15), { plan: CHARACTER_OVER }), '5 + 5 + 3 + 2');
+    assert.equal(breakdown(threeD6(11), { plan: UNDER }), '5 + 5 + 3 − 2 · raw', 'the true minus');
+  });
+
+  it('reads a count’s qualified and cancelled dice, or a pool reduced to zero (R6, R7)', () => {
+    const rolled = { data: { total: -3, successes: 1, cancelled: 4, diceGroups: [] } };
+    assert.equal(
+      breakdown(rolled, { plan: COUNT, actorName: 'Idrin' }),
+      '1 qualified − 4 cancelled = −3 net · Idrin'
+    );
+    const zero = { data: { total: null, zeroPool: true, diceGroups: [] } };
+    assert.equal(breakdown(zero, { plan: COUNT, actorName: 'Idrin' }), 'pool reduced to 0 · Idrin');
   });
 
   it('says nothing at all when there is no result to describe', () => {
-    assert.equal(terseBreakdown(null), '');
+    assert.equal(breakdown(null, { plan: OVER }), '');
   });
 });
 

@@ -191,7 +191,6 @@
     "src/ui/svelte/components/SearchablePopoverPanel.svelte | border-radius | 8px | 1",
     "src/ui/svelte/components/SegmentedControl.svelte | border-radius | 8px | 1",
     "src/ui/svelte/apps/manager/ToolsBrowserView.svelte | border-radius | 8px | 1",
-    "src/ui/svelte/apps/manager/checks/CheckOutcomePreview.svelte | border-radius | 8px | 1",
     "src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte | border-radius | 8px | 1",
     "src/ui/svelte/apps/manager/component/ComponentComplicationsSection.svelte | border-radius | 10px | 1",
     "src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte | border-radius | 10px | 1",

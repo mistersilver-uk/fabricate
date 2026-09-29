@@ -419,7 +419,6 @@
   "src/ui/svelte/components/SegmentedControl.svelte | padding | 10 | 2",
   "src/ui/svelte/components/SegmentedControl.svelte | padding | 3 | 1",
   "src/ui/svelte/components/SegmentedControl.svelte | padding | 4 | 1",
-  "src/ui/svelte/apps/manager/checks/CheckOutcomePreview.svelte | margin-top | 2 | 1",
   "src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte | gap | 10 | 1",
   "src/ui/svelte/apps/manager/component/ComponentComplicationsSection.svelte | gap | 11 | 1",
   "src/ui/svelte/apps/manager/component/ComponentComplicationsSection.svelte | gap | 5 | 1",

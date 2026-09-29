@@ -3437,6 +3437,7 @@ CraftingRunStepState = {
    `data.dc` names only a fixed target; an attribute result carries `dc: null` and its number in `data.target`.
    A simple result targets its effective target, which under sum/under includes the settled `targetDelta`; a relative routed result targets the effective threshold of the roll-matched tier, including the tier a below-every-threshold total is clamped to, before forcing or stepping, or null when no tier is matched or clamped to; fixed routed, Otherwise and progressive results have null target and margin, and progressive comparison is null.
    A non-null margin is benefit-positive — raw total minus target over, target minus raw total under — even when forcing changes the disposition.
+   A check result of any kind — pass/fail, progressive or routed; sum or count — records `data.forcedOutcome: 'success' | 'failure'` when a trigger decided the outcome or, on a routed check, rerouted it to the best succeeding or worst failing tier; it is absent otherwise.
    Error, prompt cancellation, missing engine and empty formula exits preserve their prior result shape and omit these new execution fields.
    A target refusal returns `success: false` with `misconfigured: true` and `data.targetRefusal` naming its reason, and carries no executed fields.
    An executed result's `data.preRolls`, when present, is an ordered array of `{ source, label, expression, total, destination }` for separately evaluated modifiers; the main `total` and `diceGroups` still describe only the authored check roll and its appended terms.
