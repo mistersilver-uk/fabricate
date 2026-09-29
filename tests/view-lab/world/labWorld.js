@@ -77,6 +77,35 @@ function seedGatheringTaskMode(content, mode) {
 }
 
 /**
+ * Ashfall Runework's routed crafting check graded roll-under (issue 2005): `routed-under` against
+ * its fixed DC 12, and `routed-under-multiply` against a character value whose Ruined tier is
+ * Otherwise, so the Journal ladder states `≤` bands or labelled multipliers.
+ */
+function seedRuneworkCheckMode(content, mode) {
+  const system = content.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.RUNEWORK);
+  const routed = system?.craftingCheck?.routed;
+  if (!routed || !['routed-under', 'routed-under-multiply'].includes(mode)) return;
+  const multiply = mode === 'routed-under-multiply';
+  const adjustments = { 'rw-masterwork': 0.2, 'rw-standard': 0.5, 'rw-ruined': null };
+  system.craftingCheck = {
+    ...system.craftingCheck,
+    routed: {
+      ...routed,
+      evaluation: {
+        product: 'sum',
+        direction: 'under',
+        target: multiply
+          ? { source: 'attribute', expression: '@abilities.int.value', adjustmentKind: 'multiply' }
+          : { source: 'fixed' },
+      },
+      relativeOutcomes: routed.relativeOutcomes.map((outcome) =>
+        multiply ? { ...outcome, adjustment: adjustments[outcome.id] } : outcome
+      ),
+    },
+  };
+}
+
+/**
  * The salvage and gathering-task check override states (issue 2005, prototype frames 23-24):
  * Smithing's salvage and routed gathering checks read `evaluation`, and the Longsword and the
  * Prospect task carry the overrides each state shows, with the other field kept dormant.
@@ -360,6 +389,7 @@ export async function buildLabWorld({
   noInteractables = false,
   noSceneRegions = false,
   gatheringTaskMode = null,
+  runeworkCheckMode = null,
   checkOverride = null,
   journalCaseState = null,
   checkPreviewState = null,
@@ -371,6 +401,7 @@ export async function buildLabWorld({
     seedJournalNoCheckFixture(content);
   }
   seedGatheringTaskMode(content, gatheringTaskMode);
+  seedRuneworkCheckMode(content, runeworkCheckMode);
   seedCheckOverride(content, checkOverride);
   if (noTools) stripTools(content);
   if (noAuthoredWorldComponents) stripAuthoredWorldComponents(content);

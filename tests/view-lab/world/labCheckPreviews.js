@@ -150,9 +150,11 @@ const DICE_POOL_FAULTS = {
 const sumUnder = (target) => ({ product: 'sum', direction: 'under', target });
 const SMITH_RANK = '@skills.smith.rank';
 const underTier = (id, name, dc, adjustment = null) => ({ id, name, dc, adjustment });
-const rollUnder = (target, tiers) => ({
+const rollUnder = (target, tiers, dcMode = 'static') => ({
   resolutionMode: 'simple',
-  crafting: { simple: { rollFormula: '1d20', dc: 12, evaluation: sumUnder(target), tiers } },
+  crafting: {
+    simple: { rollFormula: '1d20', dc: 12, dcMode, evaluation: sumUnder(target), tiers },
+  },
   salvage: sumUnder({ source: 'fixed' }),
   gathering: {
     evaluation: sumUnder({ source: 'fixed' }),
@@ -166,6 +168,8 @@ const ROLL_UNDER_FIXED = rollUnder({ source: 'fixed' }, [
   underTier('sm-tier-apprentice', 'Apprentice work', 14),
   underTier('sm-tier-masterwork', 'Masterwork', 8),
 ]);
+// A macro resolves the roll-under target at craft time, so the pill names no number.
+const ROLL_UNDER_DYNAMIC = rollUnder({ source: 'fixed' }, [], 'dynamic');
 const ROLL_UNDER_ADD = rollUnder(
   { source: 'attribute', expression: SMITH_RANK, adjustmentKind: 'add', baseAdjustment: 0 },
   [
@@ -187,6 +191,7 @@ export const LAB_CHECK_PREVIEW_STATES = Object.freeze({
   'dice-pool-extended': DICE_POOL_EXTENDED,
   'dice-pool-faults': DICE_POOL_FAULTS,
   'roll-under-fixed': ROLL_UNDER_FIXED,
+  'roll-under-dynamic': ROLL_UNDER_DYNAMIC,
   'roll-under-add': ROLL_UNDER_ADD,
   'roll-under-multiply': ROLL_UNDER_MULTIPLY,
 });

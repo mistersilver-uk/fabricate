@@ -335,6 +335,12 @@ export const CASES = Object.freeze([
       'attribute',
       'Character value',
     ],
+    [
+      'manager-recipes-check-pill-under-dynamic',
+      'roll-under-dynamic',
+      'dynamicTarget',
+      'Dynamic target',
+    ],
   ].map(([id, state, kind, text]) =>
     managerCase({
       id,
@@ -383,6 +389,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       ...RECIPE_BULK_EDIT_MATCHES,
       /^src\/ui\/svelte\/apps\/manager\/recipe\/recipeOverviewSelectOptions\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
     ],
   }),
   // Both frames run on herbalism rather than the flagship smithing library, which is why they say anything.

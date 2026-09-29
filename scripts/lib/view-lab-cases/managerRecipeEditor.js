@@ -65,6 +65,7 @@ export const CASES = Object.freeze([
       sourceMatches: [
         /^src\/ui\/svelte\/apps\/manager\/recipe\/(?:RecipeOverviewTab\.svelte|recipeOverviewSelectOptions\.js)$/,
         /^src\/ui\/model\/recipeBrowserModel\.js$/,
+        /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
       ],
     })
   ),

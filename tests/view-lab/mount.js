@@ -111,6 +111,8 @@ function readParams() {
     // Which crafting system the manager opens on.
     system: params.get('system') ?? null,
     gatheringTaskMode: params.get('gatheringTaskMode') ?? null,
+    // Ashfall Runework's routed crafting check graded roll-under (issue 2005).
+    runeworkCheckMode: params.get('runeworkCheckMode') ?? null,
     checkOverride: params.get('checkOverride') ?? null,
     rollPromptState: params.get('rollPromptState') ?? null,
     // A success-counting Checks Studio state seeded onto Karrun Forgecraft (issue 2004).
@@ -896,6 +898,7 @@ async function boot() {
         noInteractables: params.noInteractables,
         noSceneRegions: params.noSceneRegions,
         gatheringTaskMode: params.gatheringTaskMode,
+        runeworkCheckMode: params.runeworkCheckMode,
         checkOverride: params.checkOverride,
         journalCaseState: params.journalCaseState,
         checkPreviewState: params.checkPreviewState,

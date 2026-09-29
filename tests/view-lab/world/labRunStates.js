@@ -57,6 +57,8 @@ export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({
   paused: 'lab-v1-paused',
   'cancel-confirmation': 'lab-v1-cancel-confirmation',
   'past-stage': 'lab-v1-stage-browser',
+  // Issue 2005: the same browser, its past stage rolled roll-under against an executed target.
+  'past-stage-under': 'lab-v1-stage-browser',
   'future-stage': 'lab-v1-stage-browser',
   'gathering-straight': 'lab-v1-gathering-straight',
   'gathering-d100': 'lab-v1-gathering-d100',
@@ -590,6 +592,7 @@ function journalCaseFactories(context) {
       ),
     'cancel-confirmation': readyAlias('lab-v1-cancel-confirmation'),
     'past-stage': () => active(stageBrowserRun(context, multi())),
+    'past-stage-under': () => active(stageBrowserRun(context, multi(), UNDER_STAGE_CHECK)),
     'future-stage': () => active(stageBrowserRun(context, multi())),
     'gathering-straight': () =>
       emptyRunContainers({ gatheringActive: [gatheringCaseRun(context, 'straight')] }),
@@ -1340,13 +1343,20 @@ function futureGate() {
   };
 }
 
-function stageBrowserRun(context, recipe) {
+/** An executed roll-under check: 11 against a final target of 14, a margin of +3. */
+const UNDER_STAGE_CHECK = Object.freeze({
+  success: true,
+  value: 11,
+  data: { resolvedFormula: '1d20', total: 11, dc: 12, direction: 'under', target: 14, margin: 3 },
+});
+
+function stageBrowserRun(context, recipe, pastCheck = null) {
   const authored = recipeSteps(recipe);
   const steps = authored.map((_entry, index) => {
     if (index === 0) {
       return versionedRecipeStep(recipe, index, 'succeeded', {
         completedAt: NOW - HOUR,
-        lastCheckResult: {
+        lastCheckResult: pastCheck ?? {
           success: true,
           value: 17,
           data: { resolvedFormula: '1d20 + 3', total: 17, dc: 14 },
