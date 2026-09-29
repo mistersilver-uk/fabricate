@@ -653,6 +653,13 @@ describe('the world Tool entry (issue 1373)', () => {
       const empty = await mountWithDice('');
       assert.ok(!empty.querySelector('[data-world-tool-entry-formula-error]'));
     });
+
+    // The formula error message's DANGER COLOUR is arbitrated in a real browser, against the
+    // actual stylesheet and the actual competing selectors, in
+    // `tests/components/manager-muted-danger-cascade.test.js` (issue 2097). happy-dom mounts this
+    // component with no `styles/fabricate.css` attached at all, so a `getComputedStyle` check here
+    // would resolve against nothing and prove nothing; the class-presence assertion it replaced
+    // was equally vacuous, since both classes were already present before the cascade was fixed.
   });
 
   // THE LINKED-ITEM CARD, RELOCATED FROM THE SYSTEM EDITOR (issue 1373)
