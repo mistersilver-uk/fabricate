@@ -37,7 +37,8 @@
   import { focusValidationTarget } from '../validationFocus.js';
   import { announceValidationOutcome } from '../validationAnnouncement.js';
   import InspectorCard from '../../../components/InspectorCard.svelte';
-  import { CHECK_ISSUE_TITLES, checkIssueText } from './checksCopy.js';
+  import { checkIssueText } from './checksCopy.js';
+  import { issueRowStatus } from './checksValidationRows.js';
   import {
     buildCheckModifierContext,
     resolveActiveCraftingCheckFormula,
@@ -678,8 +679,8 @@
   });
   const modeLabel = $derived(routeModeLabel || subsystemModeLabel('crafting', resolutionMode));
 
-  // THE SECTION-LEVEL CALLOUT and THE PANE HEADING, both required by
-  // `openspec/specs/ui-system-studio/spec.md` → "GM Checks Studio". The callout reads the SAME
+  // THE SECTION NOTICES and THE PANE HEADING, both required by
+  // `openspec/specs/ui-system-studio/spec.md` → "GM Checks Studio". The notices read the SAME
   // `activeReadiness` pass the strip's dot is counted from and renders the SAME exported copy
   // the Validation route does; the heading is keyed on the SECTION, the activity being named
   // by the rail, the breadcrumb and the route title.
@@ -848,20 +849,17 @@
     return resolutionMode;
   });
 
-  // Transient warnings explain themselves here but never feed a dot, badge or tally. A titled
-  // issue is a notice at the top of the pane; any other is a callout under the mode card.
-  const activeSectionIssues = $derived(
+  // Transient warnings explain themselves here but never feed a dot, badge or tally. Every notice
+  // is amber, so blocking issues sort first, as the Validation tab orders its rows (issue 2082).
+  const sectionNotices = $derived(
     [...activeReadiness.issues, ...activeReadiness.transient]
       .filter((issue) => sectionForIssue(issue.id) === activeSection)
-      .map((issue) => ({
-        id: issue.id,
-        tone: issue.severity === 'critical' ? 'warning' : 'info',
-        titled: Object.hasOwn(CHECK_ISSUE_TITLES, issue.id),
-        ...checkIssueText(issue.id, issue.data, text),
-      }))
+      .sort((a, b) => blockingRank(a) - blockingRank(b))
+      .map((issue) => ({ id: issue.id, ...checkIssueText(issue.id, issue.data, text) }))
   );
-  const sectionNotices = $derived(activeSectionIssues.filter((issue) => issue.titled));
-  const sectionCallouts = $derived(activeSectionIssues.filter((issue) => !issue.titled));
+  function blockingRank(issue) {
+    return issueRowStatus(issue) === 'block' ? 0 : 1;
+  }
   const reviewLabel = text('FABRICATE.Admin.Manager.Checks.Validation.Review', 'Review');
 
   /** A notice's Review: the control its issue names, else its section, as a Validation row's View. */
@@ -1230,9 +1228,10 @@
       data-keyboard-focus="true"
       bind:this={sectionPanel}
     >
-      <!-- A titled issue opens the pane as the prototype draws it: amber, title over detail. -->
+      <!-- The section's warning dot, explained IN the panel and first in it, as the prototype
+           draws it: amber, title over detail, with a Review action. -->
       {#if activity !== 'validation' && !routeIsOff && sectionNotices.length > 0}
-        <div class="manager-checks-section-callouts" data-checks-section-notices={activeSection}>
+        <div class="manager-checks-section-notices" data-checks-section-notices={activeSection}>
           {#each sectionNotices as issue (issue.id)}
             <Notice
               tone="warning"
@@ -1253,10 +1252,8 @@
         </header>
       {/if}
 
-      <!-- The section's warning dot, explained IN the panel, above the section content rather
-           than inside each branch, so every route reaches one insertion point. -->
-      <!-- WHAT THIS MODE DOES reads first: it is a standing statement about the mode, where an
-           issue callout is about THIS check. -->
+      <!-- WHAT THIS MODE DOES stays a callout: it documents the mode, where a notice reports
+           THIS check's state. -->
       {#if activity !== 'validation' && !routeIsOff && activeSection === 'roll'}
         <CheckModeCallout
           {activity}
@@ -1264,21 +1261,6 @@
           {alchemyCheckMode}
           outcomeCount={outcomeCount ?? 0}
         />
-      {/if}
-
-      {#if activity !== 'validation' && !routeIsOff && sectionCallouts.length > 0}
-        <div class="manager-checks-section-callouts" data-checks-section-callouts={activeSection}>
-          <!-- The tone is DERIVED and both values stand: a readiness issue is a statement about the
-                         live record, which is what `info` is for, and a critical one is the hazard. -->
-          {#each sectionCallouts as issue (issue.id)}
-            <Callout
-              tone={issue.tone}
-              text={issue.title}
-              dataAttr="data-checks-section-callout"
-              dataValue={issue.id}
-            />
-          {/each}
-        </div>
       {/if}
 
       {#if activity === 'validation'}
@@ -1801,8 +1783,8 @@
 </div>
 
 <style>
-  /* Layout only: the strip is the shared `Callout` primitive and states its own appearance. */
-  .manager-checks-section-callouts {
+  /* Layout only: each notice is the shared `Notice` primitive and states its own appearance. */
+  .manager-checks-section-notices {
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-2);

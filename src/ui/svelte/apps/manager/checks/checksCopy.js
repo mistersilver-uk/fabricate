@@ -1,10 +1,10 @@
 /**
  * The ONE set of sentences the Checks Studio uses to describe a readiness result. A section's
- * warning dot is explained IN the panel by a `Callout`, and a dot whose sentence is a second
- * copy of the Validation route's is how one issue comes to be described two ways on two screens
- * a click apart. Each entry is `[localizationSuffix, englishFallback]`, resolved against the
- * shared `FABRICATE.Admin.Manager.Checks.Validation.` namespace, so this module stays pure; the
- * issue map is PROVEN EXHAUSTIVE against `CHECK_READINESS_ISSUE_IDS` in both directions by
+ * warning dot is explained IN the panel by a `Notice`, and a dot whose words are a second copy of
+ * the Validation route's is how one issue comes to be described two ways on two screens a click
+ * apart. Each entry is `[localizationSuffix, englishFallback]`, resolved against the shared
+ * `FABRICATE.Admin.Manager.Checks.Validation.` namespace, so this module stays pure; the issue and
+ * title maps are PROVEN EXHAUSTIVE against `CHECK_READINESS_ISSUE_IDS` in both directions by
  * `tests/checks-readiness.test.js`. */
 
 /** The satisfied/unsatisfied TICKS a check reports. */
@@ -71,7 +71,7 @@ export const CHECK_TICK_LABELS = Object.freeze({
 export const CHECK_ISSUE_LABELS = Object.freeze({
   noRollFormula: [
     'IssueNoRollFormula',
-    'This check has no roll formula; it will not resolve until one is set.',
+    'Nothing is rolled, so this check cannot resolve until you enter a formula.',
   ],
   retiredPlaceholderInFormula: [
     'IssueRetiredPlaceholderInFormula',
@@ -83,14 +83,20 @@ export const CHECK_ISSUE_LABELS = Object.freeze({
   ],
   unnamedOutcome: [
     'IssueUnnamedOutcome',
-    'Name every outcome tier — an unnamed tier cannot be routed to a result group.',
+    'An unnamed tier cannot be routed to a result group. Name every tier.',
   ],
   noSuccessOutcome: [
     'IssueNoSuccessOutcome',
-    "No outcome tier is marked as a Success — successful crafts can't route to a result set. Mark at least one tier as Success.",
+    'Every tier is marked as a failure, so this check can never succeed. Mark at least one tier as Success.',
   ],
-  rangeInvalid: ['IssueRangeInvalid', 'Some tiers have a start greater than their end.'],
-  rangeOverlap: ['IssueRangeOverlap', 'Some tier ranges overlap. Each value range must be unique.'],
+  rangeInvalid: [
+    'IssueRangeInvalid',
+    'A tier whose end is lower than its start can never be rolled. Correct its start and end.',
+  ],
+  rangeOverlap: [
+    'IssueRangeOverlap',
+    'Bands must not overlap — a roll in the overlap has two possible tiers.',
+  ],
   rangeGap: [
     'IssueRangeGap',
     'Some values between your lowest and highest tier belong to no tier at all, so a roll landing there matches nothing and the attempt cannot be routed. Close the gap.',
@@ -129,7 +135,7 @@ export const CHECK_ISSUE_LABELS = Object.freeze({
   ],
   multipleTierStepTargets: [
     'IssueMultipleTierStepTargets',
-    'Two or more triggers set a target tier; if more than one matches, the lowest-ranked wins.',
+    'If more than one matches on the same roll, the lowest-ranked tier wins.',
   ],
   attributeTargetMissing: [
     'IssueAttributeTargetMissing',
@@ -222,74 +228,56 @@ const ISSUE_PHRASES = Object.freeze({
   },
 });
 
-/**
- * Titles for the issues that render as a title over their sentence, in the Validation row and the
- * section notice alike; every other issue's sentence is its title.
- */
-export const CHECK_ISSUE_TITLES = Object.freeze({
-  attributeTargetMissing: [
-    'IssueAttributeTargetMissingTitle',
-    'No character value to measure against',
-  ],
-  attributeTargetInvalid: [
-    'IssueAttributeTargetInvalidTitle',
-    'The character value cannot be worked out',
-  ],
-  attributeTierWithoutAdjustment: [
-    'IssueAttributeTierWithoutAdjustmentTitle',
-    'A recipe tier has no difficulty adjustment',
-  ],
-  adjustmentInvalidForKind: [
-    'IssueAdjustmentInvalidForKindTitle',
-    'An adjustment does not suit its kind',
-  ],
-  otherwiseTierMissing: ['IssueOtherwiseTierMissingTitle', 'No tier is marked Otherwise'],
-  multipleOtherwiseTiers: [
-    'IssueMultipleOtherwiseTiersTitle',
-    'More than one tier is marked Otherwise',
-  ],
-  progressiveUnderUnsupported: [
-    'IssueProgressiveUnderUnsupportedTitle',
-    'Lower is better cannot drive a progressive check',
-  ],
-  attributePathUnresolvedForPreview: [
-    'IssueAttributePathUnresolvedForPreviewTitle',
-    'A character path does not resolve',
-  ],
-  attributeValueNotNumeric: [
-    'IssueAttributeValueNotNumericTitle',
-    'A character value is not a number',
-  ],
-  // Success-counting pools (issue 2004); frames 07, 08 and 19 draw three of these titles.
-  countPoolInvalid: ['IssueCountPoolInvalidTitle', 'The base pool cannot be worked out'],
-  countThresholdInvalid: [
-    'IssueCountThresholdInvalidTitle',
-    'The success threshold cannot be worked out',
-  ],
-  countFaceBeyondDie: ['IssueCountFaceBeyondDieTitle', 'A face is not on the die'],
-  countExplodeUnbounded: ['IssueCountExplodeUnboundedTitle', 'The dice would explode forever'],
-  countTierWithoutSuccesses: [
-    'IssueCountTierWithoutSuccessesTitle',
-    'A recipe tier sets no successes needed',
-  ],
-  countRequiredExceedsMaxPool: [
-    'IssueCountRequiredExceedsMaxPoolTitle',
-    'Successes needed above the most dice that can be rolled',
-  ],
-  countRequiredExceedsBasePool: [
-    'IssueCountRequiredExceedsBasePoolTitle',
-    'Successes needed above the base pool',
-  ],
-  countPoolTooLarge: ['IssueCountPoolTooLargeTitle', 'The base pool is too large to roll'],
-  countPathUnresolvedForPreview: [
-    'IssueCountPathUnresolvedForPreviewTitle',
-    'A character path does not resolve',
-  ],
-  countValueNotNumericForPreview: [
-    'IssueCountValueNotNumericForPreviewTitle',
-    'A character value is not a number',
-  ],
-});
+/** Every issue's short title, drawn over its sentence in the Validation row and the section
+ *  notice alike (issue 2082). */
+const TITLE_FALLBACKS = {
+  noRollFormula: 'The check has no roll formula',
+  retiredPlaceholderInFormula: 'The formula still uses @craftingmod',
+  retiredPlaceholderBreaksFormula: '@craftingmod breaks this formula',
+  unnamedOutcome: 'An outcome tier has no name',
+  noSuccessOutcome: 'No tier counts as a success',
+  rangeInvalid: 'A band ends before it starts',
+  rangeOverlap: 'Two bands overlap',
+  rangeGap: 'A gap between two bands',
+  modifierBoundsInverted: "A check modifier's minimum is above its maximum",
+  modifierBoundsUnsafe: "A check modifier's bounds are out of range",
+  modifierExpressionInvalid: 'A check modifier cannot be rolled',
+  modifierAverageUnavailable: 'A check modifier has no average to rank by',
+  modifiersInertNoCheck: 'Check modifiers have no check to apply to',
+  modifiersInertNoModifierSupport: 'The d100 roll cannot take check modifiers',
+  modifiersInertNoFormula: 'Check modifiers have no formula to apply to',
+  danglingTierStepTarget: "A trigger's target tier is missing",
+  multipleTierStepTargets: 'More than one trigger sets a target tier',
+  attributeTargetMissing: 'No character value to measure against',
+  attributeTargetInvalid: 'The character value cannot be worked out',
+  attributeTierWithoutAdjustment: 'A recipe tier has no difficulty adjustment',
+  adjustmentInvalidForKind: 'An adjustment does not suit its kind',
+  otherwiseTierMissing: 'No tier is marked Otherwise',
+  multipleOtherwiseTiers: 'More than one tier is marked Otherwise',
+  progressiveUnderUnsupported: 'Lower is better cannot drive a progressive check',
+  attributePathUnresolvedForPreview: 'A character path does not resolve',
+  attributeValueNotNumeric: 'A character value is not a number',
+  countPoolInvalid: 'The base pool cannot be worked out',
+  countThresholdInvalid: 'The success threshold cannot be worked out',
+  countFaceBeyondDie: 'A face is not on the die',
+  countExplodeUnbounded: 'The dice would explode forever',
+  countTierWithoutSuccesses: 'A recipe tier sets no successes needed',
+  countRequiredExceedsMaxPool: 'Successes needed above the most dice that can be rolled',
+  countRequiredExceedsBasePool: 'Successes needed above the base pool',
+  countPoolTooLarge: 'The base pool is too large to roll',
+  countPathUnresolvedForPreview: 'A character path does not resolve',
+  countValueNotNumericForPreview: 'A character value is not a number',
+};
+
+/** Each title's key is its id's `Issue<Id>Title`, so the table above holds only the fallbacks. */
+export const CHECK_ISSUE_TITLES = Object.freeze(
+  Object.fromEntries(
+    Object.entries(TITLE_FALLBACKS).map(([id, fallback]) => [
+      id,
+      [`Issue${id[0].toUpperCase()}${id.slice(1)}Title`, fallback],
+    ])
+  )
+);
 
 const NAMESPACE = 'FABRICATE.Admin.Manager.Checks.Validation.';
 
@@ -348,14 +336,12 @@ export function checkIssueSentence(id, data, text) {
 }
 
 /**
- * The words one readiness issue renders, `{ title, detail }`: a titled issue's sentence is its
- * detail, and any other issue's sentence is its title with no detail. `text(key, fallback, data)`.
+ * The words one readiness issue renders, `{ title, detail }`: its short title over its sentence.
+ * An id with no title degrades to its own id rather than throwing. `text(key, fallback, data)`.
  */
 export function checkIssueText(id, data, text) {
-  const sentence = checkIssueSentence(id, data, text);
-  const title = CHECK_ISSUE_TITLES[id];
-  if (!title) return { title: sentence, detail: '' };
-  return { title: text(`${NAMESPACE}${title[0]}`, title[1]), detail: sentence };
+  const title = copyFor(CHECK_ISSUE_TITLES, id);
+  return { title: text(title.key, title.fallback), detail: checkIssueSentence(id, data, text) };
 }
 
 /**

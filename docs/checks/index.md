@@ -41,7 +41,10 @@ When an optional check is switched off, the page collapses to a single section o
 
 Fabricate checks each activity page as you edit it.
 A section with something to fix carries a dot on the strip, and the same issue is counted on that activity's entry in the rail.
-Open that section and it states each of its own issues in full, in the same words the **Validation** page uses, so a dot never leaves you to go looking for what it meant.
+Open that section and it opens with an amber notice for each of its own issues, blocking issues listed above warnings.
+Each notice shows a short title and, beneath it, the same sentence the **Validation** page states for that issue, so a dot never leaves you to go looking for what it meant.
+A notice's **Review** button takes you to the field it names, or to the section itself when no single field is at fault.
+The one exception is the mode description that opens **The roll**: that stays a plain note about how the mode works, because it is not reporting a problem.
 The **Checks** entry itself totals the counts of the activity pages it is showing you, so a hidden feature's stale issues never badge a page you cannot open to clear them.
 **Validation** restates that same total, so it is never added on top of it.
 
@@ -56,6 +59,7 @@ Leaving Checks for another screen with unsaved edits asks first, names which act
 ### The Validation page
 
 **Validation** gathers every issue across the crafting, salvage, and gathering checks into one list, grouped by activity and rated **Pass**, **Warning**, or **Blocks enable**.
+Each issue shows a short title over the sentence explaining it, the same title and sentence its section's own notice shows.
 Selecting an issue takes you to the page and section that raised it, and highlights the specific field when the issue is about one.
 A blocking issue never stops you saving, only enabling the system.
 

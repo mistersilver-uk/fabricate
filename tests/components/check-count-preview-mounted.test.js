@@ -502,12 +502,27 @@ describe('count readiness on the route', () => {
       evaluation: pool({ base: '2', threshold: '1d4 + 6', required: 3 }),
       tiers: [{ id: 'unset', name: 'Unset Work', dc: 12, successes: null }],
     });
-    for (const id of ['countThresholdInvalid', 'countTierWithoutSuccesses', 'countRequiredExceedsMaxPool']) {
-      assert.ok(root.querySelector(`[data-checks-section-notice="${id}"]`), `${id} is explained`);
-      assert.ok(!root.querySelector(`[data-checks-section-callout="${id}"]`), `${id} is a notice, not a callout`);
-    }
-    assert.ok(!root.querySelector('[data-checks-section-callout="noRollFormula"]'));
+    // Blocking issues first, as Validation orders its rows (issue 2082); the warning was pushed between them.
+    const ids = [...root.querySelectorAll('[data-checks-section-notices="roll"] > [data-checks-section-notice]')].map(
+      (notice) => notice.getAttribute('data-checks-section-notice')
+    );
+    assert.deepEqual(ids, ['countThresholdInvalid', 'countRequiredExceedsMaxPool', 'countTierWithoutSuccesses']);
     assert.ok(!root.querySelector('[data-checks-section-notice="noRollFormula"]'));
+  });
+
+  it('ranks the preview actor warning with the warnings, below a blocking fault', async () => {
+    script([]);
+    const everyFace = { enabled: true, faces: { kind: 'from', value: 1 } };
+    const root = await mountSimple({
+      ...SMITHING,
+      evaluation: pool({ base: '@skills.smith.rank + 2', explode: everyFace }),
+      tiers: [{ id: 'unset', name: 'Unset Work', dc: 12, successes: null }],
+    });
+    await choosePreviewActor(root, 'vosk');
+    const ids = [...root.querySelectorAll('[data-checks-section-notices="roll"] > [data-checks-section-notice]')].map(
+      (notice) => notice.getAttribute('data-checks-section-notice')
+    );
+    assert.deepEqual(ids, ['countExplodeUnbounded', 'countTierWithoutSuccesses', 'countPathUnresolvedForPreview']);
   });
 });
 
