@@ -8,6 +8,7 @@ import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import { resolveAdvanceSources } from '../systems/advanceCraftingSources.js';
 import { resolveCheckFormulaDisplay } from '../systems/checkRoll.js';
 import { executePublicCraft } from '../systems/journalRunCommands.js';
+import { resolveRunRecipe } from '../systems/runTerms.js';
 import { resolvedComponentsFor } from '../systems/scopedEntityReads.js';
 import {
   activeRunStepState,
@@ -216,12 +217,17 @@ export const craftingFacade = {
     componentSourceActorIds = null,
   } = {}) {
     this._requireReady();
-    const recipe = this.recipeManager?.getRecipe?.(recipeId);
-    if (!recipe) return null;
+    const liveRecipe = this.recipeManager?.getRecipe?.(recipeId);
+    if (!liveRecipe) return null;
     const { craftingActor, componentSourceActors } = this._resolveCraftingSources({
       rememberedActorId: actorId,
       componentSourceActorIds,
     });
+    // A begun run is judged against the terms it accepted, as the engine resolves it.
+    const run = craftingActor
+      ? this.craftingRunManager?.findActiveRunForRecipe?.(craftingActor, liveRecipe.id)
+      : null;
+    const recipe = (run && resolveRunRecipe(run, this.recipeManager)) ?? liveRecipe;
     const sources =
       componentSourceActors.length > 0
         ? componentSourceActors

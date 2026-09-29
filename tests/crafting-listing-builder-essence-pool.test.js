@@ -407,6 +407,24 @@ test('evaluateSelectedSet resolves the ACTIVE execution step of an explicit mult
   assert.equal(options.essenceAllocation, allocation, 'the allocation reaches craftability');
 });
 
+test('evaluateSelectedSet judges a begun run against its accepted terms, not the live recipe', () => {
+  const termsSnapshot = { recipe: forgeRecipe().toJSON(), craftingCheck: null };
+  const { facade, evaluated } = forgeFacade({ run: { currentStepIndex: 1, steps: [{}, {}], termsSnapshot } });
+  const live = forgeRecipe().toJSON();
+  live.steps[1].ingredientSets = [{ id: 'set-live', ingredientGroups: [] }];
+  facade.recipeManager.getRecipe = () => new Recipe(live);
+
+  const answer = facade.evaluateSelectedSet({
+    recipeId: 'recipe-forge',
+    setId: 'set-2',
+    actorId: 'actor-1',
+    componentSourceActorIds: [],
+  });
+
+  assert.deepEqual(answer, { craftable: true }, 'the accepted route still evaluates');
+  assert.deepEqual(evaluated[0].stepRecipe.ingredientSets.map((set) => set.id), ['set-2']);
+});
+
 test('evaluateSelectedSet honours an explicit stepId over the active step', () => {
   const { facade, evaluated } = forgeFacade({ run: { currentStepIndex: 1, steps: [{}, {}] } });
 
