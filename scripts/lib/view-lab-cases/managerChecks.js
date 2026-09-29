@@ -418,6 +418,30 @@ export const CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'manager-checks-alchemy-behaviour',
+    label: 'Manager — Checks alchemy behaviour',
+    // Beyond the smoke: the alchemy behaviour card gained its fourth switch, "break tools on a
+    // failed brew", sharing the crafting consumption policy rather than a separate flag (issue
+    // 2100, maintainer ruling "add switch, keep old default").
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-alchemy' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-on-failure' },
+      { selector: '[data-recipe-section="alchemy-break-tools-on-fail"]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    expectSelector:
+      '.fabricate-manager [data-alchemy-behaviour] [data-recipe-section="alchemy-break-tools-on-fail"]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+  }),
+  managerCase({
     id: 'manager-checks-salvage-on-failure',
     label: 'Manager — Checks salvage on failure',
     // Beyond the smoke, and beyond every previous build: this section has never existed.
