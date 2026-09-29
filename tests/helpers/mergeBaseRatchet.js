@@ -359,12 +359,12 @@ function validEntry(entry, family) {
   return entry;
 }
 
-/** Entries summed per `(file, id)`, with `renamed` mapping a base file to its head path. */
-function tally(entries, family, renamed = (file) => file) {
+/** Entries summed per `(file, id)`. */
+function tally(entries, family) {
   const index = new Map();
   for (const raw of entries) {
     const entry = validEntry(raw, family);
-    const file = renamed(entry.file);
+    const file = entry.file;
     const key = `${file}\u0000${entry.id}`;
     const amount = entry.amount ?? 1;
     const lines = Array.isArray(entry.lines) ? entry.lines : [];
@@ -505,6 +505,8 @@ function skipped(code, reason, corpusRoot, changedCount) {
  * whole corpus under `'corpus'`), `readFile(path)` gives any file's text on that side or
  * `undefined`. It returns `{file, id, amount = 1, value?, lines?}` entries, summed per
  * `(file, id)`; `value` nets a move within a file, `lines` are the head lines a marker may sit at.
+ * `pair(base, head)` sees both sides' entries, base paths already renamed, and returns
+ * `{base, head}`: a family's own cross-side matching, such as a function rename.
  *
  * @returns {{compared: true, family: string, base: string, changedCount: number,
  *   failures: string[], shrank: string[], netted: string[], exempted: string[]}
@@ -517,6 +519,7 @@ export function compareToBase({
   measure,
   scope = 'changed',
   ceiling = (was) => was.amount,
+  pair = (baseEntries, headEntries) => ({ base: baseEntries, head: headEntries }),
   cwd = REPO_ROOT,
   env = process.env,
   base = resolveRatchetBase({ cwd, env }),
@@ -534,15 +537,16 @@ export function compareToBase({
   const readHead = (file) => readHeadFile(cwd, file);
   const readBase = baseReader(base, readBaseFiles(base, files.baseFiles, { cwd }), cwd);
   const headPathOf = new Map([...changes.renames].map(([to, from]) => [from, to]));
-  const baseIndex = tally(
-    measure(readBase, () => [...files.baseFiles]),
-    family,
-    (file) => headPathOf.get(file) ?? file
+  const toHeadPath = (raw) => {
+    const entry = validEntry(raw, family);
+    return { ...entry, file: headPathOf.get(entry.file) ?? entry.file };
+  };
+  const paired = pair(
+    measure(readBase, () => [...files.baseFiles]).map(toHeadPath),
+    measure(readHead, () => [...files.headFiles])
   );
-  const headIndex = tally(
-    measure(readHead, () => [...files.headFiles]),
-    family
-  );
+  const baseIndex = tally(paired.base, family);
+  const headIndex = tally(paired.head, family);
   const { offences, falls } = difference(baseIndex, headIndex, ceiling);
   const { remaining, netted, shrank } = netByValue(offences, falls);
   const { failures, exempted } = judge(remaining, family, readHead);

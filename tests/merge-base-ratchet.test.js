@@ -428,6 +428,22 @@ test('a family ceiling allows headroom over the base value', () => {
   ]);
 });
 
+test('a family pair hook sees both sides, base paths renamed, before they are compared', () => {
+  const repo = repoWith({ 'corpus/a.js': lines(...TEN, 'alpha x 5') });
+  repo.git('mv', 'corpus/a.js', 'corpus/moved.js');
+  repo.write({ 'corpus/moved.js': lines(...TEN, 'beta x 6') });
+  const seen = [];
+  const pair = (base, head) => {
+    const moved = (entry) => entry.value === 'x';
+    seen.push(...base.filter(moved).map((entry) => `base ${entry.file}: ${entry.id}`));
+    seen.push(...head.filter(moved).map((entry) => `head ${entry.file}: ${entry.id}`));
+    return { base, head: head.map((entry) => (moved(entry) ? { ...entry, id: 'alpha x' } : entry)) };
+  };
+  const result = compareToy(repo, { pair });
+  assert.deepEqual(seen, ['base corpus/moved.js: alpha x', 'head corpus/moved.js: beta x']);
+  assert.deepEqual(result.failures, ['corpus/moved.js: alpha x rose from 5 to 6']);
+});
+
 test('reporting throws the failures with the marker and stale-base guidance, and notes the rest', () => {
   const notes = [];
   const t = { diagnostic: (line) => notes.push(line) };
