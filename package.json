@@ -84,7 +84,7 @@
     "eslint-plugin-unicorn": "^67.0.0",
     "globals": "^17.6.0",
     "happy-dom": "^20.10.4",
-    "markdownlint-cli2": "^0.23.2",
+    "markdownlint-cli2": "^0.23.3",
     "markdownlint-sentences-per-line": "^0.1.3",
     "playwright": "^1.53.2",
     "postcss-scss": "^4.0.9",
