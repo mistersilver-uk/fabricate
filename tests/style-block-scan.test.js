@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { byCodePoint } from './helpers/ratchetBaseline.js';
+import { byCodePoint } from './helpers/codePointOrder.js';
 import { collectWorkingTreeSources, repoRoot } from './helpers/sourceScan.js';
 import {
   MAX_VAR_CHAIN_DEPTH,

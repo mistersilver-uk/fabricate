@@ -6,7 +6,8 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { test } from 'node:test';
 
-import { byCodePoint, ceilingLedgerGate } from './helpers/ratchetBaseline.js';
+import { ceilingLedgerGate } from './helpers/ratchetBaseline.js';
+import { byCodePoint } from './helpers/codePointOrder.js';
 import { collectSources, repoRoot } from './helpers/sourceScan.js';
 import {
   FILE_THRESHOLDS,

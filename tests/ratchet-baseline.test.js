@@ -5,13 +5,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test, { after } from 'node:test';
 
+import { tallyByKey } from './helpers/codePointOrder.js';
 import {
   assertRatchet,
   ceilingLedgerGate,
   formatLedger,
   parseLedger,
   ratchetFindings,
-  tallyByKey,
 } from './helpers/ratchetBaseline.js';
 
 /** A three-row baseline totalling six, small enough to reason about by eye. */

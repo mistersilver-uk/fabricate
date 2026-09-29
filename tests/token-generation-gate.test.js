@@ -8,7 +8,8 @@ import {
   KNOWN_AREA_SCOPED_STYLE_READS,
   KNOWN_AREA_SCOPED_STYLE_READ_TOTAL,
 } from './components/design-system-known-debt.js';
-import { assertRatchet, byCodePoint, tallyByKey } from './helpers/ratchetBaseline.js';
+import { assertRatchet } from './helpers/ratchetBaseline.js';
+import { byCodePoint, tallyByKey } from './helpers/codePointOrder.js';
 import { collectWorkingTreeSources } from './helpers/sourceScan.js';
 import {
   STYLE_CORPUS_EXTENSIONS,

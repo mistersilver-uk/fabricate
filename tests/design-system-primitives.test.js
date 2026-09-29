@@ -26,7 +26,8 @@ import {
   KNOWN_UNREGISTERED_SHARED_COMPONENTS,
   KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL,
 } from './components/design-system-known-debt.js';
-import { assertRatchet, tallyByKey } from './helpers/ratchetBaseline.js';
+import { assertRatchet } from './helpers/ratchetBaseline.js';
+import { tallyByKey } from './helpers/codePointOrder.js';
 
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 

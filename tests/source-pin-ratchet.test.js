@@ -8,7 +8,8 @@ import { resolve } from 'node:path';
 import { test } from 'node:test';
 
 import { parseModule } from './helpers/moduleAst.js';
-import { byCodePoint, ceilingLedgerGate } from './helpers/ratchetBaseline.js';
+import { ceilingLedgerGate } from './helpers/ratchetBaseline.js';
+import { byCodePoint } from './helpers/codePointOrder.js';
 import { countCorpusPinSites, countPinSites } from './helpers/sourcePinSites.js';
 import { collectSources, repoRoot } from './helpers/sourceScan.js';
 

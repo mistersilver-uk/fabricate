@@ -9,7 +9,7 @@ import {
   definePrimitiveAdoptionContract,
   walkTemplate,
 } from '../helpers/primitiveAdoptionContract.js';
-import { byCodePoint } from '../helpers/ratchetBaseline.js';
+import { byCodePoint } from '../helpers/codePointOrder.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const PRIMITIVE = 'src/ui/svelte/components/EditorTabs.svelte';

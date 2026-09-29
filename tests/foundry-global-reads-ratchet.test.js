@@ -15,7 +15,8 @@ import { ESLint, Linter } from 'eslint';
 import { DOMAIN_LAYER_ROOTS, DOMAIN_RESTRICTED_GLOBALS } from '../eslint.config.js';
 import { ESLINT_DEBT } from '../eslint.debt.js';
 
-import { byCodePoint, ceilingLedgerGate } from './helpers/ratchetBaseline.js';
+import { ceilingLedgerGate } from './helpers/ratchetBaseline.js';
+import { byCodePoint } from './helpers/codePointOrder.js';
 import { collectWorkingTreeSources, repoRoot } from './helpers/sourceScan.js';
 
 const RULE = 'no-restricted-globals';

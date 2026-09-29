@@ -8,7 +8,8 @@ import { readdirSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { test } from 'node:test';
 
-import { byCodePoint, ceilingLedgerGate } from './helpers/ratchetBaseline.js';
+import { ceilingLedgerGate } from './helpers/ratchetBaseline.js';
+import { byCodePoint } from './helpers/codePointOrder.js';
 import { collectWorkingTreeSources, repoRoot } from './helpers/sourceScan.js';
 
 const LEDGER_PATH = resolve(import.meta.dirname, 'comment-share-ledger.txt');
