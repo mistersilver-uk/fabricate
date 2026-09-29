@@ -505,33 +505,18 @@ export async function promptBulkCheckRoll({
 }
 
 /**
- * The chat flavor's check suffix: ` (DC n)` for a summed roll-over fixed DC, ` (Target n)` for any
- * other summed target that resolved a number, and nothing for a count or a `withheld` target.
+ * The chat flavor's ` (DC n)` suffix, which names only a summed roll-over fixed DC. Any other
+ * target is named once its benefits settle, by the pass/fail runner (`flavorTarget`).
  */
-export function checkFlavorSuffix(dc, evaluation, { withheld = false } = {}) {
-  if (!Number.isFinite(dc)) return '';
-  if (isFixedSumOver(evaluation)) return ` (DC ${dc})`;
-  if ((evaluation?.product ?? 'sum') !== 'sum' || withheld) return '';
-  return ` (${fill(localize('FABRICATE.Check.Roll.FlavorTarget', 'Target {target}'), { target: dc })})`;
+export function checkFlavorSuffix(dc, evaluation) {
+  return Number.isFinite(dc) && isFixedSumOver(evaluation) ? ` (DC ${dc})` : '';
 }
 
-/** `flavorWithheld` drops a Target suffix for a caller that grades no target (a fixed range). */
 export function buildInteractiveRollOptions(
-  {
-    interactive,
-    actor,
-    name,
-    activity,
-    dc,
-    img,
-    modifierChoice,
-    targetBasis,
-    flavorWithheld = false,
-    ...input
-  },
+  { interactive, actor, name, activity, dc, img, modifierChoice, targetBasis, ...input },
   prompt = promptCheckRoll
 ) {
-  const dcLabel = checkFlavorSuffix(dc, input.evaluation, { withheld: flavorWithheld });
+  const dcLabel = checkFlavorSuffix(dc, input.evaluation);
   const rollOptions = {
     interactive: interactive === true,
     prompt: (rollOptions) => prompt({ ...rollOptions, actorName: actor?.name }),

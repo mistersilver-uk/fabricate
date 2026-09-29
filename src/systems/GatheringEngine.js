@@ -833,7 +833,7 @@ export class GatheringEngine {
       privateEvaluation: {
         secret,
         actorUuid: stringOrNull(actor?.uuid),
-        flavor: `${label ? `${label} — ` : ''}Gathering check${checkFlavorSuffix(dc, evaluation, { withheld: !showTarget })}`,
+        flavor: `${label ? `${label} — ` : ''}Gathering check${checkFlavorSuffix(dc, evaluation)}`,
         speaker: cloneJson(globalThis.ChatMessage?.getSpeaker?.({ actor })) ?? null,
         craftingSystemId: stringOrNull(system?.id),
         environmentId: stringOrNull(environment?.id),
@@ -3855,8 +3855,6 @@ export class GatheringEngine {
           activity: 'Gathering',
           img: task?.img,
           dc: target.target,
-          // A fixed range grades the raw roll, so its flavor names no Target (issue 2005).
-          flavorWithheld: routed.type === 'fixed',
           targetBasis: attributeTargetBasis(routed, {
             override: task?.adjustmentOverride,
             label: '',

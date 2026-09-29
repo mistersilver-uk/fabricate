@@ -43,44 +43,22 @@ describe('roll prompt adapter', () => {
     ]);
   });
 
-  it('names a DC in the chat flavor only for a summed roll-over fixed target, else a Target (Q20)', () => {
+  it('names only a summed roll-over fixed DC in the options flavor; a Target waits for its benefits (Q20)', () => {
     const flavor = (evaluation, dc = 14) => buildInteractiveRollOptions(
       { interactive: true, actor: null, name: 'Rope', activity: 'Crafting', dc, evaluation },
       () => null
     ).flavor;
     const skill = { product: 'sum', direction: 'over', target: { source: 'attribute', expression: '@skill' } };
-    const underSkill = { ...skill, direction: 'under' };
     assert.equal(flavor(undefined), 'Rope — Crafting check (DC 14)');
-    assert.equal(flavor({ product: 'sum', direction: 'under', target: { source: 'fixed' } }), 'Rope — Crafting check (Target 14)');
-    assert.equal(flavor(skill), 'Rope — Crafting check (Target 14)');
-    assert.equal(flavor(underSkill), 'Rope — Crafting check (Target 14)');
-    for (const evaluation of [undefined, skill, underSkill]) {
-      assert.doesNotMatch(flavor(evaluation, null), /\(/, 'an unresolved target names no number');
+    for (const evaluation of [
+      { product: 'sum', direction: 'under', target: { source: 'fixed' } },
+      skill,
+      { ...skill, direction: 'under' },
+      { product: 'count', direction: 'under' },
+    ]) {
+      assert.equal(flavor(evaluation), 'Rope — Crafting check', JSON.stringify(evaluation));
     }
-    assert.equal(flavor({ product: 'count', direction: 'under' }, 2), 'Rope — Crafting check', 'a count names neither');
-  });
-
-  it('withholds only a Target flavor when the caller grades no target', () => {
-    const flavor = (evaluation) => buildInteractiveRollOptions(
-      { actor: null, name: 'Rope', activity: 'Gathering', dc: 9, evaluation, flavorWithheld: true },
-      () => null
-    );
-    assert.equal(flavor({ direction: 'under' }).flavor, 'Rope — Gathering check');
-    assert.equal(flavor(undefined).flavor, 'Rope — Gathering check (DC 9)');
-    assert.ok(!Object.hasOwn(flavor(undefined), 'flavorWithheld'), 'no stray key reaches the bag');
-  });
-
-  it('localizes the Target flavor suffix', () => {
-    const restore = stubI18n({ 'FABRICATE.Check.Roll.FlavorTarget': 'Ziel {target}' });
-    try {
-      const { flavor } = buildInteractiveRollOptions(
-        { actor: null, name: 'Rope', activity: 'Crafting', dc: 9, evaluation: { direction: 'under' } },
-        () => null
-      );
-      assert.equal(flavor, 'Rope — Crafting check (Ziel 9)');
-    } finally {
-      restore();
-    }
+    assert.equal(flavor(undefined, null), 'Rope — Crafting check', 'an unresolved DC names no number');
   });
 
   it('builds localized activity and actor-subject labels without inventing a missing subject', () => {

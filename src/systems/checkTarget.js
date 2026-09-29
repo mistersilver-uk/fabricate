@@ -174,6 +174,19 @@ export function isFixedSumOver(evaluation) {
   );
 }
 
+const foundryLocalize = (key) => globalThis.game?.i18n?.localize?.(key);
+
+/** The ` (Target n)` chat-flavor suffix, localized, naming the final target once benefits settle. */
+export function targetFlavorSuffix(target, localize = foundryLocalize) {
+  const template = localizeWith(
+    localize,
+    'FABRICATE.Check.Roll.FlavorTarget',
+    undefined,
+    'Target {target}'
+  );
+  return ` (${template.replaceAll('{target}', String(target))})`;
+}
+
 /** A progressive check spends its total as a budget, so summed roll-under refuses; count/under rolls. */
 export function progressiveTargetRefusal(evaluation) {
   return evaluation?.product === 'sum' && evaluation?.direction === 'under'

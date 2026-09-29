@@ -30,7 +30,9 @@ import {
 import {
   activeCheckEvaluation,
   checkTargetRefusal,
+  isFixedSumOver,
   progressiveTargetRefusal,
+  targetFlavorSuffix,
 } from './checkTarget.js';
 import { preparedCountEvaluation } from './countCheck.js';
 import {
@@ -222,14 +224,9 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
   });
   const rolledTotal = Number(roll?.total);
   const total = Number.isFinite(rolledTotal) ? rolledTotal : 0;
+  const flavor = settledFlavor(options, effectiveFlavor, evaluation, modifierPlacement);
 
-  await postCheckRoll({
-    roll,
-    preRolls,
-    options,
-    flavor: effectiveFlavor,
-    rollMode: effectiveRollMode,
-  });
+  await postCheckRoll({ roll, preRolls, options, flavor, rollMode: effectiveRollMode });
   const result = {
     engine: true,
     total,
@@ -243,11 +240,25 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
     roll,
     placement: modifierPlacement,
     options,
-    flavor: effectiveFlavor,
+    flavor,
     rollMode: effectiveRollMode,
   });
   if (rollHandoff) result.rollHandoff = rollHandoff;
   return result;
+}
+
+/**
+ * The flavor a pass/fail roll posts: outside sum/over/fixed it names the FINAL target, the
+ * `flavorTarget` anchor with its settled benefits, as the prompt chip and the result's Target row
+ * do (maintainer ruling M1). The suffix sits before any appended modifier label.
+ */
+function settledFlavor(options, flavor, evaluation, placement) {
+  const anchor = options?.flavorTarget;
+  if (typeof flavor !== 'string' || !Number.isFinite(anchor)) return flavor;
+  if (evaluation?.product !== 'sum' || isFixedSumOver(evaluation)) return flavor;
+  const target = effectiveTarget(anchor, sumGrading(evaluation), placement?.targetDelta);
+  const base = flavor.startsWith(options.flavor ?? '\0') ? options.flavor : flavor;
+  return `${base}${targetFlavorSuffix(target)}${flavor.slice(base.length)}`;
 }
 
 /**
@@ -477,6 +488,7 @@ export async function evaluatePreparedRunCheck(
   if (evaluation.product === 'count' && !count) {
     return checkTargetRefusal('invalid', label, { refusedInput: 'pool' });
   }
+  const anchor = decisionPolicy.target ?? config.resolvedDc ?? config.dc;
   const authoritativeDecision = {
     ...decision,
     bonus: decision?.allowsSituationalModifier === true ? decision.bonus : null,
@@ -499,6 +511,8 @@ export async function evaluatePreparedRunCheck(
         evaluation,
         speaker: preparation?.speaker ?? config.speaker ?? null,
         ...(count && { evaluation: count.evaluation, thresholdMode: count.thresholdMode }),
+        // A pass/fail roll names its final target; a secret one never carries it.
+        ...(kind === 'simple' && !secret && { flavorTarget: Number(anchor) }),
         reportVisibility: true,
       },
     },
@@ -528,7 +542,7 @@ export async function evaluatePreparedRunCheck(
   const graded = gradePreparedTotal(kind, {
     config,
     evaluation,
-    anchor: decisionPolicy.target ?? config.resolvedDc ?? config.dc,
+    anchor,
     rolled,
     total,
     diceGroups,
@@ -766,7 +780,14 @@ export async function runFormulaPassFail({
     actor,
     label,
     data,
-    options: { ...rollOptions, evaluation, dc, thresholdMode, craftingModifier },
+    options: {
+      ...rollOptions,
+      evaluation,
+      dc,
+      thresholdMode,
+      craftingModifier,
+      flavorTarget: dc,
+    },
     headless: { success: true, outcome: 'pass', value: null, data, message: null },
   });
   if (roll.exit) return roll.exit;

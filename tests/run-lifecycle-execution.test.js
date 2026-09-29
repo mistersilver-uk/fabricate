@@ -2260,7 +2260,7 @@ test('the versioned crafting descriptor refuses its target before the Tool roll 
     assert.deepEqual(evaluations.map(({ formula }) => formula), ['1d4+@bonus']);
     const { dc, target, targetSource } = privateEvaluation.decisionPolicy;
     assert.deepEqual({ dc, target, targetSource }, { dc: null, target: 16, targetSource: 'attribute' });
-    assert.equal(privateEvaluation.flavor, 'Sun Tea — Crafting check (Target 16)', 'a Target, never a DC');
+    assert.equal(privateEvaluation.flavor, 'Sun Tea — Crafting check', 'the Target is named at roll time');
     assert.deepEqual([publicPrompt.target, publicPrompt.direction], [16, 'over']);
     assert.equal(publicPrompt.targetSource, 'attribute', 'the prompt names a target, not a DC (QE4)');
     const surface = stubPromptSurface(() => null);
@@ -2271,6 +2271,30 @@ test('the versioned crafting descriptor refuses its target before the Tool roll 
     }
     assert.equal(surface.view.chipText, 'Target 16 · meet or beat');
     assert.equal(JSON.stringify(publicPrompt).includes('@skill'), false, 'the expression stays private');
+  } finally {
+    restore();
+  }
+});
+
+test('a fixed-range roll-under Journal descriptor names no Target in its flavor', async () => {
+  const tool = { id: 'hammer', label: 'Hammer', bonus: { enabled: true, expression: '2' } };
+  const under = { product: 'sum', direction: 'under', target: { source: 'fixed' } };
+  const { describe } = await startToolSuppliedRun(tool, {
+    resolutionMode: 'routedByCheck',
+    slot: 'routed',
+    check: {
+      rollFormula: '1d20',
+      dc: 12,
+      type: 'fixed',
+      fixedOutcomes: [{ id: 'all', name: 'All', success: true, start: 1, end: 20 }],
+      evaluation: under,
+    },
+  });
+  const { restore } = installPreparedRolls([], []);
+  try {
+    const { publicPrompt, privateEvaluation } = await describe();
+    assert.equal(publicPrompt.target, null, 'a fixed range grades no target');
+    assert.doesNotMatch(privateEvaluation.flavor, /Target/);
   } finally {
     restore();
   }
