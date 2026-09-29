@@ -1049,6 +1049,10 @@ The player's route to salvage.
   It never renders a hardcoded formula: the formula is system-authored, and the prompt has already displayed the resolved one.
 - A **cancelled** prompt returns to the pre-roll state with zero mutation and **no notification**.
 - A **time-gated** salvage (`success` with null results) shows a **waiting** state carrying the engine's message, **not** a success state.
+- **A rolled failure shows its evidence, like a failed craft.**
+  A single (non-bulk) salvage whose check actually ran and failed renders a danger-ramp result box carrying the check's Target and Margin evidence rows, withheld for a blind or secret roll by the same shared rule the success summary and the crafting result box obey, plus any items a `perRecord` failure-award policy still produced.
+  The engine's own undifferentiated fallback message is replaced by "Nothing is recovered; the failure policy applies." when the failure awarded nothing, and shown not at all when it awarded something — the awarded list speaks for itself, mirroring the crafting result box's own failure-sentence rule; a system-authored custom check message is shown verbatim in either case.
+  A **pre-roll refusal** (not enough of the component, a missing required tool, a misconfigured salvage) never reached a check and stays **toast-only**, with no result box at all.
 - The success ribbon stays **pinned to the salvaged row** until dismissed or another item is selected — **including when its last copy was consumed and the row leaves the listing**.
   Otherwise the selection falls through to another item and the ribbon renders against the wrong component; with single-copy components this is the common case.
 - **Result-driven tab routing.** A newly-arrived salvage result actively opens or reopens the Salvage tab in one ordered effect keyed on a NEW result reference — so it survives roll-dialog remounts, a manual Info click is not yanked back, a changed item key resets to Info, and the result branch wins when both fire.
