@@ -674,8 +674,15 @@ test("the roll prompt's rule line names the same face rules as the chat card", a
       .map((clause) => [
         /explode/.test(clause) ? 'explode' : 'cancel',
         /once/.test(clause),
-        /[≥≤] \d+/.exec(clause)?.[0] ?? 'extreme',
+        faceBound(clause),
       ]);
+  // The card writes a bound as `≥ 9`; the prompt reuses the Studio's `9 or above`.
+  const faceBound = (clause) => {
+    const symbol = /[≥≤] \d+/.exec(clause)?.[0];
+    if (symbol) return symbol;
+    const words = /(\d+) or (above|under)/.exec(clause);
+    return words ? `${words[2] === 'above' ? '≥' : '≤'} ${words[1]}` : 'extreme';
+  };
   const cases = [
     { explode: explodeRule(BEST), cancel: cancelRule(WORST) },
     { explode: explodeRule({ kind: 'from', value: 9 }, true), cancel: cancelRule({ kind: 'from', value: 2 }) },
