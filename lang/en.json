@@ -6878,6 +6878,21 @@
               "EffectLowestTier": "lowest tier",
               "TypeNetSuccesses": "Net successes",
               "SummaryNetSuccesses": "Net successes is {comparison} {value}"
+            },
+            "Overrides": {
+              "Title": "Successes needed override",
+              "Label": "Successes needed",
+              "HintComponent": "Replaces the successes needed for this component. The pool and threshold still come from the check.",
+              "HintTask": "Replaces the successes needed for this task. The pool and threshold still come from the check.",
+              "CustomLabel": "Custom successes needed",
+              "SystemDefault": "System default — {count} successes needed",
+              "SystemDefaultOne": "System default — 1 success needed",
+              "Preset": "{name} — {count} successes needed",
+              "PresetOne": "{name} — 1 success needed",
+              "PlayerSees": "{subject} · {count} successes needed",
+              "PlayerSeesOne": "{subject} · 1 success needed",
+              "PlayerSeesPool": "{subject} · {count} successes needed · d{die}s, success on {symbol} {threshold}",
+              "PlayerSeesPoolOne": "{subject} · 1 success needed · d{die}s, success on {symbol} {threshold}"
             }
           },
           "Digest": {

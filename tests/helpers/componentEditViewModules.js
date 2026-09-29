@@ -43,6 +43,9 @@ export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/checks/checksCopy.js',
   'src/ui/svelte/apps/manager/checks/previewActorId.js',
   'src/ui/svelte/apps/manager/component/overridePlayerSees.js',
+  // A count check's override line reads the required count and the pool description (issue 2006).
+  'src/systems/countCheck.js',
+  'src/systems/countEvaluation.js',
   // The three converted selects' option vocabularies (issue 1510), mapped beside the view.
   'src/ui/svelte/apps/manager/component/componentEditSelectOptions.js',
   // The salvage mode pill's label source (issue 676) — it already carries 'Routed by
