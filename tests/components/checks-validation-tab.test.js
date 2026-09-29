@@ -109,6 +109,32 @@ describe('ChecksValidationTab (mounted)', () => {
     harness.remount();
   });
 
+  it('draws an older issue as its short title over its sentence (issue 2082)', async () => {
+    const target = await harness.mount({
+      sections: [unfinishedRoutedSection('crafting', '', '')],
+    });
+    const words = (id) => {
+      const row = target.querySelector(`[data-issue="${id}"]`);
+      return [
+        row.querySelector('.manager-recipe-val-title').textContent.trim(),
+        row.querySelector('.manager-recipe-val-detail').textContent.trim(),
+      ];
+    };
+    assert.deepEqual(words('noRollFormula'), [
+      'The check has no roll formula',
+      'Nothing is rolled, so this check cannot resolve until you enter a formula.',
+    ]);
+    assert.deepEqual(words('unnamedOutcome'), [
+      'An outcome tier has no name',
+      'An unnamed tier cannot be routed to a result group. Name every tier.',
+    ]);
+    assert.deepEqual(words('noSuccessOutcome'), [
+      'No tier counts as a success',
+      'Every tier is marked as a failure, so this check can never succeed. Mark at least one tier as Success.',
+    ]);
+    harness.remount();
+  });
+
   it('shows transformed modifier names as one warning without blocking readiness', async () => {
     const longName = 'A transformed modifier name long enough to wrap without clipping';
     const target = await harness.mount({
