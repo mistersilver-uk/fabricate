@@ -36,6 +36,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/recipeItemAccessBadge.js',
     // The Limits tab's character-prerequisite picker imports the pure engine (issue 544).
     'src/systems/characterPrerequisites.js',
+    // The shared salvage-failure fallback literal (issue 2092), read by SalvageRollSummary.
+    'src/systems/salvageMessages.js',
     'src/ui/svelte/util/dropUtils.js',
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',

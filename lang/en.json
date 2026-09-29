@@ -696,6 +696,8 @@
           "Depleted": "That was the last one — nothing left to salvage.",
           "OutcomeSuccess": "Salvaged",
           "OutcomeWaiting": "In progress",
+          "OutcomeFailure": "Salvage failed",
+          "NothingRecovered": "Nothing is recovered; the failure policy applies.",
           "SummaryWithRoll": "with a roll of",
           "ActingSystem": "Salvaging as {system}"
         },
