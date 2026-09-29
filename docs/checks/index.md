@@ -66,8 +66,11 @@ A blocking issue never stops you saving, only enabling the system.
 The panel to the right of each activity page carries links to this documentation and to the quickstart, the check's on or off switch, and a **This check** summary of its formula, outcome tiers, triggers, and applied modifiers.
 It also carries **Preview as**, **Outcome preview**, and **Chance per outcome**.
 **Preview as** picks a character, and, where the check has one, a difficulty record, to try the check against.
-**Outcome preview** then rolls a test check against that choice.
-It never posts to chat and never costs the character anything, and it reports the outcome the roll lands on, the target and margin it was measured against, and what a real roll like it would cost.
+**Outcome preview** then rolls a test check against that choice and announces the whole result together, never posting to chat and never costing the character anything.
+A rolled number sits in a medallion, captioned with what it is, such as the die that decided a difficulty check or the total or net successes otherwise.
+Under it, a breakdown line states the dice and modifiers behind that number and the character it was rolled for, and beside the number sits a line stating what it was measured against, such as a difficulty, a target and margin, or how many successes were needed.
+A card below states the outcome and what it does, tinted for success or failure, and often carries a note explaining the margin or a trigger that changed the result.
+A **What happens** list closes the readout, naming exactly what the outcome produces, consumes, and whether it breaks the required Tools.
 **Chance per outcome** works out the exact odds for the chosen character rather than estimating them, and shows each outcome's percentage.
 When a formula cannot be charted exactly, it explains why in place of a chart.
 See [What the previews will tell you]({% link checks/crafting.md %}#what-the-previews-will-tell-you) for a worked example.

@@ -34,6 +34,7 @@ import {
   en,
   modifiersCombinationRuleMetrics,
   oddsScoped,
+  facesScoped,
   previewScoped,
   readRenderedToolGeometry,
   withBandStripPage,
@@ -1847,15 +1848,15 @@ test('the modifier row gives every field room for its longest content at every m
 
 test('the simulator face tile layers the rolled digit ON the medallion, not beside it', async () => {
   // Svelte scopes DESCENDANTS with `:where(.svelte-<hash>)`.
-  const hash = previewScoped.hashClass;
+  const hash = facesScoped.hashClass;
   const view = await renderWithCascade(
-    `<div class="fabricate-manager"><div class="manager-checks-simulator-readout ${hash}">` +
+    `<div class="fabricate-manager"><span class="manager-checks-simulator-faces ${hash}">` +
       `<span class="manager-checks-simulator-face ${hash}" id="tile">` +
       `<span style="display:block;width:44px;height:44px"></span>` +
-      `<small id="value" class="${hash}"><strong class="${hash}">20</strong>` +
-      `<span class="${hash}">d20</span></small>` +
-      `</span></div></div>`,
-    [css, previewScoped.css],
+      `<small id="value" class="${hash}"><strong class="${hash}">10</strong>` +
+      `<span class="manager-checks-simulator-marks ${hash}"></span></small>` +
+      `</span></span></div>`,
+    [css, facesScoped.css],
     { viewport: { width: 900, height: 400 } }
   );
   try {
@@ -1880,6 +1881,34 @@ test('the simulator face tile layers the rolled digit ON the medallion, not besi
       '`inset: 0` makes the digit span the tile; without it the box collapses to its content'
     );
     assert.ok(geometry.overlaps, 'the digit sits INSIDE the tile rather than beside it');
+  } finally {
+    await view.close();
+  }
+});
+
+test('the rolled readout layers its number and caption INSIDE the 38px medallion', async () => {
+  const hash = previewScoped.hashClass;
+  const view = await renderWithCascade(
+    `<div class="fabricate-manager"><div class="manager-checks-simulator-head ${hash}">` +
+      `<span class="manager-checks-simulator-medallion ${hash}" id="tile">` +
+      `<span style="display:block;width:38px;height:38px"></span>` +
+      `<span class="manager-checks-simulator-medallion-value ${hash}" id="value">` +
+      `<strong class="${hash}">−13</strong><small class="${hash}">total</small></span>` +
+      `</span></div></div>`,
+    [css, previewScoped.css],
+    { viewport: { width: 900, height: 400 } }
+  );
+  try {
+    const tile = (await view.measure('#tile')).box;
+    const value = (await view.measure('#value')).box;
+    assert.equal(Math.round(tile.width), 38, 'the tile is the medallion’s own 38px square');
+    assert.ok(
+      value.left >= tile.left - 0.5 &&
+        value.right <= tile.right + 0.5 &&
+        value.top >= tile.top - 0.5 &&
+        value.bottom <= tile.bottom + 0.5,
+      'the number and its caption sit inside the tile rather than beside it'
+    );
   } finally {
     await view.close();
   }

@@ -129,7 +129,42 @@ For `dcMode: 'dynamic'` it resolves the STATIC fallback DC and renders a stated 
 The engine reaches a dynamic DC by calling `MacroExecutor.run`, which compiles `macro.command` into an `AsyncFunction` and executes it with the current user's authority, guarded only by `typeof command === 'string'` — which is NOT a script-type check, because Foundry declares `type` with `initial: CONST.MACRO_TYPES.CHAT` and `command` as `required: true, blank: true` on both types, and the shipped `ItemDropZone documentType="Macro"` accepts any Macro.
 A DC macro that creates a `ChatMessage`, updates an Actor or writes a flag must not be able to do so from a preview button.
 
-It renders only values present on the returned result, never a parallel model: the rolled die face on a `Medallion`, the TERSE breakdown line (`d20 9 +10 · Sera Vane` — the full resolved formula is the `THIS CHECK` digest's row), the total against the DC or, for a roll-under or character-value check, the executed target (see "Roll-under and character-value preview and readiness" below), with its margin, the matched band card with its disposition, and a "What happens" list of icon fact rows including tier-step and minimum-tier evidence.
+The readout renders only values present on the returned result and the check's own configuration, in the approved prototype's layout, announced politely.
+It has five parts:
+
+- a medallion
+- a terse breakdown line
+- the total and its target line
+- a result card toned by the graded result, with a serif outcome title, a detail line and, where one applies, a note
+- a "What happens" list of icon fact rows
+
+The medallion carries:
+
+- the first rolled face captioned with its die, for a summed roll-over against a fixed DC
+- the total captioned `total`, for a roll-under or character-value check
+- the signed net captioned `net`, for a count check
+
+The breakdown is terse:
+
+- a summed roll-over against a fixed DC reads `d20 9 +3 · Sera Vane` and always states its signed remainder
+- a roll-under joins its faces with ` + ` and appends `· raw`
+- the previewed actor's name ends the line
+
+Every negative number uses the true minus sign.
+
+A summed roll-over against a fixed DC:
+
+- reads `vs DC {dc}`, `vs DC {dc} · {margin}`, `in the {min}–{max} band` or `value spent`
+- states a note only when a trigger stepped, forced or decided the result, read from `data.tierStepApplied` and `data.forcedOutcome`
+- lists the result, the failure-result policy, ingredient consumption and tool breakage from the activity's own policies
+
+Every other evaluation:
+
+- states the benefit-positive margin note whenever the line shows a margin, unless a trigger-forced outcome takes the note slot
+- lists one row, "Result group produced" or "Failure policy applies", plus a tool-breakage row when the result breaks tools
+
+A progressive check spends its rolled value down the sandbox order through `resolveProgressiveAward` and reads "{awarded} of {of} awarded".
+
 It surfaces `resolved === false` — the signal `resolveCheckFormulaDisplay` already produces by re-resolving with `missing: 'NaN'` — as a stated "does not reduce to a number for this actor" warning, because `Roll.parse`'s own `missing: "0"` silently turns an unresolved `@` key into a plausible WRONG total, and "renders only values present on the result" does not catch that, since the wrong number IS on the result.
 It treats `Actor#getRollData()`'s live `system` object as read-only and clones before any local augmentation.
 A rolled readout describes ONE (formula, actor, record, evaluation, target) tuple and is dropped when any of them changes, because a total no current configuration produces must not stay on screen.
@@ -256,7 +291,7 @@ With no actor chosen, a check whose target or formula reads the character abstai
 An actorless literal target and formula stay previewable, and summed roll-over against a fixed DC keeps its own no-actor note.
 Otherwise the reasons are `progressive-under-unsupported`, `attribute-path-unresolved` (naming the actor and path), `attribute-value-not-numeric` and `target-invalid`.
 The simulator reads the executed `data.target` and `data.margin` ("target {target} · margin {margin}"), and shows neither for a result with no target (an Otherwise tier or a fixed range); summed roll-over against a fixed DC keeps its total-minus-DC reading.
-A roll-under pass/fail band reads "The roll stays at or under the target…" or "The roll goes over the target…".
+It notes "Margin is shown so that higher is always better: how far under the target the total landed." (or "…over the target…" when higher is better).
 A rolled result is dropped when any input it describes changes, and a deferred result publishes only if the inputs it was rolled for still hold.
 
 Readiness validates only what the active mode reads: a progressive or fixed-range target source is inert.
@@ -281,8 +316,13 @@ The panel root carries `data-checks-odds-product="count"`.
 
 The preview abstains with no actor when the pool reads the character (`needs-preview-actor`), and names the actor for a path they lack (`count-path-unresolved`: `{actor} is missing a value this check reads ({path}), so it cannot resolve for them.`) or a value that is not a number (`count-value-not-numeric`); an actorless literal pool stays previewable, a pool fault of the check's own abstains as `target-invalid`, and Roll is disabled while abstaining.
 The simulator renders one tile per active face, explosion dice included, each marked `qualified`, `cancelled` or `exploded` by a glyph, a `data-checks-simulator-face-marks` value and its accessible name, so colour is never the only signal; the tile takes the success tone for a qualifying or exploding face and the danger tone for a cancelling one.
-The legend sits directly under the tiles, above the breakdown `{qualified} qualified − {cancelled} cancelled = {net} net`, the signed net and `{required} needed · margin {margin}` from the executed `data.margin`, whose margin is always signed (`+0`).
-A net below zero marks the readout `data-checks-simulator-botch`; only when the graded result is not a success does it read `{required} needed · a net below zero is a botch` against the record's count, name the band `Botch` and read `Botched. Nothing is produced; the failure policy applies.`, so a trigger-rescued botch keeps the normal margin line and its success copy, and a progressive check its award detail; a zero pool renders no tile and no total, only `A pool reduced to zero fails automatically. Nothing was rolled.`; a progressive check shows its raw net and awards `max(0, net)`.
+The tiles and legend sit directly under the medallion row.
+The breakdown reads `{qualified} qualified − {cancelled} cancelled = {net} net` and then the actor.
+The target line reads `needs {required} · margin {margin}`: `{required}` is the check's own required count, on a routed check too, and the margin is the net minus it, always signed (`+0`).
+A net below zero marks the readout `data-checks-simulator-botch`.
+Only when the graded result is not a success does the readout read `needs {required} · a net below zero is a botch`, title the card `Botch` and read `Net below zero`; a trigger-rescued botch keeps the normal margin line and its success title and sub-line, with `data-checks-simulator-botch` still set.
+A zero pool rolls nothing: it shows `0` captioned `net` and `pool reduced to 0`, and notes "The pool was reduced to zero, so the check fails automatically."
+A progressive count check shows its raw net and awards `max(0, net)`.
 Negative counts use the true minus sign.
 
 Readiness raises, in The roll: `countPoolInvalid` and `countThresholdInvalid` (critical: blank, dice or not arithmetic once every path is neutralized), `countFaceBeyondDie` (warning: an enabled explode or cancel face beyond the die, naming what follows), `countExplodeUnbounded` (critical: a recursive explosion on every face), `countTierWithoutSuccesses` (a warning until issue 2006 adds the control: a crafting recipe tier with no successes needed), and, for a literal base, `countPoolTooLarge` (critical: above the 999 dice Foundry rolls at once, raising no ceiling row), `countRequiredExceedsMaxPool` (critical) and `countRequiredExceedsBasePool` (warning) against the authored ceiling, which is the base alone until additional dice (issue 2008) raise it; the base settles through the runtime's own pool resolver, so it floors float noise, rolls at least one die when a zero pool does not fail, and never reads below zero dice.
