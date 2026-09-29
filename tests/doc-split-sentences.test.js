@@ -131,9 +131,10 @@ const DECOUNTED_COUNT = 4;
 
 /**
  * Historical policy sentences deliberately replaced, with both sides and the current destination
- * pinned so an ordinary lost instruction cannot hide in the exception (issues #1984, #1988, #1934).
+ * pinned so an ordinary lost instruction cannot hide in the exception (issues #1984, #1988, #1934,
+ * #2118). `after` lists every sentence a split replacement became.
  */
-const APPROVING_ISSUES = new Set(['#1984', '#1988', '#1934']);
+const APPROVING_ISSUES = new Set(['#1984', '#1988', '#1934', '#2118']);
 
 const SUPERSEDED_POLICY = [
   {
@@ -295,10 +296,30 @@ const SUPERSEDED_POLICY = [
       '`applyMode` throws reading `handler` of an undefined `CONFIG.ChatMessage.modes[mode]`.',
     survivesIn: '.agents/docs/foundry-and-architecture.md',
   },
+  {
+    issue: '#2118',
+    // Three of the four ledgers became merge-base ratchets with no rows to share.
+    before:
+      'The four ratchet ledgers issue #1656 added — `tests/comment-share-ledger.txt`, `tests/file-size-ledger.txt`, `tests/source-pin-ledger.txt` and `tests/foundry-global-reads-ledger.txt` — are ceiling gates whose rows change only when a unit crosses its ceiling, so lanes that share them no longer need one rail (issue #1914).',
+    after:
+      'The comment-share, file-size and source-pin ratchets compute their baseline from the base commit (issue #2118), and `tests/foundry-global-reads-ledger.txt` is a ceiling gate whose rows change only when a unit crosses its ceiling, so lanes that share them no longer need one rail (issue #1914).',
+    survivesIn: '.agents/skills/fabricate-orchestrator/references/agentic-workflow.md',
+  },
+  {
+    issue: '#2118',
+    // Source pins lost their rows, so `SLACK` and the tighten mode stay with the global-reads ledger.
+    before:
+      '`tests/source-pin-ledger.txt` and `tests/foundry-global-reads-ledger.txt` carry no headroom, because one more pin or bare read is never the same debt as the last one, so there the gate enforces that obligation itself: a row left above the unit it bounds fails as `SLACK` and is banked with the tighten mode in the same PR that earned it.',
+    after: [
+      '`tests/foundry-global-reads-ledger.txt` carries no headroom, because one more bare read is never the same debt as the last one, so there the gate enforces that obligation itself: a row left above the unit it bounds fails as `SLACK` and is banked with the tighten mode in the same PR that earned it.',
+      "`tests/source-pin-ratchet.test.js` allows no rise in a file's pin count against the base commit, because one more pin is never the same debt as the last one, so a legitimate new pin carries a `ratchet-exempt(source-pin): <reason>` marker at its site instead of a banked row.",
+    ],
+    survivesIn: 'AGENTS.md',
+  },
 ];
 
 /** Pinned exactly: every entry excuses one historical sentence. */
-const SUPERSEDED_POLICY_COUNT = 18;
+const SUPERSEDED_POLICY_COUNT = 20;
 
 /**
  * Sentences a deliberate rename forced to change, where the only edit is an identifier (issue
@@ -522,18 +543,6 @@ const RENAMED = [
       'Adding to the nearest large file or function instead of extracting a unit, answered by `tests/file-size-ratchet.test.js`.',
     identifiers: [['`tests/file-size-ratchet.test.js`', '`tests/file-size-ledger.txt`']],
   },
-  {
-    before:
-      'The four ratchet ledgers issue #1656 added — `tests/comment-share-ledger.txt`, `tests/file-size-ledger.txt`, `tests/source-pin-ledger.txt` and `tests/foundry-global-reads-ledger.txt` — are ceiling gates whose rows change only when a unit crosses its ceiling, so lanes that share them no longer need one rail (issue #1914).',
-    after:
-      'The ratchet ledgers issue #1656 added — `tests/file-size-ratchet.test.js`, `tests/source-pin-ratchet.test.js` and `tests/foundry-global-reads-ledger.txt` — are ceiling gates whose rows change only when a unit crosses its ceiling, so lanes that share them no longer need one rail (issue #1914).',
-    identifiers: [
-      [
-        'The ratchet ledgers issue #1656 added — `tests/file-size-ratchet.test.js`, `tests/source-pin-ratchet.test.js`',
-        'The four ratchet ledgers issue #1656 added — `tests/comment-share-ledger.txt`, `tests/file-size-ledger.txt`, `tests/source-pin-ledger.txt`',
-      ],
-    ],
-  },
   // Issue 2118 replaced the source-pin ledger with a merge-base ratchet test.
   {
     before:
@@ -542,18 +551,10 @@ const RENAMED = [
       'Pinning how code is written with a `Source.includes(` assertion, answered by `tests/source-pin-ratchet.test.js`.',
     identifiers: [['`tests/source-pin-ratchet.test.js`', '`tests/source-pin-ledger.txt`']],
   },
-  {
-    // Issue 2118 replaced the source-pin ledger with a gate computed against the base commit.
-    before:
-      '`tests/source-pin-ledger.txt` and `tests/foundry-global-reads-ledger.txt` carry no headroom, because one more pin or bare read is never the same debt as the last one, so there the gate enforces that obligation itself: a row left above the unit it bounds fails as `SLACK` and is banked with the tighten mode in the same PR that earned it.',
-    after:
-      '`tests/source-pin-ratchet.test.js` and `tests/foundry-global-reads-ledger.txt` carry no headroom, because one more pin or bare read is never the same debt as the last one, so there the gate enforces that obligation itself: a row left above the unit it bounds fails as `SLACK` and is banked with the tighten mode in the same PR that earned it.',
-    identifiers: [['`tests/source-pin-ratchet.test.js`', '`tests/source-pin-ledger.txt`']],
-  },
 ];
 
 /** Pinned for the same reason as DEDUPLICATED_COUNT. */
-const RENAMED_COUNT = 32;
+const RENAMED_COUNT = 30;
 
 /** Everything `extract` yields from the post-split set, as one multiset. */
 function survivingLines(extract) {
@@ -623,10 +624,10 @@ test('every sentence, table row and fenced line of the pre-#1936 AGENTS.md still
       before.length === count,
       `${PRE_1936.fixture} yields ${before.length} ${kind}, not its pinned ${count}`
     );
-    // A verified rename excuses its sentence here too; `every rename claim` checks each one.
-    const renamed = new Set(RENAMED.map(({ before: was }) => was));
+    // A verified rename or superseded policy excuses its sentence here too; each is checked below.
+    const excused = new Set([...RENAMED, ...SUPERSEDED_POLICY].map(({ before: was }) => was));
     const lost = missingSentences(multiset(before), survivingLines(extract)).filter(
-      ({ sentence }) => !renamed.has(sentence)
+      ({ sentence }) => !excused.has(sentence)
     );
     assert.deepEqual(
       lost.map(({ sentence, before: was, after: now }) => `(${was} -> ${now}) ${sentence}`),
@@ -666,7 +667,7 @@ test('every superseded policy mapping names its frozen source and current replac
   );
 
   const frozen = multiset(
-    SOURCES.flatMap(({ fixture }) =>
+    [...SOURCES, PRE_1936].flatMap(({ fixture }) =>
       sentencesOf(readFileSync(path.join(REPOSITORY_ROOT, fixture), 'utf8'))
     )
   );
@@ -675,7 +676,9 @@ test('every superseded policy mapping names its frozen source and current replac
     assert.ok((frozen.get(before) ?? 0) > 0, `superseded sentence is absent from the frozen corpus:\n  ${before}`);
     assert.ok(DESTINATIONS.includes(survivesIn), `${survivesIn} is not in DESTINATIONS`);
     const current = sentencesOf(readFileSync(path.join(REPOSITORY_ROOT, survivesIn), 'utf8'));
-    assert.ok(current.includes(after), `replacement is absent from ${survivesIn}:\n  ${after}`);
+    for (const sentence of [after].flat()) {
+      assert.ok(current.includes(sentence), `replacement is absent from ${survivesIn}:\n  ${sentence}`);
+    }
     assert.equal(
       survivingSentences().get(before) ?? 0,
       0,
