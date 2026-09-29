@@ -19,6 +19,7 @@ import {
 } from '../src/systems/checkModifierResolver.js';
 import {
   CHECK_ISSUE_LABELS,
+  CHECK_ISSUE_TITLES,
   CHECK_TICK_LABELS,
   checkIssueCopy,
   interpolate,
@@ -247,16 +248,21 @@ describe('checks readiness label maps do not drift', () => {
     return [...readinessSource.matchAll(pattern)].map((match) => match[1]).sort();
   }
 
-  // The two copy maps are a real MODULE now (issue 1096), shared by the Validation route and by the
-  // section-level Callout, so this reads the exported objects rather than scanning one component's
-  // source for a literal.
+  // The copy maps are a real MODULE now (issue 1096), shared by the Validation route and by the
+  // section notices, so this reads the exported objects rather than scanning one component's
+  // source for a literal. Every issue has a title too (issue 2082), so that map mirrors the ids.
   const LABEL_MAPS = {
     CHECK_LABELS: CHECK_TICK_LABELS,
     ISSUE_LABELS: CHECK_ISSUE_LABELS,
+    ISSUE_TITLES: CHECK_ISSUE_TITLES,
   };
 
   function mapEntries(name) {
-    return Object.entries(LABEL_MAPS[name]).map(([id, meta]) => ({ id, key: meta[0] }));
+    return Object.entries(LABEL_MAPS[name]).map(([id, meta]) => ({
+      id,
+      key: meta[0],
+      fallback: meta[1],
+    }));
   }
 
   function langLeaf(key) {
@@ -287,6 +293,7 @@ describe('checks readiness label maps do not drift', () => {
   for (const [kind, secondKey, mapName] of [
     ['check', 'satisfied', 'CHECK_LABELS'],
     ['issue', 'severity', 'ISSUE_LABELS'],
+    ['issue', 'severity', 'ISSUE_TITLES'],
   ]) {
     it(`every ${kind} id has a ${mapName} entry, and vice versa`, () => {
       const entries = mapEntries(mapName);
@@ -304,6 +311,13 @@ describe('checks readiness label maps do not drift', () => {
           'string',
           `${entry.id} maps to ${entry.key}, which must be a string leaf in en.json`
         );
+      }
+    });
+
+    // A fallback that drifts from en.json is the copy a world with no `lang/` entry reads.
+    it(`every ${mapName} fallback reads exactly as its en.json string`, () => {
+      for (const entry of mapEntries(mapName)) {
+        assert.equal(langLeaf(entry.key), entry.fallback, `${entry.id}: ${entry.key}`);
       }
     });
   }

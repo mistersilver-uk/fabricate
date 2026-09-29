@@ -1,10 +1,10 @@
 /**
  * The ONE set of sentences the Checks Studio uses to describe a readiness result. A section's
- * warning dot is explained IN the panel by a `Callout`, and a dot whose sentence is a second
- * copy of the Validation route's is how one issue comes to be described two ways on two screens
- * a click apart. Each entry is `[localizationSuffix, englishFallback]`, resolved against the
- * shared `FABRICATE.Admin.Manager.Checks.Validation.` namespace, so this module stays pure; the
- * issue map is PROVEN EXHAUSTIVE against `CHECK_READINESS_ISSUE_IDS` in both directions by
+ * warning dot is explained IN the panel by a `Notice`, and a dot whose words are a second copy of
+ * the Validation route's is how one issue comes to be described two ways on two screens a click
+ * apart. Each entry is `[localizationSuffix, englishFallback]`, resolved against the shared
+ * `FABRICATE.Admin.Manager.Checks.Validation.` namespace, so this module stays pure; the issue and
+ * title maps are PROVEN EXHAUSTIVE against `CHECK_READINESS_ISSUE_IDS` in both directions by
  * `tests/checks-readiness.test.js`. */
 
 /** The satisfied/unsatisfied TICKS a check reports. */
@@ -71,7 +71,7 @@ export const CHECK_TICK_LABELS = Object.freeze({
 export const CHECK_ISSUE_LABELS = Object.freeze({
   noRollFormula: [
     'IssueNoRollFormula',
-    'This check has no roll formula; it will not resolve until one is set.',
+    'Nothing is rolled, so this check cannot resolve until you enter a formula.',
   ],
   retiredPlaceholderInFormula: [
     'IssueRetiredPlaceholderInFormula',
@@ -83,14 +83,20 @@ export const CHECK_ISSUE_LABELS = Object.freeze({
   ],
   unnamedOutcome: [
     'IssueUnnamedOutcome',
-    'Name every outcome tier — an unnamed tier cannot be routed to a result group.',
+    'An unnamed tier cannot be routed to a result group. Name every tier.',
   ],
   noSuccessOutcome: [
     'IssueNoSuccessOutcome',
-    "No outcome tier is marked as a Success — successful crafts can't route to a result set. Mark at least one tier as Success.",
+    'Every tier is marked as a failure, so this check can never succeed. Mark at least one tier as Success.',
   ],
-  rangeInvalid: ['IssueRangeInvalid', 'Some tiers have a start greater than their end.'],
-  rangeOverlap: ['IssueRangeOverlap', 'Some tier ranges overlap. Each value range must be unique.'],
+  rangeInvalid: [
+    'IssueRangeInvalid',
+    'A tier whose end is lower than its start can never be rolled. Correct its start and end.',
+  ],
+  rangeOverlap: [
+    'IssueRangeOverlap',
+    'Bands must not overlap — a roll in the overlap has two possible tiers.',
+  ],
   rangeGap: [
     'IssueRangeGap',
     'Some values between your lowest and highest tier belong to no tier at all, so a roll landing there matches nothing and the attempt cannot be routed. Close the gap.',
@@ -129,7 +135,7 @@ export const CHECK_ISSUE_LABELS = Object.freeze({
   ],
   multipleTierStepTargets: [
     'IssueMultipleTierStepTargets',
-    'Two or more triggers set a target tier; if more than one matches, the lowest-ranked wins.',
+    'If more than one matches on the same roll, the lowest-ranked tier wins.',
   ],
   attributeTargetMissing: [
     'IssueAttributeTargetMissing',
@@ -222,11 +228,59 @@ const ISSUE_PHRASES = Object.freeze({
   },
 });
 
-/**
- * Titles for the issues that render as a title over their sentence, in the Validation row and the
- * section notice alike; every other issue's sentence is its title.
- */
+/** Every issue's short title, drawn over its sentence in the Validation row and the section
+ *  notice alike (issue 2082). */
 export const CHECK_ISSUE_TITLES = Object.freeze({
+  noRollFormula: ['IssueNoRollFormulaTitle', 'The check has no roll formula'],
+  retiredPlaceholderInFormula: [
+    'IssueRetiredPlaceholderInFormulaTitle',
+    'The formula still uses @craftingmod',
+  ],
+  retiredPlaceholderBreaksFormula: [
+    'IssueRetiredPlaceholderBreaksFormulaTitle',
+    '@craftingmod breaks this formula',
+  ],
+  unnamedOutcome: ['IssueUnnamedOutcomeTitle', 'An outcome tier has no name'],
+  noSuccessOutcome: ['IssueNoSuccessOutcomeTitle', 'No tier counts as a success'],
+  rangeInvalid: ['IssueRangeInvalidTitle', 'A band ends before it starts'],
+  rangeOverlap: ['IssueRangeOverlapTitle', 'Two bands overlap'],
+  rangeGap: ['IssueRangeGapTitle', 'A gap between two bands'],
+  modifierBoundsInverted: [
+    'IssueModifierBoundsInvertedTitle',
+    "A check modifier's minimum is above its maximum",
+  ],
+  modifierBoundsUnsafe: [
+    'IssueModifierBoundsUnsafeTitle',
+    "A check modifier's bounds are out of range",
+  ],
+  modifierExpressionInvalid: [
+    'IssueModifierExpressionInvalidTitle',
+    'A check modifier cannot be rolled',
+  ],
+  modifierAverageUnavailable: [
+    'IssueModifierAverageUnavailableTitle',
+    'A check modifier has no average to rank by',
+  ],
+  modifiersInertNoCheck: [
+    'IssueModifiersInertNoCheckTitle',
+    'Check modifiers have no check to apply to',
+  ],
+  modifiersInertNoModifierSupport: [
+    'IssueModifiersInertNoModifierSupportTitle',
+    'The d100 roll cannot take check modifiers',
+  ],
+  modifiersInertNoFormula: [
+    'IssueModifiersInertNoFormulaTitle',
+    'Check modifiers have no formula to apply to',
+  ],
+  danglingTierStepTarget: [
+    'IssueDanglingTierStepTargetTitle',
+    "A trigger's target tier is missing",
+  ],
+  multipleTierStepTargets: [
+    'IssueMultipleTierStepTargetsTitle',
+    'More than one trigger sets a target tier',
+  ],
   attributeTargetMissing: [
     'IssueAttributeTargetMissingTitle',
     'No character value to measure against',
@@ -348,14 +402,12 @@ export function checkIssueSentence(id, data, text) {
 }
 
 /**
- * The words one readiness issue renders, `{ title, detail }`: a titled issue's sentence is its
- * detail, and any other issue's sentence is its title with no detail. `text(key, fallback, data)`.
+ * The words one readiness issue renders, `{ title, detail }`: its short title over its sentence.
+ * An id with no title degrades to its own id rather than throwing. `text(key, fallback, data)`.
  */
 export function checkIssueText(id, data, text) {
-  const sentence = checkIssueSentence(id, data, text);
-  const title = CHECK_ISSUE_TITLES[id];
-  if (!title) return { title: sentence, detail: '' };
-  return { title: text(`${NAMESPACE}${title[0]}`, title[1]), detail: sentence };
+  const title = copyFor(CHECK_ISSUE_TITLES, id);
+  return { title: text(title.key, title.fallback), detail: checkIssueSentence(id, data, text) };
 }
 
 /**

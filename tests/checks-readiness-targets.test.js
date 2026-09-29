@@ -355,10 +355,22 @@ describe('the new issues render a title over their sentence', () => {
     }
   });
 
-  it('leaves an existing issue as one sentence with no detail', () => {
+  // Issue 2082: the older issues take the same shape, a short title over their sentence.
+  it('titles an older issue over its sentence rather than making the sentence its title', () => {
     assert.deepEqual(checkIssueText('noRollFormula', undefined, english), {
-      title: 'This check has no roll formula; it will not resolve until one is set.',
-      detail: '',
+      title: 'The check has no roll formula',
+      detail: 'Nothing is rolled, so this check cannot resolve until you enter a formula.',
+    });
+    assert.deepEqual(checkIssueText('rangeOverlap', undefined, english), {
+      title: 'Two bands overlap',
+      detail: 'Bands must not overlap — a roll in the overlap has two possible tiers.',
+    });
+  });
+
+  it('degrades an id with no title to the id itself rather than throwing', () => {
+    assert.deepEqual(checkIssueText('notAnIssue', undefined, english), {
+      title: 'notAnIssue',
+      detail: 'notAnIssue',
     });
   });
 });
