@@ -697,7 +697,6 @@ It exists because PR screenshot evidence should not cost a container boot and a 
 npm run viewlab:chrome:harvest              # one-off; see below
 node scripts/view-lab-screenshots.mjs apps  # every registry case -> ui-screenshot-artifact/apps/
 npm run viewlab:index                       # regenerate the evidence index on its own
-npm run viewlab:totals                      # regenerate the registry totals in scripts/README.md
 ```
 
 The window chrome is Foundry's own, harvested from the release archive `npm run test:foundry:up` already caches under `.foundry-e2e/cache/`.
@@ -717,8 +716,6 @@ Every manager case declares `expectView`, which the capture asserts against the 
 A case also declares `reaches`: `exact` when the frame lands on its smoke counterpart's own condition, `window` when it reaches the right application window but not that condition (known remaining work), and `beyond` for a condition the live smoke never walks at all — the routed recipe resolution modes, the visibility modes it does not visit, Foundry's light application theme.
 A `beyond` case carries an empty `smokeLabels`, because there is nothing to compare it against.
 A `window` case's shortfall is accounted for by a class-level entry in the known-gaps register in `scripts/README.md`, not by a per-case comment.
-How many cases the registry holds, how they split across the three claims, and how many of them surface coverage selects are generated into `scripts/README.md` from the registry itself.
-Adding or removing a case means running `npm run viewlab:totals`; `npm test` reds if you forget.
 
 A change to the lab's own inputs is attributed rather than treated like an ordinary render-file change.
 By default a PR touching the case registry, `labActors.js`, `labRunStates.js`, or any other file the lab depends on selects **surface coverage**: one frame of every route and tab the lab renders — every manager route, every player tab, one per single-screen canvas window, plus the light-theme pair.

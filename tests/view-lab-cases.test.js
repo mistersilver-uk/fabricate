@@ -51,12 +51,6 @@ import {
 } from '../src/ui/svelte/apps/manager/checks/checksNav.js';
 import { MODIFIER_POLICIES } from '../src/systems/checkModifierResolver.js';
 
-import {
-  TOTALS_DOCUMENT,
-  totalsRegion,
-  withTotalsRegion,
-} from '../scripts/view-lab-registry-totals.mjs';
-
 import { emittingHalfOf } from './helpers/interactablesSmokeLocators.js';
 import { collectWorkingTreeSources } from './helpers/sourceScan.js';
 import { SOURCES, walkTemplate } from './helpers/primitiveAdoptionContract.js';
@@ -3412,20 +3406,20 @@ test('the two Access roster frames are pinned to the crowded roster the shim see
 });
 
 // The registry totals used to be hand-copied into four documents, and they drifted three separate
-// times: `AGENTS.md` once claimed 155 cases, `CONTRIBUTING.md` 181 and `scripts/README.md` 219 —
-// three different wrong answers, none of which anything failed on. They are generated now, and
-// these two tests are the gate: the region must say what the registry says, and no carrier may
-// quote a count again.
+// times: `AGENTS.md` once claimed 155 cases, `CONTRIBUTING.md` 181 and `scripts/README.md` 219.
+// A generated README region replaced them, but it changed with every case added or removed, so
+// every open PR conflicted with every other. No document states the counts now; the registry is
+// their only record, and this test keeps any of them from coming back.
 
-/** The documents that carried a hand-copied count, plus the one that carries the generated region. */
+/** The documents that have carried a registry count. */
 const TOTALS_CARRIERS = Object.freeze([
   'AGENTS.md',
   'CONTRIBUTING.md',
-  TOTALS_DOCUMENT,
+  'scripts/README.md',
   '.agents/skills/fabricate-orchestrator/SKILL.md',
 ]);
 
-/** The six sentence shapes the generated region retired, as each document used to state it. */
+/** Every sentence shape that has stated a registry count, including the retired generated region. */
 const RETIRED_COUNT_PATTERNS = Object.freeze([
   /the registry holds (\d+) cases: (\d+) `exact`, (\d+) `window`, (\d+) `beyond`/,
   /which is (\d+) of the (\d+) publishable cases/,
@@ -3433,49 +3427,18 @@ const RETIRED_COUNT_PATTERNS = Object.freeze([
   /the normal case, at (\d+) cases across five windows/,
   /one frame of every route and tab the lab renders, (\d+) cases/,
   /one frame of every route and tab the lab renders, (\d+) of (\d+) cases/,
+  /The registry holds (\d+) publishable cases/,
+  /the lab renders — is (\d+) of them/,
 ]);
 
-/** A carrier with the generated region cut out, so the guard cannot read the writer's own output. */
-function outsideGeneratedRegion(markdown) {
-  const lines = totalsRegion().split('\n');
-  const [start] = lines;
-  const end = lines.at(-1);
-  const from = markdown.indexOf(start);
-  if (from === -1) return markdown;
-  const to = markdown.indexOf(end, from);
-  assert.ok(to !== -1, `a totals region opened by ${start} has no ${end}`);
-  return markdown.slice(0, from) + markdown.slice(to + end.length);
-}
-
-test('the generated totals region says what the registry says, exactly once', () => {
-  const carrier = readFileSync(resolve(ROOT, TOTALS_DOCUMENT), 'utf8');
-  const expected = totalsRegion();
-  assert.equal(
-    carrier.split(expected).length,
-    2,
-    `${TOTALS_DOCUMENT}'s totals region is stale or duplicated — run \`npm run viewlab:totals\`. ` +
-      `It should read once:\n${expected}`
-  );
-});
-
-test('the totals writer replaces one region and refuses a missing or duplicated one', () => {
-  const region = totalsRegion();
-  const document = `intro\n\n${region}\n\nouter\n`;
-  assert.equal(withTotalsRegion(document, region), document, 'a current region is a no-op');
-  const stale = document.replace(region, `${region.split('\n')[0]}\nstale\n${region.split('\n').at(-1)}`);
-  assert.equal(withTotalsRegion(stale, region), document, 'a stale region is replaced in place');
-  assert.throws(() => withTotalsRegion('no region here\n', region), /has no/u);
-  assert.throws(() => withTotalsRegion(`${document}${region}\n`, region), /more than one/u);
-});
-
-test('no carrier quotes a registry count outside the generated region', () => {
+test('no carrier quotes a registry count', () => {
   for (const carrier of TOTALS_CARRIERS) {
-    const prose = outsideGeneratedRegion(readFileSync(resolve(ROOT, carrier), 'utf8'));
+    const prose = readFileSync(resolve(ROOT, carrier), 'utf8');
     for (const pattern of RETIRED_COUNT_PATTERNS) {
       assert.ok(
         !pattern.test(prose),
-        `${carrier} states a registry count in prose again (${pattern}). The numbers are ` +
-          `generated into ${TOTALS_DOCUMENT}; point at that region instead of copying it.`
+        `${carrier} states a registry count in prose again (${pattern}). The count changes ` +
+          'with every case, so no document states it; the registry is the only record.'
       );
     }
   }
