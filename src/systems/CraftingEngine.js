@@ -3711,6 +3711,9 @@ export class CraftingEngine {
     runManager,
     run,
   }) {
+    // Same gate as `_resolveAlchemySimpleFailure`: `null` tells the shared producer to compute
+    // and apply breakage, so an OFF policy must pre-empty it rather than pass `null` through.
+    const failurePolicy = this._getFailureConsumptionPolicy(executionRecipe);
     return this._produceAlchemyFailureResults({
       craftingActor,
       componentSourceActors,
@@ -3722,7 +3725,7 @@ export class CraftingEngine {
       consumedItems,
       consumedRunRefs,
       toolItems,
-      usedTools: null,
+      usedTools: failurePolicy.breakToolsOnFail ? null : [],
       resolvedEssences,
       resultGroupId: null,
       checkResult,
