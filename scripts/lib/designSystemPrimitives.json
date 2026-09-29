@@ -687,6 +687,15 @@
         "src/ui/svelte/apps/journal/RunDetail.svelte"
       ],
       "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/apps/journal/RunDetail.svelte`, is below the two-importer membership bar. Broader shared adoption remains coordinated through #1644; this records the current production import graph without claiming a second consumer. Library target status and screenshot requirements remain in force."
+    },
+    {
+      "path": "src/ui/svelte/components/DiceTiles.svelte",
+      "library": "<DiceTiles>",
+      "evidence": "broad",
+      "callers": [
+        "src/ui/svelte/apps/manager/checks/CheckOutcomePreview.svelte"
+      ],
+      "why": "Issue 2006 task 6 implements the specified die tiles of a success-counting roll and converts the Checks Studio simulator onto them. ONE independent importer, `src/ui/svelte/apps/manager/checks/CheckOutcomePreview.svelte`, is below the two-importer membership bar until task 8 draws the same tiles in the player result box and the salvage roll summary; the chat cards render the same model through `countDiceTiles.js`'s escaped renderer and do not import the component. Task 8 promotes this row to the member table when those importers land. Library target status and screenshot requirements remain in force."
     }
   ],
   "ruledOut": [

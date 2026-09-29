@@ -255,7 +255,6 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/checks\/checkPreview\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/checks\/checkReadoutModel\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/checks\/CheckOutcomePreview\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/checks\/CheckSimulatorFaces\.svelte$/,
       CHECKS_ROUTE_MODEL_PATTERN,
     ],
   }),
