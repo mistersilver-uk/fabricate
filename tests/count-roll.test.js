@@ -318,6 +318,42 @@ test('the overlap label is escaped for its attribute', async () => {
   assert.match(overlapLabel, /aria-label="a &#34;quoted&#34; &#60;label&#62; &#38; more"/);
 });
 
+test('the tooltip stays on core dice.tooltip.hbs even when the game system patches the base Roll', async () => {
+  const { Roll, config } = createCoreDice({ faces: [8, 3] });
+  // Simulates dnd5e's `init` hook, which sets this directly on core `Roll`, not a subclass.
+  Roll.TOOLTIP_TEMPLATE = 'systems/dnd5e/templates/chat/roll-breakdown.hbs';
+  const rendered = [];
+  const CountRoll = registerCountRoll({
+    config,
+    BaseRoll: Roll,
+    i18n: () => i18n,
+    renderTemplate: async (path, data) => {
+      rendered.push({ path, data });
+      return `<rendered path="${path}">`;
+    },
+  });
+
+  const roll = await CountRoll.fromPolicy(settledPolicy()).evaluate();
+  const html = await roll.getTooltip();
+
+  assert.equal(
+    rendered[0].path,
+    TOOLTIP_TEMPLATE,
+    'ignores the patched static and renders core templates/dice/tooltip.hbs'
+  );
+  assert.equal(
+    rendered[0].data.parts[0].formula,
+    '2d10 · each ≥ 8',
+    'the tooltip context carries the count description'
+  );
+  assert.match(html, /templates\/dice\/tooltip\.hbs/);
+  assert.equal(
+    Roll.TOOLTIP_TEMPLATE,
+    'systems/dnd5e/templates/chat/roll-breakdown.hbs',
+    "the game system's own patch on the base Roll is untouched, so its ordinary rolls still use it"
+  );
+});
+
 test('generated dice qualify and cancel, and explode-once explodes originals only', async () => {
   const once = settledPolicy({
     die: 6,
