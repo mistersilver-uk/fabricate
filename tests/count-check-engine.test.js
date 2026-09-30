@@ -40,6 +40,7 @@ import { resolveSalvageCheck } from '../src/systems/salvageCheckUsability.js';
 import { evaluateSystemValidation } from '../src/systems/systemValidation.js';
 import { evaluateCheckBreakage } from '../src/toolBreakageRuntime.js';
 import { MacroExecutor } from '../src/utils/MacroExecutor.js';
+import { buildInteractiveRollOptions } from '../src/ui/svelte/apps/crafting/rollPrompt.js';
 
 /** Journal entries that consume, spend, award or post. */
 const EFFECT = /^(item\.|actor\.|chat\.|currency\.|itemPiles\.deduct|complication\.)/;
@@ -1110,6 +1111,56 @@ test('a fixed-range routed count prompt names no required count, since ranges gr
   };
   assert.deepEqual([describe('fixed').required, describe('relative').required], [null, 2]);
   assert.equal(describe('fixed').pool, 2, 'the pool line still shows');
+});
+
+test('a count roll posts its successes needed in the flavor, never a DC, and none for ranges (N37)', async () => {
+  const evaluation = normalized({ base: '2', threshold: '5' }, 'under');
+  const options = buildInteractiveRollOptions(
+    { interactive: true, actor: null, name: 'Rope', activity: 'Crafting', dc: 3, evaluation },
+    async () => ({ confirmed: true })
+  );
+  const shared = { formula: '1d20', actor: ACTOR, evaluation };
+  const routing = { relativeOutcomes: LADDER, fixedOutcomes: RANGES, clampToNearest: true };
+  const dice = installCountDice({ faces: [1, 2, 1, 2, 1, 2, 1, 2, 1, 2] });
+  let posted;
+  try {
+    await runFormulaPassFail({ ...shared, dc: 3, rollOptions: options });
+    await runFormulaPassFail({ ...shared, dc: 1, rollOptions: options });
+    await runFormulaRouted({ ...shared, dc: 2, type: 'relative', ...routing, rollOptions: options });
+    await runFormulaRouted({ ...shared, dc: 2, type: 'fixed', ...routing, rollOptions: options });
+    await runFormulaProgressive({ ...shared, rollOptions: options });
+    posted = dice.posts.map((post) => post.messageData.flavor);
+  } finally {
+    dice.restore();
+  }
+  assert.equal(options.flavor, 'Rope — Crafting check', 'the options flavor names no DC');
+  assert.deepEqual(posted, [
+    'Rope — Crafting check (3 successes needed)',
+    'Rope — Crafting check (1 success needed)',
+    'Rope — Crafting check (2 successes needed)',
+    'Rope — Crafting check',
+    'Rope — Crafting check',
+  ]);
+});
+
+test('a prepared count names its successes needed in its posted and handed-back flavor, never when secret', async () => {
+  const flavors = async (options, prepared = preparedCount()) => {
+    const dice = installCountDice({ faces: [9, 3] });
+    try {
+      const result = await evaluatePreparedRunCheck(prepared, LIVE_ACTOR, {}, options);
+      // An entitled roll is handed back for the player to post; a secret one posts in the GM realm.
+      return [dice.posts[0]?.messageData.flavor ?? null, result.rollHandoff?.flavor ?? null];
+    } finally {
+      dice.restore();
+    }
+  };
+  const named = 'Sun Tea — Crafting check (1 success needed)';
+  assert.deepEqual(await flavors(), [null, named]);
+  assert.deepEqual(await flavors({ secret: true }), ['Sun Tea — Crafting check', null]);
+  const fixed = preparedCountCheck({ count: { required: 3 } });
+  Object.assign(fixed, { mode: 'routedByCheck', slot: 'routed' });
+  Object.assign(fixed.decisionPolicy, { type: 'fixed', fixedOutcomes: RANGES });
+  assert.deepEqual(await flavors(undefined, fixed), [null, 'Sun Tea — Crafting check']);
 });
 
 test('a zero pool fails in every mode with no Roll and no triggers, even needing nothing', async () => {

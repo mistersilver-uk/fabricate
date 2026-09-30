@@ -653,6 +653,9 @@
           "BannerSimpleTitle": "Salvage check",
           "BannerSimpleRule": "Roll to break this down. Meet the DC to recover the materials below.",
           "BannerSimpleRuleTarget": "Roll to break this down. The total must {comparison} the target to recover the materials below.",
+          "Count": {
+            "BannerSimpleRule": "Roll to break this down. The count must reach the successes needed to recover the materials below."
+          },
           "BannerRoutedTitle": "Routed salvage",
           "BannerRoutedRule": "Your roll decides which outcome you get, and each outcome recovers different materials.",
           "BannerProgressiveTitle": "Progressive · ordered",
@@ -1060,7 +1063,16 @@
           "RollResultValue": "Rolled {value}",
           "RollResultValueWithDc": "Rolled {value} vs DC {dc}",
           "RollResultValueWithTarget": "Rolled {value} · target {target} · margin {margin}",
-          "ConsumedTitle": "Consumed"
+          "ConsumedTitle": "Consumed",
+          "Count": {
+            "Check": "{count} successes needed · d{die}s",
+            "CheckOne": "1 success needed · d{die}s",
+            "CheckDie": "Successes counted on d{die}s",
+            "RollResult": "{net} of {required} successes",
+            "RollResultOne": "{net} of 1 success",
+            "RollResultNet": "{net} net successes",
+            "RollResultNetOne": "1 net success"
+          }
         },
         "Redacted": {
           "Title": "Hidden recipe"
@@ -3064,6 +3076,15 @@
           "CheckTierDefaultAdjustment": "Default · base adjustment",
           "CheckTierTarget": "Target {dc}",
           "CheckTierUnnamed": "Unnamed tier",
+          "Count": {
+            "CheckTier": "{name} · {count} successes",
+            "CheckTierOne": "{name} · 1 success",
+            "CheckTierDefault": "Default",
+            "Pill": "{count} successes",
+            "PillOne": "1 success",
+            "PillDynamic": "Dynamic successes",
+            "Sort": "Successes needed"
+          },
           "BulkEdit": {
             "SelectedHeading": "{count} recipes selected",
             "SelectedHeadingOne": "1 recipe selected",
@@ -3089,6 +3110,12 @@
             "CheckTierNoTiers": "This system's crafting check authors no tiers, so every recipe uses its default DC. Add tiers under Checks to assign them here.",
             "CheckTierNoTiersTarget": "This system's crafting check authors no tiers, so every recipe uses its default target. Add tiers under Checks to assign them here.",
             "CheckTierNoTiersAdjustment": "This system's crafting check authors no tiers, so every recipe uses its base adjustment. Add tiers under Checks to assign them here.",
+            "Count": {
+              "CheckTierHint": "The successes needed these recipes roll for — not the check's outcome tiers.",
+              "CheckTierDefaultHint": "Clears every selected recipe to the system's default successes needed.",
+              "CheckTierDynamic": "This system's crafting check takes its successes needed from a macro at craft time, so recipes carry no tier to select.",
+              "CheckTierNoTiers": "This system's crafting check authors no tiers, so every recipe uses its default successes needed. Add tiers under Checks to assign them here."
+            },
             "Books": "Books & scrolls",
             "NoBooks": "This system defines no books or scrolls.",
             "BooksHint": "Pick one, then add it where missing or remove it where present",
@@ -6985,6 +7012,11 @@
               "DynamicNote": "Converting keeps the macro, and its return is then read as the successes needed.",
               "OverridesNote": "{names} override the DC but not the successes needed, so after converting they use the check's successes needed.",
               "OutOfRange": "It cannot be converted: it would need {value} successes, outside 0 to 20."
+            },
+            "Outcomes": {
+              "Success": "Reaches {required} successes — the {record}'s result group is produced in full.",
+              "SuccessOne": "Reaches 1 success — the {record}'s result group is produced in full.",
+              "Failure": "Fewer than {required} — nothing is produced; the failure policy decides the cost."
             }
           },
           "Digest": {

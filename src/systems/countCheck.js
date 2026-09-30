@@ -118,3 +118,13 @@ export function preparedCountEvaluation(count) {
     required: count.required,
   };
 }
+
+/**
+ * The runner options a prepared count replays: its captured evaluation, and the required count
+ * its flavor names, which a secret, progressive or fixed-range check never carries.
+ */
+export function preparedCountOptions(count, { secret, kind, type }) {
+  if (!count) return {};
+  const named = !secret && kind !== 'progressive' && type !== 'fixed';
+  return { ...count.rollOptions, ...(named && { required: count.required }) };
+}

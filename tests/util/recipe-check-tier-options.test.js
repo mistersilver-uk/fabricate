@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 
 import {
   buildCheckTierOptions,
+  bulkCheckTierCopy,
   checkTierUnit,
 } from '../../src/ui/svelte/apps/manager/recipe/recipeOverviewSelectOptions.js';
 
@@ -64,7 +65,35 @@ describe('the recipe Check tier options', () => {
     }
   });
 
-  it('leave a count on its DC wording for issue 2006', () => {
-    assert.equal(checkTierUnit({ product: 'count', direction: 'under' }), 'dc');
+  it('name a count tier by its successes needed, never its DC (issue 2006)', () => {
+    const tiers = [
+      { id: 'easy', name: 'Easy', dc: 8, successes: 2 },
+      { id: 'one', name: 'One', dc: 10, successes: 1 },
+      { id: 'unset', name: '', dc: 12, successes: null },
+    ];
+    for (const direction of ['over', 'under']) {
+      const counting = { product: 'count', direction, pool: { required: 3 } };
+      assert.equal(checkTierUnit(counting), 'successes');
+      assert.deepEqual(labels(buildCheckTierOptions(tiers, english, counting)), [
+        'Default · 3 successes',
+        'Easy · 2 successes',
+        'One · 1 success',
+        'Unnamed tier · — successes',
+      ]);
+    }
+    const one = { product: 'count', pool: { required: 1 } };
+    assert.equal(buildCheckTierOptions([], english, one)[0].label, 'Default · 1 success');
+  });
+
+  it('word the bulk axis by what a tier names, a count by its successes needed', () => {
+    const copy = (roll) => bulkCheckTierCopy(roll, english);
+    assert.match(copy(null).hint(), /^The DC these recipes/);
+    assert.match(copy(evaluation('under')).defaultHint(), /default target\.$/);
+    assert.match(copy(evaluation('over', 'attribute')).noTiers(), /base adjustment/);
+    const counting = copy({ product: 'count', direction: 'under' });
+    for (const reason of ['hint', 'defaultHint', 'dynamic', 'noTiers']) {
+      assert.match(counting[reason](), /successes needed/, reason);
+      assert.doesNotMatch(counting[reason](), /\bDC\b|target/, reason);
+    }
   });
 });

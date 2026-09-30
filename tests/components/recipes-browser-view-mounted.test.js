@@ -531,6 +531,32 @@ describe('RecipesBrowserView row readout (issue 643 §9)', () => {
     );
   });
 
+  it('names a counting pill by its successes needed in the mono face, and sorts by the count (issue 2006)', async () => {
+    const root = await browser.mount({
+      recipes: [
+        makeRecipe({ id: 'r-three', name: 'Three', checkSummary: { kind: 'successes', dc: 3 } }),
+        makeRecipe({ id: 'r-one', name: 'One', checkSummary: { kind: 'successes', dc: 1 } }),
+      ]
+    });
+    const pill = (id) => root.querySelector(`[data-recipe-id="${id}"] [data-recipe-check]`);
+    assert.equal(pill('r-three').dataset.recipeCheck, 'successes');
+    assert.equal(pill('r-three').textContent.trim(), '3 successes');
+    assert.equal(pill('r-one').textContent.trim(), '1 success');
+    assert.ok(pill('r-three').classList.contains('is-mono'), 'a count is a numeric like a DC');
+    assert.ok(selectOptionLabels(root, '[data-recipe-sort]').includes('Successes needed'));
+    chooseSelectOption(root, '[data-recipe-sort]', 'dc');
+    flushSync();
+    const order = [...root.querySelectorAll('[data-recipe-id]')].map((row) => row.dataset.recipeId);
+    assert.deepEqual(order.filter((id) => id.startsWith('r-')), ['r-one', 'r-three']);
+    browser.remount();
+
+    const macro = await browser.mount({
+      recipes: [makeRecipe({ checkSummary: { kind: 'dynamicSuccesses', dc: null } })]
+    });
+    assert.equal(macro.querySelector('[data-recipe-check]').textContent.trim(), 'Dynamic successes');
+    browser.remount();
+  });
+
   it('names a roll-under Target in the mono face, and a character value by its source (issue 2005)', async () => {
     const target = await browser.mount({
       recipes: [makeRecipe({ checkSummary: { kind: 'target', dc: 12 } })]
@@ -1050,6 +1076,8 @@ describe('RecipeBrowserInspector (mounted)', () => {
       [{ kind: 'target', dc: 12 }, 'Target 12'],
       [{ kind: 'attribute', dc: null }, 'Character value'],
       [{ kind: 'dynamicTarget', dc: null }, 'Dynamic'],
+      [{ kind: 'successes', dc: 2 }, '2 successes'],
+      [{ kind: 'dynamicSuccesses', dc: null }, 'Dynamic'],
     ]) {
       await inspector.setProps({ selectedRecipe: makeRecipe({ id: 'r1', checkSummary }) });
       assert.equal(stat('check').textContent, text, 'issue 2005: no DC outside roll-high fixed');

@@ -49,13 +49,14 @@ function salvageBenefits({ system, component, recipeManager, actor }) {
 }
 
 /**
- * A count check's Salvage line for the salvaging character (issue 2006): the successes needed,
- * the die and the per-die test at that character's threshold, or `{ unresolved }` when the pool
- * cannot read them. Null where no single count applies.
+ * A count check's Salvage line for the salvaging character (issue 2006): the banner's `rule`, the
+ * successes needed, the die and the per-die test at that character's threshold, or `{ unresolved }`
+ * when the pool cannot read them. Null where no single count applies.
  */
 function countSalvageTarget({ mode, config, component, actor, evaluation, localize }) {
   const need = salvageCheckNeed({ mode, config, checkUsable: true, component });
   if (need.kind !== 'successes') return null;
+  const rule = localize('FABRICATE.App.Inventory.Salvage.Count.BannerSimpleRule');
   const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
   const pool = resolvePool({ evaluation, thresholdMode: config?.thresholdMode, rollData });
   if (!pool.ok) {
@@ -64,7 +65,7 @@ function countSalvageTarget({ mode, config, component, actor, evaluation, locali
       pool.refusedInput === 'threshold'
         ? 'FABRICATE.Check.Roll.TargetUnresolved'
         : 'FABRICATE.Check.Roll.PoolUnresolved';
-    return { unresolved: localize(key, { label }) };
+    return { rule, unresolved: localize(key, { label }) };
   }
   const { die, comparison, threshold } = countFormulaValues(pool.policy);
   const key =
@@ -72,7 +73,7 @@ function countSalvageTarget({ mode, config, component, actor, evaluation, locali
       ? 'FABRICATE.Check.CountEvidence.SalvageLineOne'
       : 'FABRICATE.Check.CountEvidence.SalvageLine';
   const text = localize(key, { count: need.count, die, symbol: comparison, threshold });
-  return { direction: evaluation.direction, text };
+  return { rule, direction: evaluation.direction, text };
 }
 
 /**

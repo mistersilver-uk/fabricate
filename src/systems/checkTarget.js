@@ -187,6 +187,20 @@ export function targetFlavorSuffix(target, localize = foundryLocalize) {
   return ` (${template.replaceAll('{target}', String(target))})`;
 }
 
+/** The chat flavor's ` ({n} successes needed)` suffix (issue 2006), never ` (DC n)`. */
+export function countFlavorSuffix(required, localize = foundryFormat) {
+  const needed =
+    required === 1
+      ? localizeWith(localize, 'FABRICATE.App.RollPrompt.CountNeededOne', {}, '1 success needed')
+      : localizeWith(
+          localize,
+          'FABRICATE.App.RollPrompt.CountNeeded',
+          { count: required },
+          `${required} successes needed`
+        );
+  return ` (${needed})`;
+}
+
 /** A progressive check spends its total as a budget, so summed roll-under refuses; count/under rolls. */
 export function progressiveTargetRefusal(evaluation) {
   return evaluation?.product === 'sum' && evaluation?.direction === 'under'

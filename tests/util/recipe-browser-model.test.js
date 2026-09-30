@@ -16,6 +16,8 @@ import {
   filterRecipes,
   groupRecipesByCategory,
   paginateRecipes,
+  recipeCheckFact,
+  recipeCheckPill,
   recipeCheckSortLabel,
   recipeCheckSubtitleSuffix,
   sortRecipes
@@ -138,7 +140,7 @@ describe('recipeBrowserModel — sorting', () => {
     const under = { product: 'sum', direction: 'under', target: { source: 'fixed' } };
     assert.equal(recipeCheckSortLabel([], english, under), 'Check target');
     assert.equal(recipeCheckSortLabel([], english, { ...under, direction: 'over' }), 'Check DC');
-    assert.equal(recipeCheckSortLabel([], english, { product: 'count', direction: 'under' }), 'Check DC');
+    assert.equal(recipeCheckSortLabel([], english, { product: 'count', direction: 'under' }), 'Successes needed');
     assert.equal(recipeCheckSortLabel(rows('target', 12), english), 'Check target');
     assert.equal(recipeCheckSortLabel(rows('attribute', null), english), 'Check target');
     assert.equal(recipeCheckSortLabel(rows('dynamicTarget', null), english), 'Check target');
@@ -149,6 +151,31 @@ describe('recipeBrowserModel — sorting', () => {
     assert.equal(suffix('attribute', null), ' · Character value');
     assert.equal(suffix('dynamic', null), '');
     assert.equal(recipeCheckSubtitleSuffix(null, english), '');
+  });
+
+  it('names a counting pill, its sort key, fact and subline by successes needed (issue 2006)', () => {
+    const english = (_key, fallback) => fallback;
+    const format = (_key, fallback, data) => fallback.replace(/\{(\w+)\}/g, (_whole, token) => String(data[token]));
+    const rows = (kind, dc) => [makeRecipe({ checkSummary: { kind, dc } })];
+    assert.equal(recipeCheckSortLabel(rows('successes', 2), english), 'Successes needed');
+    assert.equal(recipeCheckSortLabel(rows('dynamicSuccesses', null), english), 'Successes needed');
+    assert.deepEqual(recipeCheckPill({ kind: 'successes', dc: 2 }, format), {
+      kind: 'successes', icon: 'fas fa-dice-d20', label: '2 successes', title: '', mono: true,
+    });
+    assert.equal(recipeCheckPill({ kind: 'successes', dc: 1 }, format).label, '1 success');
+    assert.equal(recipeCheckPill({ kind: 'dynamicSuccesses', dc: null }, format).label, 'Dynamic successes');
+    assert.equal(recipeCheckPill({ kind: 'dc', dc: 12 }, format).label, 'DC 12', 'roll-high unchanged');
+    assert.equal(recipeCheckPill(null, format).label, 'No check');
+    assert.equal(recipeCheckFact({ kind: 'successes', dc: 3 }, format), '3 successes');
+    assert.equal(recipeCheckFact({ kind: 'dynamicSuccesses', dc: null }, format), 'Dynamic');
+    assert.equal(recipeCheckSubtitleSuffix({ kind: 'successes', dc: 2 }, english), ' · 2 successes');
+    assert.equal(recipeCheckSubtitleSuffix({ kind: 'successes', dc: 1 }, english), ' · 1 success');
+    // A counting row sorts by its successes needed through the one `dc` key.
+    const counting = [
+      makeRecipe({ name: 'Three', checkSummary: { kind: 'successes', dc: 3 } }),
+      makeRecipe({ name: 'One', checkSummary: { kind: 'successes', dc: 1 } }),
+    ];
+    assert.deepEqual(names(sortRecipes(counting, { key: 'dc' })), ['One', 'Three']);
   });
 
   // The non-grouped path is the byte-identical pre-issue-801 order.
