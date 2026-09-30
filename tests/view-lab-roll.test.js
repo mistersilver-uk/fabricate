@@ -638,6 +638,7 @@ test('a count Roll snapshot restores as the registered count Roll, as core looks
     );
   } finally {
     shim.restore();
+    // ratchet-exempt(lint): the shim installs the lab Roll as a Foundry global; this restores it.
     globalThis.Roll = previous.Roll;
   }
 });

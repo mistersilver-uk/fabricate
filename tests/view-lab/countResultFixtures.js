@@ -41,8 +41,7 @@ export const COUNT_RESULT_STATES = Object.freeze({
   },
 });
 
-const counted = (pool) =>
-  normalizeCheckEvaluation({ product: 'count', direction: 'over', pool });
+const counted = (pool) => normalizeCheckEvaluation({ product: 'count', direction: 'over', pool });
 
 /** Persist one state's check on Smithing before the player app mounts. */
 export async function seedCountResult(world, state) {
@@ -76,5 +75,6 @@ export async function seedCountResult(world, state) {
     ...check,
     features: { ...system.features, chatOutput: true },
   });
-  if (tier) await world.fabricate.recipeManager.updateRecipe('sm-r-horseshoe', { checkTierId: tier.id });
+  if (tier)
+    await world.fabricate.recipeManager.updateRecipe('sm-r-horseshoe', { checkTierId: tier.id });
 }

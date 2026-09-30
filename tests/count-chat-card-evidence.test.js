@@ -11,14 +11,20 @@ import {
   pickCraftCardMessage,
   summarizeCraftCard,
 } from '../scripts/lib/countChatCardEvidence.js';
-import { normalizeCheckEvaluation } from '../src/systems/normalize/checkEvaluation.js';
 import { resolvePool } from '../src/systems/countEvaluation.js';
+import { normalizeCheckEvaluation } from '../src/systems/normalize/checkEvaluation.js';
 import { executedCheckDisplay } from '../src/ui/presenters/checkDisplay.js';
 import { buildCraftingChatContent } from '../src/ui/presenters/CraftingChatCard.js';
 
 import { OVER_FIXED_DATA, PUBLIC, shippedLocalize } from './helpers/checkEvidenceFixtures.js';
 
-const die = (index, face, marks = {}) => ({ index, face, active: true, explodedFrom: null, ...marks });
+const die = (index, face, marks = {}) => ({
+  index,
+  face,
+  active: true,
+  explodedFrom: null,
+  ...marks,
+});
 
 /** What each deterministic case executes: its dice in append order and its net. */
 const EXECUTED = {
@@ -35,7 +41,14 @@ const EXECUTED = {
     base: 2,
     threshold: 1,
   },
-  fail: { results: [die(0, 5), die(1, 3)], qualified: 0, cancelled: 0, required: 1, base: 2, threshold: 7 },
+  fail: {
+    results: [die(0, 5), die(1, 3)],
+    qualified: 0,
+    cancelled: 0,
+    required: 1,
+    base: 2,
+    threshold: 7,
+  },
   botch: {
     results: [
       die(0, 6, { cancelled: true }),
@@ -131,7 +144,11 @@ test('the smoke cases roll the deterministic configurations through the real nor
 test('each public count card the renderer builds passes its own case, and only its own', () => {
   for (const caseId of ['pass', 'fail', 'botch', 'zero']) {
     const card = countCard(caseId);
-    assert.deepEqual(countCardFailures(caseId, { card, rollMessages: rollsFor(caseId) }), [], caseId);
+    assert.deepEqual(
+      countCardFailures(caseId, { card, rollMessages: rollsFor(caseId) }),
+      [],
+      caseId
+    );
   }
   assert.notDeepEqual(
     countCardFailures('pass', { card: countCard('fail'), rollMessages: rollsFor('fail') }),
@@ -158,8 +175,10 @@ test('the card must agree with its count Roll die for die', () => {
     /0 count Roll messages/
   );
   assert.match(
-    countCardFailures('zero', { card: countCard('zero'), rollMessages: [countRollMessage('fail')] })
-      .join('\n'),
+    countCardFailures('zero', {
+      card: countCard('zero'),
+      rollMessages: [countRollMessage('fail')],
+    }).join('\n'),
     /posted a roll message/
   );
 });
