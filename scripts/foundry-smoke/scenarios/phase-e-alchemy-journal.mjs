@@ -9,6 +9,7 @@ import { captureAlchemyThemes } from '../pageOps/managerViews.mjs';
 import { assertNoScreenshotOverlays, closeOpenApplications } from '../pageOps/pageLifecycle.mjs';
 
 import { runCraftExecutionAsserts, runFullProfileGatherAsserts } from './phase-e-asserts.mjs';
+import { runCountChatCards } from './phase-e-count-chat-cards.mjs';
 
 export async function runPhaseEAlchemyAndJournal(ctx, { appShell }) {
   const { page, results, screenshot } = ctx;
@@ -291,6 +292,10 @@ export async function runPhaseEAlchemyAndJournal(ctx, { appShell }) {
     const crafter = game.actors.get(crafterId);
     if (crafter) crafter.sheet.close();
   }, cleanup.crafterId);
+
+  // Issue 2006: the success-counting cards, asserted in every profile and captured with the rest,
+  // after the post-craft inventory frame so their tokens and charms never reach it.
+  await runCountChatCards(ctx);
 
   // Cheap API crafts, tool breakages, salvage, negative gating, and one guaranteed-success
   // gather — no screenshots, so they run in every profile.
