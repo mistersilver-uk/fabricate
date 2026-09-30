@@ -163,6 +163,17 @@ test('a botch reads Botch and cancels every tile, below zero in the danger tone'
   assert.ok(content.includes('1 · a net below zero is a botch'));
 });
 
+test('a botch is named only on a public card; a GM or blind roll reads a plain Failure', async () => {
+  for (const rollMode of ['gmroll', 'blindroll']) {
+    const { cards } = await craftCount({ rollMode, pool: BOTCH_POOL, faces: [6, 6, 6] });
+    const content = readable(cards[0]);
+    assert.ok(!content.includes('fa-skull'), `${rollMode}: no Botch pill`);
+    assert.ok(content.includes('fa-circle-xmark" aria-hidden="true"></i>Failure</div>'), rollMode);
+  }
+  const { cards } = await craftCount({ pool: BOTCH_POOL, faces: [6, 6, 6] });
+  assert.ok(readable(cards[0]).includes('fa-skull" aria-hidden="true"></i>Botch</div>'), 'public');
+});
+
 test('a zero pool states no total and no tile, only why nothing was rolled (N32)', async () => {
   const { result, cards } = await craftCount({ pool: ZERO_POOL });
   assert.equal(result.success, false);
