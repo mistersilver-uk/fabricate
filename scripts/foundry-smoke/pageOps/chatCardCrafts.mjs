@@ -173,6 +173,7 @@ export function craftAndCollect(page, { recipeId, crafterId }) {
         result: {
           success: answer?.success ?? null,
           misconfigured: answer?.misconfigured === true,
+          reason: answer?.reason ?? null,
           data: answer?.data ?? null,
           message: answer?.message ?? null,
         },

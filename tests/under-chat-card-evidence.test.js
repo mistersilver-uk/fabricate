@@ -166,8 +166,9 @@ test('the assertions bind to the one crafting card the execute created', () => {
 });
 
 test('the refusal passes only when nothing is posted and the Crafting tab names it', () => {
+  const sentence = shippedLocalize('FABRICATE.Check.TargetRefusal.UnresolvedPath');
   const refused = {
-    result: { misconfigured: true, data: { targetRefusal: 'unresolved-path' } },
+    result: { success: false, misconfigured: false, reason: null, data: null, message: sentence },
     createdMessages: [],
     cardCount: { before: 7, after: 7 },
     promptOpened: false,
@@ -177,8 +178,21 @@ test('the refusal passes only when nothing is posted and the Crafting tab names 
     ),
   };
   assert.deepEqual(misconfiguredFailures(refused), []);
+  const direct = {
+    success: false,
+    misconfigured: true,
+    data: { targetRefusal: 'unresolved-path' },
+  };
+  assert.deepEqual(
+    misconfiguredFailures({ ...refused, result: { ...direct, message: sentence } }),
+    []
+  );
   const broken = [
     { result: { success: false, data: {} } },
+    {
+      result: { success: false, message: 'Crafting check cannot roll: no target formula is set.' },
+    },
+    { result: { ...direct, message: sentence, data: { targetRefusal: 'non-finite' } } },
     { promptOpened: true },
     { createdMessages: [{ id: 'roll' }] },
     { cardCount: { before: 7, after: 8 } },

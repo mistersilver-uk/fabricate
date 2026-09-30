@@ -199,10 +199,24 @@ export function underCardFailures(caseId, { card, rollMessages = [], characterVa
   return failures;
 }
 
+/** The unresolved-path refusal sentence (`FABRICATE.Check.TargetRefusal.UnresolvedPath`). */
+const UNRESOLVED_REFUSAL = /the character value its target reads was not found/;
+
 /**
- * Every way the refusing case falls short: the craft must answer `misconfigured` with the
- * unresolved-path refusal, open no prompt, create no message, leave the log's
- * `.fabricate-craft-chat` count unchanged, and the Crafting tab must show the refusal.
+ * Whether the craft refused for the unresolved path. The public craft runs the versioned
+ * lifecycle, whose descriptor refuses by throwing `CHECK_TARGET_INVALID`, so it answers
+ * `success: false` with the refusal sentence and no `misconfigured` flag; a direct runner answers
+ * `misconfigured` with `data.targetRefusal`.
+ */
+function refusedUnresolved(result) {
+  if (result?.success !== false || !UNRESOLVED_REFUSAL.test(result?.message ?? '')) return false;
+  return result.misconfigured !== true || result.data?.targetRefusal === 'unresolved-path';
+}
+
+/**
+ * Every way the refusing case falls short: the craft must refuse for the unresolved path, open no
+ * prompt, create no message, leave the log's `.fabricate-craft-chat` count unchanged, and the
+ * Crafting tab must show the refusal.
  */
 export function misconfiguredFailures({
   result,
@@ -212,7 +226,7 @@ export function misconfiguredFailures({
   refusalText = '',
 }) {
   const failures = [];
-  if (result?.misconfigured !== true || result?.data?.targetRefusal !== 'unresolved-path') {
+  if (!refusedUnresolved(result)) {
     failures.push(`misconfigured: the craft answered ${JSON.stringify(result ?? null)}`);
   }
   if (promptOpened) failures.push('misconfigured: a roll prompt opened');
