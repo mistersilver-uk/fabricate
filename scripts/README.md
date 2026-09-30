@@ -480,6 +480,7 @@ There is deliberately no allowlist.
 
 `scripts/view-lab-screenshots.mjs` renders whole Fabricate application windows in Chromium with no Foundry, no Docker, and no world, and writes one PNG per registry case into `ui-screenshot-artifact/apps/`.
 The chrome those windows wear is Foundry's own, harvested from the release archive `npm run test:foundry:up` already caches.
+Cases render concurrently, `VIEW_LAB_CONCURRENCY` at a time (by default the machine's core count, at most 8), each in its own browser context over one browser, and nothing written depends on which render finishes first.
 
 ```sh
 npm run viewlab:chrome:harvest     # extract chrome + core art into the gitignored .foundry-chrome/
@@ -487,6 +488,7 @@ npm run viewlab:chrome:status      # what is cached, and whether it is intact
 node scripts/view-lab-screenshots.mjs apps            # every case
 node scripts/view-lab-screenshots.mjs apps <id,id>    # a subset
 node scripts/view-lab-screenshots.mjs apps --clean    # wipe ui-screenshot-artifact/apps/ first
+VIEW_LAB_CONCURRENCY=1 node scripts/view-lab-screenshots.mjs apps <id,id>  # one case at a time
 npm run viewlab:index              # regenerate the index without a capture
 ```
 
