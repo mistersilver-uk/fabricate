@@ -92,24 +92,27 @@ Routed and Progressive modes keep the full list, where each result group maps to
 > This is the true stored state being shown for the first time rather than a setting that has been lost, and nothing has been reset or migrated.
 > Turn the toggle on for each component you want salvageable.
 
-### The Salvage DC
+### The Salvage Override
 
-When the salvage check applies, a component can override the DC that check uses.
+When the salvage check applies, a component can override the difficulty that check uses for it alone.
 
-The **DC** control offers:
+The override control offers:
 
-- **System default**, which uses the system's own salvage check DC and stores no override on the component
-- one option per salvage check outcome tier you have authored, each naming the tier and its DC
-- **Custom**, which reveals a number field for any DC you like
+- **System default**, which uses the system's own salvage check difficulty and stores no override on the component
+- one option per salvage check outcome tier you have authored, each naming the tier and its number
+- **Custom**, which reveals a field for a value of your own
 
-The preset options are your system's real authored tiers, not a fixed list of suggested numbers, so they always reflect the DCs your world actually uses.
+The preset options are your system's real authored tiers, not a fixed list of suggested numbers, so they always reflect what your world actually uses.
 If you have not authored any tiers yet, the control offers **System default** and **Custom** only.
 Either way, the **Manage presets** link takes you to the Checks screen where the tiers are authored.
 
-A DC you set that does not match any tier is kept exactly as you typed it.
+A value you set that does not match any tier is kept exactly as you typed it.
 It shows under **Custom** with its own value, and it is never rounded to the nearest tier.
 
-When the system's salvage DC is set by a macro rather than a fixed number, the **System default** option says so instead of showing a DC, because there is no single number to show.
+What the control reads and edits, and what it is called, follows how the salvage check measures its roll: a DC or a Target under a fixed difficulty, a difficulty adjustment under a character value, and a number of successes needed under a counting check.
+See [Salvage and gathering task overrides]({% link checks/crafting.md %}#salvage-and-gathering-task-overrides) and [Successes-needed overrides]({% link checks/crafting.md %}#successes-needed-overrides) for the full guide, including what is kept when you switch between them.
+
+When the system's salvage difficulty is set by a macro rather than a fixed number, **System default** says so instead of showing a number, because there is no single one to show.
 
 When the resolution mode is Progressive, each stage row also shows a read-only strip for any complications authored on that stage's own component.
 See [Complications]({% link components/complications.md %}) to author them.
@@ -158,7 +161,7 @@ What it lists depends on the system's salvage resolution mode, and on whether yo
 | Setup | What the player sees |
 |:------|:---------------------|
 | Simple, with no salvage check roll formula | **You will recover**, then the materials, each tagged **Guaranteed**. No roll is made. |
-| Simple, with a salvage check roll formula | **On a success**, the materials, the DC to beat, and a note that a failed roll can cost the component. |
+| Simple, with a salvage check roll formula | **On a success**, the materials, the DC, Target, or successes needed to clear, and a note that a failed roll can cost the component. |
 | Routed by check | Every outcome you authored, with the materials each one recovers. |
 | Progressive | The result stages in order, each showing that component's own progressive DC as **DC N** and the check value that reaches it as **Reach ≥N**, plus a strip for any complications you told the player about. |
 | Routed or Progressive with no salvage check roll formula | **Salvage isn't ready**, and a line asking the player to speak to you. The action is disabled and nothing can be consumed. |
@@ -166,12 +169,13 @@ What it lists depends on the system's salvage resolution mode, and on whether yo
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
-A component's DC override shifts the DC shown for a simple check, and it shifts the thresholds shown for relative outcome tiers.
-Fixed tiers own absolute segments of the roll range and have no DC, so they are shown exactly as you authored them and no DC appears.
+A component's override shifts the number shown for a simple check, whether that number is a DC, a Target, or a difficulty adjustment.
+It shifts the thresholds shown for relative outcome tiers the same way.
+Fixed tiers own absolute segments of the roll range and have no such number, so they are shown exactly as you authored them.
 Progressive salvage is different again.
-The progressive salvage check itself has no DC, because its roll is a budget spent down the stage list rather than a pass-or-fail against a target.
+The progressive salvage check itself has no DC, because its roll is a budget spent down the stage list rather than measured against a target.
 Each component still carries its own progressive DC, and that DC is shown on its stage beside the reach value.
-See [Relative and fixed tiers]({% link checks/crafting.md %}#relative-and-fixed-tiers).
+See [Relative and fixed tiers]({% link checks/crafting.md %}#relative-and-fixed-tiers) and [Roll-under and character-value checks]({% link checks/crafting.md %}#roll-under-and-character-value-checks).
 
 ### Required Tools
 

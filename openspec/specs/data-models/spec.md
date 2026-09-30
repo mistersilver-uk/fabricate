@@ -102,9 +102,8 @@ CraftingSystem = {
     // slot gained its own `dcMode`/`macroUuid` in issue 1096): `_resolveSalvageDc` is
     // arithmetic over the per-component override and the slot's own `dc`. That is a
     // statement about DC resolution ALONE and not a licence to drop the fields:
-    // `simple.tiers` is the preset source for the per-component salvage DC control and
-    // `simple.dcMode` selects that control's system-default label, in EVERY resolution
-    // mode including routed — see the Dynamic DC Macro Contract. No salvage editor
+    // `simple.tiers` is the preset source for the per-component salvage DC control, in
+    // EVERY resolution mode including routed — see the Dynamic DC Macro Contract. No salvage editor
     // renders a tier table (the Checks tab mounts the simple editor with its DC-source
     // half hidden and the routed editor with tiers hidden), so neither slot's `tiers`
     // is authored there.
@@ -438,6 +437,8 @@ The normalized defaults are an empty fixed target expression, additive adjustmen
 Normalization MUST retain inactive mode fields and finite/null sibling adjustments; unknown enum tokens take their defaults, an invalid die reads d10, a finite numeric expression is kept as its string, integer counts clamp to 0–20 and additional maximum clamps to 1–20, and a non-integer count takes its default (1 for `required`, null for a sibling).
 An explode or cancel face `value` is a positive integer or null and is not clamped to `die`, so changing the die loses no authored face; a face the die cannot roll is left for readiness to flag rather than repaired by normalization.
 Checks studio drafts carry the normalized record and the tier and outcome siblings, so a studio save preserves them, and schema-6 export/import MUST preserve the normalized record without a migration.
+Each of the eight subobjects also carries `offerSituationalBonus`, `true` unless explicitly `false`, which survives drafts, draft clones, the mode-change copy across the `routedByIngredients` boundary, save, schema-6 export/import and the prepared `checkConfig`.
+It decides only whether the roll prompt shows the situational-bonus field; `allowsSituationalModifier` stays the authority gate, so a programmatic, companion or prepared bonus still applies when it is `false`.
 Recipe difficulty tiers retain finite nullable `adjustment` and integer nullable `successes` beside their existing DC fields; relative outcome rows retain their finite nullable `adjustment` sibling.
 Component salvage and gathering task overrides retain `adjustmentOverride` and `successesOverride` beside `dcOverride`, including through their save projections.
 Under an attribute target source the runtime reads these sibling adjustments: the selected recipe tier's `adjustment`, the component's `salvage.adjustmentOverride` or the task's `adjustmentOverride` applies when non-null, and a null one inherits `target.baseAdjustment` (see `resolution-modes/spec.md` § Check Target Resolution).
@@ -3443,6 +3444,11 @@ CraftingRunStepState = {
    A target refusal returns `success: false` with `misconfigured: true` and `data.targetRefusal` naming its reason, and carries no executed fields.
    An executed result's `data.preRolls`, when present, is an ordered array of `{ source, label, expression, total, destination }` for separately evaluated modifiers; the main `total` and `diceGroups` still describe only the authored check roll and its appended terms.
    Error, prompt cancellation and unrolled exits do not fabricate pre-roll evidence, and a secret prepared check omits it.
+   A summed result with a target, other than a roll-high one against a fixed DC, also records `data.targetSource` (`fixed` or `attribute`) and `data.targetTerms`, an ordered array of `{ kind: 'anchor' | 'adjustment' | 'multiplier' | 'benefit', value, source?, label? }`.
+   The first term is the anchor — the fixed anchor, or the character value after any macro — followed by the difficulty step and then each settled roll-under benefit with its router `source` (`tool`, `library`, `situational` or `advantage`); an `adjustment` or `multiplier` term carries `label` when a tier supplied it (the recipe's selected check tier, or the relative tier the roll matched), and anchor and benefit terms carry none.
+   Folding the terms in order — an adjustment added and a multiplier applied, each rounded down, then each benefit — and then every `preRolls` entry whose `destination` is `target` reproduces `data.target` exactly.
+   A character-value result also records `data.targetExpression`, the typed formula trimmed, and `data.targetActor`, the rolling character's name, each only when present.
+   None of these is recorded for a result with no target (a fixed range, an Otherwise tier or progressive), a refusal, a legacy record or a secret prepared check.
    A `product: "count"` result's `data.dc` is always null, `data.target` is the effective per-die threshold (never null, even for a fixed-range or progressive result), `data.comparison` is the per-die comparison, `data.successes` and numeric `data.cancelled` count qualifying and cancelling dice, `total` is the raw net (qualified minus cancelled), and `margin` is `total` minus the required count of the tier the roll matched — simple: the required count; relative: required plus `outcome.dc`; null for a fixed-range, progressive or zero-pool result, all before forcing or stepping.
    A zero-pool count result carries `zeroPool: true` with a null `total`, `successes`, `cancelled` and `margin`, no main Roll, and the same populated `target` and `comparison` a rolled result on the same check would carry.
    A count refusal carries `misconfigured: true`, `data.targetRefusal` naming the reason and `data.refusedInput` naming the input (`'base' | 'threshold' | 'die' | 'explode' | 'cancel' | 'pool'`), and no executed evidence, exactly as a sum target refusal does.
@@ -4217,8 +4223,11 @@ Their targets resolve through `CraftingEngine._resolveSalvageTarget` and `Gather
 Salvage and gathering nonetheless persist `dcMode`, `macroUuid`, and `tiers`, because they reuse the `SimpleCheck` and `RoutedCheck` shapes so the Checks-tab editors can be shared.
 No DC-resolution path outside the crafting check reads any of the three.
 They are not inert for that reason.
-Outside the shared Checks-tab editors, which round-trip whatever their slot holds, salvage's `simple.tiers` and `simple.dcMode` have one reader: the per-component salvage DC control (`src/ui/svelte/apps/manager/component/salvageDcPresets.js`) builds its preset options from `salvageCraftingCheck.simple.tiers` in EVERY salvage resolution mode, routed included — there is no `.routed.tiers` sibling for presets — and renders its system-default option without a DC number when `salvageCraftingCheck.simple.dcMode` is `dynamic`, because a macro-computed DC has no number to show.
-Dropping salvage's `simple.tiers` would therefore silently empty that preset list, and dropping its `simple.dcMode` would mislabel the default option, so arithmetic DC resolution licenses removing neither.
+Outside the shared Checks-tab editors, which round-trip whatever their slot holds, salvage's `simple.tiers` has one reader: the per-component salvage DC control (`src/ui/svelte/apps/manager/component/salvageDcPresets.js`) builds its preset options from `salvageCraftingCheck.simple.tiers` in EVERY salvage resolution mode, routed included — there is no `.routed.tiers` sibling for presets.
+Under a fixed target a preset is a named tier's `dc`; under a character-value target it is a named tier's `adjustment` that is valid for the active adjustment kind (any finite number added, a multiplier above zero); under a count check it is a named tier's non-null `successes`.
+Because salvage never runs a DC macro, the control's system-default option names the slot's static DC whatever `simple.dcMode` says, so `simple.dcMode` is round-tripped by the shared editors only.
+Dropping salvage's `simple.tiers` would therefore silently empty that preset list, so arithmetic DC resolution does not license removing it.
+Gathering task overrides have no preset source at all: gathering authors no recipe tiers, so a task's check override is a single number field.
 `macroUuid` is the one of the three with no reader at all on salvage or gathering, and gathering has no manager-side reader of any of them.
 
 Before the configured macro runs, `_resolveCheckTarget` computes an **anchor** for the crafting check slot being resolved, and validates it: a target refusal aborts before the macro runs.

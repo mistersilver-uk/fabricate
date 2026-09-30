@@ -993,8 +993,12 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(idsFor('src/ui/svelte/apps/manager/CraftingSettingsView.svelte'), ['manager-alchemy-settings']);
     // #727 pills — RollResultBox lives under the crafting detail sources.
     assert.ok(idsFor('src/ui/svelte/apps/crafting/detail/RollResultBox.svelte').includes('player-crafting-roll-result'));
-    // #727 roll total — the chat card markup is built in CraftingChatCard.js.
-    assert.deepEqual(idsFor('src/ui/presenters/CraftingChatCard.js'), ['chat-craft-card']);
+    // #727 roll total — the chat card markup is built in CraftingChatCard.js, which also
+    // renders issue 2005's roll-under evidence, so it maps to both recipes.
+    assert.deepEqual(idsFor('src/ui/presenters/CraftingChatCard.js').sort(byCodePoint), [
+      'chat-craft-card',
+      'chat-craft-card-under',
+    ]);
     assert.deepEqual(idsFor('src/ui/presenters/SalvageChatCard.js'), ['chat-craft-card']);
     // #735 row rendering — the shared VocabularyPanel renders the item-tags rows.
     assert.ok(idsFor('src/ui/svelte/apps/manager/VocabularyPanel.svelte').includes('manager-tags-categories-tags-tab'));

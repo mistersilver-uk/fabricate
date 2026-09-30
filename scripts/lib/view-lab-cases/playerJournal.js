@@ -275,6 +275,28 @@ export const CASES = Object.freeze([
     kinds: ['player', 'journal'],
     sourceMatches: [JOURNAL_SOURCES, /^src\/ui\/presenters\/RunJournalBuilder\.js$/],
   }),
+  // Issue 2103: a future stage under a roll-under crafting check names its Target, never a DC.
+  playerCase({
+    id: 'player-journal-future-stage-under',
+    label: 'Player Journal — future stage step label under a roll-under crafting check',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'journal', journalCaseState: 'future-stage-under' },
+    steps: [
+      { selector: '[data-run-id="lab-v1-stage-browser"]' },
+      { selector: '[data-stage-nav-index="2"]' },
+    ],
+    expectTab: 'journal',
+    expectSelector:
+      '[data-journal-detail] [data-stage-card="2"][data-stage-state="future"]' +
+      ' [data-stage-fact="check"]' +
+      ':has-text("1d20 + @abilities.int.mod · Target 15 · stay at or under"):not(:has-text("DC"))',
+    kinds: ['player', 'journal'],
+    sourceMatches: [
+      JOURNAL_SOURCES,
+      /^src\/ui\/presenters\/(?:RunJournalBuilder|journalCheckText)\.js$/,
+    ],
+  }),
   // Issue 2006: a counting ladder in net successes, its Botch row beside the least demanding tier
   // while cancelling is on, and the step's successes-needed label.
   playerCase({

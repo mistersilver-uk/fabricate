@@ -21,6 +21,10 @@ export const CLASS_A_LABELS = Object.freeze(
     'chat-craft-card-count-botch',
     'chat-craft-card-count-zero',
     'chat-craft-card-over-control',
+    'chat-craft-card-under-pass',
+    'chat-craft-card-under-fail',
+    'chat-craft-card-under-otherwise',
+    'chat-craft-card-under-misconfigured',
     'fabricate-journal',
     'fabricate-journal-craft-detail',
   ])
@@ -223,6 +227,11 @@ export const SCREENSHOT_CAPTURE_ORDER = Object.freeze([
   'chat-craft-card-count-botch',
   'chat-craft-card-count-zero',
   'chat-craft-card-over-control',
+  // Issue 2005: the roll-under cards and the refusal, crafted after the counting cards.
+  'chat-craft-card-under-pass',
+  'chat-craft-card-under-fail',
+  'chat-craft-card-under-otherwise',
+  'chat-craft-card-under-misconfigured',
   'fabricate-journal',
   'fabricate-journal-craft-detail',
 ]);

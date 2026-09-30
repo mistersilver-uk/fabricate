@@ -137,6 +137,11 @@ Names are matched ignoring upper and lower case and surrounding spaces, so each 
 If the outcome is a success but matches none of your result groups, the attempt fails and no group is awarded.
 A routed task whose system has no gathering check formula reports a setup problem for the GM to fix rather than resolving.
 
+A routed task can override the gathering check's own difficulty for that task alone, with a single field and a **System default** placeholder.
+The field is labelled **DC** when the check rolls over a fixed difficulty, **Target** when it rolls under one, or **Adjustment** when it is measured against a character value instead.
+There are no presets to pick from here, because gathering's routed outcome tiers are crafting-only and cannot be authored as presets.
+See [Salvage and gathering task overrides]({% link checks/crafting.md %}#salvage-and-gathering-task-overrides) and [Successes-needed overrides]({% link checks/crafting.md %}#successes-needed-overrides) for the full guide, including what a switch between them keeps.
+
 ## Progressive Checks
 
 {: .warning }
