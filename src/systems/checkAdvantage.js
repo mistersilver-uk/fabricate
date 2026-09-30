@@ -116,3 +116,14 @@ export function advantageOfferFields(config, evaluation, formula, Roll = diceEng
   });
   return { allowAdvantage: advantageOffer.advantage, advantageOffer };
 }
+
+/**
+ * The roll options a check sub-object's own offers contribute at every check site: its
+ * situational-bonus offer and its normalized advantage rule, which the engine enforces.
+ */
+export function authoredOfferOptions(config) {
+  return {
+    offerSituationalBonus: config?.offerSituationalBonus !== false,
+    advantage: normalizeCheckAdvantage(config?.advantage),
+  };
+}

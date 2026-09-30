@@ -1,6 +1,6 @@
 /** Resolves an interactive check decision into a formula and modifier placement plan. */
 
-import { resolveAdvantageOffer } from './checkAdvantage.js';
+import { offeredDecision, resolveAdvantageOffer } from './checkAdvantage.js';
 import { planKeepTransform } from './checkKeepTransform.js';
 import {
   appendPlannedLibraryTerms,
@@ -157,7 +157,7 @@ function promptInput({
   displayFormula,
   deferred,
   countPolicy,
-  Roll,
+  advantageOffer,
 }) {
   // A count check shows no formula, so no bare deferred slot either (issue 2004).
   const formula =
@@ -167,12 +167,6 @@ function promptInput({
   const resolved = displayFormula(formula, actor);
   // The modifiers `selectedModifiers` itemises are chips, so the shown formula omits their terms.
   const shownFormula = deferred ? formula : authoredFormula.trim();
-  const advantageOffer = resolveAdvantageOffer({
-    advantage: options.advantage,
-    evaluation,
-    authoredFormula,
-    Roll,
-  });
   return {
     formula,
     resolvedFormula: resolved?.display ?? null,
@@ -256,6 +250,8 @@ export async function resolveCheckDecision({
   const preResolved = options?.rollDecision ?? null;
 
   if (options?.interactive === true && (preResolved || typeof options.prompt === 'function')) {
+    const advantage = normalizeCheckAdvantage(options.advantage);
+    const advantageOffer = resolveAdvantageOffer({ advantage, evaluation, authoredFormula, Roll });
     const choice =
       preResolved ??
       (await options.prompt(
@@ -268,7 +264,7 @@ export async function resolveCheckDecision({
           displayFormula,
           deferred,
           countPolicy,
-          Roll,
+          advantageOffer,
         })
       ));
     if (!choice || choice.confirmed === false) return { cancelled: true };
@@ -285,13 +281,10 @@ export async function resolveCheckDecision({
       if (chosenLabel) flavor = flavor ? `${flavor} · ${chosenLabel}` : chosenLabel;
     }
 
+    // A button the check's own offer excludes rolls normally, whatever transport carried it.
+    const decided = offeredDecision(advantageOffer, choice.advantage);
     // Keep acts on the constructed Roll, never this string; a count check keeps nothing.
-    keep = planKeepTransform({
-      choice: choice.advantage,
-      evaluation,
-      advantage: normalizeCheckAdvantage(options.advantage),
-      authoredFormula,
-    });
+    keep = planKeepTransform({ choice: decided, evaluation, advantage, authoredFormula });
     const bonus = applySituationalBonus(formula, choice.bonus, evaluation, Roll);
     formula = bonus.formula;
     situational = bonus.contribution;

@@ -18,7 +18,11 @@ import {
   checkRollResult,
   gateCompanionCallSite,
 } from './companionContract.js';
+import { normalizeCheckAdvantage } from './normalize/checkAdvantage.js';
 import { hasActiveCheck } from './salvageCheckUsability.js';
+
+/** A standalone roll authors no advantage rule, so it rolls under the default one (ruling R2). */
+const COMPANION_ADVANTAGE = Object.freeze(normalizeCheckAdvantage());
 
 /**
  * The post-shim formula, or `''` when nothing is left to roll. Re-derives
@@ -80,6 +84,7 @@ async function runStandaloneCheck(
   });
   // Fabricate's own prompt owns dismissal, since Foundry's RollResolver fulfils rather than aborts on close; set after the builder so a test seam can inject a dismissing prompt.
   rollOptions.prompt = seams.prompt;
+  rollOptions.advantage = COMPANION_ADVANTAGE;
   if (rollDecision) {
     rollOptions.rollDecision = {
       bonus: rollDecision.bonus,
@@ -353,7 +358,9 @@ export async function resolveBulkCheckDecision(request, seams) {
 
   // All-or-nothing over the usable subset only, each formula under the default advantage rule.
   const advantageOffer = intersectAdvantageOffers(
-    usable.map((entry) => resolveAdvantageOffer({ authoredFormula: entry.formula }))
+    usable.map((entry) =>
+      resolveAdvantageOffer({ advantage: COMPANION_ADVANTAGE, authoredFormula: entry.formula })
+    )
   );
   const allowAdvantage = advantageOffer.advantage;
   // The whole batch, as the salvage service counts; with no `subjects` the dialog reads "0 items".

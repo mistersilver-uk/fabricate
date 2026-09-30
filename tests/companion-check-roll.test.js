@@ -639,6 +639,8 @@ describe('AC-9 — the module rolls nothing and reaches nothing it was not given
             './checkTarget.js',
             './companionCheckEvaluation.js',
             './companionContract.js',
+            // The default advantage rule a standalone roll rolls under (issue 2007, ruling R2).
+            './normalize/checkAdvantage.js',
             './salvageCheckUsability.js',
           ],
         ],
