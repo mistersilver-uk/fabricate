@@ -7,6 +7,7 @@ player-crafting-roll-prompt-under-strict
 player-crafting-roll-prompt-under-picks
 player-crafting-roll-prompt-under-rolled-bonus
 player-crafting-roll-prompt-over-attribute
+player-crafting-roll-prompt-under-compact
 player-crafting-check-descriptor-under-resolved
 player-crafting-check-descriptor-under-unresolved
 player-crafting-roll-result-under-pass

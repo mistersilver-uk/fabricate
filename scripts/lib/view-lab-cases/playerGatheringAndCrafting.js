@@ -236,6 +236,24 @@ export const CASES = Object.freeze([
     kinds: ['player', 'crafting'],
     sourceMatches: PROMPT_SOURCES,
   }),
+  // The character-value prompt at the 1024x640 floor, its footer inside the window.
+  playerCase({
+    id: 'player-crafting-roll-prompt-under-compact',
+    label: 'Player app — roll-under crafting roll prompt at 1024x640',
+    smokeLabels: [],
+    reaches: 'beyond',
+    position: { width: 1024, height: 640 },
+    query: { tab: 'crafting', dialog: 'open', rollPromptState: 'under' },
+    steps: [...CRAFT_HORSESHOE],
+    expectSelector:
+      `${SINGLE_PROMPT} .target-live[aria-live="polite"] .target-row` +
+      ' > .manager-chip[data-roll-prompt-target="under"]:has-text("Target 11 · stay at or under")',
+    expectContained: [
+      { container: SINGLE_PROMPT, target: `${SINGLE_PROMPT} .manager-modal-footer` },
+    ],
+    kinds: ['player', 'crafting', 'responsive'],
+    sourceMatches: PROMPT_SOURCES,
+  }),
   // The recipe's check card names the target and its source fact, or why the target cannot be read.
   playerCase({
     id: 'player-crafting-check-descriptor-under-resolved',
