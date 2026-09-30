@@ -183,20 +183,21 @@ function reportAgainstBase(ref, sha, measured) {
   const baseByProfile = Object.fromEntries(
     requested.filter((p) => base.class1ByProfile[p]).map((p) => [p, base.class1ByProfile[p]])
   );
-  const { rises, falls, notes } = compareClass1(baseByProfile, measured.class1ByProfile);
+  const { rises, breaks, falls, notes } = compareClass1(baseByProfile, measured.class1ByProfile);
   console.log(
     `\nclass-1 counts against ${ref} (${sha.slice(0, 12)}, ${base.cached ? 'cached' : 'measured'}):`
   );
   for (const line of notes) console.log(`  ${line}`);
   for (const line of falls) console.log(`  ${line}`);
-  for (const rise of rises) console.error(`  ${rise.text}`);
-  if (rises.length === 0) {
+  for (const entry of [...rises, ...breaks]) console.error(`  ${entry.text}`);
+  if (rises.length + breaks.length === 0) {
     console.log('  no count rose');
     return;
   }
   console.error(
-    '\nA count rose. The drift test accepts it only when the change adds a ratchet-exempt(benchmark) ' +
-      'marker naming the case or its profile; see benchmarks/README.md.'
+    '\nA count rose, or a profile or case stopped being compared. The drift test accepts it only ' +
+      'when the change adds a ratchet-exempt(benchmark) marker naming the case or its profile; ' +
+      'see benchmarks/README.md.'
   );
   process.exitCode = 1;
 }

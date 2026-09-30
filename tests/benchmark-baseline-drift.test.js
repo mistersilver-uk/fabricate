@@ -1,20 +1,24 @@
 /**
  * The class-1 drift guard: the deterministic, seeded operation counts are measured at the base
  * commit, by the base's own harness over the base's own `src`, and at head. A rise fails, a fall
- * passes and is reported, and a profile whose fixture changed is reported as incomparable.
+ * passes and is reported, and a profile whose fixture changed, or a removed profile or case,
+ * fails as a rise does, since its counts are no longer compared.
  */
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
 import {
+  BASE_PATHS,
   COMPLETE_MARKER,
   lockfileDiffers,
   materialiseBase,
   measureBase,
   measureTree,
   resolveCommit,
+  workerFor,
 } from '../scripts/lib/benchmarkBase.js';
 import { compareClass1 } from '../scripts/lib/benchmarkDrift.js';
 
@@ -38,23 +42,23 @@ import {
 
 const FAMILY = 'benchmark';
 
-/** The paths whose change can move a class-1 count; any other diff skips the base run. */
-const TRIGGERS = Object.freeze([
-  /^src\//u,
-  /^tests\/helpers\/scale\//u,
-  /^scripts\/lib\/benchmark/u,
-]);
-const CORPUS = 'src/, tests/helpers/scale/ and scripts/lib/benchmark*';
-const isTrigger = (file) => TRIGGERS.some((pattern) => pattern.test(file));
+/** The paths a class-1 measurement imports, so the ones whose change can move a count. */
+const CORPUS = BASE_PATHS.map((root) => `${root}/`).join(', ');
+const isTrigger = (file) => BASE_PATHS.some((root) => file.startsWith(`${root}/`));
 
 const GUIDANCE =
-  'A class-1 count rose against the base commit. If the extra work is intended, add a ' +
+  'A class-1 count rose against the base commit, or a profile or case stopped being compared. If ' +
+  'that is intended, add a ' +
   `ratchet-exempt(${FAMILY}): <reason> comment to a file this change touches under ${CORPUS}, ` +
   'naming the case id or its profile in the reason, and say in the PR description what moved ' +
   'and why. A marker already present at the base exempts nothing. `npm run ' +
   'benchmark:performance -- --base=<ref>` prints every count that moved.';
 
-/** Whether the diff can move a count, and whether base code can be run against head's packages. */
+const LOCKFILE_NOTE =
+  ' (lockfile changed: package-lock.json differs between base and head, so the base code ran ' +
+  "against head's packages and a package may have moved this)";
+
+/** Whether the diff can move a count, and whether base code runs against changed packages. */
 function planGate(changes, lockfileChanged) {
   const touched = [...changes.changed, ...changes.removed, ...changes.renames.values()];
   const changedCount = changes.changed.length + changes.removed.length;
@@ -62,13 +66,7 @@ function planGate(changes, lockfileChanged) {
     const reason = `none of the ${changedCount} changed path(s) is under ${CORPUS}`;
     return { skipped: 'corpus-unchanged', reason, corpusRoot: CORPUS, changedCount };
   }
-  if (lockfileChanged()) {
-    const reason =
-      'package-lock.json differs between base and head, so the base code would run against ' +
-      "head's dependencies and a moved count could not be told from a moved package";
-    return { skipped: 'lockfile-changed', reason, corpusRoot: CORPUS, changedCount };
-  }
-  return { changedCount };
+  return { changedCount, lockfileChanged: lockfileChanged() };
 }
 
 /** The reasoned markers `files` gained over base, and a failure for every empty one. */
@@ -117,30 +115,45 @@ function readHeadFile(file) {
   }
 }
 
-function benchmarkGate() {
-  const base = resolveRatchetBase();
+const GATE_DEPENDENCIES = Object.freeze({
+  resolveBase: () => resolveRatchetBase(),
+  changedPaths: (base) => changedPaths(base),
+  lockfileDiffers: (sha) => lockfileDiffers(sha),
+  measureBase: (sha) => measureBase(sha),
+  measureHead: () => measureTree(REPO_ROOT),
+  readBase: (base, paths) => readBaseFiles(base, paths),
+  readHead: readHeadFile,
+});
+
+/**
+ * The drift gate as a comparison `reportComparison` reads. Every collaborator that reaches git,
+ * the file system or a child process is injectable.
+ */
+function benchmarkGate(overrides = {}) {
+  const io = { ...GATE_DEPENDENCIES, ...overrides };
+  const base = io.resolveBase();
   if (base.skipped) {
     return { skipped: base.skipped, reason: base.reason, corpusRoot: CORPUS, changedCount: null };
   }
-  const changes = changedPaths(base);
-  const plan = planGate(changes, () => lockfileDiffers(base.sha));
+  const changes = io.changedPaths(base);
+  const plan = planGate(changes, () => io.lockfileDiffers(base.sha));
   if (plan.skipped) return plan;
-  const measuredBase = measureBase(base.sha);
-  const { rises, falls, notes } = compareClass1(
-    measuredBase.class1ByProfile,
-    measureTree(REPO_ROOT)
-  );
+  const measuredBase = io.measureBase(base.sha);
+  const compared = compareClass1(measuredBase.class1ByProfile, io.measureHead());
+  const { rises, breaks, falls, notes } = compared;
   const files = changes.changed.filter((file) => isTrigger(file));
-  const baseTexts = readBaseFiles(
+  const baseTexts = io.readBase(
     base,
     files.map((file) => basePathOf(changes, file)).filter(Boolean)
   );
   const markers = newMarkers(
     files,
     (file) => baseTexts.get(basePathOf(changes, file)),
-    readHeadFile
+    io.readHead
   );
-  const { failures, exempted } = exemptRises(rises, markers.reasoned);
+  const annotate = (rise) => ({ ...rise, text: `${rise.text}${LOCKFILE_NOTE}` });
+  const judged = [...(plan.lockfileChanged ? rises.map(annotate) : rises), ...breaks];
+  const { failures, exempted } = exemptRises(judged, markers.reasoned);
   const source = measuredBase.cached ? 'cached' : 'measured';
   return {
     compared: true,
@@ -191,7 +204,7 @@ test('a fall passes and is reported', () => {
   assert.deepEqual(result.falls, ['p c.examined fell from 70 to 40']);
 });
 
-test('a new or removed case, count or profile is reported and never fails', () => {
+test('an added case, count or profile is reported; a removed profile or case is a break', () => {
   const result = compareClass1(
     { p: payload({ kept: { reads: 1 }, gone: { reads: 1 } }), old: payload({}) },
     { p: payload({ kept: { reads: 1, fresh: 9 }, added: { reads: 900 } }), fresh: payload({}) }
@@ -199,14 +212,16 @@ test('a new or removed case, count or profile is reported and never fails', () =
   assert.deepEqual(result.rises, []);
   assert.deepEqual(result.notes, [
     'profile added: fresh',
-    'profile removed: old',
     'case added: p added',
-    'case removed: p gone',
     'count added: p kept.fresh = 9',
   ]);
+  assert.deepEqual(
+    result.breaks.map((entry) => entry.text),
+    ['profile removed: old', 'case removed: p gone']
+  );
 });
 
-test('a profile whose fixture identity changed is reported as incomparable, even with a rise', () => {
+test('a profile whose fixture identity changed is a break, even with a rise', () => {
   for (const changed of [
     { checksums: { corpus: 'c2', components: 'k1', inventory: 'i1' } },
     { checksums: { corpus: 'c1', components: 'k1', inventory: 'i2' } },
@@ -216,7 +231,8 @@ test('a profile whose fixture identity changed is reported as incomparable, even
     const head = { ...payload({ c: { reads: 99 } }), ...changed };
     const result = compareClass1({ p: payload({ c: { reads: 1 } }) }, { p: head });
     assert.deepEqual(result.rises, [], JSON.stringify(changed));
-    assert.match(result.notes.join('\n'), /^incomparable: p changed its fixture identity/u);
+    assert.equal(result.breaks.length, 1, JSON.stringify(changed));
+    assert.match(result.breaks[0].text, /^incomparable: p changed its fixture identity/u);
   }
 });
 
@@ -230,10 +246,13 @@ const changesOf = ({ changed = [], removed = [], renames = [] }) => ({
 });
 const neverCalled = () => assert.fail('the lockfile is read only when the diff can move a count');
 
-test('a change under src/, tests/helpers/scale/ or scripts/lib/benchmark* is compared, not skipped', () => {
+test('a change to any path the base measurement imports is compared, not skipped', () => {
   for (const changes of [
     changesOf({ changed: ['src/systems/inventorySnapshot.js'] }),
     changesOf({ changed: ['tests/helpers/scale/benchmarkCases.js'] }),
+    changesOf({ changed: ['tests/helpers/foundryEnv.js'] }),
+    changesOf({ changed: ['tests/helpers/componentIdentityFixtures.js'] }),
+    changesOf({ changed: ['tests/view-lab/foundry/labRandom.js'] }),
     changesOf({ removed: ['scripts/lib/benchmarkStats.js'] }),
     changesOf({ changed: ['docs/moved.js'], renames: [['docs/moved.js', 'src/moved.js']] }),
   ]) {
@@ -247,17 +266,86 @@ test('a change under src/, tests/helpers/scale/ or scripts/lib/benchmark* is com
 
 test('any other change skips the base run, naming why', () => {
   const plan = planGate(
-    changesOf({ changed: ['docs/a.md', 'tests/helpers/foundryEnv.js', 'scripts/lib/lint.js'] }),
+    changesOf({ changed: ['docs/a.md', 'tests/view-lab/cases.js', 'scripts/lint.mjs'] }),
     neverCalled
   );
   assert.equal(plan.skipped, 'corpus-unchanged');
   assert.match(plan.reason, /none of the 3 changed path\(s\)/u);
 });
 
-test('a changed package-lock.json skips with a named diagnostic', () => {
-  const plan = planGate(changesOf({ changed: ['src/a.js', 'package-lock.json'] }), () => true);
-  assert.equal(plan.skipped, 'lockfile-changed');
-  assert.match(plan.reason, /package-lock\.json differs between base and head/u);
+/** The gate over injected collaborators: `src/a.js` changed, and these payloads measured. */
+function gateWith({ baseCounts, headCounts, headText = '', lockfile = false }) {
+  const seen = [];
+  const result = benchmarkGate({
+    resolveBase: () => ({ sha: 'b'.repeat(40), head: 'h'.repeat(40) }),
+    changedPaths: () => changesOf({ changed: ['src/a.js'] }),
+    lockfileDiffers: () => lockfile,
+    measureBase: (sha) => {
+      seen.push(sha);
+      return { class1ByProfile: baseCounts, dir: 'base-tree', cached: true };
+    },
+    measureHead: () => headCounts,
+    readBase: () => new Map([['src/a.js', '']]),
+    readHead: () => headText,
+  });
+  return { result, seen };
+}
+
+const ONE = { p: payload({ c: { reads: 1 } }) };
+const TWO = { p: payload({ c: { reads: 2 } }) };
+
+test('an injected rise with no new marker fails, and the base is measured at its own sha', () => {
+  const { result, seen } = gateWith({ baseCounts: ONE, headCounts: TWO });
+  assert.deepEqual(seen, ['b'.repeat(40)]);
+  assert.deepEqual(result.failures, ['p c.reads rose from 1 to 2']);
+  const marked = gateWith({
+    baseCounts: ONE,
+    headCounts: TWO,
+    headText: '// ratchet-exempt(benchmark): p: the pass reads twice\n',
+  });
+  assert.deepEqual(marked.result.failures, []);
+});
+
+test('a changed package-lock.json still compares, and a rise says so', () => {
+  const { result } = gateWith({ baseCounts: ONE, headCounts: TWO, lockfile: true });
+  assert.equal(result.compared, true);
+  assert.equal(result.failures.length, 1);
+  assert.match(result.failures[0], /^p c\.reads rose from 1 to 2 \(lockfile changed: /u);
+  const marked = gateWith({
+    baseCounts: ONE,
+    headCounts: TWO,
+    lockfile: true,
+    headText: '// ratchet-exempt(benchmark): p: a package now reads twice\n',
+  });
+  assert.deepEqual(marked.result.failures, []);
+});
+
+test('an incomparable profile and a removed case fail unless a new marker names the profile', () => {
+  const incomparable = { p: { ...payload({ c: { reads: 1 } }), harnessVersion: 3 } };
+  const removed = { p: payload({}) };
+  for (const headCounts of [incomparable, removed]) {
+    const { result } = gateWith({ baseCounts: ONE, headCounts });
+    assert.equal(result.failures.length, 1, JSON.stringify(headCounts));
+    assert.match(result.failures[0], /^(?:incomparable: p|case removed: p c)/u);
+    const marked = gateWith({
+      baseCounts: ONE,
+      headCounts,
+      headText: '// ratchet-exempt(benchmark): p: the harness moved\n',
+    });
+    assert.deepEqual(marked.result.failures, [], JSON.stringify(headCounts));
+  }
+});
+
+test("a base tree's own worker measures it, and head's stands in when it has none", () => {
+  const scratch = mkdtempSync(join(tmpdir(), 'fabricate-worker-'));
+  try {
+    assert.equal(workerFor(scratch), join(REPO_ROOT, 'scripts/lib/benchmarkBaseWorker.js'));
+    mkdirSync(join(scratch, 'scripts/lib'), { recursive: true });
+    writeFileSync(join(scratch, 'scripts/lib/benchmarkBaseWorker.js'), '');
+    assert.equal(workerFor(scratch), join(scratch, 'scripts/lib/benchmarkBaseWorker.js'));
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
 });
 
 // ---- exemptions -------------------------------------------------------------------------------

@@ -855,10 +855,10 @@ Comparison between two runs MUST be refused when the runs came from environments
 - **WHEN** a change touches the measured code or the harness, and a class-1 count exceeds the same count measured at the base commit with an identical fixture
 - **THEN** the drift test fails, naming the case, the count, and both values
 - **AND** the base's counts are measured by the base commit's own harness over the base commit's own code, extracted into a gitignored directory, and may be cached there per commit
-- **AND** a fall passes and is reported, and an added or removed case is reported
-- **AND** a profile whose fixture identity changed is reported as incomparable rather than compared
-- **AND** when the dependency lockfile differs between base and head, the comparison is skipped with a diagnostic naming it
-- **AND** a rise passes only when the change adds a `ratchet-exempt(benchmark)` reason, naming the case or its profile, to a source file it touches
+- **AND** a fall passes and is reported, and an added case is reported
+- **AND** a profile whose fixture identity changed, and a removed profile or case, fails as a rise does, because its counts are no longer compared
+- **AND** when the dependency lockfile differs between base and head, the comparison still runs and each rise says the lockfile changed
+- **AND** a rise or such a failure passes only when the change adds a `ratchet-exempt(benchmark)` reason, naming the case or its profile, to a source file it touches
 
 #### Scenario: comparing two performance runs
 

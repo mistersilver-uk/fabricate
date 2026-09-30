@@ -1,7 +1,8 @@
 /**
  * Comparing class-1 counts measured at a base commit with the same counts measured at head. A rise
- * is a regression, a fall is reported, and a profile whose fixture identity changed is not
- * compared at all, because counts over two different fixtures say nothing about the code.
+ * is a regression and a fall is reported. A profile whose fixture identity changed cannot be
+ * compared, and a removed profile or case is no longer compared, so each is a break the gate
+ * fails on as it does on a rise.
  */
 import { byCodePoint } from '../../tests/helpers/codePointOrder.js';
 
@@ -42,16 +43,18 @@ function compareCase(profile, id, before, after, result) {
 
 function compareProfile(profile, base, head, result) {
   if (fixtureIdentity(base) !== fixtureIdentity(head)) {
-    result.notes.push(
-      `incomparable: ${profile} changed its fixture identity (harness version, seed or a ` +
-        'fixture checksum), so its counts were not compared'
-    );
+    result.breaks.push({
+      profile,
+      text:
+        `incomparable: ${profile} changed its fixture identity (harness version, seed or a ` +
+        'fixture checksum), so its counts were not compared',
+    });
     return;
   }
   for (const id of sortedKeys(base.cases, head.cases)) {
     const [was, now] = [base.cases[id], head.cases[id]];
     if (was && now) compareCase(profile, id, was.counts ?? {}, now.counts ?? {}, result);
-    else if (was) result.notes.push(`case removed: ${profile} ${id}`);
+    else if (was) result.breaks.push({ profile, id, text: `case removed: ${profile} ${id}` });
     else result.notes.push(`case added: ${profile} ${id}`);
   }
 }
@@ -60,15 +63,16 @@ function compareProfile(profile, base, head, result) {
  * Compare two `class1ByProfile` payloads.
  *
  * @returns {{rises: {profile: string, id: string, count: string, was: number, now: number,
- *   text: string}[], falls: string[], notes: string[]}} `notes` names every profile, case or count
- *   present on one side only, and every profile left uncompared because its fixture changed.
+ *   text: string}[], breaks: {profile: string, id?: string, text: string}[], falls: string[],
+ *   notes: string[]}} `breaks` names every profile left uncompared because its fixture changed and
+ *   every removed profile or case; `notes` every added one, and every count on one side only.
  */
 export function compareClass1(baseByProfile, headByProfile) {
-  const result = { rises: [], falls: [], notes: [] };
+  const result = { rises: [], breaks: [], falls: [], notes: [] };
   for (const profile of sortedKeys(baseByProfile, headByProfile)) {
     const [base, head] = [baseByProfile[profile], headByProfile[profile]];
     if (base && head) compareProfile(profile, base, head, result);
-    else if (base) result.notes.push(`profile removed: ${profile}`);
+    else if (base) result.breaks.push({ profile, text: `profile removed: ${profile}` });
     else result.notes.push(`profile added: ${profile}`);
   }
   return result;

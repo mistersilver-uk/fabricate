@@ -43,7 +43,14 @@ export const COMPLETE_MARKER = '.complete';
 const CACHE_FILE = 'class1.json';
 const KEEP_TREES = 3;
 const STALE_STAGING_MS = 60 * 60 * 1000;
+const WORKER_PATH = 'scripts/lib/benchmarkBaseWorker.js';
 const WORKER = join(dirname(fileURLToPath(import.meta.url)), 'benchmarkBaseWorker.js');
+
+/** The tree's own worker, so a base measures as that base's code expects; else head's. */
+export function workerFor(treeDir) {
+  const own = join(treeDir, WORKER_PATH);
+  return existsSync(own) ? own : WORKER;
+}
 
 /** Where extracted base trees and their measured counts are cached. Gitignored. */
 export function baseCacheRoot(repoRoot = REPO_ROOT) {
@@ -164,7 +171,8 @@ export function measureTree(treeDir, { profiles } = {}) {
     const out = join(scratch, CACHE_FILE);
     // The caller's module conditions, so both sides of a comparison resolve packages alike.
     const conditions = process.execArgv.filter((arg) => arg.startsWith('--conditions='));
-    const args = [...conditions, WORKER, treeDir, out, ...(profiles ? [profiles.join(',')] : [])];
+    const worker = workerFor(treeDir);
+    const args = [...conditions, worker, treeDir, out, ...(profiles ? [profiles.join(',')] : [])];
     const run = spawnSync(process.execPath, args, { encoding: 'utf8', stdio: 'pipe' });
     if (run.status !== 0) {
       const detail = (run.error?.message ?? run.stderr).trim();

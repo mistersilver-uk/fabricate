@@ -376,14 +376,17 @@ measures head only.
 - **A rise fails**, naming the profile, the case, the count and both values.
 - **A fall passes** and is reported.
   Say in the PR description what moved and why.
-- **An added or removed case, count or profile** is reported and never fails.
+- **An added case, count or profile** is reported and never fails.
+- **A removed case or profile fails** as a rise does, because its counts are no
+  longer compared.
 - **A changed fixture identity** — harness version, seed, or any fixture
-  checksum — makes that profile incomparable: it is reported and not compared,
+  checksum — makes that profile incomparable, which fails as a rise does,
   because counts over two different fixtures say nothing about the code.
-- **The comparison runs only when the change touches** `src/**`,
-  `tests/helpers/scale/**` or `scripts/lib/benchmark*`.
-- **A changed `package-lock.json` skips** the comparison with a named
-  diagnostic, because the base code would run against head's dependencies.
+- **The comparison runs only when the change touches** a path the base run
+  extracts: `src/**`, `tests/helpers/**`, `tests/view-lab/foundry/**` or
+  `scripts/lib/**`.
+- **A changed `package-lock.json` still compares**, and each rise says the
+  lockfile changed, because the base code ran against head's dependencies.
 
 `npm run benchmark:performance -- --base <ref>` prints every count that moved
 against any commit.
@@ -391,8 +394,8 @@ against any commit.
 ### Exempting a legitimate rise
 
 A feature that must do more work records why in a source file the change
-touches under one of those three paths, with a marker whose reason names the
-case id or its profile:
+touches under one of those paths, with a marker whose reason names the case id
+or its profile; an incomparable or removed profile or case takes its profile:
 
 ```js
 // ratchet-exempt(benchmark): held-inventory: containers read stacks twice
