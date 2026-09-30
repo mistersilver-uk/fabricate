@@ -4,6 +4,7 @@
 
 import {
   ANCHORED_POPOVER_SOURCES,
+  COUNT_ADVANTAGE_FOOTER,
   CRAFTING_PROGRESSIVE,
   CRAFTING_ROUTED_CHECK,
   CRAFTING_ROUTED_INGREDIENTS,
@@ -81,6 +82,7 @@ export const CASES = Object.freeze([
     ],
     expectSelector:
       `${SINGLE_PROMPT}:not(:has(button[data-action="advantage"]))` +
+      ':has(.manager-modal-footer button[data-action="roll"][type="submit"])' +
       ':has(.manager-modal-subtitle:has-text("Bend Horseshoe"))' +
       ':has(.formula-content .formula:has-text("2d6 + 3"))' +
       ':has(.formula-content .manager-chip:has-text("DC 15 · meet or beat"))',
@@ -382,7 +384,8 @@ export const CASES = Object.freeze([
       { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
     ],
     expectSelector:
-      `${SINGLE_PROMPT}:not(:has(button[data-action="advantage"]))` +
+      SINGLE_PROMPT +
+      COUNT_ADVANTAGE_FOOTER +
       ':has(.manager-modal-subtitle:text-is("Sera Vane · Fine Craft"))' +
       ':has(.formula-content .formula[data-roll-prompt-count="over"]:text-is("6d10 · each ≥ 8"))' +
       ':has(.formula-content .formula-note:text-is("Success on ≥ 8 · explodes on 10 · 1 cancels a success"))' +
@@ -407,7 +410,8 @@ export const CASES = Object.freeze([
       { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
     ],
     expectSelector:
-      `${SINGLE_PROMPT}:not(:has(button[data-action="advantage"]))` +
+      SINGLE_PROMPT +
+      COUNT_ADVANTAGE_FOOTER +
       ':has(.manager-modal-subtitle:text-is("Sera Vane · Complex Work"))' +
       ':has(.formula-content .formula[data-roll-prompt-count="under"]:text-is("2d20 · each ≤ 14"))' +
       ':has(.formula-content .formula-note:text-is("Success on ≤ 14 (character value 13), moved +1 by modifiers"))' +
@@ -506,6 +510,7 @@ export const CASES = Object.freeze([
     ],
     expectSelector:
       `${SINGLE_PROMPT}:not(:has(button[data-action="advantage"]))` +
+      ':has(.manager-modal-footer button[data-action="roll"][type="submit"])' +
       ':has(.manager-modal-subtitle:has-text("Bend Horseshoe"))' +
       ':has(.formula-content .formula:has-text("2d6 + 3"))' +
       ':has(.formula-content .manager-chip:has-text("DC 15 · meet or beat"))',

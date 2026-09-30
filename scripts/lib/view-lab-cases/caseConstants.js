@@ -164,3 +164,9 @@ export const ANCHORED_POPOVER_SOURCES = Object.freeze([
 /** The environment editor's directory, minus its validation tab (issue 1517). */
 export const ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB =
   /^src\/ui\/svelte\/apps\/manager\/environment\/(?!EnvironmentValidationTab\.svelte$)/;
+
+/** A count check's default advantage footer (issue 2007): one die either way around the one Roll. */
+export const COUNT_ADVANTAGE_FOOTER =
+  ':has(.manager-modal-footer button[data-action="disadvantage"] .action-note:text-is("−1 die"))' +
+  ':has(.manager-modal-footer button[data-action="normal"][type="submit"])' +
+  ':has(.manager-modal-footer button[data-action="advantage"] .action-note:text-is("+1 die"))';
