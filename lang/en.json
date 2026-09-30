@@ -6499,7 +6499,7 @@
             "IssueRetiredPlaceholderBreaksFormulaTitle": "@craftingmod breaks this formula",
             "IssueAdvantageKeepNoDieTitle": "Advantage cannot keep from this formula",
             "IssueAdvantageKeepAfterReferenceTitle": "A character value precedes the kept dice",
-            "IssueAdvantageBonusInvalidTitle": "The advantage bonus is not a dice expression",
+            "IssueAdvantageBonusInvalidTitle": "The advantage bonus cannot be rolled",
             "IssueUnnamedOutcomeTitle": "An outcome tier has no name",
             "IssueNoSuccessOutcomeTitle": "No tier counts as a success",
             "IssueRangeInvalidTitle": "A band ends before it starts",
