@@ -330,7 +330,7 @@ The prompt is not shown at all when no selected item has a usable check, and dis
   A roll-high check against a fixed DC states `Needed` (`DC {T}, meet or beat`, or `DC {T}, beat` when strict) and `Margin` (`{±n}`).
   Every other summed check states `Target`, `Pre-rolled` and `Margin`:
   - `Target` reads `{T} · {character} {expression} {value}, {tier} {adjustment}, tools {±t}, modifiers {±m}, situational {±s}`, such as `14 · Sera Vane @skills.smith.level 12, Hard Work −2, modifiers +1, situational +3`, naming only the parts the record holds; a record without the typed formula reads `character value {v}`, one without the tier's name `difficulty {adjustment}`, a fixed anchor `fixed`, and a record without terms the bare number;
-  - `Pre-rolled` reads `{label} {formula} rolled {n}, raising the target` for each pre-roll that landed on the target, joined by semicolons, with the one pair of brackets the resolver wraps a rolled modifier in dropped and an unlabelled one named `Tool`, `Modifier` or `Situational`;
+  - `Pre-rolled` reads `{label} {formula} rolled {n}, raising the target` for each pre-roll that landed on the target (`lowering the target` for a disadvantaged bonus die, labelled `Disadvantage`, whose unsigned roll the target loses), joined by semicolons, with the one pair of brackets the resolver wraps a rolled modifier in dropped and an unlabelled one named `Tool`, `Modifier` or `Situational`;
   - `Margin` reads `{±n} under the target` under a roll-under check and `{±n}` otherwise.
 
   A fixed range, an Otherwise tier and a progressive result have no target, so they state neither a target nor a margin, and a legacy record omits every row its evidence lacks.
@@ -345,7 +345,7 @@ The prompt is not shown at all when no selected item has a usable check, and dis
 - **A counting check states its executed dice.**
   For a public, non-secret counting check (`publicroll` on V13, `public` on V14) the crafting, salvage and bulk salvage cards show the die tiles and the count rows, and the summary line `{pool}d{die}, each {sym} {threshold}` replaces the numeric roll row.
   Each active die is one tile in roll order with its marks combined (✓ qualified, ✕ cancelled, ↻ exploded), and each explosion roll is its own tile straight after the die that produced it.
-  The rows are `Success on` (only when the threshold read the character or modifiers moved it), `Count`, `Needed` (`{required} · margin {±m}`, or `{required} · a net below zero is a botch`) and `Pre-rolled`; a pool reduced to zero states `Pool` and `Result` instead, shows no tile and prints no roll total.
+  The rows are `Success on` (only when the threshold read the character or modifiers moved it), `Count`, `Needed` (`{required} · margin {±m}`, or `{required} · a net below zero is a botch`) and `Pre-rolled`; a pool reduced to zero states `Pool` and `Result` instead, shows no tile and prints no roll total, and names dice that Disadvantage removed as a `disadvantage` penalty.
   A failed count that netted below zero reads `Botch` in place of the Failure pill.
   That evidence is handed to the card builder at post time from the engine's own execution and is never persisted into check data, run history, a roll handoff or message flags; a secret check keeps it inside the authority.
   A gmroll, blindroll or selfroll count card, or a secret one, shows no count rows or tiles, and the card is never whispered to compensate.

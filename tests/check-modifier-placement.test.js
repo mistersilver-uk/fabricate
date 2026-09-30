@@ -362,9 +362,9 @@ test('a valid library pre-roll failure aborts the real runner before its main ro
   }
 });
 
-// The count offer is live (issue 2007); the engine's pool step lands with the count rule.
-test('a count check offers its count rule, and drops a supplied advantage before placement', async () => {
-  const dice = installCountDice({ faces: [9, 9] });
+// The count rule (issue 2007) adds its dice to the pool whatever the modifier destination.
+test('a count check offers its count rule, and adds its die to the pool', async () => {
+  const dice = installCountDice({ faces: [9, 9, 9] });
   const prompts = [];
   try {
     const result = await evaluateCheckRoll('1d20', { getRollData: () => ({}) }, {
@@ -381,9 +381,9 @@ test('a count check offers its count rule, and drops a supplied advantage before
       { advantage: true, disadvantage: true, kind: 'count', detail: { dice: 1 } },
       'the count rule offers both buttons, never the retained 1d20'
     );
-    assert.equal(result.modifierPlacement.poolDelta, 0, 'no advantage die joins the pool');
+    assert.equal(result.modifierPlacement.poolDelta, 1, 'the advantage die joins the pool');
     assert.equal(result.modifierPlacement.thresholdDelta, -2, 'the bonus still moves the threshold');
-    assert.deepEqual(dice.formulas(), ['2d10'], 'two dice, and the retained formula never rolls');
+    assert.deepEqual(dice.formulas(), ['3d10'], 'three dice, and the retained formula never rolls');
   } finally {
     dice.restore();
   }

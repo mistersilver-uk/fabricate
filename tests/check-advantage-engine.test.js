@@ -1,17 +1,20 @@
 /**
  * The advantage rule at every check site (issue 2007): each site threads its own record to the
  * engine, the engine rolls only a button that record's offer includes whatever transport carried
- * it (MA8, MA9, MA15), and a prepared check rolls its prepare-time snapshot (MA16).
+ * it (MA8, MA9, MA15), and a prepared check rolls its prepare-time snapshot (MA16). A bonus die
+ * and a count pool change act as the chosen button's one contribution (MA10 to MA14).
  */
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it } from 'node:test';
 
 import {
+  evaluateCheckRoll,
   evaluatePreparedCraftingCheck,
   evaluatePreparedRunCheck,
   runFormulaPassFail,
   runFormulaProgressive,
 } from '../src/systems/checkRoll.js';
+import { resolveCheckDecision } from '../src/systems/checkRollDecision.js';
 import { rollActorCheck } from '../src/systems/companionCheckRoll.js';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { GatheringEngine } from '../src/systems/GatheringEngine.js';
@@ -22,6 +25,8 @@ import {
 import { RUN_LIFECYCLE_VERSION } from '../src/systems/runLifecycleState.js';
 import { buildInteractiveRollOptions } from '../src/ui/svelte/apps/crafting/rollPrompt.js';
 
+import { installCountDice } from './helpers/countEngineDice.js';
+import { countEvaluation, preparedCountCheck } from './helpers/countFixtures.js';
 import { gatheringFixture } from './helpers/real-gathering-attempt.js';
 import { stubPromptSurface } from './helpers/rollPromptDialogStub.js';
 import { installTermBearingRoll } from './helpers/termBearingRoll.js';
@@ -363,5 +368,177 @@ describe('validatedPreparedDecision', () => {
       chosenModifierIds: ['b'],
     });
     assert.equal(validatedPreparedDecision({ rollMode: 'loud' }, null, KEEP).rollMode, null);
+  });
+});
+
+const OVER = Object.freeze({ product: 'sum', direction: 'over', target: { source: 'fixed' } });
+const UNDER = Object.freeze({ product: 'sum', direction: 'under', target: { source: 'fixed' } });
+
+/** Roll `1d20 + 3` under a bonus-die rule with a forwarded `choice`; the double's d8 rolls 5. */
+function rollBonus({ evaluation, choice, expression = '1d6', bonus = null }) {
+  return evaluateCheckRoll(FORMULA, ACTOR, {
+    evaluation,
+    interactive: true,
+    rollDecision: { advantage: choice, bonus },
+    advantage: { mode: 'bonus', bonusExpression: expression },
+  });
+}
+
+describe('a bonus die is one advantage contribution', () => {
+  it('sum/over rolls it in the main roll after the situational bonus (MA10)', async () => {
+    const result = await rollBonus({ evaluation: OVER, choice: 'advantage', bonus: '2' });
+    assert.equal(rolled.at(-1), '1d20 + 3 + (2) + (1d6)');
+    assert.equal(result.resolvedFormula, '1d20 + 3 + (2) + (1d6)');
+    assert.deepEqual(
+      result.modifierPlacement.appendTerms.map(({ source, label, expression }) => ({
+        source,
+        label,
+        expression,
+      })),
+      [
+        { source: 'situational', label: '', expression: '2' },
+        { source: 'advantage', label: 'Advantage', expression: '1d6' },
+      ]
+    );
+    assert.deepEqual(result.modifierPlacement.preRolls, []);
+  });
+
+  it('Disadvantage over subtracts the whole expression (MA11)', async () => {
+    const result = await rollBonus({
+      evaluation: OVER,
+      choice: 'disadvantage',
+      expression: '1d8 + 1',
+    });
+    assert.equal(rolled.at(-1), '1d20 + 3 - (1d8 + 1)');
+    const [term] = result.modifierPlacement.appendTerms;
+    assert.deepEqual([term.label, term.expression, term.negate], ['Disadvantage', '1d8 + 1', true]);
+  });
+
+  it('Disadvantage under pre-rolls the expression unsigned and lowers the target by it (MA11)', async () => {
+    const { modifierPlacement: placement } = await rollBonus({
+      evaluation: UNDER,
+      choice: 'disadvantage',
+      expression: '1d8 + 1',
+    });
+    assert.deepEqual(rolled, ['1d8 + 1', FORMULA], 'one unsigned pre-roll, then the main roll');
+    assert.equal(placement.preRolls.length, 1);
+    const [preRoll] = placement.preRolls;
+    assert.deepEqual(
+      [preRoll.expression, preRoll.destination, preRoll.total, preRoll.negate],
+      ['1d8 + 1', 'target', 6, true]
+    );
+    assert.equal(placement.targetDelta, -preRoll.total);
+  });
+
+  it('Advantage under raises the target and leaves the rolled formula alone (MA12)', async () => {
+    const { modifierPlacement: placement, resolvedFormula } = await rollBonus({
+      evaluation: UNDER,
+      choice: 'advantage',
+    });
+    assert.equal(rolled.at(-1), FORMULA);
+    assert.equal(resolvedFormula, FORMULA);
+    assert.deepEqual(placement.appendTerms, []);
+    assert.deepEqual(
+      placement.preRolls.map(({ source, label, expression, destination, total, negate }) => ({
+        source,
+        label,
+        expression,
+        destination,
+        total,
+        negate,
+      })),
+      [
+        {
+          source: 'advantage',
+          label: 'Advantage',
+          expression: '1d6',
+          destination: 'target',
+          total: 4,
+          negate: undefined,
+        },
+      ]
+    );
+    assert.equal(placement.targetDelta, 4);
+  });
+
+  it('a button the rule does not offer places nothing', async () => {
+    const result = await evaluateCheckRoll(FORMULA, ACTOR, {
+      evaluation: OVER,
+      interactive: true,
+      rollDecision: { advantage: 'disadvantage' },
+      advantage: { mode: 'bonus', bonusExpression: '1d6', offerDisadvantage: false },
+    });
+    assert.equal(rolled.at(-1), FORMULA);
+    assert.deepEqual(result.modifierPlacement.appendTerms, []);
+  });
+});
+
+const fromAdvantage = ({ source }) => source === 'advantage';
+
+/** A count check's decision under `advantage` with a forwarded `choice`, destination threshold. */
+function countDecision(advantage, choice) {
+  return resolveCheckDecision({
+    authoredFormula: '1d20',
+    actor: ACTOR,
+    options: { interactive: true, rollDecision: { advantage: choice }, advantage },
+    evaluation: countEvaluation({ modifierDestination: 'threshold' }),
+    deferred: false,
+    resolvedCheck: { formula: '', selected: [] },
+    displayFormula: () => null,
+    Roll: globalThis.Roll,
+  });
+}
+
+describe('a counting check adds or removes dice on the pool', () => {
+  it('moves the pool by countDice either way, whatever the modifier destination (MA13)', async () => {
+    const advantaged = await countDecision({ countDice: 3 }, 'advantage');
+    const disadvantaged = await countDecision({ countDice: 3 }, 'disadvantage');
+    assert.deepEqual(
+      [advantaged.placementPlan.poolDelta, disadvantaged.placementPlan.poolDelta],
+      [3, -3]
+    );
+    assert.equal(advantaged.placementPlan.thresholdDelta, 0);
+    assert.deepEqual(advantaged.contributions.filter(fromAdvantage), [
+      { source: 'advantage', label: 'Advantage', form: 'scalar', value: 3 },
+    ]);
+  });
+
+  it('a stale bonus mode still uses the count rule', async () => {
+    const decision = await countDecision({ mode: 'bonus', countDice: 2 }, 'advantage');
+    assert.equal(decision.placementPlan.poolDelta, 2);
+  });
+
+  it('leaves the pool alone when the rule is off (MA14)', async () => {
+    const decision = await countDecision({ countEnabled: false, countDice: 3 }, 'advantage');
+    assert.equal(decision.placementPlan.poolDelta, 0);
+    assert.deepEqual(decision.contributions.filter(fromAdvantage), []);
+  });
+
+  it('rolls the changed pool through the count Roll', async () => {
+    const dice = installCountDice({ faces: [9, 3, 8, 1, 2], chat: false });
+    restores.push(dice.restore);
+    const roll = (advantage, choice) =>
+      runFormulaPassFail({
+        formula: '',
+        dc: 1,
+        actor: ACTOR,
+        evaluation: countEvaluation(),
+        rollOptions: { interactive: true, rollDecision: { advantage: choice }, advantage },
+      });
+    await roll({ countDice: 3 }, 'advantage');
+    await roll({ countDice: 1 }, 'disadvantage');
+    await roll({ countEnabled: false }, 'advantage');
+    assert.deepEqual(dice.formulas(), ['5d10', '1d10', '2d10']);
+  });
+
+  it('a prepared count check changes the pool by its snapshot rule', async () => {
+    const dice = installCountDice({ faces: [9, 3, 8, 1], chat: false });
+    restores.push(dice.restore);
+    const preparation = preparedCountCheck();
+    preparation.checkConfig.advantage = { countDice: 2 };
+    const offer = { advantage: true, disadvantage: true, kind: 'count', detail: { dice: 2 } };
+    const policy = preparedDecisionPolicy({ allowAdvantage: true, advantageOffer: offer });
+    await evaluatePreparedRunCheck(preparation, ACTOR, { ...policy, advantage: 'advantage' });
+    assert.deepEqual(dice.formulas(), ['4d10']);
   });
 });

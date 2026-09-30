@@ -1988,6 +1988,12 @@
         "Botched": "Botched. Nothing is produced; the failure policy applies.",
         "SalvageLine": "Salvage check · {count} successes needed · d{die}s, success on {symbol} {threshold}",
         "SalvageLineOne": "Salvage check · 1 success needed · d{die}s, success on {symbol} {threshold}"
+      },
+      "Advantage": {
+        "Advantage": "Advantage",
+        "Disadvantage": "Disadvantage",
+        "PreRollLowering": "{label} {formula} rolled {total}, lowering the target",
+        "SourceDisadvantage": "disadvantage"
       }
     },
     "Knowledge": {

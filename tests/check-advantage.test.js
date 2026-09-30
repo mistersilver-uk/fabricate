@@ -335,7 +335,8 @@ describe('evaluateCheckRoll keeps on the constructed Roll', () => {
 
   it('keeps nothing when the rule is off or bonus, or disadvantage is not offered', async () => {
     assert.equal(await rolled('1d20', 'advantage', { advantage: { mode: 'off' } }), '1d20');
-    assert.equal(await rolled('1d20', 'advantage', { advantage: { mode: 'bonus' } }), '1d20');
+    const bonus = { advantage: { mode: 'bonus' } };
+    assert.equal(await rolled('1d20', 'advantage', bonus), '1d20 + (1d6)', 'a bonus die, no keep');
     const noDisadvantage = { offerDisadvantage: false };
     assert.equal(await rolled('1d20', 'disadvantage', { advantage: noDisadvantage }), '1d20');
     assert.equal(await rolled('1d20', 'advantage', { advantage: noDisadvantage }), '2d20kh1');
