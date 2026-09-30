@@ -157,7 +157,8 @@ Stating this positively is required rather than optional: a companion author who
 
 A Standalone Check Roll is therefore **not "a Fabricate check"**.
 A Fabricate check is always taken on a subject inside a crafting system, and carries that system's modifier catalogue, combination rule, tool bonuses, authored triggers, tier stepping and failure-result policy.
-A Standalone Check Roll is `@`-placeholder resolution against the actor's roll data, the retired-placeholder shim, the Advantage/Disadvantage rewrite, the free-text situational bonus with its `Roll.validate` net, the roll mode and the chat post, and the pass/fail or raw-total answer — **without the system-derived terms**, because there is no crafting system and no subject to derive them from.
+A Standalone Check Roll is `@`-placeholder resolution against the actor's roll data, the retired-placeholder shim, the default advantage rule (issue 2007; R2) applied to the formula's authored first dice group — keep, one extra die, disadvantage offered, kept by direction — the free-text situational bonus with its `Roll.validate` net, the roll mode and the chat post, and the pass/fail or raw-total answer — **without the system-derived terms**, because there is no crafting system and no subject to derive them from.
+A count row's forwarded Advantage answers ±1 die on the pool, the same default the record's `countDice` default states.
 
 Two members publish it.
 
@@ -199,7 +200,7 @@ Malformed evaluation refuses `evaluationInvalid`; a valid combination absent fro
 Sum-under and attribute-target requests are active on the rows above interactively too, through the shared roll prompt and a forwarded decision (issue 2005), and so are count requests (issue 2006).
 An interactive count request opens the shared roll prompt through its ManagerModal host, on the standalone overlay when no Fabricate window started it, showing the settled pool line and the successes needed; it posts the count Roll and grades against `pool.required`.
 A forwarded count decision opens no prompt, and its bonus adds dice or moves the threshold as the pool's `modifierDestination` says, graded the same way.
-An interactive count request that forwards Advantage or Disadvantage, or whose pool has additional dice enabled, refuses `evaluationUnsupported` before any prompt or roll until the count Advantage and additional-dice successors; a non-interactive count request rolls its authored pool alone.
+An interactive or forwarded count request that carries Advantage or Disadvantage moves `poolDelta` by the check's `countDice` (issue 2007), the same rule a crafting or salvage count check honours, rather than refusing; a count request whose pool has additional dice enabled still refuses `evaluationUnsupported` before any prompt or roll until the additional-dice successor, and a non-interactive count request naming neither rolls its authored pool alone.
 An interactive request for any non-interactive row, a forwarded decision included, refuses `evaluationUnsupported` before any prompt or roll.
 A count request ignores `formula` (`noFormula` applies to sum only, through the shared active-check predicate) and grades exclusively against `pool.required`, ignoring any `dc` or target.
 An unresolved or non-numeric pool `base` or `threshold` refuses `poolUnresolved` before any roll, and every other pool refusal — an invalid `die`, `explode`, `cancel`, or the settled pool itself — refuses `evaluationInvalid` before any Roll is constructed.
@@ -227,7 +228,8 @@ Then **strictly `value === null`**, never a falsy test, because a legitimate rol
 Otherwise grade on the runner's own `outcome`.
 The naive discriminator — a false `success` with a null value — is true of a throw, a dismissal and a cancel alike; derived, it reports a broken formula as "the GM declined", and the companion silently does nothing forever with nothing in the console.
 
-`allowAdvantage` is computed over the **usable subset** of the supplied formulas and is all-or-nothing across it: offering Advantage only some rolls could honour would be a lie about the rest of the batch, and denying it because of a formula that can never roll would be a lie about the ones that can.
+`allowAdvantage` is computed over the **usable subset** of the supplied formulas, with the same first-group proof the crafting and salvage producers use, and is all-or-nothing across it: offering Advantage only some rolls could honour would be a lie about the rest of the batch, and denying it because of a formula that can never roll would be a lie about the ones that can.
+It stays a boolean, as every other published shape does, and the schema version and authorization order are unchanged.
 A batch with **no** usable formula answers `nothingToDecide` with `success: true`, a null decision and an empty `covered`, and opens no dialog — "there is nothing to prompt about" is a correct answer, not a failure.
 The bulk prompt's item count is the caller's **whole batch**, not the usable subset, matching the shipped bulk-salvage prompt.
 
