@@ -27,6 +27,9 @@ const KEYS = Object.freeze({
   neededBotch: 'FABRICATE.Check.CountEvidence.NeededBotch',
   preRolled: 'FABRICATE.Check.Evidence.PreRolled',
   preRollDice: 'FABRICATE.Check.CountEvidence.PreRollDice',
+  preRollDiceOne: 'FABRICATE.Check.CountEvidence.PreRollDiceOne',
+  preRollDiceRemoved: 'FABRICATE.Check.CountEvidence.PreRollDiceRemoved',
+  preRollDiceRemovedOne: 'FABRICATE.Check.CountEvidence.PreRollDiceRemovedOne',
   preRollThreshold: 'FABRICATE.Check.CountEvidence.PreRollThreshold',
   pool: 'FABRICATE.Check.CountEvidence.Pool',
   poolReduced: 'FABRICATE.Check.CountEvidence.PoolReduced',
@@ -138,6 +141,12 @@ function neededRow(count, loc) {
   return { id: 'needed', label: loc(KEYS.needed), text };
 }
 
+/** The pool key for a rolled total: dice added, or removed below zero, singular for one. */
+function preRollDiceKey(total) {
+  if (total < 0) return total === -1 ? KEYS.preRollDiceRemovedOne : KEYS.preRollDiceRemoved;
+  return total === 1 ? KEYS.preRollDiceOne : KEYS.preRollDice;
+}
+
 /** Each pre-roll that grew the pool or moved the threshold, in the order it settled. */
 function preRolledRow(display, loc) {
   const text = (display.evidence?.preRolls ?? [])
@@ -146,9 +155,12 @@ function preRolledRow(display, loc) {
       const facts = {
         label: preRollLabel(entry, loc),
         formula: bareExpression(entry.expression),
-        total: entry.total,
+        total: formatNet(entry.total),
       };
-      if (entry.destination === 'pool') return fill(loc(KEYS.preRollDice), facts);
+      if (entry.destination === 'pool') {
+        const removed = Math.abs(entry.total);
+        return fill(loc(preRollDiceKey(entry.total)), { ...facts, removed });
+      }
       const moved = formatSignedStep(entry.total);
       return fill(loc(KEYS.preRollThreshold), { ...facts, moved });
     })

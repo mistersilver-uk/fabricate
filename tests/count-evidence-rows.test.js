@@ -124,6 +124,20 @@ test('Pre-rolled states the dice a rolled bonus added and the threshold it moved
   assert.match(lowered[1], /moving the threshold −2$/, 'a rolled penalty reads negative');
 });
 
+test('Pre-rolled names one die in the singular and a negative roll as dice removed', () => {
+  const preRolled = (total) =>
+    rows(
+      counted({
+        preRolls: [
+          { source: 'situational', label: '', expression: '1d4', total, destination: 'pool' },
+        ],
+      })
+    ).find(([id]) => id === 'preRolled')[1];
+  assert.equal(preRolled(1), 'Situational 1d4 rolled 1, adding 1 die');
+  assert.equal(preRolled(-2), 'Situational 1d4 rolled −2, removing 2 dice');
+  assert.equal(preRolled(-1), 'Situational 1d4 rolled −1, removing 1 die');
+});
+
 test('a check with no required count, progressive or fixed-range, states no Needed row', () => {
   const display = counted({ count: { required: null, margin: null, net: 2 } });
   assert.deepEqual(
