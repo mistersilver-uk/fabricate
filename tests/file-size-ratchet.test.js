@@ -36,7 +36,8 @@ const GUIDANCE =
   'a unit crossed its threshold in this change, "rose" that an oversized one grew: extract a ' +
   'cohesive unit instead of adding to the nearest large one. A function is matched by its ' +
   'qualified name, same-named `#N` siblings and renames by size, so a rename is not new; a piece ' +
-  'split out of an oversized function that is still oversized says "split further".';
+  'split out of an oversized function that is still oversized says "split further". A line that ' +
+  'is only a ratchet-exempt marker is not counted, so any family may record a reason inside a unit.';
 
 const inCorpus = (file) =>
   file.startsWith(`${CORPUS_ROOT}/`) && SCANNED_EXTENSIONS.includes(extname(file));
@@ -64,15 +65,27 @@ function functionsOf(file, text) {
   }
 }
 
+/** A line holding nothing but a `ratchet-exempt` marker, in any of the three comment forms. */
+const MARKER_ONLY =
+  /^\s*(?:\/\/\s*ratchet-exempt\(.*|\/\*\s*ratchet-exempt\(.*\*\/|<!--\s*ratchet-exempt\(.*-->)\s*$/u;
+
+/** The 1-based lines of `text` that are only a marker: a recorded reason for any family, not growth. */
+function markerOnlyLines(text) {
+  return text.split('\n').flatMap((line, index) => (MARKER_ONLY.test(line) ? [index + 1] : []));
+}
+
 /** Every file and function one side lists, oversized or not, since matching sees them all. */
 function measureUnits(readFile, listFiles) {
   return listFiles().flatMap((file) => {
     const text = readFile(file);
     if (text === undefined) return [];
+    const markers = markerOnlyLines(text);
+    const within = (first, count) =>
+      markers.filter((line) => line >= first && line < first + count).length;
     const whole = {
       file,
       id: FILE_ID,
-      amount: physicalLines(text),
+      amount: physicalLines(text) - markers.length,
       lines: [1],
       limit: thresholdOf(file),
     };
@@ -80,7 +93,7 @@ function measureUnits(readFile, listFiles) {
       file,
       id: `function ${unit.symbol}`,
       symbol: unit.symbol,
-      amount: unit.lines,
+      amount: unit.lines - within(unit.line, unit.lines),
       lines: [unit.line],
       limit: FUNCTION_THRESHOLD,
     }));
@@ -303,6 +316,23 @@ test('a reasoned marker at the unit exempts it, and an empty one fails', () => {
     'src/b.js:6 has a ratchet-exempt(file-size) marker with no reason; write why the regression ' +
       'is legitimate after the colon',
   ]);
+});
+
+test("a line that is only another family's marker is not growth, and a code line still is", () => {
+  const view = '<p>x</p>\n'.repeat(510);
+  const repo = srcRepo({ 'src/a.js': moduleOf(fn('huge', 120)), 'src/View.svelte': view });
+  const marked = (size) =>
+    moduleOf(fn('huge', size)).replace(
+      '  void 0;',
+      '  // ratchet-exempt(world-scope): x\n  void 0;'
+    );
+  repo.write({
+    'src/a.js': marked(120),
+    'src/View.svelte': `<!-- ratchet-exempt(design-system): a reason -->\n${view}`,
+  });
+  assert.deepEqual(repo.compare().failures, []);
+  repo.write({ 'src/a.js': marked(121) });
+  assert.deepEqual(repo.compare().failures, ['src/a.js: function huge rose from 120 to 121']);
 });
 
 test('a symbol is matched across every function, so a small one growing past the line fails', () => {
