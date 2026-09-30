@@ -5,10 +5,10 @@
  */
 
 /** Past this, each runner's fixed setup (install, build, harvest) outweighs the frames it saves. */
-export const MAX_CAPTURE_SHARDS = 8;
+export const MAX_CAPTURE_SHARDS = 12;
 
 /** Below this many cases per runner a second runner costs more setup than it saves rendering. */
-export const CASES_PER_SHARD = 45;
+export const CASES_PER_SHARD = 30;
 
 /**
  * @param {number} size How many cases the selection holds.

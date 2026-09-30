@@ -68,8 +68,8 @@ jobs:
   # THE TIMEOUTS ARE ONE BUDGET. `check-screenshots` waits on this workflow's whole run, and its
   # `--capture-timeout-minutes` in `ci.yml` must equal select + warm-foundry + the longer of
   # render and verify-chrome (which run side by side) + capture;
-  # `tests/ci-workflow-semantics.test.js` asserts that sum. The full registry, split eight ways,
-  # is about eighty frames a runner.
+  # `tests/ci-workflow-semantics.test.js` asserts that sum. The full registry, split twelve ways,
+  # is about fifty-five frames a runner.
   select:
     # Same-repo PRs only. A fork PR has no secrets to harvest with and no write token to publish
     # with, so running it would produce a guaranteed red that its author cannot clear.

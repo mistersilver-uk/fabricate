@@ -21,8 +21,10 @@ test('a small selection renders on one runner, and an empty one on none', () => 
   assert.equal(shardCountFor(CASES_PER_SHARD), 1);
   assert.equal(shardCountFor(CASES_PER_SHARD + 1), 2);
   assert.equal(shardCountFor(10_000), MAX_CAPTURE_SHARDS);
-  // Sized so a selection like the 357 frames that prompted sharding runs as eight shards of 45.
-  assert.equal(shardCountFor(357), 8);
+  // Sized so a selection like the 357 frames that prompted sharding runs as twelve shards of
+  // about 30: a runner's setup is about 40 seconds, so rendering is what a shard must keep short.
+  assert.equal(shardCountFor(357), 12);
+  assert.ok(Math.max(...sliceSelection(plain(357), 12).map((slice) => slice.length)) <= 30);
   assert.deepEqual(sliceSelection(plain(12), shardCountFor(12)), [plain(12).map(({ id }) => id)]);
   assert.deepEqual(sliceSelection([], 4), []);
 });
@@ -128,9 +130,10 @@ test('an unarmed gate renders no shard, and an armed one numbers its shards from
   const cases = plain(100);
   assert.deepEqual(renderMatrix(cases, false), []);
   const matrix = renderMatrix(cases, true);
+  assert.ok(matrix.length > 1, 'a hundred cases must take more than one shard');
   assert.deepEqual(
     matrix.map((entry) => entry.shard),
-    [1, 2, 3]
+    Array.from({ length: shardCountFor(cases.length) }, (_, index) => index + 1)
   );
   assert.deepEqual(matrix.flatMap((entry) => entry.ids.split(',')).sort(), cases.map(({ id }) => id));
 });
