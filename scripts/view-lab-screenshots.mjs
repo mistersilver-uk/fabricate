@@ -41,7 +41,7 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { availableParallelism, tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -52,6 +52,11 @@ import { APP_CHROME, APP_CHROME_IDS, minimumViewportFor } from './lib/foundryChr
 import { partitionConsoleErrors, publishableCases } from './lib/viewLabCases.js';
 import { groupFrames, renderIndexHtml, summarise } from './lib/viewLabIndex.js';
 import { assertViewLabLayout } from './lib/viewLabLayoutAssertion.js';
+import {
+  mapInPool,
+  rejectDuplicateEvidence,
+  resolveRenderConcurrency,
+} from './lib/viewLabRenderPool.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const ARTIFACT_DIR = join(ROOT, 'ui-screenshot-artifact');
@@ -623,6 +628,67 @@ function mergeManifest({ existing, rendered, outputDir }) {
     .sort((left, right) => left.id.localeCompare(right.id));
 }
 
+/** How one case drives `renderPage`. */
+function renderOptionsFor(viewCase) {
+  return {
+    appId: viewCase.app,
+    query: {
+      ...viewCase.query,
+      case: viewCase.id,
+      ...(viewCase.position && {
+        w: String(viewCase.position.width),
+        h: String(viewCase.position.height),
+      }),
+    },
+    label: viewCase.id,
+    steps: viewCase.steps ?? [],
+    expectView: viewCase.expectView ?? null,
+    // The player app has no declared route field: the tab it was asked for is the tab it must
+    // be showing.
+    expectTab: viewCase.app === 'fabricate-app' ? (viewCase.query?.tab ?? 'crafting') : null,
+    expectSelector: viewCase.expectSelector ?? null,
+    expectLayout: viewCase.expectLayout ?? null,
+    expectAttributes: viewCase.expectAttributes ?? [],
+    expectVisible: viewCase.expectVisible ?? null,
+    expectContained: viewCase.expectContained ?? [],
+    expectCenterHit: viewCase.expectCenterHit ?? null,
+    expectClick: viewCase.expectClick ?? null,
+    expectNoHorizontalOverflow: viewCase.expectNoHorizontalOverflow ?? null,
+    expectOverflowY: viewCase.expectOverflowY ?? null,
+    expectScrollable: viewCase.expectScrollable ?? null,
+    allowedConsoleErrors: viewCase.allowedConsoleErrors ?? [],
+  };
+}
+
+const frameSize = (box) => ({ width: Math.round(box.width), height: Math.round(box.height) });
+
+function writeFrame(outputDir, viewCase, { buffer, box }) {
+  writeFileSync(join(outputDir, `${viewCase.id}.png`), buffer);
+  const { width, height } = frameSize(box);
+  console.log(`  ok    ${viewCase.id}.png  ${width}x${height}`);
+}
+
+function logFailure(id, message) {
+  console.log(`  FAIL  ${id}: ${message.split('\n', 1)[0]}`);
+}
+
+/**
+ * Render one case in its own context. A frame in a `distinctEvidenceGroup` is held back for the
+ * check that needs the whole selection; any other is written at once and its buffer dropped.
+ */
+async function renderCase(browser, baseUrl, viewCase, outputDir) {
+  try {
+    const frame = await renderPage(browser, baseUrl, renderOptionsFor(viewCase));
+    if (viewCase.distinctEvidenceGroup) return frame;
+    writeFrame(outputDir, viewCase, frame);
+    return { buffer: null, box: frame.box };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logFailure(viewCase.id, message);
+    return { error: message };
+  }
+}
+
 async function commandApps() {
   const cache = ensureChrome();
   assertViewportFits();
@@ -661,77 +727,37 @@ async function commandApps() {
     return 0;
   }
 
+  const concurrency = resolveRenderConcurrency(
+    process.env.VIEW_LAB_CONCURRENCY,
+    availableParallelism()
+  );
   const server = await startLabServer();
   const browser = await chromium.launch({ headless: true, args: LAUNCH_ARGS });
   // Pay Vite's cold dep-optimise once, on a throwaway page, before any case is timed.
   await warmUpLabServer(browser, server.baseUrl);
-  const rendered = [];
-  const failures = [];
-  const distinctEvidence = new Map();
+  console.log(`rendering ${cases.length} cases, ${concurrency} at a time`);
+  let outcomes;
   try {
-    for (const viewCase of cases) {
-      try {
-        const { buffer, box } = await renderPage(browser, server.baseUrl, {
-          appId: viewCase.app,
-          query: {
-            ...viewCase.query,
-            case: viewCase.id,
-            ...(viewCase.position && {
-              w: String(viewCase.position.width),
-              h: String(viewCase.position.height),
-            }),
-          },
-          label: viewCase.id,
-          steps: viewCase.steps ?? [],
-          expectView: viewCase.expectView ?? null,
-          // The player app has no declared route field: the tab it was asked for is the tab it must
-          // be showing.
-          expectTab: viewCase.app === 'fabricate-app' ? (viewCase.query?.tab ?? 'crafting') : null,
-          expectSelector: viewCase.expectSelector ?? null,
-          expectLayout: viewCase.expectLayout ?? null,
-          expectAttributes: viewCase.expectAttributes ?? [],
-          expectVisible: viewCase.expectVisible ?? null,
-          expectContained: viewCase.expectContained ?? [],
-          expectCenterHit: viewCase.expectCenterHit ?? null,
-          expectClick: viewCase.expectClick ?? null,
-          expectNoHorizontalOverflow: viewCase.expectNoHorizontalOverflow ?? null,
-          expectOverflowY: viewCase.expectOverflowY ?? null,
-          expectScrollable: viewCase.expectScrollable ?? null,
-          allowedConsoleErrors: viewCase.allowedConsoleErrors ?? [],
-        });
-        if (viewCase.distinctEvidenceGroup) {
-          const prior = distinctEvidence.get(viewCase.distinctEvidenceGroup) ?? [];
-          const duplicate = prior.find((entry) => entry.buffer.equals(buffer));
-          if (duplicate) {
-            throw new Error(
-              `evidence frame is byte-identical to ${duplicate.id} in distinct group ` +
-                `'${viewCase.distinctEvidenceGroup}'`
-            );
-          }
-          distinctEvidence.set(viewCase.distinctEvidenceGroup, [
-            ...prior,
-            { id: viewCase.id, buffer },
-          ]);
-        }
-        writeFileSync(join(outputDir, `${viewCase.id}.png`), buffer);
-        rendered.push({
-          id: viewCase.id,
-          app: viewCase.app,
-          width: Math.round(box.width),
-          height: Math.round(box.height),
-        });
-        console.log(
-          `  ok    ${viewCase.id}.png  ${Math.round(box.width)}x${Math.round(box.height)}`
-        );
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        failures.push({ id: viewCase.id, message });
-        console.log(`  FAIL  ${viewCase.id}: ${message.split('\n', 1)[0]}`);
-      }
-    }
+    outcomes = await mapInPool(cases, concurrency, (viewCase) =>
+      renderCase(browser, server.baseUrl, viewCase, outputDir)
+    );
   } finally {
     await browser.close();
     await server.close();
+  }
+
+  // After the pool and in selection order, so no verdict depends on which render finished first.
+  const rendered = [];
+  const failures = [];
+  for (const [index, outcome] of rejectDuplicateEvidence(cases, outcomes).entries()) {
+    const viewCase = cases[index];
+    if (outcome.error !== undefined) {
+      failures.push({ id: viewCase.id, message: outcome.error });
+      if (outcomes[index].error === undefined) logFailure(viewCase.id, outcome.error);
+      continue;
+    }
+    if (outcome.buffer) writeFrame(outputDir, viewCase, outcome);
+    rendered.push({ id: viewCase.id, app: viewCase.app, ...frameSize(outcome.box) });
   }
 
   // Merge into whatever was already captured, so a subset run updates its frames and leaves the
