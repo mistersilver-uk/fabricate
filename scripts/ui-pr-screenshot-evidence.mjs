@@ -1711,8 +1711,9 @@ function parseCaptureEligible(value) {
   throw new Error(`--capture-eligible must be the literal 'true' or 'false', not '${value}'`);
 }
 
-// `--capture-timeout-minutes` pins the gate's capture deadline to `capture`'s real
-// `timeout-minutes` in `pr-screenshots.yml`.
+// `--capture-timeout-minutes` pins the gate's capture deadline to the summed stage
+// `timeout-minutes` of `pr-screenshots.yml` — select, warm-foundry, the longer of render and
+// verify-chrome, then capture.
 function parseCaptureTimeoutMs(value) {
   if (value === undefined || value === '') return undefined;
   const minutes = Number(value);
