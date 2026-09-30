@@ -3,6 +3,9 @@
  * deterministically by construction, and the checks its posted card and roll message must pass.
  * Pure and Playwright-free, so the smoke's assertions are unit-tested against the real renderer.
  */
+import { summarizeCraftCard } from './craftChatCardSummary.js';
+
+export { pickCraftCardMessage, summarizeCraftCard } from './craftChatCardSummary.js';
 
 const count = (pool) => ({
   rollFormula: '',
@@ -56,53 +59,6 @@ const COUNT_ROLL_CLASS = 'FabricateCountRoll';
 /** Code-point order, so a multiset compares the same whatever the locale. */
 const sorted = (values) => [...values].sort((a, b) => (a < b ? -1 : Number(a > b)));
 
-function attributesOf(tag) {
-  const attributes = {};
-  for (const [, name, value] of tag.matchAll(/\s([\w-]+)(?:="([^"]*)")?/g)) {
-    attributes[name] = value ?? '';
-  }
-  return attributes;
-}
-
-/** Every opening tag of `html` with its attributes. */
-function tagsOf(html) {
-  return [...String(html ?? '').matchAll(/<(\w+)\b[^>]*>/g)].map(([tag, name]) => ({
-    name,
-    attributes: attributesOf(tag),
-  }));
-}
-
-const hasClass = (tag, name) => (tag.attributes.class ?? '').split(/\s+/).includes(name);
-
-/**
- * What a posted crafting card states: its tiles (`{ face, marks, generated }`), evidence row ids,
- * whether it carries a count summary line or a numeric roll row, and its result pill.
- */
-export function summarizeCraftCard(html) {
-  const tags = tagsOf(html);
-  const pill = tags.find((tag) => hasClass(tag, 'fabricate-craft-chat__result'));
-  let result = null;
-  if (pill)
-    result = hasClass(pill, 'fabricate-craft-chat__result--success') ? 'success' : 'failure';
-  return {
-    isCraftCard: tags.some((tag) => hasClass(tag, 'fabricate-craft-chat')),
-    tiles: tags
-      .filter((tag) => hasClass(tag, 'fabricate-dice-tiles__tile'))
-      .map(({ attributes }) => ({
-        face: Number(attributes['data-dice-tile-face']),
-        marks: (attributes['data-dice-tile-marks'] ?? '').split(/\s+/).filter(Boolean),
-        generated: 'data-dice-tile-generated' in attributes,
-      })),
-    evidence: tags
-      .filter((tag) => hasClass(tag, 'fabricate-craft-chat__evidence-row'))
-      .map((tag) => tag.attributes['data-check-evidence']),
-    countSummary: tags.some((tag) => 'data-check-count-summary' in tag.attributes),
-    rollValue: tags.some((tag) => hasClass(tag, 'fabricate-craft-chat__roll-value')),
-    result,
-    botched: tags.some((tag) => hasClass(tag, 'fa-skull')),
-  };
-}
-
 /** A tile or an active die result as `face:marks`, so a card and its Roll compare as multisets. */
 const tileKey = ({ face, marks }) => `${face}:${sorted(marks).join('+')}`;
 const resultKey = (result) =>
@@ -114,18 +70,6 @@ const resultKey = (result) =>
       result.exploded && 'exploded',
     ].filter(Boolean),
   });
-
-/**
- * The one crafting card among the messages an execute created, or an error naming how many there
- * were: every assertion binds to that message and never to the newest card in the log.
- */
-export function pickCraftCardMessage(messages) {
-  const cards = messages.filter((message) => summarizeCraftCard(message.content).isCraftCard);
-  if (cards.length !== 1) {
-    return { error: `the execute created ${cards.length} crafting cards, expected exactly 1` };
-  }
-  return { message: cards[0] };
-}
 
 /** Each count case's pill, tile count, tile mark shapes (`:` plus sorted marks) and rows. */
 const EXPECTED = Object.freeze({

@@ -1010,6 +1010,21 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/systems\/countDisplayEvidence\.js$/,
     ],
   },
+  // Issue 2005: the roll-under result cards and the refusal, against the summed roll-over control.
+  {
+    id: 'chat-craft-card-under',
+    label: 'Chat — roll-under crafting result cards, their refusal and the roll-over control',
+    smokeLabels: [
+      'chat-craft-card-under-pass',
+      'chat-craft-card-under-fail',
+      'chat-craft-card-under-otherwise',
+      'chat-craft-card-under-misconfigured',
+      'chat-craft-card-over-control',
+    ],
+    matches: [
+      /^src\/ui\/presenters\/(?:checkDiceLine|checkEvidenceRows|checkDisplay)\.js$/,
+    ],
+  },
   {
     id: 'interactable-config',
     label: 'Canvas interactable config',
