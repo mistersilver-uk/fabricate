@@ -34,11 +34,11 @@ const FOUNDRY_URL = reconcileFoundryEndpoint({
 const log = (message) => process.stdout.write(message);
 
 /** Runs in the page: parse every corpus entry and run every transform probe. */
-function recordInPage({ corpus, probes, dataSets, describeSource }) {
+function recordInPage({ corpus, probes, dataSets }) {
   const { Roll } = foundry.dice;
   const { DiceTerm } = foundry.dice.terms;
-  // The describer is shared with Node as source, so the page and the double read one definition.
-  const describe = new Function(`return (${describeSource})`)();
+  // The describer is shared with Node, installed on the page as a script tag before this runs.
+  const describe = globalThis.__fabricateDescribeRecordedTerm;
   const termsOf = (roll) => roll.terms.map((term) => describe(term, { Roll, DiceTerm }));
 
   const entries = corpus.map(({ formula, data }) => {
@@ -109,11 +109,13 @@ async function main() {
       adminKey: process.env.FOUNDRY_ADMIN_KEY ?? 'fabricate-test-admin',
       log,
     });
+    await page.addScriptTag({
+      content: `globalThis.__fabricateDescribeRecordedTerm = ${describeRecordedTerm.toString()};`,
+    });
     const recorded = await page.evaluate(recordInPage, {
       corpus: ROLL_TERMS_CORPUS,
       probes: ROLL_TERMS_PROBES,
       dataSets: ROLL_TERMS_DATA,
-      describeSource: describeRecordedTerm.toString(),
     });
     if (recorded.version !== ARM.foundryVersion) {
       throw new Error(

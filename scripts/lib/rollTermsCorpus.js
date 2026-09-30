@@ -143,7 +143,7 @@ export function describeRecordedTerm(term, { Roll, DiceTerm }) {
     return { type: typeof value, value: typeof value === 'object' ? null : (value ?? null) };
   };
   const ancestry = [];
-  for (let cls = term.constructor; cls && cls.name; cls = Object.getPrototypeOf(cls)) {
+  for (let cls = term.constructor; cls?.name; cls = Object.getPrototypeOf(cls)) {
     ancestry.push(cls.name);
   }
   const dice = term instanceof DiceTerm;
