@@ -2211,6 +2211,7 @@ export const CASES = Object.freeze([
       ' [data-checks-panel="crafting"]:has([data-check-formula-average="25"])',
     expectSelector:
       '[data-check-advantage]:not(:has([data-check-advantage-extra]))' +
+      ':not(:has([data-check-advantage-disadvantage]))' +
       ' [data-check-advantage-note]:has-text("is not a plain die")',
   }),
   advantageCase({
