@@ -16,7 +16,8 @@ import {
   SWEPT_SCALE_PROFILE_NAMES,
 } from '../tests/helpers/scale/scaleProfiles.js';
 
-import { diffAgainstBaseline, readBaseline, writeBaseline } from './lib/benchmarkBaselines.js';
+import { lockfileDiffers, measureBase, resolveCommit } from './lib/benchmarkBase.js';
+import { compareClass1 } from './lib/benchmarkDrift.js';
 import { captureEnvelope, runRecordFilename } from './lib/benchmarkEnvelope.js';
 import { measureProfiles } from './lib/benchmarkRunner.js';
 import { summarise } from './lib/benchmarkStats.js';
@@ -26,12 +27,6 @@ const RUN_DIR = join(REPO_ROOT, '.benchmarks', 'runs');
 
 /** Valueless flags. */
 const FLAG_SETTERS = {
-  '--check': (options) => {
-    options.check = true;
-  },
-  '--update-baselines': (options) => {
-    options.updateBaselines = true;
-  },
   '--list': (options) => {
     options.list = true;
   },
@@ -51,7 +46,20 @@ const VALUE_SETTERS = {
   '--reps': (options, value) => {
     options.reps = Number(value);
   },
+  '--base': (options, value) => {
+    options.base = value;
+  },
 };
+
+/** `--base <ref>` is also accepted with a space, as a ref reads more naturally that way. */
+function joinSpacedValues(argv) {
+  const joined = [];
+  for (let index = 0; index < argv.length; index += 1) {
+    const spaced = argv[index] === '--base' && index + 1 < argv.length;
+    joined.push(spaced ? `--base=${argv[++index]}` : argv[index]);
+  }
+  return joined;
+}
 
 function parseArgs(argv) {
   const options = {
@@ -59,12 +67,11 @@ function parseArgs(argv) {
     profiles: [...SWEPT_SCALE_PROFILE_NAMES],
     seed: DEFAULT_SEED,
     reps: 5,
-    check: false,
-    updateBaselines: false,
+    base: null,
     list: false,
     writeRunRecord: true,
   };
-  for (const arg of argv) {
+  for (const arg of joinSpacedValues(argv)) {
     const flag = FLAG_SETTERS[arg];
     if (flag) {
       flag(options);
@@ -161,29 +168,44 @@ function writeRunRecord(options, measured) {
   console.log(`\nrun record: ${runPath}`);
 }
 
-function reportDrift(measured) {
-  let failed = false;
-  for (const [profile, payload] of Object.entries(measured.class1ByProfile)) {
-    const drift = diffAgainstBaseline(readBaseline(profile), payload);
-    if (drift.length > 0) {
-      failed = true;
-      console.error(`\nCLASS-1 DRIFT in ${profile}:`);
-      for (const line of drift) console.error(`  ${line}`);
-    }
-  }
-  if (failed) {
+/** Compare the measured class-1 counts with the same counts measured at `ref`; a rise fails. */
+function reportAgainstBase(ref, sha, measured) {
+  if (lockfileDiffers(sha)) {
     console.error(
-      '\nCommitted counts moved. If the change is intended, re-record with ' +
-        '`npm run benchmark:performance -- --update-baselines` IN THE SAME PR and say why.'
+      `\npackage-lock.json differs between ${ref} and this checkout, so ${ref}'s code would run ` +
+        "against this checkout's dependencies. Not compared."
     );
     process.exitCode = 1;
     return;
   }
-  console.log('\nclass-1 baselines: clean');
+  const base = measureBase(sha);
+  const requested = Object.keys(measured.class1ByProfile);
+  const baseByProfile = Object.fromEntries(
+    requested.filter((p) => base.class1ByProfile[p]).map((p) => [p, base.class1ByProfile[p]])
+  );
+  const { rises, breaks, falls, notes } = compareClass1(baseByProfile, measured.class1ByProfile);
+  console.log(
+    `\nclass-1 counts against ${ref} (${sha.slice(0, 12)}, ${base.cached ? 'cached' : 'measured'}):`
+  );
+  for (const line of notes) console.log(`  ${line}`);
+  for (const line of falls) console.log(`  ${line}`);
+  for (const entry of [...rises, ...breaks]) console.error(`  ${entry.text}`);
+  if (rises.length + breaks.length === 0) {
+    console.log('  no count rose');
+    return;
+  }
+  console.error(
+    '\nA count rose, or a profile or case stopped being compared. The drift test accepts it only ' +
+      'when the change adds a ratchet-exempt(benchmark) marker naming the case or its profile; ' +
+      'see benchmarks/README.md.'
+  );
+  process.exitCode = 1;
 }
 
 async function main() {
   const options = parseArgs(process.argv.slice(2));
+  // Resolved before the sweep, so a mistyped ref fails in a second rather than after it.
+  const baseSha = options.base ? resolveCommit(options.base) : null;
 
   if (options.list) {
     printList();
@@ -199,14 +221,8 @@ async function main() {
 
   printHumanReport(measured);
 
-  if (options.updateBaselines) {
-    for (const [profile, payload] of Object.entries(measured.class1ByProfile)) {
-      console.log(`\nwrote ${writeBaseline(profile, payload)}`);
-    }
-  }
-
   if (options.writeRunRecord) writeRunRecord(options, measured);
-  if (options.check) reportDrift(measured);
+  if (baseSha) reportAgainstBase(options.base, baseSha, measured);
 }
 
 await main();

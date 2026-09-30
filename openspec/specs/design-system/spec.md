@@ -21,7 +21,7 @@ A measurement taken on a branch is dated to that branch commit, which a squash m
 The design system's corpus is **this repository only** — every Fabricate-authored surface under `src/ui/`, and the Core prototypes that feed them.
 Measured at the commit that states this: the GM manager, the player app, the three canvas interactables windows (the interactable browser, the interactable config sheet and the interactables manager), the roll-prompt dialog and the interaction-prompt toast.
 The corpus is DERIVED rather than listed, and that distinction is what the earlier two-window sentence obscured: `collectStyleCorpus()` walks `['src','styles']` and no gate carries a directory list, so a window enters the corpus by existing.
-Its debt is therefore pinned from its first commit, and “not yet in the design system” is never true of a file under `src/` — a new surface is either compliant or on a ratchet, never outside.
+Its debt therefore meets the ratchets from its first commit, and “not yet in the design system” is never true of a file under `src/` — a new surface is either compliant or carries a `ratchet-exempt` reason at each offending site, never outside.
 The Economy module and the premium Downtime companion are separate products and are explicitly OUT of corpus, because a signature count weighted by a codebase this repository does not govern cannot justify a primitive in it.
 A prototype whose implementation brief names a module other than Core is out of corpus, and a count derived from it MUST be re-derived before it is cited.
 
@@ -127,7 +127,9 @@ That row is not a licence to leave the entry at `shipped`, and it is not `diverg
 
 A shipped-member row that names no library entry carries `target` by construction rather than by judgement: there is no specimen to measure it against, so the specimen it is owed is the target.
 `tests/design-system-coverage.test.js` is the gate, and it fails on a missing status, on a value outside the vocabulary, on a name in a heading that carries no status of its own, on a manifest row whose status contradicts its specimen, and on a `divergent` entry that names no issue.
-`tests/components/design-system-target-ratchet.test.js` pins the two `target` populations separately — the library's per-name statuses, keyed on the name, and the manifest's rows, keyed on the implementation path — and a change that flips a status lowers whichever of the two pins it moves in the same commit; raising either owes a stated reason.
+`tests/components/design-system-target-ratchet.test.js` holds the two `target` populations separately — the library's per-name statuses, keyed on the name, and the manifest's rows, keyed on the implementation path.
+A change may not add a `target` name or manifest row relative to the base commit unless the site carries a `ratchet-exempt` reason; retiring one is reported and never required.
+Where one line declares several names, as a multi-name `div.spec` or the "Entries without an API" row does, the reason exempts only the entries it names as `<Name>`.
 
 #### Scenario: A child issue lands the implementation an entry specified
 
@@ -273,7 +275,7 @@ What the adoption does NOT reach is stated with it, because a conversion issue t
 
 A COMPOSITION of existing members with many callers is the third outcome, and it is neither of the two the register already had.
 It is not a primitive, because a candidate that decomposes entirely into existing members MUST NOT enter the set; and it is not a recordable non-member either, because that record caps a component at one caller.
-Such a composition is BANKED as an unregistered shared component, which is the register's answer for a screen-region composition rather than a gap in it.
+Such a composition stays an unregistered shared component and carries a `ratchet-exempt` reason at the site, the head of its file, which is the register's answer for a screen-region composition rather than a gap in it.
 That answer is PATH-CONDITIONAL and the condition is stated with it: it holds only while the file lives outside the primitive directory, so the same file moved inside it would demand a manifest row and a library specimen instead.
 
 The corollary is that a component OUTSIDE the shared directory may keep an area-scoped family, and doing so is correct rather than debt.
@@ -554,7 +556,7 @@ Re-deriving the eight is a palette change across seven theme blocks and is recor
 
 Elevation is for surfaces that float OVER content and MUST come from `--fab-shadow-sm`, `--fab-shadow-md` or `--fab-shadow-lg`.
 A card that merely sits on the page uses a border and no shadow.
-`tests/components/design-system-debt-ratchets.test.js` reads every `box-shadow` in the global sheet and in every Svelte scoped block and pins the ones that are none of those three, allowing only `none` and an inset ring — a border drawn as a shadow, which has no offset and no blur and so claims no height at all.
+`tests/components/design-system-debt-ratchets.test.js` reads every `box-shadow` in the global sheet and in every Svelte scoped block and fails a new one that is none of those three, allowing only `none` and an inset ring — a border drawn as a shadow, which has no offset and no blur and so claims no height at all.
 
 #### Scenario: A primitive needs a colour the token set does not name
 
@@ -604,15 +606,15 @@ A PORTRAIT — an actor's tile, the avatar — is 32 as a single mark and 26 sta
 Two contradictions between that ladder and the radius rules below are settled here rather than left for a reader to arbitrate.
 "A fully rounded radius is for a shape whose contents are text alone" would, read literally, forbid the ROUND portrait the library mandates for a person; the round portrait is a stated CARVE-OUT from that sentence, because the corner is what says the mark is a person.
 And the radius rule puts 26 to 32px at radius 7 while the specimen's 32px square portrait is radius 9: for art and portraits the ladder in this paragraph GOVERNS, and the control radius rule does not reach them.
-The shipped population is off the art size ladder at more distinct values than it is on — measured on the tree rather than asserted, and RE-MEASURED after any change that moves a tile — and `tests/components/design-system-known-debt.json`'s `offLadderArtSizes` pins every art-tile render site, with a non-literal `size` recorded as an explicit `dynamic` key, so the geometry sweep lowers a number rather than re-deriving a census.
+The shipped population is off the art size ladder at more distinct values than it is on — measured on the tree rather than asserted, and RE-MEASURED after any change that moves a tile — and `tests/components/design-system-debt-ratchets.test.js` measures every art-tile render site at the base commit and in the change, with a non-literal `size` counted as an explicit `dynamic` size, so a new off-ladder site fails and the geometry sweep's progress is reported rather than re-derived by hand.
 
-A CONVERSION PRESERVES THE RENDERED SIZE AND BANKS THE ROW; THE SWEEP SNAPS IT.
-Moving a hand-rolled tile onto the art or portrait primitive MUST preserve the rendered pixel size even when that size is off the published ladder for its kind — the art ladder for a record's tile, the portrait ladder for an actor's — and MUST bank the resulting `offLadderArtSizes` row, stating per tile the rung it rejected and why, or recording that the tile already sits at its kind's published rung and the row exists only because the census filters portraits against the art ladder.
-The row is pre-existing debt becoming VISIBLE: the tile was already that size and only the conversion puts it where the census can see it.
+A CONVERSION PRESERVES THE RENDERED SIZE AND CARRIES ITS REASON AT THE SITE; THE SWEEP SNAPS IT.
+Moving a hand-rolled tile onto the art or portrait primitive MUST preserve the rendered pixel size even when that size is off the published ladder for its kind — the art ladder for a record's tile, the portrait ladder for an actor's — and each tile the art-size gate newly counts MUST carry a `ratchet-exempt` reason at the site, stating the rung it rejected and why, or recording that the tile already sits at its kind's published rung and is counted only because the census filters portraits against the art ladder.
+The site is pre-existing debt becoming VISIBLE: the tile was already that size and only the conversion puts it where the census can see it.
 Resizing to the nearest rung in the same change would smuggle a layout move into a conversion, and the two must be separable so that a reviewer can approve one without the other.
 The scenario below therefore binds a NEW or RESIZED geometry and not a conversion that preserves one.
-Discharging the accumulated rows is the geometry sweep's, which is issue 1519; that sweep also owns reconciling `design-system-debt-ratchets.test.js`'s single `ART_SIZE_LADDER` constant with the TWO ladders this requirement publishes, because filtering both primitives against the art ladder alone makes a portrait at the canon's own 32px rung bank a row while a 38px portrait banks none.
-The icon chip's own flat 9px radius and flat 0.9rem glyph are off the radius and glyph ladders above, are not corrected here, and are not recordable on a `file | size` ratchet.
+Discharging the accumulated sites is the geometry sweep's, which is issue 1519; that sweep also owns reconciling `design-system-debt-ratchets.test.js`'s single `ART_SIZE_LADDER` constant with the TWO ladders this requirement publishes, because filtering both primitives against the art ladder alone makes a portrait at the canon's own 32px rung count as an offender while a 38px portrait does not.
+The icon chip's own flat 9px radius and flat 0.9rem glyph are off the radius and glyph ladders above, are not corrected here, and are not visible to a ratchet counting tile sizes.
 Radius tracks the size of the thing: 6 for chips at or below 24px, 7 for controls of 26 to 32px, 9 for controls of 34 to 38px and for rows and wells, 11 for a 44px control and for cards and panels, and 999 for pills and tracks.
 A fully rounded radius is for a shape whose contents are text alone.
 A pill that CONTAINS a square element — an icon chip, a thumbnail — takes the control radius for its height instead, and any button inside it squares off to match, because a circle wrapped around a square reads as two competing shapes.
@@ -642,8 +644,8 @@ It joins a rule to a same-selector twin elsewhere in the same file, because the 
 #### Scenario: A hand-rolled tile becomes a primitive
 
 - **WHEN** an existing tile at an off-ladder size is converted to a shared art or portrait primitive
-- **THEN** the rendered size is preserved and its `offLadderArtSizes` row is banked
-- **AND** the banking entry states the rung that was rejected and why, or records that the tile already sits at its kind's published rung
+- **THEN** the rendered size is preserved and the tile carries a `ratchet-exempt` reason at the site
+- **AND** that reason states the rung that was rejected and why, or records that the tile already sits at its kind's published rung
 - **AND** the resize is left to the geometry sweep that owns the ladder
 
 ### Requirement: Field-sized empty states match their associated controls
@@ -762,7 +764,7 @@ A rule that exists to beat Foundry's host CSS belongs in the global sheet rather
 An application root MUST also declare `color-scheme`, because browser-drawn chrome a stylesheet cannot reach — the native `<select>` option popup above all — otherwise paints in the UA's own scheme rather than the theme's.
 
 Breakpoints MUST be `@container` queries and never viewport media queries, because an ApplicationV2 window resizes independently of the viewport.
-`tests/components/design-system-debt-ratchets.test.js` fails any `@media` whose query is not a user preference — `prefers-reduced-motion`, `prefers-contrast` or `forced-colors` — since those ask about the reader rather than about the window.
+`tests/components/design-system-debt-ratchets.test.js` fails a new `@media` whose query is not a user preference — `prefers-reduced-motion`, `prefers-contrast` or `forced-colors` — since those ask about the reader rather than about the window.
 A container query adds no specificity, so the narrow case is declared after the wide one.
 The APP-LEVEL container breakpoints are a published ladder, and a new surface reuses them rather than inventing a rung: the manager container breaks at 1320, 1120, 960, 900, 831 and 680; the recipes container at 714, 634 and 554; the alchemy and crafting containers at 960.
 A component MAY declare its own container and its own rung where the thing that must respond is the component rather than the app — that is not covered by this ladder and does not need to be.
@@ -776,7 +778,7 @@ The attribute is an OPT-IN that declares the element focused: `data-keyboard-foc
 A primitive writes that attribute on the SAME SIDE of its `{...rest}` as its own `class`, because `KeyboardManager#hasFocus` reads it off the focused element with no inheritance and a spread landing after it lets a caller's attribute bag unset it unremarked.
 HOW A `data-*` VALUE IS SPELLED is part of the same contract: a bare `data-*` written on a COMPONENT tag is the boolean `true` rather than the empty string it is on an element, and an attribute-bag entry written `{ 'data-x': true }` does the same, so a call site that means the empty string MUST spell `data-x=""`.
 A presence selector resolves either way, which is why no mounted suite, source pin or smoke step written with one can see the difference.
-`tests/design-system-keyboard-focus.test.js` holds all three populations this obliges, and for two of them it holds a pinned baseline rather than an absence: the `tabindex="-1"` targets are compliant, while the elements that carry a static `tabindex="0"` and an interactive role, and the buttons with no ancestor form, are counted debt that the shared primitives emitting the attribute will collapse.
+`tests/design-system-keyboard-focus.test.js` holds all three populations this obliges, and for two of them it holds a ratchet against the base commit rather than an absence: the `tabindex="-1"` targets are compliant, while the elements that carry a static `tabindex="0"` and an interactive role, and the buttons with no ancestor form, are counted debt that may not grow and that the shared primitives emitting the attribute will collapse.
 The shared stepper's `−`/`+` adjuncts are buttons outside a form, so they declare the attribute in every mode, and the library's stepper and range-bar entries record the formatted and read-only props they ship.
 A listbox MUST keep DOM focus on ONE element and drive selection with `aria-activedescendant`; roving focus onto option buttons re-arms those bindings and is forbidden.
 A MENU is the deliberate exception and not a loophole: its pattern requires focus to MOVE to its items, so each item carries the keyboard-focus attribute above and the bindings are declared away rather than avoided.
@@ -865,7 +867,7 @@ The restored behaviour moves an ACTIVE OPTION and never the value, so a dismissa
 A match from a CLOSED trigger opens the panel on the matched row rather than committing it; a prefix that matches nothing opens nothing, so a mistyped character is not a state change.
 Two of the five — the badge and the unavailable reason — ship with no caller on this commit and are held by test rather than by a frame.
 `tests/components/design-system-debt-ratchets.test.js` counts every native `<select>` twice over, once as a parsed element in the Svelte templates and once as markup in a JavaScript template string, since a DialogV2 body cannot host a component and is therefore the one place the rule may not reach.
-A single element is exempted by a `<!-- native select: reason -->` comment on the lines above it, which makes the exception a written decision rather than a silent one.
+A single element is exempted by a `<!-- ratchet-exempt(design-system): reason -->` comment on the line above it, which makes the exception a written decision rather than a silent one.
 
 #### Scenario: A non-input element can hold focus
 
@@ -1538,11 +1540,9 @@ There is ONE exception, and it is structural rather than discretionary: a select
 A select there stays native, and the surrounding stylesheet gives the control a themed background, because `color-scheme` alone does not reach the popup.
 There is no second exception by prose.
 A component that states a reason of its own in a docblock is NOT exempt: the precedence order above no longer puts a shipped component's reasoning over this capability, and a reason nothing reads is not a decision anything can act on.
-An element is exempted only by the mechanism `tests/components/design-system-debt-ratchets.test.js` reads — a `<!-- native select: reason -->` marker on the lines above it — or, where the component is a set member, by a `divergent` entry naming the decision that keeps it native.
-The figure is the RATCHET'S PIN rather than a prose count, so it cannot drift from what the gate measures: `KNOWN_NATIVE_SELECT_TOTAL` stands at 14 elements across 4 `.svelte` files, baselined row by row in `tests/components/design-system-known-debt.json`, plus three written into JavaScript dialog bodies.
-Both numerals are asserted against those constants by `tests/components/design-system-debt-ratchets.test.js`, because this sentence has rotted once already.
-It was 100 across 39 before those three shared controls converted, 84 across 33 before the player app's six, 78 across 28 before the manager's settings and tabs, 69 across 26 before the manager's editors and 40 across 16 before its browse screens; no file carries the marker.
-The one component long counted as a stated exception, `InventorySystemSelector.svelte`, carried a DOCBLOCK rather than the marker and was baselined with the rest; it converted at issue 1511 and its docblock reason went with the element it justified, which is what withdrawing that precedence looks like in practice rather than in principle.
+An element is exempted only by the mechanism `tests/components/design-system-debt-ratchets.test.js` reads — a `<!-- ratchet-exempt(design-system): reason -->` marker on the line above it — or, where the component is a set member, by a `divergent` entry naming the decision that keeps it native.
+The gate compares with the base commit rather than with a recorded count, so a change may not add a native select, in a template or in a JavaScript dialog body, unless the element carries that marker; converting one is reported and never required.
+The one component long counted as a stated exception, `InventorySystemSelector.svelte`, carried a DOCBLOCK rather than the marker and was counted with the rest; it converted at issue 1511 and its docblock reason went with the element it justified, which is what withdrawing that precedence looks like in practice rather than in principle.
 
 The selected tick is CONFIGURABLE and is a property of the list rather than of an option: it earns its column where options are close cousins and a reader must confirm which is live AND the trigger's own label does not settle it, and is dropped where the trigger already states the value and the list is short.
 It ships and is exercised in BOTH polarities: kept for the scoped catalogue's lane filters and sort key, and for the bulk panel's check-tier list where two INSTRUCTIONS sit beside named tiers; dropped for the pager's page size and the bulk panel's category axis.
@@ -1860,7 +1860,7 @@ It MUST also name the library entry it corresponds to, unless the primitive ship
 The split is deliberate rather than filing: purpose, geometry and API are what a reader needs rendered, and the path-to-name correspondence is what a gate needs to check.
 That obligation binds a primitive the change ADDS or ALTERS.
 An entry carried unchanged from an existing component may state its geometry alone and take the shipped props as its API by reference.
-The library records which entries currently do so: section 16's "Entries without an API" row names them, and the count is pinned — not restated here — by `tests/components/design-system-target-ratchet.test.js`, so closing the list is a debt the ratchet tracks rather than a number this sentence must be kept in sync with.
+The library records which entries currently do so: section 16's "Entries without an API" row names them, and `tests/components/design-system-target-ratchet.test.js` holds that list against the base commit rather than restating its length here, so closing the list is a debt the ratchet tracks rather than a number this sentence must be kept in sync with.
 
 A change that adds a component under `src/ui/svelte/components/` without a specimen has added an undocumented primitive; a change that ships a primitive without its manifest row has added a name no diff can be attributed to; and a change that adds a row naming a library entry that does not exist has recorded a correspondence to nothing.
 `tests/design-system-coverage.test.js` is the gate those prohibitions are enforced through: it requires every file under `src/ui/svelte/components/` to carry a manifest row, requires no entry recorded as unbuilt to ship as a component, and requires every row's library name to resolve to a specimen that is not a declined candidate.

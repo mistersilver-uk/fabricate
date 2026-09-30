@@ -87,7 +87,7 @@ const ITERATOR_ENUMERATORS = ['keys', 'values'];
  *
  * This is a SEPARATE wrapper rather than a widening of {@link countingCandidates}, and
  * deliberately so: `countingCandidates` is what `createBenchWorld` hands the benchmark cases,
- * and widening it would move every committed class-1 baseline that walks a component array.
+ * and widening it would move every class-1 count that walks a component array.
  * A caller that wants both opts in by composing them, which is why this mutates the array it
  * is handed IN PLACE and returns it — `definitionIndex` keys its retained index on array
  * IDENTITY, so a second copy here would hand the code under measurement a different array

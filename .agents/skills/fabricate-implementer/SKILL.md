@@ -63,6 +63,8 @@ Re-verify every cited ref against the current tree before editing, skip any find
 - **Concision is part of the output.** New code carries only the comments `AGENTS.md` admits under "Observed failure mode: bloat", and a docblock states purpose and contract in at most six lines.
 - Extract before the lane returns instead of adding to a giant: a function over 100 lines, a `.js` module over 800 lines, or a `.svelte` component over 500 is oversized, and `tests/file-size-ratchet.test.js` fails a change that makes a unit oversized or grows one.
 - Add no new `Source.includes(` pin (`tests/source-pin-ratchet.test.js`) and no local copy of a shared helper (`tests/scalar-helper-duplicates.test.js`); import the one implementation instead.
+- Every quality ratchet compares the lane with its base commit, so there is no ledger or pinned total to regenerate: fix a reported regression, or record a legitimate one with a `ratchet-exempt(<family>): <reason>` marker at the site and name it in the handoff.
+When a ratchet names code the lane did not touch, run `git fetch origin main` before anything else, because a stale `origin/main` moves the merge base.
 - Prefer JavaScript ES modules and Svelte 5 patterns already used in this repo.
 - Use `javascript-structural-design` as the default reference for dependency seams, cohesion, constructors, and behavior-first APIs.
 - Prefer explicit collaborators over `context`, `container`, or `manager` grab bags.

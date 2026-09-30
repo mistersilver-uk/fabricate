@@ -1,30 +1,28 @@
-/** UNDEFINED IDENTIFIERS IN THE FILES CI's LINT GLOB DOES NOT REACH (issue 1370). */
+/** UNDEFINED IDENTIFIERS ANYWHERE IN `src/` (issue 1370), which `npm run lint` fails at any count. */
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { ESLint } from 'eslint';
 
-import { LEGACY_GATE_FILES } from './helpers/legacyLintGate.js';
 import { byCodePoint } from './helpers/codePointOrder.js';
 import { collectSources, repoRoot } from './helpers/sourceScan.js';
 
 /** Repo-relative POSIX path, built without a backslash literal. */
 const posix = (file) => file.split(String.fromCharCode(92)).join('/');
 
-/** Every `.js` under `src/` that the PRE-GLOB lint gate did not reach (issue 1660). */
-function unlintedSources() {
-  const legacy = new Set(LEGACY_GATE_FILES);
-  return Object.keys(collectSources(repoRoot + '/src', { extensions: ['.js'] }))
-    .filter((file) => !legacy.has(file))
-    .sort(byCodePoint);
+/** Every `.js` under `src/`. */
+function srcSources() {
+  return Object.keys(collectSources(repoRoot + '/src', { extensions: ['.js'] })).sort(byCodePoint);
 }
 
 /** Every `no-undef` report over `files`, using the REPOSITORY'S OWN config so the Foundry and
  * browser globals it declares are in scope — a private config would report `game` and `ui` as
  * undefined and force an allowlist that hid the real thing. */
 async function undefinedIdentifiers(files) {
-  const eslint = new ESLint({ errorOnUnmatchedPattern: false });
+  // Only `no-undef` runs: the rest of the config is `npm run lint`'s to check, and slow.
+  const ruleFilter = ({ ruleId }) => ruleId === 'no-undef';
+  const eslint = new ESLint({ errorOnUnmatchedPattern: false, ruleFilter });
   const results = await eslint.lintFiles(files);
   // A GUARD THAT CANNOT TELL "CLEAN" FROM "NEVER RAN" IS THE FAILURE THIS FILE IS ABOUT.
   assert.equal(
@@ -53,10 +51,10 @@ async function undefinedIdentifiers(files) {
   );
 }
 
-describe('every src/ file outside CI’s lint glob resolves its identifiers', () => {
+describe('every src/ file resolves its identifiers', () => {
   it('covers a NON-EMPTY population, including src/main.js and the seam’s other leaf caller', () => {
     // A gate over an empty file list reports success forever.
-    const population = unlintedSources();
+    const population = srcSources();
     assert.ok(population.length > 50, `expected a real population, got ${population.length}`);
     assert.ok(population.includes('src/main.js'), 'src/main.js must be in the population');
     assert.ok(population.includes('src/gatheringResultCreation.js'));
@@ -69,22 +67,18 @@ describe('every src/ file outside CI’s lint glob resolves its identifiers', ()
       assert.ok(population.includes(rune), `${rune} must be in the population`);
     }
     // A floor re-derived by counting, never carried forward: `find src -name '*.svelte.js'`
-    // answers 20, and none of the 20 sits under CI's lint glob, so all 20 must appear here.
+    // answers 20, so all 20 must appear here.
     assert.ok(
       population.filter((file) => file.endsWith('.svelte.js')).length >= 20,
       'every rune module is in the population'
     );
-    for (const covered of ['src/systems/CraftingEngine.js', 'src/toolBreakageRuntime.js']) {
-      assert.equal(
-        population.includes(covered),
-        false,
-        `${covered} is already covered by CI's lint glob and must be subtracted`
-      );
+    for (const domain of ['src/systems/CraftingEngine.js', 'src/toolBreakageRuntime.js']) {
+      assert.ok(population.includes(domain), `${domain} must be in the population`);
     }
   });
 
   it('reports no undefined identifier anywhere in that population', async () => {
-    const offenders = await undefinedIdentifiers(unlintedSources());
+    const offenders = await undefinedIdentifiers(srcSources());
     assert.deepEqual(
       offenders,
       [],
@@ -97,7 +91,7 @@ describe('every src/ file outside CI’s lint glob resolves its identifiers', ()
     // A SCOPED DISABLE IS THE REALISTIC WAY THIS GOES BLIND.
     const eslint = new ESLint({ errorOnUnmatchedPattern: false });
     const disabled = [];
-    for (const file of unlintedSources()) {
+    for (const file of srcSources()) {
       const config = await eslint.calculateConfigForFile(file);
       const severity = config?.rules?.['no-undef'];
       const level = Array.isArray(severity) ? severity[0] : severity;

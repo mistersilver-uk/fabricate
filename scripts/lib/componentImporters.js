@@ -32,9 +32,9 @@ function listFiles(absoluteRoot, relativeRoot) {
   return found;
 }
 
-/** The specifiers one file imports, resolved to repository-relative POSIX paths. */
-function resolvedTargets(repoRoot, file) {
-  const source = readFileSync(path.join(repoRoot, file), 'utf8')
+/** The specifiers one file's text imports, resolved to repository-relative POSIX paths. */
+function resolvedTargets(file, text) {
+  const source = text
     .split(/\r?\n/)
     .filter((line) => !COMMENT_ONLY_LINE.test(line))
     .join('\n');
@@ -52,6 +52,14 @@ function resolvedTargets(repoRoot, file) {
 /** Measure the import graph under `sourceRoot` and answer who imports a given file. */
 export function measureImporters(repoRoot, sourceRoot = 'src') {
   const files = listFiles(path.join(repoRoot, sourceRoot), sourceRoot);
+  return importGraph(files, (file) => readFileSync(path.join(repoRoot, file), 'utf8'));
+}
+
+/**
+ * The import graph over `files`, repository-relative POSIX paths whose code is read through
+ * `readText(file)`: {@link measureImporters} over a tree given as data, such as a base commit's.
+ */
+export function importGraph(files, readText) {
   const known = new Set(files);
   const importers = new Map();
   const imports = new Map();
@@ -59,7 +67,7 @@ export function measureImporters(repoRoot, sourceRoot = 'src') {
 
   const codeFiles = files.filter((candidate) => CODE_FILE_PATTERN.test(candidate));
   for (const file of codeFiles) {
-    for (const target of resolvedTargets(repoRoot, file)) {
+    for (const target of resolvedTargets(file, readText(file))) {
       if (target === file || !known.has(target)) continue;
       if (!importers.has(target)) importers.set(target, new Set());
       importers.get(target).add(file);
