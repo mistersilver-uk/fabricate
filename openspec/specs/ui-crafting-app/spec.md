@@ -1086,7 +1086,7 @@ The player's route to salvage.
   The "Salvage again" inline reset is the dismissal gesture the "until dismissed" rule alludes to.
 - **Rolled-total summary.** The read-only post-roll summary appends the rolled total in mono ("with a roll of N"), omitted when `rollValue` is null for a no-check salvage.
 - **A counting salvage.** Its simple body reads `Salvage check · {n} successes needed · d{die}s, success on {sym} {threshold}` for the salvaging character in place of a DC, and its banner says the count must reach the successes needed.
-  Its post-roll summary states the die tiles and count rows the crafting result box states, under the same public, non-secret rule, and a pool reduced to zero shows no tile and no roll total.
+  Its post-roll summary states the die tiles and count rows the crafting result box states, withheld only for a blind or secret roll (the result box rule, which also shows a private or self roll to its roller), and a pool reduced to zero shows no tile and no roll total.
 - **Post-roll reconciliation.** The routed body marks the matched tier with a "Your roll" pill from `salvageRun.checkResult.data.outcomeId`, and the store threads `awardedComponentIds` from `salvageRun.createdResults` for per-stage recovered state; both are null/empty on a runless (no-check) salvage.
 - **Complication disclosure.**
   The panel's progressive body renders the per-stage complication strip defined in §Progressive Stage List, in its forecast tense before a roll and with the fired marks after one.
