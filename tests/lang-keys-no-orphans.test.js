@@ -108,12 +108,14 @@ test('en.json declares enough leaves, and src/ enough modules, for the scan to b
   const langText = readFileSync(resolve(repoRoot, LANG_FILE), 'utf8');
   const leaves = declaredStringLeaves(JSON.parse(langText).FABRICATE ?? {});
   assert.ok(leaves.length >= LEAF_FLOOR, `only ${leaves.length} FABRICATE leaves declared`);
+  // ratchet-exempt(source-pin): counts src modules for the scan floor; it asserts nothing about how code is written.
   const corpus = collectSources(resolve(repoRoot, 'src'), { extensions: ['.js', '.svelte'] });
   const files = Object.keys(corpus);
   assert.ok(files.length >= SCAN_FLOOR - 1, `only ${files.length} src modules scanned`);
 });
 
 test('negative proof on the real tree: stripping every reference to a real key orphans it', () => {
+  // ratchet-exempt(source-pin): reads every lang key reference to prove an orphan is detected, not how code is written.
   const corpus = collectSources(resolve(repoRoot, 'src'), { extensions: ['.js', '.svelte'] });
   const langText = readFileSync(resolve(repoRoot, LANG_FILE), 'utf8');
   const files = { [LANG_FILE]: langText, ...corpus };
