@@ -59,6 +59,8 @@ export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({
   'past-stage': 'lab-v1-stage-browser',
   // Issue 2005: the same browser, its past stage rolled roll-under against an executed target.
   'past-stage-under': 'lab-v1-stage-browser',
+  // Issue 2006: its past stage counted successes, recording the net and the margin it cleared.
+  'past-stage-count': 'lab-v1-stage-browser',
   'future-stage': 'lab-v1-stage-browser',
   'gathering-straight': 'lab-v1-gathering-straight',
   'gathering-d100': 'lab-v1-gathering-d100',
@@ -593,6 +595,7 @@ function journalCaseFactories(context) {
     'cancel-confirmation': readyAlias('lab-v1-cancel-confirmation'),
     'past-stage': () => active(stageBrowserRun(context, multi())),
     'past-stage-under': () => active(stageBrowserRun(context, multi(), UNDER_STAGE_CHECK)),
+    'past-stage-count': () => active(stageBrowserRun(context, multi(), COUNT_STAGE_CHECK)),
     'future-stage': () => active(stageBrowserRun(context, multi())),
     'gathering-straight': () =>
       emptyRunContainers({ gatheringActive: [gatheringCaseRun(context, 'straight')] }),
@@ -1348,6 +1351,23 @@ const UNDER_STAGE_CHECK = Object.freeze({
   success: true,
   value: 11,
   data: { resolvedFormula: '1d20', total: 11, dc: 12, direction: 'under', target: 14, margin: 3 },
+});
+
+/** An executed count check: a net of 3 against 2 needed, a margin of +1. */
+const COUNT_STAGE_CHECK = Object.freeze({
+  success: true,
+  value: 3,
+  data: {
+    product: 'count',
+    direction: 'over',
+    comparison: 'meet',
+    dc: null,
+    target: 8,
+    total: 3,
+    successes: 3,
+    cancelled: 0,
+    margin: 1,
+  },
 });
 
 function stageBrowserRun(context, recipe, pastCheck = null) {

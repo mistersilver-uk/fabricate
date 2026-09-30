@@ -62,3 +62,12 @@ player-crafting-progressive-reordered
 player-crafting-progressive-fixed
 player-crafting-progressive-stacked
 player-crafting-stacked
+player-crafting-roll-result-count-pass
+player-crafting-roll-result-count-pass-narrow
+player-crafting-roll-result-count-fail
+player-crafting-roll-result-count-botch
+player-crafting-roll-result-count-botch-light
+player-crafting-roll-result-count-zero
+player-crafting-roll-result-count-secret
+player-crafting-roll-prompt-count-companion
+player-crafting-check-descriptor-count

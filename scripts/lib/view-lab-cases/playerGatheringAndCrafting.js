@@ -11,6 +11,7 @@ import {
   CRAFTING_SIMPLE,
 } from './caseConstants.js';
 import { playerCase, responsiveLayout } from './caseFactories.js';
+import { playerCountResultCases } from './playerCountResultCases.js';
 
 /** The single-subject roll prompt: Fabricate's own modal, mounted over the player window. */
 const SINGLE_PROMPT = '.fabricate-app .manager-modal[data-roll-prompt="single"]';
@@ -1196,4 +1197,5 @@ export const CASES = Object.freeze([
     expectLayout: responsiveLayout('.crafting-view-container', '.crafting-view-grid'),
     sourceMatches: [CRAFTING_SHARED, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),
+  ...playerCountResultCases(),
 ]);

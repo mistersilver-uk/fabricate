@@ -613,6 +613,35 @@ test('the shim registers the count Roll over its Roll, so a count check reaches 
   assert.equal(globalThis.CONFIG, previous.CONFIG, 'restore puts CONFIG back');
 });
 
+test('a count Roll snapshot restores as the registered count Roll, as core looks it up', async () => {
+  const content = buildLabContent();
+  const previous = { Roll: globalThis.Roll, CONFIG: globalThis.CONFIG };
+  const shim = installFoundryShim({
+    seed: LIVE_SEED,
+    actorList: buildLabActors(content),
+    scenes: [],
+    settings: new Map(),
+    i18n: { localize: (key) => key, format: (key) => key },
+    worldTime: 0,
+    documents: new Map(),
+  });
+  try {
+    const CountRoll = findCountRoll(globalThis.CONFIG);
+    const policy = { dice: 2, die: 6, direction: 'over', comparison: 'meet', threshold: 1 };
+    const rolled = await CountRoll.fromPolicy({ ...policy, explode: null, cancel: null }).evaluate();
+    const restored = globalThis.Roll.fromData(JSON.parse(JSON.stringify(rolled.toJSON())));
+    assert.ok(restored instanceof CountRoll, 'the base class resolves the snapshot to its own class');
+    assert.equal(restored.total, rolled.total);
+    assert.throws(
+      () => globalThis.Roll.fromData({ ...rolled.toJSON(), class: 'UnregisteredRoll' }),
+      /cannot reconstruct UnregisteredRoll/
+    );
+  } finally {
+    shim.restore();
+    globalThis.Roll = previous.Roll;
+  }
+});
+
 test('the shim installs a Roll CONSTRUCTOR, so evaluateCheckRoll reaches the prompt', async () => {
   // COMPOSITION, and the reason this test exists: every other test here imports `createLabRoll`
   // directly, so reverting `installFoundryShim.js` to the pre-change two-static object left the

@@ -346,6 +346,24 @@ const GATHERING_UNDER_ADD = {
   },
 };
 
+/**
+ * Issue 2006's recipe screens: frame 06's pool needing three successes, with Smithing's own tier
+ * ids needing one and five, and two recipes on those tiers, so the recipe pills differ and sort.
+ */
+const DICE_POOL_RECIPES = {
+  ...DICE_POOL,
+  crafting: {
+    simple: {
+      evaluation: count('over', { ...DICE_POOL.crafting.simple.evaluation.pool, required: 3 }),
+      tiers: [
+        tier('sm-tier-apprentice', 'Apprentice work', 1),
+        tier('sm-tier-masterwork', 'Masterwork', 5),
+      ],
+    },
+  },
+  recipeTiers: { 'sm-r-horseshoe': 'sm-tier-apprentice', 'sm-r-longsword': 'sm-tier-masterwork' },
+};
+
 /** The `checkPreviewState` query values and the checks each seeds. */
 export const LAB_CHECK_PREVIEW_STATES = Object.freeze({
   'dice-pool': DICE_POOL,
@@ -361,6 +379,7 @@ export const LAB_CHECK_PREVIEW_STATES = Object.freeze({
   'gathering-over': GATHERING_OVER,
   'gathering-under-add': GATHERING_UNDER_ADD,
   'dice-pool-freetext': DICE_POOL_FREETEXT,
+  'dice-pool-recipes': DICE_POOL_RECIPES,
 });
 
 /** Karrun Forgecraft's crafting and salvage checks as `state` authors them, formula blank. */
@@ -408,6 +427,9 @@ export function seedCheckPreviewState(content, actors, stateId) {
   if (!state) return;
   const system = content.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.SMITHING);
   seedChecks(system, state);
+  for (const [recipeId, checkTierId] of Object.entries(state.recipeTiers ?? {})) {
+    content.recipes.find((recipe) => recipe.id === recipeId).checkTierId = checkTierId;
+  }
   const gathering = content.gatheringConfig.systems[LAB_SYSTEM_IDS.SMITHING];
   gathering.economy = { ...gathering.economy, resolutionMode: 'routed' };
   const idrin = actors.find((actor) => actor.id === 'lab-actor-idrin');

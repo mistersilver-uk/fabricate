@@ -358,6 +358,33 @@ export const CASES = Object.freeze([
       ],
     })
   ),
+  // Issue 2006: a counting check's pill names each recipe's successes needed in the mono face, and
+  // the DC sort key reads and sorts by that count.
+  managerCase({
+    id: 'manager-recipes-check-pill-count',
+    label: 'Manager — Recipes check pill and sort, success-counting check',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', checkPreviewState: 'dice-pool-recipes' },
+    // Ungrouped, so the sort reads across the whole library: one success first, five last.
+    steps: [
+      'Crafting',
+      ...chooseSelectOption('[data-recipe-sort]', 'dc'),
+      { selector: '[aria-labelledby="manager-recipe-group-label"]' },
+    ],
+    expectView: 'recipes',
+    expectSelector:
+      '.fabricate-manager:has([data-recipe-sort]:has-text("Successes needed"))' +
+      ':has(.manager-recipe-row [data-recipe-check="successes"]:has-text("1 success"))' +
+      ':has(.manager-recipe-row [data-recipe-check="successes"]:has-text("5 successes"))' +
+      ' .manager-recipe-row [data-recipe-check="successes"].is-mono:has-text("3 successes")',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipesBrowserView\.svelte$/,
+      /^src\/ui\/svelte\/stores\/(?:adminRecipeRowProjection|recipeCheckSummaryProjection)\.js$/,
+      /^src\/ui\/model\/recipeBrowserModel\.js$/,
+    ],
+  }),
   // The bulk axis under a multiplied character value: each tier names its multiplier, never a DC.
   managerCase({
     id: 'manager-recipes-bulk-edit-check-tier-under',

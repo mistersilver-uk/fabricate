@@ -196,6 +196,9 @@ export function createLabRoll({ random, replaceFormulaData, validate }) {
      */
     static fromData(data) {
       if (data.class && data.class !== this.name) {
+        // Core resolves a snapshot's class through `CONFIG.Dice.rolls`, as the count Roll needs.
+        const registered = globalThis.CONFIG?.Dice?.rolls?.find((cls) => cls.name === data.class);
+        if (registered && registered !== this) return registered.fromData(data);
         throw new Error(`View Lab Roll cannot reconstruct ${data.class}`);
       }
       const snapshot = structuredClone(data);

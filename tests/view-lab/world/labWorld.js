@@ -91,11 +91,37 @@ function seedGatheringTaskMode(content, mode) {
 /**
  * Ashfall Runework's routed crafting check graded roll-under (issue 2005): `routed-under` against
  * its fixed DC 12, and `routed-under-multiply` against a character value whose Ruined tier is
- * Otherwise, so the Journal ladder states `≤` bands or labelled multipliers.
+ * Otherwise, so the Journal ladder states `≤` bands or labelled multipliers. `routed-count` counts
+ * five d10s at 7 or more against two needed, cancelling on the worst face (issue 2006).
  */
 function seedRuneworkCheckMode(content, mode) {
   const system = content.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.RUNEWORK);
   const routed = system?.craftingCheck?.routed;
+  if (routed && mode === 'routed-count') {
+    const extra = { 'rw-masterwork': 2, 'rw-standard': 0, 'rw-ruined': -2 };
+    system.craftingCheck = {
+      ...system.craftingCheck,
+      routed: {
+        ...routed,
+        evaluation: {
+          product: 'count',
+          direction: 'over',
+          pool: {
+            die: 10,
+            base: '5',
+            threshold: '7',
+            required: 2,
+            cancel: { enabled: true, faces: { kind: 'worst' } },
+          },
+        },
+        relativeOutcomes: routed.relativeOutcomes.map((outcome) => ({
+          ...outcome,
+          dc: extra[outcome.id],
+        })),
+      },
+    };
+    return;
+  }
   if (!routed || !['routed-under', 'routed-under-multiply'].includes(mode)) return;
   const multiply = mode === 'routed-under-multiply';
   const adjustments = { 'rw-masterwork': 0.2, 'rw-standard': 0.5, 'rw-ruined': null };

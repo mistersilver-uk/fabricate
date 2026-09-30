@@ -29,3 +29,5 @@ player-inventory-bulk-roll-prompt-count
 player-inventory-bulk-destroy-confirm
 player-inventory-bulk-broken-queued
 player-inventory-bulk-report
+player-salvage-count-simple
+player-salvage-count-result

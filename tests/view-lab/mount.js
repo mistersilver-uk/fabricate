@@ -151,7 +151,7 @@ function readParams() {
     // selection top bar (issue 1198). Nothing shipped changes: the provider lives in this file
     // and registers with the production page-session registry the player app itself reads.
     //
-    // These three params are their own attributed REGION. Only the player window can render what
+    // These params are their own attributed REGION. Only the player window can render what
     // they produce, and `scripts/lib/viewLabCases.js` keys `ATTRIBUTED_LAB_INPUTS` on that fact —
     // so a hunk confined to this block selects the player frames instead of the whole corpus.
     playerProvider: params.get('playerProvider') === '1',
@@ -159,6 +159,8 @@ function readParams() {
     playerProviderFault: params.get('playerProviderFault') === '1',
     // Evidence-only label stress for the rail's truncation rule.
     longPlayerLabels: params.get('longPlayerLabels') === '1',
+    // A stand-in companion's interactive count roll, prompting on the standalone overlay.
+    companionRoll: params.get('companionRoll') === 'count',
     // view-lab-region:end
     // view-lab-region:canvas-mount-params
     // The two params only the three CANVAS windows read (issue 1520).
@@ -331,6 +333,10 @@ async function mountPlayerApp(content, params) {
     playerExtensions,
   };
   const instance = mount(FabricateAppRoot, { target: content, props });
+  if (params.companionRoll) {
+    const { installLabCompanionRoll } = await import('./labCompanionRoll.js');
+    installLabCompanionRoll(content.ownerDocument);
+  }
   return { instance, services, props };
 }
 
