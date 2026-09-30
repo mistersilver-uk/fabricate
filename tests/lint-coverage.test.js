@@ -100,7 +100,6 @@ test('the Prettier exclusions are pinned, so a new one is a visible edit', () =>
     '.github/',
     'openspec/',
     'docs/',
-    'benchmarks/baselines/',
     'styles/fabricate.css',
   ]);
 });

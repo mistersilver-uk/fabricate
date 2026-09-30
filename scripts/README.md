@@ -304,10 +304,10 @@ Inherited from issue 1071's headless harness and not re-invented.
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
-Note the difference from issue 1071: there, class 1 is committed to `benchmarks/baselines/` and asserted by a drift test.
+Note the difference from issue 1071: there, class 1 is measured at the base commit and at head, and asserted by a drift test.
 Here it is not, and cannot be.
 A count taken inside a live Foundry is invariant only *given the Foundry build and the game system*, because those decide document schemas, what a `create` call preserves and which hooks fire.
-The committed, cross-machine baseline is the headless one; this profile is the instrument that tells you whether the headless model still resembles reality.
+The cross-machine guard is the headless one; this profile is the instrument that tells you whether the headless model still resembles reality.
 
 **Report ratios, never absolute milliseconds.**
 `scripts/lib/foundryPerfRecord.js` refuses to compare two runs whose Node version, CPU model, architecture, arm, Foundry build, image, game system, browser build, fixture profile or fixture seed differ, naming every field that does.
