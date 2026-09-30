@@ -500,13 +500,20 @@ export function describeCountBandRange(band, text) {
   return describeBandRange(band, text);
 }
 
-/** Whether the Preview-as actor's pool settles to a zero-pool failure, never a refusal read as 0. */
+/**
+ * Whether the Preview-as actor's pool settles to a zero-pool failure, never a refusal read as 0,
+ * nor while a rolled bonus still pending could add dice.
+ */
 export function countPoolSettlesToZero({
   evaluation,
   thresholdMode,
   character = null,
   placement = null,
 }) {
+  const pendingDice = (placement?.preRolls ?? []).some(
+    (entry) => !Object.hasOwn(entry, 'total') && entry.destination === 'pool'
+  );
+  if (pendingDice) return false;
   const read = resolvePool({
     evaluation,
     thresholdMode,

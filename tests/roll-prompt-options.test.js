@@ -431,6 +431,8 @@ describe('roll prompt adapter', () => {
       'a pool that does not fail at zero still rolls one die');
     assert.equal(line({ ...zero, count: { ...zero.count, pool: 0 } }, [], '1d4')[2], '',
       'pending dice may lift a pool above zero, so no automatic failure is claimed');
+    assert.equal(line({ ...zero, count: { ...zero.count, pool: 0, destination: 'threshold' } }, [], '1d4')[2], notice,
+      'a rolled bonus that moves the threshold cannot add dice, so the zero pool still fails');
   });
 
   it('names a summed roll-under target to stay under, and leaves roll-over copy unchanged', async () => {

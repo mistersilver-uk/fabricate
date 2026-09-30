@@ -16,7 +16,9 @@ import {
   previewBandTarget,
   resolvePreviewTarget,
 } from '../src/ui/svelte/apps/manager/checks/checkBandModel.js';
+import { planModifierPlacement } from '../src/systems/checkModifierRouter.js';
 import { classifyCheckTotal } from '../src/systems/checkRouting.js';
+import { normalizeCheckEvaluation } from '../src/systems/normalize/checkEvaluation.js';
 import {
   missingTargetPaths,
   targetValueStatus,
@@ -520,6 +522,34 @@ describe('count bands (issue 2006)', () => {
     const penalty = { poolDelta: -1, thresholdDelta: 0, preRolls: [] };
     assert.equal(
       zero({ base: '@a.b', zeroPoolFails: true }, { character: actor, placement: penalty }),
+      true
+    );
+  });
+
+  it('claims no automatic failure while a rolled bonus could still add dice', () => {
+    const luck = [{ source: 'library', form: 'expression', expression: '1d4', label: 'Luck' }];
+    const at = (modifierDestination) =>
+      normalizeCheckEvaluation({
+        product: 'count',
+        direction: 'over',
+        pool: { die: 6, base: '0', threshold: '5', required: 1, modifierDestination, zeroPoolFails: true },
+      });
+    const pool = at('pool');
+    assert.equal(
+      countPoolSettlesToZero({
+        evaluation: pool,
+        thresholdMode: 'meet',
+        placement: planModifierPlacement({ evaluation: pool, contributions: luck }),
+      }),
+      false
+    );
+    const threshold = at('threshold');
+    assert.equal(
+      countPoolSettlesToZero({
+        evaluation: threshold,
+        thresholdMode: 'meet',
+        placement: planModifierPlacement({ evaluation: threshold, contributions: luck }),
+      }),
       true
     );
   });
