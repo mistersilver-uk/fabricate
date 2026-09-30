@@ -6,7 +6,7 @@
  */
 import { benefitSign } from '../../systems/checkModifierRouter.js';
 import { countFormulaValues } from '../../systems/countEvaluation.js';
-import { formatCheckAdjustment, formatSignedStep } from '../../utils/checkAdjustmentFormat.js';
+import { formatNet, formatSignedStep } from '../../utils/checkAdjustmentFormat.js';
 import { fill } from '../../utils/fillPlaceholders.js';
 
 import { bareExpression, preRollLabel } from './checkEvidenceRows.js';
@@ -27,6 +27,9 @@ const KEYS = Object.freeze({
   neededBotch: 'FABRICATE.Check.CountEvidence.NeededBotch',
   preRolled: 'FABRICATE.Check.Evidence.PreRolled',
   preRollDice: 'FABRICATE.Check.CountEvidence.PreRollDice',
+  preRollDiceOne: 'FABRICATE.Check.CountEvidence.PreRollDiceOne',
+  preRollDiceRemoved: 'FABRICATE.Check.CountEvidence.PreRollDiceRemoved',
+  preRollDiceRemovedOne: 'FABRICATE.Check.CountEvidence.PreRollDiceRemovedOne',
   preRollThreshold: 'FABRICATE.Check.CountEvidence.PreRollThreshold',
   pool: 'FABRICATE.Check.CountEvidence.Pool',
   poolReduced: 'FABRICATE.Check.CountEvidence.PoolReduced',
@@ -55,9 +58,6 @@ export function countBotched(display) {
 }
 
 const sum = (terms) => terms.reduce((total, term) => total + term.value, 0);
-
-/** `2`, or `−1` with the true minus sign. */
-const netText = (net) => (net < 0 ? formatCheckAdjustment('add', net) : String(net));
 
 /** `− 6` or `+ 2`: a change set apart from the dice it changes. */
 const spacedChange = (value) => formatSignedStep(value).replace(/^([+−])/, '$1 ');
@@ -100,10 +100,14 @@ export function countSummaryText(display, localize = (key) => key) {
   return fill(loc(KEYS.summaryGrown), { ...line, grown: formatSignedStep(grown) });
 }
 
-/** `≤ 14 · character value 13, moved +1 by modifiers`, only when it read or moved. */
+/**
+ * `≤ 14 · character value 13, moved +1 by modifiers`, only when it read or moved; the move is
+ * signed by its benefit, as the prompt's rule line signs it.
+ */
 function successOnRow(display, loc) {
   const { threshold } = display.count;
-  const moved = threshold.effective - threshold.anchor;
+  const sign = benefitSign('threshold', display.evaluation.direction);
+  const moved = sign * (threshold.effective - threshold.anchor);
   if (threshold.source !== 'character' && moved === 0) return null;
   const effective = formulaValues(display, 0, threshold.effective);
   const anchor = formulaValues(display, 0, threshold.anchor).threshold;
@@ -120,7 +124,7 @@ function countRow(count, loc) {
   const text = fill(loc(KEYS.countNet), {
     qualified: count.qualified,
     cancelled: count.cancelled,
-    net: netText(count.net),
+    net: formatNet(count.net),
   });
   return { id: 'count', label: loc(KEYS.count), text, ...(count.net < 0 && { tone: 'danger' }) };
 }
@@ -137,6 +141,12 @@ function neededRow(count, loc) {
   return { id: 'needed', label: loc(KEYS.needed), text };
 }
 
+/** The pool key for a rolled total: dice added, or removed below zero, singular for one. */
+function preRollDiceKey(total) {
+  if (total < 0) return total === -1 ? KEYS.preRollDiceRemovedOne : KEYS.preRollDiceRemoved;
+  return total === 1 ? KEYS.preRollDiceOne : KEYS.preRollDice;
+}
+
 /** Each pre-roll that grew the pool or moved the threshold, in the order it settled. */
 function preRolledRow(display, loc) {
   const text = (display.evidence?.preRolls ?? [])
@@ -145,11 +155,14 @@ function preRolledRow(display, loc) {
       const facts = {
         label: preRollLabel(entry, loc),
         formula: bareExpression(entry.expression),
-        total: entry.total,
+        total: formatNet(entry.total),
       };
-      if (entry.destination === 'pool') return fill(loc(KEYS.preRollDice), facts);
-      const moved = benefitSign('threshold', display.evaluation.direction) * entry.total;
-      return fill(loc(KEYS.preRollThreshold), { ...facts, moved: formatSignedStep(moved) });
+      if (entry.destination === 'pool') {
+        const removed = Math.abs(entry.total);
+        return fill(loc(preRollDiceKey(entry.total)), { ...facts, removed });
+      }
+      const moved = formatSignedStep(entry.total);
+      return fill(loc(KEYS.preRollThreshold), { ...facts, moved });
     })
     .join('; ');
   return text ? { id: 'preRolled', label: loc(KEYS.preRolled), text } : null;

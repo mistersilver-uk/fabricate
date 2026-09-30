@@ -1824,6 +1824,7 @@ export class RunJournalBuilder {
   _bandLabels() {
     return {
       otherwise: this.localize('FABRICATE.App.Journal.StepDetails.BandOtherwise'),
+      needed: this.localize('FABRICATE.App.Journal.StepDetails.BandNeeded'),
       named: (tier, adjustment) =>
         this.localize('FABRICATE.App.Journal.StepDetails.BandAdjustment', { tier, adjustment }),
     };

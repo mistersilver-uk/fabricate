@@ -251,7 +251,7 @@ describe('the simple editor authors a counting check (issue 2006)', () => {
     assert.doesNotMatch(outcome('success') + outcome('failure'), /\bDC\b/);
     await state.act(() => chooseSelectOption(state.root, '[data-simple-band-record]', 't-hard'));
     assert.match(outcome('success'), /Reaches 1 success — /, 'the previewed tier needs one');
-    assert.match(outcome('failure'), /Fewer than 1 — /);
+    assert.match(outcome('failure'), /Fewer than 1 success — /, 'the singular names its noun');
   });
 });
 

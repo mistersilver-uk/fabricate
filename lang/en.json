@@ -1057,6 +1057,7 @@
           "CheckWithDc": "{formula} vs DC {dc}",
           "CheckWithTarget": "{formula} · Target {target} · {comparison}",
           "BandOtherwise": "Otherwise",
+          "BandNeeded": "Needed",
           "BandAdjustment": "{tier} · {adjustment}",
           "FailureGeneric": "The crafting attempt failed.",
           "RollLabel": "Roll",
@@ -1960,6 +1961,9 @@
         "NeededMargin": "{required} · margin {margin}",
         "NeededBotch": "{required} · a net below zero is a botch",
         "PreRollDice": "{label} {formula} rolled {total}, adding {total} dice",
+        "PreRollDiceOne": "{label} {formula} rolled 1, adding 1 die",
+        "PreRollDiceRemoved": "{label} {formula} rolled {total}, removing {removed} dice",
+        "PreRollDiceRemovedOne": "{label} {formula} rolled {total}, removing 1 die",
         "PreRollThreshold": "{label} {formula} rolled {total}, moving the threshold {moved}",
         "Pool": "Pool",
         "PoolReduced": "Reduced to zero by a {source} penalty of {change}",
@@ -7019,7 +7023,8 @@
             "Outcomes": {
               "Success": "Reaches {required} successes — the {record}'s result group is produced in full.",
               "SuccessOne": "Reaches 1 success — the {record}'s result group is produced in full.",
-              "Failure": "Fewer than {required} — nothing is produced; the failure policy decides the cost."
+              "Failure": "Fewer than {required} — nothing is produced; the failure policy decides the cost.",
+              "FailureOne": "Fewer than 1 success — nothing is produced; the failure policy decides the cost."
             }
           },
           "Digest": {

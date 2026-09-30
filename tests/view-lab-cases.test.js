@@ -1152,6 +1152,7 @@ test('the capture runner threads the per-case console allowance into the render'
       'player-crafting-roll-result-count-botch',
       'player-crafting-roll-result-count-botch-light',
       'player-crafting-roll-result-count-zero',
+      'player-crafting-roll-result-count-zero-penalty',
     ],
     'a case gained or lost a console-error allowance; the console gate is what makes a lab frame ' +
       'evidence, so widening it is an accepted edit rather than an incidental one'
@@ -2302,8 +2303,8 @@ test('every crafting case claims exactly the resolution-mode body it renders', (
   // draft, and passed clean.
   assert.equal(
     examined.length,
-    76,
-    `expected the 76 crafting-path cases to be examined, saw ${examined.length}`
+    77,
+    `expected the 77 crafting-path cases to be examined, saw ${examined.length}`
   );
   assert.ok(
     examined.filter((id) =>

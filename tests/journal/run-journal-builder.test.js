@@ -3657,7 +3657,7 @@ test('the roll line reads the executed target and margin outside sum/over/fixed'
   assert.equal(formatRoll({ ...attribute, formula: '' }, english), 'Rolled 11 · target 16 · margin −5');
   assert.equal(formatRoll({ ...legacy, formula: '1d20' }, english), '1d20 = 11 vs DC 16');
   assert.doesNotMatch(formatRoll({ ...under, formula: '1d20' }, english), /DC/);
-  assert.equal(formatRoll({ ...count, formula: '' }, localize), 'FABRICATE.App.Journal.StepDetails.Count.RollResult|{"net":3,"required":2}');
+  assert.equal(formatRoll({ ...count, formula: '' }, localize), 'FABRICATE.App.Journal.StepDetails.Count.RollResult|{"net":"3","required":2}');
 });
 
 // ── Issue 2006: a counting check's ladder, step label and roll line read in net successes ─────
@@ -3689,6 +3689,29 @@ test('a count ladder states net successes ranked by net whatever the per-die dir
   }
   const fixed = { ...countRouted('under'), type: 'fixed', fixedOutcomes: [{ start: 0, end: 2 }] };
   assert.equal(craftingOutcomeBand(fixed.fixedOutcomes[0], fixed, 2), '0–2', 'fixed ranges are nets');
+});
+
+test('a macro-set count ladder states its bands relative to the unknown successes needed', () => {
+  const offsets = [-2, 0, 2].map((dc, index) => ({ id: `t${index}`, name: `T${index}`, success: dc >= 0, dc }));
+  const routed = { ...countRouted('over'), relativeOutcomes: offsets, dcMode: 'dynamic' };
+  routed.evaluation.pool.required = 3;
+  assert.deepEqual(bands(craftingOutcomeBand, routed, 3), ['0–2', '3–4', '5+'], 'a static count');
+  assert.deepEqual(bands(craftingOutcomeBand, routed, null), ['<Needed', 'Needed+', 'Needed+2+']);
+  const labels = { needed: 'Besoin' };
+  assert.equal(craftingOutcomeBand(offsets[2], routed, null, labels), 'Besoin+2+', 'a localized word');
+  const system = { ...SYSTEM, resolutionMode: 'routedByCheck', craftingCheck: { routed } };
+  const tiers = makeBuilder({
+    active: [activeSingleStepRun({ steps: [{ stepId: 's0', status: 'inProgress' }] })],
+    recipe: { ...SINGLE_STEP_RECIPE, getExecutionSteps: () => [{ id: 's0', resultGroups: [] }] },
+    system,
+    resolutionModeService: new ResolutionModeService({ getSystem: () => system }),
+  }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0].craftingYield.tiers;
+  assert.deepEqual(
+    tiers.map((tier) => tier.band),
+    ['<FABRICATE.App.Journal.StepDetails.BandNeeded', 'FABRICATE.App.Journal.StepDetails.BandNeeded+',
+      'FABRICATE.App.Journal.StepDetails.BandNeeded+2+'],
+    'the Journal ladder never states the static pool.required under a macro'
+  );
 });
 
 test('the crafting and gathering count ladders open with a Botch row only while cancelling is on', () => {
@@ -3784,7 +3807,14 @@ test('a count roll line reads its net against the required count, or its net, ne
     return formatRoll({ ...check, formula: '' }, english);
   };
   assert.equal(line({ total: 4, margin: 2 }), '4 of 2 successes');
-  assert.equal(line({ total: -1, margin: -2 }), '-1 of 1 success');
+  assert.equal(line({ total: 3, margin: 1 }), '3 of 2 successes', 'a simple check reads its required');
+  assert.equal(line({ total: -1, margin: -2 }), '−1 of 1 success', 'the true minus, as the card');
+  assert.equal(line({ total: 1, margin: 1 }), '1 net success', 'never a required count of 0');
+  // A routed margin is taken from the matched tier, so its line reads the net alone.
+  assert.equal(line({ type: 'relative', total: -2, margin: -1 }), '−2 net successes');
+  assert.equal(line({ type: 'relative', total: -1, margin: -1 }), '−1 net successes');
+  assert.equal(line({ type: 'relative', total: 4, margin: 1 }), '4 net successes');
+  assert.equal(line({ type: 'relative', total: 1, margin: 0 }), '1 net success');
   assert.equal(line({ total: 3, margin: null }), '3 net successes');
   assert.equal(line({ total: 1 }), '1 net success');
   assert.equal(line({ total: null, margin: null, zeroPool: true }), english('FABRICATE.Check.CountEvidence.ZeroPoolResult'));

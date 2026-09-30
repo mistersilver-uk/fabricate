@@ -1357,7 +1357,9 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     const target = await openSalvage(services);
 
     assert.ok(target.querySelector('[data-inventory-salvage-body="simple-check"]'));
-    assert.equal(target.querySelector('[data-inventory-salvage-dc]').dataset.inventorySalvageDc, '14');
+    const dc = target.querySelector('[data-inventory-salvage-dc]');
+    assert.equal(dc.dataset.inventorySalvageDc, '14');
+    assert.ok(dc.matches('.salvage-body-title > .salvage-dc'), 'the short DC sits in the kicker row');
     assert.ok(target.querySelector('[data-inventory-salvage-loss-note]'), 'a roll can cost you');
     assert.match(
       target.querySelector('[data-inventory-salvage-action]').textContent,
@@ -1393,7 +1395,10 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     const target = { rule, direction: 'over', text: 'Salvage check · 2 successes needed · d10s, success on ≥ 7' };
     const { services } = salvageServices(salvageItem({ checkUsable: true, dc: null, target }));
     const root = await openSalvage(services);
-    assert.equal(root.querySelector('[data-inventory-salvage-target="over"]').textContent.trim(), target.text);
+    const line = root.querySelector('[data-inventory-salvage-target="over"]');
+    assert.equal(line.textContent.trim(), target.text);
+    assert.ok(line.matches('p.salvage-target-source'), 'the count line sits on its own line');
+    assert.ok(!line.closest('.salvage-body-title'), 'never in the kicker row built for "DC 15"');
     assert.ok(!root.querySelector('[data-inventory-salvage-dc]'), 'no DC beside the successes needed');
     const banner = root.querySelector('[data-inventory-salvage-banner]').textContent;
     assert.match(banner, /The count must reach the successes needed/);

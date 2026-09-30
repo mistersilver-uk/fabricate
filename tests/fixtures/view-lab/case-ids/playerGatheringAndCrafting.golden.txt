@@ -68,6 +68,7 @@ player-crafting-roll-result-count-fail
 player-crafting-roll-result-count-botch
 player-crafting-roll-result-count-botch-light
 player-crafting-roll-result-count-zero
+player-crafting-roll-result-count-zero-penalty
 player-crafting-roll-result-count-secret
 player-crafting-roll-prompt-count-companion
 player-crafting-check-descriptor-count

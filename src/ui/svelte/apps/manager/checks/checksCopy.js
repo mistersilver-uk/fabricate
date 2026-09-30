@@ -511,10 +511,16 @@ export function countOutcomeCopy(required, record, text) {
           'FABRICATE.Admin.Manager.Checks.Count.Outcomes.Success',
           "Reaches {required} successes — the {record}'s result group is produced in full."
         );
-  const failure = text(
-    'FABRICATE.Admin.Manager.Checks.Count.Outcomes.Failure',
-    'Fewer than {required} — nothing is produced; the failure policy decides the cost.'
-  );
+  const failure =
+    required === 1
+      ? text(
+          'FABRICATE.Admin.Manager.Checks.Count.Outcomes.FailureOne',
+          'Fewer than 1 success — nothing is produced; the failure policy decides the cost.'
+        )
+      : text(
+          'FABRICATE.Admin.Manager.Checks.Count.Outcomes.Failure',
+          'Fewer than {required} — nothing is produced; the failure policy decides the cost.'
+        );
   return {
     success: interpolate(success, { required, record }),
     failure: interpolate(failure, { required }),

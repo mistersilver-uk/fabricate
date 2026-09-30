@@ -239,10 +239,10 @@ export function renderCountSummary(check, localize = (key) => key) {
   );
 }
 
-/** The Success or Failure pill, or Botch for a failed count that netted below zero. */
+/** The Success or Failure pill, or Botch for a public failed count that netted below zero. */
 function renderCheckPill(model, keys, loc) {
   const succeeded = model.status === 'succeeded';
-  const botched = !succeeded && countBotched(model.check);
+  const botched = !succeeded && isPublicCheckDisplay(model.check) && countBotched(model.check);
   let icon = succeeded ? 'fa-circle-check' : 'fa-circle-xmark';
   if (botched) icon = 'fa-skull';
   let text = loc(succeeded ? keys.checkSuccess : keys.checkFailure);

@@ -163,6 +163,17 @@ test('a botch reads Botch and cancels every tile, below zero in the danger tone'
   assert.ok(content.includes('1 · a net below zero is a botch'));
 });
 
+test('a botch is named only on a public card; a GM or blind roll reads a plain Failure', async () => {
+  for (const rollMode of ['gmroll', 'blindroll']) {
+    const { cards } = await craftCount({ rollMode, pool: BOTCH_POOL, faces: [6, 6, 6] });
+    const content = readable(cards[0]);
+    assert.ok(!content.includes('fa-skull'), `${rollMode}: no Botch pill`);
+    assert.ok(content.includes('fa-circle-xmark" aria-hidden="true"></i>Failure</div>'), rollMode);
+  }
+  const { cards } = await craftCount({ pool: BOTCH_POOL, faces: [6, 6, 6] });
+  assert.ok(readable(cards[0]).includes('fa-skull" aria-hidden="true"></i>Botch</div>'), 'public');
+});
+
 test('a zero pool states no total and no tile, only why nothing was rolled (N32)', async () => {
   const { result, cards } = await craftCount({ pool: ZERO_POOL });
   assert.equal(result.success, false);
@@ -329,6 +340,27 @@ test('a prepared count check reports its dice only when it is not secret (N33)',
   assert.deepEqual(secret.visibility, { rollMode: 'gmroll', secret: true });
   assert.ok(!('countDisplay' in secret), 'a secret check keeps its dice inside the authority');
   assert.equal(checkDisplayForCard(secret).count, null);
+});
+
+test('a prepared count replays the character-value threshold source it captured', async () => {
+  const replayed = async (count) => {
+    const dice = installCountDice({ faces: [9, 3], chat: false });
+    try {
+      const prepared = preparedCountCheck({ count });
+      const result = await evaluatePreparedRunCheck(
+        prepared,
+        { getRollData: () => ({}) },
+        {
+          rollMode: 'publicroll',
+        }
+      );
+      return result.countDisplay.threshold.source;
+    } finally {
+      dice.restore();
+    }
+  };
+  assert.equal(await replayed({ thresholdSource: 'character' }), 'character');
+  assert.equal(await replayed({}), 'fixed', 'a fixed threshold stays fixed');
 });
 
 test('a gathering check persists whole, so it keeps no count evidence or visibility (N34)', async () => {

@@ -116,6 +116,21 @@ export function playerCountResultCases() {
         ':not(:has([data-roll-total])):not(:has([data-check-count-tiles]))' +
         ROW('result', 'A pool reduced to zero fails automatically. Nothing was rolled.'),
     }),
+    // Frame 41: a situational −6 typed into the prompt reduces six dice to none, so the Pool row
+    // names the penalty above the Result.
+    rolledCase({
+      id: 'player-crafting-roll-result-count-zero-penalty',
+      label: 'Player app — success-counting result box, a pool reduced to zero by a penalty',
+      state: 'count-result-zero-penalty',
+      failed: true,
+      steps: [{ selector: `${SINGLE_PROMPT} input[name="situationalBonus"]`, fill: '-6' }],
+      expectSelector:
+        `${RESULT_BOX}[data-roll-success="false"]` +
+        ':not(:has([data-check-count-tiles]))' +
+        ':has([data-check-evidence="pool"] + [data-check-evidence="result"])' +
+        ROW('pool', 'Reduced to zero by a situational penalty of −6') +
+        ROW('result', 'A pool reduced to zero fails automatically. Nothing was rolled.'),
+    }),
     // The crafting app reaches no secret check, so its withheld state is the roll it cannot see.
     rolledCase({
       id: 'player-crafting-roll-result-count-secret',
