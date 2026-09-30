@@ -11,6 +11,7 @@
  * on its pool. `tests/check-trigger-presets.test.js` pins what each preset authors. */
 
 import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
+import { parseDiceGroups } from '../../../../../utils/craftingCheckExpression.js';
 
 const NAMESPACE = 'FABRICATE.Admin.Manager.Checks.Breakage.';
 
@@ -177,6 +178,30 @@ export function countPoolDiceGroup(evaluation) {
   if (evaluation?.product !== 'count') return null;
   const { die } = normalizeCheckEvaluation(evaluation).pool;
   return { groupId: 0, raw: `d${die}`, count: null, sides: die, label: `d${die}` };
+}
+
+/**
+ * The dice groups a trigger reads, in evaluated-term order with `groupId` the engine's `roll.dice`
+ * index: a counting check's one pool group, else the formula's, a repeated group numbered.
+ */
+export function triggerDiceGroups({ evaluation, rollFormula }, text) {
+  const pool = countPoolDiceGroup(evaluation);
+  if (pool) return [pool];
+  const parsed = parseDiceGroups(rollFormula);
+  const seen = new Map();
+  const totals = new Map();
+  for (const group of parsed) totals.set(group.raw, (totals.get(group.raw) || 0) + 1);
+  return parsed.map((group, groupId) => {
+    const occurrence = (seen.get(group.raw) || 0) + 1;
+    seen.set(group.raw, occurrence);
+    const label =
+      totals.get(group.raw) > 1
+        ? text('FABRICATE.Admin.Manager.Checks.Breakage.GroupOrdinal', '{die} #{n}')
+            .replace('{die}', group.raw)
+            .replace('{n}', String(occurrence))
+        : group.raw;
+    return { groupId, raw: group.raw, count: group.count, sides: group.sides, label };
+  });
 }
 
 const COUNT_PRESETS = Object.freeze({

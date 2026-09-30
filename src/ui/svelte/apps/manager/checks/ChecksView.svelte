@@ -39,6 +39,13 @@
   import { announceValidationOutcome } from '../validationAnnouncement.js';
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import { checkIssueText, convertActionCopy } from './checksCopy.js';
+  import {
+    activityWordFor,
+    failurePolicyInertNote as inertNoteFor,
+    recordNounFor,
+    recordNounPluralFor,
+    subsystemModeLabel as modeLabelFor,
+  } from './checksActivityCopy.js';
   import { issueRowStatus } from './checksValidationRows.js';
   import {
     buildCheckModifierContext,
@@ -358,46 +365,8 @@
     },
   };
 
-  // The AUTHORED mode, for the "does not apply in {mode} mode" copy and the Validation rail's
-  // rows — deliberately NOT the readiness mode, which collapses every no-check mode to `none`
-  // and would name a mode no economy editor offers. IT IS LOCALIZED through the SAME strings
-  // the rest of the manager uses: the authored token is an internal identifier and the three
-  // subsystems spell one concept three ways.
-  const SUBSYSTEM_MODE_LABELS = {
-    crafting: {
-      simple: ['FABRICATE.Admin.SystemSettings.ResolutionSimple', 'Simple'],
-      routedByIngredients: [
-        'FABRICATE.Admin.Manager.ResolutionRoutedByIngredients',
-        'Routed by ingredients',
-      ],
-      routedByCheck: ['FABRICATE.Admin.Manager.ResolutionRoutedByCheck', 'Routed by check'],
-      progressive: ['FABRICATE.Admin.SystemSettings.ResolutionProgressive', 'Progressive'],
-      alchemy: ['FABRICATE.Admin.SystemSettings.ResolutionAlchemy', 'Alchemy'],
-    },
-    // Alchemy's row names the ALCHEMY CHECK MODE, the choice deciding what alchemy rolls.
-    alchemy: {
-      none: ['FABRICATE.Admin.SystemSettings.Alchemy.CheckModeNone', 'No check'],
-      simple: ['FABRICATE.Admin.SystemSettings.Alchemy.CheckModeSimple', 'Simple check'],
-      tiered: ['FABRICATE.Admin.SystemSettings.Alchemy.CheckModeTiered', 'Tiered check'],
-    },
-    salvage: {
-      simple: ['FABRICATE.Admin.SystemSettings.SalvageResolutionSimple', 'Simple'],
-      progressive: ['FABRICATE.Admin.SystemSettings.SalvageResolutionProgressive', 'Progressive'],
-      routed: ['FABRICATE.Admin.SystemSettings.SalvageResolutionRouted', 'Routed by check'],
-    },
-    gathering: {
-      d100: ['FABRICATE.Admin.Manager.Economy.Resolution.D100', 'd100 roll'],
-      progressive: ['FABRICATE.Admin.Manager.Economy.Resolution.Progressive', 'Progressive'],
-      routed: ['FABRICATE.Admin.Manager.Economy.Resolution.Routed', 'Routed by check'],
-    },
-  };
-
-  /** The GM-facing name of an authored mode; an unmapped token falls back to itself, so a
-   *  mode added to a picker without a row here reads as unfinished, not as another. */
-  function subsystemModeLabel(vocabulary, mode) {
-    const entry = SUBSYSTEM_MODE_LABELS[vocabulary]?.[mode];
-    return entry ? text(entry[0], entry[1]) : String(mode || '');
-  }
+  // The AUTHORED mode's own name, from `checksActivityCopy.js`.
+  const subsystemModeLabel = (vocabulary, mode) => modeLabelFor(vocabulary, mode, text);
 
   // One group per in-play subsystem, against its own draft and mode. Salvage is omitted when
   // its feature is off; GATHERING IS NOT OMITTED UNDER d100, validating a selection that
@@ -762,27 +731,10 @@
     activeActivity ? resolveModifierPolicy(activeActivity.modifierContext) : 'addAll'
   );
 
-  // THE RECORD NOUN, in the activity's own word and localized, because a noun is copy.
-  const RECORD_NOUNS = {
-    crafting: ['FABRICATE.Admin.Manager.Checks.RecordNoun.Crafting', 'recipe'],
-    salvage: ['FABRICATE.Admin.Manager.Checks.RecordNoun.Salvage', 'salvageable item'],
-    gathering: ['FABRICATE.Admin.Manager.Checks.RecordNoun.Gathering', 'gathering task'],
-  };
-  const recordNoun = $derived.by(() => {
-    const entry = RECORD_NOUNS[activity] || RECORD_NOUNS.crafting;
-    return text(entry[0], entry[1]);
-  });
-
-  // The activity as the Roll button names it mid-sentence, lower-case and localized.
-  const ACTIVITY_WORDS = {
-    crafting: ['FABRICATE.Admin.Manager.Checks.Simulator.ActivityCrafting', 'crafting'],
-    salvage: ['FABRICATE.Admin.Manager.Checks.Simulator.ActivitySalvage', 'salvage'],
-    gathering: ['FABRICATE.Admin.Manager.Checks.Simulator.ActivityGathering', 'gathering'],
-  };
-  const activityWord = $derived.by(() => {
-    const entry = ACTIVITY_WORDS[activity];
-    return entry ? text(entry[0], entry[1]) : '';
-  });
+  // The activity's own words, from `checksActivityCopy.js`.
+  const recordNoun = $derived(recordNounFor(activity, text));
+  const activityWord = $derived(activityWordFor(activity, text));
+  const recordNounPlural = $derived(recordNounPluralFor(activity, text));
 
   // The failure-result policy of the activity on screen, read by its card and the readout alike.
   const activeFailureResultPolicy = $derived(
@@ -804,45 +756,12 @@
     return { consumeOnFail, breakToolsOnFail };
   });
 
-  // The PLURAL of the same noun, sentence-initial, and the three do not pluralize alike.
-  const RECORD_NOUNS_PLURAL = {
-    crafting: ['FABRICATE.Admin.Manager.Checks.RecordNoun.CraftingPlural', 'Recipes'],
-    salvage: ['FABRICATE.Admin.Manager.Checks.RecordNoun.SalvagePlural', 'Salvageable items'],
-    gathering: ['FABRICATE.Admin.Manager.Checks.RecordNoun.GatheringPlural', 'Gathering tasks'],
-  };
-  const recordNounPlural = $derived.by(() => {
-    const entry = RECORD_NOUNS_PLURAL[activity] || RECORD_NOUNS_PLURAL.crafting;
-    return text(entry[0], entry[1]);
-  });
-
-  // WHERE THE POLICY HAS NO REACH, and why: neither `routedByIngredients` nor `progressive`
-  // has an outcome tier or reserved failure group to mark, so a stated reason renders rather
-  // than a control that silently does nothing.
-  const failurePolicyInertNote = $derived.by(() => {
-    if (activity === 'gathering') {
-      return gatheringD100
-        ? text(
-            'FABRICATE.Admin.Manager.Checks.FailureResults.InertGatheringD100',
-            'The d100 gathering roll has no failure outcome to produce — and routed and progressive gathering are not available yet. This setting is kept and takes effect when they are.'
-          )
-        : '';
-    }
-    if (activity === 'crafting' && resolutionMode === 'routedByIngredients') {
-      return text(
-        'FABRICATE.Admin.Manager.Checks.FailureResults.InertRoutedByIngredients',
-        'In routed-by-ingredients mode the check has no outcome tiers to mark as failures, so nothing here can be produced on a failed check. This setting is kept, and applies again if you switch to a mode that has them.'
-      );
-    }
-    const progressive =
-      (activity === 'crafting' && craftingProgressive) ||
-      (activity === 'salvage' && salvageProgressive);
-    return progressive
-      ? text(
-          'FABRICATE.Admin.Manager.Checks.FailureResults.InertProgressive',
-          'A progressive check spends its rolled value down one ordered list of results, so it has no failure outcome to produce. This setting is kept, and applies again if you switch to a mode that has one.'
-        )
-      : '';
-  });
+  const failurePolicyInertNote = $derived(
+    inertNoteFor(
+      { activity, gatheringD100, resolutionMode, craftingProgressive, salvageProgressive },
+      text
+    )
+  );
 
   // THE ROLL SECTION'S MODE CALLOUT, in the activity's own vocabulary and on `roll` alone.
   const calloutMode = $derived.by(() => {

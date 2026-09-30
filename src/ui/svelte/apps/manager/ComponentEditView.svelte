@@ -634,8 +634,7 @@
   }
 
   // Deep clone the persisted salvage shape into an editable draft. Authoring touches only
-  // resultGroups/outcomeRouting and the check overrides; the rest are kept verbatim for
-  // `buildUpdates`.
+  // resultGroups/outcomeRouting and the overrides; the rest are kept verbatim for `buildUpdates`.
   function cloneSalvage(salvage) {
     const source = salvage && typeof salvage === 'object' ? salvage : {};
     return {
@@ -814,16 +813,8 @@
     }
     if (showEssences) updates.essences = essenceMapFrom(essenceDraft);
     if (showSalvage) {
-      // Preserved salvage fields first, then the authored ones, so the rest survive a save.
-      updates.salvage = {
-        ...salvageDraft,
-        resultGroups: salvageDraft.resultGroups,
-        outcomeRouting: salvageDraft.outcomeRouting,
-        dcOverride: salvageDraft.dcOverride,
-        adjustmentOverride: salvageDraft.adjustmentOverride,
-        successesOverride: salvageDraft.successesOverride,
-        allowPlayerResultReorder: salvageDraft.allowPlayerResultReorder,
-      };
+      // The whole draft, authored and preserved fields alike, so the rest survive a save.
+      updates.salvage = { ...salvageDraft };
       // ABSENCE IS A VALUE HERE: the normalizer keys authoredness on `Array.isArray`, so the key
       // must be DELETED, never written as `null` — `null` would read as "not an array" and inherit.
       if (!Array.isArray(salvageDraft.checkModifierIds)) delete updates.salvage.checkModifierIds;

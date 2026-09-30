@@ -12,6 +12,7 @@ import {
   checkTriggerPresets,
   countPoolDiceGroup,
   presetPolarity,
+  triggerDiceGroups,
 } from '../src/ui/svelte/apps/manager/checks/checkTriggerPresets.js';
 
 const D20 = [{ groupId: 0, label: '1d20', sides: 20, count: 1 }];
@@ -352,3 +353,21 @@ test('a progressive count check takes the simple list with the award copy', () =
   const icons = checkTriggerPresets({ kind: 'simple', evaluation: countEvaluation({ cancel: true }) });
   assert.deepEqual(icons.map((preset) => preset.icon), ['fas fa-skull', 'fas fa-skull']);
 });
+
+test('a trigger reads the formula groups, a repeated one numbered, or a counting pool alone', () => {
+  const text = (_key, fallback) => fallback;
+  const groups = triggerDiceGroups({ rollFormula: '1d6 + 1d20 + 1d6' }, text);
+  assert.deepEqual(
+    groups.map(({ groupId, label, sides }) => [groupId, label, sides]),
+    [
+      [0, '1d6 #1', 6],
+      [1, '1d20', 20],
+      [2, '1d6 #2', 6],
+    ]
+  );
+  const pool = { product: 'count', pool: { die: 10 } };
+  assert.deepEqual(triggerDiceGroups({ evaluation: pool, rollFormula: '1d20 + 5' }, text), [
+    countPoolDiceGroup(pool),
+  ]);
+});
+
