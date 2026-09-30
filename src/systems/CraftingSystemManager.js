@@ -289,13 +289,13 @@ export class CraftingSystemManager {
     return {
       componentIds: _scopeEntityBasis(
         _resolveStoreSeam(this._componentScopeStore),
-        system?.components ?? system?.managedItems ?? system?.items
+        system?.components ?? system?.managedItems ?? system?.items // ratchet-exempt(world-scope): basis
       ),
       essenceIds: _scopeEntityBasis(
         _resolveStoreSeam(this._essenceScopeStore),
-        system?.essenceDefinitions ?? system?.essences
+        system?.essenceDefinitions ?? system?.essences // ratchet-exempt(world-scope): basis
       ),
-      toolIds: _scopeEntityBasis(_resolveStoreSeam(this._toolScopeStore), system?.tools),
+      toolIds: _scopeEntityBasis(_resolveStoreSeam(this._toolScopeStore), system?.tools), // ratchet-exempt(world-scope): basis
       componentCategories: _vocabularyBasis(
         normalizeCustomComponentCategories(system?.componentCategories)
       ),
@@ -816,7 +816,7 @@ export class CraftingSystemManager {
   getItems(systemId, search = '') {
     const system = this.getSystem(systemId);
     if (!system) return [];
-    const managedItems = system.components || [];
+    const managedItems = system.components || []; // ratchet-exempt(world-scope): authoring-accessor
     if (!search) return [...managedItems];
     const q = search.toLowerCase();
     return managedItems.filter((item) => {
@@ -1084,10 +1084,10 @@ export class CraftingSystemManager {
           ? updates.tags
           : current.itemTags,
       essenceDefinitions: Object.prototype.hasOwnProperty.call(updates, 'essenceDefinitions')
-        ? updates.essenceDefinitions
+        ? updates.essenceDefinitions // ratchet-exempt(world-scope): writer
         : Object.prototype.hasOwnProperty.call(updates, 'essences')
           ? updates.essences
-          : current.essenceDefinitions,
+          : current.essenceDefinitions, // ratchet-exempt(world-scope): writer
       recipeItemDefinitions: Object.prototype.hasOwnProperty.call(updates, 'recipeItemDefinitions')
         ? updates.recipeItemDefinitions
         : Object.prototype.hasOwnProperty.call(updates, 'recipeItems')
@@ -1284,7 +1284,7 @@ export class CraftingSystemManager {
     // Not repointed at the read union (issue 1370): this validates the proposed, unsaved record.
     // `CraftingEngine` checks the union at craft time; both agree while `## CraftingSystem`
     // requirement 36 keeps the union's row set equal to the in-system array's.
-    const components = Array.isArray(system.components) ? system.components : [];
+    const components = Array.isArray(system.components) ? system.components : []; // ratchet-exempt(world-scope): pre-persist
     const validator = new SignatureValidator({
       getSystem: (id) => (id === systemId ? system : null),
       getRecipesForSystem: (id) => (id === systemId ? recipeJson : []),
@@ -1331,8 +1331,8 @@ export class CraftingSystemManager {
       ...this._salvageNormalizationContext(system),
     });
     this._assertUniqueComponentSources(system, item);
-    system.components.push(item);
-    advanceDefinitionRevision(system.components);
+    system.components.push(item); // ratchet-exempt(world-scope): writer
+    advanceDefinitionRevision(system.components); // ratchet-exempt(world-scope): writer
     await this.save({ put: system, domains: COMPONENT_FACTS });
     return item;
   }
@@ -1346,6 +1346,7 @@ export class CraftingSystemManager {
     const claimedRefs = new Set((references || []).filter(Boolean));
     if (claimedRefs.size === 0) return null;
     return (
+      // ratchet-exempt(world-scope): writer
       (system.components || []).find((item) => {
         if (excludeItemId && item.id === excludeItemId) return false;
         return getItemMatchUuids(item).some((ref) => claimedRefs.has(ref));
@@ -1412,6 +1413,7 @@ export class CraftingSystemManager {
 
   _assertUniqueComponentSourcesForSystem(system) {
     const claims = new Map();
+    // ratchet-exempt(world-scope): writer
     for (const component of system.components || []) {
       for (const ref of getItemMatchUuids(component)) {
         const existing = claims.get(ref);
@@ -1554,21 +1556,22 @@ export class CraftingSystemManager {
     this._assertGM('update component');
     const system = this.getSystem(systemId);
     if (!system) throw new Error(`Crafting system not found: ${systemId}`);
-    const idx = system.components.findIndex((i) => i.id === itemId);
+    const idx = system.components.findIndex((i) => i.id === itemId); // ratchet-exempt(world-scope): writer
     if (idx === -1) throw new Error(`Component not found: ${itemId}`);
     // A `_normalizeSystem` bypass site (issue 1359): same basis, `Set|null`; see `_scopeBasis`.
     const { essenceIds: validEssenceIds } = this._scopeBasis(system);
     const updatedItem = this._normalizeComponent(
-      { ...system.components[idx], ...updates, id: itemId },
+      { ...system.components[idx], ...updates, id: itemId }, // ratchet-exempt(world-scope): writer
       { validEssenceIds, ...this._salvageNormalizationContext(system) }
     );
+    // ratchet-exempt(world-scope): writer
     if (!this._sameSourceReferenceSet(system.components[idx], updatedItem)) {
       this._assertUniqueComponentSources(system, updatedItem, itemId);
     }
-    system.components[idx] = updatedItem;
-    advanceDefinitionRevision(system.components);
+    system.components[idx] = updatedItem; // ratchet-exempt(world-scope): writer
+    advanceDefinitionRevision(system.components); // ratchet-exempt(world-scope): writer
     await this.save({ put: system, domains: COMPONENT_FACTS });
-    return system.components[idx];
+    return system.components[idx]; // ratchet-exempt(world-scope): writer
   }
 
   async applyBulkEditToComponents(systemId, componentIds, edit = {}, options = {}) {
@@ -1692,7 +1695,7 @@ export class CraftingSystemManager {
     if (!resolutionService) return [];
 
     const disabled = [];
-    const items = Array.isArray(system.components) ? system.components : [];
+    const items = Array.isArray(system.components) ? system.components : []; // ratchet-exempt(world-scope): writer
     for (const item of items) {
       if (!item.salvage?.enabled) continue;
       const validation = resolutionService.validateSalvage(item, system);
@@ -1708,14 +1711,15 @@ export class CraftingSystemManager {
    * dropped (issue 764), for `updateSystem` to disclose; a dropped failure group is not counted. */
   _detectDroppedSimpleSalvageGroups(inputSystem, normalizedSystem) {
     if (normalizedSystem?.salvageResolutionMode !== 'simple') return [];
-    const rawItems = Array.isArray(inputSystem?.components)
-      ? inputSystem.components
+    const rawItems = Array.isArray(inputSystem?.components) // ratchet-exempt(world-scope): writer
+      ? inputSystem.components // ratchet-exempt(world-scope): writer
       : Array.isArray(inputSystem?.managedItems)
         ? inputSystem.managedItems
         : Array.isArray(inputSystem?.items)
           ? inputSystem.items
           : [];
     const normalizedById = new Map(
+      // ratchet-exempt(world-scope): writer
       (Array.isArray(normalizedSystem?.components) ? normalizedSystem.components : []).map(
         (component) => [component.id, component]
       )
@@ -1798,7 +1802,7 @@ export class CraftingSystemManager {
     const validSystemIds = new Set(systems.map((system) => system.id));
     const validRecipeIds = new Set(this.recipeManager.getRecipes({}).map((recipe) => recipe.id));
     const validComponentIds = new Set(
-      systems.flatMap((system) => (system.components || []).map((component) => component.id))
+      systems.flatMap((system) => (system.components || []).map((component) => component.id)) // ratchet-exempt(world-scope): destructive-basis
     );
     await runGatedMutationCleanup({
       passes: [

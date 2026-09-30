@@ -303,7 +303,7 @@ export async function runCraftCheck(engine, ctx, craftInputs) {
       ctx.step,
       {
         interactive: options?.interactive === true,
-        toolItems: toolValidation.tools,
+        toolItems: toolValidation.tools, // ratchet-exempt(world-scope): not-a-system
       }
     ));
   craftInputs.checkResult = checkResult;
@@ -380,7 +380,7 @@ export async function resolveCheckFailure(engine, ctx, craftInputs) {
       await engine._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
     }
     if (failurePolicy.breakToolsOnFail) {
-      usedToolPairs = toolValidation.tools;
+      usedToolPairs = toolValidation.tools; // ratchet-exempt(world-scope): not-a-system
       // The shared `evaluateCheckBreakage` seam applies failure-path breakage too, gated
       // by `breakToolsOnFail`; only `checkDriven` lets the check's triggers force it.
       const breakDecision = engine._resolveCraftingBreakageDecision(
@@ -388,6 +388,7 @@ export async function resolveCheckFailure(engine, ctx, craftInputs) {
         executionRecipe,
         checkResult
       );
+      // ratchet-exempt(world-scope): not-a-system
       usedToolsOnFail = await engine._applyToolBreakage(executionRecipe, toolValidation.tools, {
         forceBreak: breakDecision.forceBreak,
         authority: breakDecision.authority,
@@ -405,7 +406,7 @@ export async function resolveCheckFailure(engine, ctx, craftInputs) {
     step,
     ingredientSet,
     consumedItems: consumedOnFail,
-    toolItems: toolValidation.tools,
+    toolItems: toolValidation.tools, // ratchet-exempt(world-scope): not-a-system
     checkResult,
     resultGroupId: options?.resultGroupId || null,
   });
@@ -501,7 +502,7 @@ export async function resolveModeValidationFailure(engine, ctx, craftInputs) {
       await engine._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
     }
     if (validationFailurePolicy.breakToolsOnFail) {
-      usedToolPairsOnValidationFail = toolValidation.tools;
+      usedToolPairsOnValidationFail = toolValidation.tools; // ratchet-exempt(world-scope): not-a-system
       // Resolution-mode validation failure: route through the shared seam so the
       // breakage authority (and immune handling) stay consistent. The check
       // itself succeeded, so a checkDriven trigger may still force breakage.
@@ -512,7 +513,7 @@ export async function resolveModeValidationFailure(engine, ctx, craftInputs) {
       );
       usedToolsOnValidationFail = await engine._applyToolBreakage(
         executionRecipe,
-        toolValidation.tools,
+        toolValidation.tools, // ratchet-exempt(world-scope): not-a-system
         {
           forceBreak: validationBreakDecision.forceBreak,
           authority: validationBreakDecision.authority,
@@ -660,6 +661,7 @@ export async function commitCraft(engine, ctx, craftInputs) {
     executionRecipe,
     checkResult
   );
+  // ratchet-exempt(world-scope): not-a-system
   const usedTools = await engine._applyToolBreakage(executionRecipe, toolValidation.tools, {
     forceBreak: successBreakDecision.forceBreak,
     authority: successBreakDecision.authority,
@@ -675,7 +677,7 @@ export async function commitCraft(engine, ctx, craftInputs) {
     step,
     ingredientSet,
     consumedItems,
-    toolValidation.tools,
+    toolValidation.tools, // ratchet-exempt(world-scope): not-a-system
     checkResult,
     options?.resultGroupId || null,
     { resolveComponent }
@@ -735,7 +737,7 @@ export async function publishCraftSuccess(engine, ctx, craftInputs, award) {
     craftingActor,
     recipe,
     consumedIngredients: award.consumedItems,
-    tools: toolValidation.tools,
+    tools: toolValidation.tools, // ratchet-exempt(world-scope): not-a-system
     createdResults: award.resultItems,
     rollValue: rollTotalForCard(checkResult),
     tierStep: tierStepForCard(checkResult),

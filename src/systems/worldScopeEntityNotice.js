@@ -19,16 +19,16 @@ function arrayOf(value) {
 export function buildWorldScopeEntityNotice(report, localize) {
   const created = report?.createdEntities ?? {};
   const counts = {
-    components: Number(created.components) || 0,
+    components: Number(created.components) || 0, // ratchet-exempt(world-scope): not-a-system
     essences: Number(created.essences) || 0,
-    tools: Number(created.tools) || 0,
+    tools: Number(created.tools) || 0, // ratchet-exempt(world-scope): not-a-system
   };
   const merged = arrayOf(report?.mergedGroups);
   const renames = arrayOf(report?.renames);
   const refusals = arrayOf(report?.refusals);
   const flagged = arrayOf(report?.flaggedForReview);
   const transitive = arrayOf(report?.transitiveGroups);
-  const createdTotal = counts.components + counts.essences + counts.tools;
+  const createdTotal = counts.components + counts.essences + counts.tools; // ratchet-exempt(world-scope): not-a-system
   if (createdTotal + merged.length + renames.length + refusals.length === 0) {
     return { message: '', detail: '', severity: 'info' };
   }

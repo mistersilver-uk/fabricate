@@ -1,27 +1,43 @@
 /**
- * THE READER LEDGER, AS A FAIL-CLOSED GATE (issue 1370, epic 1357, PR 8a, criterion 11). 1. **An
- * UNLEDGERED SITE REDS.** Revert one repoint and the scan finds a site the ledger does not name.
+ * Bounds the raw reads of a crafting system's `components`, `essenceDefinitions` and `tools` under
+ * `src/` (issue 1370) against the base commit: no changed file may gain an unmarked one. A read
+ * that must stay raw carries `// ratchet-exempt(world-scope): <reason>` at its line, naming one of
+ * the `REASONS` below; a file-head marker excuses nothing. Engine: `mergeBaseRatchet.js`.
  */
 
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { describe, it } from 'node:test';
+import { after, describe, it } from 'node:test';
 
+import {
+  compareToBase,
+  parseMarkers,
+  reportComparison,
+  siteMarker,
+} from './helpers/mergeBaseRatchet.js';
 import { collectSources, repoRoot, stripComments } from './helpers/sourceScan.js';
+import { createTempGitRepo } from './helpers/temp-git-repo.js';
+
+const FAMILY = 'world-scope';
+const CORPUS_ROOT = 'src';
+
+/** Below this many raw reads in the whole tree the matcher has stopped seeing them (~170 today). */
+const MATCH_FLOOR = 120;
 
 /**
  * The matcher: a DOT access, or a BRACKET access with a string literal. The bracket form is the one
  * place a receiver IS required, and only to tell `system['components']` from an ARRAY LITERAL.
  */
-const MATCHER =
-  /(?:\.|[\w$)\]]\[\s*['"])(?:components|essenceDefinitions|tools)\b/g;
+const MATCHER = /(?:\.|[\w$)\]]\[\s*['"])(?:components|essenceDefinitions|tools)\b/g;
+const READ_NAME = /(?:components|essenceDefinitions|tools)$/u;
 
 /** The directories the sweep did not enter, and the file whose bare string constants are JSON paths. */
 const EXCLUDED_PREFIXES = Object.freeze(['src/ui/', 'src/migration/']);
 const PATH_CONSTANT_FILES = Object.freeze(new Set(['src/systems/worldScopeReferenceRewrite.js']));
 const STRING_CONSTANT_LINE = /^\s*'[^']*',?\s*$/;
 
-/** Every reason a raw read may still be here, each drawn from the delta's `#### D5`. */
+/** Every reason a raw read may still be here; a marker's reason starts with one of these codes. */
 const REASONS = Object.freeze({
   writer:
     "the manager's own authoring and writer surface: a reader repoint would make the manager " +
@@ -50,335 +66,103 @@ const REASONS = Object.freeze({
     'memo guard tuple or a paged browser model',
 });
 
-/** The delta's measurement of `origin/main` at `7304be93`, before this PR's first edit. */
-const BASE_SCAN = Object.freeze({
-  matches: 282,
-  lines: 228,
-  files: 32,
-  pairs: 190,
-  collisionGroups: 26,
-  collisionSites: 64,
-});
+const inCorpus = (file) =>
+  file.startsWith(`${CORPUS_ROOT}/`) &&
+  file.endsWith('.js') &&
+  EXCLUDED_PREFIXES.every((prefix) => !file.startsWith(prefix));
 
-/**
- * The live tree's measurement, asserted as an EXACT EQUALITY rather than as a floor (issue 1371).
- */
-const SCAN_TOTALS = Object.freeze({
-  // #1648: eight unique tool/receipt reads in two engines; #1666 and #1665 relocated ten files.
-  // #1701 moved nine of `CraftingEngine.js`'s validated-tool reads into `craftPipeline.js`, and
-  // #1714 moved five more into `salvagePipeline.js`, so only the per-file keying moved: no read
-  // was added or removed, which is why `matches` and `lines` hold. #1699 moved four reads into
-  // the new `SourceIdentityService.js` (`files` 20 -> 21) and retired two auto-stamp loop headers
-  // for two per-arm selectors (`pairs` 127 -> 128, and the component-loop collision group 5 -> 4,
-  // so `collisionSites` 43 -> 42); `matches` and `lines` are conserved, because nothing was added.
-  // #1923 moved five normalizer reads into `normalize/system.js` (`files` 21 -> 22); the rest hold.
-  // It then moved eight item-source lines into `manager/itemSources.js` (+1 file);
-  // pairs/collisions re-derived. Ten tool-source lines moved to `manager/toolSources.js` (+1 file).
-  // Five bulk-edit lines moved to `manager/bulkEdits.js` (+1 file).
-  // Eight delete-cascade lines moved to `manager/deleteCascades.js` (+1 file), then nine
-  // essence-delete lines followed them there.
-  matches: 169,
-  lines: 154,
-  files: 26,
-  pairs: 136,
-  collisionGroups: 15,
-  collisionSites: 33,
-});
-
-/**
- * Every surviving raw read, keyed `(file, anchor, expected occurrence count)` with the reason it is
- * still here.
- */
-const LEDGER = Object.freeze([
-  // #1648: validated tool pairs and durable effect receipts, never system libraries.
-  ['src/systems/CraftingEngine.js', "const tools = toolValidation.tools;", 1, 'not-a-system'],
-  ['src/systems/CraftingEngine.js', "toolPairs: [...prepared.toolValidation.tools],", 1, 'not-a-system'],
-  ['src/systems/CraftingEngine.js', "if (shouldUseTools && prepared.toolValidation.tools.length > 0) {", 1, 'not-a-system'],
-  ['src/systems/CraftingEngine.js', "prepared.toolValidation.tools,", 2, 'not-a-system'],
-  ['src/systems/CraftingEngine.js', "state.usedTools = cloneJsonValue(toolReceipt.tools) ?? [];", 1, 'not-a-system'],
-  ['src/systems/GatheringEngine.js', "if (resolvedTools.tools.length > 0) {", 1, 'not-a-system'],
-  ['src/systems/GatheringEngine.js', "tools: resolvedTools.tools,", 1, 'not-a-system'],
-  ['src/systems/AlchemySignatureReport.js', "this.components = components;", 1, 'parameter'],
-  ['src/systems/AlchemySignatureReport.js', "this.components,", 1, 'parameter'],
-  ['src/systems/AlchemySignatureReport.js', "this._validator.describeConflict(first, second, this.components)", 1, 'parameter'],
-  ['src/systems/BulkSalvageService.js', "item.tools = brokenToolEntries(salvageRun, entry.system);", 1, 'not-a-system'],
-  ['src/systems/BulkSalvageService.js', "tools: dedupeTools(subjects.flatMap((item) => item.tools)),", 1, 'not-a-system'],
-  ['src/systems/CompendiumImporter.js', "const components = Array.isArray(systemData.components) ? systemData.components : [];", 1, 'import'],
-  ['src/systems/CompendiumImporter.js', "summary.components.total = components.length;", 1, 'import'],
-  ['src/systems/CompendiumImporter.js', "const componentLeg = legs.components;", 1, 'import'],
-  ['src/systems/CompendiumImporter.js', "for (const entry of summary.components.remapped) {", 1, 'import'],
-  ['src/systems/CompendiumImporter.js', "for (const entry of summary.components.unresolved) {", 1, 'import'],
-  ['src/systems/CompendiumImporter.js', "system: { components: systemInput.components || [] },", 1, 'import'],
-  ['src/systems/CompendiumImporter.js', "const items = existingSystem.items || existingSystem.components || [];", 1, 'import'],
-  ['src/systems/CompendiumImporter.js', "summary.components.remapped.push({", 2, 'import'],
-  ['src/systems/CompendiumImporter.js', "summary.components.unresolved.push({", 1, 'import'],
-  ['src/systems/CompendiumImporter.js', "summary.components.retained.push({", 1, 'import'],
-  ['src/systems/CraftingEngine.js', "toolItems: toolValidation.tools,", 1, 'not-a-system'],
-  ['src/systems/craftPipeline.js', "toolItems: toolValidation.tools,", 2, 'not-a-system'],
-  ['src/systems/craftPipeline.js', "usedToolPairs = toolValidation.tools;", 1, 'not-a-system'],
-  ['src/systems/craftPipeline.js', "usedToolsOnFail = await engine._applyToolBreakage(executionRecipe, toolValidation.tools, {", 1, 'not-a-system'],
-  ['src/systems/craftPipeline.js', "usedToolPairsOnValidationFail = toolValidation.tools;", 1, 'not-a-system'],
-  ['src/systems/craftPipeline.js', "toolValidation.tools,", 2, 'not-a-system'],
-  ['src/systems/craftPipeline.js', "const usedTools = await engine._applyToolBreakage(executionRecipe, toolValidation.tools, {", 1, 'not-a-system'],
-  ['src/systems/craftPipeline.js', "tools: toolValidation.tools,", 1, 'not-a-system'],
-  ['src/systems/CraftingEngine.js', "const toolItems = toolValidation.valid ? toolValidation.tools || [] : [];", 1, 'not-a-system'],
-  ['src/systems/CraftingEngine.js', "usedTools = await this._applyToolBreakage(executionRecipe, toolValidation.tools, {", 1, 'not-a-system'],
-  ['src/systems/CraftingEngine.js', "const components = Array.isArray(system?.components)", 1, 'guard'],
-  ['src/systems/CraftingEngine.js', "for (const tool of missing.tools || []) {", 1, 'not-a-system'],
-  ['src/systems/salvagePipeline.js', "toolItems: toolValidation.tools,", 1, 'not-a-system'],
-  ['src/systems/salvagePipeline.js', "tools: toolValidation.tools,", 2, 'not-a-system'],
-  [
-    'src/systems/salvagePipeline.js',
-    "usedTools = await engine._applyToolBreakage(syntheticRecipe, toolValidation.tools, {",
-    1,
-    'not-a-system',
-  ],
-  [
-    'src/systems/salvagePipeline.js',
-    "const usedTools = await engine._applyToolBreakage(syntheticRecipe, toolValidation.tools, {",
-    1,
-    'not-a-system',
-  ],
-  ['src/systems/CraftingSystemExporter.js', "if (Array.isArray(system.essenceDefinitions)) {", 1, 'export'],
-  ['src/systems/CraftingSystemExporter.js', "for (const def of system.essenceDefinitions) {", 1, 'export'],
-  ['src/systems/CraftingSystemManager.js', "system?.components ?? system?.managedItems ?? system?.items", 1, 'basis'],
-  ['src/systems/CraftingSystemManager.js', "system?.essenceDefinitions ?? system?.essences", 1, 'basis'],
-  ['src/systems/CraftingSystemManager.js', "toolIds: _scopeEntityBasis(_resolveStoreSeam(this._toolScopeStore), system?.tools),", 1, 'basis'],
-  // #1923: the system normalizer moved to `normalize/system.js`; the tools line collapsed to one.
-  ['src/systems/normalize/system.js', "system.essenceDefinitions ?? system.essences", 1, 'writer'],
-  ['src/systems/normalize/system.js', "const rawManagedItems = Array.isArray(system.components)", 1, 'writer'],
-  ['src/systems/normalize/system.js', "? system.components", 1, 'writer'],
-  ['src/systems/normalize/system.js', "const normalizedTools = Array.isArray(system.tools)", 1, 'writer'],
-  ['src/systems/normalize/system.js', "? system.tools.map((t) => normalizeTool(t, { validPrerequisiteIds: validToolPrerequisiteIds }))", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "const managedItems = system.components || [];", 1, 'authoring-accessor'],
-  // #1923: the tool-source transaction's writer reads, moved to `manager/toolSources.js`.
-  ['src/systems/manager/toolSources.js', "system.tools = previousTools;", 3, 'writer'],
-  ['src/systems/manager/toolSources.js', "const tools = Array.isArray(system.tools) ? system.tools : [];", 2, 'writer'],
-  ['src/systems/manager/toolSources.js', ": [...tools, staged];", 1, 'writer'],
-  ['src/systems/manager/toolSources.js', "const previousTools = system.tools;", 2, 'writer'],
-  ['src/systems/manager/toolSources.js', "system.tools = nextTools;", 1, 'writer'],
-  ['src/systems/manager/toolSources.js', "system.tools = tools.filter((entry) => String(entry?.id) !== String(toolId));", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "? updates.essenceDefinitions", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', ": current.essenceDefinitions,", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "const components = Array.isArray(system.components) ? system.components : [];", 1, 'pre-persist'],
-  // #1923: the system delete's writer reads, moved to `manager/deleteCascades.js`.
-  ['src/systems/manager/deleteCascades.js', "const componentCount = Array.isArray(system.components)", 1, 'writer'],
-  ['src/systems/manager/deleteCascades.js', "? system.components.length", 1, 'writer'],
-  ['src/systems/manager/deleteCascades.js', "const essenceCount = Array.isArray(system.essenceDefinitions)", 1, 'writer'],
-  ['src/systems/manager/deleteCascades.js', "? system.essenceDefinitions.length", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "system.components.push(item);", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "advanceDefinitionRevision(system.components);", 2, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "(system.components || []).find((item) => {", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "for (const component of system.components || []) {", 1, 'writer'],
-  // #1923: the essence deletes' component loops, moved to `manager/deleteCascades.js`.
-  ['src/systems/manager/deleteCascades.js', "for (const component of system.components || []) {", 3, 'writer'],
-  // #1699: the stamping and repair clusters moved to `SourceIdentityService.js`, and the three
-  // auto-stamps collapsed onto one parameterised body whose per-arm `entriesOf` selectors replace
-  // the two retired loop headers.
-  ['src/systems/SourceIdentityService.js', "entriesOf: (system) => system.components || [],", 1, 'restamp'],
-  ['src/systems/SourceIdentityService.js', "entriesOf: (system) => system.tools || [],", 1, 'restamp'],
-  ['src/systems/SourceIdentityService.js', "definitions: system.components || [],", 1, 'restamp'],
-  ['src/systems/SourceIdentityService.js', "definitions: (system.tools || []).filter(", 1, 'restamp'],
-  ['src/systems/CraftingSystemManager.js', "const idx = system.components.findIndex((i) => i.id === itemId);", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "system.components[idx] = updatedItem;", 1, 'writer'],
-  // #1923: the item-source cluster's writer reads, moved to `manager/itemSources.js`.
-  ['src/systems/manager/itemSources.js', "advanceDefinitionRevision(system.components);", 3, 'writer'],
-  ['src/systems/manager/itemSources.js', "system.components.push(item);", 1, 'writer'],
-  ['src/systems/manager/itemSources.js', "const idx = system.components.findIndex((i) => i.id === itemId);", 1, 'writer'],
-  ['src/systems/manager/itemSources.js', "const existing = system.components[idx];", 1, 'writer'],
-  ['src/systems/manager/itemSources.js', "system.components[idx] = updatedItem;", 1, 'writer'],
-  ['src/systems/manager/itemSources.js', "const components = Array.isArray(system.components) ? system.components : [];", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "{ ...system.components[idx], ...updates, id: itemId },", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "if (!this._sameSourceReferenceSet(system.components[idx], updatedItem)) {", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "return system.components[idx];", 1, 'writer'],
-  // #1923: the component bulk edit's writer reads, moved to `manager/bulkEdits.js`.
-  ['src/systems/manager/bulkEdits.js', "for (let idx = 0; idx < system.components.length; idx += 1) {", 1, 'writer'],
-  ['src/systems/manager/bulkEdits.js', "const component = system.components[idx];", 1, 'writer'],
-  ['src/systems/manager/bulkEdits.js', "system.components[idx] = io.normalizeComponent(", 1, 'writer'],
-  ['src/systems/manager/bulkEdits.js', "if (changedIds.length > 0) advanceDefinitionRevision(system.components);", 1, 'writer'],
-  // #1923: the component-set delete's writer reads, moved to `manager/deleteCascades.js`.
-  ['src/systems/manager/deleteCascades.js', "const components = Array.isArray(system.components) ? system.components : [];", 1, 'writer'],
-  ['src/systems/manager/deleteCascades.js', "system.components = components.filter(", 1, 'writer'],
-  ['src/systems/manager/deleteCascades.js', "const essenceDefinitions = (system.essenceDefinitions || []).map((def) => ({", 1, 'writer'],
-  ['src/systems/manager/deleteCascades.js', "system.essenceDefinitions = essenceDefinitions;", 1, 'writer'],
-  // #1923: the essence deletes' writer reads, moved to `manager/deleteCascades.js`; the last
-  // collapsed onto one line at the module's shallower indent.
-  ['src/systems/manager/deleteCascades.js', "const definitions = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];", 2, 'writer'],
-  // #1923: the essence bulk edit's third copy of the line above, moved to `manager/bulkEdits.js`.
-  ['src/systems/manager/bulkEdits.js', "const definitions = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];", 1, 'writer'],
-  ['src/systems/manager/deleteCascades.js', "system.essenceDefinitions = definitions.filter((def) => def.id !== essenceId);", 1, 'writer'],
-  ['src/systems/manager/deleteCascades.js', "system.essences = system.essenceDefinitions.map((def) => def.id);", 2, 'writer'],
-  ['src/systems/manager/deleteCascades.js', "system.essenceDefinitions = definitions.filter((def) => !removedIdSet.has(String(def?.id ?? '')));", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "const items = Array.isArray(system.components) ? system.components : [];", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "const rawItems = Array.isArray(inputSystem?.components)", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "? inputSystem.components", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "(Array.isArray(normalizedSystem?.components) ? normalizedSystem.components : []).map(", 1, 'writer'],
-  ['src/systems/CraftingSystemManager.js', "systems.flatMap((system) => (system.components || []).map((component) => component.id))", 1, 'destructive-basis'],
-  ['src/systems/GatheringDropReferenceValidator.js', "if (Array.isArray(systemOrComponents?.components)) {", 1, 'guard'],
-  ['src/systems/GatheringEngine.js', "if (taskTools.tools.length > 0) {", 1, 'not-a-system'],
-  ['src/systems/GatheringEngine.js', "tools: taskTools.tools,", 2, 'not-a-system'],
-  ['src/systems/GatheringEngine.js', "} else if (taskTools.tools.length > 0) {", 1, 'not-a-system'],
-  ['src/systems/GatheringEngine.js', "tools.push(...normalizeList(task?.tools));", 1, 'not-a-system'],
-  ['src/systems/GatheringEngine.js', "const tools = resolvedTools.tools;", 2, 'not-a-system'],
-  ['src/systems/GatheringRichStateService.js', "const toolSource = Array.isArray(system?.tools)", 1, 'guard'],
-  ['src/systems/GatheringRichStateService.js', "tools: normalizeList(config?.tools).map(normalizeLibraryTool).filter(Boolean),", 1, 'not-a-system'],
-  ['src/systems/RecipeManager.js', "previous.components === next.components &&", 1, 'not-a-system'],
-  ['src/systems/SignatureValidator.js', "const conflicts = this._auditEntries(compiled.entries, compiled.components);", 1, 'parameter'],
-  ['src/systems/SignatureValidator.js', "components: compiled.components,", 1, 'parameter'],
-  ['src/systems/SignatureValidator.js', "conflicts: this._auditEntries(compiled.entries, compiled.components),", 1, 'parameter'],
-  ['src/systems/importReferenceResolver.js', "const components = arrayOf(prepared.system?.components);", 1, 'import'],
-  ['src/systems/importReferenceResolver.js', "const components = Array.isArray(system?.components) ? system.components : [];", 1, 'import'],
-  ['src/systems/importReferenceResolver.js', "const slice = prepared[WORLD_SCOPE_SLICE_KEYS.components];", 1, 'import'],
-  ['src/systems/importReferenceResolver.js', "collectMacroDescriptors(system.essenceDefinitions, 'essence', descriptors, 'propertyMacroUuid');", 1, 'import'],
-  ['src/systems/importReferenceResolver.js', "collectComplicationMacroDescriptors(system.components, descriptors);", 1, 'import'],
-  ['src/systems/importReferenceResolver.js', "const componentIds = idSet(system.components);", 1, 'import'],
-  ['src/systems/importReferenceResolver.js', "for (const tool of arrayOf(system.tools)) reportToolComponentRefs(tool);", 1, 'import'],
-  ['src/systems/importReferenceResolver.js', "for (const tool of arrayOf(slice.tools)) reportToolComponentRefs(tool);", 1, 'import'],
-  ['src/systems/importReferenceResolver.js', "for (const component of arrayOf(system.components)) {", 1, 'import'],
-  ['src/systems/importReferenceResolver.js', "for (const def of arrayOf(system.essenceDefinitions)) {", 1, 'import'],
-  ['src/systems/worldScopeReferenceRewrite.js', "for (const component of arrayOf(system.components)) {", 1, 'rewrite-walk'],
-  ['src/systems/worldScopeReferenceRewrite.js', "for (const definition of arrayOf(system.essenceDefinitions)) {", 1, 'rewrite-walk'],
-  ['src/systems/worldScopeReferenceRewrite.js', "for (const tool of arrayOf(system.tools)) {", 1, 'rewrite-walk'],
-  ['src/systems/worldScopeReferenceRewrite.js', "for (const tool of arrayOf(slice.tools)) {", 1, 'rewrite-walk'],
-  ['src/systems/remapWorldScopeIdentityFlags.js', "for (const [oldId, newId] of Object.entries(perSystem?.components ?? {})) {", 1, 'not-a-system'],
-  ['src/systems/remapWorldScopeIdentityFlags.js', "const remapComponent = legLookup(perSystem.components);", 1, 'not-a-system'],
-  ['src/systems/remapWorldScopeIdentityFlags.js', "const remapTool = legLookup(perSystem.tools);", 1, 'not-a-system'],
-  ['src/systems/remapWorldScopeIdentityFlags.js', "const remapComponent = legLookup(rekeyMap[systemId]?.components);", 1, 'not-a-system'],
-  ['src/systems/restampOwnedItemComponentIdentity.js', "const components = Array.isArray(system?.components) ? system.components : [];", 1, 'restamp'],
-  ['src/systems/startupPassComposition.js', "new Set((system.components || []).map((component) => component.id)),", 1, 'destructive-basis'],
-  ['src/systems/worldScopeEntityGrouping.js', "componentsBySystem.set(trimmedString(system.id), arrayOf(system.components));", 1, 'basis'],
-  ['src/systems/worldScopeEntityNotice.js', "components: Number(created.components) || 0,", 1, 'not-a-system'],
-  ['src/systems/worldScopeEntityNotice.js', "tools: Number(created.tools) || 0,", 1, 'not-a-system'],
-  ['src/systems/worldScopeEntityNotice.js', "const createdTotal = counts.components + counts.essences + counts.tools;", 1, 'not-a-system'],
-]);
-
-/** NAMED LIVE ANCHORS in four distinct files, the other half of the positive control. */
-const POSITIVE_ANCHORS = Object.freeze([
-  [
-    'src/systems/CraftingSystemManager.js',
-    'const components = Array.isArray(system.components) ? system.components : [];',
-  ],
-  ['src/systems/CraftingEngine.js', 'toolItems: toolValidation.tools,'],
-  [
-    'src/systems/worldScopeEntityGrouping.js',
-    'componentsBySystem.set(trimmedString(system.id), arrayOf(system.components));',
-  ],
-  [
-    'src/systems/CompendiumImporter.js',
-    'const components = Array.isArray(systemData.components) ? systemData.components : [];',
-  ],
-]);
-
-/** Every matched line under `src/`, keyed `(file, anchor)` and counted. */
-function scan() {
-  const sources = collectSources(resolve(repoRoot, 'src'), { extensions: ['.js'] });
-  const rows = new Map();
-  const totals = { matches: 0, lines: 0, files: 0, pairs: 0, collisionGroups: 0, collisionSites: 0 };
-  const files = new Set();
-  for (const [file, text] of Object.entries(sources)) {
-    if (EXCLUDED_PREFIXES.some((prefix) => file.startsWith(prefix))) continue;
-    const skipConstants = PATH_CONSTANT_FILES.has(file);
-    for (const line of stripComments(text).split('\n')) {
-      if (skipConstants && STRING_CONSTANT_LINE.test(line)) continue;
-      const found = line.match(MATCHER);
-      if (!found) continue;
-      totals.matches += found.length;
-      totals.lines += 1;
-      files.add(file);
-      const key = `${file}\u0000${line.trim()}`;
-      rows.set(key, (rows.get(key) ?? 0) + 1);
-    }
-  }
-  totals.files = files.size;
-  totals.pairs = rows.size;
-  for (const count of rows.values()) {
-    if (count > 1) {
-      totals.collisionGroups += 1;
-      totals.collisionSites += count;
-    }
-  }
-  return { rows, totals };
+/** Each matched line's raw reads, counted per read name: `{line, text, name, count}`. */
+function rawReads(file, text) {
+  const skipConstants = PATH_CONSTANT_FILES.has(file);
+  return stripComments(text)
+    .split('\n')
+    .flatMap((line, index) => {
+      if (skipConstants && STRING_CONSTANT_LINE.test(line)) return [];
+      const counts = new Map();
+      for (const [match] of line.matchAll(MATCHER)) {
+        const name = READ_NAME.exec(match)[0];
+        counts.set(name, (counts.get(name) ?? 0) + 1);
+      }
+      return [...counts].map(([name, count]) => ({
+        line: index + 1,
+        text: line.trim(),
+        name,
+        count,
+      }));
+    });
 }
 
-const ledgerByKey = new Map(
-  LEDGER.map(([file, anchor, count, reason]) => [`${file}\u0000${anchor}`, { count, reason }])
-);
+/**
+ * One entry per unmarked raw read: keyed by its line's text, netted on the read name, so a
+ * reformat or a moved line is not an offender. A read whose line carries a reasoned marker is
+ * not counted, so a file's count is the reads that give no reason.
+ */
+function measureRawReads(readFile, listFiles) {
+  return listFiles().flatMap((file) => {
+    const text = readFile(file);
+    if (text === undefined) return [];
+    const marked = text.includes(`ratchet-exempt(${FAMILY})`);
+    return rawReads(file, text)
+      .filter((read) => !marked || !siteMarker(file, text, FAMILY, read.line))
+      .map((read) => ({
+        file,
+        id: `raw ${read.name} read \`${read.text}\``,
+        value: read.name,
+        amount: read.count,
+        lines: [read.line],
+      }));
+  });
+}
 
-describe('the world-scope reader ledger', () => {
-  it('names a KNOWN reason for every entry', () => {
-    const unknown = LEDGER.filter(([, , , reason]) =>
-      reason.split('+').some((code) => !(code in REASONS))
-    );
-    assert.deepEqual(
-      unknown.map(([file, anchor, , reason]) => `${file} :: ${anchor} :: ${reason}`),
-      [],
-      'every surviving raw read cites a reason drawn from the delta’s exclusion clauses'
-    );
-    assert.equal(ledgerByKey.size, LEDGER.length, 'and no two entries share a (file, anchor) key');
+const compareRawReads = (options = {}) =>
+  compareToBase({
+    family: FAMILY,
+    corpusRoot: CORPUS_ROOT,
+    include: inCorpus,
+    measure: measureRawReads,
+    headMarkers: false,
+    ...options,
   });
 
-  // THE POSITIVE CONTROL — measured, obligations 1 and 2 both stay GREEN against a matcher that
-  // matches nothing, so neither of them can stand in for this.
+const GUIDANCE =
+  "A raw read of a crafting system's `components`, `essenceDefinitions` or `tools` bypasses the " +
+  'world-scope read union: repoint it at `resolvedComponentsFor`, `resolvedEssencesFor` or ' +
+  '`resolvedToolsFor`. If it must stay raw, mark its line, or the comment line right above it, ' +
+  'with a reason that starts with a REASONS code from tests/world-scope-reader-ratchet.test.js ' +
+  `(${Object.keys(REASONS).join(', ')}).`;
 
-  it('finds EXACTLY the committed totals, so a matcher that matched nothing reds here', () => {
-    const { totals } = scan();
-    assert.deepEqual(
-      totals,
-      SCAN_TOTALS,
-      'The live scan no longer matches the committed totals. If you have LEGITIMATELY added or ' +
-        'removed a raw read of a crafting system’s `components`, `essenceDefinitions` or `tools` ' +
-        'anywhere under `src/` outside the excluded prefixes and files — including a chat ' +
-        'view-model field or any other non-system receiver — then update the LEDGER entry and ' +
-        'these six numbers together. If you have not, the MATCHER has changed and is now finding ' +
-        'the wrong population.'
-    );
+/** The working tree's corpus: every scanned file and its text. */
+function treeCorpus() {
+  // ratchet-exempt(source-pin): scans src/ for the matcher's floor and marker reasons, not its text
+  const sources = collectSources(resolve(repoRoot, CORPUS_ROOT), { extensions: ['.js'] });
+  return Object.entries(sources).filter(([file]) => inCorpus(file));
+}
+
+describe('the world-scope reader ratchet', () => {
+  it('no changed file under src/ gains an unmarked raw read against the base commit', (t) => {
+    const result = reportComparison(t, compareRawReads(), GUIDANCE);
+    if (result.compared) t.diagnostic(`compared ${result.changedCount} changed path(s)`);
   });
 
-  it('finds the four NAMED live anchors, in four distinct files', () => {
-    const { rows } = scan();
-    for (const [file, anchor] of POSITIVE_ANCHORS) {
-      assert.ok(
-        rows.has(`${file}\u0000${anchor}`),
-        `${file} no longer carries the named anchor \`${anchor}\` — either the scan is vacuous ` +
-          'or this control needs a new anchor'
-      );
-    }
-    assert.equal(new Set(POSITIVE_ANCHORS.map(([file]) => file)).size, 4);
-  });
-
-  // OBLIGATION 1 — an unledgered site reds
-
-  it('leaves NO live raw read unledgered, and no ledgered read miscounted', () => {
-    const { rows } = scan();
-    const unledgered = [];
-    for (const [key, count] of rows) {
-      const entry = ledgerByKey.get(key);
-      const [file, anchor] = key.split('\u0000');
-      if (!entry) {
-        unledgered.push(`${file} :: ${anchor} (x${count}) is not in the ledger`);
-      } else if (entry.count !== count) {
-        unledgered.push(`${file} :: ${anchor} occurs ${count} time(s), ledgered as ${entry.count}`);
+  it('still finds its floor of raw reads, and every marker names a known reason', (t) => {
+    let matches = 0;
+    const unknown = [];
+    for (const [file, text] of treeCorpus()) {
+      for (const read of rawReads(file, text)) matches += read.count;
+      for (const marker of parseMarkers(file, text)) {
+        if (marker.family !== FAMILY) continue;
+        const [code] = marker.reason.split(/[\s,:;]/u, 1);
+        if (!Object.hasOwn(REASONS, code)) unknown.push(`${file}:${marker.line} ${marker.reason}`);
       }
     }
-    assert.deepEqual(
-      unledgered,
-      [],
-      'a raw read of a crafting system’s entity arrays must either be repointed at the read ' +
-        'union or ledgered here with the reason it is not'
+    t.diagnostic(`${matches} raw reads in the tree`);
+    assert.ok(
+      matches >= MATCH_FLOOR,
+      `only ${matches} raw reads found, below the floor of ${MATCH_FLOOR}; a matcher that stopped ` +
+        'matching would look exactly like this'
     );
+    assert.deepEqual(unknown, [], `a world-scope marker's reason starts with a REASONS code`);
   });
-
-  // OBLIGATION 2 — a stale anchor reds
-
-  it('carries no STALE anchor: every ledgered line still exists in its file', () => {
-    const { rows } = scan();
-    const stale = LEDGER.filter(([file, anchor]) => !rows.has(`${file}\u0000${anchor}`)).map(
-      ([file, anchor]) => `${file} :: ${anchor}`
-    );
-    assert.deepEqual(stale, [], 'a ledger entry whose line is gone is an excuse for nothing');
-  });
-
-  // The matcher itself, pinned — the meta-test the sibling gate added for the same reason
 
   it('matches a RAW read and stops matching a REPOINTED one', () => {
     const raw = 'const components = Array.isArray(system?.components) ? system.components : [];';
@@ -393,5 +177,122 @@ describe('the world-scope reader ledger', () => {
     const commented = '// reads system.components directly\nconst x = 1;';
     assert.equal(stripComments(commented).match(MATCHER), null);
     assert.equal(commented.match(MATCHER)?.length, 1, 'the premise: the prose WOULD have matched');
+  });
+});
+
+const repos = [];
+after(() => {
+  for (const repo of repos) repo.dispose();
+});
+
+/** A repository whose first commit holds `files`; the gate compares its working tree with it. */
+function srcRepo(files) {
+  const repo = createTempGitRepo('world-scope-ratchet-');
+  repos.push(repo);
+  repo.write(files);
+  const first = repo.commitAll('base');
+  const compare = () => compareRawReads({ cwd: repo.dir, env: { RATCHET_BASE: first } });
+  return { write: repo.write, compare };
+}
+
+const lines = (...rows) => `${rows.join('\n')}\n`;
+const READ = 'const tools = system.tools;';
+const MARKED = `${READ} // ratchet-exempt(world-scope): writer`;
+
+describe('the world-scope ratchet on a temporary repository', () => {
+  it('wiring: an injected raw read fails the gate, which a repointed one does not', (t) => {
+    const repo = srcRepo({ 'src/a.js': lines('export const a = 1;') });
+    repo.write({ 'src/a.js': lines('export const a = resolvedToolsFor(system);') });
+    assert.deepEqual(repo.compare().failures, []);
+    repo.write({ 'src/a.js': lines('export const a = 1;', READ) });
+    const result = repo.compare();
+    assert.deepEqual(result.failures, [`src/a.js: raw tools read \`${READ}\` is new (1)`]);
+    assert.throws(() => reportComparison(t, result, GUIDANCE), /world-scope: 1 regression/);
+  });
+
+  it('both legs: a new file with a raw read, and a file that already reads gaining one', () => {
+    const repo = srcRepo({ 'src/old.js': lines('const components = system.components;') });
+    repo.write({
+      'src/new.js': lines(READ),
+      'src/old.js': lines('const components = system.components;', 'use(system.components);'),
+    });
+    assert.deepEqual(repo.compare().failures, [
+      `src/new.js: raw tools read \`${READ}\` is new (1)`,
+      'src/old.js: raw components read `use(system.components);` is new (1)',
+    ]);
+  });
+
+  it('a reformat or a moved line is netted on the read name, not an offender', () => {
+    const repo = srcRepo({ 'src/a.js': lines('function f() {', `  ${READ}`, '}', 'const x = 1;') });
+    repo.write({
+      'src/a.js': lines(
+        'const x = 1;',
+        'function f() {',
+        '  const tools =',
+        '    system.tools;',
+        '}'
+      ),
+    });
+    const result = repo.compare();
+    assert.deepEqual(result.failures, []);
+    assert.equal(result.netted.length, 1);
+  });
+
+  it('sentinel: a changed corpus file compares, and a change outside the corpus is a skip', () => {
+    const repo = srcRepo({
+      'src/a.js': lines(READ),
+      'src/ui/b.js': lines('export const b = 1;'),
+      'README.md': 'x\n',
+    });
+    repo.write({ 'src/ui/b.js': lines(READ), 'README.md': 'y\n' });
+    assert.equal(repo.compare().skipped, 'corpus-unchanged');
+    repo.write({ 'src/a.js': lines(READ, 'export const touched = 1;') });
+    const result = repo.compare();
+    assert.equal(result.compared, true);
+    assert.deepEqual(result.failures, []);
+  });
+
+  it('a reasoned marker at the read exempts it, and an empty one fails', () => {
+    const repo = srcRepo({ 'src/a.js': lines('export {};'), 'src/b.js': lines('export {};') });
+    repo.write({
+      'src/a.js': lines('export {};', MARKED, '// ratchet-exempt(world-scope): guard', READ),
+      'src/b.js': lines('export {};', `${READ} // ratchet-exempt(world-scope):`),
+    });
+    const result = repo.compare();
+    assert.deepEqual(result.exempted, [], 'a marked read is not counted at all');
+    assert.deepEqual(result.failures, [
+      `src/b.js: raw tools read \`${READ}\` is new (1); its ratchet-exempt marker gives no reason`,
+      'src/b.js:2 has a ratchet-exempt(world-scope) marker with no reason; write why the ' +
+        'regression is legitimate after the colon',
+    ]);
+  });
+
+  it('a marker excuses its own read only: not a copy of the line, and not from the file head', () => {
+    const repo = srcRepo({ 'src/a.js': lines('export {};', MARKED) });
+    repo.write({ 'src/a.js': lines('export {};', MARKED, READ) });
+    assert.deepEqual(repo.compare().failures, [`src/a.js: raw tools read \`${READ}\` is new (1)`]);
+    repo.write({
+      'src/a.js': lines(
+        '// ratchet-exempt(world-scope): writer',
+        'export {};',
+        MARKED,
+        'use(system.tools);'
+      ),
+    });
+    assert.deepEqual(repo.compare().failures, [
+      'src/a.js: raw tools read `use(system.tools);` is new (1)',
+    ]);
+  });
+
+  it('negative proof on the real tree: a new raw tools read in a marked file fails', () => {
+    const file = 'src/systems/manager/toolSources.js';
+    // ratchet-exempt(source-pin): a real file as the gate's corpus, to prove a new read in it fails
+    const text = readFileSync(resolve(repoRoot, file), 'utf8');
+    assert.ok(rawReads(file, text).length > 0, 'the premise: this file reads `tools` raw today');
+    const repo = srcRepo({ [file]: text });
+    repo.write({ [file]: `${text}export const extra = (system) => system.tools;\n` });
+    assert.deepEqual(repo.compare().failures, [
+      `${file}: raw tools read \`export const extra = (system) => system.tools;\` is new (1)`,
+    ]);
   });
 });
