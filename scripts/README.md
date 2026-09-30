@@ -690,6 +690,13 @@ Issue 1010 retired that waiver from the full smoke after it hid a real defect fo
 
 The setup → license → auth → launch → join path is shared with the full smoke through `scripts/lib/foundryBrowserBoot.js`, so both harnesses log in the same way and the join-control select-vs-tile fallback exists once.
 That module takes a Playwright `page` but never imports Playwright, and reporting (step records, screenshots, progress output) is injected by the caller.
+`scripts/lib/foundryReadyWorld.js` composes it into the one "joined, Fabricate-ready Gamemaster" boot this arm and the roll-terms recorder share.
+
+### Recording Roll terms (`--check=roll-terms`)
+
+`node scripts/foundry-test.mjs --check=roll-terms [--arm=v13]` boots the arm's Foundry and runs `scripts/foundry-roll-terms-record.mjs`, which records `new Roll(formula, data).terms` for every formula in `scripts/lib/rollTermsCorpus.js`, plus keep-transform probes that read every formula surface before and after `resetFormula()`.
+It writes `tests/fixtures/recorded-roll-terms/foundry-<version>.json`, already Prettier-formatted.
+The test doubles replay those recordings (`tests/helpers/termBearingRoll.js`), and `tests/roll-terms-recording.test.js` fails when a corpus formula lacks a recording on either build, so a formula added to the corpus has to be recorded on both arms.
 
 ### Phases
 

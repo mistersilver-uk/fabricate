@@ -6,18 +6,9 @@ import { fileURLToPath } from 'node:url';
 
 import { chromium } from 'playwright';
 
-import {
-  acceptLicenseIfPresent,
-  authenticateIfRequired,
-  clearBlockingOverlays,
-  createBootReporter,
-  getPathname,
-  joinWorldSession,
-  launchWorld,
-} from './lib/foundryBrowserBoot.js';
+import { bootToReadyWorld, suppressTours } from './lib/foundryReadyWorld.js';
 import { deriveRunIdentity, reconcileFoundryEndpoint } from './lib/foundryRunIdentity.js';
 import { resolveSmokeArmFromEnv } from './lib/foundrySmokeArms.js';
-import { TOUR_PROGRESS_STORAGE_KEY, withSuppressedTours } from './lib/foundryTourSuppression.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const RESULTS_DIR = join(ROOT, 'test-results');
@@ -76,68 +67,6 @@ function attachErrorCapture(page) {
   });
 
   return { consoleErrors, waived, pageErrors, transcript };
-}
-
-/** Stop Foundry's New User Experience tours ever starting. */
-async function suppressTours(context) {
-  await context.addInitScript(
-    ({ key, value }) => {
-      try {
-        globalThis.localStorage.setItem(key, value);
-      } catch {
-        // A boot must never depend on localStorage being writable.
-      }
-    },
-    { key: TOUR_PROGRESS_STORAGE_KEY, value: JSON.stringify(withSuppressedTours(null)) }
-  );
-}
-
-/** Bring the page to a joined, Fabricate-ready Gamemaster session. */
-async function bootToReadyWorld(page) {
-  const reporter = createBootReporter({ log });
-
-  await page.goto(`${FOUNDRY_URL}/setup`, { waitUntil: 'networkidle', timeout: 120_000 });
-  await acceptLicenseIfPresent(page, { reporter });
-  await authenticateIfRequired(page, { adminKey: ADMIN_KEY, reporter });
-
-  const path = getPathname(page.url());
-  if (path !== '/join' && path !== '/game') {
-    // Foundry's nue starts a setup tour whose full-viewport `.tour-overlay` intercepts every click,
-    // so a perfectly correct selector times out as "element is visible, enabled and stable" — which
-    // reads as a missing control rather than a blocked one.
-    await page.waitForURL(/\/setup(?:\?.*)?$/, { timeout: 30_000 });
-    const cleared = await clearBlockingOverlays(page);
-    if (cleared.length > 0) log(`Cleared blocking setup overlays: ${cleared.join(', ')}\n`);
-    await launchWorld(page, { worldId: WORLD_ID, foundryUrl: FOUNDRY_URL, reporter });
-  }
-
-  await joinWorldSession(page, { userLabel: 'Gamemaster', reporter });
-  await page.waitForFunction(() => typeof game !== 'undefined' && game.ready === true, null, {
-    timeout: 120_000,
-  });
-  await clearBlockingOverlays(page);
-
-  const active = await page.evaluate(() => game.modules.get('fabricate')?.active === true);
-  if (!active) {
-    log('Fabricate module not active; enabling it and reloading...\n');
-    await page.evaluate(async () => {
-      const moduleSettings = game.settings.get('core', 'moduleConfiguration') || {};
-      moduleSettings.fabricate = true;
-      await game.settings.set('core', 'moduleConfiguration', moduleSettings);
-    });
-    await page.reload({ waitUntil: 'load', timeout: 60_000 });
-    await joinWorldSession(page, { userLabel: 'Gamemaster', reporter });
-    await page.waitForFunction(() => typeof game !== 'undefined' && game.ready === true, null, {
-      timeout: 120_000,
-    });
-  }
-
-  await page.waitForFunction(() => game.modules.get('fabricate')?.active === true, null, {
-    timeout: 30_000,
-  });
-  await page.waitForFunction(() => globalThis.game?.fabricate?.ready === true, null, {
-    timeout: 60_000,
-  });
 }
 
 /** Wait for the Compendium Directory to render the two pack rows the context-menu probe needs. */
@@ -424,7 +353,12 @@ async function main() {
   let reportedOnly = null;
   let failure = null;
   try {
-    await bootToReadyWorld(page);
+    await bootToReadyWorld(page, {
+      foundryUrl: FOUNDRY_URL,
+      worldId: WORLD_ID,
+      adminKey: ADMIN_KEY,
+      log,
+    });
     const directory = await awaitCompendiumDirectory(page);
     const observation = await observeVersionSensitiveShapes(page);
     const managerRender = await observeManagerRender(page);
