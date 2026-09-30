@@ -17,6 +17,7 @@ import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { normalizeCheckEvaluation } from '../src/systems/normalize/checkEvaluation.js';
 import { installCountDice } from './helpers/countEngineDice.js';
 import { countEvaluation } from './helpers/countFixtures.js';
+import { installTermBearingRoll } from './helpers/termBearingRoll.js';
 
 const evaluation = {
   product: 'sum',
@@ -564,14 +565,24 @@ for (const [name, runner] of Object.entries(formulaRunners)) {
 }
 
 test('keep-one advantage keeps the lowest die when the sum must come in under its target', async () => {
-  const decide = async (advantage, direction) =>
-    (await resolveCheckDecision({
-      authoredFormula: '1d20', actor: null, deferred: false, Roll: null,
-      evaluation: { ...evaluation, direction },
-      resolvedCheck: { formula: '1d20 + 2[Modifiers]', selected: [] },
-      displayFormula: (formula) => ({ display: formula }),
-      options: { interactive: true, rollDecision: { advantage } },
-    })).formula;
+  // The shared term-bearing double (issue 2007): the EVALUATED roll's `_formula` is read, because
+  // the keep transform will act on the constructed Roll's terms rather than on the string.
+  const decide = async (advantage, direction) => {
+    let rolled = null;
+    const { restore } = installTermBearingRoll({ onConstruct: (roll) => (rolled = roll) });
+    try {
+      await evaluateCheckRoll('1d20 + 2[Modifiers]', { getRollData: () => ({}) }, {
+        evaluation: { ...evaluation, direction },
+        interactive: true,
+        rollDecision: { advantage },
+        post: false,
+      });
+      assert.equal(rolled._evaluated, true);
+      return rolled._formula;
+    } finally {
+      restore();
+    }
+  };
   assert.equal(await decide('advantage', 'under'), '2d20kl1 + 2[Modifiers]');
   assert.equal(await decide('disadvantage', 'under'), '2d20kh1 + 2[Modifiers]');
   assert.equal(await decide('advantage', 'over'), '2d20kh1 + 2[Modifiers]');

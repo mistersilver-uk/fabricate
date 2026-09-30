@@ -3,6 +3,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { installTermBearingRoll } from './helpers/termBearingRoll.js';
+
 const {
   rolledDiceGroups,
   resolveForcedOutcome,
@@ -200,6 +202,26 @@ function stubCraftingModRoll() {
   };
   globalThis.Roll = Roll;
   return rolledFormulas;
+}
+
+/**
+ * The shared term-bearing double (issue 2007) for the advantage tests: records each EVALUATED
+ * roll's `_formula`, because the keep transform will act on the constructed Roll's terms.
+ */
+function stubTermBearingRoll() {
+  const evaluatedFormulas = [];
+  installTermBearingRoll({
+    total: 12,
+    extend: (TermRoll) =>
+      class RecordingTermRoll extends TermRoll {
+        async evaluate(options) {
+          await super.evaluate(options);
+          evaluatedFormulas.push(this._formula);
+          return this;
+        }
+      },
+  });
+  return evaluatedFormulas;
 }
 
 const MOD_CONTEXT = {
@@ -504,7 +526,7 @@ test('playerPicks: the prompt receives the descriptor and a neutral modifier pla
 });
 
 test('playerPicks: the chosen modifier is APPENDED BEFORE the advantage transform', async () => {
-  const rolledFormulas = stubCraftingModRoll();
+  const rolledFormulas = stubTermBearingRoll();
   const actor = { getRollData: () => ({}) };
   const rolled = await evaluateCheckRoll('1d20', actor, {
     interactive: true,
@@ -688,7 +710,7 @@ test('a non-deferred d20 modifier does not manufacture an advantage offer', asyn
 });
 
 test('advantage still rewrites the CHECK`s own d20 with a d20 modifier appended', async () => {
-  const rolledFormulas = stubCraftingModRoll();
+  const rolledFormulas = stubTermBearingRoll();
   let asked = null;
   await evaluateCheckRoll(
     '1d20',
@@ -855,7 +877,7 @@ test('playerPicks: a cancelled prompt aborts with no appended term and no roll',
 // can silently break: `effectiveFormula` gets the bonus appended, and only the paired `resolved =
 // resolveCheckFormulaDisplay(...)` recompute keeps the journal / `resolvedFormula` in step.
 test('playerPicks: eval == display with a situational bonus (and advantage) composed on top', async () => {
-  const rolledFormulas = stubCraftingModRoll();
+  const rolledFormulas = stubTermBearingRoll();
   const actor = { getRollData: () => ({}) };
   const rolled = await evaluateCheckRoll('1d20', actor, {
     interactive: true,

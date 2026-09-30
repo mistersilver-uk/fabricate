@@ -25,6 +25,7 @@ import { installCountDice } from './helpers/countEngineDice.js';
 import { countEvaluation } from './helpers/countFixtures.js';
 import { stubPromptSurface } from './helpers/rollPromptDialogStub.js';
 import { defineStructureContract } from './helpers/structureContract.js';
+import { installTermBearingRoll } from './helpers/termBearingRoll.js';
 
 // Stubs
 
@@ -77,6 +78,38 @@ function installRoll({ total = 18, throwOnConstruct = false } = {}) {
     });
   globalThis.Roll = FakeRoll;
   return { constructions };
+}
+
+/**
+ * Install the shared term-bearing double (issue 2007) for the advantage tests: `constructions`
+ * are the strings `new Roll` received and `evaluated` each evaluated roll's `_formula`, which the
+ * keep assertions read because the keep transform will act on the constructed Roll's terms.
+ */
+function installTermRoll({ total = 18 } = {}) {
+  const constructions = [];
+  const evaluated = [];
+  installTermBearingRoll({
+    total,
+    extend: (TermRoll) =>
+      class RecordingTermRoll extends TermRoll {
+        constructor(formula, data, options) {
+          constructions.push(String(formula));
+          super(formula, data, options);
+        }
+
+        async evaluate(options) {
+          await super.evaluate(options);
+          evaluated.push(this._formula);
+          return this;
+        }
+
+        async toMessage(messageData, options) {
+          chatPosts.push({ messageData, options });
+          return { id: 'msg' };
+        }
+      },
+  });
+  return { constructions, evaluated };
 }
 
 let chatPosts = [];
@@ -339,7 +372,7 @@ describe('AC-7 — a pre-resolved decision drives the roll without opening a dia
 
   it('opens NO dialog when a decision is supplied, and the decision still reaches the roll', async () => {
     installChat();
-    const rolls = installRoll();
+    const rolls = installTermRoll();
     const { seams, calls } = makeSeams({ real: true });
 
     const result = await rollActorCheck(
@@ -353,9 +386,9 @@ describe('AC-7 — a pre-resolved decision drives the roll without opening a dia
 
     assert.equal(result.outcome, COMPANION_OUTCOMES.checkPassed);
     assert.equal(calls.prompt.length, 0, 'one answer drives N rolls, so no dialog opens');
-    const [rolled] = rolls.constructions;
+    const [rolled] = rolls.evaluated;
     assert.match(rolled, /2d20kh1/, 'the advantage disposition rewrote the d20 pool');
-    assert.match(rolled, /\(\+3\)/, 'and the situational bonus appended');
+    assert.match(rolls.constructions[0], /\(\+3\)/, 'and the situational bonus appended');
     const [post] = chatPosts;
     assert.equal(post?.options?.rollMode, 'blindroll', 'and the roll mode reached the chat post');
   });
@@ -365,7 +398,7 @@ describe('AC-7 — a pre-resolved decision drives the roll without opening a dia
     // is about a caller that forwarded a whole prompt answer, and a prompt answer is usually a
     // confirmation.
     installChat();
-    const rolls = installRoll();
+    const rolls = installTermRoll();
     const { seams, calls } = makeSeams({ real: true });
 
     const result = await rollActorCheck(
@@ -384,9 +417,9 @@ describe('AC-7 — a pre-resolved decision drives the roll without opening a dia
 
     assert.equal(result.outcome, COMPANION_OUTCOMES.checkPassed);
     assert.equal(calls.prompt.length, 0, 'a supplied decision still opens no dialog');
-    const [rolled] = rolls.constructions;
+    const [rolled] = rolls.evaluated;
     assert.match(rolled, /2d20kh1/, 'and the decision still drove the roll it was handed to');
-    assert.match(rolled, /\(\+3\)/);
+    assert.match(rolls.constructions[0], /\(\+3\)/);
   });
 
   it('treats a hand-built decision carrying confirmed:false as a cancel', async () => {
@@ -1881,7 +1914,7 @@ describe('interactive summed rows compose with the shared prompt and a forwarded
     for (const cell of cells) {
       const key = `${cell.mode.direction}/${cell.source}`;
       installChat();
-      const rolled = installRoll({ total: 10 });
+      const rolled = installTermRoll({ total: 10 });
       const { seams, calls } = makeSeams({ real: true });
       const result = await roll(cell, {
         interactive: true,
@@ -1889,7 +1922,7 @@ describe('interactive summed rows compose with the shared prompt and a forwarded
         seams,
       });
       assert.equal(calls.prompt.length, 0, `${key}: a forwarded decision opens no prompt`);
-      assert.ok(rolled.constructions.includes(EXPECTED[key].formula), `${key}: ${rolled.constructions}`);
+      assert.ok(rolled.evaluated.includes(EXPECTED[key].formula), `${key}: ${rolled.evaluated}`);
       assert.equal(result.target, EXPECTED[key].target, key);
     }
   });
