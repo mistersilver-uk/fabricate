@@ -8,7 +8,7 @@
   | --- | --- | --- | --- |
   | `art` | resolved image path | `''` | Falsy renders the initials fallback, and THE FALLBACK TRIGGER IS THE CALLER'S: this never compares against Foundry's default-artwork constant, which would make it an importing component. |
   | `name` / `alt` | strings | `''` | The only source of the initials, where an empty name renders an empty tile rather than a placeholder glyph; and image alt text, passed EXPLICITLY wherever `art` is set, so that the decision was TAKEN. `avatar-source-contract.test.js` reds on an art-bearing call site that names no `alt`. |
-  | `size` | px | `32` | Edge length, unrestricted by the art ladder; the shipped population is recorded on `design-system-known-debt.json`'s `offLadderArtSizes`. |
+  | `size` | px | `32` | Edge length, unrestricted by the art ladder; the shipped population is held by the art-size gate in `design-system-debt-ratchets.test.js`. |
   | `shape` | `'round'` \| `'square'` | `'round'` | A person, or a party/vehicle/place. A CLOSED set compared against a literal, so an unrecognised value renders the default rather than an unpainted `is-*`. |
   | `tint` | bare `--fab-tag-*` key | `''` | Unset is byte-identical to a flat tile. |
 

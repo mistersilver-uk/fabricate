@@ -1,82 +1,56 @@
-/** The design-system debt gates compare observed selectors and controls to their committed ceilings. */
+/**
+ * The design-system debt gates: each measures its corpus at the base commit and in the working
+ * tree, and fails on an offender that appeared or grew, unless a
+ * `ratchet-exempt(design-system): <reason>` marker sits at the site.
+ */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { compoundClasses, compoundsOf } from '../../scripts/lib/stylesheetLiveClasses.js';
 import { censusRules, selectorAppearances } from '../../scripts/lib/stylesheetSelectorCensus.js';
-import { byCodePoint, tallyByKey } from '../helpers/codePointOrder.js';
-import { assertRatchet } from '../helpers/ratchetBaseline.js';
+import { byCodePoint } from '../helpers/codePointOrder.js';
+import {
+  DESIGN_SYSTEM_FAMILY,
+  MODULE_CORPUS,
+  STYLE_CORPUS,
+  TEMPLATE_CORPUS,
+  assertFloor,
+  assertGateCases,
+  checkGate,
+  emptyMarkerFailure,
+  exemptAt,
+  gateOver,
+  nativeSelectSites,
+  styleCorpusOf,
+  templatesOf,
+  workingTree,
+} from '../helpers/designSystemRatchet.js';
+import { parseMarkers } from '../helpers/mergeBaseRatchet.js';
 import { collectWorkingTreeSources, stripComments } from '../helpers/sourceScan.js';
 import {
-  collectCustomProperties,
-  collectStyleCorpus,
   declarationsIn,
   resolveValueCandidates,
-  rulesIn,
   splitSelectorList,
 } from '../helpers/styleBlockScan.js';
-import {
-  attributeText,
-  lineOf,
-  parsedTemplates,
-  walkElements,
-} from '../helpers/svelteTemplateScan.js';
-
-import {
-  KNOWN_BARE_FOCUS_SELECTORS,
-  KNOWN_BARE_FOCUS_TOTAL,
-  KNOWN_HEAVY_MONO_WEIGHTS,
-  KNOWN_HEAVY_MONO_WEIGHT_TOTAL,
-  KNOWN_NATIVE_SELECTS_IN_JS,
-  KNOWN_NATIVE_SELECTS_IN_JS_TOTAL,
-  KNOWN_NATIVE_SELECT_ELEMENTS,
-  KNOWN_NATIVE_SELECT_TOTAL,
-  KNOWN_OFF_LADDER_ART_SIZES,
-  KNOWN_OFF_LADDER_ART_SIZE_TOTAL,
-  KNOWN_OFF_LADDER_RADII,
-  KNOWN_OFF_LADDER_RADIUS_TOTAL,
-  KNOWN_OFF_SCALE_FONT_WEIGHTS,
-  KNOWN_OFF_SCALE_FONT_WEIGHT_TOTAL,
-  KNOWN_OFF_TOKEN_SHADOWS,
-  KNOWN_OFF_TOKEN_SHADOW_TOTAL,
-  KNOWN_VIEWPORT_MEDIA_QUERIES,
-  KNOWN_VIEWPORT_MEDIA_TOTAL,
-} from './design-system-known-debt.js';
-import {
-  SELECTOR_REPETITION_BASELINE,
-  SELECTOR_REPETITION_TOTAL,
-} from './selector-repetition-baseline.js';
+import { attributeText, lineOf, walkElements } from '../helpers/svelteTemplateScan.js';
 
 /* ─────────────────────────────── the shared corpus ─────────────────────────────── */
 
-/** The CSS corpus, its rules and its custom-property definitions, built once. */
-let cachedCorpus = null;
-function corpus() {
-  if (cachedCorpus === null) {
-    const styles = collectStyleCorpus();
-    const rules = Object.entries(styles).flatMap(([file, css]) =>
-      rulesIn(css).map((rule) => ({ ...rule, file }))
-    );
-    cachedCorpus = {
-      styles,
-      rules,
-      definitions: collectCustomProperties(styles),
-      declarations: rules.flatMap((rule) =>
-        declarationsIn(rule.file, rule.body).map((declaration) => ({
-          ...declaration,
-          line: rule.line,
-          selector: rule.selector,
-        }))
-      ),
-    };
-  }
-  return cachedCorpus;
+/** The working tree's style corpus, which every clause that is not a comparison reads. */
+function treeStyles() {
+  const tree = workingTree(STYLE_CORPUS);
+  return styleCorpusOf(tree.readFile, tree.listFiles());
+}
+
+/** The working tree's UI templates, parsed once. */
+function treeTemplates() {
+  const tree = workingTree(TEMPLATE_CORPUS);
+  return templatesOf(tree.readFile, tree.listFiles());
 }
 
 /** Declarations of one property family, by a predicate on the lowercased property name. */
-const declarationsOf = (matches) =>
-  corpus().declarations.filter((declaration) => matches(declaration.property.toLowerCase()));
+const declarationsOf = (corpus, matches) =>
+  corpus.declarations.filter((declaration) => matches(declaration.property.toLowerCase()));
 
 /** A declaration's value with `!important` and its whitespace normalised away. */
 const normaliseValue = (value) =>
@@ -85,8 +59,13 @@ const normaliseValue = (value) =>
     .trim()
     .replace(/\s+/gu, ' ');
 
-/** The row key every gate below builds: fields joined exactly as the JSON table writes them. */
-const rowKey = (...fields) => fields.join(' | ');
+/** A gate over the style corpus, whose `find(corpus)` gives one side's offending sites. */
+const styleGate = (find) =>
+  gateOver([STYLE_CORPUS], (readFile, files) => find(styleCorpusOf(readFile, files)));
+
+/** A gate over the UI templates, whose `find(templates)` gives one side's offending sites. */
+const templateGate = (find) =>
+  gateOver([TEMPLATE_CORPUS], (readFile, files) => find(templatesOf(readFile, files)));
 
 /** The module stylesheet, which gates 7 and 8 read ALONE rather than through the corpus. */
 const MODULE_SHEET = 'styles/fabricate.css';
@@ -100,7 +79,7 @@ test('both stylesheet corpora are still being read', () => {
   // and every clause below then reports a much cleaner product. So the two halves are floored
   // separately, on FILES rather than rules, because the failure being guarded against is a root or
   // an extension dropping out of the walk rather than a screen being deleted.
-  const { rules } = corpus();
+  const { rules } = treeStyles();
   const files = [...new Set(rules.map((rule) => rule.file))];
   const stylesheets = files.filter((file) => file.endsWith('.css')).length;
   const scoped = files.filter((file) => file.endsWith('.svelte')).length;
@@ -207,11 +186,11 @@ function primitiveFocusStrip(rule) {
 }
 
 /** Every selector matching bare `:focus`, split three ways: the allow-listed area resets. */
-function bareFocusSelectors() {
+function bareFocusSelectors(corpus) {
   const gated = [];
   const exempt = [];
   const strips = [];
-  for (const rule of corpus().rules) {
+  for (const rule of corpus.rules) {
     const reset = focusResetRoot(rule.selector);
     const strip = reset === null ? primitiveFocusStrip(rule) : null;
     for (const compound of splitSelectorList(rule.selector)) {
@@ -226,7 +205,7 @@ function bareFocusSelectors() {
 
 test('the five Foundry-core focus resets are recognised, and a look-alike is not', () => {
   // BOTH POLARITIES OF THE ONLY EXEMPTION THIS GATE HAS. The positive half is the live corpus:
-  const { exempt } = bareFocusSelectors();
+  const { exempt } = bareFocusSelectors(treeStyles());
 
   assert.deepEqual(
     [...new Set(exempt.map((entry) => entry.reset))].sort(byCodePoint),
@@ -286,7 +265,7 @@ test('the five Foundry-core focus resets are recognised, and a look-alike is not
 
 test('a primitive family’s focus STRIP half is recognised, and a look-alike is not', () => {
   // THE SECOND EXEMPTION, BOTH POLARITIES.
-  const { strips } = bareFocusSelectors();
+  const { strips } = bareFocusSelectors(treeStyles());
 
   assert.deepEqual(
     [...new Set(strips.map((entry) => entry.strip))].sort(byCodePoint),
@@ -368,7 +347,7 @@ test('a primitive family’s focus STRIP half is recognised, and a look-alike is
     strip('.manager-nav-button:focus', 'outline: none; box-shadow: none;'),
     null,
     'the exemption is for a PRIMITIVE FAMILY ROOT, not for any class that writes the two ' +
-      'declarations — otherwise every row in the baseline could be paid off by deleting its ring'
+      'declarations — otherwise every bare `:focus` offender could be paid off by deleting its ring'
   );
   assert.equal(
     strip('.fabricate-button:focus, .manager-nav-button:focus', 'outline: none; box-shadow: none;'),
@@ -378,19 +357,21 @@ test('a primitive family’s focus STRIP half is recognised, and a look-alike is
   );
 });
 
-test('no bare :focus selector survives outside a Foundry-core reset', () => {
-  const { gated } = bareFocusSelectors();
-  const observed = tallyByKey(gated, (entry) => rowKey(entry.file, entry.compound));
+const BARE_FOCUS_GATE = styleGate((corpus) =>
+  bareFocusSelectors(corpus).gated.map((entry) => ({
+    file: entry.file,
+    line: entry.line,
+    id: `bare :focus ${entry.compound}`,
+    value: 'bare :focus',
+  }))
+);
 
-  assertRatchet({
-    label: 'bare `:focus` selectors',
-    baseline: KNOWN_BARE_FOCUS_SELECTORS,
-    pinnedTotal: KNOWN_BARE_FOCUS_TOTAL,
-    observed,
-    scanned: corpus().rules.length,
-    floor: 3000,
-    guidance:
-      'The design system states the focus ring as `:focus-visible` — see the "Every interactive ' +
+test('no bare :focus selector survives outside a Foundry-core reset', (t) => {
+  assertFloor('bare `:focus` selectors', treeStyles().rules.length, 3000);
+  checkGate(
+    t,
+    BARE_FOCUS_GATE,
+    'The design system states the focus ring as `:focus-visible` — see the "Every interactive ' +
       'primitive declares its full state set" requirement. Bare `:focus` draws the ring for a ' +
       'MOUSE click as well as for the keyboard, which is the state the rule exists to keep apart. ' +
       "Write `:focus-visible`. There are two exceptions, both suppressing Foundry core's own " +
@@ -400,8 +381,8 @@ test('no bare :focus selector survives outside a Foundry-core reset', () => {
       'is REQUIRED CHROME rather than debt: `design-system/spec.md` says the chrome a primitive ' +
       'declares is the PAIR, because a family rooted at its own class renders in hosts carrying ' +
       "no application root, where the repaint alone lands on top of core's treatment instead of " +
-      'replacing it. Do not book one of those in the baseline; widen the recognition instead.',
-  });
+      'replacing it. Do not exempt one of those with a marker; widen the recognition instead.'
+  );
 });
 
 /* ──────────────────────────── gate 2: viewport @media ──────────────────────────── */
@@ -413,9 +394,9 @@ const MEDIA_AT_RULE = /@media\b([^{]*)\{/gu;
 const USER_PREFERENCE = /prefers-reduced-motion|prefers-contrast|forced-colors/u;
 
 /** Every `@media` in the corpus, with its query normalised and its line. */
-function mediaQueries() {
+function mediaQueries(corpus) {
   const found = [];
-  for (const [file, css] of Object.entries(corpus().styles)) {
+  for (const [file, css] of Object.entries(corpus.styles)) {
     MEDIA_AT_RULE.lastIndex = 0;
     for (let match = MEDIA_AT_RULE.exec(css); match !== null; match = MEDIA_AT_RULE.exec(css)) {
       found.push({
@@ -428,12 +409,18 @@ function mediaQueries() {
   return found;
 }
 
-test('no viewport breakpoint is introduced, and user-preference queries stay exempt', () => {
-  const all = mediaQueries();
+const VIEWPORT_MEDIA_GATE = styleGate((corpus) =>
+  mediaQueries(corpus)
+    .filter((entry) => !USER_PREFERENCE.test(entry.query))
+    .map((entry) => ({ ...entry, id: `viewport @media ${entry.query}`, value: entry.query }))
+);
+
+test('no viewport breakpoint is introduced, and user-preference queries stay exempt', (t) => {
+  const all = mediaQueries(treeStyles());
   const gated = all.filter((entry) => !USER_PREFERENCE.test(entry.query));
 
   // THE EXEMPTION, PROVED LIVE. A predicate that quietly matched everything would empty this
-  // baseline wholesale, which reads like debt paid down rather than like a gate switched off.
+  // population wholesale, which reads like debt paid down rather than like a gate switched off.
   assert.ok(
     all.length - gated.length > 0,
     'no `@media` query tests a user preference any more, so the exemption this gate grants is ' +
@@ -442,20 +429,16 @@ test('no viewport breakpoint is introduced, and user-preference queries stay exe
   );
 
   // THE FLOOR IS OVER THE CORPUS, NOT OVER THE QUERIES.
-  assertRatchet({
-    label: 'viewport `@media` breakpoints',
-    baseline: KNOWN_VIEWPORT_MEDIA_QUERIES,
-    pinnedTotal: KNOWN_VIEWPORT_MEDIA_TOTAL,
-    observed: tallyByKey(gated, (entry) => rowKey(entry.file, entry.query)),
-    scanned: corpus().rules.length,
-    floor: 3000,
-    guidance:
-      'The Foundry contract binds every primitive: an application window is RESIZED BY THE USER ' +
+  assertFloor('viewport `@media` breakpoints', treeStyles().rules.length, 3000);
+  checkGate(
+    t,
+    VIEWPORT_MEDIA_GATE,
+    'The Foundry contract binds every primitive: an application window is RESIZED BY THE USER ' +
       'and is not the viewport, so a `@media (max-width: …)` asks the wrong question and answers ' +
       'it with the monitor. Use a container query against the app root. `prefers-reduced-motion`, ' +
       '`prefers-contrast` and `forced-colors` are user preferences rather than geometry and stay ' +
-      'exempt.',
-  });
+      'exempt.'
+  );
 });
 
 /* ─────────────────────────────── gate 3: weights ─────────────────────────────── */
@@ -479,53 +462,67 @@ function weightValue(value) {
 }
 
 /** Every `font-weight` declaration, normalised. */
-const fontWeights = () =>
-  declarationsOf((property) => property === 'font-weight').map((declaration) => ({
+const fontWeights = (corpus) =>
+  declarationsOf(corpus, (property) => property === 'font-weight').map((declaration) => ({
     ...declaration,
     value: normaliseValue(declaration.value),
   }));
 
-test('no font weight leaves the published ramp', () => {
-  const weights = fontWeights();
-  const offRamp = weights.filter((declaration) => !WEIGHT_RAMP.includes(declaration.value));
-
-  assertRatchet({
-    label: 'off-ramp font weights',
-    baseline: KNOWN_OFF_SCALE_FONT_WEIGHTS,
-    pinnedTotal: KNOWN_OFF_SCALE_FONT_WEIGHT_TOTAL,
-    observed: tallyByKey(offRamp, (declaration) =>
-      rowKey(declaration.file, declaration.selector, declaration.value)
-    ),
-    scanned: weights.length,
-    floor: 400,
-    guidance:
-      'Geometry comes from the published ladders, and weight is one of them: 400, 500, 600 and ' +
-      '700 are the shipped faces. 650 and 800 have no face behind them, so the browser ' +
-      'synthesises them — the glyphs are smeared rather than drawn. `inherit` is not a weight ' +
-      'either; it defers the decision to whatever the caller happened to set.',
-  });
+/** One declaration site, keyed on its selector and value and netted on its value. */
+const declarationSite = (label, declaration) => ({
+  file: declaration.file,
+  line: declaration.at,
+  id: `${label} ${declaration.selector} | ${declaration.value}`,
+  value: `${label} ${declaration.value}`,
 });
 
+const OFF_RAMP_WEIGHT_GATE = styleGate((corpus) =>
+  fontWeights(corpus)
+    .filter((declaration) => !WEIGHT_RAMP.includes(declaration.value))
+    .map((declaration) => declarationSite('off-ramp font-weight', declaration))
+);
+
+test('no font weight leaves the published ramp', (t) => {
+  assertFloor('off-ramp font weights', fontWeights(treeStyles()).length, 400);
+  checkGate(
+    t,
+    OFF_RAMP_WEIGHT_GATE,
+    'Geometry comes from the published ladders, and weight is one of them: 400, 500, 600 and ' +
+      '700 are the shipped faces. 650 and 800 have no face behind them, so the browser ' +
+      'synthesises them — the glyphs are smeared rather than drawn. `inherit` is not a weight ' +
+      'either; it defers the decision to whatever the caller happened to set.'
+  );
+});
+
+/** A selector within its file, which is how a mono family and its weight are joined. */
+const selectorKey = (declaration) => `${declaration.file} | ${declaration.selector}`;
+
 /** Rules whose font shorthand or family names the mono face. */
-function monoSelectors() {
+function monoSelectors(corpus) {
   const named = new Set();
-  for (const declaration of declarationsOf((property) => /^font(-family)?$/u.test(property))) {
-    if (/var\(\s*--fab-font-mono/u.test(declaration.value)) {
-      named.add(rowKey(declaration.file, declaration.selector));
-    }
+  const fonts = declarationsOf(corpus, (property) => /^font(-family)?$/u.test(property));
+  for (const declaration of fonts) {
+    if (/var\(\s*--fab-font-mono/u.test(declaration.value)) named.add(selectorKey(declaration));
   }
   return named;
 }
 
-test('no mono rule asks for a weight the shipped face does not have', () => {
-  // MATCHED BY SELECTOR TEXT WITHIN A FILE, not only within the rule.
-  const mono = monoSelectors();
-  const weights = fontWeights();
-  const heavy = weights.filter((declaration) => {
-    if (!mono.has(rowKey(declaration.file, declaration.selector))) return false;
+/** The weights above 500 on a rule naming the mono face. MATCHED BY SELECTOR TEXT WITHIN A FILE. */
+function heavyMonoWeights(corpus) {
+  const mono = monoSelectors(corpus);
+  return fontWeights(corpus).filter((declaration) => {
+    if (!mono.has(selectorKey(declaration))) return false;
     const weight = weightValue(declaration.value);
     return weight !== null && weight > 500;
   });
+}
+
+const HEAVY_MONO_GATE = styleGate((corpus) =>
+  heavyMonoWeights(corpus).map((declaration) => declarationSite('heavy mono weight', declaration))
+);
+
+test('no mono rule asks for a weight the shipped face does not have', (t) => {
+  const mono = monoSelectors(treeStyles());
 
   assert.ok(
     mono.size > 20,
@@ -533,22 +530,16 @@ test('no mono rule asks for a weight the shipped face does not have', () => {
       'With none, this gate is an absence check over an empty set.'
   );
 
-  assertRatchet({
-    label: 'mono rules above the shipped weight',
-    baseline: KNOWN_HEAVY_MONO_WEIGHTS,
-    pinnedTotal: KNOWN_HEAVY_MONO_WEIGHT_TOTAL,
-    observed: tallyByKey(heavy, (declaration) =>
-      rowKey(declaration.file, declaration.selector, declaration.value)
-    ),
-    scanned: weights.length,
-    floor: 400,
-    guidance:
-      '`styles/fabricate.css` ships JetBrains Mono at 400 and 500 and at nothing else — read the ' +
+  assertFloor('mono rules above the shipped weight', fontWeights(treeStyles()).length, 400);
+  checkGate(
+    t,
+    HEAVY_MONO_GATE,
+    '`styles/fabricate.css` ships JetBrains Mono at 400 and 500 and at nothing else — read the ' +
       'four `@font-face` blocks at the top of it. A mono rule asking for 600 or 700 gets a ' +
       'SYNTHESISED bold: the browser smears the 500 glyphs sideways, and the numerals stop lining ' +
       'up with the numerals beside them, which is the entire reason this face is used. Use 500, ' +
-      'or use the body face.',
-  });
+      'or use the body face.'
+  );
 });
 
 /* ─────────────────────────────── gate 4: shadows ─────────────────────────────── */
@@ -559,17 +550,26 @@ const SHADOW_TOKEN = /^var\(\s*--fab-shadow-(sm|md|lg)\s*\)$/iu;
 /** An inset ring: a border drawn as a shadow so it costs no layout. */
 const INSET_RING = /^(?:inset )?0 0 0 \d+(?:\.\d+)?px var\(\s*--fab-[\w-]+\s*(?:,[^)]*)?\)$/iu;
 
-test('no box-shadow is written outside the published elevation set', () => {
-  const shadows = declarationsOf((property) => property === 'box-shadow').map((declaration) => ({
+/** Every `box-shadow` declaration, normalised. */
+const shadowsOf = (corpus) =>
+  declarationsOf(corpus, (property) => property === 'box-shadow').map((declaration) => ({
     ...declaration,
     value: normaliseValue(declaration.value),
   }));
-  const offToken = shadows.filter(
-    (declaration) =>
-      !SHADOW_TOKEN.test(declaration.value) &&
-      declaration.value.toLowerCase() !== 'none' &&
-      !INSET_RING.test(declaration.value)
-  );
+
+const OFF_TOKEN_SHADOW_GATE = styleGate((corpus) =>
+  shadowsOf(corpus)
+    .filter(
+      (declaration) =>
+        !SHADOW_TOKEN.test(declaration.value) &&
+        declaration.value.toLowerCase() !== 'none' &&
+        !INSET_RING.test(declaration.value)
+    )
+    .map((declaration) => declarationSite('off-token box-shadow', declaration))
+);
+
+test('no box-shadow is written outside the published elevation set', (t) => {
+  const shadows = shadowsOf(treeStyles());
 
   // The two allowances are live, so widening either shows up as rows vanishing rather than as
   // nothing at all. A `none` that is no longer written and a ring that no longer matches both
@@ -585,81 +585,50 @@ test('no box-shadow is written outside the published elevation set', () => {
       'corpus and could be widened without a row moving'
   );
 
-  assertRatchet({
-    label: 'off-token box-shadows',
-    baseline: KNOWN_OFF_TOKEN_SHADOWS,
-    pinnedTotal: KNOWN_OFF_TOKEN_SHADOW_TOTAL,
-    observed: tallyByKey(offToken, (declaration) =>
-      rowKey(declaration.file, declaration.selector, declaration.value)
-    ),
-    scanned: shadows.length,
-    floor: 60,
-    guidance:
-      'Token foundations are the only source of elevation. `--fab-shadow-sm`, `--fab-shadow-md` ' +
+  assertFloor('off-token box-shadows', shadows.length, 60);
+  checkGate(
+    t,
+    OFF_TOKEN_SHADOW_GATE,
+    'Token foundations are the only source of elevation. `--fab-shadow-sm`, `--fab-shadow-md` ' +
       'and `--fab-shadow-lg` are the three heights this product has, and a hand-written offset ' +
       'and blur is a fourth that no other surface can match. `none` and an inset ring — a border ' +
-      'drawn without costing layout — are the two shapes that are not elevation and stay allowed.',
-  });
+      'drawn without costing layout — are the two shapes that are not elevation and stay allowed.'
+  );
 });
 
 /* ────────────────────────── gate 5: native <select> ────────────────────────── */
 
-/** The marker that exempts one element, and the reason it must carry. */
-const NATIVE_SELECT_MARKER = /<!--\s*native select:\s*\S/u;
+const SELECT_GUIDANCE =
+  'Every select renders the app’s own option list — a native `<select>` draws the OPERATING ' +
+  'SYSTEM’s drop-down, which carries none of the app’s type, colour or spacing and cannot be ' +
+  'themed at all. Use the shared picker. Where a surface genuinely cannot host a Svelte ' +
+  'component, write `<!-- ratchet-exempt(design-system): your reason -->` on the line above the ' +
+  'element and the gate will accept it.';
 
-/** How many lines above an element the marker may sit and still apply to it. */
-const MARKER_LOOKBACK = 5;
-
-/** Whether a `<!-- native select: reason -->` marker sits within reach above `line`. */
-function markedNative(source, line) {
-  const lines = source.split('\n');
-  return lines
-    .slice(Math.max(0, line - 1 - MARKER_LOOKBACK), line - 1)
-    .some((text) => NATIVE_SELECT_MARKER.test(text));
-}
-
-/** Every `<select>` element in the UI corpus, with whether it is marked. */
-function nativeSelects(templates) {
-  const found = [];
-  for (const { file, source, ast } of templates) {
-    walkElements(ast.fragment, (element) => {
-      if (element.type !== 'RegularElement' || element.name.toLowerCase() !== 'select') return;
-      const line = source.slice(0, element.start).split('\n').length;
-      found.push({ file, line, marked: markedNative(source, line) });
-    });
-  }
-  return found;
-}
-
-test('an unmarked native <select> is debt, and the marker comment is what exempts one', () => {
+test('a reasoned marker above a native <select> exempts it, and prose or distance does not', () => {
   // BOTH POLARITIES, SYNTHETIC, because no file in the tree carries the marker.
-  const withMarker = [
-    '<!-- native select: the Foundry drop-down is the only control a DialogV2 body can host. -->',
-    '<select bind:value={choice}><option>a</option></select>',
-  ].join('\n');
-  const withoutMarker = [
-    '<!-- A plain comment saying nothing about a native select. -->',
-    '<select bind:value={choice}><option>a</option></select>',
-  ].join('\n');
-  const withProseOnly = [
-    '<!-- This component renders a native select on purpose. -->',
-    '<select bind:value={choice}><option>a</option></select>',
-  ].join('\n');
+  const select = '<select bind:value={choice}><option>a</option></select>';
+  const exempt = (lines) => exemptAt('src/ui/svelte/Probe.svelte', lines.join('\n'), lines.length);
+  const reason = '<!-- ratchet-exempt(design-system): a DialogV2 body hosts no component -->';
 
-  const marked = (source) => markedNative(source, source.split('\n').length);
-
-  assert.ok(marked(withMarker), 'the marker admits the element beneath it');
-  assert.ok(!marked(withoutMarker), 'an unrelated comment must not exempt anything');
+  assert.ok(exempt([reason, select]), 'the marker admits the element beneath it');
   assert.ok(
-    !marked(withProseOnly),
-    'prose describing a native select is not the marker. The marker is a specific token, so a ' +
-      'docblock explaining a decision cannot exempt an element by accident — which matters here ' +
-      'because two components in this corpus carry exactly such a docblock and are baselined.'
+    !exempt(['<!-- A plain comment saying nothing about a native select. -->', select]),
+    'an unrelated comment must not exempt anything'
   );
   assert.ok(
-    !markedNative(withMarker, 1 + MARKER_LOOKBACK + 1),
-    `the marker must not reach further than ${MARKER_LOOKBACK} lines, or one comment at the top ` +
-      'of a file exempts every element in it'
+    !exempt(['<!-- This component renders a native select on purpose. -->', select]),
+    'prose describing a native select is not the marker, so a docblock explaining a decision ' +
+      'cannot exempt an element by accident'
+  );
+  assert.ok(
+    !exempt([reason, '<div>', '</div>', select]),
+    'the marker reaches only the element right below it and the comments between, or one ' +
+      'comment at the top of a file exempts every element in it'
+  );
+  assert.ok(
+    !exempt(['<!-- ratchet-exempt(design-system): -->', select]),
+    'a marker with no reason exempts nothing'
   );
 });
 
@@ -676,150 +645,66 @@ test('a converted select did not pay its ratchet with a marker', () => {
     'src/ui/svelte/apps/inventory/detail/InventorySystemSelector.svelte',
     'src/ui/svelte/apps/journal/JournalListShell.svelte',
   ];
-  const sources = collectWorkingTreeSources(['src'], ['.svelte']);
+  const { readFile } = workingTree(TEMPLATE_CORPUS);
   for (const file of CONVERTED) {
-    const source = sources[file];
+    const source = readFile(file);
     assert.ok(
       typeof source === 'string',
       `${file} is not in the source walk, so this clause is checking nothing. Either the file ` +
         'moved — retarget this list — or the walk has stopped reading `.svelte`.'
     );
-    assert.equal(
-      (source.match(new RegExp(NATIVE_SELECT_MARKER, 'gu')) ?? []).length,
-      0,
-      `${file} carries a \`<!-- native select: … -->\` marker. Issues 1504 and 1511 lowered the ` +
-        'native select pin by converting this file to the app’s own option list; a marker here ' +
-        'would have lowered the same pin by the same amount while the operating system’s ' +
-        'drop-down went on shipping, which is the one way that ratchet can be paid without the ' +
-        'defect being fixed.'
+    assert.deepEqual(
+      parseMarkers(file, source).filter((marker) => marker.family === DESIGN_SYSTEM_FAMILY),
+      [],
+      `${file} carries a \`ratchet-exempt(design-system)\` marker. Issues 1504 and 1511 paid ` +
+        'this file’s native selects down by converting it to the app’s own option list; a ' +
+        'marker here would pay the same debt while the operating system’s drop-down went on ' +
+        'shipping, which is the one way that ratchet can be paid without the defect being fixed.'
     );
   }
 });
 
-/** The one phrase both published documents state the ratchet's pin in. */
-const PIN_PHRASE = /(\d+) elements across (\d+)\s*(?:<code>)?`?\.svelte`?(?:<\/code>)? files/u;
+const NATIVE_SELECT_GATE = templateGate((templates) =>
+  nativeSelectSites(templates).map((site) => ({ ...site, id: 'native <select>' }))
+);
 
-/** The `### Requirement:` section that owns the select pin, so a fragment cannot match elsewhere. */
-function selectRequirement() {
-  const spec = readFileSync(new URL('../../openspec/specs/design-system/spec.md', import.meta.url), 'utf8');
-  const heading = '### Requirement: Every select renders the app’s own option list';
-  const start = spec.indexOf(heading);
-  assert.ok(
-    start !== -1,
-    'the design-system spec no longer carries an "Every select renders the app’s own option ' +
-      'list" requirement, so this clause is pinning a sentence in a section that has been ' +
-      'renamed or dropped. Retarget it, or delete it deliberately.'
-  );
-  const end = spec.indexOf('\n### ', start + heading.length);
-  return spec.slice(start, end === -1 ? spec.length : end);
-}
-
-/**
- * Assert one document's pin phrase names today's two constants, each in its own position.
- *
- * @param {string} where The document, for the failure message.
- * @param {string} sentence The single sentence carrying the pin.
- */
-function assertPinPhrase(where, sentence) {
-  const match = sentence.match(PIN_PHRASE);
-  assert.ok(
-    match,
-    `${where}'s pin no longer reads "<N> elements across <M> .svelte files", so this clause has ` +
-      `stopped reading the phrase it was written to pin rather than found it correct. It reads: ${sentence}`
-  );
-  const [, elements, files] = match;
-  assert.equal(
-    Number(elements),
-    KNOWN_NATIVE_SELECT_TOTAL,
-    `${where} publishes ${elements} native select ELEMENTS against a ratchet pinned at ` +
-      `${KNOWN_NATIVE_SELECT_TOTAL}`
-  );
-  assert.equal(
-    Number(files),
-    KNOWN_NATIVE_SELECT_ELEMENTS.length,
-    `${where} publishes ${files} FILES against a baseline of ${KNOWN_NATIVE_SELECT_ELEMENTS.length}`
-  );
-}
-
-test('both published pin sentences state the two numerals this ratchet measures', () => {
-  // THE SENTENCE, NOT THE SECTION. The requirement's next line carries HISTORICAL figures.
-  // pin's earlier values — so a stale pin could match one of those and read as green. The slice
-  // is therefore the one sentence that begins "The figure is the RATCHET'S PIN", which is the
-  // only sentence in the spec making a claim about today's constants.
-  const requirement = selectRequirement();
-  const pin = requirement.match(/^The figure is the RATCHET'S PIN[^\n]*$/mu)?.[0];
-  assert.ok(
-    pin,
-    'the requirement no longer carries a sentence beginning "The figure is the RATCHET\'S PIN", ' +
-      'so this clause has stopped reading the sentence it was written to pin rather than found ' +
-      'it correct'
-  );
-  assertPinPhrase('the design-system spec', pin);
-
-  const library = readFileSync(
-    new URL('../../openspec/specs/design-system/library.html', import.meta.url),
-    'utf8'
-  );
-  const specimenPin = library.match(/Every remaining native select is recorded DEBT[^<]*<b>[^<]*<code>[^<]*<\/code>[^<]*<\/b>/u)?.[0];
-  assert.ok(
-    specimenPin,
-    'the select specimen in `library.html` no longer carries an "Every remaining native select ' +
-      'is recorded DEBT against the ratchet" sentence ending in the bolded pin, so this clause ' +
-      'is reading nothing'
-  );
-  assertPinPhrase('the `library.html` select specimen', specimenPin);
-});
-
-test('no new native <select> is rendered by a Svelte template', () => {
-  const templates = parsedTemplates();
-  const unmarked = nativeSelects(templates).filter((element) => !element.marked);
-
-  assertRatchet({
-    label: 'native `<select>` elements',
-    baseline: KNOWN_NATIVE_SELECT_ELEMENTS,
-    pinnedTotal: KNOWN_NATIVE_SELECT_TOTAL,
-    observed: tallyByKey(unmarked, (element) => element.file),
-    scanned: templates.length,
-    floor: 250,
-    guidance:
-      'Every select renders the app’s own option list — a native `<select>` draws the OPERATING ' +
-      'SYSTEM’s drop-down, which carries none of the app’s type, colour or spacing and cannot be ' +
-      'themed at all. Use the shared picker. Where a surface genuinely cannot host a Svelte ' +
-      'component, write `<!-- native select: your reason -->` on the line above the element and ' +
-      'the gate will accept it.',
-  });
+test('no new native <select> is rendered by a Svelte template', (t) => {
+  assertFloor('native `<select>` elements', treeTemplates().length, 250);
+  checkGate(t, NATIVE_SELECT_GATE, SELECT_GUIDANCE);
 });
 
 /** The template-string channel: `<select>` written into a JavaScript dialog body. */
-function nativeSelectsInJavaScript() {
+function nativeSelectsInJavaScript(readFile, files) {
   const found = [];
-  for (const [file, source] of Object.entries(collectWorkingTreeSources(['src'], ['.js']))) {
-    for (const [index, text] of stripComments(source).split('\n').entries()) {
-      if (/<select[\s>]/iu.test(text)) found.push({ file, line: index + 1 });
+  for (const file of files) {
+    if (!MODULE_CORPUS.include(file)) continue;
+    for (const [index, text] of stripComments(readFile(file)).split('\n').entries()) {
+      if (/<select[\s>]/iu.test(text)) {
+        found.push({ file, line: index + 1, id: 'native <select> in a template string' });
+      }
     }
   }
   return found;
 }
 
-test('no new native <select> is written into a JavaScript template string', () => {
-  // THE CHANNEL THE TEMPLATE WALK CANNOT SEE. A DialogV2 body is an HTML string built in a `.js`
-  // module, so `svelte/compiler` never reads it and the clause above is blind to all four of them.
-  const found = nativeSelectsInJavaScript();
-  const sources = collectWorkingTreeSources(['src'], ['.js']);
+const JS_SELECT_GATE = gateOver([MODULE_CORPUS], nativeSelectsInJavaScript);
 
-  assertRatchet({
-    label: 'native `<select>` in JavaScript template strings',
-    baseline: KNOWN_NATIVE_SELECTS_IN_JS,
-    pinnedTotal: KNOWN_NATIVE_SELECTS_IN_JS_TOTAL,
-    observed: tallyByKey(found, (entry) => entry.file),
-    scanned: Object.keys(sources).length,
-    floor: 250,
-    guidance:
-      'All four of these are DialogV2 bodies, which cannot host a Svelte component and so cannot ' +
-      'use the app’s own option list. Issue 1504 states that exemption permanently. Until it ' +
-      'does, a NEW one is a new surface built on a dialog, and the question to answer first is ' +
-      'whether it should be an application window instead.',
-  });
+test('no new native <select> is written into a JavaScript template string', (t) => {
+  // THE CHANNEL THE TEMPLATE WALK CANNOT SEE. A DialogV2 body is an HTML string built in a `.js`
+  // module, so `svelte/compiler` never reads it and the clause above is blind to every one of them.
+  assertFloor(
+    'native `<select>` in JavaScript template strings',
+    workingTree(MODULE_CORPUS).listFiles().length,
+    250
+  );
+  checkGate(
+    t,
+    JS_SELECT_GATE,
+    'These are DialogV2 bodies, which cannot host a Svelte component and so cannot use the ' +
+      'app’s own option list. A NEW one is a new surface built on a dialog, and the question to ' +
+      'answer first is whether it should be an application window instead; where it must stay ' +
+      'a dialog, a `// ratchet-exempt(design-system): <reason>` above the line says why.'
+  );
 });
 
 /* ─────────────────────────────── gate 6: radii ─────────────────────────────── */
@@ -857,7 +742,7 @@ function radiusTokens(value) {
  */
 function radiusCompliance(token, definitions) {
   if (RADIUS_LADDER.includes(token)) return { ok: true, resolved: null };
-  if (!token.includes('var(')) return { ok: false, resolved: null };
+  if (!/var\(/u.test(token)) return { ok: false, resolved: null };
   const candidates = resolveValueCandidates(token, definitions)
     .candidates.filter((candidate) => !candidate.includes('var('))
     .sort(byCodePoint);
@@ -868,28 +753,38 @@ function radiusCompliance(token, definitions) {
     : { ok: false, resolved: offending[0] };
 }
 
-/** Every off-ladder corner value in the corpus, as `{file, property, value}` findings. */
-function offLadderRadii() {
-  const { definitions } = corpus();
+/** Every `border-radius` and corner longhand in the corpus. */
+const radiusDeclarations = (corpus) =>
+  declarationsOf(corpus, (property) => RADIUS_PROPERTY.test(property));
+
+/**
+ * Every off-ladder corner value in the corpus, resolving `var()` against the corpus's own
+ * definitions, keyed `property: value` and netted on the value.
+ */
+function offLadderRadii(corpus) {
   const findings = [];
-  for (const declaration of declarationsOf((property) => RADIUS_PROPERTY.test(property))) {
+  for (const declaration of radiusDeclarations(corpus)) {
     for (const token of radiusTokens(normaliseValue(declaration.value))) {
-      const { ok, resolved } = radiusCompliance(token, definitions);
+      const { ok, resolved } = radiusCompliance(token, corpus.definitions);
       if (ok) continue;
+      const value = resolved === null ? token : `${token} => ${resolved}`;
+      const property = declaration.property.toLowerCase();
       findings.push({
         file: declaration.file,
-        line: declaration.line,
-        property: declaration.property.toLowerCase(),
-        value: resolved === null ? token : `${token} => ${resolved}`,
+        line: declaration.at,
+        id: `off-ladder ${property}: ${value}`,
+        value: `off-ladder radius ${value}`,
       });
     }
   }
   return findings;
 }
 
+const RADIUS_GATE = styleGate(offLadderRadii);
+
 test('a radius written into a token still resolves, so the ladder cannot be paid by renaming', () => {
   // THE RESOLUTION HALF, PROVED IN BOTH DIRECTIONS AGAINST SYNTHETIC DEFINITIONS. The live corpus
-  // exercises it — `--fab-books-control-radius` is 5px and appears in the baseline at its resolved
+  // exercises it — `--fab-books-control-radius` is 5px and is counted at its resolved
   // value — but relying on that makes the capability depend on the tree happening to contain a
   // non-compliant token, and paying that row down would silently take the proof with it.
   const definitions = new Map([
@@ -901,7 +796,7 @@ test('a radius written into a token still resolves, so the ladder cannot be paid
   assert.deepEqual(radiusCompliance('var(--fixture-off)', definitions), {
     ok: false,
     resolved: '5px',
-    // The row is pinned as `raw => resolved` for exactly this.
+    // The offender is keyed `raw => resolved` for exactly this.
   });
   assert.deepEqual(radiusCompliance('var(--fixture-on)', definitions), {
     ok: true,
@@ -928,24 +823,17 @@ test('a radius written into a token still resolves, so the ladder cannot be paid
   );
 });
 
-test('no corner radius leaves the published ladder', () => {
-  const radii = declarationsOf((property) => RADIUS_PROPERTY.test(property));
-
-  assertRatchet({
-    label: 'off-ladder corner radii',
-    baseline: KNOWN_OFF_LADDER_RADII,
-    pinnedTotal: KNOWN_OFF_LADDER_RADIUS_TOTAL,
-    observed: tallyByKey(offLadderRadii(), (finding) =>
-      rowKey(finding.file, finding.property, finding.value)
-    ),
-    scanned: radii.length,
-    floor: 500,
-    guidance:
-      'Geometry comes from the published ladders. The radius ladder is 6px, 7px, 9px and 11px, ' +
+test('no corner radius leaves the published ladder', (t) => {
+  assertFloor('off-ladder corner radii', radiusDeclarations(treeStyles()).length, 500);
+  checkGate(
+    t,
+    RADIUS_GATE,
+    'Geometry comes from the published ladders. The radius ladder is 6px, 7px, 9px and 11px, ' +
       'plus `0`, `999px` for a pill and `50%` for a circle — 8px is not on it however natural it ' +
       'looks beside a 16px inset. Pick the nearer rung. Writing the value into a custom property ' +
-      'does not help: this scan resolves `var()`, so the row survives with its text changed.',
-  });
+      "does not help: this scan resolves `var()` against the same side's definitions, so the " +
+      'offender survives with its text changed.'
+  );
 });
 
 /** The four rungs the icon-chip size ladder publishes. */
@@ -958,62 +846,60 @@ const ART_TILE_COMPONENTS = new Map([
 ]);
 
 /**
- * Every art-tile render site, as `{ file, size }` with `size` a number or the string `dynamic`.
+ * Every art-tile render site, as `{ file, line, size }` with `size` a number or `dynamic`.
  *
- * @returns {{ file: string, size: number|'dynamic' }[]}
+ * @returns {{ file: string, line: number, size: number|'dynamic' }[]}
  */
-function artTileSizes() {
+function artTileSizes(templates) {
   const found = [];
-  for (const { file, source, ast } of parsedTemplates()) {
+  for (const { file, source, ast } of templates) {
     walkElements(ast.fragment ?? ast, (element) => {
       if (element.type !== 'Component' || !ART_TILE_COMPONENTS.has(element.name)) return;
       const text = attributeText(source, element, 'size');
+      const line = lineOf(source, element.start);
       // An absent `size` takes the primitive's OWN default.
       if (text === null) {
-        found.push({ file, size: ART_TILE_COMPONENTS.get(element.name) });
+        found.push({ file, line, size: ART_TILE_COMPONENTS.get(element.name) });
         return;
       }
       const literal = /^size=\{\s*(\d+(?:\.\d+)?)\s*\}$/u.exec(text);
-      found.push({ file, size: literal ? Number(literal[1]) : 'dynamic' });
+      found.push({ file, line, size: literal ? Number(literal[1]) : 'dynamic' });
     });
   }
   return found;
 }
 
-test('no new art tile renders at an off-ladder size', () => {
-  const sites = artTileSizes();
-  const offLadder = sites.filter(
-    (site) => site.size === 'dynamic' || !ART_SIZE_LADDER.has(site.size)
-  );
+const isOffArtLadder = (site) => site.size === 'dynamic' || !ART_SIZE_LADDER.has(site.size);
 
-  // NON-VACUITY, and it is worth its own line here. Every clause below quantifies over
-  // `offLadder`, and the population it is drawn from is the whole reason this table can be
-  // trusted: a scan that had stopped recognising the tile's component name would produce an
-  // empty `sites`, an empty `offLadder`, and forty VANISHED rows — loud, but reported as debt
-  // paid rather than as a broken scan. The `scanned` floor below says the same thing in
-  // `assertRatchet`'s own language; this says it about the tile itself.
+const ART_SIZE_GATE = templateGate((templates) =>
+  artTileSizes(templates)
+    .filter(isOffArtLadder)
+    .map((site) => ({ ...site, id: `off-ladder art size ${site.size}` }))
+);
+
+test('no new art tile renders at an off-ladder size', (t) => {
+  const sites = artTileSizes(treeTemplates());
+
+  // NON-VACUITY, and it is worth its own line here. A scan that had stopped recognising the tile's
+  // component name would produce an empty `sites` and report every base offender as paid down
+  // rather than the scan as broken. The floor says that in the gate's own language; this says it
+  // about the tile itself.
   assert.ok(
     sites.some((site) => ART_SIZE_LADDER.has(site.size)),
     'no art tile in the tree renders at a published rung, so the ladder this gate filters ' +
       'against is matching nothing and every site would be recorded as debt'
   );
-
-  assertRatchet({
-    label: 'off-ladder art-tile sizes',
-    baseline: KNOWN_OFF_LADDER_ART_SIZES,
-    pinnedTotal: KNOWN_OFF_LADDER_ART_SIZE_TOTAL,
-    observed: tallyByKey(offLadder, (site) => `${site.file} | ${site.size}`),
-    scanned: sites.length,
-    floor: 40,
-    guidance:
-      'Art and portraits carry their own size ladder — 22, 26, 30 and 38, default 26 — and this ' +
-      'table records every render site that is off it. A NEW row is not automatically wrong: ' +
-      'restricting `size` would move almost every art tile in the app, so the geometry sweep ' +
-      'owns that correction and this pin is what lets it lower a number rather than re-derive a ' +
-      'census. What a new row does mean is that a decision was taken about one tile in ' +
-      'isolation, so state the rung you rejected and why. A VANISHED row is the sweep working, ' +
-      'or a scan that has stopped seeing the tile — check which before banking it.',
-  });
+  assertFloor('off-ladder art-tile sizes', sites.length, 40);
+  checkGate(
+    t,
+    ART_SIZE_GATE,
+    'Art and portraits carry their own size ladder — 22, 26, 30 and 38, default 26 — and this ' +
+      'gate fails a render site off it that the base commit does not have. A new one is not ' +
+      'automatically wrong: restricting `size` would move almost every art tile in the app, so ' +
+      'the geometry sweep owns that correction. What a new site does mean is that a decision was ' +
+      'taken about one tile in isolation, so state the rung you rejected and why in a ' +
+      '`<!-- ratchet-exempt(design-system): <reason> -->` above the tile.'
+  );
 });
 
 /* ─────────────── gate 7: one declaration each, over the module sheet alone ─────────────── */
@@ -1022,7 +908,7 @@ test('no new art tile renders at an off-ladder size', () => {
 let cachedSheetRules = null;
 function sheetRules() {
   if (cachedSheetRules === null) {
-    const css = corpus().styles[MODULE_SHEET];
+    const css = treeStyles().styles[MODULE_SHEET];
     if (css === undefined) {
       throw new Error(
         `${MODULE_SHEET} contributed no CSS to the corpus. Every clause below would then report ` +
@@ -1236,7 +1122,7 @@ const JAVASCRIPT_GAP_ELEMENT = /<[a-z][^<>]*\bdata-gap="[^"]+"[^<>]*>/giu;
 /** Every `data-gap` the product writes, over BOTH channels a rung can be emitted through. */
 function emittedGapRungs() {
   const found = [];
-  for (const { file, source, ast } of parsedTemplates()) {
+  for (const { file, source, ast } of treeTemplates()) {
     walkElements(ast.fragment, (element) => {
       const gap = attributeText(source, element, 'data-gap');
       const written = gap?.match(/^data-gap="([^"]*)"$/u);
@@ -1454,117 +1340,195 @@ test('every carrier of the withdrawn skin tuple carries its census marker', () =
 
 /* ─────────────── gate 8: cross-list selector repetition in the module sheet ─────────────── */
 
-/** A repeated selector's ratchet key: `<at-context chain> | <normalised selector>`. */
-const repetitionKey = (entry) =>
-  rowKey(entry.atContext.length > 0 ? entry.atContext.join(' >> ') : '(top level)', entry.selector);
+/** A repeated selector's key: `<at-context chain> | <normalised selector>`. */
+const atContextOf = (entry) =>
+  entry.atContext.length > 0 ? entry.atContext.join(' >> ') : '(top level)';
 
-/** The six contextual figures `selector-repetition-baseline.js` publishes about the sheet. */
-const PUBLISHED_REPETITION_FIGURES = Object.freeze([
-  ['keyed on the selector alone', /ALONE the sheet holds ([\d,]+) repeated selectors/],
-  // THE COPY IN THIS FILE, which the first shape of this gate exempted (issue 1503, review r2).
-  [
-    'every (at-context, selector) key',
-    /Unfiltered the sheet holds ([\d,]+) `\(at-context, selector\)`\n {2}\/\/ keys under this very keying/,
-  ],
-  [
-    'keys appearing exactly once',
-    /keys under this very keying, of which ([\d,]+) appear exactly once/,
-  ],
-  ['repeated keys, keyed on (at-context, selector)', /rather than these ([\d,]+),/],
-  ['every (at-context, selector) key', /Unfiltered, the sheet holds ([\d,]+) `\(at-context, selector\)` keys/],
-  ['keys appearing exactly once', /of which ([\d,]+) appear exactly\n \* once/],
-  ['rules in the sheet', /The sheet holds ([\d,]+) rules at that head/],
-  ['repeated keys, keyed on (at-context, selector)', /rules at that head, ([\d,]+) repeated keys/],
-  ['appearances between the repeated keys', /repeated keys and ([\d,]+) appearances/],
-  ['appearances between the repeated keys', /measured commit it is ([\d,]+) across/],
-  ['repeated keys, keyed on (at-context, selector)', /it is [\d,]+ across ([\d,]+) rows/],
-]);
-
-test("the repetition ledger publishes the figures the sheet actually produces", () => {
-  // WHY THIS IS A GATE AND NOT A CAREFUL READER. `selector-repetition-baseline.js` publishes six
-  // contextual figures about the sheet, and its own docblock records that an earlier draft's went
-  // stale after a rebase and that "no gate could see it because none of them is pinned". None was
-  // — so when issue 1503 re-banked the table from 119 keys / 244 appearances to 116 / 238, the
-  // prose kept stating the old numbers and every suite stayed green over four wrong figures. The
-  // one it calls "the one figure a reviewer can check against the issue without reading the
-  // table" was among them.
-  const rules = sheetRules();
-  const entries = [...selectorAppearances(rules).values()];
-  const repeated = entries.filter((entry) => entry.appearances.length > 1);
-  const bare = [...selectorAppearances(rules, { keyByAtContext: false }).values()];
-
-  const measured = new Map([
-    ['keyed on the selector alone', bare.filter((entry) => entry.appearances.length > 1).length],
-    ['repeated keys, keyed on (at-context, selector)', repeated.length],
-    ['every (at-context, selector) key', entries.length],
-    ['keys appearing exactly once', entries.length - repeated.length],
-    ['rules in the sheet', rules.length],
-    [
-      'appearances between the repeated keys',
-      repeated.reduce((sum, entry) => sum + entry.appearances.length, 0),
-    ],
-  ]);
-
-  // BOTH FILES THAT PUBLISH THESE FIGURES.
-  const source = ['./selector-repetition-baseline.js', './design-system-debt-ratchets.test.js']
-    .map((path) => readFileSync(new URL(path, import.meta.url), 'utf8'))
-    .join('\n');
-  const wrong = [];
-  for (const [label, pattern] of PUBLISHED_REPETITION_FIGURES) {
-    const found = source.match(pattern);
-    assert.ok(
-      found,
-      `the docblock no longer states ${label} in the shape ${pattern}, so this clause has stopped ` +
-        'reading the figure it was written to pin rather than found it correct'
-    );
-    const published = Number(found[1].replaceAll(',', ''));
-    if (published !== measured.get(label)) {
-      wrong.push(`${label}: the docblock says ${found[1]}, the sheet produces ${measured.get(label)}`);
+/**
+ * One site per appearance of every `(at-context, selector)` key the module sheet writes more than
+ * once, not counting an appearance a reasoned marker sits at. Netted on the at-context, so a
+ * repeated selector renamed in place is a move rather than a new offender.
+ */
+function repeatedSelectors(corpus) {
+  const css = corpus.styles[MODULE_SHEET];
+  if (css === undefined) return [];
+  const source = corpus.sources[MODULE_SHEET];
+  const sites = [];
+  for (const entry of selectorAppearances(censusRules(css)).values()) {
+    const counted = entry.appearances.filter(({ line }) => !exemptAt(MODULE_SHEET, source, line));
+    if (counted.length < 2) continue;
+    const context = atContextOf(entry);
+    for (const { line } of counted) {
+      sites.push({
+        file: MODULE_SHEET,
+        line,
+        id: `repeated selector ${context} | ${entry.selector}`,
+        value: context,
+      });
     }
   }
+  return sites;
+}
 
-  assert.deepEqual(
-    wrong.sort(byCodePoint),
-    [],
-    'these figures are published in `selector-repetition-baseline.js` as facts about the sheet ' +
-      'and are now false of it. Re-derive them with `node scripts/stylesheet-selector-census.mjs` ' +
-      `and say in the pull request which rule moved:\n  ${wrong.join('\n  ')}`
+const REPETITION_GATE = styleGate(repeatedSelectors);
+
+test("the module sheet's cross-list selector repetition does not grow", (t) => {
+  // Filtered to keys appearing at least twice on both sides: almost every key appears once, and a
+  // key falling to one appearance leaves the measurement, which the comparison reports as shrunk.
+  assertFloor('repeated `styles/fabricate.css` selectors', sheetRules().length, 2000);
+  checkGate(
+    t,
+    REPETITION_GATE,
+    'This describes deliberate authoring rather than a defect count. Almost every repeated key ' +
+      'is one selector written into two DIFFERENT comma-separated lists, which `stylelint`’s ' +
+      '`no-duplicate-selectors` allows by design and which splitting a list to "fix" would turn ' +
+      'into the duplicate list that rule does reject. A key that grew or appeared means a list ' +
+      'was widened or a rule copied: re-read it with `node scripts/stylesheet-selector-census.mjs`, ' +
+      'and either fold the rule into the one it repeats or say why in a ' +
+      '`/* ratchet-exempt(design-system): <reason> */` above the rule.'
   );
 });
 
-test("the module sheet's cross-list selector repetition does not move", () => {
-  // Filtered to count >= 2 on both sides. Unfiltered the sheet holds 3,051 `(at-context, selector)`
-  // keys under this very keying, of which 2,945 appear exactly once; `assertRatchet` compares key
-  // by key, so an unfiltered table would report every singleton as new debt the first time anybody
-  // added a rule. Filtering both sides keeps a selector FALLING to one appearance visible: it
-  // leaves the observed tally, and a baseline row nothing matches is a VANISHED failure.
-  const rules = sheetRules();
-  const repeated = [...selectorAppearances(rules).values()].filter(
-    (entry) => entry.appearances.length > 1
-  );
+/* ─────────────── the gates, proved against throwaway repositories ─────────────── */
 
-  assertRatchet({
-    label: 'repeated `styles/fabricate.css` selectors',
-    baseline: SELECTOR_REPETITION_BASELINE,
-    pinnedTotal: SELECTOR_REPETITION_TOTAL,
-    // ONE ITEM PER APPEARANCE, so the tally counts appearances rather than keys and its sum is the
-    // figure `assertRatchet` checks the pinned total against.
-    observed: tallyByKey(
-      repeated.flatMap((entry) => entry.appearances.map(() => entry)),
-      repetitionKey
-    ),
-    scanned: rules.length,
-    floor: 2000,
-    guidance:
-      'This is an EXACT PIN rather than a ceiling, and it is a description of deliberate ' +
-      'authoring rather than a defect count — see `selector-repetition-baseline.js`. Almost every ' +
-      'row is one selector written into two DIFFERENT comma-separated lists, which `stylelint`’s ' +
-      '`no-duplicate-selectors` allows by design and which splitting a list to "fix" would turn ' +
-      'into the duplicate list that rule does reject. A row that GREW or APPEARED means a list ' +
-      'was widened or a rule copied; one that SHRANK or VANISHED means a list was split or a rule ' +
-      'deleted, which moves declarations through the cascade. Neither is wrong on its face and ' +
-      'both are edits a reviewer should see: re-derive the table with ' +
-      '`node scripts/stylesheet-selector-census.mjs`, update the row and the pinned total ' +
-      'together, and say in the pull request which rule moved and why.',
-  });
+const SHEET_BASE = [
+  ':root { --probe-radius: 6px; }',
+  '.fabricate .a { border-radius: 9px; font-weight: 650; }',
+  '.fabricate .x, .fabricate .y { color: red; }',
+  '.fabricate .x, .fabricate .z { color: blue; }',
+  '.fabricate .r { border-radius: var(--probe-radius); }',
+];
+
+const PROBE = 'src/ui/svelte/Probe.svelte';
+
+/** A template holding one `<select>` and one 8px corner, plus `markup` and `rules`. */
+const probeWith = ({ markup = [], rules = [] } = {}) =>
+  [
+    '<div class="probe"></div>',
+    '<select><option>a</option></select>',
+    ...markup,
+    '<style>',
+    '  .probe { border-radius: 8px; }',
+    ...rules,
+    '</style>',
+    '',
+  ].join('\n');
+
+/** The module sheet with `lines` appended. */
+const sheetWith = (...lines) => [...SHEET_BASE, ...lines, ''].join('\n');
+
+const WIRING_BASE = Object.freeze({
+  [MODULE_SHEET]: sheetWith(),
+  [PROBE]: probeWith(),
+  'src/main.js': 'export const dialog = `<div></div>`;\n',
+  'README.md': 'unrelated\n',
+});
+
+const REASON = 'ratchet-exempt(design-system): the probe needs it';
+
+test('a design-system gate fails a new offender and a grown one, and nothing else', (t) => {
+  const radius = (file, value) => `${file}: off-ladder border-radius: ${value}`;
+  assertGateCases(t, RADIUS_GATE, WIRING_BASE, [
+    {
+      head: { [MODULE_SHEET]: sheetWith('.fabricate .b { border-radius: 8px; }') },
+      failures: [`${radius(MODULE_SHEET, '8px')} is new (1)`],
+    },
+    {
+      head: { [PROBE]: probeWith({ rules: ['  .probe-b { border-radius: 8px; }'] }) },
+      failures: [`${radius(PROBE, '8px')} rose from 1 to 2`],
+    },
+    { head: { 'README.md': 'changed\n' }, skipped: 'corpus-unchanged' },
+    { head: { [MODULE_SHEET]: sheetWith('.fabricate .b { border-radius: 9px; }') }, failures: [] },
+  ]);
+  assertGateCases(t, NATIVE_SELECT_GATE, WIRING_BASE, [
+    {
+      head: { [PROBE]: probeWith({ markup: ['<select></select>'] }) },
+      failures: [`${PROBE}: native <select> rose from 1 to 2`],
+    },
+    {
+      head: { 'src/ui/svelte/Other.svelte': '<select></select>\n' },
+      failures: ['src/ui/svelte/Other.svelte: native <select> is new (1)'],
+    },
+  ]);
+  assertGateCases(t, JS_SELECT_GATE, WIRING_BASE, [
+    {
+      head: { 'src/main.js': 'export const dialog = `<select></select>`;\n' },
+      failures: ['src/main.js: native <select> in a template string is new (1)'],
+    },
+  ]);
+});
+
+test('a var() resolves against its own side, so moving a value into a token pays nothing', (t) => {
+  const retoken = sheetWith().replace('--probe-radius: 6px', '--probe-radius: 8px');
+  assertGateCases(t, RADIUS_GATE, WIRING_BASE, [
+    {
+      head: { [MODULE_SHEET]: retoken },
+      failures: [
+        `${MODULE_SHEET}: off-ladder border-radius: var(--probe-radius) => 8px is new (1)`,
+      ],
+    },
+  ]);
+});
+
+test('a rename nets against the offender it replaces, and a copy does not', (t) => {
+  const renamed = sheetWith().replace('.fabricate .a {', '.fabricate .c {');
+  const repeated = (context, selector) =>
+    `${MODULE_SHEET}: repeated selector ${context} | ${selector}`;
+  assertGateCases(t, OFF_RAMP_WEIGHT_GATE, WIRING_BASE, [
+    { head: { [MODULE_SHEET]: renamed }, failures: [] },
+    {
+      head: { [MODULE_SHEET]: sheetWith('.fabricate .c { font-weight: 650; }') },
+      failures: [`${MODULE_SHEET}: off-ramp font-weight .fabricate .c | 650 is new (1)`],
+    },
+  ]);
+  assertGateCases(t, REPETITION_GATE, WIRING_BASE, [
+    {
+      head: { [MODULE_SHEET]: sheetWith().replaceAll('.fabricate .x', '.fabricate .q') },
+      failures: [],
+    },
+    {
+      head: { [MODULE_SHEET]: sheetWith('.fabricate .x, .fabricate .w { color: green; }') },
+      failures: [`${repeated('(top level)', '.fabricate .x')} rose from 2 to 3`],
+    },
+    {
+      head: { [MODULE_SHEET]: sheetWith('.fabricate .y { color: green; }') },
+      failures: [`${repeated('(top level)', '.fabricate .y')} is new (2)`],
+    },
+  ]);
+});
+
+test('a reasoned marker at the site exempts it, and an empty one fails', (t) => {
+  const offender = '.fabricate .b { border-radius: 8px; }';
+  const line = SHEET_BASE.length + 1;
+  assertGateCases(t, RADIUS_GATE, WIRING_BASE, [
+    { head: { [MODULE_SHEET]: sheetWith(`/* ${REASON} */`, offender) }, failures: [] },
+    {
+      head: { [MODULE_SHEET]: sheetWith('/* ratchet-exempt(design-system): */', offender) },
+      failures: [
+        `${MODULE_SHEET}: off-ladder border-radius: 8px is new (1); its ratchet-exempt marker ` +
+          'gives no reason',
+        emptyMarkerFailure(MODULE_SHEET, line),
+      ],
+    },
+    {
+      head: {
+        [MODULE_SHEET]: sheetWith(`/* ${REASON} */`, '.fabricate .n { color: red; }', offender),
+      },
+      failures: [`${MODULE_SHEET}: off-ladder border-radius: 8px is new (1)`],
+    },
+  ]);
+  assertGateCases(t, NATIVE_SELECT_GATE, WIRING_BASE, [
+    {
+      head: { [PROBE]: probeWith({ markup: [`<!-- ${REASON} -->`, '<select></select>'] }) },
+      failures: [],
+    },
+  ]);
+  // A marker exempts its own site and never the file's later growth.
+  const marked = { markup: [`<!-- ${REASON} -->`, '<select></select>'] };
+  assertGateCases(t, NATIVE_SELECT_GATE, { ...WIRING_BASE, [PROBE]: probeWith(marked) }, [
+    {
+      head: { [PROBE]: probeWith({ markup: [...marked.markup, '<select></select>'] }) },
+      failures: [`${PROBE}: native <select> rose from 1 to 2`],
+    },
+  ]);
 });

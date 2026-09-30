@@ -44,7 +44,6 @@ const TEST_MODULE = /\.test\.m?js$/u;
  * hands out raw text that tests pin, and may only be retired, never added.
  */
 const SCAN_HELPERS = Object.freeze({
-  'tests/components/design-system-known-debt.js': 'fixture',
   'tests/components/design-system-target-baseline.js': 'fixture',
   'tests/components/manager-bulk-mounted.js': 'fixture',
   'tests/components/manager-checks-mounted.js': 'fixture',
@@ -74,7 +73,6 @@ const SCAN_HELPERS = Object.freeze({
   'tests/components/manager-tags-mounted.js': 'fixture',
   'tests/components/manager-tools-mounted.js': 'fixture',
   'tests/components/manager-world-scope-mounted.js': 'fixture',
-  'tests/components/selector-repetition-baseline.js': 'fixture',
   'tests/components/spacing-known-literals.js': 'fixture',
   'tests/helpers/checkEvidenceFixtures.js': 'fixture',
   'tests/helpers/chipTone.js': 'legacy-scan',
@@ -82,6 +80,7 @@ const SCAN_HELPERS = Object.freeze({
   'tests/helpers/compile-svelte-module.js': 'fixture',
   'tests/helpers/componentScopeMountModules.js': 'fixture',
   'tests/helpers/designLibrary.js': 'fixture',
+  'tests/helpers/designSystemRatchet.js': 'corpus',
   'tests/helpers/domCensus.js': 'fixture',
   'tests/helpers/extension-composition-harness.js': 'fixture',
   'tests/helpers/harvestedFoundryChrome.js': 'fixture',

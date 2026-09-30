@@ -2,19 +2,15 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
-  KNOWN_FORMLESS_BUTTONS,
-  KNOWN_FORMLESS_BUTTON_TOTAL,
-  KNOWN_ROLE_FOCUS_TARGETS,
-  KNOWN_ROLE_FOCUS_TARGET_TOTAL,
-} from './components/design-system-known-debt.js';
-import { tallyByKey } from './helpers/codePointOrder.js';
-import { assertRatchet } from './helpers/ratchetBaseline.js';
-import {
-  UI_TEMPLATE_ROOT,
-  attributeText,
-  parsedTemplates,
-  walkElements,
-} from './helpers/svelteTemplateScan.js';
+  TEMPLATE_CORPUS,
+  assertFloor,
+  assertGateCases,
+  checkGate,
+  gateOver,
+  templatesOf,
+  workingTree,
+} from './helpers/designSystemRatchet.js';
+import { attributeText, walkElements } from './helpers/svelteTemplateScan.js';
 
 /**
  * Foundry decides whether a keypress belongs to the focused element or to its own bindings by
@@ -24,11 +20,10 @@ import {
 /** Foundry's `hasFocus` recognises these by TAG NAME alone, so they need no declaration. */
 const SELF_DECLARING_TAGS = new Set(['input', 'select', 'textarea']);
 
-/** The corpus, parsed once for every clause in this file (issue 1497). */
-let cachedTemplates = null;
+/** The working tree's templates, parsed once for every clause in this file (issue 1497). */
 function templates() {
-  if (cachedTemplates === null) cachedTemplates = parsedTemplates(UI_TEMPLATE_ROOT);
-  return cachedTemplates;
+  const tree = workingTree(TEMPLATE_CORPUS);
+  return templatesOf(tree.readFile, tree.listFiles());
 }
 
 /** The roles that make a non-form element an interactive control, for clause (a). */
@@ -44,12 +39,12 @@ const OPTED_OUT = /=\s*["']false["']/u;
 const DECLARATION = 'data-keyboard-focus';
 
 /** Every element the widened gate looks at, in the three clauses that make it up. */
-function focusPopulations() {
+function focusPopulations(corpus = templates()) {
   const negativeOne = [];
   const roleZero = [];
   const formlessButtons = [];
   const roving = [];
-  for (const { file, source, ast } of templates()) {
+  for (const { file, source, ast } of corpus) {
     walkElements(ast.fragment, (element, inForm) => {
       const tag = element.name.toLowerCase();
       const declared = attributeText(source, element, DECLARATION);
@@ -102,9 +97,22 @@ function focusPopulations() {
 const undeclaredIn = (population) =>
   population.filter((target) => target.declared === null || OPTED_OUT.test(target.declared));
 
+/** A gate over one population's undeclared members, one site per element, counted per file. */
+const undeclaredGate = (population, id) =>
+  gateOver([TEMPLATE_CORPUS], (readFile, files) =>
+    undeclaredIn(focusPopulations(templatesOf(readFile, files))[population]).map((target) => ({
+      file: target.file,
+      line: target.line,
+      id,
+    }))
+  );
+
+const ROLE_FOCUS_GATE = undeclaredGate('roleZero', 'undeclared role focus target');
+const FORMLESS_BUTTON_GATE = undeclaredGate('formlessButtons', 'undeclared formless button');
+
 describe('design system: a programmatic focus target declares itself focused to Foundry', () => {
-  // (C) IS A FLOOR AND NOT A PIN, AND THAT IS A JUDGEMENT ABOUT WHAT IT MEASURES rather than
-  // leniency. The clauses BELOW it are pinned, because they measure something else: debt.
+  // (C) IS A FLOOR AND NOT A RATCHET, AND THAT IS A JUDGEMENT ABOUT WHAT IT MEASURES rather than
+  // leniency. The clauses BELOW it compare with the base commit, because they measure debt.
   it('finds programmatic focus targets, so the assertions below are not vacuous', () => {
     const targets = focusPopulations().negativeOne;
     assert.ok(
@@ -155,7 +163,7 @@ describe('design system: a programmatic focus target declares itself focused to 
       ['Omitted.svelte', 'OptedOut.svelte', 'SpacedOptOut.svelte'],
       'an element that opts OUT is in exactly the state this file reports — `hasFocus` returns ' +
         'false for it — so it belongs in the debt with the elements that say nothing. A filter ' +
-        "testing only for the attribute's PRESENCE lets one site leave the baseline by writing " +
+        "testing only for the attribute's PRESENCE lets one site leave the debt by writing " +
         '"false", which reads as a fix and is the opposite of one.'
     );
   });
@@ -182,9 +190,8 @@ describe('design system: a programmatic focus target declares itself focused to 
     );
   });
 
-  it('no role-bearing element joins the tab order without declaring itself', () => {
+  it('no role-bearing element joins the tab order without declaring itself', (t) => {
     const { roleZero } = focusPopulations();
-    const undeclared = undeclaredIn(roleZero);
 
     assert.ok(
       roleZero.length >= 9,
@@ -193,23 +200,19 @@ describe('design system: a programmatic focus target declares itself focused to 
         'forever.'
     );
 
-    assertRatchet({
-      label: 'role-bearing focus targets that do not declare themselves',
-      baseline: KNOWN_ROLE_FOCUS_TARGETS,
-      pinnedTotal: KNOWN_ROLE_FOCUS_TARGET_TOTAL,
-      observed: tallyByKey(undeclared, (target) => target.file),
-      scanned: templates().length,
-      floor: 250,
-      guidance:
-        `Add ${DECLARATION}="true". An element with \`tabindex="0"\` and \`role="button"\` has ` +
+    assertFloor('role-bearing focus targets', templates().length, 250);
+    checkGate(
+      t,
+      ROLE_FOCUS_GATE,
+      `Add ${DECLARATION}="true". An element with \`tabindex="0"\` and \`role="button"\` has ` +
         'told the user it is a control and put itself in the tab order, and Foundry still treats ' +
         'the window as unfocused while it holds focus — so Space pauses the game and the arrows ' +
         'pan the canvas behind the open application. Better still, render the shared primitive ' +
-        'that already declares it rather than a div wearing a role.',
-    });
+        'that already declares it rather than a div wearing a role.'
+    );
   });
 
-  it('no button outside a form joins the tab order without declaring itself', () => {
+  it('no button outside a form joins the tab order without declaring itself', (t) => {
     // THE LARGEST POPULATION IN THIS FILE AND THE LEAST OBVIOUS.
     const { formlessButtons } = focusPopulations();
     const undeclared = undeclaredIn(formlessButtons);
@@ -226,19 +229,47 @@ describe('design system: a programmatic focus target declares itself focused to 
         'been fixed", and the compliant shape has no live example for a reader to copy.'
     );
 
-    assertRatchet({
-      label: 'formless buttons that do not declare themselves',
-      baseline: KNOWN_FORMLESS_BUTTONS,
-      pinnedTotal: KNOWN_FORMLESS_BUTTON_TOTAL,
-      observed: tallyByKey(undeclared, (target) => target.file),
-      scanned: templates().length,
-      floor: 250,
-      guidance:
-        `Add ${DECLARATION}="true", or render a shared primitive that already does. Foundry ` +
+    assertFloor('formless buttons', templates().length, 250);
+    checkGate(
+      t,
+      FORMLESS_BUTTON_GATE,
+      `Add ${DECLARATION}="true", or render a shared primitive that already does. Foundry ` +
         'recognises a BUTTON only when it has an ancestor `<form>` — `hasFocus` literally returns ' +
         '`!!focused.form` — and this application renders almost no forms, so a focused toolbar ' +
         'button leaves every keybinding live: Space pauses the game and the arrows pan the canvas ' +
-        'behind the window.',
-    });
+        'behind the window.'
+    );
+  });
+
+  it('fails a new or grown undeclared population against base, and a marker exempts one', (t) => {
+    const PROBE = 'src/ui/svelte/Probe.svelte';
+    const probe = (...lines) =>
+      ['<button>a</button>', '<form><button>b</button></form>', ...lines, ''].join('\n');
+    const base = { [PROBE]: probe(), 'README.md': 'x\n' };
+    const button = (file, what) => `${file}: undeclared formless button ${what}`;
+    assertGateCases(t, FORMLESS_BUTTON_GATE, base, [
+      {
+        head: { [PROBE]: probe('<button>c</button>') },
+        failures: [button(PROBE, 'rose from 1 to 2')],
+      },
+      {
+        head: { 'src/ui/svelte/Other.svelte': '<button>d</button>\n' },
+        failures: [button('src/ui/svelte/Other.svelte', 'is new (1)')],
+      },
+      { head: { [PROBE]: probe(`<button ${DECLARATION}="true">c</button>`) }, failures: [] },
+      {
+        head: {
+          [PROBE]: probe('<!-- ratchet-exempt(design-system): a probe -->', '<button>c</button>'),
+        },
+        failures: [],
+      },
+      { head: { 'README.md': 'y\n' }, skipped: 'corpus-unchanged' },
+    ]);
+    assertGateCases(t, ROLE_FOCUS_GATE, base, [
+      {
+        head: { [PROBE]: probe('<div role="button" tabindex="0">e</div>') },
+        failures: [`${PROBE}: undeclared role focus target is new (1)`],
+      },
+    ]);
   });
 });
