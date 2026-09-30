@@ -20,7 +20,6 @@ const RESULT_SOURCES = Object.freeze([
   CRAFTING_SHARED,
   CRAFTING_SIMPLE,
   /^src\/ui\/svelte\/apps\/crafting\/detail\/(?:RollResultBox|CheckEvidenceRows)\.svelte$/,
-  /^src\/ui\/svelte\/components\/DiceTiles\.svelte$/,
   /^src\/ui\/presenters\/(?:checkDisplay|countDiceTiles|countEvidenceRows)\.js$/,
   /^src\/systems\/countDisplayEvidence\.js$/,
 ]);

@@ -8,7 +8,7 @@
  * not a thing that can be done. Keyed on the selector ALONE the sheet holds 215 repeated selectors
  * rather than these 106, and both figures are published so a reader can tell which produced a pin.
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 3,060 `(at-context, selector)` keys, of which 2,954 appear exactly
+ * Unfiltered, the sheet holds 3,068 `(at-context, selector)` keys, of which 2,962 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
@@ -19,7 +19,7 @@
  * variant and adds ListRow name/detail truncation, by `the sheet's cross-list selector repetition
  * does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
- * printed from. The sheet holds 2,560 rules at that head, 106 repeated keys and 217 appearances
+ * printed from. The sheet holds 2,563 rules at that head, 106 repeated keys and 217 appearances
  * between them; five keys appear three times and none appears four or more.
  * ISSUE 1510 PHASE 2 moves both the contextual figures and one repeated row. The component
  * studio conversion is already in main; the checks conversion adds two net rules and one net
@@ -210,6 +210,10 @@
  * Issue 2006 moves the ten `fabricate-dice-tiles` rules out of `DiceTiles.svelte` into the sheet,
  * because a chat card draws the same tiles outside every window: ten rules, ten keys and ten
  * singletons, to 2,560 rules, 3,060 keys and 2,954 singletons; the repeated table is unmoved.
+ * Its capture lane gives the successes, target, character-value and dynamic check pills the DC
+ * pill's info tone (five keys joining one rule) and tones a chat card's die tiles by the chat's
+ * own ink (three rules, three keys): 2,563 rules, 3,068 keys and 2,962 singletons; the repeated
+ * table is unmoved. Re-derived by running `node scripts/stylesheet-selector-census.mjs`.
  */
 import { readFileSync } from 'node:fs';
 
