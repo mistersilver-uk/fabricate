@@ -37,6 +37,7 @@ const KEYS = Object.freeze({
   result: 'FABRICATE.Check.CountEvidence.Result',
   zeroPoolResult: 'FABRICATE.Check.CountEvidence.ZeroPoolResult',
   modifiers: 'FABRICATE.Check.CountEvidence.SourceModifiers',
+  disadvantage: 'FABRICATE.Check.Advantage.SourceDisadvantage',
 });
 
 /** The word each settled source reads as in a zero-pool sentence. */
@@ -75,7 +76,9 @@ function formulaValues(display, dice, threshold) {
 
 /** The one source's word, or `modifiers` for several: the terms hold one entry per source. */
 function sourceWord(terms, loc) {
-  return loc(terms.length === 1 ? SOURCE_KEYS[terms[0].source] : KEYS.modifiers);
+  if (terms.length !== 1) return loc(KEYS.modifiers);
+  const [{ source, value }] = terms;
+  return loc(source === 'advantage' && value < 0 ? KEYS.disadvantage : SOURCE_KEYS[source]);
 }
 
 /**

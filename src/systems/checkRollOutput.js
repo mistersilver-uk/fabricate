@@ -44,12 +44,13 @@ export function preRollEvidence(rolled) {
   const entries = rolled?.modifierPlacement?.preRolls;
   if (!Array.isArray(entries) || entries.length === 0) return {};
   return {
-    preRolls: entries.map(({ source, label, expression, total, destination }) => ({
+    preRolls: entries.map(({ source, label, expression, total, destination, negate }) => ({
       source,
       label,
       expression,
       total,
       destination,
+      ...(negate === true && { negate: true }),
     })),
   };
 }

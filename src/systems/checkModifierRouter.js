@@ -31,6 +31,11 @@ export function benefitSign(destination, direction) {
   return destination === 'threshold' && direction === 'over' ? -1 : 1;
 }
 
+/** What a settled pre-roll moved its destination by: its total, subtracted when `negate`. */
+export function preRollBenefit(entry) {
+  return entry?.negate === true ? -entry.total : entry?.total;
+}
+
 function addBenefit(plan, destination, value) {
   if (destination === 'target') plan.targetDelta += value;
   if (destination === 'threshold') {
@@ -65,6 +70,9 @@ function validateContribution(contribution) {
   ) {
     throw new TypeError('Contribution requires a scalar or expression form');
   }
+  if (Object.hasOwn(contribution, 'negate') && typeof contribution.negate !== 'boolean') {
+    throw new TypeError('A negated benefit requires a boolean flag');
+  }
   if (contribution.preRoll) {
     if (contribution.form !== 'scalar') {
       throw new TypeError('Evaluated pre-roll evidence requires a scalar benefit');
@@ -88,6 +96,7 @@ function preRollRecord({ index, contribution, destination }) {
     label: contribution.label,
     expression: evidence?.expression ?? contribution.expression,
     destination,
+    ...(contribution.negate === true && { negate: true }),
   };
   if (evidence) {
     record.total = evidence.total;
@@ -148,6 +157,7 @@ export function planModifierPlacement({ evaluation, contributions = [] } = {}) {
           ...(contribution.form === 'scalar'
             ? { value: contribution.value }
             : { expression: contribution.expression }),
+          ...(contribution.negate === true && { negate: true }),
         });
       }
     } else if (contribution.form === 'scalar') {
@@ -160,7 +170,10 @@ export function planModifierPlacement({ evaluation, contributions = [] } = {}) {
   return plan;
 }
 
-/** Settles each pending expression once; preserved evidence adds no second benefit. */
+/**
+ * Settles each pending expression once; preserved evidence adds no second benefit. A `negate`
+ * entry keeps its rolled total unsigned and subtracts it.
+ */
 export function settlePlacement(plan, preRollResults = []) {
   if (!Array.isArray(preRollResults)) throw new TypeError('Pre-roll results must be an array');
   const pending = new Set(
@@ -187,7 +200,7 @@ export function settlePlacement(plan, preRollResults = []) {
     if (Object.hasOwn(result, 'serializedRoll')) {
       entry.serializedRoll = structuredClone(result.serializedRoll);
     }
-    addBenefit(settled, entry.destination, result.total);
+    addBenefit(settled, entry.destination, preRollBenefit(entry));
   }
   return settled;
 }

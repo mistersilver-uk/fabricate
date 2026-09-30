@@ -147,3 +147,19 @@ test('settlement rejects missing, repeated or non-finite results instead of losi
     { source: 'advantage', label: 'Synthetic', form: 'scalar', value: 1 },
   ] }), /count pool/i);
 });
+
+test('a negated advantage expression keeps its roll unsigned and subtracts it (issue 2007)', () => {
+  const bonus = { source: 'advantage', label: 'Disadvantage', form: 'expression', expression: '1d8 + 1', negate: true };
+  const over = planModifierPlacement({ evaluation: sum('over'), contributions: [bonus] });
+  assert.equal(over.appendTerms[0].negate, true);
+  const under = planModifierPlacement({ evaluation: sum('under'), contributions: [bonus] });
+  assert.deepEqual(under.preRolls, [{
+    index: 0, source: 'advantage', label: 'Disadvantage', expression: '1d8 + 1', destination: 'target', negate: true,
+  }]);
+  const settled = settlePlacement(under, [{ index: 0, total: 6 }]);
+  assert.deepEqual([settled.preRolls[0].total, settled.targetDelta], [6, -6]);
+  assert.throws(
+    () => planModifierPlacement({ evaluation: sum('under'), contributions: [{ ...bonus, negate: 'yes' }] }),
+    /boolean/i
+  );
+});

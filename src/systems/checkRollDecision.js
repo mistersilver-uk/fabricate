@@ -1,5 +1,7 @@
 /** Resolves an interactive check decision into a formula and modifier placement plan. */
 
+import { localizeWith } from '../utils/localizeWithFallback.js';
+
 import { offeredDecision, resolveAdvantageOffer } from './checkAdvantage.js';
 import { planKeepTransform } from './checkKeepTransform.js';
 import {
@@ -210,6 +212,40 @@ function applySituationalBonus(formula, rawBonus, evaluation, Roll) {
   };
 }
 
+const ADVANTAGE_LABELS = Object.freeze({
+  advantage: ['FABRICATE.Check.Advantage.Advantage', 'Advantage'],
+  disadvantage: ['FABRICATE.Check.Advantage.Disadvantage', 'Disadvantage'],
+});
+
+/**
+ * The one contribution an offered button yields, or null: a count offer moves the pool by
+ * `±dice`; a bonus offer rolls its expression whole, negated for Disadvantage. Keep yields none.
+ */
+export function advantageContribution(offer, decided) {
+  if (!decided || (offer?.kind !== 'count' && offer?.kind !== 'bonus')) return null;
+  const [key, fallback] = ADVANTAGE_LABELS[decided];
+  const label = localizeWith(
+    (id) => globalThis.game?.i18n?.localize?.(id),
+    key,
+    undefined,
+    fallback
+  );
+  const negate = decided === 'disadvantage';
+  if (offer.kind === 'count') {
+    const dice = offer.detail.dice;
+    return { source: 'advantage', label, form: 'scalar', value: negate ? -dice : dice };
+  }
+  const { expression } = offer.detail;
+  return { source: 'advantage', label, form: 'expression', expression, negate };
+}
+
+/** Sum/over rolls a bonus die in the main roll, after the situational bonus; elsewhere nothing. */
+function appendAdvantageBonus(formula, contribution, evaluation) {
+  if (contribution?.form !== 'expression') return formula;
+  if (evaluation.product !== 'sum' || evaluation.direction !== 'over') return formula;
+  return `${formula} ${contribution.negate ? '-' : '+'} (${contribution.expression})`;
+}
+
 /**
  * The contributions a decision places and their plan: Tool contributions, the selected library
  * entries, then any the prompt's answer added. The Studio preview plans with no answer, as a
@@ -247,6 +283,7 @@ export async function resolveCheckDecision({
   let selectedModifiers = resolvedCheck.selected;
   let situational = null;
   let keep = null;
+  let advantaged = null;
   const preResolved = options?.rollDecision ?? null;
 
   if (options?.interactive === true && (preResolved || typeof options.prompt === 'function')) {
@@ -286,8 +323,9 @@ export async function resolveCheckDecision({
     // Keep acts on the constructed Roll, never this string; a count check keeps nothing.
     keep = planKeepTransform({ choice: decided, evaluation, advantage, authoredFormula });
     const bonus = applySituationalBonus(formula, choice.bonus, evaluation, Roll);
-    formula = bonus.formula;
     situational = bonus.contribution;
+    advantaged = advantageContribution(advantageOffer, decided);
+    formula = appendAdvantageBonus(bonus.formula, advantaged, evaluation);
     if (choice.rollMode) rollMode = choice.rollMode;
   }
 
@@ -295,7 +333,7 @@ export async function resolveCheckDecision({
     evaluation,
     toolContributions: options?.toolContributions,
     selected: selectedModifiers,
-    answered: [situational].filter(Boolean),
+    answered: [situational, advantaged].filter(Boolean),
   });
   return {
     formula,
