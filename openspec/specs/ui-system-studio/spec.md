@@ -857,6 +857,8 @@ The readout is a phrase, not a numeric, and stays in the UI face — the mono fa
 
 The **check pill** resolves the recipe's `checkTierId` against the system check's tiers and shows that tier's DC, falling back to the check's static default DC.
 It shows a dynamic-DC pill when the check resolves its DC through a macro and a progressive pill for a progressive system.
+A counting check's pill reads `{n} successes` (`1 success`) in the mono face — the recipe tier's successes needed, falling back to the pool's own like the engine — and `Dynamic successes` when a macro sets the count; the sort key it shares with the check DC reads `Successes needed` and sorts by that count.
+Every pill that carries or stands for a check's difficulty (DC, Target, Character value, successes and their dynamic forms) takes the info tone.
 A check is **usable** only when an authored `rollFormula` exists, which is not the same as "checks enabled", and the two check-less states are distinct and must not be conflated:
 
 - **`By ingredients`** (neutral) — a `routedByIngredients` system with no usable check.
@@ -1008,6 +1010,7 @@ The held count is resolved on the same basis every other membership reader uses 
 Staging accumulates across recipe items rather than being limited to the one on screen: each staged item appears in a list stating its operation, the number of recipes it affects, and its own control to leave that item unchanged.
 This axis deliberately differs from the Component Studio's tag axis, which is a run of tri-state controls; the divergence is in the staged axis only, and both panels render the same shared bulk-edit chrome.
 The check tier axis carries THREE distinct instructions and never collapses two of them: leave the recipe's tier alone, clear it to the system's default DC, and set a named tier.
+Under a counting check each tier reads `{name} · {n} successes` (`{name} · — successes` when it sets none), the default reads `Default · {required} successes`, and the axis hint and the dynamic and no-tier statements name successes needed rather than a DC.
 Where the system's crafting check carries no recipe-level tier — a progressive system, a dynamically resolved DC, a fixed-type routed check whose per-recipe difficulty is its minimum success tier instead, a resolution mode that rolls no crafting check at all, or a check with no tiers authored — the panel states which of those it is in place of the control rather than hiding it.
 A well-formed system whose mode rolls no check is told exactly that, and is never told its resolution mode is unrecognised.
 That is not the same fact as the system having no usable check at all, which the row's own check pill already reports, and the two are never conflated.
