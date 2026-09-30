@@ -381,8 +381,8 @@
      `styles/fabricate.css` draws `.fabricate-picker .manager-travel-portrait` at 32px, and it is
      the same tile the panel's option rows use — so overriding it here would have made the trigger
      and the rows below it disagree, and would have kept a 40px control height the design system
-     retired (`control-height-known-literals.js` banked this file's last one, and this conversion
-     pays it down). `ChecksRightMenu`'s preview-actor picker is the other actor picker in the
+     retired (this file held its last one, and this conversion removed it).
+     `ChecksRightMenu`'s preview-actor picker is the other actor picker in the
      corpus and already presents exactly this way.
 
      The same reasoning settles the portrait-LESS state. The primitive frames `triggerImg` in the

@@ -4,8 +4,13 @@
  * (`applyMode`) build, from the evidence the roll itself produced (N31, N33); a zero pool states
  * no total and no tile (N32); and none of that evidence is persisted or flagged (N36).
  */
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import { evaluatePreparedRunCheck } from '../src/systems/checkRoll.js';
+import { checkDisplayForCard } from '../src/systems/craftCardFields.js';
+import { GatheringEngine } from '../src/systems/GatheringEngine.js';
+import { normalizeCheckEvaluation } from '../src/systems/normalize/checkEvaluation.js';
 
 import { shippedLocalize } from './helpers/checkEvidenceFixtures.js';
 import { installCountDice } from './helpers/countEngineDice.js';
@@ -13,10 +18,6 @@ import { countEvaluation, preparedCountCheck } from './helpers/countFixtures.js'
 import { craftProbe, probeResolutionService, salvageProbe } from './helpers/craftPipelineProbe.js';
 import { stubPromptSurface } from './helpers/rollPromptDialogStub.js';
 import { salvageRunProbe } from './helpers/salvagePipelineProbe.js';
-import { evaluatePreparedRunCheck } from '../src/systems/checkRoll.js';
-import { GatheringEngine } from '../src/systems/GatheringEngine.js';
-import { checkDisplayForCard } from '../src/systems/craftCardFields.js';
-import { normalizeCheckEvaluation } from '../src/systems/normalize/checkEvaluation.js';
 
 const ROLL_MODES = ['publicroll', 'gmroll', 'blindroll', 'selfroll'];
 
@@ -59,6 +60,7 @@ function installChatMessage(version, created) {
     version === 13
       ? { applyRollMode: (data, mode) => Object.assign(data, { rollMode: mode }) }
       : { applyMode: (data, mode) => Object.assign(data, { messageMode: mode }) };
+  // ratchet-exempt(lint): the gate stubs Foundry's global ChatMessage, as a real card post reads it.
   globalThis.ChatMessage = {
     create: async (data) => {
       created.push(data);
@@ -70,7 +72,7 @@ function installChatMessage(version, created) {
 }
 
 /** The card with its invisible enrichment joiners removed. */
-const readable = (card) => String(card?.content ?? '').replaceAll(/[\u2060\u200B]/g, '');
+const readable = (card) => String(card?.content ?? '').replaceAll(/[\u{2060}\u{200B}]/gu, '');
 
 /** The posted result cards of `created`, never the count Roll's own roll message. */
 const resultCards = (created) =>
@@ -171,7 +173,11 @@ test('a zero pool states no total and no tile, only why nothing was rolled (N32)
 });
 
 test('the card states the executed threshold, never the live actor or check (N31)', async () => {
-  const { world, check, cards } = await craftCount({ pool: CHARACTER_POOL, faces: [4, 2], skill: 4 });
+  const { world, check, cards } = await craftCount({
+    pool: CHARACTER_POOL,
+    faces: [4, 2],
+    skill: 4,
+  });
   const posted = readable(cards[0]);
   assert.ok(posted.includes('≥ 4 · character value 4'), 'the executed character value');
   world.craftingActor.system.skills.craft.value = 1;
@@ -186,7 +192,10 @@ test('the card states the executed threshold, never the live actor or check (N31
 });
 
 test('no count evidence is persisted, flagged or handed off (N36)', async () => {
-  const { world, result, check, created } = await craftCount({ pool: PASS_POOL, faces: PASS_FACES });
+  const { world, result, check, created } = await craftCount({
+    pool: PASS_POOL,
+    faces: PASS_FACES,
+  });
   assert.ok(check.countDisplay, 'positive control: the execution reported its dice');
   assert.ok(!('countDisplay' in check.data), 'check data gains nothing');
   for (const message of created) {
@@ -201,7 +210,10 @@ test('no count evidence is persisted, flagged or handed off (N36)', async () => 
 /** A salvage of Iron Ore under a count check over `pool`, answered with `rollMode`. */
 async function salvageCount({ version = 14, rollMode = 'publicroll', pool, faces = [] }) {
   const world = salvageProbe({
-    salvageCraftingCheck: { simple: simpleCheck(pool), consumption: { consumeComponentOnFail: true } },
+    salvageCraftingCheck: {
+      simple: simpleCheck(pool),
+      consumption: { consumeComponentOnFail: true },
+    },
   });
   globalThis.game.i18n.localize = shippedLocalize;
   const created = [];
@@ -258,7 +270,9 @@ async function bulkCount({ rollMode, pool, faces = [] }) {
         name: 'Iron Ore',
         quantity: 3,
         ingredientQuantity: 1,
-        resultGroups: [{ id: 'sg-1', results: [{ id: 'sr-1', componentId: 'shard', quantity: 2 }] }],
+        resultGroups: [
+          { id: 'sg-1', results: [{ id: 'sr-1', componentId: 'shard', quantity: 2 }] },
+        ],
       },
     ],
     awards: [{ id: 'shard', name: 'Shard' }],

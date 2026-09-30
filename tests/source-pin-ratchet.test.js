@@ -7,11 +7,11 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { after, test } from 'node:test';
 
 import { byCodePoint } from './helpers/codePointOrder.js';
-import { compareToBase, reportComparison, siteMarker } from './helpers/mergeBaseRatchet.js';
+import { compareToBase, reportComparison } from './helpers/mergeBaseRatchet.js';
 import { parseModule } from './helpers/moduleAst.js';
 import { countCorpusPinSites, countPinSites } from './helpers/sourcePinSites.js';
 import { collectSources, repoRoot } from './helpers/sourceScan.js';
@@ -44,8 +44,6 @@ const TEST_MODULE = /\.test\.m?js$/u;
  * hands out raw text that tests pin, and may only be retired, never added.
  */
 const SCAN_HELPERS = Object.freeze({
-  'tests/components/design-system-known-debt.js': 'fixture',
-  'tests/components/design-system-target-baseline.js': 'fixture',
   'tests/components/manager-bulk-mounted.js': 'fixture',
   'tests/components/manager-checks-mounted.js': 'fixture',
   'tests/components/manager-components-mounted.js': 'fixture',
@@ -74,21 +72,19 @@ const SCAN_HELPERS = Object.freeze({
   'tests/components/manager-tags-mounted.js': 'fixture',
   'tests/components/manager-tools-mounted.js': 'fixture',
   'tests/components/manager-world-scope-mounted.js': 'fixture',
-  'tests/components/selector-repetition-baseline.js': 'fixture',
-  'tests/components/spacing-known-literals.js': 'fixture',
   'tests/helpers/checkEvidenceFixtures.js': 'fixture',
   'tests/helpers/chipTone.js': 'legacy-scan',
   'tests/helpers/companionContractOutcomes.js': 'fixture',
   'tests/helpers/compile-svelte-module.js': 'fixture',
   'tests/helpers/componentScopeMountModules.js': 'fixture',
   'tests/helpers/designLibrary.js': 'fixture',
+  'tests/helpers/designSystemRatchet.js': 'corpus',
   'tests/helpers/domCensus.js': 'fixture',
   'tests/helpers/extension-composition-harness.js': 'fixture',
   'tests/helpers/harvestedFoundryChrome.js': 'fixture',
   'tests/helpers/interactablesSmokeLocators.js': 'legacy-scan',
   'tests/helpers/interactablesWindowContract.js': 'ast',
   'tests/helpers/langBackedI18n.js': 'fixture',
-  'tests/helpers/legacyLintGate.js': 'fixture',
   'tests/helpers/manager-button-cascade.js': 'legacy-scan',
   'tests/helpers/manager/managerCompile.js': 'fixture',
   'tests/helpers/manager/managerLocalization.js': 'fixture',
@@ -97,7 +93,6 @@ const SCAN_HELPERS = Object.freeze({
   'tests/helpers/parsedSource.js': 'ast',
   'tests/helpers/primitiveAdoptionContract.js': 'legacy-scan',
   'tests/helpers/primitiveSourceContract.js': 'legacy-scan',
-  'tests/helpers/ratchetBaseline.js': 'fixture',
   'tests/helpers/renderedManagerShell.js': 'fixture',
   'tests/helpers/scoped-component-css.js': 'fixture',
   'tests/helpers/sourceScan.js': 'corpus',
@@ -177,18 +172,14 @@ function scanHelperRows(text) {
 }
 
 /**
- * One entry per file counting its pin sites, less any site a reasoned marker exempts, and one per
- * `legacy-scan` row, netted on the kind so the rows may only fall in number.
+ * One entry per pin site, counted per file, and one per `legacy-scan` row, netted on the kind so
+ * the rows may only fall in number. A reasoned marker at a site or row new to base excuses it.
  */
 function measureSourcePins(readFile, listFiles) {
   const { siteLines, texts } = analyseCorpus(listFiles(), readFile);
   const entries = [];
   for (const [file, lines] of siteLines) {
-    const text = texts.get(file);
-    const counted = text.includes('ratchet-exempt(')
-      ? lines.filter((line) => !siteMarker(file, text, FAMILY, line))
-      : lines;
-    if (counted.length > 0) entries.push({ file, id: PIN_ID, amount: counted.length });
+    for (const line of lines) entries.push({ file, id: PIN_ID, lines: [line] });
   }
   const self = texts.get(SELF);
   for (const row of self === undefined ? [] : scanHelperRows(self)) {
@@ -207,6 +198,7 @@ const compareSourcePins = (options = {}) =>
     measure: measureSourcePins,
     scope: 'corpus',
     headMarkers: false,
+    siteMarkers: true,
     ...options,
   });
 
@@ -268,7 +260,10 @@ test('every non-test module under tests/ that reads files is listed with a revie
 
 test("the gate reads this file's SCAN_HELPERS row for row, so its legacy-scan leg is live", () => {
   const rows = scanHelperRows(readFileSync(import.meta.filename, 'utf8'));
-  assert.deepEqual(rows.map(({ file, kind }) => [file, kind]), Object.entries(SCAN_HELPERS));
+  assert.deepEqual(
+    rows.map(({ file, kind }) => [file, kind]),
+    Object.entries(SCAN_HELPERS)
+  );
   assert.ok(rows.some(({ kind }) => kind === 'legacy-scan'));
 });
 
@@ -673,7 +668,9 @@ test('a helper reading files raw, aliased, keyed or via a wrapper chain is flagg
 });
 
 const repos = [];
-after(() => repos.forEach((repo) => repo.dispose()));
+after(() => {
+  for (const repo of repos) repo.dispose();
+});
 
 /** A throwaway repository whose one commit holds `files`, compared by this gate's own wiring. */
 function repoWith(files) {
@@ -681,7 +678,9 @@ function repoWith(files) {
   repos.push(repo);
   const write = (entries) =>
     repo.write(
-      Object.fromEntries(Object.entries(entries).map(([file, rows]) => [file, `${rows.join('\n')}\n`]))
+      Object.fromEntries(
+        Object.entries(entries).map(([file, rows]) => [file, `${rows.join('\n')}\n`])
+      )
     );
   write(files);
   const first = repo.commitAll('base');
@@ -754,8 +753,8 @@ test('a reasoned marker above each pin exempts it, one in the file head does not
   });
   const exempt = repo.compare();
   assert.deepEqual(
-    [exempt.failures, exempt.exempted],
-    [[`tests/d.test.js: ${PIN_ID} is new (2)`], []]
+    [exempt.failures, exempt.exempted.length],
+    [[`tests/d.test.js: ${PIN_ID} is new (2)`], 3]
   );
   repo.write({ 'tests/d.test.js': ['export const none = 1;'] });
   repo.write({
@@ -771,12 +770,28 @@ test('a reasoned marker above each pin exempts it, one in the file head does not
   const empty = (file, line) =>
     `${file}:${line} has a ratchet-exempt(source-pin) marker with no reason; write why the ` +
     'regression is legitimate after the colon';
+  const unreasoned = '; its ratchet-exempt marker gives no reason';
   assert.deepEqual(repo.compare().failures, [
-    `tests/a.test.js: ${PIN_ID} rose from 2 to 3`,
-    `tests/c.test.js: ${PIN_ID} is new (2)`,
+    `tests/a.test.js: ${PIN_ID} rose from 2 to 3${unreasoned}`,
+    `tests/c.test.js: ${PIN_ID} is new (2)${unreasoned}`,
     empty('tests/a.test.js', 6),
     empty('tests/c.test.js', 2),
   ]);
+});
+
+test('a marker on a pin already at base buys no room for a new one', () => {
+  const repo = repoWith(BASE_CORPUS);
+  const reasoned = `${MARKER} the emitted text is the contract under test`;
+  repo.write({
+    'tests/a.test.js': [
+      PINNING[0],
+      PINNING[1],
+      reasoned,
+      PINNING[2],
+      "export const also = source.includes('y');",
+    ],
+  });
+  assert.deepEqual(repo.compare().failures, [`tests/a.test.js: ${PIN_ID} rose from 2 to 3`]);
 });
 
 test('a legacy-scan row may be retired or swapped but not added, unless a reason marks it', () => {

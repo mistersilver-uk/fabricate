@@ -21,7 +21,7 @@ export class AlchemySignatureReport {
    */
   constructor({ systemId, validator, components, entries, cohortIndexByRecipeId, conflicts }) {
     this.systemId = systemId;
-    this.components = components;
+    this.components = components; // ratchet-exempt(world-scope): parameter
     this.entries = entries;
     this.cohortIndexByRecipeId = cohortIndexByRecipeId;
     this.conflicts = conflicts;
@@ -86,7 +86,7 @@ export class AlchemySignatureReport {
 
     const candidateEntries = this._validator.compileRecipeEntries(
       candidate,
-      this.components,
+      this.components, // ratchet-exempt(world-scope): parameter
       cohortIndex
     );
     if (candidateEntries.length === 0) return [];
@@ -115,6 +115,7 @@ export class AlchemySignatureReport {
         compareEntries(leftA, rightA) || compareEntries(leftB, rightB)
     );
     return pairs.map(([first, second]) =>
+      // ratchet-exempt(world-scope): parameter
       this._validator.describeConflict(first, second, this.components)
     );
   }

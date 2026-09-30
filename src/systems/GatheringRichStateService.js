@@ -353,7 +353,7 @@ export class GatheringRichStateService {
 
     // Tools are system-owned: read `system.tools` (normalized by `_normalizeSystem`), falling back
     // to a registry lookup when no system was passed; the gathering-config `tools` copy is retired.
-    const toolSource = Array.isArray(system?.tools)
+    const toolSource = Array.isArray(system?.tools) // ratchet-exempt(world-scope): guard
       ? resolvedToolsFor(system)
       : resolvedToolsFor(
           globalThis.game?.fabricate?.getCraftingSystemManager?.()?.getSystem?.(systemId)
@@ -1744,7 +1744,7 @@ function normalizeGatheringConfig(raw = {}) {
       }),
       vocabularies: normalizeSystemVocabularies(config?.vocabularies, vocabularies),
       tasks: normalizeList(config?.tasks).map(normalizeLibraryTask),
-      tools: normalizeList(config?.tools).map(normalizeLibraryTool).filter(Boolean),
+      tools: normalizeList(config?.tools).map(normalizeLibraryTool).filter(Boolean), // ratchet-exempt(world-scope): not-a-system
       events: normalizeList(config?.events).map(normalizeEvent),
       // `characterModifiers` is not emitted (issue 1117): this allowlist rebuild retires it.
       economy: normalizeGatheringEconomy(config?.economy),

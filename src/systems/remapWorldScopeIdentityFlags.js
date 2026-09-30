@@ -71,6 +71,7 @@ export function unambiguousComponentRemap(rekeyMap) {
   const candidates = new Map();
   const ambiguous = new Set();
   for (const perSystem of Object.values(isPlainObject(rekeyMap) ? rekeyMap : {})) {
+    // ratchet-exempt(world-scope): not-a-system
     for (const [oldId, newId] of Object.entries(perSystem?.components ?? {})) {
       if (candidates.has(oldId) && candidates.get(oldId) !== newId) ambiguous.add(oldId);
       else candidates.set(oldId, newId);
@@ -86,8 +87,8 @@ function remapRunRecord(run, rekeyMap) {
   const systemId = typeof run.craftingSystemId === 'string' ? run.craftingSystemId : null;
   const perSystem = systemId ? rekeyMap[systemId] : null;
   if (!perSystem) return false;
-  const remapComponent = legLookup(perSystem.components);
-  const remapTool = legLookup(perSystem.tools);
+  const remapComponent = legLookup(perSystem.components); // ratchet-exempt(world-scope): not-a-system
+  const remapTool = legLookup(perSystem.tools); // ratchet-exempt(world-scope): not-a-system
   let changed = false;
   const walk = (node) => {
     if (Array.isArray(node)) {
@@ -144,7 +145,7 @@ export function remapAlchemyDeadEnds(deadEnds, rekeyMap) {
   for (const [systemId, keys] of Object.entries(deadEnds)) {
     // DE-DUPLICATED: a merge can collapse two signatures onto one key. `includes` makes a duplicate
     // harmless, but this is a persisted flag that only ever grows.
-    const remapComponent = legLookup(rekeyMap[systemId]?.components);
+    const remapComponent = legLookup(rekeyMap[systemId]?.components); // ratchet-exempt(world-scope): not-a-system
     next[systemId] = arrayOf(keys).map((signature) => {
       if (typeof signature !== 'string' || signature === '') return signature;
       const multiset = {};

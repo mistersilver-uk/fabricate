@@ -240,7 +240,8 @@ export function splitSelectorList(selector) {
 }
 
 /**
- * Every RULE in one comment-stripped stylesheet, as `{ selector, body, line }` (issue 1497).
+ * Every RULE in one comment-stripped stylesheet, as `{ selector, body, line, bodyLine }` (issue
+ * 1497): `line` is where the selector begins and `bodyLine` holds the `{`, the first line of `body`.
  *
  * @param {string} css Comment-stripped CSS, offsets intact — from {@link styleTextFor}.
  */
@@ -256,7 +257,7 @@ export function rulesIn(css) {
     if (character === '\n') line += 1;
     if (character === '{') {
       const trimmed = prelude.trim().replace(/\s+/gu, ' ');
-      stack.push({ selector: trimmed, start: index + 1, line: preludeLine });
+      stack.push({ selector: trimmed, start: index + 1, line: preludeLine, bodyLine: line });
       prelude = '';
       preludeStarted = false;
       preludeLine = line;
@@ -265,7 +266,8 @@ export function rulesIn(css) {
     if (character === '}') {
       const open = stack.pop();
       if (open && !open.selector.startsWith('@')) {
-        rules.push({ selector: open.selector, body: css.slice(open.start, index), line: open.line });
+        const body = css.slice(open.start, index);
+        rules.push({ selector: open.selector, body, line: open.line, bodyLine: open.bodyLine });
       }
       prelude = '';
       preludeStarted = false;

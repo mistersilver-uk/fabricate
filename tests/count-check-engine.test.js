@@ -5,22 +5,15 @@
  * counted. The seams replaced are the recorder `_runCraftingCheck` passes through, the Tool states
  * `craftingWorld` resolves, and `MacroExecutor.run` in the macro test.
  */
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
 
-import { craftProbe, probeResolutionService, salvageProbe } from './helpers/craftPipelineProbe.js';
-import { installCountDice } from './helpers/countEngineDice.js';
-import { countEvaluation, preparedCountCheck } from './helpers/countFixtures.js';
-import { createLangBackedI18n } from './helpers/langBackedI18n.js';
-import {
-  GatheringDocumentActor,
-  gatheringFixture,
-  runRealGatheringAttempt,
-} from './helpers/real-gathering-attempt.js';
-import { repoRoot } from './helpers/sourceScan.js';
 import { BulkSalvageService } from '../src/systems/BulkSalvageService.js';
-import { CraftingEngine } from '../src/systems/CraftingEngine.js';
-import { GatheringEngine } from '../src/systems/GatheringEngine.js';
+import {
+  resolveActiveCraftingCheckFormula,
+  resolveActiveGatheringCheckFormula,
+  resolveActiveSalvageCheckFormula,
+} from '../src/systems/checkModifierResolver.js';
 import {
   evaluatePreparedRunCheck,
   postCheckRollHandoff,
@@ -28,19 +21,27 @@ import {
   runFormulaProgressive,
   runFormulaRouted,
 } from '../src/systems/checkRoll.js';
-import {
-  resolveActiveCraftingCheckFormula,
-  resolveActiveGatheringCheckFormula,
-  resolveActiveSalvageCheckFormula,
-} from '../src/systems/checkModifierResolver.js';
+import { refusalMessage } from '../src/systems/checkTarget.js';
+import { CraftingEngine } from '../src/systems/CraftingEngine.js';
+import { GatheringEngine } from '../src/systems/GatheringEngine.js';
 import { normalizeCheckEvaluation } from '../src/systems/normalize/checkEvaluation.js';
 import { ResolutionModeService } from '../src/systems/ResolutionModeService.js';
-import { refusalMessage } from '../src/systems/checkTarget.js';
 import { resolveSalvageCheck } from '../src/systems/salvageCheckUsability.js';
 import { evaluateSystemValidation } from '../src/systems/systemValidation.js';
 import { evaluateCheckBreakage } from '../src/toolBreakageRuntime.js';
-import { MacroExecutor } from '../src/utils/MacroExecutor.js';
 import { buildInteractiveRollOptions } from '../src/ui/svelte/apps/crafting/rollPrompt.js';
+import { MacroExecutor } from '../src/utils/MacroExecutor.js';
+
+import { installCountDice } from './helpers/countEngineDice.js';
+import { countEvaluation, preparedCountCheck } from './helpers/countFixtures.js';
+import { craftProbe, probeResolutionService, salvageProbe } from './helpers/craftPipelineProbe.js';
+import { createLangBackedI18n } from './helpers/langBackedI18n.js';
+import {
+  GatheringDocumentActor,
+  gatheringFixture,
+  runRealGatheringAttempt,
+} from './helpers/real-gathering-attempt.js';
+import { repoRoot } from './helpers/sourceScan.js';
 
 /** Journal entries that consume, spend, award or post. */
 const EFFECT = /^(item\.|actor\.|chat\.|currency\.|itemPiles\.deduct|complication\.)/;
@@ -940,7 +941,7 @@ test('QE5: salvage simple and gathering routed place the same benefits the same 
 // ── grading, routing, progressive and evidence ───────────────────────────────
 
 const ACTOR = { getRollData: () => ({}) };
-const normalized = (pool, direction) => normalizeCheckEvaluation(countEvaluation({ direction, ...pool }));
+const normalized = (pool = {}, direction = 'over') => normalizeCheckEvaluation(countEvaluation({ direction, ...pool }));
 const cancelWorst = { cancel: { enabled: true, faces: { kind: 'worst', value: null } } };
 
 test('a count/over exceed check passes when its net equals the required count: grading is met', async () => {
@@ -1144,7 +1145,7 @@ test('a count roll posts its successes needed in the flavor, never a DC, and non
 });
 
 test('a prepared count names its successes needed in its posted and handed-back flavor, never when secret', async () => {
-  const flavors = async (options, prepared = preparedCount()) => {
+  const flavors = async (options = {}, prepared = preparedCount()) => {
     const dice = installCountDice({ faces: [9, 3] });
     try {
       const result = await evaluatePreparedRunCheck(prepared, LIVE_ACTOR, {}, options);
@@ -1287,7 +1288,7 @@ test('progressive spends max(0, net): progressiveValue reads the budget, rollTot
 // ── prepared and secret checks ────────────────────────────────────────────────
 
 /** A prepared count check authoring a live base path, whose capture resolved a base of 2. */
-const preparedCount = (options) =>
+const preparedCount = (options = {}) =>
   preparedCountCheck({ evaluation: countEvaluation({ base: '@skills.craft.value' }), ...options });
 
 const LIVE_ACTOR = { getRollData: () => ({ skills: { craft: { value: 5 } } }) };

@@ -2,10 +2,9 @@
  * Issue 2006 — the summary line and rows a result states for an executed count check, read from
  * its projection's `count` alone, in the approved copy.
  */
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
 
-import { shippedLocalize } from './helpers/checkEvidenceFixtures.js';
 import { executedCheckDisplay } from '../src/ui/presenters/checkDisplay.js';
 import {
   countBotched,
@@ -13,6 +12,8 @@ import {
   countSummaryText,
   statesCountEvidence,
 } from '../src/ui/presenters/countEvidenceRows.js';
+
+import { shippedLocalize } from './helpers/checkEvidenceFixtures.js';
 
 const PUBLIC = { rollMode: 'publicroll', secret: false };
 
@@ -101,7 +102,11 @@ test('a fixed threshold that moved states Success on as fixed; strictness picks 
     comparison: 'exceed',
     count: { threshold: { anchor: 8, effective: 7, terms: [{ source: 'tool', value: -1 }] } },
   });
-  assert.deepEqual(rows(display)[0], ['successOn', '> 7 · fixed, moved −1 by modifiers', undefined]);
+  assert.deepEqual(rows(display)[0], [
+    'successOn',
+    '> 7 · fixed, moved −1 by modifiers',
+    undefined,
+  ]);
 });
 
 test('Pre-rolled states the dice a rolled bonus added and the threshold it moved', () => {

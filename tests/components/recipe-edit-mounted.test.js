@@ -610,7 +610,9 @@ describe('RecipeEditView (mounted)', () => {
     const patches = [];
     const target = await editHarness.mount(
       identityProps({
-        onUpdateRecipe: (patch) => patches.push(patch),
+        onUpdateRecipe: (patch) => {
+          patches.push(patch);
+        },
         checkTierOptions: [
           { id: 'tier-easy', name: 'Easy', dc: 12, successes: 3 },
           { id: 'tier-unset', name: 'Unset', dc: 8, successes: null },

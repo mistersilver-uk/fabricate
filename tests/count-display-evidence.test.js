@@ -2,15 +2,16 @@
  * Issue 2006 — a count roll's executed display input: each source's settled benefit counted once,
  * signed as it moved its destination, and reported only to a caller that reports its visibility.
  */
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
 
-import { scalar } from './helpers/countFixtures.js';
 import {
   countPlacementTerms,
   countRollReport,
   reportedCountDisplay,
 } from '../src/systems/countDisplayEvidence.js';
+
+import { scalar } from './helpers/countFixtures.js';
 
 const toPool = { product: 'count', direction: 'over', pool: { modifierDestination: 'pool' } };
 const toThreshold = (direction) => ({

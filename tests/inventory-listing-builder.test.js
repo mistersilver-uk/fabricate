@@ -1,9 +1,9 @@
-import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 
 import { InventoryListingBuilder } from '../src/ui/presenters/InventoryListingBuilder.js';
-import { fill } from '../src/utils/fillPlaceholders.js';
 import { simpleYieldRows } from '../src/ui/svelte/util/salvageYieldRows.js';
+import { fill } from '../src/utils/fillPlaceholders.js';
 
 import { shippedLocalize } from './helpers/checkEvidenceFixtures.js';
 import {

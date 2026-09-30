@@ -5,10 +5,10 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { parseModule, walkNodes } from './helpers/moduleAst.js';
-import { parseComponent } from './helpers/svelteStructureContract.js';
 import { byCodePoint } from './helpers/codePointOrder.js';
+import { parseModule, walkNodes } from './helpers/moduleAst.js';
 import { collectSources, repoRoot } from './helpers/sourceScan.js';
+import { parseComponent } from './helpers/svelteStructureContract.js';
 
 const CANONICAL = 'src/utils/scalars.js';
 

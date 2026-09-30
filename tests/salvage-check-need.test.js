@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { shippedLocalize } from './helpers/checkEvidenceFixtures.js';
-import { countEvaluation } from './helpers/countFixtures.js';
+
 import { normalizeCheckEvaluation } from '../src/systems/normalize/checkEvaluation.js';
 import {
   salvageCheckNeed,
@@ -9,6 +8,9 @@ import {
   salvageDisplayDc,
 } from '../src/ui/presenters/salvageCheckNeed.js';
 import { fill } from '../src/utils/fillPlaceholders.js';
+
+import { shippedLocalize } from './helpers/checkEvidenceFixtures.js';
+import { countEvaluation } from './helpers/countFixtures.js';
 
 test('display DC shares override and fallback arithmetic with the listing', () => {
   assert.equal(salvageDisplayDc({ mode: 'simple', config: { dc: 16 }, component: { salvage: { dcOverride: 21.8 } } }), 21);

@@ -1,6 +1,6 @@
 /** The roll prompt's closure, shared by every suite that mounts it through the real host. */
-import { CHECK_TARGET_RAW_MODULES } from './svelte-component-harness.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from './foundryBridgeModules.js';
+import { CHECK_TARGET_RAW_MODULES } from './svelte-component-harness.js';
 
 export const ROLL_PROMPT_PATH = 'src/ui/svelte/apps/crafting/RollPrompt.svelte';
 

@@ -64,7 +64,7 @@
 
     /* THE CORNER FOLLOWS THE HEIGHT (issue 1371, ruling M12a): the radius ladder in
        `openspec/specs/design-system/spec.md` gives 9 to a control of 34 to 38. `.is-primary`'s 36 is
-       a retired rung, booked in `tests/components/control-height-known-literals.js`. */
+       a retired rung, which `tests/components/control-height-ladder.test.js` holds as debt. */
     border-radius: 9px;
     color: var(--fab-text);
 
