@@ -173,6 +173,132 @@ export function applyD20Advantage(formula, mode) {
   });
 }
 
+const TOP_LEVEL_OPERATORS = new Set(['+', '-', '*', '/', '%']);
+const NESTING_OPENERS = new Set(['(', '{', '[']);
+const NESTING_CLOSERS = new Set([')', '}', ']']);
+
+/**
+ * A formula's top-level terms in order, outside `()`, `{}`, function calls and `[flavour]`, each
+ * `{ operator, operatorIndex, text }` with the operator before it (`null` for the first). A sign
+ * with no left operand leaves an empty-text term before the one it signs.
+ */
+export function splitTopLevelTerms(formula) {
+  const text = String(formula ?? '');
+  const terms = [];
+  let depth = 0;
+  let start = 0;
+  let previous = { operator: null, operatorIndex: -1 };
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+    if (NESTING_OPENERS.has(character)) depth += 1;
+    else if (NESTING_CLOSERS.has(character)) depth -= 1;
+    else if (depth === 0 && TOP_LEVEL_OPERATORS.has(character)) {
+      terms.push({ ...previous, text: text.slice(start, index).trim() });
+      previous = { operator: character, operatorIndex: index };
+      start = index + 1;
+    }
+  }
+  terms.push({ ...previous, text: text.slice(start).trim() });
+  return terms;
+}
+
+const FLAVOUR_SPANS = /\[[^\]]*\]/g;
+const HAS_DIE = /(?:^|[^\w@.])\d*(?:\.\d+)?d(?:\d|\(|@|[a-z])/i;
+const POSITIVE_LITERAL = /^\d+(?:\.\d+)?$/;
+const DYNAMIC_GROUP = /^(?:\([^()]*\)|@[\w.-]+)d|^\d*(?:\.\d+)?d[(@]/i;
+const NON_NUMERIC_DIE = /^\d*d[a-z]/i;
+const LITERAL_GROUP = /^(\d*(?:\.\d+)?)d(\d+(?:\.\d+)?)$/i;
+const MODIFIED_GROUP = /^\d*(?:\.\d+)?d\d+\S/i;
+
+/** Each non-empty term, carrying the sign an empty term before it left, its flavour stripped. */
+function signedOperands(formula) {
+  const operands = [];
+  let sign = null;
+  for (const term of splitTopLevelTerms(formula)) {
+    if (term.text === '') {
+      sign ??= term;
+      continue;
+    }
+    const bare = term.text.replaceAll(FLAVOUR_SPANS, '').trim();
+    operands.push(
+      sign
+        ? {
+            ...term,
+            bare,
+            operator: sign.operator,
+            operatorIndex: sign.operatorIndex,
+            sign: term.operator,
+          }
+        : { ...term, bare, sign: null }
+    );
+    sign = null;
+  }
+  return operands;
+}
+
+const isPositiveLiteral = (operand) =>
+  Boolean(operand) &&
+  operand.sign === null &&
+  POSITIVE_LITERAL.test(operand.bare) &&
+  Number(operand.bare) > 0;
+
+/** Added at index 0 or after `+`, or multiplied by positive literals only, on either side. */
+function inAdditivePosition(operands, index) {
+  const { operator, sign } = operands[index];
+  const before = operands[index - 1];
+  const leads =
+    operator === null ||
+    operator === '+' ||
+    (operator === '*' && isPositiveLiteral(before) && [null, '+'].includes(before.operator));
+  let next = index + 1;
+  while (['*', '/'].includes(operands[next]?.operator)) {
+    if (!isPositiveLiteral(operands[next])) return false;
+    next += 1;
+  }
+  const trails = next === operands.length || ['+', '-'].includes(operands[next].operator);
+  return sign === null && leads && trails;
+}
+
+/** Why a first dice group is not a plain literal `NdS`, or null when it is one. */
+function groupShapeRefusal(bare) {
+  if (DYNAMIC_GROUP.test(bare)) return 'dynamic';
+  if (NON_NUMERIC_DIE.test(bare)) return 'not-die';
+  const literal = LITERAL_GROUP.exec(bare);
+  if (literal) {
+    const number = literal[1] === '' ? 1 : Number(literal[1]);
+    const faces = Number(literal[2]);
+    return Number.isInteger(number) && number >= 1 && Number.isInteger(faces) && faces >= 2
+      ? null
+      : 'invalid';
+  }
+  return MODIFIED_GROUP.test(bare) ? 'modified' : 'nested';
+}
+
+/**
+ * The authored formula's FIRST top-level dice group, the one advantage keeps from (issue 2007):
+ * `{ ok: true, number, faces, prefix, referenceFirst }` when it is a plain literal `NdS` in an
+ * additive position, else `{ ok: false, reason }`. A refused first group is never skipped for a
+ * later one. `prefix` is the authored text before the group's connecting operator.
+ */
+export function findKeepGroup(authoredFormula) {
+  const formula = String(authoredFormula ?? '');
+  const operands = signedOperands(formula);
+  const index = operands.findIndex((operand) => HAS_DIE.test(operand.bare));
+  if (index === -1) return { ok: false, reason: 'none' };
+  const group = operands[index];
+  const refusal = groupShapeRefusal(group.bare);
+  if (refusal) return { ok: false, reason: refusal };
+  if (!inAdditivePosition(operands, index)) return { ok: false, reason: 'position' };
+  const [, number, faces] = LITERAL_GROUP.exec(group.bare);
+  return {
+    ok: true,
+    number: number === '' ? 1 : Number(number),
+    faces: Number(faces),
+    prefix: group.operator === null ? '' : formula.slice(0, group.operatorIndex).trim(),
+    referenceFirst: operands.slice(0, index).some((operand) => operand.bare.includes('@')),
+  };
+}
+
 export function rangesOverlap(a, b) {
   if (!a || !b) return false;
   return Number(a.start) <= Number(b.end) && Number(b.start) <= Number(a.end);

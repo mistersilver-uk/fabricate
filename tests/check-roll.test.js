@@ -658,8 +658,9 @@ const D20_MODIFIER_CHOICE = {
   defaultSelectedId: 'wild',
 };
 
-test('a d20 MODIFIER on a d20-less check neither offers nor receives advantage', async () => {
-  const rolledFormulas = stubCraftingModRoll();
+// R1 class (a) (issue 2007): the check's own plain `3d6` now keeps; the modifier's d20 never does.
+test("a d20 MODIFIER never receives the keep; the check's own plain first group does", async () => {
+  const rolledFormulas = stubTermBearingRoll();
   let asked = null;
   await evaluateCheckRoll(
     '3d6',
@@ -676,7 +677,7 @@ test('a d20 MODIFIER on a d20-less check neither offers nor receives advantage',
   assert.equal(asked.allowAdvantage, false, '3d6 is not a plain-d20 check, whatever it appends');
   assert.equal(
     rolledFormulas.at(-1),
-    '3d6 + (1d20)[Modifiers]',
+    '4d6kh3 + (1d20)[Modifiers]',
     "the modifier's die is left alone even when a caller forces the disposition"
   );
   delete globalThis.Roll;
@@ -686,7 +687,7 @@ test('a d20 MODIFIER on a d20-less check neither offers nor receives advantage',
 // covered separately: on the deferred path the two readings coincide and a mutation there
 // would go unnoticed.
 test('a non-deferred d20 modifier does not manufacture an advantage offer', async () => {
-  const rolledFormulas = stubCraftingModRoll();
+  const rolledFormulas = stubTermBearingRoll();
   let asked = null;
   await evaluateCheckRoll(
     '3d6',
@@ -705,7 +706,7 @@ test('a non-deferred d20 modifier does not manufacture an advantage offer', asyn
     }
   );
   assert.equal(asked.allowAdvantage, false, 'the appended d20 is not the check`s own');
-  assert.equal(rolledFormulas.at(-1), '3d6 + (1d20)[Modifiers]');
+  assert.equal(rolledFormulas.at(-1), '4d6kh3 + (1d20)[Modifiers]');
   delete globalThis.Roll;
 });
 

@@ -507,7 +507,7 @@ test('prepared run checks hand the evaluated lab roll to player chat on both cha
       const Roll = makeRoll();
       const ControlRoll = makeRoll();
       const posted = [];
-      const previous = ['Roll', 'ChatMessage'].map((key) => [
+      const previous = ['Roll', 'ChatMessage', 'foundry'].map((key) => [
         key, Object.getOwnPropertyDescriptor(globalThis, key),
       ]);
       t.after(() => {
@@ -517,6 +517,8 @@ test('prepared run checks hand the evaluated lab roll to player chat on both cha
         }
       });
       globalThis.Roll = Roll;
+      // ratchet-exempt(lint): the keep transform reads the lab `Die` from `foundry.dice.terms`.
+      globalThis.foundry = { dice: { terms: Roll.TERM_CLASSES } };
       globalThis.ChatMessage = {
         ...(api === 'v14' ? { applyMode() {} } : {}),
         async create(data) {

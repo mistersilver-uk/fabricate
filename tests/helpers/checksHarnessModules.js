@@ -117,6 +117,8 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/systems/normalize/checkEvaluation.js',
   'src/systems/normalize/checkAdvantage.js',
   'src/systems/checkRollDecision.js',
+  // `checkRollDecision.js` plans the keep transform the main roll takes (issue 2007).
+  'src/systems/checkKeepTransform.js',
   'src/systems/checkRouting.js',
   'src/systems/checkRollOutput.js',
   'src/systems/checkModifierRolls.js',

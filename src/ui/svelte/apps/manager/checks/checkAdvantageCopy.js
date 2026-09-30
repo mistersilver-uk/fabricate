@@ -4,72 +4,12 @@
  * `advantage` record, the check's direction and the authored formula. `text(key, fallback)` is the
  * caller's localizer.
  */
-import { interpolate } from './checksCopy.js';
+import { splitTopLevelTerms } from '../../../../../utils/craftingCheckExpression.js';
 
-const PLAIN_GROUP = /^(\d*)d(\d+)(\[[^\]]*\])?$/i;
-const POSITIVE_NUMBER = /^(\d+(\.\d+)?)$/;
-const HAS_DIE = /d[\d@(fc]/i;
-const OPENERS = '([{';
-const CLOSERS = ')]}';
+import { interpolate } from './checksCopy.js';
 
 /** The prototype's bonus-die grammar: dice and numbers joined by ASCII `+` or `-`. */
 const BONUS_GRAMMAR = /^[+-]?\s*(\d*d\d+|\d+)(\s*[+-]\s*(\d*d\d+|\d+))*$/i;
-
-/** The formula's top-level terms, each with the operator before it (`null` for the first). */
-function topLevelTerms(formula) {
-  const terms = [];
-  let depth = 0;
-  let current = '';
-  let operator = null;
-  for (const char of formula) {
-    if (OPENERS.includes(char)) depth += 1;
-    if (CLOSERS.includes(char)) depth -= 1;
-    if (depth === 0 && '+-*/'.includes(char)) {
-      terms.push({ operator, text: current.trim() });
-      operator = char;
-      current = '';
-    } else {
-      current += char;
-    }
-  }
-  terms.push({ operator, text: current.trim() });
-  return terms;
-}
-
-const isPositiveNumber = (term) =>
-  Boolean(term) && POSITIVE_NUMBER.test(term.text) && Number(term.text) > 0;
-
-function additivePosition(terms, index) {
-  const { operator } = terms[index];
-  const before =
-    operator === null ||
-    operator === '+' ||
-    (operator === '*' &&
-      isPositiveNumber(terms[index - 1]) &&
-      [null, '+'].includes(terms[index - 1].operator));
-  const next = terms[index + 1];
-  const after =
-    !next ||
-    ['+', '-'].includes(next.operator) ||
-    (['*', '/'].includes(next.operator) && isPositiveNumber(next));
-  return before && after;
-}
-
-/**
- * Stand-in for Task 3's `findKeepGroup` (issue 2007) until that predicate lands, then this call is
- * replaced by it: the formula's first top-level dice group as `{ ok, number, faces }`, `ok` only for
- * a plain `NdS` (N ≥ 1, S ≥ 2) in an additive position. A later group is never searched.
- */
-export function provisionalKeepGroup(formula) {
-  const terms = topLevelTerms(String(formula ?? ''));
-  const index = terms.findIndex((term) => !term.text.startsWith('@') && HAS_DIE.test(term.text));
-  const match = index === -1 ? null : PLAIN_GROUP.exec(terms[index].text);
-  if (!match) return { ok: false };
-  const number = match[1] === '' ? 1 : Number(match[1]);
-  const faces = Number(match[2]);
-  if (number < 1 || faces < 2 || !additivePosition(terms, index)) return { ok: false };
-  return { ok: true, number, faces };
-}
 
 /** Whether `expression` is a bonus die the prompt can offer; empty text is not. */
 export function isBonusExpression(expression) {
@@ -84,7 +24,7 @@ function namedExpression(expression, text) {
   if (canonical === '') {
     return text('FABRICATE.Admin.Manager.Checks.Advantage.ExpressionFallback', 'the expression');
   }
-  return topLevelTerms(canonical.replace(/^-/, '')).length > 1 ? `(${canonical})` : canonical;
+  return splitTopLevelTerms(canonical.replace(/^-/, '')).length > 1 ? `(${canonical})` : canonical;
 }
 
 /** `{ total, die, group, count }` for the keep notes and stepper, `count` empty for one die. */
