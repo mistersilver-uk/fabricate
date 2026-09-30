@@ -100,10 +100,14 @@ export function countSummaryText(display, localize = (key) => key) {
   return fill(loc(KEYS.summaryGrown), { ...line, grown: formatSignedStep(grown) });
 }
 
-/** `≤ 14 · character value 13, moved +1 by modifiers`, only when it read or moved. */
+/**
+ * `≤ 14 · character value 13, moved +1 by modifiers`, only when it read or moved; the move is
+ * signed by its benefit, as the prompt's rule line signs it.
+ */
 function successOnRow(display, loc) {
   const { threshold } = display.count;
-  const moved = threshold.effective - threshold.anchor;
+  const sign = benefitSign('threshold', display.evaluation.direction);
+  const moved = sign * (threshold.effective - threshold.anchor);
   if (threshold.source !== 'character' && moved === 0) return null;
   const effective = formulaValues(display, 0, threshold.effective);
   const anchor = formulaValues(display, 0, threshold.anchor).threshold;
@@ -148,8 +152,8 @@ function preRolledRow(display, loc) {
         total: entry.total,
       };
       if (entry.destination === 'pool') return fill(loc(KEYS.preRollDice), facts);
-      const moved = benefitSign('threshold', display.evaluation.direction) * entry.total;
-      return fill(loc(KEYS.preRollThreshold), { ...facts, moved: formatSignedStep(moved) });
+      const moved = formatSignedStep(entry.total);
+      return fill(loc(KEYS.preRollThreshold), { ...facts, moved });
     })
     .join('; ');
   return text ? { id: 'preRolled', label: loc(KEYS.preRolled), text } : null;

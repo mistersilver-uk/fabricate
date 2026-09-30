@@ -81,7 +81,7 @@ export function executedCheck(data = UNDER_DATA, visibility = PUBLIC) {
 
 /**
  * A count check (issue 2006): a d10 pool of 3 grown by a library +1, succeeding on 8 or above read
- * from Sera Vane at 9 and moved −1; the 10 exploded into a 5 and a 1 cancelled, netting 2 of 2.
+ * from Sera Vane at 9 and moved +1; the 10 exploded into a 5 and a 1 cancelled, netting 2 of 2.
  */
 export const COUNT_DATA = Object.freeze({
   product: 'count',
@@ -120,7 +120,7 @@ export const COUNT_DISPLAY = Object.freeze({
 });
 
 export const COUNT_ROWS = Object.freeze([
-  ['successOn', 'Success on', '≥ 8 · character value 9, moved −1 by modifiers'],
+  ['successOn', 'Success on', '≥ 8 · character value 9, moved +1 by modifiers'],
   ['count', 'Count', '3 qualified − 1 cancelled = 2 net'],
   ['needed', 'Needed', '2 · margin +0'],
 ]);

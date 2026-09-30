@@ -97,16 +97,14 @@ test('a pool grown by modifiers says so, and a character threshold moved by one 
   ]);
 });
 
-test('a fixed threshold that moved states Success on as fixed; strictness picks the sign', () => {
-  const display = counted({
-    comparison: 'exceed',
-    count: { threshold: { anchor: 8, effective: 7, terms: [{ source: 'tool', value: -1 }] } },
-  });
-  assert.deepEqual(rows(display)[0], [
-    'successOn',
-    '> 7 · fixed, moved −1 by modifiers',
-    undefined,
-  ]);
+test('a moved threshold reads signed by its benefit, as the prompt signs it, in either direction', () => {
+  const moved = (direction, comparison, effective) =>
+    rows(counted({ direction, comparison, count: { threshold: { effective } } }))[0][1];
+  assert.equal(moved('over', 'meet', 7), '≥ 7 · fixed, moved +1 by modifiers', 'a +1 Tool bonus');
+  assert.equal(moved('over', 'exceed', 7), '> 7 · fixed, moved +1 by modifiers');
+  assert.equal(moved('over', 'meet', 9), '≥ 9 · fixed, moved −1 by modifiers', 'a penalty');
+  assert.equal(moved('under', 'meet', 9), '≤ 9 · fixed, moved +1 by modifiers');
+  assert.equal(moved('under', 'meet', 7), '≤ 7 · fixed, moved −1 by modifiers');
 });
 
 test('Pre-rolled states the dice a rolled bonus added and the threshold it moved', () => {
@@ -117,10 +115,13 @@ test('Pre-rolled states the dice a rolled bonus added and the threshold it moved
   const over = rows(counted({ preRolls })).find(([id]) => id === 'preRolled');
   assert.equal(
     over[1],
-    'Situational 1d4 rolled 3, adding 3 dice; Knack 1d2 rolled 2, moving the threshold −2'
+    'Situational 1d4 rolled 3, adding 3 dice; Knack 1d2 rolled 2, moving the threshold +2'
   );
   const under = rows(counted({ direction: 'under', preRolls })).find(([id]) => id === 'preRolled');
-  assert.match(under[1], /moving the threshold \+2$/, 'a roll-low threshold rises');
+  assert.match(under[1], /moving the threshold \+2$/, 'signed by the benefit either way');
+  const penalty = [{ ...preRolls[1], total: -2 }];
+  const lowered = rows(counted({ preRolls: penalty })).find(([id]) => id === 'preRolled');
+  assert.match(lowered[1], /moving the threshold −2$/, 'a rolled penalty reads negative');
 });
 
 test('a check with no required count, progressive or fixed-range, states no Needed row', () => {
