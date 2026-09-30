@@ -653,6 +653,9 @@
           "BannerSimpleTitle": "Salvage check",
           "BannerSimpleRule": "Roll to break this down. Meet the DC to recover the materials below.",
           "BannerSimpleRuleTarget": "Roll to break this down. The total must {comparison} the target to recover the materials below.",
+          "Count": {
+            "BannerSimpleRule": "Roll to break this down. The count must reach the successes needed to recover the materials below."
+          },
           "BannerRoutedTitle": "Routed salvage",
           "BannerRoutedRule": "Your roll decides which outcome you get, and each outcome recovers different materials.",
           "BannerProgressiveTitle": "Progressive · ordered",

@@ -90,7 +90,9 @@ test('a count check names its successes needed and the salvager\'s per-die test 
       actor,
       localize,
     });
+  const rule = 'Roll to break this down. The count must reach the successes needed to recover the materials below.';
   assert.deepEqual(target({ threshold: '@skills.craft.value', required: 2 }), {
+    rule,
     direction: 'over',
     text: 'Salvage check · 2 successes needed · d10s, success on ≥ 7',
   });
@@ -100,6 +102,7 @@ test('a count check names its successes needed and the salvager\'s per-die test 
     "the component's override, singular, and the per-die strictness"
   );
   assert.deepEqual(target({ threshold: '@skills.none.value' }), {
+    rule,
     unresolved: 'Salvage check could not read a number for its target from this character.',
   });
   assert.equal(target({}, { mode: 'progressive' }), null, 'a budget has no count to reach');

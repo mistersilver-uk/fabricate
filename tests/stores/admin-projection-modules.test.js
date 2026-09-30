@@ -882,6 +882,19 @@ describe('adminSystemInspectorProjection (direct, no store)', () => {
     assert.equal(view.gatheringCraftingCheck.modifierFormulaInertCause, 'noCheck');
   });
 
+  it('reads a counting check with no retained formula as live, never as missing its formula', () => {
+    const counting = { rollFormula: '', dc: 12, evaluation: { product: 'count' } };
+    const system = makeSystem();
+    system.craftingCheck.routed = { ...counting, tiers: [] };
+    system.salvageCraftingCheck.routed = counting;
+    const view = buildSelectedSystemViewData(system, [], [], [], [], []);
+    assert.equal(view.craftingCheck.modifierFormulaInertCause, null, 'the pool rolls, so modifiers apply');
+    assert.equal(view.salvageCraftingCheck.modifierFormulaInertCause, null);
+    system.craftingCheck.routed = { ...counting, evaluation: { product: 'sum' } };
+    const summed = buildSelectedSystemViewData(system, [], [], [], [], []);
+    assert.equal(summed.craftingCheck.modifierFormulaInertCause, 'noFormula', 'a sum still needs one');
+  });
+
   it('projects the fields a hand-built allowlist has historically dropped', () => {
     const view = buildSelectedSystemViewData(makeSystem(), [], [], [], [], []);
     assert.deepEqual(view.componentCategories, ['ore']);
