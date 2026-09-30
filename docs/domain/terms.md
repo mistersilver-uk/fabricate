@@ -970,8 +970,9 @@ Distinct from an **Outcome Tier**, which bands a routed check's roll RESULT: the
 The axis exists only where the system's check has recipe-level tiers to offer, and where it does not the surface names WHICH of four reasons applies instead of hiding the control: a progressive system puts difficulty on each result component, a dynamic simple DC is resolved at craft time, a fixed-type routed check takes per-recipe difficulty from the recipe's minimum success tier instead, and a check that authors no tiers leaves every recipe on the default DC.
 None of those four is the same fact as the system having no usable crafting check at all, which the recipe row's own check pill reports, and the two are never conflated.
 A bulk write REJECTS a tier id this system does not author, before it mutates anything; the single-recipe editor write tolerates a dangling id and falls back to the default DC at resolution time, because one recipe is a smaller blast radius than a whole selection.
+Under a counting check (issue 2006), a tier names no `dc` at all: the same tier instead names `successes` (0 to 20), and a recipe's picked tier then supplies the successes needed in place of the check's own, exactly as a DC tier replaces the check's own DC (see **Count Check**, **Extra Successes**).
 
-Canonical mapping: `Recipe.checkTierId`; `craftingCheck` slot `tiers[]`; `resolveRecipeCheckTierOptions` in `src/utils/routedOutcomeKeywords.js`; `describeRecipeCheckTierAxis` in `src/ui/model/recipeBulkEditModel.js`; `resolveBulkCheckTierId` in `src/systems/manager/bulkEdits.js`; `RecipeOverviewTab.svelte`
+Canonical mapping: `Recipe.checkTierId`; `craftingCheck` slot `tiers[]`/`tiers[].successes`; `resolveRecipeCheckTierOptions` in `src/utils/routedOutcomeKeywords.js`; `describeRecipeCheckTierAxis` in `src/ui/model/recipeBulkEditModel.js`; `resolveBulkCheckTierId` in `src/systems/manager/bulkEdits.js`; `RecipeOverviewTab.svelte`; `CheckRecipeTiers.svelte`
 
 Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/ui-system-studio/spec.md, openspec/specs/ui-entity-editors/spec.md
 
@@ -1633,8 +1634,9 @@ Spec reference: openspec/specs/design-system/spec.md, openspec/specs/ui-crafting
 
 ## Count Display Evidence
 
-The allowlisted `count` projection `buildCheckDisplay` folds onto a public, non-secret executed **Count Check**'s `checkDisplay`, from the engine's own unpersisted `countDisplay` and never re-derived from the live check or actor: `die`, `tiles` (a **Die Qualification Marks** tile model), `qualified`, `cancelled`, `net`, `required`, `margin`, `zeroPool`, and the settled `pool`/`threshold` each as `{ base/anchor, terms, rolled/effective }`.
-It holds literal numbers and the two enumerated words `'fixed'`/`'character'` only, never an expression, path, label or policy, so a card that renders it can never leak a hidden formula or DC.
+The allowlisted `count` projection `buildCheckDisplay` folds onto every non-secret executed **Count Check**'s `checkDisplay`, from the engine's own unpersisted `countDisplay` and never re-derived from the live check or actor: `die`, `tiles` (a **Die Qualification Marks** tile model), `qualified`, `cancelled`, `net`, `required`, `margin`, `zeroPool`, and the settled `pool`/`threshold` each as `{ base/anchor, terms, rolled/effective }`, `threshold` also carrying the enumerated `source` (`'fixed'`/`'character'`).
+It holds literal numbers and those two enumerated words only, never an expression, path, label or policy, so a card that renders it can never leak a hidden formula or DC.
+Folding it onto the projection is not the same gate as showing it: a chat card states it only for `isPublicCheckDisplay` (a public, non-secret roll), while a result box and a salvage summary withhold it only for a blind or a secret roll, so a gmroll or a selfroll still states it there.
 It is handed to the card builders at post time beside **Executed Check Evidence**'s own visibility gate, and, like that evidence, is never written into `data`, run history, `rollHandoff`, or ChatMessage flags.
 
 Canonical mapping: `countProjection`/`countResult`/`countTerms`/`buildCheckDisplay` in `src/ui/presenters/checkDisplay.js`; `reportedCountDisplay`/`countRollReport` in `src/systems/countDisplayEvidence.js`

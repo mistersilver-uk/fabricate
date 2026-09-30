@@ -857,6 +857,7 @@ The RECORD that selects check modifiers under the `bySubject` combination rule, 
 #### Recipe Check Tier
 
 The per-recipe reference to one of the `{id, name, dc}` DC tiers a crafting system's check slot authors (`Recipe.checkTierId`), naming the DC that recipe rolls against, or under a character-value target the **Difficulty Adjustment** its nullable `adjustment` supplies.
+Under a counting check the same tier names `successes` (0 to 20) in place of `dc`, and the recipe's picked tier then supplies the successes needed.
 
 [Notes](docs/domain/terms.md#recipe-check-tier)
 
@@ -1200,7 +1201,8 @@ The `qualified`/`cancelled`/`exploded` marks one rolled die in a **Count Check**
 
 #### Count Display Evidence
 
-The allowlisted `count` projection a public, non-secret executed **Count Check** folds onto its `checkDisplay`, literal numbers and two enumerated words only, never persisted beyond the post.
+The allowlisted `count` projection every non-secret executed **Count Check** folds onto its `checkDisplay`, literal numbers and two enumerated words only, never persisted beyond the post.
+A chat card states it only on a public roll, while the result box and the salvage summary state it on any roll but a blind or secret one.
 
 [Notes](docs/domain/terms.md#count-display-evidence)
 

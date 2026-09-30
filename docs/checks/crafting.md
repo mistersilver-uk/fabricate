@@ -394,6 +394,13 @@ Adding a trigger to a counting check offers presets built for the pool's own die
 While **Cancel** is switched on, a **Botch** preset is offered too: an automatic failure, or the lowest tier on a routed check, whenever the net successes fall below zero.
 You can still author a trigger by hand against **Net successes** directly, for any comparison the preset list does not cover.
 
+### What players see
+
+An executed success-counting check states its dice tiles, one per die, and its count rows, **Success on**, **Count**, and **Needed**, on the roll's chat card and on the crafter's own result box.
+
+The chat card states them only for a public roll, the same rule its plain roll evidence follows: a private, blind, or self roll's card states neither.
+The result box, and a salvage's own result summary, are more forgiving: both still state the tiles and the rows for a private roll or a self roll, and withhold them only for a blind roll or one marked secret.
+
 ### Converting a free-text formula that counts successes
 
 A check you import, or one you typed a formula into before switching to **Count successes**, can carry a formula that already uses a success-counting die suffix while **What the roll produces** is still set to **Add the dice**.
@@ -439,7 +446,9 @@ The **Validation** page reports a success-counting check's own set of issues, ea
 This is a blocking issue.
 - **A recipe tier sets no successes needed**: a recipe tier with no successes needed of its own falls back to the check's own number and is no harder than the default.
 This is a blocking issue: set successes needed on every tier before enabling the system.
-- **Successes needed above the most dice that can be rolled**, and **Successes needed above the base pool**: the check asks for more successes than the dice it allows could ever produce without exploding, or without adding more dice than the base pool has.
+- **Successes needed above the most dice that can be rolled**: the check asks for more successes than the dice it allows could ever produce, even once exploding and every added die are counted.
+This is a blocking issue.
+- **Successes needed above the base pool**: the check asks for more successes than the base pool alone has, though exploding or an added die could still reach it.
 - **The base pool is too large to roll**: the pool is larger than the 999 dice Foundry can roll in one go, so the check cannot roll at all.
 While this is raised, the two issues above are not evaluated.
 - **This formula counts successes, but the check adds the dice**: see [Converting a free-text formula that counts successes](#converting-a-free-text-formula-that-counts-successes).
