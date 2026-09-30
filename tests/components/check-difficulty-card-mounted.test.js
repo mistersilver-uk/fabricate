@@ -192,15 +192,10 @@ describe("a counting check's Difficulty card (issue 2006)", () => {
     assert.doesNotMatch(root.textContent, /never succeed|cannot succeed|impossible/i);
   });
 
-  it('a pool that reads the character states the tick and no shortfall', async () => {
+  it('a pool that reads the character states no shortfall and no callout, as frame 06 draws it', async () => {
     const evaluation = counting({ base: '@skills.craft.value', required: 9 });
     const root = await harness.mount({ evaluation, countTiers: [] });
-    assert.deepEqual(calloutTexts(root), [
-      [
-        'countPoolCharacterDependent',
-        'The base pool reads the character, so it is compared with the successes needed only when a character rolls.',
-      ],
-    ]);
+    assert.deepEqual(calloutTexts(root), [], 'the character-dependent tick is Validation only');
   });
 
   it('grades no required count where the check grades none (countTiers null)', async () => {

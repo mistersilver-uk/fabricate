@@ -176,7 +176,7 @@ describe('count readiness raises each id with its copy, section and severity', (
       tick: 'Every recipe tier sets its successes needed',
       satisfied: false,
       sentence:
-        "Unset Work set no successes needed, so they use the check's 2 and are no harder than the default. Set successes needed on each tier.",
+        "Unset Work set no successes needed, so they use the check's 2 and are no harder than the default. Set successes needed on each tier before enabling.",
     });
     const salvage = evaluateCheckReadiness(FAULTS, { mode: 'simple', activity: 'salvage' });
     assert.equal(issue(salvage, 'countTierWithoutSuccesses'), undefined);
@@ -480,7 +480,7 @@ describe('countTriggerGroupUnreachable warns about dead dice triggers (ruling R3
     { id: 'net', condition: { type: 'rollTotal', operator: '<', value: 0 }, outcome: 'failure' },
   ];
 
-  it('names each trigger that cannot fire, as its card is titled, outside the enable gate', () => {
+  it('names each trigger that cannot fire against its own formula, quoted, outside the enable gate', () => {
     const draft = withTriggers(triggers);
     const before = structuredClone(draft);
     const result = evaluateCheckReadiness(draft, { mode: 'simple' });
@@ -490,13 +490,28 @@ describe('countTriggerGroupUnreachable warns about dead dice triggers (ruling R3
       tick: 'Every dice trigger can fire on the pool',
       satisfied: false,
       sentence:
-        'Any die of 1d6 is exactly 6, Any die of d10 is at least 12 read dice this pool never rolls, so they cannot fire while the check counts successes. They are kept and work again if the check adds the dice.',
+        'The triggers “Any die of 1d6 is exactly 6”, “Any die of 1d20 is at least 12” read dice this pool never rolls, so they cannot fire while the check counts successes. They are kept and work again if the check adds the dice.',
     });
     assert.deepEqual(draft, before, 'the triggers are neither rewritten nor removed');
     assert.ok(
       result.issues.every((entry) => entry.id !== 'countTriggerGroupUnreachable' || entry.severity !== 'critical'),
       'it never feeds the blocking tally'
     );
+  });
+
+  it('names one trigger in the singular, a repeated die by its ordinal and a lost group by number', () => {
+    const sentence = (rollFormula, list) =>
+      checkIssueSentence(
+        'countTriggerGroupUnreachable',
+        issue(evaluateCheckReadiness({ ...withTriggers(list), rollFormula }, { mode: 'simple' }), 'countTriggerGroupUnreachable').data,
+        text
+      );
+    assert.equal(
+      sentence('1d20 + 1d6', triggers.slice(0, 1)),
+      'The trigger “Any die of 1d6 is exactly 6” reads dice this pool never rolls, so it cannot fire while the check counts successes. It is kept and works again if the check adds the dice.'
+    );
+    assert.match(sentence('1d6 + 1d6', triggers.slice(0, 1)), /^The trigger “Any die of 1d6 #2 is exactly 6” reads/);
+    assert.match(sentence('1d20', triggers.slice(0, 1)), /^The trigger “Any die of dice group 2 is exactly 6” reads/);
   });
 
   it('is silent while the check adds the dice, and for triggers the pool can fire', () => {

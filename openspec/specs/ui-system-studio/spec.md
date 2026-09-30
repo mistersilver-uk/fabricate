@@ -331,7 +331,7 @@ A progressive count check shows its raw net and awards `max(0, net)`.
 Negative counts use the true minus sign.
 
 Readiness raises, in The roll: `countPoolInvalid` and `countThresholdInvalid` (critical: blank, dice or not arithmetic once every path is neutralized), `countFaceBeyondDie` (warning: an enabled explode or cancel face beyond the die, naming what follows), `countExplodeUnbounded` (critical: a recursive explosion on every face), `countTierWithoutSuccesses` (critical: a crafting recipe tier with no successes needed, raised only while at least one tier exists), and, for a literal base, `countPoolTooLarge` (critical: above the 999 dice Foundry rolls at once, raising no ceiling row), `countRequiredExceedsMaxPool` (critical) and `countRequiredExceedsBasePool` (warning) against the authored ceiling, which is the base alone until additional dice (issue 2008) raise it; the base settles through the runtime's own pool resolver, so it floors float noise, rolls at least one die when a zero pool does not fail, and never reads below zero dice.
-A base reading the character raises no ceiling issue and ticks `countPoolCharacterDependent`; fixed ranges and progressive checks grade no required count.
+A base reading the character raises no ceiling issue and ticks `countPoolCharacterDependent` on Validation only, never as a Difficulty card callout (frame 06 draws none); fixed ranges and progressive checks grade no required count.
 Frame 08's `Successes needed above the most dice that can be rolled`, frame 07's `Successes needed above the base pool` and frame 19's `A character path does not resolve` are among the count issues' titles.
 Each of these rows names the control that clears it, as "Success-counting authoring" lists, so a notice's Review and a Validation row's View focus that control.
 With a Preview-as actor chosen it raises the TRANSIENT `countPathUnresolvedForPreview` and `countValueNotNumericForPreview`, which follow the same rule as the roll-under transient warnings: a section notice and a Validation row, and never a badge, dot, tally or enable gate.
@@ -358,8 +358,8 @@ Relative outcome rows edit the shared delta as `Extra successes`, and a count ba
 
 Every count readiness id has a clearing control: `countPoolInvalid` and `countPoolTooLarge` the base pool, `countThresholdInvalid` the threshold, `countFaceBeyondDie` the explode or cancel face it names, `countExplodeUnbounded` the explode choice, the two ceiling rows the successes needed, and `countTierWithoutSuccesses` the first tier without successes.
 Two issues are added.
-`countFaceMissing` (critical, The roll) blocks an enabled explode or cancel `from` face with no value, which only imported or API data can hold.
-`countTriggerGroupUnreachable` (a warning, Triggers, outside the enable gate) names each kept trigger whose dice condition reads a group or face the pool never rolls; the trigger is kept and works again after switching back to adding the dice.
+`countFaceMissing` (critical, The roll) blocks an enabled explode or cancel `from` face with no value, which only imported or API data can hold; it is raised once per missing face, under one `countFacesSet` tick, each with its own notice.
+`countTriggerGroupUnreachable` (a warning, Triggers, outside the enable gate) names each kept trigger whose dice condition reads a group or face the pool never rolls, quoted and titled against the formula it was written for — its die, a repeated die by its ordinal, and a group that formula lacks as `dice group {n}` — in a singular sentence for one trigger; the trigger is kept and works again after switching back to adding the dice.
 
 ##### Free-text counting formula conversion
 

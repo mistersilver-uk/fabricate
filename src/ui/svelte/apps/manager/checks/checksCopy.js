@@ -200,7 +200,7 @@ export const CHECK_ISSUE_LABELS = Object.freeze({
   ],
   countTierWithoutSuccesses: [
     'IssueCountTierWithoutSuccesses',
-    "{names} set no successes needed, so they use the check's {required} and are no harder than the default. Set successes needed on each tier.",
+    "{names} set no successes needed, so they use the check's {required} and are no harder than the default. Set successes needed on each tier before enabling.",
   ],
   countRequiredExceedsMaxPool: [
     'IssueCountRequiredExceedsMaxPool',
@@ -232,8 +232,15 @@ export const CHECK_ISSUE_LABELS = Object.freeze({
   ],
   countTriggerGroupUnreachable: [
     'IssueCountTriggerGroupUnreachable',
-    '{names} read dice this pool never rolls, so they cannot fire while the check counts successes. They are kept and work again if the check adds the dice.',
+    'The triggers {names} read dice this pool never rolls, so they cannot fire while the check counts successes. They are kept and work again if the check adds the dice.',
   ],
+});
+
+/** The one-trigger sentence of `countTriggerGroupUnreachable`, its name quoted in the copy. */
+const ONE_TRIGGER_UNREACHABLE = Object.freeze({
+  key: 'FABRICATE.Admin.Manager.Checks.Validation.IssueCountTriggerGroupUnreachableOne',
+  fallback:
+    'The trigger “{names}” reads dice this pool never rolls, so it cannot fire while the check counts successes. It is kept and works again if the check adds the dice.',
 });
 
 /** The words a `countFaceBeyondDie` issue's coded `kind` and `effect` fill its sentence with. */
@@ -348,7 +355,9 @@ function issueData(data, text) {
     if (phrase) resolved[field] = text(`${NAMESPACE}${phrase[0]}`, phrase[1]);
   }
   if (Array.isArray(triggers)) {
-    resolved.names = triggers.map((fragment) => resolveFragment(fragment, text)).join(', ');
+    const names = triggers.map((fragment) => resolveFragment(fragment, text));
+    resolved.names =
+      names.length === 1 ? names[0] : names.map((name) => quotedName(name, text)).join(', ');
   }
   const named = flaggedRecordName(data, text);
   if (!named) return resolved;
@@ -360,10 +369,17 @@ function resolveFragment({ key, fallback, data = {} }, text) {
   const filled = Object.fromEntries(
     Object.entries(data).map(([field, value]) => [
       field,
-      value && typeof value === 'object' ? text(value.key, value.fallback) : value,
+      value && typeof value === 'object' ? resolveFragment(value, text) : value,
     ])
   );
   return interpolate(text(key, fallback, filled), filled);
+}
+
+/** One name of a listed trigger, in the reader's quotation marks. */
+function quotedName(name, text) {
+  const data = { name };
+  const quoted = text('FABRICATE.Admin.Manager.Checks.Validation.QuotedName', '“{name}”', data);
+  return interpolate(quoted, data);
 }
 
 /**
@@ -423,7 +439,8 @@ export function convertActionCopy(issue) {
 /** A readiness issue's one sentence, as `checkIssueText` fills it. */
 export function checkIssueSentence(id, data, text) {
   const resolved = issueData(data, text);
-  const copy = checkIssueCopy(id);
+  const one = id === 'countTriggerGroupUnreachable' && data?.triggers?.length === 1;
+  const copy = one ? ONE_TRIGGER_UNREACHABLE : checkIssueCopy(id);
   const sentence = interpolate(text(copy.key, copy.fallback, resolved), resolved);
   if (id !== 'freeTextCountingFormula') return sentence;
   return [sentence, ...conversionNotes(data, text)].join(' ');

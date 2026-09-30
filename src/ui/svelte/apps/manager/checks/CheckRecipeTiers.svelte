@@ -158,10 +158,15 @@
 <div class="manager-checks-card-body is-stack">
   {#if list.length === 0}
     <p class="manager-muted" data-tiers-empty>
-      {text(
-        'FABRICATE.Admin.Manager.Checks.Crafting.NoTiers',
-        'No tiers yet. Add named tiers a recipe can select to override the DC.'
-      )}
+      {count
+        ? text(
+            'FABRICATE.Admin.Manager.Checks.Crafting.NoTiersCount',
+            'No tiers yet. Add named tiers a recipe can select to set how many successes it needs.'
+          )
+        : text(
+            'FABRICATE.Admin.Manager.Checks.Crafting.NoTiers',
+            'No tiers yet. Add named tiers a recipe can select to override the DC.'
+          )}
     </p>
     <!-- The adder follows the empty message (issue 1512): with no tiers there is no list for it to
          be a footer of, and an empty state that says "add one" with nothing to press is a dead end. -->

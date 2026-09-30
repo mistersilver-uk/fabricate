@@ -6302,6 +6302,7 @@
             "TiersLead": "A recipe picks one of these; its DC replaces the base DC above.",
             "AddTier": "Add difficulty tier",
             "NoTiers": "No tiers yet. Add named tiers a recipe can select to override the DC.",
+            "NoTiersCount": "No tiers yet. Add named tiers a recipe can select to set how many successes it needs.",
             "TierName": "Name",
             "TierDc": "DC",
             "RemoveTier": "Remove tier",
@@ -6473,7 +6474,7 @@
             "IssueCountThresholdInvalid": "This check's success threshold uses dice or cannot be read as arithmetic. Use a number, a character path, or arithmetic on them without dice.",
             "IssueCountFaceBeyondDie": "The {kind} face {face} is not on a d{die}, so {effect}. Pick a face the die can show.",
             "IssueCountExplodeUnbounded": "Every face on this die explodes, so the roll would never stop. Pick a face that does not explode.",
-            "IssueCountTierWithoutSuccesses": "{names} set no successes needed, so they use the check's {required} and are no harder than the default. Set successes needed on each tier.",
+            "IssueCountTierWithoutSuccesses": "{names} set no successes needed, so they use the check's {required} and are no harder than the default. Set successes needed on each tier before enabling.",
             "IssueCountRequiredExceedsMaxPool": "The successes needed by {names} exceed the {ceiling} dice this check allows before any explode, so an attempt succeeds only when dice explode or are added. Lower the successes needed or allow more dice.",
             "IssueCountRequiredExceedsBasePool": "The successes needed by {names} exceed the base pool of {base} dice, so an attempt succeeds only when dice explode or are added to the pool.",
             "IssueCountPoolTooLarge": "This check's base pool is more than the {max} dice Foundry can roll at once, so the check cannot roll. Use a smaller pool.",
@@ -6491,8 +6492,11 @@
             "IssueFreeTextCountingFormulaTitle": "This formula counts successes, but the check adds the dice",
             "IssueCountFaceMissing": "Choose the face to {kind} from. Without one, this check cannot roll.",
             "IssueCountFaceMissingTitle": "A face to explode or cancel from is not chosen",
-            "IssueCountTriggerGroupUnreachable": "{names} read dice this pool never rolls, so they cannot fire while the check counts successes. They are kept and work again if the check adds the dice.",
-            "IssueCountTriggerGroupUnreachableTitle": "A trigger reads dice the pool never rolls"
+            "IssueCountTriggerGroupUnreachable": "The triggers {names} read dice this pool never rolls, so they cannot fire while the check counts successes. They are kept and work again if the check adds the dice.",
+            "IssueCountTriggerGroupUnreachableOne": "The trigger “{names}” reads dice this pool never rolls, so it cannot fire while the check counts successes. It is kept and works again if the check adds the dice.",
+            "IssueCountTriggerGroupUnreachableTitle": "A trigger reads dice the pool never rolls",
+            "CountTriggerDiceGroup": "dice group {n}",
+            "QuotedName": "“{name}”"
           },
           "Breakage": {
             "LeadOutcomeOnly": "Each trigger can force the check outcome. Switch the tool-breakage authority to check-driven to let triggers break tools.",
