@@ -484,10 +484,12 @@ export const CASES = Object.freeze([
     reaches: 'beyond',
     smokeLabels: [],
     // A refused placement raises the warning `noRollFormula` BEFORE the critical it causes, so the order is the sort's.
+    // Advantage is switched off first: a keep rule cannot keep a die multiplied by a reference (issue 2007).
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
       { selector: '#manager-checks-nav-crafting' },
+      advantageMode('off'),
       { selector: '[data-check-roll-formula]', fill: '1d20 * @craftingmod' },
     ],
     expectView: 'checks-crafting',
