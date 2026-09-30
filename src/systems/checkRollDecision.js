@@ -1,7 +1,8 @@
 /** Resolves an interactive check decision into a formula and modifier placement plan. */
 
-import { applyD20Advantage, hasPlainD20 } from '../utils/craftingCheckExpression.js';
+import { hasPlainD20 } from '../utils/craftingCheckExpression.js';
 
+import { planKeepTransform } from './checkKeepTransform.js';
 import {
   appendPlannedLibraryTerms,
   resolvedLibraryContributions,
@@ -9,11 +10,11 @@ import {
 import { planModifierPlacement } from './checkModifierRouter.js';
 import { countThresholdSource } from './countCheck.js';
 import { describeCountPolicy } from './countEvaluation.js';
+import { normalizeCheckAdvantage } from './normalize/checkAdvantage.js';
 import { CHECK_MODIFIER_TERM_LABEL } from './toolCheckBonus.js';
 
 /** The deferred `playerPicks` slot the prompt shows as a trailing term, where the resolved term lands. */
 const DEFERRED_MODIFIER_SLOT = `(modifier)[${CHECK_MODIFIER_TERM_LABEL}]`;
-const KEEP_UNDER = { advantage: 'disadvantage', disadvantage: 'advantage' };
 const BENEFIT_SOURCES = Object.freeze(['tool', 'library', 'situational', 'advantage']);
 
 function requestedModifierIds(modifierChoice, choice) {
@@ -192,24 +193,6 @@ function promptInput({
   };
 }
 
-function applyAdvantage(formula, authoredFormula, advantage, evaluation) {
-  if (advantage !== 'advantage' && advantage !== 'disadvantage') {
-    return { formula, contribution: null };
-  }
-  // A count check drops a supplied advantage before placement until issue 2007.
-  if (evaluation.product === 'count') return { formula, contribution: null };
-  // Keeping the lowest die is the advantage when a sum must come in under its target.
-  const keep = evaluation.direction === 'under' ? KEEP_UNDER[advantage] : advantage;
-  const prefix = authoredFormula.trim();
-  const rewritten = applyD20Advantage(prefix, keep);
-  return {
-    formula: formula.startsWith(prefix)
-      ? rewritten + formula.slice(prefix.length)
-      : applyD20Advantage(formula, keep),
-    contribution: null,
-  };
-}
-
 function applySituationalBonus(formula, rawBonus, evaluation, Roll) {
   const bonus = typeof rawBonus === 'string' ? rawBonus.trim() : rawBonus;
   if (!bonus) return { formula, contribution: null };
@@ -245,7 +228,7 @@ export function planDecisionPlacement({ evaluation, toolContributions, selected,
  * The prompt returns a decision, but never determines the selected modifier data directly.
  * `deferred` means the offered `modifierChoice` is selected by that decision; a count check
  * passes the `countPolicy` its pool resolved to before the prompt, and gets back the
- * `contributions` it placed.
+ * `contributions` it placed. `keep` is the keep transform the main roll takes, or null.
  */
 export async function resolveCheckDecision({
   authoredFormula,
@@ -263,7 +246,7 @@ export async function resolveCheckDecision({
   let rollMode = options?.rollMode;
   let selectedModifiers = resolvedCheck.selected;
   let situational = null;
-  let advantageContribution = null;
+  let keep = null;
   const preResolved = options?.rollDecision ?? null;
 
   if (options?.interactive === true && (preResolved || typeof options.prompt === 'function')) {
@@ -295,9 +278,13 @@ export async function resolveCheckDecision({
       if (chosenLabel) flavor = flavor ? `${flavor} · ${chosenLabel}` : chosenLabel;
     }
 
-    const advantage = applyAdvantage(formula, authoredFormula, choice.advantage, evaluation);
-    formula = advantage.formula;
-    advantageContribution = advantage.contribution;
+    // Keep acts on the constructed Roll, never this string; a count check keeps nothing.
+    keep = planKeepTransform({
+      choice: choice.advantage,
+      evaluation,
+      advantage: normalizeCheckAdvantage(options.advantage),
+      authoredFormula,
+    });
     const bonus = applySituationalBonus(formula, choice.bonus, evaluation, Roll);
     formula = bonus.formula;
     situational = bonus.contribution;
@@ -308,7 +295,7 @@ export async function resolveCheckDecision({
     evaluation,
     toolContributions: options?.toolContributions,
     selected: selectedModifiers,
-    answered: [situational, advantageContribution].filter(Boolean),
+    answered: [situational].filter(Boolean),
   });
   return {
     formula,
@@ -317,6 +304,7 @@ export async function resolveCheckDecision({
     placementPlan,
     benefitTerms: targetBenefitTerms(evaluation, contributions),
     resolvedFormula: displayFormula(formula, actor)?.display ?? null,
+    keep,
     ...(evaluation.product === 'count' && { contributions }),
   };
 }

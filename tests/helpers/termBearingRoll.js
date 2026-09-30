@@ -139,22 +139,32 @@ export function createTermBearingRoll({
 }
 
 /**
- * Install a term-bearing `Roll`, optionally subclassed by `extend`, as `globalThis.Roll`.
+ * Install a term-bearing `Roll`, optionally subclassed by `extend`, as `globalThis.Roll`, and its
+ * term classes as core's `foundry.dice.terms`, whose `Die` the keep transform checks against.
  *
  * @param {object} [options] {@link createTermBearingRoll}'s options, plus `extend(Base)`.
  * @returns {{Roll: Function, restore: () => void}} The installed class and its undo.
  */
 export function installTermBearingRoll({ extend = (Base) => Base, ...options } = {}) {
   const previous = globalThis.Roll;
+  const previousFoundry = globalThis.foundry;
   const Roll = extend(createTermBearingRoll(options));
   // ratchet-exempt(lint): the code under test reads the dice engine from `globalThis.Roll`.
   globalThis.Roll = Roll;
+  // ratchet-exempt(lint): the keep transform reads core's `Die` from `foundry.dice.terms`.
+  globalThis.foundry = {
+    ...previousFoundry,
+    dice: { ...previousFoundry?.dice, terms: TERM_CLASSES },
+  };
   return {
     Roll,
     restore() {
       if (previous === undefined) delete globalThis.Roll;
       // ratchet-exempt(lint): puts back the dice engine the install above replaced.
       else globalThis.Roll = previous;
+      if (previousFoundry === undefined) delete globalThis.foundry;
+      // ratchet-exempt(lint): puts back the namespace the install above replaced.
+      else globalThis.foundry = previousFoundry;
     },
   };
 }

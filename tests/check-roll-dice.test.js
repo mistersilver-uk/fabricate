@@ -941,7 +941,8 @@ test('evaluateCheckRoll: normal disposition leaves the formula unchanged', async
   }
 });
 
-test('evaluateCheckRoll: advantage is a no-op for a non-d20 formula (defensive)', async () => {
+// R1 class (a) (issue 2007): a plain first group of any die keeps, where only a `1d20` did.
+test('evaluateCheckRoll: advantage keeps the best of a non-d20 plain first group', async () => {
   installTermRollStub();
   installChatStub();
   try {
@@ -950,7 +951,7 @@ test('evaluateCheckRoll: advantage is a no-op for a non-d20 formula (defensive)'
       prompt: async () => ({ confirmed: true, advantage: 'advantage' }),
       flavor: 'Crafting check',
     });
-    assert.equal(lastRoll._formula, '2d6', 'no plain d20 → advantage transform does nothing');
+    assert.equal(lastRoll._formula, '3d6kh2', 'one extra d6, keeping the original two');
   } finally {
     clearStubs();
   }

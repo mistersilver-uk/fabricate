@@ -8,6 +8,7 @@ import { stripRetiredModifierPlaceholder } from '../utils/craftingCheckExpressio
 
 import { chatModeOption } from './bulkChatVisibility.js';
 import { compareToTarget, effectiveMargin } from './checkEvaluation.js';
+import { evaluateKeptRoll } from './checkKeepTransform.js';
 import {
   resolveCheckModifierFormula,
   resolvedLibraryContributions,
@@ -169,6 +170,7 @@ function resolveRolledCheck(
  * returns (issues 770, 1055); otherwise `craftingModifier` appends before anything reads the
  * formula. A cancelled prompt returns `cancelled: true` so the runner aborts with zero mutation.
  * Separately evaluated modifiers settle before the main roll and return their ordered placement.
+ * `advantage` is the check's normalized advantage rule, the normalizer's default when absent.
  */
 export async function evaluateCheckRoll(formula, actor, options = {}) {
   // A count check rolls its structured pool, so its retained formula never reaches `Roll`.
@@ -220,10 +222,8 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
     { Roll: globalThis.Roll, rollData }
   );
 
-  // `allowInteractive: false`: no manual-fulfilment dialog mid-craft, as in V13 `Roll.simulate`.
-  const roll = await new globalThis.Roll(effectiveFormula, rollData).evaluate({
-    allowInteractive: false,
-  });
+  // Construct, keep (issue 2007), then evaluate with no manual-fulfilment dialog mid-craft.
+  const { roll, kept } = await evaluateKeptRoll(effectiveFormula, rollData, decision.keep);
   const rolledTotal = Number(roll?.total);
   const total = Number.isFinite(rolledTotal) ? rolledTotal : 0;
   const flavor = settledFlavor(options, effectiveFlavor, evaluation, modifierPlacement);
@@ -233,7 +233,7 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
     engine: true,
     total,
     diceGroups: rolledDiceGroups(roll),
-    resolvedFormula,
+    resolvedFormula: kept ? roll.formula : resolvedFormula,
     modifierPlacement,
     ...(benefitTerms?.length > 0 && { benefitTerms }),
     ...(options?.reportVisibility === true && { rollMode: effectiveRollMode ?? null }),
