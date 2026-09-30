@@ -2037,14 +2037,22 @@ export const CASES = Object.freeze([
   }),
   authoringCase({
     id: 'manager-checks-v3-count-convert',
-    label: 'a summing formula that counts successes, with Convert on its Validation row',
+    label: 'a summing formula that counts successes, converted from its Validation row',
     frame: '21',
     state: 'dice-pool-freetext',
     nav: 'validation',
-    steps: [{ selector: '[data-issue="freeTextCountingFormula"]', scroll: true }],
+    steps: [
+      { selector: '[data-issue="freeTextCountingFormula"]', scroll: true },
+      {
+        selector:
+          '[data-issue="freeTextCountingFormula"][data-subsystem="crafting"]' +
+          ' [data-validation-row-action]',
+      },
+    ],
+    // Convert stages the draft, then opens the crafting roll section on `Count successes`.
+    expectView: 'checks-crafting',
     expectSelector:
-      '.fabricate-manager [data-issue="freeTextCountingFormula"][data-subsystem="crafting"]' +
-      ' [data-validation-row-action]',
+      '.fabricate-manager [data-checks-panel="crafting"][data-checks-evaluation-product="count"]',
   }),
   authoringCase({
     id: 'manager-checks-v3-count-convert-noaction',

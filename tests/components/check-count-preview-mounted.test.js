@@ -256,6 +256,9 @@ describe('count odds and the simulator readout', () => {
       'Vosk is missing a value this check reads (@skills.smith.rank), so it cannot resolve for them.'
     );
     assert.equal(rollButton(root).disabled, true);
+    assert.equal(root.querySelector('[data-check-count-actor-line]').dataset.checkCountActorLine, 'unresolved');
+    assert.match(root.querySelector('[data-check-count-actor-line]').textContent, /Vosk has no value at @skills\.smith\.rank/);
+    assert.ok(!root.querySelector('[data-check-count-expected]'), 'no reading, never 0');
     const notice = root.querySelector('[data-checks-section-notice="countPathUnresolvedForPreview"]');
     assert.ok(Boolean(notice), 'the roll section opens with a notice explaining the warning');
     assert.equal(notice.dataset.noticeTone, 'warning', 'amber, as frame 19 draws it');
