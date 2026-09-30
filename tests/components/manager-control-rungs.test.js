@@ -358,7 +358,7 @@ describe('M12a — the inspector rail’s action button takes the corner its hei
   });
 
   it('leaves the primary’s retired 36px rung exactly as it stands, which is booked debt', () => {
-    // 36 is NOT on the ladder — `control-height-known-literals.js` already books it.
+    // 36 is NOT on the ladder — `control-height-ladder.test.js` already holds it as debt.
     const body = scopedRule(ACTION, '.fab-inspector-action.is-primary');
     assert.equal(pixels(valueOf(body, 'min-height')), 36, 'the primary’s height is unchanged by this edit');
     assert.ok(!LADDER_RUNGS.includes(36), '36 is still a retired rung, so this stays booked debt');

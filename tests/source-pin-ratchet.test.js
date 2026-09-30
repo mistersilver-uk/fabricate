@@ -44,7 +44,6 @@ const TEST_MODULE = /\.test\.m?js$/u;
  * hands out raw text that tests pin, and may only be retired, never added.
  */
 const SCAN_HELPERS = Object.freeze({
-  'tests/components/design-system-target-baseline.js': 'fixture',
   'tests/components/manager-bulk-mounted.js': 'fixture',
   'tests/components/manager-checks-mounted.js': 'fixture',
   'tests/components/manager-components-mounted.js': 'fixture',
@@ -73,7 +72,6 @@ const SCAN_HELPERS = Object.freeze({
   'tests/components/manager-tags-mounted.js': 'fixture',
   'tests/components/manager-tools-mounted.js': 'fixture',
   'tests/components/manager-world-scope-mounted.js': 'fixture',
-  'tests/components/spacing-known-literals.js': 'fixture',
   'tests/helpers/checkEvidenceFixtures.js': 'fixture',
   'tests/helpers/chipTone.js': 'legacy-scan',
   'tests/helpers/companionContractOutcomes.js': 'fixture',
@@ -95,7 +93,6 @@ const SCAN_HELPERS = Object.freeze({
   'tests/helpers/parsedSource.js': 'ast',
   'tests/helpers/primitiveAdoptionContract.js': 'legacy-scan',
   'tests/helpers/primitiveSourceContract.js': 'legacy-scan',
-  'tests/helpers/ratchetBaseline.js': 'fixture',
   'tests/helpers/renderedManagerShell.js': 'fixture',
   'tests/helpers/scoped-component-css.js': 'fixture',
   'tests/helpers/sourceScan.js': 'corpus',
