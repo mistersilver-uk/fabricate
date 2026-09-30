@@ -249,6 +249,7 @@
           {targetChip}
           underTier={previewTierAdjustment(evaluation, previewedTier)}
           offerSituationalBonus={value?.offerSituationalBonus !== false}
+          advantage={value?.advantage ?? null}
           character={previewCharacter}
           {countPreview}
           onChange={emit}

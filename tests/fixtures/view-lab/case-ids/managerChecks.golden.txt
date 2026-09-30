@@ -109,3 +109,13 @@ manager-checks-v3-count-convert-noaction
 manager-checks-v3-count-convert-callout
 manager-checks-v3-count-tier-zero-point
 manager-checks-v3-count-readiness-faults
+manager-checks-crafting-advantage-keep
+manager-checks-crafting-advantage-keep-multi
+manager-checks-crafting-advantage-keep-under
+manager-checks-crafting-advantage-keep-no-group
+manager-checks-crafting-advantage-bonus
+manager-checks-crafting-advantage-bonus-invalid
+manager-checks-crafting-advantage-off
+manager-checks-crafting-advantage-no-disadvantage
+manager-checks-crafting-advantage-count
+manager-checks-crafting-advantage-count-off

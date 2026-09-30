@@ -63,6 +63,8 @@
     // under rule sentence as the adjustment applied first.
     underTier = null,
     offerSituationalBonus = true,
+    // The sub-object's `advantage` record, normalized by the prompt group before it is read.
+    advantage = null,
     // The Preview-as actor `{ name, rollData }`, and the preview's `{ placement, odds }` a counting
     // check composes its inset and expected successes from.
     character = null,
@@ -419,8 +421,12 @@
   <CheckPromptOptions
     offer={offerSituationalBonus}
     {direction}
+    {counting}
+    {advantage}
+    {rollFormula}
     destination={counting ? normalizedEvaluation.pool.modifierDestination : null}
     onChange={(offer) => onChange({ offerSituationalBonus: offer })}
+    onAdvantageChange={(next) => onChange({ advantage: next })}
   />
 </div>
 

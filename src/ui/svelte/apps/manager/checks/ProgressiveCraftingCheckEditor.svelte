@@ -79,6 +79,7 @@
           evaluation={value?.evaluation ?? null}
           underNote={!refusal}
           offerSituationalBonus={value?.offerSituationalBonus !== false}
+          advantage={value?.advantage ?? null}
           character={previewCharacter}
           {countPreview}
           onChange={emit}
