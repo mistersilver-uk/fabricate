@@ -256,6 +256,21 @@ function seedCheckOverride(content, state) {
   content.gatheringConfig.tasks = content.gatheringConfig.tasks.map(retask);
 }
 
+/**
+ * The Smithing crafting check graded roll-under against its fixed target (issue 2103), so the
+ * stage browser's future step label reads a Target rather than a DC.
+ */
+function seedJournalUnderCheck(content) {
+  const system = content.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.SMITHING);
+  system.craftingCheck = {
+    ...system.craftingCheck,
+    simple: {
+      ...system.craftingCheck.simple,
+      evaluation: { product: 'sum', direction: 'under', target: { source: 'fixed' } },
+    },
+  };
+}
+
 /** 14 days into the world's calendar, so relative timestamps render as something. */
 export const LAB_WORLD_TIME = 1_209_600;
 
@@ -463,6 +478,7 @@ export async function buildLabWorld({
   ) {
     seedJournalNoCheckFixture(content);
   }
+  if (journalCaseState === 'future-stage-under') seedJournalUnderCheck(content);
   seedGatheringTaskMode(content, gatheringTaskMode);
   seedRuneworkCheckMode(content, runeworkCheckMode);
   seedCheckOverride(content, checkOverride);

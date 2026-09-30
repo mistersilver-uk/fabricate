@@ -62,6 +62,8 @@ export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({
   // Issue 2006: its past stage counted successes, recording the net and the margin it cleared.
   'past-stage-count': 'lab-v1-stage-browser',
   'future-stage': 'lab-v1-stage-browser',
+  // Issue 2103: the same browser under a roll-under crafting check, its future step naming a Target.
+  'future-stage-under': 'lab-v1-stage-browser',
   'gathering-straight': 'lab-v1-gathering-straight',
   'gathering-d100': 'lab-v1-gathering-d100',
   'gathering-check': 'lab-v1-gathering-check',
@@ -597,6 +599,7 @@ function journalCaseFactories(context) {
     'past-stage-under': () => active(stageBrowserRun(context, multi(), UNDER_STAGE_CHECK)),
     'past-stage-count': () => active(stageBrowserRun(context, multi(), COUNT_STAGE_CHECK)),
     'future-stage': () => active(stageBrowserRun(context, multi())),
+    'future-stage-under': () => active(stageBrowserRun(context, multi())),
     'gathering-straight': () =>
       emptyRunContainers({ gatheringActive: [gatheringCaseRun(context, 'straight')] }),
     'gathering-d100': () =>

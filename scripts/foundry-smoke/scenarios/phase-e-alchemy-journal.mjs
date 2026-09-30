@@ -10,6 +10,7 @@ import { assertNoScreenshotOverlays, closeOpenApplications } from '../pageOps/pa
 
 import { runCraftExecutionAsserts, runFullProfileGatherAsserts } from './phase-e-asserts.mjs';
 import { runCountChatCards } from './phase-e-count-chat-cards.mjs';
+import { runUnderChatCards } from './phase-e-under-chat-cards.mjs';
 
 export async function runPhaseEAlchemyAndJournal(ctx, { appShell }) {
   const { page, results, screenshot } = ctx;
@@ -296,6 +297,8 @@ export async function runPhaseEAlchemyAndJournal(ctx, { appShell }) {
   // Issue 2006: the success-counting cards, asserted in every profile and captured with the rest,
   // after the post-craft inventory frame so their tokens and charms never reach it.
   await runCountChatCards(ctx);
+  // Issue 2005: the roll-under cards and the refusal, asserted and captured the same way.
+  await runUnderChatCards(ctx);
 
   // Cheap API crafts, tool breakages, salvage, negative gating, and one guaranteed-success
   // gather — no screenshots, so they run in every profile.
