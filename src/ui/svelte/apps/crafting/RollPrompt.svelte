@@ -62,6 +62,25 @@
     settled = true;
     onDismiss();
   }
+
+  // The footer note is already the button's accessible name (issue 2007 UX-L1): a `title` equal to
+  // an untruncated note makes some assistive tech announce it twice. `title` is worth adding only
+  // when the one-line ellipsis actually clips the note, so it is measured per action and kept
+  // truthy only then.
+  let truncatedNotes = $state({});
+
+  function measureNoteOverflow(node, key) {
+    const measure = () => {
+      truncatedNotes = { ...truncatedNotes, [key]: node.scrollWidth > node.clientWidth + 0.5 };
+    };
+    measure();
+    return {
+      update: (nextKey) => {
+        key = nextKey;
+        measure();
+      },
+    };
+  }
 </script>
 
 <ManagerModal
@@ -221,11 +240,13 @@
         data-action={action.action}
         data-keyboard-focus="true"
         aria-label={action.name}
-        title={action.note || undefined}
+        title={action.note && truncatedNotes[action.action] ? action.note : undefined}
         onclick={action.submit
           ? undefined
           : (event) => answer(event.currentTarget.form, action.action)}
-        ><span>{action.label}</span>{#if action.note}<small class="action-note">{action.note}</small
+        ><span>{action.label}</span>{#if action.note}<small
+            class="action-note"
+            use:measureNoteOverflow={action.action}>{action.note}</small
           >{/if}</button
       >
     {/each}
@@ -474,7 +495,8 @@
     background: var(--fab-accent);
     color: var(--fab-on-accent);
   }
-  /* One line: the full note is the button's accessible name and its `title`. */
+  /* One line: the full note is always the button's accessible name, and its `title` too once this
+     ellipsis actually clips it (measured in the script above). */
   .action-note {
     display: block;
     max-width: 100%;
