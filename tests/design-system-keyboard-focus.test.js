@@ -7,7 +7,8 @@ import {
   KNOWN_ROLE_FOCUS_TARGETS,
   KNOWN_ROLE_FOCUS_TARGET_TOTAL,
 } from './components/design-system-known-debt.js';
-import { assertRatchet, tallyByKey } from './helpers/ratchetBaseline.js';
+import { assertRatchet } from './helpers/ratchetBaseline.js';
+import { tallyByKey } from './helpers/codePointOrder.js';
 import {
   UI_TEMPLATE_ROOT,
   attributeText,

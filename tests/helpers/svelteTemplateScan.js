@@ -4,7 +4,7 @@ import path from 'node:path';
 
 import { parse } from 'svelte/compiler';
 
-import { byCodePoint } from './ratchetBaseline.js';
+import { byCodePoint } from './codePointOrder.js';
 import { repoRoot } from './sourceScan.js';
 
 /** The repository-relative root every UI template lives under. */

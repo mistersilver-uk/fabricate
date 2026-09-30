@@ -126,16 +126,17 @@ A change does not rewrite comments in files it is not otherwise editing, unless 
 
 This workflow produced each of these shapes repeatedly, and each already has a rule that answers it; naming them together is what stops review approving them one at a time.
 
-- Comments that argue a case, retell history, or shout in ALL-CAPS, answered by the comment rules above and measured per directory by `tests/comment-share-ledger.txt`.
-- Adding to the nearest large file or function instead of extracting a unit, answered by `tests/file-size-ledger.txt`.
-- Pinning how code is written with a `Source.includes(` assertion, answered by `tests/source-pin-ledger.txt`.
+- Comments that argue a case, retell history, or shout in ALL-CAPS, answered by the comment rules above and measured per directory by `tests/comment-share-ratchet.test.js`.
+- Adding to the nearest large file or function instead of extracting a unit, answered by `tests/file-size-ratchet.test.js`.
+- Pinning how code is written with a `Source.includes(` assertion, answered by `tests/source-pin-ratchet.test.js`.
 - Redeclaring a shared helper locally, answered by `tests/scalar-helper-duplicates.test.js` and `tests/category-shim-bindings.test.js`.
 - An issue delta, lane brief, or handover that runs to tens of kilobytes, answered by stating the decision rather than how it was reached.
 - A file or component header longer than [`.agents/component-header-template.md`](.agents/component-header-template.md).
 
 Each ledger is a ceiling rather than an exact count, so a unit that stays under its row costs no ledger edit at all; a ceiling is raised in a feature PR only with the reason stated in the PR, and lowered by this epic's sweeps with `TIGHTEN_<X>_LEDGER=1`.
 A ceiling gate cannot tell that a condensation sweep finished, so a PR whose stated purpose is condensation, extraction or pin conversion runs that tighten mode for every ledger it moves and commits the result, and a reviewer treats a sweep PR that leaves those ledgers byte-identical as `NEEDS_CHANGES`.
-`tests/source-pin-ledger.txt` and `tests/foundry-global-reads-ledger.txt` carry no headroom, because one more pin or bare read is never the same debt as the last one, so there the gate enforces that obligation itself: a row left above the unit it bounds fails as `SLACK` and is banked with the tighten mode in the same PR that earned it.
+`tests/foundry-global-reads-ledger.txt` carries no headroom, because one more bare read is never the same debt as the last one, so there the gate enforces that obligation itself: a row left above the unit it bounds fails as `SLACK` and is banked with the tighten mode in the same PR that earned it.
+`tests/source-pin-ratchet.test.js` allows no rise in a file's pin count against the base commit, because one more pin is never the same debt as the last one, so a legitimate new pin carries a `ratchet-exempt(source-pin): <reason>` marker at its site instead of a banked row.
 
 ## FoundryVTT Notes and Architecture Pointers
 
