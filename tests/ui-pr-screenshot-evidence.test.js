@@ -16,7 +16,7 @@ import { deflateSync } from 'node:zlib';
 
 // CODE POINT, not `localeCompare`: a recipe-id list compared by equality must order identically
 // on every machine, and `localeCompare` is locale-dependent.
-import { byCodePoint } from './helpers/ratchetBaseline.js';
+import { byCodePoint } from './helpers/codePointOrder.js';
 import {
   SMOKE_SOURCE,
   SMOKE_SOURCE_SEGMENTS,

@@ -21,7 +21,7 @@ import {
 import { SPAWN_TOOLS, WRITE_TOOLS, parseBindingsTable } from '../scripts/lib/agentModelTiers.js';
 import { allErrors } from '../scripts/validate-agent-bindings.mjs';
 
-import { byCodePoint } from './helpers/ratchetBaseline.js';
+import { byCodePoint } from './helpers/codePointOrder.js';
 
 const REPOSITORY_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const readRepo = (rel) => {

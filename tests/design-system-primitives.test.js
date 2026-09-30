@@ -26,7 +26,8 @@ import {
   KNOWN_UNREGISTERED_SHARED_COMPONENTS,
   KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL,
 } from './components/design-system-known-debt.js';
-import { assertRatchet, tallyByKey } from './helpers/ratchetBaseline.js';
+import { assertRatchet } from './helpers/ratchetBaseline.js';
+import { tallyByKey } from './helpers/codePointOrder.js';
 
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -827,7 +828,7 @@ const APP_DIRECTORY = 'src/ui/svelte/apps/';
 
 test('(f) no file under components/ imports from the application tree', () => {
   // The dependency graph inverted rather than a source pin: `importersOf` is measured, so this adds
-  // no `tests/source-pin-ledger.txt` row and no specifier's spelling can satisfy it.
+  // no pin to `tests/source-pin-ratchet.test.js` and no specifier's spelling can satisfy it.
   const appRenderFiles = RENDER_FILES.filter((file) => file.startsWith(APP_DIRECTORY));
   assert.ok(
     appRenderFiles.length >= 200,
