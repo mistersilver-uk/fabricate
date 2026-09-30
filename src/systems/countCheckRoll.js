@@ -17,7 +17,7 @@ import {
 } from './checkRollOutput.js';
 import { classifyCheckTotal, forcedFailureTier, resolveForcedOutcome } from './checkRouting.js';
 import { actorRollData, checkTargetRefusal } from './checkTarget.js';
-import { namedPoolRefusal } from './countCheck.js';
+import { countFlavorSuffix, namedPoolRefusal } from './countCheck.js';
 import { countRollReport, reportedCountDisplay } from './countDisplayEvidence.js';
 import { COUNT_CHECK_REFUSALS, countCheckPasses, resolvePool } from './countEvaluation.js';
 import { CountRollRefusal, findCountRoll } from './countRoll.js';
@@ -81,7 +81,8 @@ export async function evaluateCountCheckRoll(actor, options = {}) {
     const refusal = { ok: false, reason: error.reason, refusedInput: error.refusedInput };
     return { engine: true, refusal, modifierPlacement: placement };
   }
-  const posting = { roll, options, flavor: decision.flavor, rollMode: decision.rollMode };
+  const flavor = countFlavor(decision.flavor, options);
+  const posting = { roll, options, flavor, rollMode: decision.rollMode };
   await postCheckRoll({ ...posting, preRolls });
   const handoff = checkRollHandoff({ ...posting, placement });
   return {
@@ -92,6 +93,16 @@ export async function evaluateCountCheckRoll(actor, options = {}) {
     resolvedFormula: null,
     ...(handoff && { rollHandoff: handoff }),
   };
+}
+
+/**
+ * The flavor the count Roll posts: a pass/fail or relative check names its required count after
+ * the caller's flavor and before any chosen-modifier label, as a summed target is named.
+ */
+function countFlavor(flavor, options) {
+  if (typeof flavor !== 'string' || !Number.isInteger(options?.required)) return flavor;
+  const base = flavor.startsWith(options.flavor ?? '\0') ? options.flavor : flavor;
+  return `${base}${countFlavorSuffix(options.required)}${flavor.slice(base.length)}`;
 }
 
 /** A count refusal's misconfigured result: its reason, the input it names, and a sentence. */

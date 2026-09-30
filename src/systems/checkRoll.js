@@ -35,7 +35,7 @@ import {
   progressiveTargetRefusal,
   targetFlavorSuffix,
 } from './checkTarget.js';
-import { preparedCountEvaluation } from './countCheck.js';
+import { preparedCountEvaluation, preparedCountOptions } from './countCheck.js';
 import {
   evaluateCountCheckRoll,
   preparedCountResult,
@@ -517,7 +517,7 @@ export async function evaluatePreparedRunCheck(
         toolContributions: config.toolContributions ?? [],
         evaluation,
         speaker: preparation?.speaker ?? config.speaker ?? null,
-        ...count?.rollOptions,
+        ...preparedCountOptions(count, { secret, kind, type: config.type }),
         // A pass/fail roll names its final target; a secret one never carries it.
         ...(kind === 'simple' && !secret && { flavorTarget: anchor }),
         reportVisibility: true,
