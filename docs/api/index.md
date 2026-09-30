@@ -684,7 +684,8 @@ The concept has a name, and the name has two axes that must not be collapsed.
 
 So this is **not "a Fabricate check"**.
 A Fabricate check is taken on a subject inside a crafting system and carries that system's modifier catalogue, combination rule, tool bonuses, authored triggers, tier stepping and failure-result policy.
-A Standalone Check Roll is `@`-placeholder resolution against the actor's roll data, the retired-placeholder shim, the Advantage/Disadvantage rewrite, the situational-bonus input with its formula-validity net, the roll mode and the chat post, and the pass/fail or raw-total answer — **without the system-derived terms**, because there is no system and no subject to derive them from.
+A Standalone Check Roll is `@`-placeholder resolution against the actor's roll data, the retired-placeholder shim, the default advantage rule applied to the formula's authored first dice group (issue 2007; ruling R2 — keep, one extra die, disadvantage offered, kept by direction, since a companion authors no advantage rule of its own), the situational-bonus input with its formula-validity net, the roll mode and the chat post, and the pass/fail or raw-total answer — **without the system-derived terms**, because there is no system and no subject to derive them from.
+A count row's forwarded Advantage answers ±1 die on the pool, the same default the record's `countDice` default states.
 If you want a system's modifiers applied, route a real craft or salvage instead.
 
 {: .warning }
@@ -739,8 +740,9 @@ An unresolved or non-numeric `pool.base` or `pool.threshold` refuses the outcome
 A pool that resolves to zero or fewer dice answers `checkFailed` with no Roll constructed at all.
 An interactive count request opens Fabricate's roll prompt, which shows the dice pool and the successes needed rather than a formula or DC, and a situational bonus there adds dice or moves the threshold, as the pool's `modifierDestination` says.
 A forwarded `rollDecision` applies its bonus the same way without opening the prompt.
-Advantage and bought dice are not offered on a count yet: an interactive count request that forwards `advantage: 'advantage'` or `'disadvantage'`, or whose `pool.additionalDice.enabled` is `true`, refuses `evaluationUnsupported` before anything is prompted or rolled.
-A non-interactive count request with additional dice enabled rolls its authored pool alone.
+An interactive or forwarded count request that carries Advantage or Disadvantage moves `poolDelta` by the check's `countDice` (issue 2007; ±1 by default), the same rule a crafting or salvage count check honours, rather than refusing.
+Additional (bought) dice are not offered on a count yet: a count request whose `pool.additionalDice.enabled` is `true` still refuses `evaluationUnsupported` before anything is prompted or rolled, pending #2008.
+A non-interactive count request naming neither rolls its authored pool alone.
 
 A malformed evaluation returns `evaluationInvalid`.
 A valid evaluation whose mode is absent from the advertised rows returns `evaluationUnsupported`.
