@@ -27,7 +27,7 @@ export function planOwnedItemComponentRestamp(item, systems) {
     // An unsafe system id can never have been written as a `roles` key, so there is nothing to
     // back-fill and a write would mis-nest.
     if (!isSafeFlagKeySegment(systemId)) continue;
-    const components = Array.isArray(system?.components) ? system.components : [];
+    const components = Array.isArray(system?.components) ? system.components : []; // ratchet-exempt(world-scope): restamp
     if (components.length === 0) continue;
     // Already resolves in THIS system (durable identity or raw source refs) ⇒ not name-only.
     if (resolveComponentForItem(item, components, systemId)) continue;

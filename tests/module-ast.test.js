@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import { byCodePoint } from './helpers/codePointOrder.js';
 import {
   calledName,
   identifierNames,
@@ -9,7 +10,6 @@ import {
   parseModule,
   walkNodes,
 } from './helpers/moduleAst.js';
-import { byCodePoint } from './helpers/codePointOrder.js';
 
 test('positions are unshifted, unlike a synthetic script wrapper', () => {
   const { ast } = parseModule('const a = 1;\nconst b = 2;\n');

@@ -4,11 +4,12 @@
  * `ratchet-exempt(file-size): <reason>` marker at the unit says why. Engine: `mergeBaseRatchet.js`.
  */
 import assert from 'node:assert/strict';
-import { extname, join, resolve } from 'node:path';
+import { extname, resolve } from 'node:path';
 import test, { after } from 'node:test';
 
 import { byCodePoint } from './helpers/codePointOrder.js';
 import { compareToBase, reportComparison } from './helpers/mergeBaseRatchet.js';
+import { MARKER_ONLY } from './helpers/siteMarkers.js';
 import { collectSources, repoRoot } from './helpers/sourceScan.js';
 import { createTempGitRepo } from './helpers/temp-git-repo.js';
 import {
@@ -36,7 +37,8 @@ const GUIDANCE =
   'a unit crossed its threshold in this change, "rose" that an oversized one grew: extract a ' +
   'cohesive unit instead of adding to the nearest large one. A function is matched by its ' +
   'qualified name, same-named `#N` siblings and renames by size, so a rename is not new; a piece ' +
-  'split out of an oversized function that is still oversized says "split further".';
+  'split out of an oversized function that is still oversized says "split further". A line that ' +
+  'is only a ratchet-exempt marker is not counted, so any family may record a reason inside a unit.';
 
 const inCorpus = (file) =>
   file.startsWith(`${CORPUS_ROOT}/`) && SCANNED_EXTENSIONS.includes(extname(file));
@@ -64,15 +66,23 @@ function functionsOf(file, text) {
   }
 }
 
+/** The 1-based lines of `text` that are only a marker: a recorded reason for any family, not growth. */
+function markerOnlyLines(text) {
+  return text.split('\n').flatMap((line, index) => (MARKER_ONLY.test(line) ? [index + 1] : []));
+}
+
 /** Every file and function one side lists, oversized or not, since matching sees them all. */
 function measureUnits(readFile, listFiles) {
   return listFiles().flatMap((file) => {
     const text = readFile(file);
     if (text === undefined) return [];
+    const markers = markerOnlyLines(text);
+    const within = (first, count) =>
+      markers.filter((line) => line >= first && line < first + count).length;
     const whole = {
       file,
       id: FILE_ID,
-      amount: physicalLines(text),
+      amount: physicalLines(text) - markers.length,
       lines: [1],
       limit: thresholdOf(file),
     };
@@ -80,7 +90,7 @@ function measureUnits(readFile, listFiles) {
       file,
       id: `function ${unit.symbol}`,
       symbol: unit.symbol,
-      amount: unit.lines,
+      amount: unit.lines - within(unit.line, unit.lines),
       lines: [unit.line],
       limit: FUNCTION_THRESHOLD,
     }));
@@ -121,13 +131,19 @@ function matchFunctions(baseUnits, headUnits) {
   }
   for (const [name, bases] of baseGroups) if (!headGroups.has(name)) baseLeft.push(...bases);
   const renamed = pairBySize(baseLeft.filter(oversized), headLeft);
-  return { pairs: [...pairs, ...renamed.pairs], added: renamed.headLeft, removed: renamed.baseLeft };
+  return {
+    pairs: [...pairs, ...renamed.pairs],
+    added: renamed.headLeft,
+    removed: renamed.baseLeft,
+  };
 }
 
 /** A new oversized unit in a file whose oversized functions lost lines was split out of them. */
 function addedId(unit, shrunk) {
   const sources = shrunk.filter((was) => was.file === unit.file).map((was) => was.symbol);
-  return sources.length === 0 ? unit.id : `${unit.id} (split from ${sources.join(', ')}: split further)`;
+  return sources.length === 0
+    ? unit.id
+    : `${unit.id} (split from ${sources.join(', ')}: split further)`;
 }
 
 /** Keep the oversized units of both sides, a function keyed by its match on the other side. */
@@ -156,7 +172,9 @@ function pairUnits(baseEntries, headEntries) {
       if (oversized(was)) base.push({ ...was, id });
     }
     base.push(...removed);
-    for (const unit of added.filter(oversized)) head.push({ ...unit, id: addedId(unit, shrunk) });
+    for (const unit of added) {
+      if (oversized(unit)) head.push({ ...unit, id: addedId(unit, shrunk) });
+    }
   }
   return { base, head };
 }
@@ -183,7 +201,10 @@ test('the measurement still sees the oversized units of the whole tree', (t) => 
     extensions: [...SCANNED_EXTENSIONS],
   });
   const files = Object.keys(corpus);
-  const units = measureUnits((file) => corpus[file], () => files).filter(oversized);
+  const units = measureUnits(
+    (file) => corpus[file],
+    () => files
+  ).filter(oversized);
   const oversizedFiles = units.filter((unit) => unit.id === FILE_ID).length;
   t.diagnostic(`${oversizedFiles} oversized files and ${units.length - oversizedFiles} functions`);
   assert.ok(files.length > SCAN_FLOOR, `only ${files.length} files scanned`);
@@ -195,7 +216,9 @@ test('the measurement still sees the oversized units of the whole tree', (t) => 
 });
 
 const repos = [];
-after(() => repos.forEach((repo) => repo.dispose()));
+after(() => {
+  for (const repo of repos) repo.dispose();
+});
 
 /** A repository whose first commit holds `files`; the gate compares its working tree with it. */
 function srcRepo(files) {
@@ -273,7 +296,11 @@ test('a reasoned marker at the unit exempts it, and an empty one fails', () => {
   repo.write({
     'src/a.js': moduleOf(
       fn('kept', 5),
-      fn('table', 140, '// ratchet-exempt(file-size): one lookup table, split it and it reads worse')
+      fn(
+        'table',
+        140,
+        '// ratchet-exempt(file-size): one lookup table, split it and it reads worse'
+      )
     ),
     'src/b.js': moduleOf(fn('b', 5), fn('bare', 110, '// ratchet-exempt(file-size):')),
   });
@@ -286,6 +313,23 @@ test('a reasoned marker at the unit exempts it, and an empty one fails', () => {
     'src/b.js:6 has a ratchet-exempt(file-size) marker with no reason; write why the regression ' +
       'is legitimate after the colon',
   ]);
+});
+
+test("a line that is only another family's marker is not growth, and a code line still is", () => {
+  const view = '<p>x</p>\n'.repeat(510);
+  const repo = srcRepo({ 'src/a.js': moduleOf(fn('huge', 120)), 'src/View.svelte': view });
+  const marked = (size) =>
+    moduleOf(fn('huge', size)).replace(
+      '  void 0;',
+      '  // ratchet-exempt(world-scope): x\n  void 0;'
+    );
+  repo.write({
+    'src/a.js': marked(120),
+    'src/View.svelte': `<!-- ratchet-exempt(design-system): a reason -->\n${view}`,
+  });
+  assert.deepEqual(repo.compare().failures, []);
+  repo.write({ 'src/a.js': marked(121) });
+  assert.deepEqual(repo.compare().failures, ['src/a.js: function huge rose from 120 to 121']);
 });
 
 test('a symbol is matched across every function, so a small one growing past the line fails', () => {
@@ -315,7 +359,9 @@ test('a same-named sibling added before an oversized one does not renumber it in
   repo.write({ 'src/a.js': moduleOf(hook(4), hook(120)) });
   assert.deepEqual(repo.compare().failures, []);
   repo.write({ 'src/a.js': moduleOf(hook(4), hook(121)) });
-  assert.deepEqual(repo.compare().failures, ['src/a.js: function Hooks.on#2 (was Hooks.on) rose from 120 to 121']);
+  assert.deepEqual(repo.compare().failures, [
+    'src/a.js: function Hooks.on#2 (was Hooks.on) rose from 120 to 121',
+  ]);
 });
 
 test('a piece split out of an oversized function that is still oversized says split further', () => {

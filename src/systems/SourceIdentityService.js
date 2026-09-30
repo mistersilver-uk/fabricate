@@ -135,7 +135,7 @@ export async function autoStampRecipeItemSources(io) {
 export async function autoStampComponentSources(io) {
   return autoStampSources(io, {
     flagKeyFor: (systemId) => io.componentRoleFlagKey(systemId),
-    entriesOf: (system) => system.components || [],
+    entriesOf: (system) => system.components || [], // ratchet-exempt(world-scope): restamp
     uuidOf: (component) => component?.originItemUuid || component?.registeredItemUuid,
   });
 }
@@ -145,7 +145,7 @@ export async function autoStampComponentSources(io) {
 export async function autoStampToolSources(io) {
   return autoStampSources(io, {
     flagKeyFor: (systemId) => io.toolRoleFlagKey(systemId),
-    entriesOf: (system) => system.tools || [],
+    entriesOf: (system) => system.tools || [], // ratchet-exempt(world-scope): restamp
     uuidOf: (tool) => tool?.originItemUuid || tool?.registeredItemUuid,
   });
 }
@@ -394,7 +394,7 @@ function buildRepairKinds(io) {
       bucket: 'components',
       flagKey,
       systemId: system.id,
-      definitions: system.components || [],
+      definitions: system.components || [], // ratchet-exempt(world-scope): restamp
       refExtractor: (def) => getItemMatchUuids(def),
     });
     const toolFlagKey = io.toolRoleFlagKey(system.id);
@@ -404,6 +404,7 @@ function buildRepairKinds(io) {
         bucket: 'tools',
         flagKey: toolFlagKey,
         systemId: system.id,
+        // ratchet-exempt(world-scope): restamp
         definitions: (system.tools || []).filter(
           (tool) => tool && (tool.originItemUuid || tool.registeredItemUuid)
         ),

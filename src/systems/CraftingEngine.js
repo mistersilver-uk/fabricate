@@ -450,7 +450,7 @@ export class CraftingEngine {
     const { evaluation } = checkTarget;
     const preparedTools = await this._prepareToolCheckBonuses(
       activeCheck.rollFormula,
-      prepared.toolValidation.tools,
+      prepared.toolValidation.tools, // ratchet-exempt(world-scope): not-a-system
       evaluation
     );
     const rollFormula = preparedTools.formula;
@@ -2014,7 +2014,7 @@ export class CraftingEngine {
       essenceSpend: executedHistorySnapshots.resolutionSnapshot
         ? { labels: {}, carriers: [] }
         : undefined,
-      toolPairs: [...prepared.toolValidation.tools],
+      toolPairs: [...prepared.toolValidation.tools], // ratchet-exempt(world-scope): not-a-system
     };
     // A stage that already spent its inputs at START never re-consumes or re-spends here: it
     // resolves against the snapshot the start commit persisted.
@@ -2031,6 +2031,7 @@ export class CraftingEngine {
       alchemySubmittedItems: isAlchemy ? alchemySubmittedItems : null,
     });
 
+    // ratchet-exempt(world-scope): not-a-system
     if (shouldUseTools && prepared.toolValidation.tools.length > 0) {
       effects.push({
         effectId: 'apply-tools',
@@ -2044,7 +2045,7 @@ export class CraftingEngine {
           );
           state.usedTools = await this._applyToolBreakage(
             prepared.executionRecipe,
-            prepared.toolValidation.tools,
+            prepared.toolValidation.tools, // ratchet-exempt(world-scope): not-a-system
             {
               forceBreak: decision.forceBreak,
               authority: decision.authority,
@@ -2317,7 +2318,7 @@ export class CraftingEngine {
     }
     const toolReceipt = receipts['apply-tools'];
     if (toolReceipt) {
-      state.usedTools = cloneJsonValue(toolReceipt.tools) ?? [];
+      state.usedTools = cloneJsonValue(toolReceipt.tools) ?? []; // ratchet-exempt(world-scope): not-a-system
       if (Array.isArray(toolReceipt.resolvedTools)) {
         state.toolPairs = toolReceipt.resolvedTools.map(rehydrateVersionedToolPair);
       }
@@ -3247,7 +3248,7 @@ export class CraftingEngine {
       craftingActor,
       { excludedItems: consumedLiveItems }
     );
-    const toolItems = toolValidation.valid ? toolValidation.tools || [] : [];
+    const toolItems = toolValidation.valid ? toolValidation.tools || [] : []; // ratchet-exempt(world-scope): not-a-system
 
     const resolutionService =
       this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
@@ -3787,6 +3788,7 @@ export class CraftingEngine {
           executionRecipe,
           checkResult
         );
+        // ratchet-exempt(world-scope): not-a-system
         usedTools = await this._applyToolBreakage(executionRecipe, toolValidation.tools, {
           forceBreak: breakDecision.forceBreak,
           authority: breakDecision.authority,
@@ -3823,7 +3825,7 @@ export class CraftingEngine {
       ingredientSet,
       consumedItems,
       consumedRunRefs,
-      toolItems: toolValidation.tools,
+      toolItems: toolValidation.tools, // ratchet-exempt(world-scope): not-a-system
       usedTools,
       resolvedEssences,
       resultGroupId: options?.resultGroupId || null,
@@ -5394,7 +5396,7 @@ export class CraftingEngine {
       definition.sourceComponentId || definition.associatedSystemItemId || '';
     if (sourceComponentId) {
       // The legacy `items` alias is not a scoped corpus and keeps its raw read.
-      const components = Array.isArray(system?.components)
+      const components = Array.isArray(system?.components) // ratchet-exempt(world-scope): guard
         ? resolvedComponentsFor(system)
         : Array.isArray(system?.items)
           ? system.items
@@ -6417,6 +6419,7 @@ export class CraftingEngine {
       lines.push(`${type} essence: have ${have}, need ${need}`);
     }
 
+    // ratchet-exempt(world-scope): not-a-system
     for (const tool of missing.tools || []) {
       lines.push(`Tool (${toolDisplayReference(tool, recipe, this.recipeManager)}): missing`);
     }
@@ -7170,7 +7173,7 @@ function rehydrateVersionedItem(snapshot = {}) {
 /** The tool half of a stage plan: the uuids the plan records and the live documents it holds. One
  * reader, so the live-resolution and start-snapshot paths cannot describe tools differently. */
 function versionedToolPlan(toolValidation) {
-  const tools = toolValidation.tools;
+  const tools = toolValidation.tools; // ratchet-exempt(world-scope): not-a-system
   return {
     plan: {
       toolItemUuids: tools

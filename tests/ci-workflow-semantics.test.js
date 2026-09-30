@@ -84,7 +84,6 @@ test('CI runs full gates for source events in either draft state and isolates me
     'check-screenshots',
     'lint',
     'lint-commits',
-    'lint-debt',
     'unit-tests',
     'validate-bindings',
   ];

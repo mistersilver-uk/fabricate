@@ -5,8 +5,13 @@ import { join, resolve } from 'node:path';
 
 import { measureImporters } from '../scripts/lib/componentImporters.js';
 import { compoundsOf, ruleBlocks } from '../scripts/lib/stylesheetLiveClasses.js';
+import {
+  TEMPLATE_CORPUS,
+  nativeSelectSites,
+  templatesOf,
+  workingTree,
+} from './helpers/designSystemRatchet.js';
 import { collectSources } from './helpers/sourceScan.js';
-import { KNOWN_NATIVE_SELECT_ELEMENTS } from './components/design-system-known-debt.js';
 import { collectStyleCorpus, splitSelectorList } from './helpers/styleBlockScan.js';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
@@ -178,14 +183,22 @@ test('the element-typed leg scan is alive, so the clause below is not quantifyin
     `only ${legs.length} element-typed \`select\` legs found across both corpora, so the ` +
       'selector walk has stopped seeing them'
   );
-  // The renderers ARE the native-select ratchet's rows, so the scan is pinned to that baseline
-  // rather than to a floor a converted file's prose could hold up.
+  // The renderers ARE the files the native-select gate's parsed-template walk finds a `<select>`
+  // in, so this text scan is checked against that walk rather than against a floor a converted
+  // file's prose could hold up.
+  const tree = workingTree(TEMPLATE_CORPUS);
+  const parsed = nativeSelectSites(templatesOf(tree.readFile, tree.listFiles()));
+  assert.ok(parsed.length > 0, 'the parsed-template walk found no `<select>` to check against');
   assert.deepEqual(
-    [...RENDERS_SELECT].filter(([, renders]) => renders).map(([file]) => file).sort(),
-    [...new Set(KNOWN_NATIVE_SELECT_ELEMENTS.map((row) => row.key))].sort(),
-    'the templates this scan says render a `<select>` are not the native-select baseline, so a ' +
-      'leg would be judged against hosts that do not render one, or every leg would report as ' +
-      'stranded and the baseline below would be measuring the scan rather than the sheet'
+    [...RENDERS_SELECT]
+      .filter(([, renders]) => renders)
+      .map(([file]) => file)
+      .sort(),
+    [...new Set(parsed.map((site) => site.file))].sort(),
+    'the templates this scan says render a `<select>` are not the ones the native-select gate ' +
+      'parses one out of, so a leg would be judged against hosts that do not render one, or every ' +
+      'leg would report as stranded and the baseline below would be measuring the scan rather ' +
+      'than the sheet'
   );
 });
 
@@ -225,7 +238,8 @@ test('the stranded baseline shrinks and is never added to', () => {
     'these baseline entries no longer match a stranded leg. That is the GOOD direction — the ' +
       'rule was deleted or a `<select>` came back — and the entry must be deleted with it, ' +
       'because a spent entry silently re-permits the next stranded leg with the same ' +
-      'selector:\n  ' + spent.join('\n  ')
+      'selector:\n  ' +
+      spent.join('\n  ')
   );
 });
 

@@ -69,8 +69,8 @@ function _normalizeToolBreakageAuthority(raw) {
 }
 
 function normalizeSystemComponents(system, validEssenceIds, salvageContext) {
-  const rawManagedItems = Array.isArray(system.components)
-    ? system.components
+  const rawManagedItems = Array.isArray(system.components) // ratchet-exempt(world-scope): writer
+    ? system.components // ratchet-exempt(world-scope): writer
     : Array.isArray(system.managedItems)
       ? system.managedItems
       : system.items;
@@ -88,8 +88,8 @@ function normalizeSystemComponents(system, validEssenceIds, salvageContext) {
 /** First-class Tools (issue 561): a component-linked tool derives source refs and snapshot from
  * its component, after component normalization, so it matches owned items by source. */
 function normalizeSystemTools(system, items, itemById, validToolPrerequisiteIds) {
-  const normalizedTools = Array.isArray(system.tools)
-    ? system.tools.map((t) => normalizeTool(t, { validPrerequisiteIds: validToolPrerequisiteIds }))
+  const normalizedTools = Array.isArray(system.tools) // ratchet-exempt(world-scope): writer
+    ? system.tools.map((t) => normalizeTool(t, { validPrerequisiteIds: validToolPrerequisiteIds })) // ratchet-exempt(world-scope): writer
     : [];
   for (const normalizedTool of normalizedTools) {
     if (deriveToolSourceFromComponents(normalizedTool, items) && !normalizedTool.description) {
@@ -216,7 +216,7 @@ export function normalizeSystem(system = {}, basis) {
   const systemId = system.id || foundry.utils.randomID();
   const features = normalizeFeatures(system);
   const essenceDefinitions = normalizeEssenceDefinitions(
-    system.essenceDefinitions ?? system.essences
+    system.essenceDefinitions ?? system.essences // ratchet-exempt(world-scope): writer
   );
   const recipeItemDefinitions = normalizeRecipeItemDefinitions(
     system.recipeItemDefinitions ?? system.recipeItems

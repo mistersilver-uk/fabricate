@@ -73,8 +73,9 @@ export async function applyBulkEditToComponents(
   const { essenceIds: validEssenceIds } = io.scopeBasis(system);
   const salvageContext = io.salvageNormalizationContext(system);
   const changedIds = [];
+  // ratchet-exempt(world-scope): writer
   for (let idx = 0; idx < system.components.length; idx += 1) {
-    const component = system.components[idx];
+    const component = system.components[idx]; // ratchet-exempt(world-scope): writer
     if (!targetIds.has(String(component.id))) continue;
 
     const currentTags = Array.isArray(component.tags) ? component.tags : [];
@@ -93,6 +94,7 @@ export async function applyBulkEditToComponents(
       nextTags = nextTags.filter((tag) => !removeTags.has(String(tag).toLowerCase()));
     }
 
+    // ratchet-exempt(world-scope): writer
     system.components[idx] = io.normalizeComponent(
       {
         ...component,
@@ -106,7 +108,7 @@ export async function applyBulkEditToComponents(
     );
     changedIds.push(String(component.id));
   }
-  if (changedIds.length > 0) advanceDefinitionRevision(system.components);
+  if (changedIds.length > 0) advanceDefinitionRevision(system.components); // ratchet-exempt(world-scope): writer
 
   if (changedIds.length > 0 && options.persist !== false)
     await io.saveSystems({ put: system, domains: COMPONENT_FACTS });
@@ -363,7 +365,7 @@ export async function applyBulkEditToEssences(io, systemId, essenceIds, edit = {
   const hasEnabled = Object.hasOwn(bulkEdit, 'enabled');
   if (!hasIcon && !hasColorToken && !hasEnabled) return { updated: 0, essenceIds: [] };
 
-  const definitions = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];
+  const definitions = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : []; // ratchet-exempt(world-scope): writer
   const changedIds = [];
   const next = definitions.map((definition) => {
     if (!targetIds.has(String(definition?.id ?? ''))) return definition;

@@ -193,7 +193,7 @@ export async function runSalvageCheck(engine, ctx) {
   const { actor, component, options, salvageRunManager, system, toolValidation } = ctx;
   const checkResult = await engine._runSalvageCraftingCheck(component, system, actor, {
     interactive: options?.interactive === true,
-    toolItems: toolValidation.tools,
+    toolItems: toolValidation.tools, // ratchet-exempt(world-scope): not-a-system
     rollDecision: options?.rollDecision ?? null,
   });
   ctx.checkResult = checkResult;
@@ -277,6 +277,7 @@ export async function resolveSalvageFailure(engine, ctx) {
       // Salvage parity (issue 419): the FAILURE path breaks required tools only
       // when `breakToolsOnFail === true` (this gate), matching crafting.
       const salvageFailBreak = engine._resolveSalvageBreakageDecision(system, checkResult);
+      // ratchet-exempt(world-scope): not-a-system
       usedTools = await engine._applyToolBreakage(syntheticRecipe, toolValidation.tools, {
         forceBreak: salvageFailBreak.forceBreak,
         authority: salvageFailBreak.authority,
@@ -307,7 +308,7 @@ export async function resolveSalvageFailure(engine, ctx) {
           actor,
           resultGroups: failureResultGroups,
           consumedItems: consumedOnFail,
-          tools: toolValidation.tools,
+          tools: toolValidation.tools, // ratchet-exempt(world-scope): not-a-system
           salvageRecipeView: failureSalvageRecipeView,
           checkResult,
         })
@@ -414,6 +415,7 @@ export async function commitSalvage(engine, ctx) {
   // Salvage parity (issue 419): the SUCCESS path always applies breakage (no
   // `breakToolsOnFail` gate exists here), via the shared seam.
   const salvageSuccessBreak = engine._resolveSalvageBreakageDecision(system, checkResult);
+  // ratchet-exempt(world-scope): not-a-system
   const usedTools = await engine._applyToolBreakage(syntheticRecipe, toolValidation.tools, {
     forceBreak: salvageSuccessBreak.forceBreak,
     authority: salvageSuccessBreak.authority,
@@ -427,7 +429,7 @@ export async function commitSalvage(engine, ctx) {
     actor,
     resultGroups,
     consumedItems,
-    tools: toolValidation.tools,
+    tools: toolValidation.tools, // ratchet-exempt(world-scope): not-a-system
     salvageRecipeView,
     checkResult,
   });

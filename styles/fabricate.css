@@ -20361,7 +20361,7 @@
 
 /* `proto:1417`: `Outcome routing` is a `--fab-bg-1` well behind a hairline at radius 9, headed by a micro-label. */
 
-/* skin census (issue 1523): two unpinned carrier classes in one carrier block — no hit for either under tests/ or scripts/ except this branch's own repetition baseline, which pins `.manager-salvage-dc-card` at two appearances (`tests/components/selector-repetition- baseline.json`), so an adoption that deletes this rule must re-derive that table; both are emitted by `ComponentEditView.svelte`. */
+/* skin census (issue 1523): two unpinned carrier classes in one carrier block — no hit for either under tests/ or scripts/; both are emitted by `ComponentEditView.svelte`. */
 .fabricate-manager .manager-salvage-routing-card,
 .fabricate-manager .manager-salvage-dc-card {
   padding: var(--fab-space-3);
