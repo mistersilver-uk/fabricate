@@ -33,6 +33,7 @@ import {
   normalizePath,
   parseLabActorTableRegions,
   parseMountRegions,
+  parseRunStateRegions,
   partitionConsoleErrors,
   publishableCases,
   WORLD_PARTIES_SEARCH_TERM,
@@ -55,6 +56,8 @@ import { emittingHalfOf } from './helpers/interactablesSmokeLocators.js';
 import { collectWorkingTreeSources } from './helpers/sourceScan.js';
 import { SOURCES, walkTemplate } from './helpers/primitiveAdoptionContract.js';
 import { buildLabContent } from './view-lab/world/labContent.js';
+import { LAB_HISTORY_DATA_STATES } from './view-lab/world/labHistoryEvidence.js';
+import { LAB_JOURNAL_CASE_STATE_RUN_IDS } from './view-lab/world/labRunStates.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -2212,7 +2215,8 @@ test('system Travel Map evidence is populated and long-label focus cannot duplic
   assert.equal(longLabel.distinctEvidenceGroup, stacked.distinctEvidenceGroup);
   assert.match(mountSource, /longTravelLabels: params\.get\('longTravelLabels'\) === '1'/);
   assert.match(worldSource, /Map Region Links Across the Active Scene/);
-  assert.match(runnerSource, /evidence frame is byte-identical to/);
+  // The check itself is exercised in `tests/view-lab-render-pool.test.js`; this pins that it runs.
+  assert.match(runnerSource, /rejectDuplicateEvidence\(cases, outcomes\)/);
 });
 
 test('system Travel Map no-regions evidence reaches its world through the lab flag', () => {
@@ -3012,30 +3016,78 @@ function caseLiteralLines(id) {
   return Array.from({ length: end - start + 1 }, (_, offset) => start + offset);
 }
 
-test('a labRunStates change selects the player windows that render runs — not none, not all', () => {
-  // Its whole output is the three actor run containers and the `gatheringBlindRuns` world setting,
-  // and only the player window reads either: the Journal in its entirety, the Crafting tab's run
-  // summary, the Gathering tab's in-flight rows.
-  const selected = selectedIds(['tests/view-lab/world/labRunStates.js']);
-  const everything = publishableCases();
-  const players = everything.filter((viewCase) => viewCase.app === 'fabricate-app');
+const LAB_RUN_STATES_PATH = 'tests/view-lab/world/labRunStates.js';
+const labRunStatesFile = fileAt(LAB_RUN_STATES_PATH);
 
-  assert.ok(selected.length > 0, 'a run-state change must select evidence, not none');
-  assert.ok(
-    selected.length < everything.length,
-    'a run-state change must not still select every frame'
+/** Every line of one run state's entries, in both of the fixture's tables. */
+function runStateLines(state) {
+  const regions = parseRunStateRegions(labRunStatesFile.source).filter(
+    (region) => region.key === state
   );
+  assert.equal(regions.length, 2, `"${state}" must have a run-id entry and a factory entry`);
+  return regions.flatMap(({ start, end }) =>
+    Array.from({ length: end - start + 1 }, (_, offset) => start + offset)
+  );
+}
 
-  // Derived, not listed: EVERY player case and ONLY player cases, so a player case added tomorrow
-  // is covered without anyone remembering to add its id anywhere.
+/** The publishable cases whose query names one run state, derived rather than listed. */
+const casesOfRunState = (state) =>
+  publishableCases()
+    .filter((viewCase) => viewCase.query?.journalCaseState === state)
+    .map((viewCase) => viewCase.id);
+
+test('the run-state fixture parses into an entry for every state its run table names', () => {
+  const regions = parseRunStateRegions(labRunStatesFile.source);
+  assert.ok(regions, `${LAB_RUN_STATES_PATH} no longer parses into its run-state tables`);
+  // The spread history-data states are defined in their own module, which a patch names instead.
+  const named = Object.keys(LAB_JOURNAL_CASE_STATE_RUN_IDS).filter(
+    (state) => !LAB_HISTORY_DATA_STATES.includes(state)
+  );
+  assert.deepEqual([...new Set(regions.map((region) => region.key))].sort(), named.sort());
+});
+
+test('adding one run state to labRunStates selects only the cases that render it', () => {
+  const state = 'paused';
+  const expected = casesOfRunState(state);
+  const players = publishableCases().filter((viewCase) => viewCase.app === 'fabricate-app');
+  assert.ok(expected.length > 0, `no case renders "${state}", so this proves nothing`);
+  assert.ok(expected.length < players.length, 'one state must be narrower than every player case');
+
   assert.deepEqual(
-    selected,
-    players.map((viewCase) => viewCase.id)
+    selectedIds([LAB_RUN_STATES_PATH], labRunStatesFile.patches(runStateLines(state))),
+    expected
   );
-  assert.ok(
-    selected.includes('fabricate-journal'),
-    'the Journal is the run browser; it cannot be outside a run-state selection'
+  // A line inside a multi-line factory entry belongs to that entry, not to shared code.
+  const continuation = labRunStatesFile.lineOf("        waiting('lab-v1-paused', single(), {");
+  assert.deepEqual(
+    selectedIds([LAB_RUN_STATES_PATH], labRunStatesFile.patches([continuation])),
+    expected
   );
+});
+
+test('an unattributable labRunStates patch widens to every player-window case, by union', () => {
+  const helper = labRunStatesFile.lineOf('function stageBrowserRun(context, recipe, pastCheck = null) {');
+  const importLine = labRunStatesFile.lineOf("} from './labJournalPrototype.js';");
+  // Derived, not listed: every player case, so one added tomorrow is covered unmapped.
+  const players = publishableCases()
+    .filter((viewCase) => viewCase.app === 'fabricate-app')
+    .map((viewCase) => viewCase.id);
+
+  assert.deepEqual(selectedIds([LAB_RUN_STATES_PATH]), players, 'no patch at all');
+  for (const line of [helper, importLine]) {
+    assert.deepEqual(
+      selectedIds([LAB_RUN_STATES_PATH], labRunStatesFile.patches([line])),
+      players,
+      `line ${line} sits outside every run state's entry`
+    );
+  }
+
+  const withState = new Set(
+    selectedIds([LAB_RUN_STATES_PATH], labRunStatesFile.patches([helper, ...runStateLines('paused')]))
+  );
+  for (const id of [...players, ...casesOfRunState('paused')]) {
+    assert.ok(withState.has(id), `the union dropped "${id}"`);
+  }
 });
 
 test('every lab input the registry cannot attribute selects surface coverage', () => {
@@ -3059,6 +3111,9 @@ test('every lab input the registry cannot attribute selects surface coverage', (
     'tests/view-lab/world/labNobodyHasAttributedThisYet.js',
     'scripts/lib/foundryChromeSpec.js',
     'scripts/view-lab-screenshots.mjs',
+    'scripts/lib/viewLabRenderPool.js',
+    'scripts/lib/viewLabShards.js',
+    'scripts/view-lab-shards.mjs',
   ]) {
     assert.deepEqual(
       selectedIds([file]),
@@ -5064,12 +5119,47 @@ test('the capture workflow renders and publishes the one id list it computed', (
     1,
     'a second id list would let render and publish disagree about what the PR selected'
   );
+  // Sharded (issue 2119): the shard plan is cut from that same list, each render shard consumes
+  // its own slice of it, and the merge is checked against the whole list before anything publishes.
   assert.match(
     workflow,
-    /CASE_IDS: \$\{\{ steps\.select\.outputs\.ids }}/,
-    "the renderer must consume the selection step's own output"
+    /view-lab-shards\.mjs plan "\$IDS" "\$HAS_UI"/,
+    'the shard plan must be cut from the one computed id list'
   );
-  assert.match(workflow, /view-lab-screenshots\.mjs apps "\$CASE_IDS"/);
+  assert.match(workflow, /include: \$\{\{ fromJSON\(needs\.select\.outputs\.matrix\) }}/);
+  assert.match(
+    workflow,
+    /CASE_IDS: \$\{\{ matrix\.ids }}\n\s+run: node scripts\/view-lab-screenshots\.mjs apps "\$CASE_IDS"/,
+    'each render shard must render exactly its own slice'
+  );
+  assert.match(
+    workflow,
+    /CASE_IDS: \$\{\{ needs\.select\.outputs\.ids }}\n\s+run: node scripts\/view-lab-shards\.mjs merge "\$CASE_IDS" ui-screenshot-artifact\/shards ui-screenshot-artifact\/apps/,
+    'the merge must account for the whole selection and write the directory publish reads'
+  );
+  assert.match(workflow, /name: view-lab-shard-\$\{\{ matrix\.shard }}/);
+  assert.match(workflow, /pattern: view-lab-shard-\*\n\s+path: ui-screenshot-artifact\/shards/);
+  // Only PNGs and the manifest leave a shard, named file by file (the LICENSING header).
+  assert.match(
+    workflow,
+    /path: \|\n\s+ui-screenshot-artifact\/apps\/\*\.png\n\s+ui-screenshot-artifact\/apps\/manifest\.json\n/
+  );
+  assert.doesNotMatch(workflow, /path:[^\n]*foundry-chrome/);
+  // The chrome-dependent suites verify one harvest, so they run once, in their own job beside the
+  // shards, and the publish still waits for them.
+  const jobOf = (name) => {
+    const start = workflow.indexOf(`\n  ${name}:\n`);
+    assert.notEqual(start, -1, `pr-screenshots.yml has no ${name} job`);
+    const next = workflow.slice(start + 1).search(/\n {2}[a-z-]+:\n/);
+    return workflow.slice(start, next === -1 ? undefined : start + 1 + next);
+  };
+  assert.match(jobOf('verify-chrome'), /- name: Run every chrome-dependent suite/);
+  assert.doesNotMatch(jobOf('render'), /chrome-dependent suite, where/);
+  assert.match(jobOf('verify-chrome'), /\n {4}needs: \[select, warm-foundry]\n/);
+  assert.match(jobOf('capture'), /\n {4}needs: \[select, render, verify-chrome]\n/);
+  for (const name of ['render', 'verify-chrome']) {
+    assert.match(jobOf(name), /uses: \.\/\.github\/actions\/prepare-view-lab\n/);
+  }
 
   // The publish step names the directory the renderer writes. Derived from the runner rather than
   // trusted twice, so a moved output directory fails here instead of publishing an empty set.

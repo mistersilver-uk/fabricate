@@ -58,7 +58,7 @@ const UI_PATH_PATTERN = /^(src\/ui\/|styles\/)|\.(svelte|css)$/;
  * the case files it reads.
  */
 const LAB_INFRASTRUCTURE_PATTERN =
-  /^(tests\/view-lab\/|scripts\/lib\/view-lab-cases\/|scripts\/lib\/viewLab(?:Cases|LayoutAssertion)\.js$|scripts\/lib\/foundryChromeSpec\.js$|scripts\/view-lab-screenshots\.mjs$)/;
+  /^(tests\/view-lab\/|scripts\/lib\/view-lab-cases\/|scripts\/lib\/viewLab(?:Cases|LayoutAssertion|RenderPool|Shards)\.js$|scripts\/lib\/foundryChromeSpec\.js$|scripts\/view-lab-(?:screenshots|shards)\.mjs$)/;
 
 /** The helper that enforces the opt-in responsive layout contract. */
 const LAYOUT_ASSERTION_PATH = 'scripts/lib/viewLabLayoutAssertion.js';
@@ -68,6 +68,9 @@ const LAB_ACTORS_PATH = 'tests/view-lab/world/labActors.js';
 
 /** The page that mounts every frame, as a diff names it. Attributed by marked region — see below. */
 const LAB_MOUNT_PATH = 'tests/view-lab/mount.js';
+
+/** The lab's run-state fixture, as a diff names it. Attributed by run state — see below. */
+const LAB_RUN_STATES_PATH = 'tests/view-lab/world/labRunStates.js';
 
 /** The lab's interactables fixture, as a diff names it. Attributed whole-file — see below. */
 const LAB_INTERACTABLES_PATH = 'tests/view-lab/world/labInteractables.js';
@@ -323,6 +326,9 @@ const labActorSourceLines = memoized(() =>
 const mountSourceLines = memoized(() =>
   readSourceLines(new URL(`../../${LAB_MOUNT_PATH}`, import.meta.url))
 );
+const runStateSourceLines = memoized(() =>
+  readSourceLines(new URL(`../../${LAB_RUN_STATES_PATH}`, import.meta.url))
+);
 
 /** One case file's `CASES` array body, with the file line number its first line has. */
 function caseArrayBody(sourceLines) {
@@ -511,6 +517,103 @@ export function parseMountRegions(sourceLines) {
 const mountLineRegions = memoized(() => parseMountRegions(mountSourceLines()));
 
 /**
+ * The two tables in `labRunStates.js` keyed by run state: the run each state selects, and the
+ * factory that builds it. Each is the lines between `open` and `close`, searched from `within`.
+ */
+const RUN_STATE_TABLES = Object.freeze([
+  Object.freeze({
+    within: 'export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({',
+    open: 'export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({',
+    close: '});',
+    indent: 2,
+  }),
+  Object.freeze({
+    within: 'function journalCaseFactories(context) {',
+    open: '  return {',
+    close: '  };',
+    indent: 4,
+  }),
+]);
+
+/** A table entry's opening line, after its indent: `'state':` or `state:`. */
+const RUN_STATE_KEY_PATTERN = /^(?:'([^']+)'|([A-Za-z_$][\w$]*)):/;
+
+/** A state named alone on a line of a spread list, as the history states are. */
+const RUN_STATE_LIST_ENTRY_PATTERN = /^\s+'([^']+)',$/;
+
+/** A bracket that closes an entry when it sits at the entry's own indent. */
+const RUN_STATE_CLOSE_PATTERN = /^[)\]}]/;
+
+/** The 0-based bounds of one run-state table, or null when the file no longer carries it. */
+function runStateTableSpan(sourceLines, { within, open, close }) {
+  const from = sourceLines.indexOf(within);
+  const start = from === -1 ? -1 : sourceLines.indexOf(open, from);
+  const end = start === -1 ? -1 : sourceLines.indexOf(close, start + 1);
+  return end === -1 ? null : { start, end };
+}
+
+/** The state a line at the entry indent opens, or null. */
+function runStateKeyAt(line, indent) {
+  if (!line.startsWith(' '.repeat(indent))) return null;
+  const keyed = RUN_STATE_KEY_PATTERN.exec(line.slice(indent));
+  return keyed ? (keyed[1] ?? keyed[2]) : null;
+}
+
+/** Fold one table line into the walk: extend, close or open an entry, or record a listed state. */
+function consumeRunStateLine(walk, line, lineNumber, indent) {
+  if (line.startsWith(' '.repeat(indent + 1))) {
+    const listed = walk.entry ? null : RUN_STATE_LIST_ENTRY_PATTERN.exec(line);
+    if (walk.entry) walk.entry.end = lineNumber;
+    if (listed) walk.regions.push({ key: listed[1], start: lineNumber, end: lineNumber });
+    return;
+  }
+  // A bracket at the entry's own indent closes it; anything else there — a comment, a spread —
+  // ends it without belonging to it.
+  if (walk.entry && RUN_STATE_CLOSE_PATTERN.test(line.slice(indent))) {
+    walk.entry.end = lineNumber;
+    walk.entry = null;
+    return;
+  }
+  const key = runStateKeyAt(line, indent);
+  walk.entry = key ? { key, start: lineNumber, end: lineNumber } : null;
+  if (walk.entry) walk.regions.push(walk.entry);
+}
+
+/** The 1-based, inclusive span of every entry in one run-state table, keyed by state. */
+function runStateTableRegions(sourceLines, table) {
+  const span = runStateTableSpan(sourceLines, table);
+  if (!span) return null;
+  const walk = { regions: [], entry: null };
+  for (let index = span.start + 1; index < span.end; index += 1) {
+    consumeRunStateLine(walk, sourceLines[index], index + 1, table.indent);
+  }
+  return walk.regions;
+}
+
+/**
+ * The 1-based, inclusive span of every run state's entry in `labRunStates.js`, in both tables. A
+ * factory for a state the run table does not name is a misparse, so the whole file widens.
+ */
+export function parseRunStateRegions(sourceLines) {
+  const [runIds, factories] = RUN_STATE_TABLES.map((table) =>
+    runStateTableRegions(sourceLines, table)
+  );
+  if (!runIds?.length || !factories?.length) return null;
+  const states = runIds.map((region) => region.key);
+  if (states.length !== new Set(states).size) return null;
+  if (factories.some((region) => !states.includes(region.key))) return null;
+  return [...runIds, ...factories];
+}
+
+const runStateLineRegions = memoized(() => parseRunStateRegions(runStateSourceLines()));
+
+/**
+ * @param {string} state A run state `labRunStates.js` defines.
+ * @returns {Function} The predicate accepting the cases whose query selects it.
+ */
+const rendersRunState = (state) => (viewCase) => viewCase.query?.journalCaseState === state;
+
+/**
  * @param {string} text A source line.
  * @returns {boolean} True when changing it cannot change a rendered frame.
  */
@@ -639,8 +742,12 @@ const ATTRIBUTED_LAB_INPUTS = Object.freeze([
     selects: (viewCase) => Boolean(viewCase.expectLayout),
   }),
   Object.freeze({
-    path: 'tests/view-lab/world/labRunStates.js',
-    selects: (viewCase) => viewCase.app === PLAYER,
+    path: LAB_RUN_STATES_PATH,
+    sourceLines: runStateSourceLines,
+    regions: runStateLineRegions,
+    selectsRegion: rendersRunState,
+    // Its whole output is player-only, so an edit it cannot attribute reaches every player frame.
+    widensTo: rendersInPlayerWindow,
   }),
   Object.freeze({
     path: LAB_ACTORS_PATH,
@@ -693,6 +800,10 @@ function casesFromRegionPatch(patch, attribution) {
   const ids = new Set();
   for (const key of keys) {
     for (const id of casesSelecting(attribution.selectsRegion(key))) ids.add(id);
+  }
+  if (unattributable && attribution.widensTo) {
+    for (const id of casesSelecting(attribution.widensTo)) ids.add(id);
+    return ids;
   }
   return widenedByCoverage(ids, unattributable);
 }

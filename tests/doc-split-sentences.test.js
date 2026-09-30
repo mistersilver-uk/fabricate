@@ -132,9 +132,9 @@ const DECOUNTED_COUNT = 4;
 /**
  * Historical policy sentences deliberately replaced, with both sides and the current destination
  * pinned so an ordinary lost instruction cannot hide in the exception (issues #1984, #1988, #1934,
- * #2118). `after` lists every sentence a split replacement became.
+ * #2118, #2119). `after` lists every sentence a split replacement became.
  */
-const APPROVING_ISSUES = new Set(['#1984', '#1988', '#1934', '#2118']);
+const APPROVING_ISSUES = new Set(['#1984', '#1988', '#1934', '#2118', '#2119']);
 
 const SUPERSEDED_POLICY = [
   {
@@ -297,6 +297,31 @@ const SUPERSEDED_POLICY = [
     survivesIn: '.agents/docs/foundry-and-architecture.md',
   },
   {
+    issue: '#2119',
+    before:
+      'A patch to `tests/view-lab/world/labRunStates.js` selects player cases alone, and it needs no content-anchoring, since its whole output is player-only.',
+    after:
+      "A patch to `tests/view-lab/world/labRunStates.js` selects only the cases whose `journalCaseState` names a run state the patch touches, found by that state's entry in the run-id table or the factory table.",
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    issue: '#2119',
+    before:
+      "The three patch-narrowed inputs — the case registry, the actor fixture and the mount page — locate a hunk by searching the rendered file for its own content instead of trusting the hunk header's line numbers; where that content recurs, the hunk is attributed at every location it could be and the answer is their union, which contains wherever the edit really landed.",
+    after:
+      "The four patch-narrowed inputs — the case registry, the actor fixture, the run-state fixture and the mount page — locate a hunk by searching the rendered file for its own content instead of trusting the hunk header's line numbers; where that content recurs, the hunk is attributed at every location it could be and the answer is their union, which contains wherever the edit really landed.",
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    // The registry counts stopped being generated into scripts/README.md (issue 2116).
+    issue: '#2119',
+    before:
+      'How many cases that is, and how many of them surface coverage selects, are generated into `scripts/README.md` rather than quoted here.',
+    after:
+      'How many cases that is, and how many of them surface coverage selects, are deliberately not quoted anywhere in prose: `publishableCases()` and `LAB_SURFACE_CASE_IDS` in the registry are the only counts.',
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
     issue: '#2118',
     // Three of the four ledgers became merge-base ratchets with no rows to share.
     before:
@@ -319,7 +344,7 @@ const SUPERSEDED_POLICY = [
 ];
 
 /** Pinned exactly: every entry excuses one historical sentence. */
-const SUPERSEDED_POLICY_COUNT = 20;
+const SUPERSEDED_POLICY_COUNT = 23;
 
 /**
  * Sentences a deliberate rename forced to change, where the only edit is an identifier (issue
