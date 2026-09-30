@@ -26,6 +26,7 @@ player-inventory-bulk-roll-prompt
 player-inventory-bulk-roll-prompt-under
 player-inventory-bulk-roll-prompt-under-attribute
 player-inventory-bulk-roll-prompt-count
+player-inventory-bulk-roll-prompt-advantage
 player-inventory-bulk-destroy-confirm
 player-inventory-bulk-broken-queued
 player-inventory-bulk-report

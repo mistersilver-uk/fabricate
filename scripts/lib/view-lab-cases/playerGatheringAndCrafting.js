@@ -12,6 +12,7 @@ import {
   CRAFTING_SIMPLE,
 } from './caseConstants.js';
 import { playerCase, responsiveLayout } from './caseFactories.js';
+import { playerAdvantagePromptCases } from './playerAdvantagePromptCases.js';
 import { playerCountResultCases } from './playerCountResultCases.js';
 
 /** The single-subject roll prompt: Fabricate's own modal, mounted over the player window. */
@@ -104,8 +105,11 @@ export const CASES = Object.freeze([
       { selector: '.crafting-recipe-row[data-recipe-id="sm-r-horseshoe"]' },
       { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
     ],
+    // Frame 27: Disadvantage and Advantage each state the keep rule under their label.
     expectSelector:
-      `${SINGLE_PROMPT}:has(button[data-action="advantage"])` +
+      SINGLE_PROMPT +
+      ':has(.manager-modal-footer button[data-action="disadvantage"] .action-note:text-is("keep the worse"))' +
+      ':has(.manager-modal-footer button[data-action="advantage"] .action-note:text-is("keep the better"))' +
       ':has(.manager-modal-subtitle:has-text("Bend Horseshoe"))' +
       ':has(.formula-content .formula:has-text("1d20 + 3"))' +
       ':has(.formula-content .manager-chip:has-text("DC 15 · meet or beat"))',
@@ -435,6 +439,7 @@ export const CASES = Object.freeze([
     steps: [...CRAFT_HORSESHOE],
     expectSelector:
       SINGLE_PROMPT +
+      COUNT_ADVANTAGE_FOOTER +
       ':has(.formula-content .formula[data-roll-prompt-count="over"]:text-is("6d10 · each ≥ 7"))' +
       ':has(.formula-content .formula-note:text-is("Success on ≥ 7 · explodes on 9 or above once · 2 or under cancels a success"))' +
       ':not(:has([data-roll-prompt-zero-pool]))' +
@@ -467,6 +472,7 @@ export const CASES = Object.freeze([
     steps: [...CRAFT_HORSESHOE],
     expectSelector:
       SINGLE_PROMPT +
+      COUNT_ADVANTAGE_FOOTER +
       ':has(.formula-content .formula[data-roll-prompt-count="over"]:text-is("0d10 · each ≥ 7"))' +
       ':has(button[type="submit"]:not([disabled]))' +
       ' .formula-content [data-roll-prompt-zero-pool]',
@@ -1221,4 +1227,5 @@ export const CASES = Object.freeze([
     sourceMatches: [CRAFTING_SHARED, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),
   ...playerCountResultCases(),
+  ...playerAdvantagePromptCases(),
 ]);

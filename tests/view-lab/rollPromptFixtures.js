@@ -24,9 +24,15 @@ export async function seedRollPromptFixture(world, state) {
     });
   }
   if (state === 'under') await seedRollUnder(world);
+  if (Object.hasOwn(ADVANTAGE_STATES, state)) await seedAdvantage(world, ADVANTAGE_STATES[state]);
   if (Object.hasOwn(EVIDENCE_STATES, state)) await seedCheckEvidence(world, EVIDENCE_STATES[state]);
   if (Object.hasOwn(SALVAGE_CHECKS, state)) await seedSalvageChecks(world, state);
   if (Object.hasOwn(COUNT_POOLS, state)) await seedCount(world, state);
+  if (Object.hasOwn(COUNT_ADVANTAGE, state)) {
+    await seedCount(world, 'count');
+    await patchSimpleCheck(world, 'lab-smithing', { advantage: COUNT_ADVANTAGE[state] });
+  }
+  if (state === 'journal-bonus') await seedJournalBonus(world);
   if (Object.hasOwn(COUNT_RESULT_STATES, state)) await seedCountResult(world, state);
   if (state === 'pick-one' || state === 'overflow') {
     const system = manager.getSystem('lab-herbalism');
@@ -208,6 +214,16 @@ const SALVAGE_CHECKS = {
     under({ source: 'attribute', expression: '@skills.smith.level' }),
     under(),
   ],
+  'salvage-advantage-mixed': () => SALVAGE_CHECKS['salvage-under'](),
+};
+
+/** Issue 2007: both salvage checks offer a bonus die, of different sizes, so the batch agrees on
+ * the buttons and on no note. */
+const SALVAGE_ADVANTAGE = {
+  'salvage-advantage-mixed': [
+    { mode: 'bonus', bonusExpression: '1d6' },
+    { mode: 'bonus', bonusExpression: '1d8' },
+  ],
 };
 
 /**
@@ -217,6 +233,7 @@ const SALVAGE_CHECKS = {
  */
 async function seedSalvageChecks(world, state) {
   const [smithingEvaluation, runeworkEvaluation] = SALVAGE_CHECKS[state]();
+  const [smithingAdvantage, runeworkAdvantage] = SALVAGE_ADVANTAGE[state] ?? [];
   const salvager = world.actorList.find((actor) => actor.id === 'lab-actor-brenna');
   salvager.system.skills = { ...salvager.system.skills, smith: { level: 12 } };
   const rollFormula = smithingEvaluation.product === 'count' ? '' : '1d20';
@@ -226,14 +243,25 @@ async function seedSalvageChecks(world, state) {
     salvageCraftingCheck: {
       ...smithing.salvageCraftingCheck,
       enabled: true,
-      simple: { rollFormula, dc: 12, thresholdMode: 'meet', evaluation: smithingEvaluation },
+      simple: {
+        rollFormula,
+        dc: 12,
+        thresholdMode: 'meet',
+        evaluation: smithingEvaluation,
+        ...(smithingAdvantage && { advantage: smithingAdvantage }),
+      },
     },
   });
   const runework = manager.getSystem('lab-runework');
   await manager.updateSystem(runework.id, {
     salvageCraftingCheck: {
       ...runework.salvageCraftingCheck,
-      routed: { ...runework.salvageCraftingCheck.routed, rollFormula, evaluation: runeworkEvaluation },
+      routed: {
+        ...runework.salvageCraftingCheck.routed,
+        rollFormula,
+        evaluation: runeworkEvaluation,
+        ...(runeworkAdvantage && { advantage: runeworkAdvantage }),
+      },
     },
   });
 }
@@ -342,6 +370,75 @@ async function seedCompactChoice(world) {
         ...system.craftingCheck.defaultModifierIds,
         ...notes.map((note) => note.id),
       ],
+    },
+  });
+}
+
+/**
+ * Issue 2007's prompt footers on Smithing's simple crafting check: each state names its formula,
+ * its advantage rule over the default (keep, one extra die, disadvantage offered), whether it
+ * rolls under frame 29's target, and whether it narrates to chat for a result-card case.
+ */
+const BONUS_1D6 = Object.freeze({ mode: 'bonus', bonusExpression: '1d6' });
+const ADVANTAGE_STATES = {
+  'keep-multi': { rollFormula: '2d6 + @abilities.int.mod' },
+  'advantage-under': { under: true, rollFormula: '3d6' },
+  'advantage-bonus': { rollFormula: '2d6 + @abilities.int.mod', advantage: BONUS_1D6 },
+  'advantage-only': {
+    rollFormula: '2d6 + @abilities.int.mod',
+    advantage: { ...BONUS_1D6, offerDisadvantage: false },
+  },
+  'advantage-long': {
+    under: true,
+    rollFormula: '1d20',
+    advantage: { mode: 'bonus', bonusExpression: '2d4 + 1d6 + 1d8 + 1d10 + 2' },
+  },
+  'advantage-result-keep': { chat: true, rollFormula: '1d20 + @abilities.int.mod' },
+  // Disadvantage lowers frame 29's target of 11 by the pre-rolled `1d8 + 1`, to 2 at the least,
+  // which a `1d2` never exceeds.
+  'advantage-under-disadvantage': {
+    under: true,
+    rollFormula: '1d2',
+    advantage: { mode: 'bonus', bonusExpression: '1d8 + 1' },
+  },
+  // A total no roll can miss DC 15 with, so the card is a success whatever the dice.
+  'advantage-result-bonus': { chat: true, rollFormula: '1d4 + 20', advantage: BONUS_1D6 },
+};
+
+/** A counting pool offering two dice either way, then one offering none (frame 35's pool). */
+const COUNT_ADVANTAGE = {
+  'count-advantage': { countDice: 2 },
+  'count-advantage-off': { countEnabled: false },
+};
+
+async function seedAdvantage(world, { under: rollsUnder, chat, rollFormula, advantage = {} }) {
+  if (rollsUnder) await seedRollUnder(world);
+  await patchSimpleCheck(world, 'lab-smithing', { rollFormula, advantage }, chat);
+}
+
+/** Merge `patch` (its `advantage` over the check's own) into a system's simple crafting check. */
+async function patchSimpleCheck(world, systemId, { advantage, ...patch }, chatOutput = false) {
+  const manager = world.fabricate.craftingSystemManager;
+  const system = manager.getSystem(systemId);
+  const simple = system.craftingCheck.simple;
+  await manager.updateSystem(system.id, {
+    ...(chatOutput && { features: { ...system.features, chatOutput: true } }),
+    craftingCheck: {
+      ...system.craftingCheck,
+      simple: { ...simple, ...patch, advantage: { ...simple.advantage, ...advantage } },
+    },
+  });
+}
+
+/** Runework's routed check, which the Journal's versioned prompt reads, offers `1d8 + 1`. */
+async function seedJournalBonus(world) {
+  const manager = world.fabricate.craftingSystemManager;
+  const system = manager.getSystem('lab-runework');
+  const routed = system.craftingCheck.routed;
+  await manager.updateSystem(system.id, {
+    craftingCheck: {
+      ...system.craftingCheck,
+      routed: { ...routed, advantage: { ...routed.advantage, mode: 'bonus', bonusExpression: '1d8 + 1' } },
     },
   });
 }

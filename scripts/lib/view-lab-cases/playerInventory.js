@@ -553,10 +553,13 @@ export const CASES = Object.freeze([
       SHIFT_CLICK('lab-smithing:sm-air-shard'),
       { selector: '[data-inventory-bulk-salvage]' },
     ],
-    // Held to the prompt's own element, never to the tab.
+    // Held to the prompt's own element, never to the tab. The one row that rolls offers keep, so
+    // the batch does; the row with no check never joins the offer (issue 2007).
     expectSelector:
       '.fabricate-app .manager-modal[data-roll-prompt="bulk"]' +
       ':has(.manager-modal-title:has-text("Salvage checks"))' +
+      ':has(.bulk-need:text-is("No check"))' +
+      ':has(.manager-modal-footer button[data-action="advantage"] .action-note:text-is("keep the better"))' +
       ':has(.bulk-list + .bulk-note) .bulk-row',
     sourceMatches: [
       ...BULK_DEFAULTS.sourceMatches,
@@ -617,6 +620,27 @@ export const CASES = Object.freeze([
       ['Air Shard', '2 needed'],
       ['Ruined Slag', '1 needed'],
     ]),
+    sourceMatches: BULK_PROMPT_SOURCES,
+  }),
+  // Issue 2007: two bonus dice of different sizes, so the batch offers both buttons and no note.
+  playerCase({
+    ...BULK_DEFAULTS,
+    id: 'player-inventory-bulk-roll-prompt-advantage',
+    label: 'Player app — Inventory bulk roll prompt, rolls whose advantage notes differ',
+    query: { tab: 'inventory', dialog: 'open', rollPromptState: 'salvage-advantage-mixed' },
+    steps: [
+      ...chooseSelectOption('.inventory-grid-pagination [data-pagination-size]', '75'),
+      SHIFT_CLICK('lab-smithing:sm-air-shard'),
+      SHIFT_CLICK('lab-runework:rw-slag'),
+      { selector: '[data-inventory-bulk-salvage]' },
+    ],
+    expectSelector:
+      BULK_PROMPT +
+      ':has(.manager-modal-footer button[data-action="disadvantage"])' +
+      ':has(.manager-modal-footer button[data-action="normal"][type="submit"])' +
+      ':has(.manager-modal-footer button[data-action="advantage"])' +
+      ':not(:has(.action-note))' +
+      ' .bulk-list:has(> .bulk-row > .bulk-name:text-is("Ruined Slag") + .bulk-need:text-is("Target 11"))',
     sourceMatches: BULK_PROMPT_SOURCES,
   }),
   playerCase({

@@ -296,9 +296,22 @@ const FIXED_BANDS = Object.freeze([
 const ADVANTAGE_SOURCES = Object.freeze([
   /^src\/ui\/svelte\/apps\/manager\/checks\/(CheckPromptOptions\.svelte|checkAdvantageCopy\.js)$/,
 ]);
+const ADVANTAGE_VALIDATION_SOURCES = Object.freeze([
+  /^src\/ui\/svelte\/apps\/manager\/checks\/(?:ChecksValidationTab\.svelte|checksReadiness\.js|checksCopy\.js)$/,
+]);
 const ADVANTAGE_BLOCK = Object.freeze({ selector: '[data-check-advantage]', scroll: true });
 const advantageMode = (mode) => ({ selector: `[data-check-advantage-mode-option="${mode}"]` });
-const advantageCase = ({ id, label, frame, state, steps, expectSelector }) =>
+const CRAFTING_PANEL = '.fabricate-manager [data-checks-panel="crafting"]';
+const advantageCase = ({
+  id,
+  label,
+  frame,
+  state,
+  steps,
+  expectSelector,
+  scope = CRAFTING_PANEL,
+  ...rest
+}) =>
   managerCase({
     id,
     label: `Manager — Checks advantage authoring, ${label} (prototype state ${frame})`,
@@ -309,9 +322,10 @@ const advantageCase = ({ id, label, frame, state, steps, expectSelector }) =>
       : { system: 'lab-smithing' },
     steps: ['Checks', { selector: '#manager-checks-nav-crafting' }, ...steps, ADVANTAGE_BLOCK],
     expectView: 'checks-crafting',
-    expectSelector: `.fabricate-manager [data-checks-panel="crafting"] ${expectSelector}`,
-    kinds: ['manager', 'checks'],
+    expectSelector: `${scope} ${expectSelector}`,
+    kinds: rest.position ? ['manager', 'checks', 'responsive'] : ['manager', 'checks'],
     sourceMatches: ADVANTAGE_SOURCES,
+    ...rest,
   });
 const READOUT = '.fabricate-manager [data-checks-simulator-readout]';
 const rolledCase = ({
@@ -2151,7 +2165,19 @@ export const CASES = Object.freeze([
     steps: parityFormula('1d20 + @prof'),
     expectSelector:
       '[data-check-advantage]:has([data-check-advantage-mode-option="keep"].is-active)' +
+      ':has([data-check-advantage-extra][aria-valuetext="2d20"])' +
       ' [data-check-advantage-note]:text-is("Advantage rolls 2d20 and keeps the highest. Applies to the first dice group, 1d20.")',
+  }),
+  // The same block at the 1024x640 floor: segments, stepper and switch on the narrow card.
+  advantageCase({
+    id: 'manager-checks-crafting-advantage-keep-narrow',
+    label: 'roll extra, keep one, on 1d20, at 1024x640',
+    frame: '01',
+    steps: parityFormula('1d20 + @prof'),
+    position: { width: 1024, height: 640 },
+    expectSelector:
+      '[data-check-advantage]:has([data-check-advantage-extra][aria-valuetext="2d20"])' +
+      ' [data-check-advantage-disadvantage][aria-pressed="true"]',
   }),
   advantageCase({
     id: 'manager-checks-crafting-advantage-keep-multi',
@@ -2179,6 +2205,10 @@ export const CASES = Object.freeze([
     label: 'a first dice group that is not a plain die',
     frame: '— (new copy)',
     steps: parityFormula('(1d20+2)*2'),
+    // The ordinary average still reads, and the Roll section carries the readiness dot.
+    scope:
+      '.fabricate-manager:has([data-checks-section-dot="roll"])' +
+      ' [data-checks-panel="crafting"]:has([data-check-formula-average="25"])',
     expectSelector:
       '[data-check-advantage]:not(:has([data-check-advantage-extra]))' +
       ' [data-check-advantage-note]:has-text("is not a plain die")',
@@ -2246,5 +2276,50 @@ export const CASES = Object.freeze([
     expectSelector:
       '[data-check-advantage="count"]:has([data-check-advantage-count][aria-pressed="false"])' +
       ':not(:has([data-check-advantage-count-dice]))',
+  }),
+  // Validation lists the advantage faults. A check raises at most one keep fault and a system has
+  // two formula-bearing checks, so the three ids take two frames: Herbalism's crafting and salvage.
+  managerCase({
+    id: 'manager-checks-validation-advantage',
+    label: 'Manager — Checks validation, advantage rules the roll cannot honour',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      ...parityFormula('(1d20+2)*2'),
+      { selector: '#manager-checks-nav-salvage' },
+      advantageMode('bonus'),
+      { selector: '[data-check-advantage-bonus]', fill: '1d6x' },
+      { selector: '#manager-checks-nav-validation' },
+      { selector: '[data-issue="advantageKeepNoDie"]', scroll: true },
+    ],
+    expectView: 'checks-validation',
+    expectSelector:
+      '.fabricate-manager:has([data-issue="advantageKeepNoDie"][data-issue-severity="warning"])' +
+      ' [data-issue="advantageBonusInvalid"][data-issue-severity="critical"]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: ADVANTAGE_VALIDATION_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-checks-validation-advantage-reference',
+    label: 'Manager — Checks validation, advantage keeping a die after a character value',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-smithing' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      ...parityFormula('@abilities.int.mod + 1d20'),
+      { selector: '#manager-checks-nav-validation' },
+      { selector: '[data-issue="advantageKeepAfterReference"]', scroll: true },
+    ],
+    expectView: 'checks-validation',
+    expectSelector:
+      '.fabricate-manager [data-issue="advantageKeepAfterReference"][data-issue-severity="warning"]' +
+      ':has-text("advantage still applies only to 1d20")',
+    kinds: ['manager', 'checks'],
+    sourceMatches: ADVANTAGE_VALIDATION_SOURCES,
   }),
 ]);
