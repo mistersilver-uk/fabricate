@@ -7012,6 +7012,11 @@
               "DynamicNote": "Converting keeps the macro, and its return is then read as the successes needed.",
               "OverridesNote": "{names} override the DC but not the successes needed, so after converting they use the check's successes needed.",
               "OutOfRange": "It cannot be converted: it would need {value} successes, outside 0 to 20."
+            },
+            "Outcomes": {
+              "Success": "Reaches {required} successes — the {record}'s result group is produced in full.",
+              "SuccessOne": "Reaches 1 success — the {record}'s result group is produced in full.",
+              "Failure": "Fewer than {required} — nothing is produced; the failure policy decides the cost."
             }
           },
           "Digest": {

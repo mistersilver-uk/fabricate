@@ -31,7 +31,7 @@
   } from '../../../../../systems/normalize/checkEvaluation.js';
   import { countRequired } from '../../../../../systems/countCheck.js';
   import { activeCheckEvaluation } from '../../../../../systems/checkTarget.js';
-  import { checkTargetChip, formulaCardLead } from './checksCopy.js';
+  import { checkTargetChip, countOutcomeCopy, formulaCardLead } from './checksCopy.js';
   import { previewTierAdjustment } from './checkAdjustmentLabel.js';
   import {
     bandsAreEditable,
@@ -138,6 +138,8 @@
     const cancels = graded.pool.cancel.enabled;
     return countBandScale({ required: countTarget, zeroPool, cancels }, text);
   });
+  // The two outcomes read in the successes needed, in the prototype's words.
+  const countOutcomes = $derived(counts ? countOutcomeCopy(countTarget, recordNoun, text) : null);
   const readonlyScale = $derived(
     countScale ||
       previewScaleSentence(readonlyTarget, { direction: graded.direction, comparison }, text)
@@ -355,20 +357,22 @@
             dataAttr="data-simple-outcome"
             dataValue="success"
             title={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccess', 'Success')}
-            subtitle={text(
-              'FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccessDesc',
-              'The roll reaches the DC, and the recipe’s result group is produced in full.'
-            )}
+            subtitle={countOutcomes?.success ??
+              text(
+                'FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccessDesc',
+                'The roll reaches the DC, and the recipe’s result group is produced in full.'
+              )}
           />
           <IconFactRow
             icon="fas fa-circle-xmark"
             dataAttr="data-simple-outcome"
             dataValue="failure"
             title={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeFailure', 'Failure')}
-            subtitle={text(
-              'FABRICATE.Admin.Manager.Checks.Crafting.OutcomeFailureDesc',
-              'The roll misses the DC; nothing is produced, and the failure policy decides the cost.'
-            )}
+            subtitle={countOutcomes?.failure ??
+              text(
+                'FABRICATE.Admin.Manager.Checks.Crafting.OutcomeFailureDesc',
+                'The roll misses the DC; nothing is produced, and the failure policy decides the cost.'
+              )}
           />
         </div>
       </div>
