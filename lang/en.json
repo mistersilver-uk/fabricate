@@ -3076,6 +3076,15 @@
           "CheckTierDefaultAdjustment": "Default · base adjustment",
           "CheckTierTarget": "Target {dc}",
           "CheckTierUnnamed": "Unnamed tier",
+          "Count": {
+            "CheckTier": "{name} · {count} successes",
+            "CheckTierOne": "{name} · 1 success",
+            "CheckTierDefault": "Default",
+            "Pill": "{count} successes",
+            "PillOne": "1 success",
+            "PillDynamic": "Dynamic successes",
+            "Sort": "Successes needed"
+          },
           "BulkEdit": {
             "SelectedHeading": "{count} recipes selected",
             "SelectedHeadingOne": "1 recipe selected",
@@ -3101,6 +3110,12 @@
             "CheckTierNoTiers": "This system's crafting check authors no tiers, so every recipe uses its default DC. Add tiers under Checks to assign them here.",
             "CheckTierNoTiersTarget": "This system's crafting check authors no tiers, so every recipe uses its default target. Add tiers under Checks to assign them here.",
             "CheckTierNoTiersAdjustment": "This system's crafting check authors no tiers, so every recipe uses its base adjustment. Add tiers under Checks to assign them here.",
+            "Count": {
+              "CheckTierHint": "The successes needed these recipes roll for — not the check's outcome tiers.",
+              "CheckTierDefaultHint": "Clears every selected recipe to the system's default successes needed.",
+              "CheckTierDynamic": "This system's crafting check takes its successes needed from a macro at craft time, so recipes carry no tier to select.",
+              "CheckTierNoTiers": "This system's crafting check authors no tiers, so every recipe uses its default successes needed. Add tiers under Checks to assign them here."
+            },
             "Books": "Books & scrolls",
             "NoBooks": "This system defines no books or scrolls.",
             "BooksHint": "Pick one, then add it where missing or remove it where present",

@@ -119,6 +119,9 @@ const RAW_MODULES = [
   'src/ui/svelte/apps/manager/recipe/recipeOverviewSelectOptions.js',
   // …which names a character-value tier by its adjustment through the shared formatter.
   'src/utils/checkAdjustmentFormat.js',
+  // …and a count tier by its successes needed, the default's from the pool (issue 2006).
+  'src/systems/normalize/checkEvaluation.js',
+  'src/utils/fillPlaceholders.js',
   ...SEARCHABLE_POPOVER_RAW_MODULES,
   // A progressive stage row draws its component's complications read-only (issue 1286).
   'src/ui/model/complicationSummary.js',
@@ -601,6 +604,29 @@ describe('RecipeEditView (mounted)', () => {
       closeSelectPanel(target, TIER_TRIGGER);
       editHarness.remount();
     }
+  });
+
+  it('names each count tier by its successes needed, never its DC, and stages the pick (issue 2006)', async () => {
+    const patches = [];
+    const target = await editHarness.mount(
+      identityProps({
+        onUpdateRecipe: (patch) => patches.push(patch),
+        checkTierOptions: [
+          { id: 'tier-easy', name: 'Easy', dc: 12, successes: 3 },
+          { id: 'tier-unset', name: 'Unset', dc: 8, successes: null },
+        ],
+        checkEvaluation: { product: 'count', direction: 'under', pool: { required: 1 } },
+      })
+    );
+    assert.deepEqual(selectOptionLabels(target, TIER_TRIGGER), [
+      'Default · 1 success',
+      'Easy · 3 successes',
+      'Unset · — successes',
+    ]);
+    chooseSelectOption(target, TIER_TRIGGER, 'tier-easy');
+    await flushRender();
+    assert.deepEqual(patches.at(-1), { checkTierId: 'tier-easy' });
+    editHarness.remount();
   });
 
   it('threads the "Minimum success tier" dropdown through RecipeEditView to the Overview tab', async () => {
