@@ -1004,6 +1004,8 @@ export const VIEW_RECIPES = Object.freeze([
       'chat-craft-card-count-botch',
       'chat-craft-card-count-zero',
       'chat-craft-card-over-control',
+      // Issue 2007: the same count presenters also render the counting advantage case.
+      'chat-craft-card-advantage-count',
     ],
     matches: [
       /^src\/ui\/presenters\/(?:countDiceTiles|countEvidenceRows)\.js$/,
@@ -1014,12 +1016,17 @@ export const VIEW_RECIPES = Object.freeze([
   {
     id: 'chat-craft-card-under',
     label: 'Chat — roll-under crafting result cards, their refusal and the roll-over control',
+    // Issue 2007: the same sum-check presenters also render its keep, bonus-die and off cases.
     smokeLabels: [
       'chat-craft-card-under-pass',
       'chat-craft-card-under-fail',
       'chat-craft-card-under-otherwise',
       'chat-craft-card-under-misconfigured',
       'chat-craft-card-over-control',
+      'chat-craft-card-advantage-keep',
+      'chat-craft-card-advantage-keep-under',
+      'chat-craft-card-advantage-bonus',
+      'chat-craft-card-advantage-off',
     ],
     matches: [
       /^src\/ui\/presenters\/(?:checkDiceLine|checkEvidenceRows|checkDisplay|CraftingChatCard)\.js$/,
