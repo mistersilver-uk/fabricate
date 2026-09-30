@@ -1,5 +1,8 @@
 /** The single and bulk check prompt: view preparation, the modal surface and answer translation. */
-import { publicAdvantageOffer } from '../../../../systems/checkAdvantage.js';
+import {
+  bracketBonusExpression,
+  publicAdvantageOffer,
+} from '../../../../systems/checkAdvantage.js';
 import { isFixedSumOver } from '../../../../systems/checkTarget.js';
 import { describeCountPolicy } from '../../../../systems/countEvaluation.js';
 import { fill } from '../../../../utils/fillPlaceholders.js';
@@ -282,11 +285,6 @@ function formatCopy(data, choicePlan) {
   return formatted;
 }
 
-/** A bonus with more than one term, or a sign of its own, reads as one parenthesised quantity. */
-function bonusQuantity(expression) {
-  return /[+-]/.test(expression) ? `(${expression})` : expression;
-}
-
 /** The notes under Disadvantage and Advantage that the offer's rule states; none when mixed. */
 function actionNotes({ kind, detail }) {
   if (kind === 'keep') {
@@ -296,7 +294,7 @@ function actionNotes({ kind, detail }) {
     };
   }
   if (kind === 'bonus' && detail) {
-    const values = { expression: bonusQuantity(detail.expression) };
+    const values = { expression: bracketBonusExpression(detail.expression) };
     const [down, up] =
       detail.destination === 'target'
         ? [

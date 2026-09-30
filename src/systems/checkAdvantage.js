@@ -5,6 +5,7 @@
  */
 import {
   findKeepGroup,
+  splitTopLevelTerms,
   stripRetiredModifierPlaceholder,
 } from '../utils/craftingCheckExpression.js';
 import { diceEngine, formulaRolls } from '../utils/rollFormulaRollability.js';
@@ -21,6 +22,19 @@ const noOffer = () => ({ advantage: false, disadvantage: false, kind: null, deta
 /** Whether `expression` is a bonus die the prompt can offer; empty text is not. */
 export function isBonusExpression(expression) {
   return BONUS_GRAMMAR.test(String(expression ?? '').trim());
+}
+
+/**
+ * A canonical (already trimmed, leading `+` dropped) bonus expression as prompts and notes name
+ * it: bracketed when it carries more than one top-level term or a leading minus, so `1d8 + 1` and
+ * `-1d6` read as one signed quantity while `1d6` and `2` stand alone. The one decision `rollPrompt.js`
+ * and `checkAdvantageCopy.js` used to make separately, and disagreed on (`-1d6`).
+ */
+export function bracketBonusExpression(expression) {
+  const canonical = String(expression ?? '');
+  const unsigned = canonical.startsWith('-') ? canonical.slice(1) : canonical;
+  const bracket = unsigned !== canonical || splitTopLevelTerms(unsigned).length > 1;
+  return bracket ? `(${canonical})` : canonical;
 }
 
 function bonusOffer(rule, evaluation, Roll) {
