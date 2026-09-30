@@ -14,6 +14,21 @@ import { chooseSelectOption } from '../pageOps/selectControl.mjs';
 
 const PROMPT = '.manager-modal[data-roll-prompt]';
 
+/**
+ * Close every standing roll prompt through its own close control. Never Escape: with focus on the
+ * page body Foundry answers it by opening its main menu over the next prompt.
+ */
+async function dismissStandingPrompts(page) {
+  const close = page.locator(`${PROMPT} [data-manager-modal-close]`);
+  for (let attempt = 0; attempt < 5 && (await close.count()) > 0; attempt += 1) {
+    await close
+      .last()
+      .click({ timeout: 5000 })
+      .catch(() => {});
+    await page.waitForTimeout(200);
+  }
+}
+
 /** Seed the counting forge, its token and charm, and the crafter's tokens; returns the ids. */
 async function seedCountForge(page, crafterId) {
   return await page.evaluate(
@@ -103,10 +118,20 @@ function craftAndCollect(page, { recipeId, crafterId }) {
         componentSourceActors: [crafter],
       });
       const created = () => game.messages.contents.filter((message) => !before.has(message.id));
+      const pause = () => new Promise((resolve) => setTimeout(resolve, 250));
+      // The card and the count Roll post in either order, so wait for the card and then for the
+      // created messages to hold still for a second.
       const deadline = Date.now() + 10_000;
       while (created().every((m) => !m.content?.includes('fabricate-craft-chat'))) {
         if (Date.now() > deadline) break;
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        await pause();
+      }
+      let settled = 0;
+      for (let seen = created().length; settled < 4 && Date.now() < deadline; ) {
+        await pause();
+        const now = created().length;
+        settled = now === seen ? settled + 1 : 0;
+        seen = now;
       }
       return created().map((message) => {
         const roll = message.rolls?.[0] ?? null;
@@ -131,9 +156,18 @@ function craftAndCollect(page, { recipeId, crafterId }) {
   );
 }
 
+/** `promise`, or a rejection naming `what` once `ms` pass, so an unanswered prompt cannot hang. */
+function withinTime(promise, ms, what) {
+  let timer;
+  const expiry = new Promise((_resolve, reject) => {
+    timer = setTimeout(() => reject(new Error(`${what} within ${ms}ms`)), ms);
+  });
+  return Promise.race([promise, expiry]).finally(() => clearTimeout(timer));
+}
+
 /** Answer the prompt with a public roll, since only a public card states its evidence. */
 async function rollPublicly(page) {
-  const prompt = page.locator(PROMPT).first();
+  const prompt = page.locator(PROMPT).last();
   await prompt.waitFor({ state: 'visible', timeout: 15_000 });
   await chooseSelectOption(page, prompt.locator('.mode-field .fabricate-select-trigger'), {
     value: 'publicroll',
@@ -178,7 +212,7 @@ async function runCountCase(ctx, forge, { id, check }) {
     // Awaited below; this keeps a craft abandoned by a failed prompt from rejecting unobserved.
     crafted.catch(() => {});
     await rollPublicly(ctx.page);
-    const messages = await crafted;
+    const messages = await withinTime(crafted, 60_000, 'the craft never settled');
     const picked = pickCraftCardMessage(messages);
     if (picked.error) throw new Error(picked.error);
     const rollMessages = messages.map((message) => message.roll).filter(Boolean);
@@ -188,7 +222,7 @@ async function runCountCase(ctx, forge, { id, check }) {
     if (ctx.profile.RUN_SCREENSHOT_PHASES) await captureCountCard(ctx, id, picked.message.id);
   } catch (error) {
     // A prompt left standing would answer the next case's craft instead of its own.
-    await ctx.page.keyboard.press('Escape').catch(() => {});
+    await dismissStandingPrompts(ctx.page);
     ctx.results.steps.push({ step, passed: false, error: String(error?.message ?? error) });
     process.stderr.write(`  ${step} failed: ${error?.message ?? error}\n`);
   }
@@ -197,6 +231,7 @@ async function runCountCase(ctx, forge, { id, check }) {
 export async function runCountChatCards(ctx) {
   const { cleanup } = ctx.shared;
   process.stdout.write('  Crafting the success-counting chat card cases (#2006)...\n');
+  await dismissStandingPrompts(ctx.page);
   let forge;
   try {
     forge = await seedCountForge(ctx.page, cleanup.crafterId);
