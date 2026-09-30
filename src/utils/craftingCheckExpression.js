@@ -210,28 +210,34 @@ const NON_NUMERIC_DIE = /^\d*d[a-z]/i;
 const LITERAL_GROUP = /^(\d*(?:\.\d+)?)d(\d+(?:\.\d+)?)$/i;
 const MODIFIED_GROUP = /^\d*(?:\.\d+)?d\d+\S/i;
 
-/** Each non-empty term, carrying the sign an empty term before it left, its flavour stripped. */
+/** A leading unary `+` (the retirement shim's `+ 1d20` residue) signs nothing; others stay. */
+const unarySign = (lead, signs) => (lead.operator === null && signs === '+' ? null : signs);
+
+/** Each non-empty term, carrying the signs the empty terms before it left, its flavour stripped. */
 function signedOperands(formula) {
   const operands = [];
-  let sign = null;
+  let lead = null;
+  let signs = '';
   for (const term of splitTopLevelTerms(formula)) {
     if (term.text === '') {
-      sign ??= term;
+      if (lead) signs += term.operator;
+      lead ??= term;
       continue;
     }
     const bare = term.text.replaceAll(FLAVOUR_SPANS, '').trim();
     operands.push(
-      sign
+      lead
         ? {
             ...term,
             bare,
-            operator: sign.operator,
-            operatorIndex: sign.operatorIndex,
-            sign: term.operator,
+            operator: lead.operator,
+            operatorIndex: lead.operatorIndex,
+            sign: unarySign(lead, signs + term.operator),
           }
         : { ...term, bare, sign: null }
     );
-    sign = null;
+    lead = null;
+    signs = '';
   }
   return operands;
 }
@@ -242,21 +248,21 @@ const isPositiveLiteral = (operand) =>
   POSITIVE_LITERAL.test(operand.bare) &&
   Number(operand.bare) > 0;
 
-/** Added at index 0 or after `+`, or multiplied by positive literals only, on either side. */
+/**
+ * Added at index 0 or after `+`, multiplied only by positive literals on either side: a `*` chain
+ * before it, a `*`/`/` chain after it. `%` and references are never factors.
+ */
 function inAdditivePosition(operands, index) {
-  const { operator, sign } = operands[index];
-  const before = operands[index - 1];
-  const leads =
-    operator === null ||
-    operator === '+' ||
-    (operator === '*' && isPositiveLiteral(before) && [null, '+'].includes(before.operator));
+  let head = index;
+  while (operands[head].operator === '*' && isPositiveLiteral(operands[head - 1])) head -= 1;
   let next = index + 1;
   while (['*', '/'].includes(operands[next]?.operator)) {
     if (!isPositiveLiteral(operands[next])) return false;
     next += 1;
   }
+  const leads = [null, '+'].includes(operands[head].operator);
   const trails = next === operands.length || ['+', '-'].includes(operands[next].operator);
-  return sign === null && leads && trails;
+  return operands[index].sign === null && leads && trails;
 }
 
 /** Why a first dice group is not a plain literal `NdS`, or null when it is one. */
@@ -286,6 +292,8 @@ export function findKeepGroup(authoredFormula) {
   const index = operands.findIndex((operand) => HAS_DIE.test(operand.bare));
   if (index === -1) return { ok: false, reason: 'none' };
   const group = operands[index];
+  // Foundry constructs a negated operand as the parenthetical `(1d20 * -1)`.
+  if (group.sign?.includes('-')) return { ok: false, reason: 'nested' };
   const refusal = groupShapeRefusal(group.bare);
   if (refusal) return { ok: false, reason: refusal };
   if (!inAdditivePosition(operands, index)) return { ok: false, reason: 'position' };
@@ -297,6 +305,11 @@ export function findKeepGroup(authoredFormula) {
     prefix: group.operator === null ? '' : formula.slice(0, group.operatorIndex).trim(),
     referenceFirst: operands.slice(0, index).some((operand) => operand.bare.includes('@')),
   };
+}
+
+/** A stored `rollFormula`'s keep proof, read after the retirement shim as the engine reads it. */
+export function keepGroupOf(rollFormula, Roll = globalThis.Roll) {
+  return findKeepGroup(stripRetiredModifierPlaceholder(rollFormula, Roll));
 }
 
 export function rangesOverlap(a, b) {

@@ -14,8 +14,8 @@ import {
   normalizeNullableAdjustment,
 } from '../../../../../systems/normalize/checkEvaluation.js';
 import {
-  findKeepGroup,
   findRangeConflicts,
+  keepGroupOf,
   planRetiredPlaceholderStrip,
 } from '../../../../../utils/craftingCheckExpression.js';
 import { trimString as trimmed } from '../../../../../utils/scalars.js';
@@ -590,7 +590,7 @@ function countingFormulaReadiness(result, check, { mode, activity, components, g
 
 /**
  * The authored advantage rule's own readiness (issue 2007), read the same way the Studio's note
- * reads it: `keep` against `findKeepGroup`'s proof, `bonus` against the Studio's grammar. Inert
+ * reads it: `keep` against `keepGroupOf`'s proof, `bonus` against the Studio's grammar. Inert
  * under `off` and for a counting check, whose advantage reads only the count keys.
  */
 function advantageReadiness(check, evaluation) {
@@ -598,7 +598,7 @@ function advantageReadiness(check, evaluation) {
   const rule = normalizeCheckAdvantage(check?.advantage);
   const issues = [];
   if (rule.mode === 'keep') {
-    const group = findKeepGroup(trimmed(check?.rollFormula));
+    const group = keepGroupOf(check?.rollFormula);
     if (!group.ok && group.reason !== 'none') {
       pushIssue(issues, 'advantageKeepNoDie', 'warning');
     } else if (group.ok && group.referenceFirst) {

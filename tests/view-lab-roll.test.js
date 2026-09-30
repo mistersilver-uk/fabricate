@@ -402,6 +402,15 @@ test('a bare dN defaults to one die', async () => {
   assert.equal(roll.dice[0].results.length, 1);
 });
 
+test('a negated die totals negative, wrapped as core wraps it in `(… * -1)`', async () => {
+  const negated = await new (scriptedRoll([4], 6))('-1d6').evaluate();
+  assert.equal(negated.formula, '(1d6 * -1)');
+  assert.equal(negated.total, -4);
+  const offset = await new (scriptedRoll([7], 20))('-1d20 + 30').evaluate();
+  assert.equal(offset.formula, '(1d20 * -1) + 30');
+  assert.equal(offset.total, 23);
+});
+
 test('toMessage routes to ChatMessage.create and tolerates its absence', async () => {
   const Roll = makeRoll();
   const roll = await new Roll('1d6').evaluate();

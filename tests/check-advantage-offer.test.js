@@ -28,7 +28,7 @@ import { installCountDice } from './helpers/countEngineDice.js';
 import { countEvaluation } from './helpers/countFixtures.js';
 import { gatheringFixture } from './helpers/real-gathering-attempt.js';
 import { stubPromptSurface } from './helpers/rollPromptDialogStub.js';
-import { installTermBearingRoll } from './helpers/termBearingRoll.js';
+import { Die, installCoreDie, installTermBearingRoll } from './helpers/termBearingRoll.js';
 
 const OVER = { product: 'sum', direction: 'over' };
 const UNDER = { product: 'sum', direction: 'under' };
@@ -77,7 +77,8 @@ describe('resolveAdvantageOffer', () => {
   ];
   for (const [name, advantage, evaluation, authoredFormula, expected] of cases) {
     it(name, () => {
-      assert.deepEqual(resolveAdvantageOffer({ advantage, evaluation, authoredFormula }), expected);
+      const offer = resolveAdvantageOffer({ advantage, evaluation, authoredFormula, Die });
+      assert.deepEqual(offer, expected);
     });
   }
 
@@ -106,6 +107,20 @@ describe('resolveAdvantageOffer', () => {
     const offer = (Roll) => resolveAdvantageOffer({ advantage, evaluation: OVER, Roll });
     assert.deepEqual(offer(RefusingRoll), NONE, 'the maximized roll refuses it before any roll');
     assert.equal(offer(undefined).kind, 'bonus', 'the grammar alone admits it');
+  });
+
+  it('excludes keep without a Die class for the transform to act on', () => {
+    const offer = (dieClass) =>
+      resolveAdvantageOffer({ evaluation: OVER, authoredFormula: '1d20', Die: dieClass });
+    assert.deepEqual(offer(null), NONE);
+    assert.deepEqual(offer(Die), KEEP);
+  });
+
+  it('keeps the offer of a formula the retirement shim leaves behind a leading `+`', () => {
+    for (const authoredFormula of ['@craftingmod + 1d20', '+ 1d20', '@craftingmod + 2d6 + 1']) {
+      const offer = resolveAdvantageOffer({ evaluation: OVER, authoredFormula, Die });
+      assert.deepEqual(offer, KEEP, authoredFormula);
+    }
   });
 
   it('honours only an offered button', () => {
@@ -159,6 +174,7 @@ describe('intersectAdvantageOffers (MA19)', () => {
   });
 
   it('is what bulk salvage and the companion bulk decision offer', async () => {
+    restoreDice = installCoreDie();
     const salvage = await salvageOffer([
       { rollFormula: '1d20 + 3' },
       { rollFormula: '2d6 + 1', advantage: { offerDisadvantage: false } },
@@ -397,6 +413,7 @@ describe('every producer offers exactly resolveAdvantageOffer (MA17)', () => {
   });
 
   it('the descriptor fields are the offer after the retirement shim', () => {
+    restoreDice = installCoreDie();
     const config = { advantage: { offerDisadvantage: false } };
     assert.deepEqual(advantageOfferFields(config, OVER, '1d20 + @craftingModifier', undefined), {
       allowAdvantage: true,

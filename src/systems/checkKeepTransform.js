@@ -3,9 +3,9 @@
  * rolls `extraDice` more dice and keeps `n`, the best in the check's direction, never by string
  * rewriting. `Die` is core's `foundry.dice.terms.Die`; without it nothing is transformed.
  */
-import { findKeepGroup } from '../utils/craftingCheckExpression.js';
+import { keepGroupOf } from '../utils/craftingCheckExpression.js';
 
-import { offeredDecision, resolveAdvantageOffer } from './checkAdvantage.js';
+import { coreDieClass, offeredDecision, resolveAdvantageOffer } from './checkAdvantage.js';
 import { normalizeCheckAdvantage } from './normalize/checkAdvantage.js';
 
 /** Keeping the lowest dice is the advantage when a sum must come in under its target. */
@@ -28,7 +28,7 @@ export function planKeepTransform({ choice, evaluation, advantage, authoredFormu
   const offer = resolveAdvantageOffer({ advantage, evaluation, authoredFormula });
   if (offer.kind !== 'keep' || offeredDecision(offer, choice) === null) return null;
   return {
-    group: findKeepGroup(authoredFormula),
+    group: keepGroupOf(authoredFormula),
     keep: keepModifierFor(choice, evaluation?.direction),
     extraDice: normalizeCheckAdvantage(advantage).extraDice,
   };
@@ -69,7 +69,7 @@ function keepTermIndex(prefix, Roll, rollData) {
 }
 
 /** Keep on `roll` in place and re-cache its formula; false, with a warning, on any disagreement. */
-export function applyKeepTransform(roll, plan, index, Die = globalThis.foundry?.dice?.terms?.Die) {
+export function applyKeepTransform(roll, plan, index, Die = coreDieClass()) {
   if (typeof Die !== 'function') return false;
   const term = locateKeepTerm(roll?.terms, index, plan.group, Die);
   if (!term) {

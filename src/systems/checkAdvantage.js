@@ -3,10 +3,7 @@
  * once from its advantage rule, its evaluation and its post-shim authored formula. Every prompt
  * producer, every descriptor transport and the engine read this one derivation.
  */
-import {
-  findKeepGroup,
-  stripRetiredModifierPlaceholder,
-} from '../utils/craftingCheckExpression.js';
+import { keepGroupOf, stripRetiredModifierPlaceholder } from '../utils/craftingCheckExpression.js';
 import { diceEngine, formulaRolls } from '../utils/rollFormulaRollability.js';
 
 import { normalizeCheckAdvantage } from './normalize/checkAdvantage.js';
@@ -17,6 +14,9 @@ const KINDS = Object.freeze(['keep', 'bonus', 'count', 'mixed']);
 const CHOICES = Object.freeze(['advantage', 'disadvantage']);
 
 const noOffer = () => ({ advantage: false, disadvantage: false, kind: null, detail: null });
+
+/** Core's plain die class, the one the keep transform proves the constructed term against. */
+export const coreDieClass = () => globalThis.foundry?.dice?.terms?.Die;
 
 /** Whether `expression` is a bonus die the prompt can offer; empty text is not. */
 export function isBonusExpression(expression) {
@@ -39,16 +39,23 @@ function bonusOffer(rule, evaluation, Roll) {
 /**
  * `{ advantage, disadvantage, kind, detail }` for a check: a count check offers `countDice` both
  * ways unless disabled, whatever its formula; a summed check offers by its mode, keep only when
- * `findKeepGroup` proves the first dice group. `Roll`, when injected, also proves a bonus rollable.
+ * `keepGroupOf` proves the first dice group and a `Die` class exists for the transform to act on.
+ * `Roll`, when injected, also proves a bonus rollable.
  */
-export function resolveAdvantageOffer({ advantage, evaluation, authoredFormula, Roll } = {}) {
+export function resolveAdvantageOffer({
+  advantage,
+  evaluation,
+  authoredFormula,
+  Roll,
+  Die = coreDieClass(),
+} = {}) {
   const rule = normalizeCheckAdvantage(advantage);
   if (evaluation?.product === 'count') {
     if (!rule.countEnabled) return noOffer();
     return { advantage: true, disadvantage: true, kind: 'count', detail: { dice: rule.countDice } };
   }
   if (rule.mode === 'bonus') return bonusOffer(rule, evaluation, Roll);
-  if (rule.mode !== 'keep' || !findKeepGroup(String(authoredFormula ?? '').trim()).ok) {
+  if (rule.mode !== 'keep' || typeof Die !== 'function' || !keepGroupOf(authoredFormula).ok) {
     return noOffer();
   }
   return { advantage: true, disadvantage: rule.offerDisadvantage, kind: 'keep', detail: null };

@@ -14,7 +14,7 @@ import {
 } from '../src/systems/checkKeepTransform.js';
 import { evaluateCheckRoll } from '../src/systems/checkRoll.js';
 import { normalizeCheckAdvantage } from '../src/systems/normalize/checkAdvantage.js';
-import { findKeepGroup } from '../src/utils/craftingCheckExpression.js';
+import { findKeepGroup, keepGroupOf } from '../src/utils/craftingCheckExpression.js';
 
 import { RECORDED_ROLL_TERMS, RECORDED_TERM_BUILDS } from './helpers/recordedRollParse.js';
 import { Die, installTermBearingRoll, termFromRecording } from './helpers/termBearingRoll.js';
@@ -34,6 +34,11 @@ const PROOFS = [
   ['1d20 * 2', { number: 1, faces: 20, prefix: '', referenceFirst: false }],
   ['@prof + 1d20', { number: 1, faces: 20, prefix: '@prof', referenceFirst: true }],
   ['(2 + 3) + 1d8', { number: 1, faces: 8, prefix: '(2 + 3)', referenceFirst: false }],
+  // The retirement shim's residue of `@craftingmod + 1d20`: a leading unary `+` signs nothing.
+  ['+ 1d20', { number: 1, faces: 20, prefix: '', referenceFirst: false }],
+  ['+ 2d6 + 1', { number: 2, faces: 6, prefix: '', referenceFirst: false }],
+  ['2 * 3 * 1d20', { number: 1, faces: 20, prefix: '2 * 3', referenceFirst: false }],
+  ['1d20 * 2 * 3', { number: 1, faces: 20, prefix: '', referenceFirst: false }],
 ];
 
 const REFUSALS = [
@@ -51,9 +56,16 @@ const REFUSALS = [
   ['1df + 2', 'not-die'],
   ['dc', 'not-die'],
   ['10 - 1d20', 'position'],
-  ['-1d20', 'position'],
+  ['-1d20', 'nested'],
+  ['2 * -1d20', 'nested'],
+  ['-1d20 + 30', 'nested'],
   ['1d20 * -1', 'position'],
+  ['1d20 % 2', 'position'],
+  ['2 % 1d20', 'position'],
   ['@prof * 1d20', 'position'],
+  ['1d20 * @prof', 'position'],
+  ['1d20 / @prof', 'position'],
+  ['2 * @prof * 1d20', 'position'],
   ['5 - 2 * 1d20', 'position'],
   ['0d20 + 5', 'invalid'],
   ['1.5d20', 'invalid'],
@@ -73,6 +85,14 @@ describe('findKeepGroup: the authored FIRST dice group, which must be plain', ()
   }
 });
 
+describe('keepGroupOf: the stored formula, read after the retirement shim', () => {
+  it('proves the group the shim leaves, with no character value before it', () => {
+    const proof = { ok: true, number: 1, faces: 20, referenceFirst: false };
+    assert.deepEqual(keepGroupOf('@craftingmod + 1d20'), { ...proof, prefix: '' });
+    assert.deepEqual(keepGroupOf('2 + @craftingmod + 1d20'), { ...proof, prefix: '2' });
+  });
+});
+
 /** Whether a recorded top-level term carries a die, itself or nested. */
 const carriesDice = (term) =>
   term instanceof DiceTerm || /(?:^|[^a-z])\d*d\d/i.test(String(term.formula));
@@ -81,13 +101,9 @@ const isPositiveNumber = (term) => term?.constructor.name === 'NumericTerm' && t
 
 /** The term-side reading of an additive position: `+`-led, or a positive literal's product. */
 function additiveOnTerms(terms, index) {
-  const [operator, factor] = [terms[index - 1]?.operator, terms[index - 2]];
-  const leads =
-    index === 0 ||
-    operator === '+' ||
-    (operator === '*' &&
-      isPositiveNumber(factor) &&
-      [undefined, '+'].includes(terms[index - 3]?.operator));
+  let head = index;
+  while (terms[head - 1]?.operator === '*' && isPositiveNumber(terms[head - 2])) head -= 2;
+  const leads = head === 0 || terms[head - 1].operator === '+';
   let next = index + 1;
   while (['*', '/'].includes(terms[next]?.operator)) {
     if (!isPositiveNumber(terms[next + 1])) return false;
@@ -310,10 +326,39 @@ describe('evaluateCheckRoll keeps on the constructed Roll', () => {
       ['10 - 1d20', '10 - 1d20'],
       ['1d20 * -1', '1d20 * -1'],
       ['0d20 + 5', '0d20 + 5'],
+      ['-1d20 + 30', '(1d20 * -1) + 30'],
+      ['1d20 % 2', '1d20 % 2'],
     ]) {
       assert.equal(await rolled(formula, 'advantage', { data }), unchanged, formula);
     }
     assert.equal(await rolled('2 * 1d20', 'advantage'), '2 * 2d20kh1', 'a positive factor keeps');
+  });
+
+  it('never keeps a group a character value multiplies or divides', async () => {
+    const data = { prof: 2 };
+    for (const [formula, unchanged] of [
+      ['@prof * 1d20', '2 * 1d20'],
+      ['1d20 * @prof', '1d20 * 2'],
+      ['1d20 / @prof', '1d20 / 2'],
+    ]) {
+      assert.equal(await rolled(formula, 'advantage', { data }), unchanged, formula);
+    }
+  });
+
+  it('keeps a group a chain of positive literals multiplies, on either side', async () => {
+    assert.equal(await rolled('2 * 3 * 1d20', 'advantage'), '2 * 3 * 2d20kh1');
+    assert.equal(await rolled('1d20 * 2 * 3', 'disadvantage'), '2d20kl1 * 2 * 3');
+  });
+
+  it('keeps the group the retirement shim leaves behind a leading `+`', async () => {
+    assert.equal(await rolled('@craftingmod + 1d20', 'advantage'), '2d20kh1');
+    assert.equal(await rolled('@craftingmod + 2d6 + 1', 'advantage'), '3d6kh2 + 1');
+    assert.equal(await rolled('+ 1d20', 'disadvantage'), '2d20kl1');
+  });
+
+  it('shows the kept roll in Foundry’s own spacing (Deviations)', async () => {
+    const { result } = await rollWith('1d20+@prof', 'advantage', { data: { prof: 2 } });
+    assert.equal(result.resolvedFormula, '2d20kh1 + 2');
   });
 
   it('keeps only the AUTHORED group, never a modifier’s or a reference’s die (MA6)', async () => {
