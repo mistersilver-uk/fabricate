@@ -6,7 +6,7 @@
  */
 import { benefitSign } from '../../systems/checkModifierRouter.js';
 import { countFormulaValues } from '../../systems/countEvaluation.js';
-import { formatCheckAdjustment, formatSignedStep } from '../../utils/checkAdjustmentFormat.js';
+import { formatNet, formatSignedStep } from '../../utils/checkAdjustmentFormat.js';
 import { fill } from '../../utils/fillPlaceholders.js';
 
 import { bareExpression, preRollLabel } from './checkEvidenceRows.js';
@@ -55,9 +55,6 @@ export function countBotched(display) {
 }
 
 const sum = (terms) => terms.reduce((total, term) => total + term.value, 0);
-
-/** `2`, or `−1` with the true minus sign. */
-const netText = (net) => (net < 0 ? formatCheckAdjustment('add', net) : String(net));
 
 /** `− 6` or `+ 2`: a change set apart from the dice it changes. */
 const spacedChange = (value) => formatSignedStep(value).replace(/^([+−])/, '$1 ');
@@ -124,7 +121,7 @@ function countRow(count, loc) {
   const text = fill(loc(KEYS.countNet), {
     qualified: count.qualified,
     cancelled: count.cancelled,
-    net: netText(count.net),
+    net: formatNet(count.net),
   });
   return { id: 'count', label: loc(KEYS.count), text, ...(count.net < 0 && { tone: 'danger' }) };
 }

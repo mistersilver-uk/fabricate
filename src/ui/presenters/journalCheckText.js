@@ -10,11 +10,14 @@ import { normalizeList, stringOrNull } from '../../systems/gatheringEngineIntern
 
 import { comparisonText } from './checkDescriptor.js';
 
-/** `{ net, required, zeroPool }` from persisted count evidence, `required` being `total − margin`. */
+/**
+ * `{ net, required, zeroPool }` from persisted count evidence, `required` being `total − margin`
+ * above zero. A routed result's margin is taken from its matched tier, so it states no required.
+ */
 export function executedCount(data) {
   const net = Number.isFinite(data?.total) ? data.total : null;
-  const margin = Number.isFinite(data?.margin) ? data.margin : null;
-  const required = net !== null && margin !== null ? net - margin : null;
+  const margin = Number.isFinite(data?.margin) && !data.type ? data.margin : null;
+  const required = net !== null && margin !== null && net - margin > 0 ? net - margin : null;
   return { net, required, zeroPool: data?.zeroPool === true };
 }
 

@@ -3657,7 +3657,7 @@ test('the roll line reads the executed target and margin outside sum/over/fixed'
   assert.equal(formatRoll({ ...attribute, formula: '' }, english), 'Rolled 11 · target 16 · margin −5');
   assert.equal(formatRoll({ ...legacy, formula: '1d20' }, english), '1d20 = 11 vs DC 16');
   assert.doesNotMatch(formatRoll({ ...under, formula: '1d20' }, english), /DC/);
-  assert.equal(formatRoll({ ...count, formula: '' }, localize), 'FABRICATE.App.Journal.StepDetails.Count.RollResult|{"net":3,"required":2}');
+  assert.equal(formatRoll({ ...count, formula: '' }, localize), 'FABRICATE.App.Journal.StepDetails.Count.RollResult|{"net":"3","required":2}');
 });
 
 // ── Issue 2006: a counting check's ladder, step label and roll line read in net successes ─────
@@ -3784,7 +3784,14 @@ test('a count roll line reads its net against the required count, or its net, ne
     return formatRoll({ ...check, formula: '' }, english);
   };
   assert.equal(line({ total: 4, margin: 2 }), '4 of 2 successes');
-  assert.equal(line({ total: -1, margin: -2 }), '-1 of 1 success');
+  assert.equal(line({ total: 3, margin: 1 }), '3 of 2 successes', 'a simple check reads its required');
+  assert.equal(line({ total: -1, margin: -2 }), '−1 of 1 success', 'the true minus, as the card');
+  assert.equal(line({ total: 1, margin: 1 }), '1 net success', 'never a required count of 0');
+  // A routed margin is taken from the matched tier, so its line reads the net alone.
+  assert.equal(line({ type: 'relative', total: -2, margin: -1 }), '−2 net successes');
+  assert.equal(line({ type: 'relative', total: -1, margin: -1 }), '−1 net successes');
+  assert.equal(line({ type: 'relative', total: 4, margin: 1 }), '4 net successes');
+  assert.equal(line({ type: 'relative', total: 1, margin: 0 }), '1 net success');
   assert.equal(line({ total: 3, margin: null }), '3 net successes');
   assert.equal(line({ total: 1 }), '1 net success');
   assert.equal(line({ total: null, margin: null, zeroPool: true }), english('FABRICATE.Check.CountEvidence.ZeroPoolResult'));

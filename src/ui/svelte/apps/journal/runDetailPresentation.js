@@ -5,7 +5,7 @@
  * Extracted from `RunDetail.svelte` so the component keeps its reactive state and markup and
  * nothing else; `localize` is injected so this module stays UI-free.
  */
-import { formatSignedStep } from '../../../../utils/checkAdjustmentFormat.js';
+import { formatNet, formatSignedStep } from '../../../../utils/checkAdjustmentFormat.js';
 
 /** `NaN` for an absent value, so `Number.isFinite` alone decides whether it was recorded. */
 export function numberOrNaN(raw) {
@@ -78,14 +78,15 @@ export function formatGradedRoll({ formula, total, value, target, margin }, loca
 export function formatCountRoll({ net, required, zeroPool }, localize) {
   if (zeroPool) return localize('FABRICATE.Check.CountEvidence.ZeroPoolResult');
   if (!Number.isFinite(net)) return '';
-  if (Number.isFinite(required)) {
+  const text = formatNet(net);
+  if (Number.isFinite(required) && required > 0) {
     return required === 1
-      ? localize('FABRICATE.App.Journal.StepDetails.Count.RollResultOne', { net })
-      : localize('FABRICATE.App.Journal.StepDetails.Count.RollResult', { net, required });
+      ? localize('FABRICATE.App.Journal.StepDetails.Count.RollResultOne', { net: text })
+      : localize('FABRICATE.App.Journal.StepDetails.Count.RollResult', { net: text, required });
   }
   return net === 1
     ? localize('FABRICATE.App.Journal.StepDetails.Count.RollResultNetOne')
-    : localize('FABRICATE.App.Journal.StepDetails.Count.RollResultNet', { net });
+    : localize('FABRICATE.App.Journal.StepDetails.Count.RollResultNet', { net: text });
 }
 
 /**
