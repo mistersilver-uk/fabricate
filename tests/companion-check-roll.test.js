@@ -422,6 +422,27 @@ describe('AC-7 — a pre-resolved decision drives the roll without opening a dia
     assert.match(rolls.constructions[0], /\(\+3\)/);
   });
 
+  it('rolls the default rule’s keep transform on a forwarded Advantage (issue 2007, R2)', async () => {
+    installChat();
+    const rolls = installTermRoll();
+    const { seams, calls } = makeSeams({ real: true });
+
+    const result = await rollActorCheck(
+      request({
+        formula: '1d12 + 3',
+        dc: 15,
+        interactive: true,
+        rollDecision: { bonus: null, rollMode: undefined, advantage: 'advantage' },
+      }),
+      seams
+    );
+
+    assert.equal(result.outcome, COMPANION_OUTCOMES.checkPassed);
+    assert.equal(calls.prompt.length, 0);
+    const [rolled] = rolls.evaluated;
+    assert.equal(rolled, '2d12kh1 + 3', 'a standalone roll takes the default rule (R2)');
+  });
+
   it('treats a hand-built decision carrying confirmed:false as a cancel', async () => {
     // Constructed BY HAND rather than obtained from the prompt, because this is the assertion that
     // proves the `confirmed`-strip is load-bearing.
@@ -1084,22 +1105,24 @@ describe('attribute dispatch and roll-under (QE15, F1, D10)', () => {
     }
   });
 
-  it('keeps advantage and additional dice refused on an interactive count request, before any prompt or roll (issues 2007, 2008)', async () => {
+  it('keeps additional dice refused on an interactive count request, before any prompt or roll (issue 2008)', async () => {
     const additional = { additionalDice: { enabled: true, source: 'path', path: 'system.momentum', max: 2 } };
     const cases = [
-      ['forwarded advantage', {}, { rollDecision: { bonus: null, advantage: 'advantage' } }],
-      ['forwarded disadvantage', {}, { rollDecision: { bonus: null, advantage: 'disadvantage' } }],
-      ['additional dice, prompted', additional, {}],
-      ['additional dice, forwarded', additional, { rollDecision: { bonus: null, advantage: 'normal' } }],
+      ['additional dice, prompted', {}],
+      ['additional dice, forwarded', { rollDecision: { bonus: null, advantage: 'normal' } }],
     ];
     for (const direction of ['over', 'under']) {
-      for (const [name, pool, extra] of cases) {
+      for (const [name, extra] of cases) {
         installChat();
         const dice = installCountDice({ faces: [9, 9] });
         try {
           const { seams, calls } = makeSeams({ real: true });
           const result = await rollActorCheck(
-            request({ interactive: true, evaluation: countEvaluation({ direction, ...pool }), ...extra }),
+            request({
+              interactive: true,
+              evaluation: countEvaluation({ direction, ...additional }),
+              ...extra,
+            }),
             seams
           );
           assert.equal(result.outcome, 'evaluationUnsupported', `${direction}: ${name}`);
@@ -1108,6 +1131,34 @@ describe('attribute dispatch and roll-under (QE15, F1, D10)', () => {
         } finally {
           dice.restore();
         }
+      }
+    }
+  });
+
+  it('honours a forwarded Advantage or Disadvantage on an interactive count row: the pool grows or shrinks by the default die (issue 2007)', async () => {
+    // Base pool 2 at threshold 8: Advantage rolls 3 dice, Disadvantage rolls 1, both counted `over`.
+    const cases = [
+      ['advantage', [9, 9, 9], 3],
+      ['disadvantage', [9], 1],
+    ];
+    for (const [advantage, faces, expectedTotal] of cases) {
+      installChat();
+      const dice = installCountDice({ faces });
+      try {
+        const { seams, calls } = makeSeams({ real: true });
+        const result = await rollActorCheck(
+          request({
+            interactive: true,
+            evaluation: countEvaluation({ direction: 'over' }),
+            rollDecision: { bonus: null, advantage },
+          }),
+          seams
+        );
+        assert.equal(calls.prompt.length, 0, `${advantage} forwards without a prompt`);
+        assert.equal(result.outcome, 'checkPassed', advantage);
+        assert.equal(result.total, expectedTotal, `${advantage} moves the pool by the default die`);
+      } finally {
+        dice.restore();
       }
     }
   });
