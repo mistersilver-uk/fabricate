@@ -26,9 +26,9 @@ stats.html
 .foundry-e2e/cache/
 # Harvested Foundry window chrome for the View Lab (proprietary; never commit)
 /.foundry-chrome/
-# Class-2 benchmark run records: wall clock + heap + machine envelope (issue 1071).
-# Machine-DEPENDENT and never asserted, so they must not be committed — the committed,
-# machine-invariant half lives in benchmarks/baselines/ and is tracked.
+# Class-2 benchmark run records: wall clock + heap + machine envelope (issue 1071), which are
+# machine-DEPENDENT and never asserted; and under base/, a base commit's extracted tree and its
+# class-1 counts, which the drift test computes and caches rather than anyone committing them.
 /.benchmarks/
 # Class-2 Foundry perf run records and Chrome traces (issue 1073). Wall clock and heap measured
 # inside a live Foundry: machine-, build- and browser-dependent, never asserted, never committed.
