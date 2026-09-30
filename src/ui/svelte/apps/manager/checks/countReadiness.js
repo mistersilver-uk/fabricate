@@ -10,6 +10,7 @@ import {
   resolvePool,
 } from '../../../../../systems/countEvaluation.js';
 import { normalizeNullableSuccesses } from '../../../../../systems/normalize/checkEvaluation.js';
+import { parseDiceGroups } from '../../../../../utils/craftingCheckExpression.js';
 import { trimString as trimmed } from '../../../../../utils/scalars.js';
 
 import { missingTargetPaths, readsCharacter, targetExpressionFault } from './checkTargetStatus.js';
@@ -35,9 +36,9 @@ function countFaceSetReadiness(result, pool, raise) {
     (kind) => pool[kind].enabled && pool[kind].faces.kind === 'from'
   );
   if (fromRules.length === 0) return;
-  const missing = fromRules.find((kind) => pool[kind].faces.value === null);
-  result.checks.push({ id: 'countFacesSet', satisfied: !missing });
-  if (missing) raise(result.issues, 'countFaceMissing', 'critical', { kind: missing });
+  const missing = fromRules.filter((kind) => pool[kind].faces.value === null);
+  result.checks.push({ id: 'countFacesSet', satisfied: missing.length === 0 });
+  for (const kind of missing) raise(result.issues, 'countFaceMissing', 'critical', { kind });
 }
 
 /** Explode and cancel faces are set and on the die, and an explosion can stop. */
@@ -94,7 +95,11 @@ function countTriggerReadiness(result, check, evaluation, raise) {
   const unreachable = dice.filter((trigger) => !poolCanFire(trigger.condition, group));
   result.checks.push({ id: 'countTriggersReachable', satisfied: unreachable.length === 0 });
   if (unreachable.length > 0) {
-    const context = { diceGroups: [group], counting: true };
+    // The retained formula's other groups name a kept trigger by its die, never a bare index.
+    const retained = parseDiceGroups(check?.rollFormula)
+      .map((g, groupId) => ({ groupId, label: g.raw, sides: g.sides }))
+      .filter((g) => g.groupId !== 0);
+    const context = { diceGroups: [group, ...retained], counting: true };
     const triggers = unreachable.map((trigger) => summariseCondition(trigger.condition, context));
     raise(result.issues, 'countTriggerGroupUnreachable', 'warning', { triggers });
   }

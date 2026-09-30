@@ -110,6 +110,15 @@ describe('Review lands on the count control that clears the notice (N25)', () =>
     });
   }
 
+  it('explains each missing face in its own notice', async () => {
+    const root = await simple({ evaluation: count({ explode: missing, cancel: missing }) });
+    const notices = [...root.querySelectorAll('[data-checks-section-notice="countFaceMissing"]')];
+    assert.deepEqual(
+      notices.map((found) => found.textContent.match(/"kind":"(\w+)"/)?.[1]),
+      ['explode', 'cancel']
+    );
+  });
+
   it('a dead dice trigger is explained on Triggers, and Review lands on the trigger list', async () => {
     const trigger = {
       id: 'second',

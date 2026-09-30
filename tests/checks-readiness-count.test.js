@@ -429,6 +429,22 @@ describe('countFaceMissing blocks a from face with no value (ruling R2, N26)', (
     );
   });
 
+  it('raises one issue per missing face under one countFacesSet tick', () => {
+    const both = evaluateCheckReadiness(check({ explode: missing, cancel: missing }), { mode: 'simple' });
+    const raised = both.issues.filter((entry) => entry.id === 'countFaceMissing');
+    assert.deepEqual(
+      raised.map((entry) => [entry.severity, entry.data]),
+      [
+        ['critical', { kind: 'explode' }],
+        ['critical', { kind: 'cancel' }],
+      ]
+    );
+    assert.deepEqual(
+      both.checks.filter((entry) => entry.id === 'countFacesSet'),
+      [{ id: 'countFacesSet', satisfied: false }]
+    );
+  });
+
   it('is silent for a set face, an extreme face or a rule switched off', () => {
     for (const rule of [
       from(9),
@@ -474,7 +490,7 @@ describe('countTriggerGroupUnreachable warns about dead dice triggers (ruling R3
       tick: 'Every dice trigger can fire on the pool',
       satisfied: false,
       sentence:
-        'Any die of 1 is exactly 6, Any die of d10 is at least 12 read dice this pool never rolls, so they cannot fire while the check counts successes. They are kept and work again if the check adds the dice.',
+        'Any die of 1d6 is exactly 6, Any die of d10 is at least 12 read dice this pool never rolls, so they cannot fire while the check counts successes. They are kept and work again if the check adds the dice.',
     });
     assert.deepEqual(draft, before, 'the triggers are neither rewritten nor removed');
     assert.ok(

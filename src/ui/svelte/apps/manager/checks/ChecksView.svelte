@@ -778,6 +778,8 @@
       .sort((a, b) => blockingRank(a) - blockingRank(b))
       .map((issue) => ({
         id: issue.id,
+        // `countFaceMissing` is raised once per face kind, so the kind keeps each notice distinct.
+        key: issue.data?.kind ? `${issue.id}:${issue.data.kind}` : issue.id,
         ...checkIssueText(issue.id, issue.data, text),
         action: noticeAction(issue),
       }))
@@ -1198,7 +1200,7 @@
            draws it: amber, title over detail, with a Review action. -->
       {#if activity !== 'validation' && !routeIsOff && sectionNotices.length > 0}
         <div class="manager-checks-section-notices" data-checks-section-notices={activeSection}>
-          {#each sectionNotices as issue (issue.id)}
+          {#each sectionNotices as issue (issue.key)}
             <Notice
               tone="warning"
               title={issue.title}
