@@ -155,7 +155,7 @@ describe('recipeBrowserModel — sorting', () => {
 
   it('names a counting pill, its sort key, fact and subline by successes needed (issue 2006)', () => {
     const english = (_key, fallback) => fallback;
-    const format = (_key, fallback, data) => fallback.replace(/\{(\w+)\}/g, (_whole, token) => String(data[token]));
+    const format = (_key, fallback, data) => fallback.replaceAll(/\{(\w+)\}/g, (_whole, token) => String(data[token]));
     const rows = (kind, dc) => [makeRecipe({ checkSummary: { kind, dc } })];
     assert.equal(recipeCheckSortLabel(rows('successes', 2), english), 'Successes needed');
     assert.equal(recipeCheckSortLabel(rows('dynamicSuccesses', null), english), 'Successes needed');

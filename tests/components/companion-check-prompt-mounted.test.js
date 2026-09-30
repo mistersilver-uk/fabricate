@@ -51,15 +51,43 @@ const EXPECTED = {
   'sum/over/fixed': { chip: 'DC 15 · meet or beat', outcome: 'checkFailed', total: 10 },
   'sum/over/attribute': { chip: 'Target 55 · meet or beat', outcome: 'checkFailed', total: 10 },
   'sum/under/fixed': { chip: 'Target 15 · stay at or under', outcome: 'checkPassed', total: 10 },
-  'sum/under/attribute': { chip: 'Target 55 · stay at or under', outcome: 'checkPassed', total: 10 },
-  'count/over/fixed': { chip: '2 successes needed', line: '3d10 · each ≥ 8', outcome: 'checkPassed', total: 2 },
-  'count/over/attribute': { chip: '2 successes needed', line: '3d10 · each ≥ 8', outcome: 'checkPassed', total: 2 },
-  'count/under/fixed': { chip: '2 successes needed', line: '3d10 · each ≤ 8', outcome: 'checkFailed', total: 1 },
-  'count/under/attribute': { chip: '2 successes needed', line: '3d10 · each ≤ 8', outcome: 'checkFailed', total: 1 },
+  'sum/under/attribute': {
+    chip: 'Target 55 · stay at or under',
+    outcome: 'checkPassed',
+    total: 10,
+  },
+  'count/over/fixed': {
+    chip: '2 successes needed',
+    line: '3d10 · each ≥ 8',
+    outcome: 'checkPassed',
+    total: 2,
+  },
+  'count/over/attribute': {
+    chip: '2 successes needed',
+    line: '3d10 · each ≥ 8',
+    outcome: 'checkPassed',
+    total: 2,
+  },
+  'count/under/fixed': {
+    chip: '2 successes needed',
+    line: '3d10 · each ≤ 8',
+    outcome: 'checkFailed',
+    total: 1,
+  },
+  'count/under/attribute': {
+    chip: '2 successes needed',
+    line: '3d10 · each ≤ 8',
+    outcome: 'checkFailed',
+    total: 1,
+  },
 };
 
 const cells = CHECK_EVALUATION_CAPABILITIES.modes.flatMap((mode) =>
-  mode.targetSources.map((source) => ({ mode, source, key: `${mode.product}/${mode.direction}/${source}` }))
+  mode.targetSources.map((source) => ({
+    mode,
+    source,
+    key: `${mode.product}/${mode.direction}/${source}`,
+  }))
 );
 
 function requestFor({ mode, source }) {
@@ -88,7 +116,10 @@ async function openedPrompt() {
     await new Promise((settle) => setImmediate(settle));
     layer = document.querySelector('.fabricate-standalone-overlay');
   }
-  assert.ok(layer?.querySelector('[data-roll-prompt]'), 'the prompt mounted on the standalone overlay');
+  assert.ok(
+    layer?.querySelector('[data-roll-prompt]'),
+    'the prompt mounted on the standalone overlay'
+  );
   return { layer, dialog: layer.querySelector('[data-roll-prompt]') };
 }
 
@@ -104,7 +135,11 @@ describe('a companion interactive check through the real prompt host (issue 2006
   after(() => harness.teardown());
 
   it('publishes every row interactive, and each prompts on the overlay, posts its Roll and grades', async () => {
-    assert.deepEqual(cells.map(({ key }) => key), Object.keys(EXPECTED), 'every published cell is expected');
+    assert.deepEqual(
+      cells.map(({ key }) => key),
+      Object.keys(EXPECTED),
+      'every published cell is expected'
+    );
     const loadComponent = () => harness.loadRuneModule(ROLL_PROMPT_PATH);
     for (const cell of cells) {
       const { key, mode } = cell;
@@ -113,18 +148,23 @@ describe('a companion interactive check through the real prompt host (issue 2006
       assert.equal(mode.interactive, true, `${key}: published interactive`);
       document.body.replaceChildren();
       const dice = installCountDice({ faces: counted ? [9, 9, 3] : [10] });
-      const restoreSurface = overrideRollPromptSurface((view) => openRollPromptModal(view, { loadComponent }));
+      const restoreSurface = overrideRollPromptSurface((view) =>
+        openRollPromptModal(view, { loadComponent })
+      );
       try {
         const pending = rollActorCheck(requestFor(cell), companionFacade._companionCheckSeams());
         const { layer, dialog } = await openedPrompt();
-        const chip = dialog.querySelector('.formula-content .manager-chip');
+        const chip = dialog.querySelector(':scope .formula-content .manager-chip');
         assert.equal(chip?.textContent.trim(), expected.chip, `${key}: the chip`);
         if (counted) {
           assert.equal(chip.dataset.rollPromptRequired, '2', `${key}: pool.required, never the dc`);
           typeBonus(dialog, '1');
-          const line = dialog.querySelector('.formula-content .formula');
+          const line = dialog.querySelector(':scope .formula-content .formula');
           assert.equal(line.textContent, expected.line, `${key}: the typed bonus adds a die`);
-          assert.ok(!dialog.querySelector('button[data-action="advantage"]'), `${key}: no advantage until issue 2007`);
+          assert.ok(
+            !dialog.querySelector('button[data-action="advantage"]'),
+            `${key}: no advantage until issue 2007`
+          );
         }
         dialog.querySelector('button[type="submit"]').click();
         const result = await pending;
@@ -133,9 +173,20 @@ describe('a companion interactive check through the real prompt host (issue 2006
         assert.equal(result.total, expected.total, key);
         assert.equal(dice.posts.length, 1, `${key}: one Roll posted`);
         if (counted) {
-          assert.ok(dice.posts[0].rolls[0] instanceof dice.CountRoll, `${key}: the count Roll posted`);
-          assert.equal(dice.posts[0].rolls[0].dice[0].results.length, 3, `${key}: three dice rolled`);
-          assert.deepEqual(result.messageData, { label: 'Research', total: expected.total, required: 2 });
+          assert.ok(
+            dice.posts[0].rolls[0] instanceof dice.CountRoll,
+            `${key}: the count Roll posted`
+          );
+          assert.equal(
+            dice.posts[0].rolls[0].dice[0].results.length,
+            3,
+            `${key}: three dice rolled`
+          );
+          assert.deepEqual(result.messageData, {
+            label: 'Research',
+            total: expected.total,
+            required: 2,
+          });
           const passed = expected.outcome === 'checkPassed';
           assert.equal(
             result.message,

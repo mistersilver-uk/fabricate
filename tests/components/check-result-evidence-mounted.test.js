@@ -2,16 +2,13 @@
  * Issue 2005 — the player result boxes state the executed check's Target, Pre-rolled and Margin
  * rows from the result's projection only (Q9), and gain nothing for sum/over/fixed or a withheld roll.
  */
-import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { dirname, resolve } from 'node:path';
+import { describe, it, before, after, afterEach } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import {
-  CHECK_EVIDENCE_RAW_MODULES,
-  createMountedComponentHarness,
-} from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { executedCheckDisplay } from '../../src/ui/presenters/checkDisplay.js';
+import { tileModel } from '../../src/ui/presenters/countDiceTiles.js';
 import {
   COUNT_DATA,
   COUNT_DISPLAY,
@@ -24,8 +21,11 @@ import {
   executedCountCheck,
   shippedLocalize,
 } from '../helpers/checkEvidenceFixtures.js';
-import { executedCheckDisplay } from '../../src/ui/presenters/checkDisplay.js';
-import { tileModel } from '../../src/ui/presenters/countDiceTiles.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  CHECK_EVIDENCE_RAW_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const SHARED = {
@@ -93,7 +93,7 @@ describe('RollResultBox evidence rows', () => {
     const root = await harness.mount({ result: { ...result(executedCheck()), message: 'Made.' } });
     assert.deepEqual(rowsOf(root), UNDER_ROWS);
     const box = root.querySelector('[data-recipe-section="roll-result"]');
-    const order = [...box.children].map((child) => child.className.split(' ')[0]);
+    const order = [...box.children].map((child) => child.className.split(' ', 1)[0]);
     assert.deepEqual(order, [
       'crafting-roll-head',
       'crafting-roll-summary',
@@ -141,7 +141,7 @@ describe('RollResultBox evidence rows', () => {
   it('gives a sum/over fixed box only the Needed and Margin rows and its sentence (M3)', async () => {
     const bare = await harness.mount({ result: result(undefined) });
     const bareOrder = [...bare.querySelector('[data-recipe-section]').children].map(
-      (child) => child.className.split(' ')[0]
+      (child) => child.className.split(' ', 1)[0]
     );
     assert.deepEqual(bareOrder, ['crafting-roll-head', 'crafting-roll-awards']);
     harness.remount();
@@ -152,7 +152,7 @@ describe('RollResultBox evidence rows', () => {
     ]);
     assert.equal(over.querySelector('[data-roll-summary]').textContent, 'The result group is produced.');
     const order = [...over.querySelector('[data-recipe-section]').children].map(
-      (child) => child.className.split(' ')[0]
+      (child) => child.className.split(' ', 1)[0]
     );
     assert.deepEqual(order, [
       'crafting-roll-head',
@@ -204,7 +204,7 @@ describe('RollResultBox evidence rows', () => {
     assert.deepEqual(rowsOf(root), COUNT_ROWS);
     assert.equal(root.querySelector('[data-roll-summary]').textContent, 'The result group is produced.');
     const order = [...root.querySelector('[data-recipe-section]').children].map(
-      (child) => child.className.split(' ')[0]
+      (child) => child.className.split(' ', 1)[0]
     );
     assert.deepEqual(order, [
       'crafting-roll-head',
@@ -263,7 +263,7 @@ describe('RollResultBox evidence rows', () => {
       root.querySelector('[data-roll-summary]').textContent,
       'Botched. Nothing is produced; the failure policy applies.'
     );
-    assert.ok(root.querySelector('[data-check-evidence="count"] .journal-fact-row.is-danger'));
+    assert.ok(root.querySelector(':scope [data-check-evidence="count"] .journal-fact-row.is-danger'));
   });
 
   it('renders nothing at all without a recorded result, which a refusal leaves (Q10)', async () => {

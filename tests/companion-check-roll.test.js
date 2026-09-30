@@ -982,7 +982,8 @@ const SKILLED_ACTOR = {
 
 describe('attribute dispatch and roll-under (QE15, F1, D10)', () => {
   it('iterates every published SUM capability row', async () => {
-    for (const mode of CHECK_EVALUATION_CAPABILITIES.modes.filter((m) => m.product === 'sum')) {
+    const sumModes = CHECK_EVALUATION_CAPABILITIES.modes.filter((m) => m.product === 'sum');
+    for (const mode of sumModes) {
       for (const source of mode.targetSources) {
         installChat();
         installRoll({ total: 10 });
@@ -1016,7 +1017,8 @@ describe('attribute dispatch and roll-under (QE15, F1, D10)', () => {
     // 1), `under` qualifies neither (net 0, fails) — a discriminating pair, so the two directions
     // cannot share an outcome by accident.
     const EXPECTED = { over: { outcome: 'checkPassed', total: 2 }, under: { outcome: 'checkFailed', total: 0 } };
-    for (const mode of CHECK_EVALUATION_CAPABILITIES.modes.filter((m) => m.product === 'count')) {
+    const countModes = CHECK_EVALUATION_CAPABILITIES.modes.filter((m) => m.product === 'count');
+    for (const mode of countModes) {
       for (const source of mode.targetSources) {
         const dice = installCountDice({ faces: [9, 9] });
         try {
@@ -1082,7 +1084,8 @@ describe('attribute dispatch and roll-under (QE15, F1, D10)', () => {
   it('forwards a decision to every count row: no prompt, the bonus adds a die, graded against pool.required', async () => {
     // Faces 9, 9, 3 at threshold 8 with a third die from the bonus: over counts 2, under counts 1.
     const EXPECTED = { over: { outcome: 'checkPassed', total: 2 }, under: { outcome: 'checkFailed', total: 1 } };
-    for (const mode of CHECK_EVALUATION_CAPABILITIES.modes.filter((m) => m.product === 'count')) {
+    const countModes = CHECK_EVALUATION_CAPABILITIES.modes.filter((m) => m.product === 'count');
+    for (const mode of countModes) {
       for (const source of mode.targetSources) {
         const key = `${mode.direction}/${source}`;
         const dice = installCountDice({ faces: [9, 9, 3] });
