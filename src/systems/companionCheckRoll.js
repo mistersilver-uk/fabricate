@@ -240,6 +240,21 @@ export async function rollActorCheck(request, seams) {
   }
 }
 
+/**
+ * An interactive count request asking for what its prompt cannot offer yet: a forwarded Advantage
+ * or Disadvantage (issue 2007), or active additional dice (issue 2008). A non-interactive count
+ * rolls its authored pool alone.
+ */
+function unsupportedInteractiveCount(evaluation, interactive, rollDecision) {
+  if (!interactive || evaluation.product !== 'count') return false;
+  const advantage = rollDecision?.advantage;
+  return (
+    advantage === 'advantage' ||
+    advantage === 'disadvantage' ||
+    evaluation.pool.additionalDice.enabled === true
+  );
+}
+
 async function settleRollActorCheck(request, seams) {
   const label = resolveCheckLabel(request?.label, seams);
   const interactive = request?.interactive === true;
@@ -258,7 +273,10 @@ async function settleRollActorCheck(request, seams) {
   const resolved = resolveCompanionCheckEvaluation(request?.evaluation);
   if (!resolved.ok) return checkRollResult(COMPANION_OUTCOMES.evaluationInvalid, { label });
   const evaluation = resolved.evaluation;
-  if (!supportsCompanionCheckEvaluation(evaluation, interactive)) {
+  if (
+    !supportsCompanionCheckEvaluation(evaluation, interactive) ||
+    unsupportedInteractiveCount(evaluation, interactive, rollDecision)
+  ) {
     return checkRollResult(COMPANION_OUTCOMES.evaluationUnsupported, { label });
   }
   const counted = evaluation.product === 'count';

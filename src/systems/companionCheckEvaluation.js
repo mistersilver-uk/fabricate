@@ -25,20 +25,20 @@ const SUM_UNDER = Object.freeze({
 
 /**
  * Success counting (issue 2004), either direction and target source; the target is inert (a count
- * always grades against `pool.required`) and neither row is interactive until #2006.
+ * always grades against `pool.required`). Interactive through the shared roll prompt (issue 2006).
  */
 const COUNT_OVER = Object.freeze({
   product: 'count',
   direction: 'over',
   targetSources: Object.freeze(['fixed', 'attribute']),
-  interactive: false,
+  interactive: true,
 });
 
 const COUNT_UNDER = Object.freeze({
   product: 'count',
   direction: 'under',
   targetSources: Object.freeze(['fixed', 'attribute']),
-  interactive: false,
+  interactive: true,
 });
 
 export const CHECK_EVALUATION_CAPABILITIES = Object.freeze({
