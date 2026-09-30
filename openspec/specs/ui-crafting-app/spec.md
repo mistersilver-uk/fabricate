@@ -384,7 +384,7 @@ The prompt is not shown at all when no selected item has a usable check, and dis
 #### Scenario: A check that cannot read its target refuses
 
 - **WHEN** a player crafts a recipe whose check reads a character value the crafting character does not have
-- **THEN** the craft refuses with "Crafting check cannot roll: the character value its target reads was not found" before any prompt opens
+- **THEN** the craft refuses with "Crafting check cannot roll: the character value its target reads was not found." before any prompt opens
 - **AND** no chat card and no roll message is posted, and the recipe's check card shows the unresolved sentence
 
 #### The GM-only complication card
