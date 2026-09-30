@@ -13,6 +13,7 @@ import {
   craftingOutcomeBand,
   ladderRule,
   routedOutcomeBand,
+  withCountBotch,
 } from '../../src/systems/runJournalOutcomeBands.js';
 import { IngredientSet } from '../../src/models/IngredientSet.js';
 import {
@@ -3725,6 +3726,20 @@ test('the crafting and gathering count ladders open with a Botch row only while 
     ['<0', '0', '1', '2–3', '4+']
   );
   assert.equal(gatheringTiers(countRouted('over')).length, 4);
+});
+
+test('the Botch row sits beside the least demanding tier, whichever way the ladder is authored', () => {
+  const tiers = (outcomes) => outcomes.map(({ id }) => ({ id, name: id, band: '' }));
+  const routed = (outcomes) => ({ ...countRouted('over', true), relativeOutcomes: outcomes });
+  const ids = (outcomes) =>
+    withCountBotch(tiers(outcomes), routed(outcomes), 'Botch').map((tier) => tier.id);
+  assert.deepEqual(ids(COUNT_LADDER), ['count-botch', 'ruined', 'success', 'fine', 'masterwork']);
+  const bestFirst = COUNT_LADDER.toReversed();
+  assert.deepEqual(
+    ids(bestFirst),
+    ['masterwork', 'fine', 'success', 'ruined', 'count-botch'],
+    'a best-first ladder closes on its Botch row rather than opening on it'
+  );
 });
 
 test('a count step label names the successes needed and the die, never the formula or a DC', () => {

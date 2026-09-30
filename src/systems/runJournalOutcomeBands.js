@@ -154,15 +154,17 @@ function countBand(outcome, routed, required) {
 }
 
 /**
- * A relative count ladder's `Botch` row while cancelling is on (issue 2006), first, as the Studio
- * strip draws it: a net below zero routes to the least demanding tier, so the row carries that
- * tier's outcome and yields under the band `<0`. Any other ladder is returned as it is.
+ * A relative count ladder's `Botch` row while cancelling is on (issue 2006), beside the least
+ * demanding tier on the ladder's outer end: a net below zero routes to that tier, so the row
+ * carries its outcome and yields under the band `<0`. Any other ladder is returned as it is.
  */
 export function withCountBotch(tiers, routed, name) {
   const evaluation = activeCheckEvaluation(routed);
   const relative = evaluation.product === 'count' && routed?.type !== 'fixed';
   if (!relative || !evaluation.pool.cancel.enabled || tiers.length === 0) return tiers;
   const thresholds = countThresholds(routed, 0);
-  const lowest = tiers[thresholds.indexOf(Math.min(...thresholds))];
-  return [{ ...lowest, id: 'count-botch', name, band: '<0' }, ...tiers];
+  const at = thresholds.indexOf(Math.min(...thresholds));
+  const botch = { ...tiers[at], id: 'count-botch', name, band: '<0' };
+  // A best-first ladder ends on its least demanding tier, so its Botch row closes the ladder.
+  return at === tiers.length - 1 && tiers.length > 1 ? [...tiers, botch] : [botch, ...tiers];
 }
