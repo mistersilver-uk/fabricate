@@ -132,8 +132,10 @@ export function craftAndCollect(page, { recipeId, crafterId }) {
       const created = () => game.messages.contents.filter((message) => !before.has(message.id));
       const pause = () => new Promise((resolve) => setTimeout(resolve, 250));
       // The card and its roll post in either order, so wait for the card and then for the created
-      // messages to hold still for a second; a refusal posts nothing, so it waits out its deadline.
-      const deadline = Date.now() + (answer?.misconfigured ? 3000 : 10_000);
+      // messages to hold still for a second. A refusal posts nothing and never will, so it gets
+      // the short deadline; the public craft refuses with `success: false` and no `misconfigured`
+      // flag (issue 2005's versioned lifecycle), so key on the answer's success, not that flag.
+      const deadline = Date.now() + (answer?.success === false ? 3000 : 10_000);
       while (created().every((m) => !m.content?.includes('fabricate-craft-chat'))) {
         if (Date.now() > deadline) break;
         await pause();

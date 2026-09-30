@@ -209,6 +209,121 @@ test('the summed control states its Needed and Margin rows and no count evidence
   );
 });
 
+/** The fail case's count display, `net` and `required` overridable in isolation. */
+function failCountDisplay({ net = 0, required = 1 } = {}) {
+  const { results, qualified, cancelled, base, threshold } = EXECUTED.fail;
+  return {
+    die: 6,
+    results,
+    qualified,
+    cancelled,
+    net,
+    required,
+    margin: required === null ? null : net - required,
+    zeroPool: false,
+    pool: { base, terms: [], rolled: base },
+    threshold: { anchor: threshold, source: 'fixed', terms: [], effective: threshold },
+  };
+}
+
+/** A card built from the fail case's check display, its `check` fully overridable. */
+function failCard(check) {
+  return buildCraftingChatContent(
+    {
+      status: 'failed',
+      actorName: 'Smoke Crafter',
+      recipeName: 'Smoke Count Charm',
+      rollValue: 0,
+      check,
+    },
+    shippedLocalize
+  );
+}
+
+test('the botch pill must agree with a botched net, not just the failing case', () => {
+  const countDisplay = failCountDisplay({ net: -1 });
+  const check = executedCheckDisplay({
+    data: {
+      product: 'count',
+      direction: 'over',
+      comparison: 'meet',
+      dc: null,
+      target: EXECUTED.fail.threshold,
+      total: -1,
+      successes: 0,
+      cancelled: 0,
+      margin: -1,
+    },
+    visibility: PUBLIC,
+    countDisplay,
+  });
+  assert.match(
+    countCardFailures('fail', { card: failCard(check), rollMessages: rollsFor('fail') }).join('\n'),
+    /fail: botch pill shown/
+  );
+});
+
+test('the needed row must be present whenever the case expects one', () => {
+  const countDisplay = failCountDisplay({ required: null });
+  const check = executedCheckDisplay({
+    data: {
+      product: 'count',
+      direction: 'over',
+      comparison: 'meet',
+      dc: null,
+      target: EXECUTED.fail.threshold,
+      total: 0,
+      successes: 0,
+      cancelled: 0,
+      margin: null,
+    },
+    visibility: PUBLIC,
+    countDisplay,
+  });
+  assert.match(
+    countCardFailures('fail', { card: failCard(check), rollMessages: rollsFor('fail') }).join('\n'),
+    /fail: no needed row/
+  );
+});
+
+test('the count summary must replace the numeric roll row even without dice evidence', () => {
+  // `countDisplay: null` withholds statesCountEvidence's gate, which the evidence-row loop
+  // shares (issue 2005/2006's renderer): a card with no count evidence at all necessarily
+  // loses its 'result' row too, so this fixture also trips that loop's check — unavoidable,
+  // not a separate gap. `rollValue: 0` (not null) keeps the head from going fully empty, so
+  // the pill still renders and stays comparable to the case's expected result.
+  const check = executedCheckDisplay({
+    data: {
+      product: 'count',
+      direction: 'over',
+      comparison: 'meet',
+      dc: null,
+      target: EXECUTED.zero.threshold,
+      total: null,
+      successes: null,
+      cancelled: null,
+      margin: null,
+      zeroPool: true,
+    },
+    visibility: PUBLIC,
+    countDisplay: null,
+  });
+  const card = buildCraftingChatContent(
+    {
+      status: 'failed',
+      actorName: 'Smoke Crafter',
+      recipeName: 'Smoke Count Charm',
+      rollValue: 0,
+      check,
+    },
+    shippedLocalize
+  );
+  assert.match(
+    countCardFailures('zero', { card, rollMessages: rollsFor('zero') }).join('\n'),
+    /zero: the count summary line must replace the numeric roll row/
+  );
+});
+
 test('the assertions bind to the one crafting card the execute created', () => {
   const card = { id: 'card', content: countCard('fail') };
   const roll = { id: 'roll', content: '<div class="dice-roll"></div>' };

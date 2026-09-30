@@ -125,6 +125,25 @@ test('each public roll-under card the renderer builds passes its own case, and o
   );
 });
 
+test('the result pill must agree with the case, not just the rest of the card', () => {
+  // Same evidence as the passing case, flipped only to a failed status: every other check
+  // (dice line, target, pre-rolled, margin) still reads as 'pass' would.
+  const flipped = buildCraftingChatContent(
+    {
+      status: 'failed',
+      actorName: 'Smoke Crafter',
+      recipeName: 'Smoke Under Charm',
+      rollValue: EXECUTED.pass.total,
+      check: executedCheck(EXECUTED.pass, PUBLIC),
+    },
+    shippedLocalize
+  );
+  assert.match(
+    failuresOf('pass', flipped, rollMessage('pass')).join('\n'),
+    /pass: result pill failure, expected success/
+  );
+});
+
 test('the passing card must fold its character value and pre-roll into its target', () => {
   assert.match(
     failuresOf('pass', underCard('pass'), rollMessage('pass'), 11).join('\n'),
@@ -138,6 +157,16 @@ test('the passing card must fold its character value and pre-roll into its targe
   assert.match(
     failuresOf('pass', underCard('pass'), rollMessage('pass', { preRollTotal: 3 })).join('\n'),
     /pre-roll disagrees/
+  );
+});
+
+test('the failing card must show the literal fixed target', () => {
+  // Same total and margin as the failing case, its target anchor term dropped: the label
+  // falls back to the bare number, breaking only the literal "12 · fixed" text.
+  const noAnchor = { ...EXECUTED.fail, targetTerms: [] };
+  assert.match(
+    failuresOf('fail', underCard('fail', { data: noAnchor })).join('\n'),
+    /fail: Target is not "12 · fixed"/
   );
 });
 

@@ -1022,7 +1022,7 @@ export const VIEW_RECIPES = Object.freeze([
       'chat-craft-card-over-control',
     ],
     matches: [
-      /^src\/ui\/presenters\/(?:checkDiceLine|checkEvidenceRows|checkDisplay)\.js$/,
+      /^src\/ui\/presenters\/(?:checkDiceLine|checkEvidenceRows|checkDisplay|CraftingChatCard)\.js$/,
     ],
   },
   {
