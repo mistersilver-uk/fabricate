@@ -133,10 +133,11 @@ This workflow produced each of these shapes repeatedly, and each already has a r
 - An issue delta, lane brief, or handover that runs to tens of kilobytes, answered by stating the decision rather than how it was reached.
 - A file or component header longer than [`.agents/component-header-template.md`](.agents/component-header-template.md).
 
-Each ledger is a ceiling rather than an exact count, so a unit that stays under its row costs no ledger edit at all; a ceiling is raised in a feature PR only with the reason stated in the PR, and lowered by this epic's sweeps with `TIGHTEN_<X>_LEDGER=1`.
-A ceiling gate cannot tell that a condensation sweep finished, so a PR whose stated purpose is condensation, extraction or pin conversion runs that tighten mode for every ledger it moves and commits the result, and a reviewer treats a sweep PR that leaves those ledgers byte-identical as `NEEDS_CHANGES`.
-`npm run lint` allows no rise in a file's count of bare Foundry-global reads against the base commit, because one more bare read is never the same debt as the last one, so a legitimate new read carries a `ratchet-exempt(lint): <reason>` marker on its line instead of a banked row.
-`tests/source-pin-ratchet.test.js` allows no rise in a file's pin count against the base commit, because one more pin is never the same debt as the last one, so a legitimate new pin carries a `ratchet-exempt(source-pin): <reason>` marker at its site instead of a banked row.
+The first three gates are ratchets, and every ratchet holds one rule: no new offender and no rise against the base commit.
+A ratchet computes that baseline at test time, from `RATCHET_BASE` when it is set and otherwise from the merge base with `origin/main`, so no ledger, baseline or pinned total is checked in, and a shrink needs no edit: it passes and is reported as a `shrank` line.
+A legitimate exception carries a `ratchet-exempt(<family>): <reason>` marker at the site, in the file's own comment form, and a marker with an empty reason fails.
+A PR whose stated purpose is condensation, extraction or pin conversion shows its reduction as `shrank` lines, and a reviewer treats one that reports none as `NEEDS_CHANGES`.
+The helper-duplicate gates are fixed rules with no exception, and the last two shapes have no gate and are caught in review.
 
 ## FoundryVTT Notes and Architecture Pointers
 

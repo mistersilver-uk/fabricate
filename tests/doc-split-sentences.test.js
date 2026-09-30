@@ -302,7 +302,7 @@ const SUPERSEDED_POLICY = [
     before:
       'The four ratchet ledgers issue #1656 added — `tests/comment-share-ledger.txt`, `tests/file-size-ledger.txt`, `tests/source-pin-ledger.txt` and `tests/foundry-global-reads-ledger.txt` — are ceiling gates whose rows change only when a unit crosses its ceiling, so lanes that share them no longer need one rail (issue #1914).',
     after:
-      'The comment-share, file-size and source-pin ratchets and `npm run lint` compute their baseline from the base commit (issue #2118), so lanes that share them have no rows to share and no longer need one rail (issue #1914).',
+      '**Ratchets do not couple sibling issues.** Every quality ratchet computes its baseline from the base commit (issue #2118), so two issues whose planned path sets touch the same ratcheted files share no checked-in rows, and each is planned and delivered on its own (issue #1914).',
     survivesIn: '.agents/skills/fabricate-orchestrator/references/agentic-workflow.md',
   },
   {
@@ -311,8 +311,8 @@ const SUPERSEDED_POLICY = [
     before:
       '`tests/source-pin-ledger.txt` and `tests/foundry-global-reads-ledger.txt` carry no headroom, because one more pin or bare read is never the same debt as the last one, so there the gate enforces that obligation itself: a row left above the unit it bounds fails as `SLACK` and is banked with the tighten mode in the same PR that earned it.',
     after: [
-      "`npm run lint` allows no rise in a file's count of bare Foundry-global reads against the base commit, because one more bare read is never the same debt as the last one, so a legitimate new read carries a `ratchet-exempt(lint): <reason>` marker on its line instead of a banked row.",
-      "`tests/source-pin-ratchet.test.js` allows no rise in a file's pin count against the base commit, because one more pin is never the same debt as the last one, so a legitimate new pin carries a `ratchet-exempt(source-pin): <reason>` marker at its site instead of a banked row.",
+      'The first three gates are ratchets, and every ratchet holds one rule: no new offender and no rise against the base commit.',
+      "A legitimate exception carries a `ratchet-exempt(<family>): <reason>` marker at the site, in the file's own comment form, and a marker with an empty reason fails.",
     ],
     survivesIn: 'AGENTS.md',
   },
@@ -458,7 +458,7 @@ const SUPERSEDED_POLICY = [
     before:
       'Note what this means for `src/ui/**`: that directory holds both halves and `npm run lint` now covers both, so the 394 plain `.js` files there that are clean are gated outright; only the 60 listed in `eslint-debt.txt` carry any exclusion, and only for the rules they fail.',
     after:
-      'Note what this means for `src/ui/**`: that directory holds both halves and `npm run lint` now covers both, so the 394 plain `.js` files there that are clean are gated outright; the 60 that were not are held at their base findings, rule by rule.',
+      'Note what this means for `src/ui/**`: that directory holds both halves and `npm run lint` now covers both, so its plain `.js` files that are clean are gated outright, and those that are not are held at their base findings, rule by rule.',
     survivesIn: 'CONTRIBUTING.md',
   },
   {
@@ -490,7 +490,7 @@ const SUPERSEDED_POLICY = [
     before:
       '`scripts/**` is worth understanding before you add a script, because the reason its fifteen are still listed is a measurement rather than an oversight.',
     after:
-      '`scripts/**` is worth understanding before you add a script, because the reason its fifteen still carry debt is a measurement rather than an oversight.',
+      '`scripts/**` is worth understanding before you add a script, because the reason part of it still carries debt is a measurement rather than an oversight.',
     survivesIn: 'CONTRIBUTING.md',
   },
   {
@@ -499,13 +499,108 @@ const SUPERSEDED_POLICY = [
     before:
       '**Batch siblings that share an exact-count ledger.** Two issues whose planned path sets both touch the same pinned ledger — `tests/components/design-system-known-debt.json`, `tests/components/selector-repetition-baseline.json`, `tests/components/spacing-known-literals.json`, `tests/components/control-height-known-literals.js`, or the View Lab registry-total prose that `tests/view-lab-cases.test.js` pins — are planned as ONE delta and delivered as one PR chain, with the phases ordered so each commit boundary re-derives the pins once.',
     after:
-      '**Batch siblings that share an exact-count ledger.** Two issues whose planned path sets both touch the same pinned ledger are planned as ONE delta and delivered as one PR chain, with the phases ordered so each commit boundary re-derives the pins once.',
+      '**Ratchets do not couple sibling issues.** Every quality ratchet computes its baseline from the base commit (issue #2118), so two issues whose planned path sets touch the same ratcheted files share no checked-in rows, and each is planned and delivered on its own (issue #1914).',
     survivesIn: '.agents/skills/fabricate-orchestrator/references/agentic-workflow.md',
+  },
+  // No ratchet keeps a ledger, so no ceiling is raised, lowered or tightened.
+  {
+    issue: '#2118',
+    before:
+      "Each ledger is a ceiling rather than an exact count, so a unit that stays under its row costs no ledger edit at all; a ceiling is raised in a feature PR only with the reason stated in the PR, and lowered by this epic's sweeps with `TIGHTEN_<X>_LEDGER=1`.",
+    after: [
+      'The first three gates are ratchets, and every ratchet holds one rule: no new offender and no rise against the base commit.',
+      'A ratchet computes that baseline at test time, from `RATCHET_BASE` when it is set and otherwise from the merge base with `origin/main`, so no ledger, baseline or pinned total is checked in, and a shrink needs no edit: it passes and is reported as a `shrank` line.',
+      "A legitimate exception carries a `ratchet-exempt(<family>): <reason>` marker at the site, in the file's own comment form, and a marker with an empty reason fails.",
+    ],
+    survivesIn: 'AGENTS.md',
+  },
+  {
+    issue: '#2118',
+    before:
+      'A ceiling gate cannot tell that a condensation sweep finished, so a PR whose stated purpose is condensation, extraction or pin conversion runs that tighten mode for every ledger it moves and commits the result, and a reviewer treats a sweep PR that leaves those ledgers byte-identical as `NEEDS_CHANGES`.',
+    after:
+      'A PR whose stated purpose is condensation, extraction or pin conversion shows its reduction as `shrank` lines, and a reviewer treats one that reports none as `NEEDS_CHANGES`.',
+    survivesIn: 'AGENTS.md',
+  },
+  // Siblings share no rows to re-derive, so neither the batching rule nor its cost survives.
+  {
+    issue: '#2118',
+    before:
+      "Planned separately, every one of those PRs restacks onto the other's merge and re-derives the same pins again, which is pure overhead with no review value.",
+    after:
+      '**Ratchets do not couple sibling issues.** Every quality ratchet computes its baseline from the base commit (issue #2118), so two issues whose planned path sets touch the same ratcheted files share no checked-in rows, and each is planned and delivered on its own (issue #1914).',
+    survivesIn: '.agents/skills/fabricate-orchestrator/references/agentic-workflow.md',
+  },
+  {
+    issue: '#2118',
+    before:
+      "**Parallel lanes only where the path sets are disjoint.** The driver runs two changes as parallel lanes or teams only when neither touches the other's pinned ledgers, shared stylesheet regions, or registry-total prose; changes that share any of those run on one rail, sequenced, because each concurrent PR costs a restack with conflict resolution and pin re-derivation at the tip, and that restack has cost more than the parallelism saved.",
+    after:
+      "**Parallel lanes only where the path sets are disjoint.** The driver runs two changes as parallel lanes or teams only when neither touches the other's shared stylesheet regions; changes that share one run on one rail, sequenced, because each concurrent PR costs a restack with conflict resolution at the tip, and that restack has cost more than the parallelism saved.",
+    survivesIn: '.agents/skills/fabricate-orchestrator/references/agentic-workflow.md',
+  },
+  {
+    issue: '#2118',
+    before:
+      'Prune a path-signal role whose row fired on prose alone at the post-implementation review and docs stages, batch issues that share an exact-count ledger into one delta, and serialise lanes whose path sets are not disjoint, as `AGENTS.md` directs.',
+    after:
+      'Prune a path-signal role whose row fired on prose alone at the post-implementation review and docs stages, and serialise lanes whose path sets are not disjoint, as `AGENTS.md` directs.',
+    survivesIn: '.agents/skills/fabricate-orchestrator/references/agentic-workflow.md',
+  },
+  // Issue 1660 retired the staged scope, and lint and format now compare with the base commit.
+  {
+    issue: '#2118',
+    before:
+      'ESLint/Prettier run over a **staged path scope** (see the `lint`/`format` globs in `package.json`): now the entire `src/` JavaScript surface — `src/{models,utils,integrations,config,migration,canvas,systems}` + `src/toolBreakageRuntime.js`.',
+    after:
+      'ESLint and Prettier run over the whole repository (`scripts/lint.mjs` and `scripts/format-check.mjs`), and fail only on what a change makes worse against the base commit — see [Reading a ratchet failure](#reading-a-ratchet-failure).',
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    issue: '#2118',
+    before:
+      'Prettier additionally formats every `*.svelte` file under `src/` — `prettier-plugin-svelte` is registered in `.prettierrc.json` (Prettier 3 does not auto-load plugins, so the devDependency alone is not enough) and `format:check` names `src/**/*.svelte`, so an unformatted component fails CI.',
+    after:
+      'Prettier additionally formats every `*.svelte` file under `src/` — `prettier-plugin-svelte` is registered in `.prettierrc.json` (Prettier 3 does not auto-load plugins, so the devDependency alone is not enough) and `format:check` covers `src/**/*.svelte`, so a component that is new, or was formatted at base, fails CI when it is not formatted.',
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    issue: '#2118',
+    before:
+      "`npm run lint:svelte` separately gates every `*.svelte` file under `src/` with `--max-warnings=0`, so a component's script and markup ARE ESLint-gated even though the `.js` around them under `src/ui/**` is not — the two halves of that directory are gated by different scripts and must not be reasoned about as one scope.",
+    after:
+      "`npm run lint:svelte` separately gates every `*.svelte` file under `src/` with `--max-warnings=0` and no base comparison, so a component's script and markup are held at zero findings while the `.js` around them under `src/ui/**` is held at its base findings — the two halves of that directory are gated by different scripts and must not be reasoned about as one scope.",
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  // Debt counts are computed now, so the prose names where the debt sits and not how much.
+  {
+    issue: '#2118',
+    before:
+      'The `scripts/**` debt is fifteen of its thirty-three files, and stays that way for a measured reason: the Foundry smoke harness alone accounts for 844 of the roughly one thousand ESLint findings there and pins its Phase D0 selectors by class, index and button text with no unit coverage, so clearing it is a large triage against the least-covered file here rather than a tidy-up.',
+    after:
+      'The `scripts/**` debt stays for a measured reason: the Foundry smoke harness alone accounted for 844 of the roughly one thousand ESLint findings there when the glob landed, and it pins its Phase D0 selectors by class, index and button text with no unit coverage, so clearing it is a large triage against the least-covered file here rather than a tidy-up.',
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    issue: '#2118',
+    before:
+      '60 of the 454 plain `.js` files under `src/ui/**`; the other 394 are gated outright, as are the `.svelte` components beside them',
+    after:
+      'the plain `.js` files under `src/ui/**` that are not yet clean; the rest are gated outright, as are the `.svelte` components beside them',
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    issue: '#2118',
+    before:
+      '15 of the 33 files under `scripts/**`',
+    after:
+      'part of `scripts/**`, for the reason below',
+    survivesIn: 'CONTRIBUTING.md',
   },
 ];
 
 /** Pinned exactly: every entry excuses one historical sentence. */
-const SUPERSEDED_POLICY_COUNT = 43;
+const SUPERSEDED_POLICY_COUNT = 54;
 
 /**
  * Sentences a deliberate rename forced to change, where the only edit is an identifier (issue

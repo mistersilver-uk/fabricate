@@ -478,6 +478,51 @@ A missing local dependency MUST fail setup normally with an actionable diagnosti
 - **AND** the test process reports a normal failure with zero cancelled tests rather than hanging
 - **AND** local development and CI exercise the same helper through the existing `npm test` path
 
+### Requirement: Quality ratchets compute their baseline
+
+A test that bounds a population of offenders MUST compute its baseline at test time from the base commit, and MUST NOT read a checked-in ledger, baseline or pinned total.
+The base commit MUST be `RATCHET_BASE` when that variable is set, and otherwise the merge base of `HEAD` with `origin/main`.
+A ratchet MUST fail only on an offender that appeared or got worse against that base, MUST pass and report a shrink, and MUST offer no update, tighten or slack mode.
+A regression MUST pass only when its site carries a `ratchet-exempt(<family>): <reason>` marker in the file's own comment form, and a marker with an empty reason MUST fail.
+
+#### Scenario: a change adds an offender
+
+- **WHEN** a change adds an offender, or makes an existing one worse, against the base commit
+- **THEN** the ratchet fails, naming the offender with its base value and its head value, or naming it as new
+- **AND** the failure says how to fix it or record a `ratchet-exempt` reason, and that a stale `origin/main` is refreshed with `git fetch origin main`
+
+#### Scenario: a change removes an offender
+
+- **WHEN** a change shrinks or removes an offender
+- **THEN** the ratchet passes and reports the shrink as a diagnostic
+- **AND** no file needs editing to record it
+
+#### Scenario: the requested base does not resolve
+
+- **WHEN** `RATCHET_BASE` is set to a ref that names no commit
+- **THEN** the ratchet fails rather than passing unchecked
+
+#### Scenario: CI has no base
+
+- **WHEN** a ratchet runs with `CI` or `GITHUB_ACTIONS` set, `RATCHET_BASE` unset, and no merge base with `origin/main`, or a merge base that is `HEAD` itself
+- **THEN** the ratchet fails, naming `RATCHET_BASE` as the fix
+
+#### Scenario: a run opts out
+
+- **WHEN** `RATCHET_BASE` is `none`, as on the beta and release jobs that test a tree CI already compared
+- **THEN** every ratchet skips and says it was opted out
+
+#### Scenario: a local run has no origin/main
+
+- **WHEN** a ratchet runs outside CI with `RATCHET_BASE` unset and `origin/main` unresolvable or sharing no merge base with `HEAD`
+- **THEN** the ratchet skips with a diagnostic that names the fix, `git fetch origin main` or setting `RATCHET_BASE`
+
+#### Scenario: a regression carries a marker
+
+- **WHEN** an appeared or worsened offender's site carries a `ratchet-exempt(<family>): <reason>` marker for that ratchet's family
+- **THEN** the ratchet passes and reports the exemption with its reason
+- **AND** a marker for that family with an empty reason fails the ratchet
+
 ### Requirement: Product contracts stay in specs
 
 Agents and skills MUST keep durable product behavior in canonical specs or active OpenSpec design docs, not in role prompts.

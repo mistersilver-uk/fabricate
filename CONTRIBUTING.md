@@ -542,9 +542,9 @@ npm run lint:md        # markdownlint over all Markdown (what CI runs)
 npm run lint:md:fix    # …and auto-fix (splits prose to one sentence per line)
 ```
 
-ESLint/Prettier run over a **staged path scope** (see the `lint`/`format` globs in `package.json`): now the entire `src/` JavaScript surface — `src/{models,utils,integrations,config,migration,canvas,systems}` + `src/toolBreakageRuntime.js`.
-Prettier additionally formats every `*.svelte` file under `src/` — `prettier-plugin-svelte` is registered in `.prettierrc.json` (Prettier 3 does not auto-load plugins, so the devDependency alone is not enough) and `format:check` names `src/**/*.svelte`, so an unformatted component fails CI.
-`npm run lint:svelte` separately gates every `*.svelte` file under `src/` with `--max-warnings=0`, so a component's script and markup ARE ESLint-gated even though the `.js` around them under `src/ui/**` is not — the two halves of that directory are gated by different scripts and must not be reasoned about as one scope.
+ESLint and Prettier run over the whole repository (`scripts/lint.mjs` and `scripts/format-check.mjs`), and fail only on what a change makes worse against the base commit — see [Reading a ratchet failure](#reading-a-ratchet-failure).
+Prettier additionally formats every `*.svelte` file under `src/` — `prettier-plugin-svelte` is registered in `.prettierrc.json` (Prettier 3 does not auto-load plugins, so the devDependency alone is not enough) and `format:check` covers `src/**/*.svelte`, so a component that is new, or was formatted at base, fails CI when it is not formatted.
+`npm run lint:svelte` separately gates every `*.svelte` file under `src/` with `--max-warnings=0` and no base comparison, so a component's script and markup are held at zero findings while the `.js` around them under `src/ui/**` is held at its base findings — the two halves of that directory are gated by different scripts and must not be reasoned about as one scope.
 That gate polices suppressions in both directions: `svelte/no-unused-svelte-ignore` is active, so a `svelte-ignore` comment that no longer suppresses anything is itself a lint failure and must be removed once it stops being needed.
 The same holds for an ESLint suppression — the `.svelte` block in `eslint.config.js` pins `linterOptions: { reportUnusedDisableDirectives: 'error' }`, so a stale `eslint-disable` directive fails the gate exactly as a stale `svelte-ignore` does.
 That is pinned rather than left to ESLint's default because it is half of what makes reformatting components safe: `eslint-disable-next-line` is anchored to a line and Prettier moves lines, so a directive that slips off its violation resurfaces the violation, and one that lands suppressing nothing is reported by this option.
@@ -564,7 +564,7 @@ Formatting debt is held the same way: a file Prettier-clean at base, or new, mus
 `npm run lint` compares with `RATCHET_BASE` when it is set and with the merge base of `origin/main` otherwise, so run `git fetch origin main` if it names code you did not touch; it runs as a step of the `lint` CI job rather than from `npm test`, because it lints the whole tree.
 `tests/new-violations.test.js` proves both comparisons against a temporary repository, including that `no-undef` and a parse error fail at any count.
 When you bring a file to green there is nothing to update, because the comparison reports the fall; widen nothing else in the same PR, since reformatting counts as new code and surfaces pre-existing Sonar findings.
-The `scripts/**` debt is fifteen of its thirty-three files, and stays that way for a measured reason: the Foundry smoke harness alone accounts for 844 of the roughly one thousand ESLint findings there and pins its Phase D0 selectors by class, index and button text with no unit coverage, so clearing it is a large triage against the least-covered file here rather than a tidy-up.
+The `scripts/**` debt stays for a measured reason: the Foundry smoke harness alone accounted for 844 of the roughly one thousand ESLint findings there when the glob landed, and it pins its Phase D0 selectors by class, index and button text with no unit coverage, so clearing it is a large triage against the least-covered file here rather than a tidy-up.
 A new `.sh` under `scripts/` is the one thing still added by hand — to `SHELL_SCRIPTS` in `tests/scripts-lint-gate-coverage.test.js`, which with its `bash -n` parse is the only gate shell gets anywhere in this repository.
 `npm run lint:css` (Stylelint, config in `stylelint.config.js`) gates `styles/**/*.{css,scss}` and enforces quality, reliability, duplication, reuse/shorthand, and cross-browser support (against the `browserslist` in `package.json`); Svelte scoped `<style>` blocks are out of scope.
 Use `npm run lint:fix` / `npm run lint:css:fix` / `npm run format` to auto-fix.
@@ -637,7 +637,7 @@ The debt is visible, not hidden: an editor shows it as errors, and a bare `npx e
 
 A **second** gated script, `npm run lint:svelte`, covers every `*.svelte` file under `src/` and runs as its own step of the same required `lint` job.
 It is separate because components need the Svelte parser and their own rule set, not because they are optional.
-Note what this means for `src/ui/**`: that directory holds both halves and `npm run lint` now covers both, so the 394 plain `.js` files there that are clean are gated outright; the 60 that were not are held at their base findings, rule by rule.
+Note what this means for `src/ui/**`: that directory holds both halves and `npm run lint` now covers both, so its plain `.js` files that are clean are gated outright, and those that are not are held at their base findings, rule by rule.
 
 `lint:svelte` runs with `--max-warnings=0`, so the two WARN-level rules in `svelte.configs.recommended` (`svelte/no-at-debug-tags`, `svelte/no-inspect`) fail the build rather than printing and exiting 0 — a `{@debug}` tag or an `$inspect()` call left in a component is a CI failure.
 A finding has three legitimate dispositions: fix the code, tune the rule in `eslint.config.js`, or suppress it.
@@ -679,15 +679,32 @@ Carried as debt rather than gated away (held at their base findings; `npx eslint
 
 - the `tests/` suite — held per file and rule like the rest, where 887 of its 1,040 files reported something when the glob landed.
   Every rule is now enforced there, `no-undef` at any count.
-- 60 of the 454 plain `.js` files under `src/ui/**`; the other 394 are gated outright, as are the `.svelte` components beside them
+- the plain `.js` files under `src/ui/**` that are not yet clean; the rest are gated outright, as are the `.svelte` components beside them
 - `src/main.js` and three root `src/gathering*.js` modules
-- 15 of the 33 files under `scripts/**`
+- part of `scripts/**`, for the reason below
 - the `examples/macros/*.js` documentation macros, and two root config files
 
-`scripts/**` is worth understanding before you add a script, because the reason its fifteen still carry debt is a measurement rather than an oversight.
+`scripts/**` is worth understanding before you add a script, because the reason part of it still carries debt is a measurement rather than an oversight.
 The Foundry smoke harness alone accounts for 844 of the roughly one thousand ESLint findings across that directory, and it pins its Phase D0 selectors by class, index and button text with no unit coverage over any of them.
 Adding a script now lints it — that is the whole point of the glob — so the only thing left to remember is that a new `.sh` file joins `SHELL_SCRIPTS` in `tests/scripts-lint-gate-coverage.test.js` by hand.
 Shell is parsed by no linter and formatted by no formatter here, and that list plus its `bash -n` parse is the only gate a shell script gets.
+
+### Reading a ratchet failure
+
+A ratchet is a test that bounds a population of offenders: oversized units, comment share, source pins, design-system debt, world-scope reads and orphaned `lang/` keys.
+`npm run lint` and `npm run format:check` hold ESLint and Prettier findings the same way.
+Each compares the working tree with a base commit it computes at test time: `RATCHET_BASE` when that is set, as CI sets it to the commit the pushed change sits on, and otherwise the merge base of `HEAD` with `origin/main`.
+No ledger, baseline or pinned total is checked in, so there is nothing to regenerate or tighten.
+
+A failure names the family, the base commit and each regression, as an entry that is new or one that rose from its base value to its head value.
+Fix the code, or, when the regression is legitimate, record why at the site with a `ratchet-exempt(<family>): <reason>` comment in the file's own comment form: `//` in JavaScript, `/* */` in CSS, and `<!-- -->` in Svelte markup, HTML and Markdown.
+The marker sits on the offending line or in the comment lines right above it, and a family that measures a whole file or unit, such as `file-size` or `comment-share`, also accepts it in the file's head comment.
+A marker with an empty reason fails, and a reviewer reads every marker a diff adds.
+A shrink never fails: it is reported as a `shrank` diagnostic, and the next change is compared with the smaller figure.
+
+A stale `origin/main` can give a false positive: run `git fetch origin main`.
+When a ratchet names code you did not touch, your local `origin/main` usually predates the commit your branch started from, so the comparison counts other people's changes as yours.
+Locally, with no `origin/main` and no `RATCHET_BASE`, the ratchets skip and name that fix; in CI they fail instead, and `RATCHET_BASE=none` is the explicit opt-out the beta and release jobs use.
 
 ## The View Lab (Foundry-free window captures)
 
