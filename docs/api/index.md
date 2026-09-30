@@ -728,7 +728,7 @@ This additive `features` field leaves `schemaVersion` at `1`.
 Its shape is `{ version, modes, additionalDice }`: each `modes` row is `{ product, direction, targetSources, interactive }`, and an evaluation is executable when one row matches its `product` and `direction`, lists its `target.source` in `targetSources`, and has `interactive: true` when the roll is interactive.
 `version` names this descriptor's shape, not its rows.
 Activating a mode appends a row without changing it, so match rows rather than comparing versions.
-At version 1 the descriptor publishes five rows: `{ product: 'sum', direction: 'over', targetSources: ['fixed'], interactive: true }`, `{ product: 'sum', direction: 'over', targetSources: ['attribute'], interactive: false }`, `{ product: 'sum', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: false }`, `{ product: 'count', direction: 'over', targetSources: ['fixed', 'attribute'], interactive: false }`, and `{ product: 'count', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: false }`.
+At version 1 the descriptor publishes five rows: `{ product: 'sum', direction: 'over', targetSources: ['fixed'], interactive: true }`, `{ product: 'sum', direction: 'over', targetSources: ['attribute'], interactive: true }`, `{ product: 'sum', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: true }`, `{ product: 'count', direction: 'over', targetSources: ['fixed', 'attribute'], interactive: true }`, and `{ product: 'count', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: true }`.
 `additionalDice` stays `false`, so additional dice have no standalone execution route.
 On the fixed sum-over row the evaluation only selects the mode, `target.expression` and the pool settings are validated but never change the roll, and Fabricate still grades `formula` against `dc` through `compare`, so a request without a finite `dc` rolls ungraded.
 On an attribute row Fabricate ignores `dc` entirely and resolves the target from `target.expression` against the actor's roll data instead, using the same lookup Foundry's own `Roll.replaceFormulaData` uses, plus the row's `baseAdjustment`.
@@ -737,6 +737,10 @@ A sum-under request against a fixed target with no finite `dc` also refuses `eva
 On a count row Fabricate ignores both `formula` and `dc` and grades the rolled dice pool's net successes against `evaluation.pool.required` alone.
 An unresolved or non-numeric `pool.base` or `pool.threshold` refuses the outcome `poolUnresolved` before any roll, and any other invalid pool setting (`die`, `explode`, `cancel`, or the settled pool itself) refuses `evaluationInvalid` before Fabricate constructs a Roll.
 A pool that resolves to zero or fewer dice answers `checkFailed` with no Roll constructed at all.
+An interactive count request opens Fabricate's roll prompt, which shows the dice pool and the successes needed rather than a formula or DC, and a situational bonus there adds dice or moves the threshold, as the pool's `modifierDestination` says.
+A forwarded `rollDecision` applies its bonus the same way without opening the prompt.
+Advantage and bought dice are not offered on a count yet: an interactive count request that forwards `advantage: 'advantage'` or `'disadvantage'`, or whose `pool.additionalDice.enabled` is `true`, refuses `evaluationUnsupported` before anything is prompted or rolled.
+A non-interactive count request with additional dice enabled rolls its authored pool alone.
 
 A malformed evaluation returns `evaluationInvalid`.
 A valid evaluation whose mode is absent from the advertised rows returns `evaluationUnsupported`.
