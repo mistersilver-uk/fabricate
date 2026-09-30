@@ -808,7 +808,7 @@
   }
 
   /**
-   * Convert a summing counting formula (issue 2006): STAGED into the draft, so Save applies it and
+   * Convert a summing counting formula (issue 2006): staged into the draft, so Save applies it and
    * Discard restores the summing check, then the roll section opens on `Count successes`.
    */
   function convertCheck(subsystem) {

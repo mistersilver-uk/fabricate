@@ -1,6 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  THE DIE TILES OF A SUCCESS-COUNTING ROLL (issue 2006): one tile per active die in roll order,
+  The die tiles of a success-counting roll (issue 2006): one tile per active die in roll order,
   each explosion's die straight after the die that produced it, every mark on one tile.
   `countDiceTiles.js` builds the model and every string; its chat renderer emits this markup.
 
