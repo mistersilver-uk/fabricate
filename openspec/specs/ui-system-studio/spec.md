@@ -306,6 +306,28 @@ The target, adjustment and progressive-direction issues belong to The roll, the 
 With a Preview-as actor chosen it raises two TRANSIENT warnings naming that actor, `attributePathUnresolvedForPreview` and `attributeValueNotNumeric`; they are explained by the section notice and listed on the Validation route, and they never feed a rail or nav badge, a section dot, the Validation tally or the enable gate.
 Their notices' Review focuses the character-value field for the target issues and the transient warnings.
 
+#### Roll-under and character-value authoring
+
+The Formula card's "Which way is better" axis (`Higher is better` / `Lower is better`) writes only `evaluation.direction`.
+No direction, target-source or adjustment-kind switch rewrites anything: `dc`, tier `dc`, `adjustment`, `successes`, `target`, inactive outcome rows and dormant overrides all survive, and `dc`, `adjustment` and `successes` stay distinct fields.
+A multiplier kept after switching back to `Add a number` reads as an added adjustment (`+0.5`), which is valid and rounds down at runtime, so no readiness issue is raised for it.
+Under a roll-under check the Formula card notes `The total must stay {cmp} the target. Modifiers raise the target; the dice stay as rolled.`, where `{cmp}` is `at or under` (meet) or `under` (exceed) everywhere in the Studio, and no label names a game system, a die size or a fixed direction phrase.
+Its inset reads the formula, the comparison, the target chip (`Target {dc}` for a fixed target, the authored expression for a character value) and the modifier chips, never joining the chips with `+`, and `avg —` stays visible for a transformed formula under every direction, source and kind.
+Its rule sentence reads `The dice are compared raw. Every modifier that applies raises the target instead of being added to the roll.`, naming the previewed tier's adjustment first when one applies.
+
+Every summed check that grades against a target offers the target source as a `RadioCardGroup`, `What the roll is measured against`: `Fixed difficulty` (`The same number for every character, set here and per recipe tier.`) or `Character value` (`Read from the crafting character. Difficulty adjusts it rather than replacing it.`).
+The Difficulty card's lead names the direction: fixed roll-under "The number the roll must stay {cmp}, and where that number comes from.", character value "The character value the roll must reach, and how difficulty adjusts it." or "…must stay {cmp}, and how difficulty adjusts it."
+A character value is a plain `RollDataExpressionInput` (no sigil affix) whose help shows `@skills.craft.value - 2`, never Foundry's V14-only `@{path}` form; with no Preview-as actor it reads "Choose a character in Preview as to see what this resolves to.", resolved `{actor} → {value}`, and unresolved `{actor} has no value at {path}. The check cannot resolve for them.`
+Its static value is labelled `Base DC`, `Target` or `Base adjustment` by source and direction, its adjustment source group reads "How the adjustment is set" with a static base adjustment or a macro that returns the target to reach or to roll under, and its `Difficulty adjustment` is `Add a number` or `Multiply, rounded down`.
+The Comparison reads `At or under` / `Strictly under` under a roll-under check.
+Numeric and fractional values edit through the formatted `Stepper` (`ui-visual-style/spec.md` § Numeric entry), so a multiplier reads `×½` and stays directly typeable, including an off-list `×0.7`.
+
+The formula card also renders one `In the roll prompt` group ("What the player can change before the dice are rolled.") with an `Offer a situational bonus` toggle writing `offerSituationalBonus`: on, it describes the bonus as adding to the total, raising the target or moving the threshold for the evaluation; off, "The prompt shows no bonus field."
+Recipe tiers name their unit `DC`, `Target` or `Adjustment`; under a character value they lead "A recipe picks one of these; it adjusts the character value before the roll.", and a tier with no adjustment reads `—` beside `Set an adjustment` while keeping the base adjustment at runtime.
+Relative outcome rows edit a fixed or added check's `dc` as `Benefit ±`, and a multiplied character value's `adjustment` as `Adjustment`, where exactly one row with no multiplier is `Otherwise`; a new row never duplicates Otherwise or reads `dc` as a multiplier.
+Every band strip but a roll-high fixed-DC one is a read-only picture built by `checkBandModel.js` (`ui-visual-style/spec.md` § Threshold band strip), scaled `Target {T} ({source}). Success sits at the low end: a total {cmp} {T} succeeds.` under a roll-under check; the tier Steppers stay authoritative.
+A progressive summed check shows its budget, the direction axis and the prompt group but no Difficulty card, keeping its inactive target data, and a progressive roll-under check raises the blocking readiness above.
+
 #### Success-counting preview and readiness
 
 While a check's evaluation is `count`, its retained `rollFormula` is inert on every Studio surface: readiness raises no `noRollFormula`, `modifiersInertNoFormula` or retired-placeholder issue and reports no `hasRollFormula` tick, the simulator reads its pool rather than the formula, and the digest's roll row reads `Roll · {base}d{die} · each {comparison} {threshold}` with the authored expressions (`Digest.CountFormula`), a base that is not a whole number bracketed as `(@skills.smith.rank + 2)d10`.
@@ -408,6 +430,8 @@ Each trigger pairs an expressive dice-matching condition with three effects (iss
   Routed: `Any die shows its best face ({best}) → step up a tier` and `Every die shows its worst face ({worst}) → step down a tier`.
   When cancelling is enabled: `Botch (net below zero) → automatic failure` (simple, `rollTotal < 0`) or `Botch (net below zero) → lowest tier` (routed, offered only while a tier exists).
   Best and worst follow `presetPolarity`, and authored triggers are never rewritten.
+- A summed check's natural-face presets read `Natural {face} on {die} → {effect}` and take their faces from `presetPolarity(evaluation)` (`checkTriggerPresets.js`), which names the best face `low` under a roll-under direction and `high` otherwise: the best-face preset (id `high`) names 1 under a roll-under check and the die's maximum otherwise, and the worst-face preset (id `low`) the opposite.
+  Only a newly authored preset reads the evaluation; changing the direction never rewrites an existing trigger.
 - When the check has no named outcome tiers, the `target` branch shows its own muted guidance cue rather than hiding the control — a GM authoring top-down configures triggers before tiers, and hiding it would make an authored target invisible.
   It carries a hook and a lang key distinct from the `outcomeTier` condition's no-tiers cue, because a trigger that is both `outcomeTier`-conditioned and `target`-stepping on a tier-less check would otherwise render two identically-hooked nodes in one card.
 - Two readiness rules back the control, both `warning` severity and both reported only once at least one trigger sets `target`: `danglingTierStepTarget` (the target names no tier on the active list, including "no tier chosen at all") and `multipleTierStepTargets` (two or more triggers set a target; if more than one matches, the lowest-ranked wins).
@@ -755,6 +779,7 @@ The header owns Back to Tool Rules, a World Tool route to the world record, Save
 Both navigations render as the same secondary treatment, because they are the same kind of verb — leaving this screen for another — and `Save rules` is the only primary in the cluster.
 The World Tool route renders only when the world catalogue actually holds a record for the Tool, because a pre-migration in-system Tool has no world half to open.
 The body includes a live behavior preview, while the inspector summarizes identity, effective rules, the player-facing copy, a per-actor preview, and what requires the Tool in this system.
+The behaviour preview states where a Tool's check bonus lands for each evaluation, as a benefit: `Adds the dice` · `{expression} to the total`, `Lower is better` · `{expression} to the target`, and `Counts successes` · `moves the threshold {expression}, or adds {expression} dice, as the check routes it`.
 
 Breakage opens with the two per-system facts that are not rules — `Enabled in {system}` and the per-system display-label OVERRIDE — and closes with `Stop using this Tool here`.
 The label field states that it overrides the world Tool name in this crafting system only and that blank falls back to it.
@@ -857,6 +882,8 @@ The readout is a phrase, not a numeric, and stays in the UI face — the mono fa
 
 The **check pill** resolves the recipe's `checkTierId` against the system check's tiers and shows that tier's DC, falling back to the check's static default DC.
 It shows a dynamic-DC pill when the check resolves its DC through a macro and a progressive pill for a progressive system.
+Only a summed roll-high check against a fixed DC shows a DC: a fixed roll-under target reads `Target {n}`, a character-value target reads `Character value` in either direction, and a macro-resolved target of either reads `Dynamic target`.
+The sort key those pills share with the check DC reads `Check target` whenever any row names a target or character value (with no rows, whenever the system's summed check is not roll-high against a fixed DC), and a character-value row, which has no single number, sorts with the dynamic rows; the editor subline names the same fact.
 A counting check's pill reads `{n} successes` (`1 success`) in the mono face — the recipe tier's successes needed, falling back to the pool's own like the engine — and `Dynamic successes` when a macro sets the count; the sort key it shares with the check DC reads `Successes needed` and sorts by that count.
 Every pill that carries or stands for a check's difficulty (DC, Target, Character value, successes and their dynamic forms) takes the info tone.
 A check is **usable** only when an authored `rollFormula` exists, which is not the same as "checks enabled", and the two check-less states are distinct and must not be conflated:
@@ -1010,6 +1037,7 @@ The held count is resolved on the same basis every other membership reader uses 
 Staging accumulates across recipe items rather than being limited to the one on screen: each staged item appears in a list stating its operation, the number of recipes it affects, and its own control to leave that item unchanged.
 This axis deliberately differs from the Component Studio's tag axis, which is a run of tri-state controls; the divergence is in the staged axis only, and both panels render the same shared bulk-edit chrome.
 The check tier axis carries THREE distinct instructions and never collapses two of them: leave the recipe's tier alone, clear it to the system's default DC, and set a named tier.
+Under a fixed roll-under target each tier reads `{name} (Target {dc})`, the default `Default target`, and the hint, default hint and dynamic and no-tier statements name a target; under a character value each tier reads its adjustment, `{name} (−2)` or `{name} (×½)`, the default `Default · base adjustment`, and those statements name the base adjustment, never a DC.
 Under a counting check each tier reads `{name} · {n} successes` (`{name} · — successes` when it sets none), the default reads `Default · {required} successes`, and the axis hint and the dynamic and no-tier statements name successes needed rather than a DC.
 Where the system's crafting check carries no recipe-level tier — a progressive system, a dynamically resolved DC, a fixed-type routed check whose per-recipe difficulty is its minimum success tier instead, a resolution mode that rolls no crafting check at all, or a check with no tiers authored — the panel states which of those it is in place of the control rather than hiding it.
 A well-formed system whose mode rolls no check is told exactly that, and is never told its resolution mode is unrecognised.
@@ -1305,6 +1333,8 @@ Current GM editor behavior:
   D100 row selection is controlled by selected-system Gathering Rules, not Gathering Task authoring.
 - Gathering Task authoring may also include node count, depletion timing, respawn policy, stamina cost, attempt limits, risk overrides, encounter hooks, natural expression providers, and macro providers where the selected economy/features use them.
 - A routed task's check override is one Stepper with the `System default` placeholder and no presets.
+  Under a fixed target it edits `task.dcOverride`, labelled `Target override` for a roll-under check (hint `Replaces the system target for this task. The total must stay {cmp} it.`); under a character value it edits `task.adjustmentOverride` as `Difficulty adjustment override`, formatted for the adjustment kind and never truncating a multiplier; a roll-high fixed check keeps its DC override unchanged.
+  Clearing it restores the system default by nulling only the active field, and a dormant DC or adjustment override survives with its own notice.
   Under a counting check it is labelled `Successes needed override` and edits `task.successesOverride` (0–20); a kept DC or adjustment override survives, is never rewritten and is named in its own dormant notice.
 - Reusable event authoring includes name, image, description, enabled state, danger/match tags, d100 drop rate, and modifier provider evidence.
 - The selected-system inspector exposes the WORLD character modifier library for gathering (issue 1308; per-system until then), with add/edit/delete controls, opt-in preset seeding when supported by the active Foundry system, and stale-reference evidence for rows that still point at deleted modifiers.
