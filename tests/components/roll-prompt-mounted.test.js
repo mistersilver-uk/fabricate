@@ -750,7 +750,7 @@ describe('mounted roll prompt', () => {
     const note = () => dialog.querySelector('.formula-content .formula-note').textContent.trim();
     assert.equal(line().getAttribute('aria-live'), 'polite', 'the settled line announces each change');
     assert.equal(line().textContent, '6d10 · each ≥ 7', 'the default pick already moved the threshold');
-    assert.equal(note(), 'Success on ≥ 7, moved −1 by modifiers · explodes on 9 or above once');
+    assert.equal(note(), 'Success on ≥ 7, moved +1 by modifiers · explodes on 9 or above once');
     dialog.querySelectorAll('input[name="craftingModifier"]')[1].click();
     flushSync();
     assert.equal(line().textContent, '6d10 · each ≥ 7 + 1d4', 'a rolled pick is pending, never averaged');
@@ -759,7 +759,7 @@ describe('mounted roll prompt', () => {
     bonus.dispatchEvent(new document.defaultView.Event('input', { bubbles: true }));
     flushSync();
     assert.equal(line().textContent, '6d10 · each ≥ 5 + 1d4');
-    assert.equal(note(), 'Success on ≥ 5, moved −3 by modifiers · explodes on 9 or above once');
+    assert.equal(note(), 'Success on ≥ 5, moved +3 by modifiers · explodes on 9 or above once');
     dialog.querySelectorAll('input[name="craftingModifier"]')[0].click();
     flushSync();
     assert.equal(line().textContent, '6d10 · each ≥ 6 + 1d4', 'unpicking a flat modifier gives its step back');
