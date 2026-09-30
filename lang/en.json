@@ -1057,6 +1057,7 @@
           "CheckWithDc": "{formula} vs DC {dc}",
           "CheckWithTarget": "{formula} · Target {target} · {comparison}",
           "BandOtherwise": "Otherwise",
+          "BandNeeded": "Needed",
           "BandAdjustment": "{tier} · {adjustment}",
           "FailureGeneric": "The crafting attempt failed.",
           "RollLabel": "Roll",

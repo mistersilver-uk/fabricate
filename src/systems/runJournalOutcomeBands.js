@@ -47,8 +47,10 @@ export function routedOutcomeBand(outcome, routed, task, labels = {}) {
 export function craftingOutcomeBand(outcome, routed, dc, labels = {}) {
   if (routed?.type === 'fixed') return routedOutcomeBand(outcome, routed, null);
   const evaluation = activeCheckEvaluation(routed);
-  if (evaluation.product === 'count')
-    return countBand(outcome, routed, dc ?? countRequired(evaluation));
+  if (evaluation.product === 'count') {
+    if (dc === null) return relativeCountBand(outcome, routed, labels.needed ?? 'Needed');
+    return countBand(outcome, routed, dc);
+  }
   const grading = ladderGrading(routed);
   if (grading.source === 'attribute') return adjustmentBand(outcome, grading, labels);
   const base = dc ?? 0;
@@ -122,11 +124,15 @@ function outcomeBandPosition(routed, threshold, base, grading) {
   };
 }
 
+/** `DC`, `DC+2` or `DC−1`: an offset from a word standing for an unresolved number. */
+function offsetFrom(word, offset) {
+  return offset === 0 ? word : `${word}${offset > 0 ? '+' : '−'}${Math.abs(offset)}`;
+}
+
 // Absolute once the target resolved, relative to an unresolved `DC` or `Target` when it did not.
 function craftingThreshold(threshold, dc, grading) {
   if (dc !== null) return String(threshold);
-  const word = grading.direction === 'under' ? 'Target' : 'DC';
-  return threshold === 0 ? word : `${word}${threshold > 0 ? '+' : '−'}${Math.abs(threshold)}`;
+  return offsetFrom(grading.direction === 'under' ? 'Target' : 'DC', threshold);
 }
 
 /** A relative count ladder's thresholds, `required + outcome.dc`, in authored order. */
@@ -151,6 +157,18 @@ function countBand(outcome, routed, required) {
   if (lowest && next <= 0) return `<${next}`;
   const low = lowest ? 0 : threshold;
   return low === next - 1 ? String(low) : `${low}–${next - 1}`;
+}
+
+/**
+ * A count tier's band when a macro sets the successes needed, relative to `word` as an unresolved
+ * summed DC reads: `<Needed` for the least demanding tier, `Needed+2+` above it.
+ */
+function relativeCountBand(outcome, routed, word) {
+  const offset = numberOrNull(outcome?.dc) ?? 0;
+  const thresholds = countThresholds(routed, 0);
+  const higher = thresholds.filter((value) => value > offset);
+  if (!thresholds.every((value) => value >= offset)) return `${offsetFrom(word, offset)}+`;
+  return higher.length === 0 ? '0+' : `<${offsetFrom(word, Math.min(...higher))}`;
 }
 
 /**

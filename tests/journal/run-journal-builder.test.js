@@ -3691,6 +3691,29 @@ test('a count ladder states net successes ranked by net whatever the per-die dir
   assert.equal(craftingOutcomeBand(fixed.fixedOutcomes[0], fixed, 2), '0–2', 'fixed ranges are nets');
 });
 
+test('a macro-set count ladder states its bands relative to the unknown successes needed', () => {
+  const offsets = [-2, 0, 2].map((dc, index) => ({ id: `t${index}`, name: `T${index}`, success: dc >= 0, dc }));
+  const routed = { ...countRouted('over'), relativeOutcomes: offsets, dcMode: 'dynamic' };
+  routed.evaluation.pool.required = 3;
+  assert.deepEqual(bands(craftingOutcomeBand, routed, 3), ['0–2', '3–4', '5+'], 'a static count');
+  assert.deepEqual(bands(craftingOutcomeBand, routed, null), ['<Needed', 'Needed+', 'Needed+2+']);
+  const labels = { needed: 'Besoin' };
+  assert.equal(craftingOutcomeBand(offsets[2], routed, null, labels), 'Besoin+2+', 'a localized word');
+  const system = { ...SYSTEM, resolutionMode: 'routedByCheck', craftingCheck: { routed } };
+  const tiers = makeBuilder({
+    active: [activeSingleStepRun({ steps: [{ stepId: 's0', status: 'inProgress' }] })],
+    recipe: { ...SINGLE_STEP_RECIPE, getExecutionSteps: () => [{ id: 's0', resultGroups: [] }] },
+    system,
+    resolutionModeService: new ResolutionModeService({ getSystem: () => system }),
+  }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0].craftingYield.tiers;
+  assert.deepEqual(
+    tiers.map((tier) => tier.band),
+    ['<FABRICATE.App.Journal.StepDetails.BandNeeded', 'FABRICATE.App.Journal.StepDetails.BandNeeded+',
+      'FABRICATE.App.Journal.StepDetails.BandNeeded+2+'],
+    'the Journal ladder never states the static pool.required under a macro'
+  );
+});
+
 test('the crafting and gathering count ladders open with a Botch row only while cancelling is on', () => {
   const recipe = { ...SINGLE_STEP_RECIPE, checkTierId: 'hard', getExecutionSteps: () => [{ id: 's0', resultGroups: [] }] };
   const craftingTiers = (routed) => {
