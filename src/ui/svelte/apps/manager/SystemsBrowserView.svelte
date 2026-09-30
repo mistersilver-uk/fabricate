@@ -127,7 +127,7 @@
   // generic verb ("Delete component", "Move up"). The row is identified by the trigger the menu was
   // opened from, so repeating its name in every item widens the panel to restate what the reader
   // just acted on. This is also why `Recipe.DuplicateNamed` and `Component.DeleteNamed` are already
-  // dead in `tests/lang-known-orphans.js`: the earlier conversions retired the same `{name}` copy.
+  // orphaned in `lang/en.json`: the earlier conversions retired the same `{name}` copy.
   function rowMenuItems() {
     return [
       {
