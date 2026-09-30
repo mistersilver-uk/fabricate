@@ -345,7 +345,9 @@ function stripTransitionalAliases(system) {
   delete system.advancedOptionsEnabled;
 
   // Strip associatedSystemItemId from essence definitions (transitional alias)
+  // ratchet-exempt(world-scope): export
   if (Array.isArray(system.essenceDefinitions)) {
+    // ratchet-exempt(world-scope): export
     for (const def of system.essenceDefinitions) {
       delete def.associatedSystemItemId;
     }

@@ -417,7 +417,7 @@ export class BulkSalvageService {
         img: created?.img || '',
         quantity: created.quantity,
       }));
-      item.tools = brokenToolEntries(salvageRun, entry.system);
+      item.tools = brokenToolEntries(salvageRun, entry.system); // ratchet-exempt(world-scope): not-a-system
       // GM requests stay on the ENTRY, never the card model; the engine-redacted player
       // complications go on the ITEM with the component name the bulk card attributes them by.
       entry.complicationRequests = result?.complicationRequests ?? [];
@@ -470,7 +470,7 @@ export class BulkSalvageService {
         })),
         results: sumChatEntriesByName(subjects.flatMap((item) => item.results)),
         consumed: sumChatEntriesByName(subjects.flatMap((item) => item.consumed)),
-        tools: dedupeTools(subjects.flatMap((item) => item.tools)),
+        tools: dedupeTools(subjects.flatMap((item) => item.tools)), // ratchet-exempt(world-scope): not-a-system
         // Every row's engine-redacted player complications, in run order and undeduped (each row
         // is its own run); this service holds no audience filter and must not grow one.
         complications: subjects.flatMap((item) => item.complications || []),

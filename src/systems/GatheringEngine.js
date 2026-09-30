@@ -624,6 +624,7 @@ export class GatheringEngine {
         })
       );
     }
+    // ratchet-exempt(world-scope): not-a-system
     if (resolvedTools.tools.length > 0) {
       const viewer = await this._viewerForRun({ actor, run: resolvedRun });
       const availability = await this._checkTools({
@@ -632,7 +633,7 @@ export class GatheringEngine {
         system: resolved.system,
         environment: resolved.environment,
         task: resolved.task,
-        tools: resolvedTools.tools,
+        tools: resolvedTools.tools, // ratchet-exempt(world-scope): not-a-system
         presentTools: null,
       });
       if (availability.available !== true) {
@@ -1170,6 +1171,7 @@ export class GatheringEngine {
         }),
       });
     }
+    // ratchet-exempt(world-scope): not-a-system
     if (taskTools.tools.length > 0) {
       const toolResult = await this._checkTools({
         actor: selectedActor,
@@ -1177,7 +1179,7 @@ export class GatheringEngine {
         system,
         environment,
         task,
-        tools: taskTools.tools,
+        tools: taskTools.tools, // ratchet-exempt(world-scope): not-a-system
         presentTools,
       });
       if (toolResult.available !== true) {
@@ -1854,6 +1856,7 @@ export class GatheringEngine {
           data: redact ? null : this._toolBlockedData({ task, resolvedTools: taskTools }),
         })
       );
+      // ratchet-exempt(world-scope): not-a-system
     } else if (taskTools.tools.length > 0) {
       const toolResult = await this._checkTools({
         actor,
@@ -1861,7 +1864,7 @@ export class GatheringEngine {
         system,
         environment,
         task,
-        tools: taskTools.tools,
+        tools: taskTools.tools, // ratchet-exempt(world-scope): not-a-system
         presentTools,
       });
       if (toolResult.available !== true) {
@@ -1930,7 +1933,7 @@ export class GatheringEngine {
       tools.push(tool);
     }
 
-    tools.push(...normalizeList(task?.tools));
+    tools.push(...normalizeList(task?.tools)); // ratchet-exempt(world-scope): not-a-system
     return { tools, missingToolIds, disabledToolIds };
   }
 
@@ -4194,7 +4197,7 @@ export class GatheringEngine {
         ],
       });
     }
-    const tools = resolvedTools.tools;
+    const tools = resolvedTools.tools; // ratchet-exempt(world-scope): not-a-system
     if (tools.length === 0 || typeof this.toolBreakage?.plan !== 'function') {
       return [];
     }
@@ -4231,7 +4234,7 @@ export class GatheringEngine {
     presentTools = null,
   }) {
     const resolvedTools = this._resolveTaskTools({ environment, task });
-    const tools = resolvedTools.tools;
+    const tools = resolvedTools.tools; // ratchet-exempt(world-scope): not-a-system
     if (tools.length === 0 || typeof this.toolBreakage?.apply !== 'function') {
       return [];
     }

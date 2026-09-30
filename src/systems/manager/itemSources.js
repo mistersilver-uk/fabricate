@@ -344,7 +344,7 @@ export async function addItemFromUuid(io, systemId, itemUuid, options = {}) {
     existing.originItemUuid = nextSnapshot.originItemUuid;
     existing.aliasItemUuids = nextFallbacks;
     // Indexed fields rewritten in place (issue 1076).
-    advanceDefinitionRevision(system.components);
+    advanceDefinitionRevision(system.components); // ratchet-exempt(world-scope): writer
 
     if (options.persist !== false) await io.saveSystems({ put: system, domains: COMPONENT_FACTS });
     return { item: existing, action: 'updated', sourceFallbacks: nextSnapshot.sourceFallbacks };
@@ -361,8 +361,8 @@ export async function addItemFromUuid(io, systemId, itemUuid, options = {}) {
   );
 
   io.assertUniqueComponentSources(system, item);
-  system.components.push(item);
-  advanceDefinitionRevision(system.components);
+  system.components.push(item); // ratchet-exempt(world-scope): writer
+  advanceDefinitionRevision(system.components); // ratchet-exempt(world-scope): writer
   const addedRoleKey = io.componentRoleFlagKey(system.id);
   if (addedRoleKey) await io.stampSourceIdentity(source, addedRoleKey, item.id);
   if (options.persist !== false) await io.saveSystems({ put: system, domains: COMPONENT_FACTS });
@@ -377,7 +377,7 @@ export async function replaceItemSource(io, systemId, itemId, itemUuid) {
   io.assertGM('replace component source');
   const system = io.getSystem(systemId);
   if (!system) throw new Error(`Crafting system not found: ${systemId}`);
-  const idx = system.components.findIndex((i) => i.id === itemId);
+  const idx = system.components.findIndex((i) => i.id === itemId); // ratchet-exempt(world-scope): writer
   if (idx === -1) throw new Error(`Component not found: ${itemId}`);
 
   const source = await resolveItemSource(
@@ -385,7 +385,7 @@ export async function replaceItemSource(io, systemId, itemId, itemUuid) {
     (documentName) => `Cannot use non-Item document (${documentName}) as a component source`
   );
 
-  const existing = system.components[idx];
+  const existing = system.components[idx]; // ratchet-exempt(world-scope): writer
   const previousSourceUuid = existing.originItemUuid || existing.registeredItemUuid || null;
   const nextSnapshot = await io.buildComponentSourceSnapshot(itemUuid, source, existing);
   const conflict = io.findComponentBySourceReferences(system, nextSnapshot.references, itemId);
@@ -412,8 +412,8 @@ export async function replaceItemSource(io, systemId, itemId, itemUuid) {
     { validEssenceIds, ...io.salvageNormalizationContext(system) }
   );
 
-  system.components[idx] = updatedItem;
-  advanceDefinitionRevision(system.components);
+  system.components[idx] = updatedItem; // ratchet-exempt(world-scope): writer
+  advanceDefinitionRevision(system.components); // ratchet-exempt(world-scope): writer
   // Re-point the flag: clear the old source if it points here and stamp the new one.
   const replaceRoleKey = io.componentRoleFlagKey(system.id);
   if (replaceRoleKey) {
@@ -478,7 +478,7 @@ export async function refreshComponentMetadataForUpdatedItem(io, item, changes =
   const touched = new Set();
 
   for (const system of io.systems().values()) {
-    const components = Array.isArray(system.components) ? system.components : [];
+    const components = Array.isArray(system.components) ? system.components : []; // ratchet-exempt(world-scope): writer
     for (const component of components) {
       const matches = getItemMatchUuids(component).some((ref) => itemRefs.has(ref));
       if (!matches) continue;

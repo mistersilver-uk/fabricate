@@ -213,7 +213,7 @@ export class SignatureValidator {
     const compiled = this.compileSystemEntries(systemId);
     if (!compiled) return { valid: true, conflicts: [] };
 
-    const conflicts = this._auditEntries(compiled.entries, compiled.components);
+    const conflicts = this._auditEntries(compiled.entries, compiled.components); // ratchet-exempt(world-scope): parameter
     return {
       valid: conflicts.length === 0,
       conflicts,
@@ -317,10 +317,10 @@ export class SignatureValidator {
     return new AlchemySignatureReport({
       systemId,
       validator: this,
-      components: compiled.components,
+      components: compiled.components, // ratchet-exempt(world-scope): parameter
       entries: compiled.entries,
       cohortIndexByRecipeId: compiled.cohortIndexByRecipeId,
-      conflicts: this._auditEntries(compiled.entries, compiled.components),
+      conflicts: this._auditEntries(compiled.entries, compiled.components), // ratchet-exempt(world-scope): parameter
     });
   }
 

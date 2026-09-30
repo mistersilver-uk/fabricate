@@ -129,7 +129,7 @@ function reportEntry(kind, ownerType, owner, referenceValue) {
 export function reportWorldEntityCollisions(prepared, worldEntityIndex, mode) {
   const entries = [];
   if (!prepared || typeof prepared !== 'object' || !worldEntityIndex) return entries;
-  const components = arrayOf(prepared.system?.components);
+  const components = arrayOf(prepared.system?.components); // ratchet-exempt(world-scope): import
   for (const entityType of WORLD_SCOPE_ENTITY_TYPES) {
     // Copy-mode components bind by match-or-mint, so they never arrive under a colliding id.
     if (mode === 'copy' && entityType === 'components') continue;
@@ -198,7 +198,7 @@ export function rebindCopyComponentIds(
   if (!prepared || typeof prepared !== 'object') return prepared;
   const { system, recipes, gatheringConfig } = prepared;
 
-  const components = Array.isArray(system?.components) ? system.components : [];
+  const components = Array.isArray(system?.components) ? system.components : []; // ratchet-exempt(world-scope): import
   const roster = destinationRoster(worldEntityIndex, 'components');
 
   const idMap = {};
@@ -308,7 +308,7 @@ function reportBinding(report, component, claimed, contested, beaten) {
  * would otherwise merge in as a second world record for an Item the destination already has.
  */
 function dropMatchedWorldEntities(prepared, matched, idMap) {
-  const slice = prepared[WORLD_SCOPE_SLICE_KEYS.components];
+  const slice = prepared[WORLD_SCOPE_SLICE_KEYS.components]; // ratchet-exempt(world-scope): import
   if (!slice || typeof slice !== 'object' || !Array.isArray(slice.entities)) return;
   const kept = [];
   for (const entity of slice.entities) {
@@ -501,8 +501,8 @@ function collectExternalDescriptors(payload) {
   collectMacroDescriptors(slice.tasks, 'task', descriptors);
   collectMacroDescriptors(slice.events, 'event', descriptors);
   // Essence property macros (issue 1036) sit on a differently named field.
-  collectMacroDescriptors(system.essenceDefinitions, 'essence', descriptors, 'propertyMacroUuid');
-  collectComplicationMacroDescriptors(system.components, descriptors);
+  collectMacroDescriptors(system.essenceDefinitions, 'essence', descriptors, 'propertyMacroUuid'); // ratchet-exempt(world-scope): import
+  collectComplicationMacroDescriptors(system.components, descriptors); // ratchet-exempt(world-scope): import
 
   return descriptors;
 }
@@ -555,7 +555,7 @@ function collectMacroDescriptors(records, ownerType, descriptors, field = 'macro
 /** Report the internal references that resolve to nothing within the payload. */
 function collectBrokenInternalReferences(payload, out) {
   const system = payload.system || {};
-  const componentIds = idSet(system.components);
+  const componentIds = idSet(system.components); // ratchet-exempt(world-scope): import
   const recipeItemIds = idSet(system.recipeItemDefinitions);
   const slice = systemSlice(payload.gatheringConfig);
   const taskIds = idSet(slice.tasks);
@@ -603,8 +603,8 @@ function collectBrokenInternalReferences(payload, out) {
       push(REFERENCE_KINDS.COMPONENT_LINK, 'tool', tool, replacementComponentId);
     }
   };
-  for (const tool of arrayOf(system.tools)) reportToolComponentRefs(tool);
-  for (const tool of arrayOf(slice.tools)) reportToolComponentRefs(tool);
+  for (const tool of arrayOf(system.tools)) reportToolComponentRefs(tool); // ratchet-exempt(world-scope): import
+  for (const tool of arrayOf(slice.tools)) reportToolComponentRefs(tool); // ratchet-exempt(world-scope): import
 
   // Recipe ingredient, result and catalyst refs, recursive `alternatives[]` and flat aliases
   // included, top level and per step (issue 570). `ownerType` travels with the owner because a
@@ -666,6 +666,7 @@ function collectBrokenInternalReferences(payload, out) {
 
   // Component salvage result refs + legacy salvage catalysts (issue 570 D2). The owner
   // here is a COMPONENT, so the report says "Component: <name>" (issue 877).
+  // ratchet-exempt(world-scope): import
   for (const component of arrayOf(system.components)) {
     const salvage = component?.salvage;
     if (!salvage || typeof salvage !== 'object') continue;
@@ -675,6 +676,7 @@ function collectBrokenInternalReferences(payload, out) {
   }
 
   // Essence `sourceComponentId`, falling back to the legacy `associatedSystemItemId`.
+  // ratchet-exempt(world-scope): import
   for (const def of arrayOf(system.essenceDefinitions)) {
     const sourceComponentId = def?.sourceComponentId ?? def?.associatedSystemItemId;
     if (sourceComponentId && !componentIds.has(sourceComponentId)) {
