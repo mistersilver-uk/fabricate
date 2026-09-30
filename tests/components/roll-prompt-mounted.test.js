@@ -3,11 +3,12 @@ import assert from 'node:assert/strict';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { flushSync } from 'svelte';
+import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import {
-  CHECK_TARGET_RAW_MODULES,
-  createMountedComponentHarness,
-} from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+  ROLL_PROMPT_COMPILED_MODULES,
+  ROLL_PROMPT_PATH as PROMPT,
+  ROLL_PROMPT_RAW_MODULES,
+} from '../helpers/rollPromptHarnessModules.js';
 import { stubI18n } from '../helpers/rollPromptDialogStub.js';
 import {
   buildBulkPromptData,
@@ -17,47 +18,12 @@ import {
 import { openRollPromptModal } from '../../src/ui/svelte/apps/crafting/rollPromptHost.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const PROMPT = 'src/ui/svelte/apps/crafting/RollPrompt.svelte';
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-roll-prompt-',
   componentPath: PROMPT,
-  rawModules: [
-    ...FOUNDRY_BRIDGE_RAW_MODULES,
-    'src/ui/svelte/actions/anchoredPopover.js',
-    'src/ui/svelte/actions/dismissOnOutsideClick.js',
-    'src/ui/svelte/actions/portal.js',
-    'src/ui/svelte/util/iconPickerPopover.js',
-    'src/ui/svelte/util/listboxNavigation.js',
-    'src/ui/svelte/util/overlayBounds.js',
-    'src/ui/svelte/util/overlayHost.js',
-    'src/ui/svelte/util/pickerOptionModel.js',
-    'src/ui/svelte/apps/crafting/rollPromptTarget.js',
-    // The count line settles through the router and the pool's own floor (issue 2006).
-    'src/systems/checkModifierRouter.js',
-    'src/systems/countEvaluation.js',
-    ...CHECK_TARGET_RAW_MODULES,
-    'src/utils/fillPlaceholders.js',
-    'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
-    'src/utils/checkAdjustmentFormat.js',
-    'src/utils/scalars.js',
-  ],
-  compiledModules: [
-    'src/ui/svelte/components/Field.svelte',
-    'src/ui/svelte/components/Chip.svelte',
-    'src/ui/svelte/components/EmptyState.svelte',
-    'src/ui/svelte/components/Notice.svelte',
-    'src/ui/svelte/components/ManagerButton.svelte',
-    // The roll mode is the shared `Select`, which renders the popover pair behind it.
-    'src/ui/svelte/components/SearchablePopover.svelte',
-    'src/ui/svelte/components/SearchablePopoverPanel.svelte',
-    'src/ui/svelte/components/Select.svelte',
-    'src/ui/svelte/components/SelectionCheckbox.svelte',
-    'src/ui/svelte/components/IconButton.svelte',
-    'src/ui/svelte/apps/manager/ManagerModal.svelte',
-    'src/ui/svelte/apps/crafting/RollPromptTarget.svelte',
-    PROMPT,
-  ],
+  rawModules: ROLL_PROMPT_RAW_MODULES,
+  compiledModules: ROLL_PROMPT_COMPILED_MODULES,
   rootClass: 'fabricate fabricate-app',
 });
 

@@ -568,10 +568,10 @@ describe('AC-14 (facade half) — the delegator forwards NAMED KEYS, never the r
       actor: impostorActor,
       speaker: impostorSpeaker,
       prompt: callerPrompt,
-      // Every non-interactive product/direction/source combination is published (issue 2004), so
-      // an INTERACTIVE count request is what stays unsupported.
+      // Every product/direction/source combination is published interactively (issue 2006), so an
+      // interactive count with active additional dice is what stays unsupported (issue 2008).
       interactive: true,
-      evaluation: { product: 'count' },
+      evaluation: { product: 'count', pool: { additionalDice: { enabled: true } } },
     };
     const unsupported = await facade.rollActorCheck(request);
     assert.equal(unsupported.outcome, 'evaluationUnsupported');

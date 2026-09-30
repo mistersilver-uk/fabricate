@@ -304,8 +304,8 @@ test('the descriptor publishes versioned evaluation features, frozen', () => {
       { product: 'sum', direction: 'over', targetSources: ['fixed'], interactive: true },
       { product: 'sum', direction: 'over', targetSources: ['attribute'], interactive: true },
       { product: 'sum', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: true },
-      { product: 'count', direction: 'over', targetSources: ['fixed', 'attribute'], interactive: false },
-      { product: 'count', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: false },
+      { product: 'count', direction: 'over', targetSources: ['fixed', 'attribute'], interactive: true },
+      { product: 'count', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: true },
     ],
     additionalDice: false,
   });

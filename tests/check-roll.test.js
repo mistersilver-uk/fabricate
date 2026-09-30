@@ -1767,10 +1767,10 @@ test('executed simple evidence records the raw sum/over comparison under a force
 
 test('standalone companion check refuses an unpublished mode before the current over runner', async () => {
   stubRoll(8);
-  // Count rows publish `interactive: false` (issue 2004), so an interactive count request is unsupported.
+  // Active additional dice are unpublished on an interactive count until issue 2008.
   const result = await rollActorCheck(
     { actor: ACTOR, callSite: 'gmAction', formula: '1d20', dc: 10, interactive: true,
-      evaluation: { product: 'count', direction: 'under' } },
+      evaluation: { product: 'count', direction: 'under', pool: { additionalDice: { enabled: true } } } },
     {
       isElectedExecutor: () => true,
       hasDiceEngine: () => true,
