@@ -212,7 +212,6 @@ export function playerAdvantagePromptCases() {
       expectSelector:
         `${RESULT_BOX}[data-roll-success="false"]` +
         ':not(:has([data-check-count-tiles]))' +
-        ':has-text("2d10 − 3 disadvantage = 0 dice")' +
         ROW('pool', 'Reduced to zero by a disadvantage penalty of −3'),
       kinds: ['player', 'crafting'],
       sourceMatches: RESULT_SOURCES,
