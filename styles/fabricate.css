@@ -16442,6 +16442,86 @@
   font-weight: 700;
 }
 
+/* The die tiles of a success-counting roll (issue 2006), one family for the Studio simulator, the result boxes and the chat cards: a chat card sits outside every Fabricate window, so the rules are rooted at the family rather than at an app, and read only the :root tokens. */
+.fabricate-dice-tiles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+}
+
+.fabricate-dice-tiles__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Frames 39 and 40: a 38 by 44 tile at radius 9, the face over its marks, toned by what it did. */
+.fabricate-dice-tiles__tile {
+  display: inline-flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 38px;
+  height: 44px;
+  margin: 0;
+  padding: 0 var(--fab-space-1);
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  background: var(--fab-surface-soft);
+  color: var(--fab-text-muted);
+  font-family: var(--fab-font-mono);
+  line-height: 1;
+}
+
+.fabricate-dice-tiles__tile--success {
+  border-color: var(--fab-success-border);
+  background: var(--fab-success-soft);
+  color: var(--fab-success-text);
+}
+
+.fabricate-dice-tiles__tile--danger {
+  border-color: var(--fab-danger-border);
+  background: var(--fab-danger-soft);
+  color: var(--fab-danger-text);
+}
+
+.fabricate-dice-tiles__face {
+  font-size: 14px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.fabricate-dice-tiles__tile--success .fabricate-dice-tiles__face {
+  color: var(--fab-text);
+}
+
+.fabricate-dice-tiles__marks {
+  display: flex;
+  gap: var(--fab-space-2xs);
+  font-size: 9px;
+}
+
+.fabricate-dice-tiles__more {
+  align-self: center;
+  color: var(--fab-text-muted);
+  font-family: var(--fab-font-mono);
+  font-size: 11px;
+}
+
+.fabricate-dice-tiles__legend {
+  margin: 0;
+  color: var(--fab-text-muted);
+  font-size: 10px;
+}
+
 /* Region-first player interaction prompt (InteractionPromptApp) — a small, non-modal toast. */
 .fabricate-interaction-prompt {
   display: flex;
