@@ -21,12 +21,24 @@ import {
   resolveRatchetBase,
   siteMarker,
 } from '../../tests/helpers/mergeBaseRatchet.js';
+import { keyByAlignment, netOfSiteMarkers, siteText } from '../../tests/helpers/siteMarkers.js';
 
 /** The marker family: `ratchet-exempt(lint): <reason>` at a finding's line excuses it. */
 export const LINT_FAMILY = 'lint';
 
-/** Rules no base count excuses, because a report is a runtime `ReferenceError`. */
-export const ABSOLUTE_RULES = Object.freeze(['no-undef']);
+/**
+ * Rules no base count excuses: `no-undef` is a runtime `ReferenceError`, and the cross-file import
+ * rules report in a file the change did not touch, where no count is compared.
+ */
+export const ABSOLUTE_RULES = Object.freeze([
+  'no-undef',
+  'import-x/named',
+  'import-x/no-unresolved',
+  'import-x/namespace',
+  'import-x/default',
+  'import-x/export',
+  'import-x/no-cycle',
+]);
 
 /** What the format gate asks Prettier's CLI, so it expands `.` exactly as `prettier --check .`. */
 export const PRETTIER_GATE_ARGS = Object.freeze(['--list-different', '.']);
@@ -34,6 +46,7 @@ export const PRETTIER_GATE_ARGS = Object.freeze(['--list-different', '.']);
 const PRETTIER_BIN = path.join(REPO_ROOT, 'node_modules/prettier/bin/prettier.cjs');
 const CLI_BUFFER = 64 * 1024 * 1024;
 
+const GLOB = /[*?[{]/u;
 const posix = (file) => file.split(path.sep).join('/');
 const ruleOf = (message) =>
   message.ruleId ?? (message.fatal ? 'parse-error' : 'unused-disable-directive');
@@ -45,48 +58,61 @@ function absoluteFailures(file, messages) {
     .map((m) => `${file}:${m.line}:${m.column} ${ruleOf(m)} (fails at any count): ${m.message}`);
 }
 
-/** Findings per rule, with those a reasoned marker at their line excuses set apart. */
-function tallyRules(file, text, messages) {
+/** One side's counted findings, each keyed on its rule and its line's marker-free text. */
+function findingsOf(file, text, messages) {
+  const lines = text === undefined ? [] : text.split('\n');
+  const marked = text?.includes('ratchet-exempt(') ?? false;
+  return messages
+    .filter((message) => !isAbsolute(message))
+    .map((message) => {
+      const rule = ruleOf(message);
+      const marker = marked ? siteMarker(file, text, LINT_FAMILY, message.line) : null;
+      const key = `${rule}\u{0}${siteText(lines[message.line - 1])}`;
+      return { rule, line: message.line, key, marker };
+    });
+}
+
+function linesByRule(findings) {
   const rules = new Map();
-  for (const message of messages) {
-    if (isAbsolute(message)) continue;
-    const rule = ruleOf(message);
-    if (!rules.has(rule)) rules.set(rule, { count: 0, exempt: [], lines: [] });
-    const entry = rules.get(rule);
-    entry.count += 1;
-    const marker = text === undefined ? null : siteMarker(file, text, LINT_FAMILY, message.line);
-    if (marker) entry.exempt.push(`${file}:${message.line} ${rule}: ${marker.reason}`);
-    else entry.lines.push(message.line);
-  }
+  for (const { rule, line } of findings) rules.set(rule, [...(rules.get(rule) ?? []), line]);
   return rules;
 }
 
 /**
- * One changed file's head findings against its base findings. A rule regresses when its count,
- * less the findings a reasoned marker excuses, is above the base count.
+ * One changed file's head findings against its base findings, each net of the reasoned markers
+ * at their lines. A marker excuses a head finding only when it is new to base, so marking one
+ * already there buys no room (`siteMarkers.js`); a rule regresses when its count rises.
  *
  * @returns {{failures: string[], exempted: string[], shrank: string[], regressed: string[]}}
  */
-export function compareFileFindings({ file, text, headMessages, baseMessages }) {
-  const base = tallyRules(file, undefined, baseMessages);
-  const head = tallyRules(file, text, headMessages);
-  const failures = absoluteFailures(file, headMessages);
-  const outcome = { failures, exempted: [], shrank: [], regressed: [] };
-  for (const [rule, entry] of head) {
-    const was = base.get(rule)?.count ?? 0;
-    const counted = entry.count - entry.exempt.length;
-    if (counted > was) {
-      outcome.regressed.push(rule);
-      const where = `line ${entry.lines.join(', ')}`;
-      outcome.failures.push(`${file}: ${rule} rose from ${was} to ${counted} (${where})`);
-    } else if (entry.count > was) {
-      outcome.exempted.push(...entry.exempt);
-    }
+export function compareFileFindings({ file, text, baseText, headMessages, baseMessages }) {
+  const keyed = keyByAlignment(
+    baseText,
+    text,
+    findingsOf(file, baseText, baseMessages),
+    findingsOf(file, text, headMessages)
+  );
+  const net = netOfSiteMarkers(keyed.base, keyed.head);
+  const base = linesByRule(net.base);
+  const head = linesByRule(net.head);
+  const outcome = {
+    failures: absoluteFailures(file, headMessages),
+    exempted: net.fresh.map((f) => `${file}:${f.line} ${f.rule}: ${f.marker.reason}`),
+    shrank: [],
+    regressed: [],
+  };
+  for (const [rule, lines] of head) {
+    const was = base.get(rule)?.length ?? 0;
+    if (lines.length <= was) continue;
+    outcome.regressed.push(rule);
+    outcome.failures.push(
+      `${file}: ${rule} rose from ${was} to ${lines.length} (line ${lines.join(', ')})`
+    );
   }
-  for (const [rule, entry] of base) {
-    const now = head.get(rule)?.count ?? 0;
-    if (now < entry.count)
-      outcome.shrank.push(`${file}: ${rule} fell from ${entry.count} to ${now}`);
+  for (const [rule, lines] of base) {
+    const now = head.get(rule)?.length ?? 0;
+    if (now < lines.length)
+      outcome.shrank.push(`${file}: ${rule} fell from ${lines.length} to ${now}`);
   }
   if (text !== undefined) outcome.failures.push(...emptyMarkers(file, text));
   return outcome;
@@ -113,17 +139,19 @@ function emptyTally() {
   return { failures: [], exempted: [], shrank: [], regressed: new Map(), findings: 0, files: 0 };
 }
 
-async function baseMessagesFor(eslint, scope, file, filePath, baseTexts) {
+/** A changed file's base text and its findings there, linted as if at its head path. */
+async function baseSideOf(eslint, scope, file, filePath, baseTexts) {
   const basePath = basePathOf(scope.changes, file);
   const text = basePath === null ? undefined : baseTexts.get(basePath);
-  if (text === undefined) return [];
+  if (text === undefined) return { text, messages: [] };
   const [result] = await eslint.lintText(text, { filePath });
-  return result?.messages ?? [];
+  return { text, messages: result?.messages ?? [] };
 }
 
 /**
  * The linter for base contents: the head config, running only the rules a changed file reports,
- * since no other rule's count is compared. ESLint reports no directive for a rule it filtered out.
+ * since no other rule's count is compared. ESLint reports no directive for a rule it filtered out,
+ * so a changed file reporting an unused directive has its base linted with every rule.
  */
 function baseLinter({ cwd, eslintOptions, results, changed }) {
   const rules = new Set();
@@ -131,6 +159,7 @@ function baseLinter({ cwd, eslintOptions, results, changed }) {
     if (!changed.has(posix(path.relative(cwd, result.filePath)))) continue;
     for (const message of result.messages) rules.add(message.ruleId);
   }
+  if (rules.has(null) || rules.has(undefined)) return new ESLint({ cwd, ...eslintOptions });
   return new ESLint({ cwd, ...eslintOptions, ruleFilter: ({ ruleId }) => rules.has(ruleId) });
 }
 
@@ -154,14 +183,16 @@ async function compareResults({ eslintOptions, results, scope, cwd }) {
       tally.failures.push(...absoluteFailures(file, result.messages));
       continue;
     }
+    const base =
+      result.messages.length === 0
+        ? { text: undefined, messages: [] }
+        : await baseSideOf(eslint, scope, file, result.filePath, baseTexts);
     const outcome = compareFileFindings({
       file,
       text: readFileSync(result.filePath, 'utf8'),
+      baseText: base.text,
       headMessages: result.messages,
-      baseMessages:
-        result.messages.length === 0
-          ? []
-          : await baseMessagesFor(eslint, scope, file, result.filePath, baseTexts),
+      baseMessages: base.messages,
     });
     tally.failures.push(...outcome.failures);
     tally.exempted.push(...outcome.exempted);
@@ -175,7 +206,7 @@ async function compareResults({ eslintOptions, results, scope, cwd }) {
 async function fixRegressions({ cwd, eslintOptions, regressed, results }) {
   const byPath = new Map(results.map((result) => [result.filePath, result]));
   for (const [filePath, rules] of regressed) {
-    const fixer = new ESLint({ cwd, ...eslintOptions, fix: (m) => rules.includes(m.ruleId) });
+    const fixer = new ESLint({ cwd, ...eslintOptions, fix: (m) => rules.includes(ruleOf(m)) });
     const [fixed] = await fixer.lintFiles([filePath]);
     await ESLint.outputFixes([fixed]);
     byPath.set(filePath, fixed);
@@ -198,14 +229,16 @@ export async function lintAgainstBase({
   fix = false,
   base,
 } = {}) {
+  const scope = comparisonScope(cwd, env, base);
   const eslint = new ESLint({ cwd, ...eslintOptions });
   // A path from a diff can name a file the change deleted or renamed away, and ESLint throws on
-  // it. Drop those while another path remains; a list of only missing paths is a typo and throws.
-  const existing = patterns.filter((pattern) => existsSync(path.resolve(cwd, pattern)));
+  // it. Drop those while another path or glob remains; only missing paths is a typo and throws.
+  const existing = patterns.filter(
+    (pattern) => GLOB.test(pattern) || existsSync(path.resolve(cwd, pattern))
+  );
   const present = existing.length > 0 ? existing : patterns;
   let results = await eslint.lintFiles(present);
   if (results.length === 0) throw new Error(`ESLint linted no file for ${patterns.join(' ')}`);
-  const scope = comparisonScope(cwd, env, base);
   let tally = await compareResults({ eslintOptions, results, scope, cwd });
   if (fix && tally.regressed.size > 0) {
     results = await fixRegressions({ cwd, eslintOptions, regressed: tally.regressed, results });
@@ -252,9 +285,10 @@ export async function formatAgainstBase({
   cwd = REPO_ROOT,
   env = process.env,
   base,
-  unformatted = listUnformatted({ cwd }),
+  unformatted: listed,
 } = {}) {
   const scope = comparisonScope(cwd, env, base);
+  const unformatted = listed ?? listUnformatted({ cwd });
   const outcome = {
     base: scope.base?.sha ?? null,
     ...skipOf(scope),
@@ -307,4 +341,57 @@ export function reportGate(
       '`git fetch origin main`, or set RATCHET_BASE.'
   );
   return 1;
+}
+
+const passed = (outcome) => !outcome.skipped && outcome.failures.length === 0;
+
+/** `scripts/lint.mjs`: lint `args` (paths, globs, `--fix`) against the base; the exit code. */
+export async function runLintCli(
+  args,
+  { cwd = REPO_ROOT, env = process.env, log = console.log, error = console.error } = {}
+) {
+  const unknown = args.filter((arg) => arg.startsWith('-') && arg !== '--fix');
+  if (unknown.length > 0) {
+    error(`lint: unknown option ${unknown.join(' ')}; the only option is --fix`);
+    return 2;
+  }
+  const patterns = args.filter((arg) => arg !== '--fix');
+  const outcome = await lintAgainstBase({
+    patterns: patterns.length > 0 ? patterns : ['.'],
+    fix: args.includes('--fix'),
+    cwd,
+    env,
+  });
+  if (passed(outcome)) {
+    log(
+      `lint: ${outcome.linted} file(s) linted; ${outcome.findings} finding(s) in ${outcome.files} ` +
+        'file(s) are held at their base counts.'
+    );
+  }
+  return reportGate('lint', outcome, { log, error });
+}
+
+/** `scripts/format-check.mjs`: check, or with `--write` format, what regressed; the exit code. */
+export async function runFormatCli(
+  args,
+  { cwd = REPO_ROOT, env = process.env, log = console.log, error = console.error } = {}
+) {
+  if (args.some((arg) => arg !== '--write')) {
+    error(`format-check: unknown argument ${args.join(' ')}; the only option is --write`);
+    return 2;
+  }
+  const outcome = await formatAgainstBase({ cwd, env });
+  if (args.includes('--write') && outcome.offenders.length > 0) {
+    listUnformatted({ cwd, args: ['--write', ...outcome.offenders] });
+    log(`format: wrote ${outcome.offenders.join(', ')}`);
+    return 0;
+  }
+  if (passed(outcome)) {
+    log(`format:check: ${outcome.unformatted} unformatted file(s) are held as they were at base.`);
+  }
+  return reportGate('format:check', outcome, {
+    guidance: 'Run `npm run format` to format exactly these files.',
+    log,
+    error,
+  });
 }

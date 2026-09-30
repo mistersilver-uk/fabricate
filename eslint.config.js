@@ -5,8 +5,8 @@
 //
 // `npm run lint` (`scripts/lint.mjs`) lints the WHOLE repository with this config
 // and fails on a `(file, rule)` count above the base commit's; `no-undef` and parse
-// errors fail at any count. `npm run lint:svelte` remains as a focused gate over
-// every `.svelte` file under `src/`. See CONTRIBUTING.md.
+// errors fail at any count. `npm run lint:svelte` runs the same comparison over
+// every `.svelte` file under `src/` alone. See CONTRIBUTING.md.
 //
 // Block order matters in flat config: later blocks override earlier ones, and
 // `eslint-config-prettier` MUST stay last so it can switch off the stylistic
@@ -593,11 +593,10 @@ export default [
   //    step of the required `lint` CI job. It is a strict subset of `lint` now and
   //    therefore duplicated work; it is kept because it is the focused command to
   //    run while working on a component, and because its findings are attributable
-  //    to one step rather than to a repository-wide sweep. It runs with `--max-warnings=0`, which matters because
-  //    `svelte.configs.recommended` ships two WARN-level rules
-  //    (`svelte/no-at-debug-tags`, `svelte/no-inspect`) — without the flag a
-  //    stray `{@debug}` tag or a leftover `$inspect()` would report and the job
-  //    would still exit 0.
+  //    to one step rather than to a repository-wide sweep. The base comparison
+  //    counts warnings too, which matters because `svelte.configs.recommended`
+  //    ships two WARN-level rules (`svelte/no-at-debug-tags`, `svelte/no-inspect`):
+  //    a new `{@debug}` tag or `$inspect()` call fails rather than printing.
   //
   //    `svelte/no-unused-svelte-ignore` (from the recommended set) makes the
   //    gate bidirectional: a `svelte-ignore` comment that no longer suppresses

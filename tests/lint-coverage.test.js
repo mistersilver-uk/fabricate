@@ -116,7 +116,7 @@ test('ESLint ignores every tree git ignores', async () => {
     .split('\n')
     .map((line) => line.trim())
     .filter((line) => line.endsWith('/') || line === 'node_modules')
-    .map((line) => line.endsWith('/') ? line : `${line}/`);
+    .map((line) => (line.endsWith('/') ? line : `${line}/`));
 
   assert.ok(
     ignoredTrees.includes('node_modules/'),
@@ -211,6 +211,12 @@ test('the npm scripts cover the repository, and are short enough to read', () =>
     );
   }
   assert.equal(scripts.lint, 'node scripts/lint.mjs');
+  assert.equal(
+    scripts['lint:svelte'],
+    'node scripts/lint.mjs "src/**/*.svelte"',
+    '`lint:svelte` is the base comparison narrowed to components, so a marker `npm run lint` ' +
+      'honours is honoured there too'
+  );
   assert.equal(scripts['format:check'], 'node scripts/format-check.mjs');
   assert.deepEqual(
     Object.keys(scripts).filter((key) => key.includes('debt')),

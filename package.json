@@ -13,7 +13,7 @@
     "validate:agents": "node scripts/validate-agent-bindings.mjs",
     "lint": "node scripts/lint.mjs",
     "lint:fix": "npm run lint -- --fix",
-    "lint:svelte": "eslint \"src/**/*.svelte\" --max-warnings=0",
+    "lint:svelte": "node scripts/lint.mjs \"src/**/*.svelte\"",
     "lint:svelte:warnings": "node scripts/check-svelte-warnings.mjs",
     "format": "node scripts/format-check.mjs --write",
     "format:check": "node scripts/format-check.mjs",

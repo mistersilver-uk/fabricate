@@ -569,7 +569,15 @@ const SUPERSEDED_POLICY = [
     before:
       "`npm run lint:svelte` separately gates every `*.svelte` file under `src/` with `--max-warnings=0`, so a component's script and markup ARE ESLint-gated even though the `.js` around them under `src/ui/**` is not — the two halves of that directory are gated by different scripts and must not be reasoned about as one scope.",
     after:
-      "`npm run lint:svelte` separately gates every `*.svelte` file under `src/` with `--max-warnings=0` and no base comparison, so a component's script and markup are held at zero findings while the `.js` around them under `src/ui/**` is held at its base findings — the two halves of that directory are gated by different scripts and must not be reasoned about as one scope.",
+      "`npm run lint:svelte` runs the same base comparison over every `*.svelte` file under `src/` alone, so a component's script and markup are held to their base findings exactly as the `.js` around them under `src/ui/**` is, and a `ratchet-exempt(lint)` marker counts in both.",
+    survivesIn: 'CONTRIBUTING.md',
+  },
+  {
+    issue: '#2118',
+    before:
+      '`lint:svelte` runs with `--max-warnings=0`, so the two WARN-level rules in `svelte.configs.recommended` (`svelte/no-at-debug-tags`, `svelte/no-inspect`) fail the build rather than printing and exiting 0 — a `{@debug}` tag or an `$inspect()` call left in a component is a CI failure.',
+    after:
+      'The base comparison counts warnings as it counts errors, so the two WARN-level rules in `svelte.configs.recommended` (`svelte/no-at-debug-tags`, `svelte/no-inspect`) fail the build rather than printing and exiting 0 — a new `{@debug}` tag or `$inspect()` call left in a component is a CI failure.',
     survivesIn: 'CONTRIBUTING.md',
   },
   // Debt counts are computed now, so the prose names where the debt sits and not how much.
@@ -600,7 +608,7 @@ const SUPERSEDED_POLICY = [
 ];
 
 /** Pinned exactly: every entry excuses one historical sentence. */
-const SUPERSEDED_POLICY_COUNT = 54;
+const SUPERSEDED_POLICY_COUNT = 55;
 
 /**
  * Sentences a deliberate rename forced to change, where the only edit is an identifier (issue

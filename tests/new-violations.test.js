@@ -7,6 +7,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 
+import { createNodeResolver, importX } from 'eslint-plugin-import-x';
 import unicorn from 'eslint-plugin-unicorn';
 
 import {
@@ -14,6 +15,8 @@ import {
   formatAgainstBase,
   lintAgainstBase,
   reportGate,
+  runFormatCli,
+  runLintCli,
 } from '../scripts/lib/newViolations.js';
 
 import { createTempGitRepo } from './helpers/temp-git-repo.js';
@@ -126,6 +129,33 @@ test('a reasoned marker at the finding exempts it, and an empty one fails', () =
     assert.match(failures[1], /^debted\.js:5 has a ratchet-exempt\(lint\) marker with no reason/u);
   }));
 
+test('a marker on a finding already at base buys no room for a new unmarked one', () =>
+  withFixture({ 'debted.js': EACH }, async (repo) => {
+    const again = 'export function again(list) {\n  list.forEach((entry) => entry);\n}\n';
+    const markedOld = EACH.replace(
+      '  list',
+      '  // ratchet-exempt(lint): marked the old one\n  list'
+    );
+    repo.write({ 'debted.js': `${markedOld}${again}` });
+    const outcome = await repo.lint();
+    assert.deepEqual(outcome.failures, [
+      'debted.js: unicorn/no-for-each rose from 1 to 2 (line 3, 6)',
+    ]);
+    assert.deepEqual(outcome.exempted, []);
+  }));
+
+test('a marker already excusing a base finding keeps excusing it, and no other', () => {
+  const markedOld = EACH.replace('  list', '  // ratchet-exempt(lint): marked at base\n  list');
+  return withFixture({ 'debted.js': markedOld }, async (repo) => {
+    repo.write({
+      'debted.js': `${markedOld}export function again(list) {\n  list.forEach((entry) => entry);\n}\n`,
+    });
+    assert.deepEqual((await repo.lint()).failures, [
+      'debted.js: unicorn/no-for-each rose from 0 to 1 (line 6)',
+    ]);
+  });
+});
+
 test('the gate compares once a file changes, and skips only when the base is opted out', () =>
   withFixture({ 'undef.js': 'export const a = missing;\n', 'debted.js': EACH }, async (repo) => {
     repo.write({ 'debted.js': TWICE });
@@ -156,6 +186,24 @@ test('a new unused disable directive fails against a base that had none', () =>
       ]);
     }
   ));
+
+test('a directive already unused at base is not reported as new', () =>
+  withFixture(
+    { 'stale.js': '// eslint-disable-next-line no-var\nexport const a = 1;\n' },
+    async (repo) => {
+      repo.write({
+        'stale.js': '// reworded\n// eslint-disable-next-line no-var\nexport const a = 1;\n',
+      });
+      assert.deepEqual((await repo.lint()).failures, []);
+    }
+  ));
+
+test('--fix removes a new unused disable directive', () =>
+  withFixture({ 'fresh.js': CLEAN }, async (repo) => {
+    repo.write({ 'fresh.js': `// eslint-disable-next-line no-var\n${CLEAN}` });
+    assert.deepEqual((await repo.lint({ fix: true })).failures, []);
+    assert.doesNotMatch(readFileSync(path.join(repo.dir, 'fresh.js'), 'utf8'), /eslint-disable/u);
+  }));
 
 test('--fix applies the fixes of the regressed rule only, leaving untouched debt alone', () =>
   withFixture({ 'fix.js': 'let kept = 1;\nexport { kept };\n' }, async (repo) => {
@@ -215,10 +263,108 @@ test('the report returns the exit code and says how to exempt or refresh the bas
 });
 
 test('a path a change deleted is dropped beside one that exists, and only-missing paths still throw', () =>
-  withFixture({ 'debted.js': EACH, 'kept.js': CLEAN }, async (repo) => {
+  withFixture({ 'debted.js': EACH, 'kept.js': CLEAN, 'glob.js': CLEAN }, async (repo) => {
     repo.git('mv', 'debted.js', 'moved.js');
     const outcome = await repo.lint({ patterns: ['debted.js', 'kept.js'] });
     assert.deepEqual(outcome.failures, []);
     assert.equal(outcome.linted, 1, 'only the path that still exists is linted');
     await assert.rejects(() => repo.lint({ patterns: ['debted.js'] }), /No files matching/u);
+    const globbed = await repo.lint({ patterns: ['kept.js', 'g*.js'] });
+    assert.equal(globbed.linted, 2, 'a glob beside a real path is kept');
   }));
+
+test('a base that does not resolve fails before anything is linted', () =>
+  withFixture({ 'clean.js': CLEAN }, async (repo) => {
+    await assert.rejects(
+      () => repo.lint({ env: { RATCHET_BASE: 'no-such-ref' }, patterns: ['nothing-here'] }),
+      /RATCHET_BASE=no-such-ref does not resolve/u
+    );
+  }));
+
+const IMPORT_CONFIG = [
+  {
+    files: ['**/*.js'],
+    plugins: { 'import-x': importX },
+    settings: { 'import-x/resolver-next': [createNodeResolver()] },
+    languageOptions: { ecmaVersion: 2025, sourceType: 'module' },
+    rules: { 'import-x/named': 'error' },
+  },
+];
+
+test('renaming an export fails the unchanged file importing it, at any count', () =>
+  withFixture(
+    {
+      'a.js': 'export const alpha = 1;\n',
+      'b.js': "import { alpha } from './a.js';\nexport const b = alpha;\n",
+    },
+    async (repo) => {
+      repo.write({ 'a.js': 'export const gamma = 1;\n' });
+      const outcome = await repo.lint({
+        eslintOptions: { overrideConfigFile: true, overrideConfig: IMPORT_CONFIG },
+      });
+      assert.equal(outcome.failures.length, 1, outcome.failures.join('\n'));
+      assert.match(outcome.failures[0], /^b\.js:1:\d+ import-x\/named \(fails at any count\)/u);
+    }
+  ));
+
+/** A repository whose own `eslint.config.js` the CLI reads, and a sink for what it prints. */
+function cliFixture(files) {
+  const config =
+    "export default [{ files: ['**/*.js'], rules: { 'no-var': 'error', 'object-shorthand': 'error' } }];\n";
+  const repo = fixture({ 'eslint.config.mjs': config, ...files });
+  const printed = [];
+  const io = {
+    cwd: repo.dir,
+    env: { RATCHET_BASE: repo.base },
+    log: (line) => {
+      printed.push(line);
+    },
+    error: (line) => {
+      printed.push(line);
+    },
+  };
+  return { repo, printed, io };
+}
+
+test('the lint CLI returns its exit code, applies --fix and rejects an unknown option', async () => {
+  const { repo, printed, io } = cliFixture({ 'a.js': CLEAN });
+  try {
+    assert.equal(await runLintCli(['a.js'], io), 0);
+    assert.match(printed.join('\n'), /held at their base counts/u, 'a pass says what was held');
+    repo.write({ 'a.js': `${CLEAN}var b = 2;\nexport { b };\n` });
+    printed.length = 0;
+    assert.equal(await runLintCli([], io), 1);
+    assert.doesNotMatch(printed.join('\n'), /held at their base counts/u, 'only a pass says so');
+    repo.write({ 'a.js': `${CLEAN}const x = 2;\nexport const o = { x: x };\n` });
+    assert.equal(await runLintCli(['--fix'], io), 0);
+    assert.match(readFileSync(path.join(repo.dir, 'a.js'), 'utf8'), /\{ x \}/u, '--fix reached');
+    assert.equal(await runLintCli(['--bogus'], io), 2);
+    printed.length = 0;
+    assert.equal(await runLintCli([], { ...io, env: { RATCHET_BASE: 'none' } }), 0);
+    assert.doesNotMatch(
+      printed.join('\n'),
+      /held at their base counts/u,
+      'a skip compared nothing'
+    );
+  } finally {
+    repo.dispose();
+  }
+});
+
+test('the format CLI returns its exit code, writes only what regressed and rejects an unknown option', async () => {
+  const { repo, printed, io } = cliFixture({ 'a.js': CLEAN, 'held.js': 'let  b\n' });
+  try {
+    assert.equal(await runFormatCli([], io), 0);
+    assert.match(printed.join('\n'), /held as they were at base/u);
+    repo.write({ 'fresh.js': 'export const c   =  3\n' });
+    printed.length = 0;
+    assert.equal(await runFormatCli([], io), 1);
+    assert.doesNotMatch(printed.join('\n'), /held as they were at base/u);
+    assert.equal(await runFormatCli(['--write'], io), 0);
+    assert.equal(readFileSync(path.join(repo.dir, 'fresh.js'), 'utf8'), 'export const c = 3;\n');
+    assert.equal(readFileSync(path.join(repo.dir, 'held.js'), 'utf8'), 'let  b\n');
+    assert.equal(await runFormatCli(['--check'], io), 2);
+  } finally {
+    repo.dispose();
+  }
+});

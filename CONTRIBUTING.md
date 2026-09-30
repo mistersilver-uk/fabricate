@@ -544,7 +544,7 @@ npm run lint:md:fix    # …and auto-fix (splits prose to one sentence per line)
 
 ESLint and Prettier run over the whole repository (`scripts/lint.mjs` and `scripts/format-check.mjs`), and fail on what a change makes worse against the base commit — see [Reading a ratchet failure](#reading-a-ratchet-failure).
 Prettier additionally formats every `*.svelte` file under `src/` — `prettier-plugin-svelte` is registered in `.prettierrc.json` (Prettier 3 does not auto-load plugins, so the devDependency alone is not enough) and `format:check` covers `src/**/*.svelte`, so a component that is new, or was formatted at base, fails CI when it is not formatted.
-`npm run lint:svelte` separately gates every `*.svelte` file under `src/` with `--max-warnings=0` and no base comparison, so a component's script and markup are held at zero findings while the `.js` around them under `src/ui/**` is held at its base findings — the two halves of that directory are gated by different scripts and must not be reasoned about as one scope.
+`npm run lint:svelte` runs the same base comparison over every `*.svelte` file under `src/` alone, so a component's script and markup are held to their base findings exactly as the `.js` around them under `src/ui/**` is, and a `ratchet-exempt(lint)` marker counts in both.
 That gate polices suppressions in both directions: `svelte/no-unused-svelte-ignore` is active, so a `svelte-ignore` comment that no longer suppresses anything is itself a lint failure and must be removed once it stops being needed.
 The same holds for an ESLint suppression — the `.svelte` block in `eslint.config.js` pins `linterOptions: { reportUnusedDisableDirectives: 'error' }`, so a stale `eslint-disable` directive fails the gate exactly as a stale `svelte-ignore` does.
 That is pinned rather than left to ESLint's default because it is half of what makes reformatting components safe: `eslint-disable-next-line` is anchored to a line and Prettier moves lines, so a directive that slips off its violation resurfaces the violation, and one that lands suppressing nothing is reported by this option.
@@ -627,6 +627,8 @@ That is deliberately not an `ignores` entry: ignoring a file takes it out of ESL
 So the debt only shrinks: a finding fixed in a file lowers the base the next change to that file is compared with.
 
 - `npm run lint` fails `no-undef` and a parse error at any count, and excuses a regression only where a `// ratchet-exempt(lint): <reason>` comment sits on the finding's line or in the comment lines right above it; an empty reason fails.
+  The cross-file import rules (`import-x/named`, `no-unresolved`, `namespace`, `default`, `export` and `no-cycle`) fail at any count too, since they report in a file the change did not touch.
+  A marker excuses only a finding new against the base, so marking one the base already had makes no room for another.
   It is a step of the `lint` CI job rather than a unit test because it lints the whole tree, and more than a minute of CPU-bound work does not belong in the unit-test job.
 - `tests/lint-coverage.test.js` asserts `no-undef` is armed in every part of the tree and pins both ignore lists.
 - Formatting debt is held by `npm run format:check` (`scripts/format-check.mjs`) the same way, and `npm run format` formats exactly the files it fails.
@@ -639,7 +641,7 @@ A **second** gated script, `npm run lint:svelte`, covers every `*.svelte` file u
 It is separate because components need the Svelte parser and their own rule set, not because they are optional.
 Note what this means for `src/ui/**`: that directory holds both halves and `npm run lint` now covers both, so its plain `.js` files that are clean are gated outright, and those that are not are held at their base findings, rule by rule.
 
-`lint:svelte` runs with `--max-warnings=0`, so the two WARN-level rules in `svelte.configs.recommended` (`svelte/no-at-debug-tags`, `svelte/no-inspect`) fail the build rather than printing and exiting 0 — a `{@debug}` tag or an `$inspect()` call left in a component is a CI failure.
+The base comparison counts warnings as it counts errors, so the two WARN-level rules in `svelte.configs.recommended` (`svelte/no-at-debug-tags`, `svelte/no-inspect`) fail the build rather than printing and exiting 0 — a new `{@debug}` tag or `$inspect()` call left in a component is a CI failure.
 A finding has three legitimate dispositions: fix the code, tune the rule in `eslint.config.js`, or suppress it.
 Suppressions use `eslint-disable-next-line` only — never a file-level disable — and carry a one-line rationale naming the contract they protect; a markup site needs the HTML-comment form `<!-- eslint-disable-next-line <rule> -->`, because a `//` in markup renders as literal on-screen text.
 The gate polices suppressions in **both** directions: with `svelte/no-unused-svelte-ignore` active, a stale `svelte-ignore` comment is itself a lint failure, so remove a suppression when it stops being needed rather than leaving it to mask a future warning.
