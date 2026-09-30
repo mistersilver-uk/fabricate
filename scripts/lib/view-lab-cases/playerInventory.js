@@ -643,6 +643,26 @@ export const CASES = Object.freeze([
       ' .bulk-list:has(> .bulk-row > .bulk-name:text-is("Ruined Slag") + .bulk-need:text-is("Target 11"))',
     sourceMatches: BULK_PROMPT_SOURCES,
   }),
+  // Issue 2007 (frame 36, `pBulk`): both bonus dice are the same `1d6`, so the batch's offer agrees
+  // on `kind` and `detail`, and the sub-label shows once for the whole footer.
+  playerCase({
+    ...BULK_DEFAULTS,
+    id: 'player-inventory-bulk-roll-prompt-advantage-shared',
+    label: 'Player app — Inventory bulk roll prompt, rolls that share an advantage note',
+    query: { tab: 'inventory', dialog: 'open', rollPromptState: 'salvage-advantage-shared' },
+    steps: [
+      ...chooseSelectOption('.inventory-grid-pagination [data-pagination-size]', '75'),
+      SHIFT_CLICK('lab-smithing:sm-air-shard'),
+      SHIFT_CLICK('lab-runework:rw-slag'),
+      { selector: '[data-inventory-bulk-salvage]' },
+    ],
+    expectSelector:
+      BULK_PROMPT +
+      ':has(.manager-modal-footer button[data-action="advantage"] .action-note:text-is("+1d6 to the target"))' +
+      ':has(.manager-modal-footer button[data-action="disadvantage"] .action-note:text-is("−1d6 to the target"))' +
+      ' .bulk-list:has(> .bulk-row > .bulk-name:text-is("Ruined Slag") + .bulk-need:text-is("Target 11"))',
+    sourceMatches: BULK_PROMPT_SOURCES,
+  }),
   playerCase({
     ...BULK_DEFAULTS,
     id: 'player-inventory-bulk-destroy-confirm',
