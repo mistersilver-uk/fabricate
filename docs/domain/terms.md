@@ -248,6 +248,18 @@ Canonical mapping: `check.checkBreakage`, `resolveForcedOutcome`/`rolledDiceGrou
 
 Spec reference: openspec/specs/data-models/spec.md, openspec/specs/gathering-and-harvesting/spec.md, openspec/specs/ui-system-studio/spec.md
 
+## Preset Polarity
+
+`presetPolarity(evaluation)` answers `'low'` when `evaluation.direction === 'under'`, else `'high'`: which end of a die the **Add a common trigger** row's two presets treat as best.
+The `high`-id preset always fires on the best face and `low` on the worst, so under a roll-under evaluation `high` names the LOWEST face on the die and `low` the highest, while a roll-over evaluation keeps the familiar natural-20/natural-1 pairing.
+`presetFace(presetId, sides, evaluation)` resolves the actual face number from the polarity, and `EFFECT_COPY` then names what the fired preset does per check `kind`: force success/failure on a simple check, step a routed tier up/down, or award all/nothing on a progressive check.
+A count check's own direction qualifies which face of its pool's die is best the same way, but never reverses the net-successes ranking a trigger's `Net successes` condition reads.
+A preset produces an ordinary trigger, with no marker field surviving it, so the polarity affects only which face a NEWLY authored preset names, never a trigger already on the check.
+
+Canonical mapping: `presetPolarity`/`presetFace`/`EFFECT_COPY` in `src/ui/svelte/apps/manager/checks/checkTriggerPresets.js`; consumed by `CheckTriggers.svelte`
+
+Spec reference: openspec/specs/ui-system-studio/spec.md
+
 ## Provider (vocabulary boundary)
 
 The 1.6.0 provider enum was `ingredientSet` | `check` — the legacy `macroOutcome` and `rollTableOutcome` providers (and the `rollTableUuid` field) were **removed** and persisted recipes migrated onto `check`; issue 554 then retired the per-recipe result-selection provider entirely (alchemy — the last provider-routed mode — moved to the system-level `alchemy.checkMode`, and the `1.14.0` migration strips `resultSelection` from every alchemy recipe).
@@ -1558,6 +1570,18 @@ Canonical mapping: `normalizeCheckEvaluation`/`normalizeNullableAdjustment`/`nor
 
 Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-modes/spec.md
 
+## Situational Bonus Offer
+
+`offerSituationalBonus` normalizes to `true` unless the stored value is exactly `false` (`normalizeSituationalBonusOffer` in `src/systems/normalize/craftingCheck.js`), and is carried beside `evaluation` on all eight normalized check sub-objects.
+It survives `checkDraftClone.js`'s clone functions, the Studio's save wiring, schema-6 export/import, and `CraftingSystemManager._copyPassFailCheckFields`'s crossing of the routed-by-ingredients boundary.
+It is a display flag only: `CheckPromptOptions.svelte` reads it to decide whether the interactive roll prompt's **In the roll prompt** group shows a **Situational bonus** field at all, and with it `false` the prompt shows no bonus field, caption or help text, so `ManagerModal`'s initial focus falls through to the Roll button.
+`allowsSituationalModifier` (threaded from each activity's own usability check, read at `checkRoll.js:501`) is the SEPARATE authority gate a decision's typed bonus is checked against, and it is never derived from the offer: a Tool bonus, an eligible named modifier, and a programmatic bonus a Macro or companion module supplies all keep applying while the offer is off.
+A bulk prompt hides its bonus field only when every usable subject's check has the offer off, and a companion call through `rollActorCheck`/`resolveBulkCheckDecision` always offers the field regardless of any system's own offer.
+
+Canonical mapping: `normalizeSituationalBonusOffer` in `src/systems/normalize/craftingCheck.js`; `CheckPromptOptions.svelte`; `allowsSituationalModifier` in `src/systems/checkRoll.js`
+
+Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/ui-system-studio/spec.md, openspec/specs/ui-crafting-app/spec.md
+
 ## Count Check
 
 `evaluation.product === 'count'` rolls a dice pool of `pool.die`-sided dice sized by `pool.base`, counts how many individually qualify against `pool.threshold` in the check's `direction`, subtracts any the cancel rule removed, and grades that net **successes** count against `pool.required`, reading neither `dc` nor `target`.
@@ -1693,10 +1717,34 @@ An unrolled, prompt-cancelled, no-engine, empty-formula or errored evaluation do
 Optional `data.preRolls` preserves the ordered source, label, expression, actual total and destination of separately evaluated modifiers; the main `data.total` and `data.diceGroups` remain the main check roll's evidence.
 The result's `data.cancelled` is distinct from the top-level `cancelled` flag that aborts a prompt.
 Only a permitted executed versioned crafting check may carry its executed product and direction into its historical `resolutionSnapshot`, and only when snapshot and result agree.
+Outside sum/over/fixed a summed result also carries **Target Terms** at `data.targetTerms`, plus `data.targetSource` (`'fixed'`/`'attribute'`), and, under an attribute target, `data.targetExpression` (the typed formula, trimmed) and `data.targetActor` (the rolling character's name), each present only when the resolver recorded it; `data.resolvedFormula` names the executed dice expression for a card's dice line.
 
 Canonical mapping: `executedSumEvidence` and the formula runners in `src/systems/checkRoll.js`; `craftingStepHistoryEvidence` in `src/systems/CraftingRunManager.js`; `checkResolutionEvidence` and `historyEvidenceFields` in `src/systems/runHistoryEvidence.js`
 
 Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-modes/spec.md, openspec/specs/recipes-and-steps/spec.md
+
+## Target Terms
+
+`data.targetTerms` is the ordered list of terms a summed check outside sum/over/fixed records on execution, one entry per step the target passed through: one leading `anchor` (the fixed difficulty, or the resolved character value after any macro), then zero or more `adjustment`/`multiplier` steps, then zero or more `benefit` entries (the settled under scalar contributions, one per router `source`: `tool`, `library`, `situational`, or `advantage`).
+An `adjustment` or `multiplier` term carries a `label` only when a recipe's selected check tier or the relative tier the roll matched supplied one; an `anchor` or `benefit` term never carries a `label`, and only a `benefit` term ever carries a `source`.
+They carry no expression, path, or policy beyond a tier's own name, and they are omitted for a legacy record, a **Target Refusal**, and a secret projection.
+`sanitizeTargetTerms` (`checkDisplay.js`) rebuilds them from the allowlist, dropping anything that is not a well-formed term, and `foldTargetTerms(terms, preRolls)` folds the anchor, then each adjustment (added and floored) or multiplier (applied and floored) in order, then each benefit, then each pre-roll whose `destination` is `'target'`, reproducing the executed `data.target` exactly.
+
+Canonical mapping: `targetTerm`/`sanitizeTargetTerms`/`foldTargetTerms` in `src/ui/presenters/checkDisplay.js`; recorded by the sum runners in `src/systems/checkRoll.js`
+
+Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-modes/spec.md
+
+## Check Display Projection
+
+`buildCheckDisplay` (`src/ui/presenters/checkDisplay.js`) rebuilds one deep-frozen plain-data record from an allowlist: `evaluation` (only `product` and `direction`), `target`, `comparison`, `terms` (sanitized **Target Terms**), `destination` (`'target'` for a summed under check, `'append'` for over, `null` for a count), `evidence` (an **Executed Check Evidence** projection or `null`), `visibility`, and, for a count, `count` (the **Count Display Evidence** projection).
+`executedCheckDisplay(checkResult)` builds one from a posted check result's `data`, `visibility` and `countDisplay`, and is the only site that ever supplies `evidence`.
+`isPublicCheckDisplay` is the one gate a chat card consults before stating any evidence: `visibility.rollMode === 'publicroll'` and `visibility.secret !== true`, because Foundry sends a ChatMessage's `content` to every client whatever its whisper, so an unknown visibility is never treated as public.
+A result box and a salvage summary read the same projection but apply their own narrower withholding rule instead (see **Executed Check Evidence** and **Count Display Evidence**): they withhold only for a blind or a secret roll, so a gmroll or a selfroll still states it there.
+`evaluation` is never spread into the projection, so a hidden `target.expression` or policy field can never leak through it.
+
+Canonical mapping: `buildCheckDisplay`/`executedCheckDisplay`/`isPublicCheckDisplay` in `src/ui/presenters/checkDisplay.js`; consumed by `src/systems/craftCardFields.js`, `src/ui/presenters/CraftingChatCard.js`, `CheckEvidenceRows.svelte`
+
+Spec reference: openspec/specs/ui-crafting-app/spec.md, openspec/specs/data-models/spec.md
 
 ## Standalone Check Roll
 
@@ -1785,6 +1833,18 @@ They hold the per-record **Difficulty Adjustment** for a character-value target 
 Canonical mapping: `salvage.dcOverride`, `GatheringTask.dcOverride`; `_resolveSalvageDc` in `CraftingEngine`, `_resolveGatheringRoutedDc` in `GatheringEngine`; `salvage.adjustmentOverride`/`salvage.successesOverride` via `normalizeSalvage` in `src/systems/normalize/salvage.js`; `GatheringTask.adjustmentOverride`/`GatheringTask.successesOverride` via `_normalizeGatheringTask` in `src/ui/svelte/stores/adminStore.js` and `normalizeLibraryTask` in `src/systems/GatheringRichStateService.js`
 
 Spec reference: openspec/specs/recipes-and-steps/spec.md, openspec/specs/gathering-and-harvesting/spec.md, openspec/specs/data-models/spec.md
+
+## Dormant Override
+
+A salvage component's `dcOverride`/`adjustmentOverride` pair (and a gathering task's own pair) is edited one at a time: `checkOverrideField(evaluation)` names the one field the check's active target source (and, for `successesOverride`, its `count` product) reads, and the other is DORMANT rather than deleted.
+Switching **Fixed difficulty** ↔ **Character value** never rewrites the dormant field.
+`keptOverrides` names every set field that is not the active one, as `{field, value}`, and the editor turns that into a plain callout naming the kept value and stating that the active target source does not read it, so a value authored under one target source is exactly what comes back when the record switches back to it.
+A kind switch (`add` ↔ `multiply`) can leave a kept `adjustmentOverride` invalid for the new kind (a multiplier at or below zero, say); `overrideInvalidForKind` flags that on the ACTIVE field alone, without touching the dormant one (issue 2078).
+Converting a summed check to counting keeps the same principle in the other direction: the record's `dcOverride`/`adjustmentOverride` survives unread while `successesOverride` takes over, and switching back to a summed product restores it exactly as authored.
+
+Canonical mapping: `checkOverrideField`/`keptOverrides`/`overrideInvalidForKind` in `src/ui/svelte/apps/manager/component/overridePlayerSees.js`; `CheckOverrideField.svelte`; `taskOverrideCopy.js`; **Check DC Override**
+
+Spec reference: openspec/specs/ui-entity-editors/spec.md, openspec/specs/ui-system-studio/spec.md, openspec/specs/data-models/spec.md
 
 ## Character Modifier
 

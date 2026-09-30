@@ -88,35 +88,12 @@ See [Success-counting checks]({% link checks/crafting.md %}#success-counting-che
 
 ## Which way is better
 
-A pass-or-fail or routed check's **The roll** section carries a **Which way is better** setting.
-**Higher is better** is the classic roll-over-a-difficulty check.
-**Lower is better** instead requires the roll to stay at or under the difficulty.
+A pass-or-fail or routed check's **The roll** section carries a **Which way is better** setting, next to **What the roll produces**.
+**Higher is better** is the classic roll-over-a-difficulty check, and **Lower is better** instead requires the roll to stay at or under the difficulty.
 A progressive check has no such setting, because it spends its roll as a budget rather than measuring it against anything.
-
-Below that setting, **What the roll is measured against** picks where the difficulty itself comes from.
-
-- **Fixed difficulty** is the same number for every character, set here and per recipe difficulty tier, exactly as difficulty has always worked.
-- **Character value** reads a value from the crafting, salvage, or gathering character instead.
-Write a character-data path such as `@skills.craft.value`, the same way a modifier's expression is written.
-See [Defining modifiers](#defining-modifiers).
-
-A **Character value** target then takes a **Difficulty adjustment**.
-**Add a number** adds a flat amount to the character value.
-**Multiply, rounded down** scales it instead, and rounds the result down.
-A recipe difficulty tier, a salvage component's own override, or a gathering task's own override supplies that number when one is authored.
-Otherwise the check's own base adjustment does.
-
-A routed check under **Character value** and **Multiply, rounded down** can leave one tier with no adjustment of its own.
-That tier becomes the check's **Otherwise** tier, the catch-all a roll lands on when no multiplied tier's threshold is reached.
-Author at most one.
-It always sorts to the worst end of the tier list, whatever the tier is named.
-
-A **Lower is better** check reads differently at the table.
-The roll prompt shows a **Target** chip instead of a **DC** chip.
-The chip reads "stay at or under," or, on a strict comparison, "stay under."
-A flat or rolled situational bonus, and any Tool bonus or eligible named modifier, raise that target rather than joining the roll, and the prompt says so beneath the formula.
-The posted chat card still names the difficulty only for a Higher-is-better check against a fixed difficulty.
-Every other check keeps its difficulty off the card, exactly as it did before this setting existed.
+Below it, **What the roll is measured against** picks a **Fixed difficulty**, the same number for every character, or a **Character value** read from the crafting, salvage, or gathering character, which a **Difficulty adjustment** adjusts rather than replaces.
+Switching between **Higher is better** and **Lower is better**, or between the two target sources, keeps everything you authored on every side, so trying one and switching back costs you nothing.
+See [Roll-under and character-value checks]({% link checks/crafting.md %}#roll-under-and-character-value-checks) for the full guide, including a character-value target's adjustment, the salvage and gathering task overrides, and what a player's roll prompt, chat card, and result box show.
 
 ## Check modifiers
 
@@ -384,6 +361,6 @@ The prompt opens over the Fabricate window you rolled from, or over the page whe
 Clicking outside it does not cancel the roll; **Escape** pressed inside the prompt or its close button does, and pressing **Enter** rolls normally.
 Outside the prompt, **Escape** keeps its usual Foundry meaning.
 It offers **Situational bonus** and **Roll mode**, plus **Advantage** and **Disadvantage** when the formula supports them.
-It shows a **DC** chip only when the check has one target.
+It shows a **DC** or **Target** chip only when the check has one target to show.
 For an entitled visible Journal check, the prepared modifier contributions stay fixed while the prompt is open.
 Changing character data or the modifier library after preparation cannot change those captured modifier terms; other actor-dependent formula terms are resolved when the authority evaluates the roll.

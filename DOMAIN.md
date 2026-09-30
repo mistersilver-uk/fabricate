@@ -501,6 +501,13 @@ The per-check, GM-authored **unified trigger model** persisted as `checkBreakage
 
 [Notes](docs/domain/terms.md#check-breakage-checkbreakage)
 
+#### Preset Polarity
+
+Which end of a die the **Add a common trigger** presets treat as best: `'low'` (the `high`-id preset names the lowest face) under a roll-under evaluation, else `'high'`, whatever the check's product.
+A preset produces an ordinary trigger with no marker, so the polarity decides only the face a NEW preset names, never an already-authored trigger.
+
+[Notes](docs/domain/terms.md#preset-polarity)
+
 #### Provider (vocabulary boundary)
 
 A discriminator field naming a behaviour family.
@@ -1156,6 +1163,13 @@ The normalized check policy of product, direction, target and pool settings that
 
 [Notes](docs/domain/terms.md#check-evaluation)
 
+#### Situational Bonus Offer
+
+`offerSituationalBonus` (true unless explicitly `false`), a per-check display flag deciding only whether the interactive roll prompt shows a **Situational bonus** field, carried beside `evaluation` on all eight normalized check sub-objects.
+`allowsSituationalModifier` stays the runtime's separate authority gate, so a Tool bonus, an eligible named modifier and a programmatic bonus keep applying while the offer is off.
+
+[Notes](docs/domain/terms.md#situational-bonus-offer)
+
 #### Count Check
 
 A `product: 'count'` **Check Evaluation** rolls a `pool.die`-sided dice pool sized by `pool.base`, counts dice that qualify against `pool.threshold` net of any the cancel rule removed, and grades that net **successes** count against `pool.required`, reading neither `dc` nor `target`.
@@ -1230,6 +1244,20 @@ The recorded arithmetic meaning of a rolled check, including ordered evidence fo
 
 [Notes](docs/domain/terms.md#executed-check-evidence)
 
+#### Target Terms
+
+`data.targetTerms`, the ordered `{kind: 'anchor'|'adjustment'|'multiplier'|'benefit', value, source?, label?}[]` a summed check outside sum/over/fixed records on execution: the fixed or resolved-attribute anchor, each difficulty step, then each settled under benefit by its router source.
+Folding them, then the target-destined `preRolls`, in arithmetic order reproduces `data.target` exactly.
+
+[Notes](docs/domain/terms.md#target-terms)
+
+#### Check Display Projection
+
+The one immutable plain-data record `buildCheckDisplay` rebuilds from an allowlist for a posted check: evaluation product and direction, effective target, comparison, sanitized **Target Terms**, destination, **Executed Check Evidence**, executed visibility and, for a count, its **Count Display Evidence**.
+It never spreads the authored `evaluation` record, and `isPublicCheckDisplay` is the one gate a chat card consults before stating any of it.
+
+[Notes](docs/domain/terms.md#check-display-projection)
+
 #### Standalone Check Roll
 
 The check-roll mechanics published to a companion module that owns no crafting system: actor roll-data resolution, the retired-placeholder shim, roll decisions and chat, with a pass/fail or raw-total answer.
@@ -1273,6 +1301,12 @@ The system-level gathering check singleton (`system.gatheringCraftingCheck = { e
 A per-attempt DC shift applied **only where a DC is used** — i.e. the simple and routed runners.
 
 [Notes](docs/domain/terms.md#check-dc-override)
+
+#### Dormant Override
+
+A component's or task's `dcOverride`, `adjustmentOverride`, or `successesOverride` that the check's active target source or product does not currently read: kept verbatim across a target-source or product switch, never rewritten, and named in a plain callout rather than offered for editing.
+
+[Notes](docs/domain/terms.md#dormant-override)
 
 #### Character Modifier
 

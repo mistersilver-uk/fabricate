@@ -28,17 +28,23 @@ A one-call craft that resolves immediately — a macro or API `craft()`, with no
 ## Dynamic DC macros
 
 A GM can have a Macro calculate the difficulty for each crafting attempt.
-On **Checks › Crafting**, open **The roll** section, find the **Difficulty** card and choose **Dynamic** under **DC source**.
+On **Checks › Crafting**, open **The roll** section, find the **Difficulty** card and choose **Dynamic** under **How the number is set**.
 Then drag the Script Macro you want to use into the **DC macro** area below it.
 The macro calculates only the DC.
 It does not roll the check or choose the crafting result.
 If no Macro is linked, the Macro fails, or it cannot provide a usable number, Fabricate falls back to the recipe's chosen difficulty tier when it has one, and to the configured static DC when it does not.
 See the [Dynamic DC Macro API example]({% link api/crafting-engine.md %}#dynamic-dc-macro) for the supported inputs and a working Script Macro.
 
+This section covers a **Fixed difficulty** target.
+Under a **Character value** target the same control is labelled **How the adjustment is set** instead, and choosing **Dynamic** there hands the macro the character value already adjusted by the recipe's tier, asking it to return the number to reach or roll under, rather than a DC.
+See [Roll-under and character-value checks](#roll-under-and-character-value-checks).
+
 ## Named difficulty tiers
 
 Named difficulty tiers on the check, together with a per-recipe tier selection, give you per-recipe difficulty with no macro at all.
 You author the tiers themselves on the **Crafting** page of the **Checks** screen, where each one carries a name and the DC it puts in place of the base DC.
+Under a **Character value** target, a tier instead carries a **Difficulty adjustment** in place of the base adjustment, and a tier with none of its own becomes the check's **Otherwise** tier when the adjustment kind is **Multiply, rounded down**.
+See [Roll-under and character-value checks](#roll-under-and-character-value-checks).
 Each tier row has a drag handle and up and down buttons beside it, so you can reorder your named tiers by dragging a row's handle or by focusing it and using the arrow keys.
 
 {% include screenshot.html case="manager-checks-crafting-recipe-tiers" caption="Two named recipe difficulty tiers on a crafting check, each with the DC a recipe picking it is measured against." %}
@@ -47,10 +53,10 @@ Where a dynamic DC macro is also in play, the recipe's chosen tier resolves firs
 If the macro is missing, throws, or returns something that is not a number, the tier's DC still stands.
 The two features compose rather than compete.
 
-On a simple pass/fail check, the per-recipe **Check tier** control is only offered on a recipe's **Overview** tab while that check's **DC source** is **Static**.
+On a simple pass/fail check, the per-recipe **Check tier** control is only offered on a recipe's **Overview** tab while that check's difficulty is set to **Static**.
 Switching a simple check to **Dynamic** removes that control from every recipe's **Overview** tab.
 Fabricate still honours a tier a recipe already had chosen, so the composition above is real, not only theoretical.
-On a simple check, choose the recipe's difficulty tier while the **DC source** is **Static**.
+On a simple check, choose the recipe's difficulty tier while the check's difficulty is **Static**.
 A tier you already chose keeps setting the starting point the macro adjusts, even after you switch that check to **Dynamic**.
 See [Dynamic DC macros](#dynamic-dc-macros).
 
@@ -141,6 +147,10 @@ On a relative check the handles read the difficulty numbers the offsets resolve 
 It offers the check's own DC, which is the default, and each named difficulty tier the check carries, each labelled with its DC.
 It appears only once the check has at least one tier to offer, and it is a reading aid alone.
 Choosing one re-labels the strip and changes nothing you have authored.
+
+This draggable strip is a **Higher is better** check measured against a **Fixed difficulty** only.
+A **Lower is better** check, or one measured against a **Character value**, draws the same tiers as a read-only picture with no handles, and you edit the thresholds in the tier rows instead.
+See [Roll-under and character-value checks](#roll-under-and-character-value-checks).
 
 Fixed tiers must not overlap, and must leave no value between the lowest and the highest belonging to no tier.
 Either fault makes the tiers impossible to draw as one strip, so the strip steps aside with a note and leaves the rows to edit.
@@ -304,6 +314,88 @@ Set a Tool to **Immune** in its **Breakage** tab to exclude it while keeping its
 The dice groups in a trigger come from the formula.
 When the same shape appears twice (for example two separate d20 rolls), Fabricate numbers them so you can tell them apart.
 Editing the formula can renumber the groups, so check your dice-group triggers after you change a check formula.
+
+## Roll-under and character-value checks
+
+Every pass-or-fail or routed crafting, salvage, or gathering check carries a **Which way is better** setting on **The roll** section, beside **What the roll produces**.
+**Higher is better** is the classic check that rolls over a difficulty.
+**Lower is better** instead requires the total to stay at or under it.
+A progressive check has no such setting, because it spends its roll as a budget rather than measuring it against anything.
+Switching between the two keeps everything you authored on both sides: the difficulty, the recipe tiers, the triggers, and every override survive a switch in either direction, so trying **Lower is better** and switching back costs you nothing.
+
+### What the roll is measured against
+
+Below **Which way is better**, **What the roll is measured against** picks where the difficulty itself comes from.
+
+- **Fixed difficulty** is the same number for every character, set here and per recipe difficulty tier, exactly as difficulty has always worked.
+- **Character value** reads a value from the crafting, salvage, or gathering character instead.
+Write a character-data path such as `@skills.craft.value`, the same way a modifier's expression is written.
+See [Defining modifiers]({% link checks/index.md %}#defining-modifiers).
+
+A **Character value** target then takes a **Difficulty adjustment**.
+**Add a number** adds a flat amount to the character value.
+**Multiply, rounded down** scales it instead, and rounds the result down.
+A recipe difficulty tier, a salvage component's own override, or a gathering task's own override supplies that number when one is authored.
+Otherwise the check's own base adjustment does.
+
+A routed check under **Character value** and **Multiply, rounded down** can leave one tier with no adjustment of its own.
+That tier becomes the check's **Otherwise** tier, the catch-all a roll lands on when no multiplied tier's threshold is reached.
+Author at most one.
+It always sorts to the worst end of the tier list, whatever the tier is named.
+See [Outcome bands](#outcome-bands) for how a routed check's tiers are edited once the target is a character value.
+
+On the **Triggers** section, **Add a common trigger** offers the same natural-1 and natural-20 presets whichever way the check reads.
+Under **Lower is better** the low face is the best one, so the preset that used to name the highest face now names the lowest, and the one that used to force a failure on the lowest face now forces it on the highest.
+Nothing about a trigger you already authored changes when you switch **Which way is better**.
+Only the presets offered for a new one follow the switch.
+
+### How a bonus reaches a Lower is better check
+
+A **Lower is better** check reads differently at the table.
+The roll prompt shows a **Target** chip instead of a **DC** chip.
+The chip reads "stay at or under," or, on a strict comparison, "stay under."
+A flat or rolled situational bonus, and any Tool bonus or eligible named modifier, raise that target rather than joining the roll, and the prompt says so beneath the formula.
+The check's own rule sentence, under the resolved formula, states the same thing: the dice are compared raw, and every modifier that applies raises the target instead of being added to the roll.
+Where a character-value target's tier supplies its own adjustment, the rule sentence names that tier and the adjustment it applied first.
+
+### Offering a situational bonus in the prompt
+
+Every roll-graded check's roll prompt carries a **Situational bonus** field by default.
+On the check's Formula card, an **Offer a situational bonus** switch turns that field off for this check alone.
+Turned off, the roll prompt for this check shows no bonus field, caption, or help text, and the player rolls straight from the **Roll** button.
+Turning the offer off does not stop a Tool bonus, an eligible named modifier, or a bonus a Macro or companion module supplies programmatically.
+Those still apply exactly as configured.
+The switch decides only what the interactive prompt shows.
+
+### Salvage and gathering task overrides
+
+A salvage component's own check override, on the component's Salvage section, replaces the check's difficulty for that component alone.
+
+- Under **Fixed difficulty** it is a **Target override** (labelled **Salvage DC override** under **Higher is better**), offering **System default**, one option per outcome tier you have authored naming the tier and its number, and **Custom** for a number of your own.
+- Under **Character value** it is a **Difficulty adjustment override**, offering the same choices read as adjustments instead.
+
+Switching a component between **Fixed difficulty** and **Character value** keeps whichever override you had authored on the field the old target source used.
+Fabricate never rewrites it, and it stops showing that field for editing while the active target source does not read it.
+It shows a plain note in its place instead, naming the kept value and explaining that this target source does not read it, so it is not offered for editing.
+So a value you authored under one target source is exactly what comes back when you switch back to it.
+
+A **Routed** gathering task carries the equivalent single override field, labelled **Target** or **Adjustment** for the check's target source, with a **System default** placeholder and no presets to choose from, because gathering's routed outcome tiers are crafting-only and cannot be authored as presets here.
+See [Gathering Checks]({% link checks/gathering.md %}) for where that field sits on the task editor.
+
+### What players see
+
+An executed roll-under check, or one measured against a character value in either direction, states a **Target** row and, once the roll settles, a **Margin** row on the roll's chat card and on the crafter's own result box.
+A **Higher is better** check against a **Fixed difficulty** keeps its familiar **Needed** and **Margin** rows instead, unchanged.
+
+The Target row names the source: the character and the typed formula for a character value, for example "Sera Vane `@skills.smith.level` 12," or "fixed" for a fixed difficulty, followed by the difficulty tier's own adjustment where one applied, and any Tool bonus, named modifier, or situational bonus that raised it.
+A bonus that is itself rolled, such as a `1d4` situational bonus, states its own **Pre-rolled** row naming the formula and what it rolled, because raising the target is still something that happened during the roll.
+The Margin row reads "under the target" for a **Lower is better** check, so a positive margin always means the roll did better, whichever way the check reads.
+
+The chat card states these rows only for a public roll, the same rule its plain roll evidence follows: a private, blind, or self roll's card states neither.
+The result box, and a salvage's own result summary, are more forgiving: both still state the rows for a private roll or a self roll, and withhold them only for a blind roll or one marked secret.
+
+A pass-or-fail check's chat message also names the settled target in its flavor line outside a **Higher is better** check against a **Fixed difficulty**, reading, for example, "Crafting check (Target 14)" once every benefit has raised or adjusted it.
+A routed check, which grades each outcome tier against its own threshold rather than one final number, names no target this way, whichever way it reads or what it is measured against.
 
 ## Success-counting checks
 
