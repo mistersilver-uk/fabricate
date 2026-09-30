@@ -1875,6 +1875,22 @@ export const CASES = Object.freeze([
       ' [data-check-count-actor-line="resolved"]',
   }),
   authoringCase({
+    id: 'manager-checks-v3-count-over-modifier',
+    label: 'six d10s from a character value, an applied modifier growing the pool',
+    frame: '06',
+    steps: [
+      ...COUNT_IDRIN,
+      { selector: '#checks-section-modifiers' },
+      { selector: '[data-crafting-modifier-eligibility="hb-mod-medicine"]' },
+      { selector: '#checks-section-roll' },
+      { selector: '[data-check-formula-resolved]', scroll: true },
+    ],
+    expectSelector:
+      COUNTING +
+      ':has([data-check-count-composed] [data-check-formula-modifier="hb-mod-medicine"])' +
+      ' [data-check-count-actor-line="resolved"]:has-text("grown by")',
+  }),
+  authoringCase({
     id: 'manager-checks-v3-count-over-narrow',
     label: 'six d10s from a character value, at 1024x640',
     frame: '06',

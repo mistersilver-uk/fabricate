@@ -365,7 +365,7 @@ export const CASES = Object.freeze([
     expectSelector:
       `${SINGLE_PROMPT}:not(:has(button[data-action="advantage"]))` +
       ':has(.manager-modal-subtitle:text-is("Sera Vane · Fine Craft"))' +
-      ':has(.formula-content .formula[data-roll-prompt-count="over"]:text-is("7d10 · each ≥ 8"))' +
+      ':has(.formula-content .formula[data-roll-prompt-count="over"]:text-is("6d10 · each ≥ 8"))' +
       ':has(.formula-content .formula-note:text-is("Success on ≥ 8 · explodes on 10 · 1 cancels a success"))' +
       ':has(.formula-content .manager-chip[data-roll-prompt-required="2"]:has-text("2 successes needed"))' +
       ':has(.static-modifiers .manager-chip:has-text("Steady hands +1"))' +
@@ -390,8 +390,8 @@ export const CASES = Object.freeze([
     expectSelector:
       `${SINGLE_PROMPT}:not(:has(button[data-action="advantage"]))` +
       ':has(.manager-modal-subtitle:text-is("Sera Vane · Complex Work"))' +
-      ':has(.formula-content .formula[data-roll-prompt-count="under"]:text-is("2d20 · each ≤ 15"))' +
-      ':has(.formula-content .formula-note:text-is("Success on ≤ 15 (character value 14), moved +1 by modifiers"))' +
+      ':has(.formula-content .formula[data-roll-prompt-count="under"]:text-is("2d20 · each ≤ 14"))' +
+      ':has(.formula-content .formula-note:text-is("Success on ≤ 14 (character value 13), moved +1 by modifiers"))' +
       ':has(.formula-content .manager-chip[data-roll-prompt-required="2"]:has-text("2 successes needed"))' +
       ':has(.static-modifiers .manager-chip:has-text("Steady hands +1"))' +
       ':has(.static-modifiers > .help:text-is("Each moves the threshold."))',
@@ -464,7 +464,7 @@ export const CASES = Object.freeze([
     ],
     expectSelector:
       '[data-recipe-section="check"][data-check-usable="true"]' +
-      ':has([data-check-formula] code:text-is("6d10 · each ≥ 8"))' +
+      ':has([data-check-formula] code:text-is("5d10 · each ≥ 8"))' +
       ':has([data-check-successes-needed="2"]:has-text("2 successes needed"))' +
       ':not(:has([data-check-dc]))',
     kinds: ['player', 'crafting'],

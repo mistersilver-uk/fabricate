@@ -247,7 +247,7 @@ const COUNT_POOLS = {
     subject: 'Fine Craft',
     pool: {
       die: 10,
-      base: '6',
+      base: '5',
       threshold: '8',
       explode: { enabled: true, faces: { kind: 'best' } },
       cancel: { enabled: true, faces: { kind: 'worst' } },
@@ -260,7 +260,7 @@ const COUNT_POOLS = {
     pool: {
       die: 20,
       base: '2',
-      threshold: '@abilities.int.mod + 11',
+      threshold: '@abilities.int.mod + 10',
       modifierDestination: 'threshold',
     },
   },
