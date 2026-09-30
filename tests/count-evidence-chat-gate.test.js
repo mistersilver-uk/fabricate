@@ -342,6 +342,23 @@ test('a prepared count check reports its dice only when it is not secret (N33)',
   assert.equal(checkDisplayForCard(secret).count, null);
 });
 
+test('a prepared count replays the character-value threshold source it captured', async () => {
+  const replayed = async (count) => {
+    const dice = installCountDice({ faces: [9, 3], chat: false });
+    try {
+      const prepared = preparedCountCheck({ count });
+      const result = await evaluatePreparedRunCheck(prepared, { getRollData: () => ({}) }, {
+        rollMode: 'publicroll',
+      });
+      return result.countDisplay.threshold.source;
+    } finally {
+      dice.restore();
+    }
+  };
+  assert.equal(await replayed({ thresholdSource: 'character' }), 'character');
+  assert.equal(await replayed({}), 'fixed', 'a fixed threshold stays fixed');
+});
+
 test('a gathering check persists whole, so it keeps no count evidence or visibility (N34)', async () => {
   const gathering = new GatheringEngine({ localize: (key) => key });
   gathering.installVersionedRunAuthority({ evaluatePreparedRunCheck });
