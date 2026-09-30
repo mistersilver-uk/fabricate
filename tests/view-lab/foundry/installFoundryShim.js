@@ -3,12 +3,13 @@
  * `game.settings` is the entire persistence layer.
  */
 import { registerCountRoll } from '../../../src/systems/countRoll.js';
-
-import { createLabRoll } from './labRoll.js';
-import { installLabRandom } from './labRandom.js';
 import { createLabDialogV2 } from '../foundryDialog.js';
 import { createLabRollPromptAnswerer } from '../rollPromptAnswer.js';
 import { installUpdateSemantics, makeGetFlag, makeSetFlag } from '../world/labFlags.js';
+
+import { installLabRandom } from './labRandom.js';
+import { createLabRoll } from './labRoll.js';
+import { LAB_TERM_CLASSES } from './labRollTerms.js';
 
 /**
  * Compose the Map key for one setting.
@@ -596,6 +597,8 @@ export function installFoundryShim(world) {
       instances: new Map(),
     },
     documents: {},
+    // Core's dice namespace, whose `terms.Die` the keep transform checks a term against (issue 2007).
+    dice: { Roll: globalThis.Roll, terms: LAB_TERM_CLASSES },
     CONST: globalThis.CONST,
   };
 
