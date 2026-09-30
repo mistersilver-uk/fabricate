@@ -60,9 +60,9 @@
   `spec.md:43` says "a candidate that decomposes entirely into existing members is a COMPOSITION
   and MUST NOT enter the set", and this decomposes into `EmptyState` and `Notice` plus one line of
   chrome. It cannot take a `notAPrimitive` row either — `tests/design-system-primitives.test.js`
-  caps a recorded non-member at one caller. So it takes an `unregisteredSharedComponents` row in
-  `tests/components/design-system-known-debt.json`, which is the register's answer for a
-  screen-region composition rather than a gap in it.
+  caps a recorded non-member at one caller. So it stays an unregistered shared component, which
+  `tests/design-system-primitives.test.js` holds against the base commit: the register's answer
+  for a screen-region composition rather than a gap in it.
 
   THAT ANSWER IS PATH-CONDITIONAL. The banked route holds only while this file lives OUTSIDE
   `src/ui/svelte/components/` and inside `src/ui/svelte/`. The same file under `components/` would

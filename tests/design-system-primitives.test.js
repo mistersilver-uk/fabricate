@@ -8,7 +8,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { measureImporters } from '../scripts/lib/componentImporters.js';
+import { importGraph, measureImporters } from '../scripts/lib/componentImporters.js';
 import {
   DESIGN_SYSTEM_PRIMITIVES,
   NOT_A_PRIMITIVE,
@@ -24,11 +24,14 @@ import {
 import { VIEW_RECIPES } from '../scripts/ui-pr-screenshot-evidence.mjs';
 
 import {
-  KNOWN_UNREGISTERED_SHARED_COMPONENTS,
-  KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL,
-} from './components/design-system-known-debt.js';
-import { tallyByKey } from './helpers/codePointOrder.js';
-import { assertRatchet } from './helpers/ratchetBaseline.js';
+  DESIGN_SYSTEM_FAMILY,
+  MANIFEST_CORPUS,
+  MANIFEST_PATH,
+  assertGateCases,
+  checkGate,
+  manifestRows,
+} from './helpers/designSystemRatchet.js';
+import { headMarker } from './helpers/mergeBaseRatchet.js';
 
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -720,22 +723,34 @@ const PRIMITIVE_DIRECTORY = 'src/ui/svelte/components/';
 const MEMBERSHIP_BAR = 2;
 
 /**
- * Every `.svelte` outside `components/` that clears the membership bar and has no manifest row. The
- * register below is therefore the EXCLUSION MECHANISM rather than a list of offenders (issue 1481).
+ * Every `.svelte` outside `components/` that clears the membership bar and has no manifest row, on
+ * the side `readFile` reads. That is the register's EXCLUSION MECHANISM rather than a list of
+ * offenders (issue 1481).
  */
-function unregisteredSharedComponents() {
-  const registered = new Set(MANIFEST_ROWS.map((row) => row.path));
-  return RENDER_FILES.filter(
+function unregisteredSharedComponents(readFile, files) {
+  const sources = files.filter((file) => file.startsWith('src/'));
+  const graph = importGraph(sources, (file) => readFile(file) ?? '');
+  const registered = new Set(manifestRows(readFile).map((row) => row.path));
+  return sources.filter(
     (file) =>
       file.startsWith(UI_ROOT) &&
       file.endsWith('.svelte') &&
       !file.startsWith(PRIMITIVE_DIRECTORY) &&
       !registered.has(file) &&
-      IMPORTERS.importersOf(file).length >= MEMBERSHIP_BAR
+      graph.importersOf(file).length >= MEMBERSHIP_BAR
   );
 }
 
-test('(e) the register of unadjudicated shared components is exactly what is recorded', () => {
+/** Its trigger set is the whole import graph under `src/` and the manifest. */
+const UNREGISTERED_GATE = Object.freeze({
+  include: (file) => file.startsWith('src/') || MANIFEST_CORPUS.include(file),
+  measure: (readFile, listFiles) =>
+    unregisteredSharedComponents(readFile, listFiles())
+      .filter((file) => !headMarker(file, readFile(file), DESIGN_SYSTEM_FAMILY))
+      .map((file) => ({ file, id: 'unregistered shared component' })),
+});
+
+test('(e) no shared component crosses the membership bar without a manifest row', (t) => {
   const domain = RENDER_FILES.filter(
     (file) =>
       file.startsWith(UI_ROOT) &&
@@ -757,54 +772,43 @@ test('(e) the register of unadjudicated shared components is exactly what is rec
       'mechanism this register relies on is not being exercised by the tree at all'
   );
 
-  assertRatchet({
-    label: 'shared components outside components/ with no manifest row',
-    baseline: KNOWN_UNREGISTERED_SHARED_COMPONENTS,
-    pinnedTotal: KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL,
-    observed: tallyByKey(unregisteredSharedComponents(), (file) => file),
-    scanned: IMPORTERS.fileCount,
-    floor: 500,
-    guidance:
-      'A component with two or more independent callers is a candidate for the shared vocabulary, ' +
+  checkGate(
+    t,
+    UNREGISTERED_GATE,
+    'A component with two or more independent callers is a candidate for the shared vocabulary, ' +
       'wherever it lives — see the "primitive set is a closed, versioned vocabulary" requirement ' +
       'in `openspec/specs/design-system/spec.md`, which sets the bar by CALLER COUNT and not by ' +
-      'directory. A name arriving here means one more component crossed the bar without anyone ' +
-      'deciding: either promote it, with its `library` adjudication and its `evidence` ' +
-      'derivation, or record it on `notAPrimitive` with the measurement that put it there. A name ' +
-      'LEAVING here without a manifest row means it dropped below the bar, which is worth a ' +
-      'sentence of its own.',
-  });
+      'directory. A component arriving here crossed the bar without anyone deciding: promote it, ' +
+      'with its `library` adjudication and its `evidence` derivation; record it on ' +
+      '`notAPrimitive` with the measurement that put it there; or, for a composition of existing ' +
+      'members, write `<!-- ratchet-exempt(design-system): <reason> -->` at the head of its file.'
+  );
 });
 
-test('(e) every registered path is a real, unadjudicated component', () => {
-  // THE MIRROR GUARD. A register keyed on a path rots the moment a file is renamed, and
-  // `assertRatchet` would report that as VANISHED — correct, but in the language of counts rather
-  // than of the mistake.
-  const onDisk = new Set(RENDER_FILES);
-  const registered = new Set(MANIFEST_ROWS.map((row) => row.path));
-  const paths = KNOWN_UNREGISTERED_SHARED_COMPONENTS.map((row) => row.key);
-
-  assert.deepEqual(
-    paths.filter((file) => !onDisk.has(file)),
-    [],
-    'a register row names a file that is not on disk. A renamed component leaves a row that can ' +
-      'never match anything, and the next author reads it as a component nobody has adjudicated ' +
-      'when in fact nobody can find it.'
-  );
-  assert.deepEqual(
-    paths.filter((file) => registered.has(file)),
-    [],
-    'a register row names a component that now HAS a manifest row. That is the register working ' +
-      '— the component was adjudicated — and the row should have been deleted by the change that ' +
-      'adjudicated it, with the pinned total lowered to match.'
-  );
-  assert.deepEqual(
-    paths.filter((file) => file.startsWith(PRIMITIVE_DIRECTORY)),
-    [],
-    `a register row names a file under ${PRIMITIVE_DIRECTORY}, which is outside this property's ` +
-      'domain entirely — those are covered by the manifest clauses above, and a row here would be ' +
-      'checked by nothing while looking checked'
-  );
+test('(e) the register gate reads the import graph and the manifest on each side', (t) => {
+  const SHARED = `${UI_ROOT}apps/Shared.svelte`;
+  const importer = (name) => `<script>import Shared from './${name}.svelte';</script>\n`;
+  const manifest = (...paths) =>
+    `${JSON.stringify({ designSystemPrimitives: paths.map((file) => ({ path: file })), notAPrimitive: [] })}\n`;
+  const base = {
+    [SHARED]: '<div></div>\n',
+    [`${UI_ROOT}apps/One.svelte`]: importer('Shared'),
+    [MANIFEST_PATH]: manifest(),
+    'README.md': 'x\n',
+  };
+  const second = { [`${UI_ROOT}apps/Two.svelte`]: importer('Shared') };
+  assertGateCases(t, UNREGISTERED_GATE, base, [
+    { head: second, failures: [`${SHARED}: unregistered shared component is new (1)`] },
+    { head: { ...second, [MANIFEST_PATH]: manifest(SHARED) }, failures: [] },
+    {
+      head: {
+        ...second,
+        [SHARED]: '<!-- ratchet-exempt(design-system): a composition -->\n<div></div>\n',
+      },
+      failures: [],
+    },
+    { head: { 'README.md': 'y\n' }, skipped: 'corpus-unchanged' },
+  ]);
 });
 
 test('(e) exactly three shared member rows live outside the primitive directory', () => {
