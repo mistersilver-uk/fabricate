@@ -25,6 +25,8 @@ const BOTCH = {
 };
 /** A pool of no dice, which fails without rolling. */
 const ZERO = { die: 6, base: '0', threshold: '4', required: 1, zeroPoolFails: true };
+/** Six d10s, which the prompt's situational −6 reduces to none (prototype frame 41). */
+const ZERO_PENALTY = { die: 10, base: '6', threshold: '8', required: 1, zeroPoolFails: true };
 
 /** The `rollPromptState` values, each naming the slot it counts on and its pool. */
 export const COUNT_RESULT_STATES = Object.freeze({
@@ -32,6 +34,7 @@ export const COUNT_RESULT_STATES = Object.freeze({
   'count-result-fail': { slot: 'crafting', pool: FAIL },
   'count-result-botch': { slot: 'crafting', pool: BOTCH },
   'count-result-zero': { slot: 'crafting', pool: ZERO },
+  'count-result-zero-penalty': { slot: 'crafting', pool: ZERO_PENALTY },
   'salvage-count-result': { slot: 'salvage', pool: PASS },
   // The horseshoe's recipe tier needs one success where the pool needs two.
   'count-result-descriptor': {
