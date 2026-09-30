@@ -5,13 +5,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { gradeCountRouted } from '../src/systems/countCheckRoll.js';
 import {
   countPlacementTerms,
   countRollReport,
   reportedCountDisplay,
 } from '../src/systems/countDisplayEvidence.js';
-
-import { gradeCountRouted } from '../src/systems/countCheckRoll.js';
 import { executedCheckDisplay } from '../src/ui/presenters/checkDisplay.js';
 import { countEvidenceRows } from '../src/ui/presenters/countEvidenceRows.js';
 

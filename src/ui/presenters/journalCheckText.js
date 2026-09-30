@@ -17,8 +17,8 @@ import { comparisonText } from './checkDescriptor.js';
 export function executedCount(data) {
   const net = Number.isFinite(data?.total) ? data.total : null;
   const margin = Number.isFinite(data?.margin) && !data.type ? data.margin : null;
-  const required = net !== null && margin !== null && net - margin > 0 ? net - margin : null;
-  return { net, required, zeroPool: data?.zeroPool === true };
+  const required = net !== null && margin !== null ? net - margin : null;
+  return { net, required: required > 0 ? required : null, zeroPool: data?.zeroPool === true };
 }
 
 /**

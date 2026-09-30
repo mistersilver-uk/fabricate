@@ -347,9 +347,13 @@ test('a prepared count replays the character-value threshold source it captured'
     const dice = installCountDice({ faces: [9, 3], chat: false });
     try {
       const prepared = preparedCountCheck({ count });
-      const result = await evaluatePreparedRunCheck(prepared, { getRollData: () => ({}) }, {
-        rollMode: 'publicroll',
-      });
+      const result = await evaluatePreparedRunCheck(
+        prepared,
+        { getRollData: () => ({}) },
+        {
+          rollMode: 'publicroll',
+        }
+      );
       return result.countDisplay.threshold.source;
     } finally {
       dice.restore();

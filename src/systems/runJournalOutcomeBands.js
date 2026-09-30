@@ -167,7 +167,7 @@ function relativeCountBand(outcome, routed, word) {
   const offset = numberOrNull(outcome?.dc) ?? 0;
   const thresholds = countThresholds(routed, 0);
   const higher = thresholds.filter((value) => value > offset);
-  if (!thresholds.every((value) => value >= offset)) return `${offsetFrom(word, offset)}+`;
+  if (thresholds.some((value) => value < offset)) return `${offsetFrom(word, offset)}+`;
   return higher.length === 0 ? '0+' : `<${offsetFrom(word, Math.min(...higher))}`;
 }
 
