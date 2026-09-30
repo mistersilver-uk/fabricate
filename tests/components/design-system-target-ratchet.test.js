@@ -10,7 +10,6 @@ import test from 'node:test';
 import { byCodePoint } from '../helpers/codePointOrder.js';
 import { parseDesignLibrary, primitiveNamesIn } from '../helpers/designLibrary.js';
 import {
-  DESIGN_SYSTEM_FAMILY,
   MANIFEST_CORPUS,
   MANIFEST_PATH,
   TEMPLATE_CORPUS,
@@ -23,7 +22,6 @@ import {
   manifestRows,
   workingTree,
 } from '../helpers/designSystemRatchet.js';
-import { headMarker } from '../helpers/mergeBaseRatchet.js';
 
 const LIBRARY_PATH = 'openspec/specs/design-system/library.html';
 const LIBRARY_CORPUS = Object.freeze({
@@ -44,11 +42,22 @@ function perNameStatuses(readFile) {
   );
 }
 
-const TARGET_NAME_GATE = gateOver([LIBRARY_CORPUS], (readFile) =>
-  perNameStatuses(readFile)
-    .filter((entry) => entry.status === 'target')
-    .map(({ name, line }) => ({ file: LIBRARY_PATH, line, id: `<${name}> at \`target\`` }))
-);
+/** A marker at a line several entries share excuses only the entry its reason names. */
+const NAMED = Object.freeze({ siteMarkers: (entry, marker) => marker.reason.includes(entry.name) });
+
+const TARGET_NAME_GATE = {
+  ...gateOver([LIBRARY_CORPUS], (readFile) =>
+    perNameStatuses(readFile)
+      .filter((entry) => entry.status === 'target')
+      .map(({ name, line }) => ({
+        file: LIBRARY_PATH,
+        line,
+        id: `<${name}> at \`target\``,
+        name: `<${name}>`,
+      }))
+  ),
+  ...NAMED,
+};
 
 const API_ROW_LABEL = '>Entries without an API</td>';
 
@@ -62,26 +71,32 @@ function entriesWithoutApi(readFile) {
   return { line: index + 1, names: primitiveNamesIn(listed.replaceAll('&gt;', '>')) };
 }
 
-const NO_API_GATE = gateOver([LIBRARY_CORPUS], (readFile) => {
-  const listed = entriesWithoutApi(readFile);
-  return (listed?.names ?? []).map((name) => ({
-    file: LIBRARY_PATH,
-    line: listed.line,
-    id: `<${name}> has no Svelte API`,
-  }));
-});
+const NO_API_GATE = {
+  ...gateOver([LIBRARY_CORPUS], (readFile) => {
+    const listed = entriesWithoutApi(readFile);
+    return (listed?.names ?? []).map((name) => ({
+      file: LIBRARY_PATH,
+      line: listed.line,
+      id: `<${name}> has no Svelte API`,
+      name: `<${name}>`,
+    }));
+  }),
+  ...NAMED,
+};
 
 /**
  * Every manifest row at `target`, as an entry on its implementation file, so a moved component
- * keeps its row; a manifest cannot hold a comment, so the marker sits at that file's head.
+ * keeps its row; a manifest cannot hold a comment, so the marker sits at that file's head and
+ * excuses the file's rows only when they are new or grew.
  */
 const TARGET_ROW_GATE = {
   include: inAny(MANIFEST_CORPUS, TEMPLATE_CORPUS),
   measure: (readFile) =>
     manifestRows(readFile)
       .filter((row) => row.status === 'target')
-      .filter((row) => !headMarker(row.path, readFile(row.path) ?? '', DESIGN_SYSTEM_FAMILY))
       .map((row) => ({ file: row.path, id: 'manifest row at `target`' })),
+  siteMarkers: false,
+  headMarkers: true,
 };
 
 const tree = () => workingTree(LIBRARY_CORPUS, MANIFEST_CORPUS);
@@ -114,7 +129,8 @@ test('no library entry is newly written at `target`', (t) => {
       'when its API and geometry match the specimen and a View Lab case draws it, or to ' +
       '`divergent` on a maintainer decision carrying its issue. A new name at `target` is ' +
       'legitimate only when the entry is new, and then it carries a ' +
-      '`<!-- ratchet-exempt(design-system): reason -->` line right above its `div.spec`.'
+      '`<!-- ratchet-exempt(design-system): <Name>: reason -->` line right above its `div.spec`, ' +
+      'naming the entry, since one `div.spec` can declare several.'
   );
 });
 
@@ -135,7 +151,8 @@ test('no entry newly joins the "Entries without an API" list', (t) => {
     NO_API_GATE,
     'An entry carried unchanged from an existing component may state its geometry alone, but the ' +
       'list of such entries only shrinks: write the Svelte API section instead, or put a ' +
-      'ratchet-exempt(design-system) reason on the line above the row.'
+      'ratchet-exempt(design-system) reason naming the entry, as `<Name>`, on the line above the ' +
+      'row, since the row lists every such entry.'
   );
 });
 
@@ -222,7 +239,23 @@ test('a reasoned marker at the site exempts a new `target` entry, and an empty o
   const marked = (reason) => `<!-- ${reason} -->`;
   const markerLine = 4;
   assertGateCases(t, TARGET_NAME_GATE, BASE, [
-    { head: { [LIBRARY_PATH]: library(marked(REASON), spec('Baz', 'target')) }, failures: [] },
+    {
+      head: { [LIBRARY_PATH]: library(marked(`${REASON} <Baz>`), spec('Baz', 'target')) },
+      failures: [],
+    },
+    {
+      head: { [LIBRARY_PATH]: library(marked(`${REASON} <Qux>`), spec('Baz', 'target')) },
+      failures: [`${LIBRARY_PATH}: <Baz> at \`target\` is new (1)`],
+    },
+    {
+      head: {
+        [LIBRARY_PATH]: library(
+          marked(`${REASON} <Baz>`),
+          `<div class="spec" data-status-Baz="target" data-status-Zed="target">`
+        ),
+      },
+      failures: [`${LIBRARY_PATH}: <Zed> at \`target\` is new (1)`],
+    },
     {
       head: {
         [LIBRARY_PATH]: library(marked('ratchet-exempt(design-system):'), spec('Baz', 'target')),
@@ -246,20 +279,19 @@ test('a reasoned marker at the site exempts a new `target` entry, and an empty o
         'src/ui/svelte/C.svelte': component('ratchet-exempt(design-system):'),
       },
       failures: [
-        'src/ui/svelte/C.svelte: manifest row at `target` is new (1)',
+        'src/ui/svelte/C.svelte: manifest row at `target` is new (1); its ratchet-exempt marker ' +
+          'gives no reason',
         emptyMarkerFailure('src/ui/svelte/C.svelte', 1),
       ],
     },
   ]);
+  const noApi = (reason, listed) =>
+    library().replace(apiRow('none'), `${marked(reason)}\n${apiRow(listed)}`);
   assertGateCases(t, NO_API_GATE, BASE, [
+    { head: { [LIBRARY_PATH]: noApi(`${REASON} <Qux>`, '&lt;Qux&gt;') }, failures: [] },
     {
-      head: {
-        [LIBRARY_PATH]: library().replace(
-          apiRow('none'),
-          `${marked(REASON)}\n${apiRow('&lt;Qux&gt;')}`
-        ),
-      },
-      failures: [],
+      head: { [LIBRARY_PATH]: noApi(`${REASON} <Qux>`, '&lt;Qux&gt; · &lt;Zed&gt;') },
+      failures: [`${LIBRARY_PATH}: <Zed> has no Svelte API is new (1)`],
     },
   ]);
 });

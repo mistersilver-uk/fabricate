@@ -9,6 +9,7 @@ import test, { after } from 'node:test';
 
 import { byCodePoint } from './helpers/codePointOrder.js';
 import { compareToBase, reportComparison } from './helpers/mergeBaseRatchet.js';
+import { MARKER_ONLY } from './helpers/siteMarkers.js';
 import { collectSources, repoRoot } from './helpers/sourceScan.js';
 import { createTempGitRepo } from './helpers/temp-git-repo.js';
 import {
@@ -64,10 +65,6 @@ function functionsOf(file, text) {
     throw new Error(`${file} failed to parse: ${error.message}`, { cause: error });
   }
 }
-
-/** A line holding nothing but a `ratchet-exempt` marker, in any of the three comment forms. */
-const MARKER_ONLY =
-  /^\s*(?:\/\/\s*ratchet-exempt\(.*|\/\*\s*ratchet-exempt\(.*\*\/|<!--\s*ratchet-exempt\(.*-->)\s*$/u;
 
 /** The 1-based lines of `text` that are only a marker: a recorded reason for any family, not growth. */
 function markerOnlyLines(text) {

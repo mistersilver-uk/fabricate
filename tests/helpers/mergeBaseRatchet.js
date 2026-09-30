@@ -10,6 +10,7 @@ import path from 'node:path';
 import { resolveExecutable } from '../../scripts/lib/resolveExecutable.js';
 
 import { byCodePoint } from './codePointOrder.js';
+import { keyByAlignment, netOfSiteMarkers, siteText } from './siteMarkers.js';
 import { envWithoutGitLocation } from './temp-git-repo.js';
 
 export const REPO_ROOT = path.resolve(import.meta.dirname, '..', '..');
@@ -381,6 +382,57 @@ export function siteMarker(file, text, family, line) {
   return markers.find((m) => m.family === family && m.reason !== '' && sites.has(m.line)) ?? null;
 }
 
+/**
+ * Annotates an entry with its site: its first line's {@link siteText}, and the reasoned `family`
+ * marker at that line that `excuses(entry, marker)` accepts. Each file is parsed once.
+ */
+function siteReader(readFile, family, excuses) {
+  const files = new Map();
+  const fileOf = (file) => {
+    if (!files.has(file)) {
+      const text = readFile(file);
+      const markers =
+        text === undefined
+          ? []
+          : parseMarkers(file, text).filter((m) => m.family === family && m.reason !== '');
+      files.set(file, text === undefined ? null : { lines: text.split('\n'), markers });
+    }
+    return files.get(file);
+  };
+  return (entry) => {
+    const line = entry.lines?.[0];
+    const known = line === undefined ? null : fileOf(entry.file);
+    if (!known) return { ...entry, site: { line, text: '' }, marker: null };
+    const sites = known.markers.length > 0 ? new Set(anchorLines(known.lines, line)) : new Set();
+    const marker = known.markers.find((m) => sites.has(m.line) && excuses(entry, m)) ?? null;
+    return { ...entry, site: { line, text: siteText(known.lines[line - 1]) }, marker };
+  };
+}
+
+const siteKey = (entry) => ({
+  ...entry,
+  line: entry.site.line,
+  key: `${entry.file}\u{0}${entry.id}\u{0}${entry.site.text}`,
+});
+
+/** Both sides' site entries net of their markers, each file's lines aligned with its base's. */
+function netSites(paired, readBase, readHead, renames) {
+  const byFile = new Map();
+  const side = (file) => byFile.get(file) ?? byFile.set(file, { base: [], head: [] }).get(file);
+  for (const entry of paired.base) side(entry.file).base.push(siteKey(entry));
+  for (const entry of paired.head) side(entry.file).head.push(siteKey(entry));
+  const all = { base: [], head: [] };
+  for (const [file, { base, head }] of byFile) {
+    const baseText = head.some((entry) => entry.marker)
+      ? readBase(renames.get(file) ?? file)
+      : undefined;
+    const keyed = keyByAlignment(baseText, readHead(file), base, head);
+    all.base.push(...keyed.base);
+    all.head.push(...keyed.head);
+  }
+  return netOfSiteMarkers(all.base, all.head);
+}
+
 function validEntry(entry, family) {
   const ok =
     typeof entry?.file === 'string' &&
@@ -494,12 +546,13 @@ function emptyMarkerFailures(files, family, readFile) {
   );
 }
 
-function judge(remaining, family, readHead, headMarkers) {
+/** Each remaining offence, exempt by a marker at its lines unless site markers were netted. */
+function judge(remaining, family, readHead, { headMarkers, exempts }) {
   const failures = [];
   const exempted = [];
   for (const offence of remaining) {
     const { exempt, empty } = markerFor(offence.entry, family, readHead, headMarkers);
-    if (exempt) exempted.push(`${offence.text}: ${exempt.reason}`);
+    if (exempt && exempts) exempted.push(`${offence.text}: ${exempt.reason}`);
     else if (empty) failures.push(`${offence.text}; its ratchet-exempt marker gives no reason`);
     else failures.push(offence.text);
   }
@@ -540,6 +593,8 @@ function skipped(code, reason, corpusRoot, changedCount) {
  * `pair(base, head)` sees both sides' entries, base paths already renamed, and returns
  * `{base, head}`: a family's own cross-side matching, such as a function rename. `headMarkers:
  * false` stops a file-head marker exempting an entry, for a family whose markers excuse one site.
+ * `siteMarkers` makes each entry one site, excused at its first line only when it is new relative
+ * to base (`siteMarkers.js`); a function `(entry, marker)` narrows which markers excuse.
  *
  * @returns {{compared: true, family: string, base: string, changedCount: number,
  *   failures: string[], shrank: string[], netted: string[], exempted: string[]}
@@ -554,6 +609,7 @@ export function compareToBase({
   ceiling = (was) => was.amount,
   pair = (baseEntries, headEntries) => ({ base: baseEntries, head: headEntries }),
   headMarkers = true,
+  siteMarkers = false,
   cwd = REPO_ROOT,
   env = process.env,
   base = resolveRatchetBase({ cwd, env }),
@@ -575,15 +631,33 @@ export function compareToBase({
     const entry = validEntry(raw, family);
     return { ...entry, file: headPathOf.get(entry.file) ?? entry.file };
   };
+  const excuses = typeof siteMarkers === 'function' ? siteMarkers : () => true;
+  const annotate = (entries, readFile) =>
+    siteMarkers
+      ? entries.map((entry) => validEntry(entry, family)).map(siteReader(readFile, family, excuses))
+      : entries;
   const paired = pair(
-    measure(readBase, () => [...files.baseFiles]).map(toHeadPath),
-    measure(readHead, () => [...files.headFiles])
+    annotate(
+      measure(readBase, () => [...files.baseFiles]),
+      readBase
+    ).map(toHeadPath),
+    annotate(
+      measure(readHead, () => [...files.headFiles]),
+      readHead
+    )
   );
-  const baseIndex = tally(paired.base, family);
-  const headIndex = tally(paired.head, family);
+  const net = siteMarkers
+    ? netSites(paired, readBase, readHead, changes.renames)
+    : { ...paired, fresh: [] };
+  const baseIndex = tally(net.base, family);
+  const headIndex = tally(net.head, family);
   const { offences, falls } = difference(baseIndex, headIndex, ceiling);
   const { remaining, netted, shrank } = netByValue(offences, falls);
-  const { failures, exempted } = judge(remaining, family, readHead, headMarkers);
+  const exempts = !siteMarkers;
+  const { failures, exempted } = judge(remaining, family, readHead, { headMarkers, exempts });
+  for (const entry of net.fresh) {
+    exempted.push(`${entry.file}:${entry.site.line} ${entry.id}: ${entry.marker.reason}`);
+  }
   failures.push(...emptyMarkerFailures(files.headChanged, family, readHead));
   return {
     compared: true,

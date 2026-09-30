@@ -484,6 +484,7 @@ A test that bounds a population of offenders MUST compute its baseline at test t
 The base commit MUST be `RATCHET_BASE` when that variable is set, and otherwise the merge base of `HEAD` with `origin/main`.
 A ratchet MUST fail only on an offender that appeared or got worse against that base, MUST pass and report a shrink, and MUST offer no update, tighten or slack mode.
 A regression MUST pass only when its site carries a `ratchet-exempt(<family>): <reason>` marker in the file's own comment form, and a marker with an empty reason MUST fail.
+A marker at one site of many MUST excuse only an offender that is new against the base, so marking an offender the base already had makes no room for another.
 
 #### Scenario: a change adds an offender
 
@@ -522,6 +523,7 @@ A regression MUST pass only when its site carries a `ratchet-exempt(<family>): <
 - **WHEN** an appeared or worsened offender's site carries a `ratchet-exempt(<family>): <reason>` marker for that ratchet's family
 - **THEN** the ratchet passes and reports the exemption with its reason
 - **AND** a marker for that family with an empty reason fails the ratchet
+- **AND** a marker placed on an offender the base already had excuses nothing, so a new unmarked offender beside it still fails
 
 ### Requirement: Product contracts stay in specs
 

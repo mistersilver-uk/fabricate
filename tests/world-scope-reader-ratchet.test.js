@@ -10,12 +10,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, describe, it } from 'node:test';
 
-import {
-  compareToBase,
-  parseMarkers,
-  reportComparison,
-  siteMarker,
-} from './helpers/mergeBaseRatchet.js';
+import { compareToBase, parseMarkers, reportComparison } from './helpers/mergeBaseRatchet.js';
 import { collectSources, repoRoot, stripComments } from './helpers/sourceScan.js';
 import { createTempGitRepo } from './helpers/temp-git-repo.js';
 
@@ -93,24 +88,20 @@ function rawReads(file, text) {
 }
 
 /**
- * One entry per unmarked raw read: keyed by its line's text, netted on the read name, so a
- * reformat or a moved line is not an offender. A read whose line carries a reasoned marker is
- * not counted, so a file's count is the reads that give no reason.
+ * One entry per raw read: keyed by its line's text, netted on the read name, so a reformat or a
+ * moved line is not an offender. A reasoned marker at a read new to base excuses it.
  */
 function measureRawReads(readFile, listFiles) {
   return listFiles().flatMap((file) => {
     const text = readFile(file);
     if (text === undefined) return [];
-    const marked = text.includes(`ratchet-exempt(${FAMILY})`);
-    return rawReads(file, text)
-      .filter((read) => !marked || !siteMarker(file, text, FAMILY, read.line))
-      .map((read) => ({
-        file,
-        id: `raw ${read.name} read \`${read.text}\``,
-        value: read.name,
-        amount: read.count,
-        lines: [read.line],
-      }));
+    return rawReads(file, text).map((read) => ({
+      file,
+      id: `raw ${read.name} read \`${read.text}\``,
+      value: read.name,
+      amount: read.count,
+      lines: [read.line],
+    }));
   });
 }
 
@@ -121,6 +112,7 @@ const compareRawReads = (options = {}) =>
     include: inCorpus,
     measure: measureRawReads,
     headMarkers: false,
+    siteMarkers: true,
     ...options,
   });
 
@@ -259,7 +251,7 @@ describe('the world-scope ratchet on a temporary repository', () => {
       'src/b.js': lines('export {};', `${READ} // ratchet-exempt(world-scope):`),
     });
     const result = repo.compare();
-    assert.deepEqual(result.exempted, [], 'a marked read is not counted at all');
+    assert.equal(result.exempted.length, 2, 'each marked read is excused and named');
     assert.deepEqual(result.failures, [
       `src/b.js: raw tools read \`${READ}\` is new (1); its ratchet-exempt marker gives no reason`,
       'src/b.js:2 has a ratchet-exempt(world-scope) marker with no reason; write why the ' +
@@ -279,6 +271,14 @@ describe('the world-scope ratchet on a temporary repository', () => {
         'use(system.tools);'
       ),
     });
+    assert.deepEqual(repo.compare().failures, [
+      'src/a.js: raw tools read `use(system.tools);` is new (1)',
+    ]);
+  });
+
+  it('a marker on a read already at base buys no room for a new one', () => {
+    const repo = srcRepo({ 'src/a.js': lines('export {};', READ) });
+    repo.write({ 'src/a.js': lines('export {};', MARKED, 'use(system.tools);') });
     assert.deepEqual(repo.compare().failures, [
       'src/a.js: raw tools read `use(system.tools);` is new (1)',
     ]);

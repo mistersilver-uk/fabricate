@@ -129,6 +129,7 @@ A shipped-member row that names no library entry carries `target` by constructio
 `tests/design-system-coverage.test.js` is the gate, and it fails on a missing status, on a value outside the vocabulary, on a name in a heading that carries no status of its own, on a manifest row whose status contradicts its specimen, and on a `divergent` entry that names no issue.
 `tests/components/design-system-target-ratchet.test.js` holds the two `target` populations separately — the library's per-name statuses, keyed on the name, and the manifest's rows, keyed on the implementation path.
 A change may not add a `target` name or manifest row relative to the base commit unless the site carries a `ratchet-exempt` reason; retiring one is reported and never required.
+Where one line declares several names, as a multi-name `div.spec` or the "Entries without an API" row does, the reason exempts only the entries it names as `<Name>`.
 
 #### Scenario: A child issue lands the implementation an entry specified
 

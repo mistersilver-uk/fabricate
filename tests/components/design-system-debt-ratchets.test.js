@@ -357,12 +357,13 @@ test('a primitive family’s focus STRIP half is recognised, and a look-alike is
   );
 });
 
+/** Netted on the rule body, so a renamed selector is a move and a new offender is not. */
 const BARE_FOCUS_GATE = styleGate((corpus) =>
   bareFocusSelectors(corpus).gated.map((entry) => ({
     file: entry.file,
     line: entry.line,
     id: `bare :focus ${entry.compound}`,
-    value: 'bare :focus',
+    value: `bare :focus | ${entry.body.replaceAll(/\s+/gu, ' ').trim()}`,
   }))
 );
 
@@ -1344,26 +1345,33 @@ test('every carrier of the withdrawn skin tuple carries its census marker', () =
 const atContextOf = (entry) =>
   entry.atContext.length > 0 ? entry.atContext.join(' >> ') : '(top level)';
 
+/** A rule's declarations, whitespace normalised, in source order. */
+const bodyOf = (rule) =>
+  rule.declarations
+    .map(({ property, value }) => `${property}: ${value.replaceAll(/\s+/gu, ' ')}`)
+    .join('; ');
+
 /**
  * One site per appearance of every `(at-context, selector)` key the module sheet writes more than
- * once, not counting an appearance a reasoned marker sits at. Netted on the at-context, so a
- * repeated selector renamed in place is a move rather than a new offender.
+ * once. Netted on the at-context and the bodies of the rules it appears in, so a repeated selector
+ * renamed in place is a move and a new one repeated beside a removal is not.
  */
 function repeatedSelectors(corpus) {
   const css = corpus.styles[MODULE_SHEET];
   if (css === undefined) return [];
-  const source = corpus.sources[MODULE_SHEET];
+  const rules = censusRules(css);
   const sites = [];
-  for (const entry of selectorAppearances(censusRules(css)).values()) {
-    const counted = entry.appearances.filter(({ line }) => !exemptAt(MODULE_SHEET, source, line));
-    if (counted.length < 2) continue;
+  for (const entry of selectorAppearances(rules).values()) {
+    if (entry.appearances.length < 2) continue;
     const context = atContextOf(entry);
-    for (const { line } of counted) {
+    const bodies = entry.appearances.map(({ ruleIndex }) => bodyOf(rules[ruleIndex]));
+    const value = `${context} | ${bodies.sort(byCodePoint).join(' || ')}`;
+    for (const { line } of entry.appearances) {
       sites.push({
         file: MODULE_SHEET,
         line,
         id: `repeated selector ${context} | ${entry.selector}`,
-        value: context,
+        value,
       });
     }
   }
@@ -1385,7 +1393,8 @@ test("the module sheet's cross-list selector repetition does not grow", (t) => {
       'into the duplicate list that rule does reject. A key that grew or appeared means a list ' +
       'was widened or a rule copied: re-read it with `node scripts/stylesheet-selector-census.mjs`, ' +
       'and either fold the rule into the one it repeats or say why in a ' +
-      '`/* ratchet-exempt(design-system): <reason> */` above the rule.'
+      '`/* ratchet-exempt(design-system): <reason> */` above each rule it appears in that the ' +
+      'base did not already count, which for a newly repeated selector is every one of them.'
   );
 });
 
@@ -1470,6 +1479,22 @@ test('a var() resolves against its own side, so moving a value into a token pays
   ]);
 });
 
+test('a gate reads the whole corpus, so a var() resolves against an unchanged sheet', (t) => {
+  const base = {
+    ...WIRING_BASE,
+    [MODULE_SHEET]: sheetWith().replace('--probe-radius: 6px', '--probe-radius: 8px'),
+  };
+  const fresh = 'src/ui/svelte/Fresh.svelte';
+  assertGateCases(t, RADIUS_GATE, base, [
+    {
+      head: {
+        [fresh]: '<div></div>\n<style>\n  div { border-radius: var(--probe-radius); }\n</style>\n',
+      },
+      failures: [`${fresh}: off-ladder border-radius: var(--probe-radius) => 8px is new (1)`],
+    },
+  ]);
+});
+
 test('a rename nets against the offender it replaces, and a copy does not', (t) => {
   const renamed = sheetWith().replace('.fabricate .a {', '.fabricate .c {');
   const repeated = (context, selector) =>
@@ -1494,7 +1519,29 @@ test('a rename nets against the offender it replaces, and a copy does not', (t) 
       head: { [MODULE_SHEET]: sheetWith('.fabricate .y { color: green; }') },
       failures: [`${repeated('(top level)', '.fabricate .y')} is new (2)`],
     },
+    {
+      head: {
+        [MODULE_SHEET]: sheetWith('.fabricate .y { color: green; }').replace(
+          '.fabricate .x, .fabricate .z {',
+          '.fabricate .z {'
+        ),
+      },
+      failures: [`${repeated('(top level)', '.fabricate .y')} is new (2)`],
+    },
   ]);
+  const focused = (selector, body) => sheetWith(`${selector}:focus { ${body} }`);
+  assertGateCases(
+    t,
+    BARE_FOCUS_GATE,
+    { ...WIRING_BASE, [MODULE_SHEET]: focused('.fabricate .f', 'color: red;') },
+    [
+      { head: { [MODULE_SHEET]: focused('.fabricate .g', 'color: red;') }, failures: [] },
+      {
+        head: { [MODULE_SHEET]: focused('.fabricate .g', 'color: blue;') },
+        failures: [`${MODULE_SHEET}: bare :focus .fabricate .g:focus is new (1)`],
+      },
+    ]
+  );
 });
 
 test('a reasoned marker at the site exempts it, and an empty one fails', (t) => {
@@ -1520,6 +1567,22 @@ test('a reasoned marker at the site exempts it, and an empty one fails', (t) => 
   assertGateCases(t, NATIVE_SELECT_GATE, WIRING_BASE, [
     {
       head: { [PROBE]: probeWith({ markup: [`<!-- ${REASON} -->`, '<select></select>'] }) },
+      failures: [],
+    },
+  ]);
+  // A marker on a select already at base buys no room for a new one.
+  const markOld = (probe) =>
+    probe.replace(
+      '<select><option>a</option></select>',
+      `<!-- ${REASON} -->\n<select><option>a</option></select>`
+    );
+  assertGateCases(t, NATIVE_SELECT_GATE, WIRING_BASE, [
+    {
+      head: { [PROBE]: markOld(probeWith({ markup: ['<select></select>'] })) },
+      failures: [`${PROBE}: native <select> rose from 1 to 2`],
+    },
+    {
+      head: { [PROBE]: markOld(probeWith()) },
       failures: [],
     },
   ]);

@@ -332,7 +332,9 @@ test('no new raw spacing literal has been introduced', (t) => {
       `\`${SPACING_SCALE_PREFIX}-2xs\` and \`${SPACING_SCALE_PREFIX}-chip\`); the literals the ` +
       'base commit already carries are debt owed, not a permission to add to it. The nearest ' +
       'step is almost always right. The spec exempts exactly two things and this gate already ' +
-      'applies both, so a value outside them needs a token rather than a marker.'
+      'applies both, so a value outside them needs a token; a ' +
+      '`ratchet-exempt(design-system): <reason>` marker is for a value that genuinely is not ' +
+      'spacing.'
   );
 });
 

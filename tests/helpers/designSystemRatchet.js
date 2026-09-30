@@ -154,10 +154,6 @@ export function exemptAt(file, text, line) {
   return siteMarker(file, text, DESIGN_SYSTEM_FAMILY, line) !== null;
 }
 
-/** The `{ file, line }` sites `readFile` shows no reasoned marker at. */
-export const unexempted = (sites, readFile) =>
-  sites.filter((site) => !exemptAt(site.file, readFile(site.file), site.line));
-
 /** Every `<select>` element the templates render, with its line. */
 export function nativeSelectSites(templates) {
   const found = [];
@@ -170,7 +166,10 @@ export function nativeSelectSites(templates) {
   return found;
 }
 
-/** Compare one gate with the base commit over the whole corpus its measure reads. */
+/**
+ * Compare one gate with the base commit over the whole corpus its measure reads. Each entry is a
+ * site, which a reasoned marker excuses only when the site is new to base; a gate may override.
+ */
 export function compareDesignSystem({ include, measure, ...options }) {
   return compareToBase({
     family: DESIGN_SYSTEM_FAMILY,
@@ -179,6 +178,7 @@ export function compareDesignSystem({ include, measure, ...options }) {
     measure,
     scope: 'corpus',
     headMarkers: false,
+    siteMarkers: true,
     ...options,
   });
 }
@@ -221,15 +221,15 @@ export const emptyMarkerFailure = (file, line) =>
   `${file}:${line} has a ratchet-exempt(${DESIGN_SYSTEM_FAMILY}) marker with no reason; write why ` +
   'the regression is legitimate after the colon';
 
-const entryOf = ({ file, line, id, value }) => ({ file, id, value, lines: [line] });
+const entryOf = ({ line, ...site }) => ({ ...site, lines: [line] });
 
 /**
  * A gate over `corpora`, whose `find(readFile, files)` gives the offending `{ file, line, id,
- * value? }` sites of one side; a site a reasoned marker sits at is not counted.
+ * value? }` sites of one side; a reasoned marker at a site new to base excuses it.
  */
 export const gateOver = (corpora, find) => ({
   include: inAny(...corpora),
-  measure: (readFile, listFiles) => unexempted(find(readFile, listFiles()), readFile).map(entryOf),
+  measure: (readFile, listFiles) => find(readFile, listFiles()).map(entryOf),
 });
 
 /** Fail when a scan saw fewer than `floor` candidates: a broken scan, not a clean tree. */

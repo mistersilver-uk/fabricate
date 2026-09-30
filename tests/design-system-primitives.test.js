@@ -24,14 +24,12 @@ import {
 import { VIEW_RECIPES } from '../scripts/ui-pr-screenshot-evidence.mjs';
 
 import {
-  DESIGN_SYSTEM_FAMILY,
   MANIFEST_CORPUS,
   MANIFEST_PATH,
   assertGateCases,
   checkGate,
   manifestRows,
 } from './helpers/designSystemRatchet.js';
-import { headMarker } from './helpers/mergeBaseRatchet.js';
 
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -741,13 +739,19 @@ function unregisteredSharedComponents(readFile, files) {
   );
 }
 
-/** Its trigger set is the whole import graph under `src/` and the manifest. */
+/**
+ * Its trigger set is the whole import graph under `src/` and the manifest. A marker at a file's
+ * head excuses the file only when it newly crosses the bar.
+ */
 const UNREGISTERED_GATE = Object.freeze({
   include: (file) => file.startsWith('src/') || MANIFEST_CORPUS.include(file),
   measure: (readFile, listFiles) =>
-    unregisteredSharedComponents(readFile, listFiles())
-      .filter((file) => !headMarker(file, readFile(file), DESIGN_SYSTEM_FAMILY))
-      .map((file) => ({ file, id: 'unregistered shared component' })),
+    unregisteredSharedComponents(readFile, listFiles()).map((file) => ({
+      file,
+      id: 'unregistered shared component',
+    })),
+  siteMarkers: false,
+  headMarkers: true,
 });
 
 test('(e) no shared component crosses the membership bar without a manifest row', (t) => {

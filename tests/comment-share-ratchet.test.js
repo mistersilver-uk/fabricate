@@ -10,6 +10,7 @@ import { after, test } from 'node:test';
 
 import { byCodePoint } from './helpers/codePointOrder.js';
 import { compareToBase, headMarker, reportComparison } from './helpers/mergeBaseRatchet.js';
+import { MARKER_ONLY } from './helpers/siteMarkers.js';
 import { collectWorkingTreeSources, repoRoot } from './helpers/sourceScan.js';
 import { createTempGitRepo } from './helpers/temp-git-repo.js';
 
@@ -182,9 +183,12 @@ function* lineKinds(text, extension) {
   }
 }
 
+/** Comment lines, not counting one that is only a `ratchet-exempt` marker: a reason, not prose. */
 function countCommentLines(text, extension) {
   let count = 0;
-  for (const [, kind] of lineKinds(text, extension)) if (kind === 'comment') count += 1;
+  for (const [line, kind] of lineKinds(text, extension)) {
+    if (kind === 'comment' && !MARKER_ONLY.test(line)) count += 1;
+  }
   return count;
 }
 
@@ -197,10 +201,14 @@ function extensionOf(file) {
   return file.slice(file.lastIndexOf('.'));
 }
 
-/** Physical lines, discounting the empty element a trailing newline leaves behind. */
+/**
+ * Physical lines, discounting the empty element a trailing newline leaves behind and every line
+ * that is only a marker, so recording a reason moves neither side of the share.
+ */
 function totalLines(text) {
   const lines = text.split('\n');
-  return lines.length - (lines.at(-1) === '' ? 1 : 0);
+  const markers = lines.filter((line) => MARKER_ONLY.test(line)).length;
+  return lines.length - (lines.at(-1) === '' ? 1 : 0) - markers;
 }
 
 const shareOf = ({ commentLines, totalLines: total }) => (100 * commentLines) / total;
@@ -486,6 +494,14 @@ test('a change to any file of the corpus compares rather than skips, and one out
   }
 });
 
+test('a line that is only a marker, of any family, is neither a comment nor a line', () => {
+  const repo = repoWith({ 'src/f/one.js': jsFile(3, 7) });
+  repo.write({ 'src/f/one.js': jsFile(3, 7, ['// ratchet-exempt(file-size): a generated table']) });
+  assert.deepEqual(repo.compare().failures, []);
+  repo.write({ 'src/f/one.js': jsFile(3, 7, ['// a reason in prose']) });
+  assert.deepEqual(repo.compare().failures, [`src/f/*: ${ENTRY_ID} is new (36.3636)`]);
+});
+
 test('a reasoned marker in the file head of a file in the directory exempts it; an empty fails', () => {
   const marker = (reason) => `// ratchet-exempt(comment-share):${reason}`;
   const repo = repoWith({ 'src/d/one.js': jsFile(1, 9), 'src/e/one.js': jsFile(1, 9) });
@@ -522,10 +538,10 @@ test('a reasoned marker in the file head of a file in the directory exempts it; 
       '',
     ].join('\n'),
   });
-  assert.deepEqual(repo.compare().failures, [`src/d/*: ${ENTRY_ID} is new (52.381)`]);
+  assert.deepEqual(repo.compare().failures, [`src/d/*: ${ENTRY_ID} is new (50)`]);
   repo.write({ 'src/d/two.js': jsFile(9, 1, [marker('')]) });
   assert.deepEqual(repo.compare().failures, [
-    `src/d/*: ${ENTRY_ID} is new (52.381)`,
+    `src/d/*: ${ENTRY_ID} is new (50)`,
     'src/d/two.js:1 has a ratchet-exempt(comment-share) marker with no reason; write why the ' +
       'regression is legitimate after the colon',
   ]);

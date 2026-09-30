@@ -11,7 +11,7 @@ import { resolve } from 'node:path';
 import { after, test } from 'node:test';
 
 import { byCodePoint } from './helpers/codePointOrder.js';
-import { compareToBase, reportComparison, siteMarker } from './helpers/mergeBaseRatchet.js';
+import { compareToBase, reportComparison } from './helpers/mergeBaseRatchet.js';
 import { parseModule } from './helpers/moduleAst.js';
 import { countCorpusPinSites, countPinSites } from './helpers/sourcePinSites.js';
 import { collectSources, repoRoot } from './helpers/sourceScan.js';
@@ -172,18 +172,14 @@ function scanHelperRows(text) {
 }
 
 /**
- * One entry per file counting its pin sites, less any site a reasoned marker exempts, and one per
- * `legacy-scan` row, netted on the kind so the rows may only fall in number.
+ * One entry per pin site, counted per file, and one per `legacy-scan` row, netted on the kind so
+ * the rows may only fall in number. A reasoned marker at a site or row new to base excuses it.
  */
 function measureSourcePins(readFile, listFiles) {
   const { siteLines, texts } = analyseCorpus(listFiles(), readFile);
   const entries = [];
   for (const [file, lines] of siteLines) {
-    const text = texts.get(file);
-    const counted = text.includes('ratchet-exempt(')
-      ? lines.filter((line) => !siteMarker(file, text, FAMILY, line))
-      : lines;
-    if (counted.length > 0) entries.push({ file, id: PIN_ID, amount: counted.length });
+    for (const line of lines) entries.push({ file, id: PIN_ID, lines: [line] });
   }
   const self = texts.get(SELF);
   for (const row of self === undefined ? [] : scanHelperRows(self)) {
@@ -202,6 +198,7 @@ const compareSourcePins = (options = {}) =>
     measure: measureSourcePins,
     scope: 'corpus',
     headMarkers: false,
+    siteMarkers: true,
     ...options,
   });
 
@@ -756,8 +753,8 @@ test('a reasoned marker above each pin exempts it, one in the file head does not
   });
   const exempt = repo.compare();
   assert.deepEqual(
-    [exempt.failures, exempt.exempted],
-    [[`tests/d.test.js: ${PIN_ID} is new (2)`], []]
+    [exempt.failures, exempt.exempted.length],
+    [[`tests/d.test.js: ${PIN_ID} is new (2)`], 3]
   );
   repo.write({ 'tests/d.test.js': ['export const none = 1;'] });
   repo.write({
@@ -773,12 +770,28 @@ test('a reasoned marker above each pin exempts it, one in the file head does not
   const empty = (file, line) =>
     `${file}:${line} has a ratchet-exempt(source-pin) marker with no reason; write why the ` +
     'regression is legitimate after the colon';
+  const unreasoned = '; its ratchet-exempt marker gives no reason';
   assert.deepEqual(repo.compare().failures, [
-    `tests/a.test.js: ${PIN_ID} rose from 2 to 3`,
-    `tests/c.test.js: ${PIN_ID} is new (2)`,
+    `tests/a.test.js: ${PIN_ID} rose from 2 to 3${unreasoned}`,
+    `tests/c.test.js: ${PIN_ID} is new (2)${unreasoned}`,
     empty('tests/a.test.js', 6),
     empty('tests/c.test.js', 2),
   ]);
+});
+
+test('a marker on a pin already at base buys no room for a new one', () => {
+  const repo = repoWith(BASE_CORPUS);
+  const reasoned = `${MARKER} the emitted text is the contract under test`;
+  repo.write({
+    'tests/a.test.js': [
+      PINNING[0],
+      PINNING[1],
+      reasoned,
+      PINNING[2],
+      "export const also = source.includes('y');",
+    ],
+  });
+  assert.deepEqual(repo.compare().failures, [`tests/a.test.js: ${PIN_ID} rose from 2 to 3`]);
 });
 
 test('a legacy-scan row may be retired or swapped but not added, unless a reason marks it', () => {

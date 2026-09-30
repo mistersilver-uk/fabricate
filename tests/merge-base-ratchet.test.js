@@ -23,6 +23,7 @@ import {
   reportComparison,
   resolveRatchetBase,
 } from './helpers/mergeBaseRatchet.js';
+import { alignLines, siteText } from './helpers/siteMarkers.js';
 import { createTempGitRepo, envWithoutGitLocation } from './helpers/temp-git-repo.js';
 
 const GIT = resolveExecutable('git');
@@ -397,6 +398,49 @@ test('a reasoned marker at the line, above it or at the file head exempts; an em
   const siteOnly = compareToy(repo, { headMarkers: false });
   assert.deepEqual(siteOnly.exempted, ['corpus/a.js: beta y is new (1): the spec banks it']);
   assert.ok(siteOnly.failures.includes('corpus/b.js: beta y is new (3)'));
+});
+
+test('a site marker excuses only a finding new to base, so marking an old one buys no room', () => {
+  const repo = repoWith({ 'corpus/a.js': lines('alpha x first') });
+  const sites = (files) => {
+    repo.write(files);
+    return compareToy(repo, { siteMarkers: true, headMarkers: false });
+  };
+  const marker = '// ratchet-exempt(toy): the reason';
+  const bought = { 'corpus/a.js': lines(marker, 'alpha x first', 'alpha x second') };
+  assert.deepEqual(sites(bought).failures, ['corpus/a.js: alpha x rose from 1 to 2']);
+  assert.deepEqual(compareToy(repo).exempted, [
+    'corpus/a.js: alpha x rose from 1 to 2: the reason',
+  ]);
+  const fresh = sites({ 'corpus/a.js': lines('alpha x first', marker, 'alpha x second') });
+  assert.deepEqual(fresh.failures, []);
+  assert.deepEqual(fresh.exempted, ['corpus/a.js:3 alpha x: the reason']);
+  const sameLine = sites({ 'corpus/a.js': lines(`alpha x first ${marker}`, 'alpha x second') });
+  assert.deepEqual(sameLine.failures, ['corpus/a.js: alpha x rose from 1 to 2']);
+  const carried = repoWith({ 'corpus/a.js': lines(marker, 'alpha x first') });
+  carried.write({ 'corpus/a.js': lines(marker, 'alpha x first', 'alpha x second') });
+  assert.deepEqual(
+    compareToy(carried, { siteMarkers: true, headMarkers: false }).failures,
+    ['corpus/a.js: alpha x is new (1)'],
+    'a marker already excusing a base finding keeps excusing it, and no other'
+  );
+});
+
+test('lines align past their markers, and files too far apart do not align at all', () => {
+  assert.equal(siteText('  x(); // ratchet-exempt(toy): why'), 'x();');
+  assert.equal(siteText('<a> <!-- ratchet-exempt(toy): why --> <b>'), '<a>  <b>');
+  const aligned = alignLines('a\nb\nc\nd', 'a\nx\nb\nc /* ratchet-exempt(toy): r */\ny\nd');
+  assert.deepEqual(
+    [...aligned].sort(([left], [right]) => left - right),
+    [
+      [0, 0],
+      [2, 1],
+      [3, 2],
+      [5, 3],
+    ]
+  );
+  const many = (tag) => Array.from({ length: 2100 }, (_, index) => `${tag} ${index}`).join('\n');
+  assert.equal(alignLines(many('base'), many('head')), null);
 });
 
 test('a gate skips without reading base when its corpus is untouched, and compares when it is', () => {
