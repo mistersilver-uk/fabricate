@@ -970,8 +970,9 @@ Distinct from an **Outcome Tier**, which bands a routed check's roll RESULT: the
 The axis exists only where the system's check has recipe-level tiers to offer, and where it does not the surface names WHICH of four reasons applies instead of hiding the control: a progressive system puts difficulty on each result component, a dynamic simple DC is resolved at craft time, a fixed-type routed check takes per-recipe difficulty from the recipe's minimum success tier instead, and a check that authors no tiers leaves every recipe on the default DC.
 None of those four is the same fact as the system having no usable crafting check at all, which the recipe row's own check pill reports, and the two are never conflated.
 A bulk write REJECTS a tier id this system does not author, before it mutates anything; the single-recipe editor write tolerates a dangling id and falls back to the default DC at resolution time, because one recipe is a smaller blast radius than a whole selection.
+Under a counting check (issue 2006), a tier names no `dc` at all: the same tier instead names `successes` (0 to 20), and a recipe's picked tier then supplies the successes needed in place of the check's own, exactly as a DC tier replaces the check's own DC (see **Count Check**, **Extra Successes**).
 
-Canonical mapping: `Recipe.checkTierId`; `craftingCheck` slot `tiers[]`; `resolveRecipeCheckTierOptions` in `src/utils/routedOutcomeKeywords.js`; `describeRecipeCheckTierAxis` in `src/ui/model/recipeBulkEditModel.js`; `resolveBulkCheckTierId` in `src/systems/manager/bulkEdits.js`; `RecipeOverviewTab.svelte`
+Canonical mapping: `Recipe.checkTierId`; `craftingCheck` slot `tiers[]`/`tiers[].successes`; `resolveRecipeCheckTierOptions` in `src/utils/routedOutcomeKeywords.js`; `describeRecipeCheckTierAxis` in `src/ui/model/recipeBulkEditModel.js`; `resolveBulkCheckTierId` in `src/systems/manager/bulkEdits.js`; `RecipeOverviewTab.svelte`; `CheckRecipeTiers.svelte`
 
 Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/ui-system-studio/spec.md, openspec/specs/ui-entity-editors/spec.md
 
@@ -1569,6 +1570,79 @@ Canonical mapping: `resolvePool`/`countFacePredicates`/`projectCountResults`/`de
 
 Spec reference: openspec/specs/companion-api/spec.md, openspec/specs/resolution-modes/spec.md, openspec/specs/ui-crafting-app/spec.md
 
+## Evaluation Product
+
+`evaluation.product` (`'sum'` default, or `'count'`) is the "What the roll produces" axis: which of the two grading engines — a summed total against a **Target Source**, or a **Structured Pool** against `pool.required` — a record's authored formula, target, pool, tiers and triggers feed.
+A switch is lossless: `normalizeCheckEvaluation` retains every field of the inactive side, so `rollFormula`, `dc`, tier `dc`/`successes`, adjustments, `target`, `pool`, `thresholdMode` and every override survive both ways, and an authored `pool` survives a switch to `sum` and back.
+It is offered on every check editor route except gathering's immediate d100 mode and an inactive Alchemy check, because neither reads an evaluation at all.
+
+Canonical mapping: `evaluation.product` in `normalizeCheckEvaluation` (`src/systems/normalize/checkEvaluation.js`); the axis control in `CheckFormulaFields.svelte` (`data-checks-evaluation-product`); `FABRICATE.Admin.Manager.Checks.Count.Product*` in `lang/en.json`
+
+Spec reference: openspec/specs/ui-system-studio/spec.md, openspec/specs/data-models/spec.md
+
+## Structured Pool
+
+`evaluation.pool` is the record a **Count Check** grades in place of a formula and target: `die` (an integer at least 2), `base` and `threshold` (each a number literal or a character-value expression resolved the same way a **Target Source** is), `required` (0-20, the successes needed), `modifierDestination` (`'pool'` default or `'threshold'`), `zeroPoolFails`, and the `explode`/`cancel` face rules, each `{ enabled, faces: { kind: 'best'|'worst'|'from', value }, once? }`.
+Every field is retained while `product` is `sum` and survives an **Evaluation Product** switch in both directions.
+Stepper bounds constrain editing only: a stored value outside them (a fractional pool, a face beyond the die, a non-standard die) is read and rolled exactly as stored, never clamped on load, convert or save.
+Choosing a `from` face seeds the pool's current best (explode) or worst (cancel) face, so the UI itself never writes a null face; an imported or API record can still carry one, which the **`countFaceMissing`** readiness issue then blocks on.
+
+Canonical mapping: `evaluation.pool` in `normalizeCheckEvaluation`/`normalizeFaces` (`src/systems/normalize/checkEvaluation.js`); `resolvePool`/`countFacePredicates` in `src/systems/countEvaluation.js`; authored by `CheckCountPoolFields.svelte`, `CheckCountInputField.svelte` and `CheckCharacterValueField.svelte`
+
+Spec reference: openspec/specs/ui-system-studio/spec.md, openspec/specs/data-models/spec.md
+
+## Free-Text Counting Formula
+
+The `freeTextCountingFormula` readiness warning: raised while `product` is `sum` and the trimmed `rollFormula` has a die term whose modifier run carries `cs`, `cf`, `even` or `odd`, case-insensitively, with a roll-data path neutralised to `0` first so a path is never misread as a modifier run.
+It never fires while `product` is `count`, and is never counted by the enable gate.
+It is the one Checks warning whose row can carry an `action` (a **Counting Formula Conversion**) instead of View alone.
+
+Canonical mapping: raised by `checksReadiness.js` (`pushIssue(result.issues, 'freeTextCountingFormula', 'warning', data)`); the lexer `formulaCountsSuccesses` in `src/ui/svelte/apps/manager/checks/countFormulaConversion.js` (shares `src/utils/rollExpressionAverage.js`'s path neutralisation); `FABRICATE.Admin.Manager.Checks.Validation.IssueFreeTextCountingFormula*` in `lang/en.json`
+
+Spec reference: openspec/specs/ui-system-studio/spec.md
+
+## Counting Formula Conversion
+
+The staged `Convert to count successes` row action a **Free-Text Counting Formula** warning offers only for a sum/over, fixed-target check (simple or routed, the only summed grading that measures its count against a DC) whose formula matches exactly: one die term, a directional `cs`, an optional same-side explosion, and an optional worst-side `df` that never overlaps a qualifying face (Foundry's own `_applyDeduct` scores an overlapping face −1 where a **Structured Pool**'s cancel scores it 0), with every copied required count an integer fitting 0-20.
+Converting stages `product: 'count'` with the pool, direction and per-die test parsed from the formula, and copies the check's `dc` and every tier `dc` that has no authored `successes` into `pool.required`/`tiers[].successes`, each plus 1 where the check graded `exceed` (ruling: the converted check must pass on exactly the same rolls as the summed one did).
+`rollFormula`, every `dc`, and every component or task override are retained verbatim; only `thresholdMode` is rewritten, to the per-die test.
+`cf` is never mapped to `cancel`, because it is a positive count of failures, never a deduction (see **Die Qualification Marks**).
+Nothing is written until the draft is saved, and Discard restores the summing check.
+
+Canonical mapping: `planCountConversion`/`convertCountingFormula`/`parseCountingFormula` in `src/ui/svelte/apps/manager/checks/countFormulaConversion.js`; grammar verified against Foundry V13.351 and V14.367 dice sources (`.agents/docs/foundry-and-architecture.md`)
+
+Spec reference: openspec/specs/ui-system-studio/spec.md
+
+## Extra Successes
+
+On a counting check's relative outcome tiers, the column labelled `Extra successes` edits the same `outcome.dc` field a summing check calls its DC delta, now read as successes above the check's required count rather than roll total above a DC.
+The read-only count band strip draws each relative tier's threshold at `required + outcome.dc`, the best-met tier winning exactly as the runtime routes, and, while `cancel` is enabled, a `Botch` band below zero net successes stands first, ahead of every other tier.
+
+Canonical mapping: `outcomeThresholdLabels(type, 'successes', text)` in `src/ui/svelte/apps/manager/checks/checksCopy.js`; `countGradedBands`/`countTierAt`/`countBandsFor` in `src/ui/svelte/apps/manager/checks/checkBandModel.js`
+
+Spec reference: openspec/specs/ui-system-studio/spec.md, openspec/specs/ui-visual-style/spec.md
+
+## Die Qualification Marks
+
+The marks one rolled die in a **Count Check**'s projection can carry, combined on a single tile rather than one tile per mark: `qualified` (met the threshold), `cancelled` (matched the cancel face), and `exploded` (matched the explode face and rolled again, its explosion die its own tile immediately after).
+Foundry's `df` deducts a failing face as −1, including one that also qualifies, where a **Structured Pool**'s own cancel rule nets that overlap to 0; `cf` counts failing dice as a positive addition to `DiceTerm#total` and never becomes a mark at all, and neither is ever produced by Fabricate's own count projection.
+Rendered by the one shared `DiceTiles` primitive — a pure tile model plus the Svelte component and an escaped-HTML chat renderer share it — glyphed with `aria-hidden` Font Awesome Free icons, capped at 40 tiles with a `+{n} more` overflow, and never a core Foundry dice CSS class.
+
+Canonical mapping: `DICE_TILE_MARKS`/`tileModel`/`tileOf`/`tileLabel` in `src/ui/presenters/countDiceTiles.js`; `DiceTiles.svelte`; `countResult` in `src/ui/presenters/checkDisplay.js`; Foundry `DiceTerm._applyDeduct`/`Die.countFailures` (`client/dice/terms/{dice,die}.mjs`, V13.351 and V14.367)
+
+Spec reference: openspec/specs/design-system/spec.md, openspec/specs/ui-crafting-app/spec.md
+
+## Count Display Evidence
+
+The allowlisted `count` projection `buildCheckDisplay` folds onto every non-secret executed **Count Check**'s `checkDisplay`, from the engine's own unpersisted `countDisplay` and never re-derived from the live check or actor: `die`, `tiles` (a **Die Qualification Marks** tile model), `qualified`, `cancelled`, `net`, `required`, `margin`, `zeroPool`, and the settled `pool`/`threshold` each as `{ base/anchor, terms, rolled/effective }`, `threshold` also carrying the enumerated `source` (`'fixed'`/`'character'`).
+It holds literal numbers and those two enumerated words only, never an expression, path, label or policy, so a card that renders it can never leak a hidden formula or DC.
+Folding it onto the projection is not the same gate as showing it: a chat card states it only for `isPublicCheckDisplay` (a public, non-secret roll), while a result box and a salvage summary withhold it only for a blind or a secret roll, so a gmroll or a selfroll still states it there.
+It is handed to the card builders at post time beside **Executed Check Evidence**'s own visibility gate, and, like that evidence, is never written into `data`, run history, `rollHandoff`, or ChatMessage flags.
+
+Canonical mapping: `countProjection`/`countResult`/`countTerms`/`buildCheckDisplay` in `src/ui/presenters/checkDisplay.js`; `reportedCountDisplay`/`countRollReport` in `src/systems/countDisplayEvidence.js`
+
+Spec reference: openspec/specs/ui-crafting-app/spec.md, openspec/specs/data-models/spec.md
+
 ## Target Source
 
 `evaluation.target.source` is `fixed` or `attribute`.
@@ -1629,7 +1703,7 @@ Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-mo
 It is therefore NOT a **Check**: a Check is taken on a subject inside a Crafting System and carries that system's **Check Modifier** catalogue, combination rule, tool bonuses, **Check Breakage** triggers, **Tier Stepping** and failure-result policy, none of which a Standalone Check Roll has a system or a subject to derive.
 A companion wanting those routes a real craft or salvage instead.
 Its optional evaluation is strictly validated after the existing authorization and roll-decision gates: malformed records refuse `evaluationInvalid`, and valid modes absent from `game.fabricate.api.companion.features.checkEvaluation` refuse `evaluationUnsupported` before rolling or prompting.
-The version-1 capability descriptor advertises `sum/over/fixed` (including interactive use), `sum/over/attribute`, `sum/under` and both directions of `count`, each with either target source and every row but the first non-interactively.
+The version-1 capability descriptor advertises `sum/over/fixed`, `sum/over/attribute`, `sum/under` and both directions of `count`, each with either target source and every row interactively too; an interactive `count` request that forwards Advantage or has additional dice enabled still refuses `evaluationUnsupported`.
 On the `sum/over/fixed` row the evaluation only selects the mode: the roll still grades `formula` against `dc` through `compare`, so `target.expression` and the pool settings are validated but never change the roll.
 An attribute row ignores `dc` and resolves its **Target Source** from the actor, answering `targetUnresolved` when it cannot, and a `sum/under` fixed request without a finite `dc` refuses `evaluationInvalid`.
 A `count` row ignores both `dc` and `target` and grades a **Count Check** exclusively against `evaluation.pool.required`, answering `poolUnresolved` for an unresolved pool `base`/`threshold` and `evaluationInvalid` for any other invalid pool setting, both before a `Roll` is constructed, and a zero pool answers `checkFailed` with no `Roll` at all.

@@ -2,6 +2,8 @@
 import { resolveModifierLibrary } from '../../src/systems/characterLibraries.js';
 import { normalizeCheckEvaluation } from '../../src/systems/normalize/checkEvaluation.js';
 
+import { COUNT_RESULT_STATES, seedCountResult } from './countResultFixtures.js';
+
 export async function seedRollPromptFixture(world, state) {
   if (!state || !world) return;
   const manager = world.fabricate.craftingSystemManager;
@@ -21,6 +23,7 @@ export async function seedRollPromptFixture(world, state) {
   if (Object.hasOwn(EVIDENCE_STATES, state)) await seedCheckEvidence(world, EVIDENCE_STATES[state]);
   if (Object.hasOwn(SALVAGE_CHECKS, state)) await seedSalvageChecks(world, state);
   if (Object.hasOwn(COUNT_POOLS, state)) await seedCount(world, state);
+  if (Object.hasOwn(COUNT_RESULT_STATES, state)) await seedCountResult(world, state);
   if (state === 'pick-one' || state === 'overflow') {
     const system = manager.getSystem('lab-herbalism');
     await manager.updateSystem(system.id, {

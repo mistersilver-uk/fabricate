@@ -275,6 +275,57 @@ export const CASES = Object.freeze([
     kinds: ['player', 'journal'],
     sourceMatches: [JOURNAL_SOURCES, /^src\/ui\/presenters\/RunJournalBuilder\.js$/],
   }),
+  // Issue 2006: a counting ladder in net successes, its Botch row beside the least demanding tier
+  // while cancelling is on, and the step's successes-needed label.
+  playerCase({
+    id: 'player-journal-routed-bands-count',
+    label: 'Player Journal — success-counting routed crafting ladder and step label',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: {
+      tab: 'journal',
+      journalCaseState: 'journal-check-prompt',
+      runeworkCheckMode: 'routed-count',
+    },
+    steps: [{ selector: '[data-run-id="lab-v1-journal-check-prompt"]' }],
+    expectTab: 'journal',
+    expectSelector:
+      '[data-journal-detail]' +
+      ':has([data-journal-summary-card="check"]:has-text("2 successes needed · d10s"))' +
+      ' [data-outcome-ladder]' +
+      ':has([data-outcome-tier="count-botch"] .manager-chip:text-is("<0"))' +
+      ':has([data-outcome-tier="rw-masterwork"] .manager-chip:text-is("4+"))' +
+      ':has([data-outcome-tier="rw-standard"] .manager-chip:text-is("2–3"))' +
+      ':has([data-outcome-tier="rw-ruined"] .manager-chip:text-is("0–1"))' +
+      // In ladder order: a best-first ladder closes on its Botch row.
+      ':has([data-outcome-tier="rw-masterwork"] ~ [data-outcome-tier="rw-ruined"] + [data-outcome-tier="count-botch"])',
+    kinds: ['player', 'journal'],
+    sourceMatches: [
+      JOURNAL_SOURCES,
+      /^src\/ui\/presenters\/(?:RunJournalBuilder|journalCheckText)\.js$/,
+      /^src\/systems\/runJournalOutcomeBands\.js$/,
+    ],
+  }),
+  // The executed count's roll line on a past stage: its net against the required count it cleared.
+  playerCase({
+    id: 'player-journal-roll-line-count',
+    label: 'Player Journal — past stage that counted successes, net of required',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'journal', journalCaseState: 'past-stage-count', checkPreviewState: 'dice-pool' },
+    steps: [
+      { selector: '[data-run-id="lab-v1-stage-browser"]' },
+      { selector: '[data-stage-nav-index="0"]' },
+    ],
+    expectTab: 'journal',
+    expectSelector: '[data-journal-detail]:has-text("3 of 2 successes")',
+    kinds: ['player', 'journal'],
+    sourceMatches: [
+      JOURNAL_SOURCES,
+      /^src\/ui\/presenters\/(?:RunJournalBuilder|journalCheckText)\.js$/,
+      /^src\/ui\/svelte\/apps\/journal\/runDetailPresentation\.js$/,
+    ],
+  }),
   ...journalBlindRunCases(),
   ...journalLifecycleCases(),
   ...journalHistoryBatchCases(),

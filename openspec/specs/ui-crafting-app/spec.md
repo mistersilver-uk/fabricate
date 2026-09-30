@@ -238,6 +238,7 @@ Advantage-eligible checks offer Disadvantage, Roll and Advantage in that order, 
 Roll is the form's only submit button, so Enter from any field rolls normally and never with Advantage or Disadvantage.
 Displayed comparison and applied modifiers come from the actual normalized runner and the selected formula contributions, and existing result keys and advantage eligibility are unchanged.
 The posted roll's chat flavor, on the direct and versioned paths alike, carries the `(DC n)` suffix only for a summed roll-over check against a fixed DC; any other evaluation posts no DC in its flavor.
+A counting check's flavor carries the `({n} successes needed)` suffix (`(1 success needed)`) in the same place, never `(DC n)`, and a secret handoff carries neither.
 - **The count prompt.**
 A `product: 'count'` check shows no formula and no DC chip; its body instead reads a pool line (`{pool}d{die} · each {comparison} {threshold}`, the chat card's own wording so the two cannot disagree), a rule line and a successes chip ("N successes needed").
 The pool line shows the SETTLED pool, floored after every benefit, and the settled threshold, and updates as the player's picks and flat bonus change without constructing or evaluating a Roll; a pending rolled bonus reads as `{pool}d{die} + {formula} dice · each {comparison} {threshold}` when bonuses add dice, or `{pool}d{die} · each {comparison} {threshold} + {formula}` when they move the threshold, and the line is announced politely.
@@ -258,6 +259,7 @@ A Standalone Check Roll published to a companion (`companion-api/spec.md`) opens
 Its chat flavor and its dialog titles are built from the caller's own `label`, defaulted to a **localized activity noun** so that no flavor can render `undefined` and none can render a doubled "check check".
 Its bulk prompt's item count is the caller's **whole batch**, not the usable subset, so a batch in which some formulas cannot roll still reads as the number of things the player queued.
 A dismissal is reported to the caller as `cancelled` with **zero mutation**, which is the property that capability exists to preserve.
+A companion's interactive count request opens the count prompt above on the standalone overlay (`.fabricate-standalone-overlay`) when no Fabricate window started it, and grades against `pool.required`.
 - **Crafting-only "Check modifier" group.**
 When — and only when — the caller supplies `rollOptions.modifierChoice`, the dialog renders one extra control between the formula block and the situational-bonus input: a fieldset legended "Check modifier" holding one input per eligible modifier, each showing that modifier's icon, its label, and a signed value chip (`+3` / `0` / `-2`).
 The **input type follows the descriptor's `maxPicks`**, which is clamped into `[1, options.length]`: at 1 it is the pick-one **radio** group it has always been, and above 1 it is a **checkbox** group whose legend states the bound in words ("Pick up to 3").
@@ -302,6 +304,14 @@ The prompt is not shown at all when no selected item has a usable check, and dis
   The card reads the roll the award recorded and never re-rolls it.
   The evaluated rolls are carried in the message's `rolls`, which is what sounds the dice and animates Dice So Nice; the custom card content survives that, and neither card is ever whispered, so carrying them hides it from nobody.
   The gathering card states no roll — it has its own builder and its own row shape — and the run journal is where a gathered amount's roll is read.
+- **A counting check states its executed dice.**
+  For a public, non-secret counting check (`publicroll` on V13, `public` on V14) the crafting, salvage and bulk salvage cards show the die tiles and the count rows, and the summary line `{pool}d{die}, each {sym} {threshold}` replaces the numeric roll row.
+  Each active die is one tile in roll order with its marks combined (✓ qualified, ✕ cancelled, ↻ exploded), and each explosion roll is its own tile straight after the die that produced it.
+  The rows are `Success on` (only when the threshold read the character or modifiers moved it), `Count`, `Needed` (`{required} · margin {±m}`, or `{required} · a net below zero is a botch`) and `Pre-rolled`; a pool reduced to zero states `Pool` and `Result` instead, shows no tile and prints no roll total.
+  A failed count that netted below zero reads `Botch` in place of the Failure pill.
+  That evidence is handed to the card builder at post time from the engine's own execution and is never persisted into check data, run history, a roll handoff or message flags; a secret check keeps it inside the authority.
+  A gmroll, blindroll or selfroll count card, or a secret one, shows no count rows or tiles, and the card is never whispered to compensate.
+  No count Roll or pre-roll is attached to the card, whose only Foundry roll stays the count Roll's own post, and the gathering card stays roll-free.
 - The card is posted only on resolved success or rolled failure — never on cancelled, misconfigured, or time-gated outcomes.
 - Posting is gated by `features.chatOutput` (default on); `ChatMessage.create` failures are non-fatal (logged only), so a chat error never aborts the craft/salvage.
 - Gathering posts its own result card under the same `features.chatOutput` toggle.
@@ -1075,6 +1085,8 @@ The player's route to salvage.
 - **Depleted-stack honesty.** After the last copy is consumed the store reconciles the held row to `totalQuantity` 0, the header reads "None remaining", the ribbon's "Salvage again" is replaced by a nothing-left note, and the pre-roll action disables on depletion or an unavailable required tool (`disabled = busy || misconfigured || waiting || depleted || !toolsAvailable`).
   The "Salvage again" inline reset is the dismissal gesture the "until dismissed" rule alludes to.
 - **Rolled-total summary.** The read-only post-roll summary appends the rolled total in mono ("with a roll of N"), omitted when `rollValue` is null for a no-check salvage.
+- **A counting salvage.** Its simple body reads `Salvage check · {n} successes needed · d{die}s, success on {sym} {threshold}` for the salvaging character in place of a DC, and its banner says the count must reach the successes needed.
+  Its post-roll summary states the die tiles and count rows the crafting result box states, withheld only for a blind or secret roll (the result box rule, which also shows a private or self roll to its roller), and a pool reduced to zero shows no tile and no roll total.
 - **Post-roll reconciliation.** The routed body marks the matched tier with a "Your roll" pill from `salvageRun.checkResult.data.outcomeId`, and the store threads `awardedComponentIds` from `salvageRun.createdResults` for per-stage recovered state; both are null/empty on a runless (no-check) salvage.
 - **Complication disclosure.**
   The panel's progressive body renders the per-stage complication strip defined in §Progressive Stage List, in its forecast tense before a roll and with the fired marks after one.

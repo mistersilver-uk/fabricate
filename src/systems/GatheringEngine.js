@@ -550,7 +550,7 @@ export class GatheringEngine {
       );
     }
     // The gathering card states no roll (R4), and a check result persists whole on the run, so
-    // the executed visibility the crafting and salvage cards gate on is dropped here.
+    // the executed visibility and count display the crafting and salvage cards read are dropped.
     return Promise.resolve(
       evaluate(privateEvaluation, actor, decision, {
         secret: privateEvaluation?.secret === true,
@@ -4989,10 +4989,10 @@ function normalizeToolResult(result) {
  * @param {boolean} [options.retainFailureResultGroups] Carry `raw.resultGroups` through a failed
  *   outcome (issue 1098); only the routed failure branch opts in.
  */
-/** A prepared check result without its unpersisted executed visibility. */
+/** A prepared check result without its unpersisted executed visibility and count display. */
 function withoutVisibility(evaluated) {
   if (!evaluated || typeof evaluated !== 'object') return evaluated;
-  const { visibility: _visibility, ...result } = evaluated;
+  const { visibility: _visibility, countDisplay: _countDisplay, ...result } = evaluated;
   return result;
 }
 

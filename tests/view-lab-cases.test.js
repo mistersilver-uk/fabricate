@@ -372,7 +372,9 @@ const FOUNDRY_CHROME_HOOKS = new Set(['dialog-content']);
 
 /** Hooks the LAB HARNESS renders rather than `src/`, matched by their reserved `lab-` prefix. */
 const LAB_HOOK = /^(?:data-)?lab-/;
-const labHarnessSource = readFileSync(resolve(ROOT, 'tests/view-lab/mount.js'), 'utf8');
+const labHarnessSource = ['tests/view-lab/mount.js', 'tests/view-lab/labCompanionRoll.js']
+  .map((file) => readFileSync(resolve(ROOT, file), 'utf8'))
+  .join('\n');
 
 /** A selector with every `:not(…)` group removed, brackets balanced. */
 function stripNegations(selector) {
@@ -1139,13 +1141,18 @@ test('the capture runner threads the per-case console allowance into the render'
   assert.deepEqual(
     declaring,
     // The Knowledge error frame's rejected read is rethrown by the store (issue 1969), and a failed
-    // roll-under craft or salvage raises the resolved-failure toast the lab reports as a warning
-    // (issues 2005 and 2092).
+    // roll-under or counting craft or salvage raises the resolved-failure toast the lab reports as
+    // a warning (issues 2005, 2092 and 2006).
     [
       'manager-recipes-blocked-enable-flash',
       'manager-knowledge-error',
       'player-salvage-under-result-fail',
       'player-crafting-roll-result-under-fail',
+      'player-crafting-roll-result-count-fail',
+      'player-crafting-roll-result-count-botch',
+      'player-crafting-roll-result-count-botch-light',
+      'player-crafting-roll-result-count-zero',
+      'player-crafting-roll-result-count-zero-penalty',
     ],
     'a case gained or lost a console-error allowance; the console gate is what makes a lab frame ' +
       'evidence, so widening it is an accepted edit rather than an incidental one'
@@ -2296,8 +2303,8 @@ test('every crafting case claims exactly the resolution-mode body it renders', (
   // draft, and passed clean.
   assert.equal(
     examined.length,
-    66,
-    `expected the 66 crafting-path cases to be examined, saw ${examined.length}`
+    77,
+    `expected the 77 crafting-path cases to be examined, saw ${examined.length}`
   );
   assert.ok(
     examined.filter((id) =>
@@ -3561,6 +3568,7 @@ const SHARED_CASE_MODULES = Object.freeze([
   'journalBlindRunCases.js',
   'journalHistoryCases.js',
   'journalLifecycleCases.js',
+  'playerCountResultCases.js',
 ]);
 
 const CASE_FILE_DIRECTORY = 'scripts/lib/view-lab-cases';

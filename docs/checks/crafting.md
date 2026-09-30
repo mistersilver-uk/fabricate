@@ -308,32 +308,111 @@ Editing the formula can renumber the groups, so check your dice-group triggers a
 ## Success-counting checks
 
 Some games measure a check by rolling several dice and counting how many of them individually clear a threshold, rather than adding the dice together into one total.
-Fabricate supports this as its own check type, alongside the roll-over and roll-under checks described above.
+Fabricate supports this as its own way of measuring the roll, right beside the roll-over and roll-under checks described above, and you author it on the same **Checks** page.
 
-This screen has no control yet to turn an ordinary check into a success-counting one.
-A check that already has one configured, for example one imported from a shared crafting system, still validates, previews, and rolls correctly wherever checks appear, and everything below describes what you and your players see when it does.
+### What the roll produces
 
-### How a success-counting check rolls
+**The roll** section of a crafting, salvage, or gathering check carries a **What the roll produces** control, next to **Which way is better**.
+**Add the dice** is the classic check this whole page otherwise describes, and **Count successes** turns the formula field into a set of pool controls instead.
+Switching between the two keeps everything you authored on both sides: the pool, the difficulty, the recipe tiers, the triggers, and every override survive a switch in either direction, so trying **Count successes** and switching back costs you nothing.
+**What the roll produces** is offered on every check that rolls, with two exceptions: gathering's immediate d100 mode and an Alchemy check switched off both resolve with no roll at all, so neither offers a way to measure one.
 
-A success-counting check rolls a pool of same-sized dice, such as `6d10`, and tests each die on its own against a threshold, such as `8`.
-A die that meets or beats the threshold (or, on a check set to roll low, meets or comes under it) qualifies as a success.
-Some checks also name a face that cancels a success instead of adding one, so a very unlucky die can take a success away even from a roll that otherwise qualified.
+### The structured pool
+
+Choosing **Count successes** replaces the formula field with a row of pool controls, each with its own label and a short line explaining what it does.
+
+- **Die** picks the die every dice in the pool shares, from d4 up to d100, or a larger die size Fabricate carries over from an imported check.
+- **Base pool** sets how many dice are rolled.
+Above the field, a **Number** / **Character value** choice decides whether you type a plain count or a character-data path such as `@skills.smith.rank`, the same way a roll-under target does.
+A character value can also be arithmetic on more than one value, for example `@abilities.int.value + @skills.repair.value`, so a pool sized from two character values no longer needs an Active Effect to compute it first.
+
+### Success on
+
+**Success on** sets the threshold each die is tested against, with the same **Number** / **Character value** choice **Base pool** offers.
+Beside it, a per-die test reads **At or above** or **Above** on a check set to **Higher is better**, and **At or under** or **Under** on one set to **Lower is better**, matching [Which way is better]({% link checks/index.md %}#which-way-is-better) exactly.
+This is the only place that comparison is edited for a counting check: the Difficulty card's own comparison control does not apply here, because there is no single roll total left to compare.
+
+### Explode and cancel
+
+**Explode** and **Cancel** each offer the same three choices: **Off**, the pool's best or worst face by default, or **From a face** you name yourself with its own stepper.
+A die showing the explode face is rolled again, and both dice count.
+**Keeps exploding** lets that chain continue for as long as the new face keeps qualifying, and **Once** stops it after one extra die.
+A die showing the cancel face removes one success instead of adding one, so a very unlucky die can take a success away even from a roll that otherwise qualified.
 A die that both qualifies and cancels on the same roll contributes nothing, and Fabricate marks it both ways rather than hiding the cancellation.
-The check passes once the dice qualify at least as many successes as the check needs.
 
-The roll prompt and the chat card both show the pool and threshold as a line such as "6d10 · each ≥ 8", a chip stating how many successes are needed (for example "2 successes needed", or "1 success needed" for a single success), and, where the check explodes or cancels on a face, a short rule such as "best face explodes" or "worst face cancels" (or naming the exact face when the check names one instead of the highest or lowest).
-The pool and the threshold can each be a plain number, a single character-data path such as `@skills.smith.rank`, or arithmetic on them, for example `@abilities.int.value + @skills.repair.value`, so a threshold that combines two character values no longer needs an Active Effect to compute it first.
+Choosing **From a face** and leaving its stepper empty is a blocking issue: Fabricate cannot roll a check that explodes or cancels from no face at all, and the **Validation** page says so under [Warnings you may see on Validation](#warnings-you-may-see-on-validation).
 
-If a Tool bonus, an eligible check modifier, or the roll prompt's **Situational bonus** applies to a success-counting check, it either adds more dice to the pool or moves the threshold, and the prompt tells you which with "Each adds dice." or "Each moves the threshold."
-A rolled bonus, such as `1d4`, is rolled on its own before the pool or threshold settles, and its result is what adds the dice or moves the threshold.
-It posts to chat as its own roll alongside the main one, rather than adding free successes the way an un-noticed bonus used to.
+### Where a bonus lands, and a pool that runs dry
 
-If the acting character is missing a value the pool or the threshold needs, or that value is not a number, Fabricate refuses to roll rather than guessing zero, and says so before any dice are cast.
-Depending on how the check is set up, a pool that works out to zero dice or fewer either fails the check outright with no roll at all, or is rolled as a single die regardless.
-Either way, Fabricate never quietly treats a missing or zero pool as an ordinary-sized roll.
+**Modifiers and bonuses** decides what an eligible Tool bonus, check modifier, or the roll prompt's **Situational bonus** does to a counting check: **Add dice to the pool** rolls more dice, and **Move the threshold** shifts what every die is tested against instead.
+A rolled bonus, such as `1d4`, is rolled on its own before the pool or threshold settles, posts to chat as its own roll alongside the main one, and its result is what adds the dice or moves the threshold, never a free success added straight to the count.
 
-On a **Routed by check** system, more net successes (successes minus cancellations) always wins a better outcome tier, whichever direction the individual dice compare in.
-On a **Progressive** check, the net successes become the budget it spends down your ordered results, never less than zero even when cancellations outweigh successes on an unlucky roll.
+**Zero pool** decides what happens when the settled pool works out to zero dice or fewer.
+Switched on, the check fails automatically with no dice rolled at all.
+Switched off, Fabricate still rolls at least one die rather than treating a shrunk pool as an ordinary-sized roll.
+
+### What actually gets rolled
+
+Under the pool controls, **What actually gets rolled** shows the composed roll exactly as Fabricate will roll it, the same way the ordinary formula card shows its resolved expression.
+It reads as a short line such as "2d6, each ≥ 4", with any applied modifier shown as its own labelled chip on the term it moves, and, where the check explodes or cancels, a trailing note such as "explodes on 6" or "1 cancels a success".
+Beside the kicker sits **expected successes**, the average number of successes the pool produces for the character chosen in **Preview as**, shown to two decimal places and marked "nearly exact" once the dice explode often enough to leave a very small chance unaccounted for.
+
+Under the composed line, an actor line resolves the pool and threshold against the character chosen in **Preview as**: "For Sera Vane: 3d6, each ≥ 5", noting when a benefit grew the pool or moved the threshold.
+With no character chosen, it invites you to choose one in **Preview as** instead.
+If the chosen character is missing a value the pool or the threshold reads, or that value is not a number, the line names the missing value rather than guessing zero.
+
+### How many successes the check needs
+
+The **Difficulty** card reads **Successes needed** for a counting check, edited with a stepper from 0 to 20.
+**How the successes needed are set** offers the same **Static** / **Dynamic** choice a difficulty DC does.
+**Static** sets the number here and per recipe tier, and is the intended route for a counting check.
+**Dynamic** hands the number to a Script Macro instead, the same way [Dynamic DC macros](#dynamic-dc-macros) works, except the macro returns the successes needed rather than a DC.
+Use **Dynamic** only when no recipe tier can express the rule you need.
+
+Recipe tiers carry their own **Successes** column in place of DC, so a recipe's chosen difficulty tier can ask for more or fewer successes than the check's own number.
+A tier with no successes of its own reads "Set successes needed" and falls back to the check's number in the meantime, exactly as a DC tier falls back today.
+Adding a new tier seeds it at the check's own successes needed, the same way a new DC tier seeds from the check's own DC.
+
+On a routed check, each outcome tier's relative threshold is edited as **Extra successes** instead of a DC delta, so a tier reads as some number of successes over what the check needs rather than over a DC.
+The **Outcome bands** strip becomes a read-only picture of those thresholds in successes for a counting check, because a count has no single roll total for a drag handle to move.
+While **Cancel** is switched on, the strip shows a **Botch** band below zero net successes, naming the automatic failure a heavily cancelled roll produces.
+
+### Successes-needed overrides
+
+A salvage component's own **Successes needed override**, on the component's Salvage section, replaces the check's successes needed for that component alone, the same way its dormant DC override does for a roll-over check.
+It offers the same named presets a DC override does, each read as a plain number of successes instead of a DC, a **Custom** entry for a number of your own, and **System default** to fall back to the check's own successes needed.
+Where you already had a DC override recorded, it is kept but has no effect on a counting check, so switching back to **Add the dice** later restores it exactly as you left it.
+See [Salvage]({% link components/salvage.md %}) for the component editor these controls live on.
+
+A **Routed** gathering task carries the equivalent single **Successes needed override** field, edited with one stepper and a **System default** placeholder, and no presets to choose from.
+See [Gathering Checks]({% link checks/gathering.md %}) and [Progressive Checks]({% link gathering/tasks.md %}#progressive-checks) for where that field sits on the task editor.
+
+### Botch and other count triggers
+
+A counting check's triggers read net successes, successes minus cancellations, rather than a roll total, and [Tier stepping](#tier-stepping) and [Tool breakage triggers](#tool-breakage-triggers) work exactly as described above once a trigger's condition is authored that way.
+Adding a trigger to a counting check offers presets built for the pool's own die: the worst face forces an automatic failure, and, on a routed check, the best face steps up a tier while the worst face steps down one.
+While **Cancel** is switched on, a **Botch** preset is offered too: an automatic failure, or the lowest tier on a routed check, whenever the net successes fall below zero.
+You can still author a trigger by hand against **Net successes** directly, for any comparison the preset list does not cover.
+
+### What players see
+
+An executed success-counting check states its dice tiles, one per die, and its count rows, **Success on**, **Count**, and **Needed**, on the roll's chat card and on the crafter's own result box.
+
+The chat card states them only for a public roll, the same rule its plain roll evidence follows: a private, blind, or self roll's card states neither.
+The result box, and a salvage's own result summary, are more forgiving: both still state the tiles and the rows for a private roll or a self roll, and withhold them only for a blind roll or one marked secret.
+
+### Converting a free-text formula that counts successes
+
+A check you import, or one you typed a formula into before switching to **Count successes**, can carry a formula that already uses a success-counting die suffix while **What the roll produces** is still set to **Add the dice**.
+Fabricate raises a warning for that formula, because a counting formula left in **Add the dice** still adds every bonus to its count: a Tool bonus, an eligible check modifier, or a situational bonus lands on the formula's total the ordinary way, and that total is what the die suffix then measures, so the bonus corrupts the very count it was meant to help.
+
+Where the formula is simple enough, the warning's row offers a **Convert to count successes** action.
+Converting rebuilds the check with the structured pool controls above: the die, the pool, the per-die test, and any explode or cancel face all come from the formula, and the check's DC and every recipe tier's DC become their successes needed.
+A check graded on passing above its DC gets one extra success added on top, so the converted check still passes on exactly the rolls the old one did.
+The formula and every DC stay on the check after converting, kept for reference, and nothing about them is used to grade the roll any more.
+
+A formula built a different way, for example one that counts failures instead of successes, keeps the warning with no Convert action, and you rebuild it by hand with the pool controls instead.
+Converting never rewrites a component's or a task's own DC override, so where one of those was relying on the check's DC alone, it now relies on the check's successes needed instead, and the row names anything affected that way.
 
 ### What the previews will tell you
 
@@ -363,10 +442,17 @@ The **Validation** page reports a success-counting check's own set of issues, ea
 - **The base pool cannot be worked out** or **The success threshold cannot be worked out**: the pool or the threshold uses dice, or cannot be read as arithmetic.
 - **A face is not on the die**: an explode or cancel face is higher than the die can roll.
 - **The dice would explode forever**: every face on the die explodes, so the roll could never stop.
-- **A recipe tier sets no successes needed**: until this screen gains its own control for it, a recipe tier with no successes needed falls back to the check's own number and is no harder than the default.
-- **Successes needed above the most dice that can be rolled**, and **Successes needed above the base pool**: the check asks for more successes than the dice it allows could ever produce without exploding, or without adding more dice than the base pool has.
+- **A face to explode or cancel from is not chosen**: **From a face** is picked for **Explode** or **Cancel** with no face set on its stepper, so the check cannot roll until you choose one.
+This is a blocking issue.
+- **A recipe tier sets no successes needed**: a recipe tier with no successes needed of its own falls back to the check's own number and is no harder than the default.
+This is a blocking issue: set successes needed on every tier before enabling the system.
+- **Successes needed above the most dice that can be rolled**: the check asks for more successes than the dice it allows could ever produce, even once exploding and every added die are counted.
+This is a blocking issue.
+- **Successes needed above the base pool**: the check asks for more successes than the base pool alone has, though exploding or an added die could still reach it.
 - **The base pool is too large to roll**: the pool is larger than the 999 dice Foundry can roll in one go, so the check cannot roll at all.
 While this is raised, the two issues above are not evaluated.
+- **This formula counts successes, but the check adds the dice**: see [Converting a free-text formula that counts successes](#converting-a-free-text-formula-that-counts-successes).
+- **A trigger reads dice the pool never rolls**: a trigger built for a formula this check no longer rolls is kept, but cannot fire while the check counts successes, and fires again if you switch back to **Add the dice**.
 
 With a **Preview as** character chosen, the same panel may also warn that the character is missing a value the check reads, or that the value it read is not a number.
 Both warnings name the character and disappear the moment you choose one that has what the check needs.

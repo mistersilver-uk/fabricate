@@ -1,4 +1,5 @@
 <!-- Svelte 5 runes mode -->
+<!-- ratchet-exempt(design-system): the die tiles are promoted to a shared primitive at target, because the player result box and the salvage roll summary now import them beside the Checks Studio simulator (issue 2006) -->
 <!--
   The die tiles of a success-counting roll (issue 2006): one tile per active die in roll order,
   each explosion's die straight after the die that produced it, every mark on one tile.

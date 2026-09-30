@@ -358,6 +358,33 @@ export const CASES = Object.freeze([
       ],
     })
   ),
+  // Issue 2006: a counting check's pill names each recipe's successes needed in the mono face, and
+  // the DC sort key reads and sorts by that count.
+  managerCase({
+    id: 'manager-recipes-check-pill-count',
+    label: 'Manager — Recipes check pill and sort, success-counting check',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', checkPreviewState: 'dice-pool-recipes' },
+    // Ungrouped, so the sort reads across the whole library: one success first, five last.
+    steps: [
+      'Crafting',
+      ...chooseSelectOption('[data-recipe-sort]', 'dc'),
+      { selector: '[aria-labelledby="manager-recipe-group-label"]' },
+    ],
+    expectView: 'recipes',
+    expectSelector:
+      '.fabricate-manager:has([data-recipe-sort]:has-text("Successes needed"))' +
+      ':has(.manager-recipe-row [data-recipe-check="successes"]:has-text("1 success"))' +
+      ':has(.manager-recipe-row [data-recipe-check="successes"]:has-text("5 successes"))' +
+      ' .manager-recipe-row [data-recipe-check="successes"].is-mono:has-text("3 successes")',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipesBrowserView\.svelte$/,
+      /^src\/ui\/svelte\/stores\/(?:adminRecipeRowProjection|recipeCheckSummaryProjection)\.js$/,
+      /^src\/ui\/model\/recipeBrowserModel\.js$/,
+    ],
+  }),
   // The bulk axis under a multiplied character value: each tier names its multiplier, never a DC.
   managerCase({
     id: 'manager-recipes-bulk-edit-check-tier-under',
@@ -390,6 +417,39 @@ export const CASES = Object.freeze([
       ...RECIPE_BULK_EDIT_MATCHES,
       /^src\/ui\/svelte\/apps\/manager\/recipe\/recipeOverviewSelectOptions\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+    ],
+  }),
+  // Issue 2006: under a counting check each tier names its successes needed, and the axis says so.
+  managerCase({
+    id: 'manager-recipes-bulk-edit-check-tier-count',
+    label: 'Manager — Recipes bulk edit check tier list, success-counting check',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', checkPreviewState: 'dice-pool-recipes' },
+    steps: [
+      'Crafting',
+      { selector: 'label:has(input[data-recipe-select="sm-r-longsword"])' },
+      { selector: 'label:has(input[data-recipe-select="sm-r-greatsword"])' },
+      { selector: '[data-recipe-bulk-check-tier]' },
+      { selector: '[data-popover-option="sm-tier-masterwork"]', scroll: true },
+    ],
+    expectView: 'recipes',
+    expectSelector:
+      '.fabricate-manager:has(.fab-bulk-edit-subhint:has-text("The successes needed these recipes"))' +
+      ' > .fabricate-select-popover' +
+      ':has([data-popover-option="sm-tier-masterwork"]:has-text("Masterwork · 5 successes"))' +
+      ':has-text("Default · 3 successes")',
+    expectContained: [
+      { container: '.fabricate-manager', target: '.fabricate-select-popover' },
+      {
+        container: '.fabricate-select-popover',
+        target: '[data-popover-option="sm-tier-masterwork"]',
+      },
+    ],
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      ...RECIPE_BULK_EDIT_MATCHES,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/recipeOverviewSelectOptions\.js$/,
     ],
   }),
   // Both frames run on herbalism rather than the flagship smithing library, which is why they say anything.

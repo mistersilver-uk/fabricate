@@ -2,7 +2,7 @@
  * Threshold-band labels for the Journal's routed outcome ladders: the "what a roll has to beat"
  * text beside each tier, for routed gathering and routed crafting. Thresholds rank through the
  * check's own direction; a character-value ladder has no number to state, so each tier names its
- * adjustment instead (issue 2005).
+ * adjustment instead (issue 2005). A counting ladder is stated in net successes (issue 2006).
  */
 
 import { formatCheckAdjustment } from '../utils/checkAdjustmentFormat.js';
@@ -10,6 +10,7 @@ import { formatCheckAdjustment } from '../utils/checkAdjustmentFormat.js';
 import { better } from './checkEvaluation.js';
 import { sumGrading } from './checkRouting.js';
 import { activeCheckEvaluation } from './checkTarget.js';
+import { countRequired } from './countCheck.js';
 import { normalizeList, numberOrNull } from './gatheringEngineInternals.js';
 
 /** The boundary glyphs a band states, by direction and comparison. */
@@ -24,6 +25,10 @@ export function routedOutcomeBand(outcome, routed, task, labels = {}) {
     const start = numberOrNull(outcome?.start) ?? 0;
     const end = numberOrNull(outcome?.end) ?? start;
     return start === end ? String(start) : `${start}–${end}`;
+  }
+  const evaluation = activeCheckEvaluation(routed);
+  if (evaluation.product === 'count') {
+    return countBand(outcome, routed, countRequired(evaluation, task?.successesOverride));
   }
   const grading = ladderGrading(routed);
   if (grading.source === 'attribute') return adjustmentBand(outcome, grading, labels);
@@ -41,6 +46,11 @@ export function routedOutcomeBand(outcome, routed, task, labels = {}) {
 /** A routed crafting tier's band; an unresolved crafting target states it relative to its word. */
 export function craftingOutcomeBand(outcome, routed, dc, labels = {}) {
   if (routed?.type === 'fixed') return routedOutcomeBand(outcome, routed, null);
+  const evaluation = activeCheckEvaluation(routed);
+  if (evaluation.product === 'count') {
+    if (dc === null) return relativeCountBand(outcome, routed, labels.needed ?? 'Needed');
+    return countBand(outcome, routed, dc);
+  }
   const grading = ladderGrading(routed);
   if (grading.source === 'attribute') return adjustmentBand(outcome, grading, labels);
   const base = dc ?? 0;
@@ -114,9 +124,65 @@ function outcomeBandPosition(routed, threshold, base, grading) {
   };
 }
 
+/** `DC`, `DC+2` or `DC−1`: an offset from a word standing for an unresolved number. */
+function offsetFrom(word, offset) {
+  return offset === 0 ? word : `${word}${offset > 0 ? '+' : '−'}${Math.abs(offset)}`;
+}
+
 // Absolute once the target resolved, relative to an unresolved `DC` or `Target` when it did not.
 function craftingThreshold(threshold, dc, grading) {
   if (dc !== null) return String(threshold);
-  const word = grading.direction === 'under' ? 'Target' : 'DC';
-  return threshold === 0 ? word : `${word}${threshold > 0 ? '+' : '−'}${Math.abs(threshold)}`;
+  return offsetFrom(grading.direction === 'under' ? 'Target' : 'DC', threshold);
+}
+
+/** A relative count ladder's thresholds, `required + outcome.dc`, in authored order. */
+function countThresholds(routed, required) {
+  return normalizeList(routed?.relativeOutcomes).map(
+    (entry) => required + (numberOrNull(entry?.dc) ?? 0)
+  );
+}
+
+/**
+ * A count tier's band in net successes (issue 2006), ranked by net whatever the per-die direction:
+ * from its threshold up to the next tier's, the best met winning as the runner routes it. The
+ * least demanding tier starts at 0, since a net below zero is the Botch row.
+ */
+function countBand(outcome, routed, required) {
+  const threshold = required + (numberOrNull(outcome?.dc) ?? 0);
+  const thresholds = countThresholds(routed, required);
+  const higher = thresholds.filter((value) => value > threshold);
+  const lowest = thresholds.every((value) => value >= threshold);
+  if (higher.length === 0) return `${lowest ? 0 : threshold}+`;
+  const next = Math.min(...higher);
+  if (lowest && next <= 0) return `<${next}`;
+  const low = lowest ? 0 : threshold;
+  return low === next - 1 ? String(low) : `${low}–${next - 1}`;
+}
+
+/**
+ * A count tier's band when a macro sets the successes needed, relative to `word` as an unresolved
+ * summed DC reads: `<Needed` for the least demanding tier, `Needed+2+` above it.
+ */
+function relativeCountBand(outcome, routed, word) {
+  const offset = numberOrNull(outcome?.dc) ?? 0;
+  const thresholds = countThresholds(routed, 0);
+  const higher = thresholds.filter((value) => value > offset);
+  if (thresholds.some((value) => value < offset)) return `${offsetFrom(word, offset)}+`;
+  return higher.length === 0 ? '0+' : `<${offsetFrom(word, Math.min(...higher))}`;
+}
+
+/**
+ * A relative count ladder's `Botch` row while cancelling is on (issue 2006), beside the least
+ * demanding tier on the ladder's outer end: a net below zero routes to that tier, so the row
+ * carries its outcome and yields under the band `<0`. Any other ladder is returned as it is.
+ */
+export function withCountBotch(tiers, routed, name) {
+  const evaluation = activeCheckEvaluation(routed);
+  const relative = evaluation.product === 'count' && routed?.type !== 'fixed';
+  if (!relative || !evaluation.pool.cancel.enabled || tiers.length === 0) return tiers;
+  const thresholds = countThresholds(routed, 0);
+  const at = thresholds.indexOf(Math.min(...thresholds));
+  const botch = { ...tiers[at], id: 'count-botch', name, band: '<0' };
+  // A best-first ladder ends on its least demanding tier, so its Botch row closes the ladder.
+  return at === tiers.length - 1 && tiers.length > 1 ? [...tiers, botch] : [botch, ...tiers];
 }

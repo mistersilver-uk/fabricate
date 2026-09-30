@@ -994,6 +994,22 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/ui\/presenters\/SalvageChatCard\.js$/,
     ],
   },
+  // Issue 2006: the success-counting result cards, rolled deterministically in real Foundry.
+  {
+    id: 'chat-craft-card-count',
+    label: 'Chat — success-counting crafting result cards and their summed control',
+    smokeLabels: [
+      'chat-craft-card-count-pass',
+      'chat-craft-card-count-fail',
+      'chat-craft-card-count-botch',
+      'chat-craft-card-count-zero',
+      'chat-craft-card-over-control',
+    ],
+    matches: [
+      /^src\/ui\/presenters\/(?:countDiceTiles|countEvidenceRows)\.js$/,
+      /^src\/systems\/countDisplayEvidence\.js$/,
+    ],
+  },
   {
     id: 'interactable-config',
     label: 'Canvas interactable config',

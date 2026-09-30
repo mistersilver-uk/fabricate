@@ -1,5 +1,4 @@
 import { resolveActiveCraftingCheckFormula } from '../../systems/checkModifierResolver.js';
-import { activeCheckEvaluation, isFixedSumOver } from '../../systems/checkTarget.js';
 import { craftingStepHistoryEvidence } from '../../systems/CraftingRunManager.js';
 import {
   actorToOption,
@@ -23,6 +22,7 @@ import {
   craftingOutcomeBand,
   ladderRule,
   routedOutcomeBand,
+  withCountBotch,
 } from '../../systems/runJournalOutcomeBands.js';
 import { getRunLifecycleContract } from '../../systems/runLifecycleState.js';
 import { resolvedComponentsFor, resolvedEssencesFor } from '../../systems/scopedEntityReads.js';
@@ -42,7 +42,7 @@ import { activityPermitsFailureResults } from '../../utils/failureResultPolicy.j
 import { cloneJson } from '../../utils/scalars.js';
 import { resolveRecipeImage } from '../svelte/util/craftingImageDefaults.js';
 
-import { comparisonText } from './checkDescriptor.js';
+import { executedCount, journalCheckAnchor, journalCheckLabel } from './journalCheckText.js';
 
 const DEFAULT_RUN_IMAGE = 'icons/svg/item-bag.svg';
 const DEFAULT_GATHERING_IMAGE = 'icons/containers/bags/pouch-leather-brown-green.webp';
@@ -58,8 +58,8 @@ function recordedNumber(value) {
 
 /** Outside sum/over/fixed a roll names its executed target and margin, never a DC (issue 2005). */
 function executedTargetFields(data) {
-  // A count's `target` is a per-die face, so its line keeps its wording until issue 2006.
-  if (data.product === 'count') return null;
+  // A count's `target` is a per-die face: its line reads its net and required count (issue 2006).
+  if (data.product === 'count') return { target: null, margin: null, count: executedCount(data) };
   if (data.direction !== 'under' && data.targetSource !== 'attribute') return null;
   return { target: recordedNumber(data.target), margin: recordedNumber(data.margin) };
 }
@@ -1236,9 +1236,10 @@ export class RunJournalBuilder {
         : normalizeList(routed.relativeOutcomes);
     const permitsFailure = activityPermitsFailureResults(system, 'crafting');
     const systemId = stringOrNull(recipe.craftingSystemId);
-    const dc = this._resolveCheckDc({ config: routed, recipe, mode });
+    const dc = journalCheckAnchor({ config: routed, recipe, mode });
+    const botch = this.localize('FABRICATE.Check.CountEvidence.Botch');
     try {
-      return outcomes.map((outcome, index) => {
+      const tiers = outcomes.map((outcome, index) => {
         const fail = outcome?.success !== true;
         const resolved =
           fail && !permitsFailure
@@ -1261,6 +1262,7 @@ export class RunJournalBuilder {
           ),
         };
       });
+      return withCountBotch(tiers, routed, botch);
     } catch {
       return null;
     }
@@ -1822,6 +1824,7 @@ export class RunJournalBuilder {
   _bandLabels() {
     return {
       otherwise: this.localize('FABRICATE.App.Journal.StepDetails.BandOtherwise'),
+      needed: this.localize('FABRICATE.App.Journal.StepDetails.BandNeeded'),
       named: (tier, adjustment) =>
         this.localize('FABRICATE.App.Journal.StepDetails.BandAdjustment', { tier, adjustment }),
     };
@@ -1832,39 +1835,12 @@ export class RunJournalBuilder {
     return rule ? { ladderRule: rule } : null;
   }
 
-  /**
-   * Compose the step's crafting-check label as `rollFormula` + resolved DC ONLY
-   * (no skill name — none is stored). The active mode selects the check config
-   * (`simple`/`progressive`/`routed`); the DC resolves from the recipe's selected
-   * tier, else the config's static DC. A dynamic-DC macro and progressive
-   * (value-budget) checks have no statically resolvable DC, so the formula is
-   * surfaced without a number rather than a hardcoded default. Outside sum/over/fixed
-   * a fixed target is named a Target, and a character value names no number.
-   * @private
-   */
+  /** The step's check label through {@link journalCheckLabel}, for the recipe's active check. */
   _checkLabel({ system, recipe }) {
     if (!system) return null;
     const mode = this._resolveMode(recipe, system);
-    const { config, rollFormula } = resolveActiveCraftingCheckFormula({
-      ...system,
-      resolutionMode: mode,
-    });
-    const formula = stringOrNull(rollFormula);
-    if (!formula) return null;
-    const dc = this._resolveCheckDc({ config, recipe, mode });
-    if (dc === null) return formula;
-    const evaluation = activeCheckEvaluation(config);
-    // A count keeps its DC wording until issue 2006.
-    if (isFixedSumOver(evaluation) || evaluation.product === 'count') {
-      return this.localize('FABRICATE.App.Journal.StepDetails.CheckWithDc', { formula, dc });
-    }
-    // A character value states no number, and a fixed range grades the raw roll against no target.
-    if (evaluation.target.source === 'attribute' || config?.type === 'fixed') return formula;
-    return this.localize('FABRICATE.App.Journal.StepDetails.CheckWithTarget', {
-      formula,
-      target: dc,
-      comparison: comparisonText(evaluation, config, this.localize),
-    });
+    const active = resolveActiveCraftingCheckFormula({ ...system, resolutionMode: mode });
+    return journalCheckLabel({ ...active, recipe, mode }, this.localize);
   }
 
   _activeCheckKind({ system, recipe }) {
@@ -1875,19 +1851,6 @@ export class RunJournalBuilder {
     });
     if (check.checkUsable) return 'check';
     return check.requiresCheck ? 'unknown' : 'none';
-  }
-
-  _resolveCheckDc({ config, recipe, mode }) {
-    if (mode === 'progressive') return null;
-    if (config?.dcMode === 'dynamic') return null;
-    const tierId = stringOrNull(recipe?.checkTierId);
-    if (tierId) {
-      const tier = normalizeList(config?.tiers).find((entry) => entry?.id === tierId);
-      const tierDc = Number(tier?.dc);
-      if (Number.isFinite(tierDc)) return Math.trunc(tierDc);
-    }
-    const dc = Number(config?.dc);
-    return Number.isFinite(dc) ? Math.trunc(dc) : null;
   }
 
   _craftingFailureReason(runSteps) {
@@ -2389,7 +2352,7 @@ export class RunJournalBuilder {
       groupsByName.set(name, [...(groupsByName.get(name) ?? []), group]);
     }
     const permitFailure = activityPermitsFailureResults(system, 'gathering');
-    return outcomes.map((outcome, index) => {
+    const tiers = outcomes.map((outcome, index) => {
       const fail = outcome?.success !== true;
       const groups = groupsByName.get(normalizeName(outcome?.name)) ?? [];
       const results =
@@ -2404,6 +2367,7 @@ export class RunJournalBuilder {
         ),
       };
     });
+    return withCountBotch(tiers, routed, this.localize('FABRICATE.Check.CountEvidence.Botch'));
   }
 
   _tierYield(result, systemId, index) {

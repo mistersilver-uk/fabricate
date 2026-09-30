@@ -665,4 +665,57 @@ export const CASES = Object.freeze([
     expectSelector:
       '[data-inventory-bulk-panel="report"] [data-inventory-bulk-subjects] [data-inventory-bulk-subject]',
   }),
+  // Issue 2006: a counting salvage names its successes needed and per-die test in place of a DC.
+  playerCase({
+    id: 'player-salvage-count-simple',
+    label: 'Player app — Salvage that counts successes, its need and per-die test',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'inventory', rollPromptState: 'salvage-count' },
+    steps: [
+      { selector: '.inventory-filters input', fill: 'Air Shard' },
+      { selector: CARD_BUTTON('lab-smithing:sm-air-shard') },
+      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+    ],
+    expectSelector:
+      '[data-inventory-salvage-panel="simple"]:not(:has([data-inventory-salvage-dc]))' +
+      ':has([data-inventory-salvage-banner]:has-text("The count must reach the successes needed"))' +
+      ' [data-inventory-salvage-target="over"]' +
+      ':text-is("Salvage check · 2 successes needed · d10s, success on ≥ 8")',
+    kinds: ['player', 'inventory'],
+    sourceMatches: SALVAGE_TARGET_SOURCES,
+  }),
+  // Its executed dice: two d6s meeting 1 and exploding once, netting four against two needed.
+  playerCase({
+    id: 'player-salvage-count-result',
+    label: 'Player app — Salvage summary after a counting salvage, with its tiles and rows',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'inventory', dialog: 'open', rollPromptState: 'salvage-count-result' },
+    steps: [
+      { selector: '.inventory-filters input', fill: 'Longsword' },
+      { selector: CARD_BUTTON('lab-smithing:sm-longsword') },
+      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+      { selector: '[data-inventory-salvage-action]' },
+      {
+        selector: '.fabricate-app .manager-modal[data-roll-prompt="single"] button[type="submit"]',
+      },
+      {
+        selector: '[data-inventory-salvage-summary="success"] [data-check-count-tiles]',
+        scroll: true,
+      },
+    ],
+    expectSelector:
+      '[data-inventory-salvage-summary="success"]' +
+      ':has([data-check-count-tiles] [data-dice-tile-generated][data-dice-tile-marks="qualified"])' +
+      ':has([data-check-evidence="count"]:has-text("4 qualified − 0 cancelled = 4 net"))' +
+      ' [data-check-evidence="needed"]:has-text("2 · margin +2")',
+    kinds: ['player', 'inventory'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/inventory\/detail\/salvage\/SalvageRollSummary\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/detail\/CheckEvidenceRows\.svelte$/,
+      /^src\/ui\/presenters\/(?:checkDisplay|countDiceTiles|countEvidenceRows)\.js$/,
+      /^src\/ui\/svelte\/stores\/inventorySalvageExecution/,
+    ],
+  }),
 ]);

@@ -39,14 +39,18 @@
         ? localize('FABRICATE.App.Inventory.Salvage.OnASuccess')
         : localize('FABRICATE.App.Inventory.Salvage.YouWillRecover')}</Kicker
     >
-    {#if target?.text}
-      <span class="salvage-dc" data-inventory-salvage-target={target.direction}>{target.text}</span>
-    {:else if checkUsable && dc !== null}
+    {#if !target?.text && checkUsable && dc !== null}
       <span class="salvage-dc" data-inventory-salvage-dc={String(dc)}>
         {localize('FABRICATE.App.Inventory.Salvage.Dc', { dc })}
       </span>
     {/if}
   </p>
+  <!-- A target or successes line is a sentence, not the kicker row's short "DC 15" figure. -->
+  {#if target?.text}
+    <p class="salvage-target-source" data-inventory-salvage-target={target.direction}>
+      {target.text}
+    </p>
+  {/if}
   {#if target?.source}
     <p class="salvage-target-source" data-inventory-salvage-target-source>{target.source}</p>
   {:else if target?.unresolved}

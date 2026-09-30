@@ -1,6 +1,16 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { salvageCheckNeed, salvageDisplayDc } from '../src/ui/presenters/salvageCheckNeed.js';
+
+import { normalizeCheckEvaluation } from '../src/systems/normalize/checkEvaluation.js';
+import {
+  salvageCheckNeed,
+  salvageCheckTarget,
+  salvageDisplayDc,
+} from '../src/ui/presenters/salvageCheckNeed.js';
+import { fill } from '../src/utils/fillPlaceholders.js';
+
+import { shippedLocalize } from './helpers/checkEvidenceFixtures.js';
+import { countEvaluation } from './helpers/countFixtures.js';
 
 test('display DC shares override and fallback arithmetic with the listing', () => {
   assert.equal(salvageDisplayDc({ mode: 'simple', config: { dc: 16 }, component: { salvage: { dcOverride: 21.8 } } }), 21);
@@ -69,4 +79,33 @@ test('a summed roll-under row names its fixed target, and a character value has 
     salvageCheckNeed({ mode: 'progressive', config: { evaluation: { direction: 'under' } }, checkUsable: true }),
     { kind: 'noSingleTarget' }
   );
+});
+
+test('a count check names its successes needed and the salvager\'s per-die test (issue 2006)', () => {
+  const localize = (key, data) => fill(shippedLocalize(key), data ?? {});
+  const actor = { getRollData: () => ({ skills: { craft: { value: 7 } } }) };
+  const target = (pool, { mode = 'simple', component = null, thresholdMode = 'meet' } = {}) =>
+    salvageCheckTarget({
+      mode,
+      config: { thresholdMode, evaluation: normalizeCheckEvaluation(countEvaluation(pool)) },
+      component,
+      actor,
+      localize,
+    });
+  const rule = 'Roll to break this down. The count must reach the successes needed to recover the materials below.';
+  assert.deepEqual(target({ threshold: '@skills.craft.value', required: 2 }), {
+    rule,
+    direction: 'over',
+    text: 'Salvage check · 2 successes needed · d10s, success on ≥ 7',
+  });
+  assert.equal(
+    target({ direction: 'under', die: 6 }, { component: { salvage: { successesOverride: 1 } }, thresholdMode: 'exceed' }).text,
+    'Salvage check · 1 success needed · d6s, success on < 8',
+    "the component's override, singular, and the per-die strictness"
+  );
+  assert.deepEqual(target({ threshold: '@skills.none.value' }), {
+    rule,
+    unresolved: 'Salvage check could not read a number for its target from this character.',
+  });
+  assert.equal(target({}, { mode: 'progressive' }), null, 'a budget has no count to reach');
 });

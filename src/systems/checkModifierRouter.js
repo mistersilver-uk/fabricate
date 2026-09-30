@@ -19,13 +19,15 @@ function placementOrder({ source, form }) {
   return 4;
 }
 
-function destinationFor(evaluation, source) {
+/** Where one source's benefit lands for `evaluation`: `append`, `target`, `pool` or `threshold`. */
+export function destinationFor(evaluation, source) {
   if (evaluation.product === 'sum') return evaluation.direction === 'over' ? 'append' : 'target';
   if (source === 'advantage') return 'pool';
   return evaluation.pool?.modifierDestination === 'threshold' ? 'threshold' : 'pool';
 }
 
-function benefitSign(destination, direction) {
+/** A threshold benefit lowers a roll-high threshold and raises a roll-low one. */
+export function benefitSign(destination, direction) {
   return destination === 'threshold' && direction === 'over' ? -1 : 1;
 }
 

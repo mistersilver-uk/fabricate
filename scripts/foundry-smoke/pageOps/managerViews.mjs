@@ -34,13 +34,9 @@ export async function handleRollPromptIfPresent(ctx, label, { timeout = 2500 } =
     return false;
   }
   await screenshot(page, label);
-  // The confirm button is "Normal" for a d20 check (Advantage/Normal/Disadvantage) or "Roll" for a
-  // non-d20 / d100 check (single button).
-  const rollBtn = dialog
-    .locator(
-      'button[data-action="normal"], button[data-action="roll"], button:has-text("Normal"), button:has-text("Roll")'
-    )
-    .first();
+  // Roll is the form's only submit button, and it rolls normally. A text match found the roll-mode
+  // Select's "Public roll" trigger first and opened it instead, leaving the prompt standing.
+  const rollBtn = dialog.locator('button[type="submit"]').first();
   await rollBtn.click().catch(() => {});
   await dialog.waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
   return true;

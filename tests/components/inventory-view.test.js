@@ -87,6 +87,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/RowDisclosure.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageRollSummary.svelte',
     'src/ui/svelte/apps/crafting/detail/CheckEvidenceRows.svelte',
+    'src/ui/svelte/components/DiceTiles.svelte',
     'src/ui/svelte/apps/journal/JournalFactRow.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageSimpleBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageRoutedBody.svelte',
@@ -1356,7 +1357,9 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     const target = await openSalvage(services);
 
     assert.ok(target.querySelector('[data-inventory-salvage-body="simple-check"]'));
-    assert.equal(target.querySelector('[data-inventory-salvage-dc]').dataset.inventorySalvageDc, '14');
+    const dc = target.querySelector('[data-inventory-salvage-dc]');
+    assert.equal(dc.dataset.inventorySalvageDc, '14');
+    assert.ok(dc.matches('.salvage-body-title > .salvage-dc'), 'the short DC sits in the kicker row');
     assert.ok(target.querySelector('[data-inventory-salvage-loss-note]'), 'a roll can cost you');
     assert.match(
       target.querySelector('[data-inventory-salvage-action]').textContent,
@@ -1384,6 +1387,22 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     assert.ok(!root.querySelector('[data-inventory-salvage-dc]'), 'no DC beside a target');
     assert.match(root.querySelector('[data-inventory-salvage-banner]').textContent, /stay at or under the target/);
     assert.doesNotMatch(root.querySelector('[data-inventory-salvage-banner]').textContent, /Meet the DC/);
+  });
+
+  it('a count salvage states its successes-needed rule and line in place of the DC (issue 2006)', async () => {
+    // The target `salvageCheckTarget` builds for a count check (tests/salvage-check-need.test.js).
+    const rule = 'Roll to break this down. The count must reach the successes needed to recover the materials below.';
+    const target = { rule, direction: 'over', text: 'Salvage check · 2 successes needed · d10s, success on ≥ 7' };
+    const { services } = salvageServices(salvageItem({ checkUsable: true, dc: null, target }));
+    const root = await openSalvage(services);
+    const line = root.querySelector('[data-inventory-salvage-target="over"]');
+    assert.equal(line.textContent.trim(), target.text);
+    assert.ok(line.matches('p.salvage-target-source'), 'the count line sits on its own line');
+    assert.ok(!line.closest('.salvage-body-title'), 'never in the kicker row built for "DC 15"');
+    assert.ok(!root.querySelector('[data-inventory-salvage-dc]'), 'no DC beside the successes needed');
+    const banner = root.querySelector('[data-inventory-salvage-banner]').textContent;
+    assert.match(banner, /The count must reach the successes needed/);
+    assert.doesNotMatch(banner, /Meet the DC/);
   });
 
   it('a relative routed roll-under salvage states its base target in place of the DC', async () => {

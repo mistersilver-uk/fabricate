@@ -663,10 +663,13 @@ describe('AC-10 — every REAL answer carries a key from its own member table', 
     );
     record(await rollActorCheck(request({ rollDecision: { bonus: '+1' } }), makeSeams().seams));
     record(await rollActorCheck(request({ evaluation: null }), makeSeams().seams));
-    // Every count row is non-interactive (issue 2004): an interactive request refuses.
+    // Additional dice stay unsupported on an interactive count until issue 2008.
     record(
       await rollActorCheck(
-        request({ interactive: true, evaluation: { product: 'count' } }),
+        request({
+          interactive: true,
+          evaluation: { product: 'count', pool: { additionalDice: { enabled: true } } },
+        }),
         makeSeams().seams
       )
     );
@@ -806,8 +809,11 @@ describe('evaluation dispatch and executed evidence', () => {
   it('refuses malformed and unavailable modes before formula, engine, prompt or runners', async () => {
     const cases = [
       [{ product: 'count', pool: { die: '6' } }, 'evaluationInvalid'],
-      [{ product: 'count' }, 'evaluationUnsupported'],
-      [{ product: 'count', direction: 'under' }, 'evaluationUnsupported'],
+      [{ product: 'count', pool: { additionalDice: { enabled: true } } }, 'evaluationUnsupported'],
+      [
+        { product: 'count', direction: 'under', pool: { additionalDice: { enabled: true } } },
+        'evaluationUnsupported',
+      ],
     ];
     for (const [evaluation, outcome] of cases) {
       const { seams, calls } = makeSeams({ hasDiceEngine: () => { throw new Error('engine read'); } });
@@ -976,7 +982,8 @@ const SKILLED_ACTOR = {
 
 describe('attribute dispatch and roll-under (QE15, F1, D10)', () => {
   it('iterates every published SUM capability row', async () => {
-    for (const mode of CHECK_EVALUATION_CAPABILITIES.modes.filter((m) => m.product === 'sum')) {
+    const sumModes = CHECK_EVALUATION_CAPABILITIES.modes.filter((m) => m.product === 'sum');
+    for (const mode of sumModes) {
       for (const source of mode.targetSources) {
         installChat();
         installRoll({ total: 10 });
@@ -1010,7 +1017,8 @@ describe('attribute dispatch and roll-under (QE15, F1, D10)', () => {
     // 1), `under` qualifies neither (net 0, fails) — a discriminating pair, so the two directions
     // cannot share an outcome by accident.
     const EXPECTED = { over: { outcome: 'checkPassed', total: 2 }, under: { outcome: 'checkFailed', total: 0 } };
-    for (const mode of CHECK_EVALUATION_CAPABILITIES.modes.filter((m) => m.product === 'count')) {
+    const countModes = CHECK_EVALUATION_CAPABILITIES.modes.filter((m) => m.product === 'count');
+    for (const mode of countModes) {
       for (const source of mode.targetSources) {
         const dice = installCountDice({ faces: [9, 9] });
         try {
@@ -1031,17 +1039,80 @@ describe('attribute dispatch and roll-under (QE15, F1, D10)', () => {
     }
   });
 
-  it('refuses an interactive request for a non-interactive row, before any prompt', async () => {
-    for (const evaluation of [{ product: 'count' }, { product: 'count', direction: 'under' }]) {
-      installChat();
-      installRoll();
-      const { seams, calls } = makeSeams({ real: true });
-      const result = await rollActorCheck(
-        request({ actor: SKILLED_ACTOR, dc: 15, interactive: true, evaluation }),
-        seams
-      );
-      assert.equal(result.outcome, 'evaluationUnsupported', JSON.stringify(evaluation));
-      assert.equal(calls.prompt.length, 0);
+  it('keeps advantage and additional dice refused on an interactive count request, before any prompt or roll (issues 2007, 2008)', async () => {
+    const additional = { additionalDice: { enabled: true, source: 'path', path: 'system.momentum', max: 2 } };
+    const cases = [
+      ['forwarded advantage', {}, { rollDecision: { bonus: null, advantage: 'advantage' } }],
+      ['forwarded disadvantage', {}, { rollDecision: { bonus: null, advantage: 'disadvantage' } }],
+      ['additional dice, prompted', additional, {}],
+      ['additional dice, forwarded', additional, { rollDecision: { bonus: null, advantage: 'normal' } }],
+    ];
+    for (const direction of ['over', 'under']) {
+      for (const [name, pool, extra] of cases) {
+        installChat();
+        const dice = installCountDice({ faces: [9, 9] });
+        try {
+          const { seams, calls } = makeSeams({ real: true });
+          const result = await rollActorCheck(
+            request({ interactive: true, evaluation: countEvaluation({ direction, ...pool }), ...extra }),
+            seams
+          );
+          assert.equal(result.outcome, 'evaluationUnsupported', `${direction}: ${name}`);
+          assert.equal(calls.prompt.length, 0, `${direction}: ${name} opens no prompt`);
+          assert.deepEqual(dice.constructed, [], `${direction}: ${name} constructs no Roll`);
+        } finally {
+          dice.restore();
+        }
+      }
+    }
+  });
+
+  it('rolls a non-interactive count with additional dice enabled on its authored pool alone', async () => {
+    installChat();
+    const dice = installCountDice({ faces: [9, 9] });
+    try {
+      const { seams } = makeSeams({ real: true });
+      const evaluation = countEvaluation({ additionalDice: { enabled: true, source: 'path', path: 'system.momentum', max: 2 } });
+      const result = await rollActorCheck(request({ evaluation }), seams);
+      assert.equal(result.outcome, 'checkPassed');
+      assert.equal(result.total, 2, 'two dice, none bought');
+    } finally {
+      dice.restore();
+    }
+  });
+
+  it('forwards a decision to every count row: no prompt, the bonus adds a die, graded against pool.required', async () => {
+    // Faces 9, 9, 3 at threshold 8 with a third die from the bonus: over counts 2, under counts 1.
+    const EXPECTED = { over: { outcome: 'checkPassed', total: 2 }, under: { outcome: 'checkFailed', total: 1 } };
+    const countModes = CHECK_EVALUATION_CAPABILITIES.modes.filter((m) => m.product === 'count');
+    for (const mode of countModes) {
+      for (const source of mode.targetSources) {
+        const key = `${mode.direction}/${source}`;
+        const dice = installCountDice({ faces: [9, 9, 3] });
+        try {
+          const { seams, calls } = makeSeams({ real: true });
+          const evaluation = { ...countEvaluation({ direction: mode.direction, required: 2 }), target: { source } };
+          const result = await rollActorCheck(
+            request({
+              actor: SKILLED_ACTOR,
+              dc: 99,
+              interactive: true,
+              rollDecision: { bonus: '1', rollMode: 'gmroll', advantage: 'normal' },
+              evaluation,
+            }),
+            seams
+          );
+          assert.equal(calls.prompt.length, 0, `${key}: a forwarded decision opens no prompt`);
+          assert.equal(result.outcome, EXPECTED[mode.direction].outcome, key);
+          assert.equal(result.total, EXPECTED[mode.direction].total, key);
+          assert.deepEqual(result.messageData, { label: 'Fabricate', total: result.total, required: 2 }, key);
+          assert.equal(dice.posts.length, 1, `${key}: one count Roll posted`);
+          assert.ok(dice.posts[0].rolls[0] instanceof dice.CountRoll, key);
+          assert.equal(dice.posts[0].rolls[0].dice[0].results.length, 3, `${key}: the bonus die rolled`);
+        } finally {
+          dice.restore();
+        }
+      }
     }
   });
 

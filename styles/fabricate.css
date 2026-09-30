@@ -4760,7 +4760,12 @@
 }
 
 .fabricate-manager .manager-recipe-check.is-dc,
-.fabricate-manager .manager-recipe-check.is-dynamic {
+.fabricate-manager .manager-recipe-check.is-dynamic,
+.fabricate-manager .manager-recipe-check.is-target,
+.fabricate-manager .manager-recipe-check.is-attribute,
+.fabricate-manager .manager-recipe-check.is-dynamicTarget,
+.fabricate-manager .manager-recipe-check.is-successes,
+.fabricate-manager .manager-recipe-check.is-dynamicSuccesses {
   border-color: var(--fab-info-border);
   color: var(--fab-info-text);
   background: var(--fab-info-soft);
@@ -16493,6 +16498,23 @@
   color: var(--fab-danger-text);
 }
 
+/* On a chat card a tile mixes its tone into the chat's own ink, as the result pill does, so it reads on parchment and on a dark chat theme alike. */
+.fabricate-craft-chat .fabricate-dice-tiles__tile {
+  --fabricate-dice-tile-tone: currentcolor;
+
+  border-color: color-mix(in srgb, var(--fabricate-dice-tile-tone) 45%, transparent);
+  background: color-mix(in srgb, var(--fabricate-dice-tile-tone) 12%, transparent);
+  color: color-mix(in srgb, var(--fabricate-dice-tile-tone) 45%, currentcolor);
+}
+
+.fabricate-craft-chat .fabricate-dice-tiles__tile--success {
+  --fabricate-dice-tile-tone: var(--fab-success);
+}
+
+.fabricate-craft-chat .fabricate-dice-tiles__tile--danger {
+  --fabricate-dice-tile-tone: var(--fab-danger);
+}
+
 .fabricate-dice-tiles__face {
   font-size: 14px;
   font-weight: 500;
@@ -16516,6 +16538,12 @@
   margin: 0;
   color: var(--fab-text-muted);
   font-size: 10px;
+}
+
+/* On a chat card the overflow count and legend read in the chat's own ink, at the subtitle's 72%, as the tiles do. */
+.fabricate-craft-chat .fabricate-dice-tiles__more,
+.fabricate-craft-chat .fabricate-dice-tiles__legend {
+  color: color-mix(in srgb, currentcolor 72%, transparent);
 }
 
 /* Region-first player interaction prompt (InteractionPromptApp) — a small, non-modal toast. */

@@ -253,6 +253,10 @@ export const CHECK_TARGET_RAW_MODULES = Object.freeze([
 /** The result boxes' executed check evidence rows (issue 2005) and their import closure. */
 export const CHECK_EVIDENCE_RAW_MODULES = Object.freeze([
   'src/ui/presenters/checkEvidenceRows.js',
+  // A count check's rows and its die tiles (issue 2006).
+  'src/ui/presenters/countEvidenceRows.js',
+  'src/ui/presenters/countDiceTiles.js',
+  'src/ui/presenters/htmlEscape.js',
   'src/ui/svelte/apps/crafting/rollPromptTarget.js',
   // The count line the prompt target settles through the router and the pool floor (issue 2006).
   'src/systems/checkModifierRouter.js',
@@ -409,6 +413,7 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/crafting/detail/OutcomeTierTable.svelte',
   'src/ui/svelte/apps/crafting/detail/RollResultBox.svelte',
   'src/ui/svelte/apps/crafting/detail/CheckEvidenceRows.svelte',
+  'src/ui/svelte/components/DiceTiles.svelte',
   'src/ui/svelte/apps/journal/JournalFactRow.svelte',
   'src/ui/svelte/apps/crafting/detail/RecipeBodyShell.svelte',
   'src/ui/svelte/apps/crafting/detail/SimpleRecipeBody.svelte',

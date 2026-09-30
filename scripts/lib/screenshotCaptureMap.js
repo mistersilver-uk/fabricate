@@ -16,6 +16,11 @@ export const CLASS_A_LABELS = Object.freeze(
     'post-craft',
     'crafter-post-craft-inventory',
     'chat-craft-card',
+    'chat-craft-card-count-pass',
+    'chat-craft-card-count-fail',
+    'chat-craft-card-count-botch',
+    'chat-craft-card-count-zero',
+    'chat-craft-card-over-control',
     'fabricate-journal',
     'fabricate-journal-craft-detail',
   ])
@@ -212,6 +217,12 @@ export const SCREENSHOT_CAPTURE_ORDER = Object.freeze([
   'player-alchemy-workbench',
   'player-alchemy-stacked',
   'chat-craft-card',
+  // Issue 2006: the success-counting cards, crafted after the post-craft inventory frame.
+  'chat-craft-card-count-pass',
+  'chat-craft-card-count-fail',
+  'chat-craft-card-count-botch',
+  'chat-craft-card-count-zero',
+  'chat-craft-card-over-control',
   'fabricate-journal',
   'fabricate-journal-craft-detail',
 ]);

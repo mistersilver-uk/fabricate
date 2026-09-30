@@ -5,7 +5,7 @@
  * Extracted from `RunDetail.svelte` so the component keeps its reactive state and markup and
  * nothing else; `localize` is injected so this module stays UI-free.
  */
-import { formatSignedStep } from '../../../../utils/checkAdjustmentFormat.js';
+import { formatNet, formatSignedStep } from '../../../../utils/checkAdjustmentFormat.js';
 
 /** `NaN` for an absent value, so `Number.isFinite` alone decides whether it was recorded. */
 export function numberOrNaN(raw) {
@@ -72,10 +72,30 @@ export function formatGradedRoll({ formula, total, value, target, margin }, loca
 }
 
 /**
+ * A count roll's line (issue 2006): `{net} of {required} successes`, its net alone where the
+ * required count was not recorded, or the zero-pool sentence for a pool that rolled nothing.
+ */
+export function formatCountRoll({ net, required, zeroPool }, localize) {
+  if (zeroPool) return localize('FABRICATE.Check.CountEvidence.ZeroPoolResult');
+  if (!Number.isFinite(net)) return '';
+  const text = formatNet(net);
+  if (Number.isFinite(required) && required > 0) {
+    return required === 1
+      ? localize('FABRICATE.App.Journal.StepDetails.Count.RollResultOne', { net: text })
+      : localize('FABRICATE.App.Journal.StepDetails.Count.RollResult', { net: text, required });
+  }
+  return net === 1
+    ? localize('FABRICATE.App.Journal.StepDetails.Count.RollResultNetOne')
+    : localize('FABRICATE.App.Journal.StepDetails.Count.RollResultNet', { net: text });
+}
+
+/**
  * The recorded roll, preferring the resolved formula and total over a bare value. Outside
- * sum/over/fixed it names the executed target and margin, never a DC (issue 2005).
+ * sum/over/fixed it names the executed target and margin, never a DC (issue 2005), and a count
+ * its net successes.
  */
 export function formatRoll(check, localize) {
+  if (check?.count) return formatCountRoll(check.count, localize);
   const formula = String(check?.formula ?? '');
   const total = numberOrNaN(check?.total);
   const value = numberOrNaN(check?.value);

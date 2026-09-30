@@ -722,6 +722,9 @@ Each is full-profile only, leaves the world as it found it, and rides an existin
 - `manager-tags-categories-tags-tab` — the Tags & Categories screen's Item tags rows (the three seeded tags).
   The id predates issue 1915's retirement of the tabs and is kept for golden and evidence-map stability; there is no tab to open, the band is addressed by `[data-vocabulary-panel="componentTags"]`, and its direction toggle is clicked first so the frame shows the vocabulary sorted descending, as the View Lab case of the same id does.
 
+Phase E also crafts issue 2006's success-counting cards on a dedicated `Smoke Counting Forge`, each rolled publicly and deterministic by construction: `chat-craft-card-count-pass`, `chat-craft-card-count-fail`, `chat-craft-card-count-botch`, `chat-craft-card-count-zero` and the summed `chat-craft-card-over-control`.
+Their assertions bind to the card each craft created and to its count Roll's own die flags, and run in every profile; only the frames wait on `RUN_SCREENSHOT_PHASES`.
+
 ### Test artifacts
 
 After any run (success or failure), results are written to `test-results/`:

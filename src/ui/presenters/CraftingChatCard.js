@@ -22,6 +22,13 @@
 import { checkDiceLine } from './checkDiceLine.js';
 import { isPublicCheckDisplay } from './checkDisplay.js';
 import { checkEvidenceRows, pathBreakSegments } from './checkEvidenceRows.js';
+import { renderDiceTilesHtml } from './countDiceTiles.js';
+import {
+  countBotched,
+  countEvidenceRows,
+  countSummaryText,
+  statesCountEvidence,
+} from './countEvidenceRows.js';
 import { esc } from './htmlEscape.js';
 
 const ITEM_FALLBACK_IMG = 'icons/svg/item-bag.svg';
@@ -55,6 +62,9 @@ const COMPLICATIONS_HEADING_KEY = 'FABRICATE.Chat.Complications';
  * A FLAT leaf in the `Chat` namespace, on the same rule as the heading key above.
  */
 const COMPLICATION_POSITION_KEY = 'FABRICATE.Chat.ComplicationResult';
+
+/** The pill a failed count check that netted below zero reads (issue 2006). */
+const COUNT_BOTCH_KEY = 'FABRICATE.Check.CountEvidence.Botch';
 
 /**
  * The two keys a ROLLED result amount reads (issue 1645), on the `FABRICATE.Chat.Roll` precedent
@@ -186,38 +196,77 @@ function withPathBreaks(text) {
   return pathBreakSegments(text).join('\u{200B}');
 }
 
-/**
- * The executed check's Target, Pre-rolled and Margin rows (issue 2005), or '' for a check that is
- * not public and non-secret, a sum/over/fixed check or no check. Text only: never a Roll or a flag.
- */
-export function renderCheckEvidenceRows(check, localize = (key) => key) {
-  const rows = isPublicCheckDisplay(check) ? checkEvidenceRows(check, localize) : [];
+/** Evidence rows as the card's definition list; a `danger` row gains its modifier. */
+function renderEvidenceList(rows) {
   if (rows.length === 0) return '';
   return [
     '<dl class="fabricate-craft-chat__evidence">',
-    ...rows.map(
-      ({ id, label, text }) =>
-        `<div class="fabricate-craft-chat__evidence-row" data-check-evidence="${id}">` +
+    ...rows.map(({ id, label, text, tone }) => {
+      const danger = tone === 'danger' ? ' fabricate-craft-chat__evidence-row--danger' : '';
+      return (
+        `<div class="fabricate-craft-chat__evidence-row${danger}" data-check-evidence="${id}">` +
         `<dt class="fabricate-craft-chat__evidence-label">${inertText(label)}</dt>` +
         `<dd class="fabricate-craft-chat__evidence-value">${inertText(withPathBreaks(text))}</dd></div>`
-    ),
+      );
+    }),
     '</dl>',
   ].join('');
 }
 
 /**
+ * The executed check's evidence (issue 2005), or '' for a check that is not public and non-secret,
+ * a sum/over/fixed check or no check: Target, Pre-rolled and Margin rows, or for a count check its
+ * die tiles and count rows (issue 2006). Text only: never a Roll or a flag.
+ */
+export function renderCheckEvidenceRows(check, localize = (key) => key) {
+  if (!isPublicCheckDisplay(check)) return '';
+  if (statesCountEvidence(check)) {
+    const tiles = renderDiceTilesHtml(check.count.tiles, localize);
+    return `${tiles}${renderEvidenceList(countEvidenceRows(check, localize))}`;
+  }
+  return renderEvidenceList(checkEvidenceRows(check, localize));
+}
+
+/**
+ * A public count check's summary line (issue 2006), stated in place of the numeric roll row, or ''
+ * for any other check.
+ */
+export function renderCountSummary(check, localize = (key) => key) {
+  if (!isPublicCheckDisplay(check) || !statesCountEvidence(check)) return '';
+  return (
+    '<div class="fabricate-craft-chat__dice" data-check-count-summary>' +
+    `${inertText(countSummaryText(check, localize))}</div>`
+  );
+}
+
+/** The Success or Failure pill, or Botch for a public failed count that netted below zero. */
+function renderCheckPill(model, keys, loc) {
+  const succeeded = model.status === 'succeeded';
+  const botched = !succeeded && isPublicCheckDisplay(model.check) && countBotched(model.check);
+  let icon = succeeded ? 'fa-circle-check' : 'fa-circle-xmark';
+  if (botched) icon = 'fa-skull';
+  let text = loc(succeeded ? keys.checkSuccess : keys.checkFailure);
+  if (botched) text = loc(COUNT_BOTCH_KEY);
+  return (
+    `<div class="fabricate-craft-chat__result fabricate-craft-chat__result--${succeeded ? 'success' : 'failure'}">` +
+    `<i class="fa-solid ${icon}" aria-hidden="true"></i>${esc(text)}</div>`
+  );
+}
+
+/**
  * The rolled check's head (issue 2005, frames 37 and 38): a key map naming `checkSuccess` adds the
- * Success or Failure pill, and a public check's dice line replaces the bare total. Without a
- * rolled total, or for another card's keys, it is {@link renderRollTotal} unchanged.
+ * Success or Failure pill, and a public check's dice line replaces the bare total. A public count
+ * check states its summary line instead, even for a pool that rolled nothing (issue 2006, frames
+ * 39 to 41). Without a rolled total, or for another card's keys, it is {@link renderRollTotal}.
  */
 function renderCheckHead(model, keys, loc) {
+  const countSummary = renderCountSummary(model.check, loc);
+  if (countSummary) {
+    return keys.checkSuccess ? `${renderCheckPill(model, keys, loc)}${countSummary}` : countSummary;
+  }
   const total = renderRollTotal(model.rollValue, loc(keys.roll));
   if (!total || !keys.checkSuccess) return total;
-  const succeeded = model.status === 'succeeded';
-  const pill =
-    `<div class="fabricate-craft-chat__result fabricate-craft-chat__result--${succeeded ? 'success' : 'failure'}">` +
-    `<i class="fa-solid ${succeeded ? 'fa-circle-check' : 'fa-circle-xmark'}" aria-hidden="true"></i>` +
-    `${esc(loc(succeeded ? keys.checkSuccess : keys.checkFailure))}</div>`;
+  const pill = renderCheckPill(model, keys, loc);
   const diceLine = isPublicCheckDisplay(model.check) ? checkDiceLine(model.check, loc) : '';
   return diceLine
     ? `${pill}<div class="fabricate-craft-chat__dice">${inertText(withPathBreaks(diceLine))}</div>`

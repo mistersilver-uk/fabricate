@@ -1,7 +1,8 @@
-import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 
 import { InventoryListingBuilder } from '../src/ui/presenters/InventoryListingBuilder.js';
+import { simpleYieldRows } from '../src/ui/svelte/util/salvageYieldRows.js';
 import { fill } from '../src/utils/fillPlaceholders.js';
 
 import { shippedLocalize } from './helpers/checkEvidenceFixtures.js';
@@ -2295,5 +2296,37 @@ describe('InventoryListingBuilder - a roll-under or character-value salvage targ
     const salvage = salvageFor('simple', { simple: { rollFormula: '1d20', dc: 12 } });
     assert.equal(salvage.dc, 12);
     assert.equal(salvage.target, null);
+  });
+
+  it("states a count check's successes needed at the salvager's threshold (issue 2006)", () => {
+    const evaluation = {
+      product: 'count',
+      direction: 'over',
+      pool: { die: 10, base: '4', threshold: '@skills.craft.value', required: 2 },
+    };
+    const salvage = salvageFor('simple', { simple: { rollFormula: '', dc: 12, evaluation } }, {
+      salvage: { dcOverride: 9, successesOverride: 3 },
+      skills: { craft: { value: 8 } },
+    });
+    assert.equal(salvage.dc, null, 'a count check grades successes, never a DC');
+    assert.deepEqual(salvage.target, {
+      rule: 'Roll to break this down. The count must reach the successes needed to recover the materials below.',
+      direction: 'over',
+      text: 'Salvage check · 3 successes needed · d10s, success on ≥ 8',
+    });
+  });
+
+  it('reads a count check with no retained formula as a roll, so nothing is guaranteed', () => {
+    const evaluation = { product: 'count', pool: { base: '2', threshold: '5', required: 1 } };
+    const salvage = salvageFor('simple', { simple: { rollFormula: '', evaluation } }, {
+      salvage: { resultGroups: [{ results: [{ componentId: 'c2', quantity: 2 }] }] },
+    });
+    assert.equal(salvage.checkUsable, true, 'a count rolls its pool, never the empty formula');
+    assert.deepEqual(
+      simpleYieldRows(salvage).map((row) => row.guaranteedQuantity),
+      salvage.results.map(() => 0),
+      'the bulk yield never counts a rolled count salvage as guaranteed'
+    );
+    assert.ok(salvage.results.length > 0);
   });
 });

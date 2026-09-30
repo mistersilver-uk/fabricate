@@ -653,6 +653,9 @@
           "BannerSimpleTitle": "Salvage check",
           "BannerSimpleRule": "Roll to break this down. Meet the DC to recover the materials below.",
           "BannerSimpleRuleTarget": "Roll to break this down. The total must {comparison} the target to recover the materials below.",
+          "Count": {
+            "BannerSimpleRule": "Roll to break this down. The count must reach the successes needed to recover the materials below."
+          },
           "BannerRoutedTitle": "Routed salvage",
           "BannerRoutedRule": "Your roll decides which outcome you get, and each outcome recovers different materials.",
           "BannerProgressiveTitle": "Progressive · ordered",
@@ -701,6 +704,9 @@
           "OutcomeFailure": "Salvage failed",
           "NothingRecovered": "Nothing is recovered; the failure policy applies.",
           "SummaryWithRoll": "with a roll of",
+          "SummaryWithCount": "with",
+          "SummaryNetSuccesses": "net successes",
+          "SummaryNetSuccessOne": "net success",
           "ActingSystem": "Salvaging as {system}"
         },
         "Detail": {
@@ -1051,6 +1057,7 @@
           "CheckWithDc": "{formula} vs DC {dc}",
           "CheckWithTarget": "{formula} · Target {target} · {comparison}",
           "BandOtherwise": "Otherwise",
+          "BandNeeded": "Needed",
           "BandAdjustment": "{tier} · {adjustment}",
           "FailureGeneric": "The crafting attempt failed.",
           "RollLabel": "Roll",
@@ -1060,7 +1067,16 @@
           "RollResultValue": "Rolled {value}",
           "RollResultValueWithDc": "Rolled {value} vs DC {dc}",
           "RollResultValueWithTarget": "Rolled {value} · target {target} · margin {margin}",
-          "ConsumedTitle": "Consumed"
+          "ConsumedTitle": "Consumed",
+          "Count": {
+            "Check": "{count} successes needed · d{die}s",
+            "CheckOne": "1 success needed · d{die}s",
+            "CheckDie": "Successes counted on d{die}s",
+            "RollResult": "{net} of {required} successes",
+            "RollResultOne": "{net} of 1 success",
+            "RollResultNet": "{net} net successes",
+            "RollResultNetOne": "1 net success"
+          }
         },
         "Redacted": {
           "Title": "Hidden recipe"
@@ -1931,6 +1947,38 @@
         "DiceModifiers": "modifiers",
         "Success": "Success",
         "Failure": "Failure"
+      },
+      "CountEvidence": {
+        "Summary": "{pool}d{die}, each {symbol} {threshold}",
+        "SummaryGrown": "{pool}d{die}, each {symbol} {threshold} (pool grown {grown} by modifiers)",
+        "SummaryZero": "{base}d{die} {change} {source} = 0 dice",
+        "SummaryZeroBare": "{base}d{die} = 0 dice",
+        "SuccessOn": "Success on",
+        "SuccessOnCharacter": "{symbol} {threshold} · character value {value}",
+        "SuccessOnFixed": "{symbol} {threshold} · fixed",
+        "SuccessOnMoved": "{rule}, moved {moved} by modifiers",
+        "Count": "Count",
+        "NeededMargin": "{required} · margin {margin}",
+        "NeededBotch": "{required} · a net below zero is a botch",
+        "PreRollDice": "{label} {formula} rolled {total}, adding {total} dice",
+        "PreRollDiceOne": "{label} {formula} rolled 1, adding 1 die",
+        "PreRollDiceRemoved": "{label} {formula} rolled {total}, removing {removed} dice",
+        "PreRollDiceRemovedOne": "{label} {formula} rolled {total}, removing 1 die",
+        "PreRollThreshold": "{label} {formula} rolled {total}, moving the threshold {moved}",
+        "Pool": "Pool",
+        "PoolReduced": "Reduced to zero by a {source} penalty of {change}",
+        "PoolReducedSeveral": "Reduced to zero by modifiers totalling {change}",
+        "Result": "Result",
+        "ZeroPoolResult": "A pool reduced to zero fails automatically. Nothing was rolled.",
+        "SourceTool": "tool",
+        "SourceLibrary": "modifier",
+        "SourceSituational": "situational",
+        "SourceAdvantage": "advantage",
+        "SourceModifiers": "modifiers",
+        "Botch": "Botch",
+        "Botched": "Botched. Nothing is produced; the failure policy applies.",
+        "SalvageLine": "Salvage check · {count} successes needed · d{die}s, success on {symbol} {threshold}",
+        "SalvageLineOne": "Salvage check · 1 success needed · d{die}s, success on {symbol} {threshold}"
       }
     },
     "Knowledge": {
@@ -3035,6 +3083,15 @@
           "CheckTierDefaultAdjustment": "Default · base adjustment",
           "CheckTierTarget": "Target {dc}",
           "CheckTierUnnamed": "Unnamed tier",
+          "Count": {
+            "CheckTier": "{name} · {count} successes",
+            "CheckTierOne": "{name} · 1 success",
+            "CheckTierDefault": "Default",
+            "Pill": "{count} successes",
+            "PillOne": "1 success",
+            "PillDynamic": "Dynamic successes",
+            "Sort": "Successes needed"
+          },
           "BulkEdit": {
             "SelectedHeading": "{count} recipes selected",
             "SelectedHeadingOne": "1 recipe selected",
@@ -3060,6 +3117,12 @@
             "CheckTierNoTiers": "This system's crafting check authors no tiers, so every recipe uses its default DC. Add tiers under Checks to assign them here.",
             "CheckTierNoTiersTarget": "This system's crafting check authors no tiers, so every recipe uses its default target. Add tiers under Checks to assign them here.",
             "CheckTierNoTiersAdjustment": "This system's crafting check authors no tiers, so every recipe uses its base adjustment. Add tiers under Checks to assign them here.",
+            "Count": {
+              "CheckTierHint": "The successes needed these recipes roll for — not the check's outcome tiers.",
+              "CheckTierDefaultHint": "Clears every selected recipe to the system's default successes needed.",
+              "CheckTierDynamic": "This system's crafting check takes its successes needed from a macro at craft time, so recipes carry no tier to select.",
+              "CheckTierNoTiers": "This system's crafting check authors no tiers, so every recipe uses its default successes needed. Add tiers under Checks to assign them here."
+            },
             "Books": "Books & scrolls",
             "NoBooks": "This system defines no books or scrolls.",
             "BooksHint": "Pick one, then add it where missing or remove it where present",
@@ -6956,6 +7019,12 @@
               "DynamicNote": "Converting keeps the macro, and its return is then read as the successes needed.",
               "OverridesNote": "{names} override the DC but not the successes needed, so after converting they use the check's successes needed.",
               "OutOfRange": "It cannot be converted: it would need {value} successes, outside 0 to 20."
+            },
+            "Outcomes": {
+              "Success": "Reaches {required} successes — the {record}'s result group is produced in full.",
+              "SuccessOne": "Reaches 1 success — the {record}'s result group is produced in full.",
+              "Failure": "Fewer than {required} — nothing is produced; the failure policy decides the cost.",
+              "FailureOne": "Fewer than 1 success — nothing is produced; the failure policy decides the cost."
             }
           },
           "Digest": {

@@ -3,12 +3,14 @@
   RollResultBox shows the outcome of the player's most recent craft of the current
   recipe (store.lastRollResult[recipeId]). It is defensive about the result shape:
   it surfaces a success/failure tone, the rolled total and outcome label when
-  present, a summed check's outcome sentence, an optional message, the executed check's evidence
-  rows, and any awarded items. Renders nothing when there is no recorded result.
+  present, a summed or counted check's outcome sentence, an optional message, the executed check's
+  evidence rows, and any awarded items. A pool reduced to zero states no total. Renders nothing
+  when there is no recorded result.
 -->
 <script>
   import Medallion from '../../../components/Medallion.svelte';
   import { statesEvidence } from '../../../../presenters/checkEvidenceRows.js';
+  import { countBotched, statesCountEvidence } from '../../../../presenters/countEvidenceRows.js';
   import CheckEvidenceRows from './CheckEvidenceRows.svelte';
   import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
   import { localize } from '../../../util/foundryBridge.js';
@@ -17,7 +19,11 @@
 
   const success = $derived(result?.success !== false);
   const outcome = $derived(result?.outcome ?? result?.checkResult?.outcome ?? null);
-  const total = $derived(result?.total ?? result?.checkResult?.total ?? null);
+  // A pool reduced to zero rolled nothing, so it states no total rather than 0 (issue 2006).
+  const zeroPool = $derived(
+    result?.check?.count?.zeroPool === true || result?.checkResult?.data?.zeroPool === true
+  );
+  const total = $derived(zeroPool ? null : (result?.total ?? result?.checkResult?.total ?? null));
   const message = $derived(typeof result?.message === 'string' ? result.message : '');
   const items = $derived(
     Array.isArray(result?.items)
@@ -29,9 +35,12 @@
   // What the outcome means for the award, beside the check's evidence; a failure that still
   // awarded items says nothing rather than claim nothing was produced.
   const summary = $derived.by(() => {
-    if (!statesEvidence(result?.check)) return '';
+    if (!statesEvidence(result?.check) && !statesCountEvidence(result?.check)) return '';
     if (success) return localize('FABRICATE.App.Crafting.Run.ResultProduced');
-    return items.length === 0 ? localize('FABRICATE.App.Crafting.Run.NothingProduced') : '';
+    if (items.length > 0) return '';
+    return countBotched(result.check)
+      ? localize('FABRICATE.Check.CountEvidence.Botched')
+      : localize('FABRICATE.App.Crafting.Run.NothingProduced');
   });
 </script>
 

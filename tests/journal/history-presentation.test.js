@@ -123,6 +123,16 @@ describe('recorded Journal presentation', () => {
     );
   });
 
+  it('names a count stage and gathering roll by its net successes, never a target or DC (issue 2006)', () => {
+    const stage = (lastCheckResult) => presentStage({ lastCheckResult }, text).check;
+    const count = (fields) => ({ formula: null, total: 4, value: 4, dc: null, target: null, margin: null, count: fields });
+    assert.equal(stage(count({ net: 4, required: 2, zeroPool: false })), `RollResult${JSON.stringify({ net: '4', required: 2 })}`);
+    assert.equal(stage(count({ net: 4, required: null, zeroPool: false })), `RollResultNet${JSON.stringify({ net: '4' })}`);
+    assert.equal(stage({ ...count({ net: null, required: null, zeroPool: true }), total: null, value: 0 }), 'ZeroPoolResult');
+    const gathering = presentHistory({ gatheringYield: { check: count({ net: 1, required: 1, zeroPool: false }) } }, text);
+    assert.equal(gathering.gatheringCheck, `RollResultOne${JSON.stringify({ net: '1' })}`);
+  });
+
   for (const [checked, kind] of [[true, 'check'], [false, 'none']]) {
     it(`classifies persisted ${kind} after live configuration changed`, async () => {
       const { deletedRecipeModel } = await createPersistedCraftingHistory({ stageCount: 1, checked });

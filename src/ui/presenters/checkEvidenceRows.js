@@ -139,7 +139,8 @@ function targetText(evidence, loc) {
   return fill(loc(KEYS.targetTerms), { target: evidence.target, terms: terms.join(', ') });
 }
 
-function preRollLabel(entry, loc) {
+/** A pre-roll's recorded label, else its source's generic name. */
+export function preRollLabel(entry, loc) {
   if (entry.label) return entry.label;
   if (entry.source === 'tool') return loc(KEYS.toolLabel);
   if (entry.source === 'situational') return loc(KEYS.situationalLabel);
@@ -147,7 +148,7 @@ function preRollLabel(entry, loc) {
 }
 
 /** An expression without the one pair of brackets the resolver wraps a rolled modifier in. */
-function bareExpression(expression) {
+export function bareExpression(expression) {
   const inner = /^\((.*)\)$/.exec(expression)?.[1];
   if (inner === undefined) return expression;
   let depth = 0;

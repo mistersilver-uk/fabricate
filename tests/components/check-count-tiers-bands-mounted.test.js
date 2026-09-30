@@ -3,9 +3,9 @@
  * rows and read-only count strips, composed in the real editors. Each control is acted on through
  * its element, and each composed reading is compared with the model or readiness it must share.
  */
-import { after, afterEach, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
+import { after, afterEach, before, describe, it } from 'node:test';
 
 import { normalizeCheckEvaluation } from '../../src/systems/normalize/checkEvaluation.js';
 import { checkIssueSentence } from '../../src/ui/svelte/apps/manager/checks/checksCopy.js';
@@ -14,6 +14,7 @@ import {
   CHECK_EDITOR_COMPILED_MODULES,
   CHECK_EDITOR_RAW_MODULES,
 } from '../helpers/checksHarnessModules.js';
+import { chooseSelectOption } from '../helpers/select-control.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -232,6 +233,25 @@ describe('the simple editor authors a counting check (issue 2006)', () => {
       root.querySelector('[data-simple-band-scale]').textContent.trim(),
       'Measured in successes. The count must reach 2. A net below zero is a botch.'
     );
+  });
+
+  it("states the two outcomes in the previewed record's successes needed, never a DC", async () => {
+    const value = check({}, { tiers: [{ id: 't-hard', name: 'Hard work', dc: 12, successes: 1 }] });
+    const previewRecords = [{ id: '', name: 'Default' }, { id: 't-hard', name: 'Hard work' }];
+    const state = await mountControlled(simpleHarness, value, {
+      section: 'outcomes',
+      recordNoun: 'component',
+      previewRecords,
+      onSelectPreviewRecord: (id) => simpleHarness.setProps({ previewRecordId: id }),
+    });
+    const outcome = (kind) =>
+      state.root.querySelector(`[data-simple-outcome="${kind}"]`).textContent.replaceAll(/\s+/g, ' ');
+    assert.match(outcome('success'), /Reaches 2 successes — the component's result group is produced in full\./);
+    assert.match(outcome('failure'), /Fewer than 2 — nothing is produced; the failure policy decides the cost\./);
+    assert.doesNotMatch(outcome('success') + outcome('failure'), /\bDC\b/);
+    await state.act(() => chooseSelectOption(state.root, '[data-simple-band-record]', 't-hard'));
+    assert.match(outcome('success'), /Reaches 1 success — /, 'the previewed tier needs one');
+    assert.match(outcome('failure'), /Fewer than 1 success — /, 'the singular names its noun');
   });
 });
 

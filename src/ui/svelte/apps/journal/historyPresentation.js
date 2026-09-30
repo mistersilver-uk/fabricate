@@ -1,5 +1,5 @@
 /** Read-only presentation of the builder's entitled evidence, with no catalogue or runtime reads. */
-import { formatGradedRoll } from './runDetailPresentation.js';
+import { formatCountRoll, formatGradedRoll } from './runDetailPresentation.js';
 
 const prefix = 'FABRICATE.App.Journal.History.';
 const list = (value) => (Array.isArray(value) ? value : []);
@@ -46,6 +46,7 @@ export function presentCurrencySpends(spends, localize) {
 
 function checkText(check, localize) {
   if (!check) return '';
+  if (check.count) return formatCountRoll(check.count, localize);
   const total = finite(check.total) ? check.total : check.value;
   if (!finite(total)) return '';
   // Outside sum/over/fixed the executed target and margin, never a DC (issue 2005).

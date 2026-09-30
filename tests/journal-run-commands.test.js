@@ -1970,6 +1970,51 @@ describe('journal run command protocol', () => {
     assert.equal(posts, 1);
   });
 
+  for (const disposition of ['fail', 'botch']) {
+    it(`hands an entitled player a rolled craft's handoff even when it ${disposition}s (issue 2006)`, async () => {
+      let posts = 0;
+      const run = { id: 'run-1', lifecycleVersion: 1, runRevision: 3, status: 'waiting' };
+      const { service } = commandHarness({
+        currentUserId: 'gm',
+        run,
+        promptCheck: async () => ({ confirmed: true }),
+        postRollHandoff: async () => { posts += 1; },
+        operations: {
+          crafting: {
+            getRun: () => run,
+            describeCheck: async () => ({
+              required: true,
+              publicPrompt: { label: 'Known recipe' },
+              privateEvaluation: { recipeId: 'recipe', rollFormula: '1d20' },
+            }),
+            evaluateCheck: async () => ({
+              engineEvaluated: true,
+              success: false,
+              data: {},
+              rollHandoff: { serializedRoll: { formula: '1d20', total: 3 } },
+            }),
+            execute: async () => ({ success: false, disposition, runId: run.id, runRevision: 4 }),
+            authorizeRollHandoff: async () => true,
+          },
+        },
+      });
+
+      const response = await service.executeJournalRunCommand({
+        actorUuid: 'Actor.a',
+        runType: 'crafting',
+        runId: run.id,
+        expectedRevision: 3,
+        action: 'execute',
+      });
+
+      assert.equal(posts, 1, `a ${disposition} craft must still hand its roll to the player`);
+      assert.ok(
+        Object.hasOwn(response, 'rollHandoff'),
+        `a ${disposition} response must carry its roll handoff`
+      );
+    });
+  }
+
   it('releases a prepared check on local dismissal without invoking the mutation', async () => {
     let releases = 0;
     let mutations = 0;

@@ -857,6 +857,7 @@ The RECORD that selects check modifiers under the `bySubject` combination rule, 
 #### Recipe Check Tier
 
 The per-recipe reference to one of the `{id, name, dc}` DC tiers a crafting system's check slot authors (`Recipe.checkTierId`), naming the DC that recipe rolls against, or under a character-value target the **Difficulty Adjustment** its nullable `adjustment` supplies.
+Under a counting check the same tier names `successes` (0 to 20) in place of `dc`, and the recipe's picked tier then supplies the successes needed.
 
 [Notes](docs/domain/terms.md#recipe-check-tier)
 
@@ -1161,6 +1162,49 @@ A `product: 'count'` **Check Evaluation** rolls a `pool.die`-sided dice pool siz
 The explode rule adds and re-rolls a die when the best qualifying face for the check's direction comes up (or a named face), and the cancel rule removes a success when the worst face comes up (or a named face); `pool.modifierDestination` sends every applied modifier and bonus to the pool ("Each adds dice") or the threshold ("Each moves the threshold").
 
 [Notes](docs/domain/terms.md#count-check)
+
+#### Evaluation Product
+
+`evaluation.product` (`sum` default, or `count`), the "What the roll produces" axis choosing between a summed total and a **Count Check**'s pool; a switch is lossless and retains both sides' settings.
+
+[Notes](docs/domain/terms.md#evaluation-product)
+
+#### Structured Pool
+
+`evaluation.pool`, the die, base, threshold, required-successes and explode/cancel record a **Count Check** grades in place of a formula and target, authored by the Checks Studio's pool controls in place of the typed formula.
+
+[Notes](docs/domain/terms.md#structured-pool)
+
+#### Free-Text Counting Formula
+
+The `freeTextCountingFormula` readiness warning: a summed check whose formula carries a success-counting die suffix (`cs`, `cf`, `even` or `odd`), measured against the wrong number because the check still adds the dice.
+
+[Notes](docs/domain/terms.md#free-text-counting-formula)
+
+#### Counting Formula Conversion
+
+The staged `Convert to count successes` action that rebuilds a convertible **Free-Text Counting Formula** as a **Structured Pool**, copying its DC and tier DCs into successes needed (plus one where the check graded `exceed`) and retaining the formula and DCs for reference.
+
+[Notes](docs/domain/terms.md#counting-formula-conversion)
+
+#### Extra Successes
+
+A counting check's relative outcome-tier column, editing the same `outcome.dc` field a summing check calls a DC delta, now read as successes above the check's required count.
+
+[Notes](docs/domain/terms.md#extra-successes)
+
+#### Die Qualification Marks
+
+The `qualified`/`cancelled`/`exploded` marks one rolled die in a **Count Check**'s projection can carry, combined on a single tile and rendered by the shared `DiceTiles` primitive.
+
+[Notes](docs/domain/terms.md#die-qualification-marks)
+
+#### Count Display Evidence
+
+The allowlisted `count` projection every non-secret executed **Count Check** folds onto its `checkDisplay`, literal numbers and two enumerated words only, never persisted beyond the post.
+A chat card states it only on a public roll, while the result box and the salvage summary state it on any roll but a blind or secret one.
+
+[Notes](docs/domain/terms.md#count-display-evidence)
 
 #### Target Source
 

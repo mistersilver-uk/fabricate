@@ -19,6 +19,7 @@ import {
   checkRollHandoff,
   postCheckRoll,
   preRollEvidence,
+  reportedVisibility,
   rolledDiceGroups,
 } from './checkRollOutput.js';
 import {
@@ -34,7 +35,7 @@ import {
   progressiveTargetRefusal,
   targetFlavorSuffix,
 } from './checkTarget.js';
-import { preparedCountEvaluation } from './countCheck.js';
+import { preparedCountEvaluation, preparedCountOptions } from './countCheck.js';
 import {
   evaluateCountCheckRoll,
   preparedCountResult,
@@ -108,13 +109,6 @@ function routedTriggerEvidence({ forcedDisposition, tierStepApplied }) {
     ...(forcedDisposition && { forcedOutcome: forcedDisposition }),
     ...(tierStepApplied && { tierStepApplied }),
   };
-}
-
-/** The executed roll mode, on a result whose caller asked for it; never persisted. */
-function reportedVisibility(rolled) {
-  return rolled && Object.hasOwn(rolled, 'rollMode')
-    ? { visibility: { rollMode: rolled.rollMode, secret: false } }
-    : {};
 }
 
 /**
@@ -523,7 +517,7 @@ export async function evaluatePreparedRunCheck(
         toolContributions: config.toolContributions ?? [],
         evaluation,
         speaker: preparation?.speaker ?? config.speaker ?? null,
-        ...(count && { evaluation: count.evaluation, thresholdMode: count.thresholdMode }),
+        ...preparedCountOptions(count, { secret, kind, type: config.type }),
         // A pass/fail roll names its final target; a secret one never carries it.
         ...(kind === 'simple' && !secret && { flavorTarget: anchor }),
         reportVisibility: true,

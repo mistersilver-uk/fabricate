@@ -69,6 +69,31 @@ export const CASES = Object.freeze([
       ],
     })
   ),
+  // Issue 2006: a counting check's tier options name each tier's successes needed, and the default's.
+  managerCase({
+    id: 'manager-recipe-edit-check-tier-count',
+    label: 'Manager — Recipe edit check tier list, success-counting check',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', checkPreviewState: 'dice-pool-recipes' },
+    steps: [
+      'Crafting',
+      { selector: '[data-recipe-edit="sm-r-horseshoe"]' },
+      { selector: '#recipe-tab-overview' },
+      { selector: '[data-recipe-field="checkTierId"]' },
+    ],
+    expectView: 'recipe-edit',
+    expectSelector:
+      '.fabricate-manager:has([data-recipe-edit-subline]:has-text("· 1 success")) ' +
+      '.fabricate-select-popover:has-text("Default · 3 successes")' +
+      ':has([data-popover-option="sm-tier-apprentice"]:has-text("Apprentice work · 1 success"))' +
+      ' [data-popover-option="sm-tier-masterwork"]:has-text("Masterwork · 5 successes")',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/(?:RecipeOverviewTab\.svelte|recipeOverviewSelectOptions\.js)$/,
+      /^src\/ui\/model\/recipeBrowserModel\.js$/,
+    ],
+  }),
   // Every frame below reaches its state by clicking the rule group rather than by authoring a second catalogued system.
   managerCase({
     id: 'manager-recipe-edit-crafting-modifier-inherit',
