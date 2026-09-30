@@ -1,5 +1,5 @@
 /** The public-shape pin the four player-store suites share (issue 1673). */
-import { byCodePoint } from './ratchetBaseline.js';
+import { byCodePoint } from './codePointOrder.js';
 
 /** Every member's kind, read through its descriptor so no getter is invoked. */
 export function storeMemberKinds(store) {

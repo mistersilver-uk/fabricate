@@ -12,7 +12,8 @@ import { chooseSelectOption, managerCase, previewAsActor } from './caseFactories
 /**
  * The gathering task check override (issue 2005, R3), one per state of the approved prototype's
  * frames 23 and 24, on Smithing's Prospect task under `checkOverride`. `sees` is the Player sees
- * state; a `resolved` case chooses a character in the task's own Preview-as picker.
+ * state; a `resolved` case chooses a character in the task's own Preview-as picker, and `claim`
+ * adds the field's own state. `count` is issue 2006's: one successes needed Stepper, no presets.
  */
 const OPEN_PROSPECT_TASK = Object.freeze([
   { selector: '#manager-gathering-nav-tasks' },
@@ -22,7 +23,7 @@ const OPEN_PROSPECT_TASK = Object.freeze([
   },
 ]);
 const TASK_PREVIEW = '[data-gathering-task-dc] [data-override-preview-actor]';
-const taskOverrideCase = ({ id, label, field, frame, sees }) =>
+const taskOverrideCase = ({ id, label, field, frame, sees, claim = '' }) =>
   managerCase({
     id,
     label: `Manager — Gathering task check override, ${label} (prototype state ${frame})`,
@@ -39,7 +40,7 @@ const taskOverrideCase = ({ id, label, field, frame, sees }) =>
       ...(sees === 'resolved' ? previewAsActor('lab-actor-idrin', TASK_PREVIEW) : []),
     ],
     expectView: 'gathering-task-edit',
-    expectSelector: `.fabricate-manager [data-gathering-task-dc][data-gathering-task-override-field="${field}"] [data-override-player-sees="${sees}"]`,
+    expectSelector: `.fabricate-manager [data-gathering-task-dc][data-gathering-task-override-field="${field}"]${claim} [data-override-player-sees="${sees}"]`,
     kinds: ['manager', 'environments'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/,
@@ -786,5 +787,15 @@ export const CASES = Object.freeze([
     field: 'adjustmentOverride',
     frame: 24,
     sees: 'adjustment-invalid',
+  }),
+  taskOverrideCase({
+    id: 'manager-gathering-task-editor-check-count',
+    label: 'counting successes, one successes needed stepper',
+    field: 'successesOverride',
+    frame: 25,
+    sees: 'count',
+    claim:
+      ':has([data-gathering-task-successes-override][placeholder="System default"])' +
+      ':has([data-gathering-task-override-kept])',
   }),
 ]);

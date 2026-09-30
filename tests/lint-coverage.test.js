@@ -16,7 +16,7 @@ import { ESLint } from 'eslint';
 import { check as prettierCheck, getFileInfo, resolveConfig } from 'prettier/index.mjs';
 
 import { ESLINT_DEBT, ESLINT_TESTS_DEBT } from '../eslint.debt.js';
-import { byCodePoint } from './helpers/ratchetBaseline.js';
+import { byCodePoint } from './helpers/codePointOrder.js';
 import {
   LEGACY_FORMAT_ARGV,
   LEGACY_GATE_FILES,

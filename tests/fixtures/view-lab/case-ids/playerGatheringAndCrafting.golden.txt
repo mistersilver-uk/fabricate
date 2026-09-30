@@ -17,6 +17,9 @@ player-crafting-chat-card-under-blind
 player-crafting-chat-card-over-control
 player-crafting-roll-prompt-count
 player-crafting-roll-prompt-count-threshold
+player-crafting-roll-prompt-count-explode
+player-crafting-roll-prompt-count-explode-narrow
+player-crafting-roll-prompt-count-zero
 player-crafting-check-count
 player-crafting-roll-prompt-light
 player-gathering-events

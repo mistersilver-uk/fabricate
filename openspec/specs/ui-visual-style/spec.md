@@ -232,6 +232,9 @@ The numeric steppers in the tier rows remain AUTHORITATIVE; the strip is a visua
 Handles, `role="slider"` and the "DC" `aria-valuetext` remain only on the strip of a summed check graded over a fixed target.
 Every other strip — roll under, a character-value target, or a count — is a READ-ONLY derived picture drawn through the primitive's `readonly` mode: it renders no handle, so no slider role, tabindex or drag cursor, and its group's `aria-describedby` names a visually hidden list stating each band and its range.
 The caller derives those bands and formats each range; the strip derives nothing, and the tier steppers are its only editor.
+A count strip is built by `checkBandModel.js` in net successes: each band starts at the required count plus the band's extra successes, the best band met wins, and a first `Botch` band below zero is drawn only while cancelling is enabled, with a `<0` tick under the track's start (the strip's `leadingTick`).
+Its scale reads `Measured in successes. The count must reach {T}`, then `; this pool is reduced to zero, so the check fails automatically.` for a pool that is reduced to zero and fails, or a full stop otherwise, then `A net below zero is a botch.` as its own sentence while cancelling is enabled.
+Band tones follow net successes and are never reversed for a roll-under per-die test.
 
 It uses NO gradient.
 Each band is a solid fill from that band's own runtime colour applied inline via `style=` (authored data, never a source literal), and it claims NO §Product UI Visual Style exemption — the exemption's own rule (a gradient across the complete track, fill kept full-width) conflicts with per-band identity, which is the whole point of the control.

@@ -6,7 +6,7 @@ import { describe, it } from 'node:test';
 import { ESLint } from 'eslint';
 
 import { LEGACY_GATE_FILES } from './helpers/legacyLintGate.js';
-import { byCodePoint } from './helpers/ratchetBaseline.js';
+import { byCodePoint } from './helpers/codePointOrder.js';
 import { collectSources, repoRoot } from './helpers/sourceScan.js';
 
 /** Repo-relative POSIX path, built without a backslash literal. */

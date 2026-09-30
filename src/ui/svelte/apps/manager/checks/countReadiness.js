@@ -10,6 +10,7 @@ import {
   resolvePool,
 } from '../../../../../systems/countEvaluation.js';
 import { normalizeNullableSuccesses } from '../../../../../systems/normalize/checkEvaluation.js';
+import { parseDiceGroups } from '../../../../../utils/craftingCheckExpression.js';
 import { trimString as trimmed } from '../../../../../utils/scalars.js';
 
 import { missingTargetPaths, readsCharacter, targetExpressionFault } from './checkTargetStatus.js';
@@ -35,9 +36,9 @@ function countFaceSetReadiness(result, pool, raise) {
     (kind) => pool[kind].enabled && pool[kind].faces.kind === 'from'
   );
   if (fromRules.length === 0) return;
-  const missing = fromRules.find((kind) => pool[kind].faces.value === null);
-  result.checks.push({ id: 'countFacesSet', satisfied: !missing });
-  if (missing) raise(result.issues, 'countFaceMissing', 'critical', { kind: missing });
+  const missing = fromRules.filter((kind) => pool[kind].faces.value === null);
+  result.checks.push({ id: 'countFacesSet', satisfied: missing.length === 0 });
+  for (const kind of missing) raise(result.issues, 'countFaceMissing', 'critical', { kind });
 }
 
 /** Explode and cancel faces are set and on the die, and an explosion can stop. */
@@ -80,9 +81,33 @@ function poolCanFire(condition, { groupId, sides }) {
 }
 
 /**
- * Retained dice triggers the pool can never fire (ruling R3), named by the summary heading their
- * cards, as `{ key, fallback, data }` fragments the copy layer localizes: a warning only, and the
- * triggers are never rewritten, so they work again after switching back.
+ * The die a kept trigger's group reads in the formula it was written for: a repeated die by its
+ * ordinal, and a group the formula no longer has by number, as a fragment the copy layer localizes.
+ */
+function formulaGroupName(rollFormula, groupId) {
+  const parsed = parseDiceGroups(rollFormula);
+  const group = parsed[groupId];
+  if (!group) {
+    return {
+      key: 'FABRICATE.Admin.Manager.Checks.Validation.CountTriggerDiceGroup',
+      fallback: 'dice group {n}',
+      data: { n: groupId + 1 },
+    };
+  }
+  const same = parsed.filter((entry) => entry.raw === group.raw);
+  if (same.length === 1) return group.raw;
+  const n = parsed.slice(0, groupId + 1).filter((entry) => entry.raw === group.raw).length;
+  return {
+    key: 'FABRICATE.Admin.Manager.Checks.Breakage.GroupOrdinal',
+    fallback: '{die} #{n}',
+    data: { die: group.raw, n },
+  };
+}
+
+/**
+ * Retained dice triggers the pool can never fire (ruling R3), named against the formula they were
+ * written for, as `{ key, fallback, data }` fragments the copy layer localizes: a warning only, and
+ * the triggers are never rewritten, so they work again after switching back.
  */
 function countTriggerReadiness(result, check, evaluation, raise) {
   const triggers = Array.isArray(check?.checkBreakage?.triggers)
@@ -94,8 +119,11 @@ function countTriggerReadiness(result, check, evaluation, raise) {
   const unreachable = dice.filter((trigger) => !poolCanFire(trigger.condition, group));
   result.checks.push({ id: 'countTriggersReachable', satisfied: unreachable.length === 0 });
   if (unreachable.length > 0) {
-    const context = { diceGroups: [group], counting: true };
-    const triggers = unreachable.map((trigger) => summariseCondition(trigger.condition, context));
+    const triggers = unreachable.map(({ condition }) => {
+      const groupId = Number(condition.groupId);
+      const label = formulaGroupName(check?.rollFormula, groupId);
+      return summariseCondition(condition, { diceGroups: [{ groupId, label }], counting: true });
+    });
     raise(result.issues, 'countTriggerGroupUnreachable', 'warning', { triggers });
   }
 }

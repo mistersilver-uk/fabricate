@@ -1,29 +1,7 @@
 /** The shared shape of a ratchet: a keyed, counted baseline that may only shrink (issue 1391). */
 import { readFileSync, writeFileSync } from 'node:fs';
 
-/**
- * Tally observed keys.
- *
- * @returns {Map<string, number>} key to count, insertion-ordered.
- */
-export function tallyByKey(items, keyOf) {
-  const counts = new Map();
-  for (const item of items) {
-    const key = keyOf(item);
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
-  return counts;
-}
-
-/**
- * Order two strings by code point.
- *
- * @returns {number} negative, zero or positive, per the `Array#sort` contract
- */
-export function byCodePoint(left, right) {
-  if (left === right) return 0;
-  return left < right ? -1 : 1;
-}
+import { byCodePoint } from './codePointOrder.js';
 
 /** The baseline as a `key -> count` map, rejecting a duplicated or malformed row. */
 function indexBaseline(baseline, label) {

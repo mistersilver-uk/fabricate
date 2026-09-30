@@ -4,7 +4,7 @@
  */
 import assert from 'node:assert/strict';
 
-import { byCodePoint } from '../helpers/ratchetBaseline.js';
+import { byCodePoint } from '../helpers/codePointOrder.js';
 
 
 export const MANAGER_SERVICE_KEYS = Object.freeze([

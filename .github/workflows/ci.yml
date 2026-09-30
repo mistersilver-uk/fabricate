@@ -31,8 +31,19 @@ jobs:
     # tests and the build, which run in about 4 minutes warm. Raising it does not reintroduce
     # the burn it used to hide: nothing here can now hang for the whole budget unnoticed.
     timeout-minutes: 15
+    env:
+      # The base every merge-base ratchet compares with (tests/helpers/mergeBaseRatchet.js): on a
+      # PR's merge ref HEAD^1 is the base tip, and a push compares with the tip it replaced.
+      RATCHET_BASE: ${{ github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000' && github.event.before || 'HEAD^1' }}
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      # A push of several commits leaves the tip it replaced outside the depth-2 checkout.
+      - name: Fetch the ratchet base
+        if: github.event_name == 'push'
+        run: git cat-file -e "$RATCHET_BASE^{commit}" 2>/dev/null || git fetch --no-tags --depth=1 origin "$RATCHET_BASE"
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -133,8 +144,19 @@ jobs:
     # time with the debt baseline lifted, which would serialise two full ESLint passes into one
     # job's budget. It has its own job below so the two run in parallel.
     timeout-minutes: 15
+    env:
+      # The base every merge-base ratchet compares with (tests/helpers/mergeBaseRatchet.js): on a
+      # PR's merge ref HEAD^1 is the base tip, and a push compares with the tip it replaced.
+      RATCHET_BASE: ${{ github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000' && github.event.before || 'HEAD^1' }}
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      # A push of several commits leaves the tip it replaced outside the depth-2 checkout.
+      - name: Fetch the ratchet base
+        if: github.event_name == 'push'
+        run: git cat-file -e "$RATCHET_BASE^{commit}" 2>/dev/null || git fetch --no-tags --depth=1 origin "$RATCHET_BASE"
 
       - name: Setup Node.js
         uses: actions/setup-node@v6

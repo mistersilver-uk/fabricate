@@ -110,6 +110,34 @@ describe('Review lands on the count control that clears the notice (N25)', () =>
     });
   }
 
+  it('a typed cancel face stages through the draft writer and clears countFaceMissing', async () => {
+    const staged = [];
+    const root = await simple(
+      { evaluation: count({ cancel: missing }) },
+      { onUpdateCraftingCheckSimple: (next) => staged.push(next) }
+    );
+    assert.ok(Boolean(notice(root, 'countFaceMissing')), 'the missing face is explained first');
+    const input = root.querySelector('[data-check-count-cancel-face]');
+    input.value = '2';
+    const { Event } = root.ownerDocument.defaultView;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('blur'));
+    await settle();
+    assert.deepEqual(staged.at(-1).evaluation.pool.cancel.faces, { kind: 'from', value: 2 });
+    await harness.setProps({ craftingCheckSimple: staged.at(-1) });
+    await settle();
+    assert.ok(!notice(root, 'countFaceMissing'), 'the notice clears once the face is set');
+  });
+
+  it('explains each missing face in its own notice', async () => {
+    const root = await simple({ evaluation: count({ explode: missing, cancel: missing }) });
+    const notices = [...root.querySelectorAll('[data-checks-section-notice="countFaceMissing"]')];
+    assert.deepEqual(
+      notices.map((found) => found.textContent.match(/"kind":"(\w+)"/)?.[1]),
+      ['explode', 'cancel']
+    );
+  });
+
   it('a dead dice trigger is explained on Triggers, and Review lands on the trigger list', async () => {
     const trigger = {
       id: 'second',
@@ -188,5 +216,97 @@ describe('the roll section converts a summing counting formula (N21)', () => {
     assert.deepEqual(staged, [], 'Review writes nothing');
     assert.ok(focused === root.querySelector('[data-validation-target="checks-roll-formula"]'));
     assert.ok(Boolean(root.querySelector('[data-check-formula-average-withheld="die-modifiers"]')), 'avg — stays beside the warning');
+  });
+});
+
+describe('the Validation tab converts through each activity draft writer (N21)', () => {
+  const summed = {
+    rollFormula: '6d10cs>=8',
+    dc: 12,
+    thresholdMode: 'meet',
+    dcMode: 'static',
+    checkBreakage: { triggers: [] },
+    tiers: [],
+    evaluation: { product: 'sum', direction: 'over', target: { source: 'fixed' } },
+  };
+  const routedSummed = {
+    ...summed,
+    type: 'relative',
+    relativeOutcomes: [{ id: 'pass', name: 'Pass', dc: 0, success: true }],
+    fixedOutcomes: [],
+  };
+  const convertRow = (root, subsystem) =>
+    root.querySelector(
+      `[data-issue="freeTextCountingFormula"][data-subsystem="${subsystem}"] [data-validation-row-action]`
+    );
+
+  it('Validation Convert stages the salvage row through the salvage writer, never crafting', async () => {
+    const staged = { crafting: [], salvage: [] };
+    const opened = [];
+    const root = await harness.mount({
+      activity: 'validation',
+      resolutionMode: 'simple',
+      craftingCheckSimple: simpleCheck({ rollFormula: '1d20 + 2' }),
+      salvageResolutionMode: 'simple',
+      salvageCheckSimple: summed,
+      activation: { crafting: { enabled: true, optional: false }, salvage: { enabled: true, optional: false } },
+      features: { salvage: true },
+      onUpdateCraftingCheckSimple: (n) => staged.crafting.push(n),
+      onUpdateSalvageCheckSimple: (n) => staged.salvage.push(n),
+      onOpenActivity: (a, s) => opened.push([a, s]),
+    });
+    await settle();
+    convertRow(root, 'salvage').click();
+    await settle();
+    assert.deepEqual(staged.crafting, []);
+    assert.deepEqual(staged.salvage, [convertCountingFormula(summed)]);
+    assert.deepEqual(opened, [['salvage', 'roll']]);
+  });
+
+  it('stages a routed gathering row through the routed gathering writer', async () => {
+    const staged = { crafting: [], progressive: [], routed: [] };
+    const opened = [];
+    const root = await harness.mount({
+      activity: 'validation',
+      resolutionMode: 'simple',
+      craftingCheckSimple: simpleCheck({ rollFormula: '1d20 + 2' }),
+      gatheringResolutionMode: 'routed',
+      gatheringCheckRouted: routedSummed,
+      activation: { crafting: { enabled: true, optional: false }, gathering: { enabled: true, optional: false } },
+      features: { salvage: false, gathering: true },
+      onUpdateCraftingCheckSimple: (n) => staged.crafting.push(n),
+      onUpdateGatheringCheckProgressive: (n) => staged.progressive.push(n),
+      onUpdateGatheringCheckRouted: (n) => staged.routed.push(n),
+      onOpenActivity: (a, s) => opened.push([a, s]),
+    });
+    await settle();
+    convertRow(root, 'gathering').click();
+    await settle();
+    assert.deepEqual(staged.crafting, []);
+    assert.deepEqual(staged.progressive, []);
+    assert.deepEqual(staged.routed, [convertCountingFormula(routedSummed)]);
+    assert.deepEqual(opened, [['gathering', 'roll']]);
+  });
+
+  it('stages a routedByCheck crafting row through the routed crafting writer', async () => {
+    const staged = { simple: [], routed: [] };
+    const opened = [];
+    const root = await harness.mount({
+      activity: 'validation',
+      resolutionMode: 'routedByCheck',
+      craftingCheck: routedSummed,
+      craftingCheckSimple: simpleCheck({ rollFormula: '1d20 + 2' }),
+      activation: { crafting: { enabled: true, optional: false } },
+      features: { salvage: false },
+      onUpdateCraftingCheckSimple: (n) => staged.simple.push(n),
+      onUpdateCraftingCheck: (n) => staged.routed.push(n),
+      onOpenActivity: (a, s) => opened.push([a, s]),
+    });
+    await settle();
+    convertRow(root, 'crafting').click();
+    await settle();
+    assert.deepEqual(staged.simple, []);
+    assert.deepEqual(staged.routed, [convertCountingFormula(routedSummed)]);
+    assert.deepEqual(opened, [['crafting', 'roll']]);
   });
 });

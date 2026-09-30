@@ -109,6 +109,10 @@
     margin-left: auto;
   }
 
+  .manager-checks-formula-average-value {
+    color: var(--fab-text-muted);
+  }
+
   .manager-checks-formula-comparison {
     color: var(--fab-text-subtle);
     font-size: 11.5px;

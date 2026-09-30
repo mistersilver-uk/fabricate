@@ -161,12 +161,14 @@ describe('the routed editor authors a counting check (issue 2006)', () => {
       'Fine: 3–4',
       'Masterwork: 5 or more',
     ]);
+    assert.deepEqual(texts(state.root, '.fab-band-strip-tick'), ['<0', '0', '2', '3', '5'], 'frame 13');
     assert.equal(
       state.root.querySelector('[data-outcome-band-scale]').textContent.trim(),
       'Measured in successes. The count must reach 2. A net below zero is a botch.'
     );
     await routedHarness.setProps({ value: check({ cancel: { enabled: false } }) });
     assert.deepEqual(texts(state.root, '[data-band-strip-band-list] li')[0], 'Ruined: 0–1');
+    assert.ok(!state.root.querySelector('[data-band-strip-leading-tick]'), 'no <0 without a botch');
     assert.equal(
       state.root.querySelector('[data-outcome-band-scale]').textContent.trim(),
       'Measured in successes. The count must reach 2.'
@@ -225,6 +227,7 @@ describe('the simple editor authors a counting check (issue 2006)', () => {
       'Failure: 0–1',
       'Success: 2 or more',
     ]);
+    assert.equal(root.querySelector('[data-band-strip-leading-tick]')?.textContent.trim(), '<0');
     assert.equal(
       root.querySelector('[data-simple-band-scale]').textContent.trim(),
       'Measured in successes. The count must reach 2. A net below zero is a botch.'

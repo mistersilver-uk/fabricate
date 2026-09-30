@@ -319,6 +319,20 @@ describe("a counting check's tiers name the successes they need (issue 2006)", (
     assert.ok(!Object.hasOwn(emitted.at(-1)[0], 'successes'), 'a later switch to count still asks');
   });
 
+  it('an empty counting list invites tiers that set successes, never a DC override', async () => {
+    const counting = await harness.mount({ tiers: [], evaluation: COUNTING });
+    assert.equal(
+      counting.querySelector('[data-tiers-empty]').textContent.trim(),
+      'No tiers yet. Add named tiers a recipe can select to set how many successes it needs.'
+    );
+    harness.remount();
+    const summing = await harness.mount({ tiers: [], evaluation: { ...COUNTING, product: 'sum' } });
+    assert.equal(
+      summing.querySelector('[data-tiers-empty]').textContent.trim(),
+      'No tiers yet. Add named tiers a recipe can select to override the DC.'
+    );
+  });
+
   it('a summing check keeps the DC column and no successes', async () => {
     const target = await harness.mount({ tiers: COUNT_TIERS, evaluation: { ...COUNTING, product: 'sum' } });
     assert.deepEqual(

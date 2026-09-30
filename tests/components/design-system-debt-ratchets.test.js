@@ -5,7 +5,8 @@ import test from 'node:test';
 
 import { compoundClasses, compoundsOf } from '../../scripts/lib/stylesheetLiveClasses.js';
 import { censusRules, selectorAppearances } from '../../scripts/lib/stylesheetSelectorCensus.js';
-import { assertRatchet, byCodePoint, tallyByKey } from '../helpers/ratchetBaseline.js';
+import { assertRatchet } from '../helpers/ratchetBaseline.js';
+import { byCodePoint, tallyByKey } from '../helpers/codePointOrder.js';
 import { collectWorkingTreeSources, stripComments } from '../helpers/sourceScan.js';
 import {
   collectCustomProperties,
@@ -1532,8 +1533,8 @@ test("the repetition ledger publishes the figures the sheet actually produces", 
 });
 
 test("the module sheet's cross-list selector repetition does not move", () => {
-  // Filtered to count >= 2 on both sides. Unfiltered the sheet holds 3,051 `(at-context, selector)`
-  // keys under this very keying, of which 2,945 appear exactly once; `assertRatchet` compares key
+  // Filtered to count >= 2 on both sides. Unfiltered the sheet holds 3,061 `(at-context, selector)`
+  // keys under this very keying, of which 2,955 appear exactly once; `assertRatchet` compares key
   // by key, so an unfiltered table would report every singleton as new debt the first time anybody
   // added a rule. Filtering both sides keeps a selector FALLING to one appearance visible: it
   // leaves the observed tally, and a baseline row nothing matches is a VANISHED failure.

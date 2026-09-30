@@ -304,7 +304,7 @@ describe('roll prompt adapter', () => {
     );
     assert.equal(
       await note({ threshold: 6.5, thresholdAnchor: 8 }),
-      'Success on ≥ 6.5, moved −1.5 by modifiers',
+      'Success on ≥ 6.5, moved +1.5 by modifiers',
       'a Tool benefit settled before the prompt moved the fixed threshold'
     );
     assert.equal(await note({ pool: null, threshold: null, die: null, explode: best }), undefined,
@@ -412,8 +412,9 @@ describe('roll prompt adapter', () => {
       'the pool floors once, after every benefit');
 
     const threshold = await promptFor({ modifierDestination: 'threshold' });
-    assert.equal(threshold.labels.formulaNote, 'Success on ≥ 7, moved −1 by modifiers');
-    assert.deepEqual(line(threshold, ['a'], '+2'), ['6d10 · each ≥ 5', 'Success on ≥ 5, moved −3 by modifiers', '']);
+    assert.equal(threshold.labels.formulaNote, 'Success on ≥ 7, moved +1 by modifiers',
+      'a +1 benefit reads moved +1, signed by the benefit, never by the arithmetic');
+    assert.deepEqual(line(threshold, ['a'], '+2'), ['6d10 · each ≥ 5', 'Success on ≥ 5, moved +3 by modifiers', '']);
     assert.deepEqual(line(threshold, [], '1d4'), ['6d10 · each ≥ 8 + 1d4', 'Success on ≥ 8', '']);
     const under = await promptFor({
       direction: 'under', modifierDestination: 'threshold', thresholdSource: 'character', thresholdAnchor: 8,
@@ -421,6 +422,8 @@ describe('roll prompt adapter', () => {
     assert.deepEqual(line(under, ['a'], '-3'), [
       '6d10 · each ≤ 6', 'Success on ≤ 6 (character value 8), moved −2 by modifiers', '',
     ]);
+    assert.equal(line(under, ['a'], '')[1], 'Success on ≤ 9 (character value 8), moved +1 by modifiers',
+      'a +1 benefit reads moved +1 under too');
 
     const zero = await promptFor({ pool: 1, die: 6, modifierChoice: null });
     const notice = 'This roll fails automatically: the pool is reduced to zero.';
@@ -431,6 +434,8 @@ describe('roll prompt adapter', () => {
       'a pool that does not fail at zero still rolls one die');
     assert.equal(line({ ...zero, count: { ...zero.count, pool: 0 } }, [], '1d4')[2], '',
       'pending dice may lift a pool above zero, so no automatic failure is claimed');
+    assert.equal(line({ ...zero, count: { ...zero.count, pool: 0, destination: 'threshold' } }, [], '1d4')[2], notice,
+      'a rolled bonus that moves the threshold cannot add dice, so the zero pool still fails');
   });
 
   it('names a summed roll-under target to stay under, and leaves roll-over copy unchanged', async () => {

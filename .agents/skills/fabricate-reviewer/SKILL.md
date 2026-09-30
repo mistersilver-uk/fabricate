@@ -109,8 +109,9 @@ PR-scoped screenshots should not be committed as repository assets.
 - Image UI tests or smoke screenshots prove linked-image priority, or the remaining screenshot gap is explicitly called out.
 - Smoke screenshot data uses Foundry VTT core or dnd5e non-SVG raster paths when previews need imagery; invented SVG preview art should be treated as a finding.
 - **Bloat is a finding, not a style note.** Return `NEEDS_CHANGES` for a comment that narrates history or argues a rejected alternative, for ALL-CAPS emphasis, for a header longer than its template, for a unit past the size gate, for a new `Source.includes(` pin, and for a helper redeclared beside a shared one.
-"Observed failure mode: bloat" in `AGENTS.md` names each shape with the ledger that measures it, and a diff that raises `tests/comment-share-ledger.txt`, `tests/file-size-ledger.txt`, or `tests/source-pin-ledger.txt` is going the wrong way even while its gate stays green.
-Those rows are ceilings, so a raised one needs its reason in the PR, and a PR whose stated purpose is condensation, extraction or pin conversion is `NEEDS_CHANGES` when it leaves the ledgers it moved byte-identical instead of running `TIGHTEN_<X>_LEDGER=1`.
+"Observed failure mode: bloat" in `AGENTS.md` names each shape with the ledger that measures it, and a diff that raises a directory's comment share or a file's pin count in `tests/source-pin-ratchet.test.js`, or adds a `ratchet-exempt(file-size)` marker for `tests/file-size-ratchet.test.js`, is going the wrong way even while its gate stays green.
+For `tests/comment-share-ratchet.test.js`, `tests/file-size-ratchet.test.js` and `tests/source-pin-ratchet.test.js`, `NEEDS_CHANGES` follows when a moved unit is still oversized, a touched directory is still over cap, or a file's pin count is unchanged — a real reduction shows up as a `shrank` line against the base commit, and a legitimate rise needs a `ratchet-exempt(<family>): <reason>` marker at the site.
+A remaining ledger-backed family's rows are still ceilings, raised with a reason in the PR and lowered with `TIGHTEN_<X>_LEDGER=1`.
 
 ## Foundry API checks
 

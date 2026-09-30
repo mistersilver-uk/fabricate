@@ -12,7 +12,7 @@
 
   Under a character value (issue 2005) a tier names its difficulty ADJUSTMENT instead of a DC; a
   tier without one reads `—` and says so, and its kept DC is left untouched. Under a counting check
-  (issue 2006) a tier names the SUCCESSES it needs the same way, never reading its DC as a count.
+  (issue 2006) a tier names the successes it needs the same way, never reading its DC as a count.
 -->
 <script>
   import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
@@ -131,7 +131,7 @@
         );
   });
 
-  // Validation's control for a tier without successes is the FIRST such tier's stepper.
+  // Validation's control for a tier without successes is the first such tier's stepper.
   const firstMissing = $derived(count ? list.find((tier) => tier.successes == null) : undefined);
 
   const uid = $props.id();
@@ -158,10 +158,15 @@
 <div class="manager-checks-card-body is-stack">
   {#if list.length === 0}
     <p class="manager-muted" data-tiers-empty>
-      {text(
-        'FABRICATE.Admin.Manager.Checks.Crafting.NoTiers',
-        'No tiers yet. Add named tiers a recipe can select to override the DC.'
-      )}
+      {count
+        ? text(
+            'FABRICATE.Admin.Manager.Checks.Crafting.NoTiersCount',
+            'No tiers yet. Add named tiers a recipe can select to set how many successes it needs.'
+          )
+        : text(
+            'FABRICATE.Admin.Manager.Checks.Crafting.NoTiers',
+            'No tiers yet. Add named tiers a recipe can select to override the DC.'
+          )}
     </p>
     <!-- The adder follows the empty message (issue 1512): with no tiers there is no list for it to
          be a footer of, and an empty state that says "add one" with nothing to press is a dead end. -->

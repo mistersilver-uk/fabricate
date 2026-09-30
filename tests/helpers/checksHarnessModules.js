@@ -95,6 +95,9 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
   'src/utils/checkAdjustmentFormat.js',
   'src/ui/svelte/apps/manager/checks/checkBandModel.js',
+  'src/ui/svelte/apps/manager/checks/readonlyBandPicture.js',
+  // The Checks route's per-activity words.
+  'src/ui/svelte/apps/manager/checks/checksActivityCopy.js',
   'src/ui/svelte/apps/manager/checks/checkTargetStatus.js',
   'src/systems/checkEvaluation.js',
   'src/systems/checkRoll.js',

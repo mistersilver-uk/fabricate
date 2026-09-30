@@ -147,7 +147,7 @@ function countTarget(data, selectedIds, bonus) {
     chipText: data.chipText,
     source: '',
     formula: fill(template, { ...values, formula: pending.join(' + ') }),
-    note: `${countRule(count, values, threshold, labels)}${labels.countFaces}`,
+    note: `${countRule(count, values, { threshold, direction }, labels)}${labels.countFaces}`,
     // A pending roll that adds dice may still lift the pool above zero.
     zeroPool:
       settled.zeroPool && !(pending.length > 0 && destination === 'pool')
@@ -156,8 +156,11 @@ function countTarget(data, selectedIds, bonus) {
   };
 }
 
-/** `Success on {sym} {threshold}`, the character value it read, and how far modifiers moved it. */
-function countRule(count, values, threshold, labels) {
+/**
+ * `Success on {sym} {threshold}`, the character value it read, and how far modifiers moved it,
+ * signed by the benefit: a +1 bonus reads `moved +1` whichever way the threshold travelled.
+ */
+function countRule(count, values, { threshold, direction }, labels) {
   const character = count.thresholdSource === 'character' && Number.isFinite(count.thresholdAnchor);
   const rule = character
     ? fill(labels.countRuleCharacter, {
@@ -165,8 +168,7 @@ function countRule(count, values, threshold, labels) {
         value: countFormulaValues({ threshold: count.thresholdAnchor }).threshold,
       })
     : fill(labels.countRule, values);
-  const moved = Number.isFinite(count.thresholdAnchor)
-    ? Number((threshold - count.thresholdAnchor).toFixed(2))
-    : 0;
+  const delta = Number.isFinite(count.thresholdAnchor) ? threshold - count.thresholdAnchor : 0;
+  const moved = Number((direction === 'over' ? -delta : delta).toFixed(2));
   return moved === 0 ? rule : fill(labels.countRuleMoved, { rule, moved: formatSignedStep(moved) });
 }

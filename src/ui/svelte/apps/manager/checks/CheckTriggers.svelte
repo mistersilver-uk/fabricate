@@ -9,7 +9,7 @@
   An `outcomeTier` condition cannot force an outcome — the routed tier resolves AFTER the forced
   outcome would run — so its outcome segments are pinned to No effect and disabled. It CAN step.
 
-  Controlled. Dice groups come from `parseDiceGroups`, so a `diceGroup` trigger targets a group
+  Controlled. Dice groups come from `triggerDiceGroups`, so a `diceGroup` trigger targets a group
   by its evaluated-term index, and `kind` selects which condition types are offered. A counting
   check reads its pool as the one group and its total as net successes (issue 2006).
 -->
@@ -18,12 +18,12 @@
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import Select from '../../../components/Select.svelte';
   import { localize } from '../../../util/foundryBridge.js';
-  import { parseDiceGroups } from '../../../../../utils/craftingCheckExpression.js';
   import { interpolate } from './checksCopy.js';
   import {
     buildPresetTrigger,
     checkTriggerPresets,
     countPoolDiceGroup,
+    triggerDiceGroups,
   } from './checkTriggerPresets.js';
   import { summariseCondition, summariseEffect, summariseHeadline } from './checkTriggerSummary.js';
   import {
@@ -66,33 +66,9 @@
 
   const triggers = $derived(Array.isArray(value?.triggers) ? value.triggers : []);
 
-  const poolGroup = $derived(countPoolDiceGroup(evaluation));
-  const counting = $derived(poolGroup !== null);
-
-  // Dice groups in evaluated-term order, `groupId` matching the engine's `roll.dice` index.
-  const diceGroups = $derived(
-    (() => {
-      if (poolGroup) return [poolGroup];
-      const parsed = parseDiceGroups(rollFormula);
-      // Function-local counters, discarded when the $derived IIFE returns.
-      // eslint-disable-next-line svelte/prefer-svelte-reactivity
-      const seen = new Map();
-      // eslint-disable-next-line svelte/prefer-svelte-reactivity
-      const counts = new Map();
-      for (const group of parsed) counts.set(group.raw, (counts.get(group.raw) || 0) + 1);
-      return parsed.map((group, groupId) => {
-        const occurrence = (seen.get(group.raw) || 0) + 1;
-        seen.set(group.raw, occurrence);
-        const duplicated = (counts.get(group.raw) || 0) > 1;
-        const label = duplicated
-          ? text('FABRICATE.Admin.Manager.Checks.Breakage.GroupOrdinal', '{die} #{n}')
-              .replace('{die}', group.raw)
-              .replace('{n}', String(occurrence))
-          : group.raw;
-        return { groupId, raw: group.raw, count: group.count, sides: group.sides, label };
-      });
-    })()
-  );
+  // Dice groups in evaluated-term order; a counting check reads its pool as the one group.
+  const diceGroups = $derived(triggerDiceGroups({ evaluation, rollFormula }, text));
+  const counting = $derived(countPoolDiceGroup(evaluation) !== null);
 
   const firstD20GroupId = $derived(diceGroups.find((group) => group.sides === 20)?.groupId ?? null);
 

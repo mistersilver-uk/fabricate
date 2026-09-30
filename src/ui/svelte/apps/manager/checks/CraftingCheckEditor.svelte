@@ -17,28 +17,14 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import { findRangeConflicts } from '../../../../../utils/craftingCheckExpression.js';
-  import {
-    normalizeCheckEvaluation,
-    normalizeNullableSuccesses,
-  } from '../../../../../systems/normalize/checkEvaluation.js';
+  import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
   import { activeCheckEvaluation } from '../../../../../systems/checkTarget.js';
   import { routedOutcomeOrder } from '../../../../../systems/checkRouting.js';
   import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import ThresholdBandStrip from '../../../components/ThresholdBandStrip.svelte';
-  import {
-    bandToneFor,
-    bandsAreEditable,
-    buildCountBands,
-    buildRoutedBands,
-    countBandScale,
-    countPoolSettlesToZero,
-    describeBandRange,
-    describeCountBandRange,
-    describeBandsUnavailable,
-    previewBandTarget,
-    previewScaleSentence,
-  } from './checkBandModel.js';
+  import { bandToneFor, bandsAreEditable, describeBandsUnavailable } from './checkBandModel.js';
+  import { readonlyBandPicture } from './readonlyBandPicture.js';
   import CheckDcMacroCard from './CheckDcMacroCard.svelte';
   import CheckOutcomeRow from './CheckOutcomeRow.svelte';
   import CheckDifficultyCard from './CheckDifficultyCard.svelte';
@@ -55,7 +41,6 @@
   import Select from '../../../components/Select.svelte';
   import { previewRecordSelectOptions } from './checksSelectOptions.js';
   import { previewTierAdjustment } from './checkAdjustmentLabel.js';
-  import { countRequired } from '../../../../../systems/countCheck.js';
 
   // `showTiers` (default true) renders the per-recipe tier table, relative type only;
   // salvage/gathering reuse this editor with it off, having no records to pick a tier from.
@@ -273,29 +258,9 @@
     return `color-mix(in oklab, var(--fab-${tone}) ${BAND_TONE_MIX}%, ${BAND_TONE_BASE})`;
   }
 
-  // The read-only picture (issue 2005): the runtime's own classification of each total against
-  // the previewed target, toned by rank so the best band takes the same hue in either direction.
-  // A fixed-type check reads no target, so its ranges are drawn as authored.
+  // The read-only picture (issues 2005, 2006), painted with this editor's fill.
   const previewedTier = $derived(
     recipeTiers.find((tier) => tier.id === selectedPreviewRecordId) ?? null
-  );
-  const readonlyTarget = $derived(
-    editableBands || counts || type === 'fixed'
-      ? null
-      : previewBandTarget(
-          {
-            evaluation: graded,
-            anchor: previewDc,
-            tier: previewedTier,
-            character: previewCharacter,
-            modifiers: previewModifierTotal,
-          },
-          text
-        )
-  );
-  // A count grades the previewed record's successes needed, its own when the tier sets none.
-  const countTarget = $derived(
-    counts ? countRequired(graded, normalizeNullableSuccesses(previewedTier?.successes)) : null
   );
   const paintBand = (band, tone, range) => ({
     ...band,
@@ -304,40 +269,29 @@
     ink: `var(--fab-${tone}-text)`,
     swatch: `var(--fab-${tone})`,
   });
-  const readonlyBands = $derived.by(() => {
-    if (counts) {
-      const names = { botch: text('FABRICATE.Admin.Manager.Checks.Odds.Botch', 'Botch') };
-      const input = { evaluation: graded, required: countTarget, type, outcomes, names };
-      const paint = (band) => paintBand(band, band.tone, describeCountBandRange(band, text));
-      return buildCountBands(input).map(paint);
-    }
-    if (editableBands || (type !== 'fixed' && readonlyTarget?.state !== 'ok')) return [];
-    const bands = buildRoutedBands({
-      evaluation: graded,
-      comparison,
-      anchor: readonlyTarget?.anchor ?? null,
-      targetDelta: readonlyTarget?.delta ?? 0,
-      type,
-      outcomes,
-      min: trackMin,
-      max: trackMax,
-    });
-    return bands.map((band, position) => {
-      const rank = graded.direction === 'under' ? bands.length - 1 - position : position;
-      return paintBand(band, bandToneFor(rank, bands.length), describeBandRange(band, text));
-    });
-  });
-  const countScale = $derived.by(() => {
-    if (!counts || type === 'fixed') return '';
-    const pool = { evaluation: graded, thresholdMode: comparison, character: previewCharacter };
-    const zeroPool = countPoolSettlesToZero({ ...pool, placement: countPreview?.placement });
-    const cancels = graded.pool.cancel.enabled;
-    return countBandScale({ required: countTarget, zeroPool, cancels }, text);
-  });
-  const readonlyScale = $derived(
-    countScale ||
-      previewScaleSentence(readonlyTarget, { direction: graded.direction, comparison }, text)
+  const picture = $derived(
+    readonlyBandPicture(
+      {
+        graded,
+        editableBands,
+        type,
+        outcomes,
+        comparison,
+        anchor: previewDc,
+        tier: previewedTier,
+        character: previewCharacter,
+        modifiers: previewModifierTotal,
+        placement: countPreview?.placement,
+        min: trackMin,
+        max: trackMax,
+        paint: paintBand,
+      },
+      text
+    )
   );
+  const readonlyTarget = $derived(picture.target);
+  const readonlyBands = $derived(picture.bands);
+  const readonlyScale = $derived(picture.scale);
   const bandsFallback = $derived.by(() => {
     if (readonlyTarget && readonlyTarget.state !== 'ok') {
       return describeBandsUnavailable(
@@ -591,6 +545,7 @@
             readonly={!editableBands}
             binding={type === 'fixed' ? 'fixed' : 'relative'}
             bands={bandStripBands}
+            leadingTick={bandStripBands[0]?.botch ? '<0' : ''}
             {previewDc}
             {previewLabel}
             groupLabel={text('FABRICATE.Admin.Manager.Checks.Crafting.BandsTitle', 'Outcome bands')}

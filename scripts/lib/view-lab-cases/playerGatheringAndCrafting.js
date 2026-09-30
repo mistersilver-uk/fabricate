@@ -14,6 +14,12 @@ import { playerCase, responsiveLayout } from './caseFactories.js';
 
 /** The single-subject roll prompt: Fabricate's own modal, mounted over the player window. */
 const SINGLE_PROMPT = '.fabricate-app .manager-modal[data-roll-prompt="single"]';
+/** The files a count prompt case is drawn from (issue 2006). */
+const COUNT_PROMPT_SOURCES = Object.freeze([
+  CRAFTING_SIMPLE,
+  /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target)?\.svelte$/,
+  /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
+]);
 
 /** Issue 2005's player-rendering states: open the horseshoe and press Craft, prompting. */
 const CRAFT_HORSESHOE = Object.freeze([
@@ -359,7 +365,7 @@ export const CASES = Object.freeze([
     expectSelector:
       `${SINGLE_PROMPT}:not(:has(button[data-action="advantage"]))` +
       ':has(.manager-modal-subtitle:text-is("Sera Vane · Fine Craft"))' +
-      ':has(.formula-content .formula[data-roll-prompt-count="over"]:text-is("7d10 · each ≥ 8"))' +
+      ':has(.formula-content .formula[data-roll-prompt-count="over"]:text-is("6d10 · each ≥ 8"))' +
       ':has(.formula-content .formula-note:text-is("Success on ≥ 8 · explodes on 10 · 1 cancels a success"))' +
       ':has(.formula-content .manager-chip[data-roll-prompt-required="2"]:has-text("2 successes needed"))' +
       ':has(.static-modifiers .manager-chip:has-text("Steady hands +1"))' +
@@ -384,8 +390,8 @@ export const CASES = Object.freeze([
     expectSelector:
       `${SINGLE_PROMPT}:not(:has(button[data-action="advantage"]))` +
       ':has(.manager-modal-subtitle:text-is("Sera Vane · Complex Work"))' +
-      ':has(.formula-content .formula[data-roll-prompt-count="under"]:text-is("2d20 · each ≤ 15"))' +
-      ':has(.formula-content .formula-note:text-is("Success on ≤ 15 (character value 14), moved +1 by modifiers"))' +
+      ':has(.formula-content .formula[data-roll-prompt-count="under"]:text-is("2d20 · each ≤ 14"))' +
+      ':has(.formula-content .formula-note:text-is("Success on ≤ 14 (character value 13), moved +1 by modifiers"))' +
       ':has(.formula-content .manager-chip[data-roll-prompt-required="2"]:has-text("2 successes needed"))' +
       ':has(.static-modifiers .manager-chip:has-text("Steady hands +1"))' +
       ':has(.static-modifiers > .help:text-is("Each moves the threshold."))',
@@ -396,7 +402,56 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
     ],
   }),
-  // The recipe detail behind the count prompt: the pool line in place of a formula, and no DC chip.
+  // Issue 2006: the note names the faces actually authored, a from-face explosion and cancel.
+  playerCase({
+    id: 'player-crafting-roll-prompt-count-explode',
+    label: 'Player app — success-counting crafting roll prompt naming its chosen faces',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', dialog: 'open', rollPromptState: 'count-explode' },
+    steps: [...CRAFT_HORSESHOE],
+    expectSelector:
+      SINGLE_PROMPT +
+      ':has(.formula-content .formula[data-roll-prompt-count="over"]:text-is("6d10 · each ≥ 7"))' +
+      ':has(.formula-content .formula-note:text-is("Success on ≥ 7 · explodes on 9 or above once · 2 or under cancels a success"))' +
+      ':not(:has([data-roll-prompt-zero-pool]))' +
+      ' .formula-content .manager-chip[data-roll-prompt-required="2"]',
+    kinds: ['player', 'crafting'],
+    sourceMatches: COUNT_PROMPT_SOURCES,
+  }),
+  playerCase({
+    id: 'player-crafting-roll-prompt-count-explode-narrow',
+    label: 'Player app — success-counting crafting roll prompt naming its chosen faces at 1024x640',
+    smokeLabels: [],
+    reaches: 'beyond',
+    position: { width: 1024, height: 640 },
+    query: { tab: 'crafting', dialog: 'open', rollPromptState: 'count-explode' },
+    steps: [...CRAFT_HORSESHOE],
+    expectSelector:
+      SINGLE_PROMPT +
+      ':has(.formula-content .formula[data-roll-prompt-count="over"]:text-is("6d10 · each ≥ 7"))' +
+      ' .formula-content .manager-chip[data-roll-prompt-required="2"]',
+    kinds: ['player', 'crafting', 'responsive'],
+    sourceMatches: COUNT_PROMPT_SOURCES,
+  }),
+  // A pool reduced to zero warns that the roll fails, and the roll stays possible.
+  playerCase({
+    id: 'player-crafting-roll-prompt-count-zero',
+    label: 'Player app — success-counting crafting roll prompt over a pool of no dice',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', dialog: 'open', rollPromptState: 'count-zero' },
+    steps: [...CRAFT_HORSESHOE],
+    expectSelector:
+      SINGLE_PROMPT +
+      ':has(.formula-content .formula[data-roll-prompt-count="over"]:text-is("0d10 · each ≥ 7"))' +
+      ':has(button[type="submit"]:not([disabled]))' +
+      ' .formula-content [data-roll-prompt-zero-pool]',
+    kinds: ['player', 'crafting'],
+    sourceMatches: COUNT_PROMPT_SOURCES,
+  }),
+  // The recipe detail behind the count prompt: the pool line in place of a formula, its successes
+  // needed (issue 2006) and no DC chip.
   playerCase({
     id: 'player-crafting-check-count',
     label: 'Player app — success-counting crafting check in the recipe detail',
@@ -409,7 +464,8 @@ export const CASES = Object.freeze([
     ],
     expectSelector:
       '[data-recipe-section="check"][data-check-usable="true"]' +
-      ':has([data-check-formula] code:text-is("6d10 · each ≥ 8"))' +
+      ':has([data-check-formula] code:text-is("5d10 · each ≥ 8"))' +
+      ':has([data-check-successes-needed="2"]:has-text("2 successes needed"))' +
       ':not(:has([data-check-dc]))',
     kinds: ['player', 'crafting'],
     sourceMatches: [

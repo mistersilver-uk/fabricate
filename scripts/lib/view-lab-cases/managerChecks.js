@@ -189,7 +189,7 @@ const underCase = ({ id, label, frame, query = {}, steps, expectView, expectSele
 /*
  * The success-counting preview states (issue 2004): the odds panel, simulator readout, abstention,
  * readiness and Validation rows for a count check, seeded onto Karrun Forgecraft through the lab's
- * `checkPreviewState` (count authoring is issue 2006's), each on the prototype frame it answers.
+ * `checkPreviewState`, each on the prototype frame it answers.
  */
 const COUNT_ODDS = Object.freeze([{ selector: '[data-checks-odds]', scroll: true }]);
 const COUNT_IDRIN = Object.freeze(previewAsActor('lab-actor-idrin'));
@@ -210,6 +210,37 @@ const countCase = ({ id, label, frame, state = 'dice-pool', nav = 'crafting', st
     sourceMatches: PARITY_SOURCES,
     ...rest,
   });
+
+/*
+ * The success-counting authoring states (issue 2006), one per row of its reachable-state capture
+ * matrix and on the prototype frame each answers. Each opens on one of issue 2004's seeded pools
+ * or a summing check, and authors the state it claims through the Studio's own controls.
+ */
+const authoringCase = ({
+  id,
+  label,
+  frame,
+  state = 'dice-pool',
+  nav = 'crafting',
+  steps,
+  ...rest
+}) =>
+  managerCase({
+    id,
+    label: `Manager — Checks count authoring, ${label} (prototype state ${frame})`,
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: state
+      ? { system: 'lab-smithing', checkPreviewState: state }
+      : { system: 'lab-smithing' },
+    steps: ['Checks', { selector: `#manager-checks-nav-${nav}` }, ...steps],
+    expectView: `checks-${nav}`,
+    kinds: rest.position ? ['manager', 'checks', 'responsive'] : ['manager', 'checks'],
+    sourceMatches: PARITY_SOURCES,
+    ...rest,
+  });
+const COUNTING = '.fabricate-manager:has([data-check-product-option="count"].is-active)';
+const EXPLODE_ROW = Object.freeze({ selector: '[data-check-count-row-explode]', scroll: true });
 
 /*
  * The rolled readout states (issue 2080): each rolled state of the prototype parity matrix, rolled
@@ -1798,7 +1829,8 @@ export const CASES = Object.freeze([
       ':has([data-checks-section-notice="countRequiredExceedsMaxPool"])' +
       ':has([data-checks-section-notice="countTierWithoutSuccesses"])',
   }),
-  // The worst realistic roll pile-up at the declared floor, blocking notices first (issue 2082).
+  // The worst realistic roll pile-up at the declared floor, blocking notices first (issue 2082);
+  // a tier with no successes needed blocks since issue 2006, so it sorts before the face warning.
   countCase({
     id: 'manager-checks-roll-notices-floor',
     label: 'four pool notices stacked at 1024x640',
@@ -1811,8 +1843,8 @@ export const CASES = Object.freeze([
       '.fabricate-manager [data-checks-section-notices="roll"]' +
       ' > [data-checks-section-notice="countThresholdInvalid"]:nth-child(1)' +
       ' + [data-checks-section-notice="countExplodeUnbounded"]' +
-      ' + [data-checks-section-notice="countFaceBeyondDie"]' +
-      ' + [data-checks-section-notice="countTierWithoutSuccesses"]:last-child',
+      ' + [data-checks-section-notice="countTierWithoutSuccesses"]' +
+      ' + [data-checks-section-notice="countFaceBeyondDie"]:last-child',
   }),
   countCase({
     id: 'manager-checks-count-readiness',
@@ -1827,5 +1859,263 @@ export const CASES = Object.freeze([
       ':has([data-issue="countTierWithoutSuccesses"])' +
       ':has([data-issue="countThresholdInvalid"])' +
       ':has([data-issue="countPoolInvalid"])',
+  }),
+  authoringCase({
+    id: 'manager-checks-v3-count-over',
+    label: 'six d10s from a character value, best face exploding, worst cancelling',
+    frame: '06',
+    steps: [...COUNT_IDRIN, { selector: '[data-check-count-row-cancel]', scroll: true }],
+    expectSelector:
+      COUNTING +
+      ':has([data-check-count-base-mode-option="value"].is-active)' +
+      ':has([data-check-count-explode-option="extreme"].is-active)' +
+      ':has([data-check-count-explode-repeat-option="keeps"].is-active)' +
+      ':has([data-check-count-cancel-option="extreme"].is-active)' +
+      ':has([data-check-count-destination-option="pool"].is-active)' +
+      ' [data-check-count-actor-line="resolved"]',
+  }),
+  authoringCase({
+    id: 'manager-checks-v3-count-over-modifier',
+    label: 'six d10s from a character value, an applied modifier growing the pool',
+    frame: '06',
+    steps: [
+      ...COUNT_IDRIN,
+      { selector: '#checks-section-modifiers' },
+      { selector: '[data-crafting-modifier-eligibility="hb-mod-medicine"]' },
+      { selector: '#checks-section-roll' },
+      { selector: '[data-check-formula-resolved]', scroll: true },
+    ],
+    expectSelector:
+      COUNTING +
+      ':has([data-check-count-composed] [data-check-formula-modifier="hb-mod-medicine"])' +
+      ' [data-check-count-actor-line="resolved"]:has-text("grown by")',
+  }),
+  authoringCase({
+    id: 'manager-checks-v3-count-over-narrow',
+    label: 'six d10s from a character value, at 1024x640',
+    frame: '06',
+    position: { width: 1024, height: 640 },
+    steps: [...COUNT_IDRIN, { selector: '[data-check-count-row-base]', scroll: true }],
+    expectSelector:
+      COUNTING +
+      ':has([data-check-count-base-mode-option="value"].is-active)' +
+      ' [data-check-count-actor-line="resolved"]',
+  }),
+  authoringCase({
+    id: 'manager-checks-v3-count-under',
+    label: 'two d20s at or under a character value, modifiers moving the threshold',
+    frame: '07',
+    nav: 'salvage',
+    steps: [
+      ...COUNT_IDRIN,
+      { selector: '[data-check-count-threshold-mode-option="value"]' },
+      {
+        selector: '[data-check-count-threshold-expression]',
+        fill: '@abilities.int.mod + @skills.med.mod + 6',
+      },
+      { selector: '[data-check-count-row-threshold]', scroll: true },
+    ],
+    expectSelector:
+      COUNTING +
+      ':has([data-check-direction-option="under"].is-active)' +
+      ':has([data-check-count-base-mode-option="number"].is-active)' +
+      ':has([data-check-count-threshold-mode-option="value"].is-active)' +
+      ':has([data-check-count-test-option="meet"].is-active)' +
+      ':has([data-check-count-destination-option="threshold"].is-active)' +
+      ':not(:has([data-threshold-mode]))' +
+      ' [data-check-count-actor-line="resolved"]',
+  }),
+  authoringCase({
+    id: 'manager-checks-v3-count-explode-off',
+    label: 'explode switched off',
+    frame: '06 variant',
+    steps: [{ selector: '[data-check-count-explode-option="off"]' }, EXPLODE_ROW],
+    expectSelector:
+      COUNTING +
+      ':has([data-check-count-explode-option="off"].is-active)' +
+      ':not(:has([data-check-count-explode-repeat]))' +
+      ':not(:has([data-check-count-explode-face]))' +
+      ' [data-check-count-row-explode]',
+  }),
+  authoringCase({
+    id: 'manager-checks-v3-count-explode-from',
+    label: 'explode from a chosen face',
+    frame: '06 variant',
+    steps: [
+      { selector: '[data-check-count-explode-option="from"]' },
+      ...parityType('[data-check-count-explode-face]', 1, '9'),
+      EXPLODE_ROW,
+    ],
+    expectSelector:
+      COUNTING +
+      ':has([data-check-count-explode-option="from"].is-active)' +
+      ':has([data-check-count-explode-repeat-option="keeps"].is-active)' +
+      ':has([data-check-count-clause]:text-is("· explodes on 9 or above"))' +
+      ' [data-check-count-row-explode] [data-check-count-explode-face]',
+  }),
+  authoringCase({
+    id: 'manager-checks-v3-count-explode-once',
+    label: 'the best face exploding once',
+    frame: '06 variant',
+    steps: [{ selector: '[data-check-count-explode-repeat-option="once"]' }, EXPLODE_ROW],
+    expectSelector:
+      COUNTING +
+      ':has([data-check-count-explode-option="extreme"].is-active)' +
+      ':has([data-check-count-explode-repeat-option="once"].is-active)' +
+      ' [data-check-count-row-explode]',
+  }),
+  authoringCase({
+    id: 'manager-checks-v3-count-zero-pool-off',
+    label: 'a pool reduced to zero no longer failing',
+    frame: '06',
+    steps: [
+      { selector: '[data-check-count-zero-pool]' },
+      { selector: '[data-check-count-row-zero]', scroll: true },
+    ],
+    expectSelector: `${COUNTING} [data-check-count-zero-pool][aria-pressed="false"]`,
+  }),
+  authoringCase({
+    id: 'manager-checks-v3-count-required-block',
+    label: 'successes needed above the most dice that can be rolled',
+    frame: '08',
+    state: 'dice-pool-faults',
+    steps: [{ selector: '[data-check-count-callouts]', scroll: true }],
+    expectSelector:
+      `${COUNTING}:not(:has([data-threshold-mode]))` +
+      ' [data-check-count-callouts] [data-check-count-callout="countRequiredExceedsMaxPool"]',
+  }),
+  authoringCase({
+    id: 'manager-checks-v3-count-switch',
+    label: 'a summing check with tier DCs switched to count',
+    frame: 'cntExtraOff',
+    state: null,
+    steps: [
+      { selector: '[data-check-product-option="count"]' },
+      { selector: '[data-tier-row="sm-tier-masterwork"]', scroll: true },
+    ],
+    expectSelector:
+      `${COUNTING}:not(:has([data-tier-row]:not(.is-invalid)))` +
+      ' [data-tier-row="sm-tier-masterwork"] [data-tier-successes-missing]',
+  }),
+  authoringCase({
+    id: 'manager-checks-v3-count-routed',
+    label: 'routed tiers in extra successes, over a read-only strip with a botch band',
+    frame: '13',
+    nav: 'gathering',
+    steps: [
+      { selector: '#checks-section-outcomes' },
+      { selector: '[data-outcome-band-scale]', scroll: true },
+    ],
+    expectSelector:
+      '.fabricate-manager:has([data-outcome-head]:has-text("Extra successes"))' +
+      ':not(:has([data-band-strip-handle]))' +
+      ' [data-band-strip-band="botch"]',
+  }),
+  authoringCase({
+    id: 'manager-checks-v3-count-routed-light',
+    label: 'routed tiers in extra successes, in the light scheme',
+    frame: '13',
+    nav: 'gathering',
+    query: { system: 'lab-smithing', checkPreviewState: 'dice-pool', colorScheme: 'light' },
+    steps: [
+      { selector: '#checks-section-outcomes' },
+      { selector: '[data-outcome-band-scale]', scroll: true },
+    ],
+    expectSelector:
+      '.fabricate-manager:has([data-outcome-head]:has-text("Extra successes"))' +
+      ':not(:has([data-band-strip-handle]))' +
+      ' [data-band-strip-band="botch"]',
+  }),
+  authoringCase({
+    id: 'manager-checks-v3-count-progressive',
+    label: 'a progressive pool with no difficulty card',
+    frame: '09',
+    state: 'dice-pool-extended',
+    steps: [{ selector: '[data-check-count-fields]', scroll: true }],
+    expectSelector:
+      COUNTING +
+      ':not(:has([data-check-difficulty-card]))' +
+      ':not(:has([data-check-count-test]))' +
+      ' [data-check-count-fields]',
+  }),
+  authoringCase({
+    id: 'manager-checks-v3-count-triggers',
+    label: 'the count presets, a botch added',
+    frame: '15',
+    steps: [
+      { selector: '#checks-section-triggers' },
+      { selector: '[data-add-trigger-preset="botch"]' },
+    ],
+    expectSelector:
+      '.fabricate-manager:has([data-add-trigger-preset="low"])' +
+      ':not(:has([data-add-trigger-preset="high"]))' +
+      ' [data-trigger] [data-trigger-summary]:has-text("Net successes")',
+  }),
+  authoringCase({
+    id: 'manager-checks-v3-count-convert',
+    label: 'a summing formula that counts successes, converted from its Validation row',
+    frame: '21',
+    state: 'dice-pool-freetext',
+    nav: 'validation',
+    steps: [
+      { selector: '[data-issue="freeTextCountingFormula"]', scroll: true },
+      {
+        selector:
+          '[data-issue="freeTextCountingFormula"][data-subsystem="crafting"]' +
+          ' [data-validation-row-action]',
+      },
+    ],
+    // Convert stages the draft, then opens the crafting roll section on `Count successes`.
+    expectView: 'checks-crafting',
+    expectSelector:
+      '.fabricate-manager [data-checks-panel="crafting"][data-checks-evaluation-product="count"]',
+  }),
+  authoringCase({
+    id: 'manager-checks-v3-count-convert-noaction',
+    label: 'a counting formula that cannot convert, its roll-section notice offering Review only',
+    frame: '21',
+    state: 'dice-pool-freetext',
+    nav: 'salvage',
+    steps: [{ selector: '[data-checks-section-notice="freeTextCountingFormula"]', scroll: true }],
+    expectSelector:
+      '.fabricate-manager:has([data-check-formula-average-withheld="die-modifiers"])' +
+      ' [data-checks-section-notice="freeTextCountingFormula"]' +
+      ' [data-notice-action]:text-is("Review")',
+  }),
+  authoringCase({
+    id: 'manager-checks-v3-count-convert-callout',
+    label: 'a summing formula that counts successes, with Convert in the roll section',
+    frame: '21',
+    state: 'dice-pool-freetext',
+    steps: [],
+    expectSelector:
+      '.fabricate-manager:has([data-check-formula-average-withheld="die-modifiers"])' +
+      ' [data-checks-section-notice="freeTextCountingFormula"]' +
+      ' [data-notice-action]:text-is("Convert to count successes")',
+  }),
+  authoringCase({
+    id: 'manager-checks-v3-count-tier-zero-point',
+    label: 'a count check with no recipe tiers, owing no tier successes',
+    frame: '16',
+    state: 'dice-pool-faults',
+    steps: [
+      ...Array.from({ length: 4 }, () => ({ selector: nthMatch('[data-remove-tier]', 1) })),
+      { selector: '[data-tiers-empty]', scroll: true },
+    ],
+    expectSelector:
+      COUNTING +
+      ':not(:has([data-checks-section-notice="countTierWithoutSuccesses"]))' +
+      ' [data-tiers-empty]',
+  }),
+  authoringCase({
+    id: 'manager-checks-v3-count-readiness-faults',
+    label: 'a missing explode face and a trigger the pool cannot fire, on Validation',
+    frame: '16',
+    state: 'dice-pool-faults',
+    nav: 'validation',
+    steps: [{ selector: '[data-issue="countTriggerGroupUnreachable"]', scroll: true }],
+    expectSelector:
+      '.fabricate-manager:has([data-issue="countFaceMissing"][data-issue-severity="critical"])' +
+      ' [data-issue="countTriggerGroupUnreachable"][data-issue-severity="warning"]',
   }),
 ]);

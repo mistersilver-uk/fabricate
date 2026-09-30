@@ -17,7 +17,8 @@ import {
   KNOWN_UNTRANSLATED_NAME_DEFAULTS,
   KNOWN_UNTRANSLATED_NAME_DEFAULT_TOTAL,
 } from './components/design-system-known-debt.js';
-import { assertRatchet, byCodePoint, tallyByKey } from './helpers/ratchetBaseline.js';
+import { assertRatchet } from './helpers/ratchetBaseline.js';
+import { byCodePoint, tallyByKey } from './helpers/codePointOrder.js';
 import { repoRoot } from './helpers/sourceScan.js';
 import { attributeText, parsedTemplates, walkElements } from './helpers/svelteTemplateScan.js';
 

@@ -9,7 +9,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { assertRatchet, byCodePoint, tallyByKey } from '../helpers/ratchetBaseline.js';
+import { assertRatchet } from '../helpers/ratchetBaseline.js';
+import { byCodePoint, tallyByKey } from '../helpers/codePointOrder.js';
 import { repoRoot } from '../helpers/sourceScan.js';
 import {
   MAX_VAR_CHAIN_DEPTH,

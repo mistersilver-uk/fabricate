@@ -162,8 +162,10 @@ describe('2006 DiceTiles', () => {
     }));
     const root = await harness.mount({ model: { ...tileModel({ results }), more: 959 }, legend: true });
     const componentCss = [...document.head.querySelectorAll('style')].map((node) => node.textContent);
-    assert.ok(componentCss.some((sheet) => sheet.includes('fabricate-dice-tiles__list')));
     const tokens = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+    // Styled once, globally: a chat card draws these tiles outside every Fabricate window.
+    assert.ok(tokens.includes('.fabricate-dice-tiles__list {'), 'the family is in the sheet');
+    assert.ok(!componentCss.some((sheet) => sheet.includes('fabricate-dice-tiles__list')));
     const view = await renderWithCascade(
       `<div id="host" style="width:280px">${root.innerHTML}</div>`,
       [tokens, ...componentCss],
