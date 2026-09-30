@@ -379,8 +379,8 @@ Fabricate never rewrites it, and it stops showing that field for editing while t
 It shows a plain note in its place instead, naming the kept value and explaining that this target source does not read it, so it is not offered for editing.
 So a value you authored under one target source is exactly what comes back when you switch back to it.
 
-A **Routed** gathering task carries the equivalent single override field, labelled **Target** or **Adjustment** for the check's target source, with a **System default** placeholder and no presets to choose from, because gathering's routed outcome tiers are crafting-only and cannot be authored as presets here.
-See [Gathering Checks]({% link checks/gathering.md %}) for where that field sits on the task editor.
+A **Routed** gathering task carries the equivalent single override field, labelled **DC** under **Higher is better**, or **Target** or **Adjustment** under **Lower is better** or a **Character value** target, with a **System default** placeholder and no presets to choose from, because gathering's routed outcome tiers are crafting-only and cannot be authored as presets here.
+See [Routed Result Selection]({% link gathering/tasks.md %}#routed-result-selection) for where that field sits on the task editor.
 
 ### What players see
 
