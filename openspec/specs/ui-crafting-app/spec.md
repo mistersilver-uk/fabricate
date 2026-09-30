@@ -239,7 +239,12 @@ Roll is the form's only submit button, so Enter from any field rolls normally an
 Displayed comparison and applied modifiers come from the actual normalized runner and the selected formula contributions, and existing result keys and advantage eligibility are unchanged.
 The posted roll's chat flavor, on the direct and versioned paths alike, carries the `(DC n)` suffix only for a summed roll-over check against a fixed DC; any other evaluation posts no DC in its flavor.
 - **The count prompt.**
-A `product: 'count'` check shows no formula and no DC chip; its body instead reads a pool line (`{pool}d{die} · each {comparison} {threshold}`, the chat card's own wording so the two cannot disagree), a rule line naming the qualifying threshold and any face rule ("best face explodes", "worst face cancels", or a named face onward, each once or every time), and a successes chip ("N successes needed").
+A `product: 'count'` check shows no formula and no DC chip; its body instead reads a pool line (`{pool}d{die} · each {comparison} {threshold}`, the chat card's own wording so the two cannot disagree), a rule line and a successes chip ("N successes needed").
+The pool line shows the SETTLED pool, floored after every benefit, and the settled threshold, and updates as the player's picks and flat bonus change without constructing or evaluating a Roll; a pending rolled bonus reads as `{pool}d{die} + {formula} dice · each {comparison} {threshold}` when bonuses add dice, or `{pool}d{die} · each {comparison} {threshold} + {formula}` when they move the threshold, and the line is announced politely.
+The rule line states the effective per-die threshold, whether it came from a character value (`(character value {v})`) and how far modifiers moved it, then the actual explode and cancel faces (`explodes on 9 or above once`, `2 or under cancels a success`) — the authored face, never the default one.
+A settled pool at or below zero that fails shows a warning `Notice`, "This roll fails automatically: the pool is reduced to zero.", and Roll stays enabled; no such warning shows while a pending rolled bonus could still add dice.
+No retained formula, DC, expression or path is shown on a count prompt, single or bulk, and the prompt gains no focusable control of its own.
+The same count region serves the single, bulk salvage and Journal prompts, which forward the settled threshold source and anchor and the explode and cancel faces as numbers and enums only; the unentitled public prompt allowlist is unchanged.
 Its modifier-destination copy and situational-bonus help ("Each adds dice"/"Each moves the threshold") replace the summed wording, matching `pool.modifierDestination`.
 A hidden or redacted pool, meaning its `pool`, `die` and `threshold` are all unresolved, shows neither the pool line nor the rule line, but keeps its successes chip and modifier-destination wording, and never falls back to the retained roll formula or a summed DC.
 A fixed-range routed count check reads no `pool.required` either, so its prompt shows no successes chip, matching a fixed-range routed sum check's own missing DC chip.
@@ -717,6 +722,9 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
 - It is `null` when the system configures no check block for the recipe's mode.
 - `usable` is derived from an authored, non-empty `rollFormula` — NOT the legacy
   `enabled` flag.
+- A counting check's descriptor carries `successesNeeded`, the recipe tier's successes when it
+  sets them and the check's own otherwise, and the recipe check card reads it as
+  `{n} successes needed` (`1 success needed`) beside the pool line, never as a DC.
 
 ##### Outcome Tiers
 
