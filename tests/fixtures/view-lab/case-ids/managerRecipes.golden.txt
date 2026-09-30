@@ -16,6 +16,7 @@ manager-recipes-check-pill-under-attribute
 manager-recipes-check-pill-under-dynamic
 manager-recipes-check-pill-count
 manager-recipes-bulk-edit-check-tier-under
+manager-recipes-bulk-edit-check-tier-count
 manager-recipes-bulk-delete-idle
 manager-recipes-bulk-delete-armed
 manager-crafting-group-expanded

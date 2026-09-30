@@ -419,6 +419,39 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
     ],
   }),
+  // Issue 2006: under a counting check each tier names its successes needed, and the axis says so.
+  managerCase({
+    id: 'manager-recipes-bulk-edit-check-tier-count',
+    label: 'Manager — Recipes bulk edit check tier list, success-counting check',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', checkPreviewState: 'dice-pool-recipes' },
+    steps: [
+      'Crafting',
+      { selector: 'label:has(input[data-recipe-select="sm-r-longsword"])' },
+      { selector: 'label:has(input[data-recipe-select="sm-r-greatsword"])' },
+      { selector: '[data-recipe-bulk-check-tier]' },
+      { selector: '[data-popover-option="sm-tier-masterwork"]', scroll: true },
+    ],
+    expectView: 'recipes',
+    expectSelector:
+      '.fabricate-manager:has(.fab-bulk-edit-subhint:has-text("The successes needed these recipes"))' +
+      ' > .fabricate-select-popover' +
+      ':has([data-popover-option="sm-tier-masterwork"]:has-text("Masterwork · 5 successes"))' +
+      ':has-text("Default · 3 successes")',
+    expectContained: [
+      { container: '.fabricate-manager', target: '.fabricate-select-popover' },
+      {
+        container: '.fabricate-select-popover',
+        target: '[data-popover-option="sm-tier-masterwork"]',
+      },
+    ],
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      ...RECIPE_BULK_EDIT_MATCHES,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/recipeOverviewSelectOptions\.js$/,
+    ],
+  }),
   // Both frames run on herbalism rather than the flagship smithing library, which is why they say anything.
   managerCase({
     id: 'manager-recipes-bulk-delete-idle',
