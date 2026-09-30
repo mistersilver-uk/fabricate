@@ -26,9 +26,8 @@ const {
   isRollExpression,
 } = await import(RESOLVER_MODULE);
 const { appendCheckModifierTerm } = await import('../src/systems/toolCheckBonus.js');
-const { resolveRolledFormula } = await import('../src/systems/checkRoll.js');
-const { resolveCheckDecision } = await import('../src/systems/checkRollDecision.js');
-const { SUM_OVER_EVALUATION } = await import('../src/systems/checkModifierRouter.js');
+const { evaluateCheckRoll, resolveRolledFormula } = await import('../src/systems/checkRoll.js');
+const { installTermBearingRoll } = await import('./helpers/termBearingRoll.js');
 
 // The FLAT half of a resolved contribution (issue 1118).
 function scalarOf(context, resolveExpression) {
@@ -1678,18 +1677,20 @@ test('isRollExpression answers the same question the resolver does', () => {
 test('a padded authored formula rolls trimmed once a modifier context applies', async () => {
   const context = { catalogue: [], systemPolicy: 'addAll', defaultModifierIds: [] };
   assert.equal(resolveRolledFormula('1d20 ', null, context, PermissiveRoll), '1d20');
-  const decision = await resolveCheckDecision({
-    authoredFormula: ' 1d20 ',
-    actor: null,
-    options: { interactive: true, rollDecision: { advantage: 'advantage' } },
-    evaluation: SUM_OVER_EVALUATION,
-    deferred: false,
-    resolvedCheck: {
-      formula: resolveRolledFormula(' 1d20 ', null, context, PermissiveRoll),
-      selected: [],
-    },
-    displayFormula: (formula) => ({ display: formula }),
-    Roll: null,
-  });
-  assert.equal(decision.formula, '2d20kh1');
+  // The shared term-bearing double (issue 2007): the EVALUATED roll's `_formula` is read, because
+  // the keep transform will act on the constructed Roll's terms rather than on the string.
+  let rolled = null;
+  const { restore } = installTermBearingRoll({ onConstruct: (roll) => (rolled = roll) });
+  try {
+    await evaluateCheckRoll(' 1d20 ', null, {
+      craftingModifier: context,
+      interactive: true,
+      rollDecision: { advantage: 'advantage' },
+      post: false,
+    });
+  } finally {
+    restore();
+  }
+  assert.equal(rolled._evaluated, true);
+  assert.equal(rolled._formula, '2d20kh1');
 });

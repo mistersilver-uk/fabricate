@@ -1,0 +1,4202 @@
+{
+  "foundryVersion": "13.351",
+  "generation": 13,
+  "system": "dnd5e 5.2.5",
+  "dieClass": "Die",
+  "data": {
+    "default": {
+      "prof": 3,
+      "mod": 3,
+      "craftingmod": 3,
+      "skill": 2,
+      "faces": 20,
+      "skills": {
+        "x": {
+          "rank": 2
+        }
+      }
+    },
+    "diceProf": {
+      "prof": "1d4"
+    }
+  },
+  "entries": {
+    "2": {
+      "formula": "2",
+      "data": "default",
+      "threw": false,
+      "_formula": "2",
+      "rollFormula": "2",
+      "terms": [
+        {
+          "class": "NumericTerm",
+          "ancestry": ["NumericTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": 2,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "2",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "1d20": {
+      "formula": "1d20",
+      "data": "default",
+      "threw": false,
+      "_formula": "1d20",
+      "rollFormula": "1d20",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d20",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "d20": {
+      "formula": "d20",
+      "data": "default",
+      "threw": false,
+      "_formula": "1d20",
+      "rollFormula": "1d20",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d20",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "1D20 + 3": {
+      "formula": "1D20 + 3",
+      "data": "default",
+      "threw": false,
+      "_formula": "1d20 + 3",
+      "rollFormula": "1d20 + 3",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d20",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "NumericTerm",
+          "ancestry": ["NumericTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": 3,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "3",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "1d20[skill] + 3": {
+      "formula": "1d20[skill] + 3",
+      "data": "default",
+      "threw": false,
+      "_formula": "1d20[skill] + 3",
+      "rollFormula": "1d20[skill] + 3",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": "skill",
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d20[skill]",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "NumericTerm",
+          "ancestry": ["NumericTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": 3,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "3",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "1d12 + @prof": {
+      "formula": "1d12 + @prof",
+      "data": "default",
+      "threw": false,
+      "_formula": "1d12 + 3",
+      "rollFormula": "1d12 + 3",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 12
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d12",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "NumericTerm",
+          "ancestry": ["NumericTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": 3,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "3",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "2d6 + @prof": {
+      "formula": "2d6 + @prof",
+      "data": "default",
+      "threw": false,
+      "_formula": "2d6 + 3",
+      "rollFormula": "2d6 + 3",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 2
+          },
+          "faces": {
+            "type": "number",
+            "value": 6
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "2d6",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "NumericTerm",
+          "ancestry": ["NumericTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": 3,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "3",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "1d100": {
+      "formula": "1d100",
+      "data": "default",
+      "threw": false,
+      "_formula": "1d100",
+      "rollFormula": "1d100",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 100
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d100",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "1d20 + 1d6": {
+      "formula": "1d20 + 1d6",
+      "data": "default",
+      "threw": false,
+      "_formula": "1d20 + 1d6",
+      "rollFormula": "1d20 + 1d6",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d20",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 6
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d6",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "1d6 + 1d20": {
+      "formula": "1d6 + 1d20",
+      "data": "default",
+      "threw": false,
+      "_formula": "1d6 + 1d20",
+      "rollFormula": "1d6 + 1d20",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 6
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d6",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d20",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "1d6x + 1d20": {
+      "formula": "1d6x + 1d20",
+      "data": "default",
+      "threw": false,
+      "_formula": "1d6x + 1d20",
+      "rollFormula": "1d6x + 1d20",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 6
+          },
+          "modifiers": ["x"],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d6x",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d20",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "(1d20+2)*2": {
+      "formula": "(1d20+2)*2",
+      "data": "default",
+      "threw": false,
+      "_formula": "(1d20 + 2) * 2",
+      "rollFormula": "(1d20 + 2) * 2",
+      "terms": [
+        {
+          "class": "ParentheticalTerm",
+          "ancestry": ["ParentheticalTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": "1d20 + 2",
+          "fn": null,
+          "args": null,
+          "formula": "(1d20 + 2)",
+          "isIntermediate": true
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "*",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " * ",
+          "isIntermediate": false
+        },
+        {
+          "class": "NumericTerm",
+          "ancestry": ["NumericTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": 2,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "2",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "{1d20,1d20}kh": {
+      "formula": "{1d20,1d20}kh",
+      "data": "default",
+      "threw": false,
+      "_formula": "{1d20,1d20}kh",
+      "rollFormula": "{1d20,1d20}kh",
+      "terms": [
+        {
+          "class": "PoolTerm",
+          "ancestry": ["PoolTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": ["kh"],
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": ["1d20", "1d20"],
+          "formula": "{1d20,1d20}kh",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "2d20kh1 + 1d6": {
+      "formula": "2d20kh1 + 1d6",
+      "data": "default",
+      "threw": false,
+      "_formula": "2d20kh1 + 1d6",
+      "rollFormula": "2d20kh1 + 1d6",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 2
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": ["kh1"],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "2d20kh1",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 6
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d6",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "(@skills.x.rank)d20": {
+      "formula": "(@skills.x.rank)d20",
+      "data": "default",
+      "threw": false,
+      "_formula": "(2)d20",
+      "rollFormula": "(2)d20",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "Roll",
+            "value": "(2)"
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "(2)d20",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "1d@faces": {
+      "formula": "1d@faces",
+      "data": "default",
+      "threw": false,
+      "_formula": "1d20",
+      "rollFormula": "1d20",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d20",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "1df + 2": {
+      "formula": "1df + 2",
+      "data": "default",
+      "threw": false,
+      "_formula": "1df + 2",
+      "rollFormula": "1df + 2",
+      "terms": [
+        {
+          "class": "FateDie",
+          "ancestry": ["FateDie", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 3
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1df",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "NumericTerm",
+          "ancestry": ["NumericTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": 2,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "2",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "max(1d20,10)": {
+      "formula": "max(1d20,10)",
+      "data": "default",
+      "threw": false,
+      "_formula": "max(1d20,10)",
+      "rollFormula": "max(1d20,10)",
+      "terms": [
+        {
+          "class": "FunctionTerm",
+          "ancestry": ["FunctionTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": "max",
+          "args": ["1d20", "10"],
+          "formula": "max(1d20,10)",
+          "isIntermediate": true
+        }
+      ]
+    },
+    "floor(1d20/2)": {
+      "formula": "floor(1d20/2)",
+      "data": "default",
+      "threw": false,
+      "_formula": "floor(1d20 / 2)",
+      "rollFormula": "floor(1d20 / 2)",
+      "terms": [
+        {
+          "class": "FunctionTerm",
+          "ancestry": ["FunctionTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": "floor",
+          "args": ["1d20 / 2"],
+          "formula": "floor(1d20 / 2)",
+          "isIntermediate": true
+        }
+      ]
+    },
+    "10 - 1d20": {
+      "formula": "10 - 1d20",
+      "data": "default",
+      "threw": false,
+      "_formula": "10 - 1d20",
+      "rollFormula": "10 - 1d20",
+      "terms": [
+        {
+          "class": "NumericTerm",
+          "ancestry": ["NumericTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": 10,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "10",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "-",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " - ",
+          "isIntermediate": false
+        },
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d20",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "2 * 1d20": {
+      "formula": "2 * 1d20",
+      "data": "default",
+      "threw": false,
+      "_formula": "2 * 1d20",
+      "rollFormula": "2 * 1d20",
+      "terms": [
+        {
+          "class": "NumericTerm",
+          "ancestry": ["NumericTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": 2,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "2",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "*",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " * ",
+          "isIntermediate": false
+        },
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d20",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "1d20 * -1": {
+      "formula": "1d20 * -1",
+      "data": "default",
+      "threw": false,
+      "_formula": "1d20 * -1",
+      "rollFormula": "1d20 * -1",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d20",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "*",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " * ",
+          "isIntermediate": false
+        },
+        {
+          "class": "NumericTerm",
+          "ancestry": ["NumericTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": -1,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "-1",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "0d20 + 5": {
+      "formula": "0d20 + 5",
+      "data": "default",
+      "threw": false,
+      "_formula": "0d20 + 5",
+      "rollFormula": "0d20 + 5",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 0
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "0d20",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "NumericTerm",
+          "ancestry": ["NumericTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": 5,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "5",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "@skill + 3 + (1d20)[Modifiers]": {
+      "formula": "@skill + 3 + (1d20)[Modifiers]",
+      "data": "default",
+      "threw": false,
+      "_formula": "2 + 3 + (1d20)[Modifiers]",
+      "rollFormula": "2 + 3 + (1d20)[Modifiers]",
+      "terms": [
+        {
+          "class": "NumericTerm",
+          "ancestry": ["NumericTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": 2,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "2",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "NumericTerm",
+          "ancestry": ["NumericTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": 3,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "3",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "ParentheticalTerm",
+          "ancestry": ["ParentheticalTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": "Modifiers",
+          "operator": null,
+          "value": null,
+          "term": "1d20",
+          "fn": null,
+          "args": null,
+          "formula": "(1d20)[Modifiers]",
+          "isIntermediate": true
+        }
+      ]
+    },
+    "@prof + 1d20 ⟨diceProf⟩": {
+      "formula": "@prof + 1d20",
+      "data": "diceProf",
+      "threw": false,
+      "_formula": "1d4 + 1d20",
+      "rollFormula": "1d4 + 1d20",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 4
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d4",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d20",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "@prof": {
+      "formula": "@prof",
+      "data": "default",
+      "threw": false,
+      "_formula": "3",
+      "rollFormula": "3",
+      "terms": [
+        {
+          "class": "NumericTerm",
+          "ancestry": ["NumericTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": 3,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "3",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "@prof ⟨diceProf⟩": {
+      "formula": "@prof",
+      "data": "diceProf",
+      "threw": false,
+      "_formula": "1d4",
+      "rollFormula": "1d4",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 4
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d4",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "1d20 + 3": {
+      "formula": "1d20 + 3",
+      "data": "default",
+      "threw": false,
+      "_formula": "1d20 + 3",
+      "rollFormula": "1d20 + 3",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d20",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "NumericTerm",
+          "ancestry": ["NumericTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": 3,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "3",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "2d20kh1 + 3": {
+      "formula": "2d20kh1 + 3",
+      "data": "default",
+      "threw": false,
+      "_formula": "2d20kh1 + 3",
+      "rollFormula": "2d20kh1 + 3",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 2
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": ["kh1"],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "2d20kh1",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "NumericTerm",
+          "ancestry": ["NumericTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": 3,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "3",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "2d20kl1 + 3": {
+      "formula": "2d20kl1 + 3",
+      "data": "default",
+      "threw": false,
+      "_formula": "2d20kl1 + 3",
+      "rollFormula": "2d20kl1 + 3",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 2
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": ["kl1"],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "2d20kl1",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "NumericTerm",
+          "ancestry": ["NumericTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": 3,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "3",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "1d20 + (2)": {
+      "formula": "1d20 + (2)",
+      "data": "default",
+      "threw": false,
+      "_formula": "1d20 + (2)",
+      "rollFormula": "1d20 + (2)",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d20",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "ParentheticalTerm",
+          "ancestry": ["ParentheticalTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": "2",
+          "fn": null,
+          "args": null,
+          "formula": "(2)",
+          "isIntermediate": true
+        }
+      ]
+    },
+    "2d20kh1 + (2)": {
+      "formula": "2d20kh1 + (2)",
+      "data": "default",
+      "threw": false,
+      "_formula": "2d20kh1 + (2)",
+      "rollFormula": "2d20kh1 + (2)",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 2
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": ["kh1"],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "2d20kh1",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "ParentheticalTerm",
+          "ancestry": ["ParentheticalTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": "2",
+          "fn": null,
+          "args": null,
+          "formula": "(2)",
+          "isIntermediate": true
+        }
+      ]
+    },
+    "2d20kl1": {
+      "formula": "2d20kl1",
+      "data": "default",
+      "threw": false,
+      "_formula": "2d20kl1",
+      "rollFormula": "2d20kl1",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 2
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": ["kl1"],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "2d20kl1",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "2d20kh1": {
+      "formula": "2d20kh1",
+      "data": "default",
+      "threw": false,
+      "_formula": "2d20kh1",
+      "rollFormula": "2d20kh1",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 2
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": ["kh1"],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "2d20kh1",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "2d6": {
+      "formula": "2d6",
+      "data": "default",
+      "threw": false,
+      "_formula": "2d6",
+      "rollFormula": "2d6",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 2
+          },
+          "faces": {
+            "type": "number",
+            "value": 6
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "2d6",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "1d20 + 3[Modifiers]": {
+      "formula": "1d20 + 3[Modifiers]",
+      "data": "default",
+      "threw": false,
+      "_formula": "1d20 + 3[Modifiers]",
+      "rollFormula": "1d20 + 3[Modifiers]",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d20",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "NumericTerm",
+          "ancestry": ["NumericTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": "Modifiers",
+          "operator": null,
+          "value": 3,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "3[Modifiers]",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "2d20kh1 + 3[Modifiers]": {
+      "formula": "2d20kh1 + 3[Modifiers]",
+      "data": "default",
+      "threw": false,
+      "_formula": "2d20kh1 + 3[Modifiers]",
+      "rollFormula": "2d20kh1 + 3[Modifiers]",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 2
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": ["kh1"],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "2d20kh1",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "NumericTerm",
+          "ancestry": ["NumericTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": "Modifiers",
+          "operator": null,
+          "value": 3,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "3[Modifiers]",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "1d20 + 2[Modifiers]": {
+      "formula": "1d20 + 2[Modifiers]",
+      "data": "default",
+      "threw": false,
+      "_formula": "1d20 + 2[Modifiers]",
+      "rollFormula": "1d20 + 2[Modifiers]",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d20",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "NumericTerm",
+          "ancestry": ["NumericTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": "Modifiers",
+          "operator": null,
+          "value": 2,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "2[Modifiers]",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "2d20kh1 + 2[Modifiers]": {
+      "formula": "2d20kh1 + 2[Modifiers]",
+      "data": "default",
+      "threw": false,
+      "_formula": "2d20kh1 + 2[Modifiers]",
+      "rollFormula": "2d20kh1 + 2[Modifiers]",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 2
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": ["kh1"],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "2d20kh1",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "NumericTerm",
+          "ancestry": ["NumericTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": "Modifiers",
+          "operator": null,
+          "value": 2,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "2[Modifiers]",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "2d20kl1 + 2[Modifiers]": {
+      "formula": "2d20kl1 + 2[Modifiers]",
+      "data": "default",
+      "threw": false,
+      "_formula": "2d20kl1 + 2[Modifiers]",
+      "rollFormula": "2d20kl1 + 2[Modifiers]",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 2
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": ["kl1"],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "2d20kl1",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "NumericTerm",
+          "ancestry": ["NumericTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": "Modifiers",
+          "operator": null,
+          "value": 2,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "2[Modifiers]",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "1d20 + 2[Modifiers] + (3)": {
+      "formula": "1d20 + 2[Modifiers] + (3)",
+      "data": "default",
+      "threw": false,
+      "_formula": "1d20 + 2[Modifiers] + (3)",
+      "rollFormula": "1d20 + 2[Modifiers] + (3)",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d20",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "NumericTerm",
+          "ancestry": ["NumericTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": "Modifiers",
+          "operator": null,
+          "value": 2,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "2[Modifiers]",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "ParentheticalTerm",
+          "ancestry": ["ParentheticalTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": "3",
+          "fn": null,
+          "args": null,
+          "formula": "(3)",
+          "isIntermediate": true
+        }
+      ]
+    },
+    "2d20kh1 + 2[Modifiers] + (3)": {
+      "formula": "2d20kh1 + 2[Modifiers] + (3)",
+      "data": "default",
+      "threw": false,
+      "_formula": "2d20kh1 + 2[Modifiers] + (3)",
+      "rollFormula": "2d20kh1 + 2[Modifiers] + (3)",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 2
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": ["kh1"],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "2d20kh1",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "NumericTerm",
+          "ancestry": ["NumericTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": "Modifiers",
+          "operator": null,
+          "value": 2,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "2[Modifiers]",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "ParentheticalTerm",
+          "ancestry": ["ParentheticalTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": "3",
+          "fn": null,
+          "args": null,
+          "formula": "(3)",
+          "isIntermediate": true
+        }
+      ]
+    },
+    "1d20 + (1d20)[Modifiers]": {
+      "formula": "1d20 + (1d20)[Modifiers]",
+      "data": "default",
+      "threw": false,
+      "_formula": "1d20 + (1d20)[Modifiers]",
+      "rollFormula": "1d20 + (1d20)[Modifiers]",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d20",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "ParentheticalTerm",
+          "ancestry": ["ParentheticalTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": "Modifiers",
+          "operator": null,
+          "value": null,
+          "term": "1d20",
+          "fn": null,
+          "args": null,
+          "formula": "(1d20)[Modifiers]",
+          "isIntermediate": true
+        }
+      ]
+    },
+    "2d20kh1 + (1d20)[Modifiers]": {
+      "formula": "2d20kh1 + (1d20)[Modifiers]",
+      "data": "default",
+      "threw": false,
+      "_formula": "2d20kh1 + (1d20)[Modifiers]",
+      "rollFormula": "2d20kh1 + (1d20)[Modifiers]",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 2
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": ["kh1"],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "2d20kh1",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "ParentheticalTerm",
+          "ancestry": ["ParentheticalTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": "Modifiers",
+          "operator": null,
+          "value": null,
+          "term": "1d20",
+          "fn": null,
+          "args": null,
+          "formula": "(1d20)[Modifiers]",
+          "isIntermediate": true
+        }
+      ]
+    },
+    "1d20 + 3[Modifiers] + (2)": {
+      "formula": "1d20 + 3[Modifiers] + (2)",
+      "data": "default",
+      "threw": false,
+      "_formula": "1d20 + 3[Modifiers] + (2)",
+      "rollFormula": "1d20 + 3[Modifiers] + (2)",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d20",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "NumericTerm",
+          "ancestry": ["NumericTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": "Modifiers",
+          "operator": null,
+          "value": 3,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "3[Modifiers]",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "ParentheticalTerm",
+          "ancestry": ["ParentheticalTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": "2",
+          "fn": null,
+          "args": null,
+          "formula": "(2)",
+          "isIntermediate": true
+        }
+      ]
+    },
+    "2d20kh1 + 3[Modifiers] + (2)": {
+      "formula": "2d20kh1 + 3[Modifiers] + (2)",
+      "data": "default",
+      "threw": false,
+      "_formula": "2d20kh1 + 3[Modifiers] + (2)",
+      "rollFormula": "2d20kh1 + 3[Modifiers] + (2)",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 2
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": ["kh1"],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "2d20kh1",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "NumericTerm",
+          "ancestry": ["NumericTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": "Modifiers",
+          "operator": null,
+          "value": 3,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "3[Modifiers]",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "ParentheticalTerm",
+          "ancestry": ["ParentheticalTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": "2",
+          "fn": null,
+          "args": null,
+          "formula": "(2)",
+          "isIntermediate": true
+        }
+      ]
+    },
+    "1d20 + (+3)": {
+      "formula": "1d20 + (+3)",
+      "data": "default",
+      "threw": false,
+      "_formula": "1d20 + (3)",
+      "rollFormula": "1d20 + (3)",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d20",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "ParentheticalTerm",
+          "ancestry": ["ParentheticalTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": "3",
+          "fn": null,
+          "args": null,
+          "formula": "(3)",
+          "isIntermediate": true
+        }
+      ]
+    },
+    "2d20kh1 + (+3)": {
+      "formula": "2d20kh1 + (+3)",
+      "data": "default",
+      "threw": false,
+      "_formula": "2d20kh1 + (3)",
+      "rollFormula": "2d20kh1 + (3)",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 2
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": ["kh1"],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "2d20kh1",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "ParentheticalTerm",
+          "ancestry": ["ParentheticalTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": "3",
+          "fn": null,
+          "args": null,
+          "formula": "(3)",
+          "isIntermediate": true
+        }
+      ]
+    },
+    "1d20 + (3)": {
+      "formula": "1d20 + (3)",
+      "data": "default",
+      "threw": false,
+      "_formula": "1d20 + (3)",
+      "rollFormula": "1d20 + (3)",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d20",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "ParentheticalTerm",
+          "ancestry": ["ParentheticalTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": "3",
+          "fn": null,
+          "args": null,
+          "formula": "(3)",
+          "isIntermediate": true
+        }
+      ]
+    },
+    "2d20kh1 + (3)": {
+      "formula": "2d20kh1 + (3)",
+      "data": "default",
+      "threw": false,
+      "_formula": "2d20kh1 + (3)",
+      "rollFormula": "2d20kh1 + (3)",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 2
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": ["kh1"],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "2d20kh1",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "ParentheticalTerm",
+          "ancestry": ["ParentheticalTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": "3",
+          "fn": null,
+          "args": null,
+          "formula": "(3)",
+          "isIntermediate": true
+        }
+      ]
+    },
+    "1d20+3": {
+      "formula": "1d20+3",
+      "data": "default",
+      "threw": false,
+      "_formula": "1d20 + 3",
+      "rollFormula": "1d20 + 3",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d20",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "NumericTerm",
+          "ancestry": ["NumericTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": 3,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "3",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "1d20 + 3 + 1d4 [Tool]": {
+      "formula": "1d20 + 3 + 1d4 [Tool]",
+      "data": "default",
+      "threw": true,
+      "error": "peg$SyntaxError"
+    },
+    "2d6x>=6": {
+      "formula": "2d6x>=6",
+      "data": "default",
+      "threw": false,
+      "_formula": "2d6x>=6",
+      "rollFormula": "2d6x>=6",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 2
+          },
+          "faces": {
+            "type": "number",
+            "value": 6
+          },
+          "modifiers": ["x>=6"],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "2d6x>=6",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "5d10xo>=8": {
+      "formula": "5d10xo>=8",
+      "data": "default",
+      "threw": false,
+      "_formula": "5d10xo>=8",
+      "rollFormula": "5d10xo>=8",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 5
+          },
+          "faces": {
+            "type": "number",
+            "value": 10
+          },
+          "modifiers": ["xo>=8"],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "5d10xo>=8",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "{1d20,1d12}kh + 2": {
+      "formula": "{1d20,1d12}kh + 2",
+      "data": "default",
+      "threw": false,
+      "_formula": "{1d20,1d12}kh + 2",
+      "rollFormula": "{1d20,1d12}kh + 2",
+      "terms": [
+        {
+          "class": "PoolTerm",
+          "ancestry": ["PoolTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": ["kh"],
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": ["1d20", "1d12"],
+          "formula": "{1d20,1d12}kh",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "NumericTerm",
+          "ancestry": ["NumericTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": 2,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "2",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "1d20 + 5": {
+      "formula": "1d20 + 5",
+      "data": "default",
+      "threw": false,
+      "_formula": "1d20 + 5",
+      "rollFormula": "1d20 + 5",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d20",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "NumericTerm",
+          "ancestry": ["NumericTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": 5,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "5",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "1d20 + @prof": {
+      "formula": "1d20 + @prof",
+      "data": "default",
+      "threw": false,
+      "_formula": "1d20 + 3",
+      "rollFormula": "1d20 + 3",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d20",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "NumericTerm",
+          "ancestry": ["NumericTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": 3,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "3",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "1d20 + 3[Tools] + 2[Modifiers]": {
+      "formula": "1d20 + 3[Tools] + 2[Modifiers]",
+      "data": "default",
+      "threw": false,
+      "_formula": "1d20 + 3[Tools] + 2[Modifiers]",
+      "rollFormula": "1d20 + 3[Tools] + 2[Modifiers]",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d20",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "NumericTerm",
+          "ancestry": ["NumericTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": "Tools",
+          "operator": null,
+          "value": 3,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "3[Tools]",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "NumericTerm",
+          "ancestry": ["NumericTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": "Modifiers",
+          "operator": null,
+          "value": 2,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "2[Modifiers]",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "2d20": {
+      "formula": "2d20",
+      "data": "default",
+      "threw": false,
+      "_formula": "2d20",
+      "rollFormula": "2d20",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 2
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "2d20",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "1d20r1": {
+      "formula": "1d20r1",
+      "data": "default",
+      "threw": false,
+      "_formula": "1d20r1",
+      "rollFormula": "1d20r1",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": ["r1"],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d20r1",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "1d20min2": {
+      "formula": "1d20min2",
+      "data": "default",
+      "threw": false,
+      "_formula": "1d20min2",
+      "rollFormula": "1d20min2",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": ["min2"],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d20min2",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "1d(1d4)": {
+      "formula": "1d(1d4)",
+      "data": "default",
+      "threw": false,
+      "_formula": "1d(1d4)",
+      "rollFormula": "1d(1d4)",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "Roll",
+            "value": "(1d4)"
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d(1d4)",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "1dc": {
+      "formula": "1dc",
+      "data": "default",
+      "threw": false,
+      "_formula": "1dc",
+      "rollFormula": "1dc",
+      "terms": [
+        {
+          "class": "Coin",
+          "ancestry": ["Coin", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 2
+          },
+          "modifiers": [],
+          "keepModifiers": false,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1dc",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "5 + 3": {
+      "formula": "5 + 3",
+      "data": "default",
+      "threw": false,
+      "_formula": "5 + 3",
+      "rollFormula": "5 + 3",
+      "terms": [
+        {
+          "class": "NumericTerm",
+          "ancestry": ["NumericTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": 5,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "5",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "NumericTerm",
+          "ancestry": ["NumericTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": 3,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "3",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "1d20 + (2d6)": {
+      "formula": "1d20 + (2d6)",
+      "data": "default",
+      "threw": false,
+      "_formula": "1d20 + (2d6)",
+      "rollFormula": "1d20 + (2d6)",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d20",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "ParentheticalTerm",
+          "ancestry": ["ParentheticalTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": "2d6",
+          "fn": null,
+          "args": null,
+          "formula": "(2d6)",
+          "isIntermediate": true
+        }
+      ]
+    },
+    "1d20 + 3[Tools] + min(max((1d8), -1), 6)[Modifiers]": {
+      "formula": "1d20 + 3[Tools] + min(max((1d8), -1), 6)[Modifiers]",
+      "data": "default",
+      "threw": false,
+      "_formula": "1d20 + 3[Tools] + min(max((1d8),-1),6)[Modifiers]",
+      "rollFormula": "1d20 + 3[Tools] + min(max((1d8),-1),6)[Modifiers]",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d20",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "NumericTerm",
+          "ancestry": ["NumericTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": "Tools",
+          "operator": null,
+          "value": 3,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "3[Tools]",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "FunctionTerm",
+          "ancestry": ["FunctionTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": "Modifiers",
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": "min",
+          "args": ["max((1d8),-1)", "6"],
+          "formula": "min(max((1d8),-1),6)[Modifiers]",
+          "isIntermediate": true
+        }
+      ]
+    },
+    "1d20 +": {
+      "formula": "1d20 +",
+      "data": "default",
+      "threw": true,
+      "error": "peg$SyntaxError"
+    },
+    "1d20 + (": {
+      "formula": "1d20 + (",
+      "data": "default",
+      "threw": true,
+      "error": "peg$SyntaxError"
+    },
+    "1d20 + @nope": {
+      "formula": "1d20 + @nope",
+      "data": "default",
+      "threw": false,
+      "_formula": "1d20 + 0",
+      "rollFormula": "1d20 + 0",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d20",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "NumericTerm",
+          "ancestry": ["NumericTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": 0,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "0",
+          "isIntermediate": false
+        }
+      ]
+    },
+    "1d20 + 2 * 3": {
+      "formula": "1d20 + 2 * 3",
+      "data": "default",
+      "threw": false,
+      "_formula": "1d20 + 2 * 3",
+      "rollFormula": "1d20 + 2 * 3",
+      "terms": [
+        {
+          "class": "Die",
+          "ancestry": ["Die", "DiceTerm", "RollTerm"],
+          "number": {
+            "type": "number",
+            "value": 1
+          },
+          "faces": {
+            "type": "number",
+            "value": 20
+          },
+          "modifiers": [],
+          "keepModifiers": true,
+          "flavor": null,
+          "operator": null,
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "1d20",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "+",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " + ",
+          "isIntermediate": false
+        },
+        {
+          "class": "NumericTerm",
+          "ancestry": ["NumericTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": 2,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "2",
+          "isIntermediate": false
+        },
+        {
+          "class": "OperatorTerm",
+          "ancestry": ["OperatorTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": "*",
+          "value": null,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": " * ",
+          "isIntermediate": false
+        },
+        {
+          "class": "NumericTerm",
+          "ancestry": ["NumericTerm", "RollTerm"],
+          "number": null,
+          "faces": null,
+          "modifiers": null,
+          "keepModifiers": null,
+          "flavor": null,
+          "operator": null,
+          "value": 3,
+          "term": null,
+          "fn": null,
+          "args": null,
+          "formula": "3",
+          "isIntermediate": false
+        }
+      ]
+    }
+  },
+  "probes": [
+    {
+      "formula": "1d12 + @prof",
+      "data": "default",
+      "index": 0,
+      "extraDice": 1,
+      "keep": "kh",
+      "beforeReset": {
+        "_formula": "1d12 + 3",
+        "rollFormula": "2d12kh1 + 3"
+      },
+      "afterReset": {
+        "_formula": "2d12kh1 + 3",
+        "rollFormula": "2d12kh1 + 3",
+        "toJSONFormula": "2d12kh1 + 3",
+        "fromDataFormula": "2d12kh1 + 3",
+        "cloneFormula": "2d12kh1 + 3",
+        "terms": [
+          {
+            "class": "Die",
+            "ancestry": ["Die", "DiceTerm", "RollTerm"],
+            "number": {
+              "type": "number",
+              "value": 2
+            },
+            "faces": {
+              "type": "number",
+              "value": 12
+            },
+            "modifiers": ["kh1"],
+            "keepModifiers": true,
+            "flavor": null,
+            "operator": null,
+            "value": null,
+            "term": null,
+            "fn": null,
+            "args": null,
+            "formula": "2d12kh1",
+            "isIntermediate": false
+          },
+          {
+            "class": "OperatorTerm",
+            "ancestry": ["OperatorTerm", "RollTerm"],
+            "number": null,
+            "faces": null,
+            "modifiers": null,
+            "keepModifiers": null,
+            "flavor": null,
+            "operator": "+",
+            "value": null,
+            "term": null,
+            "fn": null,
+            "args": null,
+            "formula": " + ",
+            "isIntermediate": false
+          },
+          {
+            "class": "NumericTerm",
+            "ancestry": ["NumericTerm", "RollTerm"],
+            "number": null,
+            "faces": null,
+            "modifiers": null,
+            "keepModifiers": null,
+            "flavor": null,
+            "operator": null,
+            "value": 3,
+            "term": null,
+            "fn": null,
+            "args": null,
+            "formula": "3",
+            "isIntermediate": false
+          }
+        ]
+      }
+    },
+    {
+      "formula": "1d20[skill] + 3",
+      "data": "default",
+      "index": 0,
+      "extraDice": 1,
+      "keep": "kl",
+      "beforeReset": {
+        "_formula": "1d20[skill] + 3",
+        "rollFormula": "2d20kl1[skill] + 3"
+      },
+      "afterReset": {
+        "_formula": "2d20kl1[skill] + 3",
+        "rollFormula": "2d20kl1[skill] + 3",
+        "toJSONFormula": "2d20kl1[skill] + 3",
+        "fromDataFormula": "2d20kl1[skill] + 3",
+        "cloneFormula": "2d20kl1[skill] + 3",
+        "terms": [
+          {
+            "class": "Die",
+            "ancestry": ["Die", "DiceTerm", "RollTerm"],
+            "number": {
+              "type": "number",
+              "value": 2
+            },
+            "faces": {
+              "type": "number",
+              "value": 20
+            },
+            "modifiers": ["kl1"],
+            "keepModifiers": true,
+            "flavor": "skill",
+            "operator": null,
+            "value": null,
+            "term": null,
+            "fn": null,
+            "args": null,
+            "formula": "2d20kl1[skill]",
+            "isIntermediate": false
+          },
+          {
+            "class": "OperatorTerm",
+            "ancestry": ["OperatorTerm", "RollTerm"],
+            "number": null,
+            "faces": null,
+            "modifiers": null,
+            "keepModifiers": null,
+            "flavor": null,
+            "operator": "+",
+            "value": null,
+            "term": null,
+            "fn": null,
+            "args": null,
+            "formula": " + ",
+            "isIntermediate": false
+          },
+          {
+            "class": "NumericTerm",
+            "ancestry": ["NumericTerm", "RollTerm"],
+            "number": null,
+            "faces": null,
+            "modifiers": null,
+            "keepModifiers": null,
+            "flavor": null,
+            "operator": null,
+            "value": 3,
+            "term": null,
+            "fn": null,
+            "args": null,
+            "formula": "3",
+            "isIntermediate": false
+          }
+        ]
+      }
+    },
+    {
+      "formula": "2 * 1d20",
+      "data": "default",
+      "index": 2,
+      "extraDice": 1,
+      "keep": "kh",
+      "beforeReset": {
+        "_formula": "2 * 1d20",
+        "rollFormula": "2 * 2d20kh1"
+      },
+      "afterReset": {
+        "_formula": "2 * 2d20kh1",
+        "rollFormula": "2 * 2d20kh1",
+        "toJSONFormula": "2 * 2d20kh1",
+        "fromDataFormula": "2 * 2d20kh1",
+        "cloneFormula": "2 * 2d20kh1",
+        "terms": [
+          {
+            "class": "NumericTerm",
+            "ancestry": ["NumericTerm", "RollTerm"],
+            "number": null,
+            "faces": null,
+            "modifiers": null,
+            "keepModifiers": null,
+            "flavor": null,
+            "operator": null,
+            "value": 2,
+            "term": null,
+            "fn": null,
+            "args": null,
+            "formula": "2",
+            "isIntermediate": false
+          },
+          {
+            "class": "OperatorTerm",
+            "ancestry": ["OperatorTerm", "RollTerm"],
+            "number": null,
+            "faces": null,
+            "modifiers": null,
+            "keepModifiers": null,
+            "flavor": null,
+            "operator": "*",
+            "value": null,
+            "term": null,
+            "fn": null,
+            "args": null,
+            "formula": " * ",
+            "isIntermediate": false
+          },
+          {
+            "class": "Die",
+            "ancestry": ["Die", "DiceTerm", "RollTerm"],
+            "number": {
+              "type": "number",
+              "value": 2
+            },
+            "faces": {
+              "type": "number",
+              "value": 20
+            },
+            "modifiers": ["kh1"],
+            "keepModifiers": true,
+            "flavor": null,
+            "operator": null,
+            "value": null,
+            "term": null,
+            "fn": null,
+            "args": null,
+            "formula": "2d20kh1",
+            "isIntermediate": false
+          }
+        ]
+      }
+    },
+    {
+      "formula": "2d6 + @prof",
+      "data": "default",
+      "index": 0,
+      "extraDice": 2,
+      "keep": "kh",
+      "beforeReset": {
+        "_formula": "2d6 + 3",
+        "rollFormula": "4d6kh2 + 3"
+      },
+      "afterReset": {
+        "_formula": "4d6kh2 + 3",
+        "rollFormula": "4d6kh2 + 3",
+        "toJSONFormula": "4d6kh2 + 3",
+        "fromDataFormula": "4d6kh2 + 3",
+        "cloneFormula": "4d6kh2 + 3",
+        "terms": [
+          {
+            "class": "Die",
+            "ancestry": ["Die", "DiceTerm", "RollTerm"],
+            "number": {
+              "type": "number",
+              "value": 4
+            },
+            "faces": {
+              "type": "number",
+              "value": 6
+            },
+            "modifiers": ["kh2"],
+            "keepModifiers": true,
+            "flavor": null,
+            "operator": null,
+            "value": null,
+            "term": null,
+            "fn": null,
+            "args": null,
+            "formula": "4d6kh2",
+            "isIntermediate": false
+          },
+          {
+            "class": "OperatorTerm",
+            "ancestry": ["OperatorTerm", "RollTerm"],
+            "number": null,
+            "faces": null,
+            "modifiers": null,
+            "keepModifiers": null,
+            "flavor": null,
+            "operator": "+",
+            "value": null,
+            "term": null,
+            "fn": null,
+            "args": null,
+            "formula": " + ",
+            "isIntermediate": false
+          },
+          {
+            "class": "NumericTerm",
+            "ancestry": ["NumericTerm", "RollTerm"],
+            "number": null,
+            "faces": null,
+            "modifiers": null,
+            "keepModifiers": null,
+            "flavor": null,
+            "operator": null,
+            "value": 3,
+            "term": null,
+            "fn": null,
+            "args": null,
+            "formula": "3",
+            "isIntermediate": false
+          }
+        ]
+      }
+    },
+    {
+      "formula": "@prof + 1d20",
+      "data": "diceProf",
+      "index": 2,
+      "extraDice": 1,
+      "keep": "kh",
+      "beforeReset": {
+        "_formula": "1d4 + 1d20",
+        "rollFormula": "1d4 + 2d20kh1"
+      },
+      "afterReset": {
+        "_formula": "1d4 + 2d20kh1",
+        "rollFormula": "1d4 + 2d20kh1",
+        "toJSONFormula": "1d4 + 2d20kh1",
+        "fromDataFormula": "1d4 + 2d20kh1",
+        "cloneFormula": "1d4 + 2d20kh1",
+        "terms": [
+          {
+            "class": "Die",
+            "ancestry": ["Die", "DiceTerm", "RollTerm"],
+            "number": {
+              "type": "number",
+              "value": 1
+            },
+            "faces": {
+              "type": "number",
+              "value": 4
+            },
+            "modifiers": [],
+            "keepModifiers": true,
+            "flavor": null,
+            "operator": null,
+            "value": null,
+            "term": null,
+            "fn": null,
+            "args": null,
+            "formula": "1d4",
+            "isIntermediate": false
+          },
+          {
+            "class": "OperatorTerm",
+            "ancestry": ["OperatorTerm", "RollTerm"],
+            "number": null,
+            "faces": null,
+            "modifiers": null,
+            "keepModifiers": null,
+            "flavor": null,
+            "operator": "+",
+            "value": null,
+            "term": null,
+            "fn": null,
+            "args": null,
+            "formula": " + ",
+            "isIntermediate": false
+          },
+          {
+            "class": "Die",
+            "ancestry": ["Die", "DiceTerm", "RollTerm"],
+            "number": {
+              "type": "number",
+              "value": 2
+            },
+            "faces": {
+              "type": "number",
+              "value": 20
+            },
+            "modifiers": ["kh1"],
+            "keepModifiers": true,
+            "flavor": null,
+            "operator": null,
+            "value": null,
+            "term": null,
+            "fn": null,
+            "args": null,
+            "formula": "2d20kh1",
+            "isIntermediate": false
+          }
+        ]
+      }
+    }
+  ]
+}

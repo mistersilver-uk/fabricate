@@ -516,7 +516,10 @@ export default [
   {
     files: [
       'scripts/lib/foundryBrowserBoot.js',
+      'scripts/lib/foundryReadyWorld.js',
       'scripts/foundry-version-assert.mjs',
+      // The Roll terms recorder (issue 2007): one `page.evaluate` body reading `foundry.dice`.
+      'scripts/foundry-roll-terms-record.mjs',
       // The Checks Studio parity extractor (issue 1096): its whole measurement pass is one
       // `page.evaluate` body reading `getComputedStyle` inside the prototype's page.
       'scripts/checks-studio-parity-extract.mjs',

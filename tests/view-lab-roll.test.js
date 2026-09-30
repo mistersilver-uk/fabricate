@@ -437,7 +437,8 @@ test('toMessage routes to ChatMessage.create and tolerates its absence', async (
 test('evaluated Roll snapshots survive JSON transport without consuming seeded entropy', async () => {
   const Roll = makeRoll();
   const ControlRoll = makeRoll();
-  const formula = '2d20kh1 + @prof + 1d4 [Tool]';
+  // No space before `[Tool]`: real Foundry refuses `1d4 [Tool]` (the recorded 13.351/14.365 terms).
+  const formula = '2d20kh1 + @prof + 1d4[Tool]';
   const options = { flavor: 'Smithing', custom: { source: 'check' } };
   const original = await new Roll(formula, { prof: 3 }, options).evaluate();
   await new ControlRoll(formula, { prof: 3 }).evaluate();
@@ -448,7 +449,7 @@ test('evaluated Roll snapshots survive JSON transport without consuming seeded e
   );
   assert.equal(snapshot.class, 'LabRoll');
   assert.equal(snapshot.evaluated, true, 'core uses evaluated, not _evaluated, on the wire');
-  assert.equal(snapshot.formula, '2d20kh1 + 3 + 1d4 [Tool]');
+  assert.equal(snapshot.formula, '2d20kh1 + 3 + 1d4[Tool]');
   assert.equal(snapshot.total, original.total);
   assert.deepEqual(snapshot.options, options);
   const transported = JSON.parse(JSON.stringify(snapshot));

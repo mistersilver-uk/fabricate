@@ -12,6 +12,7 @@ globalThis.ui = globalThis.ui || { notifications: { warn: () => {}, error: () =>
 
 const { CraftingEngine } = await import('../src/systems/CraftingEngine.js');
 const { salvageForChatCard } = await import('./helpers/routedCheckEngine.js');
+const { installTermBearingRoll } = await import('./helpers/termBearingRoll.js');
 
 function makeEngine() {
   return new CraftingEngine({}, null, {});
@@ -449,6 +450,32 @@ function stubRecordingRoll(total) {
   return seen;
 }
 
+/**
+ * The shared term-bearing double (issue 2007) for the advantage tests: `formulas` are each
+ * EVALUATED roll's `_formula`, because the keep transform will act on the constructed Roll's terms.
+ */
+function stubTermRecordingRoll(total) {
+  // The recording stub's `ChatMessage` stays; only its `Roll` is replaced.
+  const seen = stubRecordingRoll(total);
+  installTermBearingRoll({
+    total,
+    extend: (TermRoll) =>
+      class RecordingTermRoll extends TermRoll {
+        async evaluate(options) {
+          await super.evaluate(options);
+          seen.formulas.push(this._formula);
+          return this;
+        }
+
+        async toMessage(data, options) {
+          seen.messages.push({ data, options });
+          return { id: 'msg-1' };
+        }
+      },
+  });
+  return seen;
+}
+
 /** Run one salvage check, capturing every `rollOptions` bag the runners built. */
 async function runWithDecision(engine, system, component, options = {}) {
   const bags = [];
@@ -551,7 +578,7 @@ test('the no-decision bag is DEEP-EQUAL to what it was before the seam existed',
 
 test('a decision applies the bonus and the advantage transform to the rolled formula', async () => {
   const engine = makeEngine();
-  const seen = stubRecordingRoll(16);
+  const seen = stubTermRecordingRoll(16);
   await runWithDecision(
     engine,
     sys({ simple: { rollFormula: '1d20', dc: 5 } }, 'simple'),
@@ -587,7 +614,7 @@ test('a decision supplied with NO prompt still applies bonus, advantage and roll
   // The load-bearing half of `evaluateCheckRoll`'s predicate: `interactive === true &&
   // (Boolean(preResolved) || typeof options.prompt === 'function')`.
   const engine = makeEngine();
-  const seen = stubRecordingRoll(16);
+  const seen = stubTermRecordingRoll(16);
   const { result } = await runWithDecision(
     engine,
     sys({ simple: { rollFormula: '1d20', dc: 5 } }, 'simple'),

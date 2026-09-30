@@ -93,6 +93,7 @@ const SCAN_HELPERS = Object.freeze({
   'tests/helpers/parsedSource.js': 'ast',
   'tests/helpers/primitiveAdoptionContract.js': 'legacy-scan',
   'tests/helpers/primitiveSourceContract.js': 'legacy-scan',
+  'tests/helpers/recordedRollParse.js': 'fixture',
   'tests/helpers/renderedManagerShell.js': 'fixture',
   'tests/helpers/scoped-component-css.js': 'fixture',
   'tests/helpers/sourceScan.js': 'corpus',

@@ -36,6 +36,13 @@ const CHECKS = Object.freeze({
       Object.freeze({ script: 'foundry-icon-bundle-assert.mjs', timeoutMs: 120_000 })
     ])
   }),
+  // Records the keep-transform corpus's Roll terms from real Foundry (issue #2007).
+  'roll-terms': Object.freeze({
+    script: 'foundry-roll-terms-record.mjs',
+    timeoutMs: 360_000,
+    preflightArgs: null,
+    companionScripts: null
+  }),
   // The performance profile (issue #1073).
   perf: Object.freeze({
     script: 'foundry-perf-run.mjs',
