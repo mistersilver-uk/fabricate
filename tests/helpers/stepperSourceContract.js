@@ -308,6 +308,20 @@ export const UNSET_VALUE_CALL_SITES = Object.freeze(
       evidence: 'data-models spec: adjustmentOverride is `number | null`; empty reads the base',
     },
     {
+      id: 'salvage successesOverride',
+      path: 'src/ui/svelte/apps/manager/component/CheckOverrideField.svelte',
+      anchor: ['data-salvage-successes-custom'],
+      kind: 'genuine-absence',
+      evidence: 'successesOverride is `integer 0–20 | null`; empty reads the check\'s own count',
+    },
+    {
+      id: 'gathering task successesOverride',
+      path: 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte',
+      anchor: ['data-gathering-task-successes-override'],
+      kind: 'genuine-absence',
+      evidence: 'successesOverride is `integer 0–20 | null`; empty reads the check\'s own count',
+    },
+    {
       id: 'gathering task staminaCost',
       path: 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte',
       anchor: ['data-gathering-task-stamina-cost'],

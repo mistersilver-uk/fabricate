@@ -12,18 +12,23 @@
   The target source (issue 2005) is a fixed DC or a character value that difficulty adjusts. Every
   switch writes only its own field, so the inactive source's DC, expression and adjustments survive
   a round trip. `character` is the Preview-as actor, `{ name, rollData }`.
+
+  A counting check (issue 2006) measures against `Successes needed`, its `pool.required`, with no
+  target source and no Comparison; `countTiers` are the recipe tiers its readiness grades, or null
+  where no required count is graded, and its callouts are Validation's own rows.
 -->
 <script>
   import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
   import { localize } from '../../../util/foundryBridge.js';
-  import RollDataExpressionInput from '../RollDataExpressionInput.svelte';
   import {
     MULTIPLIER_STOPS,
     formatCheckAdjustment,
     parseCheckAdjustment,
   } from './checkAdjustmentLabel.js';
+  import CheckCharacterValueField from './CheckCharacterValueField.svelte';
   import { interpolate, underComparisonPhrase } from './checksCopy.js';
-  import { targetValueStatus } from './checkTargetStatus.js';
+  import { countDifficultyCallouts } from './countDifficultyModel.js';
+  import Callout from '../../../components/Callout.svelte';
   import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
   import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import Stepper from '../../../components/Stepper.svelte';
@@ -38,6 +43,7 @@
     recordNoun = 'recipe',
     evaluation = null,
     character = null,
+    countTiers = null,
     onChange = () => {},
   } = $props();
 
@@ -60,7 +66,14 @@
   const resolvedDcMode = $derived(dcMode === 'dynamic' ? 'dynamic' : 'static');
   const normalized = $derived(normalizeCheckEvaluation(evaluation));
   const under = $derived(normalized.direction === 'under');
-  const attribute = $derived(normalized.target.source === 'attribute');
+  const count = $derived(normalized.product === 'count');
+  // A counting check reads no target, so a kept character-value target is inert under it.
+  const attribute = $derived(!count && normalized.target.source === 'attribute');
+  const countCallouts = $derived(
+    count
+      ? countDifficultyCallouts({ evaluation: normalized, thresholdMode, tiers: countTiers }, text)
+      : []
+  );
   const adjustmentKind = $derived(normalized.target.adjustmentKind);
 
   const cmp = $derived(underComparisonPhrase(comparison, text));
@@ -107,6 +120,12 @@
   ];
 
   const lead = $derived.by(() => {
+    if (count) {
+      return text(
+        'FABRICATE.Admin.Manager.Checks.Count.Difficulty.Lead',
+        'How many successes the roll must reach, and where that number comes from.'
+      );
+    }
     if (attribute) {
       return under
         ? text(
@@ -138,15 +157,7 @@
       icon: 'fas fa-hashtag',
       labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.DcStatic',
       fallback: 'Static',
-      description: attribute
-        ? text(
-            'FABRICATE.Admin.Manager.Checks.Evaluation.AdjustmentStaticDesc',
-            'A base adjustment here, with one per recipe tier.'
-          )
-        : sentence(
-            'FABRICATE.Admin.Manager.Checks.Crafting.DcStaticDesc',
-            'A fixed DC for every {record}, with optional named difficulty tiers.'
-          ),
+      description: staticDescription(),
     },
     {
       value: 'dynamic',
@@ -157,7 +168,31 @@
     },
   ]);
 
+  function staticDescription() {
+    if (count) {
+      return text(
+        'FABRICATE.Admin.Manager.Checks.Count.Difficulty.StaticDesc',
+        'Successes needed, set here and per recipe tier. The intended route for counting checks.'
+      );
+    }
+    return attribute
+      ? text(
+          'FABRICATE.Admin.Manager.Checks.Evaluation.AdjustmentStaticDesc',
+          'A base adjustment here, with one per recipe tier.'
+        )
+      : sentence(
+          'FABRICATE.Admin.Manager.Checks.Crafting.DcStaticDesc',
+          'A fixed DC for every {record}, with optional named difficulty tiers.'
+        );
+  }
+
   function dynamicDescription() {
+    if (count) {
+      return text(
+        'FABRICATE.Admin.Manager.Checks.Count.Difficulty.DynamicDesc',
+        'A macro returns the successes needed. Use it only when no recipe tier can express the rule.'
+      );
+    }
     if (!attribute) {
       return sentence(
         'FABRICATE.Admin.Manager.Checks.Crafting.DcDynamicDesc',
@@ -175,7 +210,26 @@
         );
   }
 
+  // The DC-source group's `[legendKey, legend]`: the source of whatever number this card sets.
+  const dcSourceLegend = $derived.by(() => {
+    if (count) {
+      return [
+        'FABRICATE.Admin.Manager.Checks.Count.Difficulty.SourceTitle',
+        'How the successes needed are set',
+      ];
+    }
+    return attribute
+      ? [
+          'FABRICATE.Admin.Manager.Checks.Evaluation.AdjustmentSourceTitle',
+          'How the adjustment is set',
+        ]
+      : ['FABRICATE.Admin.Manager.Checks.Evaluation.NumberSourceTitle', 'How the number is set'];
+  });
+
   const dcLabel = $derived.by(() => {
+    if (count) {
+      return text('FABRICATE.Admin.Manager.Checks.Count.Difficulty.Required', 'Successes needed');
+    }
     if (attribute) {
       return text('FABRICATE.Admin.Manager.Checks.Evaluation.BaseAdjustment', 'Base adjustment');
     }
@@ -210,12 +264,7 @@
   ];
   const COMPARISON_OPTIONS = $derived(under ? COMPARISON_UNDER : COMPARISON_OVER);
 
-  // What the character value resolves to for the Preview-as actor, never read as zero.
   const expression = $derived(normalized.target.expression);
-  const resolution = $derived(targetValueStatus(expression, character, text));
-  const uid = $props.id();
-  const hintId = `${uid}-target-expression-hint`;
-  const resolutionId = `${uid}-target-resolution`;
 
   const formatAdjustment = (value) => formatCheckAdjustment(adjustmentKind, value);
   const parseAdjustment = (value) => parseCheckAdjustment(adjustmentKind, value);
@@ -233,28 +282,28 @@
     </div>
   </div>
   <div class="manager-checks-card-body">
-    <RadioCardGroup
-      legendKey="FABRICATE.Admin.Manager.Checks.Evaluation.SourceTitle"
-      legend="What the roll is measured against"
-      legendVisible
-      options={SOURCE_OPTIONS}
-      selectedValue={normalized.target.source}
-      groupName="check-target-source"
-      columns={2}
-      optionDataAttr="data-check-target-source-option"
-      onChange={(next) => {
-        if (next !== normalized.target.source) emitTarget({ source: next });
-      }}
-    />
+    {#if !count}
+      <RadioCardGroup
+        legendKey="FABRICATE.Admin.Manager.Checks.Evaluation.SourceTitle"
+        legend="What the roll is measured against"
+        legendVisible
+        options={SOURCE_OPTIONS}
+        selectedValue={normalized.target.source}
+        groupName="check-target-source"
+        columns={2}
+        optionDataAttr="data-check-target-source-option"
+        onChange={(next) => {
+          if (next !== normalized.target.source) emitTarget({ source: next });
+        }}
+      />
+    {/if}
 
     {#if showDcSource}
       <!-- The target source leads the card, ruled off from the choice it governs. -->
-      <div class="manager-checks-difficulty-rule" aria-hidden="true"></div>
+      {#if !count}<div class="manager-checks-difficulty-rule" aria-hidden="true"></div>{/if}
       <RadioCardGroup
-        legendKey={attribute
-          ? 'FABRICATE.Admin.Manager.Checks.Evaluation.AdjustmentSourceTitle'
-          : 'FABRICATE.Admin.Manager.Checks.Evaluation.NumberSourceTitle'}
-        legend={attribute ? 'How the adjustment is set' : 'How the number is set'}
+        legendKey={dcSourceLegend[0]}
+        legend={dcSourceLegend[1]}
         legendVisible
         options={DC_MODE_OPTIONS}
         selectedValue={resolvedDcMode}
@@ -273,37 +322,21 @@
           <span class="manager-checks-difficulty-label">
             {text('FABRICATE.Admin.Manager.Checks.Evaluation.SourceAttribute', 'Character value')}
           </span>
-          <RollDataExpressionInput
-            sigil={false}
-            dataField="check-target-expression"
-            inputAttrs={{
-              'data-check-target-expression': '',
-              'data-validation-target': 'checks-target-expression',
-              'aria-label': text(
-                'FABRICATE.Admin.Manager.Checks.Evaluation.SourceAttribute',
-                'Character value'
-              ),
-              'aria-describedby': resolution ? `${hintId} ${resolutionId}` : hintId,
-            }}
+          <CheckCharacterValueField
             value={expression}
-            placeholder="@skills.craft.value"
+            {character}
+            label={text(
+              'FABRICATE.Admin.Manager.Checks.Evaluation.SourceAttribute',
+              'Character value'
+            )}
+            hooks={{
+              expression: 'data-check-target-expression',
+              hint: 'data-check-target-expression-hint',
+              resolution: 'data-check-target-resolution',
+            }}
+            inputAttrs={{ 'data-validation-target': 'checks-target-expression' }}
             onChange={(next) => emitTarget({ expression: next })}
           />
-          <!-- The path syntax stays the field's description for assistive tech; the prototype
-               draws only the live reading beneath the field. -->
-          <small class="visually-hidden" id={hintId} data-check-target-expression-hint>
-            {text(
-              'FABRICATE.Admin.Manager.Checks.Evaluation.ValueHint',
-              'A character path with its leading @, or arithmetic on paths without dice, such as @skills.craft.value - 2.'
-            )}
-          </small>
-          {#if resolution}
-            <small
-              class="manager-muted"
-              id={resolutionId}
-              data-check-target-resolution={resolution.tone}>{resolution.text}</small
-            >
-          {/if}
         </div>
         <div class="manager-checks-difficulty-field is-comparison">
           <span class="manager-checks-difficulty-label">
@@ -333,7 +366,21 @@
     <div class="manager-checks-difficulty-fields">
       <div class="manager-checks-difficulty-field is-dc">
         <span class="manager-checks-difficulty-label">{dcLabel}</span>
-        {#if attribute}
+        {#if count}
+          <!-- 0 passes unless the roll botches; 20 is the normalizer's own ceiling. -->
+          <Stepper
+            fill
+            min={0}
+            max={20}
+            value={normalized.pool.required}
+            {...stepperLabels(dcLabel)}
+            inputProps={{
+              'data-check-count-required': '',
+              'data-validation-target': 'checks-count-required',
+            }}
+            onChange={(required) => emitEvaluation({ pool: { ...normalized.pool, required } })}
+          />
+        {:else if attribute}
           <!-- Keyed by kind, so a switch re-reads the kept value through the other formatter. -->
           {#key adjustmentKind}
             <Stepper
@@ -363,28 +410,44 @@
           />
         {/if}
       </div>
-      <div class="manager-checks-difficulty-field is-comparison">
-        <span class="manager-checks-difficulty-label">
-          {text('FABRICATE.Admin.Manager.Checks.Crafting.ThresholdComparison', 'Comparison')}
-        </span>
-        <!-- A SEGMENTED CONTROL rather than a `<select>`: two options is not a list to open, both
+      <!-- Under count `thresholdMode` is the per-die test, edited only under `Success on`. -->
+      {#if normalized.product !== 'count'}
+        <div class="manager-checks-difficulty-field is-comparison">
+          <span class="manager-checks-difficulty-label">
+            {text('FABRICATE.Admin.Manager.Checks.Crafting.ThresholdComparison', 'Comparison')}
+          </span>
+          <!-- A SEGMENTED CONTROL rather than a `<select>`: two options is not a list to open, both
              readings are on screen at once, and the one in force is lit. -->
-        <SegmentedControl
-          fill
-          density="field"
-          options={COMPARISON_OPTIONS}
-          value={comparison}
-          groupName="check-threshold-mode"
-          ariaLabel={text(
-            'FABRICATE.Admin.Manager.Checks.Crafting.ThresholdComparison',
-            'Comparison'
-          )}
-          dataAttr="data-threshold-mode"
-          optionDataAttr="data-threshold-mode-option"
-          onChange={(next) => onChange({ thresholdMode: next })}
-        />
-      </div>
+          <SegmentedControl
+            fill
+            density="field"
+            options={COMPARISON_OPTIONS}
+            value={comparison}
+            groupName="check-threshold-mode"
+            ariaLabel={text(
+              'FABRICATE.Admin.Manager.Checks.Crafting.ThresholdComparison',
+              'Comparison'
+            )}
+            dataAttr="data-threshold-mode"
+            optionDataAttr="data-threshold-mode-option"
+            onChange={(next) => onChange({ thresholdMode: next })}
+          />
+        </div>
+      {/if}
     </div>
+    {#if countCallouts.length > 0}
+      <div class="manager-checks-difficulty-callouts" data-check-count-callouts>
+        {#each countCallouts as callout (callout.id)}
+          <Callout
+            tone={callout.tone}
+            icon={callout.icon}
+            text={callout.text}
+            dataAttr="data-check-count-callout"
+            dataValue={callout.id}
+          />
+        {/each}
+      </div>
+    {/if}
   </div>
 </InspectorCard>
 
@@ -415,21 +478,9 @@
     margin-top: var(--fab-space-3);
   }
 
-  [data-check-attribute-fields] small {
-    font-size: 10px;
-    font-weight: 500;
-    line-height: 1.45;
-  }
-
-  [data-check-target-resolution='muted'] {
-    color: var(--fab-text-subtle);
-  }
-
-  [data-check-target-resolution='resolved'] {
-    color: var(--fab-text-secondary);
-  }
-
-  [data-check-target-resolution='unresolved'] {
-    color: var(--fab-danger-text);
+  .manager-checks-difficulty-callouts {
+    display: grid;
+    gap: var(--fab-space-2);
+    margin-top: var(--fab-space-3);
   }
 </style>

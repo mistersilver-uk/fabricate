@@ -65,6 +65,15 @@ export const CHECK_TICK_LABELS = Object.freeze({
     'CheckCountPoolCharacterDependent',
     'The base pool reads the character, so it is compared with the successes needed only when a character rolls.',
   ],
+  summedFormulaCountsNothing: [
+    'CheckSummedFormulaCountsNothing',
+    'No summing formula counts successes',
+  ],
+  countFacesSet: ['CheckCountFacesSet', 'Explode and cancel faces are set'],
+  countTriggersReachable: [
+    'CheckCountTriggersReachable',
+    'Every dice trigger can fire on the pool',
+  ],
 });
 
 /** The ISSUES a check can raise, keyed by `CHECK_READINESS_ISSUE_IDS` member. */
@@ -191,7 +200,7 @@ export const CHECK_ISSUE_LABELS = Object.freeze({
   ],
   countTierWithoutSuccesses: [
     'IssueCountTierWithoutSuccesses',
-    "{names} set no successes needed, so they use the check's {required} and are no harder than the default. Set successes needed on each tier.",
+    "{names} set no successes needed, so they use the check's {required} and are no harder than the default. Set successes needed on each tier before enabling.",
   ],
   countRequiredExceedsMaxPool: [
     'IssueCountRequiredExceedsMaxPool',
@@ -213,6 +222,25 @@ export const CHECK_ISSUE_LABELS = Object.freeze({
     'IssueCountValueNotNumericForPreview',
     'The value this check reads from {actor} is not a number, so this check cannot roll for them.',
   ],
+  freeTextCountingFormula: [
+    'IssueFreeTextCountingFormula',
+    'The total of {formula} is a count, so every bonus and DC here is measured against the wrong number.',
+  ],
+  countFaceMissing: [
+    'IssueCountFaceMissing',
+    'Choose the face to {kind} from. Without one, this check cannot roll.',
+  ],
+  countTriggerGroupUnreachable: [
+    'IssueCountTriggerGroupUnreachable',
+    'The triggers {names} read dice this pool never rolls, so they cannot fire while the check counts successes. They are kept and work again if the check adds the dice.',
+  ],
+});
+
+/** The one-trigger sentence of `countTriggerGroupUnreachable`, its name quoted in the copy. */
+const ONE_TRIGGER_UNREACHABLE = Object.freeze({
+  key: 'FABRICATE.Admin.Manager.Checks.Validation.IssueCountTriggerGroupUnreachableOne',
+  fallback:
+    'The trigger “{names}” reads dice this pool never rolls, so it cannot fire while the check counts successes. It is kept and works again if the check adds the dice.',
 });
 
 /** The words a `countFaceBeyondDie` issue's coded `kind` and `effect` fill its sentence with. */
@@ -267,6 +295,9 @@ const TITLE_FALLBACKS = {
   countPoolTooLarge: 'The base pool is too large to roll',
   countPathUnresolvedForPreview: 'A character path does not resolve',
   countValueNotNumericForPreview: 'A character value is not a number',
+  freeTextCountingFormula: 'This formula counts successes, but the check adds the dice',
+  countFaceMissing: 'A face to explode or cancel from is not chosen',
+  countTriggerGroupUnreachable: 'A trigger reads dice the pool never rolls',
 };
 
 /** Each title's key is its id's `Issue<Id>Title`, so the table above holds only the fallbacks. */
@@ -318,21 +349,101 @@ function flaggedRecordName(data, text) {
  */
 function issueData(data, text) {
   if (!data) return data;
-  const resolved = { ...data };
+  const { triggers, ...resolved } = data;
   for (const [field, phrases] of Object.entries(ISSUE_PHRASES)) {
     const phrase = phrases[resolved[field]];
     if (phrase) resolved[field] = text(`${NAMESPACE}${phrase[0]}`, phrase[1]);
+  }
+  if (Array.isArray(triggers)) {
+    const names = triggers.map((fragment) => resolveFragment(fragment, text));
+    resolved.names =
+      names.length === 1 ? names[0] : names.map((name) => quotedName(name, text)).join(', ');
   }
   const named = flaggedRecordName(data, text);
   if (!named) return resolved;
   return { ...resolved, names: [named, data.names].filter(Boolean).join(', ') };
 }
 
+/** A `{ key, fallback, data }` fragment, any fragment nested in its data resolved first. */
+function resolveFragment({ key, fallback, data = {} }, text) {
+  const filled = Object.fromEntries(
+    Object.entries(data).map(([field, value]) => [
+      field,
+      value && typeof value === 'object' ? resolveFragment(value, text) : value,
+    ])
+  );
+  return interpolate(text(key, fallback, filled), filled);
+}
+
+/** One name of a listed trigger, in the reader's quotation marks. */
+function quotedName(name, text) {
+  const data = { name };
+  const quoted = text('FABRICATE.Admin.Manager.Checks.Validation.QuotedName', '“{name}”', data);
+  return interpolate(quoted, data);
+}
+
+/**
+ * What a `freeTextCountingFormula` row adds about its Convert (issue 2006): a kept macro read as
+ * the successes needed, the records overriding only the DC, or the count that falls outside 0–20.
+ */
+function conversionNotes(data, text) {
+  const notes = [];
+  if (data?.dynamic) {
+    notes.push(
+      text(
+        'FABRICATE.Admin.Manager.Checks.Count.Convert.DynamicNote',
+        'Converting keeps the macro, and its return is then read as the successes needed.'
+      )
+    );
+  }
+  if (data?.overrides) {
+    const sentence = text(
+      'FABRICATE.Admin.Manager.Checks.Count.Convert.OverridesNote',
+      "{names} override the DC but not the successes needed, so after converting they use the check's successes needed.",
+      { names: data.overrides }
+    );
+    notes.push(interpolate(sentence, { names: data.overrides }));
+  }
+  if (Number.isFinite(data?.outOfRange)) {
+    const value = formatSigned(data.outOfRange);
+    const sentence = text(
+      'FABRICATE.Admin.Manager.Checks.Count.Convert.OutOfRange',
+      'It cannot be converted: it would need {value} successes, outside 0 to 20.',
+      { value }
+    );
+    notes.push(interpolate(sentence, { value }));
+  }
+  return notes;
+}
+
+/**
+ * The Convert action a convertible `freeTextCountingFormula` issue offers, as `[key, fallback]`
+ * pairs for its verb and its accessible description, or null for any other issue.
+ */
+export function convertActionCopy(issue) {
+  if (issue?.id !== 'freeTextCountingFormula' || issue.data?.convertible !== true) return null;
+  return {
+    label: ['FABRICATE.Admin.Manager.Checks.Count.Convert.Action', 'Convert to count successes'],
+    description: issue.data.exceed
+      ? [
+          'FABRICATE.Admin.Manager.Checks.Count.Convert.DescriptionExceed',
+          'Copies each DC plus one into successes needed, because this check passes only above its DC. The formula and DCs are kept.',
+        ]
+      : [
+          'FABRICATE.Admin.Manager.Checks.Count.Convert.Description',
+          'Copies the DCs into successes needed. The formula and DCs are kept.',
+        ],
+  };
+}
+
 /** A readiness issue's one sentence, as `checkIssueText` fills it. */
 export function checkIssueSentence(id, data, text) {
   const resolved = issueData(data, text);
-  const copy = checkIssueCopy(id);
-  return interpolate(text(copy.key, copy.fallback, resolved), resolved);
+  const one = id === 'countTriggerGroupUnreachable' && data?.triggers?.length === 1;
+  const copy = one ? ONE_TRIGGER_UNREACHABLE : checkIssueCopy(id);
+  const sentence = interpolate(text(copy.key, copy.fallback, resolved), resolved);
+  if (id !== 'freeTextCountingFormula') return sentence;
+  return [sentence, ...conversionNotes(data, text)].join(' ');
 }
 
 /**
@@ -375,6 +486,25 @@ export function underComparisonPhrase(thresholdMode, text) {
   return thresholdMode === 'exceed'
     ? text('FABRICATE.Admin.Manager.Checks.Evaluation.CmpExceed', 'under')
     : text('FABRICATE.Admin.Manager.Checks.Evaluation.CmpMeet', 'at or under');
+}
+
+/** A count's per-die comparison word: `at or above` / `above` over, `at or under` / `under` under. */
+export function countComparisonPhrase(direction, thresholdMode, text) {
+  if (direction === 'under') return underComparisonPhrase(thresholdMode, text);
+  return thresholdMode === 'exceed'
+    ? text('FABRICATE.Admin.Manager.Checks.Count.CmpOverExceed', 'above')
+    : text('FABRICATE.Admin.Manager.Checks.Count.CmpOverMeet', 'at or above');
+}
+
+/** The Formula card's lead: a counting check is built from controls, not typed. */
+export function formulaCardLead(evaluation, text, key, fallback) {
+  if (evaluation?.product === 'count') {
+    return text(
+      'FABRICATE.Admin.Manager.Checks.Count.FormulaLead',
+      'Built from the controls below, so every part of the roll can be checked.'
+    );
+  }
+  return text(key, fallback);
 }
 
 /**
@@ -446,6 +576,9 @@ export function outcomeThresholdLabels(type, column, text) {
   }
   if (column === 'benefit') {
     return [text('FABRICATE.Admin.Manager.Checks.Evaluation.OutcomeBenefit', 'Benefit ±')];
+  }
+  if (column === 'successes') {
+    return [text('FABRICATE.Admin.Manager.Checks.Count.Bands.ExtraSuccesses', 'Extra successes')];
   }
   return [text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeDc', 'DC ±')];
 }

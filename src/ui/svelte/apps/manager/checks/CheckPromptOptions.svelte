@@ -2,13 +2,20 @@
 <!--
   `In the roll prompt`: what a player may change before the dice are rolled, rendered once inside
   the Formula card as a group named by its title. The situational-bonus offer is a display flag only; `allowsSituationalModifier`
-  stays the runtime's authority gate. `extra` is the slot later prompt options extend.
+  stays the runtime's authority gate. `extra` is the slot later prompt options extend. A counting
+  check passes its `destination`, `pool` or `threshold`, and the offer's help follows it (issue 2006).
 -->
 <script>
   import StatusToggle from '../../../components/StatusToggle.svelte';
   import { localize } from '../../../util/foundryBridge.js';
 
-  let { offer = true, direction = 'over', extra = undefined, onChange = () => {} } = $props();
+  let {
+    offer = true,
+    direction = 'over',
+    destination = null,
+    extra = undefined,
+    onChange = () => {},
+  } = $props();
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -26,6 +33,18 @@
       return text(
         'FABRICATE.Admin.Manager.Checks.Evaluation.OfferBonusOff',
         'The prompt shows no bonus field.'
+      );
+    }
+    if (destination === 'pool') {
+      return text(
+        'FABRICATE.Admin.Manager.Checks.Count.OfferPool',
+        'The player can type a flat or rolled bonus, such as +2 or 1d4. It adds that many dice.'
+      );
+    }
+    if (destination === 'threshold') {
+      return text(
+        'FABRICATE.Admin.Manager.Checks.Count.OfferThreshold',
+        'The player can type a flat or rolled bonus, such as +2 or 1d4. It moves the threshold by that much.'
       );
     }
     return direction === 'under'

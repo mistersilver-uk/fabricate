@@ -640,6 +640,19 @@ test('the gathering descriptor refuses a count pool and captures its resolved po
     },
     'the prompt shows the resolved pool line and the override required count'
   );
+  const { thresholdAnchor, thresholdSource, explode: explodes, cancel: cancels, zeroPoolFails } =
+    described.publicPrompt;
+  assert.deepEqual(
+    { thresholdAnchor, thresholdSource, explodes, cancels, zeroPoolFails },
+    {
+      thresholdAnchor: 8,
+      thresholdSource: 'fixed',
+      explodes: { kind: 'from', face: 9, once: true },
+      cancels: { kind: 'worst', face: 10 },
+      zeroPoolFails: false,
+    },
+    'the prompt names the faces the pool acts on and where its threshold came from (issue 2006)'
+  );
 });
 
 test('a hidden gathering task prompts with count wording but no pool or required count', () => {
@@ -1047,19 +1060,23 @@ test('the interactive count prompt reads the pre-modifier pool and each runner\'
     await runFormulaProgressive({ ...shared, dc: 7 });
     assert.deepEqual(dice.formulas(), ['3d10', '3d10', '3d10'], 'the bonus moved the threshold, not the pool');
   });
-  const fields = ({ product, direction, comparison, pool, threshold, die, required, modifierDestination }) => ({
-    product, direction, comparison, pool, threshold, die, required, modifierDestination,
+  const fields = ({
+    product, direction, comparison, pool, threshold, thresholdAnchor, thresholdSource, die, required,
+    modifierDestination,
+  }) => ({
+    product, direction, comparison, pool, threshold, thresholdAnchor, thresholdSource, die, required,
+    modifierDestination,
   });
   const expected = {
-    product: 'count', direction: 'under', comparison: 'exceed', pool: 3, threshold: 5, die: 10,
-    modifierDestination: 'threshold',
+    product: 'count', direction: 'under', comparison: 'exceed', pool: 3.6, threshold: 5, thresholdAnchor: 5,
+    thresholdSource: 'fixed', die: 10, modifierDestination: 'threshold',
   };
   assert.deepEqual(prompted.map(fields), [
     { ...expected, required: 2 },
     { ...expected, required: 4 },
     // The progressive runner takes no threshold mode, so it compares as it rolls: met.
     { ...expected, comparison: 'meet', required: null },
-  ], 'the pool 3.6 shows rounded down, and a progressive check needs no count');
+  ], 'the pool 3.6 is handed unfloored for the prompt to floor after its benefits, and a progressive check needs no count');
   for (const input of prompted) {
     assert.deepEqual([input.dc, input.target, input.formula, input.allowAdvantage], [null, null, '', false]);
   }

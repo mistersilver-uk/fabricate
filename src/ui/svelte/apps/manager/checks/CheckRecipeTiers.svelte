@@ -11,7 +11,8 @@
   the delete and the polite announcement; the library's section 16 carries the ruling.
 
   Under a character value (issue 2005) a tier names its difficulty ADJUSTMENT instead of a DC; a
-  tier without one reads `—` and says so, and its kept DC is left untouched.
+  tier without one reads `—` and says so, and its kept DC is left untouched. Under a counting check
+  (issue 2006) a tier names the successes it needs the same way, never reading its DC as a count.
 -->
 <script>
   import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
@@ -37,7 +38,14 @@
   } = $props();
 
   const normalized = $derived(normalizeCheckEvaluation(evaluation));
-  const attribute = $derived(normalized.target.source === 'attribute');
+  const count = $derived(normalized.product === 'count');
+  const attribute = $derived(!count && normalized.target.source === 'attribute');
+  // The field a row edits and its missing sentence: successes, an adjustment, or the DC.
+  const field = $derived.by(() => {
+    if (count) return 'successes';
+    return attribute ? 'adjustment' : 'dc';
+  });
+  const missing = (tier) => field !== 'dc' && tier[field] == null;
   const kind = $derived(normalized.target.adjustmentKind);
   const formatAdjustment = (value) => formatCheckAdjustment(kind, value);
   const parseAdjustment = (value) => parseCheckAdjustment(kind, value);
@@ -57,6 +65,7 @@
   // Named once: the row's micro label, the stepper's accessible name and the shared adjunct
   // strings' `{label}` slot all read it.
   const dcLabel = $derived.by(() => {
+    if (count) return text('FABRICATE.Admin.Manager.Checks.Count.Tiers.Unit', 'Successes');
     if (attribute)
       return text('FABRICATE.Admin.Manager.Checks.Evaluation.Adjustment', 'Adjustment');
     return normalized.direction === 'under'
@@ -69,8 +78,11 @@
     text('FABRICATE.Admin.Manager.Checks.Crafting.TiersTitle', 'Recipe difficulty tiers')
   );
 
+  // A counting tier also starts at the check's own successes needed; a summing one adds none, so a
+  // later switch to count still asks for them.
   function addTier() {
-    onChange([...list, { id: newId(), name: '', dc: Number(defaultDc) || 0 }]);
+    const tier = { id: newId(), name: '', dc: Number(defaultDc) || 0 };
+    onChange([...list, count ? { ...tier, successes: normalized.pool.required } : tier]);
   }
 
   function updateTier(id, patch) {
@@ -96,6 +108,12 @@
   }
 
   const tiersLead = $derived.by(() => {
+    if (count) {
+      return text(
+        'FABRICATE.Admin.Manager.Checks.Count.Tiers.Lead',
+        'A recipe picks one of these; it sets how many successes the roll needs.'
+      );
+    }
     if (attribute) {
       return text(
         'FABRICATE.Admin.Manager.Checks.Evaluation.TiersLeadAttribute',
@@ -112,6 +130,9 @@
           'A recipe picks one of these; its DC replaces the base DC above.'
         );
   });
+
+  // Validation's control for a tier without successes is the first such tier's stepper.
+  const firstMissing = $derived(count ? list.find((tier) => tier.successes == null) : undefined);
 
   const uid = $props.id();
   const missingId = (tier) => `${uid}-tier-adjustment-missing-${tier.id}`;
@@ -137,10 +158,15 @@
 <div class="manager-checks-card-body is-stack">
   {#if list.length === 0}
     <p class="manager-muted" data-tiers-empty>
-      {text(
-        'FABRICATE.Admin.Manager.Checks.Crafting.NoTiers',
-        'No tiers yet. Add named tiers a recipe can select to override the DC.'
-      )}
+      {count
+        ? text(
+            'FABRICATE.Admin.Manager.Checks.Crafting.NoTiersCount',
+            'No tiers yet. Add named tiers a recipe can select to set how many successes it needs.'
+          )
+        : text(
+            'FABRICATE.Admin.Manager.Checks.Crafting.NoTiers',
+            'No tiers yet. Add named tiers a recipe can select to override the DC.'
+          )}
     </p>
     <!-- The adder follows the empty message (issue 1512): with no tiers there is no list for it to
          be a footer of, and an empty state that says "add one" with nothing to press is a dead end. -->
@@ -154,8 +180,7 @@
       removable
       onReorder={(from, to) => moveTier(from, to)}
       onRemove={(tier) => removeTier(tier.id)}
-      rowClass={(tier) =>
-        `manager-checks-tier-row${attribute && tier.adjustment == null ? ' is-invalid' : ''}`}
+      rowClass={(tier) => `manager-checks-tier-row${missing(tier) ? ' is-invalid' : ''}`}
       rowData={(tier) => ({ 'data-tier-row': tier.id })}
       removeData={() => ({
         'data-remove-tier': '',
@@ -170,14 +195,20 @@
           value={tier.name || ''}
           oninput={(event) => updateTier(tier.id, { name: event.currentTarget.value })}
         />
-        <!-- A missing adjustment is named before the unit and describes the stepper it belongs to. -->
-        {#if attribute && tier.adjustment == null}
+        <!-- A missing value is named before the unit and describes the stepper it belongs to. -->
+        {#if missing(tier)}
           <span
             class="manager-checks-tier-missing"
             id={missingId(tier)}
-            data-tier-adjustment-missing
+            data-tier-adjustment-missing={count ? undefined : ''}
+            data-tier-successes-missing={count ? '' : undefined}
           >
-            {text('FABRICATE.Admin.Manager.Checks.Evaluation.SetAdjustment', 'Set an adjustment')}
+            {count
+              ? text('FABRICATE.Admin.Manager.Checks.Count.Tiers.Missing', 'Set successes needed')
+              : text(
+                  'FABRICATE.Admin.Manager.Checks.Evaluation.SetAdjustment',
+                  'Set an adjustment'
+                )}
           </span>
         {/if}
         <!-- The number is labelled in the row rather than in a column header, so the row stays
@@ -188,7 +219,27 @@
              as a narrower inline island. No `allowUnset`: a tier's DC has no absent state, 0 being a
              real DC, and the `data-*` hook rides `inputProps` onto the real `<input>`. `min={0}`
              because -1 is not a DC, and without the clamp one click of the `−` adjunct commits one. -->
-        {#if attribute}
+        {#if count}
+          <!-- Unset is real here: a tier without successes inherits the check's own. -->
+          <div class="manager-checks-tier-stepper is-recipe">
+            <Stepper
+              fill
+              allowUnset
+              min={0}
+              max={20}
+              value={tier.successes ?? null}
+              placeholder="—"
+              {...stepperLabels(dcLabel)}
+              inputProps={{
+                'data-tier-successes': '',
+                'aria-describedby': missing(tier) ? missingId(tier) : undefined,
+                'data-validation-target':
+                  tier === firstMissing ? 'checks-count-tier-successes' : undefined,
+              }}
+              onChange={(successes) => updateTier(tier.id, { successes })}
+            />
+          </div>
+        {:else if attribute}
           <div class="manager-checks-tier-stepper is-recipe">
             {#key kind}
               <Stepper

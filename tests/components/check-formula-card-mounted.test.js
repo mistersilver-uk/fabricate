@@ -5,6 +5,11 @@ import { resolve } from 'node:path';
 
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  COUNT_POOL_COMPILED_MODULES,
+  COUNT_POOL_RAW_MODULES,
+} from '../helpers/countPoolHarnessModules.js';
+import { planModifierPlacement } from '../../src/systems/checkModifierRouter.js';
 import { formulaTokenIcon } from '../../src/ui/svelte/apps/manager/checks/checksCopy.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -29,6 +34,8 @@ const harness = createMountedComponentHarness({
     // The direction axis and the roll-prompt group (issue 2005).
     'src/systems/normalize/checkEvaluation.js',
     'src/ui/svelte/apps/manager/checks/checksCopy.js',
+    // The counting pool, its inset and its character-value fields (issue 2006).
+    ...COUNT_POOL_RAW_MODULES,
   ],
   compiledModules: [
     'src/ui/svelte/components/Chip.svelte',
@@ -36,6 +43,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/components/ToggleCard.svelte',
     'src/ui/svelte/apps/manager/checks/CheckPromptOptions.svelte',
+    ...COUNT_POOL_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte',
@@ -368,5 +376,133 @@ describe('the formula card under a roll-under check (issue 2005, Q14)', () => {
     assert.equal(emitted.at(-1).evaluation.direction, 'over');
     assert.equal(emitted.at(-1).evaluation.target.expression, '@a.b');
     assert.equal(emitted.at(-1).evaluation.target.adjustmentKind, 'multiply');
+  });
+});
+
+describe('the counting inset composes against the Preview-as actor (issue 2006)', () => {
+  const countEvaluation = (pool = {}, direction = 'over') => ({
+    product: 'count',
+    direction,
+    pool: { die: 6, base: '2', threshold: '5', required: 1, modifierDestination: 'pool', ...pool },
+  });
+  const IDRIN = { name: 'Idrin', rollData: { skills: { smith: { rank: 4 } } } };
+  /** The runner's own placement of a library benefit, as the preview plans it. */
+  const libraryPlacement = (evaluation, value) =>
+    planModifierPlacement({
+      evaluation,
+      contributions: [{ source: 'library', form: 'scalar', value, label: 'Knack' }],
+    });
+  const actorLine = (root) => root.querySelector('[data-check-count-actor-line]');
+
+  it('grows the pool, or moves the threshold, by the placed benefit (N3)', async () => {
+    const pool = countEvaluation();
+    let target = await harness.mount({
+      evaluation: pool,
+      thresholdMode: 'meet',
+      character: IDRIN,
+      countPreview: { placement: libraryPlacement(pool, 1), odds: null },
+    });
+    assert.equal(actorLine(target).textContent.trim(), 'For Idrin: 3d6, each ≥ 5 (pool 2 grown by 1).');
+    harness.remount();
+    const threshold = countEvaluation({ modifierDestination: 'threshold' });
+    target = await harness.mount({
+      evaluation: threshold,
+      thresholdMode: 'meet',
+      character: IDRIN,
+      countPreview: { placement: libraryPlacement(threshold, 1), odds: null },
+    });
+    assert.equal(
+      actorLine(target).textContent.trim(),
+      'For Idrin: 2d6, each ≥ 4 (threshold 5 moved by 1).'
+    );
+  });
+
+  it('floors a fractional pool only after every benefit (N4)', async () => {
+    const pool = countEvaluation();
+    const target = await harness.mount({
+      evaluation: pool,
+      thresholdMode: 'meet',
+      character: IDRIN,
+      countPreview: { placement: libraryPlacement(pool, 0.5), odds: null },
+    });
+    assert.equal(actorLine(target).textContent.trim(), 'For Idrin: 2d6, each ≥ 5 (pool 2 grown by 0.5).');
+  });
+
+  it('shows a rolled benefit as an unsettled term, never an average', async () => {
+    const pool = countEvaluation();
+    const placement = planModifierPlacement({
+      evaluation: pool,
+      contributions: [{ source: 'library', form: 'expression', expression: '1d4', label: 'Luck' }],
+    });
+    const target = await harness.mount({
+      evaluation: pool,
+      thresholdMode: 'meet',
+      character: IDRIN,
+      countPreview: { placement, odds: null },
+    });
+    assert.equal(actorLine(target).textContent.trim(), 'For Idrin: 2d6 + 1d4 dice, each ≥ 5.');
+  });
+
+  it('abstains on a path the actor lacks, never reading it as zero (N5)', async () => {
+    const pool = countEvaluation({ base: '@skills.lore.rank' });
+    const odds = { product: 'count', enumerable: false, reason: 'count-path-unresolved' };
+    let target = await harness.mount({
+      evaluation: pool,
+      thresholdMode: 'meet',
+      character: IDRIN,
+      countPreview: { placement: null, odds },
+    });
+    assert.equal(actorLine(target).dataset.checkCountActorLine, 'unresolved');
+    assert.match(actorLine(target).textContent, /Idrin has no value at @skills\.lore\.rank/);
+    assert.doesNotMatch(actorLine(target).textContent, /0d6/);
+    assert.ok(!target.querySelector('[data-check-count-expected]'), 'no reading while the odds abstain');
+    harness.remount();
+    target = await harness.mount({ evaluation: pool, thresholdMode: 'meet', character: null });
+    assert.equal(
+      actorLine(target).textContent.trim(),
+      'Choose a character in Preview as to see the composed pool and threshold.'
+    );
+  });
+
+  it("reads the odds panel's own expected net, with its status", async () => {
+    const odds = { product: 'count', enumerable: true, expected: '1.33', status: 'bounded' };
+    const target = await harness.mount({
+      evaluation: countEvaluation(),
+      thresholdMode: 'meet',
+      countPreview: { placement: null, odds },
+    });
+    const reading = target.querySelector('[data-check-count-expected]');
+    assert.equal(reading.dataset.checkCountExpected, '1.33');
+    assert.equal(reading.dataset.checkCountExpectedStatus, 'nearly-exact');
+    assert.match(reading.textContent, /expected successes\s+1\.33/);
+  });
+
+  it('count renders no free-text input, and a sum check keeps avg — (N7)', async () => {
+    let target = await harness.mount({
+      rollFormula: '2d6cs>=5',
+      evaluation: countEvaluation(),
+      thresholdMode: 'meet',
+    });
+    assert.ok(!target.querySelector('[data-check-roll-formula]'), 'no free-text input in count');
+    assert.ok(!target.querySelector('[data-check-formula-average-withheld]'));
+    harness.remount();
+    target = await harness.mount({
+      rollFormula: '2d6cs>=5',
+      evaluation: { ...countEvaluation(), product: 'sum' },
+    });
+    assert.ok(target.querySelector('[data-check-formula-average-withheld="die-modifiers"]'));
+    assert.ok(!target.querySelector('[data-check-count-fields]'));
+  });
+
+  it('writes only the product when the axis is chosen', async () => {
+    const emitted = [];
+    const evaluation = { ...countEvaluation(), product: 'sum' };
+    const target = await harness.mount({ evaluation, onChange: (patch) => emitted.push(patch) });
+    const radio = target.querySelector('[data-check-product-option="count"] input[type="radio"]');
+    radio.checked = true;
+    radio.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+    assert.deepEqual(Object.keys(emitted.at(-1)), ['evaluation']);
+    assert.equal(emitted.at(-1).evaluation.product, 'count');
+    assert.equal(emitted.at(-1).evaluation.pool.base, '2');
   });
 });

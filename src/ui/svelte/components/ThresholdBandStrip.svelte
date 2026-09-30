@@ -14,6 +14,7 @@
   | `groupLabel` / `boundaryLabel(band, next)` | string / function | `'Outcome bands'` / name pair | The group's accessible name, and the accessible name of the handle between two bands. |
   | `fallbackNote` | string | `''` | Rendered INSTEAD of the strip when the authored set is not contiguous: a gapped or overlapping FIXED set is reachable and a contiguous strip cannot draw it, so the tier rows are left as the only editor. |
   | `disabled` / `dataAttr` / `dataValue` | boolean / strings | `false` / `''` | The handles go inert, and the caller's own hook on the root. |
+  | `leadingTick` | string | `''` | A label under the track's start, before the boundary ticks: a count strip passes `<0` under its Botch band. |
   | `readonly` | boolean | `false` | A derived band PICTURE: no handles, so no slider role, tabindex or drag cursor, and the group is described by a visually hidden list of each band's `name` and caller-formatted `range` (`bands[].range`). |
   | `onChange(patch)` | function | no-op | The authored patch, per binding above. |
 
@@ -53,6 +54,7 @@
     dataAttr = '',
     dataValue = '',
     readonly = false,
+    leadingTick = '',
     onChange = () => {},
   } = $props();
 
@@ -290,6 +292,11 @@
     </div>
 
     <div class="fab-band-strip-ticks" aria-hidden="true">
+      {#if leadingTick}
+        <span class="fab-band-strip-tick is-leading" style="left: 0%;" data-band-strip-leading-tick>
+          {leadingTick}
+        </span>
+      {/if}
       {#each boundaries as boundary, index (index)}
         <span class="fab-band-strip-tick" style={`left: ${percentOf(boundary)}%;`}>{boundary}</span>
       {/each}
@@ -408,6 +415,10 @@
     font-size: 0.66rem;
     font-weight: 500;
     font-variant-numeric: tabular-nums;
+  }
+
+  .fab-band-strip-tick.is-leading {
+    transform: none;
   }
 
   .fab-band-strip-fallback {

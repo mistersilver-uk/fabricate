@@ -32,14 +32,14 @@
   import RecipeResultGroupCard from './recipe/RecipeResultGroupCard.svelte';
   import Callout from '../../components/Callout.svelte';
   import OverridePlayerSees from './component/OverridePlayerSees.svelte';
-  import { keptOverride, overrideInvalidForKind } from './component/overridePlayerSees.js';
+  import { checkOverrideField, overrideInvalidForKind } from './component/overridePlayerSees.js';
+  import { taskKeptNotices, taskOverrideCopy } from './component/taskOverrideCopy.js';
   import { normalizeCheckEvaluation } from '../../../../systems/normalize/checkEvaluation.js';
   import {
     MULTIPLIER_STOPS,
     formatCheckAdjustment,
     parseCheckAdjustment,
   } from './checks/checkAdjustmentLabel.js';
-  import { interpolate, underComparisonPhrase } from './checks/checksCopy.js';
 
   let {
     task = null,
@@ -694,16 +694,17 @@
     onUpdateTask({ staminaCostModifiers: staminaCostModifiers.filter((_, i) => i !== index) });
   }
   // Per-task check override, routed only (progressive has no target). One field (R3, issue 2005):
-  // `dcOverride` under a fixed target, `adjustmentOverride` under a character value, and neither
-  // is ever rewritten by the other. null = use the system gathering check's own value.
+  // `dcOverride` under a fixed target, `adjustmentOverride` under a character value,
+  // `successesOverride` under a count, and none is ever rewritten by another. null = use the system
+  // gathering check's own value.
   const dcOverrideEnabled = $derived(taskResolutionMode === 'routed');
   const checkEvaluation = $derived(normalizeCheckEvaluation(checkConfig?.evaluation));
-  const overrideAttribute = $derived(checkEvaluation.target.source === 'attribute');
-  const overrideUnder = $derived(checkEvaluation.direction === 'under');
+  const overrideField = $derived(checkOverrideField(checkEvaluation));
+  const overrideAttribute = $derived(overrideField === 'adjustmentOverride');
   const overrideKind = $derived(checkEvaluation.target.adjustmentKind);
-  const overrideCmp = $derived(underComparisonPhrase(checkConfig?.thresholdMode, text));
   const dcOverrideValue = $derived(task?.dcOverride ?? null);
   const adjustmentOverrideValue = $derived(task?.adjustmentOverride ?? null);
+  const successesOverrideValue = $derived(task?.successesOverride ?? null);
   // A kind switch can leave a kept override invalid with no re-typing to catch it (issue 2078).
   const overrideInvalid = $derived(
     overrideInvalidForKind({
@@ -725,74 +726,18 @@
   function updateAdjustmentOverride(value) {
     onUpdateTask({ adjustmentOverride: Number.isFinite(value) ? value : null });
   }
+  function updateSuccessesOverride(value) {
+    onUpdateTask({ successesOverride: Number.isFinite(value) ? Math.trunc(value) : null });
+  }
   const formatOverride = (value) => formatCheckAdjustment(overrideKind, value);
   const parseOverride = (value) => parseCheckAdjustment(overrideKind, value);
-  const overrideCopy = $derived.by(() => {
-    if (overrideAttribute) {
-      return {
-        title: text(
-          'FABRICATE.Admin.Manager.Gathering.TaskOverrideAdjustment',
-          'Difficulty adjustment override'
-        ),
-        hint:
-          overrideKind === 'multiply'
-            ? text(
-                'FABRICATE.Admin.Manager.Gathering.TaskOverrideMultiplyHint',
-                'Adjusts the character value this task is attempted against. Multiplied, rounded down.'
-              )
-            : text(
-                'FABRICATE.Admin.Manager.Gathering.TaskOverrideAddHint',
-                'Adjusts the character value this task is attempted against. Added to the value.'
-              ),
-        label: text('FABRICATE.Admin.Manager.Gathering.TaskOverrideAdjustmentLabel', 'Adjustment'),
-      };
-    }
-    if (overrideUnder) {
-      return {
-        title: text('FABRICATE.Admin.Manager.Gathering.TaskOverrideTarget', 'Target override'),
-        hint: interpolate(
-          text(
-            'FABRICATE.Admin.Manager.Gathering.TaskOverrideTargetHint',
-            'Replaces the system target for this task. The total must stay {cmp} it.'
-          ),
-          { cmp: overrideCmp }
-        ),
-        label: text('FABRICATE.Admin.Manager.Gathering.TaskOverrideTargetLabel', 'Target'),
-      };
-    }
-    return {
-      title: text('FABRICATE.Admin.Manager.Gathering.TaskDcOverrideTitle', 'DC override'),
-      hint: text(
-        'FABRICATE.Admin.Manager.Gathering.TaskDcOverrideHint',
-        'Replaces the system DC for this task.'
-      ),
-      label: text('FABRICATE.Admin.Manager.Gathering.TaskDcOverride', 'DC'),
-    };
-  });
-  // The dormant field is kept rather than cleared; the notice says so.
-  const keptOverrideNotice = $derived.by(() => {
-    const kept = keptOverride({
-      attribute: overrideAttribute,
-      dcOverride: dcOverrideValue,
-      adjustmentOverride: adjustmentOverrideValue,
-    });
-    if (!kept) return '';
-    return kept.field === 'dcOverride'
-      ? interpolate(
-          text(
-            'FABRICATE.Admin.Manager.Gathering.TaskOverrideKeptDc',
-            'A DC override of {dc} is kept on this task. This system does not read it, so it is not shown for editing.'
-          ),
-          { dc: kept.value }
-        )
-      : interpolate(
-          text(
-            'FABRICATE.Admin.Manager.Gathering.TaskOverrideKeptAdjustment',
-            'A difficulty adjustment override of {adjustment} is kept on this task. This system does not read it, so it is not shown for editing.'
-          ),
-          { adjustment: formatCheckAdjustment(overrideKind, kept.value) }
-        );
-  });
+  const overrideCopy = $derived(
+    taskOverrideCopy(checkEvaluation, checkConfig?.thresholdMode, text)
+  );
+  // Each dormant field is kept rather than cleared; its notice says so.
+  const keptOverrideNotices = $derived(
+    taskKeptNotices({ evaluation: checkEvaluation, task }, text)
+  );
 
   // Resource-node authoring (enforced only when the system has resource nodes enabled).
   const DEFAULT_NODES = {
@@ -1495,7 +1440,7 @@
       <section
         class="manager-task-dc-card"
         data-gathering-task-dc
-        data-gathering-task-override-field={overrideAttribute ? 'adjustmentOverride' : 'dcOverride'}
+        data-gathering-task-override-field={overrideField}
       >
         {@render taskCardHeader(overrideCopy.title, overrideCopy.hint)}
 
@@ -1503,7 +1448,25 @@
           <!-- `<div>`, not `<label>`: see the NAMING contract in `Stepper.svelte`. -->
           <Field as="div" class="manager-task-dc-field">
             <span>{overrideCopy.label}</span>
-            {#if overrideAttribute}
+            {#if overrideField === 'successesOverride'}
+              <!-- An integer 0–20, the range the normalizer keeps; no presets (R3). -->
+              <Stepper
+                value={successesOverrideValue}
+                allowUnset
+                step={1}
+                min={0}
+                max={20}
+                fill
+                density="comfortable"
+                placeholder={text(
+                  'FABRICATE.Admin.Manager.Gathering.TaskDcOverridePlaceholder',
+                  'System default'
+                )}
+                {...stepperLabels(overrideCopy.label)}
+                inputProps={{ 'data-gathering-task-successes-override': '' }}
+                onChange={(next) => updateSuccessesOverride(next)}
+              />
+            {:else if overrideAttribute}
               <!-- Keyed by kind, so a switch re-reads the kept value through the other formatter. -->
               {#key overrideKind}
                 <Stepper
@@ -1565,9 +1528,9 @@
             )}
           </p>
         {/if}
-        {#if keptOverrideNotice}
-          <Callout text={keptOverrideNotice} dataAttr="data-gathering-task-override-kept" />
-        {/if}
+        {#each keptOverrideNotices as notice (notice)}
+          <Callout text={notice} dataAttr="data-gathering-task-override-kept" />
+        {/each}
         <OverridePlayerSees
           subject={task?.name || ''}
           evaluation={checkEvaluation}
@@ -1575,6 +1538,7 @@
           type={checkConfig?.type ?? null}
           dcOverride={dcOverrideValue}
           adjustmentOverride={adjustmentOverrideValue}
+          successesOverride={successesOverrideValue}
           anchorDc={Number(checkConfig?.dc ?? 15)}
           actors={previewActors}
           resolveCharacter={resolvePreviewCharacter}

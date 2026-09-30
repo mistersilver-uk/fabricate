@@ -164,6 +164,37 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/crafting\/(?:RollPrompt(?:Target)?\.svelte|rollPrompt(?:Target)?\.js)$/,
     ],
   }),
+  // Issue 2006: a Journal-prompted count check opens the same count prompt, its faces named.
+  playerCase({
+    id: 'player-journal-check-roll-prompt-count',
+    label: 'Player Journal — versioned gathering success-counting check prompt',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: {
+      tab: 'journal',
+      journalCaseState: 'gathering-journal-check-prompt',
+      gatheringTaskMode: 'routed-count',
+      dialog: 'open',
+    },
+    steps: [
+      { selector: '[data-run-id="lab-v1-gathering-journal-check-prompt"]' },
+      { selector: '[data-journal-detail] [data-run-action="primary"]' },
+    ],
+    expectTab: 'journal',
+    expectSelector:
+      '.fabricate-app .manager-modal[data-roll-prompt="single"]' +
+      ':has(.manager-modal-subtitle:has-text("Brenna Karrunsdottir · Tend the Slow Bloom"))' +
+      ':has(.formula-content .formula[data-roll-prompt-count="over"]:text-is("5d10 · each ≥ 7"))' +
+      ':has(.formula-content .formula-note:text-is("Success on ≥ 7 · explodes on 9 or above once"))' +
+      ' .formula-content .manager-chip[data-roll-prompt-required="2"]',
+    kinds: ['player', 'journal', 'gathering'],
+    sourceMatches: [
+      JOURNAL_SOURCES,
+      /^src\/bootstrap\/journalOperations\.js$/,
+      /^src\/systems\/GatheringEngine\.js$/,
+      /^src\/ui\/svelte\/apps\/crafting\/(?:RollPrompt(?:Target)?\.svelte|rollPrompt(?:Target)?\.js)$/,
+    ],
+  }),
   // Issue 2005 (T6): a fixed roll-under ladder states `≤` bands, in ladder order.
   playerCase({
     id: 'player-journal-routed-bands-under',

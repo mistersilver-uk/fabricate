@@ -41,8 +41,9 @@ export const TARGET_LIBRARY_NAMES = rows('libraryTargetNames');
 
 /** @see TARGET_LIBRARY_NAMES */
 // Measured over the library at issue 1512, which shipped the ordered list and the row disclosure
-// it promoted.
-export const TARGET_LIBRARY_NAME_TOTAL = 56;
+// it promoted. 57 at issue 2006, whose new die-tile entry is written at `target` until the result
+// boxes and chat cards draw it.
+export const TARGET_LIBRARY_NAME_TOTAL = 57;
 
 /**
  * Every manifest row whose `status` reads `target`, keyed on the implementation path, measured at
@@ -51,4 +52,4 @@ export const TARGET_LIBRARY_NAME_TOTAL = 56;
 export const TARGET_MANIFEST_ROWS = rows('manifestTargetRows');
 
 /** @see TARGET_MANIFEST_ROWS */
-export const TARGET_MANIFEST_ROW_TOTAL = 53;
+export const TARGET_MANIFEST_ROW_TOTAL = 54;

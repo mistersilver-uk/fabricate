@@ -32,3 +32,6 @@ manager-component-edit-salvage-override-default
 manager-component-edit-salvage-override-custom
 manager-component-edit-salvage-override-routed
 manager-component-edit-salvage-override-invalid
+manager-component-edit-salvage-override-count-preset
+manager-component-edit-salvage-override-count-custom
+manager-component-edit-salvage-override-count-default

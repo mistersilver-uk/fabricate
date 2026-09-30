@@ -5,7 +5,7 @@
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `options` | `[{ value, labelKey, fallback, icon?, variant?, disabled?, count?, badge? }]` | `[]` | the segments, in order. `variant` tints the ACTIVE segment only; `disabled` is carried onto the radio ITSELF, because `select()` only guards `next !== value` and a dimmed-but-live segment would still fire `onChange`; and a caller passes `count` or `badge`, never both. |
+  | `options` | `[{ value, labelKey, fallback, icon?, variant?, disabled?, count?, badge?, validationTarget? }]` | `[]` | the segments, in order. `variant` tints the ACTIVE segment only; `disabled` is carried onto the radio ITSELF, because `select()` only guards `next !== value` and a dimmed-but-live segment would still fire `onChange`; a caller passes `count` or `badge`, never both; and `validationTarget` stamps `data-validation-target` on that segment's radio, the focusable half a Validation row lands on. |
   | `value` / `groupName` / `ariaLabel` | strings | | the selection, the shared radio `name` (unique per rendered control) and the radiogroup's accessible name |
   | `dataAttr` / `optionDataAttr` / `fill` / `iconOnly` | | `''` / `false` | the two data-* hook names, whether segments share the track `flex: 1 1 0`, and whether each renders its `icon` alone with the label CLIPPED |
   | `shape` \| `density` \| `tone` | `'pill'` \| `'compact'`/`'field'` \| `'tag'`/`'accent'`/`'accent-soft'` | `''`/`'default'`/`''` | the CONSTRUCTION, the SCALE and the PAINT, as variants ON the primitive: the design system forbids a layout-context rule restyling a primitive's `font-*`, `border`, `border-radius` and `background`. `is-accent` is a PREFIX of `is-accent-soft`, so only a whole-token match tells the two apart. |
@@ -72,6 +72,7 @@
         value={option.value}
         checked={option.value === value}
         disabled={option.disabled === true}
+        data-validation-target={option.validationTarget || undefined}
         onchange={() => select(option.value)}
       />
       {#if option.icon}<i class={option.icon} aria-hidden="true"></i>{/if}

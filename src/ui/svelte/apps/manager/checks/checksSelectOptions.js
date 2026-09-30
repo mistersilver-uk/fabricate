@@ -75,6 +75,13 @@ const ROLL_TOTAL = Object.freeze({
   fallback: 'Roll total',
 });
 
+// A counting check's total is its net successes (issue 2006).
+const NET_SUCCESSES = Object.freeze({
+  value: 'rollTotal',
+  labelKey: 'FABRICATE.Admin.Manager.Checks.Count.Triggers.TypeNetSuccesses',
+  fallback: 'Net successes',
+});
+
 const PROGRESSIVE_VALUE = Object.freeze({
   value: 'progressiveValue',
   labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.TypeProgressiveValue',
@@ -94,9 +101,9 @@ const OUTCOME_TIER = Object.freeze({
 });
 
 /** `addTrigger` reads the first entry, so the order is the authored default, not a presentation choice. */
-export function conditionTypesFor(kind) {
+export function conditionTypesFor(kind, { counting = false } = {}) {
   return [
-    ROLL_TOTAL,
+    counting ? NET_SUCCESSES : ROLL_TOTAL,
     kind === 'progressive' ? PROGRESSIVE_VALUE : null,
     DICE_GROUP,
     kind === 'routed' ? OUTCOME_TIER : null,

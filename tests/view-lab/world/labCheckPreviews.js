@@ -1,8 +1,8 @@
 /**
  * The success-counting Checks Studio states (issue 2004) and the roll-under recipe states (issue
  * 2005), each written onto Karrun Forgecraft's crafting, salvage and gathering checks before the
- * runtime boots, so the real normalizer reads them. Count authoring is issue 2006's, so the lab
- * seeds what no control can author yet.
+ * runtime boots, so the real normalizer reads them. Issue 2006's authoring cases start from these
+ * pools and drive the rest through the Studio's own controls.
  */
 import { LAB_SYSTEM_IDS } from './labContent.js';
 
@@ -134,12 +134,37 @@ const DICE_POOL_FAULTS = {
     },
   },
   salvage: count('under', { die: 20, base: '2', threshold: '1d4 + 6', required: 1 }),
+  // Frame 16's two issue 2006 faults: an explosion from a face nobody chose, and a kept trigger
+  // reading dice group 1, which the pool's one group never rolls.
   gathering: {
-    evaluation: count('over', { die: 10, base: '2d4', threshold: '8', required: 1 }),
+    evaluation: count('over', {
+      die: 10,
+      base: '2d4',
+      threshold: '8',
+      required: 1,
+      explode: { enabled: true, faces: { kind: 'from', value: null } },
+    }),
     relativeOutcomes: [
       outcome('lab-count-failure', 'Failure', -1, false),
       outcome('lab-count-success', 'Success', 0, true),
     ],
+    checkBreakage: {
+      triggers: [
+        {
+          id: 'lab-trig-group-one',
+          condition: {
+            type: 'diceGroup',
+            groupId: 1,
+            aggregate: 'anyDie',
+            operator: '==',
+            value: 6,
+          },
+          outcome: 'failure',
+          breakTools: false,
+          tierStep: { mode: 'none', steps: 1, tierId: null },
+        },
+      ],
+    },
   },
 };
 
@@ -206,6 +231,30 @@ const DICE_POOL_PILEUP = {
       ],
     },
   },
+};
+
+/**
+ * Frame 21 (issue 2006): summing checks whose free-text formulas count successes. Crafting's
+ * `2d20cs<=@skills.survival.value` against a fixed DC with tier DCs 1, 2 and 3 converts; salvage's
+ * `6d10cs>=8df<=8` cancels on faces that also qualify, so it only warns.
+ */
+const SUM_OVER = Object.freeze({ product: 'sum', direction: 'over' });
+const DICE_POOL_FREETEXT = {
+  resolutionMode: 'simple',
+  crafting: {
+    simple: {
+      rollFormula: '2d20cs<=@skills.survival.value',
+      dc: 1,
+      evaluation: SUM_OVER,
+      tiers: [
+        { id: 'lab-tier-rough-work', name: 'Rough Work', dc: 1, successes: null },
+        { id: 'lab-tier-fine-craft', name: 'Fine Craft', dc: 2, successes: null },
+        { id: 'lab-tier-masterwork', name: 'Masterwork', dc: 3, successes: null },
+      ],
+    },
+  },
+  salvage: SUM_OVER,
+  salvageFormula: '6d10cs>=8df<=8',
 };
 
 /** A trigger forcing `outcome`, by default on every roll (issue 2080). */
@@ -311,6 +360,7 @@ export const LAB_CHECK_PREVIEW_STATES = Object.freeze({
   'dice-pool-rescued': DICE_POOL_RESCUED,
   'gathering-over': GATHERING_OVER,
   'gathering-under-add': GATHERING_UNDER_ADD,
+  'dice-pool-freetext': DICE_POOL_FREETEXT,
 });
 
 /** Karrun Forgecraft's crafting and salvage checks as `state` authors them, formula blank. */
@@ -328,14 +378,20 @@ function seedCraftingAndSalvage(system, state) {
   system.salvageCraftingCheck = {
     ...system.salvageCraftingCheck,
     enabled: true,
-    simple: { rollFormula: '', dc: 12, thresholdMode: 'meet', evaluation: state.salvage },
+    simple: {
+      rollFormula: state.salvageFormula ?? '',
+      dc: 12,
+      thresholdMode: 'meet',
+      evaluation: state.salvage,
+    },
   };
 }
 
-/** Karrun Forgecraft's checks as `state` authors them; a state with no crafting keeps its own. */
+/** Karrun Forgecraft's checks as `state` authors them; a slot a state leaves out keeps its own. */
 function seedChecks(system, state) {
   system.modifiers = [...(system.modifiers ?? []), ...(state.modifiers ?? [])];
   if (state.crafting) seedCraftingAndSalvage(system, state);
+  if (!state.gathering) return;
   system.gatheringCraftingCheck = {
     ...system.gatheringCraftingCheck,
     enabled: true,

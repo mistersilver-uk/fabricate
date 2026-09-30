@@ -15,6 +15,7 @@ import {
   salvagePresetTiers,
   usableSalvageAdjustmentTiers,
   usableSalvageDcTiers,
+  usableSalvageSuccessesTiers,
 } from '../../src/ui/svelte/apps/manager/component/salvageDcPresets.js';
 import { buildSalvageDcSelectOptions } from '../../src/ui/svelte/apps/manager/component/componentEditSelectOptions.js';
 
@@ -226,5 +227,68 @@ describe('salvage override presets under a character value (issue 2005)', () => 
     assert.equal(salvageDcOverrideForSelection('adj:-2', null, attribute()), -2);
     assert.equal(salvageDcOverrideForSelection(SALVAGE_DC_SYSTEM_DEFAULT, 0.7, multiply), null);
     assert.equal(salvageDcOverrideForSelection(SALVAGE_DC_CUSTOM, 14.6, FIXED_UNDER), 14, 'a DC is whole');
+  });
+});
+
+describe('salvage successes-needed presets under a count check (issue 2006)', () => {
+  // A count check that still carries a character-value target: the retained target is dormant.
+  const COUNT = {
+    product: 'count',
+    direction: 'over',
+    target: { source: 'attribute', expression: '@a', adjustmentKind: 'add' },
+    pool: { die: 10, required: 3 },
+  };
+  const COUNT_TIERS = [
+    { id: 'o', name: 'One', dc: 10, adjustment: 2, successes: 1 },
+    { id: 't', name: 'Two', dc: 15, adjustment: 0, successes: 2 },
+    { id: 'n', name: 'Unset', dc: 20, adjustment: -2, successes: null },
+    { id: 'z', name: 'Zero', dc: 5, successes: 0 },
+    { id: 'b', name: '  ', dc: 12, successes: 4 },
+    { id: 'd', name: 'Twice', dc: 25, successes: 2 },
+  ];
+
+  it('edits the successes override, never the retained target\'s adjustment or the DC', () => {
+    assert.equal(salvageOverrideField(COUNT), 'successesOverride');
+  });
+
+  it('lists named tiers whose successes needed is set, 0 included, first per count', () => {
+    assert.deepEqual(usableSalvageSuccessesTiers(COUNT_TIERS).map((tier) => tier.id), [
+      'o',
+      't',
+      'z',
+      'd',
+    ]);
+    const options = buildSalvageDcOptions({ tiers: COUNT_TIERS, evaluation: COUNT });
+    assert.deepEqual(values(options), ['system', 'req:1', 'req:2', 'req:0', 'custom']);
+  });
+
+  it('labels each preset with its successes needed and the default with the pool\'s', () => {
+    const options = buildSalvageDcSelectOptions(COUNT_TIERS, 15, englishText, COUNT);
+    assert.deepEqual(labels(options), [
+      'System default — 3 successes needed',
+      'One — 1 success needed',
+      'Two — 2 successes needed',
+      'Zero — 0 successes needed',
+      'Custom…',
+    ]);
+    const one = buildSalvageDcSelectOptions([], 15, englishText, {
+      ...COUNT,
+      pool: { die: 10, required: 1 },
+    });
+    assert.deepEqual(labels(one), ['System default — 1 success needed', 'Custom…']);
+  });
+
+  it('matches a successes override by count, and an off-list count selects Custom…', () => {
+    assert.equal(resolveSalvageDcSelection(2, COUNT_TIERS, COUNT), 'req:2');
+    assert.equal(resolveSalvageDcSelection(0, COUNT_TIERS, COUNT), 'req:0');
+    assert.equal(resolveSalvageDcSelection(7, COUNT_TIERS, COUNT), SALVAGE_DC_CUSTOM);
+    assert.equal(resolveSalvageDcSelection(null, COUNT_TIERS, COUNT), SALVAGE_DC_SYSTEM_DEFAULT);
+  });
+
+  it('persists a whole count, and System default as null', () => {
+    assert.equal(salvageDcOverrideForSelection('req:2', null, COUNT), 2);
+    assert.equal(salvageDcOverrideForSelection('req:0', 5, COUNT), 0);
+    assert.equal(salvageDcOverrideForSelection(SALVAGE_DC_CUSTOM, 4, COUNT), 4);
+    assert.equal(salvageDcOverrideForSelection(SALVAGE_DC_SYSTEM_DEFAULT, 4, COUNT), null);
   });
 });

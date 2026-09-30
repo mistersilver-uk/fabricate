@@ -12,6 +12,7 @@ import {
 } from '../helpers/checksHarnessModules.js';
 import { installCountDice } from '../helpers/countEngineDice.js';
 import { forceTrigger, MARGIN_NOTES, readReadout } from '../helpers/checkReadoutDom.js';
+import { renderDiceTilesHtml, tileModel } from '../../src/ui/presenters/countDiceTiles.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -38,6 +39,38 @@ const WORLD_ACTORS = [
   },
   { id: 'vosk', name: 'Vosk', type: 'character', getRollData: () => ({ skills: {} }) },
 ];
+
+/** The executed smithing roll as the count Roll projects it: 8 10 1 3 9 2, then 10 and 1. */
+const SMITHING_PROJECTION = {
+  results: [
+    { index: 0, face: 8, qualified: true },
+    { index: 1, face: 10, qualified: true, exploded: true },
+    { index: 2, face: 1, cancelled: true },
+    { index: 3, face: 3 },
+    { index: 4, face: 9, qualified: true },
+    { index: 5, face: 2 },
+    { index: 6, face: 10, qualified: true, exploded: true, explodedFrom: 1 },
+    { index: 7, face: 1, cancelled: true, explodedFrom: 6 },
+  ],
+};
+
+const tileFacts = (tile, face, marks) => [
+  face,
+  marks,
+  tile.hasAttribute('data-dice-tile-generated'),
+  tile.getAttribute('aria-label'),
+];
+const simulatorTile = (tile) =>
+  tileFacts(tile, tile.dataset.checksSimulatorFace, tile.dataset.checksSimulatorFaceMarks);
+
+/** The tiles the chat renderer writes for a projection, read as the simulator's are. */
+function chatTiles(projection) {
+  const host = document.createElement('div');
+  host.innerHTML = renderDiceTilesHtml(tileModel(projection), (key) => key);
+  return [...host.querySelectorAll('.fabricate-dice-tiles__tile')].map((tile) =>
+    tileFacts(tile, tile.dataset.diceTileFace, tile.dataset.diceTileMarks)
+  );
+}
 
 const BEST = { enabled: true, faces: { kind: 'best' } };
 const WORST = { enabled: true, faces: { kind: 'worst' } };
@@ -154,21 +187,28 @@ describe('count odds and the simulator readout', () => {
     const readout = root.querySelector('[data-checks-simulator-readout]');
     assert.equal(readout.dataset.checksSimulatorProduct, 'count');
     const tiles = [...readout.querySelectorAll('[data-checks-simulator-face]')];
+    // Each explosion's die follows the die that rolled it, as the result card draws it (issue 2006).
     assert.deepEqual(
       tiles.map((tile) => [tile.textContent.trim(), tile.dataset.checksSimulatorFaceMarks]),
       [
         ['8', 'qualified'],
         ['10', 'qualified exploded'],
+        ['10', 'qualified exploded'],
+        ['1', 'cancelled'],
         ['1', 'cancelled'],
         ['3', ''],
         ['9', 'qualified'],
         ['2', ''],
-        ['10', 'qualified exploded'],
-        ['1', 'cancelled'],
       ]
     );
     assert.equal(tiles[1].getAttribute('aria-label'), '10, qualified and exploded');
+    assert.equal(tiles[2].getAttribute('aria-label'), '10, qualified, exploded and rolled by an explosion');
     assert.equal(tiles[1].querySelectorAll('i.fa-check, i.fa-rotate').length, 2, 'a glyph per mark');
+    assert.deepEqual(
+      tiles.map(simulatorTile),
+      chatTiles(SMITHING_PROJECTION),
+      'the simulator draws the tiles the result card renders for the same projection (N29)'
+    );
     assert.equal(readout.querySelector('[data-checks-simulator-total]').dataset.checksSimulatorTotal, '2');
     assert.deepEqual(readReadout(root), {
       medallion: ['2', 'net'],
@@ -179,13 +219,13 @@ describe('count odds and the simulator readout', () => {
       note: MARGIN_NOTES.count,
       rows: [['result-group', 'Result group produced', 'Success']],
     });
-    // The tiles sit in their own component under the medallion row, the #2006 seam.
-    assert.ok(Boolean(readout.querySelector('.manager-checks-simulator-head + .manager-checks-simulator-dice')));
+    // The shared tiles sit under the medallion row (issue 2006).
+    assert.ok(Boolean(readout.querySelector('.manager-checks-simulator-head + .fabricate-dice-tiles')));
     // The tile's tone is the face's result: success for a qualifier, danger for a cancel.
-    const tone = (tile) => tile.querySelector('.fab-medallion').className;
-    assert.match(tone(tiles[0]), /is-tone-success/);
-    assert.match(tone(tiles[2]), /is-tone-danger/);
-    assert.doesNotMatch(tone(tiles[3]), /is-tone-/, 'a face that did nothing is untoned');
+    const tone = (tile) => tile.className;
+    assert.match(tone(tiles[0]), /fabricate-dice-tiles__tile--success/);
+    assert.match(tone(tiles[3]), /fabricate-dice-tiles__tile--danger/);
+    assert.doesNotMatch(tone(tiles[5]), /--/, 'a face that did nothing is untoned');
     assert.ok(root.querySelector('[data-checks-simulator-legend]'));
     assert.equal(root.querySelector('[data-checks-simulator-band]').dataset.checksSimulatorBand, 'success');
   });
@@ -216,6 +256,9 @@ describe('count odds and the simulator readout', () => {
       'Vosk is missing a value this check reads (@skills.smith.rank), so it cannot resolve for them.'
     );
     assert.equal(rollButton(root).disabled, true);
+    assert.equal(root.querySelector('[data-check-count-actor-line]').dataset.checkCountActorLine, 'unresolved');
+    assert.match(root.querySelector('[data-check-count-actor-line]').textContent, /Vosk has no value at @skills\.smith\.rank/);
+    assert.ok(!root.querySelector('[data-check-count-expected]'), 'no reading, never 0');
     const notice = root.querySelector('[data-checks-section-notice="countPathUnresolvedForPreview"]');
     assert.ok(Boolean(notice), 'the roll section opens with a notice explaining the warning');
     assert.equal(notice.dataset.noticeTone, 'warning', 'amber, as frame 19 draws it');
@@ -225,14 +268,17 @@ describe('count odds and the simulator readout', () => {
     );
     assert.match(
       notice.querySelector('.fab-notice-detail').textContent,
-      /IssueCountPathUnresolvedForPreview:\{"actor":"Vosk","path":"@skills\.smith\.rank"\}/u,
+      /IssueCountPathUnresolvedForPreview:\{"actor":"Vosk","path":"@skills\.smith\.rank","input":"base"\}/u,
       'the detail is the Validation sentence, naming the actor and the path'
     );
     const panel = root.querySelector('[role="tabpanel"]');
     assert.ok(panel.firstElementChild.matches('[data-checks-section-notices="roll"]'), 'it opens the pane');
     notice.querySelector('[data-notice-action]').click();
     await settle();
-    assert.ok(root.ownerDocument.activeElement === panel, 'no count control exists yet, so Review focuses the section');
+    assert.ok(
+      root.ownerDocument.activeElement === root.querySelector('[data-validation-target="checks-count-base"]'),
+      'Review focuses the base pool the actor cannot read (issue 2006)'
+    );
     assert.equal(dots(), before, 'a transient warning puts no dot on a section');
   });
 
@@ -462,11 +508,11 @@ describe('count readiness on the route', () => {
       evaluation: pool({ base: '2', threshold: '1d4 + 6', required: 3 }),
       tiers: [{ id: 'unset', name: 'Unset Work', dc: 12, successes: null }],
     });
-    // Blocking issues first, as Validation orders its rows (issue 2082); the warning was pushed between them.
+    // Blocking issues first, as Validation orders its rows (issue 2082); all three block since issue 2006.
     const ids = [...root.querySelectorAll('[data-checks-section-notices="roll"] > [data-checks-section-notice]')].map(
       (notice) => notice.getAttribute('data-checks-section-notice')
     );
-    assert.deepEqual(ids, ['countThresholdInvalid', 'countRequiredExceedsMaxPool', 'countTierWithoutSuccesses']);
+    assert.deepEqual(ids, ['countThresholdInvalid', 'countTierWithoutSuccesses', 'countRequiredExceedsMaxPool']);
     assert.ok(!root.querySelector('[data-checks-section-notice="noRollFormula"]'));
   });
 
@@ -483,5 +529,85 @@ describe('count readiness on the route', () => {
       (notice) => notice.getAttribute('data-checks-section-notice')
     );
     assert.deepEqual(ids, ['countExplodeUnbounded', 'countTierWithoutSuccesses', 'countPathUnresolvedForPreview']);
+  });
+});
+
+// The Formula card's reading and actor line are composed by ChecksView from the same preview the
+// odds panel reads, so this needs the whole view (issue 2006, N6).
+describe('the Formula card reads the odds panel and the preview placement (issue 2006)', () => {
+  const reading = (root) => root.querySelector('[data-check-count-expected]');
+  const expected = (root) =>
+    root.querySelector('[data-checks-odds-domain]')?.dataset.checksOddsExpected ?? null;
+  const KNACK = (expression) => ({
+    modifiers: [{ id: 'knack', label: 'Knack', expression }],
+    craftingDefaultModifierPolicy: 'addAll',
+    craftingDefaultModifierIds: ['knack'],
+  });
+
+  it('crafting: expected successes equals the odds heading, and the actor line composes', async () => {
+    script([]);
+    const root = await mountSimple(SMITHING);
+    assert.ok(!reading(root), 'no reading while the odds wait for an actor');
+    await choosePreviewActor(root, 'idrin');
+    assert.equal(expected(root), '1.33');
+    assert.equal(reading(root).dataset.checkCountExpected, expected(root));
+    assert.equal(reading(root).dataset.checkCountExpectedStatus, 'nearly-exact');
+    assert.equal(
+      root.querySelector('[data-check-count-actor-line]').textContent.trim(),
+      'For Idrin: 6d10, each ≥ 8.'
+    );
+  });
+
+  it('salvage: a literal pool reads 1.30 with no actor, as the odds panel does', async () => {
+    script([]);
+    const root = await harness.mount({
+      activity: 'salvage',
+      salvageResolutionMode: 'simple',
+      salvageCheckSimple: {
+        ...SMITHING,
+        evaluation: pool({ die: 20, base: '2', threshold: '8', required: 1 }),
+        tiers: [],
+      },
+      activation: { salvage: { enabled: true, optional: false } },
+      features: { salvage: true },
+    });
+    await settle();
+    assert.equal(expected(root), '1.30');
+    assert.equal(reading(root).dataset.checkCountExpected, '1.30');
+    assert.equal(reading(root).dataset.checkCountExpectedStatus, 'exact');
+  });
+
+  it('a library benefit grows the pool once in the actor line and the odds', async () => {
+    script([]);
+    const root = await mountSimple(SMITHING, KNACK('1'));
+    await choosePreviewActor(root, 'idrin');
+    assert.equal(
+      root.querySelector('[data-check-count-actor-line]').textContent.trim(),
+      'For Idrin: 7d10, each ≥ 8 (pool 6 grown by 1).'
+    );
+    assert.equal(reading(root).dataset.checkCountExpected, expected(root));
+  });
+
+  it('both readings vanish when a rolled benefit cannot be enumerated', async () => {
+    // The core double rolls one `NdX` term only, so a library fragment `(1d2x)` is proved rollable
+    // by a Roll with no synchronous evaluation, which the rollability check accepts.
+    const previous = globalThis.Roll;
+    globalThis.Roll = class ParseOnlyRoll {
+      static replaceFormulaData(formula) {
+        return formula;
+      }
+    };
+    try {
+      const root = await mountSimple(SMITHING, KNACK('1d2x'));
+      await choosePreviewActor(root, 'idrin');
+      assert.equal(odds(root).dataset.checksOddsReason, 'modifier-preroll-not-enumerable');
+      assert.ok(!reading(root), 'the reading abstains with the odds, never showing 0');
+      assert.equal(
+        root.querySelector('[data-check-count-actor-line]').textContent.trim(),
+        'For Idrin: 6d10 + (1d2x) dice, each ≥ 8.'
+      );
+    } finally {
+      globalThis.Roll = previous;
+    }
   });
 });

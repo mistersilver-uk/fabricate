@@ -388,6 +388,9 @@ The GM component surfaces: the component browser and the component editor.
 6. The salvage check DC control offers the system's authored check tiers, a system-default option storing `null`, and a `Custom…` option exposing an arbitrary integer.
    A persisted override matching no tier selects `Custom…` and is displayed and round-tripped unchanged.
    A "Manage presets" link routes to the system's Checks screen.
+   Under a counting check the control is labelled `Successes needed override` and edits `component.salvage.successesOverride` (0–20); its presets are the named `salvageCraftingCheck.simple.tiers` with non-null `successes`, each reading `{name} — {n} successes needed`, and System default clears only `successesOverride`.
+   A kept DC or adjustment override is never rewritten, and each is named in its own dormant notice.
+   Player sees reads `Salvage check · {n} successes needed · d{die}s, success on {sym} {threshold}`.
 7. The component browser's category group headers obey the shared GM-library group-header rule specified under Recipe Studio: the header pairs what the group renders with the category's total across the filtered rows (`25 of 282 components`) whenever the two differ, reports one number for a wholly-shown group, and localizes both singulars.
 8. The component browser preserves the identical view-state across an editor round-trip specified under Recipe Studio, including its **essence** filter alongside category, page, sort, group-by-category, page size, and per-category collapse state; opening a component editor and returning restores exactly what the GM left.
    A genuine crafting-system switch resets category + essence + page + collapse, while keeping sort, group-by-category, and page size as cross-system preferences.

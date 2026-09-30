@@ -22,6 +22,7 @@ import {
 import { countOdds } from '../../../../../systems/countOdds.js';
 import { evaluateCheckBreakageCondition } from '../../../../../toolBreakageRuntime.js';
 import { resolveProgressiveAward } from '../../../../../utils/progressiveAward.js';
+import { tileModel } from '../../../../presenters/countDiceTiles.js';
 
 import { enumeratePreRollTotals, ODDS_REASONS, percentOf, SANDBOX_ABSENT } from './checkOdds.js';
 import { interpolate, MINUS } from './checksCopy.js';
@@ -103,6 +104,12 @@ function countPlacement(plan, Roll) {
   );
   const toolContributions = args?.rollOptions?.toolContributions;
   return planDecisionPlacement({ evaluation, toolContributions, selected }).placementPlan;
+}
+
+/** The Formula inset's placement for a count preview with an actor (issue 2006), else null. */
+export function countPreviewPlacement(plan, { Roll = globalThis.Roll } = {}) {
+  if (!plan?.kind || plan.evaluation?.product !== 'count' || !plan.actor) return null;
+  return countPlacement(plan, Roll);
 }
 
 const FACE_AGGREGATES = new Set(['anyDie', 'allDice']);
@@ -305,37 +312,18 @@ export function buildCountOddsModel(plan, enumeration, sandbox, text) {
   }
   const rows = countRows(plan, enumeration, sandbox, text);
   const { expected, domain } = countDomain(enumeration.odds, text);
-  return { kind, direction, product: 'count', enumerable: true, rows, expected, domain };
-}
-
-const MARKS = Object.freeze([
-  ['qualified', 'FABRICATE.Admin.Manager.Checks.Simulator.MarkQualified', 'qualified'],
-  ['cancelled', 'FABRICATE.Admin.Manager.Checks.Simulator.MarkCancelled', 'cancelled'],
-  ['exploded', 'FABRICATE.Admin.Manager.Checks.Simulator.MarkExploded', 'exploded'],
-]);
-
-/** "8, qualified and cancelled": the face, then every mark it carries. */
-function faceLabel(face, marks, text) {
-  if (marks.length === 0) return String(face);
-  const words = marks.map((mark) => {
-    const [, key, fallback] = MARKS.find(([id]) => id === mark);
-    return text(key, fallback);
-  });
-  const and = text('FABRICATE.Admin.Manager.Checks.Simulator.MarkJoin', ' and ');
-  const joined =
-    words.length > 1 ? `${words.slice(0, -1).join(', ')}${and}${words.at(-1)}` : words[0];
-  const copy = text('FABRICATE.Admin.Manager.Checks.Simulator.FaceMarked', '{face}, {marks}');
-  return interpolate(copy, { face, marks: joined });
+  const { status } = enumeration.odds;
+  return { kind, direction, product: 'count', enumerable: true, rows, expected, domain, status };
 }
 
 /**
  * Every active face the runner rolled, explosion dice included, marked by the production
- * projection against the executed threshold; the k-th exploding original produced the k-th
- * appended die, as Foundry appends them.
+ * projection against the executed threshold and ordered into tiles by `countDiceTiles.js`, as the
+ * result card orders them; the k-th exploding original produced the k-th appended die.
  */
-function countFaces(plan, data, text) {
+function countTiles(plan, data) {
   const group = data?.diceGroups?.[0];
-  if (!group || !plan.target?.ok) return [];
+  if (!group || !plan.target?.ok) return tileModel(null);
   const number = Number(String(group.group).split('d', 1)[0]);
   const policy = { ...plan.target.policy, threshold: data.target };
   const { explodes } = countFacePredicates(policy);
@@ -343,27 +331,19 @@ function countFaces(plan, data, text) {
     result,
     exploded: explodes(result, { generated: index >= number }),
   }));
-  return projectCountResults({ policy, results, number }).results.map((entry) => {
-    const marks = MARKS.map(([id]) => id).filter((id) => entry[id]);
-    return {
-      index: entry.index,
-      face: entry.face,
-      marks,
-      label: faceLabel(entry.face, marks, text),
-    };
-  });
+  return tileModel(projectCountResults({ policy, results, number }));
 }
 
 /**
  * The simulator's count tiles and states: every active face marked, whether the pool was reduced to
  * zero, and whether the net fell below zero. The readout's lines are `checkReadoutModel.js`'s.
  */
-export function buildCountReadout(plan, result, text) {
+export function buildCountReadout(plan, result) {
   const data = result?.data ?? {};
   const zeroPool = data.zeroPool === true;
   const net = data.total === null || data.total === undefined ? NaN : Number(data.total);
   return {
-    faces: zeroPool ? [] : countFaces(plan, data, text),
+    dice: zeroPool ? tileModel(null) : countTiles(plan, data),
     zeroPool,
     botch: Number.isFinite(net) && net < 0,
   };

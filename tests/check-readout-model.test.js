@@ -333,7 +333,7 @@ describe('the result card', () => {
       text: 'The pool was reduced to zero, so the check fails automatically.',
     });
     assert.deepEqual([model.card.title, model.card.tone], ['Failure', 'danger']);
-    assert.deepEqual(model.count, { faces: [], zeroPool: true, botch: false });
+    assert.deepEqual(model.count, { dice: { tiles: [], more: 0 }, zeroPool: true, botch: false });
   });
 });
 

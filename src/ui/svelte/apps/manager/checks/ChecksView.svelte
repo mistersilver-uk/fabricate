@@ -25,19 +25,27 @@
   import CraftingModifierCatalogueCard from './CraftingModifierCatalogueCard.svelte';
   import ChecksValidationTab from './ChecksValidationTab.svelte';
   import {
-    CHECK_ISSUE_CONTROLS,
     CHECK_SECTION_IDS,
     evaluateCheckReadiness,
+    issueControl,
     readinessModeForSlot,
     sectionForIssue,
   } from './checksReadiness.js';
+  import { convertCountingFormula } from './countFormulaConversion.js';
   import Callout from '../../../components/Callout.svelte';
   import Notice from '../../../components/Notice.svelte';
   import CheckModeCallout from './CheckModeCallout.svelte';
   import { focusValidationTarget } from '../validationFocus.js';
   import { announceValidationOutcome } from '../validationAnnouncement.js';
   import InspectorCard from '../../../components/InspectorCard.svelte';
-  import { checkIssueText } from './checksCopy.js';
+  import { checkIssueText, convertActionCopy } from './checksCopy.js';
+  import {
+    activityWordFor,
+    failurePolicyInertNote as inertNoteFor,
+    recordNounFor,
+    recordNounPluralFor,
+    subsystemModeLabel as modeLabelFor,
+  } from './checksActivityCopy.js';
   import { issueRowStatus } from './checksValidationRows.js';
   import {
     buildCheckModifierContext,
@@ -62,6 +70,7 @@
   import {
     buildOddsModel,
     buildReadoutModel,
+    countPreviewPlacement,
     labelPreviewRecords,
     previewAbstention,
     previewActorNote,
@@ -356,46 +365,8 @@
     },
   };
 
-  // The AUTHORED mode, for the "does not apply in {mode} mode" copy and the Validation rail's
-  // rows — deliberately NOT the readiness mode, which collapses every no-check mode to `none`
-  // and would name a mode no economy editor offers. IT IS LOCALIZED through the SAME strings
-  // the rest of the manager uses: the authored token is an internal identifier and the three
-  // subsystems spell one concept three ways.
-  const SUBSYSTEM_MODE_LABELS = {
-    crafting: {
-      simple: ['FABRICATE.Admin.SystemSettings.ResolutionSimple', 'Simple'],
-      routedByIngredients: [
-        'FABRICATE.Admin.Manager.ResolutionRoutedByIngredients',
-        'Routed by ingredients',
-      ],
-      routedByCheck: ['FABRICATE.Admin.Manager.ResolutionRoutedByCheck', 'Routed by check'],
-      progressive: ['FABRICATE.Admin.SystemSettings.ResolutionProgressive', 'Progressive'],
-      alchemy: ['FABRICATE.Admin.SystemSettings.ResolutionAlchemy', 'Alchemy'],
-    },
-    // Alchemy's row names the ALCHEMY CHECK MODE, the choice deciding what alchemy rolls.
-    alchemy: {
-      none: ['FABRICATE.Admin.SystemSettings.Alchemy.CheckModeNone', 'No check'],
-      simple: ['FABRICATE.Admin.SystemSettings.Alchemy.CheckModeSimple', 'Simple check'],
-      tiered: ['FABRICATE.Admin.SystemSettings.Alchemy.CheckModeTiered', 'Tiered check'],
-    },
-    salvage: {
-      simple: ['FABRICATE.Admin.SystemSettings.SalvageResolutionSimple', 'Simple'],
-      progressive: ['FABRICATE.Admin.SystemSettings.SalvageResolutionProgressive', 'Progressive'],
-      routed: ['FABRICATE.Admin.SystemSettings.SalvageResolutionRouted', 'Routed by check'],
-    },
-    gathering: {
-      d100: ['FABRICATE.Admin.Manager.Economy.Resolution.D100', 'd100 roll'],
-      progressive: ['FABRICATE.Admin.Manager.Economy.Resolution.Progressive', 'Progressive'],
-      routed: ['FABRICATE.Admin.Manager.Economy.Resolution.Routed', 'Routed by check'],
-    },
-  };
-
-  /** The GM-facing name of an authored mode; an unmapped token falls back to itself, so a
-   *  mode added to a picker without a row here reads as unfinished, not as another. */
-  function subsystemModeLabel(vocabulary, mode) {
-    const entry = SUBSYSTEM_MODE_LABELS[vocabulary]?.[mode];
-    return entry ? text(entry[0], entry[1]) : String(mode || '');
-  }
+  // The AUTHORED mode's own name, from `checksActivityCopy.js`.
+  const subsystemModeLabel = (vocabulary, mode) => modeLabelFor(vocabulary, mode, text);
 
   // One group per in-play subsystem, against its own draft and mode. Salvage is omitted when
   // its feature is off; GATHERING IS NOT OMITTED UNDER d100, validating a selection that
@@ -465,6 +436,7 @@
   // The evaluation the active editor stack authors, stated on the stack for its captures.
   const activeEvaluation = $derived(normalizeCheckEvaluation(activeCheck?.evaluation));
   const evaluationAttrs = $derived({
+    'data-checks-evaluation-product': activeEvaluation.product,
     'data-checks-evaluation-direction': activeEvaluation.direction,
     'data-checks-target-source': activeEvaluation.target.source,
     'data-checks-adjustment-kind': activeEvaluation.target.adjustmentKind,
@@ -647,8 +619,9 @@
    *
    * @param {{activity?: string, section?: string}} target the ROUTE the row carries.
    * @param {string} [focusTarget] the CONTROL's `data-validation-target` value, if it named one.
+   * @param {string} [status] A sentence announced ahead of the destination, as Convert's is.
    */
-  function selectIssue(target, focusTarget) {
+  function selectIssue(target, focusTarget, status = '') {
     if (!target?.activity) return;
     const section = target.section || 'roll';
     onOpenActivity(target.activity, section);
@@ -660,7 +633,7 @@
       focus: () => focusValidationTarget(checksRoot, focusTarget),
       fallbackPanel: sectionPanel,
       announce: (sentence) => {
-        issueAnnouncement = sentence;
+        issueAnnouncement = sentence && status ? `${status} ${sentence}` : sentence;
       },
     });
   }
@@ -758,27 +731,10 @@
     activeActivity ? resolveModifierPolicy(activeActivity.modifierContext) : 'addAll'
   );
 
-  // THE RECORD NOUN, in the activity's own word and localized, because a noun is copy.
-  const RECORD_NOUNS = {
-    crafting: ['FABRICATE.Admin.Manager.Checks.RecordNoun.Crafting', 'recipe'],
-    salvage: ['FABRICATE.Admin.Manager.Checks.RecordNoun.Salvage', 'salvageable item'],
-    gathering: ['FABRICATE.Admin.Manager.Checks.RecordNoun.Gathering', 'gathering task'],
-  };
-  const recordNoun = $derived.by(() => {
-    const entry = RECORD_NOUNS[activity] || RECORD_NOUNS.crafting;
-    return text(entry[0], entry[1]);
-  });
-
-  // The activity as the Roll button names it mid-sentence, lower-case and localized.
-  const ACTIVITY_WORDS = {
-    crafting: ['FABRICATE.Admin.Manager.Checks.Simulator.ActivityCrafting', 'crafting'],
-    salvage: ['FABRICATE.Admin.Manager.Checks.Simulator.ActivitySalvage', 'salvage'],
-    gathering: ['FABRICATE.Admin.Manager.Checks.Simulator.ActivityGathering', 'gathering'],
-  };
-  const activityWord = $derived.by(() => {
-    const entry = ACTIVITY_WORDS[activity];
-    return entry ? text(entry[0], entry[1]) : '';
-  });
+  // The activity's own words, from `checksActivityCopy.js`.
+  const recordNoun = $derived(recordNounFor(activity, text));
+  const activityWord = $derived(activityWordFor(activity, text));
+  const recordNounPlural = $derived(recordNounPluralFor(activity, text));
 
   // The failure-result policy of the activity on screen, read by its card and the readout alike.
   const activeFailureResultPolicy = $derived(
@@ -800,45 +756,12 @@
     return { consumeOnFail, breakToolsOnFail };
   });
 
-  // The PLURAL of the same noun, sentence-initial, and the three do not pluralize alike.
-  const RECORD_NOUNS_PLURAL = {
-    crafting: ['FABRICATE.Admin.Manager.Checks.RecordNoun.CraftingPlural', 'Recipes'],
-    salvage: ['FABRICATE.Admin.Manager.Checks.RecordNoun.SalvagePlural', 'Salvageable items'],
-    gathering: ['FABRICATE.Admin.Manager.Checks.RecordNoun.GatheringPlural', 'Gathering tasks'],
-  };
-  const recordNounPlural = $derived.by(() => {
-    const entry = RECORD_NOUNS_PLURAL[activity] || RECORD_NOUNS_PLURAL.crafting;
-    return text(entry[0], entry[1]);
-  });
-
-  // WHERE THE POLICY HAS NO REACH, and why: neither `routedByIngredients` nor `progressive`
-  // has an outcome tier or reserved failure group to mark, so a stated reason renders rather
-  // than a control that silently does nothing.
-  const failurePolicyInertNote = $derived.by(() => {
-    if (activity === 'gathering') {
-      return gatheringD100
-        ? text(
-            'FABRICATE.Admin.Manager.Checks.FailureResults.InertGatheringD100',
-            'The d100 gathering roll has no failure outcome to produce — and routed and progressive gathering are not available yet. This setting is kept and takes effect when they are.'
-          )
-        : '';
-    }
-    if (activity === 'crafting' && resolutionMode === 'routedByIngredients') {
-      return text(
-        'FABRICATE.Admin.Manager.Checks.FailureResults.InertRoutedByIngredients',
-        'In routed-by-ingredients mode the check has no outcome tiers to mark as failures, so nothing here can be produced on a failed check. This setting is kept, and applies again if you switch to a mode that has them.'
-      );
-    }
-    const progressive =
-      (activity === 'crafting' && craftingProgressive) ||
-      (activity === 'salvage' && salvageProgressive);
-    return progressive
-      ? text(
-          'FABRICATE.Admin.Manager.Checks.FailureResults.InertProgressive',
-          'A progressive check spends its rolled value down one ordered list of results, so it has no failure outcome to produce. This setting is kept, and applies again if you switch to a mode that has one.'
-        )
-      : '';
-  });
+  const failurePolicyInertNote = $derived(
+    inertNoteFor(
+      { activity, gatheringD100, resolutionMode, craftingProgressive, salvageProgressive },
+      text
+    )
+  );
 
   // THE ROLL SECTION'S MODE CALLOUT, in the activity's own vocabulary and on `roll` alone.
   const calloutMode = $derived.by(() => {
@@ -853,7 +776,13 @@
     [...activeReadiness.issues, ...activeReadiness.transient]
       .filter((issue) => sectionForIssue(issue.id) === activeSection)
       .sort((a, b) => blockingRank(a) - blockingRank(b))
-      .map((issue) => ({ id: issue.id, ...checkIssueText(issue.id, issue.data, text) }))
+      .map((issue) => ({
+        id: issue.id,
+        // `countFaceMissing` is raised once per face kind, so the kind keeps each notice distinct.
+        key: issue.data?.kind ? `${issue.id}:${issue.data.kind}` : issue.id,
+        ...checkIssueText(issue.id, issue.data, text),
+        action: noticeAction(issue),
+      }))
   );
   function blockingRank(issue) {
     return issueRowStatus(issue) === 'block' ? 0 : 1;
@@ -861,8 +790,49 @@
   const reviewLabel = text('FABRICATE.Admin.Manager.Checks.Validation.Review', 'Review');
 
   /** A notice's Review: the control its issue names, else its section, as a Validation row's View. */
-  function reviewIssue(id) {
-    selectIssue({ activity, section: activeSection }, CHECK_ISSUE_CONTROLS[id]);
+  function reviewIssue(issue) {
+    selectIssue({ activity, section: activeSection }, issueControl(issue));
+  }
+
+  /** The draft writer of the check an activity rolls, chosen as `validationSections` chooses it. */
+  function checkWriterFor(subsystem) {
+    if (subsystem === 'salvage') {
+      if (salvageRouted) return onUpdateSalvageCheckRouted;
+      return salvageProgressive ? onUpdateSalvageCheckProgressive : onUpdateSalvageCheckSimple;
+    }
+    if (subsystem === 'gathering') {
+      return gatheringProgressive
+        ? onUpdateGatheringCheckProgressive
+        : onUpdateGatheringCheckRouted;
+    }
+    if (craftingRouted) return onUpdateCraftingCheck;
+    return craftingProgressive ? onUpdateCraftingCheckProgressive : onUpdateCraftingCheckSimple;
+  }
+
+  /**
+   * Convert a summing counting formula (issue 2006): staged into the draft, so Save applies it and
+   * Discard restores the summing check, then the roll section opens on `Count successes`.
+   */
+  function convertCheck(subsystem) {
+    const section = validationSections.find((row) => row.subsystem === subsystem);
+    if (!section?.check) return;
+    checkWriterFor(subsystem)(convertCountingFormula(section.check));
+    const status = text(
+      'FABRICATE.Admin.Manager.Checks.Count.Convert.Status',
+      'Converted to count successes. The original formula and DCs are kept.'
+    );
+    selectIssue({ activity: subsystem, section: 'roll' }, 'checks-product', status);
+  }
+
+  /** A notice's one action: Convert where its issue converts, else Review. */
+  function noticeAction(issue) {
+    const copy = convertActionCopy(issue);
+    if (!copy) return { label: reviewLabel, onClick: () => reviewIssue(issue) };
+    return {
+      label: text(...copy.label),
+      description: text(...copy.description),
+      onClick: () => convertCheck(activity),
+    };
   }
 
   // ONE previewed record, three readers, so it lives HERE; two copies is how two surfaces
@@ -1017,6 +987,9 @@
     previewRecordId = id;
   }
 
+  // A counting Formula card's inset and reading: this preview's placement and its own odds model.
+  const countPreview = $derived({ placement: countPreviewPlacement(previewPlan), odds: oddsModel });
+
   // Spread rather than restated at ten call sites: the prop list IS the contract.
   const routedPreviewProps = $derived({
     previewRecords,
@@ -1027,6 +1000,7 @@
     previewModifierTotal,
     trackMin: previewTrackRange.min,
     trackMax: previewTrackRange.max,
+    countPreview,
     onSelectPreviewRecord: selectPreviewRecord,
   });
   const simplePreviewProps = $derived({
@@ -1037,6 +1011,7 @@
     trackMax: previewTrackRange.max,
     previewCharacter,
     previewModifierTotal,
+    countPreview,
     onSelectPreviewRecord: selectPreviewRecord,
   });
   const previewActorSummary = $derived(
@@ -1225,12 +1200,12 @@
            draws it: amber, title over detail, with a Review action. -->
       {#if activity !== 'validation' && !routeIsOff && sectionNotices.length > 0}
         <div class="manager-checks-section-notices" data-checks-section-notices={activeSection}>
-          {#each sectionNotices as issue (issue.id)}
+          {#each sectionNotices as issue (issue.key)}
             <Notice
               tone="warning"
               title={issue.title}
               detail={issue.detail}
-              action={{ label: reviewLabel, onClick: () => reviewIssue(issue.id) }}
+              action={issue.action}
               dataAttr="data-checks-section-notice"
               dataValue={issue.id}
             />
@@ -1263,6 +1238,7 @@
           {dirty}
           {dirtyActivities}
           onSelectIssue={selectIssue}
+          onConvert={convertCheck}
         />
       {:else if routeIsOff}
         <!-- The check is optional and the GM turned it off, so the way back on is IN the panel. -->
@@ -1483,6 +1459,8 @@
             />
           {:else}
             <ProgressiveCraftingCheckEditor
+              {previewCharacter}
+              {countPreview}
               {recordNoun}
               {appliedModifiers}
               modifierPolicy={appliedModifierPolicy}
@@ -1576,6 +1554,8 @@
             />
           {:else if salvageProgressive}
             <ProgressiveCraftingCheckEditor
+              {previewCharacter}
+              {countPreview}
               {recordNoun}
               {appliedModifiers}
               modifierPolicy={appliedModifierPolicy}
@@ -1694,6 +1674,8 @@
         <div class="manager-checks-editor-stack" data-checks-panel="gathering" {...evaluationAttrs}>
           {#if gatheringProgressive}
             <ProgressiveCraftingCheckEditor
+              {previewCharacter}
+              {countPreview}
               {recordNoun}
               {appliedModifiers}
               modifierPolicy={appliedModifierPolicy}

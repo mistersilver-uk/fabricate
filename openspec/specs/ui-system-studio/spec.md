@@ -232,6 +232,8 @@ The panel additionally guards a missing or throwing `Roll.parse` as a not-enumer
 An `avg N` annotation on the formula field renders the deterministic magnitude average (`reduceRollExpression`) of the free-text formula with character paths taken as zero, its value set in the mono face and the annotation referenced by the formula input's `aria-describedby`.
 When a die or pool carries `cs`, `cf`, `even`, `odd`, `df`, `sf` or `ms`, the annotation renders visible `avg —`, stamps `data-check-formula-average-withheld="die-modifiers"`, and exposes, in visually hidden text that needs no hover, a localized explanation that the average is withheld because the die modifier transforms the total.
 Malformed or irreducible input omits the annotation.
+A counting check's Formula card carries no `avg`: its reading is `expected successes {n}`, the same expected net the odds panel renders on `data-checks-odds-expected`, from the one preview computation, to two decimals, and hidden whenever the count odds abstain rather than shown as zero.
+A summing check's `avg` and `avg —` are unchanged.
 Magnitude expressions remain deliberately LOOSER than the histogram's predicate — the annotation answers for multi-group and magnitude-modified formulas the histogram abstains from — because it is an annotation on a field the GM is typing in rather than a claim about a distribution.
 Its responsive behaviour reuses the SHIPPED `fabricate-manager` container ladder and introduces no new breakpoint: `styles/fabricate.css` already declares that container with blocks at 1320 / 1120 / 960 / 900 / 831 / 680, and `.fabricate-manager .manager-inspector` already carries `overflow-y: auto; max-height: 100%`.
 At the existing 1320 breakpoint and below, the odds histogram and the simulator readout become collapsed disclosures, headers and counts retained.
@@ -318,7 +320,7 @@ The heading adjunct reads `exact · expected {expected}`, or `nearly exact · ex
 The panel root carries `data-checks-odds-product="count"`.
 
 The preview abstains with no actor when the pool reads the character (`needs-preview-actor`), and names the actor for a path they lack (`count-path-unresolved`: `{actor} is missing a value this check reads ({path}), so it cannot resolve for them.`) or a value that is not a number (`count-value-not-numeric`); an actorless literal pool stays previewable, a pool fault of the check's own abstains as `target-invalid`, and Roll is disabled while abstaining.
-The simulator renders one tile per active face, explosion dice included, each marked `qualified`, `cancelled` or `exploded` by a glyph, a `data-checks-simulator-face-marks` value and its accessible name, so colour is never the only signal; the tile takes the success tone for a qualifying or exploding face and the danger tone for a cancelling one.
+The simulator renders its faces through the shared `DiceTiles` primitive (see `design-system`), one tile per active face in roll order with each explosion's die straight after the die that produced it, every mark `qualified`, `cancelled` or `exploded` combined on one tile by a glyph, a `data-checks-simulator-face-marks` value and its accessible name, so colour is never the only signal; the tile takes the success tone for a qualifying or exploding face and the danger tone for a cancelling one.
 The tiles and legend sit directly under the medallion row.
 The breakdown reads `{qualified} qualified − {cancelled} cancelled = {net} net` and then the actor.
 The target line reads `needs {required} · margin {margin}`: `{required}` is the check's own required count, on a routed check too, and the margin is the net minus it, always signed (`+0`).
@@ -328,11 +330,53 @@ A zero pool rolls nothing: it shows `0` captioned `net` and `pool reduced to 0`,
 A progressive count check shows its raw net and awards `max(0, net)`.
 Negative counts use the true minus sign.
 
-Readiness raises, in The roll: `countPoolInvalid` and `countThresholdInvalid` (critical: blank, dice or not arithmetic once every path is neutralized), `countFaceBeyondDie` (warning: an enabled explode or cancel face beyond the die, naming what follows), `countExplodeUnbounded` (critical: a recursive explosion on every face), `countTierWithoutSuccesses` (a warning until issue 2006 adds the control: a crafting recipe tier with no successes needed), and, for a literal base, `countPoolTooLarge` (critical: above the 999 dice Foundry rolls at once, raising no ceiling row), `countRequiredExceedsMaxPool` (critical) and `countRequiredExceedsBasePool` (warning) against the authored ceiling, which is the base alone until additional dice (issue 2008) raise it; the base settles through the runtime's own pool resolver, so it floors float noise, rolls at least one die when a zero pool does not fail, and never reads below zero dice.
-A base reading the character raises no ceiling issue and ticks `countPoolCharacterDependent`; fixed ranges and progressive checks grade no required count.
+Readiness raises, in The roll: `countPoolInvalid` and `countThresholdInvalid` (critical: blank, dice or not arithmetic once every path is neutralized), `countFaceBeyondDie` (warning: an enabled explode or cancel face beyond the die, naming what follows), `countExplodeUnbounded` (critical: a recursive explosion on every face), `countTierWithoutSuccesses` (critical: a crafting recipe tier with no successes needed, raised only while at least one tier exists), and, for a literal base, `countPoolTooLarge` (critical: above the 999 dice Foundry rolls at once, raising no ceiling row), `countRequiredExceedsMaxPool` (critical) and `countRequiredExceedsBasePool` (warning) against the authored ceiling, which is the base alone until additional dice (issue 2008) raise it; the base settles through the runtime's own pool resolver, so it floors float noise, rolls at least one die when a zero pool does not fail, and never reads below zero dice.
+A base reading the character raises no ceiling issue and ticks `countPoolCharacterDependent` on Validation only, never as a Difficulty card callout (frame 06 draws none); fixed ranges and progressive checks grade no required count.
 Frame 08's `Successes needed above the most dice that can be rolled`, frame 07's `Successes needed above the base pool` and frame 19's `A character path does not resolve` are among the count issues' titles.
-These rows are route-only until issue 2006 adds the controls that clear them, so a notice's Review focuses the section.
+Each of these rows names the control that clears it, as "Success-counting authoring" lists, so a notice's Review and a Validation row's View focus that control.
 With a Preview-as actor chosen it raises the TRANSIENT `countPathUnresolvedForPreview` and `countValueNotNumericForPreview`, which follow the same rule as the roll-under transient warnings: a section notice and a Validation row, and never a badge, dot, tally or enable gate.
+
+#### Success-counting authoring
+
+The Formula card's first axis row pairs "What the roll produces" (`Add the dice` / `Count successes`) with "Which way is better" on every slot that rolls, and is absent for gathering `d100` and alchemy `none`.
+The product control writes only `evaluation.product`: a switch rewrites nothing, so `rollFormula`, `dc`, tier `dc`, adjustments, `target`, `pool`, `thresholdMode`, tier `successes`, overrides and triggers all survive both ways, and a never-counted record shows the normalizer's defaults.
+Each field has one editor: under count, `thresholdMode` is edited only by the per-die test under `Success on`, and the Difficulty card's Comparison does not render.
+
+In count mode the Formula card replaces the free-text formula, its `avg` and its token row with the structured pool: `Die`, `Base pool`, `Success on` with its per-die test, `Explode`, `Cancel`, `Modifiers and bonuses` (move the threshold or add dice) and `Zero pool`.
+The base pool and the threshold each offer `Number` or `Character value`; the choice is view state derived from the stored string, switching writes nothing, and the Stepper writes a string.
+Stepper bounds constrain editing only, so an imported or converted value outside them shows as stored and is never clamped on load, convert or save.
+`Off` / `Best face` (or `Worst face`) / `From a face` are three peer choices; choosing `From a face` seeds the current best or worst face, so the Studio never writes a null face, and turning a feature off keeps its face and repeat.
+The face Stepper and `Keeps exploding` / `Once` render only while their feature is on.
+
+The inset under the pool states the composed roll as authored — the pool, the per-die test and its threshold, the modifier chips on the term they move and the explode and cancel faces — and, against the Preview-as actor, the settled pool floored after every benefit and the settled threshold.
+It never shows a Foundry formula, a `cs`/`df` token or the retained `rollFormula`, and it constructs and evaluates no Roll; with no actor and a character-dependent input it asks for one, and a missing path is named rather than read as zero.
+Every surface that describes a count policy formats it from the one Foundry-free `describeCountPolicy`.
+
+The Difficulty card of a counting check edits `pool.required` as `Successes needed` (0–20) with its static or dynamic source, and states the `countRequiredExceedsMaxPool` and `countRequiredExceedsBasePool` sentences as callouts, never a predicate of its own; a progressive counting check has no Difficulty card.
+Recipe tiers edit `tiers[].successes` in a `Successes` column; a tier with none reads `—` beside `Set successes needed`, and a tier added while counting starts at the check's successes needed.
+Relative outcome rows edit the shared delta as `Extra successes`, and a count band strip is a read-only picture in net successes (see `ui-visual-style`).
+
+Every count readiness id has a clearing control: `countPoolInvalid` and `countPoolTooLarge` the base pool, `countThresholdInvalid` the threshold, `countFaceBeyondDie` the explode or cancel face it names, `countExplodeUnbounded` the explode choice, the two ceiling rows the successes needed, and `countTierWithoutSuccesses` the first tier without successes.
+Two issues are added.
+`countFaceMissing` (critical, The roll) blocks an enabled explode or cancel `from` face with no value, which only imported or API data can hold; it is raised once per missing face, under one `countFacesSet` tick, each with its own notice.
+`countTriggerGroupUnreachable` (a warning, Triggers, outside the enable gate) names each kept trigger whose dice condition reads a group or face the pool never rolls, quoted and titled against the formula it was written for — its die, a repeated die by its ordinal, and a group that formula lacks as `dice group {n}` — in a singular sentence for one trigger; the trigger is kept and works again after switching back to adding the dice.
+
+##### Free-text counting formula conversion
+
+A summing check whose formula carries a success-counting die modifier (`cs`, `cf`, `even` or `odd`, with character paths neutralised) raises the `freeTextCountingFormula` warning in The roll; it never feeds the enable gate, is absent while the check counts, and `avg —` stays beside it.
+The row offers `Convert to count successes` only when all of these hold:
+
+- the check is summed, higher is better, against a fixed target rather than a character value;
+- the formula maps exactly: one die term, one directional `cs`, an optional same-side explosion, and an optional worst-side `df` whose faces are disjoint from the qualifying ones;
+- every copied required count fits 0–20.
+
+A dynamic-DC check converts only when it grades `meet`: its macro is kept and its return is then read as the successes needed, and the row says so.
+Otherwise the row stays a warning offering View only.
+The Validation row carries the action in place of View and the roll-section notice carries the same action; both call one handler.
+Convert STAGES into the draft — it marks the activity dirty, `Save checks` applies it and Discard restores the summing check — and writes nothing on the click.
+It sets `product: 'count'`, the pool, the direction and the per-die strictness, and copies the static and tier DCs into the required counts, plus one where the check graded `exceed`; a tier with authored successes keeps them.
+Convert retains `rollFormula` and every DC, never maps `cf` to cancel, and edits no component or task.
+It focuses the product axis's `Count successes` choice and announces the change politely.
 
 #### Check Trigger Controls
 
@@ -359,6 +403,11 @@ Each trigger pairs an expressive dice-matching condition with three effects (iss
 - **The `target` select never displays a tier it has not persisted.**
   `tierId` defaults to `null`, and a control whose value matches no option must not read as a tier the check has not persisted, so the `Select` takes a `placeholder` ("Choose a tier…") that renders as its trigger's value while `tierId` is `null` — placeholder text on the trigger, with no row for it in the list to choose — and renders a dangling id as an appended disabled "Missing tier" option with the primitive's `invalid` treatment on the trigger, its danger border and soft fill.
   A dangling target is reachable by ordinary authoring, not only by import: the relative↔fixed type switch swaps the whole tier list and dangles every authored `tierId` at once.
+- For a counting check the `rollTotal` subject reads `Net successes` in the editor and the trigger summary, and the presets act on the pool's single die group, never the retained formula.
+  Simple: `Every die shows its worst face ({worst}) → automatic failure`.
+  Routed: `Any die shows its best face ({best}) → step up a tier` and `Every die shows its worst face ({worst}) → step down a tier`.
+  When cancelling is enabled: `Botch (net below zero) → automatic failure` (simple, `rollTotal < 0`) or `Botch (net below zero) → lowest tier` (routed, offered only while a tier exists).
+  Best and worst follow `presetPolarity`, and authored triggers are never rewritten.
 - When the check has no named outcome tiers, the `target` branch shows its own muted guidance cue rather than hiding the control — a GM authoring top-down configures triggers before tiers, and hiding it would make an authored target invisible.
   It carries a hook and a lang key distinct from the `outcomeTier` condition's no-tiers cue, because a trigger that is both `outcomeTier`-conditioned and `target`-stepping on a tier-less check would otherwise render two identically-hooked nodes in one card.
 - Two readiness rules back the control, both `warning` severity and both reported only once at least one trigger sets `target`: `danglingTierStepTarget` (the target names no tier on the active list, including "no tier chosen at all") and `multipleTierStepTargets` (two or more triggers set a target; if more than one matches, the lowest-ranked wins).
@@ -1252,6 +1301,8 @@ Current GM editor behavior:
 - Gathering Task authoring includes identity, image, description, enabled state, task-level time/weather availability gates, search/pagination for ordered d100 drop rows, unresolved drop-zone rows, inline chance/quantity controls, modifier summaries, selected-drop inspector editing, and final chance preview.
   D100 row selection is controlled by selected-system Gathering Rules, not Gathering Task authoring.
 - Gathering Task authoring may also include node count, depletion timing, respawn policy, stamina cost, attempt limits, risk overrides, encounter hooks, natural expression providers, and macro providers where the selected economy/features use them.
+- A routed task's check override is one Stepper with the `System default` placeholder and no presets.
+  Under a counting check it is labelled `Successes needed override` and edits `task.successesOverride` (0–20); a kept DC or adjustment override survives, is never rewritten and is named in its own dormant notice.
 - Reusable event authoring includes name, image, description, enabled state, danger/match tags, d100 drop rate, and modifier provider evidence.
 - The selected-system inspector exposes the WORLD character modifier library for gathering (issue 1308; per-system until then), with add/edit/delete controls, opt-in preset seeding when supported by the active Foundry system, and stale-reference evidence for rows that still point at deleted modifiers.
   The inspector projection is an explicit allowlist, so neither library may be projected off the crafting system any more: a field omitted there is invisible to the UI, and one projected from the system would show a stale copy the corpus no longer carries.

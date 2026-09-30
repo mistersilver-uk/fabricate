@@ -144,3 +144,20 @@ test('a trigger that does nothing SAYS it does nothing', () => {
     ['nothing changes']
   );
 });
+
+test('a counting check names its total net successes, and a summing one keeps the roll total', () => {
+  const condition = { type: 'rollTotal', operator: '<', value: 0 };
+  assert.equal(render(summariseCondition(condition, { counting: true })), 'Net successes is under 0');
+  assert.equal(render(summariseCondition(condition, { counting: false })), 'Roll total is under 0');
+  assert.equal(render(summariseCondition(condition)), 'Roll total is under 0');
+  assert.equal(
+    render(
+      summariseCondition(
+        { type: 'diceGroup', groupId: 0, aggregate: 'allDice', operator: '==', value: 1 },
+        { counting: true, diceGroups: [{ groupId: 0, label: 'd10', sides: 10 }] }
+      )
+    ),
+    'All dice of d10 is exactly 1',
+    'only the total changes its subject'
+  );
+});

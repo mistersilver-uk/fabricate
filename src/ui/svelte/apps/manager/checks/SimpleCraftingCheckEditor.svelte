@@ -9,7 +9,8 @@
   `showDcSource` (default true) renders the DC-SOURCE half. Salvage and gathering reuse this
   editor with it off, having no records to pick a tier from and no dynamic-DC macro, and take a
   per-entity DC override elsewhere. Controlled through `onChange`. Outside summed roll-over against
-  a fixed DC (issue 2005, ruling R2) the two-band strip is a read-only picture of the target.
+  a fixed DC (issue 2005, ruling R2) the two-band strip is a read-only picture of the target, and a
+  counting check's (issue 2006) is drawn in net successes.
 -->
 <script>
   import Field from '../../../components/Field.svelte';
@@ -24,14 +25,22 @@
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import Select from '../../../components/Select.svelte';
   import { previewRecordSelectOptions } from './checksSelectOptions.js';
-  import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
+  import {
+    normalizeCheckEvaluation,
+    normalizeNullableSuccesses,
+  } from '../../../../../systems/normalize/checkEvaluation.js';
+  import { countRequired } from '../../../../../systems/countCheck.js';
   import { activeCheckEvaluation } from '../../../../../systems/checkTarget.js';
-  import { checkTargetChip } from './checksCopy.js';
+  import { checkTargetChip, formulaCardLead } from './checksCopy.js';
   import { previewTierAdjustment } from './checkAdjustmentLabel.js';
   import {
     bandsAreEditable,
+    buildCountBands,
     buildPassFailBands,
+    countBandScale,
+    countPoolSettlesToZero,
     describeBandRange,
+    describeCountBandRange,
     describeBandsUnavailable,
     previewBandTarget,
     previewScaleSentence,
@@ -63,6 +72,8 @@
     previewCharacter = null,
     // The previewed actor's flat check-modifier total; a roll-under strip adds it to the target.
     previewModifierTotal = 0,
+    // The preview's `{ placement, odds }` a counting Formula card composes from (issue 2006).
+    countPreview = null,
     onSelectPreviewRecord = () => {},
     onChange = () => {},
   } = $props();
@@ -93,6 +104,7 @@
   const evaluation = $derived(normalizeCheckEvaluation(value?.evaluation));
   const graded = $derived(activeCheckEvaluation(value));
   const editableBands = $derived(bandsAreEditable(value?.evaluation));
+  const counts = $derived(graded.product === 'count');
   const comparison = $derived(value?.thresholdMode === 'exceed' ? 'exceed' : 'meet');
   const targetChip = $derived(checkTargetChip(evaluation, dc, text));
 
@@ -102,7 +114,7 @@
       null
   );
   const readonlyTarget = $derived(
-    editableBands
+    editableBands || counts
       ? null
       : previewBandTarget(
           {
@@ -115,8 +127,20 @@
           text
         )
   );
+  // A count grades the previewed record's successes needed, its own when the tier sets none.
+  const countTarget = $derived(
+    counts ? countRequired(graded, normalizeNullableSuccesses(previewedTier?.successes)) : null
+  );
+  const countScale = $derived.by(() => {
+    if (!counts) return '';
+    const pool = { evaluation: graded, thresholdMode: comparison, character: previewCharacter };
+    const zeroPool = countPoolSettlesToZero({ ...pool, placement: countPreview?.placement });
+    const cancels = graded.pool.cancel.enabled;
+    return countBandScale({ required: countTarget, zeroPool, cancels }, text);
+  });
   const readonlyScale = $derived(
-    previewScaleSentence(readonlyTarget, { direction: graded.direction, comparison }, text)
+    countScale ||
+      previewScaleSentence(readonlyTarget, { direction: graded.direction, comparison }, text)
   );
 
   const failureLabel = $derived(
@@ -144,6 +168,16 @@
     failure: 'color-mix(in srgb, var(--fab-danger) 22%, var(--fab-bg-0))',
     success: 'color-mix(in srgb, var(--fab-success) 22%, var(--fab-bg-0))',
   };
+  const countBands = $derived.by(() => {
+    if (!counts) return [];
+    const botch = text('FABRICATE.Admin.Manager.Checks.Odds.Botch', 'Botch');
+    const names = { success: successLabel, failure: failureLabel, botch };
+    return buildCountBands({ evaluation: graded, required: countTarget, names }).map((band) => ({
+      ...band,
+      range: describeCountBandRange(band, text),
+      color: band.success ? BAND_COLORS.success : BAND_COLORS.failure,
+    }));
+  });
   const readonlyBands = $derived(
     readonlyTarget?.state === 'ok'
       ? buildPassFailBands({
@@ -166,7 +200,10 @@
     { id: 'failure', index: 0, name: failureLabel, from: stripMin, color: BAND_COLORS.failure },
     { id: 'success', index: 1, name: successLabel, from: dc, color: BAND_COLORS.success },
   ]);
-  const bandStripBands = $derived(editableBands ? editableBandsList : readonlyBands);
+  const bandStripBands = $derived.by(() => {
+    if (editableBands) return editableBandsList;
+    return counts ? countBands : readonlyBands;
+  });
 
   /**
    * Apply the single boundary move. The strip has already clamped the value inside the track,
@@ -189,7 +226,9 @@
             {text('FABRICATE.Admin.Manager.Checks.Crafting.FormulaTitle', 'Formula')}
           </h3>
           <p class="manager-checks-card-description">
-            {text(
+            {formulaCardLead(
+              evaluation,
+              text,
               'FABRICATE.Admin.Manager.Checks.Crafting.FormulaLead',
               'Rolled once per attempt. Modifiers from the Modifiers tab are applied by the check; they never appear in the formula.'
             )}
@@ -208,6 +247,8 @@
           {targetChip}
           underTier={previewTierAdjustment(evaluation, previewedTier)}
           offerSituationalBonus={value?.offerSituationalBonus !== false}
+          character={previewCharacter}
+          {countPreview}
           onChange={emit}
         />
       </div>
@@ -223,6 +264,7 @@
       {recordNoun}
       {evaluation}
       character={previewCharacter}
+      countTiers={showDcSource ? (value?.tiers ?? []) : []}
       onChange={emit}
     />
   {/if}
@@ -275,6 +317,7 @@
           readonly={!editableBands}
           binding="simple"
           bands={bandStripBands}
+          leadingTick={bandStripBands[0]?.botch ? '<0' : ''}
           {previewLabel}
           min={editableBands ? stripMin : null}
           max={editableBands ? stripMax : null}
