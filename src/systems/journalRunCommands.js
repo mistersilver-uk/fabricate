@@ -900,7 +900,7 @@ export function createJournalRunCommandService({
     const check = secretCheck
       ? null
       : executedCheckFor(request.runType, trustedContext.resolvedCheckResult);
-    const handoff = response.success && !secretCheck ? responseRollHandoff : null;
+    const handoff = secretCheck ? null : responseRollHandoff;
     // Evidence and the handoff share one entitlement: an unentitled initiator receives neither.
     if (
       (handoff || check) &&
