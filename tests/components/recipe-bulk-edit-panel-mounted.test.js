@@ -842,7 +842,7 @@ describe('RecipeBulkEditPanel check-tier axis (issue 1010)', () => {
     assert.match(rows[1], /default successes needed\.$/, 'the Default row clears to the count');
     assert.ok(rows.every((text) => !/\bDC\b/.test(text)), 'no row says DC');
     const hints = [...root.querySelectorAll('.fab-bulk-edit-subhint')].map((node) => node.textContent);
-    assert.ok(hints.some((text) => /^The successes needed these recipes/.test(text)));
+    assert.ok(hints.some((text) => text.startsWith('The successes needed these recipes')));
     chooseOption(root, TIER_HOOK, 'tier-easy');
     assert.equal(state.draft.checkTierId, 'tier-easy');
     assert.equal(tierLabel(root), 'Easy · 1 success');

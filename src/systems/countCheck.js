@@ -3,7 +3,6 @@
  * roll, pick its required count, and capture the resolved policy a prepared run replays. It reads
  * no Actor, recipe, component, task or macro: callers pass roll data and the override they select.
  */
-import { localizeWith } from '../utils/localizeWithFallback.js';
 import { hasRollDataPath } from '../utils/rollFormulaRollability.js';
 
 import { firstUnresolvedPath } from './checkEvaluation.js';
@@ -118,22 +117,6 @@ export function preparedCountEvaluation(count) {
     rollOptions: { evaluation, thresholdMode: count.comparison, thresholdSource },
     required: count.required,
   };
-}
-
-const foundryFormat = (key, data) => globalThis.game?.i18n?.format?.(key, data);
-
-/** The chat flavor's ` ({n} successes needed)` suffix (issue 2006), never ` (DC n)`. */
-export function countFlavorSuffix(required, localize = foundryFormat) {
-  const needed =
-    required === 1
-      ? localizeWith(localize, 'FABRICATE.App.RollPrompt.CountNeededOne', {}, '1 success needed')
-      : localizeWith(
-          localize,
-          'FABRICATE.App.RollPrompt.CountNeeded',
-          { count: required },
-          `${required} successes needed`
-        );
-  return ` (${needed})`;
 }
 
 /**

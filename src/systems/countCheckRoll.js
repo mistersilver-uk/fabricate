@@ -16,8 +16,8 @@ import {
   rolledDiceGroups,
 } from './checkRollOutput.js';
 import { classifyCheckTotal, forcedFailureTier, resolveForcedOutcome } from './checkRouting.js';
-import { actorRollData, checkTargetRefusal } from './checkTarget.js';
-import { countFlavorSuffix, namedPoolRefusal } from './countCheck.js';
+import { actorRollData, checkTargetRefusal, countFlavorSuffix } from './checkTarget.js';
+import { namedPoolRefusal } from './countCheck.js';
 import { countRollReport, reportedCountDisplay } from './countDisplayEvidence.js';
 import { COUNT_CHECK_REFUSALS, countCheckPasses, resolvePool } from './countEvaluation.js';
 import { CountRollRefusal, findCountRoll } from './countRoll.js';
