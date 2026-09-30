@@ -72,10 +72,29 @@ export function formatGradedRoll({ formula, total, value, target, margin }, loca
 }
 
 /**
+ * A count roll's line (issue 2006): `{net} of {required} successes`, its net alone where the
+ * required count was not recorded, or the zero-pool sentence for a pool that rolled nothing.
+ */
+export function formatCountRoll({ net, required, zeroPool }, localize) {
+  if (zeroPool) return localize('FABRICATE.Check.CountEvidence.ZeroPoolResult');
+  if (!Number.isFinite(net)) return '';
+  if (Number.isFinite(required)) {
+    return required === 1
+      ? localize('FABRICATE.App.Journal.StepDetails.Count.RollResultOne', { net })
+      : localize('FABRICATE.App.Journal.StepDetails.Count.RollResult', { net, required });
+  }
+  return net === 1
+    ? localize('FABRICATE.App.Journal.StepDetails.Count.RollResultNetOne')
+    : localize('FABRICATE.App.Journal.StepDetails.Count.RollResultNet', { net });
+}
+
+/**
  * The recorded roll, preferring the resolved formula and total over a bare value. Outside
- * sum/over/fixed it names the executed target and margin, never a DC (issue 2005).
+ * sum/over/fixed it names the executed target and margin, never a DC (issue 2005), and a count
+ * its net successes.
  */
 export function formatRoll(check, localize) {
+  if (check?.count) return formatCountRoll(check.count, localize);
   const formula = String(check?.formula ?? '');
   const total = numberOrNaN(check?.total);
   const value = numberOrNaN(check?.value);

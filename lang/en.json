@@ -1060,7 +1060,16 @@
           "RollResultValue": "Rolled {value}",
           "RollResultValueWithDc": "Rolled {value} vs DC {dc}",
           "RollResultValueWithTarget": "Rolled {value} · target {target} · margin {margin}",
-          "ConsumedTitle": "Consumed"
+          "ConsumedTitle": "Consumed",
+          "Count": {
+            "Check": "{count} successes needed · d{die}s",
+            "CheckOne": "1 success needed · d{die}s",
+            "CheckDie": "Successes counted on d{die}s",
+            "RollResult": "{net} of {required} successes",
+            "RollResultOne": "{net} of 1 success",
+            "RollResultNet": "{net} net successes",
+            "RollResultNetOne": "1 net success"
+          }
         },
         "Redacted": {
           "Title": "Hidden recipe"
