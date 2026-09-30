@@ -13,6 +13,7 @@ player-journal-routed-bands-under-crafting
 player-journal-routed-bands-under-attribute
 player-journal-routed-bands-under-multiply
 player-journal-roll-line-under
+player-journal-future-stage-under
 player-journal-routed-bands-count
 player-journal-roll-line-count
 fabricate-journal-blind-run

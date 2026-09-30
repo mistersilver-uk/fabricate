@@ -724,6 +724,8 @@ Each is full-profile only, leaves the world as it found it, and rides an existin
 
 Phase E also crafts issue 2006's success-counting cards on a dedicated `Smoke Counting Forge`, each rolled publicly and deterministic by construction: `chat-craft-card-count-pass`, `chat-craft-card-count-fail`, `chat-craft-card-count-botch`, `chat-craft-card-count-zero` and the summed `chat-craft-card-over-control`.
 Their assertions bind to the card each craft created and to its count Roll's own die flags, and run in every profile; only the frames wait on `RUN_SCREENSHOT_PHASES`.
+Issue 2005's roll-under cards follow on a `Smoke Roll-Under Forge`, each decided by construction whatever the dice show: `chat-craft-card-under-pass` (the crafter's Strength raised by a typed situational `1d4`), `chat-craft-card-under-fail` (a fixed target), `chat-craft-card-under-otherwise` (a routed multiplied Strength that no tier admits) and `chat-craft-card-under-misconfigured`, compared against `chat-craft-card-over-control`.
+The rolled cases assert the card's pill, dice line and evidence rows against the posted roll and pre-roll; the refusing case asserts that the craft refuses before any prompt, posts no message, leaves the chat log's crafting card count unchanged, and that the Crafting tab's check card shows the refusal.
 
 ### Test artifacts
 

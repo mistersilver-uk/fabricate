@@ -120,6 +120,7 @@ The control gains no new state.
 
 The per-recipe select-row grid's worst case is **three** cells — Category, the picker cell, and _at most one_ of Check tier / Minimum success tier — because the picker cell hosts its own tri-state select (**Inherit system default** / **Custom set** / **No modifiers**) rather than adding a further grid cell.
 Check tier and Minimum success tier are mutually exclusive by construction and never render together: `resolveRecipeFixedOutcomeTierOptions` offers a minimum tier only for `routedByCheck` + `fixed`, while `resolveRecipeCheckTierOptions` under that same mode offers tiers only when the routed type is **not** `fixed`.
+Under a fixed roll-under target the Check tier options read `{name} (Target {dc})` and `Default target`, and under a character value `{name} (−2)` or `{name} (×½)` and `Default · base adjustment`, never a DC.
 Under a counting check the Check tier options read `{name} · {n} successes` (`{name} · 1 success`, or `{name} · — successes` when a tier sets none) and `Default · {required} successes`, and the editor header's check fact names the same count, never a DC.
 Selecting **Custom set** seeds the pill row from the recipe's own eligible ids (falling back to the system default set, so "customize" starts from what the recipe was inheriting), TRUNCATED to `craftingCheck.maxModifierPicks` so the seed never shows picks the engine would not roll; selecting **No modifiers** writes an authored empty `modifierIds` array (nothing is appended to that recipe's check roll); selecting **Inherit system default** drops the `modifierIds` key.
 Clearing the LAST selected pill under **Custom set** posts an authored empty array (`{ modifierIds: [] }`), never `null` — posting `null` would silently become _Inherit_, which is the pre-1055 defect this control replaces (a GM could not express "this recipe gets no check modifiers" at all).
@@ -228,11 +229,12 @@ It keeps every convention the settings-list cards already have and the Checks ca
   No stored value changes — the affix only ever supplied the sigil on write, so a persisted path already carries it.
   The summary row reads the stored expression back verbatim for the same reason;
 - the two BLOCKING bounds faults, reported on the COLLAPSED row and named by cause (`inverted` / `unsafe`), because an entry that contributes nothing is a fault a GM scanning the list must be able to see;
-- a **roll-shaped expression** note on the open editor, stating that EVERY activity may use it: a gathering drop row applies its rolled result, and a check appends the dice to its roll formula so the roll is made once and shows on the card, and that where modifiers compete — `highest`, or `playerPicks` — such an entry is ranked by its average.
+- a **roll-shaped expression** note on the open editor, stating that EVERY activity may use it: a gathering drop row applies its rolled result, a check that adds to its total appends the dice to its roll formula so the roll is made once and shows on the card, and a roll-under check rolls them first and raises its target by the result, and that where modifiers compete — `highest`, or `playerPicks` — such an entry is ranked by its average.
   An entry whose expression transforms its dice total (`cs`, `cf`, `even`, `odd`, `df`, `sf` or `ms`, judged by `classifyModifierExpression` with character paths taken as zero) carries the transformed variant of the note instead: where modifiers compete it has no comparable average, so entries with an ordinary average are chosen ahead of it.
   It is a NOTE, not a warning, and it raises no readiness issue of its own: the blocking `modifierRollExpression` is RETIRED, because there is nothing left to report about an entry that rolls.
   A transformed entry that a check ranks is reported on that check's Modifiers readiness instead, as the non-blocking `modifierAverageUnavailable` (`ui-system-studio`).
 
+The section hint describes a modifier as a benefit a check applies the way it applies bonuses — added to the total, raising a roll-under target, or moving a success count's threshold or dice — never as something always added to the roll.
 The summary row keeps its `@`-stripped inline expression and its `Roll` chip, and gains the signed bounds chip.
 The Checks screens' read-only modifier cards deep-link here, expanding the section and scrolling it into view; the link goes through the same route-exit guard every other manager navigation does, so leaving a dirty Checks draft still prompts.
 
@@ -389,6 +391,12 @@ The GM component surfaces: the component browser and the component editor.
 6. The salvage check DC control offers the system's authored check tiers, a system-default option storing `null`, and a `Custom…` option exposing an arbitrary integer.
    A persisted override matching no tier selects `Custom…` and is displayed and round-tripped unchanged.
    A "Manage presets" link routes to the system's Checks screen.
+   The control (`component/CheckOverrideField.svelte`, on the component editor only) edits the one field the active check reads.
+   Under a roll-under fixed target it edits `component.salvage.dcOverride` as `Target override` (`Replaces the system target for this component. The total must stay {cmp} it.`), its presets reading `{name} — Target n` beside `System default — Target n`.
+   Under a character value it edits `component.salvage.adjustmentOverride` as `Difficulty adjustment override`, hinted as added to or multiplied into the character value and rounded down; its presets are the named `salvageCraftingCheck.simple.tiers` whose `adjustment` is valid for the kind, each reading `{name} — {adjustment}` beside `System default — base adjustment`, and a custom multiplier is kept exactly (`×0.7`).
+   A roll-high fixed check keeps `Salvage DC override` and its `System default — DC n` wording unchanged.
+   System default nulls only the active field, a dormant DC or adjustment override survives with its own notice (`A DC override of {dc} is kept on this component. This system does not read it, so it is not shown for editing.`), and changing the source never rewrites either.
+   Player sees reads `Salvage check · stay {cmp} {dc}` for a fixed roll-under target, and `Salvage check · stay {cmp} {target} ({source})` or `Salvage check · reach {target} ({source})` for a character value, naming the Preview-as character's value and the adjustment.
    Under a counting check the control is labelled `Successes needed override` and edits `component.salvage.successesOverride` (0–20); its presets are the named `salvageCraftingCheck.simple.tiers` with non-null `successes`, each reading `{name} — {n} successes needed`, and System default clears only `successesOverride`.
    A kept DC or adjustment override is never rewritten, and each is named in its own dormant notice.
    Player sees reads `Salvage check · {n} successes needed · d{die}s, success on {sym} {threshold}`.
