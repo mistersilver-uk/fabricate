@@ -15,7 +15,8 @@ import test from 'node:test';
 
 import { DESIGN_SYSTEM_PRIMITIVES } from '../../scripts/lib/designSystemPrimitives.js';
 import { parseDesignLibrary, readDesignLibrary } from '../helpers/designLibrary.js';
-import { assertRatchet, tallyByKey } from '../helpers/ratchetBaseline.js';
+import { assertRatchet } from '../helpers/ratchetBaseline.js';
+import { tallyByKey } from '../helpers/codePointOrder.js';
 
 import {
   TARGET_LIBRARY_NAMES,

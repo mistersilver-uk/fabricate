@@ -9,7 +9,7 @@ import {
   parseModule,
   walkNodes,
 } from './helpers/moduleAst.js';
-import { byCodePoint } from './helpers/ratchetBaseline.js';
+import { byCodePoint } from './helpers/codePointOrder.js';
 
 test('positions are unshifted, unlike a synthetic script wrapper', () => {
   const { ast } = parseModule('const a = 1;\nconst b = 2;\n');

@@ -566,6 +566,12 @@ function jobOutputs(source, jobName) {
   return scalars(nestedEntries(nestedEntries(jobEntries, jobName), 'outputs'));
 }
 
+/** The job's own `env:` mapping, which `parseJobs` folds to an empty scalar. */
+function jobEnv(source, jobName) {
+  const jobEntries = section(entries(source), 'jobs');
+  return scalars(nestedEntries(nestedEntries(jobEntries, jobName), 'env'));
+}
+
 /** A `needs` context for a semantic-release publisher, given what the run minted. */
 function mintedContext({ nextVersion, tag = '', verify = 'skipped' }) {
   return {
@@ -953,4 +959,42 @@ test('every inline tester-segment resolution words its refusal through describeM
     }
   }
   assert.ok(resolutions >= 2, `only ${resolutions} inline tester-segment resolution(s) were found`);
+});
+
+test('the ratchet jobs check out and name their base, and a release test run opts out', () => {
+  const ci = readFileSync(path.join(WORKFLOWS, 'ci.yml'), 'utf8');
+  const jobs = parseJobs(ci);
+  const before = 'b'.repeat(40);
+  for (const name of ['unit-tests', 'lint']) {
+    const { steps } = jobs[name];
+    const checkout = steps.find((step) => step.uses.startsWith('actions/checkout@'));
+    assert.equal(checkout?.with['fetch-depth'], '2', `${name} must check out the merge ref's parents`);
+    assert.equal(checkout.with.ref, undefined, `${name} must check out the merge ref, whose HEAD^1 is the base tip`);
+    const base = unwrap(jobEnv(ci, name).RATCHET_BASE ?? '');
+    const resolved = (github) => evaluate(base, { github });
+    assert.equal(resolved({ event_name: 'pull_request', event: { before } }), 'HEAD^1', name);
+    assert.equal(resolved({ event_name: 'push', event: { before } }), before, name);
+    assert.equal(
+      resolved({ event_name: 'push', event: { before: '0'.repeat(40) } }),
+      'HEAD^1',
+      `${name}: a push that created the branch has no previous tip`
+    );
+    const fetchIndex = steps.findIndex((step) => /git fetch .*"\$RATCHET_BASE"/.test(step.run));
+    const firstNpm = steps.findIndex((step) => /\bnpm\b/.test(step.run));
+    assert.ok(fetchIndex !== -1 && fetchIndex < firstNpm, `${name} fetches its base before running`);
+    const fetchIf = unwrap(steps[fetchIndex].if);
+    assert.equal(evaluate(fetchIf, { github: { event_name: 'push' } }), true, name);
+    assert.equal(evaluate(fetchIf, { github: { event_name: 'pull_request' } }), false, name);
+  }
+
+  for (const file of ['beta.yml', 'release.yml']) {
+    const source = readFileSync(path.join(WORKFLOWS, file), 'utf8');
+    const testing = Object.entries(parseJobs(source)).filter(([, job]) =>
+      job.steps.some((step) => /\bnpm test\b/.test(step.run))
+    );
+    assert.ok(testing.length > 0, `${file} runs npm test in some job`);
+    for (const [name] of testing) {
+      assert.equal(jobEnv(source, name).RATCHET_BASE, 'none', `${file} job "${name}" runs npm test`);
+    }
+  }
 });

@@ -29,6 +29,9 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
+    env:
+      # A release run tests a tree CI already compared with its base, so the ratchets opt out.
+      RATCHET_BASE: none
     steps:
       - uses: actions/checkout@v6
       # Shared Node + npm ci preamble (no OIDC — this job touches no bucket).
