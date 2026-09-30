@@ -102,6 +102,21 @@ describe('ThresholdBandStrip: the two number systems', () => {
     );
   });
 
+  it('draws a caller leading tick at the track start, and none by default', async () => {
+    const plain = await harness.mount({ bands: RELATIVE_BANDS, previewDc: 12 });
+    assert.ok(!plain.querySelector('[data-band-strip-leading-tick]'), 'no leading tick unless asked');
+    harness.remount();
+    const root = await harness.mount({ bands: RELATIVE_BANDS, previewDc: 12, leadingTick: '<0' });
+    const leading = root.querySelector('[data-band-strip-leading-tick]');
+    assert.equal(leading.textContent.trim(), '<0');
+    assert.match(leading.getAttribute('style'), /left: 0%/);
+    assert.ok(leading.closest('.fab-band-strip-ticks'), 'it sits in the tick row, first');
+    assert.deepEqual(
+      [...root.querySelectorAll('.fab-band-strip-tick')].map((tick) => tick.textContent.trim()),
+      ['<0', '7', '12', '17', '22']
+    );
+  });
+
   it('carries BOTH readings in aria-valuetext, because the absolute one is record-relative', async () => {
     // Switching the PREVIEW AGAINST record re-announces every handle with no data change at
     // all, so the announcement has to say what did not change. "17 — DC +5 against Uncommon

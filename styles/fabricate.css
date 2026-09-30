@@ -16499,10 +16499,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.fabricate-dice-tiles__tile--success .fabricate-dice-tiles__face {
-  color: var(--fab-text);
-}
-
 .fabricate-dice-tiles__marks {
   display: flex;
   gap: var(--fab-space-2xs);

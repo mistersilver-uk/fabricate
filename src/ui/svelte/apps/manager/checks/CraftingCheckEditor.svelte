@@ -545,6 +545,7 @@
             readonly={!editableBands}
             binding={type === 'fixed' ? 'fixed' : 'relative'}
             bands={bandStripBands}
+            leadingTick={bandStripBands[0]?.botch ? '<0' : ''}
             {previewDc}
             {previewLabel}
             groupLabel={text('FABRICATE.Admin.Manager.Checks.Crafting.BandsTitle', 'Outcome bands')}

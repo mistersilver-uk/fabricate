@@ -418,6 +418,7 @@
 
   .manager-checks-count-stack {
     display: flex;
+    flex: 1 1 0;
     flex-direction: column;
     gap: var(--fab-space-2);
     min-width: 0;

@@ -317,6 +317,7 @@
           readonly={!editableBands}
           binding="simple"
           bands={bandStripBands}
+          leadingTick={bandStripBands[0]?.botch ? '<0' : ''}
           {previewLabel}
           min={editableBands ? stripMin : null}
           max={editableBands ? stripMax : null}
