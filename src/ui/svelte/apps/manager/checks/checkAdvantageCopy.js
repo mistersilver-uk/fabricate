@@ -4,17 +4,12 @@
  * `advantage` record, the check's direction and the authored formula. `text(key, fallback)` is the
  * caller's localizer.
  */
+import { isBonusExpression } from '../../../../../systems/checkAdvantage.js';
 import { splitTopLevelTerms } from '../../../../../utils/craftingCheckExpression.js';
 
 import { interpolate } from './checksCopy.js';
 
-/** The prototype's bonus-die grammar: dice and numbers joined by ASCII `+` or `-`. */
-const BONUS_GRAMMAR = /^[+-]?\s*(\d*d\d+|\d+)(\s*[+-]\s*(\d*d\d+|\d+))*$/i;
-
-/** Whether `expression` is a bonus die the prompt can offer; empty text is not. */
-export function isBonusExpression(expression) {
-  return BONUS_GRAMMAR.test(String(expression ?? '').trim());
-}
+export { isBonusExpression } from '../../../../../systems/checkAdvantage.js';
 
 /** The expression as the notes name it: trimmed, a leading `+` dropped, parenthesised past one term. */
 function namedExpression(expression, text) {

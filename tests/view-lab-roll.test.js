@@ -147,7 +147,8 @@ async function countPromptView(world) {
       assert.equal(view.labels.formulaNote, rules);
       assert.equal(view.neededText, '2 successes needed');
       assert.equal(view.labels.eachAdds, eachAdds);
-      assert.deepEqual([view.dc, view.allowAdvantage], [null, false]);
+      // The count rule offers by default (issue 2007).
+      assert.deepEqual([view.dc, view.allowAdvantage], [null, true]);
       assert.deepEqual(dice.constructed, [], 'a dismissed prompt rolls nothing');
     } finally {
       surface.restore();
@@ -537,7 +538,13 @@ test('prepared run checks hand the evaluated lab roll to player chat on both cha
       const result = await evaluatePreparedRunCheck(
         preparation,
         { getRollData: () => ({ prof: 3 }) },
-        { allowAdvantage: true, advantage: 'advantage', rollMode: 'selfroll' }
+        {
+          allowAdvantage: true,
+          // The authority honours only a button the bound offer includes (issue 2007).
+          advantageOffer: { advantage: true, disadvantage: true, kind: 'keep', detail: null },
+          advantage: 'advantage',
+          rollMode: 'selfroll',
+        }
       );
       assert.equal(result.success, true);
       assert.equal(posted.length, 0, 'authority evaluation does not post the visible check');

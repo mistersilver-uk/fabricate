@@ -1,7 +1,6 @@
 /** Resolves an interactive check decision into a formula and modifier placement plan. */
 
-import { hasPlainD20 } from '../utils/craftingCheckExpression.js';
-
+import { resolveAdvantageOffer } from './checkAdvantage.js';
 import { planKeepTransform } from './checkKeepTransform.js';
 import {
   appendPlannedLibraryTerms,
@@ -158,6 +157,7 @@ function promptInput({
   displayFormula,
   deferred,
   countPolicy,
+  Roll,
 }) {
   // A count check shows no formula, so no bare deferred slot either (issue 2004).
   const formula =
@@ -167,6 +167,12 @@ function promptInput({
   const resolved = displayFormula(formula, actor);
   // The modifiers `selectedModifiers` itemises are chips, so the shown formula omits their terms.
   const shownFormula = deferred ? formula : authoredFormula.trim();
+  const advantageOffer = resolveAdvantageOffer({
+    advantage: options.advantage,
+    evaluation,
+    authoredFormula,
+    Roll,
+  });
   return {
     formula,
     resolvedFormula: resolved?.display ?? null,
@@ -184,8 +190,8 @@ function promptInput({
     modifierChoice: options.modifierChoice,
     selectedModifiers: resolvedCheck.selected,
     thresholdMode: options.thresholdMode === 'exceed' ? 'exceed' : 'meet',
-    // A count check offers no advantage until it is mode-aware (issue 2007).
-    allowAdvantage: evaluation.product !== 'count' && hasPlainD20(authoredFormula.trim()),
+    allowAdvantage: advantageOffer.advantage,
+    advantageOffer,
     // Display only: a bonus the decision carries still applies when the offer is off.
     offerSituationalBonus: options.offerSituationalBonus !== false,
     ...(evaluation.product === 'count' &&
@@ -262,6 +268,7 @@ export async function resolveCheckDecision({
           displayFormula,
           deferred,
           countPolicy,
+          Roll,
         })
       ));
     if (!choice || choice.confirmed === false) return { cancelled: true };

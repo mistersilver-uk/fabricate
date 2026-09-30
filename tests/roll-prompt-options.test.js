@@ -215,7 +215,8 @@ describe('roll prompt adapter', () => {
       },
       'the resolved base unfloored, so the prompt floors it once after every benefit (issue 2006)'
     );
-    assert.deepEqual([input.dc, input.target, input.formula, input.allowAdvantage], [null, null, '', false]);
+    // The count rule offers by default (issue 2007), whatever the retained formula.
+    assert.deepEqual([input.dc, input.target, input.formula, input.allowAdvantage], [null, null, '', true]);
     assert.equal(input.thresholdMode, 'exceed');
     const bare = await received({}, { required: null });
     assert.deepEqual(

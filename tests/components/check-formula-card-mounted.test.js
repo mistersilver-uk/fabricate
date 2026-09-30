@@ -37,6 +37,7 @@ const harness = createMountedComponentHarness({
     // The advantage rule the roll-prompt group authors (issue 2007).
     'src/systems/normalize/checkAdvantage.js',
     'src/ui/svelte/apps/manager/checks/checkAdvantageCopy.js',
+    'src/systems/checkAdvantage.js',
     'src/utils/craftingCheckExpression.js',
     // The counting pool, its inset and its character-value fields (issue 2006).
     ...COUNT_POOL_RAW_MODULES,

@@ -1,4 +1,5 @@
 import { checkDisplayForCard } from './craftCardFields.js';
+import { preparedDecisionPolicy } from './preparedDecisionPolicy.js';
 import { applyGuardedRunMutation } from './runLifecycleState.js';
 
 /** Request/reply discriminators multiplexed on the existing module socket. */
@@ -844,11 +845,7 @@ export function createJournalRunCommandService({
           {
             ...binding,
             privateEvaluation: descriptor.privateEvaluation,
-            decisionPolicy: {
-              allowsSituationalModifier:
-                descriptor.publicPrompt?.allowsSituationalModifier === true,
-              allowAdvantage: descriptor.publicPrompt?.allowAdvantage === true,
-            },
+            decisionPolicy: preparedDecisionPolicy(descriptor.publicPrompt),
           },
           { expiresAt: now() + 60_000 }
         );

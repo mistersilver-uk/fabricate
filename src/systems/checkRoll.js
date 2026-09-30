@@ -44,6 +44,7 @@ import {
   runCountProgressive,
   runCountRouted,
 } from './countCheckRoll.js';
+import { authorizedPreparedDecision } from './preparedDecisionPolicy.js';
 
 export { classifyCheckTotal, resolveForcedOutcome } from './checkRouting.js';
 export { rolledDiceGroups } from './checkRollOutput.js';
@@ -496,11 +497,7 @@ export async function evaluatePreparedRunCheck(
     return checkTargetRefusal('invalid', label, { refusedInput: 'pool' });
   }
   const anchor = decisionPolicy.target ?? config.resolvedDc ?? config.dc;
-  const authoritativeDecision = {
-    ...decision,
-    bonus: decision?.allowsSituationalModifier === true ? decision.bonus : null,
-    advantage: decision?.allowAdvantage === true ? decision.advantage : null,
-  };
+  const authoritativeDecision = authorizedPreparedDecision(decision);
   const rolled = await evaluatePreparedCheck(
     {
       formula: preparation?.rollFormula,

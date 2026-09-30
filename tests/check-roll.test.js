@@ -674,7 +674,7 @@ test("a d20 MODIFIER never receives the keep; the check's own plain first group 
       },
     }
   );
-  assert.equal(asked.allowAdvantage, false, '3d6 is not a plain-d20 check, whatever it appends');
+  assert.equal(asked.allowAdvantage, true, "3d6 is the check's own plain first group");
   assert.equal(
     rolledFormulas.at(-1),
     '4d6kh3 + (1d20)[Modifiers]',
@@ -685,8 +685,8 @@ test("a d20 MODIFIER never receives the keep; the check's own plain first group 
 
 // The NON-DEFERRED path asked the same question of the POST-append formula, so it is
 // covered separately: on the deferred path the two readings coincide and a mutation there
-// would go unnoticed.
-test('a non-deferred d20 modifier does not manufacture an advantage offer', async () => {
+// would go unnoticed. R1 class (a) (issue 2007): the offer is now the check's own plain 3d6.
+test('a non-deferred d20 modifier never becomes the offered or kept group', async () => {
   const rolledFormulas = stubTermBearingRoll();
   let asked = null;
   await evaluateCheckRoll(
@@ -705,7 +705,7 @@ test('a non-deferred d20 modifier does not manufacture an advantage offer', asyn
       },
     }
   );
-  assert.equal(asked.allowAdvantage, false, 'the appended d20 is not the check`s own');
+  assert.equal(asked.allowAdvantage, true, 'the offer is the check`s own 3d6, not the appended d20');
   assert.equal(rolledFormulas.at(-1), '4d6kh3 + (1d20)[Modifiers]');
   delete globalThis.Roll;
 });

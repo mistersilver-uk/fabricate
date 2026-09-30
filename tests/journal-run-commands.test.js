@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { compileFunction } from 'node:vm';
 import { IngredientSet } from '../src/models/IngredientSet.js';
+import { publicAdvantageOffer } from '../src/systems/checkAdvantage.js';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { GatheringEngine } from '../src/systems/GatheringEngine.js';
@@ -138,6 +139,10 @@ it('Journal prompt adapter forwards only named, permitted display fields', async
     comparison: 'exceed', selectedModifiers: [{ label: 'Focus', display: '+3' }],
     targetBasis: { expression: '@skills.brew', value: 16, adjustment: null }, toolBonus: 1,
     allowAdvantage: true, allowsSituationalModifier: true, offerSituationalBonus: false,
+    advantageOffer: {
+      advantage: true, disadvantage: false, kind: 'bonus', rule: 'SECRET',
+      detail: { expression: '1d8 + 1', destination: 'target', formula: 'SECRET' },
+    },
     modifierChoice: null, privateEvaluation: { rollFormula: 'SECRET' },
   };
   let received;
@@ -149,6 +154,10 @@ it('Journal prompt adapter forwards only named, permitted display fields', async
     targetBasis: { expression: '@skills.brew', value: 16, adjustment: null }, toolBonus: 1,
     selectedModifiers: [{ label: 'Focus', display: '+3' }],
     allowAdvantage: true, offerSituationalBonus: false, modifierChoice: null,
+    advantageOffer: {
+      advantage: true, disadvantage: false, kind: 'bonus',
+      detail: { expression: '1d8 + 1', destination: 'target' },
+    },
   });
   await promptJournalStageCheck(
     { ...descriptor, target: null, comparison: null, offerSituationalBonus: undefined },
@@ -180,6 +189,7 @@ describe('journal run command protocol', () => {
               required: true,
               publicPrompt: hidden ? { label: 'Hidden work' } : {
                 label: 'VISIBLE_PROMPT', allowsSituationalModifier: true, allowAdvantage: true,
+                advantageOffer: { advantage: true, disadvantage: false, kind: 'keep', detail: null },
               },
               privateEvaluation: {
                 rollFormula: 'PRIVATE_FORMULA', modifierCatalogue: ['PRIVATE_CHOICE'],
@@ -203,6 +213,10 @@ describe('journal run command protocol', () => {
       assert.equal(evaluated.privateEvaluation.rollFormula, 'PRIVATE_FORMULA');
       assert.equal(evaluated.decision.allowsSituationalModifier, !hidden);
       assert.equal(evaluated.decision.allowAdvantage, !hidden);
+      // The token binds the whole offer the authority enforces (issue 2007).
+      assert.deepEqual(evaluated.decision.advantageOffer, {
+        advantage: !hidden, disadvantage: false, kind: hidden ? null : 'keep', detail: null,
+      });
       assert.equal(effects, 1);
       assert.ok(readable.length >= 3, 'creation and state writes are captured');
       for (const document of readable) {
@@ -252,8 +266,8 @@ describe('journal run command protocol', () => {
     const end = source.indexOf('export function createJournalCommandsForFabricate(', start);
     assert.ok(start >= 0 && end > start, 'the production operation factory must be present');
     return compileFunction(`${source.slice(start, end)}\nreturn createCraftingJournalOperations;`,
-      ['resolveAlchemySubmissions', 'resolvedComponentsFor', 'createManagerMutation'])(
-        resolveAlchemySubmissions, resolvedComponentsFor, createManagerMutation);
+      ['resolveAlchemySubmissions', 'resolvedComponentsFor', 'createManagerMutation', 'publicAdvantageOffer'])(
+        resolveAlchemySubmissions, resolvedComponentsFor, createManagerMutation, publicAdvantageOffer);
   }
 
   for (const kind of ['crafting', 'matched-alchemy', 'fizzle']) {
@@ -340,6 +354,7 @@ describe('journal run command protocol', () => {
         target: 987, comparison: 'exceed', dc: 987,
         mode: 'simple', allowsSituationalModifier: true, allowAdvantage: true,
         offerSituationalBonus: false,
+        advantageOffer: { advantage: true, disadvantage: true, kind: 'keep', detail: { canary } },
         modifierChoice: { modifiers: [{ id: canary, label: canary }] },
         selectedModifiers: [{ label: canary, display: '+987' }],
         allowedModifierIds: [canary], protectedFields: { nested: canary },
@@ -370,6 +385,7 @@ describe('journal run command protocol', () => {
       assert.equal(hidden.response.checkRequired, true);
       assert.deepEqual(hidden.response.promptDescriptor, {
         allowsSituationalModifier: true, allowAdvantage: true, offerSituationalBonus: false,
+        advantageOffer: { advantage: true, disadvantage: true, kind: 'keep', detail: null },
       });
       assert.equal(JSON.stringify(hidden).includes(canary), false);
       assert.equal(JSON.stringify(hidden).includes('987'), false);
@@ -427,6 +443,7 @@ describe('journal run command protocol', () => {
       }, 'player');
       assert.deepEqual(hidden.response.promptDescriptor, {
         allowsSituationalModifier: true, allowAdvantage: false, offerSituationalBonus: true,
+        advantageOffer: { advantage: false, disadvantage: false, kind: null, detail: null },
         product: 'count', direction: 'under', comparison: 'exceed', modifierDestination: 'threshold',
       });
       assert.equal(JSON.stringify(hidden).includes(canary), false);
@@ -2336,7 +2353,8 @@ describe('journal run pause lifecycle at the real command boundary', () => {
       'resolveAlchemySubmissions',
       'resolvedComponentsFor',
       'createManagerMutation',
-    ])(resolveAlchemySubmissions, resolvedComponentsFor, createManagerMutation);
+      'publicAdvantageOffer',
+    ])(resolveAlchemySubmissions, resolvedComponentsFor, createManagerMutation, publicAdvantageOffer);
   }
 
   // A merging flag write, like Foundry's: `setFlag` never removes a key deleted from a nested

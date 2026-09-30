@@ -5,6 +5,9 @@
  */
 import { findKeepGroup } from '../utils/craftingCheckExpression.js';
 
+import { offeredDecision, resolveAdvantageOffer } from './checkAdvantage.js';
+import { normalizeCheckAdvantage } from './normalize/checkAdvantage.js';
+
 /** Keeping the lowest dice is the advantage when a sum must come in under its target. */
 const KEEP_MODIFIERS = Object.freeze({
   over: Object.freeze({ advantage: 'kh', disadvantage: 'kl' }),
@@ -18,15 +21,17 @@ export function keepModifierFor(choice, direction) {
 }
 
 /**
- * The keep a summed check's decision asks for under its normalized advantage rule, or null: the
- * mode is `keep`, the rule offers the chosen button, and the authored first group qualifies.
+ * The keep a check's decision asks for under its advantage rule, or null: the check's one
+ * advantage offer is a keep offer and includes the chosen button.
  */
 export function planKeepTransform({ choice, evaluation, advantage, authoredFormula }) {
-  if (evaluation?.product !== 'sum' || advantage?.mode !== 'keep') return null;
-  if (choice === 'disadvantage' && advantage.offerDisadvantage === false) return null;
-  const keep = keepModifierFor(choice, evaluation.direction);
-  const group = keep ? findKeepGroup(authoredFormula) : null;
-  return group?.ok ? { group, keep, extraDice: advantage.extraDice } : null;
+  const offer = resolveAdvantageOffer({ advantage, evaluation, authoredFormula });
+  if (offer.kind !== 'keep' || offeredDecision(offer, choice) === null) return null;
+  return {
+    group: findKeepGroup(authoredFormula),
+    keep: keepModifierFor(choice, evaluation?.direction),
+    extraDice: normalizeCheckAdvantage(advantage).extraDice,
+  };
 }
 
 const isOperator = (term, operator) => term?.operator === operator;

@@ -1,4 +1,5 @@
 /** The single and bulk check prompt: view preparation, the modal surface and answer translation. */
+import { publicAdvantageOffer } from '../../../../systems/checkAdvantage.js';
 import { isFixedSumOver } from '../../../../systems/checkTarget.js';
 import { describeCountPolicy } from '../../../../systems/countEvaluation.js';
 import { fill } from '../../../../utils/fillPlaceholders.js';
@@ -482,8 +483,13 @@ export function buildBulkPromptData({ count, subjects, activity, actorName } = {
   };
 }
 
+/** The prompt data with the check's advantage offer, when its producer supplied one. */
+function withAdvantageOffer(data, offer) {
+  return offer ? { ...data, advantageOffer: publicAdvantageOffer(offer) } : data;
+}
+
 export async function promptCheckRoll(options = {}) {
-  const { modifierChoice, allowAdvantage } = options;
+  const { modifierChoice, allowAdvantage, advantageOffer } = options;
   const plan = planModifierChoice(modifierChoice);
   const open = resolveSurface();
   if (!open) {
@@ -497,11 +503,13 @@ export async function promptCheckRoll(options = {}) {
         }
       : { confirmed: true };
   }
-  return waitForPrompt(buildSinglePromptData(options), allowAdvantage, plan, open);
+  const data = withAdvantageOffer(buildSinglePromptData(options), advantageOffer);
+  return waitForPrompt(data, allowAdvantage, plan, open);
 }
 
 export async function promptBulkCheckRoll({
   allowAdvantage,
+  advantageOffer,
   count,
   subjects,
   activity,
@@ -510,7 +518,10 @@ export async function promptBulkCheckRoll({
   const open = resolveSurface();
   if (!open) return { confirmed: true, bonus: null, rollMode: undefined, advantage: 'normal' };
   return waitForPrompt(
-    buildBulkPromptData({ count, subjects, activity, actorName }),
+    withAdvantageOffer(
+      buildBulkPromptData({ count, subjects, activity, actorName }),
+      advantageOffer
+    ),
     allowAdvantage,
     planModifierChoice(null),
     open

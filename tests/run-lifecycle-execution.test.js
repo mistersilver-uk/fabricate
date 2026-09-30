@@ -1999,6 +1999,7 @@ test('CraftingEngine check preflight is read-only and a missing trusted result w
       allowsSituationalModifier: true,
       offerSituationalBonus: true,
       allowAdvantage: true,
+      advantageOffer: { advantage: true, disadvantage: true, kind: 'keep', detail: null },
       modifierChoice: null,
     });
     assert.equal(descriptor.privateEvaluation.rollFormula, '1d20 + 3');
@@ -2379,7 +2380,7 @@ test('a count versioned prompt shows its Tool-settled pool line and successes th
     assert.equal(view.labels.formulaNote, 'Success on < 17, moved +4 by modifiers');
     assert.deepEqual([publicPrompt.threshold, publicPrompt.thresholdAnchor], [17, 13]);
     assert.equal(view.neededText, '2 successes needed');
-    assert.deepEqual([view.dc, view.dcText, view.allowAdvantage], [null, '', false]);
+    assert.deepEqual([view.dc, view.dcText, view.allowAdvantage], [null, '', true]);
     assert.equal(view.labels.eachAdds, 'Each moves the threshold.');
   } finally {
     surface.restore();
@@ -2439,8 +2440,8 @@ test('the versioned count descriptor refuses before the Tool roll and captures i
     assert.equal(privateEvaluation.flavor, 'Sun Tea — Crafting check', 'no DC suffix');
     assert.deepEqual(
       [publicPrompt.target, publicPrompt.allowAdvantage, publicPrompt.allowsSituationalModifier],
-      [null, false, true],
-      'the retained 1d20 offers no advantage and names no target'
+      [null, true, true],
+      'the count rule offers advantage, never the retained 1d20, and names no target'
     );
     assert.deepEqual(
       [publicPrompt.formula, publicPrompt.displayFormula, publicPrompt.resolvedFormula],

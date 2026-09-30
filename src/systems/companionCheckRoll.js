@@ -3,8 +3,9 @@
  * The resolved actor, prompt, runners and dice-engine check enter through named seams.
  */
 
-import { hasPlainD20, stripRetiredModifierPlaceholder } from '../utils/craftingCheckExpression.js';
+import { stripRetiredModifierPlaceholder } from '../utils/craftingCheckExpression.js';
 
+import { intersectAdvantageOffers, resolveAdvantageOffer } from './checkAdvantage.js';
 import { isFixedSumOver, resolveCheckTarget, selectTargetAdjustment } from './checkTarget.js';
 import {
   resolveCompanionCheckEvaluation,
@@ -350,10 +351,13 @@ export async function resolveBulkCheckDecision(request, seams) {
     });
   }
 
-  // All-or-nothing over the usable subset only.
-  const allowAdvantage = usable.every((entry) => hasPlainD20(entry.formula));
+  // All-or-nothing over the usable subset only, each formula under the default advantage rule.
+  const advantageOffer = intersectAdvantageOffers(
+    usable.map((entry) => resolveAdvantageOffer({ authoredFormula: entry.formula }))
+  );
+  const allowAdvantage = advantageOffer.advantage;
   // The whole batch, as the salvage service counts; with no `subjects` the dialog reads "0 items".
-  const choice = await seams.promptBulk({ allowAdvantage, count: formulas.length });
+  const choice = await seams.promptBulk({ allowAdvantage, advantageOffer, count: formulas.length });
   if (!choice || choice.confirmed === false) {
     return bulkCheckDecisionResult(COMPANION_OUTCOMES.cancelled);
   }

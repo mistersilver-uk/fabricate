@@ -14,14 +14,15 @@ import {
 import { salvageCheckNeed } from '../ui/presenters/salvageCheckNeed.js';
 // The player forecast projection and its trigger-id read, both import-free leaves.
 import { forecastComplications } from '../utils/complicationPlan.js';
-import { hasPlainD20 } from '../utils/craftingCheckExpression.js';
 import { findById, getDefinitionIndex } from '../utils/definitionIndex.js';
 import { localizeWith } from '../utils/localizeWithFallback.js';
 import { applyPlayerResultOrder } from '../utils/progressiveResultOrder.js';
 import { checkTriggerIdsOf } from '../utils/progressiveStageComplications.js';
 
+import { advantageOfferFields, intersectAdvantageOffers } from './checkAdvantage.js';
+import { activeCheckEvaluation } from './checkTarget.js';
 import { awardReceipts } from './runHistoryEvidence.js';
-import { isCountCheck, resolveSalvageCheck } from './salvageCheckUsability.js';
+import { resolveSalvageCheck } from './salvageCheckUsability.js';
 import { resolvedComponentsFor } from './scopedEntityReads.js';
 
 /** Whether a subject's salvage check offers the prompt's situational bonus (issue 2005). */
@@ -335,8 +336,8 @@ export class BulkSalvageService {
 
   /**
    * Open the ONE roll prompt, or not: no usable check means no prompt, and a dismissal returns
-   * before the first `salvage()`, so a cancel mutates nothing. `allowAdvantage` is all-or-nothing
-   * over the usable checks' AUTHORED formulas, which the listing projection does not carry.
+   * before the first `salvage()`, so a cancel mutates nothing. The advantage offer intersects the
+   * usable checks' own offers, from their AUTHORED rules, which the listing projection lacks.
    */
   async _resolveRollDecision(runnable, interactive) {
     const none = { cancelled: false, rollDecision: null };
@@ -345,14 +346,17 @@ export class BulkSalvageService {
     const usable = runnable.filter((entry) => resolveSalvageCheck(entry.system).checkUsable);
     if (usable.length === 0) return none;
 
-    // A count check offers no advantage until it is mode-aware (issue 2007).
-    const allowAdvantage = usable.every((entry) => {
-      const check = resolveSalvageCheck(entry.system);
-      return !isCountCheck(check.config) && hasPlainD20(check.rollFormula);
-    });
+    const advantageOffer = intersectAdvantageOffers(
+      usable.map((entry) => {
+        const { config, rollFormula } = resolveSalvageCheck(entry.system);
+        return advantageOfferFields(config, activeCheckEvaluation(config), rollFormula)
+          .advantageOffer;
+      })
+    );
     const actorNames = new Set(runnable.map((entry) => entry.item.actorName));
     const choice = await this.promptRollDecision({
-      allowAdvantage,
+      allowAdvantage: advantageOffer.advantage,
+      advantageOffer,
       activity: this._salvageActivity(),
       actorName: actorNames.size === 1 ? [...actorNames][0] || undefined : undefined,
       count: runnable.length,

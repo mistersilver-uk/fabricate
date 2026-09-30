@@ -447,9 +447,11 @@ describe('AC-7 — a pre-resolved decision drives the roll without opening a dia
 
 describe('AC-8 — allowAdvantage is computed over the USABLE subset, all-or-nothing', () => {
   for (const [formulas, expected, why] of [
-    [['1d20+@prof', '2d10+3'], false, 'a 2d10 check cannot honour Advantage'],
+    // R1 class (a) (issue 2007): a plain 2d10 first group now keeps, so it offers.
+    [['1d20+@prof', '2d10+3'], true, 'a plain 2d10 first group keeps under the default rule'],
+    [['1d20+@prof', '(1d20 + 2) * 2'], false, 'a nested d20 cannot honour Advantage (R1 (b2))'],
     [['1d20+@prof', ''], true, 'the empty formula is not usable and is excluded before the test'],
-    [['2d10', '2d10'], false, 'no plain d20 anywhere in the batch'],
+    [['2d10', '2d10'], true, 'every usable formula has a plain first group (R1 class (a))'],
   ]) {
     it(`${JSON.stringify(formulas)} -> allowAdvantage ${expected}: ${why}`, async () => {
       installChat();
@@ -583,7 +585,8 @@ describe('AC-14 (bulk half) — resolveBulkCheckDecision never throws, whatever 
     const result = await resolveBulkCheckDecision(
       {
         callSite: 'gmAction',
-        formulas: ['1d20', '2d10'],
+        // R1 class (b2) (issue 2007): the nested d20 is what refuses, since a plain 2d10 keeps.
+        formulas: ['1d20', '(1d20 + 2) * 2'],
         // The keys a caller might expect to matter, and the ones that would matter if the
         // request were spread anywhere: this member takes no actor and no `interactive`.
         actorId: 'ghost',
@@ -600,11 +603,16 @@ describe('AC-14 (bulk half) — resolveBulkCheckDecision never throws, whatever 
     assert.equal(calls.promptBulk.length, 1);
     assert.deepEqual(
       Object.keys(calls.promptBulk[0]),
-      ['allowAdvantage', 'count'],
-      'the dialog is told exactly two things, both DERIVED from the formulas'
+      ['allowAdvantage', 'advantageOffer', 'count'],
+      'the dialog is told exactly three things, each DERIVED from the formulas'
     );
     assert.equal(calls.promptBulk[0].count, 2, 'the batch size, never the caller-supplied one');
-    assert.equal(calls.promptBulk[0].allowAdvantage, false, 'derived: a 2d10 cannot honour it');
+    assert.equal(calls.promptBulk[0].allowAdvantage, false, 'derived: a nested d20 cannot honour it');
+    assert.deepEqual(
+      calls.promptBulk[0].advantageOffer,
+      { advantage: false, disadvantage: false, kind: null, detail: null },
+      'and the intersected offer is empty'
+    );
   });
 });
 
@@ -626,6 +634,8 @@ describe('AC-9 — the module rolls nothing and reaches nothing it was not given
           '',
           [
             '../utils/craftingCheckExpression.js',
+            // The one advantage offer derivation (issue 2007), called with no dice engine.
+            './checkAdvantage.js',
             './checkTarget.js',
             './companionCheckEvaluation.js',
             './companionContract.js',

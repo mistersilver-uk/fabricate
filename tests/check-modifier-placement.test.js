@@ -362,7 +362,8 @@ test('a valid library pre-roll failure aborts the real runner before its main ro
   }
 });
 
-test('a count check drops a supplied advantage before placement until advantage is mode-aware', async () => {
+// The count offer is live (issue 2007); the engine's pool step lands with the count rule.
+test('a count check offers its count rule, and drops a supplied advantage before placement', async () => {
   const dice = installCountDice({ faces: [9, 9] });
   const prompts = [];
   try {
@@ -375,7 +376,11 @@ test('a count check drops a supplied advantage before placement until advantage 
       },
       post: false,
     });
-    assert.equal(prompts[0].allowAdvantage, false, 'the retained 1d20 offers no advantage');
+    assert.deepEqual(
+      prompts[0].advantageOffer,
+      { advantage: true, disadvantage: true, kind: 'count', detail: { dice: 1 } },
+      'the count rule offers both buttons, never the retained 1d20'
+    );
     assert.equal(result.modifierPlacement.poolDelta, 0, 'no advantage die joins the pool');
     assert.equal(result.modifierPlacement.thresholdDelta, -2, 'the bonus still moves the threshold');
     assert.deepEqual(dice.formulas(), ['2d10'], 'two dice, and the retained formula never rolls');
