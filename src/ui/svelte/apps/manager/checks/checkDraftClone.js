@@ -3,6 +3,7 @@
  * fills the defaults the editors render, so a draft and its baseline built from the same source
  * compare equal.
  */
+import { normalizeCheckAdvantage } from '../../../../../systems/normalize/checkAdvantage.js';
 import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
 import { normalizePreviewSandbox } from '../../../../../systems/progressiveCheckSandbox.js';
 
@@ -56,6 +57,7 @@ export function cloneRoutedCheck(routed) {
     checkBreakage: cloneCheckBreakage(source.checkBreakage),
     evaluation: normalizeCheckEvaluation(source.evaluation),
     offerSituationalBonus: source.offerSituationalBonus !== false,
+    advantage: normalizeCheckAdvantage(source.advantage),
   };
 }
 
@@ -72,6 +74,7 @@ export function cloneSimpleCheck(simple) {
     checkBreakage: cloneCheckBreakage(source.checkBreakage),
     evaluation: normalizeCheckEvaluation(source.evaluation),
     offerSituationalBonus: source.offerSituationalBonus !== false,
+    advantage: normalizeCheckAdvantage(source.advantage),
   };
 }
 
@@ -91,6 +94,7 @@ export function cloneProgressiveCheck(progressive) {
     checkBreakage: cloneCheckBreakage(source.checkBreakage),
     evaluation: normalizeCheckEvaluation(source.evaluation),
     offerSituationalBonus: source.offerSituationalBonus !== false,
+    advantage: normalizeCheckAdvantage(source.advantage),
   };
   // Attached rather than spread, so an absent preview sandbox (issue 1097) stays absent in both
   // the draft and its baseline.

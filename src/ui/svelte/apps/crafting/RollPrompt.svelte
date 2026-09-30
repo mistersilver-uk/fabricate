@@ -1,11 +1,12 @@
 <!--
   The interactive check prompt, single or bulk, in the shared `ManagerModal` chrome: one header, a
-  scrolling body and a footer of Disadvantage / Roll / Advantage, or one Roll.
+  scrolling body and a footer of Disadvantage / Roll / Advantage as the check's advantage offer
+  allows, or one Roll.
 
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `data` | the view `rollPrompt.js` prepares | none | Localized, pre-formatted labels, roll modes, the choice plan and either the single formula or the bulk subject rows. |
+  | `data` | the view `rollPrompt.js` prepares | none | Localized, pre-formatted labels, roll modes, the choice plan, the footer `actions` and either the single formula or the bulk subject rows. |
   | `onSubmit(answer)` | function | no-op | Called once with the raw form answer; `rollPrompt.js` translates it. |
   | `onDismiss()` | function | no-op | Called once when Escape or the close control dismisses the prompt. |
 
@@ -14,6 +15,7 @@
     Advantage are `type="button"` — pinned by `tests/components/roll-prompt-mounted.test.js`.
 -->
 <script>
+  import { noteOverflow } from './noteOverflow.js';
   import { untrack } from 'svelte';
   import Chip from '../../components/Chip.svelte';
   import Field from '../../components/Field.svelte';
@@ -61,6 +63,10 @@
     settled = true;
     onDismiss();
   }
+
+  // A note earns a `title` only when it clips (see `noteOverflow.js`).
+  let truncatedNotes = $state({});
+  const markTruncated = (key, clipped) => (truncatedNotes = { ...truncatedNotes, [key]: clipped });
 </script>
 
 <ManagerModal
@@ -212,40 +218,24 @@
   {/snippet}
 
   {#snippet footer()}
-    {#if data.allowAdvantage === true}
+    {#each data.actions as action (action.action)}
       <button
-        type="button"
+        type={action.submit ? 'submit' : 'button'}
         class="prompt-action"
-        data-action="disadvantage"
+        class:is-primary={action.submit}
+        data-action={action.action}
         data-keyboard-focus="true"
-        onclick={(event) => answer(event.currentTarget.form, 'disadvantage')}
-        ><span>{data.labels.disadvantage}</span><small class="action-note"
-          >{data.labels.worse}</small
-        ></button
+        aria-label={action.name}
+        title={action.note && truncatedNotes[action.action] ? action.note : undefined}
+        onclick={action.submit
+          ? undefined
+          : (event) => answer(event.currentTarget.form, action.action)}
+        ><span>{action.label}</span>{#if action.note}<small
+            class="action-note"
+            use:noteOverflow={{ key: action.action, onMeasure: markTruncated }}>{action.note}</small
+          >{/if}</button
       >
-      <button
-        type="submit"
-        class="prompt-action is-primary"
-        data-action="normal"
-        data-keyboard-focus="true"><span>{data.labels.roll}</span></button
-      >
-      <button
-        type="button"
-        class="prompt-action"
-        data-action="advantage"
-        data-keyboard-focus="true"
-        onclick={(event) => answer(event.currentTarget.form, 'advantage')}
-        ><span>{data.labels.advantage}</span><small class="action-note">{data.labels.better}</small
-        ></button
-      >
-    {:else}
-      <button
-        type="submit"
-        class="prompt-action is-primary"
-        data-action="roll"
-        data-keyboard-focus="true"><span>{data.labels.roll}</span></button
-      >
-    {/if}
+    {/each}
   {/snippet}
 </ManagerModal>
 
@@ -491,10 +481,16 @@
     background: var(--fab-accent);
     color: var(--fab-on-accent);
   }
+  /* One line: the full note is always the button's accessible name, and its `title` too once this
+     ellipsis actually clips it (measured in the script above). */
   .action-note {
     display: block;
+    max-width: 100%;
+    overflow: hidden;
     color: var(--fab-text-secondary);
     font-size: 9.5px;
     font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 </style>

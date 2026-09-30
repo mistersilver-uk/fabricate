@@ -25,6 +25,7 @@ import { rollPromptTarget } from '../src/ui/svelte/apps/crafting/rollPromptTarge
 import { installCountDice } from './helpers/countEngineDice.js';
 import { countEvaluation } from './helpers/countFixtures.js';
 import { stubPromptSurface } from './helpers/rollPromptDialogStub.js';
+import { installCoreDie } from './helpers/termBearingRoll.js';
 import { createPersistedCraftingHistory, mergeHistoryFlag } from './helpers/journal-fixtures.js';
 import { gatheringFixture } from './helpers/real-gathering-attempt.js';
 
@@ -1925,6 +1926,7 @@ test('CraftingEngine records a non-consuming fizzle without touching submitted s
 
 test('CraftingEngine check preflight is read-only and a missing trusted result writes no journal', async () => {
   const { engine, runManager } = setupEngineFixture();
+  const restoreDie = installCoreDie();
   const actor = new FakeActor('crafter');
   actor.name = 'Tinker';
   const source = new FakeActor('source');
@@ -1999,6 +2001,7 @@ test('CraftingEngine check preflight is read-only and a missing trusted result w
       allowsSituationalModifier: true,
       offerSituationalBonus: true,
       allowAdvantage: true,
+      advantageOffer: { advantage: true, disadvantage: true, kind: 'keep', detail: null },
       modifierChoice: null,
     });
     assert.equal(descriptor.privateEvaluation.rollFormula, '1d20 + 3');
@@ -2057,6 +2060,7 @@ test('CraftingEngine check preflight is read-only and a missing trusted result w
     }
   } finally {
     game.i18n = originalI18n;
+    restoreDie();
     if (originalChatMessage === undefined) delete globalThis.ChatMessage;
     else globalThis.ChatMessage = originalChatMessage;
   }
@@ -2379,7 +2383,7 @@ test('a count versioned prompt shows its Tool-settled pool line and successes th
     assert.equal(view.labels.formulaNote, 'Success on < 17, moved +4 by modifiers');
     assert.deepEqual([publicPrompt.threshold, publicPrompt.thresholdAnchor], [17, 13]);
     assert.equal(view.neededText, '2 successes needed');
-    assert.deepEqual([view.dc, view.dcText, view.allowAdvantage], [null, '', false]);
+    assert.deepEqual([view.dc, view.dcText, view.allowAdvantage], [null, '', true]);
     assert.equal(view.labels.eachAdds, 'Each moves the threshold.');
   } finally {
     surface.restore();
@@ -2439,8 +2443,8 @@ test('the versioned count descriptor refuses before the Tool roll and captures i
     assert.equal(privateEvaluation.flavor, 'Sun Tea — Crafting check', 'no DC suffix');
     assert.deepEqual(
       [publicPrompt.target, publicPrompt.allowAdvantage, publicPrompt.allowsSituationalModifier],
-      [null, false, true],
-      'the retained 1d20 offers no advantage and names no target'
+      [null, true, true],
+      'the count rule offers advantage, never the retained 1d20, and names no target'
     );
     assert.deepEqual(
       [publicPrompt.formula, publicPrompt.displayFormula, publicPrompt.resolvedFormula],

@@ -27,7 +27,7 @@ import { canonicalSignatureKey } from '../utils/alchemySignatureKey.js';
 import { resolveAlchemySubmissionComponent } from '../utils/alchemySubmissions.js';
 import { planComplications, publicComplications } from '../utils/complicationPlan.js';
 import { matchComponentByName } from '../utils/componentNameMatch.js';
-import { hasPlainD20, stripRetiredModifierPlaceholder } from '../utils/craftingCheckExpression.js';
+import { stripRetiredModifierPlaceholder } from '../utils/craftingCheckExpression.js';
 import { findById, getDefinitionIndex } from '../utils/definitionIndex.js';
 import {
   accumulateSubmissionEssences,
@@ -42,6 +42,7 @@ import { diceEngine } from '../utils/rollFormulaRollability.js';
 import { itemResolvesToComponent } from '../utils/sourceUuid.js';
 
 import { evaluatePrerequisite } from './characterPrerequisites.js';
+import { advantageOfferFields, authoredOfferOptions } from './checkAdvantage.js';
 import {
   buildCheckModifierChoice,
   buildCheckModifierContext,
@@ -180,14 +181,14 @@ import {
 } from './toolCheckBonus.js';
 
 /** The contributions and the evaluation that placed them come from one prepared collection; the
- * check config supplies the prompt's situational-bonus offer, and the executed roll mode is
- * reported for the result card. */
+ * check config supplies its situational-bonus offer and advantage rule, and the executed roll mode
+ * is reported for the result card. */
 function checkRollOptions(options, { contributions, evaluation }, config) {
   return {
     ...options,
     toolContributions: contributions,
     evaluation,
-    offerSituationalBonus: config?.offerSituationalBonus !== false,
+    ...authoredOfferOptions(config),
     reportVisibility: true,
   };
 }
@@ -7409,8 +7410,7 @@ function versionedCheckPrompt({
     mode: activeCheck.mode,
     allowsSituationalModifier: activeCheck.checkUsable,
     offerSituationalBonus: activeCheck.config?.offerSituationalBonus !== false,
-    // A count check offers no advantage until it is mode-aware (issue 2007).
-    allowAdvantage: !counts && hasPlainD20(activeCheck.rollFormula),
+    ...advantageOfferFields(activeCheck.config, evaluation, activeCheck.rollFormula),
     modifierChoice: publicModifierChoice(modifierChoice),
     // The pool with any Tool bonus folded in, and the macro's required count; fixed ranges read none.
     ...(counts &&

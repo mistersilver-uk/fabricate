@@ -90,6 +90,18 @@ export const CHECK_ISSUE_LABELS = Object.freeze({
     'IssueRetiredPlaceholderBreaksFormula',
     'This formula uses the retired @craftingmod placeholder somewhere it cannot be removed safely, so the whole formula is discarded and this check will not roll. Rewrite it by hand without the placeholder — check modifiers are added automatically now.',
   ],
+  advantageKeepNoDie: [
+    'IssueAdvantageKeepNoDie',
+    "Advantage keeps extra dice from the formula's first dice group, but that group is not a plain die, so players get a single Roll button. Choose Bonus die or turn advantage off.",
+  ],
+  advantageKeepAfterReference: [
+    'IssueAdvantageKeepAfterReference',
+    "A character value comes before the formula's first dice group. If that value rolls dice, advantage still applies only to {n}{dN}.",
+  ],
+  advantageBonusInvalid: [
+    'IssueAdvantageBonusInvalid',
+    'The advantage bonus is not a dice expression. Use dice and numbers joined by + or −, such as 1d8 + 1.',
+  ],
   unnamedOutcome: [
     'IssueUnnamedOutcome',
     'An unnamed tier cannot be routed to a result group. Name every tier.',
@@ -262,6 +274,9 @@ const TITLE_FALLBACKS = {
   noRollFormula: 'The check has no roll formula',
   retiredPlaceholderInFormula: 'The formula still uses @craftingmod',
   retiredPlaceholderBreaksFormula: '@craftingmod breaks this formula',
+  advantageKeepNoDie: 'Advantage cannot keep from this formula',
+  advantageKeepAfterReference: 'A character value precedes the kept dice',
+  advantageBonusInvalid: 'The advantage bonus cannot be rolled',
   unnamedOutcome: 'An outcome tier has no name',
   noSuccessOutcome: 'No tier counts as a success',
   rangeInvalid: 'A band ends before it starts',

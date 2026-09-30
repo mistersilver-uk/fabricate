@@ -1534,7 +1534,12 @@ describe('journal run authority ledger', () => {
     const binding = {
       actorUuid: 'Actor.a', runType: 'crafting', runId: 'run-1', expectedRevision: 2,
       privateEvaluation: { formula: 'SECRET_FORMULA', catalogue: ['SECRET_CHOICE'] },
-      decisionPolicy: { allowsSituationalModifier: true, allowAdvantage: false },
+      // The persisted whitelist keeps the whole advantage offer (issue 2007).
+      decisionPolicy: {
+        allowsSituationalModifier: true,
+        allowAdvantage: true,
+        advantageOffer: { advantage: true, disadvantage: false, kind: 'keep', detail: null },
+      },
     };
     const request = { requestId: 'private-prepare', senderId: 'player', sessionId: 'one' };
     const prepare = () => authority.run(request, ({ issuePrepareToken }) => ({

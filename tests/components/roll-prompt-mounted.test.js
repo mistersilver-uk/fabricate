@@ -10,9 +10,14 @@ import {
   ROLL_PROMPT_RAW_MODULES,
 } from '../helpers/rollPromptHarnessModules.js';
 import { stubI18n } from '../helpers/rollPromptDialogStub.js';
+import { intersectAdvantageOffers, resolveAdvantageOffer } from '../../src/systems/checkAdvantage.js';
 import {
   buildBulkPromptData,
   buildSinglePromptData,
+  overrideRollPromptSurface,
+  promptActions,
+  promptBulkCheckRoll,
+  promptCheckRoll,
   waitForPrompt,
 } from '../../src/ui/svelte/apps/crafting/rollPrompt.js';
 import { openRollPromptModal } from '../../src/ui/svelte/apps/crafting/rollPromptHost.js';
@@ -33,8 +38,7 @@ const labels = {
   eachAdds: 'Each adds', bonus: 'Situational bonus', bonusPlaceholder: '+2 or 1d4',
   bonusHelp: 'A bonus adds', rollMode: 'Roll mode', meet: 'meet or beat', exceed: 'beat',
   bulkNote: 'One choice applies to all', bulkRows: 'Rolls in this batch', noCheck: 'No check',
-  noSingleTarget: 'No single target', worse: 'keep the worse', better: 'keep the better',
-  roll: 'Roll', advantage: 'Advantage', disadvantage: 'Disadvantage', close: 'Close',
+  noSingleTarget: 'No single target', roll: 'Roll', advantage: 'Advantage', disadvantage: 'Disadvantage', close: 'Close',
 };
 const modes = [{ value: 'publicroll', label: 'Public roll' }, { value: 'gmroll', label: 'Private GM roll' }];
 const choices = [
@@ -47,6 +51,7 @@ const base = {
   kind: 'single', title: 'Crafting check', subtitle: 'Brenna · Forge rivets', formula: '2d6 + 3',
   dc: 12, dcText: 'DC 12', chipText: 'DC 12 · meet or beat', comparison: 'meet', selectedModifiers: [], labels, rollModes: modes,
   defaultRollMode: 'publicroll', choicePlan: noChoice, allowAdvantage: false,
+  actions: promptActions(null, labels),
 };
 const bulk = {
   ...base, kind: 'bulk', title: 'Salvage checks', subtitle: 'Brenna · 3 items', subjects: [
@@ -75,17 +80,15 @@ async function chooseRollMode(dialog, value) {
   await settleUi();
 }
 
-/** The real path: adapter, host and compiled prompt, over an application root holding focus. */
-async function openThroughHost(data, allowAdvantage, choicePlan = data.choicePlan) {
+/** Open a prompt through `start(open)` on the real host, over an application root holding focus. */
+async function openFocused(start) {
   const root = document.createElement('div');
   root.className = 'fabricate fabricate-app';
   const opener = document.createElement('button');
   root.append(opener);
   document.body.append(root);
   opener.focus();
-  const pending = waitForPrompt(data, allowAdvantage, choicePlan, (view) =>
-    openRollPromptModal(view, { loadComponent: loadPrompt })
-  );
+  const pending = start((view) => openRollPromptModal(view, { loadComponent: loadPrompt }));
   for (let attempt = 0; attempt < 20 && !dialogOf(root); attempt += 1) {
     await new Promise((settle) => setImmediate(settle));
   }
@@ -93,6 +96,38 @@ async function openThroughHost(data, allowAdvantage, choicePlan = data.choicePla
   assert.ok(dialog, 'the prompt mounted into the application root');
   return { root, opener, dialog, pending };
 }
+
+/** The real path: adapter, host and compiled prompt. */
+const openThroughHost = (data, allowAdvantage, choicePlan = data.choicePlan) =>
+  openFocused((open) => waitForPrompt(data, allowAdvantage, choicePlan, open));
+
+/** The public entry point (`promptCheckRoll`, `promptBulkCheckRoll`) with the host as its surface. */
+const openThroughEntry = (start) =>
+  openFocused((open) => {
+    const restore = overrideRollPromptSurface(open);
+    try {
+      return start();
+    } finally {
+      restore();
+    }
+  });
+
+/** Each footer button as `[action, note, accessible name, title]`. */
+const footerOf = (dialog) =>
+  [...dialog.querySelectorAll(':scope .manager-modal-footer button')].map((button) => [
+    button.dataset.action,
+    button.querySelector('.action-note')?.textContent ?? '',
+    button.getAttribute('aria-label'),
+    button.getAttribute('title') ?? '',
+  ]);
+
+const sumOver = { product: 'sum', direction: 'over' };
+const sumUnder = { product: 'sum', direction: 'under' };
+/** Any class stands in for core's `Die`, whose presence alone lets a keep offer stand. */
+const CORE_DIE = class Die {};
+const offerFor = (advantage, evaluation = sumOver, authoredFormula = '1d20 + 3') =>
+  resolveAdvantageOffer({ advantage, evaluation, authoredFormula, Die: CORE_DIE });
+const DECISION = { disadvantage: 'disadvantage', normal: 'normal', advantage: 'advantage', roll: 'normal' };
 
 describe('mounted roll prompt', () => {
   before(() => harness.setup());
@@ -180,8 +215,9 @@ describe('mounted roll prompt', () => {
     assert.ok(modeTrigger(empty), 'the roll mode is offered without subjects');
   });
 
-  it('keeps Roll the only submit button, before Advantage, and one Roll unless advantage is strictly true', async () => {
-    const root = await harness.mount({ data: { ...base, allowAdvantage: true } });
+  it('keeps Roll the only submit button, between the outer actions, and one Roll for an empty offer', async () => {
+    const keep = { advantage: true, disadvantage: true, kind: 'keep', detail: null };
+    const root = await harness.mount({ data: { ...base, actions: promptActions(keep, labels) } });
     const actions = [...root.querySelectorAll('.manager-modal-footer button')];
     assert.deepEqual(actions.map((button) => button.dataset.action), ['disadvantage', 'normal', 'advantage']);
     assert.deepEqual(actions.map((button) => button.type), ['button', 'submit', 'button']);
@@ -190,11 +226,12 @@ describe('mounted roll prompt', () => {
       actions.map((button) => button.querySelector('.action-note')?.textContent ?? null),
       ['keep the worse', null, 'keep the better']
     );
-    for (const allowAdvantage of [undefined, null, 'true', 1]) {
+    for (const offer of [undefined, null, { advantage: 'true', disadvantage: true, kind: 'keep' }]) {
       harness.remount();
-      const single = await harness.mount({ data: { ...base, allowAdvantage } });
+      const single = await harness.mount({ data: { ...base, actions: promptActions(offer, labels) } });
       const buttons = [...single.querySelectorAll('.manager-modal-footer button')];
-      assert.deepEqual(buttons.map((button) => button.dataset.action), ['roll'], String(allowAdvantage));
+      assert.deepEqual(buttons.map((button) => button.dataset.action), ['roll'], JSON.stringify(offer));
+      assert.equal(buttons[0].type, 'submit');
     }
   });
 
@@ -663,7 +700,6 @@ describe('mounted roll prompt', () => {
       assert.ok(!/DC|meet or beat|beat/.test(dialog.querySelector('.formula-row').textContent), 'no DC');
       assert.equal(dialog.querySelector('.static-modifiers .help').textContent, note);
       assert.equal(dialog.querySelector('.bonus-group .help').textContent, help);
-      assert.ok(!dialog.querySelector('button[data-action="advantage"]'), 'no advantage until issue 2007');
       dialog.querySelector('[data-manager-modal-close]').click();
       await pending;
     }
@@ -775,5 +811,120 @@ describe('mounted roll prompt', () => {
     assert.deepEqual(chips.map((chip) => chip.textContent.trim()), ['Focus +6']);
     dialog.querySelector('[data-manager-modal-close]').click();
     await pending;
+  });
+  it('offers each check its own buttons and notes, and every button answers its own choice (issue 2007)', async () => {
+    const keep = [['disadvantage', 'keep the worse'], ['normal', ''], ['advantage', 'keep the better']];
+    const cases = [
+      ['keep over', offerFor({ mode: 'keep' }), keep],
+      ['keep under', offerFor({ mode: 'keep' }, sumUnder, '1d20'), keep],
+      ['keep, two dice', offerFor({ mode: 'keep', extraDice: 2 }, sumOver, '2d6 + @prof'), keep],
+      ['bonus over', offerFor({ mode: 'bonus', bonusExpression: '1d6' }), [
+        ['disadvantage', '−1d6 to the total'], ['normal', ''], ['advantage', '+1d6 to the total'],
+      ]],
+      ['bonus under', offerFor({ mode: 'bonus', bonusExpression: ' +1d8 + 1 ' }, sumUnder, '1d20'), [
+        ['disadvantage', '−(1d8 + 1) to the target'], ['normal', ''], ['advantage', '+(1d8 + 1) to the target'],
+      ]],
+      ['bonus, no disadvantage', offerFor({ mode: 'bonus', bonusExpression: '1d6', offerDisadvantage: false }), [
+        ['normal', ''], ['advantage', '+1d6 to the total'],
+      ]],
+      ['keep, no disadvantage', offerFor({ mode: 'keep', offerDisadvantage: false }), [
+        ['normal', ''], ['advantage', 'keep the better'],
+      ]],
+      ['count', offerFor({}, { product: 'count' }, ''), [['disadvantage', '−1 die'], ['normal', ''], ['advantage', '+1 die']]],
+      ['count, three dice', offerFor({ countDice: 3 }, { product: 'count' }), [
+        ['disadvantage', '−3 dice'], ['normal', ''], ['advantage', '+3 dice'],
+      ]],
+      ['off', offerFor({ mode: 'off' }), [['roll', '']]],
+      ['keep, no plain first group', offerFor({ mode: 'keep' }, sumOver, '(1d20 + 2) * 2'), [['roll', '']]],
+      ['count, disabled', offerFor({ countEnabled: false }, { product: 'count' }), [['roll', '']]],
+    ];
+    const name = { disadvantage: 'Disadvantage', normal: 'Roll', advantage: 'Advantage', roll: 'Roll' };
+    for (const [label, advantageOffer, expected] of cases) {
+      for (const [clicked] of expected) {
+        document.body.replaceChildren();
+        const { dialog, pending } = await openThroughEntry(() =>
+          promptCheckRoll({ displayFormula: '1d20 + 3', dc: 12, allowAdvantage: advantageOffer.advantage, advantageOffer })
+        );
+        // `title` stays empty here: happy-dom's zeroed scrollWidth/clientWidth never overflow, so
+        // none of these untruncated notes duplicate onto `title` (UX-L1; the truncated case is
+        // proven below with an overridden layout).
+        assert.deepEqual(
+          footerOf(dialog),
+          expected.map(([action, note]) => [action, note, note ? `${name[action]}, ${note}` : name[action], '']),
+          label
+        );
+        assert.deepEqual(
+          [...dialog.querySelectorAll(':scope .manager-modal-footer button[type="submit"]')].map((button) => button.dataset.action),
+          [expected.length === 1 ? 'roll' : 'normal'],
+          `${label}: Roll is the only submit`
+        );
+        assert.ok(!dialog.querySelector(':scope .manager-modal-footer i'), `${label}: no footer glyph`);
+        dialog.querySelector(`:scope .manager-modal-footer button[data-action="${clicked}"]`).click();
+        assert.equal((await pending).advantage, DECISION[clicked], `${label}: ${clicked}`);
+      }
+    }
+  });
+
+  it('adds a title only once the footer note actually clips (issue 2007 UX-L1)', async () => {
+    const keep = { advantage: true, disadvantage: true, kind: 'keep', detail: null };
+    const scrollWidthDescriptor = Object.getOwnPropertyDescriptor(globalThis.Element.prototype, 'scrollWidth');
+    const clientWidthDescriptor = Object.getOwnPropertyDescriptor(globalThis.HTMLElement.prototype, 'clientWidth');
+    // happy-dom never lays out real pixels, so the note is stubbed to overflow its box the way a
+    // real browser's ellipsis would once the text is longer than the button can show on one line.
+    Object.defineProperty(globalThis.Element.prototype, 'scrollWidth', {
+      configurable: true,
+      get() {
+        return this.classList?.contains('action-note') ? 200 : scrollWidthDescriptor.get.call(this);
+      },
+    });
+    Object.defineProperty(globalThis.HTMLElement.prototype, 'clientWidth', {
+      configurable: true,
+      get() {
+        return this.classList?.contains('action-note') ? 80 : clientWidthDescriptor.get.call(this);
+      },
+    });
+    try {
+      const { dialog, pending } = await openThroughEntry(() =>
+        promptCheckRoll({ displayFormula: '1d20 + 3', dc: 12, allowAdvantage: true, advantageOffer: keep })
+      );
+      const advantage = dialog.querySelector('button[data-action="advantage"]');
+      assert.equal(advantage.getAttribute('title'), 'keep the better', 'the clipped note becomes the title');
+      assert.equal(advantage.getAttribute('aria-label'), 'Advantage, keep the better', 'unchanged');
+      dialog.querySelector('button[data-action="normal"]').click();
+      await pending;
+    } finally {
+      Object.defineProperty(globalThis.Element.prototype, 'scrollWidth', scrollWidthDescriptor);
+      Object.defineProperty(globalThis.HTMLElement.prototype, 'clientWidth', clientWidthDescriptor);
+    }
+  });
+
+  it('offers a batch only what every roll in it offers, and a note only when every roll agrees (issue 2007)', async () => {
+    const keepOver = offerFor({ mode: 'keep' });
+    const keepUnder = offerFor({ mode: 'keep' }, sumUnder, '1d20');
+    const count = offerFor({}, { product: 'count' });
+    const bonus = (bonusExpression) => offerFor({ mode: 'bonus', bonusExpression });
+    const bare = [['disadvantage', ''], ['normal', ''], ['advantage', '']];
+    const cases = [
+      ['keep over and under', [keepOver, keepUnder], [['disadvantage', 'keep the worse'], ['normal', ''], ['advantage', 'keep the better']]],
+      ['keep and count', [keepOver, count], bare],
+      ['bonus 1d6 and 1d8', [bonus('1d6'), bonus('1d8')], bare],
+      ['one off subject', [keepOver, offerFor({ mode: 'off' })], [['roll', '']]],
+      ['one without disadvantage', [keepOver, offerFor({ mode: 'keep', offerDisadvantage: false })], [
+        ['normal', ''], ['advantage', 'keep the better'],
+      ]],
+    ];
+    const subjects = [{ name: 'Ore', need: { kind: 'dc', dc: 12 } }, { name: 'Scrap', need: { kind: 'dc', dc: 14 } }];
+    for (const [label, offers, expected] of cases) {
+      const advantageOffer = intersectAdvantageOffers(offers);
+      const [clicked] = expected.at(-1);
+      document.body.replaceChildren();
+      const { dialog, pending } = await openThroughEntry(() =>
+        promptBulkCheckRoll({ allowAdvantage: advantageOffer.advantage, advantageOffer, count: 2, subjects })
+      );
+      assert.equal(dialog.dataset.rollPrompt, 'bulk');
+      assert.deepEqual(footerOf(dialog).map(([action, note]) => [action, note]), expected, label);
+      dialog.querySelector(`:scope .manager-modal-footer button[data-action="${clicked}"]`).click();
+      assert.equal((await pending).advantage, DECISION[clicked], `${label}: ${clicked}`);
+    }
   });
 });

@@ -215,6 +215,18 @@ function _idSet(...lists) {
   return ids;
 }
 
+const PASS_FAIL_CARRIED_FIELDS = Object.freeze([
+  'dc',
+  'thresholdMode',
+  'tiers',
+  'dcMode',
+  'macroUuid',
+  'checkBreakage',
+  'evaluation',
+  'offerSituationalBonus',
+  'advantage',
+]);
+
 export class CraftingSystemManager {
   /** `seams` injects the Foundry-facing collaborators (issue 800), each defaulting to a safe
    * pass-through; `enrichToHtml` passes through because `enrichHTML` cannot run under happy-dom. */
@@ -1182,7 +1194,8 @@ export class CraftingSystemManager {
   }
 
   /** Copy the pass/fail check fields to a destination only when it has no `rollFormula` and the
-   * source does, including `dcMode`/`macroUuid` (issue 1096), the evaluation and the offer. */
+   * source does, including `dcMode`/`macroUuid` (issue 1096), the evaluation, the offer and the
+   * advantage rule. */
   _copyPassFailCheckFields(source, destination) {
     if (!source || typeof source !== 'object' || !destination || typeof destination !== 'object') {
       return;
@@ -1194,24 +1207,8 @@ export class CraftingSystemManager {
     if (destFormula.length > 0) return;
 
     destination.rollFormula = source.rollFormula;
-    if ('dc' in source) destination.dc = source.dc;
-    if ('thresholdMode' in source) destination.thresholdMode = source.thresholdMode;
-    if ('tiers' in source) {
-      destination.tiers = Array.isArray(source.tiers)
-        ? source.tiers.map((tier) => ({ ...tier }))
-        : source.tiers;
-    }
-    if ('dcMode' in source) destination.dcMode = source.dcMode;
-    if ('macroUuid' in source) destination.macroUuid = source.macroUuid;
-    if ('checkBreakage' in source) {
-      destination.checkBreakage =
-        source.checkBreakage && typeof source.checkBreakage === 'object'
-          ? structuredClone(source.checkBreakage)
-          : source.checkBreakage;
-    }
-    if ('evaluation' in source) destination.evaluation = structuredClone(source.evaluation);
-    if ('offerSituationalBonus' in source) {
-      destination.offerSituationalBonus = source.offerSituationalBonus;
+    for (const key of PASS_FAIL_CARRIED_FIELDS) {
+      if (key in source) destination[key] = structuredClone(source[key]);
     }
   }
 

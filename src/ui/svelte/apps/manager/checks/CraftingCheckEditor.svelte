@@ -436,6 +436,7 @@
           {targetChip}
           underTier={previewTierAdjustment(evaluation, previewedTier)}
           offerSituationalBonus={value?.offerSituationalBonus !== false}
+          advantage={value?.advantage ?? null}
           character={previewCharacter}
           {countPreview}
           onChange={emit}
@@ -443,10 +444,9 @@
       </div>
     </InspectorCard>
 
-    <!-- DIFFICULTY, in its own card, WITH its DC-source chooser: a routed RELATIVE check is
-             DEFINED as bands offset from a DC, so offering the number without its source was
-             incoherent. `bandsAreAbsolute` is the one state with no DC, and it is the SAME named
-             gate the tier list and `PREVIEW AGAINST` read. -->
+    <!-- DIFFICULTY, with its DC-source chooser: a routed relative check is bands offset from a
+         DC. `bandsAreAbsolute` is the one state with no DC, the same gate the tier list and
+         `PREVIEW AGAINST` read. -->
     {#if !bandsAreAbsolute}
       <CheckDifficultyCard
         showDcSource

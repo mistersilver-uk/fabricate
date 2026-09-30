@@ -739,7 +739,8 @@ An unresolved or non-numeric `pool.base` or `pool.threshold` refuses the outcome
 A pool that resolves to zero or fewer dice answers `checkFailed` with no Roll constructed at all.
 An interactive count request opens Fabricate's roll prompt, which shows the dice pool and the successes needed rather than a formula or DC, and a situational bonus there adds dice or moves the threshold, as the pool's `modifierDestination` says.
 A forwarded `rollDecision` applies its bonus the same way without opening the prompt.
-Advantage and bought dice are not offered on a count yet: an interactive count request that forwards `advantage: 'advantage'` or `'disadvantage'`, or whose `pool.additionalDice.enabled` is `true`, refuses `evaluationUnsupported` before anything is prompted or rolled.
+Advantage and Disadvantage move the pool by the default rule's one die: an interactive count request that forwards `advantage: 'advantage'` adds a die, `'disadvantage'` removes one, and the pool floor and `zeroPoolFails` apply after that adjustment.
+Bought dice are not offered on a count yet: an interactive count request whose `pool.additionalDice.enabled` is `true` refuses `evaluationUnsupported` before anything is prompted or rolled.
 A non-interactive count request with additional dice enabled rolls its authored pool alone.
 
 A malformed evaluation returns `evaluationInvalid`.

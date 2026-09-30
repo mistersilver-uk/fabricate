@@ -1,4 +1,10 @@
-/** `Roll.parse` output RECORDED from a real Foundry build (14.365), not modelled (issue 1097). */
+/**
+ * `Roll.parse` output RECORDED from a real Foundry build (14.365), not modelled (issue 1097), and
+ * `new Roll(formula, data).terms` recorded from 13.351 and 14.365 (issue 2007).
+ */
+import { readFileSync } from 'node:fs';
+
+import { ROLL_TERMS_CORPUS, rollTermsKey } from '../../scripts/lib/rollTermsCorpus.js';
 
 /** The recording. Keyed by the exact formula string passed to `Roll.parse`. */
 export const RECORDED_ROLL_PARSE_14_365 = Object.freeze({
@@ -466,4 +472,26 @@ export function recordedRollDouble(overrides = {}) {
     },
     ...overrides,
   };
+}
+
+/** The Foundry builds `scripts/foundry-roll-terms-record.mjs` recorded the terms corpus on. */
+export const RECORDED_TERM_BUILDS = Object.freeze(['13.351', '14.365']);
+
+function readTermsRecording(version) {
+  const url = new URL(`../fixtures/recorded-roll-terms/foundry-${version}.json`, import.meta.url);
+  return Object.freeze(JSON.parse(readFileSync(url, 'utf8')));
+}
+
+/**
+ * `new Roll(formula, data).terms` and every formula surface, per build, keyed by
+ * `rollTermsKey`: `entries` for the corpus and `probes` for the keep-transform probes.
+ */
+export const RECORDED_ROLL_TERMS = Object.freeze(
+  Object.fromEntries(RECORDED_TERM_BUILDS.map((version) => [version, readTermsRecording(version)]))
+);
+
+/** Corpus entries a build has no recording for; the drift guard requires none. */
+export function unrecordedCorpusEntries(version) {
+  const { entries } = RECORDED_ROLL_TERMS[version];
+  return ROLL_TERMS_CORPUS.filter((entry) => !Object.hasOwn(entries, rollTermsKey(entry)));
 }

@@ -3,8 +3,9 @@
  * The resolved actor, prompt, runners and dice-engine check enter through named seams.
  */
 
-import { hasPlainD20, stripRetiredModifierPlaceholder } from '../utils/craftingCheckExpression.js';
+import { stripRetiredModifierPlaceholder } from '../utils/craftingCheckExpression.js';
 
+import { intersectAdvantageOffers, resolveAdvantageOffer } from './checkAdvantage.js';
 import { isFixedSumOver, resolveCheckTarget, selectTargetAdjustment } from './checkTarget.js';
 import {
   resolveCompanionCheckEvaluation,
@@ -17,7 +18,11 @@ import {
   checkRollResult,
   gateCompanionCallSite,
 } from './companionContract.js';
+import { normalizeCheckAdvantage } from './normalize/checkAdvantage.js';
 import { hasActiveCheck } from './salvageCheckUsability.js';
+
+/** A standalone roll authors no advantage rule, so it rolls under the default one (ruling R2). */
+const COMPANION_ADVANTAGE = Object.freeze(normalizeCheckAdvantage());
 
 /**
  * The post-shim formula, or `''` when nothing is left to roll. Re-derives
@@ -79,6 +84,7 @@ async function runStandaloneCheck(
   });
   // Fabricate's own prompt owns dismissal, since Foundry's RollResolver fulfils rather than aborts on close; set after the builder so a test seam can inject a dismissing prompt.
   rollOptions.prompt = seams.prompt;
+  rollOptions.advantage = COMPANION_ADVANTAGE;
   if (rollDecision) {
     rollOptions.rollDecision = {
       bonus: rollDecision.bonus,
@@ -241,17 +247,13 @@ export async function rollActorCheck(request, seams) {
 }
 
 /**
- * An interactive count request asking for what its prompt cannot offer yet: a forwarded Advantage
- * or Disadvantage (issue 2007), or active additional dice (issue 2008). A non-interactive count
- * rolls its authored pool alone.
+ * An interactive count request asking for what its prompt cannot offer yet: active additional
+ * dice (issue 2008). Advantage and Disadvantage are supported (issue 2007): the shared advantage
+ * offer moves the pool by `±countDice`. A non-interactive count rolls its authored pool alone.
  */
-function unsupportedInteractiveCount(evaluation, interactive, rollDecision) {
-  if (!interactive || evaluation.product !== 'count') return false;
-  const advantage = rollDecision?.advantage;
+function unsupportedInteractiveCount(evaluation, interactive) {
   return (
-    advantage === 'advantage' ||
-    advantage === 'disadvantage' ||
-    evaluation.pool.additionalDice.enabled === true
+    interactive && evaluation.product === 'count' && evaluation.pool.additionalDice.enabled === true
   );
 }
 
@@ -275,7 +277,7 @@ async function settleRollActorCheck(request, seams) {
   const evaluation = resolved.evaluation;
   if (
     !supportsCompanionCheckEvaluation(evaluation, interactive) ||
-    unsupportedInteractiveCount(evaluation, interactive, rollDecision)
+    unsupportedInteractiveCount(evaluation, interactive)
   ) {
     return checkRollResult(COMPANION_OUTCOMES.evaluationUnsupported, { label });
   }
@@ -350,10 +352,15 @@ export async function resolveBulkCheckDecision(request, seams) {
     });
   }
 
-  // All-or-nothing over the usable subset only.
-  const allowAdvantage = usable.every((entry) => hasPlainD20(entry.formula));
+  // All-or-nothing over the usable subset only, each formula under the default advantage rule.
+  const advantageOffer = intersectAdvantageOffers(
+    usable.map((entry) =>
+      resolveAdvantageOffer({ advantage: COMPANION_ADVANTAGE, authoredFormula: entry.formula })
+    )
+  );
+  const allowAdvantage = advantageOffer.advantage;
   // The whole batch, as the salvage service counts; with no `subjects` the dialog reads "0 items".
-  const choice = await seams.promptBulk({ allowAdvantage, count: formulas.length });
+  const choice = await seams.promptBulk({ allowAdvantage, advantageOffer, count: formulas.length });
   if (!choice || choice.confirmed === false) {
     return bulkCheckDecisionResult(COMPANION_OUTCOMES.cancelled);
   }

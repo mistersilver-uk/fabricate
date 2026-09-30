@@ -2138,6 +2138,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -2191,6 +2199,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -2246,6 +2262,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -2310,6 +2334,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -2364,6 +2396,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -2420,6 +2460,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -2479,6 +2527,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -2528,6 +2584,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -2769,6 +2833,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -2822,6 +2894,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -2877,6 +2957,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -2941,6 +3029,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -2995,6 +3091,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -3051,6 +3155,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -3110,6 +3222,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -3159,6 +3279,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -3607,6 +3735,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -3660,6 +3796,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -3715,6 +3859,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -3779,6 +3931,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -3833,6 +3993,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -3889,6 +4057,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -3948,6 +4124,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -3997,6 +4181,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -4164,6 +4356,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -4217,6 +4417,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -4272,6 +4480,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -4336,6 +4552,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -4390,6 +4614,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -4446,6 +4678,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -4505,6 +4745,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -4554,6 +4802,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -4757,6 +5013,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -4810,6 +5074,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -4865,6 +5137,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -4929,6 +5209,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -4983,6 +5271,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",
@@ -5039,6 +5335,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -5098,6 +5402,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "checkBreakage": {
             "triggers": []
           }
@@ -5147,6 +5459,14 @@
             }
           },
           "offerSituationalBonus": true,
+          "advantage": {
+            "mode": "keep",
+            "extraDice": 1,
+            "bonusExpression": "1d6",
+            "offerDisadvantage": true,
+            "countEnabled": true,
+            "countDice": 1
+          },
           "dc": 15,
           "thresholdMode": "meet",
           "dcMode": "static",

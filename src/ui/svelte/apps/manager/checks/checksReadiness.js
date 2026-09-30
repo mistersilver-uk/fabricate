@@ -8,16 +8,19 @@ import {
   resolveModifierPolicy,
 } from '../../../../../systems/checkModifierResolver.js';
 import { isValidTargetAdjustment } from '../../../../../systems/checkTarget.js';
+import { normalizeCheckAdvantage } from '../../../../../systems/normalize/checkAdvantage.js';
 import {
   normalizeCheckEvaluation,
   normalizeNullableAdjustment,
 } from '../../../../../systems/normalize/checkEvaluation.js';
 import {
   findRangeConflicts,
+  keepGroupOf,
   planRetiredPlaceholderStrip,
 } from '../../../../../utils/craftingCheckExpression.js';
 import { trimString as trimmed } from '../../../../../utils/scalars.js';
 
+import { isBonusExpression } from './checkAdvantageCopy.js';
 import { invalidOverrideRecords, overrideEntriesFor } from './checkOverrideReadiness.js';
 import { missingTargetPaths, targetExpressionFault } from './checkTargetStatus.js';
 import { formulaCountsSuccesses, planCountConversion } from './countFormulaConversion.js';
@@ -41,6 +44,10 @@ export const CHECK_READINESS_ISSUE_IDS = Object.freeze([
   'retiredPlaceholderBreaksFormula',
   'retiredPlaceholderInFormula',
   'freeTextCountingFormula',
+  // Advantage (issue 2007)
+  'advantageKeepNoDie',
+  'advantageKeepAfterReference',
+  'advantageBonusInvalid',
   // Outcomes
   'unnamedOutcome',
   'noSuccessOutcome',
@@ -108,6 +115,9 @@ export const CHECK_ISSUE_SECTIONS = Object.freeze({
   retiredPlaceholderBreaksFormula: 'roll',
   retiredPlaceholderInFormula: 'roll',
   freeTextCountingFormula: 'roll',
+  advantageKeepNoDie: 'roll',
+  advantageKeepAfterReference: 'roll',
+  advantageBonusInvalid: 'roll',
   unnamedOutcome: 'outcomes',
   noSuccessOutcome: 'outcomes',
   rangeInvalid: 'outcomes',
@@ -165,6 +175,9 @@ export const CHECK_ISSUE_CONTROLS = Object.freeze({
   retiredPlaceholderBreaksFormula: 'checks-roll-formula',
   retiredPlaceholderInFormula: 'checks-roll-formula',
   freeTextCountingFormula: 'checks-roll-formula',
+  advantageKeepNoDie: 'checks-advantage-mode',
+  advantageKeepAfterReference: 'checks-advantage-mode',
+  advantageBonusInvalid: 'checks-advantage-bonus',
   danglingTierStepTarget: 'checks-triggers',
   multipleTierStepTargets: 'checks-triggers',
   countTriggerGroupUnreachable: 'checks-triggers',
@@ -576,6 +589,74 @@ function countingFormulaReadiness(result, check, { mode, activity, components, g
 }
 
 /**
+ * The authored advantage rule's own readiness (issue 2007), read the same way the Studio's note
+ * reads it: `keep` against `keepGroupOf`'s proof, `bonus` against the Studio's grammar. Inert
+ * under `off` and for a counting check, whose advantage reads only the count keys.
+ */
+function advantageReadiness(check, evaluation) {
+  if (evaluation.product === 'count') return [];
+  const rule = normalizeCheckAdvantage(check?.advantage);
+  const issues = [];
+  if (rule.mode === 'keep') {
+    const group = keepGroupOf(check?.rollFormula);
+    if (!group.ok && group.reason !== 'none') {
+      pushIssue(issues, 'advantageKeepNoDie', 'warning');
+    } else if (group.ok && group.referenceFirst) {
+      pushIssue(issues, 'advantageKeepAfterReference', 'warning', {
+        n: group.number,
+        dN: `d${group.faces}`,
+      });
+    }
+  } else if (rule.mode === 'bonus' && !isBonusExpression(rule.bonusExpression)) {
+    pushIssue(issues, 'advantageBonusInvalid', 'critical');
+  }
+  return issues;
+}
+
+/**
+ * Routed-only readiness, extracted so `evaluateCheckReadiness` stays under the function-size
+ * ratchet: outcome-tier naming and Success coverage, fixed-range validity, and tier-step targets.
+ * Tier-step targets are read outside the tier-count gate on purpose: a target authored before any
+ * tier exists is exactly the dangling case a GM needs told about.
+ */
+function routedTierReadiness(check) {
+  const checks = [];
+  const issues = [];
+  const { type, outcomes } = routedOutcomes(check);
+  if (outcomes.length > 0) {
+    const allNamed = outcomes.every((outcome) => trimmed(outcome?.name) !== '');
+    checks.push({ id: 'outcomesNamed', satisfied: allNamed });
+    if (!allNamed) pushIssue(issues, 'unnamedOutcome', 'critical');
+
+    const hasSuccess = outcomes.some((outcome) => outcome?.success === true);
+    checks.push({ id: 'hasSuccessOutcome', satisfied: hasSuccess });
+    if (!hasSuccess) pushIssue(issues, 'noSuccessOutcome', 'critical');
+
+    // Fixed tiers own a CONTIGUOUS, non-overlapping segment of the roll value range, and all
+    // three faults are `critical`: no copy or test may describe `rangeInvalid` or
+    // `rangeOverlap` as a warning, each leaving a roll value routed wrongly or not at all.
+    if (type === 'fixed') {
+      const conflicts = findRangeConflicts(outcomes);
+      const rangesValid = conflicts.invalid.size === 0;
+      const rangesNoOverlap = conflicts.overlapping.size === 0;
+      checks.push({ id: 'rangesValid', satisfied: rangesValid });
+      if (!rangesValid) pushIssue(issues, 'rangeInvalid', 'critical');
+      checks.push({ id: 'rangesNoOverlap', satisfied: rangesNoOverlap });
+      if (!rangesNoOverlap) pushIssue(issues, 'rangeOverlap', 'critical');
+      const excluded = new Set([...conflicts.invalid, ...conflicts.overlapping]);
+      const gapped = fixedRangesHaveGap(outcomes, excluded);
+      checks.push({ id: 'rangesContiguous', satisfied: !gapped });
+      if (gapped) pushIssue(issues, 'rangeGap', 'critical');
+    }
+  }
+
+  const tierStep = tierStepTargetReadiness(check, outcomes);
+  checks.push(...tierStep.checks);
+  issues.push(...tierStep.issues);
+  return { checks, issues };
+}
+
+/**
  * Evaluate one subsystem check's readiness.
  * @param {object} check Plain check draft (the active draft for its mode).
  * @param {object} [options]
@@ -622,55 +703,15 @@ export function evaluateCheckReadiness(check = {}, options = {}) {
   const evaluation = normalizeCheckEvaluation(check?.evaluation);
   const formula = formulaReadiness(check, evaluation, { ...options, mode });
   checks.push(...formula.checks);
-  issues.push(...formula.issues);
+  issues.push(...formula.issues, ...advantageReadiness(check, evaluation));
   const { hasRollFormula } = formula;
 
   // Routed checks route an outcome tier to a result set by tier NAME, and only SUCCESS tiers
   // can be routed, so the rules below wait until at least one tier is authored.
   if (mode === 'routed') {
-    const { type, outcomes } = routedOutcomes(check);
-    if (outcomes.length > 0) {
-      const allNamed = outcomes.every((outcome) => trimmed(outcome?.name) !== '');
-      checks.push({ id: 'outcomesNamed', satisfied: allNamed });
-      if (!allNamed) {
-        pushIssue(issues, 'unnamedOutcome', 'critical');
-      }
-
-      const hasSuccess = outcomes.some((outcome) => outcome?.success === true);
-      checks.push({ id: 'hasSuccessOutcome', satisfied: hasSuccess });
-      if (!hasSuccess) {
-        pushIssue(issues, 'noSuccessOutcome', 'critical');
-      }
-
-      // Fixed tiers own a CONTIGUOUS, non-overlapping segment of the roll value range, and all
-      // three faults are `critical`: no copy or test may describe `rangeInvalid` or
-      // `rangeOverlap` as a warning, each leaving a roll value routed wrongly or not at all.
-      if (type === 'fixed') {
-        const conflicts = findRangeConflicts(outcomes);
-        const rangesValid = conflicts.invalid.size === 0;
-        const rangesNoOverlap = conflicts.overlapping.size === 0;
-        checks.push({ id: 'rangesValid', satisfied: rangesValid });
-        if (!rangesValid) {
-          pushIssue(issues, 'rangeInvalid', 'critical');
-        }
-        checks.push({ id: 'rangesNoOverlap', satisfied: rangesNoOverlap });
-        if (!rangesNoOverlap) {
-          pushIssue(issues, 'rangeOverlap', 'critical');
-        }
-        const excluded = new Set([...conflicts.invalid, ...conflicts.overlapping]);
-        const gapped = fixedRangesHaveGap(outcomes, excluded);
-        checks.push({ id: 'rangesContiguous', satisfied: !gapped });
-        if (gapped) {
-          pushIssue(issues, 'rangeGap', 'critical');
-        }
-      }
-    }
-
-    // Outside the tier-count gate on purpose: a target authored before any tier exists is
-    // exactly the dangling case a GM needs told about.
-    const tierStep = tierStepTargetReadiness(check, outcomes);
-    checks.push(...tierStep.checks);
-    issues.push(...tierStep.issues);
+    const routed = routedTierReadiness(check);
+    checks.push(...routed.checks);
+    issues.push(...routed.issues);
   }
 
   const overrideEntries = overrideEntriesFor(options.activity, options);

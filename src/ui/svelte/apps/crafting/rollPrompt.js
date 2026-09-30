@@ -1,4 +1,8 @@
 /** The single and bulk check prompt: view preparation, the modal surface and answer translation. */
+import {
+  bracketBonusExpression,
+  publicAdvantageOffer,
+} from '../../../../systems/checkAdvantage.js';
 import { isFixedSumOver } from '../../../../systems/checkTarget.js';
 import { describeCountPolicy } from '../../../../systems/countEvaluation.js';
 import { fill } from '../../../../utils/fillPlaceholders.js';
@@ -70,8 +74,6 @@ function copy() {
     bulkRows: promptLabel('BulkRows', 'Rolls in this batch'),
     noCheck: promptLabel('NoCheck', 'No check'),
     noSingleTarget: promptLabel('NoSingleTarget', 'No single target'),
-    worse: promptLabel('KeepWorse', 'keep the worse'),
-    better: promptLabel('KeepBetter', 'keep the better'),
     dcValue: promptLabel('DcValue', 'DC {dc}'),
     targetValue: promptLabel('TargetValue', 'Target {target}'),
     countNeed: promptLabel('CountNeed', '{count} needed'),
@@ -283,13 +285,97 @@ function formatCopy(data, choicePlan) {
   return formatted;
 }
 
+/** The notes under Disadvantage and Advantage that the offer's rule states; none when mixed. */
+function actionNotes({ kind, detail }) {
+  if (kind === 'keep') {
+    return {
+      disadvantage: localize('FABRICATE.App.RollPrompt.KeepWorse', 'keep the worse'),
+      advantage: localize('FABRICATE.App.RollPrompt.KeepBetter', 'keep the better'),
+    };
+  }
+  if (kind === 'bonus' && detail) {
+    const values = { expression: bracketBonusExpression(detail.expression) };
+    const [down, up] =
+      detail.destination === 'target'
+        ? [
+            localize(
+              'FABRICATE.App.RollPrompt.BonusTargetDisadvantage',
+              '−{expression} to the target'
+            ),
+            localize(
+              'FABRICATE.App.RollPrompt.BonusTargetAdvantage',
+              '+{expression} to the target'
+            ),
+          ]
+        : [
+            localize(
+              'FABRICATE.App.RollPrompt.BonusTotalDisadvantage',
+              '−{expression} to the total'
+            ),
+            localize('FABRICATE.App.RollPrompt.BonusTotalAdvantage', '+{expression} to the total'),
+          ];
+    return { disadvantage: fill(down, values), advantage: fill(up, values) };
+  }
+  if (kind === 'count' && detail) {
+    if (detail.dice === 1) {
+      return {
+        disadvantage: localize('FABRICATE.App.RollPrompt.CountDisadvantageOne', '−1 die'),
+        advantage: localize('FABRICATE.App.RollPrompt.CountAdvantageOne', '+1 die'),
+      };
+    }
+    const values = { count: detail.dice };
+    return {
+      disadvantage: fill(
+        localize('FABRICATE.App.RollPrompt.CountDisadvantage', '−{count} dice'),
+        values
+      ),
+      advantage: fill(localize('FABRICATE.App.RollPrompt.CountAdvantage', '+{count} dice'), values),
+    };
+  }
+  return {};
+}
+
+function promptAction(action, label, note = '') {
+  const name = note
+    ? fill(localize('FABRICATE.App.RollPrompt.ActionName', '{label}, {note}'), { label, note })
+    : label;
+  return { action, label, note, name, submit: action === 'normal' || action === 'roll' };
+}
+
+/**
+ * The footer, left to right (issue 2007): Disadvantage when offered, Roll and Advantage, each
+ * outer action with the note its check's rule states. An empty offer is the single Roll.
+ */
+export function promptActions(offer, labels) {
+  if (offer?.advantage !== true) return [promptAction('roll', labels.roll)];
+  const notes = actionNotes(offer);
+  return [
+    ...(offer.disadvantage === true
+      ? [promptAction('disadvantage', labels.disadvantage, notes.disadvantage)]
+      : []),
+    promptAction('normal', labels.roll),
+    promptAction('advantage', labels.advantage, notes.advantage),
+  ];
+}
+
+/** A producer that names no offer keeps the one rule it had before issue 2007: keep, both ways. */
+function viewOffer(data, allowAdvantage) {
+  if (data.advantageOffer) return publicAdvantageOffer(data.advantageOffer);
+  return allowAdvantage === true
+    ? { advantage: true, disadvantage: true, kind: 'keep', detail: null }
+    : { advantage: false, disadvantage: false, kind: null, detail: null };
+}
+
 /** Open the surface for a prepared view; a failed or rejected open is a dismissal. */
 export async function waitForPrompt(data, allowAdvantage, choicePlan, open = resolveSurface()) {
   const defaultRollMode = supportedRollMode(globalThis.game?.settings?.get?.('core', 'rollMode'));
+  const formatted = formatCopy(data, choicePlan);
+  const offer = viewOffer(data, allowAdvantage);
   const view = {
     ...data,
-    ...formatCopy(data, choicePlan),
-    allowAdvantage: allowAdvantage === true,
+    ...formatted,
+    allowAdvantage: offer.advantage,
+    actions: promptActions(offer, formatted.labels),
     rollModes: ROLL_MODES.map(([value, key, fallback]) => ({
       value,
       label: promptLabel(key, fallback),
@@ -482,8 +568,13 @@ export function buildBulkPromptData({ count, subjects, activity, actorName } = {
   };
 }
 
+/** The prompt data with the check's advantage offer, when its producer supplied one. */
+function withAdvantageOffer(data, offer) {
+  return offer ? { ...data, advantageOffer: publicAdvantageOffer(offer) } : data;
+}
+
 export async function promptCheckRoll(options = {}) {
-  const { modifierChoice, allowAdvantage } = options;
+  const { modifierChoice, allowAdvantage, advantageOffer } = options;
   const plan = planModifierChoice(modifierChoice);
   const open = resolveSurface();
   if (!open) {
@@ -497,11 +588,13 @@ export async function promptCheckRoll(options = {}) {
         }
       : { confirmed: true };
   }
-  return waitForPrompt(buildSinglePromptData(options), allowAdvantage, plan, open);
+  const data = withAdvantageOffer(buildSinglePromptData(options), advantageOffer);
+  return waitForPrompt(data, allowAdvantage, plan, open);
 }
 
 export async function promptBulkCheckRoll({
   allowAdvantage,
+  advantageOffer,
   count,
   subjects,
   activity,
@@ -510,7 +603,10 @@ export async function promptBulkCheckRoll({
   const open = resolveSurface();
   if (!open) return { confirmed: true, bonus: null, rollMode: undefined, advantage: 'normal' };
   return waitForPrompt(
-    buildBulkPromptData({ count, subjects, activity, actorName }),
+    withAdvantageOffer(
+      buildBulkPromptData({ count, subjects, activity, actorName }),
+      advantageOffer
+    ),
     allowAdvantage,
     planModifierChoice(null),
     open

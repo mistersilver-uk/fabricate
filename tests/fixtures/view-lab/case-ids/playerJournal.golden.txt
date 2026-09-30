@@ -6,6 +6,7 @@ player-journal-sort-list
 fabricate-journal
 fabricate-journal-craft-detail
 player-journal-check-roll-prompt
+player-journal-check-roll-prompt-bonus
 player-gathering-journal-check-roll-prompt
 player-journal-check-roll-prompt-count
 player-journal-routed-bands-under

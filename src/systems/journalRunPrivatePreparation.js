@@ -1,3 +1,5 @@
+import { preparedDecisionPolicy } from './preparedDecisionPolicy.js';
+
 function safePrepareRecord(record, invalidateLegacy = true) {
   const binding = record?.binding ?? {};
   const safeBinding = Object.fromEntries(
@@ -5,10 +7,7 @@ function safePrepareRecord(record, invalidateLegacy = true) {
       .filter((key) => Object.hasOwn(binding, key))
       .map((key) => [key, binding[key]])
   );
-  safeBinding.decisionPolicy = {
-    allowsSituationalModifier: binding.decisionPolicy?.allowsSituationalModifier === true,
-    allowAdvantage: binding.decisionPolicy?.allowAdvantage === true,
-  };
+  safeBinding.decisionPolicy = preparedDecisionPolicy(binding.decisionPolicy);
   const legacyPrivate = invalidateLegacy && Object.hasOwn(binding, 'privateEvaluation');
   return {
     status: legacyPrivate && record?.status === 'active' ? 'released' : record?.status,

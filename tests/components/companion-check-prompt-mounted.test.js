@@ -162,8 +162,8 @@ describe('a companion interactive check through the real prompt host (issue 2006
           const line = dialog.querySelector(':scope .formula-content .formula');
           assert.equal(line.textContent, expected.line, `${key}: the typed bonus adds a die`);
           assert.ok(
-            !dialog.querySelector('button[data-action="advantage"]'),
-            `${key}: no advantage until issue 2007`
+            dialog.querySelector('button[data-action="advantage"]'),
+            `${key}: the count rule offers advantage (issue 2007)`
           );
         }
         dialog.querySelector('button[type="submit"]').click();

@@ -145,16 +145,19 @@ Measured against the shipped 14.365 stack over 355 emitted formulas, 25 validate
 `maximize: true` renders every term deterministic so nothing is skipped, and the finite test is load-bearing rather than decorative: `Roll#total` is `Number(this._total) || 0`, which passes `-Infinity` through, so this predicate also closes the `max(, 2)` empty-head trap BY CONSTRUCTION.
 The check fails OPEN with no dice engine (headless, tests), where nothing evaluates the formula anyway.
 The FLAT term is **sign-aware** — `Constant` is unsigned in the dice grammar, which is why `appendToolBonusTerms`' `sign` + `Math.abs` split is required and correct (`+ -3[Modifiers]` would not parse; `- 3[Modifiers]` does) — **label-sanitized**, **SKIPPED when the value is `0`**, and **formatted through a decimal-safe formatter that refuses exponent notation and non-finite values**, because `Constant = _ [0-9]+ ("." [0-9]+)?` has no exponent production and `+ 1e-7[Modifiers]` would parse as a `StringTerm` and throw at evaluate.
-Ordering: tool bonuses append first, then the modifier term, then the advantage transform, then the situational bonus.
+Ordering: tool bonuses append first, then the modifier term, then the situational bonus, then a bonus-die expression; the keep transform acts afterwards on the constructed `Roll`'s authored first dice group.
 - **Under active sum/over, a rolling modifier's dice enter `roll.dice`, and therefore the `diceGroup` trigger DSL's index space.**
 Modifier terms are APPENDED, so every die the authored formula declares keeps its existing `groupId` and no working trigger changes meaning.
 A trigger whose `groupId` already DANGLED — authored against a formula that has since lost a die — used to match nothing and can now resolve against a modifier's die.
 That is accepted rather than guarded: the only available guard is a group count re-parsed from the authored formula, and `parseDiceGroups` does not agree term-for-term with `roll.dice` on every formula, so a slice would sometimes drop an AUTHORED group from trigger matching, which is a worse failure than the one it fixes.
 The trigger editor offers only the authored formula's groups, so the state is reachable only by editing a formula after authoring a trigger against it.
 - **Advantage is a question about the AUTHORED check, never about what its modifiers appended.**
-`parsePlainDiceGroups` splits on parentheses and flavour brackets alike, so `(1d20)[Modifiers]` tokenizes as a plain `1d20`; without scoping, a `2d10` check carrying a `1d20` modifier would offer Advantage it does not have and the transform would rewrite the MODIFIER's die.
-Both `hasPlainD20` and `applyD20Advantage` are therefore applied to the post-shim authored formula, and the appended terms are re-attached afterwards.
-The `[Modifiers]` label is a **fixed ASCII literal and deliberately not localized**, because `parsePlainDiceGroups` tokenizes on flavour brackets and a localized label containing a `\d*d\d+` token would be read as a phantom crit-eligible die group by the same tokenizer that backs `hasPlainD20` and `applyD20Advantage`.
+Whether keep is offered, and which group it rewrites, is decided by `findKeepGroup` on the post-shim authored formula alone (issue 2007).
+Tool terms, library terms, the deferred `playerPicks` slot, the situational bonus, a bonus-die expression and `@` substitutions can never supply or become the kept group.
+A dice-free authored formula offers no keep, even when a rolling modifier follows it.
+The `[Modifiers]` label is a **fixed ASCII literal and deliberately not localized**, because `parsePlainDiceGroups` still backs crit-eligible group parsing and a localized label containing a `\d*d\d+` token would be read as a phantom crit-eligible die group by the same tokenizer.
+- **eval == display, even through the keep transform.**
+The posted, journaled, companion and handed-off formula is the evaluated `Roll`'s formula after the keep transform and its `resetFormula()`; with no keep transform applied it is the appended string as before.
 
 Both paths build the modifier context through the one shared `buildCheckModifierContext(system, activity, subject)`, so a displayed formula cannot disagree with the rolled one on any axis the context carries.
 The `activity` argument is load-bearing: the catalogue is shared but the SELECTION is not, so a two-argument call would resolve one activity's formula against another's rule.
@@ -289,9 +292,9 @@ It does not extend to arbitrary external macro effects, and it does not promise 
 ### Modifier Placement and Pre-roll Evidence
 
 After actor resolution, eligibility, bounds, ranking and selection, one immutable placement plan routes Tool, library, situational and advantage contributions by source and by scalar or rolling form.
-Sum/over appends in this exact order: authored post-shim formula, numeric Tool terms in Tool order, combined library scalar, library rolling fragments in eligible order, authored-prefix advantage rewrite and parenthesized situational bonus.
+Sum/over appends in this exact order: authored post-shim formula (its first group kept on the Roll when chosen), numeric Tool terms in Tool order, combined library scalar, library rolling fragments in eligible order, parenthesized situational bonus, then the bonus-die expression.
 Sum/under routes scalars and separately evaluated expressions to the target; count routes them to the pool or threshold according to `pool.modifierDestination`, while count advantage always changes the pool.
-Under sum/under the authored-prefix advantage rewrite keeps the lowest d20 and disadvantage keeps the highest, because a sum that must come in under its target benefits from the lower die.
+Under sum/under the keep transform keeps the lowest `n` of the first group for advantage and the highest for disadvantage, for any die size, because a sum that must come in under its target benefits from the lower dice.
 The plan retains fractional and negative benefits without rounding; a count check's effective pool floors, with float noise rounded away first, only after every pool benefit aggregates, and its effective threshold stays fractional or out of range without clamping.
 `targetDelta`, `thresholdDelta` and `poolDelta` are amounts to add to the effective target, per-die threshold and pool; a count/over threshold benefit is therefore stored negated and a count/under one unchanged.
 A pre-roll `destination` is one of `target`, `threshold` or `pool`.
@@ -302,11 +305,32 @@ An already evaluated dice-bearing Tool contribution keeps its scalar benefit pai
 A versioned Journal crafting check collects these Tool contributions once, from the stage's validated Tools, when the issuing GM prepares the check, and its execution places that prepared snapshot rather than evaluating the Tools again.
 Serialization failure, or reconstruction failure before the main roll posts, aborts before the main check rather than paying a bonus whose evidence was lost.
 An entitled handoff reconstructs after GM execution and reports a failed chat post without rerolling or rolling back that check.
-The optional executed `data.preRolls` records `{ source, label, expression, total, destination }` in placement order; a posted check bundles the main roll first and the pre-rolls after it in one message under the same roll mode, speaker and flavor, with the main total as its content so each viewer sees every roll they may see.
+The optional executed `data.preRolls` records `{ source, label, expression, total, destination }` in placement order, plus `negate: true` on a disadvantaged bonus die, whose `total` stays the unsigned roll and whose settlement subtracts it; a posted check bundles the main roll first and the pre-rolls after it in one message under the same roll mode, speaker and flavor, with the main total as its content so each viewer sees every roll they may see.
 When that bundled post has no explicit roll mode, it reads the posting client's current core mode with the supported-version key (`rollMode` on V13, `messageMode` on V14); an explicit mode takes precedence.
 An entitled prepared handoff carries the already evaluated serialized pre-rolls beside its existing `serializedRoll`, and reconstruction does not reroll; secret execution exposes no formula-bearing handoff or pre-roll evidence to its requester.
 Crafting and salvage prepare their Tool contributions, and every activity places its modifiers, by the check's own normalized evaluation, so the prepared plan and the grading runner always agree.
 Under sum/under the settled `targetDelta` raises or lowers the effective target exactly once, after target resolution and any tier arithmetic, and no benefit term is appended to the rolled formula.
+
+### Advantage and Disadvantage
+
+A check's advantage rule (issue 2007; shape in `data-models/spec.md` § Check advantage record) acts only on the button the player chose, and only when its offer includes that button; any other decision rolls normally, whatever its transport — prompt, bulk `rollDecision`, companion forward or a prepared snapshot.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+| Evaluation | `keep` | `bonus` | counting |
+|---|---|---|---|
+| `sum/over` | the authored first dice group `nDS`, when it qualifies, becomes `(n+extraDice)dS kh n` (`kl n` for disadvantage) | `+ (E)` appended after the situational bonus (`- (E)` for disadvantage) | — |
+| `sum/under` | `(n+extraDice)dS kl n` for advantage, `kh n` for disadvantage | `E` pre-rolled unsigned; its total raises the target for advantage, lowers it for disadvantage | — |
+| `count/*` | — | — | `poolDelta ± countDice`, whatever `modifierDestination` says; the pool floor and `zeroPoolFails` apply after it |
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+- The first group qualifies only when it is a literal plain `Die` term with an integer count of at least 1 and integer faces of at least 2, no modifiers, and an additive position in the authored formula.
+An additive position is the formula's start, a leading unary `+` included, or a place after a top-level `+`, with only positive literal numbers multiplying the group from the left and multiplying or dividing it from the right; a unary minus, a subtraction before the group, a character value as a factor, and `%` each refuse it.
+It is mutated on the constructed `Roll` — `term.number`, a pushed keep modifier, then `resetFormula()` — and never by string rewriting.
+- A modified group (`1d6x`, `2d20kh1`) is refused rather than rewritten, because Foundry applies modifiers in array order and ranks a keep by raw face, never by success or `count`, so on a modified group the better keep would follow the comparator rather than the check's direction.
+- Later groups are never rewritten when the first is refused: there is no search past the first group, and a non-qualifying first group offers no keep at all.
+- The bonus expression must match the dice-and-numbers grammar (dice and numbers joined by `+`/`-`) and be proven rollable by the maximized evaluation (`formulaRolls`), never by `Roll.validate`, which `resolution-modes/spec.md` § Check Source already forbids as an evaluate-time predicate.
+- Odds, the simulator and the "avg" reading describe the Roll button only; an advantaged or disadvantaged roll is out of scope for them.
+- A versioned check answers by the advantage rule captured at prepare time, exactly as it answers by its other prepared snapshot fields.
 
 ## Check Evaluation Foundation
 

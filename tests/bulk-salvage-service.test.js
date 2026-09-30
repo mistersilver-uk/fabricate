@@ -2,7 +2,7 @@
  * `BulkSalvageService` — one player gesture, N salvage attempts, one aggregated card (issue 859).
  */
 
-import { describe, it } from 'node:test';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
@@ -11,7 +11,7 @@ import {
   BulkSalvageService,
   classifySalvageOutcome,
 } from '../src/systems/BulkSalvageService.js';
-import { hasPlainD20 } from '../src/utils/craftingCheckExpression.js';
+import { resolveAdvantageOffer } from '../src/systems/checkAdvantage.js';
 import { attachAwardReceipts, createItemReceiptCollector } from '../src/systems/runHistoryEvidence.js';
 import { createOrStackComponentItem } from '../src/systems/componentStacking.js';
 import {
@@ -21,6 +21,7 @@ import {
   craftingSystemLookup,
   recordingSalvage,
 } from './helpers/bulkSalvageFixtures.js';
+import { installCoreDie } from './helpers/termBearingRoll.js';
 
 /** Swallow the service's per-item `console.error` for one test, and restore after. */
 function silenceErrors(t) {
@@ -775,6 +776,12 @@ describe('BulkSalvageService.run: the ONE roll prompt', () => {
 });
 
 describe('BulkSalvageService.run: allowAdvantage is all-or-nothing, from the system', () => {
+  let restoreDie = null;
+  beforeEach(() => {
+    restoreDie = installCoreDie();
+  });
+  afterEach(() => restoreDie());
+
   /** Run one prompt and hand back the `allowAdvantage` it was offered. */
   async function offeredAdvantage(systems, componentIds) {
     let offered = null;
@@ -804,13 +811,14 @@ describe('BulkSalvageService.run: allowAdvantage is all-or-nothing, from the sys
   });
 
   it('withholds it when ANY usable-check subject does not', async () => {
-    // Offering advantage that only some rolls could honour is a lie about half the batch:
-    // `applyD20Advantage` leaves a non-plain-d20 formula unchanged, so those rows would
-    // roll normally under an Advantage button.
+    // Offering advantage that only some rolls could honour is a lie about half the batch: the
+    // keep leaves a nested first group unchanged, so those rows would roll normally under an
+    // Advantage button. A plain `2d6 + 1` now keeps (R1 class (a), issue 2007), so the refusing
+    // subject is a nested d20 (R1 class (b2)).
     const offered = await offeredAdvantage(
       [
         bulkSystem({ id: 'sys-a', rollFormula: '1d20 + 3', components: [ORE] }),
-        bulkSystem({ id: 'sys-b', rollFormula: '2d6 + 1', components: [HIDE] }),
+        bulkSystem({ id: 'sys-b', rollFormula: '(1d20 + 2) * 2', components: [HIDE] }),
       ],
       ['comp-ore', 'comp-hide']
     );
@@ -818,14 +826,15 @@ describe('BulkSalvageService.run: allowAdvantage is all-or-nothing, from the sys
   });
 
   it('agrees with evaluateCheckRoll for a TOOL-BONUSED plain-d20 formula', async () => {
-    // The evaluator computes its own `allowAdvantage` as `hasPlainD20(effectiveFormula)`.
+    // The evaluator offers by the one derivation, `resolveAdvantageOffer`, on its own formula.
     const formula = '1d20 + @tools';
-    assert.equal(hasPlainD20(formula), true, 'the evaluator would offer advantage');
+    const offer = resolveAdvantageOffer({ authoredFormula: formula });
+    assert.equal(offer.advantage, true, 'the evaluator would offer advantage');
     const offered = await offeredAdvantage(
       [bulkSystem({ rollFormula: formula, components: [ORE] })],
       ['comp-ore']
     );
-    assert.equal(offered, hasPlainD20(formula), 'and so does the service');
+    assert.equal(offered, offer.advantage, 'and so does the service');
   });
 
   it('ignores a subject with NO usable check when deciding', async () => {

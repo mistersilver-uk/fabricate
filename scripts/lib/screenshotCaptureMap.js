@@ -25,6 +25,11 @@ export const CLASS_A_LABELS = Object.freeze(
     'chat-craft-card-under-fail',
     'chat-craft-card-under-otherwise',
     'chat-craft-card-under-misconfigured',
+    'chat-craft-card-advantage-keep',
+    'chat-craft-card-advantage-keep-under',
+    'chat-craft-card-advantage-bonus',
+    'chat-craft-card-advantage-count',
+    'chat-craft-card-advantage-off',
     'fabricate-journal',
     'fabricate-journal-craft-detail',
   ])
@@ -232,6 +237,12 @@ export const SCREENSHOT_CAPTURE_ORDER = Object.freeze([
   'chat-craft-card-under-fail',
   'chat-craft-card-under-otherwise',
   'chat-craft-card-under-misconfigured',
+  // Issue 2007: the advantage cards, crafted after the roll-under cards.
+  'chat-craft-card-advantage-keep',
+  'chat-craft-card-advantage-keep-under',
+  'chat-craft-card-advantage-bonus',
+  'chat-craft-card-advantage-count',
+  'chat-craft-card-advantage-off',
   'fabricate-journal',
   'fabricate-journal-craft-detail',
 ]);

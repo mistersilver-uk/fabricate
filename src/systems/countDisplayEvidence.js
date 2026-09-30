@@ -3,7 +3,7 @@
  * own execution values for a caller that reports its visibility, handed to the result card and
  * box beside that visibility, and never persisted or re-derived from the live check or actor.
  */
-import { benefitSign, destinationFor } from './checkModifierRouter.js';
+import { benefitSign, destinationFor, preRollBenefit } from './checkModifierRouter.js';
 import { countThresholdSource } from './countCheck.js';
 
 const SOURCES = Object.freeze(['tool', 'library', 'situational', 'advantage']);
@@ -26,7 +26,7 @@ export function countPlacementTerms(evaluation, contributions = [], preRolls = [
     add(destinationFor(evaluation, contribution.source), contribution.source, contribution.value);
   }
   for (const entry of Array.isArray(preRolls) ? preRolls : []) {
-    add(entry?.destination, entry?.source, entry?.total);
+    add(entry?.destination, entry?.source, preRollBenefit(entry));
   }
   const listed = (bySource) =>
     SOURCES.filter((source) => (bySource.get(source) ?? 0) !== 0).map((source) => ({

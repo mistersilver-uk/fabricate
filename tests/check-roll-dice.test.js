@@ -14,6 +14,8 @@ import {
 } from '../src/systems/checkRoll.js';
 import { postBundledCheckRoll } from '../src/systems/checkModifierRolls.js';
 
+import { installTermBearingRoll } from './helpers/termBearingRoll.js';
+
 // Stubs
 
 /** The most recently constructed fake Roll (null when none constructed). */
@@ -57,6 +59,29 @@ function installRollStub() {
   // A trivial `@`-substitution so `resolveCheckFormulaDisplay` returns a string.
   FakeRoll.replaceFormulaData = (formula) => String(formula);
   globalThis.Roll = FakeRoll;
+}
+
+/**
+ * Install the shared term-bearing double (issue 2007) for the advantage tests, which read the
+ * EVALUATED roll's `_formula`: the keep transform will act on the constructed Roll's terms.
+ */
+function installTermRollStub() {
+  lastRoll = null;
+  installTermBearingRoll({
+    total: 15,
+    onConstruct: (roll) => {
+      lastRoll = roll;
+    },
+    extend: (TermRoll) =>
+      class CapturingTermRoll extends TermRoll {
+        toMessageCalls = [];
+
+        async toMessage(messageData, options) {
+          this.toMessageCalls.push({ messageData, options });
+          return { id: 'msg' };
+        }
+      },
+  });
 }
 
 let chatCreated = [];
@@ -294,7 +319,7 @@ test('evaluateCheckRoll: non-interactive default does not prompt or post chat', 
 });
 
 test('evaluatePreparedCheck validates decisions, evaluates without posting, and returns a handoff', async () => {
-  installRollStub();
+  installTermRollStub();
   installChatStub();
   try {
     lastRoll = null;
@@ -315,9 +340,10 @@ test('evaluatePreparedCheck validates decisions, evaluates without posting, and 
       { bonus: '3', advantage: 'advantage', modifierIds: ['unknown', 'allowed'], total: 999 }
     );
     assert.equal(result.total, 15, 'the evaluated total comes from the GM Roll');
-    assert.match(lastRoll.formula, /2d20kh1/);
-    assert.match(lastRoll.formula, /\+ 2\[Modifiers\]/);
-    assert.match(lastRoll.formula, /\+ \(3\)/);
+    assert.equal(lastRoll._evaluated, true, 'the evaluated roll');
+    assert.match(lastRoll._formula, /2d20kh1/);
+    assert.match(lastRoll._formula, /\+ 2\[Modifiers\]/);
+    assert.match(lastRoll._formula, /\+ \(3\)/);
     assert.equal(lastRoll.toMessageCalls.length, 0, 'the GM does not post a visible player roll');
     assert.equal(result.rollHandoff.serializedRoll.total, 15);
     assert.equal(Object.hasOwn(result, 'roll'), false);
@@ -855,7 +881,7 @@ test('runFormulaPassFail: non-interactive rollOptions rolls and evaluates normal
 // 7. Advantage / Disadvantage transform (2d20kh1 / 2d20kl1)
 
 test('evaluateCheckRoll: advantage rewrites a plain d20 to 2d20kh1 (before any bonus)', async () => {
-  installRollStub();
+  installTermRollStub();
   installChatStub();
   try {
     await evaluateCheckRoll('1d20 + 3', actor, {
@@ -863,14 +889,14 @@ test('evaluateCheckRoll: advantage rewrites a plain d20 to 2d20kh1 (before any b
       prompt: async () => ({ confirmed: true, advantage: 'advantage' }),
       flavor: 'Crafting check',
     });
-    assert.equal(lastRoll.formula, '2d20kh1 + 3', 'first plain d20 became keep-highest');
+    assert.equal(lastRoll._formula, '2d20kh1 + 3', 'first plain d20 became keep-highest');
   } finally {
     clearStubs();
   }
 });
 
 test('evaluateCheckRoll: advantage + situational bonus yields 2d20kh1 ... + (2)', async () => {
-  installRollStub();
+  installTermRollStub();
   installChatStub();
   try {
     await evaluateCheckRoll('1d20', actor, {
@@ -879,14 +905,14 @@ test('evaluateCheckRoll: advantage + situational bonus yields 2d20kh1 ... + (2)'
       flavor: 'Crafting check',
     });
     // Advantage transform runs first, then the bonus appends.
-    assert.equal(lastRoll.formula, '2d20kh1 + (2)');
+    assert.equal(lastRoll._formula, '2d20kh1 + (2)');
   } finally {
     clearStubs();
   }
 });
 
 test('evaluateCheckRoll: disadvantage rewrites a plain d20 to 2d20kl1', async () => {
-  installRollStub();
+  installTermRollStub();
   installChatStub();
   try {
     await evaluateCheckRoll('1d20 + 3', actor, {
@@ -894,14 +920,14 @@ test('evaluateCheckRoll: disadvantage rewrites a plain d20 to 2d20kl1', async ()
       prompt: async () => ({ confirmed: true, advantage: 'disadvantage' }),
       flavor: 'Crafting check',
     });
-    assert.equal(lastRoll.formula, '2d20kl1 + 3');
+    assert.equal(lastRoll._formula, '2d20kl1 + 3');
   } finally {
     clearStubs();
   }
 });
 
 test('evaluateCheckRoll: normal disposition leaves the formula unchanged', async () => {
-  installRollStub();
+  installTermRollStub();
   installChatStub();
   try {
     await evaluateCheckRoll('1d20', actor, {
@@ -909,14 +935,15 @@ test('evaluateCheckRoll: normal disposition leaves the formula unchanged', async
       prompt: async () => ({ confirmed: true, advantage: 'normal' }),
       flavor: 'Crafting check',
     });
-    assert.equal(lastRoll.formula, '1d20', 'normal keeps the plain d20');
+    assert.equal(lastRoll._formula, '1d20', 'normal keeps the plain d20');
   } finally {
     clearStubs();
   }
 });
 
-test('evaluateCheckRoll: advantage is a no-op for a non-d20 formula (defensive)', async () => {
-  installRollStub();
+// R1 class (a) (issue 2007): a plain first group of any die keeps, where only a `1d20` did.
+test('evaluateCheckRoll: advantage keeps the best of a non-d20 plain first group', async () => {
+  installTermRollStub();
   installChatStub();
   try {
     await evaluateCheckRoll('2d6', actor, {
@@ -924,7 +951,7 @@ test('evaluateCheckRoll: advantage is a no-op for a non-d20 formula (defensive)'
       prompt: async () => ({ confirmed: true, advantage: 'advantage' }),
       flavor: 'Crafting check',
     });
-    assert.equal(lastRoll.formula, '2d6', 'no plain d20 → advantage transform does nothing');
+    assert.equal(lastRoll._formula, '3d6kh2', 'one extra d6, keeping the original two');
   } finally {
     clearStubs();
   }

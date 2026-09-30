@@ -1142,7 +1142,7 @@ test('the capture runner threads the per-case console allowance into the render'
     declaring,
     // The Knowledge error frame's rejected read is rethrown by the store (issue 1969), and a failed
     // roll-under or counting craft or salvage raises the resolved-failure toast the lab reports as
-    // a warning (issues 2005, 2092 and 2006).
+    // a warning (issues 2005, 2092, 2006 and 2007).
     [
       'manager-recipes-blocked-enable-flash',
       'manager-knowledge-error',
@@ -1153,6 +1153,7 @@ test('the capture runner threads the per-case console allowance into the render'
       'player-crafting-roll-result-count-botch-light',
       'player-crafting-roll-result-count-zero',
       'player-crafting-roll-result-count-zero-penalty',
+      'player-crafting-roll-result-count-disadvantage-zero',
     ],
     'a case gained or lost a console-error allowance; the console gate is what makes a lab frame ' +
       'evidence, so widening it is an accepted edit rather than an incidental one'
@@ -2303,8 +2304,8 @@ test('every crafting case claims exactly the resolution-mode body it renders', (
   // draft, and passed clean.
   assert.equal(
     examined.length,
-    78,
-    `expected the 78 crafting-path cases to be examined, saw ${examined.length}`
+    92,
+    `expected the 92 crafting-path cases to be examined, saw ${examined.length}`
   );
   assert.ok(
     examined.filter((id) =>
@@ -3568,6 +3569,7 @@ const SHARED_CASE_MODULES = Object.freeze([
   'journalBlindRunCases.js',
   'journalHistoryCases.js',
   'journalLifecycleCases.js',
+  'playerAdvantagePromptCases.js',
   'playerCountResultCases.js',
 ]);
 

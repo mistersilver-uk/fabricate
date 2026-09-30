@@ -4,6 +4,7 @@
  * carries no evaluation record, path or policy; executed evidence alone names the recorded typed
  * formula, character and tier labels. Actor reads and target resolution stay with their adapters.
  */
+import { preRollBenefit } from '../../systems/checkModifierRouter.js';
 import { numberOrNull } from '../../utils/scalars.js';
 
 import { tileModel } from './countDiceTiles.js';
@@ -56,7 +57,7 @@ export function foldTargetTerms(terms, preRolls = []) {
     if (kind === 'benefit') target += value;
   }
   for (const entry of Array.isArray(preRolls) ? preRolls : []) {
-    if (entry?.destination === 'target') target += numberOrNull(entry.total) ?? 0;
+    if (entry?.destination === 'target') target += numberOrNull(preRollBenefit(entry)) ?? 0;
   }
   return target;
 }
@@ -70,6 +71,7 @@ function preRollRow(entry) {
     expression: typeof entry.expression === 'string' ? entry.expression : '',
     total,
     destination: typeof entry.destination === 'string' ? entry.destination : null,
+    ...(entry.negate === true && { negate: true }),
   };
 }
 

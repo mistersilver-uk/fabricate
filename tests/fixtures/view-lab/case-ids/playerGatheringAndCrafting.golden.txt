@@ -73,3 +73,16 @@ player-crafting-roll-result-count-zero-penalty
 player-crafting-roll-result-count-secret
 player-crafting-roll-prompt-count-companion
 player-crafting-check-descriptor-count
+player-crafting-roll-prompt-keep-multi
+player-crafting-roll-prompt-advantage-under
+player-crafting-roll-prompt-advantage-bonus
+player-crafting-roll-prompt-advantage-only
+player-crafting-roll-prompt-advantage-long
+player-crafting-roll-prompt-count-advantage-one
+player-crafting-roll-prompt-count-advantage
+player-crafting-roll-prompt-count-advantage-off
+player-crafting-chat-card-advantage-keep
+player-crafting-chat-card-advantage-bonus
+player-crafting-roll-result-count-advantage
+player-crafting-roll-result-under-disadvantage-bonus
+player-crafting-roll-result-count-disadvantage-zero

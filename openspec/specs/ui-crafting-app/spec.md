@@ -237,9 +237,11 @@ A stray outside click never dismisses it; Escape and the close control dismiss i
 The body reads: a generic dice glyph beside the formula and, when the check has one target, its DC chip (`DC N · meet or beat` inclusive, `DC N · beat` strict); the applied modifier chips or the bounded player choice; the situational bonus; roll mode; then the footer.
 A roll-over check against a character value names its number a target, never a DC: `Target N · meet or beat` or `Target N · beat`.
 The roll mode is the shared `Select`, whose options are Fabricate's own labels over the legacy `publicroll`/`gmroll`/`blindroll`/`selfroll` tokens, defaulting to the client's supported setting and otherwise to a public roll.
-Advantage-eligible checks offer Disadvantage, Roll and Advantage in that order, each outer action naming what it keeps; other checks offer one Roll.
+A check whose advantage offer (issue 2007) is empty shows one Roll (`data-action="roll"`).
+Otherwise the footer shows Disadvantage (when offered), Roll and Advantage in that order, each outer action carrying the sub-label its rule states.
+Advantage eligibility follows the check's advantage rule and is no longer tied to a plain `1d20`.
 Roll is the form's only submit button, so Enter from any field rolls normally and never with Advantage or Disadvantage.
-Displayed comparison and applied modifiers come from the actual normalized runner and the selected formula contributions, and existing result keys and advantage eligibility are unchanged.
+Displayed comparison and applied modifiers come from the actual normalized runner and the selected formula contributions, and existing result keys are unchanged.
 The posted roll's chat flavor, on the direct and versioned paths alike, carries the `(DC n)` suffix only for a summed roll-over check against a fixed DC; any other evaluation posts no DC in its flavor.
 A summed pass/fail roll under a target or against a character value carries `(Target n)` instead, naming the final target — the anchor plus every settled benefit, the number the prompt chip and the result's Target row show — placed before any appended modifier label.
 A routed roll of any other summed evaluation names no target in its flavor, relative or fixed-range, because each tier grades against its own threshold, and a secret Journal roll names none.
@@ -294,7 +296,7 @@ After confirmation, the selected legal modifiers and any valid situational bonus
 Under any other evaluation, rolling contributions evaluate once outside the main check and share its chat visibility, while cancellation still creates no new modifier roll, check roll or message.
 - **Pre-resolved roll decisions.**
 A caller MAY supply a `rollDecision` (`{ bonus, rollMode, advantage }` — the prompt's own return shape minus `confirmed`).
-The evaluator then treats it as an already-answered choice and **never opens the modal**, running the identical downstream code: the check-modifier append, the advantage transform, the situational-bonus append, the formula-validity net and the effective roll mode.
+The evaluator then treats it as an already-answered choice and **never opens the modal**, running the identical downstream code: the check-modifier append, the check's advantage rule (the keep transform, a bonus-die contribution or a pool change), the situational-bonus append, the formula-validity net and the effective roll mode; a decision naming a choice the rule does not offer rolls normally.
 With no decision supplied every existing path builds a byte-identical options bag, so single-item salvage, crafting, alchemy and gathering are unchanged.
 A decision carries **no `confirmed` key** and MUST NOT be read as a cancellation; only an explicit `confirmed === false` is one.
 A decision supplied without a prompt function must still apply, or the base formula rolls and the player's answer is silently discarded.
@@ -307,8 +309,10 @@ A summed roll-under subject against a fixed target reads `Target N`, and a summe
 When every subject rolls under, the bonus help is the roll-under help above.
 The note that one choice applies to every roll renders on every bulk prompt, including a count-only companion call with no subject rows, which keeps its controls and its normal result.
 The heading names the activity and, for a batch of one actor, that actor with the item count; a caller that names neither reads "Bulk check" over the item count.
-Advantage is offered only when **every** usable-check subject's **authored** formula carries a plain `1d20`, computed from the crafting system rather than from the listing projection, which carries no formula at all.
-It is all-or-nothing across those subjects: offering advantage only some rolls could honour would be a lie about the rest of the batch.
+Advantage is offered only when **every** usable-check subject's advantage offer includes it, and Disadvantage only when every one includes Disadvantage, computed from the crafting system's authored checks rather than from the listing projection, which carries no formula at all.
+A sub-label shows only when it is identical for every subject; otherwise the buttons render with no sub-label.
+Each roll applies the one answer by its own check's rule — Advantage on a `2d6` subject and a `1d20` subject in the same batch keeps each subject's own dice.
+It is all-or-nothing across those subjects: offering a choice only some rolls could honour would be a lie about the rest of the batch.
 The prompt is not shown at all when no selected item has a usable check, and dismissal returns the same not-confirmed shape the single-item prompt returns.
 
 ### Result Chat Cards
@@ -326,7 +330,7 @@ The prompt is not shown at all when no selected item has a usable check, and dis
   A roll-high check against a fixed DC states `Needed` (`DC {T}, meet or beat`, or `DC {T}, beat` when strict) and `Margin` (`{±n}`).
   Every other summed check states `Target`, `Pre-rolled` and `Margin`:
   - `Target` reads `{T} · {character} {expression} {value}, {tier} {adjustment}, tools {±t}, modifiers {±m}, situational {±s}`, such as `14 · Sera Vane @skills.smith.level 12, Hard Work −2, modifiers +1, situational +3`, naming only the parts the record holds; a record without the typed formula reads `character value {v}`, one without the tier's name `difficulty {adjustment}`, a fixed anchor `fixed`, and a record without terms the bare number;
-  - `Pre-rolled` reads `{label} {formula} rolled {n}, raising the target` for each pre-roll that landed on the target, joined by semicolons, with the one pair of brackets the resolver wraps a rolled modifier in dropped and an unlabelled one named `Tool`, `Modifier` or `Situational`;
+  - `Pre-rolled` reads `{label} {formula} rolled {n}, raising the target` for each pre-roll that landed on the target (`lowering the target` for a disadvantaged bonus die, labelled `Disadvantage`, whose unsigned roll the target loses), joined by semicolons, with the one pair of brackets the resolver wraps a rolled modifier in dropped and an unlabelled one named `Tool`, `Modifier` or `Situational`;
   - `Margin` reads `{±n} under the target` under a roll-under check and `{±n}` otherwise.
 
   A fixed range, an Otherwise tier and a progressive result have no target, so they state neither a target nor a margin, and a legacy record omits every row its evidence lacks.
@@ -341,7 +345,7 @@ The prompt is not shown at all when no selected item has a usable check, and dis
 - **A counting check states its executed dice.**
   For a public, non-secret counting check (`publicroll` on V13, `public` on V14) the crafting, salvage and bulk salvage cards show the die tiles and the count rows, and the summary line `{pool}d{die}, each {sym} {threshold}` replaces the numeric roll row.
   Each active die is one tile in roll order with its marks combined (✓ qualified, ✕ cancelled, ↻ exploded), and each explosion roll is its own tile straight after the die that produced it.
-  The rows are `Success on` (only when the threshold read the character or modifiers moved it), `Count`, `Needed` (`{required} · margin {±m}`, or `{required} · a net below zero is a botch`) and `Pre-rolled`; a pool reduced to zero states `Pool` and `Result` instead, shows no tile and prints no roll total.
+  The rows are `Success on` (only when the threshold read the character or modifiers moved it), `Count`, `Needed` (`{required} · margin {±m}`, or `{required} · a net below zero is a botch`) and `Pre-rolled`; a pool reduced to zero states `Pool` and `Result` instead, shows no tile and prints no roll total, and names dice that Disadvantage removed as a `disadvantage` penalty.
   A failed count that netted below zero reads `Botch` in place of the Failure pill.
   That evidence is handed to the card builder at post time from the engine's own execution and is never persisted into check data, run history, a roll handoff or message flags; a secret check keeps it inside the authority.
   A gmroll, blindroll or selfroll count card, or a secret one, shows no count rows or tiles, and the card is never whispered to compensate.

@@ -99,6 +99,8 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   // The Checks route's per-activity words.
   'src/ui/svelte/apps/manager/checks/checksActivityCopy.js',
   'src/ui/svelte/apps/manager/checks/checkTargetStatus.js',
+  // The Formula card's advantage notes (issue 2007).
+  'src/ui/svelte/apps/manager/checks/checkAdvantageCopy.js',
   'src/systems/checkEvaluation.js',
   'src/systems/checkRoll.js',
   // `checkRoll.js` resolves and validates check targets (issue 2003), and localizes a refusal.
@@ -113,7 +115,13 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/systems/countDisplayEvidence.js',
   'src/systems/countRoll.js',
   'src/systems/normalize/checkEvaluation.js',
+  'src/systems/normalize/checkAdvantage.js',
   'src/systems/checkRollDecision.js',
+  // `checkRollDecision.js` plans the keep transform the main roll takes (issue 2007).
+  'src/systems/checkKeepTransform.js',
+  // …from the check's one advantage offer, which the prepared authority also enforces.
+  'src/systems/checkAdvantage.js',
+  'src/systems/preparedDecisionPolicy.js',
   'src/systems/checkRouting.js',
   'src/systems/checkRollOutput.js',
   'src/systems/checkModifierRolls.js',

@@ -36,6 +36,14 @@ export const COUNT_RESULT_STATES = Object.freeze({
   'count-result-zero': { slot: 'crafting', pool: ZERO },
   'count-result-zero-penalty': { slot: 'crafting', pool: ZERO_PENALTY },
   'salvage-count-result': { slot: 'salvage', pool: PASS },
+  // Issue 2007: Disadvantage removes three dice from a pool of two, which fails unrolled.
+  'count-result-disadvantage-zero': {
+    slot: 'crafting',
+    pool: { die: 10, base: '2', threshold: '8', required: 1, zeroPoolFails: true },
+    advantage: { countDice: 3 },
+  },
+  // Issue 2007: Advantage adds two dice, so four d6s net eight.
+  'count-result-advantage': { slot: 'crafting', pool: PASS, advantage: { countDice: 2 } },
   // The horseshoe's recipe tier needs one success where the pool needs two.
   'count-result-descriptor': {
     slot: 'crafting',
@@ -48,7 +56,7 @@ const counted = (pool) => normalizeCheckEvaluation({ product: 'count', direction
 
 /** Persist one state's check on Smithing before the player app mounts. */
 export async function seedCountResult(world, state) {
-  const { slot, pool, tier } = COUNT_RESULT_STATES[state];
+  const { slot, pool, tier, advantage } = COUNT_RESULT_STATES[state];
   const manager = world.fabricate.craftingSystemManager;
   const system = manager.getSystem('lab-smithing');
   const check =
@@ -63,6 +71,9 @@ export async function seedCountResult(world, state) {
               thresholdMode: 'meet',
               evaluation: counted(pool),
               ...(tier && { tiers: [...(system.craftingCheck.simple.tiers ?? []), tier] }),
+              ...(advantage && {
+                advantage: { ...system.craftingCheck.simple.advantage, ...advantage },
+              }),
             },
           },
         }

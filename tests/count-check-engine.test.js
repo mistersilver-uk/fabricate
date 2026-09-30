@@ -474,7 +474,7 @@ test('bulk salvage: a refused count row is misconfigured, rolls nothing and cons
   assert.deepEqual(control.formulas, ['2d10']);
 });
 
-test('bulk salvage offers no advantage over a count check whose retained formula is a d20', async () => {
+test('bulk salvage offers the count rule over a count check whose retained formula is a d20', async () => {
   const prompts = [];
   salvageWorld('simple', simpleCheck(countEvaluation(), { rollFormula: '1d20' }));
   const system = globalThis.game.fabricate.getCraftingSystemManager().getSystem('sys-salvage');
@@ -490,7 +490,8 @@ test('bulk salvage offers no advantage over a count check whose retained formula
     [{ system, component: {}, item: { actorName: 'Salvager', name: 'Ore' } }],
     true
   );
-  assert.equal(prompts[0].allowAdvantage, false);
+  assert.equal(prompts[0].allowAdvantage, true);
+  assert.deepEqual(prompts[0].advantageOffer, { advantage: true, disadvantage: true, kind: 'count', detail: { dice: 1 } });
 });
 
 // ── gathering ─────────────────────────────────────────────────────────────────
@@ -623,7 +624,11 @@ test('the gathering descriptor refuses a count pool and captures its resolved po
     zeroPoolFails: false,
     modifierDestination: 'threshold',
   });
-  assert.equal(described.publicPrompt.allowAdvantage, false, 'the retained 1d20 offers none');
+  assert.deepEqual(
+    described.publicPrompt.advantageOffer,
+    { advantage: true, disadvantage: true, kind: 'count', detail: { dice: 1 } },
+    'the count rule offers, never the retained 1d20'
+  );
   assert.equal(described.publicPrompt.allowsSituationalModifier, true);
   assert.equal(described.privateEvaluation.flavor, 'Forage — Gathering check', 'no DC suffix');
   assert.equal(JSON.stringify(described.publicPrompt).includes('skills'), false);
@@ -1081,7 +1086,7 @@ test('the interactive count prompt reads the pre-modifier pool and each runner\'
     { ...expected, comparison: 'meet', required: null },
   ], 'the pool 3.6 is handed unfloored for the prompt to floor after its benefits, and a progressive check needs no count');
   for (const input of prompted) {
-    assert.deepEqual([input.dc, input.target, input.formula, input.allowAdvantage], [null, null, '', false]);
+    assert.deepEqual([input.dc, input.target, input.formula, input.allowAdvantage], [null, null, '', true]);
   }
 });
 

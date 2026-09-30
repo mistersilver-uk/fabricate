@@ -25,6 +25,7 @@ import { installCountDice } from './helpers/countEngineDice.js';
 import { countEvaluation } from './helpers/countFixtures.js';
 import { stubPromptSurface } from './helpers/rollPromptDialogStub.js';
 import { defineStructureContract } from './helpers/structureContract.js';
+import { installTermBearingRoll } from './helpers/termBearingRoll.js';
 
 // Stubs
 
@@ -77,6 +78,38 @@ function installRoll({ total = 18, throwOnConstruct = false } = {}) {
     });
   globalThis.Roll = FakeRoll;
   return { constructions };
+}
+
+/**
+ * Install the shared term-bearing double (issue 2007) for the advantage tests: `constructions`
+ * are the strings `new Roll` received and `evaluated` each evaluated roll's `_formula`, which the
+ * keep assertions read because the keep transform will act on the constructed Roll's terms.
+ */
+function installTermRoll({ total = 18 } = {}) {
+  const constructions = [];
+  const evaluated = [];
+  installTermBearingRoll({
+    total,
+    extend: (TermRoll) =>
+      class RecordingTermRoll extends TermRoll {
+        constructor(formula, data, options) {
+          constructions.push(String(formula));
+          super(formula, data, options);
+        }
+
+        async evaluate(options) {
+          await super.evaluate(options);
+          evaluated.push(this._formula);
+          return this;
+        }
+
+        async toMessage(messageData, options) {
+          chatPosts.push({ messageData, options });
+          return { id: 'msg' };
+        }
+      },
+  });
+  return { constructions, evaluated };
 }
 
 let chatPosts = [];
@@ -339,7 +372,7 @@ describe('AC-7 — a pre-resolved decision drives the roll without opening a dia
 
   it('opens NO dialog when a decision is supplied, and the decision still reaches the roll', async () => {
     installChat();
-    const rolls = installRoll();
+    const rolls = installTermRoll();
     const { seams, calls } = makeSeams({ real: true });
 
     const result = await rollActorCheck(
@@ -353,9 +386,9 @@ describe('AC-7 — a pre-resolved decision drives the roll without opening a dia
 
     assert.equal(result.outcome, COMPANION_OUTCOMES.checkPassed);
     assert.equal(calls.prompt.length, 0, 'one answer drives N rolls, so no dialog opens');
-    const [rolled] = rolls.constructions;
+    const [rolled] = rolls.evaluated;
     assert.match(rolled, /2d20kh1/, 'the advantage disposition rewrote the d20 pool');
-    assert.match(rolled, /\(\+3\)/, 'and the situational bonus appended');
+    assert.match(rolls.constructions[0], /\(\+3\)/, 'and the situational bonus appended');
     const [post] = chatPosts;
     assert.equal(post?.options?.rollMode, 'blindroll', 'and the roll mode reached the chat post');
   });
@@ -365,7 +398,7 @@ describe('AC-7 — a pre-resolved decision drives the roll without opening a dia
     // is about a caller that forwarded a whole prompt answer, and a prompt answer is usually a
     // confirmation.
     installChat();
-    const rolls = installRoll();
+    const rolls = installTermRoll();
     const { seams, calls } = makeSeams({ real: true });
 
     const result = await rollActorCheck(
@@ -384,9 +417,30 @@ describe('AC-7 — a pre-resolved decision drives the roll without opening a dia
 
     assert.equal(result.outcome, COMPANION_OUTCOMES.checkPassed);
     assert.equal(calls.prompt.length, 0, 'a supplied decision still opens no dialog');
-    const [rolled] = rolls.constructions;
+    const [rolled] = rolls.evaluated;
     assert.match(rolled, /2d20kh1/, 'and the decision still drove the roll it was handed to');
-    assert.match(rolled, /\(\+3\)/);
+    assert.match(rolls.constructions[0], /\(\+3\)/);
+  });
+
+  it('rolls the default rule’s keep transform on a forwarded Advantage (issue 2007, R2)', async () => {
+    installChat();
+    const rolls = installTermRoll();
+    const { seams, calls } = makeSeams({ real: true });
+
+    const result = await rollActorCheck(
+      request({
+        formula: '1d12 + 3',
+        dc: 15,
+        interactive: true,
+        rollDecision: { bonus: null, rollMode: undefined, advantage: 'advantage' },
+      }),
+      seams
+    );
+
+    assert.equal(result.outcome, COMPANION_OUTCOMES.checkPassed);
+    assert.equal(calls.prompt.length, 0);
+    const [rolled] = rolls.evaluated;
+    assert.equal(rolled, '2d12kh1 + 3', 'a standalone roll takes the default rule (R2)');
   });
 
   it('treats a hand-built decision carrying confirmed:false as a cancel', async () => {
@@ -414,9 +468,11 @@ describe('AC-7 — a pre-resolved decision drives the roll without opening a dia
 
 describe('AC-8 — allowAdvantage is computed over the USABLE subset, all-or-nothing', () => {
   for (const [formulas, expected, why] of [
-    [['1d20+@prof', '2d10+3'], false, 'a 2d10 check cannot honour Advantage'],
+    // R1 class (a) (issue 2007): a plain 2d10 first group now keeps, so it offers.
+    [['1d20+@prof', '2d10+3'], true, 'a plain 2d10 first group keeps under the default rule'],
+    [['1d20+@prof', '(1d20 + 2) * 2'], false, 'a nested d20 cannot honour Advantage (R1 (b2))'],
     [['1d20+@prof', ''], true, 'the empty formula is not usable and is excluded before the test'],
-    [['2d10', '2d10'], false, 'no plain d20 anywhere in the batch'],
+    [['2d10', '2d10'], true, 'every usable formula has a plain first group (R1 class (a))'],
   ]) {
     it(`${JSON.stringify(formulas)} -> allowAdvantage ${expected}: ${why}`, async () => {
       installChat();
@@ -550,7 +606,8 @@ describe('AC-14 (bulk half) — resolveBulkCheckDecision never throws, whatever 
     const result = await resolveBulkCheckDecision(
       {
         callSite: 'gmAction',
-        formulas: ['1d20', '2d10'],
+        // R1 class (b2) (issue 2007): the nested d20 is what refuses, since a plain 2d10 keeps.
+        formulas: ['1d20', '(1d20 + 2) * 2'],
         // The keys a caller might expect to matter, and the ones that would matter if the
         // request were spread anywhere: this member takes no actor and no `interactive`.
         actorId: 'ghost',
@@ -567,11 +624,16 @@ describe('AC-14 (bulk half) — resolveBulkCheckDecision never throws, whatever 
     assert.equal(calls.promptBulk.length, 1);
     assert.deepEqual(
       Object.keys(calls.promptBulk[0]),
-      ['allowAdvantage', 'count'],
-      'the dialog is told exactly two things, both DERIVED from the formulas'
+      ['allowAdvantage', 'advantageOffer', 'count'],
+      'the dialog is told exactly three things, each DERIVED from the formulas'
     );
     assert.equal(calls.promptBulk[0].count, 2, 'the batch size, never the caller-supplied one');
-    assert.equal(calls.promptBulk[0].allowAdvantage, false, 'derived: a 2d10 cannot honour it');
+    assert.equal(calls.promptBulk[0].allowAdvantage, false, 'derived: a nested d20 cannot honour it');
+    assert.deepEqual(
+      calls.promptBulk[0].advantageOffer,
+      { advantage: false, disadvantage: false, kind: null, detail: null },
+      'and the intersected offer is empty'
+    );
   });
 });
 
@@ -593,9 +655,13 @@ describe('AC-9 — the module rolls nothing and reaches nothing it was not given
           '',
           [
             '../utils/craftingCheckExpression.js',
+            // The one advantage offer derivation (issue 2007), called with no dice engine.
+            './checkAdvantage.js',
             './checkTarget.js',
             './companionCheckEvaluation.js',
             './companionContract.js',
+            // The default advantage rule a standalone roll rolls under (issue 2007, ruling R2).
+            './normalize/checkAdvantage.js',
             './salvageCheckUsability.js',
           ],
         ],
@@ -1039,22 +1105,24 @@ describe('attribute dispatch and roll-under (QE15, F1, D10)', () => {
     }
   });
 
-  it('keeps advantage and additional dice refused on an interactive count request, before any prompt or roll (issues 2007, 2008)', async () => {
+  it('keeps additional dice refused on an interactive count request, before any prompt or roll (issue 2008)', async () => {
     const additional = { additionalDice: { enabled: true, source: 'path', path: 'system.momentum', max: 2 } };
     const cases = [
-      ['forwarded advantage', {}, { rollDecision: { bonus: null, advantage: 'advantage' } }],
-      ['forwarded disadvantage', {}, { rollDecision: { bonus: null, advantage: 'disadvantage' } }],
-      ['additional dice, prompted', additional, {}],
-      ['additional dice, forwarded', additional, { rollDecision: { bonus: null, advantage: 'normal' } }],
+      ['additional dice, prompted', {}],
+      ['additional dice, forwarded', { rollDecision: { bonus: null, advantage: 'normal' } }],
     ];
     for (const direction of ['over', 'under']) {
-      for (const [name, pool, extra] of cases) {
+      for (const [name, extra] of cases) {
         installChat();
         const dice = installCountDice({ faces: [9, 9] });
         try {
           const { seams, calls } = makeSeams({ real: true });
           const result = await rollActorCheck(
-            request({ interactive: true, evaluation: countEvaluation({ direction, ...pool }), ...extra }),
+            request({
+              interactive: true,
+              evaluation: countEvaluation({ direction, ...additional }),
+              ...extra,
+            }),
             seams
           );
           assert.equal(result.outcome, 'evaluationUnsupported', `${direction}: ${name}`);
@@ -1063,6 +1131,34 @@ describe('attribute dispatch and roll-under (QE15, F1, D10)', () => {
         } finally {
           dice.restore();
         }
+      }
+    }
+  });
+
+  it('honours a forwarded Advantage or Disadvantage on an interactive count row: the pool grows or shrinks by the default die (issue 2007)', async () => {
+    // Base pool 2 at threshold 8: Advantage rolls 3 dice, Disadvantage rolls 1, both counted `over`.
+    const cases = [
+      ['advantage', [9, 9, 9], 3],
+      ['disadvantage', [9], 1],
+    ];
+    for (const [advantage, faces, expectedTotal] of cases) {
+      installChat();
+      const dice = installCountDice({ faces });
+      try {
+        const { seams, calls } = makeSeams({ real: true });
+        const result = await rollActorCheck(
+          request({
+            interactive: true,
+            evaluation: countEvaluation({ direction: 'over' }),
+            rollDecision: { bonus: null, advantage },
+          }),
+          seams
+        );
+        assert.equal(calls.prompt.length, 0, `${advantage} forwards without a prompt`);
+        assert.equal(result.outcome, 'checkPassed', advantage);
+        assert.equal(result.total, expectedTotal, `${advantage} moves the pool by the default die`);
+      } finally {
+        dice.restore();
       }
     }
   });
@@ -1881,7 +1977,7 @@ describe('interactive summed rows compose with the shared prompt and a forwarded
     for (const cell of cells) {
       const key = `${cell.mode.direction}/${cell.source}`;
       installChat();
-      const rolled = installRoll({ total: 10 });
+      const rolled = installTermRoll({ total: 10 });
       const { seams, calls } = makeSeams({ real: true });
       const result = await roll(cell, {
         interactive: true,
@@ -1889,7 +1985,7 @@ describe('interactive summed rows compose with the shared prompt and a forwarded
         seams,
       });
       assert.equal(calls.prompt.length, 0, `${key}: a forwarded decision opens no prompt`);
-      assert.ok(rolled.constructions.includes(EXPECTED[key].formula), `${key}: ${rolled.constructions}`);
+      assert.ok(rolled.evaluated.includes(EXPECTED[key].formula), `${key}: ${rolled.evaluated}`);
       assert.equal(result.target, EXPECTED[key].target, key);
     }
   });

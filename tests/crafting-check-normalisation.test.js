@@ -17,6 +17,7 @@ const { CraftingSystemManager } = await import('../src/systems/CraftingSystemMan
 const { normalizeCheckEvaluation, normalizeNullableSuccesses } = await import(
   '../src/systems/normalize/checkEvaluation.js'
 );
+const { normalizeCheckAdvantage } = await import('../src/systems/normalize/checkAdvantage.js');
 
 // Helper: make a minimal manager
 function makeManager() {
@@ -92,6 +93,7 @@ test('_normalizeCraftingCheck defaults the routed config when absent', () => {
     rollFormula: '',
     evaluation: normalizeCheckEvaluation(),
     offerSituationalBonus: true,
+    advantage: normalizeCheckAdvantage(),
     dc: 15,
     thresholdMode: 'meet',
     // The routed slot carries its own DC SOURCE (issue 1096), absence-preserving: anything
@@ -539,6 +541,7 @@ test('_normalizeCraftingCheck defaults the simple config when absent', () => {
     rollFormula: '',
     evaluation: normalizeCheckEvaluation(),
     offerSituationalBonus: true,
+    advantage: normalizeCheckAdvantage(),
     dc: 15,
     thresholdMode: 'meet',
     dcMode: 'static',
@@ -556,6 +559,7 @@ test('_normalizeCraftingCheck defaults the progressive check when absent', () =>
     rollFormula: '',
     evaluation: normalizeCheckEvaluation(),
     offerSituationalBonus: true,
+    advantage: normalizeCheckAdvantage(),
     checkBreakage: { triggers: [] },
   });
 });

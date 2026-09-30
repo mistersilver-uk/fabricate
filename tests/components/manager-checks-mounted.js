@@ -3713,7 +3713,10 @@ export function registerChecksCases() {
 
   it('sorts a section’s blocking notices above its warnings, as Validation orders its rows', async () => {
     // A refused placement raises the warning `noRollFormula` BEFORE the critical it causes.
-    await mountChecks([], routedCraftingOptions('1d20 * @craftingmod'));
+    // Advantage is off: a keep rule cannot keep a die multiplied by a reference (issue 2007).
+    const options = routedCraftingOptions('1d20 * @craftingmod');
+    options.craftingCheck.routed.advantage = { mode: 'off' };
+    await mountChecks([], options);
     await openChecksActivity('crafting');
     assert.deepEqual(noticeIds(), ['retiredPlaceholderBreaksFormula', 'noRollFormula']);
     for (const notice of target.querySelectorAll('[data-checks-section-notice]')) {

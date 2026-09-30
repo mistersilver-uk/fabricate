@@ -17,6 +17,7 @@ import { activityPermitsFailureResults } from '../utils/failureResultPolicy.js';
 import { resolveProgressiveAward as resolveProgressiveAwardLoop } from '../utils/progressiveAward.js';
 import { matchResultGroupsByName, normalizeRoutedName } from '../utils/routedOutcomeKeywords.js';
 
+import { advantageOfferFields, authoredOfferOptions } from './checkAdvantage.js';
 import { buildCheckModifierContext } from './checkModifierResolver.js';
 import {
   evaluateSituationalBonus,
@@ -808,8 +809,7 @@ export class GatheringEngine {
           resolveCheckFormulaDisplay(shown, actor, null, undefined, evaluation)?.display ?? shown,
         allowsSituationalModifier: hasActiveCheck(config, rollFormula),
         offerSituationalBonus: config?.offerSituationalBonus !== false,
-        // A count check offers no advantage until it is mode-aware (issue 2007).
-        allowAdvantage: !count && Boolean(rollFormula && /(?:^|\W)d20(?:\W|$)/i.test(rollFormula)),
+        ...advantageOfferFields(config, evaluation, rollFormula),
         target: showTarget ? dc : null,
         direction: showTarget ? evaluation.direction : null,
         comparison: showTarget ? (config?.thresholdMode === 'exceed' ? 'exceed' : 'meet') : null,
@@ -3866,7 +3866,7 @@ export class GatheringEngine {
           }),
           evaluation,
         }),
-        offerSituationalBonus: routed?.offerSituationalBonus !== false,
+        ...authoredOfferOptions(routed),
       },
     });
   }
@@ -4091,7 +4091,7 @@ export class GatheringEngine {
             activity: 'Gathering',
             img: task?.img,
           }),
-          offerSituationalBonus: progressive?.offerSituationalBonus !== false,
+          ...authoredOfferOptions(progressive),
         },
       });
       // A cancelled roll makes `_resolveProgressiveOutcome` abort with zero mutation.

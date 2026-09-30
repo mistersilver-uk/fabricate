@@ -396,6 +396,83 @@ The result box, and a salvage's own result summary, are more forgiving: both sti
 A pass-or-fail check's chat message also names the settled target in its flavor line outside a **Higher is better** check against a **Fixed difficulty**, reading, for example, "Crafting check (Target 14)" once every benefit has raised or adjusted it.
 A routed check, which grades each outcome tier against its own threshold rather than one final number, names no target this way, whichever way it reads or what it is measured against.
 
+## Advantage and disadvantage
+
+Every pass-or-fail, routed, or progressive crafting, salvage, or gathering check that adds the dice can offer the player Advantage and Disadvantage.
+You author this on the check's Formula card, in the **In the roll prompt** group, beside [Offering a situational bonus in the prompt](#offering-a-situational-bonus-in-the-prompt).
+An **Advantage and disadvantage** control offers three modes.
+
+- **Off** gives the player a single **Roll** button, with no Advantage or Disadvantage offered.
+- **Roll extra, keep one** rolls extra dice and keeps the best of them, and is the default.
+- **Bonus die** adds a separate dice expression instead of extra dice.
+
+A success-counting check carries its own **Offer advantage and disadvantage** switch in place of this control, covered in [Advantage and disadvantage on a counting check](#advantage-and-disadvantage-on-a-counting-check).
+
+### Roll extra, keep one
+
+This mode changes only the formula's first dice group, the first block of dice your formula rolls, reading left to right.
+That group must be a plain die with no keep, explode, or other suffix of its own, such as `1d20`, `2d6`, or `1d12`.
+
+A **Dice rolled for {die}** stepper sets how many dice Advantage rolls, from the group's own count up to four more.
+On a **Higher is better** check, Advantage rolls that many dice and keeps the highest, and Disadvantage rolls the same dice and keeps the lowest.
+On a **Lower is better** check the keep flips, because the low roll is the good one there: Advantage keeps the lowest and Disadvantage keeps the highest.
+
+For example, a check whose formula begins `1d12 + @mod` rolls `2d12kh1 + @mod` on Advantage.
+A check whose formula begins `2d6` rolls `3d6kh2` with two extra dice set on the stepper.
+A check whose formula begins `1d6 + 1d20` rolls extra d6s on Advantage, never extra d20s, because the d6 comes first.
+
+When the formula's first dice group is not a plain die, such as `(1d20 + 2) * 2`, there is nothing for this mode to keep from.
+The Formula card says so directly: "The formula's first dice group is not a plain die, so the prompt has a single Roll button."
+It adds: "Choose Bonus die, or start the formula with a plain die."
+Fabricate gives the player a single Roll button and raises a Validation warning, without changing the check's other readings, so the formula's ordinary average still shows on the Formula card.
+Choose **Bonus die** instead, or move a plain die to the front of your formula.
+
+### Bonus die
+
+This mode leaves the check's own dice alone and instead adds a separate dice expression you write in the **Bonus expression** field, such as `1d6`, `2d4`, or `1d8 + 1`.
+Use it when your formula has more than one dice group, or when the game system's own advantage rule grants a fixed die rather than extra dice from the formula.
+
+On a **Higher is better** check, Advantage adds the bonus expression to the total and Disadvantage subtracts it.
+On a **Lower is better** check, Advantage raises the target the roll must stay under, making the check easier, and Disadvantage lowers it.
+
+The **Bonus expression** field takes dice and numbers joined by plus or minus, such as `1d6`, `2d4 + 1`, or `+3`.
+Its help line reads "Any dice expression: 1d6, 2d4, 1d8 + 1." while the expression is valid.
+It reads "Enter a dice expression, such as 1d6, 2d4 or 1d8 + 1." while the field is empty.
+While the expression does not parse, it reads "Not a dice expression."
+It adds: "Use dice and numbers joined by + or −, such as 1d8 + 1."
+The offer is withdrawn until the expression is fixed.
+
+### Also offer disadvantage
+
+Both summing modes carry an **Also offer disadvantage** switch, on by default.
+Turn it off, and the Formula card says "The prompt offers advantage only," dropping the Disadvantage button from the roll prompt.
+
+### The roll prompt and chat card
+
+When a check offers Advantage, its roll prompt shows three buttons: **Disadvantage**, **Roll**, and **Advantage**, each captioned with what choosing it does, for example "keep the better" and "keep the worse" under **Roll extra, keep one**, or "+1d6 to the total" and "−1d6 to the total" under **Bonus die**.
+Turning off **Also offer disadvantage** drops the Disadvantage button, leaving Roll and Advantage.
+When Advantage has nothing to offer, such as a check set to **Off**, or a **Roll extra, keep one** check with no qualifying first dice group, the prompt shows a single Roll button.
+
+The chat card and the crafter's own result box always show the formula exactly as it was rolled, extra dice included, so a `1d12 + @mod` check rolled on Advantage reads `2d12kh1 + <resolved bonus>`.
+
+### Advantage and disadvantage on a counting check
+
+A success-counting check has its own **Offer advantage and disadvantage** switch, off by default, in place of the mode control above.
+Turn it on, and a **Dice added or removed** stepper sets how many dice change the pool, from one to five.
+Advantage adds that many dice to the pool and Disadvantage removes them, always the pool, whatever **Modifiers and bonuses** sends a situational bonus to.
+The Formula card explains it directly: "Advantage adds 1 die to the pool; disadvantage removes 1," or, with more than one die set, "Advantage adds {n} dice to the pool; disadvantage removes {n}."
+
+A pool Disadvantage reduces to zero or fewer dice follows the check's own **Zero pool** setting, exactly as a shrunk pool from any other cause does.
+See [Where a bonus lands, and a pool that runs dry](#where-a-bonus-lands-and-a-pool-that-runs-dry).
+
+### Advantage warnings on Validation
+
+- **Advantage cannot keep from this formula**: the check is set to **Roll extra, keep one**, but its first dice group is not a plain die, so the prompt offers a single Roll button.
+Choose **Bonus die**, or start the formula with a plain die.
+- **A character value precedes the kept dice**: a character value such as `@skill` comes before the formula's first dice group.
+If that value itself rolls dice, Advantage still applies only to the formula's own first dice group, never to the character value's dice.
+- **The advantage bonus is not a dice expression**: the **Bonus expression** field under **Bonus die** is empty or does not parse as dice and numbers joined by plus or minus.
+
 ## Success-counting checks
 
 Some games measure a check by rolling several dice and counting how many of them individually clear a threshold, rather than adding the dice together into one total.

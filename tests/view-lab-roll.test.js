@@ -147,7 +147,8 @@ async function countPromptView(world) {
       assert.equal(view.labels.formulaNote, rules);
       assert.equal(view.neededText, '2 successes needed');
       assert.equal(view.labels.eachAdds, eachAdds);
-      assert.deepEqual([view.dc, view.allowAdvantage], [null, false]);
+      // The count rule offers by default (issue 2007).
+      assert.deepEqual([view.dc, view.allowAdvantage], [null, true]);
       assert.deepEqual(dice.constructed, [], 'a dismissed prompt rolls nothing');
     } finally {
       surface.restore();
@@ -401,6 +402,15 @@ test('a bare dN defaults to one die', async () => {
   assert.equal(roll.dice[0].results.length, 1);
 });
 
+test('a negated die totals negative, wrapped as core wraps it in `(… * -1)`', async () => {
+  const negated = await new (scriptedRoll([4], 6))('-1d6').evaluate();
+  assert.equal(negated.formula, '(1d6 * -1)');
+  assert.equal(negated.total, -4);
+  const offset = await new (scriptedRoll([7], 20))('-1d20 + 30').evaluate();
+  assert.equal(offset.formula, '(1d20 * -1) + 30');
+  assert.equal(offset.total, 23);
+});
+
 test('toMessage routes to ChatMessage.create and tolerates its absence', async () => {
   const Roll = makeRoll();
   const roll = await new Roll('1d6').evaluate();
@@ -437,7 +447,8 @@ test('toMessage routes to ChatMessage.create and tolerates its absence', async (
 test('evaluated Roll snapshots survive JSON transport without consuming seeded entropy', async () => {
   const Roll = makeRoll();
   const ControlRoll = makeRoll();
-  const formula = '2d20kh1 + @prof + 1d4 [Tool]';
+  // No space before `[Tool]`: real Foundry refuses `1d4 [Tool]` (the recorded 13.351/14.365 terms).
+  const formula = '2d20kh1 + @prof + 1d4[Tool]';
   const options = { flavor: 'Smithing', custom: { source: 'check' } };
   const original = await new Roll(formula, { prof: 3 }, options).evaluate();
   await new ControlRoll(formula, { prof: 3 }).evaluate();
@@ -448,7 +459,7 @@ test('evaluated Roll snapshots survive JSON transport without consuming seeded e
   );
   assert.equal(snapshot.class, 'LabRoll');
   assert.equal(snapshot.evaluated, true, 'core uses evaluated, not _evaluated, on the wire');
-  assert.equal(snapshot.formula, '2d20kh1 + 3 + 1d4 [Tool]');
+  assert.equal(snapshot.formula, '2d20kh1 + 3 + 1d4[Tool]');
   assert.equal(snapshot.total, original.total);
   assert.deepEqual(snapshot.options, options);
   const transported = JSON.parse(JSON.stringify(snapshot));
@@ -506,7 +517,7 @@ test('prepared run checks hand the evaluated lab roll to player chat on both cha
       const Roll = makeRoll();
       const ControlRoll = makeRoll();
       const posted = [];
-      const previous = ['Roll', 'ChatMessage'].map((key) => [
+      const previous = ['Roll', 'ChatMessage', 'foundry'].map((key) => [
         key, Object.getOwnPropertyDescriptor(globalThis, key),
       ]);
       t.after(() => {
@@ -516,6 +527,8 @@ test('prepared run checks hand the evaluated lab roll to player chat on both cha
         }
       });
       globalThis.Roll = Roll;
+      // ratchet-exempt(lint): the keep transform reads the lab `Die` from `foundry.dice.terms`.
+      globalThis.foundry = { dice: { terms: Roll.TERM_CLASSES } };
       globalThis.ChatMessage = {
         ...(api === 'v14' ? { applyMode() {} } : {}),
         async create(data) {
@@ -534,7 +547,13 @@ test('prepared run checks hand the evaluated lab roll to player chat on both cha
       const result = await evaluatePreparedRunCheck(
         preparation,
         { getRollData: () => ({ prof: 3 }) },
-        { allowAdvantage: true, advantage: 'advantage', rollMode: 'selfroll' }
+        {
+          allowAdvantage: true,
+          // The authority honours only a button the bound offer includes (issue 2007).
+          advantageOffer: { advantage: true, disadvantage: true, kind: 'keep', detail: null },
+          advantage: 'advantage',
+          rollMode: 'selfroll',
+        }
       );
       assert.equal(result.success, true);
       assert.equal(posted.length, 0, 'authority evaluation does not post the visible check');

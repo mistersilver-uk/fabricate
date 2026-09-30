@@ -289,6 +289,44 @@ const FIXED_BANDS = Object.freeze([
   ]),
   { selector: `${nthMatch('[data-outcome-row]', 3)} [data-outcome-success-option="success"]` },
 ]);
+/*
+ * The advantage rule's Studio states (issue 2007), authored through the Formula card's own
+ * controls on a summing crafting check, or on issue 2004's seeded counting pool.
+ */
+const ADVANTAGE_SOURCES = Object.freeze([
+  /^src\/ui\/svelte\/apps\/manager\/checks\/(CheckPromptOptions\.svelte|checkAdvantageCopy\.js)$/,
+]);
+const ADVANTAGE_VALIDATION_SOURCES = Object.freeze([
+  /^src\/ui\/svelte\/apps\/manager\/checks\/(?:ChecksValidationTab\.svelte|checksReadiness\.js|checksCopy\.js)$/,
+]);
+const ADVANTAGE_BLOCK = Object.freeze({ selector: '[data-check-advantage]', scroll: true });
+const advantageMode = (mode) => ({ selector: `[data-check-advantage-mode-option="${mode}"]` });
+const CRAFTING_PANEL = '.fabricate-manager [data-checks-panel="crafting"]';
+const advantageCase = ({
+  id,
+  label,
+  frame,
+  state,
+  steps,
+  expectSelector,
+  scope = CRAFTING_PANEL,
+  ...rest
+}) =>
+  managerCase({
+    id,
+    label: `Manager — Checks advantage authoring, ${label} (prototype state ${frame})`,
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: state
+      ? { system: 'lab-smithing', checkPreviewState: state }
+      : { system: 'lab-smithing' },
+    steps: ['Checks', { selector: '#manager-checks-nav-crafting' }, ...steps, ADVANTAGE_BLOCK],
+    expectView: 'checks-crafting',
+    expectSelector: `${scope} ${expectSelector}`,
+    kinds: rest.position ? ['manager', 'checks', 'responsive'] : ['manager', 'checks'],
+    sourceMatches: ADVANTAGE_SOURCES,
+    ...rest,
+  });
 const READOUT = '.fabricate-manager [data-checks-simulator-readout]';
 const rolledCase = ({
   id,
@@ -460,10 +498,12 @@ export const CASES = Object.freeze([
     reaches: 'beyond',
     smokeLabels: [],
     // A refused placement raises the warning `noRollFormula` BEFORE the critical it causes, so the order is the sort's.
+    // Advantage is switched off first: a keep rule cannot keep a die multiplied by a reference (issue 2007).
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
       { selector: '#manager-checks-nav-crafting' },
+      advantageMode('off'),
       { selector: '[data-check-roll-formula]', fill: '1d20 * @craftingmod' },
     ],
     expectView: 'checks-crafting',
@@ -2117,5 +2157,170 @@ export const CASES = Object.freeze([
     expectSelector:
       '.fabricate-manager:has([data-issue="countFaceMissing"][data-issue-severity="critical"])' +
       ' [data-issue="countTriggerGroupUnreachable"][data-issue-severity="warning"]',
+  }),
+  advantageCase({
+    id: 'manager-checks-crafting-advantage-keep',
+    label: 'roll extra, keep one, on 1d20',
+    frame: '01',
+    steps: parityFormula('1d20 + @prof'),
+    expectSelector:
+      '[data-check-advantage]:has([data-check-advantage-mode-option="keep"].is-active)' +
+      ':has([data-check-advantage-extra][aria-valuetext="2d20"])' +
+      ' [data-check-advantage-note]:text-is("Advantage rolls 2d20 and keeps the highest. Applies to the first dice group, 1d20.")',
+  }),
+  // The same block at the 1024x640 floor: segments, stepper and switch on the narrow card.
+  advantageCase({
+    id: 'manager-checks-crafting-advantage-keep-narrow',
+    label: 'roll extra, keep one, on 1d20, at 1024x640',
+    frame: '01',
+    steps: parityFormula('1d20 + @prof'),
+    position: { width: 1024, height: 640 },
+    expectSelector:
+      '[data-check-advantage]:has([data-check-advantage-extra][aria-valuetext="2d20"])' +
+      ' [data-check-advantage-disadvantage][aria-pressed="true"]',
+  }),
+  advantageCase({
+    id: 'manager-checks-crafting-advantage-keep-multi',
+    label: 'two extra dice on 2d6',
+    frame: '01, with 2d6',
+    steps: [
+      ...parityFormula('2d6 + @prof'),
+      { selector: '.fab-stepper:has([data-check-advantage-extra]) [data-stepper-increment]' },
+    ],
+    expectSelector:
+      '[data-check-advantage]:has([data-check-advantage-extra][aria-valuetext="4d6"])' +
+      ' [data-check-advantage-note]:has-text("keeps the 2 highest. Applies to the first dice group, 2d6.")',
+  }),
+  advantageCase({
+    id: 'manager-checks-crafting-advantage-keep-under',
+    label: 'roll extra, keep one, lower is better',
+    frame: '05',
+    steps: [...parityFormula('1d20'), ...PARITY_UNDER],
+    expectSelector:
+      '[data-check-advantage]:has([data-check-advantage-note]:has-text("keeps the lowest."))' +
+      ' [data-check-advantage-disadvantage-hint]:has-text("keeps the highest.")',
+  }),
+  advantageCase({
+    id: 'manager-checks-crafting-advantage-keep-no-group',
+    label: 'a first dice group that is not a plain die',
+    frame: '— (new copy)',
+    steps: parityFormula('(1d20+2)*2'),
+    // The ordinary average still reads, and the Roll section carries the readiness dot.
+    scope:
+      '.fabricate-manager:has([data-checks-section-dot="roll"])' +
+      ' [data-checks-panel="crafting"]:has([data-check-formula-average="25"])',
+    expectSelector:
+      '[data-check-advantage]:not(:has([data-check-advantage-extra]))' +
+      ':not(:has([data-check-advantage-disadvantage]))' +
+      ' [data-check-advantage-note]:has-text("is not a plain die")',
+  }),
+  advantageCase({
+    id: 'manager-checks-crafting-advantage-bonus',
+    label: 'a bonus die of 1d8 + 1',
+    frame: '— (bonus mode)',
+    steps: [
+      ...parityFormula('1d20 + @prof'),
+      advantageMode('bonus'),
+      { selector: '[data-check-advantage-bonus]', fill: '1d8 + 1' },
+    ],
+    expectSelector:
+      '[data-check-advantage]:has([data-check-advantage-bonus][aria-invalid="false"])' +
+      ' [data-check-advantage-note]:has-text("by (1d8 + 1)")',
+  }),
+  advantageCase({
+    id: 'manager-checks-crafting-advantage-bonus-invalid',
+    label: 'a bonus expression that is not dice',
+    frame: '— (bonus mode)',
+    steps: [
+      ...parityFormula('1d20 + @prof'),
+      advantageMode('bonus'),
+      { selector: '[data-check-advantage-bonus]', fill: '1d6x' },
+    ],
+    expectSelector:
+      '[data-check-advantage]:has([data-check-advantage-bonus][aria-invalid="true"])' +
+      ' [data-check-advantage-bonus-help].is-danger',
+  }),
+  advantageCase({
+    id: 'manager-checks-crafting-advantage-off',
+    label: 'advantage off',
+    frame: '— (off)',
+    steps: [...parityFormula('1d20 + @prof'), advantageMode('off')],
+    expectSelector:
+      '[data-check-advantage]:not(:has([data-check-advantage-disadvantage]))' +
+      ' [data-check-advantage-note]:text-is("The prompt has a single Roll button.")',
+  }),
+  advantageCase({
+    id: 'manager-checks-crafting-advantage-no-disadvantage',
+    label: 'advantage without disadvantage',
+    frame: '— (advantage only)',
+    steps: [...parityFormula('1d20 + @prof'), { selector: '[data-check-advantage-disadvantage]' }],
+    expectSelector:
+      '[data-check-advantage]:has([data-check-advantage-disadvantage][aria-pressed="false"])' +
+      ' [data-check-advantage-disadvantage-hint]:text-is("The prompt offers advantage only.")',
+  }),
+  advantageCase({
+    id: 'manager-checks-crafting-advantage-count',
+    label: 'a counting pool offering a die either way',
+    frame: '06',
+    state: 'dice-pool',
+    steps: [],
+    expectSelector:
+      '[data-check-advantage="count"]:has([data-check-advantage-count][aria-pressed="true"])' +
+      ' [data-check-advantage-count-dice]',
+  }),
+  advantageCase({
+    id: 'manager-checks-crafting-advantage-count-off',
+    label: 'a counting pool offering no advantage',
+    frame: '06, turned off',
+    state: 'dice-pool',
+    steps: [{ selector: '[data-check-advantage-count]' }],
+    expectSelector:
+      '[data-check-advantage="count"]:has([data-check-advantage-count][aria-pressed="false"])' +
+      ':not(:has([data-check-advantage-count-dice]))',
+  }),
+  // Validation lists the advantage faults. A check raises at most one keep fault and a system has
+  // two formula-bearing checks, so the three ids take two frames: Herbalism's crafting and salvage.
+  managerCase({
+    id: 'manager-checks-validation-advantage',
+    label: 'Manager — Checks validation, advantage rules the roll cannot honour',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      ...parityFormula('(1d20+2)*2'),
+      { selector: '#manager-checks-nav-salvage' },
+      advantageMode('bonus'),
+      { selector: '[data-check-advantage-bonus]', fill: '1d6x' },
+      { selector: '#manager-checks-nav-validation' },
+      { selector: '[data-issue="advantageKeepNoDie"]', scroll: true },
+    ],
+    expectView: 'checks-validation',
+    expectSelector:
+      '.fabricate-manager:has([data-issue="advantageKeepNoDie"][data-issue-severity="warning"])' +
+      ' [data-issue="advantageBonusInvalid"][data-issue-severity="critical"]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: ADVANTAGE_VALIDATION_SOURCES,
+  }),
+  managerCase({
+    id: 'manager-checks-validation-advantage-reference',
+    label: 'Manager — Checks validation, advantage keeping a die after a character value',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-smithing' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      ...parityFormula('@abilities.int.mod + 1d20'),
+      { selector: '#manager-checks-nav-validation' },
+      { selector: '[data-issue="advantageKeepAfterReference"]', scroll: true },
+    ],
+    expectView: 'checks-validation',
+    expectSelector:
+      '.fabricate-manager [data-issue="advantageKeepAfterReference"][data-issue-severity="warning"]' +
+      ':has-text("advantage still applies only to 1d20")',
+    kinds: ['manager', 'checks'],
+    sourceMatches: ADVANTAGE_VALIDATION_SOURCES,
   }),
 ]);

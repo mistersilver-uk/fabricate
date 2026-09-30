@@ -21,6 +21,7 @@ const {
   normalizeExportEnvelope,
 } = await import('./helpers/fullAuthoringFixture.js');
 const { emptyCopyOptions } = await import('./helpers/worldEntityIndex.js');
+const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 
 function seedFutureCheckFields(fixture) {
   const authoredEvaluations = new Map();
@@ -60,9 +61,19 @@ function seedFutureCheckFields(fixture) {
           },
         },
       };
+      // Issue 2007: a non-default advantage record per slot, so a dropped record cannot pass.
+      const advantage = {
+        mode: ordinal % 2 === 0 ? 'off' : 'bonus',
+        extraDice: 1 + (ordinal % 4),
+        bonusExpression: `1d${ordinal + 3} + 1`,
+        offerDisadvantage: false,
+        countEnabled: false,
+        countDice: 1 + (ordinal % 5),
+      };
       fixture.system[checkName][slot] ??= {};
       fixture.system[checkName][slot].evaluation = evaluation;
-      authoredEvaluations.set(`${checkName}.${slot}`, evaluation);
+      fixture.system[checkName][slot].advantage = advantage;
+      authoredEvaluations.set(`${checkName}.${slot}`, { evaluation, advantage });
     }
   }
   fixture.system.craftingCheck.simple.tiers = [
@@ -82,9 +93,10 @@ function seedFutureCheckFields(fixture) {
 }
 
 function assertFutureCheckFields(payload, authoredEvaluations, stage) {
-  for (const [key, evaluation] of authoredEvaluations) {
+  for (const [key, { evaluation, advantage }] of authoredEvaluations) {
     const [checkName, slot] = key.split('.');
     assert.deepEqual(payload.system[checkName][slot].evaluation, evaluation, `${key} ${stage}`);
+    assert.deepEqual(payload.system[checkName][slot].advantage, advantage, `${key} ${stage}`);
   }
   assert.equal(payload.system.craftingCheck.simple.tiers[0].adjustment, 0.5);
   assert.equal(payload.system.craftingCheck.simple.tiers[0].successes, 3);
@@ -152,6 +164,15 @@ test('round-trip: export → import(keep) → export is deep-equal modulo volati
 
   const second = exportCurrent(h, FIXTURE_SYSTEM_ID);
   assertFutureCheckFields(second, authoredEvaluations, 're-export');
+  // The harness stores systems verbatim, so the persisting normalizer is exercised directly.
+  const persisted = new CraftingSystemManager(
+    { getRecipes: () => [] },
+    { componentScopeStore: null, essenceScopeStore: null, toolScopeStore: null }
+  )._normalizeSystem(second.system);
+  for (const [key, { advantage }] of authoredEvaluations) {
+    const [checkName, slot] = key.split('.');
+    assert.deepEqual(persisted[checkName][slot].advantage, advantage, `${key} persisted`);
+  }
 
   assert.deepEqual(normalizeExportEnvelope(second), normalizeExportEnvelope(first));
 

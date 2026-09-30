@@ -1170,6 +1170,31 @@ The normalized check policy of product, direction, target and pool settings that
 
 [Notes](docs/domain/terms.md#situational-bonus-offer)
 
+#### Advantage Rule
+
+The `advantage` record (`mode: 'off'|'keep'|'bonus'` for summing, `extraDice`, `bonusExpression`, `offerDisadvantage`, `countEnabled`, `countDice`), normalized by `normalizeCheckAdvantage` and carried beside `evaluation`, never inside it, on all eight normalized check sub-objects.
+A **Standalone Check Roll** authors none of its own and rolls under the untouched default record, by maintainer ruling R2.
+
+[Notes](docs/domain/terms.md#advantage-rule)
+
+#### Keep (Roll Extra, Keep One)
+
+Under an **Advantage Rule**'s `mode: 'keep'`, `findKeepGroup` proves the authored formula's first top-level dice group a plain, unmodified, additively-positioned `NdS`, and `checkKeepTransform.js` mutates that term directly on the constructed `Roll` (never by string rewriting), rolling `extraDice` more and keeping the original count in the check's direction.
+
+[Notes](docs/domain/terms.md#keep-roll-extra-keep-one)
+
+#### Bonus Die
+
+Under an **Advantage Rule**'s `mode: 'bonus'`, `bonusExpression` contributes a separate dice expression instead of changing the check's own dice: appended to the total on `sum/over`, pre-rolled unsigned and settled onto the target on `sum/under`.
+
+[Notes](docs/domain/terms.md#bonus-die)
+
+#### Advantage Offer
+
+`resolveAdvantageOffer`'s `{ advantage, disadvantage, kind, detail }`, the one derivation every prompt producer, descriptor transport and the engine's authority gate read to decide which of Advantage and Disadvantage a check offers, and `intersectAdvantageOffers`'s all-or-nothing reduction of it over a batch.
+
+[Notes](docs/domain/terms.md#advantage-offer)
+
 #### Count Check
 
 A `product: 'count'` **Check Evaluation** rolls a `pool.die`-sided dice pool sized by `pool.base`, counts dice that qualify against `pool.threshold` net of any the cancel rule removed, and grades that net **successes** count against `pool.required`, reading neither `dc` nor `target`.

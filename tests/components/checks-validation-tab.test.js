@@ -659,9 +659,10 @@ describeValidationAddressPairing({
   // From the two per-kind maps through the table, which names them by reference (issue 2006).
   tablePattern: /(const FACE_CONTROLS[\s\S]*?const CHECK_ISSUE_CONTROLS = Object\.freeze\(\{[\s\S]*?\n\}\);)/u,
   addressPattern: /'(checks-[^']+)'/gu,
-  expectedAddressCount: 10,
+  expectedAddressCount: 12,
   expectation:
-    'the roll field, the character-value field, the trigger list and the seven count controls',
+    'the roll field, the character-value field, the trigger list, the seven count controls and ' +
+    'the two advantage controls',
   // WHICH FILE IS SUPPOSED TO CARRY WHICH ADDRESS. This is the half a producer cannot check.
   destinations: {
     'checks-roll-formula': 'checks/CheckFormulaFields.svelte',
@@ -674,9 +675,14 @@ describeValidationAddressPairing({
     'checks-count-cancel-face': 'checks/CheckCountPoolFields.svelte',
     'checks-count-required': 'checks/CheckDifficultyCard.svelte',
     'checks-count-tier-successes': 'checks/CheckRecipeTiers.svelte',
+    'checks-advantage-mode': 'checks/CheckPromptOptions.svelte',
+    'checks-advantage-bonus': 'checks/CheckPromptOptions.svelte',
   },
   // Stamped through a primitive's attribute bag or prop; the mounted Review tests focus each one
-  // (`check-preview-mounted`, `check-count-readiness-mounted`).
+  // (`check-preview-mounted`, `check-count-readiness-mounted`). `checks-advantage-mode` is the
+  // same shape: `SegmentedControl` stamps the literal onto its radio from an option prop, so no
+  // `data-validation-target="checks-advantage-mode"` is ever written together in one file.
+  // `checks-advantage-bonus` sits directly on its own `<input>`, so it is not deferred.
   focusProvenElsewhere: [
     'checks-target-expression',
     'checks-count-base',
@@ -686,6 +692,7 @@ describeValidationAddressPairing({
     'checks-count-cancel-face',
     'checks-count-required',
     'checks-count-tier-successes',
+    'checks-advantage-mode',
   ],
   routeNoun: 'route',
   destinationNoun: 'section',

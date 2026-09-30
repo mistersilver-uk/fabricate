@@ -4,6 +4,7 @@
  */
 
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
+import { publicAdvantageOffer } from '../systems/checkAdvantage.js';
 import { evaluatePreparedCraftingCheck, postCheckRollHandoff } from '../systems/checkRoll.js';
 import { EVENT_SCENE_SOCKET } from '../systems/eventSceneCoordinator.js';
 import { createFoundryJournalRunAuthority } from '../systems/journalRunAuthority.js';
@@ -49,6 +50,7 @@ export function promptJournalStageCheck(descriptor, prompt = promptCheckRoll) {
     thresholdMode: descriptor?.comparison === 'exceed' ? 'exceed' : null,
     selectedModifiers: descriptor?.selectedModifiers,
     allowAdvantage: descriptor?.allowAdvantage === true,
+    advantageOffer: publicAdvantageOffer(descriptor?.advantageOffer),
     offerSituationalBonus: descriptor?.offerSituationalBonus !== false,
     modifierChoice: descriptor?.modifierChoice ?? null,
     ...(descriptor?.product === 'count' && {
@@ -300,6 +302,7 @@ function buildCheckOperations(fabricate, authorizeRollHandoff) {
         publicPrompt: {
           allowsSituationalModifier: descriptor.publicPrompt?.allowsSituationalModifier === true,
           allowAdvantage: descriptor.publicPrompt?.allowAdvantage === true,
+          advantageOffer: publicAdvantageOffer(descriptor.publicPrompt?.advantageOffer),
           offerSituationalBonus: descriptor.publicPrompt?.offerSituationalBonus !== false,
           ...countPromptWording(descriptor.publicPrompt),
         },
