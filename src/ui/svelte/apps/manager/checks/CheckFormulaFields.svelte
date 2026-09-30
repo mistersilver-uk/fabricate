@@ -17,6 +17,9 @@
   The card also carries the `Which way is better` axis and the `In the roll prompt` group (issue
   2005). Under, the dice stay as rolled and modifiers raise the target, so the inset joins the
   target chip and the modifier chips with `+` and joins nothing to the dice.
+
+  `What the roll produces` (issue 2006) writes only `evaluation.product`. Counting replaces the
+  input, its reading, the inset and the token row with `CheckCountPoolFields`; nothing is rewritten.
 -->
 <script>
   import { getModifierExpressionSuggestions } from '../../../../../config/modifierExpressionSuggestions.js';
@@ -28,8 +31,14 @@
   import Chip from '../../../components/Chip.svelte';
   import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import { localize } from '../../../util/foundryBridge.js';
+  import CheckCountPoolFields from './CheckCountPoolFields.svelte';
   import CheckPromptOptions from './CheckPromptOptions.svelte';
-  import { formulaTokenIcon, interpolate, underComparisonPhrase } from './checksCopy.js';
+  import {
+    countComparisonPhrase,
+    formulaTokenIcon,
+    interpolate,
+    underComparisonPhrase,
+  } from './checksCopy.js';
 
   let {
     rollFormula = '',
@@ -46,19 +55,47 @@
     // character expression); a check with no target passes none. `underNote` is false where the
     // runtime refuses a roll-under check, so the note does not describe a roll that never happens.
     evaluation = null,
-    thresholdMode = 'meet',
+    // Null where the slot has no comparison (progressive), so a counting pool offers no per-die test.
+    thresholdMode = null,
     targetChip = '',
     underNote = true,
     // Under a character value, the previewed tier's `{ name, adjustment }` reading, named in the
     // under rule sentence as the adjustment applied first.
     underTier = null,
     offerSituationalBonus = true,
+    // The Preview-as actor `{ name, rollData }`, and the preview's `{ placement, odds }` a counting
+    // check composes its inset and expected successes from.
+    character = null,
+    countPreview = null,
     onChange = () => {},
   } = $props();
 
   const normalizedEvaluation = $derived(normalizeCheckEvaluation(evaluation));
   const direction = $derived(normalizedEvaluation.direction);
+  const counting = $derived(normalizedEvaluation.product === 'count');
   const underInset = $derived(direction === 'under');
+
+  const PRODUCT_OPTIONS = [
+    {
+      value: 'sum',
+      labelKey: 'FABRICATE.Admin.Manager.Checks.Count.ProductSum',
+      fallback: 'Add the dice',
+    },
+    {
+      value: 'count',
+      labelKey: 'FABRICATE.Admin.Manager.Checks.Count.ProductCount',
+      fallback: 'Count successes',
+      validationTarget: 'checks-product',
+    },
+  ];
+  const productLabel = $derived(
+    text('FABRICATE.Admin.Manager.Checks.Count.ProductTitle', 'What the roll produces')
+  );
+
+  function setProduct(next) {
+    if (next === normalizedEvaluation.product) return;
+    onChange({ evaluation: { ...normalizedEvaluation, product: next } });
+  }
 
   const DIRECTION_OPTIONS = [
     {
@@ -198,9 +235,21 @@
 </script>
 
 <div class="manager-checks-formula">
-  <!-- The prototype's two-column axis row: `What the roll produces` (issue 2006) takes the first
-       column, so the direction axis keeps the second. -->
   <div class="manager-checks-formula-axes">
+    <div class="manager-checks-difficulty-field" data-check-product-field>
+      <span class="manager-checks-difficulty-label">{productLabel}</span>
+      <SegmentedControl
+        fill
+        density="field"
+        options={PRODUCT_OPTIONS}
+        value={normalizedEvaluation.product}
+        groupName="check-evaluation-product"
+        ariaLabel={productLabel}
+        dataAttr="data-check-product"
+        optionDataAttr="data-check-product-option"
+        onChange={setProduct}
+      />
+    </div>
     <div class="manager-checks-difficulty-field is-direction" data-check-direction-field>
       <span class="manager-checks-difficulty-label">{directionLabel}</span>
       <SegmentedControl
@@ -216,7 +265,23 @@
       />
     </div>
   </div>
-  {#if direction === 'under' && underNote}
+  {#if counting}
+    <p class="manager-checks-formula-direction-note" data-check-direction-note>
+      {text(
+        'FABRICATE.Admin.Manager.Checks.Count.AxisNote',
+        'Each die that rolls {cmp} its threshold is a success. The count must reach the number needed.'
+      ).replaceAll('{cmp}', countComparisonPhrase(direction, thresholdMode, text))}
+    </p>
+    <CheckCountPoolFields
+      evaluation={normalizedEvaluation}
+      {thresholdMode}
+      {character}
+      modifiers={applied}
+      placement={countPreview?.placement ?? null}
+      odds={countPreview?.odds ?? null}
+      {onChange}
+    />
+  {:else if direction === 'under' && underNote}
     <p class="manager-checks-formula-direction-note" data-check-direction-note>
       {interpolateCmp(
         text(
@@ -227,142 +292,145 @@
     </p>
   {/if}
 
-  <!-- The CARD TITLE is `Formula`, so the input takes an `aria-label` rather than a second
+  {#if !counting}
+    <!-- The CARD TITLE is `Formula`, so the input takes an `aria-label` rather than a second
          visible label. -->
-  <div class="manager-checks-formula-input">
-    <i class="fas fa-dice" aria-hidden="true"></i>
-    <!-- THE CONTROL HALF of the Validation route's row action. All three roll issues are about
+    <div class="manager-checks-formula-input">
+      <i class="fas fa-dice" aria-hidden="true"></i>
+      <!-- THE CONTROL HALF of the Validation route's row action. All three roll issues are about
              THIS field, the roll section's first control in every editor, so it is addressed as
              `checks-roll-formula`. An `<input>` is natively focusable, so no `tabindex`. -->
-    <input
-      data-check-roll-formula
-      data-validation-target="checks-roll-formula"
-      aria-label={formulaLabel}
-      aria-describedby={average ? averageId : undefined}
-      value={rollFormula || ''}
-      {placeholder}
-      oninput={(event) => onChange({ rollFormula: event.currentTarget.value })}
-    />
-    {#if average?.quantity === 'magnitude'}
-      <span
-        id={averageId}
-        class="manager-checks-formula-average"
-        data-check-formula-average={average.value}
-        title={text(
-          'FABRICATE.Admin.Manager.Checks.Crafting.AverageHint',
-          'The average of the dice, with every character value taken as zero — no actor is chosen on this screen.'
-        )}
-      >
-        {text('FABRICATE.Admin.Manager.Checks.Crafting.Average', 'avg')}
-        <span class="manager-checks-formula-average-value">{average.value}</span>
-      </span>
-    {:else if average?.quantity === 'transformed'}
-      <span
-        id={averageId}
-        class="manager-checks-formula-average"
-        data-check-formula-average-withheld="die-modifiers"
-        title={transformedReason}
-      >
-        {text('FABRICATE.Admin.Manager.Checks.Crafting.Average', 'avg')}
-        <span class="manager-checks-formula-average-value" aria-hidden="true">—</span>
-        <span class="visually-hidden">{transformedReason}</span>
-      </span>
-    {/if}
-  </div>
+      <input
+        data-check-roll-formula
+        data-validation-target="checks-roll-formula"
+        aria-label={formulaLabel}
+        aria-describedby={average ? averageId : undefined}
+        value={rollFormula || ''}
+        {placeholder}
+        oninput={(event) => onChange({ rollFormula: event.currentTarget.value })}
+      />
+      {#if average?.quantity === 'magnitude'}
+        <span
+          id={averageId}
+          class="manager-checks-formula-average"
+          data-check-formula-average={average.value}
+          title={text(
+            'FABRICATE.Admin.Manager.Checks.Crafting.AverageHint',
+            'The average of the dice, with every character value taken as zero — no actor is chosen on this screen.'
+          )}
+        >
+          {text('FABRICATE.Admin.Manager.Checks.Crafting.Average', 'avg')}
+          <span class="manager-checks-formula-average-value">{average.value}</span>
+        </span>
+      {:else if average?.quantity === 'transformed'}
+        <span
+          id={averageId}
+          class="manager-checks-formula-average"
+          data-check-formula-average-withheld="die-modifiers"
+          title={transformedReason}
+        >
+          {text('FABRICATE.Admin.Manager.Checks.Crafting.Average', 'avg')}
+          <span class="manager-checks-formula-average-value" aria-hidden="true">—</span>
+          <span class="visually-hidden">{transformedReason}</span>
+        </span>
+      {/if}
+    </div>
 
-  <div class="manager-checks-formula-resolved" data-check-formula-resolved>
-    <i class="fas fa-equals" aria-hidden="true"></i>
-    <div class="manager-checks-formula-resolved-body">
-      <p class="manager-checks-formula-kicker">
-        {text('FABRICATE.Admin.Manager.Checks.Crafting.ResolvedTitle', 'What actually gets rolled')}
-      </p>
-      <p class="manager-checks-formula-expression">
-        <span class="manager-checks-formula-base">{rollFormula || placeholder}</span>
-        {#if underInset}
-          <!-- Under, the modifiers raise the target: `+` joins them to the target chip, never to
+    <div class="manager-checks-formula-resolved" data-check-formula-resolved>
+      <i class="fas fa-equals" aria-hidden="true"></i>
+      <div class="manager-checks-formula-resolved-body">
+        <p class="manager-checks-formula-kicker">
+          {text(
+            'FABRICATE.Admin.Manager.Checks.Crafting.ResolvedTitle',
+            'What actually gets rolled'
+          )}
+        </p>
+        <p class="manager-checks-formula-expression">
+          <span class="manager-checks-formula-base">{rollFormula || placeholder}</span>
+          {#if underInset}
+            <!-- Under, the modifiers raise the target: `+` joins them to the target chip, never to
                the dice, which a reader would take for a sum. -->
-          {#if targetChip}
-            <span class="manager-checks-formula-comparison" data-check-formula-comparison
-              >{comparisonPhrase}</span
-            >
-            <Chip tone="info" density="tag-run" icon="fas fa-bullseye" data-check-formula-target
-              >{targetChip}</Chip
-            >
-          {/if}
-          {#each applied as modifier, index (modifier.id)}
-            {#if targetChip || index > 0}
-              <span class="manager-checks-formula-sep" aria-hidden="true">+</span>
+            {#if targetChip}
+              <span class="manager-checks-formula-comparison" data-check-formula-comparison
+                >{comparisonPhrase}</span
+              >
+              <Chip tone="info" density="tag-run" icon="fas fa-bullseye" data-check-formula-target
+                >{targetChip}</Chip
+              >
             {/if}
-            <span class="manager-checks-formula-chip" data-check-formula-modifier={modifier.id}>
-              <i class={modifier.icon || DEFAULT_MODIFIER_ICON} aria-hidden="true"></i>
-              <span>{modifier.name}</span>
-            </span>
-          {/each}
-        {:else}
-          {#if applied.length > 0}
-            <!-- The join between the FORMULA and the modifier list carries the accent and the list's
+            {#each applied as modifier, index (modifier.id)}
+              {#if targetChip || index > 0}
+                <span class="manager-checks-formula-sep" aria-hidden="true">+</span>
+              {/if}
+              <span class="manager-checks-formula-chip" data-check-formula-modifier={modifier.id}>
+                <i class={modifier.icon || DEFAULT_MODIFIER_ICON} aria-hidden="true"></i>
+                <span>{modifier.name}</span>
+              </span>
+            {/each}
+          {:else}
+            {#if applied.length > 0}
+              <!-- The join between the FORMULA and the modifier list carries the accent and the list's
                  own separators are subtle, so the expression reads as one written term plus a set
                  of automatic ones rather than a flat sum. -->
-            <span class="manager-checks-formula-join" aria-hidden="true">+</span>
-          {/if}
-          {#each applied as modifier, index (modifier.id)}
-            {#if index > 0}
-              <span class="manager-checks-formula-sep" aria-hidden="true">+</span>
+              <span class="manager-checks-formula-join" aria-hidden="true">+</span>
             {/if}
-            <span class="manager-checks-formula-chip" data-check-formula-modifier={modifier.id}>
-              <i class={modifier.icon || DEFAULT_MODIFIER_ICON} aria-hidden="true"></i>
-              <span>{modifier.name}</span>
-            </span>
-          {/each}
-        {/if}
-      </p>
-      <p class="manager-checks-formula-rule" data-check-formula-rule={modifierPolicy}>
-        {ruleSentence}
-      </p>
+            {#each applied as modifier, index (modifier.id)}
+              {#if index > 0}
+                <span class="manager-checks-formula-sep" aria-hidden="true">+</span>
+              {/if}
+              <span class="manager-checks-formula-chip" data-check-formula-modifier={modifier.id}>
+                <i class={modifier.icon || DEFAULT_MODIFIER_ICON} aria-hidden="true"></i>
+                <span>{modifier.name}</span>
+              </span>
+            {/each}
+          {/if}
+        </p>
+        <p class="manager-checks-formula-rule" data-check-formula-rule={modifierPolicy}>
+          {ruleSentence}
+        </p>
+      </div>
     </div>
-  </div>
 
-  <!-- Real `<button>`s: this row is five controls a GM operates, and a span with an `onclick`
+    <!-- Real `<button>`s: this row is five controls a GM operates, and a span with an `onclick`
          reaches neither the keyboard nor a screen reader. -->
-  <span class="manager-checks-formula-tokens" data-check-formula-tokens>
-    {#each quickTokens as token (token)}
-      <button
-        type="button"
-        class="manager-checks-formula-token"
-        data-check-formula-token={token}
-        onclick={() => appendToken(token)}
-      >
-        <!-- The verb as a GLYPH: a literal `+` in the label reads as part of the expression. -->
-        <i class="fas fa-plus" aria-hidden="true"></i>
-        {#if formulaTokenIcon(token)}
-          <i
-            class={`${formulaTokenIcon(token)} is-kind`}
-            aria-hidden="true"
-            data-check-formula-token-kind
-          ></i>
-        {/if}
-        <span>{token}</span>
-      </button>
-    {/each}
-  </span>
+    <span class="manager-checks-formula-tokens" data-check-formula-tokens>
+      {#each quickTokens as token (token)}
+        <button
+          type="button"
+          class="manager-checks-formula-token"
+          data-check-formula-token={token}
+          onclick={() => appendToken(token)}
+        >
+          <!-- The verb as a GLYPH: a literal `+` in the label reads as part of the expression. -->
+          <i class="fas fa-plus" aria-hidden="true"></i>
+          {#if formulaTokenIcon(token)}
+            <i
+              class={`${formulaTokenIcon(token)} is-kind`}
+              aria-hidden="true"
+              data-check-formula-token-kind
+            ></i>
+          {/if}
+          <span>{token}</span>
+        </button>
+      {/each}
+    </span>
+  {/if}
 
   <CheckPromptOptions
     offer={offerSituationalBonus}
     {direction}
+    destination={counting ? normalizedEvaluation.pool.modifierDestination : null}
     onChange={(offer) => onChange({ offerSituationalBonus: offer })}
   />
 </div>
 
 <style>
+  /* The prototype's two-column axis row, wrapping to one column, product first, when narrow. */
   .manager-checks-formula-axes {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
     gap: var(--fab-space-3);
     margin-bottom: var(--fab-space-3);
-  }
-
-  .manager-checks-formula-axes > .is-direction {
-    grid-column: 2;
   }
 
   /* The axis note tucks under the axis row; it is the rule the GM is reading, in secondary ink. */

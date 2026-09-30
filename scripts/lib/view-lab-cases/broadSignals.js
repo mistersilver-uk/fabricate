@@ -75,6 +75,11 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/components/OutcomeLadder.svelte': Object.freeze([
     'fabricate-journal-lifecycle-gathering-check',
   ]),
+  // The shared die tiles (issue 2006): the simulator's rolled pool, marked, and a botch's cancels.
+  'src/ui/svelte/components/DiceTiles.svelte': Object.freeze([
+    'manager-checks-count-over-rolled',
+    'manager-checks-count-botch',
+  ]),
   // The shared icon picker (issue 1269).
   'src/ui/svelte/components/IconPicker.svelte': Object.freeze(['manager-system-edit-lists']),
   // The most-used control in the app, and until issue 1378 it published no frame that renders one.

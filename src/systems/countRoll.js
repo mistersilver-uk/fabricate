@@ -6,12 +6,10 @@
 import { isPlainObject } from '../utils/scalars.js';
 
 import {
-  countFormulaValues,
-  describedFaceRules,
+  describeCountPolicy,
   explodesOnEveryFace,
   extremeFace,
   faceBeyondDie,
-  faceSign,
   MAX_COUNT_POOL,
   projectCountResults,
 } from './countEvaluation.js';
@@ -215,25 +213,23 @@ function markResult(result, { qualified, cancelled, contribution }) {
 }
 
 function describeCountRoll({ policy }, i18n) {
-  const { die, direction } = policy;
-  const { explode, cancel } = describedFaceRules(policy);
-  const clauses = [format(i18n, 'FABRICATE.Check.CountRoll.Pool', countFormulaValues(policy))];
+  const { pool, die, symbol, threshold, explode, cancel } = describeCountPolicy(policy);
+  const values = { pool, die, comparison: symbol, threshold };
+  const clauses = [format(i18n, 'FABRICATE.Check.CountRoll.Pool', values)];
   if (explode) {
     const key = explode.once
       ? 'FABRICATE.Check.CountRoll.ExplodeOnce'
       : 'FABRICATE.Check.CountRoll.Explode';
-    clauses.push(format(i18n, key, { faces: faceLabel(explode, die, direction) }));
+    clauses.push(format(i18n, key, { faces: faceLabel(explode) }));
   }
   if (cancel) {
-    const faces = faceLabel(cancel, die, direction === 'under' ? 'over' : 'under');
-    clauses.push(format(i18n, 'FABRICATE.Check.CountRoll.Cancel', { faces }));
+    clauses.push(format(i18n, 'FABRICATE.Check.CountRoll.Cancel', { faces: faceLabel(cancel) }));
   }
   return clauses.join(' · ');
 }
 
-function faceLabel({ kind, value }, die, direction) {
-  if (kind !== 'from') return String(extremeFace(die, direction));
-  return `${faceSign(direction)} ${value}`;
+function faceLabel({ from, face, sign }) {
+  return from ? `${sign} ${face}` : String(face);
 }
 
 // Core pairs `success failure` on an overlap, and its CSS lets `.failure` win; name both instead.

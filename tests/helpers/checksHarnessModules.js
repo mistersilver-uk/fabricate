@@ -22,6 +22,9 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/actions/anchoredPopover.js',
   'src/ui/svelte/util/overlayBounds.js',
   'src/ui/svelte/apps/manager/checks/checksReadiness.js',
+  // The count rules and the free-text Convert the evaluator delegates to (issue 2006).
+  'src/ui/svelte/apps/manager/checks/countReadiness.js',
+  'src/ui/svelte/apps/manager/checks/countFormulaConversion.js',
   // The Validation tab's row-merging rules (issue 2083): a fault reads once, as its issue.
   'src/ui/svelte/apps/manager/checks/checksValidationRows.js',
   // `checksReadiness.js` grades a kept salvage/task override through the same rule the
@@ -80,10 +83,21 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/checks/checkReadoutModel.js',
   // The success-counting preview the model delegates to (issue 2004).
   'src/ui/svelte/apps/manager/checks/countPreviewModel.js',
+  // The shared die tiles' model and escaped renderer the readout draws through (issue 2006).
+  'src/ui/presenters/countDiceTiles.js',
+  'src/ui/presenters/htmlEscape.js',
+  'src/utils/fillPlaceholders.js',
+  'src/ui/svelte/apps/manager/checks/countInsetModel.js',
+  'src/ui/svelte/apps/manager/checks/countPoolOptions.js',
+  // The Difficulty card's count callouts, read from the readiness evaluator (issue 2006).
+  'src/ui/svelte/apps/manager/checks/countDifficultyModel.js',
   // The Studio's adjustment labels and read-only band pictures (issue 2005).
   'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
   'src/utils/checkAdjustmentFormat.js',
   'src/ui/svelte/apps/manager/checks/checkBandModel.js',
+  'src/ui/svelte/apps/manager/checks/readonlyBandPicture.js',
+  // The Checks route's per-activity words.
+  'src/ui/svelte/apps/manager/checks/checksActivityCopy.js',
   'src/ui/svelte/apps/manager/checks/checkTargetStatus.js',
   'src/systems/checkEvaluation.js',
   'src/systems/checkRoll.js',
@@ -193,15 +207,19 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/checks/CheckFailurePolicy.svelte',
   // The Formula card's `In the roll prompt` group and the routed outcome row (issue 2005).
   'src/ui/svelte/apps/manager/checks/CheckPromptOptions.svelte',
+  'src/ui/svelte/apps/manager/checks/CheckCharacterValueField.svelte',
+  'src/ui/svelte/apps/manager/checks/CheckCountInputField.svelte',
+  'src/ui/svelte/apps/manager/checks/CheckCountInset.svelte',
+  'src/ui/svelte/apps/manager/checks/CheckCountPoolFields.svelte',
   'src/ui/svelte/apps/manager/checks/CheckOutcomeRow.svelte',
   // The progressive editor's roll-under refusal (issue 2005).
   'src/ui/svelte/components/Notice.svelte',
   'src/ui/svelte/components/SegmentedControl.svelte',
   'src/ui/svelte/apps/manager/checks/CheckOddsPanel.svelte',
   'src/ui/svelte/apps/manager/checks/CheckOutcomePreview.svelte',
-  // The rolled readout's eyebrow and a count roll's tiles, the #2006 seam (issue 2080).
+  // The rolled readout's eyebrow (issue 2080) and a count roll's shared die tiles (issue 2006).
   'src/ui/svelte/components/Kicker.svelte',
-  'src/ui/svelte/apps/manager/checks/CheckSimulatorFaces.svelte',
+  'src/ui/svelte/components/DiceTiles.svelte',
   // THE manager's editor tab strip (issue 1362).
   'src/ui/svelte/components/EditorTabs.svelte',
   'src/ui/svelte/apps/manager/checks/ChecksEditorTabs.svelte',

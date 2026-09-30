@@ -36,6 +36,9 @@ export const CHECK_TO_ISSUES = Object.freeze({
   countRequiredWithinMaxPool: ['countRequiredExceedsMaxPool'],
   countRequiredWithinBasePool: ['countRequiredExceedsBasePool'],
   progressiveHigherIsBetter: ['progressiveUnderUnsupported'],
+  summedFormulaCountsNothing: ['freeTextCountingFormula'],
+  countFacesSet: ['countFaceMissing'],
+  countTriggersReachable: ['countTriggerGroupUnreachable'],
 });
 
 /**

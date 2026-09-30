@@ -11,32 +11,32 @@
 
   Controlled; range parsing lives in `utils/craftingCheckExpression.js`. Outside summed roll-over
   against a fixed DC (issue 2005, ruling R2) the strip is a read-only picture from
-  `checkBandModel.js`, and each row edits the field its evaluation reads through `CheckOutcomeRow`.
+  `checkBandModel.js`, and each row edits the field its evaluation reads through `CheckOutcomeRow`:
+  a counting check's (issue 2006) are `Extra successes`, drawn in net successes.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import { findRangeConflicts } from '../../../../../utils/craftingCheckExpression.js';
   import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
   import { activeCheckEvaluation } from '../../../../../systems/checkTarget.js';
+  import { routedOutcomeOrder } from '../../../../../systems/checkRouting.js';
   import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import ThresholdBandStrip from '../../../components/ThresholdBandStrip.svelte';
-  import {
-    bandToneFor,
-    bandsAreEditable,
-    buildRoutedBands,
-    describeBandRange,
-    describeBandsUnavailable,
-    previewBandTarget,
-    previewScaleSentence,
-  } from './checkBandModel.js';
+  import { bandToneFor, bandsAreEditable, describeBandsUnavailable } from './checkBandModel.js';
+  import { readonlyBandPicture } from './readonlyBandPicture.js';
   import CheckDcMacroCard from './CheckDcMacroCard.svelte';
   import CheckOutcomeRow from './CheckOutcomeRow.svelte';
   import CheckDifficultyCard from './CheckDifficultyCard.svelte';
   import CheckFormulaFields from './CheckFormulaFields.svelte';
   import CheckRecipeTiers from './CheckRecipeTiers.svelte';
   import CheckTriggers from './CheckTriggers.svelte';
-  import { checkTargetChip, checkTypeOptions, outcomeThresholdLabels } from './checksCopy.js';
+  import {
+    checkTargetChip,
+    checkTypeOptions,
+    formulaCardLead,
+    outcomeThresholdLabels,
+  } from './checksCopy.js';
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import Select from '../../../components/Select.svelte';
   import { previewRecordSelectOptions } from './checksSelectOptions.js';
@@ -79,6 +79,8 @@
     previewModifierTotal = 0,
     trackMin = null,
     trackMax = null,
+    // The preview's `{ placement, odds }` a counting Formula card composes from (issue 2006).
+    countPreview = null,
     onSelectPreviewRecord = () => {},
     onChange = () => {},
   } = $props();
@@ -126,14 +128,18 @@
   // `evaluation` is the authored record every control writes back losslessly; `graded` is the one
   // the runtime grades with, which gates the strip, its direction and the outcome column.
   const evaluation = $derived(normalizeCheckEvaluation(value?.evaluation));
+  // The tier a count Botch preset targets, by the engine's own ranking.
+  const lowestTierId = $derived(routedOutcomeOrder({ ...value, type, evaluation })[0] ?? null);
   const graded = $derived(activeCheckEvaluation(value));
   const editableBands = $derived(bandsAreEditable(value?.evaluation));
+  const counts = $derived(graded.product === 'count');
   const multiplyTiers = $derived(
-    graded.target.source === 'attribute' && graded.target.adjustmentKind === 'multiply'
+    !counts && graded.target.source === 'attribute' && graded.target.adjustmentKind === 'multiply'
   );
   // Which field a relative row's threshold edits: the offset reads `DC ±` only for roll-over against
-  // a fixed DC, and a multiply row edits its multiplier instead.
+  // a fixed DC, `Extra successes` for a count, and a multiply row edits its multiplier instead.
   const outcomeColumn = $derived.by(() => {
+    if (counts) return 'successes';
     if (multiplyTiers) return 'adjustment';
     return editableBands ? 'dc' : 'benefit';
   });
@@ -252,53 +258,40 @@
     return `color-mix(in oklab, var(--fab-${tone}) ${BAND_TONE_MIX}%, ${BAND_TONE_BASE})`;
   }
 
-  // The read-only picture (issue 2005): the runtime's own classification of each total against
-  // the previewed target, toned by rank so the best band takes the same hue in either direction.
-  // A fixed-type check reads no target, so its ranges are drawn as authored.
+  // The read-only picture (issues 2005, 2006), painted with this editor's fill.
   const previewedTier = $derived(
     recipeTiers.find((tier) => tier.id === selectedPreviewRecordId) ?? null
   );
-  const readonlyTarget = $derived(
-    editableBands || type === 'fixed'
-      ? null
-      : previewBandTarget(
-          {
-            evaluation: graded,
-            anchor: previewDc,
-            tier: previewedTier,
-            character: previewCharacter,
-            modifiers: previewModifierTotal,
-          },
-          text
-        )
-  );
-  const readonlyBands = $derived.by(() => {
-    if (editableBands || (type !== 'fixed' && readonlyTarget?.state !== 'ok')) return [];
-    const bands = buildRoutedBands({
-      evaluation: graded,
-      comparison,
-      anchor: readonlyTarget?.anchor ?? null,
-      targetDelta: readonlyTarget?.delta ?? 0,
-      type,
-      outcomes,
-      min: trackMin,
-      max: trackMax,
-    });
-    return bands.map((band, position) => {
-      const rank = graded.direction === 'under' ? bands.length - 1 - position : position;
-      const tone = bandToneFor(rank, bands.length);
-      return {
-        ...band,
-        range: describeBandRange(band, text),
-        color: bandFill(tone),
-        ink: `var(--fab-${tone}-text)`,
-        swatch: `var(--fab-${tone})`,
-      };
-    });
+  const paintBand = (band, tone, range) => ({
+    ...band,
+    range,
+    color: bandFill(tone),
+    ink: `var(--fab-${tone}-text)`,
+    swatch: `var(--fab-${tone})`,
   });
-  const readonlyScale = $derived(
-    previewScaleSentence(readonlyTarget, { direction: graded.direction, comparison }, text)
+  const picture = $derived(
+    readonlyBandPicture(
+      {
+        graded,
+        editableBands,
+        type,
+        outcomes,
+        comparison,
+        anchor: previewDc,
+        tier: previewedTier,
+        character: previewCharacter,
+        modifiers: previewModifierTotal,
+        placement: countPreview?.placement,
+        min: trackMin,
+        max: trackMax,
+        paint: paintBand,
+      },
+      text
+    )
   );
+  const readonlyTarget = $derived(picture.target);
+  const readonlyBands = $derived(picture.bands);
+  const readonlyScale = $derived(picture.scale);
   const bandsFallback = $derived.by(() => {
     if (readonlyTarget && readonlyTarget.state !== 'ok') {
       return describeBandsUnavailable(
@@ -421,7 +414,9 @@
             {text('FABRICATE.Admin.Manager.Checks.Crafting.FormulaTitle', 'Formula')}
           </h3>
           <p class="manager-checks-card-description">
-            {text(
+            {formulaCardLead(
+              evaluation,
+              text,
               'FABRICATE.Admin.Manager.Checks.Crafting.FormulaLead',
               'Rolled once per attempt. Modifiers from the Modifiers tab are applied by the check; they never appear in the formula.'
             )}
@@ -441,6 +436,8 @@
           {targetChip}
           underTier={previewTierAdjustment(evaluation, previewedTier)}
           offerSituationalBonus={value?.offerSituationalBonus !== false}
+          character={previewCharacter}
+          {countPreview}
           onChange={emit}
         />
       </div>
@@ -459,6 +456,7 @@
         {recordNoun}
         {evaluation}
         character={previewCharacter}
+        countTiers={type === 'fixed' ? null : showTiers ? recipeTiers : []}
         onChange={emit}
       />
     {/if}
@@ -472,6 +470,7 @@
       outcomeOptions={breakageOutcomeOptions}
       showBreakTools={checkDriven}
       {evaluation}
+      {lowestTierId}
       onChange={(checkBreakage) => emit({ checkBreakage })}
     />
   {/if}
@@ -546,6 +545,7 @@
             readonly={!editableBands}
             binding={type === 'fixed' ? 'fixed' : 'relative'}
             bands={bandStripBands}
+            leadingTick={bandStripBands[0]?.botch ? '<0' : ''}
             {previewDc}
             {previewLabel}
             groupLabel={text('FABRICATE.Admin.Manager.Checks.Crafting.BandsTitle', 'Outcome bands')}

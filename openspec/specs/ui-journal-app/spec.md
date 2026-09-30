@@ -244,6 +244,7 @@ The client-supplied `recipeId` is ignored; trusting it also allowed advancing on
 - The initial versioned secret-check prompt MUST remain generic, omitting protected subject names, artwork, formula, DC and modifier details before any reply leaves the GM.
 An entitled visible versioned check prompt MUST receive a Crafting activity label, actor and recipe or step subject, the tool-appended formula, a finite simple-check target with its meet-or-exceed comparison, and the display entries resolved from the same prepared modifier snapshot that evaluation uses.
 Its offered player choices MUST remain deferred rather than appear as already-applied modifiers; routed and progressive checks MUST expose no single public target or comparison.
+An entitled prepared check that counts successes MUST open the same count prompt as the crafting path: the settled pool and threshold, the actual explode and cancel faces and the successes needed, forwarded as numbers and enums only, never the retained formula, an expression or a path.
 The prompt projection MUST omit private configuration, outcome tiers, source actors, speaker and execution results.
 The complete prepared evaluation MUST stay in the issuing GM authority instance rather than replicated JournalEntry flags.
 If that instance loses its snapshot or another GM takes over, the pending token MUST fail without evaluation or effects and the viewer may prepare a fresh check.

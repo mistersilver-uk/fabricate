@@ -1589,6 +1589,11 @@ Each issue offers an action that moves focus to the offending control.
 
 The arrangement is fixed because validation is where a GM goes when something is wrong, which is the worst moment to make them learn a second layout.
 
+A row MAY carry one action of its own, `{ labelKey, descriptionKey?, onAction }`, for an issue whose fix is a single staged edit.
+It is drawn by the same button IN PLACE OF View, so each row still offers one verb; its accessible name composes as View's does, from the verb and the row's title, `descriptionKey` becomes its accessible description, and activating it runs the action instead of the focus move.
+The button carries `data-validation-row-action`.
+A `Notice` that carries the same action takes the same accessible description, so the section notice and the Validation row describe one action one way.
+
 The arrangement has ONE implementation, `src/ui/svelte/components/EditorValidationSurface.svelte`, and an editor that draws it MUST render through that component rather than restate its markup.
 That is what makes the sentence above enforceable rather than aspirational: while a second copy of the markup exists, "the same arrangement" is a convention each copy is free to drift from, and the two class families the sheet paints it with have more than one writer.
 A site whose DOM hooks, root classes, status words or reported counts differ passes them as props, and a site needing something the surface does not draw extends the surface rather than forking it.
@@ -1627,6 +1632,12 @@ The environment editor's validation tab was ADJUDICATED a different surface at i
 - **AND** focus lands on the offending control
 - **AND** the control is visibly marked whether the GM used a pointer or the keyboard
 - **AND** where they landed is announced after focus has moved
+
+#### Scenario: An issue's row carries its own action
+
+- **WHEN** a validation row carries an action, such as converting a summing formula that counts successes
+- **THEN** the row draws that action in place of View, named with the row's title
+- **AND** activating it runs the action rather than moving focus to a control
 
 #### Scenario: An issue names a control that cannot hold focus
 
@@ -1823,6 +1834,22 @@ Widening the composition with a background prop for one such caller is not the a
 - **WHEN** a view root is in its loading state
 - **THEN** it carries `aria-busy`
 - **AND** a visible label states what is loading
+
+### Requirement: The die tiles of a success-counting roll are one primitive
+
+A success-counting roll's dice MUST be drawn by `DiceTiles`, one implementation whose pure tile model (`src/ui/presenters/countDiceTiles.js`) is shared by the Svelte component and by the escaped-HTML renderer a stored chat card uses, so the Studio simulator, the result boxes and the chat cards cannot mark one roll differently.
+The model draws one tile per active die in roll order, each explosion's die straight after the die that produced it, and combines every mark — ✓ qualified, ✕ cancelled, ↻ exploded — on one tile.
+Each glyph is a Font Awesome Free icon with `aria-hidden`, and each tile is a list item whose `aria-label` names its face and every mark, so colour is never the only signal.
+Every tile carries `data-dice-tile-face` and space-separated `data-dice-tile-marks`, unless its host names its own hooks.
+An optional legend sits under the tiles; the model caps at 40 tiles and adds a `+{n} more` item, and the tiles wrap inside their host with no sideways scroll at chat-sidebar width.
+The `fabricate-dice-tiles` class family is styled ONCE in `styles/fabricate.css` from the root tokens, because a chat card sits outside every Fabricate window, and no core Foundry dice class is used or restyled.
+`Medallion` owns record art and is not a die tile.
+
+#### Scenario: A die explodes and qualifies
+
+- **WHEN** a die qualifies and explodes, and its explosion rolls another qualifying die
+- **THEN** the first tile carries both the qualified and the exploded mark
+- **AND** the explosion's die is its own tile, straight after it
 
 ### Requirement: The set is extended by an explicit, recorded decision
 

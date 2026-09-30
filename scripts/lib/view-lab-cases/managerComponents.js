@@ -12,10 +12,12 @@ import { chooseSelectOption, managerCase, previewAsActor } from './caseFactories
 /**
  * The salvage check override states (issue 2005), one per state the approved prototype's frames 23
  * and 24 depict, on Smithing's Longsword under `checkOverride` (`tests/view-lab/world/labWorld.js`).
- * `sees` is the Player sees state; a `resolved` case chooses a character in its Preview-as picker.
+ * `sees` is the Player sees state; a `resolved` case chooses a character in its Preview-as picker,
+ * and `claim` adds the field's own state. The `count-*` states are issue 2006's frame 25: a
+ * counting check's successes needed override beside a kept DC override it never reads.
  */
 const OVERRIDE_PREVIEW = '[data-salvage-dc-override] [data-override-preview-actor]';
-const overrideCase = ({ id, label, field, frame, sees }) =>
+const overrideCase = ({ id, label, field, frame, sees, claim = '' }) =>
   managerCase({
     id,
     label: `Manager — Component edit salvage override, ${label} (prototype state ${frame})`,
@@ -34,7 +36,7 @@ const overrideCase = ({ id, label, field, frame, sees }) =>
       ...(sees === 'resolved' ? previewAsActor('lab-actor-idrin', OVERRIDE_PREVIEW) : []),
     ],
     expectView: 'component-edit',
-    expectSelector: `.fabricate-manager [data-salvage-dc-override][data-salvage-override-field="${field}"] [data-override-player-sees="${sees}"]`,
+    expectSelector: `.fabricate-manager [data-salvage-dc-override][data-salvage-override-field="${field}"]${claim} [data-override-player-sees="${sees}"]`,
     kinds: ['manager', 'components'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/component\/(CheckOverrideField\.svelte|OverridePlayerSees\.svelte|overridePlayerSees\.js|salvageDcPresets\.js|componentEditSelectOptions\.js)$/,
@@ -776,5 +778,34 @@ export const CASES = Object.freeze([
     field: 'adjustmentOverride',
     frame: 24,
     sees: 'adjustment-invalid',
+  }),
+  overrideCase({
+    id: 'manager-component-edit-salvage-override-count-preset',
+    label: 'counting successes, a tier preset',
+    field: 'successesOverride',
+    frame: 25,
+    sees: 'count',
+    claim:
+      ':has([data-salvage-dc-preset]:has-text("Standard — 3 successes needed"))' +
+      ':has([data-salvage-override-kept])',
+  }),
+  overrideCase({
+    id: 'manager-component-edit-salvage-override-count-custom',
+    label: 'counting successes, a custom count',
+    field: 'successesOverride',
+    frame: 25,
+    sees: 'count',
+    claim: ':has([data-salvage-successes-custom])',
+  }),
+  overrideCase({
+    id: 'manager-component-edit-salvage-override-count-default',
+    label: 'counting successes, the system default',
+    field: 'successesOverride',
+    frame: 25,
+    sees: 'count',
+    claim:
+      ':has([data-salvage-dc-preset]:has-text("System default — 2 successes needed"))' +
+      ':not(:has([data-salvage-successes-custom]))' +
+      ':has([data-salvage-override-kept])',
   }),
 ]);

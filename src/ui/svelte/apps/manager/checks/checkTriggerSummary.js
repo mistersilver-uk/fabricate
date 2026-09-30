@@ -54,10 +54,11 @@ export function aggregateWord(aggregate) {
  * @param {Array<{groupId: number, label: string}>} [context.diceGroups] Groups parsed from the
  *   roll formula, so a `diceGroup` condition names the die rather than an index a GM never sees.
  * @param {Record<string, string>} [context.tierNames] Outcome tier names by id.
+ * @param {boolean} [context.counting] Whether the check counts successes, so its total is the net.
  * @returns {{key: string, fallback: string, data: object}}
  */
 export function summariseCondition(condition = {}, context = {}) {
-  const { diceGroups = [], tierNames = {} } = context;
+  const { diceGroups = [], tierNames = {}, counting = false } = context;
   const type = condition?.type ?? 'rollTotal';
   const comparison = operatorWord(condition?.operator);
   const value = String(condition?.value ?? 0);
@@ -91,6 +92,13 @@ export function summariseCondition(condition = {}, context = {}) {
           ...copy(['SummaryOutcomeTier', 'Outcome tier is {tiers}']),
           data: { tiers: named.join(', ') },
         };
+  }
+  if (counting) {
+    return {
+      key: 'FABRICATE.Admin.Manager.Checks.Count.Triggers.SummaryNetSuccesses',
+      fallback: 'Net successes is {comparison} {value}',
+      data: { comparison, value },
+    };
   }
   return {
     ...copy(['SummaryRollTotal', 'Roll total is {comparison} {value}']),

@@ -7412,9 +7412,9 @@ function versionedCheckPrompt({
     // A count check offers no advantage until it is mode-aware (issue 2007).
     allowAdvantage: !counts && hasPlainD20(activeCheck.rollFormula),
     modifierChoice: publicModifierChoice(modifierChoice),
-    // The pool resolved before any Tool roll, and the required count the macro settled, which
-    // fixed ranges never read.
-    ...(counts && countPromptFields(evaluation, countPolicy, routedFixed ? null : dc)),
+    // The pool with any Tool bonus folded in, and the macro's required count; fixed ranges read none.
+    ...(counts &&
+      countPromptFields(evaluation, countPolicy, routedFixed ? null : dc, toolContributions)),
   };
 }
 

@@ -29,10 +29,40 @@ export function buildSalvageRouteOptions(resultGroups, unroutedLabel, groupFallb
   ];
 }
 
+/** `System default — {n} successes needed`, singular at one. */
+function successesDefaultLabel(count, text) {
+  if (count === 1) {
+    return text(
+      'FABRICATE.Admin.Manager.Checks.Count.Overrides.SystemDefaultOne',
+      'System default — 1 success needed'
+    );
+  }
+  return text(
+    'FABRICATE.Admin.Manager.Checks.Count.Overrides.SystemDefault',
+    'System default — {count} successes needed'
+  ).replace('{count}', String(count));
+}
+
+/** `{name} — {n} successes needed`, singular at one. */
+function successesTierLabel(name, count, text) {
+  const copy =
+    count === 1
+      ? text(
+          'FABRICATE.Admin.Manager.Checks.Count.Overrides.PresetOne',
+          '{name} — 1 success needed'
+        )
+      : text(
+          'FABRICATE.Admin.Manager.Checks.Count.Overrides.Preset',
+          '{name} — {count} successes needed'
+        );
+  return copy.replace('{name}', name).replace('{count}', String(count));
+}
+
 /**
  * System default, each usable tier, then Custom… — `buildSalvageDcOptions` with this screen's label
  * keys bound to it, which is why the binding has a home here rather than in that pure leaf. A
- * roll-under fixed target names a Target, and a character-value target names adjustments.
+ * roll-under fixed target names a Target, a character-value target names adjustments, and a count
+ * check names successes needed.
  */
 export function buildSalvageDcSelectOptions(tiers, systemDc, text, evaluation = null) {
   const under = evaluation?.direction === 'under';
@@ -74,6 +104,8 @@ export function buildSalvageDcSelectOptions(tiers, systemDc, text, evaluation = 
       )
         .replace('{name}', name)
         .replace('{adjustment}', formatCheckAdjustment(kind, value)),
+    successesDefaultLabel: (count) => successesDefaultLabel(count, text),
+    successesTierLabel: (name, count) => successesTierLabel(name, count, text),
     customLabel: () => text('FABRICATE.Admin.Manager.Component.SalvageEditor.DcCustom', 'Custom…'),
   });
 }

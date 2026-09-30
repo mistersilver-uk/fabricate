@@ -251,3 +251,94 @@ describe('the recipe difficulty tier list (issue 1096)', () => {
     assert.equal(emitted.at(-1).at(-1).dc, 14, 'a new tier is seeded from the base DC');
   });
 });
+
+describe("a counting check's tiers name the successes they need (issue 2006)", () => {
+  const COUNTING = Object.freeze({ product: 'count', pool: { required: 3 } });
+  const COUNT_TIERS = [
+    { id: 't-plain', name: 'Plain work', dc: 12 },
+    { id: 't-fine', name: 'Fine work', dc: 16, successes: 2 },
+  ];
+  const stepperOf = (input) => input.closest('.fab-stepper').querySelectorAll('.fab-stepper-adjunct');
+
+  it('N9: never reads a tier DC as its successes, and names a tier that sets none', async () => {
+    const target = await harness.mount({ tiers: COUNT_TIERS, evaluation: COUNTING });
+    const inputs = [...target.querySelectorAll('[data-tier-successes]')];
+    assert.deepEqual(
+      inputs.map((input) => input.value),
+      ['', '2'],
+      'a tier with no successes reads blank, never its DC of 12'
+    );
+    assert.ok(!target.querySelector('[data-tier-dc]'), 'the DC column is not the count column');
+    assert.equal(inputs[0].getAttribute('placeholder'), '—');
+    const missing = target.querySelectorAll('[data-tier-successes-missing]');
+    assert.equal(missing.length, 1, 'only the tier without successes is flagged');
+    assert.equal(missing[0].textContent.trim(), 'Set successes needed');
+    assert.equal(inputs[0].getAttribute('aria-describedby'), missing[0].id);
+    assert.ok(target.querySelector('[data-tier-row="t-plain"]').classList.contains('is-invalid'));
+    assert.ok(!target.querySelector('[data-tier-row="t-fine"]').classList.contains('is-invalid'));
+    assert.equal(inputs[0].getAttribute('aria-label'), 'Successes');
+    assert.equal(inputs[0].getAttribute('data-validation-target'), 'checks-count-tier-successes');
+    assert.ok(!inputs[1].hasAttribute('data-validation-target'), 'Validation focuses the first unset tier');
+    assert.match(target.textContent, /it sets how many successes the roll needs/);
+  });
+
+  it('stepping writes the tier successes and keeps its DC for a switch back', async () => {
+    const emitted = [];
+    const target = await harness.mount({
+      tiers: COUNT_TIERS,
+      evaluation: COUNTING,
+      onChange: (next) => emitted.push(next),
+    });
+    stepperOf(target.querySelector('[data-tier-successes]'))[1].click();
+    assert.deepEqual(emitted.at(-1), [{ ...COUNT_TIERS[0], successes: 1 }, COUNT_TIERS[1]]);
+    const second = target.querySelectorAll('[data-tier-successes]')[1];
+    second.value = '';
+    second.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
+    assert.deepEqual(emitted.at(-1)[1], { ...COUNT_TIERS[1], successes: null }, 'clearing unsets');
+  });
+
+  it("seeds a new counting tier from the check's successes needed, and a summing one with none", async () => {
+    const emitted = [];
+    const counting = await harness.mount({
+      tiers: [],
+      defaultDc: 9,
+      evaluation: COUNTING,
+      onChange: (next) => emitted.push(next),
+    });
+    counting.querySelector('[data-add-tier]').click();
+    assert.equal(emitted.at(-1)[0].successes, 3);
+    assert.equal(emitted.at(-1)[0].dc, 9, 'beside the DC seed');
+    harness.remount();
+    const summing = await harness.mount({
+      tiers: [],
+      defaultDc: 9,
+      evaluation: { ...COUNTING, product: 'sum' },
+      onChange: (next) => emitted.push(next),
+    });
+    summing.querySelector('[data-add-tier]').click();
+    assert.ok(!Object.hasOwn(emitted.at(-1)[0], 'successes'), 'a later switch to count still asks');
+  });
+
+  it('an empty counting list invites tiers that set successes, never a DC override', async () => {
+    const counting = await harness.mount({ tiers: [], evaluation: COUNTING });
+    assert.equal(
+      counting.querySelector('[data-tiers-empty]').textContent.trim(),
+      'No tiers yet. Add named tiers a recipe can select to set how many successes it needs.'
+    );
+    harness.remount();
+    const summing = await harness.mount({ tiers: [], evaluation: { ...COUNTING, product: 'sum' } });
+    assert.equal(
+      summing.querySelector('[data-tiers-empty]').textContent.trim(),
+      'No tiers yet. Add named tiers a recipe can select to override the DC.'
+    );
+  });
+
+  it('a summing check keeps the DC column and no successes', async () => {
+    const target = await harness.mount({ tiers: COUNT_TIERS, evaluation: { ...COUNTING, product: 'sum' } });
+    assert.deepEqual(
+      [...target.querySelectorAll('[data-tier-dc]')].map((input) => input.value),
+      ['12', '16']
+    );
+    assert.ok(!target.querySelector('[data-tier-successes]'));
+  });
+});

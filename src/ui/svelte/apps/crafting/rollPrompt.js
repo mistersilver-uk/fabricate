@@ -1,13 +1,11 @@
 /** The single and bulk check prompt: view preparation, the modal surface and answer translation. */
 import { isFixedSumOver } from '../../../../systems/checkTarget.js';
-import {
-  countFormulaValues,
-  describedFaceRules,
-  faceSign,
-} from '../../../../systems/countEvaluation.js';
+import { describeCountPolicy } from '../../../../systems/countEvaluation.js';
 import { fill } from '../../../../utils/fillPlaceholders.js';
+import { countFaceClauses } from '../manager/checks/countInsetModel.js';
 
 import { openRollPromptModal } from './rollPromptHost.js';
+import { rollPromptTarget } from './rollPromptTarget.js';
 
 // Legacy tokens on both versions (issue 1043): V14 maps them in Roll#toMessage, and core.messageMode is unregistered on V13, where reading it throws.
 const ROLL_MODES = [
@@ -177,69 +175,64 @@ function needText(need, labels) {
   return need?.kind === 'noSingleTarget' ? labels.noSingleTarget : labels.noCheck;
 }
 
-/** The count formula line, `{pool}d{die} · each ≥ {threshold}`, its rules line and successes chip. */
-function countText(data) {
-  const { pool, die, threshold, required } = data.count;
-  const resolved = [pool, die, threshold].every(Number.isFinite);
-  const { direction, comparison } = data;
-  let neededText = '';
-  if (required === 1) neededText = promptLabel('CountNeededOne', '1 success needed');
-  else if (required !== null) {
-    neededText = fill(promptLabel('CountNeeded', '{count} successes needed'), { count: required });
-  }
-  const values = countFormulaValues({ dice: pool, die, threshold, direction, comparison });
+/** A count check's successes chip, `{count} successes needed`, blank when nothing is required. */
+function countNeededText({ required }) {
+  if (required === 1)
+    return localize('FABRICATE.App.RollPrompt.CountNeededOne', '1 success needed');
+  if (required === null) return '';
+  return fill(localize('FABRICATE.App.RollPrompt.CountNeeded', '{count} successes needed'), {
+    count: required,
+  });
+}
+
+/**
+ * The templates a count line and its note settle into as the player picks and types, and the
+ * face clauses (issue 2006), which no pick or bonus moves, formatted once from the actual faces.
+ */
+function countLabels({ count, direction, comparison }) {
+  const rule = (face) =>
+    face && { kind: face.kind, value: face.kind === 'from' ? face.face : null, once: face.once };
+  const described = describeCountPolicy({
+    die: count.die,
+    direction,
+    comparison,
+    explode: rule(count.explode),
+    cancel: rule(count.cancel),
+  });
   return {
-    formula: resolved
-      ? fill(
-          // The chat card's own pool line, so the two cannot word it differently.
-          localize(
-            'FABRICATE.Check.CountRoll.Pool',
-            '{pool}d{die} · each {comparison} {threshold}'
-          ),
-          values
-        )
-      : '',
-    formulaNote: resolved ? countRules(data.count, values, direction) : '',
-    dcText: '',
-    neededText,
+    // The chat card's own pool line, so the two cannot word it differently.
+    countFormula: localize(
+      'FABRICATE.Check.CountRoll.Pool',
+      '{pool}d{die} · each {comparison} {threshold}'
+    ),
+    countPendingDice: localize(
+      'FABRICATE.App.RollPrompt.CountPendingDice',
+      '{pool}d{die} + {formula} dice · each {comparison} {threshold}'
+    ),
+    countPendingThreshold: localize(
+      'FABRICATE.App.RollPrompt.CountPendingThreshold',
+      '{pool}d{die} · each {comparison} {threshold} + {formula}'
+    ),
+    countRule: localize(
+      'FABRICATE.App.RollPrompt.CountRule',
+      'Success on {comparison} {threshold}'
+    ),
+    countRuleCharacter: localize(
+      'FABRICATE.App.RollPrompt.CountRuleCharacter',
+      'Success on {comparison} {threshold} (character value {value})'
+    ),
+    countRuleMoved: localize(
+      'FABRICATE.App.RollPrompt.CountRuleMoved',
+      '{rule}, moved {moved} by modifiers'
+    ),
+    countFaces: countFaceClauses(described, localize)
+      .map((clause) => ` · ${clause}`)
+      .join(''),
+    countZeroPool: localize(
+      'FABRICATE.App.RollPrompt.CountZeroPool',
+      'This roll fails automatically: the pool is reduced to zero.'
+    ),
   };
-}
-
-/** Frames 30 and 35: `Success on ≥ 8 · best face explodes · worst face cancels`. */
-function countRules({ die, thresholdSource, ...rules }, values, direction) {
-  const clauses = [
-    thresholdSource
-      ? fill(promptLabel('CountRuleSource', 'Success on {comparison} {threshold} ({source})'), {
-          ...values,
-          source: thresholdSource,
-        })
-      : fill(promptLabel('CountRule', 'Success on {comparison} {threshold}'), values),
-  ];
-  const { explode, cancel } = describedFaceRules({ die, direction, ...rules });
-  if (explode) {
-    clauses.push(faceRuleText(explode, direction, explode.once ? 'ExplodeOnce' : 'Explode'));
-  }
-  if (cancel) {
-    clauses.push(faceRuleText(cancel, direction === 'under' ? 'over' : 'under', 'Cancel'));
-  }
-  return clauses.join(' · ');
-}
-
-const FACE_RULES = {
-  Explode: ['CountExplodeBest', 'best face explodes', 'CountExplodeFrom', 'faces {faces} explode'],
-  ExplodeOnce: [
-    'CountExplodeBestOnce',
-    'best face explodes once',
-    'CountExplodeFromOnce',
-    'faces {faces} explode once',
-  ],
-  Cancel: ['CountCancelWorst', 'worst face cancels', 'CountCancelFrom', 'faces {faces} cancel'],
-};
-
-function faceRuleText({ kind, value }, direction, rule) {
-  const [extremeKey, extremeText, fromKey, fromText] = FACE_RULES[rule];
-  if (kind !== 'from') return promptLabel(extremeKey, extremeText);
-  return fill(promptLabel(fromKey, fromText), { faces: `${faceSign(direction)} ${value}` });
 }
 
 function targetText(data, labels) {
@@ -251,7 +244,9 @@ function targetText(data, labels) {
 
 /** The labels a check's product and direction word the prompt with. */
 function labelsFor(data) {
-  if (data.count) return { ...copy(), ...countCopy(data.count.destination) };
+  if (data.count) {
+    return { ...copy(), ...countCopy(data.count.destination), ...countLabels(data) };
+  }
   if (data.countDestination) return { ...copy(), ...countCopy(data.countDestination) };
   return data.direction === 'under' ? { ...copy(), ...underCopy() } : copy();
 }
@@ -259,15 +254,21 @@ function labelsFor(data) {
 /** The target, bulk-need and pick-cap copy, formatted here so the component renders strings only. */
 function formatCopy(data, choicePlan) {
   const labels = labelsFor(data);
-  const { formulaNote, ...counted } = data.count ? countText(data) : {};
   const formatted = {
-    labels: {
-      ...labels,
-      pickUpTo: fill(labels.pickUpTo, { count: choicePlan.maxPicks }),
-      ...(formulaNote && { formulaNote }),
-    },
-    ...(data.count ? counted : { dcText: targetText(data, labels) }),
+    labels: { ...labels, pickUpTo: fill(labels.pickUpTo, { count: choicePlan.maxPicks }) },
+    dcText: data.count ? '' : targetText(data, labels),
   };
+  if (data.count) {
+    // The line and note as they open, with the default picks and no bonus yet.
+    const line = rollPromptTarget(
+      { ...data, labels: formatted.labels, choicePlan },
+      choicePlan.defaultSelectedIds,
+      ''
+    );
+    formatted.formula = line.formula;
+    formatted.neededText = countNeededText(data.count);
+    if (line.note) formatted.labels.formulaNote = line.note;
+  }
   // The one target chip: a count's successes needed, else the DC or target and its comparison.
   formatted.chipText = data.count
     ? formatted.neededText
@@ -310,38 +311,46 @@ function rollsUnder(need) {
   return need?.kind === 'target' || (need?.kind === 'noSingleTarget' && need.direction === 'under');
 }
 
-/** A count check's view: the pre-modifier pool, per-die threshold and required count. */
+/**
+ * A count check's view: the pool and threshold its picks and bonus settle onto, the threshold's
+ * anchor and source, the faces it explodes and cancels on, and the required count.
+ */
 function countPromptView({
   pool,
   die,
   threshold,
+  thresholdAnchor,
   thresholdSource,
   explode,
   cancel,
+  zeroPoolFails,
   required,
   modifierDestination,
 }) {
+  const finite = (value) => (Number.isFinite(value) ? value : null);
   return {
-    pool: Number.isFinite(pool) ? pool : null,
-    die: Number.isFinite(die) ? die : null,
-    threshold: Number.isFinite(threshold) ? threshold : null,
-    thresholdSource:
-      typeof thresholdSource === 'string' && thresholdSource ? thresholdSource : null,
-    explode: faceRule(explode),
-    cancel: faceRule(cancel),
+    pool: finite(pool),
+    die: finite(die),
+    threshold: finite(threshold),
+    thresholdAnchor: finite(thresholdAnchor),
+    thresholdSource: ['fixed', 'character'].includes(thresholdSource) ? thresholdSource : null,
+    explode: faceRule(explode, 'best'),
+    cancel: faceRule(cancel, 'worst'),
+    zeroPoolFails: zeroPoolFails !== false,
     required: Number.isInteger(required) ? required : null,
     destination: modifierDestination === 'threshold' ? 'threshold' : 'pool',
   };
 }
 
-function faceRule(rule) {
-  if (!rule || typeof rule !== 'object') return null;
-  if (rule.kind === 'from' && !Number.isInteger(rule.value)) return null;
-  return {
-    kind: rule.kind === 'from' ? 'from' : 'extreme',
-    value: rule.value ?? null,
-    once: rule.once === true,
-  };
+/** `{ kind, face }` (plus `once` to explode) for a face the dice can show, else null. */
+function faceRule(rule, extreme) {
+  if (!rule || typeof rule !== 'object' || !Number.isInteger(rule.face) || rule.face < 1) {
+    return null;
+  }
+  const kind = rule.kind === 'from' ? 'from' : extreme;
+  return extreme === 'best'
+    ? { kind, face: rule.face, once: rule.once === true }
+    : { kind, face: rule.face };
 }
 
 /**
@@ -370,9 +379,11 @@ export function buildSinglePromptData({
   pool,
   die,
   threshold,
+  thresholdAnchor,
   thresholdSource,
   explode,
   cancel,
+  zeroPoolFails,
   required,
   modifierDestination,
   offerSituationalBonus,
@@ -406,9 +417,11 @@ export function buildSinglePromptData({
         pool,
         die,
         threshold,
+        thresholdAnchor,
         thresholdSource,
         explode,
         cancel,
+        zeroPoolFails,
         required,
         modifierDestination,
       }),

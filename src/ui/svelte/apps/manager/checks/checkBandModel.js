@@ -16,11 +16,13 @@ import {
   resolveCheckTarget,
   selectTargetAdjustment,
 } from '../../../../../systems/checkTarget.js';
+import { countCheckPasses, resolvePool } from '../../../../../systems/countEvaluation.js';
 import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
 
 import { formatCheckAdjustment } from './checkAdjustmentLabel.js';
 import { interpolate, underComparisonPhrase } from './checksCopy.js';
 import { missingTargetPaths, targetRefusalSentence } from './checkTargetStatus.js';
+import { settledPlacement } from './countInsetModel.js';
 
 const WINDOW_PADDING = 5;
 const MAX_WINDOW = 5000;
@@ -388,4 +390,155 @@ export function describeBandsUnavailable(state, { character = null, expression =
     );
   }
   return targetRefusalSentence(state?.reason, text);
+}
+
+/** Name each band's tone: the botch always the worst, the rest walked by their own count. */
+function countTones(bands) {
+  const tiers = bands.filter((band) => !band.botch);
+  return bands.map((band) =>
+    band.botch
+      ? { ...band, tone: BAND_TONES[0] }
+      : { ...band, tone: bandToneFor(tiers.indexOf(band), tiers.length) }
+  );
+}
+
+/** The routed tier one net lands in, classified as the count runner classifies it. */
+function countTierAt(net, required, outcomes) {
+  const { matched } = classifyCheckTotal({
+    type: 'relative',
+    total: net,
+    dc: required,
+    comparison: 'meet',
+    relativeOutcomes: outcomes,
+    fixedOutcomes: [],
+    triggers: [],
+    clampToNearest: true,
+  });
+  const index = Math.max(0, outcomes.indexOf(matched));
+  return {
+    key: matched?.id ?? 'unrouted',
+    name: matched?.name ?? '',
+    success: matched?.success === true,
+    index,
+  };
+}
+
+/** A pass/fail count's band for one net, graded as the runner grades a pool that rolled. */
+function countPassFailAt(net, required, names) {
+  const success = countCheckPasses({ policy: { zeroPool: false }, net, required });
+  const name = success ? names.success : names.failure;
+  return { key: success ? 'success' : 'failure', name, success, index: success ? 1 : 0 };
+}
+
+/** The net-success bands a count's `required` count grades: its relative tiers', or pass/fail. */
+function countGradedBands({ required, outcomes, names }) {
+  const edges = outcomes ? outcomes.map((outcome) => required + Number(outcome.dc)) : [required];
+  const finite = edges.filter(Number.isFinite);
+  if (finite.length === 0) return [];
+  const classify = outcomes
+    ? (net) => countTierAt(net, required, outcomes)
+    : (net) => countPassFailAt(net, required, names);
+  // A net never falls below zero outside a botch, so the lowest band starts at zero.
+  return runsOver(0, Math.max(0, ...finite), classify).map((band, position) =>
+    position === 0 ? { ...band, low: 0 } : band
+  );
+}
+
+/**
+ * A counting check's read-only bands in net successes (ruling R2), worst first, each with its
+ * `tone`: relative tiers at `required + outcome.dc` with the best met winning as the runtime
+ * routes, fixed ranges as authored, or pass/fail at `required` when `outcomes` is null. While
+ * cancelling is on, a first `Botch` band stands below zero. `names` carries `{ success, failure,
+ * botch }`.
+ */
+export function buildCountBands({
+  evaluation,
+  required,
+  type = 'relative',
+  outcomes = null,
+  names,
+}) {
+  const list = Array.isArray(outcomes) ? outcomes.filter(Boolean) : null;
+  if (list && list.length === 0) return [];
+  const bands =
+    list && type === 'fixed'
+      ? buildRoutedBands({ evaluation, type, outcomes: list }).map((band) => ({
+          ...band,
+          low: band.from,
+          high: band.to,
+        }))
+      : countGradedBands({ required, outcomes: list, names });
+  const cancels = normalizeCheckEvaluation(evaluation).pool.cancel.enabled;
+  if (!cancels || bands[0]?.from !== 0) return countTones(bands);
+  const botch = {
+    id: 'botch',
+    name: names.botch,
+    success: false,
+    botch: true,
+    from: -1,
+    to: -1,
+    low: null,
+    high: -1,
+  };
+  return countTones([botch, ...bands]);
+}
+
+/** A count band's range in the strip's hidden list: `below 0`, `0–1`, `2`, `5 or more`. */
+export function describeCountBandRange(band, text) {
+  if (band.botch) {
+    return interpolate(
+      text('FABRICATE.Admin.Manager.Checks.Count.Bands.RangeBelow', 'below {value}'),
+      { value: band.high + 1 }
+    );
+  }
+  if (band.high === null) {
+    return interpolate(
+      text('FABRICATE.Admin.Manager.Checks.Count.Bands.RangeOrMore', '{value} or more'),
+      { value: band.low }
+    );
+  }
+  return describeBandRange(band, text);
+}
+
+/**
+ * Whether the Preview-as actor's pool settles to a zero-pool failure, never a refusal read as 0,
+ * nor while a rolled bonus still pending could add dice.
+ */
+export function countPoolSettlesToZero({
+  evaluation,
+  thresholdMode,
+  character = null,
+  placement = null,
+}) {
+  const pendingDice = (placement?.preRolls ?? []).some(
+    (entry) => !Object.hasOwn(entry, 'total') && entry.destination === 'pool'
+  );
+  if (pendingDice) return false;
+  const read = resolvePool({
+    evaluation,
+    thresholdMode,
+    rollData: character?.rollData ?? {},
+    placement: settledPlacement(placement),
+  });
+  return read.ok && read.policy.zeroPool;
+}
+
+/**
+ * The read-only count strip's lead: `Measured in successes. The count must reach {required}`, the
+ * zero-pool clause or a full stop, and the botch sentence while cancelling is on.
+ */
+export function countBandScale({ required, zeroPool = false, cancels = false }, text) {
+  const reach = zeroPool
+    ? text(
+        'FABRICATE.Admin.Manager.Checks.Count.Bands.ScaleZero',
+        'Measured in successes. The count must reach {required}; this pool is reduced to zero, so the check fails automatically.'
+      )
+    : text(
+        'FABRICATE.Admin.Manager.Checks.Count.Bands.Scale',
+        'Measured in successes. The count must reach {required}.'
+      );
+  const sentence = interpolate(reach, { required });
+  return cancels
+    ? `${sentence} ${text('FABRICATE.Admin.Manager.Checks.Count.Bands.ScaleBotch', 'A net below zero is a botch.')}`
+    : sentence;
 }

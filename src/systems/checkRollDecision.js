@@ -1,12 +1,14 @@
 /** Resolves an interactive check decision into a formula and modifier placement plan. */
 
 import { applyD20Advantage, hasPlainD20 } from '../utils/craftingCheckExpression.js';
+import { hasRollDataPath } from '../utils/rollFormulaRollability.js';
 
 import {
   appendPlannedLibraryTerms,
   resolvedLibraryContributions,
 } from './checkModifierResolver.js';
 import { planModifierPlacement } from './checkModifierRouter.js';
+import { describeCountPolicy } from './countEvaluation.js';
 import { CHECK_MODIFIER_TERM_LABEL } from './toolCheckBonus.js';
 
 /** The deferred `playerPicks` slot the prompt shows as a trailing term, where the resolved term lands. */
@@ -87,33 +89,63 @@ export function attributeTargetPromptField(evaluation) {
 }
 
 /**
- * A count prompt's fields: the pre-modifier pool, threshold and face rules from the pool resolved
- * before the prompt opens (`policy`, or null), and the required count, or null when nothing grades
- * against it: a progressive or fixed-range routed check, or a hidden gathering task.
- * `thresholdSource` is the authored threshold when it is not a plain number.
+ * A count prompt's fields, numbers and enums only, from the pool resolved before the prompt opens
+ * (`policy`, or null): `pool` and `threshold` are the resolved base and threshold with any scalar
+ * Tool benefit already settled on them, unfloored, which the prompt settles its picks and bonus
+ * onto; `thresholdAnchor` is the resolved threshold before any benefit, read from the character or
+ * `fixed` as `thresholdSource` says; `explode` and `cancel` name the face each acts from. The
+ * required count is null when nothing grades against it: progressive, fixed-range routed, hidden.
  */
-export function countPromptFields(evaluation, policy, required) {
-  return {
+export function countPromptFields(evaluation, policy, required, toolContributions = []) {
+  const direction = evaluation.direction === 'under' ? 'under' : 'over';
+  const modifierDestination =
+    evaluation.pool?.modifierDestination === 'threshold' ? 'threshold' : 'pool';
+  const shared = {
     product: 'count',
-    direction: evaluation.direction === 'under' ? 'under' : 'over',
+    direction,
     comparison: policy?.comparison ?? null,
-    pool: policy?.dice ?? null,
-    threshold: policy?.threshold ?? null,
-    thresholdSource: policy ? authoredThreshold(evaluation.pool?.threshold) : null,
-    die: policy?.die ?? null,
-    explode: policy?.explode
-      ? { kind: policy.explode.kind, value: policy.explode.value, once: policy.explode.once }
-      : null,
-    cancel: policy?.cancel ? { kind: policy.cancel.kind, value: policy.cancel.value } : null,
     required: Number.isFinite(required) ? required : null,
-    modifierDestination:
-      evaluation.pool?.modifierDestination === 'threshold' ? 'threshold' : 'pool',
+    modifierDestination,
+  };
+  if (!policy) return { ...shared, ...UNRESOLVED_COUNT_FIELDS };
+  const tools = planModifierPlacement({
+    evaluation: { product: 'count', direction, pool: { modifierDestination } },
+    contributions: settledToolBenefits(toolContributions),
+  });
+  const { explode, cancel } = describeCountPolicy(policy);
+  return {
+    ...shared,
+    pool: policy.resolved.base + tools.poolDelta,
+    die: policy.die,
+    threshold: policy.resolved.threshold + tools.thresholdDelta,
+    thresholdAnchor: policy.resolved.threshold,
+    thresholdSource: hasRollDataPath(evaluation.pool?.threshold) ? 'character' : 'fixed',
+    explode: explode && {
+      kind: explode.from ? 'from' : 'best',
+      face: explode.face,
+      once: explode.once === true,
+    },
+    cancel: cancel && { kind: cancel.from ? 'from' : 'worst', face: cancel.face },
+    zeroPoolFails: evaluation.pool?.zeroPoolFails !== false,
   };
 }
 
-function authoredThreshold(expression) {
-  const text = String(expression ?? '').trim();
-  return text && !/^[+-]?\d+(?:\.\d+)?$/.test(text) ? text : null;
+const UNRESOLVED_COUNT_FIELDS = Object.freeze({
+  pool: null,
+  die: null,
+  threshold: null,
+  thresholdAnchor: null,
+  thresholdSource: null,
+  explode: null,
+  cancel: null,
+  zeroPoolFails: null,
+});
+
+/** The Tool benefits already rolled before the prompt, as bare scalars for the router to place. */
+function settledToolBenefits(toolContributions) {
+  return (Array.isArray(toolContributions) ? toolContributions : [])
+    .filter((tool) => tool?.form === 'scalar' && Number.isFinite(tool.value))
+    .map((tool) => ({ source: 'tool', label: '', form: 'scalar', value: tool.value }));
 }
 
 function promptInput({
@@ -156,7 +188,7 @@ function promptInput({
     // Display only: a bonus the decision carries still applies when the offer is off.
     offerSituationalBonus: options.offerSituationalBonus !== false,
     ...(evaluation.product === 'count' &&
-      countPromptFields(evaluation, countPolicy, options.required)),
+      countPromptFields(evaluation, countPolicy, options.required, options.toolContributions)),
   };
 }
 

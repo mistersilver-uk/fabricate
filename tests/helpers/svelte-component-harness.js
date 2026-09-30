@@ -254,6 +254,10 @@ export const CHECK_TARGET_RAW_MODULES = Object.freeze([
 export const CHECK_EVIDENCE_RAW_MODULES = Object.freeze([
   'src/ui/presenters/checkEvidenceRows.js',
   'src/ui/svelte/apps/crafting/rollPromptTarget.js',
+  // The count line the prompt target settles through the router and the pool floor (issue 2006).
+  'src/systems/checkModifierRouter.js',
+  'src/systems/countEvaluation.js',
+  ...CHECK_TARGET_RAW_MODULES,
   'src/utils/fillPlaceholders.js',
   'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
   'src/utils/checkAdjustmentFormat.js',
@@ -290,6 +294,8 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/ui/presenters/CraftingListingBuilder.js',
   // Issue 2005: the check card's roll-under or character-value target line.
   'src/ui/presenters/checkDescriptor.js',
+  // Issue 2006: a count card's successes needed, read as the engine reads it.
+  'src/systems/countCheck.js',
   'src/ui/presenters/heldToolBonus.js',
   // Same rule, issue 1091: the browse-status vocabulary and its precedence rule moved out of the
   // builder into an import-free leaf so #1091's summary projection can share them without pulling

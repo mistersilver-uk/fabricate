@@ -19,6 +19,7 @@ import {
   installLabRunStates,
 } from './view-lab/world/labRunStates.js';
 import { LAB_HISTORY_DATA_STATES } from './view-lab/world/labHistoryEvidence.js';
+import { LAB_CHECK_PREVIEW_STATES } from './view-lab/world/labCheckPreviews.js';
 import { Recipe } from '../src/models/Recipe.js';
 import { RecipeVisibilityService } from '../src/systems/RecipeVisibilityService.js';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
@@ -199,6 +200,20 @@ test('every query.system names a real lab crafting system', () => {
       'to whichever system it had and the case photographs the wrong one:\n  ' +
       unknown.join('\n  ')
   );
+});
+
+test('every query.checkPreviewState names a state the lab seeds', () => {
+  // An unknown state seeds nothing, so the case photographs the system's own checks instead.
+  const unknown = [];
+  let named = 0;
+  for (const viewCase of VIEW_LAB_CASES) {
+    const state = viewCase.query?.checkPreviewState;
+    if (!state) continue;
+    named += 1;
+    if (!Object.hasOwn(LAB_CHECK_PREVIEW_STATES, state)) unknown.push(`${viewCase.id}: ${state}`);
+  }
+  assert.ok(named > 0, 'no case names a checkPreviewState, so this sweep proves nothing');
+  assert.deepEqual(unknown, [], `these cases name no seeded check state:\n  ${unknown.join('\n  ')}`);
 });
 
 test('every fixture id a selector names exists in the lab world', () => {

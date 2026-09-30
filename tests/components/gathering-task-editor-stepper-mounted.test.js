@@ -71,6 +71,10 @@ const harness = createMountedComponentHarness({
     'src/utils/localizeWithFallback.js',
     'src/ui/svelte/apps/manager/checks/previewActorId.js',
     'src/ui/svelte/apps/manager/component/overridePlayerSees.js',
+    // A count check's override and line (issue 2006): its copy, and the count description.
+    'src/ui/svelte/apps/manager/component/taskOverrideCopy.js',
+    'src/systems/countCheck.js',
+    'src/systems/countEvaluation.js',
   ],
   // A component missing here does not fail this suite — it HANGS it, reported as `# cancelled`.
   compiledModules: [
@@ -775,5 +779,68 @@ describe('the task check override follows the routed check evaluation (issue 200
       'an added adjustment of -2 is valid, so the warning clears'
     );
     assert.ok(!view.input().hasAttribute('aria-invalid'));
+  });
+
+  // Issue 2006: a count check reads `successesOverride`; the retained target's overrides lie dormant.
+  const countConfig = (required = 2) => ({
+    evaluation: {
+      ...evaluation(),
+      product: 'count',
+      direction: 'over',
+      pool: { die: 6, base: '3', threshold: '5', required },
+    },
+  });
+  const successesInput = (view) => view.card().querySelector('[data-gathering-task-successes-override]');
+
+  it('a count check edits the successes override in the one Stepper, with no presets (R3)', async () => {
+    const view = await mountOverride({ dcOverride: 14, adjustmentOverride: -2 }, countConfig());
+    assert.equal(view.card().dataset.gatheringTaskOverrideField, 'successesOverride');
+    assert.equal(view.heading(), 'Successes needed override');
+    assert.equal(
+      view.hint(),
+      'Replaces the successes needed for this task. The pool and threshold still come from the check.'
+    );
+    assert.equal(view.label(), 'Successes needed');
+    assert.ok(!view.input(), 'neither dormant override is offered for editing');
+    assert.equal(successesInput(view).placeholder, 'System default');
+    assert.equal(successesInput(view).getAttribute('aria-label'), 'Successes needed');
+    assert.ok(!view.card().querySelector('.fabricate-select-trigger'), 'R3: no preset Select');
+    assert.equal(
+      view.card().querySelectorAll('button').length,
+      2,
+      'R3: the Stepper\'s own − and + are the card\'s only buttons, so no preset buttons'
+    );
+    assert.deepEqual(
+      [...view.root.querySelectorAll('[data-gathering-task-override-kept]')].map((node) =>
+        node.textContent.trim()
+      ),
+      [
+        'A DC override of 14 is kept on this task. This system does not read it, so it is not shown for editing.',
+        'A difficulty adjustment override of −2 is kept on this task. This system does not read it, so it is not shown for editing.',
+      ]
+    );
+    assert.equal(view.sees(), 'Riverbed Ore · 2 successes needed');
+
+    commit(successesInput(view), '3');
+    assert.deepEqual(view.updates.at(-1), { successesOverride: 3 }, 'it writes only the successes');
+    await view.sync();
+    assert.equal(view.sees(), 'Riverbed Ore · 3 successes needed', 'the line follows the override');
+    view.card().querySelector('.fab-stepper button:first-of-type').click();
+    assert.deepEqual(view.updates.at(-1), { successesOverride: 2 }, 'the − button steps it down');
+    await view.sync();
+    clear(successesInput(view));
+    assert.deepEqual(view.updates.at(-1), { successesOverride: null }, 'clearing restores the default');
+    assert.ok(
+      view.updates.every((patch) => !('dcOverride' in patch) && !('adjustmentOverride' in patch)),
+      'no dormant override is ever written or cleared'
+    );
+  });
+
+  it('a count check names one success needed in the singular', async () => {
+    const view = await mountOverride({}, countConfig(3));
+    assert.equal(view.sees(), 'Riverbed Ore · 3 successes needed', 'the check\'s own count by default');
+    commit(successesInput(view), '1');
+    await view.sync();
+    assert.equal(view.sees(), 'Riverbed Ore · 1 success needed');
   });
 });

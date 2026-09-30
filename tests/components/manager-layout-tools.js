@@ -34,7 +34,6 @@ import {
   en,
   modifiersCombinationRuleMetrics,
   oddsScoped,
-  facesScoped,
   previewScoped,
   readRenderedToolGeometry,
   withBandStripPage,
@@ -1843,46 +1842,6 @@ test('the modifier row gives every field room for its longest content at every m
     );
   } finally {
     await context.close();
-  }
-});
-
-test('the simulator face tile layers the rolled digit ON the medallion, not beside it', async () => {
-  // Svelte scopes DESCENDANTS with `:where(.svelte-<hash>)`.
-  const hash = facesScoped.hashClass;
-  const view = await renderWithCascade(
-    `<div class="fabricate-manager"><span class="manager-checks-simulator-faces ${hash}">` +
-      `<span class="manager-checks-simulator-face ${hash}" id="tile">` +
-      `<span style="display:block;width:44px;height:44px"></span>` +
-      `<small id="value" class="${hash}"><strong class="${hash}">10</strong>` +
-      `<span class="manager-checks-simulator-marks ${hash}"></span></small>` +
-      `</span></span></div>`,
-    [css, facesScoped.css],
-    { viewport: { width: 900, height: 400 } }
-  );
-  try {
-    const tile = (await view.measure('#tile')).box;
-    const digit = await view.measure('#value');
-    const value = digit.box;
-    const geometry = {
-      position: digit.style.position,
-      overlaps:
-        value.left >= tile.left - 0.5 &&
-        value.right <= tile.right + 0.5 &&
-        value.top >= tile.top - 0.5 &&
-        value.bottom <= tile.bottom + 0.5,
-      width: Math.round(value.width),
-      tileWidth: Math.round(tile.width),
-    };
-    assert.equal(geometry.position, 'absolute', 'the rule that positions it still matches');
-    assert.equal(geometry.tileWidth, 44, 'the tile is the medallion’s own 44px square');
-    assert.equal(
-      geometry.width,
-      geometry.tileWidth,
-      '`inset: 0` makes the digit span the tile; without it the box collapses to its content'
-    );
-    assert.ok(geometry.overlaps, 'the digit sits INSIDE the tile rather than beside it');
-  } finally {
-    await view.close();
   }
 });
 

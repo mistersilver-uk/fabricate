@@ -9,6 +9,8 @@ import {
   MAX_COUNT_POOL,
   countCheckPasses,
   countFacePredicates,
+  describeAuthoredCountPolicy,
+  describeCountPolicy,
   minimumAdditionalDice,
   projectCountResults,
   resolvePool,
@@ -557,4 +559,66 @@ test('resolution never mutates deep-frozen roll data, evaluation or placement', 
   const result = resolvePool({ evaluation, rollData, placement });
   assert.equal(result.ok, true);
   assert.equal(result.policy.dice, 7);
+});
+
+// ── the shared description (issue 2006) ──────────────────────────────────────
+
+const EXPLODE_BEST = { enabled: true, faces: { kind: 'best', value: null }, once: false };
+const CANCEL_WORST = { enabled: true, faces: { kind: 'worst', value: null } };
+
+test('describeCountPolicy names the settled pool, die, sign, threshold and actual faces', () => {
+  const policy = resolved(
+    { explode: EXPLODE_BEST, cancel: CANCEL_WORST },
+    { placement: { poolDelta: 1, thresholdDelta: -0.5, preRolls: [] } }
+  );
+  assert.deepEqual(describeCountPolicy(policy), {
+    pool: 3,
+    die: 10,
+    symbol: '≥',
+    threshold: 7.5,
+    explode: { from: false, face: 10, sign: null, once: false },
+    cancel: { from: false, face: 1, sign: null },
+  });
+});
+
+test('describeCountPolicy words under, strict and from faces on the side each rule reads', () => {
+  const policy = resolved(
+    {
+      direction: 'under',
+      explode: { enabled: true, faces: { kind: 'from', value: 2 }, once: true },
+      cancel: { enabled: true, faces: { kind: 'from', value: 9 } },
+    },
+    { thresholdMode: 'exceed' }
+  );
+  const described = describeCountPolicy(policy);
+  assert.equal(described.symbol, '<');
+  assert.deepEqual(described.explode, { from: true, face: 2, sign: '≤', once: true });
+  assert.deepEqual(described.cancel, { from: true, face: 9, sign: '≥' });
+  const worst = describeCountPolicy(resolved({ direction: 'under', cancel: CANCEL_WORST }));
+  assert.deepEqual(worst.cancel, { from: false, face: 10, sign: null }, 'the worst face under is the die');
+});
+
+test('describeCountPolicy drops a from explosion beyond the die, which never fires', () => {
+  const policy = resolved({ explode: { enabled: true, faces: { kind: 'from', value: 11 }, once: false } });
+  assert.equal(describeCountPolicy(policy).explode, null);
+});
+
+test('describeAuthoredCountPolicy keeps the authored text and leaves a faceless from rule undescribed', () => {
+  const described = describeAuthoredCountPolicy({
+    evaluation: countEvaluation({
+      base: '@a + @b',
+      threshold: '@skills.x',
+      explode: { enabled: true, faces: { kind: 'from', value: null }, once: false },
+      cancel: CANCEL_WORST,
+    }),
+    thresholdMode: 'meet',
+  });
+  assert.deepEqual(described, {
+    pool: '@a + @b',
+    die: 10,
+    symbol: '≥',
+    threshold: '@skills.x',
+    explode: null,
+    cancel: { from: false, face: 1, sign: null },
+  });
 });

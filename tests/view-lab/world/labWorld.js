@@ -29,7 +29,8 @@ const FABRICATE_NAMESPACE = 'fabricate';
 // world remains unchanged, including every existing d100 editor and gathering screenshot.
 function seedGatheringTaskMode(content, mode) {
   // Roll-under evaluations: `routed-under` reads Brenna's Intelligence (issue 2073), and
-  // `routed-under-fixed` is the fixed ladder whose Journal bands read `≤` (issue 2005). Declared
+  // `routed-under-fixed` is the fixed ladder whose Journal bands read `≤` (issue 2005); and
+  // `routed-count` counts five d10s at 7 or more, exploding once from 9 (issue 2006). Declared
   // here because a fixture test evaluates this function's text on its own.
   const underEvaluations = {
     'routed-under': {
@@ -38,6 +39,17 @@ function seedGatheringTaskMode(content, mode) {
       target: { source: 'attribute', expression: '@abilities.int.mod' },
     },
     'routed-under-fixed': { product: 'sum', direction: 'under', target: { source: 'fixed' } },
+    'routed-count': {
+      product: 'count',
+      direction: 'over',
+      pool: {
+        die: 10,
+        base: '5',
+        threshold: '7',
+        required: 2,
+        explode: { enabled: true, faces: { kind: 'from', value: 9 }, once: true },
+      },
+    },
   };
   const modes = ['straight', 'routed', 'routed-unmatched', ...Object.keys(underEvaluations)];
   if (!modes.includes(mode)) return;
@@ -128,6 +140,19 @@ const CHECK_OVERRIDE_STATES = Object.freeze({
   // A kept override authored under `add`, invalidated by a switch to `multiply` (issue 2078): the
   // field itself, not just readiness, must name it.
   invalid: { source: 'attribute', kind: 'multiply', salvage: [15, -2], task: [15, -2] },
+  // Counting checks (issue 2006, frame 25): the successes needed override, a Standard preset, a
+  // custom count, and the system default, each beside a kept DC override the count never reads.
+  'count-preset': { count: true, salvage: [15, null, 3], task: [12, null, null] },
+  'count-custom': { count: true, salvage: [15, null, 6], task: [12, null, null] },
+  'count-default': { count: true, salvage: [15, null, null], task: [12, null, null] },
+  count: { count: true, salvage: [15, null, null], task: [12, null, null] },
+});
+
+/** The counting evaluation the count override states read: d10s, success on 8 or more. */
+const OVERRIDE_COUNT = Object.freeze({
+  product: 'count',
+  direction: 'over',
+  pool: { die: 10, base: '4', threshold: '8', required: 2 },
 });
 
 /** A relative routed check over `evaluation`, as the salvage and gathering states seed it. */
@@ -146,22 +171,30 @@ const routedCheck = (evaluation) => ({
 function seedCheckOverride(content, state) {
   const spec = CHECK_OVERRIDE_STATES[state];
   if (!spec) return;
-  const evaluation = {
-    product: 'sum',
-    direction: spec.direction ?? 'under',
-    target: {
-      source: spec.source,
-      expression: '@skills.med.mod + 8',
-      adjustmentKind: spec.kind,
-      baseAdjustment: null,
-    },
-  };
+  const evaluation = spec.count
+    ? OVERRIDE_COUNT
+    : {
+        product: 'sum',
+        direction: spec.direction ?? 'under',
+        target: {
+          source: spec.source,
+          expression: '@skills.med.mod + 8',
+          adjustmentKind: spec.kind,
+          baseAdjustment: null,
+        },
+      };
   const multiply = spec.kind === 'multiply';
   const tiers = [
-    ['Easy', 10, multiply ? 1 : 2],
-    [spec.source === 'fixed' ? 'Medium' : 'Standard', 15, multiply ? 0.5 : 0],
-    ['Hard', 20, multiply ? 0.2 : -2],
-  ].map(([name, dc, adjustment]) => ({ id: `lab-ov-${name.toLowerCase()}`, name, dc, adjustment }));
+    ['Easy', 10, multiply ? 1 : 2, 2],
+    [spec.source === 'fixed' ? 'Medium' : 'Standard', 15, multiply ? 0.5 : 0, 3],
+    ['Hard', 20, multiply ? 0.2 : -2, 4],
+  ].map(([name, dc, adjustment, successes]) => ({
+    id: `lab-ov-${name.toLowerCase()}`,
+    name,
+    dc,
+    adjustment,
+    ...(spec.count && { successes }),
+  }));
   const system = content.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.SMITHING);
   // A routed state gives `simple` a fixed target, so an override reading it would edit the DC.
   const simpleEvaluation = spec.routed
@@ -181,7 +214,11 @@ function seedCheckOverride(content, state) {
   };
   if (spec.routed) system.salvageResolutionMode = 'routed';
   system.gatheringCraftingCheck = { routed: routedCheck(evaluation) };
-  const overrides = ([dcOverride, adjustmentOverride]) => ({ dcOverride, adjustmentOverride });
+  const overrides = ([dcOverride, adjustmentOverride, successesOverride = null]) => ({
+    dcOverride,
+    adjustmentOverride,
+    successesOverride,
+  });
   const sword = content.components.find((entry) => entry.id === 'sm-longsword');
   sword.salvage = { ...sword.salvage, ...overrides(spec.salvage) };
   const retask = (entry) =>

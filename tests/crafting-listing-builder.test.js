@@ -851,6 +851,48 @@ describe('CraftingListingBuilder — success-counting check (issue 2004)', () =>
   });
 });
 
+describe('CraftingListingBuilder — a count check\'s successes needed (issue 2006)', () => {
+  const countCheck = (extra = {}) => ({
+    rollFormula: '1d20', dc: 15,
+    tiers: [{ id: 'hard', name: 'Hard', dc: 18, successes: 3 }, { id: 'open', name: 'Open', dc: 12, successes: null }],
+    evaluation: { product: 'count', direction: 'over', pool: { die: 10, base: '4', threshold: '8', required: 2 } },
+    ...extra,
+  });
+  const neededFor = ({ mode = 'simple', slot = 'simple', check = countCheck(), checkTierId = null } = {}) => {
+    const system = makeSystem({
+      resolutionMode: mode,
+      features: { craftingChecks: true },
+      craftingCheck: { simple: {}, routed: {}, progressive: {}, [slot]: check },
+    });
+    const builder = makeBuilder({ system, entries: [{ recipe: makeRecipe({ checkTierId }), access: { reason: 'ok' } }] });
+    const { summaries } = builder.buildListing({ craftingActor: null, viewer: PLAYER });
+    const detail = builder.buildRecipeDetail({ recipeId: summaries[0].id, craftingActor: null, viewer: PLAYER });
+    return detail.check;
+  };
+
+  it('reads the recipe tier\'s successes, else the pool\'s, and never a DC', () => {
+    const plain = neededFor();
+    assert.deepEqual([plain.successesNeeded, plain.dc], [2, null]);
+    assert.equal(neededFor({ checkTierId: 'hard' }).successesNeeded, 3, 'the tier\'s successes, not its DC 18');
+    assert.equal(neededFor({ checkTierId: 'open' }).successesNeeded, 2, 'a tier with none falls back to the pool');
+    assert.equal(
+      neededFor({ mode: 'routedByCheck', slot: 'routed', check: countCheck({ type: 'relative' }) }).successesNeeded,
+      2,
+      'a relative ladder is anchored on the count'
+    );
+  });
+
+  it('names no count where nothing grades against one, and leaves a summed check unchanged', () => {
+    const absent = (check) => !Object.hasOwn(check, 'successesNeeded');
+    assert.ok(absent(neededFor({ mode: 'routedByCheck', slot: 'routed', check: countCheck({ type: 'fixed' }) })));
+    assert.ok(absent(neededFor({ mode: 'progressive', slot: 'progressive' })));
+    assert.ok(absent(neededFor({ check: countCheck({ dcMode: 'dynamic', macroUuid: 'Macro.x' }) })), 'a macro sets it');
+    const summed = neededFor({ check: countCheck({ evaluation: undefined }) });
+    assert.ok(absent(summed));
+    assert.equal(summed.dc, 15);
+  });
+});
+
 describe('CraftingListingBuilder — outcome tiers', () => {
   function routedSystem() {
     return makeSystem({

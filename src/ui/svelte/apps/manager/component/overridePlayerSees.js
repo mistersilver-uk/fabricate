@@ -8,6 +8,8 @@ import {
   resolveCheckTarget,
   selectTargetAdjustment,
 } from '../../../../../systems/checkTarget.js';
+import { countRequired } from '../../../../../systems/countCheck.js';
+import { describeAuthoredCountPolicy } from '../../../../../systems/countEvaluation.js';
 import { numberOrNull } from '../../../../../utils/scalars.js';
 import { formatCheckAdjustment } from '../checks/checkAdjustmentLabel.js';
 import { interpolate, underComparisonPhrase } from '../checks/checksCopy.js';
@@ -47,7 +49,29 @@ const KEY = {
     'FABRICATE.Admin.Manager.Checks.Evaluation.ValueNoActor',
     'Choose a character in Preview as to see what this resolves to.',
   ],
+  count: [
+    'FABRICATE.Admin.Manager.Checks.Count.Overrides.PlayerSees',
+    '{subject} · {count} successes needed',
+  ],
+  countOne: [
+    'FABRICATE.Admin.Manager.Checks.Count.Overrides.PlayerSeesOne',
+    '{subject} · 1 success needed',
+  ],
+  countPool: [
+    'FABRICATE.Admin.Manager.Checks.Count.Overrides.PlayerSeesPool',
+    '{subject} · {count} successes needed · d{die}s, success on {symbol} {threshold}',
+  ],
+  countPoolOne: [
+    'FABRICATE.Admin.Manager.Checks.Count.Overrides.PlayerSeesPoolOne',
+    '{subject} · 1 success needed · d{die}s, success on {symbol} {threshold}',
+  ],
 };
+
+/** The override a check reads: `successesOverride` under a count, else by its target's source. */
+export function checkOverrideField(evaluation) {
+  if (evaluation?.product === 'count') return 'successesOverride';
+  return evaluation?.target?.source === 'attribute' ? 'adjustmentOverride' : 'dcOverride';
+}
 
 /**
  * Whether a kept `adjustmentOverride` breaks its kind's rule — the SAME rule
@@ -64,27 +88,47 @@ export function overrideInvalidForKind({ attribute, kind, adjustmentOverride }) 
 }
 
 /**
- * The dormant override an editor names in its callout, or `null`: the DC override under a
- * character value, or the adjustment override under a fixed target. Neither is ever cleared.
+ * The dormant DC and adjustment overrides an editor names in its callouts, as `{ field, value }`:
+ * every one set that `field`, the active override, is not. None is ever cleared.
  */
-export function keptOverride({ attribute, dcOverride = null, adjustmentOverride = null }) {
-  const [field, value] = attribute
-    ? ['dcOverride', dcOverride]
-    : ['adjustmentOverride', adjustmentOverride];
-  const number = numberOrNull(value);
-  return number === null ? null : { field, value: number };
+export function keptOverrides({ field, dcOverride = null, adjustmentOverride = null }) {
+  return [
+    ['dcOverride', dcOverride],
+    ['adjustmentOverride', adjustmentOverride],
+  ]
+    .filter(([name]) => name !== field)
+    .map(([name, value]) => ({ field: name, value: numberOrNull(value) }))
+    .filter(({ value }) => value !== null);
 }
 
 /**
- * `{ line, note, readsCharacter, state }` for one override. `line` is `''` where the check is not
- * graded against one number (`count`, fixed-range `ranges`); `note` names the missing character;
- * `readsCharacter` says whether Preview as matters; `state` is also `fixed`, `no-character`,
- * `unresolved`, `adjustment-invalid` or `resolved`.
+ * A count check's line: the successes needed, and for `poolDetail` the die and per-die test with
+ * its threshold as authored, since the runtime reads the successes override and not a DC.
+ */
+function countPlayerSees(
+  { subject, evaluation, thresholdMode, successesOverride, poolDetail },
+  say
+) {
+  const count = countRequired(evaluation, successesOverride);
+  const one = count === 1;
+  let key = one ? KEY.countOne : KEY.count;
+  if (poolDetail) key = one ? KEY.countPoolOne : KEY.countPool;
+  const { die, symbol, threshold } = describeAuthoredCountPolicy({ evaluation, thresholdMode });
+  const line = say(key, { subject, count, die, symbol, threshold: String(threshold).trim() });
+  return { line, note: '', readsCharacter: false, state: 'count' };
+}
+
+/**
+ * `{ line, note, readsCharacter, state }` for one override. `line` is `''` where a fixed-range
+ * check is graded by its `ranges`; `note` names the missing character; `readsCharacter` says
+ * whether Preview as matters; `state` is also `count`, `fixed`, `no-character`, `unresolved`,
+ * `adjustment-invalid` or `resolved`.
  * @param {object} args
  * @param {string} args.subject The line's lead: `Salvage check`, or the task's name.
  * @param {object} args.evaluation The normalized check evaluation.
  * @param {string|null} args.type The routed check's `type`; `fixed` grades by ranges.
  * @param {number} args.anchorDc The system DC a fixed target falls back to.
+ * @param {boolean} args.poolDetail Whether a count line also names the die and per-die test.
  * @param {{ name: string, rollData: object }|null} args.character The Preview-as character.
  */
 export function overridePlayerSees({
@@ -94,6 +138,8 @@ export function overridePlayerSees({
   thresholdMode = 'meet',
   dcOverride = null,
   adjustmentOverride = null,
+  successesOverride = null,
+  poolDetail = false,
   anchorDc = 15,
   character = null,
   text,
@@ -102,10 +148,11 @@ export function overridePlayerSees({
   const attribute = evaluation?.target?.source === 'attribute';
   const under = evaluation?.direction === 'under';
   const cmp = underComparisonPhrase(thresholdMode, text);
-  // The runtime reads `successesOverride` for a count check, and a fixed-range check its ranges.
-  if (evaluation?.product === 'count')
-    return { line: '', note: '', readsCharacter: false, state: 'count' };
   if (type === 'fixed') return { line: '', note: '', readsCharacter: false, state: 'ranges' };
+  if (evaluation?.product === 'count') {
+    const count = { subject, evaluation, thresholdMode, successesOverride, poolDetail };
+    return countPlayerSees(count, say);
+  }
   if (!attribute) {
     const dc = numberOrNull(dcOverride) ?? Number(anchorDc);
     const line = say(under ? KEY.fixedUnder : KEY.fixedOver, { subject, cmp, dc: Math.trunc(dc) });

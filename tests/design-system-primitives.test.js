@@ -95,6 +95,8 @@ const EXPECTED_OVERRIDE_KEYS = [
   // Issue 1509: the editor tab strip, and the third key gained by neither of the two routes above —
   // the component did not acquire a state and it did not arrive.
   'src/ui/svelte/components/ChoiceOptionList.svelte',
+  // Issue 2006: the die tiles, a primitive ARRIVING, on the simulator's two rolled count frames.
+  'src/ui/svelte/components/DiceTiles.svelte',
   'src/ui/svelte/components/EditorTabs.svelte',
   'src/ui/svelte/components/EditorValidationSurface.svelte',
   'src/ui/svelte/components/EmptyState.svelte',
@@ -225,8 +227,9 @@ test('the inputs every property below quantifies over are alive', () => {
   // had crossed the membership bar with nobody adjudicating it.
   // 68 as of issue 2005, which promoted the shared Preview-as picker, the Player sees block and the
   // executed check evidence rows.
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 68, 'the shipped primitive set changed size');
-  assert.equal(NOT_A_PRIMITIVE.length, 16, 'the recorded non-member set changed size');
+  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 69, 'the shipped primitive set changed size');
+  // 17 as of issue 2006, which records the die tiles at one importer until its result boxes land.
+  assert.equal(NOT_A_PRIMITIVE.length, 17, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(
     PUBLISHING_CASE_IDS.size > 0,

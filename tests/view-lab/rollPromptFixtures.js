@@ -20,7 +20,7 @@ export async function seedRollPromptFixture(world, state) {
   if (state === 'under') await seedRollUnder(world);
   if (Object.hasOwn(EVIDENCE_STATES, state)) await seedCheckEvidence(world, EVIDENCE_STATES[state]);
   if (Object.hasOwn(SALVAGE_CHECKS, state)) await seedSalvageChecks(world, state);
-  if (state === 'count' || state === 'count-threshold') await seedCount(world, state);
+  if (Object.hasOwn(COUNT_POOLS, state)) await seedCount(world, state);
   if (state === 'pick-one' || state === 'overflow') {
     const system = manager.getSystem('lab-herbalism');
     await manager.updateSystem(system.id, {
@@ -235,27 +235,67 @@ async function seedSalvageChecks(world, state) {
  * Smithing's simple slot counts successes with one applied modifier, "Steady hands +1". `count` is
  * frame 35: six d10s, each qualifying at 8 or more, the best face exploding and the worst
  * cancelling. `count-threshold` is frame 30: two d20s, each qualifying at or under a threshold
- * read from the character, and modifiers move the threshold. Both need two successes; the retained
- * roll formula stays authored and inert, so the prompt must not show it. The subtitles are the
- * frames': "Sera Vane · Fine Craft" and "Sera Vane · Complex Work".
+ * read from the character, and modifiers move the threshold. `count-explode` explodes once from a
+ * chosen face and cancels from another, so the note names the actual faces (issue 2006), and
+ * `count-zero` rolls a pool of no dice that the modifier cannot grow. Each needs two successes; the
+ * retained roll formula stays authored and inert, so the prompt must not show it. The subtitles
+ * are the frames': "Sera Vane · Fine Craft" and "Sera Vane · Complex Work".
  */
+const COUNT_POOLS = {
+  count: {
+    direction: 'over',
+    subject: 'Fine Craft',
+    pool: {
+      die: 10,
+      base: '5',
+      threshold: '8',
+      explode: { enabled: true, faces: { kind: 'best' } },
+      cancel: { enabled: true, faces: { kind: 'worst' } },
+      modifierDestination: 'pool',
+    },
+  },
+  'count-threshold': {
+    direction: 'under',
+    subject: 'Complex Work',
+    pool: {
+      die: 20,
+      base: '2',
+      threshold: '@abilities.int.mod + 10',
+      modifierDestination: 'threshold',
+    },
+  },
+  'count-explode': {
+    direction: 'over',
+    subject: 'Fine Craft',
+    pool: {
+      die: 10,
+      base: '5',
+      threshold: '7',
+      explode: { enabled: true, faces: { kind: 'from', value: 9 }, once: true },
+      cancel: { enabled: true, faces: { kind: 'from', value: 2 } },
+      modifierDestination: 'pool',
+    },
+  },
+  'count-zero': {
+    direction: 'over',
+    subject: 'Fine Craft',
+    pool: {
+      die: 10,
+      base: '0',
+      threshold: '8',
+      modifierDestination: 'threshold',
+      zeroPoolFails: true,
+    },
+  },
+};
+
 async function seedCount(world, state) {
   const store = world.fabricate.characterLibrariesStore;
   await store.saveModifiers([
     { id: 'lab-mod-steady-hands', label: 'Steady hands', icon: 'fa-solid fa-hand', expression: '1' },
     ...store.listModifiers().filter((entry) => entry.id !== 'lab-mod-steady-hands'),
   ]);
-  const pool =
-    state === 'count'
-      ? {
-          die: 10,
-          base: '6',
-          threshold: '8',
-          explode: { enabled: true, faces: { kind: 'best' } },
-          cancel: { enabled: true, faces: { kind: 'worst' } },
-          modifierDestination: 'pool',
-        }
-      : { die: 20, base: '2', threshold: '@abilities.int.mod + 11', modifierDestination: 'threshold' };
+  const { direction, subject, pool } = COUNT_POOLS[state];
   const manager = world.fabricate.craftingSystemManager;
   const system = manager.getSystem('lab-smithing');
   await manager.updateSystem(system.id, {
@@ -267,13 +307,13 @@ async function seedCount(world, state) {
         ...system.craftingCheck.simple,
         evaluation: normalizeCheckEvaluation({
           product: 'count',
-          direction: state === 'count' ? 'over' : 'under',
+          direction,
           pool: { ...pool, required: 2 },
         }),
       },
     },
   });
-  await nameFrameSubject(world, { name: state === 'count' ? 'Fine Craft' : 'Complex Work' });
+  await nameFrameSubject(world, { name: subject });
 }
 
 /** Nine long-named world modifiers Herbalism's check offers, so the prompt meets the height cap. */
