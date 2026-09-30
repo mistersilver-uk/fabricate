@@ -1574,11 +1574,11 @@ Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-mo
 
 `offerSituationalBonus` normalizes to `true` unless the stored value is exactly `false` (`normalizeSituationalBonusOffer` in `src/systems/normalize/craftingCheck.js`), and is carried beside `evaluation` on all eight normalized check sub-objects.
 It survives `checkDraftClone.js`'s clone functions, the Studio's save wiring, schema-6 export/import, and `CraftingSystemManager._copyPassFailCheckFields`'s crossing of the routed-by-ingredients boundary.
-It is a display flag only: `CheckPromptOptions.svelte` reads it to decide whether the interactive roll prompt's **In the roll prompt** group shows a **Situational bonus** field at all, and with it `false` the prompt shows no bonus field, caption or help text, so `ManagerModal`'s initial focus falls through to the Roll button.
+It is a display flag only: the Studio's `CheckPromptOptions.svelte` toggle writes it, and the roll prompt (`RollPrompt.svelte`, `rollPrompt.js`) reads it to decide whether the interactive roll prompt's **In the roll prompt** group shows a **Situational bonus** field at all, and with it `false` the prompt shows no bonus field, caption or help text, so `ManagerModal`'s initial focus falls through to the Roll button.
 `allowsSituationalModifier` (threaded from each activity's own usability check, read at `checkRoll.js:501`) is the SEPARATE authority gate a decision's typed bonus is checked against, and it is never derived from the offer: a Tool bonus, an eligible named modifier, and a programmatic bonus a Macro or companion module supplies all keep applying while the offer is off.
 A bulk prompt hides its bonus field only when every usable subject's check has the offer off, and a companion call through `rollActorCheck`/`resolveBulkCheckDecision` always offers the field regardless of any system's own offer.
 
-Canonical mapping: `normalizeSituationalBonusOffer` in `src/systems/normalize/craftingCheck.js`; `CheckPromptOptions.svelte`; `allowsSituationalModifier` in `src/systems/checkRoll.js`
+Canonical mapping: `normalizeSituationalBonusOffer` in `src/systems/normalize/craftingCheck.js`; `CheckPromptOptions.svelte` (writes); `RollPrompt.svelte` and `rollPrompt.js` (read); `allowsSituationalModifier` in `src/systems/checkRoll.js`
 
 Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/ui-system-studio/spec.md, openspec/specs/ui-crafting-app/spec.md
 

@@ -90,7 +90,7 @@ See [Success-counting checks]({% link checks/crafting.md %}#success-counting-che
 
 A pass-or-fail or routed check's **The roll** section carries a **Which way is better** setting, next to **What the roll produces**.
 **Higher is better** is the classic roll-over-a-difficulty check, and **Lower is better** instead requires the roll to stay at or under the difficulty.
-A progressive check has no such setting, because it spends its roll as a budget rather than measuring it against anything.
+A progressive check shows the setting too, but only **Higher is better** can drive it, because it spends its roll as a budget; **Lower is better** raises a blocking issue on **Validation**.
 Below it, **What the roll is measured against** picks a **Fixed difficulty**, the same number for every character, or a **Character value** read from the crafting, salvage, or gathering character, which a **Difficulty adjustment** adjusts rather than replaces.
 Switching between **Higher is better** and **Lower is better**, or between the two target sources, keeps everything you authored on every side, so trying one and switching back costs you nothing.
 See [Roll-under and character-value checks]({% link checks/crafting.md %}#roll-under-and-character-value-checks) for the full guide, including a character-value target's adjustment, the salvage and gathering task overrides, and what a player's roll prompt, chat card, and result box show.

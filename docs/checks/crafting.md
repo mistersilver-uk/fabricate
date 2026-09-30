@@ -43,7 +43,7 @@ See [Roll-under and character-value checks](#roll-under-and-character-value-chec
 
 Named difficulty tiers on the check, together with a per-recipe tier selection, give you per-recipe difficulty with no macro at all.
 You author the tiers themselves on the **Crafting** page of the **Checks** screen, where each one carries a name and the DC it puts in place of the base DC.
-Under a **Character value** target, a tier instead carries a **Difficulty adjustment** in place of the base adjustment, and a tier with none of its own becomes the check's **Otherwise** tier when the adjustment kind is **Multiply, rounded down**.
+Under a **Character value** target, a tier instead carries a **Difficulty adjustment** in place of the base adjustment, and a tier left without one falls back to the base adjustment and is flagged on **Validation**.
 See [Roll-under and character-value checks](#roll-under-and-character-value-checks).
 Each tier row has a drag handle and up and down buttons beside it, so you can reorder your named tiers by dragging a row's handle or by focusing it and using the arrow keys.
 
@@ -320,7 +320,7 @@ Editing the formula can renumber the groups, so check your dice-group triggers a
 Every pass-or-fail or routed crafting, salvage, or gathering check carries a **Which way is better** setting on **The roll** section, beside **What the roll produces**.
 **Higher is better** is the classic check that rolls over a difficulty.
 **Lower is better** instead requires the total to stay at or under it.
-A progressive check has no such setting, because it spends its roll as a budget rather than measuring it against anything.
+A progressive check shows the setting too, but only **Higher is better** can drive it: a progressive check spends its roll as a budget, so **Lower is better** raises a blocking issue on **Validation**.
 Switching between the two keeps everything you authored on both sides: the difficulty, the recipe tiers, the triggers, and every override survive a switch in either direction, so trying **Lower is better** and switching back costs you nothing.
 
 ### What the roll is measured against
@@ -338,9 +338,8 @@ A **Character value** target then takes a **Difficulty adjustment**.
 A recipe difficulty tier, a salvage component's own override, or a gathering task's own override supplies that number when one is authored.
 Otherwise the check's own base adjustment does.
 
-A routed check under **Character value** and **Multiply, rounded down** can leave one tier with no adjustment of its own.
-That tier becomes the check's **Otherwise** tier, the catch-all a roll lands on when no multiplied tier's threshold is reached.
-Author at most one.
+A routed check under **Character value** and **Multiply, rounded down** leaves exactly one outcome tier with no adjustment of its own.
+That tier becomes the check's **Otherwise** tier, the catch-all a roll lands on when no multiplied tier's threshold is reached; **Validation** flags a check with none.
 It always sorts to the worst end of the tier list, whatever the tier is named.
 See [Outcome bands](#outcome-bands) for how a routed check's tiers are edited once the target is a character value.
 
