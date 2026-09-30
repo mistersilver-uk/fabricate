@@ -542,7 +542,7 @@ npm run lint:md        # markdownlint over all Markdown (what CI runs)
 npm run lint:md:fix    # …and auto-fix (splits prose to one sentence per line)
 ```
 
-ESLint and Prettier run over the whole repository (`scripts/lint.mjs` and `scripts/format-check.mjs`), and fail only on what a change makes worse against the base commit — see [Reading a ratchet failure](#reading-a-ratchet-failure).
+ESLint and Prettier run over the whole repository (`scripts/lint.mjs` and `scripts/format-check.mjs`), and fail on what a change makes worse against the base commit — see [Reading a ratchet failure](#reading-a-ratchet-failure).
 Prettier additionally formats every `*.svelte` file under `src/` — `prettier-plugin-svelte` is registered in `.prettierrc.json` (Prettier 3 does not auto-load plugins, so the devDependency alone is not enough) and `format:check` covers `src/**/*.svelte`, so a component that is new, or was formatted at base, fails CI when it is not formatted.
 `npm run lint:svelte` separately gates every `*.svelte` file under `src/` with `--max-warnings=0` and no base comparison, so a component's script and markup are held at zero findings while the `.js` around them under `src/ui/**` is held at its base findings — the two halves of that directory are gated by different scripts and must not be reasoned about as one scope.
 That gate polices suppressions in both directions: `svelte/no-unused-svelte-ignore` is active, so a `svelte-ignore` comment that no longer suppresses anything is itself a lint failure and must be removed once it stops being needed.
@@ -697,7 +697,8 @@ Each compares the working tree with a base commit it computes at test time: `RAT
 No ledger, baseline or pinned total is checked in, so there is nothing to regenerate or tighten.
 
 A failure names the family, the base commit and each regression, as an entry that is new or one that rose from its base value to its head value.
-Fix the code, or, when the regression is legitimate, record why at the site with a `ratchet-exempt(<family>): <reason>` comment in the file's own comment form: `//` in JavaScript, `/* */` in CSS, and `<!-- -->` in Svelte markup, HTML and Markdown.
+Fix the code, or, when the regression is legitimate, record why at the site with a `ratchet-exempt(<family>): <reason>` comment in the file's own comment form: `//` in JavaScript, `/* */` in CSS, `<!-- -->` in HTML and Markdown, and any of the three in a Svelte file.
+`lang-orphan` alone takes no marker, because `lang/en.json` cannot carry a comment, so an orphaned key is wired up or deleted.
 The marker sits on the offending line or in the comment lines right above it, and a family that measures a whole file or unit, such as `file-size` or `comment-share`, also accepts it in the file's head comment.
 A marker with an empty reason fails, and a reviewer reads every marker a diff adds.
 A shrink never fails: it is reported as a `shrank` diagnostic, and the next change is compared with the smaller figure.

@@ -553,7 +553,7 @@ const SUPERSEDED_POLICY = [
     before:
       'ESLint/Prettier run over a **staged path scope** (see the `lint`/`format` globs in `package.json`): now the entire `src/` JavaScript surface — `src/{models,utils,integrations,config,migration,canvas,systems}` + `src/toolBreakageRuntime.js`.',
     after:
-      'ESLint and Prettier run over the whole repository (`scripts/lint.mjs` and `scripts/format-check.mjs`), and fail only on what a change makes worse against the base commit — see [Reading a ratchet failure](#reading-a-ratchet-failure).',
+      'ESLint and Prettier run over the whole repository (`scripts/lint.mjs` and `scripts/format-check.mjs`), and fail on what a change makes worse against the base commit — see [Reading a ratchet failure](#reading-a-ratchet-failure).',
     survivesIn: 'CONTRIBUTING.md',
   },
   {
