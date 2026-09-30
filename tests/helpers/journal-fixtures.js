@@ -1,4 +1,5 @@
 // Shared RunModel fixtures for the Journal mounted-component tests.
+import { Recipe } from '../../src/models/Recipe.js';
 
 /**
  * A crafting RunModel. By default it is a 2-step run gated on world time
@@ -162,6 +163,9 @@ export async function createPersistedCraftingHistory({
   failLast = false, cancelAfter = null, armNext = false, opaque = false,
   resumePrefix = false, stageCount = 2, mode = 'simple', checked = true, awardQuantity = undefined, previewOnly = false, transformBeforeResume = null,
   legacy = false, timed = true, refuseConsumeAt = null, refuseSettlement = false, drive = null,
+  // `recipeModel` builds a real `Recipe` (so a run can snapshot its terms); `prepare` edits the
+  // world after it is built and before the run starts.
+  recipeModel = false, prepare = null,
   // The 99gp plan and the canned 2gp settlement below exist so a history-capture fixture has
   // currency EVIDENCE to project (issue 1648).
   stubCurrencySettlement = drive === null,
@@ -216,8 +220,12 @@ export async function createPersistedCraftingHistory({
     id: `stage-${index}`, name: `Stage ${index + 1}`, description: `Purpose ${index + 1}`,
     ingredientSets: [index === 0 ? set : emptySet], resultGroups: awardQuantity === null ? [] : [{ id: `outputs-${index}`, results: [{ id: `result-${index}`, componentId: `award-stage-${index}`, quantity: awardQuantity ?? (index === 0 ? 1 : 3) }] }], toolIds: [], timeRequirement: timed ? { minutes: 1 } : null,
   }));
-  const recipe = { id: 'historical-recipe', name: 'Recorded tonic', craftingSystemId: system.id,
-    getExecutionSteps: () => steps, validate: () => ({ valid: true, errors: [] }) };
+  await prepare?.({ system, steps, items, sources, actor });
+  const recipe = recipeModel
+    ? Recipe.fromJSON({ id: 'historical-recipe', name: 'Recorded tonic', craftingSystemId: system.id, metadata: { version: '1.0.0' },
+      steps: steps.map((step) => ({ ...step, ingredientSets: step.ingredientSets.map((entry) => entry.toJSON()) })) })
+    : { id: 'historical-recipe', name: 'Recorded tonic', craftingSystemId: system.id,
+      getExecutionSteps: () => steps, validate: () => ({ valid: true, errors: [] }) };
   const visibility = {
     applyRecipeItemUseOnCraft: async () => {},
     learnRecipeOnCraft: async () => {},

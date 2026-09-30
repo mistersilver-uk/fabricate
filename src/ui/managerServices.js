@@ -496,6 +496,8 @@ async function runSystemImport({ file, conflictMode }) {
       getSetting: (key) => getSetting(key),
       setSetting: (key, value) => setSetting(key, value),
       isGM: () => game.user?.isGM === true,
+      activeRunRecipeIds: () =>
+        game.fabricate.getCraftingRunManager?.()?.activeRunRecipeIds?.(game.actors) ?? [],
       // The importer fails closed on an absent seam, so a lazy lookup would make a broken
       // accessor present as a successful import that merged nothing (issue 1364).
       componentScopeStore: game.fabricate.getComponentScopeStore?.() ?? null,

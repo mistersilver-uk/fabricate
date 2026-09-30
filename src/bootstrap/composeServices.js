@@ -214,6 +214,8 @@ function buildCoreManagers(fabricate) {
       getSetting: (key) => getSetting(key),
       setSetting: (key, value) => setSetting(key, value),
       isGM: () => game.user?.isGM === true,
+      activeRunRecipeIds: () =>
+        fabricate.craftingRunManager?.activeRunRecipeIds?.(game.actors) ?? [],
       // Delegators over the field (issue 1364): the merge fails closed on an absent store, so a
       // captured still-undefined value would merge nothing and report success.
       componentScopeStore: scopeStoreDelegate(() => fabricate.componentScopeStore),

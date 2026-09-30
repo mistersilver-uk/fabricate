@@ -25,6 +25,7 @@ import {
   routedOutcomeBand,
 } from '../../systems/runJournalOutcomeBands.js';
 import { getRunLifecycleContract } from '../../systems/runLifecycleState.js';
+import { resolveRunRecipe } from '../../systems/runTerms.js';
 import { resolvedComponentsFor, resolvedEssencesFor } from '../../systems/scopedEntityReads.js';
 import {
   STAGE_BLOCKERS,
@@ -434,7 +435,8 @@ export class RunJournalBuilder {
       // A fizzle projects through `_fizzleRunModel`, which never resolves a recipe, so
       // resolving one for it here would add a lookup the pass does not make today.
       if (!run?.id || run.isFizzle === true || byRunId.has(run.id)) continue;
-      const recipe = this._recipeManager?.getRecipe?.(stringOrNull(run.recipeId)) ?? null;
+      // The recipe the engine resolves this run against, so the card offers only its routes.
+      const recipe = resolveRunRecipe(run, this._recipeManager);
       if (recipe) byRunId.set(run.id, recipe);
     }
     return byRunId;

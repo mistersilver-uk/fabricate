@@ -206,6 +206,20 @@ Legacy consumption and refund behavior and salvage remain unchanged.
 - A recipe-less alchemy fizzle persists its versioned terminal-history execution journal before recording a dead end or consuming submitted items.
 It honors the existing consume-on-failure policy and history visibility rules without revealing a recipe or replaying uncertain effects.
 
+### A begun run keeps its accepted terms
+
+A begun run MUST persist the recipe and crafting-check terms it accepted at start (`termsSnapshot`, `data-models/spec.md` § CraftingRun requirement 5), and every resolution site — describing the check, beginning a stage, executing a stage, reversing consumption on cancellation, the Journal's step-selection command, the Journal's run projection, and the crafting window's selected-set craftability — MUST resolve the run's recipe from those accepted terms in preference to the live recipe.
+The owning crafting system's crafting-check configuration accepted at start travels with the recipe resolved this way, so a check description, roll and grading all apply the accepted check rather than whatever the live system currently configures.
+Roll data — ability scores, proficiency and any other actor-derived value the check's formula reads — MUST still be read from the live actor at roll time; the accepted terms fix WHAT is rolled and against WHAT target, never the actor's own current values.
+
+1. A recipe replaced or overwritten after a run begins MUST NOT change what that run produces, except a GM delete, which removes the run.
+   The run's check and resolution continue to route through the result groups, outcome-tier assignments and progressive ladder captured at start, not the live recipe's current ones, even where the live recipe has been overwritten by a later import (`import-export/spec.md` § Recipe import provenance and pruning) or edited by the GM.
+2. Roll data resolves from the live actor.
+   A mid-run change to the crafting actor — an ability score increase, a proficiency change — MUST be honoured at roll time even though the accepted check's own formula, DC and outcome mapping are not; only the DATA the formula reads is live, never the formula or its targets.
+3. A run begun before this field existed persists no `termsSnapshot`.
+   Resolution for such a run MUST fall back to resolving the live recipe by id, exactly as it did before this requirement, so a run already active when this feature ships is unaffected.
+4. The snapshot MUST be removed from the run record when the run completes, before the record is archived to history, so a completed run's history entry never carries `termsSnapshot` and the accepted-terms exception applies only to a run that is still active.
+
 ### Captured Execution Evidence
 
 A completed managed write — a legacy or version-1 crafting stage, a recipe-less alchemy fizzle, or a native salvage run, each persisted through its own run manager — MUST capture the permitted evidence below.

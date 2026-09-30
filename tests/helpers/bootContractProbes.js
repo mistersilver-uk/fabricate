@@ -561,8 +561,13 @@ export async function probeImporterSeams(facade) {
       ])
     );
   const settings = [];
+  const heldRecipeIds = [];
   const restores = [
     ...IMPORTER_SEAM_FIELDS.map((field) => spyOn(facade, field, recorder(field))),
+    // Holds a recipe only for the world's own actors, so a seam reading anything else reports none.
+    spyOn(facade, 'craftingRunManager', {
+      activeRunRecipeIds: (actors) => new Set(actors === game.actors ? ['probe-held-recipe'] : []),
+    }),
     spyOn(game.settings, 'get', (namespace, key) => settings.push(`get ${namespace}.${key}`)),
     spyOn(game.settings, 'set', (namespace, key, value) =>
       settings.push(`set ${namespace}.${key} ${JSON.stringify(value)}`)
@@ -582,6 +587,7 @@ export async function probeImporterSeams(facade) {
     }
     importer._getSetting('gatheringConfig');
     importer._setSetting('gatheringConfig', { probe: 'gatheringConfig' });
+    heldRecipeIds.push(...importer._activeRunRecipeIds());
   } finally {
     for (const restore of restores) restore();
   }
@@ -589,6 +595,7 @@ export async function probeImporterSeams(facade) {
   return {
     reached,
     settings,
+    heldRecipeIds,
     admits: {
       activeGm: await admits(game.user),
       assistantGm: await admits(ASSISTANT_GM),
