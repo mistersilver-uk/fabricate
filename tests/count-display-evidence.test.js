@@ -11,6 +11,10 @@ import {
   reportedCountDisplay,
 } from '../src/systems/countDisplayEvidence.js';
 
+import { gradeCountRouted } from '../src/systems/countCheckRoll.js';
+import { executedCheckDisplay } from '../src/ui/presenters/checkDisplay.js';
+import { countEvidenceRows } from '../src/ui/presenters/countEvidenceRows.js';
+
 import { scalar } from './helpers/countFixtures.js';
 
 const toPool = { product: 'count', direction: 'over', pool: { modifierDestination: 'pool' } };
@@ -69,4 +73,31 @@ test('only a caller that reports its visibility receives the report or the displ
     [countDisplay.net, countDisplay.required, countDisplay.margin, countDisplay.pool.rolled],
     [1, 2, -1, 3]
   );
+});
+
+test('a fixed-range routed count card states no Needed row, since its ranges grade the net', () => {
+  const policy = { die: 6, dice: 3, threshold: 5, direction: 'over', comparison: 'meet' };
+  const rolled = {
+    policy: { ...policy, resolved: { base: 3, threshold: 5 } },
+    total: 2,
+    countProjection: { results: [], successes: 2, cancelled: 0 },
+    diceGroups: [],
+    rollMode: 'publicroll',
+  };
+  const routing = {
+    relativeOutcomes: [{ id: 'fine', name: 'Fine', success: true, dc: 0 }],
+    fixedOutcomes: [{ id: 'good', name: 'Good', success: true, start: 1, end: 5 }],
+    clampToNearest: true,
+  };
+  const card = (type) => {
+    const graded = gradeCountRouted(rolled, { required: 2, type, ...routing });
+    const display = executedCheckDisplay({
+      data: graded.data,
+      visibility: { rollMode: 'publicroll', secret: false },
+      countDisplay: graded.countDisplay,
+    });
+    return countEvidenceRows(display).map(({ id }) => id);
+  };
+  assert.ok(!card('fixed').includes('needed'), 'a range grades the net itself');
+  assert.ok(card('relative').includes('needed'), 'a relative ladder states its required count');
 });
