@@ -495,11 +495,11 @@ const SUPERSEDED_POLICY = [
   },
   {
     issue: '#2118',
-    // The design-system known-debt and selector-repetition baselines, and the View Lab registry totals, are gone.
+    // The design-system, spacing and control-height ledgers, and the View Lab registry totals, are gone.
     before:
       '**Batch siblings that share an exact-count ledger.** Two issues whose planned path sets both touch the same pinned ledger — `tests/components/design-system-known-debt.json`, `tests/components/selector-repetition-baseline.json`, `tests/components/spacing-known-literals.json`, `tests/components/control-height-known-literals.js`, or the View Lab registry-total prose that `tests/view-lab-cases.test.js` pins — are planned as ONE delta and delivered as one PR chain, with the phases ordered so each commit boundary re-derives the pins once.',
     after:
-      '**Batch siblings that share an exact-count ledger.** Two issues whose planned path sets both touch the same pinned ledger — `tests/components/spacing-known-literals.json` or `tests/components/control-height-known-literals.js` — are planned as ONE delta and delivered as one PR chain, with the phases ordered so each commit boundary re-derives the pins once.',
+      '**Batch siblings that share an exact-count ledger.** Two issues whose planned path sets both touch the same pinned ledger are planned as ONE delta and delivered as one PR chain, with the phases ordered so each commit boundary re-derives the pins once.',
     survivesIn: '.agents/skills/fabricate-orchestrator/references/agentic-workflow.md',
   },
 ];

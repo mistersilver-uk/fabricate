@@ -11,7 +11,7 @@
 - Use GitHub issue numbers such as `#42` when an issue exists; treat legacy `T-XXX` IDs as reference only.
 - Route quick-start documentation changes to `docs/help/quickstart.md` only.
 - Non-trivial UI plans include a `Reference surfaces / reuse inventory` and follow `.agents/skills/fabricate-ux-designer/references/visual-evidence-and-reuse.md`.
-- **Batch siblings that share an exact-count ledger.** Two issues whose planned path sets both touch the same pinned ledger — `tests/components/spacing-known-literals.json` or `tests/components/control-height-known-literals.js` — are planned as ONE delta and delivered as one PR chain, with the phases ordered so each commit boundary re-derives the pins once.
+- **Batch siblings that share an exact-count ledger.** Two issues whose planned path sets both touch the same pinned ledger are planned as ONE delta and delivered as one PR chain, with the phases ordered so each commit boundary re-derives the pins once.
 Planned separately, every one of those PRs restacks onto the other's merge and re-derives the same pins again, which is pure overhead with no review value.
 The comment-share, file-size and source-pin ratchets and `npm run lint` compute their baseline from the base commit (issue #2118), so lanes that share them have no rows to share and no longer need one rail (issue #1914).
 
