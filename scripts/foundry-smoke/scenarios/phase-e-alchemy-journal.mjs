@@ -8,6 +8,7 @@ import {
 import { captureAlchemyThemes } from '../pageOps/managerViews.mjs';
 import { assertNoScreenshotOverlays, closeOpenApplications } from '../pageOps/pageLifecycle.mjs';
 
+import { runAdvantageChatCards } from './phase-e-advantage-chat-cards.mjs';
 import { runCraftExecutionAsserts, runFullProfileGatherAsserts } from './phase-e-asserts.mjs';
 import { runCountChatCards } from './phase-e-count-chat-cards.mjs';
 import { runUnderChatCards } from './phase-e-under-chat-cards.mjs';
@@ -299,6 +300,8 @@ export async function runPhaseEAlchemyAndJournal(ctx, { appShell }) {
   await runCountChatCards(ctx);
   // Issue 2005: the roll-under cards and the refusal, asserted and captured the same way.
   await runUnderChatCards(ctx);
+  // Issue 2007: the advantage rule's keep, bonus-die, counting and off cases, likewise.
+  await runAdvantageChatCards(ctx);
 
   // Cheap API crafts, tool breakages, salvage, negative gating, and one guaranteed-success
   // gather — no screenshots, so they run in every profile.

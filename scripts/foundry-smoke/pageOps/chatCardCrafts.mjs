@@ -196,17 +196,45 @@ export function withinTime(promise, ms, what) {
 
 /**
  * Answer the prompt with a public roll, since only a public card states its evidence, first
- * typing `bonus` into the situational-bonus field when one is given.
+ * typing `bonus` into the situational-bonus field when one is given. `choice` picks the footer
+ * button by its `data-action` (issue 2007's `advantage`/`disadvantage`/`normal`/`roll`); the
+ * default finds the one submit button, whichever of those it is labelled.
  */
-export async function rollPublicly(page, { bonus = '' } = {}) {
+export async function rollPublicly(page, { bonus = '', choice = null } = {}) {
   const prompt = page.locator(ROLL_PROMPT).last();
   await prompt.waitFor({ state: 'visible', timeout: 15_000 });
   if (bonus) await prompt.locator('input[name="situationalBonus"]').fill(bonus);
   await chooseSelectOption(page, prompt.locator('.mode-field .fabricate-select-trigger'), {
     value: 'publicroll',
   });
-  await prompt.locator('button[type="submit"]').click();
+  const button = choice
+    ? prompt.locator(`button[data-action="${choice}"]`)
+    : prompt.locator('button[type="submit"]');
+  await button.click();
   await prompt.waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
+}
+
+/**
+ * The rolls the messages `messageIds` name actually carry, read back through `game.messages.get`
+ * (which reconstructs each via `Roll.fromData`) rather than the live objects `craftAndCollect`
+ * captured — issue 2007's proof that the round trip preserves the keep transform's formula and
+ * dice.
+ */
+export async function readBackAllRolls(page, messageIds) {
+  return await page.evaluate(
+    (ids) =>
+      ids.flatMap((id) =>
+        (game.messages.get(id)?.rolls ?? []).map((roll) => ({
+          className: roll.constructor?.name ?? null,
+          formula: roll.formula ?? null,
+          results: (roll.dice?.[0]?.results ?? []).map(({ result, active }) => ({
+            result,
+            active: active !== false,
+          })),
+        }))
+      ),
+    messageIds
+  );
 }
 
 /** Show the chat log with `messageId` in view; resolves to the sidebar's clip for a frame. */
