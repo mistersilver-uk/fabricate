@@ -114,6 +114,9 @@
   const countDiceTitle = $derived(
     text('FABRICATE.Admin.Manager.Checks.Advantage.CountDice', 'Dice added or removed')
   );
+  // Keep with no qualifying first group offers only Roll, so the disadvantage row (and its hint)
+  // would describe a button the prompt never renders; `offerDisadvantage` is still kept.
+  const showDisadvantage = $derived(rule.mode !== 'off' && !(rule.mode === 'keep' && !group.ok));
   const keepLabel = $derived(
     group.ok
       ? text('FABRICATE.Admin.Manager.Checks.Advantage.KeepLabel', 'Dice rolled for {die}').replace(
@@ -279,7 +282,7 @@
           {bonusHelp.text}
         </p>
       {/if}
-      {#if rule.mode !== 'off'}
+      {#if showDisadvantage}
         <div class="manager-checks-prompt-options-line">
           <div class="manager-checks-prompt-options-copy">
             <p class="manager-checks-prompt-options-label is-sub">{disadvantageTitle}</p>
@@ -391,7 +394,13 @@
     width: 96px;
   }
 
-  .manager-checks-prompt-options-expression {
+  /* `.fabricate-field input[type="text"] { min-height: 34px }` in the sheet is (0,2,1); scoped,
+     `.manager-checks-prompt-options-expression` alone is only (0,2,0) (class + Svelte's scope
+     attribute), so it lost. Adding the input's own `data-check-advantage-bonus` hook raises this
+     to (0,3,0), which beats (0,2,1) on the class/attribute column — the same technique
+     `.crafting-shopping-entry-main:focus-visible` in `ShoppingList.svelte` uses against the
+     sheet's equal-specificity `focus-visible` rule. */
+  .manager-checks-prompt-options-expression[data-check-advantage-bonus] {
     width: 300px;
     max-width: 100%;
     height: 30px;

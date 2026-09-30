@@ -9,6 +9,7 @@ import { afterEach, describe, it } from 'node:test';
 import { BulkSalvageService } from '../src/systems/BulkSalvageService.js';
 import {
   advantageOfferFields,
+  bracketBonusExpression,
   intersectAdvantageOffers,
   isBonusExpression,
   offeredDecision,
@@ -81,6 +82,17 @@ describe('resolveAdvantageOffer', () => {
       assert.deepEqual(offer, expected);
     });
   }
+
+  it('brackets a multi-term or signed expression, the one decision every note and prompt shares (UX-L3)', () => {
+    assert.equal(
+      bracketBonusExpression('-1d6'),
+      '(-1d6)',
+      'a leading minus is a sign, always bracketed'
+    );
+    assert.equal(bracketBonusExpression('1d8 + 1'), '(1d8 + 1)');
+    assert.equal(bracketBonusExpression('1d6'), '1d6');
+    assert.equal(bracketBonusExpression('2'), '2');
+  });
 
   it('reads the bonus grammar exactly as the prototype pins it', () => {
     for (const accepted of ['1d6', '2d4', '1d8 + 1', '+1d6', '3']) {

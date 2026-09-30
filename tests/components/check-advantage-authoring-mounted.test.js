@@ -276,18 +276,26 @@ describe('the advantage block states the rule it authors', () => {
     );
   });
 
-  it('refuses a first group that is not a plain die, hiding the stepper but keeping the dice', async () => {
+  it('refuses a first group that is not a plain die, hiding the stepper and the disadvantage row', async () => {
     const state = await mount({
       rollFormula: '(1d20+2)*2',
       advantage: { ...DEFAULT_RULE, extraDice: 3 },
     });
     assert.ok(!state.query('[data-check-advantage-extra]'), 'no stepper for a nested die');
+    assert.ok(
+      !state.query('[data-check-advantage-disadvantage]'),
+      'no disadvantage row: the prompt offers only a single Roll'
+    );
     assert.equal(
       state.text('[data-check-advantage-note]'),
       "The formula's first dice group is not a plain die, so the prompt has a single Roll button. Choose Bonus die, or start the formula with a plain die."
     );
-    await state.act((root) => root.querySelector('[data-check-advantage-disadvantage]').click());
     assert.equal(state.value.advantage.extraDice, 3, 'the hidden extra dice are kept');
+    assert.equal(
+      state.value.advantage.offerDisadvantage,
+      true,
+      'the hidden disadvantage offer is kept'
+    );
   });
 
   it('describes a bonus die, parenthesising more than one term, and flags a bad expression', async () => {

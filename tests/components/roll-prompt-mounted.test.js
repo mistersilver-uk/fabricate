@@ -845,9 +845,12 @@ describe('mounted roll prompt', () => {
         const { dialog, pending } = await openThroughEntry(() =>
           promptCheckRoll({ displayFormula: '1d20 + 3', dc: 12, allowAdvantage: advantageOffer.advantage, advantageOffer })
         );
+        // `title` stays empty here: happy-dom's zeroed scrollWidth/clientWidth never overflow, so
+        // none of these untruncated notes duplicate onto `title` (UX-L1; the truncated case is
+        // proven below with an overridden layout).
         assert.deepEqual(
           footerOf(dialog),
-          expected.map(([action, note]) => [action, note, note ? `${name[action]}, ${note}` : name[action], note]),
+          expected.map(([action, note]) => [action, note, note ? `${name[action]}, ${note}` : name[action], '']),
           label
         );
         assert.deepEqual(
@@ -859,6 +862,39 @@ describe('mounted roll prompt', () => {
         dialog.querySelector(`:scope .manager-modal-footer button[data-action="${clicked}"]`).click();
         assert.equal((await pending).advantage, DECISION[clicked], `${label}: ${clicked}`);
       }
+    }
+  });
+
+  it('adds a title only once the footer note actually clips (issue 2007 UX-L1)', async () => {
+    const keep = { advantage: true, disadvantage: true, kind: 'keep', detail: null };
+    const scrollWidthDescriptor = Object.getOwnPropertyDescriptor(globalThis.Element.prototype, 'scrollWidth');
+    const clientWidthDescriptor = Object.getOwnPropertyDescriptor(globalThis.HTMLElement.prototype, 'clientWidth');
+    // happy-dom never lays out real pixels, so the note is stubbed to overflow its box the way a
+    // real browser's ellipsis would once the text is longer than the button can show on one line.
+    Object.defineProperty(globalThis.Element.prototype, 'scrollWidth', {
+      configurable: true,
+      get() {
+        return this.classList?.contains('action-note') ? 200 : scrollWidthDescriptor.get.call(this);
+      },
+    });
+    Object.defineProperty(globalThis.HTMLElement.prototype, 'clientWidth', {
+      configurable: true,
+      get() {
+        return this.classList?.contains('action-note') ? 80 : clientWidthDescriptor.get.call(this);
+      },
+    });
+    try {
+      const { dialog, pending } = await openThroughEntry(() =>
+        promptCheckRoll({ displayFormula: '1d20 + 3', dc: 12, allowAdvantage: true, advantageOffer: keep })
+      );
+      const advantage = dialog.querySelector('button[data-action="advantage"]');
+      assert.equal(advantage.getAttribute('title'), 'keep the better', 'the clipped note becomes the title');
+      assert.equal(advantage.getAttribute('aria-label'), 'Advantage, keep the better', 'unchanged');
+      dialog.querySelector('button[data-action="normal"]').click();
+      await pending;
+    } finally {
+      Object.defineProperty(globalThis.Element.prototype, 'scrollWidth', scrollWidthDescriptor);
+      Object.defineProperty(globalThis.HTMLElement.prototype, 'clientWidth', clientWidthDescriptor);
     }
   });
 

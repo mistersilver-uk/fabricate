@@ -235,6 +235,20 @@ describe('evaluateCheckReadiness: advantage (issue 2007)', () => {
     }
   });
 
+  it('titles advantageBonusInvalid without repeating its sentence (UX-L2)', () => {
+    const [, title] = CHECK_ISSUE_TITLES.advantageBonusInvalid;
+    assert.equal(title, 'The advantage bonus cannot be rolled');
+    assert.equal(
+      checkIssueCopy('advantageBonusInvalid').fallback,
+      'The advantage bonus is not a dice expression. Use dice and numbers joined by + or −, such as 1d8 + 1.',
+      'the body sentence is unchanged'
+    );
+    assert.ok(
+      !checkIssueCopy('advantageBonusInvalid').fallback.startsWith(title),
+      'the title no longer repeats the body’s opening sentence'
+    );
+  });
+
   it('raises nothing for a valid bonus expression', () => {
     for (const bonusExpression of ['1d6', '2d4', '1d8 + 1', '+1d6', '3']) {
       const { issues } = evaluateCheckReadiness(

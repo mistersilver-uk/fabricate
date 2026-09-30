@@ -78,6 +78,7 @@ player-crafting-roll-prompt-advantage-under
 player-crafting-roll-prompt-advantage-bonus
 player-crafting-roll-prompt-advantage-only
 player-crafting-roll-prompt-advantage-long
+player-crafting-roll-prompt-count-advantage-one
 player-crafting-roll-prompt-count-advantage
 player-crafting-roll-prompt-count-advantage-off
 player-crafting-chat-card-advantage-keep

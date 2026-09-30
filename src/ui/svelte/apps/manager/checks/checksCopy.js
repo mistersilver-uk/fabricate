@@ -276,7 +276,7 @@ const TITLE_FALLBACKS = {
   retiredPlaceholderBreaksFormula: '@craftingmod breaks this formula',
   advantageKeepNoDie: 'Advantage cannot keep from this formula',
   advantageKeepAfterReference: 'A character value precedes the kept dice',
-  advantageBonusInvalid: 'The advantage bonus is not a dice expression',
+  advantageBonusInvalid: 'The advantage bonus cannot be rolled',
   unnamedOutcome: 'An outcome tier has no name',
   noSuccessOutcome: 'No tier counts as a success',
   rangeInvalid: 'A band ends before it starts',

@@ -117,6 +117,15 @@ export function playerAdvantagePromptCases() {
         },
       ],
     }),
+    // The singular footer, one die either way (prototype frame 35, `pCntOff`).
+    promptCase({
+      id: 'player-crafting-roll-prompt-count-advantage-one',
+      label: 'a counting pool offering one die either way (prototype frame 35)',
+      state: 'count-advantage-one',
+      expectSelector:
+        THREE('−1 die', '+1 die') +
+        ':has(.formula-content .formula[data-roll-prompt-count="over"]:text-is("6d10 · each ≥ 8"))',
+    }),
     promptCase({
       id: 'player-crafting-roll-prompt-count-advantage',
       label: 'a counting pool offering two dice either way',

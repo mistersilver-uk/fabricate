@@ -215,14 +215,22 @@ const SALVAGE_CHECKS = {
     under(),
   ],
   'salvage-advantage-mixed': () => SALVAGE_CHECKS['salvage-under'](),
+  'salvage-advantage-shared': () => SALVAGE_CHECKS['salvage-under'](),
 };
 
-/** Issue 2007: both salvage checks offer a bonus die, of different sizes, so the batch agrees on
- * the buttons and on no note. */
+/**
+ * Issue 2007: both salvage checks offer a bonus die. `-mixed` differs in size, so the batch agrees
+ * on the buttons and on no note; `-shared` (frame 36, `pBulk`) offers the SAME `1d6` bonus, so the
+ * batch's sub-label shows once for both rows.
+ */
 const SALVAGE_ADVANTAGE = {
   'salvage-advantage-mixed': [
     { mode: 'bonus', bonusExpression: '1d6' },
     { mode: 'bonus', bonusExpression: '1d8' },
+  ],
+  'salvage-advantage-shared': [
+    { mode: 'bonus', bonusExpression: '1d6' },
+    { mode: 'bonus', bonusExpression: '1d6' },
   ],
 };
 
@@ -405,8 +413,9 @@ const ADVANTAGE_STATES = {
   'advantage-result-bonus': { chat: true, rollFormula: '1d4 + 20', advantage: BONUS_1D6 },
 };
 
-/** A counting pool offering two dice either way, then one offering none (frame 35's pool). */
+/** Frame 35's pool: the default single die either way, two dice, then one offering none. */
 const COUNT_ADVANTAGE = {
+  'count-advantage-one': {},
   'count-advantage': { countDice: 2 },
   'count-advantage-off': { countEnabled: false },
 };

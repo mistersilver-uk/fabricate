@@ -4,8 +4,10 @@
  * `advantage` record, the check's direction and the authored formula. `text(key, fallback)` is the
  * caller's localizer.
  */
-import { isBonusExpression } from '../../../../../systems/checkAdvantage.js';
-import { splitTopLevelTerms } from '../../../../../utils/craftingCheckExpression.js';
+import {
+  bracketBonusExpression,
+  isBonusExpression,
+} from '../../../../../systems/checkAdvantage.js';
 
 import { interpolate } from './checksCopy.js';
 
@@ -19,7 +21,7 @@ function namedExpression(expression, text) {
   if (canonical === '') {
     return text('FABRICATE.Admin.Manager.Checks.Advantage.ExpressionFallback', 'the expression');
   }
-  return splitTopLevelTerms(canonical.replace(/^-/, '')).length > 1 ? `(${canonical})` : canonical;
+  return bracketBonusExpression(canonical);
 }
 
 /** `{ total, die, group, count }` for the keep notes and stepper, `count` empty for one die. */
