@@ -837,22 +837,26 @@ Skills SHOULD include provider-specific metadata under the skill directory when 
 
 ### Requirement: Two-class performance measurement baselines
 
-Committed performance baselines MUST contain only machine-invariant values, and machine-dependent measurements MUST NOT be committed or asserted.
+Class-1 performance measurements MUST contain only machine-invariant values, and MUST be measured at the base commit at test time rather than committed; machine-dependent measurements MUST NOT be committed or asserted.
 Comparison between two runs MUST be refused when the runs came from environments that cannot be meaningfully compared.
 
 #### Scenario: recording a performance measurement
 
 - **WHEN** the deterministic benchmark harness measures a profile
-- **THEN** it writes operation counts, model counts, serialized payload sizes, and fixture checksums to a committed class-1 baseline under `benchmarks/baselines/`
+- **THEN** it produces operation counts, model counts, serialized payload sizes, and fixture checksums as a class-1 payload that is never committed
 - **AND** it writes wall clock and heap to a gitignored class-2 run record carrying the commit, branch, dirty flag, Node and V8 versions, OS, architecture, CPU model and count, memory, containerization, fixture profile, fixture seed, and harness version
 - **AND** no committed artifact contains a wall-clock or heap value, and no test asserts one
 - **AND** fixture generation and case setup run outside every timed region
 
-#### Scenario: guarding a committed baseline against drift
+#### Scenario: guarding class-1 counts against a rise
 
-- **WHEN** a committed class-1 count or fixture checksum changes
-- **THEN** a drift test re-derives the counts from the fixtures and the code under measurement and fails, naming the case, the count, and both values
-- **AND** the failure instructs the author to re-record the baseline in the same pull request and state what moved and why
+- **WHEN** a change touches the measured code or the harness, and a class-1 count exceeds the same count measured at the base commit with an identical fixture
+- **THEN** the drift test fails, naming the case, the count, and both values
+- **AND** the base's counts are measured by the base commit's own harness over the base commit's own code, extracted into a gitignored directory, and may be cached there per commit
+- **AND** a fall passes and is reported, and an added or removed case is reported
+- **AND** a profile whose fixture identity changed is reported as incomparable rather than compared
+- **AND** when the dependency lockfile differs between base and head, the comparison is skipped with a diagnostic naming it
+- **AND** a rise passes only when the change adds a `ratchet-exempt(benchmark)` reason, naming the case or its profile, to a source file it touches
 
 #### Scenario: comparing two performance runs
 

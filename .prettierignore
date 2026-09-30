@@ -39,10 +39,6 @@ openspec/
 # Jekyll owns the docs site; its build output and vendored assets are already excluded above.
 docs/
 
-# Machine-written and rewritten by `npm run benchmark:performance`. Formatting it here would be
-# undone by the next run, so the two would disagree forever.
-benchmarks/baselines/
-
 # The compiled stylesheet. Its source of truth is the component `<style>` blocks and the design
 # tokens; stylelint gates those.
 styles/fabricate.css

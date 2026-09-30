@@ -11,8 +11,7 @@ Every profile runs under plain Node against synthetic fixtures generated from
 npm run benchmark:performance                              # all profiles, 5 reps
 npm run benchmark:performance -- --profile=held-inventory  # one profile
 npm run benchmark:performance -- --list                    # what exists
-npm run benchmark:performance -- --check                   # fail on class-1 drift
-npm run benchmark:performance -- --update-baselines        # re-record class 1
+npm run benchmark:performance -- --base origin/main        # fail on a class-1 rise
 npm run benchmark:compare -- <baseline-run.json> <candidate-run.json>
 ```
 
@@ -25,8 +24,8 @@ This is the load-bearing convention of the whole harness.
 | | Class 1 | Class 2 |
 |---|---|---|
 | What | Operation counts, hydrated-model counts, candidate examinations, signature comparisons, graph nodes/edges, serialized payload bytes, fixture checksums | Wall clock, heap delta |
-| Where | `benchmarks/baselines/<profile>.json` — **committed** | `.benchmarks/runs/<iso8601>-<shortsha>.json` — **gitignored** |
-| Asserted | Yes, by `tests/benchmark-baseline-drift.test.js`. This is the actual regression guard | **Never** |
+| Where | Measured at the base commit and at head, **never committed**; the base's counts are cached in `.benchmarks/base/<sha>/` — **gitignored** | `.benchmarks/runs/<iso8601>-<shortsha>.json` — **gitignored** |
+| Asserted | Yes, by `tests/benchmark-baseline-drift.test.js`: a count may not rise against the base commit. This is the actual regression guard | **Never** |
 | Portable | Identical on every machine and every Node build | Meaningless off the machine that produced it |
 
 <!-- markdownlint-enable MD013 markdownlint-sentences-per-line -->
@@ -43,8 +42,8 @@ A ratio is the only form that survives being pasted by a different maintainer.
 
 ## Reference hardware and runtime
 
-The committed class-1 baselines are machine-invariant, so they need no hardware
-note to be valid.
+Class-1 counts are machine-invariant, so they need no hardware note to be
+valid.
 The class-2 medians quoted below do, and were measured on:
 
 <!-- markdownlint-disable MD013 -->
@@ -86,10 +85,9 @@ either.
 three** series.
 The corpus and inventory rows below are class-2 wall-clock medians from the
 reference hardware above.
-The library row has no committed wall-clock baseline, so it is quoted instead
+The library row has no recorded wall-clock median, so it is quoted instead
 in class-1 `identityCandidatesExamined` counts from
-`craftingListing.buildListing.library@<n>` in
-`benchmarks/baselines/component-library.json`:
+`craftingListing.buildListing.library@<n>` in the `component-library` profile:
 
 <!-- markdownlint-disable MD013 -->
 
@@ -112,8 +110,7 @@ later case in the profile is a cache hit.
 That build walks nothing, so `identityCandidatesExamined` is unaffected:
 `craftingListing.buildListing.library@1000` records `identityIndexBuilds: 2`
 against an unchanged `identityCandidatesExamined: 1300`, and the same pattern
-recurs at `craftingListing.buildListing@100` in
-`benchmarks/baselines/held-inventory.json`.
+recurs at `craftingListing.buildListing@100` in the `held-inventory` profile.
 Read the extra `1` as "this case executed first", not as a signal about the
 series point.
 Reordering a profile's cases, or inserting a new one ahead of the first,
@@ -135,7 +132,7 @@ because that is #1077's term rather than this one's.
 ### Most held items resolve to NO component, and that is deliberate
 
 Each inventory profile declares a **70% unmatched / 30% component** mix, and the
-mix is recorded in the baseline.
+mix is recorded in its class-1 payload.
 
 An inventory made entirely of registered components exercises the *cheap*
 identity tier: a durable `flags.fabricate.roles[systemId].componentId` hits on
@@ -212,7 +209,7 @@ That case is also the one place a benchmark carries **both** counting layers.
 `createBenchWorld` wraps every profile's library in `countingCandidates`, which
 sees a scan written as `components.find(...)` and is blind to
 `for (const c of components)`.
-Widening the shared wrapper would move every committed count that walks a
+Widening the shared wrapper would move every class-1 count that walks a
 component array, so the enumeration layer is applied to this one case's array
 instead, under its own `componentEnumerationsWalked` and
 `componentEntriesWalked` keys.
@@ -250,9 +247,9 @@ the whole inventory `2N` times.
 At these bounds that is already **204,000** documents offered to the per-recipe
 recipe-item matcher for one workbench open, against **4,000** after the fix.
 Raising either axis buys no extra signal and costs the drift test, which
-re-derives every count inside `npm test`.
+measures every count at both the base commit and head inside `npm test`.
 
-Two committed counts on this profile are the criterion, and they are counted on
+Two class-1 counts on this profile are the criterion, and they are counted on
 the OFFER rather than on an inventory read for a reason that is measured rather
 than argued:
 
@@ -309,8 +306,9 @@ can re-derive, and the bound stays because the solver's own per-node
 
 ## Fixture construction: literals versus real models
 
-Stated per profile in `benchmarks/baselines/<profile>.json` under
-`construction`, because mixing the two silently makes numbers incomparable.
+Stated per profile under `construction` in
+`tests/helpers/scale/scaleProfiles.js`, and carried into every class-1 payload,
+because mixing the two silently makes numbers incomparable.
 
 - Profiles measuring **algorithmic** behaviour (filtering, browser models, graph
   construction, signature validation, visibility) consume plain recipe
@@ -331,7 +329,7 @@ and nothing beyond what `npm ci` provides for `node:test`.
 "No Foundry runtime" is not "no dependencies": a future store-level profile
 (`journalStore`, `craftingSourcesStore`, `createAdminStore`) would need
 `node_modules` for `svelte/store` and the runes compiler.
-Each profile records `requiresNodeModules` in its baseline so this stays a fact
+Each profile records `requiresNodeModules` in its definition so this stays a fact
 rather than a memory.
 
 ## Comparing a candidate branch to `main`
@@ -361,20 +359,48 @@ The output is a **median ratio with an IQR band** per case.
 A band straddling 1.0 means the two runs did not separate, and the tool says so
 in those words rather than leaving a 3% ratio to be over-read.
 
-## Refreshing the baselines
+## When a count moves
 
-Issue 1070 requires baselines to be refreshed **as part of each optimisation
-merge**, not left to drift.
+Nothing is re-recorded, because no class-1 count is committed.
+`tests/benchmark-baseline-drift.test.js` measures every swept profile twice: at
+head, and at the base commit (`RATCHET_BASE`, or the merge base with
+`origin/main`).
+The base run extracts the base's `src`, `tests/helpers`,
+`tests/view-lab/foundry` and `scripts/lib` with `git archive` into the gitignored
+`.benchmarks/base/<sha>/`, and runs the base's own harness over the base's own
+code there.
+The extraction is staged and renamed into place with a completion marker, and
+the base's counts are cached beside it, so a second run against the same base
+measures head only.
 
-1. `npm run benchmark:performance -- --check` — see which counts moved.
-2. `npm run benchmark:performance -- --update-baselines` — re-record, in the
-   SAME pull request.
-3. Say in the PR description *what* moved and *why*.
-   A count changing is the guard doing its job; a count changing without an
-   explanation is the guard being switched off.
+- **A rise fails**, naming the profile, the case, the count and both values.
+- **A fall passes** and is reported.
+  Say in the PR description what moved and why.
+- **An added or removed case, count or profile** is reported and never fails.
+- **A changed fixture identity** — harness version, seed, or any fixture
+  checksum — makes that profile incomparable: it is reported and not compared,
+  because counts over two different fixtures say nothing about the code.
+- **The comparison runs only when the change touches** `src/**`,
+  `tests/helpers/scale/**` or `scripts/lib/benchmark*`.
+- **A changed `package-lock.json` skips** the comparison with a named
+  diagnostic, because the base code would run against head's dependencies.
 
-The drift test names the same instruction on failure, so nobody has to find this
-file first.
+`npm run benchmark:performance -- --base <ref>` prints every count that moved
+against any commit.
+
+### Exempting a legitimate rise
+
+A feature that must do more work records why in a source file the change
+touches under one of those three paths, with a marker whose reason names the
+case id or its profile:
+
+```js
+// ratchet-exempt(benchmark): held-inventory: containers read stacks twice
+```
+
+Only a marker the change adds counts.
+One already present at the base commit exempts nothing, so a reason cannot
+outlive the change it was written for, and an empty reason fails.
 
 ## Adding a case
 
@@ -385,5 +411,6 @@ file first.
    that hides real work in `run`'s first statement defeats it by hand.
 3. Bound anything whose cost is a product, and record the bound on the profile's
    `ceiling`.
-4. `npm run benchmark:performance -- --update-baselines`, then confirm
-   `tests/benchmark-baseline-drift.test.js` is green.
+4. Confirm `tests/benchmark-baseline-drift.test.js` is green.
+   A new case has no base value, so it is reported as added and compared from
+   the next change on.
