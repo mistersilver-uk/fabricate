@@ -4,7 +4,7 @@
  * (`tests/view-lab/countResultFixtures.js`), so its tiles and rows are known before it rolls.
  */
 
-import { CRAFTING_SHARED, CRAFTING_SIMPLE } from './caseConstants.js';
+import { COUNT_ADVANTAGE_FOOTER, CRAFTING_SHARED, CRAFTING_SIMPLE } from './caseConstants.js';
 import { playerCase } from './caseFactories.js';
 
 const SINGLE_PROMPT = '.fabricate-app .manager-modal[data-roll-prompt="single"]';
@@ -156,7 +156,7 @@ export function playerCountResultCases() {
       steps: [{ selector: '[data-lab-companion-roll]' }],
       expectSelector:
         '.fabricate-standalone-overlay .manager-modal[data-roll-prompt="single"]' +
-        ':not(:has(button[data-action="advantage"]))' +
+        COUNT_ADVANTAGE_FOOTER +
         ':has(.formula-content .formula[data-roll-prompt-count="over"]:text-is("4d10 · each ≥ 8"))' +
         ':has(.formula-content .formula-note:text-is("Success on ≥ 8 · explodes on 10 · 1 cancels a success"))' +
         ' .formula-content .manager-chip[data-roll-prompt-required="2"]',

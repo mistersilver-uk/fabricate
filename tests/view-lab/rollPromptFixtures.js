@@ -15,6 +15,10 @@ export async function seedRollPromptFixture(world, state) {
         simple: {
           ...system.craftingCheck.simple,
           rollFormula: state === 'advantage' ? '1d20 + @abilities.int.mod' : '2d6 + @abilities.int.mod',
+          // The single-Roll captures: a plain `2d6` would otherwise offer keep (issue 2007).
+          ...(state !== 'advantage' && {
+            advantage: { ...system.craftingCheck.simple.advantage, mode: 'off' },
+          }),
         },
       },
     });
