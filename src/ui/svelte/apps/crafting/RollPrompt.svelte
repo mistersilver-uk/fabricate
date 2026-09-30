@@ -15,6 +15,7 @@
     Advantage are `type="button"` — pinned by `tests/components/roll-prompt-mounted.test.js`.
 -->
 <script>
+  import { noteOverflow } from './noteOverflow.js';
   import { untrack } from 'svelte';
   import Chip from '../../components/Chip.svelte';
   import Field from '../../components/Field.svelte';
@@ -63,24 +64,9 @@
     onDismiss();
   }
 
-  // The footer note is already the button's accessible name (issue 2007 UX-L1): a `title` equal to
-  // an untruncated note makes some assistive tech announce it twice. `title` is worth adding only
-  // when the one-line ellipsis actually clips the note, so it is measured per action and kept
-  // truthy only then.
+  // A note earns a `title` only when it clips (see `noteOverflow.js`).
   let truncatedNotes = $state({});
-
-  function measureNoteOverflow(node, key) {
-    const measure = () => {
-      truncatedNotes = { ...truncatedNotes, [key]: node.scrollWidth > node.clientWidth + 0.5 };
-    };
-    measure();
-    return {
-      update: (nextKey) => {
-        key = nextKey;
-        measure();
-      },
-    };
-  }
+  const markTruncated = (key, clipped) => (truncatedNotes = { ...truncatedNotes, [key]: clipped });
 </script>
 
 <ManagerModal
@@ -246,7 +232,7 @@
           : (event) => answer(event.currentTarget.form, action.action)}
         ><span>{action.label}</span>{#if action.note}<small
             class="action-note"
-            use:measureNoteOverflow={action.action}>{action.note}</small
+            use:noteOverflow={{ key: action.action, onMeasure: markTruncated }}>{action.note}</small
           >{/if}</button
       >
     {/each}
