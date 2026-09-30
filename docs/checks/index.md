@@ -79,6 +79,13 @@ A **What happens** list closes the readout, naming exactly what the outcome prod
 When a formula cannot be charted exactly, it explains why in place of a chart.
 See [What the previews will tell you]({% link checks/crafting.md %}#what-the-previews-will-tell-you) for a worked example.
 
+## What the roll produces
+
+Every check's **The roll** section opens with a **What the roll produces** setting, choosing between **Add the dice**, the classic check every other section on this page describes, and **Count successes**, where the check rolls a pool of dice and counts how many of them individually clear a threshold instead of adding them into one total.
+It appears on every check that rolls, except gathering's immediate d100 mode and an Alchemy check switched off, neither of which rolls a check at all.
+Switching between the two keeps everything you authored on both sides, so trying **Count successes** and switching back costs you nothing.
+See [Success-counting checks]({% link checks/crafting.md %}#success-counting-checks) for the full guide to authoring one.
+
 ## Which way is better
 
 A pass-or-fail or routed check's **The roll** section carries a **Which way is better** setting.

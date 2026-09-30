@@ -20,6 +20,9 @@ Individual gathering tasks do not carry their own check.
 The page is laid out in the same five sections the Crafting page uses — **The roll**, **Outcomes**, **Triggers**, **Modifiers**, and **On failure** — and they behave identically.
 See [The Checks screen]({% link checks/index.md %}#the-checks-screen) for the editor, and [Check modifiers]({% link checks/index.md %}#check-modifiers) for the named-modifier library all three activities select from.
 
+Set the gathering check to **Count successes** to roll a dice pool and count qualifying dice instead of adding them into one total.
+See [Success-counting checks]({% link checks/crafting.md %}#success-counting-checks) for the full guide, including a **Routed** task's own **Successes needed override**.
+
 ## What the check decides
 
 A **routed** gathering task is resolved by this check.

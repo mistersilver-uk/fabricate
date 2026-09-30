@@ -24,6 +24,9 @@ See [The Checks screen]({% link checks/index.md %}#the-checks-screen) for the ed
 
 A salvaged component has a single ingredient, so ingredient-set routing does not apply here.
 
+Set the salvage check to **Count successes** to roll a dice pool and count qualifying dice instead of adding them into one total.
+See [Success-counting checks]({% link checks/crafting.md %}#success-counting-checks) for the full guide, including the component's own **Successes needed override**.
+
 ## What players see
 
 Everything a player is shown when they salvage comes from the salvage check, never from the recipe crafting check.
