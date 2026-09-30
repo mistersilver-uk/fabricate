@@ -213,3 +213,12 @@ test('the report returns the exit code and says how to exempt or refresh the bas
   assert.match(lines.at(-1), /ratchet-exempt\(lint\): <reason>/u);
   assert.match(lines.at(-1), /git fetch origin main/u);
 });
+
+test('a path a change deleted is dropped beside one that exists, and only-missing paths still throw', () =>
+  withFixture({ 'debted.js': EACH, 'kept.js': CLEAN }, async (repo) => {
+    repo.git('mv', 'debted.js', 'moved.js');
+    const outcome = await repo.lint({ patterns: ['debted.js', 'kept.js'] });
+    assert.deepEqual(outcome.failures, []);
+    assert.equal(outcome.linted, 1, 'only the path that still exists is linted');
+    await assert.rejects(() => repo.lint({ patterns: ['debted.js'] }), /No files matching/u);
+  }));

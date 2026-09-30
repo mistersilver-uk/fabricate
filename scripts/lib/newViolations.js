@@ -4,7 +4,7 @@
  * `no-undef` and parse errors fail at any count. A file Prettier-clean at base, or new, stays clean.
  */
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { ESLint } from 'eslint';
@@ -199,7 +199,11 @@ export async function lintAgainstBase({
   base,
 } = {}) {
   const eslint = new ESLint({ cwd, ...eslintOptions });
-  let results = await eslint.lintFiles(patterns);
+  // A path from a diff can name a file the change deleted or renamed away, and ESLint throws on
+  // it. Drop those while another path remains; a list of only missing paths is a typo and throws.
+  const existing = patterns.filter((pattern) => existsSync(path.resolve(cwd, pattern)));
+  const present = existing.length > 0 ? existing : patterns;
+  let results = await eslint.lintFiles(present);
   if (results.length === 0) throw new Error(`ESLint linted no file for ${patterns.join(' ')}`);
   const scope = comparisonScope(cwd, env, base);
   let tally = await compareResults({ eslintOptions, results, scope, cwd });
