@@ -10,7 +10,7 @@
 -->
 <script>
   import { normalizeCheckAdvantage } from '../../../../../systems/normalize/checkAdvantage.js';
-  import { findKeepGroup } from '../../../../../utils/craftingCheckExpression.js';
+  import { keepGroupOf } from '../../../../../utils/craftingCheckExpression.js';
   import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
   import Stepper from '../../../components/Stepper.svelte';
@@ -80,7 +80,7 @@
 
   const rule = $derived(normalizeCheckAdvantage(advantage));
   const under = $derived(direction === 'under');
-  const group = $derived(findKeepGroup(rollFormula));
+  const group = $derived(keepGroupOf(rollFormula));
   const copy = $derived({ rule, group, under, text });
   const bonusHelp = $derived(bonusExpressionHelp(rule.bonusExpression, text));
   const bonusHelpId = `${uid}-advantage-bonus-help`;

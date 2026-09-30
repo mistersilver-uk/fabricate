@@ -211,6 +211,17 @@ describe('evaluateCheckReadiness: advantage (issue 2007)', () => {
     );
   });
 
+  it('reads the formula after the retirement shim, as the engine rolls it', () => {
+    for (const rollFormula of ['@craftingmod + 1d20', '2 + @craftingmod + 1d20']) {
+      const { issues } = evaluateCheckReadiness(
+        { rollFormula, advantage: { mode: 'keep' } },
+        { mode: 'simple' }
+      );
+      assert.equal(issue(issues, 'advantageKeepAfterReference'), undefined, rollFormula);
+      assert.equal(issue(issues, 'advantageKeepNoDie'), undefined, rollFormula);
+    }
+  });
+
   it('flags a bonus expression the grammar refuses, including empty', () => {
     for (const bonusExpression of ['', '1d6x', '@prof', '1d6*2', '(1d6)', '1d6kh1', '1d6 − 1']) {
       const { issues } = evaluateCheckReadiness(

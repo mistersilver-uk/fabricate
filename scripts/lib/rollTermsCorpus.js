@@ -41,12 +41,22 @@ const PLAN_FORMULAS = [
   '2 * 1d20',
   '1d20 * -1',
   '0d20 + 5',
+  // The retirement shim's residue of `@craftingmod + 1d20` and `@craftingmod + 2d6 + 1`.
+  '+ 1d20',
+  '+ 2d6 + 1',
+  '-1d20',
+  '2 * -1d20',
+  '-1d20 + 30',
+  '(2 + 3) + 1d8',
+  '2 * 3 * 1d20',
+  '1d20 * 2 * 3',
+  '1d20 % 2',
   // The library fragment `appendCheckModifierRollTerms` appends to an authored `@skill + 3`.
   '@skill + 3 + (1d20)[Modifiers]',
 ];
 
 /** Every `prefix` the plan's first-group proof yields for its corpus; `''` needs no Roll. */
-const PREFIX_FORMULAS = ['2', '@prof'];
+const PREFIX_FORMULAS = ['2', '@prof', '2 * 3', '(2 + 3)'];
 
 /**
  * The advantage formulas the check tests construct, before and after the keep transform, so the
@@ -100,6 +110,7 @@ const PARSE_FORMULAS = [
   '1d20 + (',
   '1d20 + @nope',
   '1d20 + 2 * 3',
+  '-1d6',
 ];
 
 /** One recorded entry per `formula` and `data` pair. */
@@ -125,6 +136,8 @@ export const ROLL_TERMS_PROBES = Object.freeze(
     { formula: '2 * 1d20', data: 'default', index: 2, extraDice: 1, keep: 'kh' },
     { formula: '2d6 + @prof', data: 'default', index: 0, extraDice: 2, keep: 'kh' },
     { formula: '@prof + 1d20', data: 'diceProf', index: 2, extraDice: 1, keep: 'kh' },
+    { formula: '+ 2d6 + 1', data: 'default', index: 0, extraDice: 1, keep: 'kh' },
+    { formula: '2 * 3 * 1d20', data: 'default', index: 4, extraDice: 1, keep: 'kl' },
   ].map((entry) => Object.freeze(entry))
 );
 

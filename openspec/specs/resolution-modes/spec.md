@@ -324,6 +324,7 @@ A check's advantage rule (issue 2007; shape in `data-models/spec.md` § Check ad
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 - The first group qualifies only when it is a literal plain `Die` term with an integer count of at least 1 and integer faces of at least 2, no modifiers, and an additive position in the authored formula.
+An additive position is the formula's start, a leading unary `+` included, or a place after a top-level `+`, with only positive literal numbers multiplying the group from the left and multiplying or dividing it from the right; a unary minus, a subtraction before the group, a character value as a factor, and `%` each refuse it.
 It is mutated on the constructed `Roll` — `term.number`, a pushed keep modifier, then `resetFormula()` — and never by string rewriting.
 - A modified group (`1d6x`, `2d20kh1`) is refused rather than rewritten, because Foundry applies modifiers in array order and ranks a keep by raw face, never by success or `count`, so on a modified group the better keep would follow the comparator rather than the check's direction.
 - Later groups are never rewritten when the first is refused: there is no search past the first group, and a non-qualifying first group offers no keep at all.

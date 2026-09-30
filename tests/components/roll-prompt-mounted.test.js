@@ -123,8 +123,10 @@ const footerOf = (dialog) =>
 
 const sumOver = { product: 'sum', direction: 'over' };
 const sumUnder = { product: 'sum', direction: 'under' };
+/** Any class stands in for core's `Die`, whose presence alone lets a keep offer stand. */
+const CORE_DIE = class Die {};
 const offerFor = (advantage, evaluation = sumOver, authoredFormula = '1d20 + 3') =>
-  resolveAdvantageOffer({ advantage, evaluation, authoredFormula });
+  resolveAdvantageOffer({ advantage, evaluation, authoredFormula, Die: CORE_DIE });
 const DECISION = { disadvantage: 'disadvantage', normal: 'normal', advantage: 'advantage', roll: 'normal' };
 
 describe('mounted roll prompt', () => {
@@ -698,7 +700,6 @@ describe('mounted roll prompt', () => {
       assert.ok(!/DC|meet or beat|beat/.test(dialog.querySelector('.formula-row').textContent), 'no DC');
       assert.equal(dialog.querySelector('.static-modifiers .help').textContent, note);
       assert.equal(dialog.querySelector('.bonus-group .help').textContent, help);
-      assert.ok(!dialog.querySelector('button[data-action="advantage"]'), 'no advantage until issue 2007');
       dialog.querySelector('[data-manager-modal-close]').click();
       await pending;
     }

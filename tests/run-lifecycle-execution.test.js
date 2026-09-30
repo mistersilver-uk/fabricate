@@ -25,6 +25,7 @@ import { rollPromptTarget } from '../src/ui/svelte/apps/crafting/rollPromptTarge
 import { installCountDice } from './helpers/countEngineDice.js';
 import { countEvaluation } from './helpers/countFixtures.js';
 import { stubPromptSurface } from './helpers/rollPromptDialogStub.js';
+import { installCoreDie } from './helpers/termBearingRoll.js';
 import { createPersistedCraftingHistory, mergeHistoryFlag } from './helpers/journal-fixtures.js';
 import { gatheringFixture } from './helpers/real-gathering-attempt.js';
 
@@ -1925,6 +1926,7 @@ test('CraftingEngine records a non-consuming fizzle without touching submitted s
 
 test('CraftingEngine check preflight is read-only and a missing trusted result writes no journal', async () => {
   const { engine, runManager } = setupEngineFixture();
+  const restoreDie = installCoreDie();
   const actor = new FakeActor('crafter');
   actor.name = 'Tinker';
   const source = new FakeActor('source');
@@ -2058,6 +2060,7 @@ test('CraftingEngine check preflight is read-only and a missing trusted result w
     }
   } finally {
     game.i18n = originalI18n;
+    restoreDie();
     if (originalChatMessage === undefined) delete globalThis.ChatMessage;
     else globalThis.ChatMessage = originalChatMessage;
   }

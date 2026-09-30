@@ -2,7 +2,7 @@
  * `BulkSalvageService` — one player gesture, N salvage attempts, one aggregated card (issue 859).
  */
 
-import { describe, it } from 'node:test';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
@@ -21,6 +21,7 @@ import {
   craftingSystemLookup,
   recordingSalvage,
 } from './helpers/bulkSalvageFixtures.js';
+import { installCoreDie } from './helpers/termBearingRoll.js';
 
 /** Swallow the service's per-item `console.error` for one test, and restore after. */
 function silenceErrors(t) {
@@ -775,6 +776,12 @@ describe('BulkSalvageService.run: the ONE roll prompt', () => {
 });
 
 describe('BulkSalvageService.run: allowAdvantage is all-or-nothing, from the system', () => {
+  let restoreDie = null;
+  beforeEach(() => {
+    restoreDie = installCoreDie();
+  });
+  afterEach(() => restoreDie());
+
   /** Run one prompt and hand back the `allowAdvantage` it was offered. */
   async function offeredAdvantage(systems, componentIds) {
     let offered = null;

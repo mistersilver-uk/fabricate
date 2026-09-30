@@ -256,6 +256,22 @@ function readParenthetical(source, cursor, rest, terms) {
   return end - cursor;
 }
 
+/** A negated number stays numeric; core wraps any other negated operand as `(operand * -1)`. */
+function negateOperand(terms, operandSource) {
+  const operand = terms.at(-1);
+  if (operand.class === 'NumericTerm') {
+    operand.number = -operand.number;
+    return;
+  }
+  terms[terms.length - 1] = {
+    class: 'ParentheticalTerm',
+    term: `${operandSource} * -1`,
+    roll: undefined,
+    isIntermediate: true,
+    isDeterministic: operand.isDeterministic === true,
+  };
+}
+
 /**
  * Push the one operand starting at `cursor` and report how many characters it spanned.
  *
@@ -276,10 +292,10 @@ function readOperand(source, cursor, rest, terms) {
   // A UNARY SIGN, which the grammar allows in front of any operand and which a bounded rolling
   // check modifier always produces: `min(max((1d8), -1), 6)` opens its second argument with one.
   if ((rest.startsWith('-') || rest.startsWith('+')) && rest.length > 1) {
-    const consumed = readOperand(source, cursor + 1, rest.slice(1), terms);
-    const operand = terms.at(-1);
-    if (rest.startsWith('-') && operand?.class === 'NumericTerm') operand.number = -operand.number;
-    return consumed + 1;
+    const start = cursor + 1 + /^\s*/.exec(rest.slice(1))[0].length;
+    const consumed = readOperand(source, start, source.slice(start), terms);
+    if (rest.startsWith('-')) negateOperand(terms, source.slice(start, start + consumed));
+    return start + consumed - cursor;
   }
 
   const bracketed =
