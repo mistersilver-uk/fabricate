@@ -404,6 +404,7 @@
     width: 300px;
     max-width: 100%;
     height: 30px;
+    min-height: 30px;
     padding: 0 var(--fab-space-2);
     border: 1px solid var(--fab-border);
     border-radius: 7px;
