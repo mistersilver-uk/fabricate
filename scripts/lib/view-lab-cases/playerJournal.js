@@ -2,11 +2,21 @@
  * The player window's Journal, with the generated lifecycle, history and blind-run frames.
  */
 
-import { ANCHORED_POPOVER_SOURCES, JOURNAL_SOURCES, PLAYER_VIEW_STATE } from './caseConstants.js';
+import {
+  ANCHORED_POPOVER_SOURCES,
+  COUNT_ADVANTAGE_FOOTER,
+  JOURNAL_SOURCES,
+  PLAYER_VIEW_STATE,
+} from './caseConstants.js';
 import { playerCase, responsiveLayout } from './caseFactories.js';
 import { journalBlindRunCases } from './journalBlindRunCases.js';
 import { journalHistoryBatchCases, journalHistoryDataCases } from './journalHistoryCases.js';
 import { journalLifecycleCases } from './journalLifecycleCases.js';
+
+/** A keep rule's footer (issue 2007): each outer button names the die it keeps. */
+const KEEP_FOOTER =
+  ':has(.manager-modal-footer button[data-action="disadvantage"] .action-note:text-is("keep the worse"))' +
+  ':has(.manager-modal-footer button[data-action="advantage"] .action-note:text-is("keep the better"))';
 
 export const CASES = Object.freeze([
   playerCase({
@@ -120,7 +130,8 @@ export const CASES = Object.freeze([
     ],
     expectTab: 'journal',
     expectSelector:
-      '.fabricate-app .manager-modal[data-roll-prompt="single"]:has(button[data-action="advantage"])' +
+      '.fabricate-app .manager-modal[data-roll-prompt="single"]' +
+      KEEP_FOOTER +
       ':has(.manager-modal-subtitle:has-text("Brenna Karrunsdottir · Inscribe a Runeblade"))' +
       ':has(.formula-content .formula:text-is("1d20 + 3"))' +
       ':not(:has(.formula-content .manager-chip))' +
@@ -133,6 +144,35 @@ export const CASES = Object.freeze([
       /^src\/bootstrap\/journalOperations\.js$/,
       /^src\/systems\/CraftingEngine\.js$/,
       /^src\/ui\/svelte\/apps\/crafting\/(?:RollPrompt(?:Target)?\.svelte|rollPrompt(?:Target)?\.js)$/,
+    ],
+  }),
+  // Issue 2007: the versioned prompt's notes come from the offer the stage check prepared.
+  playerCase({
+    id: 'player-journal-check-roll-prompt-bonus',
+    label: 'Player Journal — versioned check roll prompt offering a bonus die',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: {
+      tab: 'journal',
+      journalCaseState: 'journal-check-prompt',
+      rollPromptState: 'journal-bonus',
+      dialog: 'open',
+    },
+    steps: [
+      { selector: '[data-run-id="lab-v1-journal-check-prompt"]' },
+      { selector: '[data-journal-detail] [data-run-action="primary"]' },
+    ],
+    expectTab: 'journal',
+    expectSelector:
+      '.fabricate-app .manager-modal[data-roll-prompt="single"]' +
+      ':has(.manager-modal-subtitle:has-text("Brenna Karrunsdottir · Inscribe a Runeblade"))' +
+      ':has(.manager-modal-footer button[data-action="disadvantage"] .action-note:text-is("−(1d8 + 1) to the total"))' +
+      ' .manager-modal-footer button[data-action="advantage"] .action-note:text-is("+(1d8 + 1) to the total")',
+    kinds: ['player', 'journal'],
+    sourceMatches: [
+      JOURNAL_SOURCES,
+      /^src\/bootstrap\/journalOperations\.js$/,
+      /^src\/ui\/svelte\/apps\/crafting\/(?:RollPrompt\.svelte|rollPrompt\.js)$/,
     ],
   }),
   playerCase({
@@ -153,6 +193,7 @@ export const CASES = Object.freeze([
     expectTab: 'journal',
     expectSelector:
       '.fabricate-app .manager-modal[data-roll-prompt="single"]' +
+      KEEP_FOOTER +
       ':has(.manager-modal-subtitle:has-text("Brenna Karrunsdottir · Tend the Slow Bloom"))' +
       ':has(.formula-content .formula:text-is("1d20"))' +
       ':has(.target-row > .manager-chip[data-roll-prompt-target="under"]:has-text("Target 2 · stay at or under"))',
@@ -183,6 +224,7 @@ export const CASES = Object.freeze([
     expectTab: 'journal',
     expectSelector:
       '.fabricate-app .manager-modal[data-roll-prompt="single"]' +
+      COUNT_ADVANTAGE_FOOTER +
       ':has(.manager-modal-subtitle:has-text("Brenna Karrunsdottir · Tend the Slow Bloom"))' +
       ':has(.formula-content .formula[data-roll-prompt-count="over"]:text-is("5d10 · each ≥ 7"))' +
       ':has(.formula-content .formula-note:text-is("Success on ≥ 7 · explodes on 9 or above once"))' +
