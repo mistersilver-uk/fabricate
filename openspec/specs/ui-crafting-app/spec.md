@@ -126,7 +126,8 @@ and the browse half is the one that scales with the corpus.
   the discriminator salvage carries, and a check target refusal adds `data.targetRefusal`
   naming its reason (`resolution-modes/spec.md` § Check Target Resolution); a timed FINISH
   returns the same shape and leaves the run resumable.
-  A target refusal answers before the roll prompt opens, posts no chat card and no roll message, and the Crafting tab notifies the refusal and drops the recipe's last recorded result, so the recipe shows the refusal and never an earlier attempt's facts.
+  The public craft runs the versioned lifecycle, whose descriptor refuses a target by throwing `CHECK_TARGET_INVALID` (`resolution-modes/spec.md` § Check Target Resolution), so there the refusal arrives as `success: false` with the localized refusal sentence as its message and no `misconfigured` flag.
+  Either way a target refusal answers before the roll prompt opens and posts no chat card and no roll message, and the Crafting tab notifies the refusal sentence.
 - A non-GM crafts directly against owned actors; there is no GM relay for player
   crafting.
 - Time-based countdowns are driven by world time only: a new `subscribeWorldTime`
@@ -383,7 +384,7 @@ The prompt is not shown at all when no selected item has a usable check, and dis
 #### Scenario: A check that cannot read its target refuses
 
 - **WHEN** a player crafts a recipe whose check reads a character value the crafting character does not have
-- **THEN** the craft answers `misconfigured` with `data.targetRefusal: 'unresolved-path'` before any prompt opens
+- **THEN** the craft refuses with "Crafting check cannot roll: the character value its target reads was not found" before any prompt opens
 - **AND** no chat card and no roll message is posted, and the recipe's check card shows the unresolved sentence
 
 #### The GM-only complication card
