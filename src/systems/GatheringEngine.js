@@ -17,7 +17,7 @@ import { activityPermitsFailureResults } from '../utils/failureResultPolicy.js';
 import { resolveProgressiveAward as resolveProgressiveAwardLoop } from '../utils/progressiveAward.js';
 import { matchResultGroupsByName, normalizeRoutedName } from '../utils/routedOutcomeKeywords.js';
 
-import { advantageOfferFields } from './checkAdvantage.js';
+import { advantageOfferFields, authoredOfferOptions } from './checkAdvantage.js';
 import { buildCheckModifierContext } from './checkModifierResolver.js';
 import {
   evaluateSituationalBonus,
@@ -3866,7 +3866,7 @@ export class GatheringEngine {
           }),
           evaluation,
         }),
-        offerSituationalBonus: routed?.offerSituationalBonus !== false,
+        ...authoredOfferOptions(routed),
       },
     });
   }
@@ -4091,7 +4091,7 @@ export class GatheringEngine {
             activity: 'Gathering',
             img: task?.img,
           }),
-          offerSituationalBonus: progressive?.offerSituationalBonus !== false,
+          ...authoredOfferOptions(progressive),
         },
       });
       // A cancelled roll makes `_resolveProgressiveOutcome` abort with zero mutation.

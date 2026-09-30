@@ -42,7 +42,7 @@ import { diceEngine } from '../utils/rollFormulaRollability.js';
 import { itemResolvesToComponent } from '../utils/sourceUuid.js';
 
 import { evaluatePrerequisite } from './characterPrerequisites.js';
-import { advantageOfferFields } from './checkAdvantage.js';
+import { advantageOfferFields, authoredOfferOptions } from './checkAdvantage.js';
 import {
   buildCheckModifierChoice,
   buildCheckModifierContext,
@@ -181,14 +181,14 @@ import {
 } from './toolCheckBonus.js';
 
 /** The contributions and the evaluation that placed them come from one prepared collection; the
- * check config supplies the prompt's situational-bonus offer, and the executed roll mode is
- * reported for the result card. */
+ * check config supplies its situational-bonus offer and advantage rule, and the executed roll mode
+ * is reported for the result card. */
 function checkRollOptions(options, { contributions, evaluation }, config) {
   return {
     ...options,
     toolContributions: contributions,
     evaluation,
-    offerSituationalBonus: config?.offerSituationalBonus !== false,
+    ...authoredOfferOptions(config),
     reportVisibility: true,
   };
 }

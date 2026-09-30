@@ -7,6 +7,7 @@
 import { stripRetiredModifierPlaceholder } from '../utils/craftingCheckExpression.js';
 
 import { chatModeOption } from './bulkChatVisibility.js';
+import { resolveAdvantageOffer } from './checkAdvantage.js';
 import { compareToTarget, effectiveMargin } from './checkEvaluation.js';
 import { evaluateKeptRoll } from './checkKeepTransform.js';
 import {
@@ -44,7 +45,7 @@ import {
   runCountProgressive,
   runCountRouted,
 } from './countCheckRoll.js';
-import { authorizedPreparedDecision } from './preparedDecisionPolicy.js';
+import { authorizedPreparedDecision, validatedPreparedDecision } from './preparedDecisionPolicy.js';
 
 export { classifyCheckTotal, resolveForcedOutcome } from './checkRouting.js';
 export { rolledDiceGroups } from './checkRollOutput.js';
@@ -277,31 +278,6 @@ function ownEvaluation(...sources) {
   return SUM_OVER_EVALUATION;
 }
 
-function validatedPreparedDecision(decision, modifierChoice) {
-  const source = decision && typeof decision === 'object' ? decision : {};
-  const offered = new Set(
-    (Array.isArray(modifierChoice?.modifiers) ? modifierChoice.modifiers : [])
-      .map((modifier) => modifier?.id)
-      .filter((id) => typeof id === 'string')
-  );
-  const selected = (Array.isArray(source.modifierIds) ? source.modifierIds : []).filter(
-    (id) => typeof id === 'string' && offered.has(id)
-  );
-  const advantage = ['advantage', 'disadvantage'].includes(source.advantage)
-    ? source.advantage
-    : null;
-  const rollMode = ['publicroll', 'gmroll', 'blindroll', 'selfroll'].includes(source.rollMode)
-    ? source.rollMode
-    : null;
-  // Absent ids fall through to the descriptor's defaults; an empty array is an answer.
-  return {
-    bonus: typeof source.bonus === 'string' ? source.bonus : null,
-    advantage,
-    rollMode,
-    ...(Array.isArray(source.modifierIds) && { chosenModifierIds: selected }),
-  };
-}
-
 /**
  * Evaluate a GM-retained check plan from player decisions. Client totals, formulas and modifier
  * values are absent from the accepted boundary; eligible modifier ids are revalidated here.
@@ -312,7 +288,14 @@ export async function evaluatePreparedCheck(preparation, actor, decision = {}) {
   const source = preparation && typeof preparation === 'object' ? preparation : {};
   const options = source.options && typeof source.options === 'object' ? source.options : {};
   const secret = source.secret === true;
-  const rollDecision = validatedPreparedDecision(decision, options.modifierChoice);
+  // The prepare-time snapshot's own offer: a button it excludes never reaches the roll.
+  const advantageOffer = resolveAdvantageOffer({
+    advantage: options.advantage,
+    evaluation: ownEvaluation(options),
+    authoredFormula: stripRetiredModifierPlaceholder(String(source.formula ?? '')),
+    Roll: globalThis.Roll,
+  });
+  const rollDecision = validatedPreparedDecision(decision, options.modifierChoice, advantageOffer);
   // Secrecy is authoritative, not a default that the player's roll-mode choice may override.
   if (secret) rollDecision.rollMode = 'gmroll';
   const result = await evaluateCheckRoll(source.formula, actor, {
@@ -467,6 +450,31 @@ function gradePreparedTotal(
 }
 
 /**
+ * The options a prepared check rolls with, every one from its prepare-time capture: the advantage
+ * rule is the snapshot's, so a config edit between prepare and execute changes nothing.
+ */
+function preparedRollOptions(
+  preparation,
+  { config, advantage, evaluation, count, kind, secret, anchor, rollMode }
+) {
+  return {
+    flavor:
+      preparation?.flavor ?? preparation?.publicPrompt?.label ?? config.label ?? 'Crafting check',
+    rollMode: secret ? 'gmroll' : (rollMode ?? 'selfroll'),
+    craftingModifier: config.craftingModifier ?? null,
+    modifierChoice: config.modifierChoice ?? null,
+    toolContributions: config.toolContributions ?? [],
+    evaluation,
+    advantage,
+    speaker: preparation?.speaker ?? config.speaker ?? null,
+    ...preparedCountOptions(count, { secret, kind, type: config.type }),
+    // A pass/fail roll names its final target; a secret one never carries it.
+    ...(kind === 'simple' && !secret && { flavorTarget: anchor }),
+    reportVisibility: true,
+  };
+}
+
+/**
  * Evaluate and classify the private CraftingEngine check descriptor without accepting a client
  * formula or total. This is the authority-side twin of the three existing formula runners; it
  * places by the prepared evaluation and grades against the captured `decisionPolicy.target`.
@@ -498,28 +506,18 @@ export async function evaluatePreparedRunCheck(
   }
   const anchor = decisionPolicy.target ?? config.resolvedDc ?? config.dc;
   const authoritativeDecision = authorizedPreparedDecision(decision);
+  const options = preparedRollOptions(preparation, {
+    config,
+    advantage: checkConfig.advantage,
+    evaluation,
+    count,
+    kind,
+    secret,
+    anchor,
+    rollMode: authoritativeDecision.rollMode,
+  });
   const rolled = await evaluatePreparedCheck(
-    {
-      formula: preparation?.rollFormula,
-      secret,
-      options: {
-        flavor:
-          preparation?.flavor ??
-          preparation?.publicPrompt?.label ??
-          config.label ??
-          'Crafting check',
-        rollMode: secret ? 'gmroll' : (authoritativeDecision.rollMode ?? 'selfroll'),
-        craftingModifier: config.craftingModifier ?? null,
-        modifierChoice: config.modifierChoice ?? null,
-        toolContributions: config.toolContributions ?? [],
-        evaluation,
-        speaker: preparation?.speaker ?? config.speaker ?? null,
-        ...preparedCountOptions(count, { secret, kind, type: config.type }),
-        // A pass/fail roll names its final target; a secret one never carries it.
-        ...(kind === 'simple' && !secret && { flavorTarget: anchor }),
-        reportVisibility: true,
-      },
-    },
+    { formula: preparation?.rollFormula, secret, options },
     actor,
     authoritativeDecision
   );
