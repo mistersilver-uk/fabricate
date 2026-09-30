@@ -926,7 +926,7 @@ The entitled prompt displays applied entries from that snapshot, or offers the d
 The world authority ledger carries only safe token coordination, while the prepared evaluation and cached recipient-specific reply stay in the issuing authority instance and disappear on consume, release or expiry.
 Placement keeps **source** (`tool`, `library`, `situational`, or `advantage`) separate from **form** (scalar or rolling expression): eligibility, selection, actor resolution and bounds happen first, then the same plan sends benefits to the formula, target, threshold or pool according to the evaluation.
 For sum/under, a positive benefit raises the target; for count, a positive pool benefit raises the pool while a threshold benefit changes the threshold in the direction that helps the check, retaining signed and fractional totals until the count-mode integer policy is defined by its behavior child.
-An authored advantage rewrites only the check prefix under sum, keeping the lowest d20 under sum/under, while count advantage changes the pool; an average can rank a library entry but never supplies its benefit.
+An authored Advantage Rule decides how Advantage and Disadvantage reach the roll: `keep` mutates the constructed `Roll`'s own first dice-group `Die` term rather than any string, `bonus` appends or pre-rolls a separate expression, and a count check moves `poolDelta` by `±countDice` whatever `modifierDestination` says; an average can rank a library entry but never supplies its benefit.
 Outside sum/over, unresolved rolling contributions evaluate once after confirmation; evaluated dice-bearing Tool bonuses retain their actual roll and are not rerolled.
 Under sum/over a dice-bearing Tool bonus appends only its numeric result, as before, and adds no roll evidence.
 An invalid situational contribution or ordinary Tool evaluation failure contributes zero, while a valid library pre-roll failure aborts before the main check roll or message.
@@ -1581,6 +1581,51 @@ A bulk prompt hides its bonus field only when every usable subject's check has t
 Canonical mapping: `normalizeSituationalBonusOffer` in `src/systems/normalize/craftingCheck.js`; `CheckPromptOptions.svelte` (writes); `RollPrompt.svelte` and `rollPrompt.js` (read); `allowsSituationalModifier` in `src/systems/checkRoll.js`
 
 Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/ui-system-studio/spec.md, openspec/specs/ui-crafting-app/spec.md
+
+## Advantage Rule
+
+The `advantage` record (issue 2007): `mode: 'off' | 'keep' | 'bonus'` for summing (default `keep`, an unknown token reads `keep`), integer `extraDice` 1-4 (default 1), string `bonusExpression` (default `'1d6'` when absent or not a string, any string including `''` kept verbatim), `offerDisadvantage` (true unless explicitly `false`), `countEnabled` (true unless explicitly `false`), and integer `countDice` 1-5 (default 1).
+It is normalized once by `normalizeCheckAdvantage` and carried beside `evaluation`, NEVER inside it, on all eight normalized check sub-objects; an out-of-range integer clamps and a non-integer takes its default, and all six keys are retained whatever the evaluation, though summing reads only the first four and counting only the last two.
+It survives `checkDraftClone.js`'s clone functions, schema-6 export/import with no migration, and the prepared descriptor's `checkConfig` snapshot.
+A **Standalone Check Roll** authors no rule of its own and rolls under the untouched default record (`mode: 'keep'`, one extra die, disadvantage offered), by maintainer ruling R2.
+
+Canonical mapping: `normalizeCheckAdvantage` in `src/systems/normalize/checkAdvantage.js`; spread in `src/systems/normalize/craftingCheck.js`, `checkDraftClone.js` and `CraftingSystemManager._copyPassFailCheckFields`
+
+Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-modes/spec.md, openspec/specs/companion-api/spec.md
+
+## Keep (Roll Extra, Keep One)
+
+Under an **Advantage Rule**'s `mode: 'keep'`, the offer and the roll both key off `findKeepGroup`, the one eligibility predicate reading the post-shim AUTHORED formula alone: it never reads Tool terms, library fragments, the deferred `playerPicks` slot, a situational bonus, or a bonus-die expression, and it never searches past the formula's first top-level dice group.
+That group qualifies only as a literal plain `NdS` with no modifier of its own, in an additive position; a modified group (`1d6x`, `2d20kh1`), a nested group (`(1d20+2)*2`, `max(1d20,10)`), a dynamic count or face, or a non-additive position (`10 - 1d20`, `1d20 * -1`) all refuse, and refusal offers no keep at all.
+When it qualifies, `checkKeepTransform.js` mutates the CONSTRUCTED `Roll`'s own `Die` term rather than rewriting any string: it sets `term.number` to the group's count plus `extraDice`, pushes a `kh{n}`/`kl{n}` keep modifier where `n` is the group's original count, and calls `roll.resetFormula()`, because the chat context, `toJSON`, `Roll.fromData` and `clone`/`reroll` all read the cached `_formula`.
+Advantage keeps the highest dice on `sum/over` and the lowest on `sum/under`; Disadvantage keeps the opposite.
+Refusing a modified group is deliberate: Foundry applies modifiers in array order and ranks a keep by raw face, never by success or `count`, so the better keep on a `cs`/`cf`/`x` group would follow the comparator rather than the check's own direction.
+
+Canonical mapping: `findKeepGroup` in `src/utils/craftingCheckExpression.js`; `src/systems/checkKeepTransform.js` (`locateKeepTerm`, `applyKeepTransform`, `evaluateKeptRoll`)
+
+Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/data-models/spec.md
+
+## Bonus Die
+
+Under an **Advantage Rule**'s `mode: 'bonus'`, the check's own dice never change; instead `bonusExpression` (grammar: dice and numbers joined by ASCII `+`/`-`, proved rollable by a maximized evaluation, NEVER `Roll.validate`) contributes a separate dice expression.
+A `sum/over` check appends `+ (E)`/`- (E)` to the working formula after the situational bonus, joining the main roll under the next free dice-group id, so no authored group moves.
+A `sum/under` check pre-rolls `E` once, UNSIGNED, and lets Disadvantage's `negate` flag lower the target by its total rather than posting a negated roll, so the card and Dice So Nice show the unsigned expression.
+A count check ignores `bonusExpression` entirely: its own **Advantage Offer** always answers `kind: 'count'`.
+
+Canonical mapping: `isBonusExpression`, `bonusOffer` in `src/systems/checkAdvantage.js`; `advantageContribution`, `appendAdvantageBonus` in `src/systems/checkRollDecision.js`
+
+Spec reference: openspec/specs/resolution-modes/spec.md
+
+## Advantage Offer
+
+`resolveAdvantageOffer` is the one derivation every prompt producer, descriptor transport and the engine's authority gate read, answering `{ advantage, disadvantage, kind: 'keep'|'bonus'|'count'|null, detail }` from an **Advantage Rule**, the check's evaluation, and its authored formula.
+A count check offers both buttons whenever `countEnabled`, whatever its formula; a summing check offers a keep only when `findKeepGroup` proves the first dice group, and a bonus only when `bonusExpression` passes the grammar and, with a `Roll` injected, proves rollable.
+`intersectAdvantageOffers` answers one offer for a batch: a button is offered only when every usable subject's own offer includes it, and `kind`/`detail` are kept only when every subject agrees, else `kind: 'mixed'` with no detail so no sub-label renders.
+Every transport — the versioned descriptors, `publicPrompt`, the Journal adapter, the token `decisionPolicy`, and `safePrepareRecord` — carries the allowlisted `advantageOffer` `publicAdvantageOffer` produces, NEVER the raw rule, and the engine's authority gate enforces both directions from that same offer: a decision naming a choice the offer excludes rolls normally, whatever its transport.
+
+Canonical mapping: `resolveAdvantageOffer`, `intersectAdvantageOffers`, `publicAdvantageOffer`, `offeredDecision` in `src/systems/checkAdvantage.js`
+
+Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/ui-crafting-app/spec.md, openspec/specs/companion-api/spec.md
 
 ## Count Check
 

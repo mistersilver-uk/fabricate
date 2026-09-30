@@ -122,7 +122,8 @@ Under the formula field, **What actually gets rolled** shows the same formula wi
 
 ### What a check rolls today
 
-For an active check, Fabricate builds the roll in this order: your authored formula, eligible Tool bonuses, the selected named modifiers, Advantage or Disadvantage, and then a valid situational bonus.
+For an active check, Fabricate builds the roll in this order: your authored formula, with Advantage or Disadvantage already rolled into its first dice group where that mode is chosen, then eligible Tool bonuses, the selected named modifiers, a valid situational bonus, and finally an Advantage or Disadvantage bonus die where that mode is chosen instead.
+See [Advantage and disadvantage]({% link checks/crafting.md %}#advantage-and-disadvantage) for the three modes a check can offer.
 Under **Lower is better**, the Tool bonus and the named modifiers raise the target instead of joining the roll, as [Which way is better](#which-way-is-better) describes.
 Flat named modifiers share one labelled term, while each named modifier that rolls dice keeps its own labelled term.
 
@@ -360,7 +361,8 @@ A visible interactive check prompt names the activity and, when available, the c
 The prompt opens over the Fabricate window you rolled from, or over the page when a macro or another module opens it, and closing that window cancels the roll.
 Clicking outside it does not cancel the roll; **Escape** pressed inside the prompt or its close button does, and pressing **Enter** rolls normally.
 Outside the prompt, **Escape** keeps its usual Foundry meaning.
-It offers **Situational bonus** and **Roll mode**, plus **Advantage** and **Disadvantage** when the formula supports them.
+It offers **Situational bonus** and **Roll mode**, plus **Advantage** and **Disadvantage** when the check's own advantage rule offers them.
+See [Advantage and disadvantage]({% link checks/crafting.md %}#advantage-and-disadvantage).
 It shows a **DC** or **Target** chip only when the check has one target to show.
 For an entitled visible Journal check, the prepared modifier contributions stay fixed while the prompt is open.
 Changing character data or the modifier library after preparation cannot change those captured modifier terms; other actor-dependent formula terms are resolved when the authority evaluates the roll.
