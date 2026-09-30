@@ -704,6 +704,9 @@
           "OutcomeFailure": "Salvage failed",
           "NothingRecovered": "Nothing is recovered; the failure policy applies.",
           "SummaryWithRoll": "with a roll of",
+          "SummaryWithCount": "with",
+          "SummaryNetSuccesses": "net successes",
+          "SummaryNetSuccessOne": "net success",
           "ActingSystem": "Salvaging as {system}"
         },
         "Detail": {

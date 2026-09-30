@@ -56,6 +56,18 @@
       : null
   );
   const hasRoll = $derived(rollValue !== null);
+  // A counting check's number is its net successes rather than a rolled total (issue 2006).
+  const countWords = $derived(
+    result?.check?.count
+      ? {
+          before: localize('FABRICATE.App.Inventory.Salvage.SummaryWithCount'),
+          after:
+            rollValue === 1
+              ? localize('FABRICATE.App.Inventory.Salvage.SummaryNetSuccessOne')
+              : localize('FABRICATE.App.Inventory.Salvage.SummaryNetSuccesses'),
+        }
+      : null
+  );
 </script>
 
 {#if state}
@@ -85,8 +97,9 @@
     </p>
     {#if displayMessage}
       <p class="salvage-summary-message" data-inventory-salvage-message>
-        {displayMessage}{#if hasRoll}{` ${localize('FABRICATE.App.Inventory.Salvage.SummaryWithRoll')}`}
-          <span class="salvage-summary-roll" data-inventory-salvage-roll>{rollValue}</span>{/if}
+        {displayMessage}{#if hasRoll}{` ${countWords?.before ?? localize('FABRICATE.App.Inventory.Salvage.SummaryWithRoll')}`}
+          <span class="salvage-summary-roll" data-inventory-salvage-roll>{rollValue}</span
+          >{#if countWords}{` ${countWords.after}`}{/if}{/if}
       </p>
     {/if}
     <CheckEvidenceRows check={result.check ?? null} />

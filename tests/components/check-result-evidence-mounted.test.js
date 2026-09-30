@@ -327,6 +327,24 @@ describe('SalvageRollSummary evidence rows', () => {
     assert.ok(!zero.querySelector('[data-dice-tile-face]'));
   });
 
+  it("names a count salvage's number as net successes, singular and plural (issue 2006)", async () => {
+    const summary = async (net) => {
+      harness.remount();
+      const root = await harness.mount({
+        result: {
+          state: 'success',
+          message: 'Salvaged.',
+          rollValue: net,
+          check: executedCountCheck({ ...COUNT_DISPLAY, net }),
+        },
+      });
+      return root.querySelector('[data-inventory-salvage-message]').textContent.trim();
+    };
+    assert.match(await summary(4), /^Salvaged\. with\s+4 net successes$/);
+    assert.match(await summary(1), /^Salvaged\. with\s+1 net success$/);
+    assert.match(await summary(0), /^Salvaged\. with\s+0 net successes$/);
+  });
+
   it('keeps the space between the message and the roll it names (F5)', async () => {
     const root = await harness.mount({
       result: { state: 'success', message: 'Salvaged.', rollValue: 9 },
