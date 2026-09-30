@@ -74,7 +74,7 @@ function integerAtLeast(value, minimum, fallback) {
   return Number.isInteger(number) && number >= minimum ? number : fallback;
 }
 
-function integerInRange(value, minimum, maximum, fallback) {
+export function integerInRange(value, minimum, maximum, fallback) {
   if ([null, undefined, ''].includes(value)) return fallback;
   const number = Number(value);
   return Number.isInteger(number) ? Math.max(minimum, Math.min(maximum, number)) : fallback;

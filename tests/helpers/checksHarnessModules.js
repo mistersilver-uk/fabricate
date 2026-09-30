@@ -113,6 +113,7 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/systems/countDisplayEvidence.js',
   'src/systems/countRoll.js',
   'src/systems/normalize/checkEvaluation.js',
+  'src/systems/normalize/checkAdvantage.js',
   'src/systems/checkRollDecision.js',
   'src/systems/checkRouting.js',
   'src/systems/checkRollOutput.js',

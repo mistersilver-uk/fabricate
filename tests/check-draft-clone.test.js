@@ -9,11 +9,13 @@ import {
   cloneSimpleCheck,
   readCheckActive,
 } from '../src/ui/svelte/apps/manager/checks/checkDraftClone.js';
+import { normalizeCheckAdvantage } from '../src/systems/normalize/checkAdvantage.js';
 import { normalizeCheckEvaluation } from '../src/systems/normalize/checkEvaluation.js';
 import { normalizeSalvage } from '../src/systems/normalize/salvage.js';
 
 const EMPTY_BREAKAGE = Object.freeze({ triggers: [] });
 const DEFAULT_EVALUATION = Object.freeze(normalizeCheckEvaluation());
+const DEFAULT_ADVANTAGE = Object.freeze(normalizeCheckAdvantage());
 const AUTHORED_EVALUATION = normalizeCheckEvaluation({
   product: 'count',
   direction: 'under',
@@ -76,6 +78,7 @@ describe('cloneRoutedCheck', () => {
       checkBreakage: EMPTY_BREAKAGE,
       evaluation: DEFAULT_EVALUATION,
       offerSituationalBonus: true,
+      advantage: DEFAULT_ADVANTAGE,
     });
   });
 
@@ -120,6 +123,7 @@ describe('cloneSimpleCheck', () => {
       checkBreakage: EMPTY_BREAKAGE,
       evaluation: DEFAULT_EVALUATION,
       offerSituationalBonus: true,
+      advantage: DEFAULT_ADVANTAGE,
     });
   });
 
@@ -144,6 +148,7 @@ describe('cloneProgressiveCheck', () => {
       checkBreakage: EMPTY_BREAKAGE,
       evaluation: DEFAULT_EVALUATION,
       offerSituationalBonus: true,
+      advantage: DEFAULT_ADVANTAGE,
     });
     assert.ok(!Object.hasOwn(draft, 'preview'), 'an absent sandbox stays absent');
   });
@@ -253,6 +258,40 @@ describe('the situational-bonus offer (issue 2005)', () => {
     it(`${name} rebaselines a saved false offer as clean`, () => {
       const saved = clone({ rollFormula: '1d20', offerSituationalBonus: false });
       assert.equal(JSON.stringify(clone(saved)), JSON.stringify(saved));
+    });
+  }
+});
+
+describe('the advantage record (issue 2007)', () => {
+  const AUTHORED = Object.freeze({
+    mode: 'bonus',
+    extraDice: 3,
+    bonusExpression: '1d8 + 1',
+    offerDisadvantage: false,
+    countEnabled: false,
+    countDice: 4,
+  });
+
+  for (const [name, clone] of [
+    ['cloneRoutedCheck', cloneRoutedCheck],
+    ['cloneSimpleCheck', cloneSimpleCheck],
+    ['cloneProgressiveCheck', cloneProgressiveCheck],
+  ]) {
+    it(`${name} keeps an authored record detached and rebaselines it clean`, () => {
+      const source = { rollFormula: '1d20', advantage: { ...AUTHORED } };
+      const draft = clone(source);
+      assert.deepEqual(draft.advantage, AUTHORED);
+      assert.notEqual(draft.advantage, source.advantage);
+      draft.advantage.countDice = 2;
+      assert.equal(source.advantage.countDice, 4, 'an edit leaves the source untouched');
+      assert.equal(clone(draft).advantage.countDice, 2, 'the save keeps the edit');
+      const saved = clone(source);
+      assert.equal(JSON.stringify(clone(saved)), JSON.stringify(saved), 'a save rebaselines clean');
+    });
+
+    it(`${name} normalizes an out-of-range record as the save would`, () => {
+      const draft = clone({ advantage: { mode: 'sideways', extraDice: 0, countDice: 6 } });
+      assert.deepEqual(draft.advantage, { ...DEFAULT_ADVANTAGE, extraDice: 1, countDice: 5 });
     });
   }
 });

@@ -426,7 +426,15 @@ test('a dynamic-DC simple check moved into routedByCheck KEEPS its dynamic DC (i
   assert.equal(routed.dc, 13, 'the static DC still travels, as the anchor the macro receives');
 });
 
-test('the pass/fail move carries the evaluation and a false offer both ways (issue 2005)', async () => {
+test('the pass/fail move carries the evaluation, offer and advantage rule both ways', async () => {
+  const advantage = {
+    mode: 'bonus',
+    extraDice: 2,
+    bonusExpression: '1d8 + 1',
+    offerDisadvantage: false,
+    countEnabled: false,
+    countDice: 3,
+  };
   const evaluation = {
     product: 'sum',
     direction: 'under',
@@ -442,7 +450,9 @@ test('the pass/fail move carries the evaluation and a false offer both ways (iss
       id: 'sys-1',
       name: 'Forge',
       resolutionMode: fromMode,
-      craftingCheck: { [from]: { rollFormula: '1d20', evaluation, offerSituationalBonus: false } }
+      craftingCheck: {
+        [from]: { rollFormula: '1d20', evaluation, offerSituationalBonus: false, advantage }
+      }
     }));
 
     await manager.updateSystem('sys-1', { resolutionMode: toMode });
@@ -452,6 +462,7 @@ test('the pass/fail move carries the evaluation and a false offer both ways (iss
     assert.equal(moved.evaluation.direction, 'under', `${from} → ${to} keeps the evaluation`);
     assert.deepEqual(moved.evaluation.target, evaluation.target);
     assert.equal(moved.offerSituationalBonus, false, `${from} → ${to} keeps the offer`);
+    assert.deepEqual(moved.advantage, advantage, `${from} → ${to} keeps the advantage rule`);
   }
 });
 

@@ -108,12 +108,13 @@ CraftingSystem = {
     // renders a tier table (the Checks tab mounts the simple editor with its DC-source
     // half hidden and the routed editor with tiers hidden), so neither slot's `tiers`
     // is authored there.
-    simple: SimpleCheck,               // { rollFormula, evaluation, dc, thresholdMode, dcMode, tiers, macroUuid, checkBreakage }
-    routed: RoutedCheck,               // { type, rollFormula, evaluation, dc, thresholdMode, dcMode, macroUuid, tiers, relativeOutcomes, fixedOutcomes, checkBreakage }
+    simple: SimpleCheck,               // { rollFormula, evaluation, advantage, dc, thresholdMode, dcMode, tiers, macroUuid, checkBreakage }
+    routed: RoutedCheck,               // { type, rollFormula, evaluation, advantage, dc, thresholdMode, dcMode, macroUuid, tiers, relativeOutcomes, fixedOutcomes, checkBreakage }
     progressive: {
       awardMode: "partial" | "equal" | "exceed",
       rollFormula: string,             // default ""; total drives progressive awarding
       evaluation: CheckEvaluation,
+      advantage: CheckAdvantage,
       checkBreakage: CheckBreakage,    // unified per-check trigger list (force award-all/none and/or break tools)
     },
 
@@ -139,6 +140,7 @@ CraftingSystem = {
       awardMode: "partial" | "equal" | "exceed",
       rollFormula: string,
       evaluation: CheckEvaluation,
+      advantage: CheckAdvantage,
       checkBreakage: CheckBreakage,
     },
     routed: RoutedCheck,
@@ -197,6 +199,7 @@ CraftingSystem = {
       awardMode: "partial" | "equal" | "exceed",
       rollFormula: string,         // default ""; total drives progressive awarding
       evaluation: CheckEvaluation,
+      advantage: CheckAdvantage,
       checkBreakage: CheckBreakage,
     },
 
@@ -244,6 +247,7 @@ CraftingSystem = {
   //   SimpleCheck = {
   //     rollFormula: string,                       // default ""
   //     evaluation: CheckEvaluation,
+  //     advantage: CheckAdvantage,
   //     dc: number,                                // default 15; the default DC
   //     thresholdMode: "meet" | "exceed",          // default "meet"
   //     dcMode: "static" | "dynamic",              // default "static" (crafting only)
@@ -254,6 +258,7 @@ CraftingSystem = {
   //   RoutedCheck = {
   //     type: "relative" | "fixed",                // default "relative"
   //     evaluation: CheckEvaluation,
+  //     advantage: CheckAdvantage,
   //     rollFormula: string, dc: number, thresholdMode: "meet" | "exceed",
   //     dcMode: "static" | "dynamic",              // default "static" (crafting only)
   //     macroUuid: string | null,                  // dynamic-DC macro (crafting only)
@@ -277,6 +282,12 @@ CraftingSystem = {
   //       additionalDice: { enabled: boolean, source: "path" | "macro", path: string,
   //                         readMacroUuid: string, spendMacroUuid: string, max: number },
   //     },
+  //   }
+  //
+  //   // Normalized by `normalizeCheckAdvantage`; see § Check advantage record.
+  //   CheckAdvantage = {
+  //     mode: "off" | "keep" | "bonus", extraDice: number, bonusExpression: string,
+  //     offerDisadvantage: boolean, countEnabled: boolean, countDice: number,
   //   }
   //
   //   // Unified per-check trigger list (issue 419 recombine). Each trigger pairs an
@@ -444,6 +455,15 @@ Under an attribute target source the runtime reads these sibling adjustments: th
 An added adjustment is any finite number and a multiplier is a finite number above zero; a relative outcome tier's `adjustment` is its multiplier under an attribute/multiply check, where a null one marks the Otherwise tier and a non-finite imported multiplier normalizes to null and so becomes Otherwise.
 A `product: "count"` check ignores the target and adjustment fields entirely and reads its required count from the selected recipe tier's non-null `successes`, the component's non-null `salvage.successesOverride` or the task's non-null `successesOverride`; each falls back to `pool.required` when null, and 0 is a valid required count.
 It also never reads `dc` or any adjustment field, fixed or attribute.
+
+### Check advantage record
+
+Each of the eight normalized check subobjects MUST carry `advantage` as a sibling of `evaluation`, never inside it.
+It holds `mode: "off" | "keep" | "bonus"` (default `keep`; an unknown token reads `keep`), integer `extraDice` 1–4 (default 1), string `bonusExpression` (default `"1d6"` when absent or not a string; any string, including `""`, is kept verbatim), `offerDisadvantage` (true unless explicitly false), `countEnabled` (true unless explicitly false) and integer `countDice` 1–5 (default 1).
+Integers clamp into range, and a non-integer takes its default.
+All six keys are retained whatever the evaluation; summing reads only the first four and counting only the last two.
+The defaults reproduce the rolled formula of a check whose authored first dice group is a plain `1d20`, so no migration runs.
+Checks Studio drafts carry the normalized record, a pass/fail slot move carries it with the evaluation, schema-6 export and import preserve it without a migration, and the private versioned descriptor's `checkConfig` snapshots it.
 
 ### Requirements
 
