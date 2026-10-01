@@ -7,6 +7,7 @@ import { greedyAllocate } from '../utils/essenceAllocation.js';
 import {
   buildEssenceIndex,
   essenceBlockMember,
+  essenceCeilingFrom,
   essenceMemberIsFundable,
   essencePoolFrom,
   essenceResolverFor,
@@ -53,13 +54,14 @@ export function createIngredientSolver({
       const deps = { ingredientGroups, seedRemaining, buildPassIndex };
       // The per-pass resolution index (issue 1083).
       ctx.index = buildPassIndex(availableItems, matcher, ctx, deps);
+      const essenceCeiling = essenceCeilingFrom(ctx.index?.essence);
 
       // Bounded item-level backtracking (issue 663): find a satisfying assignment if one exists.
       const search = searchAssignment(availableItems, matcher, ctx, deps);
 
       // The solver's own cost, surfaced rather than discarded (issue 1072).
       const searchStats = Object.freeze({ nodes: search.nodes, capHit: search.capHit });
-      if (search.selection) return { ...search.selection, searchStats };
+      if (search.selection) return { ...search.selection, searchStats, essenceCeiling };
 
       // Proven unsatisfiable, or the generous search bound was reached (a safeguard degradation that
       // is never worse than the pre-663 behaviour and never double-counts): fall back to the
@@ -71,7 +73,7 @@ export function createIngredientSolver({
             '(a satisfiable assignment may be missed for this pathological input).'
         );
       }
-      return { ...resolveGreedy(availableItems, matcher, ctx, deps), searchStats };
+      return { ...resolveGreedy(availableItems, matcher, ctx, deps), searchStats, essenceCeiling };
     },
   };
 }

@@ -31,6 +31,7 @@ globalThis.ChatMessage = { create: () => {}, getSpeaker: () => ({}) };
 const { IngredientSet } = await import('../src/models/IngredientSet.js');
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 const { Recipe } = await import('../src/models/Recipe.js');
+const { suggestChoiceOverrides } = await import('../src/ui/svelte/util/requirementSlots.js');
 
 function makeItem(uuid, quantity = 1) {
   return { uuid, id: uuid, name: uuid, img: null, system: { quantity }, getFlag: () => undefined };
@@ -67,8 +68,8 @@ function makeActor(items) {
   return { items: arr };
 }
 
-function makeSystemManager(systemId, components, essenceDefinitions = []) {
-  return {
+function installSystemManager(systemId, components, essenceDefinitions = []) {
+  globalThis.game = {
     user: { isGM: true },
     fabricate: {
       getCraftingSystemManager: () => ({
@@ -201,7 +202,7 @@ test('evaluateCraftability display picks the SAME option the resolver consumes',
     { id: 'cmp-a', name: 'Red Herb', registeredItemUuid: 'reg-a', img: 'a.webp' },
     { id: 'cmp-b', name: 'Blue Herb', registeredItemUuid: 'reg-b', img: 'b.webp' },
   ];
-  globalThis.game = makeSystemManager(systemId, components);
+  installSystemManager(systemId, components);
   const manager = new RecipeManager();
 
   const g = group(
@@ -248,7 +249,7 @@ test('an insufficient overridden option is selectable-but-flagged (not craftable
     { id: 'cmp-a', name: 'Red Herb', registeredItemUuid: 'reg-a' },
     { id: 'cmp-b', name: 'Blue Herb', registeredItemUuid: 'reg-b' },
   ];
-  globalThis.game = makeSystemManager(systemId, components);
+  installSystemManager(systemId, components);
   const manager = new RecipeManager();
 
   const g = group(
@@ -276,7 +277,7 @@ test('mixed OR choices carry authored essence icon metadata without an aura imag
   const components = [
     { id: 'cmp-a', name: 'Red Herb', registeredItemUuid: 'reg-a', img: 'a.webp' },
   ];
-  globalThis.game = makeSystemManager(systemId, components, [
+  installSystemManager(systemId, components, [
     { id: 'restorative', name: 'Restorative', icon: 'fas fa-heart' },
   ]);
   const manager = new RecipeManager();
@@ -305,9 +306,117 @@ test('mixed OR choices carry authored essence icon metadata without an aura imag
   assert.notEqual(essence.img, 'icons/svg/aura.svg');
 });
 
+// ── Issue 2142: an essence alternative beside a component alternative ──────
+const PRIMAL_SYSTEM = 'sys-primal-choice';
+
+// A recipe of `groups`, each an `Any one of` [component alternative, `primal` essence
+// alternative]. Wildmoss carries 1 primal per unit; Acidic Essence carries none.
+function primalChoiceRecipe(groups) {
+  installSystemManager(
+    PRIMAL_SYSTEM,
+    [
+      { id: 'cmp-acid', name: 'Acidic Essence', registeredItemUuid: 'reg-acid' },
+      { id: 'cmp-moss', name: 'Wildmoss', registeredItemUuid: 'reg-moss', essences: { primal: 1 } },
+    ],
+    [{ id: 'primal', name: 'Primal', icon: 'fas fa-leaf' }]
+  );
+  const ingredientGroups = groups.map(({ id, amount, essenceId = 'primal' }) =>
+    group(
+      [
+        { match: { type: 'component', componentId: 'cmp-acid' }, quantity: 1 },
+        { match: { type: 'essence', essenceId, amount }, quantity: 1 },
+      ],
+      id
+    )
+  );
+  return new Recipe({
+    name: 'Primal Tonic',
+    craftingSystemId: PRIMAL_SYSTEM,
+    ingredientSets: [makeSet(ingredientGroups).toJSON()],
+    resultGroups: [{ id: 'rg-1', results: [] }],
+  });
+}
+
+function primalCards(result) {
+  return result.ingredientChoices
+    .filter((choice) => choice.kind === 'option')
+    .map((choice) => choice.options[1]);
+}
+
+test('choosing the essence alternative keeps the group a two-alternative choice', () => {
+  const recipe = primalChoiceRecipe([{ id: 'g-primal', amount: 1 }]);
+  const actor = makeActor([makeComponentItem('i-moss', 'reg-moss', 3)]);
+  const result = new RecipeManager().evaluateCraftability([actor], recipe, {
+    optionOverrides: { 'g-primal': { optionIndex: 1 } },
+  });
+  const [state] = result.ingredientStates;
+  assert.equal(state.isEssence, true, 'the chosen alternative is the essence');
+  assert.equal(state.hasChoice, true);
+  assert.equal(state.choiceCount, 2);
+  const choice = result.ingredientChoices.find((entry) => entry.kind === 'option');
+  assert.equal(choice.selectedOptionIndex, 1);
+  assert.equal(choice.options.length, 2, 'both alternatives stay on offer');
+});
+
+test('an essence alternative card counts the essence held stacks carry against its amount', () => {
+  const recipe = primalChoiceRecipe([{ id: 'g-primal', amount: 2 }]);
+  const manager = new RecipeManager();
+
+  const [held] = primalCards(
+    manager.evaluateCraftability([makeActor([makeComponentItem('i-moss', 'reg-moss', 3)])], recipe)
+  );
+  assert.deepEqual([held.have, held.need, held.satisfied], [3, 2, true]);
+  assert.equal(held.isEssence, true, 'the card keeps its essence presentation');
+  assert.equal(held.icon, 'fas fa-leaf');
+
+  const [none] = primalCards(
+    manager.evaluateCraftability([makeActor([makeComponentItem('i-acid', 'reg-acid', 1)])], recipe)
+  );
+  assert.deepEqual([none.have, none.need, none.satisfied], [0, 2, false]);
+});
+
+test('a degenerate essence alternative needs nothing and reads satisfied', () => {
+  const recipe = primalChoiceRecipe([{ id: 'g-primal', amount: 0 }]);
+  const [card] = primalCards(new RecipeManager().evaluateCraftability([makeActor([])], recipe));
+  assert.deepEqual([card.have, card.need, card.satisfied], [0, 0, true]);
+});
+
+// A blank essence id is a runtime no-op in the resolver, so the card must agree.
+test('an essence alternative with a blank essence id reads satisfied, as the resolver settles it', () => {
+  const recipe = primalChoiceRecipe([{ id: 'g-primal', amount: 2, essenceId: '' }]);
+  const [card] = primalCards(new RecipeManager().evaluateCraftability([makeActor([])], recipe));
+  assert.equal(card.satisfied, true);
+});
+
+// Fundable is not funded: each card states its own fundability, not the joint draw.
+test('two essence alternatives on one essence id each read fundable from the same ceiling', () => {
+  const recipe = primalChoiceRecipe([
+    { id: 'g-first', amount: 2 },
+    { id: 'g-second', amount: 2 },
+  ]);
+  const actor = makeActor([makeComponentItem('i-moss', 'reg-moss', 3)]);
+  const cards = primalCards(new RecipeManager().evaluateCraftability([actor], recipe));
+  assert.deepEqual(
+    cards.map((card) => [card.have, card.need, card.satisfied]),
+    [
+      [3, 2, true],
+      [3, 2, true],
+    ]
+  );
+});
+
+test('pick for me chooses a fundable essence alternative over an unheld component', () => {
+  const recipe = primalChoiceRecipe([{ id: 'g-primal', amount: 1 }]);
+  const actor = makeActor([makeComponentItem('i-moss', 'reg-moss', 3)]);
+  const result = new RecipeManager().evaluateCraftability([actor], recipe);
+  assert.deepEqual(suggestChoiceOverrides(result), {
+    'g-primal': { optionIndex: 1, heldItemId: null },
+  });
+});
+
 test('a tag option matching multiple held stacks emits a stack choice', () => {
   const systemId = 'sys-1';
-  globalThis.game = makeSystemManager(systemId, []);
+  installSystemManager(systemId, []);
   const manager = new RecipeManager();
 
   const g = group([{ match: { type: 'tags', tags: ['metal'], tagMatch: 'any' }, quantity: 1 }], 'g1');
