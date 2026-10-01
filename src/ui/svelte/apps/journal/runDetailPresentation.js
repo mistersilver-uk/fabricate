@@ -7,6 +7,18 @@
  */
 import { formatNet, formatSignedStep } from '../../../../utils/checkAdjustmentFormat.js';
 
+// The selection-rule hint a roll-under or character-value ladder states (issue 2005).
+const LADDER_RULE_KEYS = Object.freeze({
+  under: 'FABRICATE.App.Journal.Yields.RoutedRuleUnder',
+  underStrict: 'FABRICATE.App.Journal.Yields.RoutedRuleUnderStrict',
+  adjustment: 'FABRICATE.App.Journal.Yields.RoutedRuleAdjustment',
+});
+
+/** The lang key of a gathering ladder's selection-rule hint. */
+export function ladderRuleKey(rule) {
+  return LADDER_RULE_KEYS[rule] ?? 'FABRICATE.App.Journal.Yields.RoutedRule';
+}
+
 /** `NaN` for an absent value, so `Number.isFinite` alone decides whether it was recorded. */
 export function numberOrNaN(raw) {
   return raw == null ? NaN : Number(raw);

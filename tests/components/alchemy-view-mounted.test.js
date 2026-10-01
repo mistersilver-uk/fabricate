@@ -131,6 +131,29 @@ describe('AlchemyView mounted behavior', () => {
     );
   });
 
+  it('records the window a Brew came from as its roll prompt origin (issue 2053)', async () => {
+    const { activeRollPromptOrigin } = await harness.loadRawModule(
+      'src/ui/svelte/util/rollPromptOrigin.js'
+    );
+    let origin = 'unread';
+    const store = fakeAlchemyStore({
+      brewEnabled: true,
+      brew: async () => {
+        origin = activeRollPromptOrigin();
+      },
+    });
+    const target = await harness.mount({ services: services(store) });
+
+    target.querySelector('[data-alchemy-brew]').click();
+    await Promise.resolve();
+
+    assert.ok(
+      origin === target,
+      'the workbench forwards the click and the view records its window'
+    );
+    assert.ok(activeRollPromptOrigin() === null, 'the origin is released once the brew settles');
+  });
+
   it('renders the error state when the store reports an error', async () => {
     const target = await harness.mount({
       services: services(fakeAlchemyStore({ error: 'boom' })),

@@ -1685,7 +1685,7 @@ It dismisses on an outside click; a step that would lose work confirms first.
 
 The interactive roll prompt also renders in this chrome, and it is a decision rather than a flow: one header, a scrolling body and a footer rail of equal actions, drawn as the library's banded Modal.
 ManagerModal draws ONE frame, the library's banded Modal, with no unbanded option: the import report, the import folder mapping and the add-from-catalogue picker draw it too, by maintainer ruling (2026-09-28), so every Fabricate dialog shares one header, body and footer treatment.
-It mounts over the Fabricate window the player started the roll from — the one the starting control recorded, whether it was clicked or activated from the keyboard, with focus and then the pointer as fallbacks — and otherwise over a themed standalone layer on the page, which stays frontmost; it answers as a dismissal when the window hosting it closes.
+It mounts over the Fabricate window the player started the roll from — the one the starting control recorded, whether it was clicked or activated from the keyboard, with focus and then, when focus is nowhere, the pointer as fallbacks — and otherwise over a themed standalone layer on the page, which stays frontmost; it answers as a dismissal when the window hosting it closes.
 Its behavioural differences from the flow are additive `ManagerModal` props whose defaults leave every other caller unchanged: a stray outside click never dismisses it, focus enters it, Tab stays inside it, it owns every key while open, Escape and the close control dismiss it, and focus returns to the opener, or to the window hosting it while the opener is still disabled.
 
 #### Scenario: An import needs two steps
