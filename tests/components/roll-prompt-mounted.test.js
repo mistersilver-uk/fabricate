@@ -1117,5 +1117,120 @@ describe('mounted roll prompt', () => {
       dialog.querySelector('form').requestSubmit();
       assert.ok(!('additionalDice' in (await pending)));
     });
+
+    describe('in a batch (frame 36)', () => {
+      const batchRow = (name, needed) => ({
+        name,
+        need: { kind: 'successes', count: needed, destination: 'pool' },
+        offerSituationalBonus: true,
+        additionalDice: {
+          countDice: { base: 2, poolDelta: 0, zeroPoolFails: true, destination: 'pool' },
+          reach: { needed, perDieMost: 1, explode: 'off', rescued: false },
+        },
+      });
+      const rowsNeeding = (...needs) => needs.map((needed, index) => batchRow(`Row ${index + 1}`, needed));
+      const openBatch = (subjects, over = {}) =>
+        openThroughEntry(() =>
+          promptBulkCheckRoll({
+            count: subjects.length,
+            subjects,
+            activity: 'Salvage',
+            actorName: 'Brenna',
+            allowAdvantage: true,
+            advantageOffer: offerFor({}, { product: 'count' }),
+            additionalDiceOffer: diceOffer(null, { available: 2, limit: 0, reach: null }),
+            ...over,
+          })
+        );
+      const disabledActions = (dialog) =>
+        ['disadvantage', 'normal', 'advantage'].filter(
+          (action) => actionOf(dialog, action).getAttribute('aria-disabled') === 'true'
+        );
+      const suffixes = (dialog) =>
+        [...dialog.querySelectorAll('.bulk-row')].map(
+          (row) => row.querySelector('[data-roll-prompt-bulk-unreachable]')?.textContent ?? ''
+        );
+
+      it('states the whole batch spend, and one choice answers every roll', async () => {
+        const subjects = rowsNeeding(1, 1, 1, 1);
+        const unaffordable = await openBatch(subjects);
+        const control = controlOf(unaffordable.dialog);
+        assert.equal(
+          control.querySelector('[data-roll-prompt-additional-dice-line]').textContent,
+          'Momentum 2 available · Spends 0 Momentum across 4 rolls (0 each)'
+        );
+        assert.equal(
+          control.querySelector('[data-notice-tone]').textContent.trim(),
+          'Not enough Momentum to buy a die for every roll.'
+        );
+        assert.equal(stepperInput(unaffordable.dialog).disabled, true);
+        unaffordable.dialog.querySelector('[data-manager-modal-close]').click();
+        await unaffordable.pending;
+
+        document.body.replaceChildren();
+        const { dialog, pending } = await openBatch(subjects, {
+          additionalDiceOffer: diceOffer(null, { available: 4, limit: 1, reach: null }),
+        });
+        controlOf(dialog).querySelector('[data-stepper-increment]').click();
+        flushSync();
+        assert.equal(
+          controlOf(dialog).querySelector('[data-roll-prompt-additional-dice-spend]').textContent,
+          'Spends 4 Momentum across 4 rolls (1 each)'
+        );
+        dialog.querySelector('form').requestSubmit();
+        assert.deepEqual((await pending).additionalDice, 1);
+      });
+
+      it('disables Roll and Disadvantage when every row reaches only with Advantage (-blocked)', async () => {
+        const { dialog, pending } = await openBatch(rowsNeeding(3, 3, 3));
+        assert.deepEqual(disabledActions(dialog), ['disadvantage', 'normal']);
+        assert.equal(blockNote(dialog).textContent, 'Only Advantage can reach the successes needed.');
+        assert.deepEqual(suffixes(dialog), ['', '', ''], 'Advantage reaches every row');
+        const state = answered(pending);
+        dialog.querySelector('form').requestSubmit();
+        await settleUi();
+        assert.equal(state.done, false, 'a blocked Roll never answers');
+        actionOf(dialog, 'advantage').click();
+        assert.equal((await pending).advantage, 'advantage');
+      });
+
+      it('disables every action and marks every row when none can reach (-blocked-all)', async () => {
+        const { dialog, pending } = await openBatch(rowsNeeding(4, 4));
+        assert.deepEqual(disabledActions(dialog), ['disadvantage', 'normal', 'advantage']);
+        assert.equal(
+          blockNote(dialog).textContent,
+          'Rolling is disabled: none of these rolls can reach the successes they need.'
+        );
+        assert.deepEqual(suffixes(dialog), [' · cannot reach', ' · cannot reach']);
+        const suffix = dialog.querySelector('[data-roll-prompt-bulk-unreachable]');
+        assert.ok(suffix.parentElement.matches('.bulk-need'), 'after the needed count');
+        assert.ok(suffix.classList.contains('bulk-unreachable'), 'in danger ink');
+        dialog.querySelector('[data-manager-modal-close]').click();
+        await pending;
+      });
+
+      it('marks only the row no action reaches and keeps every action (-partial)', async () => {
+        const { dialog, pending } = await openBatch(rowsNeeding(1, 5, 1, 1));
+        assert.deepEqual(disabledActions(dialog), []);
+        assert.ok(!blockNote(dialog), 'no block note');
+        assert.deepEqual(suffixes(dialog), ['', ' · cannot reach', '', '']);
+        dialog.querySelector('form').requestSubmit();
+        assert.equal((await pending).advantage, 'normal');
+      });
+
+      it('notes a batch whose rows pay differently instead of offering the control', async () => {
+        const { dialog, pending } = await openBatch(rowsNeeding(1, 1), {
+          additionalDiceOffer: undefined,
+          additionalDiceMixed: true,
+        });
+        assert.ok(!controlOf(dialog));
+        assert.equal(
+          dialog.querySelector('[data-roll-prompt-additional-dice-mixed]').textContent,
+          'Rolls in this batch use different resources, so no dice can be added.'
+        );
+        dialog.querySelector('form').requestSubmit();
+        assert.ok(!('additionalDice' in (await pending)));
+      });
+    });
   });
 });

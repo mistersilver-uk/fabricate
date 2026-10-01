@@ -53,6 +53,9 @@
         chosen: additionalDice,
         labels: data.labels.additionalDice,
         actorName: data.actorName,
+        rolls: data.additionalDiceRolls,
+        rows: data.kind === 'bulk' ? data.subjects : null,
+        bonus,
       })
   );
 
@@ -134,7 +137,13 @@
               {#each data.subjects as subject, index (index)}
                 <div class="bulk-row">
                   <span class="bulk-name">{subject.name || data.labels.unnamedSubject}</span>
-                  <span class="bulk-need">{subject.needText}</span>
+                  <span class="bulk-need"
+                    >{subject.needText}{#if dice?.unreachableRows[index]}<span
+                        class="bulk-unreachable"
+                        data-roll-prompt-bulk-unreachable
+                        >{` · ${data.labels.additionalDice.cannotReach}`}</span
+                      >{/if}</span
+                  >
                 </div>
               {/each}
             </div>
@@ -226,6 +235,8 @@
           limit={data.additionalDiceOffer.limit}
           onChange={(next) => (additionalDice = next)}
         />
+      {:else if data.labels.additionalDiceMixed}
+        <p class="help" data-roll-prompt-additional-dice-mixed>{data.labels.additionalDiceMixed}</p>
       {/if}
 
       <!-- A `div`, not a `label`: a caption click would re-open the list its mousedown dismissed. -->
@@ -353,6 +364,9 @@
     font-size: 10.5px;
     font-weight: 500;
     white-space: nowrap;
+  }
+  .bulk-unreachable {
+    color: var(--fab-danger-text);
   }
   .bulk-list + .bulk-note {
     margin-top: var(--fab-space-chip);

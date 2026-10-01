@@ -562,7 +562,18 @@
           "BlockedOnlyAdvantage": "Only Advantage can reach the successes needed.",
           "BlockedDisadvantage": "Disadvantage cannot reach the successes needed.",
           "Spent": "{n} {resource} spent; the roll could not be completed.",
-          "SpentUnlabelled": "{n} spent; the roll could not be completed."
+          "SpentUnlabelled": "{n} spent; the roll could not be completed.",
+          "Bulk": {
+            "Spends": "Spends {total} {resource} across {rolls} rolls ({n} each)",
+            "SpendsUnlabelled": "Spends {total} across {rolls} rolls ({n} each)",
+            "Unaffordable": "Not enough {resource} to buy a die for every roll.",
+            "UnaffordableUnlabelled": "Not enough to buy a die for every roll.",
+            "BlockedAll": "Rolling is disabled: none of these rolls can reach the successes they need.",
+            "CannotReach": "cannot reach",
+            "Mixed": "Rolls in this batch use different resources, so no dice can be added.",
+            "Exhausted": "{resource} ran out after {done} of {rolls} rolls. The rolls already made stand.",
+            "ExhaustedUnlabelled": "The resource ran out after {done} of {rolls} rolls. The rolls already made stand."
+          }
         }
       },
       "Nav": {

@@ -298,6 +298,12 @@ function formatCopy(data, choicePlan) {
   if (data.additionalDiceOffer) {
     formatted.labels.additionalDice = additionalDiceCopy(data.additionalDiceOffer, localize);
   }
+  if (data.additionalDiceMixed) {
+    formatted.labels.additionalDiceMixed = localize(
+      'FABRICATE.App.RollPrompt.AdditionalDice.Bulk.Mixed',
+      'Rolls in this batch use different resources, so no dice can be added.'
+    );
+  }
   formatted.chipText = data.count
     ? formatted.neededText
     : formatted.dcText &&
@@ -632,6 +638,40 @@ export async function promptCheckRoll(options = {}) {
   return waitForPrompt(data, allowAdvantage, plan, open);
 }
 
+/** A batch row's pool and reach facts, numbers and enums only; null for a row with none. */
+function bulkRowDice(row) {
+  const { countDice, reach } = row?.additionalDice ?? {};
+  const finite = (value) => (Number.isFinite(value) ? value : null);
+  return {
+    countDice: countDice && {
+      base: finite(countDice.base),
+      poolDelta: finite(countDice.poolDelta) ?? 0,
+      zeroPoolFails: countDice.zeroPoolFails !== false,
+      destination: countDice.destination === 'threshold' ? 'threshold' : 'pool',
+    },
+    reach: publicAdditionalDiceOffer({ reach })?.reach ?? null,
+  };
+}
+
+/**
+ * A batch's additional-dice offer (issue 2008), the rolls one choice covers and the one actor it
+ * names, each covered row keeping its own pool and reach; else the note that rows differ.
+ */
+function withBulkAdditionalDice(data, { additionalDiceOffer, additionalDiceMixed, actorName }) {
+  const offer = publicAdditionalDiceOffer(additionalDiceOffer);
+  if (!offer) return additionalDiceMixed === true ? { ...data, additionalDiceMixed: true } : data;
+  const subjects = data.subjects.map((row) =>
+    row?.additionalDice ? { ...row, additionalDice: bulkRowDice(row) } : row
+  );
+  return {
+    ...data,
+    subjects,
+    additionalDiceOffer: offer,
+    additionalDiceRolls: subjects.filter((row) => row?.additionalDice).length,
+    actorName: actorName || '',
+  };
+}
+
 export async function promptBulkCheckRoll({
   allowAdvantage,
   advantageOffer,
@@ -639,13 +679,26 @@ export async function promptBulkCheckRoll({
   subjects,
   activity,
   actorName,
+  additionalDiceOffer,
+  additionalDiceMixed,
 } = {}) {
   const open = resolveSurface();
-  if (!open) return { confirmed: true, bonus: null, rollMode: undefined, advantage: 'normal' };
+  if (!open) {
+    return {
+      confirmed: true,
+      bonus: null,
+      rollMode: undefined,
+      advantage: 'normal',
+      ...(additionalDiceOffer && { additionalDice: 0 }),
+    };
+  }
   return waitForPrompt(
-    withAdvantageOffer(
-      buildBulkPromptData({ count, subjects, activity, actorName }),
-      advantageOffer
+    withBulkAdditionalDice(
+      withAdvantageOffer(
+        buildBulkPromptData({ count, subjects, activity, actorName }),
+        advantageOffer
+      ),
+      { additionalDiceOffer, additionalDiceMixed, actorName }
     ),
     allowAdvantage,
     planModifierChoice(null),
