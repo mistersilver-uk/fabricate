@@ -4,6 +4,7 @@ manager-recipes-inspector-empty-step
 manager-recipes-inspector-route-list
 manager-recipes-narrow
 manager-recipes-no-check
+manager-recipes-inspector-check-off
 manager-recipes-grouped-continuation
 manager-recipes-bulk-edit
 manager-recipes-bulk-edit-unstaged

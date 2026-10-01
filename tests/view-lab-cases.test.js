@@ -1352,7 +1352,7 @@ test('environment empty membership evidence clears the actual fixture and is sel
 });
 
 test('every combination-rule value the registry targets is a real MODIFIER_POLICIES member', () => {
-  // Ten selectors in this registry pin a rule option by its VALUE, and NOTHING else could see them
+  // Eleven selectors in this registry pin a rule option by its VALUE, and NOTHING else could see them
   // go stale (issue 1095).
   const pattern = new RegExp(
     String.raw`\[` + escapeForRegExp(MODIFIER_POLICY_OPTION_ATTR) + String.raw`="([^"]*)"\]`,
@@ -1370,8 +1370,8 @@ test('every combination-rule value the registry targets is a real MODIFIER_POLIC
   // NON-EMPTY, and of the EXPECTED CARDINALITY (issue 1095).
   assert.equal(
     found.length,
-    10,
-    `expected 10 combination-rule selectors in the registry, found ${found.length} — ` +
+    11,
+    `expected 11 combination-rule selectors in the registry, found ${found.length} — ` +
       `either \`${MODIFIER_POLICY_OPTION_ATTR}\` was renamed in the registry without being ` +
       'renamed here, or cases carrying it were added or deleted'
   );

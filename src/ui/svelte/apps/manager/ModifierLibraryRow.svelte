@@ -45,7 +45,7 @@
 
 <!-- ONE DEFINITION OF THE TWO TEXT CELLS, drawn into the row or into the stacking block. -->
 {#snippet cells()}
-  <span class="manager-modifier-readonly-label" {...labelAttributes}>{label}</span>
+  <span class="manager-modifier-readonly-label" title={label} {...labelAttributes}>{label}</span>
   <code class="manager-modifier-readonly-expression" {...expressionAttributes}
     >{expression || NO_EXPRESSION}</code
   >

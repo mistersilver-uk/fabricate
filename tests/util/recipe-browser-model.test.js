@@ -153,6 +153,13 @@ describe('recipeBrowserModel — sorting', () => {
     assert.equal(recipeCheckSubtitleSuffix(null, english), '');
   });
 
+  it('names a switched-off check in the inspector fact as the pill does (issue 2136)', () => {
+    const format = (_key, fallback) => fallback;
+    const summary = { kind: 'checkOff', dc: null };
+    assert.equal(recipeCheckFact(summary, format), 'Check off', 'not "No check"');
+    assert.equal(recipeCheckFact(summary, format), recipeCheckPill(summary, format).label);
+  });
+
   it('names a counting pill, its sort key, fact and subline by successes needed (issue 2006)', () => {
     const english = (_key, fallback) => fallback;
     const format = (_key, fallback, data) => fallback.replaceAll(/\{(\w+)\}/g, (_whole, token) => String(data[token]));

@@ -246,6 +246,80 @@ describe('ChecksValidationTab (mounted)', () => {
     harness.remount();
   });
 
+  it('lists every issue row, blocking then warning, before the passes (issue 2130)', async () => {
+    // A blocking tier, a ranking warning and a satisfied formula tick share one group.
+    const target = await harness.mount({
+      sections: [
+        {
+          ...unfinishedRoutedSection('crafting', '1d20', '  '),
+          modifierContext: {
+            catalogue: [
+              { id: 'count', label: 'Count', expression: '1d20cs>15' },
+              { id: 'flat', label: 'Flat', expression: '-2' },
+            ],
+            systemPolicy: 'highest',
+            defaultModifierIds: ['count', 'flat'],
+          },
+        },
+      ],
+    });
+    const group = target.querySelector('[data-checks-validation-section="crafting"]');
+    const statuses = [...group.querySelectorAll('.manager-recipe-val-row')].map((row) =>
+      ['block', 'warn', 'pass'].find((status) => row.classList.contains(`is-${status}`))
+    );
+    for (const status of ['block', 'warn', 'pass']) {
+      assert.ok(statuses.includes(status), `the fixture draws a ${status} row`);
+    }
+    const rank = (status) => ['block', 'warn', 'pass'].indexOf(status);
+    assert.deepEqual(
+      statuses,
+      [...statuses].sort((left, right) => rank(left) - rank(right)),
+      `every issue row precedes every pass row; got ${JSON.stringify(statuses)}`
+    );
+    harness.remount();
+  });
+
+  it('names a check with warnings and no blocking issue "Enabled with warnings" (issue 2130)', async () => {
+    const target = await harness.mount({
+      sections: [{ subsystem: 'crafting', mode: 'simple', check: { rollFormula: '' } }],
+    });
+    assert.equal(railCounts(target).blocking, 0, 'the fixture blocks nothing');
+    assert.ok(railCounts(target).warnings > 0, 'and warns');
+    const hero = target.querySelector('[data-editor-validation-summary]');
+    assert.equal(hero.dataset.editorValidationSummary, 'warn');
+    assert.equal(
+      hero.querySelector('.manager-recipe-rail-summary-title').textContent.trim(),
+      'Enabled with warnings'
+    );
+    assert.equal(
+      hero.querySelector('.manager-recipe-rail-summary-sub').textContent.trim(),
+      'Saves and enables — review the warnings when you can.'
+    );
+    harness.remount();
+  });
+
+  it('words the blocked and the unsaved hero as the prototype does (issue 2130)', async () => {
+    const heroText = (root) =>
+      ['title', 'sub'].map((part) =>
+        root.querySelector(`.manager-recipe-rail-summary-${part}`).textContent.trim()
+      );
+    const blocked = await harness.mount({
+      sections: [unfinishedRoutedSection('crafting', '1d20', '  ')],
+    });
+    assert.deepEqual(heroText(blocked), [
+      'Blocked from enabling',
+      'Clear the blocking issues before this crafting system can be enabled.',
+    ]);
+    harness.remount();
+    const unsaved = await harness.mount({
+      sections: [{ subsystem: 'crafting', mode: 'simple', check: { rollFormula: '' } }],
+      dirty: true,
+      dirtyActivities: ['crafting'],
+    });
+    assert.equal(heroText(unsaved)[0], 'No blocking issues, but not saved yet', 'never "Clean"');
+    harness.remount();
+  });
+
   it('renders the tier-step target issues and their shared green tick (issue 975)', async () => {
     const target = await harness.mount({
       sections: [tierStepTargetSection(['t1', '<=', 1, 'gone'], ['t2', '>=', 20, 'a'])],
