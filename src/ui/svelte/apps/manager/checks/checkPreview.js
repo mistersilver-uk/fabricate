@@ -286,14 +286,28 @@ function toolContributions(toolTerms) {
 
 /** Roll the preview through the engine's own runner.
  *  @param {{kind: string|null, args: object}} plan {@link buildPreviewCheckArgs}'s output.
+ *  @param {number} [additionalDice] The simulator's stepped dice, for a check that allows them.
  *  @returns {Promise<object|null>} The runner's result verbatim, or null when nothing rolls. */
-export async function runCheckPreview(plan) {
+export async function runCheckPreview(plan, additionalDice = 0) {
   if (!plan?.kind) return null;
   const rollsPool = plan.evaluation?.product === 'count';
   if (!rollsPool && String(plan.formula ?? '').trim() === '') return null;
-  if (plan.kind === 'routed') return runFormulaRouted(plan.args);
-  if (plan.kind === 'progressive') return runFormulaProgressive(plan.args);
-  return runFormulaPassFail(plan.args);
+  const args = simulatedArgs(plan, additionalDice);
+  if (plan.kind === 'routed') return runFormulaRouted(args);
+  if (plan.kind === 'progressive') return runFormulaProgressive(args);
+  return runFormulaPassFail(args);
+}
+
+/**
+ * The runner's arguments with the stepped dice placed through the engine's preview seam, which
+ * reads and spends nothing (issue 2008); unchanged for a check that allows no additional dice.
+ */
+function simulatedArgs(plan, additionalDice) {
+  const allowed = plan.evaluation?.pool?.additionalDice?.enabled === true;
+  if (plan.evaluation?.product !== 'count' || !allowed) return plan.args;
+  const dice = Number.isInteger(additionalDice) && additionalDice > 0 ? additionalDice : 0;
+  const rollOptions = { ...plan.args.rollOptions, simulatedAdditionalDice: dice };
+  return { ...plan.args, rollOptions: { ...rollOptions, reportVisibility: true } };
 }
 
 /** Whether the plan grades against a character value the target resolution reads. */

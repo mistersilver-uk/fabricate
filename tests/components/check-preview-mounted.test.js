@@ -10,6 +10,7 @@ import {
   CHECKS_TREE_COMPILED_MODULES,
   CHECKS_TREE_RAW_MODULES,
 } from '../helpers/checksHarnessModules.js';
+import { installCountDice } from '../helpers/countEngineDice.js';
 // The three record controls are driven by open-then-click on a portaled panel (issue 1510).
 import {
   assertSelectHasResolvedName,
@@ -1530,6 +1531,172 @@ describe('the rolled readout, per check type and mode (issue 2080)', () => {
         MARGIN_NOTES.under,
       ]);
     });
+  });
+});
+
+describe('the Preview’s additional-dice stepper (issue 2008)', () => {
+  const PATH = 'system.resources.momentum.value';
+  const calls = { updates: [], macros: [] };
+  const balance = (id, name, resources = {}) => ({
+    id,
+    name,
+    type: 'character',
+    _source: { system: { resources } },
+    overrides: {},
+    getRollData: () => ({}),
+    update: async (change) => {
+      calls.updates.push(change);
+    },
+  });
+  const ACTORS = [balance('sera', 'Sera Vane', { momentum: { value: 2 } }),
+    balance('bare', 'Bare Hands'),
+  ];
+  const paid = (rule = {}) => ({
+    rollFormula: '',
+    dc: 10,
+    thresholdMode: 'meet',
+    dcMode: 'static',
+    evaluation: {
+      product: 'count',
+      direction: 'over',
+      pool: {
+        die: 10,
+        base: '2',
+        threshold: '8',
+        required: 1,
+        additionalDice: { enabled: true, source: 'path', path: PATH, max: 3, label: 'Momentum', ...rule },
+      },
+    },
+    checkBreakage: { triggers: [] },
+    tiers: [],
+  });
+  const MACROS = { source: 'macro', readMacroUuid: 'Macro.read', spendMacroUuid: 'Macro.spend' };
+  const saved = {};
+  let dice = null;
+
+  before(() => {
+    Object.assign(saved, { actors: globalThis.game.actors, foundry: globalThis.foundry });
+    Object.assign(saved, { fromUuid: globalThis.fromUuid });
+    Object.assign(globalThis.game, {
+      actors: { contents: ACTORS, get: (id) => ACTORS.find((a) => a.id === id) },
+    });
+    const getProperty = (object, key) => key.split('.').reduce((node, part) => node?.[part], object);
+    const hasProperty = (object, key) => getProperty(object, key) !== undefined;
+    // The drop zones resolve the macros' names; only a RUN executes the command, which records it.
+    const run = (uuid) => `globalThis.previewMacroRuns.push('${uuid}'); return 9;`;
+    Object.assign(globalThis, {
+      foundry: { utils: { getProperty, hasProperty } },
+      previewMacroRuns: calls.macros,
+      fromUuid: async (uuid) => ({ name: uuid, type: 'script', command: run(uuid) }),
+    });
+  });
+  after(() => {
+    Object.assign(globalThis.game, { actors: saved.actors });
+    Object.assign(globalThis, { foundry: saved.foundry, fromUuid: saved.fromUuid });
+    delete globalThis.previewMacroRuns;
+  });
+  afterEach(() => {
+    dice?.restore();
+    dice = null;
+    calls.updates.length = 0;
+    calls.macros.length = 0;
+  });
+
+  const field = (root) => root.querySelector('[data-checks-preview-additional-dice-field]');
+  const input = (root) => root.querySelector('input[data-checks-preview-additional-dice]');
+  const note = (root) => root.querySelector('[data-checks-preview-additional-dice-note]');
+  const tileMarks = (root) =>
+    [...root.querySelectorAll('[data-checks-simulator-face]')].map(
+      (tile) => tile.dataset.checksSimulatorFaceMarks
+    );
+
+  async function mountPaid(rule = {}) {
+    return mountChecks({ resolutionMode: 'simple', craftingCheckSimple: paid(rule) });
+  }
+
+  async function step(root, times) {
+    for (let index = 0; index < times; index += 1) {
+      field(root).querySelector('[data-stepper-increment]').click();
+      await settle();
+    }
+  }
+
+  async function rollFaces(root, faces) {
+    dice = installCountDice({ faces, chat: false });
+    await rollAndSettle(root);
+  }
+
+  it('captions a stepper above Roll, bounded by the Preview-as actor’s stored balance', async () => {
+    const root = await mountPaid();
+    await settle();
+    assert.equal(note(root).textContent.trim(), 'Choose a character to see how many they can add.');
+    assert.ok(input(root).disabled, 'no Preview-as actor, so nothing can be added');
+    await choosePreviewActor(root, 'sera');
+    const caption = field(root).querySelector('.manager-checks-simulator-extra-title');
+    assert.equal(caption.textContent.trim(), 'Additional dice', 'a visible caption names it');
+    assert.equal(input(root).getAttribute('aria-label'), 'Additional dice');
+    assert.equal(input(root).getAttribute('aria-describedby'), note(root).id);
+    assert.deepEqual(
+      [input(root).value, input(root).getAttribute('max'), note(root).dataset.checksPreviewAdditionalDiceNote],
+      ['0', '2', 'path']
+    );
+    assert.equal(note(root).textContent.trim(), 'Up to 2 for Sera Vane (Momentum 2, at most 3 per roll).');
+    const roll = root.querySelector('[data-checks-simulator-roll]');
+    assert.ok(field(root).compareDocumentPosition(roll) & Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it('rolls the stepped dice as bought tiles, the odds, the inset and the balance unchanged', async () => {
+    const root = await mountPaid();
+    await choosePreviewActor(root, 'sera');
+    const readings = () => [
+      root.querySelector('[data-checks-odds-state]').textContent,
+      root.querySelector('[data-check-count-composed]')?.textContent ?? '',
+    ];
+    const before = readings();
+    await step(root, 1);
+    assert.equal(input(root).value, '1');
+    assert.deepEqual(readings(), before, 'the odds and the inset read the base pool alone');
+    await rollFaces(root, [9, 3, 8]);
+    assert.deepEqual(tileMarks(root), ['qualified', '', 'qualified bought']);
+    assert.match(root.querySelector('[data-checks-simulator-legend]').textContent, /dashed = bought/);
+    assert.deepEqual([calls.updates, calls.macros], [[], []], 'the preview reads and spends nothing');
+  });
+
+  it('clamps a count left above a lowered bound, so it is never rolled', async () => {
+    const root = await mountPaid();
+    await choosePreviewActor(root, 'sera');
+    await step(root, 2);
+    assert.equal(input(root).value, '2');
+    await choosePreviewActor(root, 'bare');
+    assert.equal(input(root).value, '0');
+    assert.equal(
+      note(root).textContent.trim(),
+      `Bare Hands has no readable value at ${PATH}, so no dice can be added.`
+    );
+    await rollFaces(root, [9, 3, 8, 8]);
+    assert.deepEqual(tileMarks(root), ['qualified', ''], 'the base pool alone rolls');
+  });
+
+  it('bounds a macro source by its most per roll, running neither macro', async () => {
+    const root = await mountPaid({ ...MACROS, max: 2 });
+    await settle();
+    assert.equal(
+      note(root).textContent.trim(),
+      'The preview never runs the read macro, so up to 2 can be added here.'
+    );
+    await step(root, 3);
+    assert.equal(input(root).value, '2');
+    await rollFaces(root, [9, 3, 8, 2]);
+    assert.deepEqual(tileMarks(root), ['qualified', '', 'qualified bought', 'bought']);
+    assert.deepEqual([calls.updates, calls.macros], [[], []]);
+  });
+
+  it('offers no stepper while the check allows no additional dice', async () => {
+    const root = await mountPaid({ enabled: false });
+    await choosePreviewActor(root, 'sera');
+    assert.ok(!field(root), 'no stepper');
+    await rollFaces(root, [9, 3, 8]);
+    assert.deepEqual(tileMarks(root), ['qualified', '']);
   });
 });
 

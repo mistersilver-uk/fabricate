@@ -6920,7 +6920,18 @@
             "FactNothingProduced": "Nothing produced",
             "FactPolicyNever": "never",
             "Raw": "raw",
-            "PoolZero": "pool reduced to 0"
+            "PoolZero": "pool reduced to 0",
+            "AdditionalDice": {
+              "Title": "Additional dice",
+              "Fewer": "Fewer additional dice",
+              "More": "More additional dice",
+              "NotePath": "Up to {limit} for {actor} ({resource} {available}, at most {max} per roll).",
+              "NotePathUnlabelled": "Up to {limit} for {actor} ({available} available, at most {max} per roll).",
+              "NoteMacro": "The preview never runs the read macro, so up to {max} can be added here.",
+              "NoteUnreadable": "{actor} has no readable value at {path}, so no dice can be added.",
+              "NoteNoActor": "Choose a character to see how many they can add.",
+              "NoteNoSource": "This check has no source to pay for additional dice."
+            }
           },
           "Odds": {
             "Title": "Chance per outcome",

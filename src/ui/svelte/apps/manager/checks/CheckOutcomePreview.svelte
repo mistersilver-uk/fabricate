@@ -20,6 +20,7 @@
   import Kicker from '../../../components/Kicker.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import Medallion from '../../../components/Medallion.svelte';
+  import Stepper from '../../../components/Stepper.svelte';
   import { localize } from '../../../util/foundryBridge.js';
 
   let {
@@ -53,6 +54,18 @@
     ],
   };
   const dynamicNote = $derived(DYNAMIC_NOTES[preview?.dynamicNote] ?? null);
+
+  const uid = $props.id();
+  const extra = $derived(preview?.additionalDice ?? null);
+  const extraLimit = $derived(extra?.limit ?? 0);
+  const extraTitle = $derived(
+    text('FABRICATE.Admin.Manager.Checks.Simulator.AdditionalDice.Title', 'Additional dice')
+  );
+  // Clamped whenever its bound moves, so the count shown and the count rolled agree.
+  let additionalDice = $state(0);
+  $effect.pre(() => {
+    if (additionalDice > extraLimit) additionalDice = extraLimit;
+  });
 </script>
 
 <div class="manager-checks-simulator" data-checks-simulator-panel>
@@ -71,6 +84,42 @@
       )}
     </p>
   {:else}
+    {#if extra}
+      <div class="manager-checks-simulator-extra" data-checks-preview-additional-dice-field>
+        <div class="manager-checks-simulator-extra-row">
+          <span class="manager-checks-simulator-extra-title">{extraTitle}</span>
+          <Stepper
+            density="comfortable"
+            min={0}
+            max={extraLimit}
+            value={additionalDice}
+            disabled={extraLimit === 0}
+            ariaLabel={extraTitle}
+            decrementLabel={text(
+              'FABRICATE.Admin.Manager.Checks.Simulator.AdditionalDice.Fewer',
+              'Fewer additional dice'
+            )}
+            incrementLabel={text(
+              'FABRICATE.Admin.Manager.Checks.Simulator.AdditionalDice.More',
+              'More additional dice'
+            )}
+            inputProps={{
+              'data-checks-preview-additional-dice': '',
+              'aria-describedby': `${uid}-additional-dice-note`,
+            }}
+            onChange={(next) => (additionalDice = next)}
+          />
+        </div>
+        <p
+          class="manager-muted"
+          id={`${uid}-additional-dice-note`}
+          data-checks-preview-additional-dice-note={extra.note.kind}
+        >
+          {extra.note.text}
+        </p>
+      </div>
+    {/if}
+
     <!-- THE STUDIO'S BUTTON PRIMITIVE, not a hand-written class string: a bare
              `manager-button is-primary` matches no rule stating a type size, so the label lands on
              Foundry's inherited app base while every other button reads at the primitive's size —
@@ -82,7 +131,7 @@
       data-checks-simulator-roll
       disabled={Boolean(abstain)}
       aria-disabled={preview.rolling === true ? 'true' : undefined}
-      onclick={() => onRoll()}
+      onclick={() => onRoll(additionalDice)}
     >
       <i class="fas fa-dice-d20" aria-hidden="true"></i>
       <span>{preview.rollLabel}</span>
@@ -228,6 +277,26 @@
   .manager-checks-simulator-hint {
     padding: var(--fab-space-4) var(--fab-space-2);
     text-align: center;
+  }
+
+  /* The prototype's 5px under the stepper row snaps to 6, and its 10px row gap to 12. */
+  .manager-checks-simulator-extra {
+    display: grid;
+    gap: var(--fab-space-chip);
+  }
+
+  .manager-checks-simulator-extra-row {
+    display: flex;
+    gap: var(--fab-space-3);
+    align-items: center;
+  }
+
+  .manager-checks-simulator-extra-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    color: var(--fab-text-secondary);
+    font-size: 11px;
+    font-weight: 500;
   }
 
   .manager-checks-simulator-live {

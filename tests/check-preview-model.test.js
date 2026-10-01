@@ -23,6 +23,7 @@ import {
   previewSignature,
 } from '../src/ui/svelte/apps/manager/checks/checkPreviewModel.js';
 import { SUM_OVER_EVALUATION } from '../src/systems/checkModifierRouter.js';
+import { installCountDice } from './helpers/countEngineDice.js';
 import { recordedRollDouble } from './helpers/recordedRollParse.js';
 import { createLabRoll } from './view-lab/foundry/labRoll.js';
 
@@ -481,5 +482,98 @@ describe('the no-actor note and the invalidation signature', () => {
     assert.notEqual(signature(IDRIN, { id: 'x', dc: 0, adjustment: 0.5 }), base);
     const add = { ...MULTIPLY_ROUTED, evaluation: attribute('@skills.craft.value', { adjustmentKind: 'add' }) };
     assert.notEqual(signature(IDRIN, null, add), base);
+  });
+});
+
+describe('the Preview’s additional dice reach the simulated roll only (issue 2008)', () => {
+  const PATH = 'system.resources.momentum.value';
+  const rule = (source) => ({
+    enabled: true,
+    source,
+    path: PATH,
+    readMacroUuid: 'Macro.read',
+    spendMacroUuid: 'Macro.spend',
+    max: 3,
+    label: 'Momentum',
+  });
+  const counting = (additionalDice) => ({
+    rollFormula: '',
+    dc: 10,
+    thresholdMode: 'meet',
+    evaluation: {
+      product: 'count',
+      direction: 'over',
+      pool: { die: 10, base: '2', threshold: '8', required: 1, additionalDice },
+    },
+    checkBreakage: { triggers: [] },
+  });
+
+  /** An actor that records every write, with macros that record every run. */
+  function paidWorld() {
+    const calls = { updates: [], macros: [] };
+    const actor = {
+      name: 'Sera Vane',
+      _source: { system: { resources: { momentum: { value: 2 } } } },
+      overrides: {},
+      getRollData: () => ({}),
+      canUserModify: () => true,
+      update: async (change) => {
+        calls.updates.push(change);
+        return actor;
+      },
+    };
+    const previous = globalThis.fromUuid;
+    Object.assign(globalThis, {
+      fromUuid: async (uuid) => {
+        calls.macros.push(uuid);
+        return { type: 'script', command: 'return 9;' };
+      },
+    });
+    return { actor, calls, restore: () => Object.assign(globalThis, { fromUuid: previous }) };
+  }
+
+  async function simulate(source, additionalDice, faces = [9, 3, 8, 8, 8]) {
+    const world = paidWorld();
+    const dice = installCountDice({ faces, chat: false });
+    try {
+      const previewPlan = plan({ draft: counting(rule(source)), actor: world.actor });
+      const result = await runCheckPreview(previewPlan, additionalDice);
+      return { result, formulas: dice.formulas(), calls: world.calls, previewPlan };
+    } finally {
+      dice.restore();
+      world.restore();
+    }
+  }
+
+  it('rolls the stepped dice as bought, with no read, no spend and no macro (AD50)', async () => {
+    for (const source of ['path', 'macro']) {
+      const { result, formulas, calls } = await simulate(source, 2);
+      assert.deepEqual(formulas, ['4d10'], `${source}: the base pool plus the two stepped dice`);
+      assert.deepEqual(result.data.boughtDice, { count: 2, source });
+      assert.equal(result.countDisplay.bought, 2, 'the engine marks two originals bought');
+      assert.deepEqual([calls.updates, calls.macros], [[], []], `${source}: nothing read or spent`);
+    }
+  });
+
+  it('rolls the base pool alone at zero, and leaves the plan the odds read untouched', async () => {
+    const { result, formulas, calls, previewPlan } = await simulate('path', 0);
+    assert.deepEqual(formulas, ['2d10']);
+    assert.equal(result.data.boughtDice, undefined);
+    assert.deepEqual([calls.updates, calls.macros], [[], []]);
+    assert.equal(previewPlan.args.rollOptions, null, 'the stepper never reaches the plan');
+  });
+
+  it('ignores a count that is not a whole number of 0 or more, and a check that buys none', async () => {
+    for (const count of [-1, 1.5, '2', NaN]) {
+      assert.deepEqual((await simulate('path', count)).formulas, ['2d10'], String(count));
+    }
+    const dice = installCountDice({ faces: [9, 3, 8], chat: false });
+    try {
+      const off = plan({ draft: counting({ ...rule('path'), enabled: false }), actor: IDRIN });
+      await runCheckPreview(off, 1);
+      assert.deepEqual(dice.formulas(), ['2d10'], 'a check that allows none rolls none');
+    } finally {
+      dice.restore();
+    }
   });
 });

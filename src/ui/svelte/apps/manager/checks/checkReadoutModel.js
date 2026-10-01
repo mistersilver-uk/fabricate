@@ -4,8 +4,13 @@
  * runner's result and the check's own configuration and re-resolves nothing, `text(key,
  * fallback)` localizes, and every negative number carries U+2212.
  */
+import {
+  boundAdditionalDice,
+  spendableAmount,
+} from '../../../../../systems/additionalDiceReach.js';
 import { evaluateCheckBreakage } from '../../../../../toolBreakageRuntime.js';
 import { resolveProgressiveAward } from '../../../../../utils/progressiveAward.js';
+import { tileModel } from '../../../../presenters/countDiceTiles.js';
 
 import { readoutBreakdown, readoutFamily, readsAttributeTarget } from './checkPreview.js';
 import { formatSigned, interpolate } from './checksCopy.js';
@@ -112,6 +117,34 @@ const NOTES = Object.freeze({
   downMany: [
     'FABRICATE.Admin.Manager.Checks.Simulator.NoteStepsDown',
     'Trigger fired — the result steps down {steps} tiers.',
+  ],
+});
+
+/** The Preview stepper's note, by why its bound is what it is (issue 2008). */
+const ADDITIONAL_DICE_NOTES = Object.freeze({
+  path: [
+    'FABRICATE.Admin.Manager.Checks.Simulator.AdditionalDice.NotePath',
+    'Up to {limit} for {actor} ({resource} {available}, at most {max} per roll).',
+  ],
+  pathUnlabelled: [
+    'FABRICATE.Admin.Manager.Checks.Simulator.AdditionalDice.NotePathUnlabelled',
+    'Up to {limit} for {actor} ({available} available, at most {max} per roll).',
+  ],
+  macro: [
+    'FABRICATE.Admin.Manager.Checks.Simulator.AdditionalDice.NoteMacro',
+    'The preview never runs the read macro, so up to {max} can be added here.',
+  ],
+  unreadable: [
+    'FABRICATE.Admin.Manager.Checks.Simulator.AdditionalDice.NoteUnreadable',
+    '{actor} has no readable value at {path}, so no dice can be added.',
+  ],
+  'no-actor': [
+    'FABRICATE.Admin.Manager.Checks.Simulator.AdditionalDice.NoteNoActor',
+    'Choose a character to see how many they can add.',
+  ],
+  'no-source': [
+    'FABRICATE.Admin.Manager.Checks.Simulator.AdditionalDice.NoteNoSource',
+    'This check has no source to pay for additional dice.',
   ],
 });
 
@@ -238,7 +271,7 @@ function readoutFacts(input, text) {
   const { plan, result } = input;
   const family = readoutFamily(plan);
   const data = result.data ?? {};
-  const count = family === 'count' ? buildCountReadout(plan, result) : null;
+  const count = family === 'count' ? countReadout(plan, result) : null;
   const unrouted = plan.kind === 'routed' && !result.outcome;
   const success = count?.zeroPool || unrouted ? false : result.success === true;
   return {
@@ -254,6 +287,14 @@ function readoutFacts(input, text) {
     botch: Boolean(count?.botch) && !success,
     award: plan.kind === 'progressive' ? progressiveAward(result, input.sandbox) : null,
   };
+}
+
+/** The count readout, its tiles from the engine's own projection once the simulator bought dice. */
+function countReadout(plan, result) {
+  const count = buildCountReadout(plan, result);
+  return result.countDisplay?.bought > 0
+    ? { ...count, dice: tileModel(result.countDisplay) }
+    : count;
 }
 
 /** The progressive spend of the rolled value down the sandbox order, or null with no order. */
@@ -628,11 +669,40 @@ function rolledReadout(input, text) {
   };
 }
 
+const blank = (value) => typeof value !== 'string' || value.trim() === '';
+
+/** The stepper's bound and why: a path's stored balance under `max`, a macro pair's `max`, else 0. */
+function additionalDiceBound(rule, character) {
+  if (rule.source === 'macro') {
+    const linked = !blank(rule.readMacroUuid) && !blank(rule.spendMacroUuid);
+    return linked ? { kind: 'macro', limit: rule.max } : { kind: 'no-source', limit: 0 };
+  }
+  if (blank(rule.path)) return { kind: 'no-source', limit: 0 };
+  if (!character) return { kind: 'no-actor', limit: 0 };
+  const available = spendableAmount(character.readStored(rule.path).value);
+  if (available === null) return { kind: 'unreadable', limit: 0 };
+  return { kind: 'path', limit: boundAdditionalDice({ max: rule.max, available }), available };
+}
+
+/**
+ * The Preview's additional-dice stepper, `{ limit, note: { kind, text } }`, or null unless the
+ * counting check allows additional dice. It feeds the simulated roll only (issue 2008).
+ */
+function previewAdditionalDice(plan, character, text) {
+  const rule = plan.evaluation.pool?.additionalDice;
+  if (plan.evaluation.product !== 'count' || rule?.enabled !== true) return null;
+  const { kind, limit, available } = additionalDiceBound(rule, character);
+  const copy = kind === 'path' && blank(rule.label) ? 'pathUnlabelled' : kind;
+  const data = { limit, available, actor: character?.name ?? '', resource: rule.label };
+  const note = say(text, ADDITIONAL_DICE_NOTES[copy], { ...data, max: rule.max, path: rule.path });
+  return { limit, note: { kind, text: note } };
+}
+
 /**
  * The simulator readout. `resolved` is false for a formula that does not reduce for the actor;
  * `abstention` withholds the roll, the target and the margin, stating why instead. `consumption`
- * is the activity's own `{ consumeOnFail, breakToolsOnFail }` and `sandbox` a progressive check's
- * `{ difficulties, awardMode }`.
+ * is the activity's own `{ consumeOnFail, breakToolsOnFail }`, `sandbox` a progressive check's
+ * `{ difficulties, awardMode }` and `character` the Preview-as `previewCharacter`, or null.
  */
 export function buildReadoutModel(
   {
@@ -641,7 +711,8 @@ export function buildReadoutModel(
     rolling = false,
     resolved = true,
     abstention = null,
-    actorName = '',
+    character = null,
+    actorName = character?.name ?? '',
     activity = 'crafting',
     activityLabel = '',
     recordNoun = '',
@@ -667,6 +738,7 @@ export function buildReadoutModel(
     result,
     rollLabel: rollLabel(result, activityLabel, text),
     waitingHint: say(text, COPY.waiting, { record: noun }),
+    additionalDice: previewAdditionalDice(plan, character, text),
     ...rolledReadout({ ...input, consumption, sandbox }, text),
   };
 }

@@ -932,7 +932,7 @@
         rolling: previewRolling,
         resolved: previewResolved,
         abstention: previewAbstaining,
-        actorName: previewActor?.name ?? '',
+        character: previewCharacter,
         activity,
         activityLabel: activityWord,
         recordNoun,
@@ -968,12 +968,12 @@
     previewRecordId = previewRecords[0].id;
   });
 
-  async function rollPreview() {
+  async function rollPreview(additionalDice = 0) {
     if (previewRolling || previewAbstaining) return;
     const rolledFor = previewSignatureNow;
     previewRolling = true;
     try {
-      const result = await runCheckPreview(previewPlan);
+      const result = await runCheckPreview(previewPlan, additionalDice);
       // A result from inputs that have since changed never publishes.
       if (previewSignatureNow === rolledFor) previewResult = result;
     } finally {
