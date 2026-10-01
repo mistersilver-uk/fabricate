@@ -47,7 +47,7 @@
 import { buildCheckModifierContext } from '../../systems/checkModifierResolver.js';
 import { activeCheckEvaluation, actorRollData, isFixedSumOver } from '../../systems/checkTarget.js';
 import { countFormulaValues, resolvePool } from '../../systems/countEvaluation.js';
-import { craftingCheckRefuses } from '../../systems/craftingCheckRefusal.js';
+import { craftingCheckRefuses, memoizedRollData } from '../../systems/craftingCheckRefusal.js';
 import { buildPassInventorySnapshot } from '../../systems/passInventorySnapshot.js';
 import { hasActiveCheck } from '../../systems/salvageCheckUsability.js';
 import { resolvedComponentsFor } from '../../systems/scopedEntityReads.js';
@@ -231,6 +231,7 @@ export class CraftingListingBuilder {
     );
 
     const summaries = [];
+    const readRollData = memoizedRollData(craftingActor);
     for (const entry of visibleEntries) {
       const recipe = entry?.recipe;
       if (!recipe) continue;
@@ -243,6 +244,7 @@ export class CraftingListingBuilder {
           snapshot,
           craftingActor,
           knowledgeSources,
+          readRollData,
         })
       );
     }
@@ -381,7 +383,15 @@ export class CraftingListingBuilder {
    * summary, so it is emitted as its "not asserted here" value.
    * @private
    */
-  _buildRecipeSummary({ recipe, access, isGM, snapshot, craftingActor, knowledgeSources }) {
+  _buildRecipeSummary({
+    recipe,
+    access,
+    isGM,
+    snapshot,
+    craftingActor,
+    knowledgeSources,
+    readRollData,
+  }) {
     const redacted = !isGM && stringOrEmpty(access?.reason) === 'teaser';
     const system = this.craftingSystemManager?.getSystem?.(recipe.craftingSystemId) ?? null;
     return projectRecipeSummary({
@@ -394,7 +404,7 @@ export class CraftingListingBuilder {
         !isGM &&
         !redacted &&
         this._isKnowledgeExhausted(access, recipe, craftingActor, knowledgeSources, snapshot),
-      checkRefused: !redacted && craftingCheckRefuses(system, recipe, craftingActor),
+      checkRefused: !redacted && craftingCheckRefuses(system, recipe, craftingActor, readRollData),
       favourite: false,
       localize: this.localize,
     });

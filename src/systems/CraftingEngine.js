@@ -69,7 +69,6 @@ import {
   actorRollData,
   attributeTargetBasis,
   checkTargetRefusal,
-  progressiveTargetRefusal,
   refusalMessage,
 } from './checkTarget.js';
 import { fireComplications } from './complicationRuntime.js';
@@ -87,6 +86,12 @@ import {
   tierStepForCard,
   VERSIONED_EXECUTION_CONTEXT,
 } from './craftCardFields.js';
+import {
+  craftingCheckAnchorDc,
+  resolveActiveCheckTarget,
+  resolveCraftingCheckTarget,
+  selectedCheckTier,
+} from './craftingCheckRefusal.js';
 import { CraftingFizzleExecutor } from './CraftingFizzleExecutor.js';
 import {
   CraftingLifecycleExecutionError,
@@ -527,21 +532,12 @@ export class CraftingEngine {
    * roll; a refusal throws before any mutation. A progressive slot has no target: it refuses
    * summed roll-under, and a count pool that cannot resolve. */
   _versionedCheckTarget(activeCheck, recipe, actor) {
-    const evaluation = activeCheckEvaluation(activeCheck.config);
-    const progressive = activeCheck.slot === 'progressive';
-    let resolved = { ok: true, target: null, source: null };
-    if (progressive && evaluation.product !== 'count') {
-      const reason = progressiveTargetRefusal(evaluation);
-      if (reason) resolved = { ok: false, reason };
-    } else if (activeCheck.slot) {
-      resolved = this._resolveCheckTarget(activeCheck.config, recipe, actor);
-    }
-    if (!resolved.ok) {
-      if (!(activeCheck.checkUsable || activeCheck.requiresCheck)) {
-        return { evaluation, target: null, source: null };
-      }
+    const decision = resolveActiveCheckTarget(activeCheck, recipe, actor);
+    const { evaluation, progressive, resolved } = decision;
+    if (decision.refuses) {
       throw new CraftingLifecycleExecutionError(refusalMessage(resolved), 'CHECK_TARGET_INVALID');
     }
+    if (!resolved.ok) return { evaluation, target: null, source: null };
     return {
       evaluation,
       target: progressive ? null : resolved.target,
@@ -5608,7 +5604,7 @@ export class CraftingEngine {
     { interactive = false, toolItems = [] } = {}
   ) {
     const checkConfig = config || {};
-    const target = this._resolveCheckTarget(checkConfig, recipe, craftingActor);
+    const target = resolveCraftingCheckTarget(checkConfig, recipe, craftingActor);
     if (!target.ok) return checkTargetRefusal(target.reason, 'Crafting', target);
     const evaluation = activeCheckEvaluation(checkConfig);
     const preparedTools = await this._prepareToolCheckBonuses(
@@ -5675,7 +5671,7 @@ export class CraftingEngine {
     { interactive = false, applyMinSuccessOutcome = true, toolItems = [] } = {}
   ) {
     const routed = system?.craftingCheck?.routed || {};
-    const target = this._resolveCheckTarget(routed, recipe, craftingActor);
+    const target = resolveCraftingCheckTarget(routed, recipe, craftingActor);
     if (!target.ok) return checkTargetRefusal(target.reason, 'Crafting', target);
     const evaluation = activeCheckEvaluation(routed);
     const preparedTools = await this._prepareToolCheckBonuses(
@@ -5962,7 +5958,7 @@ export class CraftingEngine {
     recipe,
     ingredientSet,
     craftingActor,
-    anchor = this._resolveCheckAnchorDc(simple, recipe)
+    anchor = craftingCheckAnchorDc(simple, recipe)
   ) {
     if (simple.dcMode !== 'dynamic') return anchor;
     if (!simple.macroUuid) return anchor;
@@ -5986,37 +5982,6 @@ export class CraftingEngine {
       console.error(`Fabricate | Crafting check DC macro failed (${simple.macroUuid})`, error);
       return anchor;
     }
-  }
-
-  /** The crafting target before any macro: the fixed anchor DC, or the actor's character value
-   * adjusted by the selected recipe tier's adjustment, else the base. A count check validates its
-   * pool and answers its required count instead. */
-  _resolveCheckTarget(config, recipe, actor) {
-    return resolveActivityCheck(config, {
-      anchor: this._resolveCheckAnchorDc(config, recipe),
-      override: selectedCheckTier(config, recipe)?.adjustment,
-      label: selectedCheckTier(config, recipe)?.name ?? '',
-      required: this._resolveCountRequired(config, recipe),
-      readRollData: () => actorRollData(actor),
-    });
-  }
-
-  /** A count check's required count before any macro: the selected recipe tier's non-null
-   * `successes`, else the pool's; the tier's DC is never read. */
-  _resolveCountRequired(config, recipe) {
-    return countRequired(
-      activeCheckEvaluation(config),
-      selectedCheckTier(config, recipe)?.successes
-    );
-  }
-
-  /** The fixed DC before any macro: the selected difficulty tier, else the static default; one
-   * definition for the target adapter and {@link _resolveSimpleCheckDc}'s default anchor. */
-  _resolveCheckAnchorDc(config, recipe) {
-    const fallback = Number.isFinite(Number(config?.dc)) ? Math.trunc(Number(config.dc)) : 15;
-    const tier = selectedCheckTier(config, recipe);
-    const tierDc = Number(tier?.dc);
-    return tier && Number.isFinite(tierDc) ? Math.trunc(tierDc) : fallback;
   }
 
   /**
@@ -7329,14 +7294,6 @@ function promptTargetBasis(config, recipe, actor, target, dc) {
     label: tier?.name ?? '',
     readRollData: () => actorRollData(actor),
   });
-}
-
-/** The recipe's selected difficulty tier on a check config, while it still exists. */
-function selectedCheckTier(config, recipe) {
-  const tierId = recipe?.checkTierId;
-  if (!tierId) return null;
-  const tiers = Array.isArray(config?.tiers) ? config.tiers : [];
-  return tiers.find((entry) => entry.id === tierId) ?? null;
 }
 
 function versionedFailure(message) {

@@ -309,6 +309,7 @@ export const CASES = Object.freeze([
       CRAFTING_SIMPLE,
       /^src\/ui\/presenters\/(?:CraftingListingBuilder|craftingBrowseStatus|summaryProjection)\.js$/,
       /^src\/ui\/svelte\/util\/craftingRecipeStatus\.js$/,
+      /^src\/systems\/craftingCheckRefusal\.js$/,
     ],
   }),
   // The player result box's Target, Pre-rolled and Margin rows for a passed and a failed roll-under.
