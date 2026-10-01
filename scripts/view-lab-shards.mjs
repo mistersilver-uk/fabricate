@@ -33,12 +33,25 @@ function commandPlan([idText, hasUi]) {
   process.stdout.write(JSON.stringify(renderMatrix(cases, hasUi === 'true')));
 }
 
-function commandMerge([idText, shardsDir, outputDir]) {
-  const shardDirs = readdirSync(shardsDir, { withFileTypes: true })
+/**
+ * One folder per shard, or `shardsDir` itself when a lone artifact downloaded without its folder
+ * (download-artifact drops it when the pattern matches one artifact). Refuses both at once.
+ */
+function shardDirectoriesIn(shardsDir) {
+  const subfolders = readdirSync(shardsDir, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => join(shardsDir, entry.name))
     .sort((left, right) => left.localeCompare(right));
-  const manifests = shardDirs.map((dir) => ({
+  if (!existsSync(join(shardsDir, 'manifest.json'))) return subfolders;
+  if (subfolders.length > 0)
+    throw new Error(
+      `${shardsDir} holds both a manifest and shard folders: ${subfolders.join(', ')}`
+    );
+  return [shardsDir];
+}
+
+function commandMerge([idText, shardsDir, outputDir]) {
+  const manifests = shardDirectoriesIn(shardsDir).map((dir) => ({
     dir,
     manifest: JSON.parse(readFileSync(join(dir, 'manifest.json'), 'utf8')),
   }));

@@ -1,5 +1,9 @@
 /** The PR capture's shard plan and merge. */
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 
 import {
@@ -136,4 +140,67 @@ test('an unarmed gate renders no shard, and an armed one numbers its shards from
     Array.from({ length: shardCountFor(cases.length) }, (_, index) => index + 1)
   );
   assert.deepEqual(matrix.flatMap((entry) => entry.ids.split(',')).sort(), cases.map(({ id }) => id));
+});
+
+/** Write one shard's frames and manifest into `dir`, as its artifact downloads. */
+function writeShard(dir, frames, failures = []) {
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'manifest.json'), JSON.stringify(manifest(frames, failures)));
+  for (const id of frames) writeFileSync(join(dir, `${id}.png`), `png of ${id}`);
+}
+
+/** Run the CLI merge of `ids` over a scratch download folder laid out by `layout`. */
+function runMerge(t, ids, layout) {
+  const root = mkdtempSync(join(tmpdir(), 'view-lab-shards-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const shardsDir = join(root, 'shards');
+  const outputDir = join(root, 'apps');
+  mkdirSync(shardsDir);
+  layout(shardsDir);
+  const run = spawnSync(
+    process.execPath,
+    ['scripts/view-lab-shards.mjs', 'merge', ids.join(','), shardsDir, outputDir],
+    { encoding: 'utf8' }
+  );
+  return { run, outputDir };
+}
+
+const mergedFrameSet = (outputDir) => ({
+  files: readdirSync(outputDir).sort((left, right) => left.localeCompare(right)),
+  frames: JSON.parse(readFileSync(join(outputDir, 'manifest.json'), 'utf8')).frames.map(({ id }) => id),
+});
+
+test('the merge reads one folder per shard when several artifacts download', (t) => {
+  const { run, outputDir } = runMerge(t, ['a', 'b', 'c'], (shardsDir) => {
+    writeShard(join(shardsDir, 'view-lab-shard-1'), ['a', 'c']);
+    writeShard(join(shardsDir, 'view-lab-shard-2'), ['b']);
+  });
+  assert.equal(run.status, 0, run.stderr);
+  assert.deepEqual(mergedFrameSet(outputDir), {
+    files: ['a.png', 'b.png', 'c.png', 'manifest.json'],
+    frames: ['a', 'b', 'c'],
+  });
+  assert.equal(readFileSync(join(outputDir, 'b.png'), 'utf8'), 'png of b');
+});
+
+test('the merge reads a lone artifact that downloads straight into the shards folder', (t) => {
+  // download-artifact drops the artifact's own folder when its pattern matches only one.
+  const { run, outputDir } = runMerge(t, ['a', 'b', 'c'], (shardsDir) =>
+    writeShard(shardsDir, ['a', 'b'], ['c'])
+  );
+  assert.equal(run.status, 0, run.stderr);
+  assert.deepEqual(mergedFrameSet(outputDir), {
+    files: ['a.png', 'b.png', 'manifest.json'],
+    frames: ['a', 'b'],
+  });
+  assert.equal(readFileSync(join(outputDir, 'a.png'), 'utf8'), 'png of a');
+});
+
+test('the merge refuses a shards folder that holds both a manifest and shard folders', (t) => {
+  const { run } = runMerge(t, ['a', 'b'], (shardsDir) => {
+    writeShard(shardsDir, ['a']);
+    writeShard(join(shardsDir, 'view-lab-shard-2'), ['b']);
+  });
+  assert.equal(run.status, 1);
+  assert.match(run.stderr, /both a manifest and shard folders/);
 });
