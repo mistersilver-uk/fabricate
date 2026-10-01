@@ -16,6 +16,7 @@ player-journal-routed-bands-under-multiply
 player-journal-roll-line-under
 player-journal-future-stage-under
 player-journal-routed-bands-count
+player-journal-routed-bands-count-unordered
 player-journal-roll-line-count
 player-journal-roll-line-routed-count
 fabricate-journal-blind-run

@@ -376,6 +376,35 @@ export const CASES = Object.freeze([
       /^src\/systems\/runJournalOutcomeBands\.js$/,
     ],
   }),
+  // Issue 2135: tiers authored out of order (Standard 0, Ruined −2, Masterwork +1 from three
+  // needed), so the Botch row sits beside Ruined, the least demanding tier, not at an end.
+  playerCase({
+    id: 'player-journal-routed-bands-count-unordered',
+    label: 'Player Journal — success-counting ladder authored out of order, Botch beside Ruined',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: {
+      tab: 'journal',
+      journalCaseState: 'journal-check-prompt',
+      runeworkCheckMode: 'routed-count-unordered',
+    },
+    steps: [{ selector: '[data-run-id="lab-v1-journal-check-prompt"]' }],
+    expectTab: 'journal',
+    expectSelector:
+      '[data-journal-detail] [data-outcome-ladder]' +
+      ':has([data-outcome-tier="rw-standard"] .manager-chip:text-is("3"))' +
+      ':has([data-outcome-tier="count-botch"] .manager-chip:text-is("<0"))' +
+      ':has([data-outcome-tier="rw-ruined"] .manager-chip:text-is("0–2"))' +
+      ':has([data-outcome-tier="rw-masterwork"] .manager-chip:text-is("4+"))' +
+      ':has([data-outcome-tier="rw-standard"] + [data-outcome-tier="count-botch"]' +
+      ' + [data-outcome-tier="rw-ruined"] + [data-outcome-tier="rw-masterwork"])',
+    kinds: ['player', 'journal'],
+    sourceMatches: [
+      JOURNAL_SOURCES,
+      /^src\/ui\/presenters\/RunJournalBuilder\.js$/,
+      /^src\/systems\/runJournalOutcomeBands\.js$/,
+    ],
+  }),
   // The executed count's roll line on a past stage: its net against the required count it cleared,
   // under a counting check whose header names no DC (issue 2133).
   playerCase({

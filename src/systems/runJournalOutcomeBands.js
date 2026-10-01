@@ -160,7 +160,10 @@ function countBand(outcome, routed, required) {
   const lowest = thresholds.every((value) => value >= threshold);
   const low = lowest ? lowestTierStart(routed, threshold, next) : threshold;
   if (next === null) return `${formatNet(low)}+`;
-  return low === next - 1 ? formatNet(low) : `${formatNet(low)}–${formatNet(next - 1)}`;
+  if (low === next - 1) return formatNet(low);
+  // A negative end reads apart from the dash between them: `−2 – −1`, never `−2–−1`.
+  const dash = low < 0 ? ' – ' : '–';
+  return `${formatNet(low)}${dash}${formatNet(next - 1)}`;
 }
 
 /**

@@ -2356,7 +2356,7 @@ describe('InventoryListingBuilder - a roll-under or character-value salvage targ
     assert.deepEqual(bands(true, { successesOverride: 4 }), [
       ['o3', '9+', null],
       ['o2', '4–8', null],
-      ['o1', '−1–3', null],
+      ['o1', '−1 – 3', null],
       ['count-botch', '<−1', null],
     ]);
     const summed = salvageFor('routed', { routed: { ...routed(false).routed, rollFormula: '1d20', evaluation: undefined } });
