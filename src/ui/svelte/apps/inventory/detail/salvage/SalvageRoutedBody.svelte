@@ -42,7 +42,12 @@
   // A count's net below its Botch row's floor lands on that row, not on the tier it routes to.
   const botchRolled = $derived.by(() => {
     const below = outcomes.find((outcome) => outcome.id === 'count-botch')?.below;
-    return Number.isFinite(below) && Number.isFinite(result?.rollValue) && result.rollValue < below;
+    return (
+      result?.state === 'success' &&
+      Number.isFinite(below) &&
+      Number.isFinite(result?.rollValue) &&
+      result.rollValue < below
+    );
   });
   const isRolled = (outcome) =>
     botchRolled

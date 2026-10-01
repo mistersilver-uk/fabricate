@@ -2252,9 +2252,10 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     assert.ok(marked[0].querySelector('[data-inventory-outcome-your-roll]'));
   });
 
-  // Issue 2137: a count's net below the Botch row's floor marks that row, never the tier it routes to.
+  // Issue 2137: a successful count whose net is below the Botch row's floor marks that row, in
+  // place of the least demanding tier it routed to; a failed salvage marks no row at all.
   it('routed count: a net below the Botch floor marks the Botch row "Your roll"', async () => {
-    const ruined = { id: 'o1', name: 'Ruined', success: false, threshold: null, band: '−4 – 0', results: [] };
+    const ruined = { id: 'o1', name: 'Ruined', success: true, threshold: null, band: '−4 – 0', results: [] };
     const routed = {
       mode: 'routed',
       checkUsable: true,
@@ -2266,20 +2267,22 @@ describe('InventoryView (mounted) — player salvage surface', () => {
         { ...ruined, id: 'count-botch', name: 'Botch', band: '<−4', below: -4 },
       ],
     };
-    const marked = async (rollValue, state = 'failure') => {
+    const marked = async (salvageResult) => {
       harness.remount();
-      const { services } = salvageServices(salvageItem(routed), {
-        salvageResult: { systemId: 'sys', componentId: 'c1', state, message: '', awarded: [],
-          awardedComponentIds: [], outcomeId: 'o1', rollValue },
-      });
+      const { services } = salvageServices(salvageItem(routed), { salvageResult });
       const target = await openSalvage(services);
       return [...target.querySelectorAll('[data-outcome-rolled="true"]')].map(
         (node) => node.dataset.inventorySalvageOutcome
       );
     };
-    assert.deepEqual(await marked(-5), ['count-botch'], 'below the floor');
-    assert.deepEqual(await marked(-4), [], 'a failed Ruined net is not a Botch');
-    assert.deepEqual(await marked(-4, 'success'), ['o1'], 'a net Ruined meets stays on Ruined');
+    const success = (rollValue) => ({ systemId: 'sys', componentId: 'c1', state: 'success',
+      message: '', awarded: [], awardedComponentIds: [], outcomeId: 'o1', rollValue });
+    assert.deepEqual(await marked(success(-5)), ['count-botch'], 'below the floor');
+    assert.deepEqual(await marked(success(-4)), ['o1'], 'a net Ruined meets stays on Ruined');
+    // As the store's `failureSnapshot` builds it: no roll value and no outcome id.
+    const failure = { systemId: 'sys', componentId: 'c1', state: 'failure', message: 'Salvage check failed',
+      check: null, awarded: [] };
+    assert.deepEqual(await marked(failure), [], 'a failed salvage marks no row');
   });
 });
 
