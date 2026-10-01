@@ -9,6 +9,7 @@ import {
   resolveDeterministicExpression,
 } from '../src/systems/checkEvaluation.js';
 import { normalizeCheckAdvantage } from '../src/systems/normalize/checkAdvantage.js';
+import { normalizeCheckEvaluation } from '../src/systems/normalize/checkEvaluation.js';
 import {
   normalizeProgressiveCraftingCheck,
   normalizeRoutedCraftingCheck,
@@ -312,5 +313,28 @@ test('every check sub-object carries the normalized advantage record beside its 
     assert.deepEqual(normalize({}).advantage, DEFAULT_ADVANTAGE, `${name} absent`);
     const again = normalize(normalize({ advantage }));
     assert.deepEqual(again.advantage, expected, `${name} is idempotent`);
+  }
+});
+
+test('the additional-dice resource name is trimmed text kept whatever the toggle or source', () => {
+  const read = (additionalDice) =>
+    normalizeCheckEvaluation({ pool: { additionalDice } }).pool.additionalDice.label;
+  assert.equal(normalizeCheckEvaluation().pool.additionalDice.label, '');
+  assert.equal(read({ label: '  Momentum  ' }), 'Momentum');
+  assert.equal(read({ enabled: false, source: 'macro', label: 'Focus' }), 'Focus');
+  assert.equal(read({ enabled: true, source: 'path', label: 'Focus' }), 'Focus');
+  const blank = ' '.repeat(3);
+  for (const value of [undefined, null, 3, true, ['Momentum'], { name: 'Momentum' }, blank]) {
+    assert.equal(read({ label: value }), '', String(value));
+  }
+  const authored = normalizeCheckEvaluation({ pool: { additionalDice: { label: 'Momentum' } } });
+  for (const normalize of [
+    normalizeSimpleCraftingCheck,
+    normalizeRoutedCraftingCheck,
+    normalizeProgressiveCraftingCheck,
+  ]) {
+    const once = normalize({ evaluation: authored });
+    assert.equal(once.evaluation.pool.additionalDice.label, 'Momentum');
+    assert.deepEqual(normalize(once).evaluation, once.evaluation, 'idempotent');
   }
 });

@@ -84,6 +84,7 @@ const poolSchema = {
     readMacroUuid: (value) => typeof value === 'string',
     spendMacroUuid: (value) => typeof value === 'string',
     max: (value) => integer(value, 1, 20),
+    label: (value) => typeof value === 'string',
   },
 };
 

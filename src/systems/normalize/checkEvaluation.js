@@ -43,6 +43,7 @@ export function normalizeCheckEvaluation(input = {}) {
         readMacroUuid: string(additional.readMacroUuid),
         spendMacroUuid: string(additional.spendMacroUuid),
         max: integerInRange(additional.max, 1, 20, 1),
+        label: string(additional.label).trim(),
       },
     },
   };

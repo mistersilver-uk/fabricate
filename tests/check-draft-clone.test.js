@@ -242,6 +242,26 @@ describe('count data through update, save and reseed (issue 2004)', () => {
   });
 });
 
+describe('the additional-dice resource name (issue 2008)', () => {
+  for (const [name, clone] of [
+    ['cloneRoutedCheck', cloneRoutedCheck],
+    ['cloneSimpleCheck', cloneSimpleCheck],
+    ['cloneProgressiveCheck', cloneProgressiveCheck],
+  ]) {
+    it(`${name} keeps the name through update, save and reseed`, () => {
+      const additionalDice = { enabled: false, source: 'macro', label: ' Momentum ' };
+      const source = { evaluation: { pool: { additionalDice } } };
+      const draft = clone(source);
+      assert.equal(draft.evaluation.pool.additionalDice.label, 'Momentum');
+      draft.evaluation.pool.additionalDice.label = 'Focus';
+      assert.equal(additionalDice.label, ' Momentum ', 'an update leaves the source untouched');
+      assert.equal(clone(draft).evaluation.pool.additionalDice.label, 'Focus');
+      draft.evaluation.pool.additionalDice.label = 7;
+      assert.equal(clone(draft).evaluation.pool.additionalDice.label, '', 'never a non-string');
+    });
+  }
+});
+
 describe('the situational-bonus offer (issue 2005)', () => {
   for (const [name, clone] of [
     ['cloneRoutedCheck', cloneRoutedCheck],

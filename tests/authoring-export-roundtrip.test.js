@@ -58,6 +58,7 @@ function seedFutureCheckFields(fixture) {
             readMacroUuid: 'Macro.read',
             spendMacroUuid: 'Macro.spend',
             max: 4,
+            label: `Resource ${ordinal}`,
           },
         },
       };
@@ -169,8 +170,9 @@ test('round-trip: export → import(keep) → export is deep-equal modulo volati
     { getRecipes: () => [] },
     { componentScopeStore: null, essenceScopeStore: null, toolScopeStore: null }
   )._normalizeSystem(second.system);
-  for (const [key, { advantage }] of authoredEvaluations) {
+  for (const [key, { evaluation, advantage }] of authoredEvaluations) {
     const [checkName, slot] = key.split('.');
+    assert.deepEqual(persisted[checkName][slot].evaluation, evaluation, `${key} persisted`);
     assert.deepEqual(persisted[checkName][slot].advantage, advantage, `${key} persisted`);
   }
 
