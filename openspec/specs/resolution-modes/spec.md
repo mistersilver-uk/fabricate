@@ -442,7 +442,7 @@ The reason names therefore differ by mode for a boolean or plain object, which t
 A target that cannot resolve is a **target refusal**, one of `expression-missing`, `unresolved-path`, `non-finite`, `dice`, `invalid`, `adjustment-invalid`, `progressive-under` and `formula-empty`.
 The refusal is answered before any Fabricate-controlled roll, Tool roll, spend or award, through the misconfigured channel (`success: false, misconfigured: true`) with `data.targetRefusal` set to the reason.
 Its message is a localized sentence naming the activity, such as "Crafting check cannot roll: the character value its target reads was not found.", and never the raw reason code.
-A versioned crafting or gathering descriptor refuses by throwing its lifecycle error with code `CHECK_TARGET_INVALID` and mutates nothing.
+A versioned crafting or gathering descriptor refuses by throwing its lifecycle error with code `CHECK_TARGET_INVALID` and mutates nothing, and the run authority answers it as `roll-unavailable` with the refusal sentence as its message (#2139).
 Only a check that reads a target validates one: a progressive check and a fixed-range routed check read no target, so their target source is inert and never refuses.
 An empty formula under sum/under refuses `formula-empty` rather than grading a total of 0 as a pass.
 

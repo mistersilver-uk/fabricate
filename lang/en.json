@@ -885,7 +885,8 @@
           "Unknown": "Not yet known",
           "Exhausted": "Out of uses",
           "MissingMaterials": "Missing materials",
-          "Discovery": "Undiscovered"
+          "Discovery": "Undiscovered",
+          "CheckUnrollable": "Check can't roll"
         },
         "Blocking": {
           "Locked": "This recipe is locked by your GM.",
@@ -893,6 +894,7 @@
           "Exhausted": "This recipe's source has no uses left.",
           "Discovery": "Discover this recipe to reveal its details.",
           "MissingMaterials": "You're missing some required materials.",
+          "CheckUnrollable": "This recipe's check can't roll for this character, so crafting it will be refused.",
           "AuthorityRefused": "Starting a craft will be refused until this clears."
         },
         "Browser": {

@@ -35,6 +35,11 @@ const STATUS_PRESENTATION = Object.freeze({
     icon: 'fa-solid fa-magnifying-glass',
     labelKey: 'FABRICATE.App.Crafting.Status.Discovery',
   }),
+  [CRAFTING_BROWSE_STATUS.CHECK_UNROLLABLE]: Object.freeze({
+    tone: 'danger',
+    icon: 'fa-solid fa-ban',
+    labelKey: 'FABRICATE.App.Crafting.Status.CheckUnrollable',
+  }),
 });
 
 const FALLBACK_PRESENTATION = STATUS_PRESENTATION[CRAFTING_BROWSE_STATUS.UNKNOWN];

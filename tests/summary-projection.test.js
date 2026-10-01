@@ -740,6 +740,7 @@ describe('browse-status precedence', () => {
     ['knowledge', { reason: 'knowledge' }, CRAFTING_BROWSE_STATUS.UNKNOWN],
     ['exhausted', { exhausted: true }, CRAFTING_BROWSE_STATUS.EXHAUSTED],
     ['short', { materialsAvailable: false }, CRAFTING_BROWSE_STATUS.MISSING_MATERIALS],
+    ['check refused', { checkRefused: true }, CRAFTING_BROWSE_STATUS.CHECK_UNROLLABLE],
     ['ok', { materialsAvailable: true }, CRAFTING_BROWSE_STATUS.AVAILABLE],
     ['not asked', { materialsAvailable: null }, CRAFTING_BROWSE_STATUS.AVAILABLE],
   ];
@@ -758,6 +759,13 @@ describe('browse-status precedence', () => {
     ['knowledge over everything below it', { reason: 'knowledge' }, CRAFTING_BROWSE_STATUS.UNKNOWN],
     ['exhaustion over a material shortfall', {}, CRAFTING_BROWSE_STATUS.EXHAUSTED],
   ];
+
+  it('resolves a material shortfall over a check that cannot roll (issue 2139)', () => {
+    assert.equal(
+      deriveBrowseStatus({ materialsAvailable: false, checkRefused: true }),
+      CRAFTING_BROWSE_STATUS.MISSING_MATERIALS
+    );
+  });
 
   for (const [label, higher, expected] of precedencePairs) {
     it(`resolves ${label} with every lower condition also set`, () => {

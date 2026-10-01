@@ -290,6 +290,27 @@ export const CASES = Object.freeze([
     kinds: ['player', 'crafting'],
     sourceMatches: DESCRIPTOR_SOURCES,
   }),
+  // The listing says the check cannot roll for this character instead of Ready to craft (issue 2139).
+  playerCase({
+    id: 'player-crafting-check-unrollable-status',
+    label: 'Player app — a recipe whose check cannot roll for this character',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', rollPromptState: 'under-unresolved' },
+    steps: [CRAFT_HORSESHOE[0]],
+    position: { width: 1100, height: 760 },
+    expectSelector:
+      '.fabricate-app' +
+      ':has(.crafting-recipe-row[data-recipe-id="sm-r-horseshoe"][data-recipe-status="checkUnrollable"])' +
+      ' [data-recipe-blocking]:has-text("roll for this character")',
+    kinds: ['player', 'crafting'],
+    sourceMatches: [
+      CRAFTING_SHARED,
+      CRAFTING_SIMPLE,
+      /^src\/ui\/presenters\/(?:CraftingListingBuilder|craftingBrowseStatus|summaryProjection)\.js$/,
+      /^src\/ui\/svelte\/util\/craftingRecipeStatus\.js$/,
+    ],
+  }),
   // The player result box's Target, Pre-rolled and Margin rows for a passed and a failed roll-under.
   playerCase({
     id: 'player-crafting-roll-result-under-pass',

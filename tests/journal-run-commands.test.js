@@ -10,7 +10,10 @@ import { GatheringEngine } from '../src/systems/GatheringEngine.js';
 import { RunJournalBuilder } from '../src/ui/presenters/RunJournalBuilder.js';
 import { resolveAlchemySubmissions } from '../src/utils/alchemySubmissions.js';
 import { resolvedComponentsFor } from '../src/systems/scopedEntityReads.js';
-import { promptJournalStageCheck } from '../src/bootstrap/journalOperations.js';
+import {
+  promptJournalStageCheck,
+  withUnrollableCheckRefusal,
+} from '../src/bootstrap/journalOperations.js';
 import { createJournalRunAuthority } from '../src/systems/journalRunAuthority.js';
 import { evaluatePreparedRunCheck } from '../src/systems/checkRoll.js';
 import { installCountDice } from './helpers/countEngineDice.js';
@@ -1395,6 +1398,40 @@ describe('journal run command protocol', () => {
       reason: null,
     });
     assert.equal(posts, 0);
+  });
+
+  it('answers a check refused at describe as roll-unavailable with its sentence (issue 2139)', async () => {
+    const run = { id: 'run-1', lifecycleVersion: 1, runRevision: 3, status: 'waiting' };
+    const message = 'Crafting check cannot roll: the character value its target reads was not found.';
+    const { service } = commandHarness({
+      currentUserId: 'gm',
+      run,
+      operations: {
+        crafting: withUnrollableCheckRefusal({
+          getRun: () => run,
+          describeCheck: async () => {
+            throw Object.assign(new Error(message), { code: 'CHECK_TARGET_INVALID' });
+          },
+          execute: async () => {
+            throw new Error('a refused check must never execute');
+          },
+        }),
+      },
+    });
+    const response = await service.executeJournalRunCommand({
+      actorUuid: 'Actor.a', runType: 'crafting', runId: run.id,
+      expectedRevision: 3, action: 'execute',
+    });
+    assert.deepEqual(response, { success: false, reason: 'roll-unavailable', message });
+  });
+
+  it('keeps any other describe failure an operation failure', async () => {
+    const failing = withUnrollableCheckRefusal({
+      describeCheck: async () => {
+        throw Object.assign(new Error('stale'), { code: 'STALE_RUN_STAGE' });
+      },
+    });
+    await assert.rejects(failing.describeCheck({}), { code: 'STALE_RUN_STAGE' });
   });
 
   it('answers a count check that cannot roll with its refusal sentence, and executes nothing', async () => {

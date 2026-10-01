@@ -32,6 +32,10 @@ const EXPECTED = {
     tone: 'info',
     labelKey: 'FABRICATE.App.Crafting.Status.Discovery',
   },
+  [CRAFTING_BROWSE_STATUS.CHECK_UNROLLABLE]: {
+    tone: 'danger',
+    labelKey: 'FABRICATE.App.Crafting.Status.CheckUnrollable',
+  },
 };
 
 describe('craftingRecipeStatus', () => {

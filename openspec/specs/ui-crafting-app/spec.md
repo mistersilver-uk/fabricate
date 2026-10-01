@@ -126,7 +126,8 @@ and the browse half is the one that scales with the corpus.
   the discriminator salvage carries, and a check target refusal adds `data.targetRefusal`
   naming its reason (`resolution-modes/spec.md` § Check Target Resolution); a timed FINISH
   returns the same shape and leaves the run resumable.
-  The public craft runs the versioned lifecycle, whose descriptor refuses a target by throwing `CHECK_TARGET_INVALID` (`resolution-modes/spec.md` § Check Target Resolution), so there the refusal arrives as `success: false` with the localized refusal sentence as its message and no `misconfigured` flag.
+  The public craft runs the versioned lifecycle, whose descriptor refuses a target by throwing `CHECK_TARGET_INVALID` (`resolution-modes/spec.md` § Check Target Resolution); the run authority answers that refusal as `{ success: false, reason: 'roll-unavailable', message }` with the localized refusal sentence, exactly as it answers a check that cannot roll at evaluation (#2139).
+  The Crafting tab clears the recipe's last result for a `roll-unavailable` refusal as it does for a `misconfigured` one, so no stale result box stands beside the refusal.
   Either way a target refusal answers before the roll prompt opens and posts no chat card and no roll message, and the Crafting tab notifies the refusal sentence.
 - A non-GM crafts directly against owned actors; there is no GM relay for player
   crafting.
@@ -770,7 +771,8 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
 ##### Browse Status
 
 - Each projected recipe carries exactly one `browseStatus` from the vocabulary:
-  `available`, `locked`, `unknown`, `exhausted`, `missingMaterials`, `discovery`.
+  `available`, `locked`, `unknown`, `exhausted`, `missingMaterials`, `discovery`, `checkUnrollable`.
+- `checkUnrollable` states, before the player presses Craft, that the check the recipe's mode rolls would refuse this character before any roll — a target or pool path the character lacks, or another pre-roll target refusal — decided as the versioned descriptor decides it (#2139); it reads "Check can't roll" with its own blocking sentence.
 - `discovery` is the Discovery-Mode redacted state for an undiscovered recipe (a
   player-facing "Undiscovered" badge).
 - `incomplete` is intentionally NOT a player badge: a recipe is either visible
@@ -778,7 +780,8 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
   authoring state.
 - Status precedence (highest first): Discovery-Mode teaser → `discovery`, locked →
   `locked`, unlearned knowledge → `unknown`, recipe-item uses exhausted →
-  `exhausted`, materials missing → `missingMaterials`, otherwise `available`.
+  `exhausted`, materials missing → `missingMaterials`, a check that refuses this character →
+  `checkUnrollable`, otherwise `available`.
 
 ##### Discovery-Mode Redaction
 

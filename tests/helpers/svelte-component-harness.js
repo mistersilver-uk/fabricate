@@ -312,6 +312,8 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/ui/presenters/checkDescriptor.js',
   // Issue 2006: a count card's successes needed, read as the engine reads it.
   'src/systems/countCheck.js',
+  // Issue 2139: whether the check refuses the character, which the browse status reads.
+  'src/systems/craftingCheckRefusal.js',
   'src/ui/presenters/heldToolBonus.js',
   // Same rule, issue 1091: the browse-status vocabulary and its precedence rule moved out of the
   // builder into an import-free leaf so #1091's summary projection can share them without pulling

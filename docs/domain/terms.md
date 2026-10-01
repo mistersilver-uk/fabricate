@@ -1005,7 +1005,7 @@ Spec reference: openspec/specs/ui-crafting-app/spec.md, openspec/specs/recipe-vi
 ## Crafting Browse Status
 
 `discovery` is the Discovery-Mode teaser-redacted state (player copy "Undiscovered"); `incomplete` is deliberately NOT a player status, because an unfinished recipe is either visible-and-projected or filtered out upstream.
-Precedence (highest first): teaser → `discovery`, locked → `locked`, unlearned knowledge → `unknown`, recipe-item uses exhausted → `exhausted`, materials missing → `missingMaterials`, else `available`.
+Precedence (highest first): teaser → `discovery`, locked → `locked`, unlearned knowledge → `unknown`, recipe-item uses exhausted → `exhausted`, materials missing → `missingMaterials`, a check that would refuse the acting character before any roll → `checkUnrollable` (issue 2139), else `available`.
 The `exhausted` status reads `RecipeVisibilityService.isKnowledgeItemExhausted` (item-limited knowledge owned but every matching item capped); owning no matching item is `unknown`, not `exhausted`.
 Since issue 1091 the vocabulary AND the precedence rule live in ONE import-free leaf, `src/ui/presenters/craftingBrowseStatus.js`, so the detail model and the **Summary Projection** the page rows are built from cannot label the same recipe differently; `CraftingListingBuilder` re-exports the vocabulary and delegates the rule.
 `materialsAvailable` is a TRISTATE there — `false` is a material check that ran and came back short, `null`/absent is no check at all, and only `false` yields `missingMaterials` — so a surface holding no inventory (the GM browser projects definitions, not one actor’s view of them) does not paint every row short of materials.

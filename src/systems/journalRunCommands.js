@@ -824,7 +824,7 @@ export function createJournalRunCommandService({
         preparationGrant,
         requestId: request.requestId,
       });
-      if (descriptor?.blocked) return failure(descriptor.blocked);
+      if (descriptor?.blocked) return failure(descriptor.blocked, descriptor.detail);
       if (descriptor?.required) {
         const publicPrompt = await withPreparedAdditionalDiceOffer(descriptor, context);
         const token = helpers.issuePrepareToken(

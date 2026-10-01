@@ -10,6 +10,7 @@ player-crafting-roll-prompt-over-attribute
 player-crafting-roll-prompt-under-compact
 player-crafting-check-descriptor-under-resolved
 player-crafting-check-descriptor-under-unresolved
+player-crafting-check-unrollable-status
 player-crafting-roll-result-under-pass
 player-crafting-roll-result-under-fail
 player-crafting-chat-card-under-public
