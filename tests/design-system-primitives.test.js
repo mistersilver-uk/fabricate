@@ -229,11 +229,10 @@ test('the inputs every property below quantifies over are alive', () => {
   // had crossed the membership bar with nobody adjudicating it.
   // 68 as of issue 2005, which promoted the shared Preview-as picker, the Player sees block and the
   // executed check evidence rows; 70 as of issue 2006, whose result boxes promoted the die tiles;
-  // 71 as of issue 2008, whose additional-dice group extracted the Formula card's option well.
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 71, 'the shipped primitive set changed size');
-  // 16 as of issue 2006, which promoted the die tiles once the result boxes drew them; 17 as of
-  // issue 2008, which built the library's `<Well>` on its first caller.
-  assert.equal(NOT_A_PRIMITIVE.length, 17, 'the recorded non-member set changed size');
+  // 72 as of issue 2008: the Formula card's option well, and the `<Well>` on its second caller.
+  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 72, 'the shipped primitive set changed size');
+  // 16 as of issue 2006's die tiles, and again once issue 2008 promoted the `<Well>` it built.
+  assert.equal(NOT_A_PRIMITIVE.length, 16, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(
     PUBLISHING_CASE_IDS.size > 0,

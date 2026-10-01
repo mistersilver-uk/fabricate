@@ -46,6 +46,8 @@ export const ROLL_PROMPT_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/ManagerModal.svelte',
   'src/ui/svelte/apps/crafting/RollPromptTarget.svelte',
   'src/ui/svelte/components/Stepper.svelte',
+  'src/ui/svelte/components/Kicker.svelte',
+  'src/ui/svelte/components/Well.svelte',
   'src/ui/svelte/apps/crafting/RollPromptAdditionalDice.svelte',
   'src/ui/svelte/apps/crafting/RollPromptFooter.svelte',
   ROLL_PROMPT_PATH,

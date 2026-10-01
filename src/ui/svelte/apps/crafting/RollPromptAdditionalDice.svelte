@@ -1,7 +1,7 @@
 <!--
   The roll prompt's additional-dice control (issue 2008, frame 31): the title, the resource and
-  spend line, the shared `Stepper` at the row's end and the one message beneath, unframed until the
-  shared `<Well>` wraps it. It renders only while the check offers additional dice.
+  spend line, the shared `Stepper` at the row's end and the one message beneath, framed by the
+  shared `<Well>`. It renders only while the check offers additional dice.
 
   Props:
   | prop | values | default | contract |
@@ -14,6 +14,7 @@
 <script>
   import Notice from '../../components/Notice.svelte';
   import Stepper from '../../components/Stepper.svelte';
+  import Well from '../../components/Well.svelte';
 
   let { view, labels, value, limit, onChange = () => {} } = $props();
   const instanceId = $props.id();
@@ -21,44 +22,46 @@
   const messageId = `${instanceId}-message`;
 </script>
 
-<section class="additional-dice" data-roll-prompt-additional-dice-group>
-  <div class="additional-dice-row">
-    <div class="additional-dice-text">
-      <p class="additional-dice-title" data-roll-prompt-additional-dice-title>{labels.title}</p>
-      <p class="additional-dice-line" id={lineId} data-roll-prompt-additional-dice-line>
-        <span data-roll-prompt-additional-dice-resource>{view.resourceLine}</span> ·
-        <span data-roll-prompt-additional-dice-spend>{view.spendLine}</span>
-      </p>
+<Well data-roll-prompt-additional-dice-group="">
+  <div class="additional-dice">
+    <div class="additional-dice-row">
+      <div class="additional-dice-text">
+        <p class="additional-dice-title" data-roll-prompt-additional-dice-title>{labels.title}</p>
+        <p class="additional-dice-line" id={lineId} data-roll-prompt-additional-dice-line>
+          <span data-roll-prompt-additional-dice-resource>{view.resourceLine}</span> ·
+          <span data-roll-prompt-additional-dice-spend>{view.spendLine}</span>
+        </p>
+      </div>
+      <span class="additional-dice-stepper" data-roll-prompt-additional-dice-stepper>
+        <Stepper
+          density="comfortable"
+          min={0}
+          max={limit}
+          {value}
+          disabled={view.disabled}
+          ariaLabel={labels.title}
+          decrementLabel={labels.decrease}
+          incrementLabel={labels.increase}
+          inputProps={{
+            name: 'additionalDice',
+            'data-roll-prompt-additional-dice': '',
+            'aria-describedby': view.message ? `${lineId} ${messageId}` : lineId,
+          }}
+          {onChange}
+        />
+      </span>
     </div>
-    <span class="additional-dice-stepper" data-roll-prompt-additional-dice-stepper>
-      <Stepper
-        density="comfortable"
-        min={0}
-        max={limit}
-        {value}
-        disabled={view.disabled}
-        ariaLabel={labels.title}
-        decrementLabel={labels.decrease}
-        incrementLabel={labels.increase}
-        inputProps={{
-          name: 'additionalDice',
-          'data-roll-prompt-additional-dice': '',
-          'aria-describedby': view.message ? `${lineId} ${messageId}` : lineId,
-        }}
-        {onChange}
-      />
-    </span>
+    {#if view.message}
+      <div id={messageId}>
+        <Notice
+          tone={view.message.tone}
+          title={view.message.text}
+          dataAttr="data-roll-prompt-additional-dice-message"
+        />
+      </div>
+    {/if}
   </div>
-  {#if view.message}
-    <div id={messageId}>
-      <Notice
-        tone={view.message.tone}
-        title={view.message.text}
-        dataAttr="data-roll-prompt-additional-dice-message"
-      />
-    </div>
-  {/if}
-</section>
+</Well>
 
 <style>
   .additional-dice {

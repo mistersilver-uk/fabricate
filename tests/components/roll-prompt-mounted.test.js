@@ -988,6 +988,19 @@ describe('mounted roll prompt', () => {
       );
     });
 
+    it('draws the whole control in the shared well rather than a hand-rolled frame (frames 30-34)', async () => {
+      const { dialog, pending } = await openCount({ additionalDiceOffer: diceOffer(3) });
+      const well = stepperInput(dialog).closest('.fab-well');
+      assert.ok(Boolean(well), 'the stepper sits inside the shared `<Well>`');
+      assert.ok(well.matches('[data-roll-prompt-additional-dice-group]'), 'the well is the group');
+      for (const hook of ['title', 'line', 'message']) {
+        const part = well.querySelector(`[data-roll-prompt-additional-dice-${hook}]`);
+        assert.ok(Boolean(part), `the ${hook} renders inside the well`);
+      }
+      dialog.querySelector('form').requestSubmit();
+      await pending;
+    });
+
     it('steps within the limit, settles the pool line and answers the chosen dice (frames 30-31, AD36)', async () => {
       const { dialog, pending } = await openCount({ additionalDiceOffer: diceOffer(3) });
       const control = controlOf(dialog);
