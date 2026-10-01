@@ -98,6 +98,7 @@ Each ingredient option decides how it is matched against the items a player is c
 
 An essence is a first-class option like any other, so it can sit inside a group as one of several **Accept instead** alternatives.
 For example, a group might accept either 2x Iron Ingot or 3 units of Fire essence, and either one satisfies the group.
+See [Using Essences in Recipes]({% link essences/index.md %}#using-essences-in-recipes) for how the Crafting tab presents an essence alternative chosen this way.
 
 {: .note }
 > Earlier versions attached a separate essence requirement to the whole ingredient set.

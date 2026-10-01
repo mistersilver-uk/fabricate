@@ -401,3 +401,29 @@ test('salvage() retains independent receipt rows while returning one shared Item
     'the merged stack appears once in the results, not duplicated'
   );
 });
+
+test('salvage() regression: two separate operations onto one persistent held item each report their own amount, not the stack total (issue #2145)', async () => {
+  const existing = makeItem('have-scrap', 'Scrap Metal', 5, {
+    roles: { 'sys-1': { componentId: 'recovered' } },
+  });
+  const { engine, actor, system, source } = makeSalvageWorld({
+    existingRecovered: existing,
+    recoverQuantity: 2,
+  });
+
+  const result1 = await engine.salvage(actor.uuid, system.id, source.id);
+  assert.equal(result1.success, true);
+  const recorded1 = result1.salvageRun.createdResults.find((r) => r.componentId === 'recovered');
+  assert.equal(recorded1.quantity, 2, 'first salvage records 2 recovered');
+  assert.equal(existing.system.quantity, 7, 'first salvage: 5 + 2 = 7');
+
+  const result2 = await engine.salvage(actor.uuid, system.id, source.id);
+  assert.equal(result2.success, true);
+  const recorded2 = result2.salvageRun.createdResults.find((r) => r.componentId === 'recovered');
+  assert.equal(
+    recorded2.quantity,
+    2,
+    'second salvage records 2 recovered, not the stack total of 7'
+  );
+  assert.equal(existing.system.quantity, 9, 'second salvage: 7 + 2 = 9');
+});

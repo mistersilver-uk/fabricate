@@ -2,6 +2,7 @@
  * per-group option and stack choices, essence rows and the shared essence pool.
  * Every builder takes the recipe first and reads its system through `deps`, never a manager. */
 
+import { essenceBlockMember, essenceMemberIsFundable } from '../models/ingredientEssenceBlock.js';
 import { getMatchHandler } from '../models/match/matchTypes.js';
 import { findMatchingComponent } from '../utils/essenceResolver.js';
 
@@ -209,7 +210,7 @@ function buildCurrencyIngredientState(recipe, deps, option, context, { isMissing
  * `delivered` beside `owned`, never the component/tag `have`, which is not net of plan (917). */
 function buildEssenceIngredientState(recipe, deps, group, option, selection, context) {
   const { requirement, isMissing, missingEntry, availableItems, ...base } = context;
-  const need = Math.max(0, Number(option?.match?.amount) || 0);
+  const { need } = essenceBlockMember(group, option);
   // A selection with no pool at all (a duck-typed set that never resolved one) falls
   // back to the missing-group verdict rather than silently reading satisfied.
   const delivered = requirement
@@ -346,7 +347,7 @@ function buildOptionChoice(
   const matchingItems = availableItems.filter((item) => deps.matchesItem(recipe, option, item));
   const have = matchingItems.reduce((sum, item) => sum + readStackQuantity(item), 0);
   const need = Number(option?.quantity || 1);
-  const choice = {
+  return {
     optionIndex,
     name: visual.name || resolveIngredientDescription(recipe, deps, option),
     img: visual.img,
@@ -357,12 +358,45 @@ function buildOptionChoice(
     costLabel: '',
     affordable: true,
   };
-  if (visual.isEssence === true) {
-    choice.isEssence = true;
-    choice.icon = visual.icon ?? null;
-    choice.colorToken = visual.colorToken ?? null;
+}
+
+/** One essence alternative's card: `have` is what the held stacks carry for its essence before
+ * any group claims, `need` its authored amount, and `satisfied` the resolver's own fundability
+ * predicate. Fundable is not funded: the slot reports what the allocation delivers. */
+function buildEssenceOptionChoice(recipe, deps, group, option, optionIndex, context) {
+  const visual = resolveIngredientVisual(recipe, deps, option, context.availableItems);
+  const member = essenceBlockMember(group, option);
+  return {
+    optionIndex,
+    name: visual.name || resolveIngredientDescription(recipe, deps, option),
+    img: visual.img,
+    need: member.need,
+    have: Number(context.essenceCeiling.get(member.essenceId)) || 0,
+    satisfied: essenceMemberIsFundable(member, { ceiling: context.essenceCeiling }),
+    isCurrency: false,
+    costLabel: '',
+    affordable: true,
+    isEssence: true,
+    icon: visual.icon ?? null,
+    colorToken: visual.colorToken ?? null,
+  };
+}
+
+/** One alternative's card, dispatched on its kind: an essence alternative is amount-based. */
+function buildGroupOptionChoice(recipe, deps, group, option, optionIndex, context) {
+  if (option?.match?.type === 'essence') {
+    return buildEssenceOptionChoice(recipe, deps, group, option, optionIndex, context);
   }
-  return choice;
+  const { availableItems, affordCurrency, currencyUnits } = context;
+  return buildOptionChoice(
+    recipe,
+    deps,
+    option,
+    optionIndex,
+    availableItems,
+    affordCurrency,
+    currencyUnits
+  );
 }
 
 /** The distinct held stacks a tag option matches, or `[]` when the option is not a tag option
@@ -397,6 +431,8 @@ export function buildIngredientChoices(
   if (groups.length === 0) return [];
 
   const chosenByGroup = chosenOptionByGroup(ingredientSet, selection);
+  const essenceCeiling = new Map(Object.entries(selection?.essenceCeiling ?? {}));
+  const optionContext = { availableItems, affordCurrency, currencyUnits, essenceCeiling };
   const choices = [];
 
   for (const group of groups) {
@@ -416,15 +452,7 @@ export function buildIngredientChoices(
         groupName,
         selectedOptionIndex,
         options: options.map((option, idx) =>
-          buildOptionChoice(
-            recipe,
-            deps,
-            option,
-            idx,
-            availableItems,
-            affordCurrency,
-            currencyUnits
-          )
+          buildGroupOptionChoice(recipe, deps, group, option, idx, optionContext)
         ),
       });
     }
