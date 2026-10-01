@@ -259,6 +259,8 @@ A slot of `null` — a mode that rolls NO check, which is alchemy `none` and gat
 The evaluator REFUSES a mode outside its own vocabulary rather than defaulting to `simple`, since a default is what made the mismatch silent.
 
 A Validation group with no ticks and no issues states "No issues detected." rather than rendering a heading over nothing; the group is never dropped, because absence reads as "this subsystem was not evaluated".
+Each Validation group lists every issue before the passes — blocking, then warning, then pass — through the shared surface's `issuesFirst` order, whose default lifts only blocking rows and leaves every other editor's authored order alone.
+With warnings and no blocking issue on a saved draft, the hero reads "Enabled with warnings" over "Saves and enables — review the warnings when you can.", the shared `FABRICATE.Admin.Manager.Validation.*` verdict the recipe and environment editors also render, and a transient warning never moves it.
 
 A `Save checks` that does not land BLOCKS the route exit it was raised for, matching the shipped essence and system-details guards: every dirty activity is still attempted, the answer is the conjunction, and a failed activity keeps its draft dirty.
 

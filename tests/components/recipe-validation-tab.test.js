@@ -419,6 +419,27 @@ describe('EditorValidationSurface row action (mounted)', () => {
     surfaceHarness.remount();
   });
 
+  it('lists every issue before the passes when a site asks for issues first (issue 2130)', async () => {
+    const target = await surfaceHarness.mount({
+      issuesFirst: true,
+      groups: [
+        groupOf('checks', [
+          { id: 'passA', status: 'pass', title: 'A' },
+          { id: 'warnB', status: 'warn', title: 'B' },
+          { id: 'blockC', status: 'block', title: 'C' },
+          { id: 'passE', status: 'pass', title: 'E' },
+          { id: 'warnF', status: 'warn', title: 'F' }
+        ])
+      ]
+    });
+    assert.deepEqual(
+      rowIds(target),
+      ['blockC', 'warnB', 'warnF', 'passA', 'passE'],
+      'blocking, then warning, then pass, each rank keeping the order the site authored'
+    );
+    surfaceHarness.remount();
+  });
+
   it('renders the row action for either half of the contract, and for neither half not at all', async () => {
     const target = await surfaceHarness.mount({
       viewDataAttr: 'data-validation-view',

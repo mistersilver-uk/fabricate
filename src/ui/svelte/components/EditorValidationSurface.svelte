@@ -10,7 +10,8 @@
   | `title` / `intro` | strings | `'Validation'` / `''` | The tab heading and its explanation; passing neither renders no head block. |
   | `summary` | `{ status, icon, title, sub }` | `{}` | `status` is the site's own domain word and reaches the DOM verbatim on the site's summary hook; the CLASS it resolves to is one of this surface's three, through `SUMMARY_STATUS_ALIASES`. |
   | `counts` / `countLabels` | `{ passing, warnings, blocking }` | zeros / localized | A site draws the tiles it REPORTS: the rail renders `COUNT_ORDER` filtered to the keys present in `counts`. |
-  | `groups` | `{ id, icon, label, rows, dataAttrs? }[]`, each row `{ id, status, title, detail?, target?, focusTarget?, recordId?, viewLabel?, action?, dataAttrs? }` | `[]` | ROWS ARE RE-ORDERED — blocking first, within each group — so an authored sequence is a tiebreak rather than a guarantee. THE ROW ACTION IS A TWO-FIELD CONTRACT: `target` is the ROUTE, opaque here, and beside it ONE ADDRESS the row names for what it holds — `focusTarget`, the `data-validation-target` value the offending CONTROL carries, or `recordId`, a RECORD the route selects. Two names for one argument is the point: the producer says which kind it emitted. `target` could not simply become the control id — for one host it is a TAB id consumed by a whitelist and for another an `{ activity, section }` object. |
+  | `groups` | `{ id, icon, label, rows, dataAttrs? }[]`, each row `{ id, status, title, detail?, target?, focusTarget?, recordId?, viewLabel?, action?, dataAttrs? }` | `[]` | ROWS ARE RE-ORDERED — blocking first, within each group, or every issue before the passes under `issuesFirst` — so an authored sequence is a tiebreak rather than a guarantee. THE ROW ACTION IS A TWO-FIELD CONTRACT: `target` is the ROUTE, opaque here, and beside it ONE ADDRESS the row names for what it holds — `focusTarget`, the `data-validation-target` value the offending CONTROL carries, or `recordId`, a RECORD the route selects. Two names for one argument is the point: the producer says which kind it emitted. `target` could not simply become the control id — for one host it is a TAB id consumed by a whitelist and for another an `{ activity, section }` object. |
+  | `issuesFirst` | boolean | `false` | Ranks warnings above passes too; off, only blocking rows rise and the rest keep the site's order. |
   | `row.action` | `{ labelKey, descriptionKey?, onAction }` | absent | A row's OWN verb, drawn by the same button IN PLACE OF View: `labelKey` is its visible verb and composes the accessible name as View's does, `descriptionKey` its accessible description, and `onAction()` runs instead of `onSelectIssue`. The button carries `data-validation-row-action`. |
   | `statusLabels` / `rowDataAttr` / `viewDataAttr` | `{ pass, warn, block }` / attribute names | localized / `''` | The per-status pill word, one attribute carrying the row id on every row, and the same idea for the View button carrying the row's ROUTE. |
   | `viewLabel` | localization KEY | `FABRICATE.Admin.Manager.Validation.View` | The View button's visible verb; a row may override it with `row.viewLabel`, also a key, because one caller draws two different verbs down one list. |
@@ -60,6 +61,7 @@
     viewLabel = 'FABRICATE.Admin.Manager.Validation.View',
     hookAttrs = {},
     countAttrs = {},
+    issuesFirst = false,
     class: extraClass = '',
     onSelectIssue = () => {},
   } = $props();
@@ -114,7 +116,8 @@
       .map((entry) => entry.row);
 
   function rowRank(row) {
-    return row?.status === 'block' ? 0 : 1;
+    if (row?.status === 'block') return 0;
+    return issuesFirst && row?.status !== 'pass' ? 1 : 2;
   }
 
   function rowAddress(row) {
