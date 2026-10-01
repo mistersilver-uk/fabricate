@@ -244,6 +244,7 @@ That requires the studio's own workspace to restack there too, and a container q
 The workspace's column track is therefore set through a custom property the base rule reads and never declares, which cannot tie whichever order the two are read in; a source-text assertion cannot tell a dead rule from a live one, so this is pinned by measuring the rendered grid at the floor.
 
 The Validation route renders the documentation pair and the "All checks" summary ONLY — no activation toggle, no Preview-as, no simulator, no histogram, no This-check digest — and renders no section strip.
+The "All checks" summary's second line names the authored mode and what the check rolls — for a counting check its pool, comparison, threshold and face clauses as the Formula card's inset reads them, never its retained formula.
 Validation renders through the shared `EditorValidationSurface`, selecting an issue deep-links to the owning activity AND section, and the issue-id to section map is proven exhaustive against the frozen `CHECK_READINESS_ISSUE_IDS` registry `evaluateCheckReadiness` pushes from — never a hand-copied list.
 A deep link is an EVENT with its own identity, not a standing instruction: the route carries a request nonce the section strip latches on, so the same section requested twice is two requests and the second still lands.
 Latching on the section VALUE strands the repeat — leave the requested section, ask for it again, and the request equals the latch and is swallowed — and not latching at all drags the strip back to the standing request the instant the GM clicks anything else.
@@ -261,6 +262,7 @@ The evaluator REFUSES a mode outside its own vocabulary rather than defaulting t
 A Validation group with no ticks and no issues states "No issues detected." rather than rendering a heading over nothing; the group is never dropped, because absence reads as "this subsystem was not evaluated".
 Each Validation group lists every issue before the passes — blocking, then warning, then pass — through the shared surface's `issuesFirst` order, whose default lifts only blocking rows and leaves every other editor's authored order alone.
 With warnings and no blocking issue on a saved draft, the hero reads "Enabled with warnings" over "Saves and enables — review the warnings when you can.", the shared `FABRICATE.Admin.Manager.Validation.*` verdict the recipe and environment editors also render, and a transient warning never moves it.
+A blocking issue reads "Blocked from enabling", and an unsaved draft with none reads "No blocking issues, but not saved yet" rather than calling warnings clean.
 
 A `Save checks` that does not land BLOCKS the route exit it was raised for, matching the shipped essence and system-details guards: every dirty activity is still attempted, the answer is the conjunction, and a failed activity keeps its draft dirty.
 

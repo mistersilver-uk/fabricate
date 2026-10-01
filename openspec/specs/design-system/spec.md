@@ -1576,6 +1576,7 @@ Every editor’s validation surface MUST use one arrangement: a verdict stating 
 It is a full-width screen with no inspector rail, because the issues are the content.
 The manager's shell selects full width per VIEW rather than per tab, so an editor whose validation is a tab either becomes a full-width view or states why it keeps its third column; two shipped editors repurpose that column rather than reserving it for an inspector.
 A passing group still renders, so a GM sees what was checked rather than inferring it from silence, and blocking issues sort above warnings inside a group.
+A site MAY pass `issuesFirst` to lift warnings above passes as well, so every issue precedes every pass; the Checks validation route does, after the GM Checks Studio prototype's Validation frames.
 Each issue offers an action that moves focus to the offending control.
 
 - the action has ONE implementation, `src/ui/svelte/apps/manager/validationFocus.js`;
