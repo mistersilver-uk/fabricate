@@ -1,6 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import { withRollPromptOrigin } from '../crafting/rollPromptOrigin.js';
   import { journalRunReasonMessage } from '../../util/journalRunReasons.js';
   import RunActionBar from '../../components/RunActionBar.svelte';
   import { formatDurationHMS } from '../../util/formatDuration.js';
@@ -151,7 +152,7 @@
       keepLabel: localize('FABRICATE.App.Journal.Actions.CancelKeep'),
     }}
     {completion}
-    onPrimary={() => journal?.execute?.(run)}
+    onPrimary={(event) => withRollPromptOrigin(event, () => journal?.execute?.(run))}
     onBegin={() => journal?.beginStep?.(run)}
     onPause={() => journal?.pause?.(run)}
     onResume={() => journal?.resume?.(run)}

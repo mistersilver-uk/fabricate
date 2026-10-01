@@ -7,13 +7,18 @@ import {
   STANDALONE_OVERLAY_HOST_CLASS,
 } from '../../util/overlayHost.js';
 
+import { activeRollPromptOrigin } from './rollPromptOrigin.js';
+
 /**
- * The Fabricate root a player started the roll from: the one holding focus or, when focus is
- * nowhere because the clicked button disabled itself, the one under the pointer. Anything else,
- * such as a companion or macro call, returns `null` and takes the standalone layer. A minimized
- * window never hosts, and of nested roots the innermost wins.
+ * The Fabricate root a player started the roll from: the origin its call site recorded, else the
+ * root holding focus or, when focus is nowhere, the one under the pointer. Anything else, such as
+ * a companion or macro call, returns `null` and takes the standalone layer. A minimized window
+ * never hosts, and of nested roots the innermost wins.
  */
-export function findApplicationHost(doc) {
+export function findApplicationHost(doc, origin = activeRollPromptOrigin()) {
+  if (origin?.isConnected && origin.ownerDocument === doc && !origin.closest('.minimized')) {
+    return origin;
+  }
   const active = doc.activeElement;
   const focusNowhere = !active || active === doc.body || active === doc.documentElement;
   const started = (root) => (focusNowhere ? root.matches(':hover') : root.contains(active));

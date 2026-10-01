@@ -543,7 +543,7 @@
             data-inventory-bulk-salvage
             disabled={busy || salvageable.length === 0}
             aria-busy={running === true}
-            onclick={() => onSalvage?.()}
+            onclick={(event) => onSalvage?.(event)}
           >
             <i
               class="fas"

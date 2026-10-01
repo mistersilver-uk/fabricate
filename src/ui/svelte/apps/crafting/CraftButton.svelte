@@ -8,6 +8,7 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import { withRollPromptOrigin } from './rollPromptOrigin.js';
 
   let {
     label = '',
@@ -35,7 +36,7 @@
   disabled={blocked}
   title={accessibleLabel}
   aria-label={accessibleLabel}
-  onclick={() => onCraft?.()}
+  onclick={(event) => withRollPromptOrigin(event, () => onCraft?.())}
 >
   {#if busy}
     <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>

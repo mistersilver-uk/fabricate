@@ -228,7 +228,8 @@ This is the PR #497 per-call-flag decision, consumed uniformly by the crafting s
 
 - **One modal, one header.**
 The prompt renders in Fabricate's shared modal chrome (`ManagerModal`), never in a Foundry dialog, so it has one header: the activity check as its title and the actor and subject beneath it.
-It mounts over the Fabricate window the player started the roll from, unless that window is minimized: the window holding focus or, when the clicked button disabled itself and focus is nowhere, the window under the pointer.
+It mounts over the Fabricate window the player started the roll from, unless that window is minimized, whatever the input device: the control that starts a roll records its own window for as long as the roll it started runs.
+Only when no control recorded one does it fall back to the window holding focus or, when focus is nowhere, the window under the pointer.
 Any other call, such as a companion or macro, mounts it on a themed standalone layer on the page that stays frontmost and that closing removes.
 When the window hosting it closes, the prompt answers with the not-confirmed shape and unmounts.
 It is 500px wide within the viewport, and when crowded only its body scrolls while the footer stays visible.

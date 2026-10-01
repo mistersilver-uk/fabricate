@@ -9,6 +9,7 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import { withRollPromptOrigin } from '../crafting/rollPromptOrigin.js';
   import KnownRecipesColumn from './KnownRecipesColumn.svelte';
   import Workbench from './Workbench.svelte';
   import ComponentInventoryColumn from './ComponentInventoryColumn.svelte';
@@ -126,7 +127,7 @@
             onAdd={(id) => store?.add(id)}
             onRemoveOne={(id) => store?.removeOne(id)}
             onRemoveAll={(id) => store?.removeAll(id)}
-            onBrew={() => store?.brew()}
+            onBrew={(event) => withRollPromptOrigin(event, () => store?.brew())}
             onDrop={(id) => store?.add(id)}
           />
         </section>

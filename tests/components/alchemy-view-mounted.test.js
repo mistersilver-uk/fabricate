@@ -15,7 +15,11 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-alchemy-view-',
-  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
+  rawModules: [
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
+    'src/ui/svelte/apps/crafting/rollPromptOrigin.js',
+    'src/ui/svelte/util/overlayHost.js',
+  ],
   compiledModules: [
     // The shared not-yet-ready chrome, the standing statement the workbench composes.
     ...PLAYER_APP_COMPILED_MODULES,

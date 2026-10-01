@@ -24,6 +24,7 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-run-detail-',
   rawModules: [
+    'src/ui/svelte/apps/crafting/rollPromptOrigin.js',
     // Issue 1504/1506: the raw closure the shared `<Select>` reaches through
     // `SearchablePopover`, which the compiled `<Chip>` closure below arrives with.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
