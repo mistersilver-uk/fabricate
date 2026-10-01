@@ -540,7 +540,7 @@ function countOptions({
   return {
     ...rollOptions,
     evaluation,
-    thresholdMode,
+    thresholdMode: thresholdMode ?? rollOptions?.thresholdMode,
     craftingModifier,
     dc: null,
     required: required ?? null,

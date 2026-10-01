@@ -90,6 +90,7 @@ export function cloneProgressiveCheck(progressive) {
     awardMode: ['partial', 'equal', 'exceed'].includes(source.awardMode)
       ? source.awardMode
       : 'equal',
+    thresholdMode: source.thresholdMode === 'exceed' ? 'exceed' : 'meet',
     rollFormula: typeof source.rollFormula === 'string' ? source.rollFormula : '',
     checkBreakage: cloneCheckBreakage(source.checkBreakage),
     evaluation: normalizeCheckEvaluation(source.evaluation),

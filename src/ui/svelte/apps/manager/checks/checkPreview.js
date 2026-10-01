@@ -221,9 +221,12 @@ export function buildPreviewCheckArgs({
   };
   const plan = { kind, formula, dc, dynamicDc, actor, evaluation, target };
 
-  if (kind === 'progressive') return { ...plan, args: shared };
-
   const thresholdMode = draft?.thresholdMode === 'exceed' ? 'exceed' : 'meet';
+  // A summed progressive check has no comparison; a counting one tests each die by it.
+  if (kind === 'progressive') {
+    return { ...plan, args: count ? { ...shared, thresholdMode } : shared };
+  }
+
   if (kind === 'routed') {
     return {
       ...plan,

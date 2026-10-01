@@ -144,6 +144,7 @@ describe('cloneProgressiveCheck', () => {
     const draft = cloneProgressiveCheck({ awardMode: 'sideways' });
     assert.deepEqual(draft, {
       awardMode: 'equal',
+      thresholdMode: 'meet',
       rollFormula: '',
       checkBreakage: EMPTY_BREAKAGE,
       evaluation: DEFAULT_EVALUATION,
@@ -160,6 +161,11 @@ describe('cloneProgressiveCheck', () => {
     });
     assert.equal(draft.awardMode, 'exceed');
     assert.deepEqual(draft.preview, { difficulties: [5, 2, 9] });
+  });
+
+  it('carries the per-die comparison a counting check reads (issue 2067)', () => {
+    assert.equal(cloneProgressiveCheck({ thresholdMode: 'exceed' }).thresholdMode, 'exceed');
+    assert.equal(cloneProgressiveCheck({ thresholdMode: 'sideways' }).thresholdMode, 'meet');
   });
 });
 

@@ -111,6 +111,7 @@ CraftingSystem = {
     routed: RoutedCheck,               // { type, rollFormula, evaluation, advantage, dc, thresholdMode, dcMode, macroUuid, tiers, relativeOutcomes, fixedOutcomes, checkBreakage }
     progressive: {
       awardMode: "partial" | "equal" | "exceed",
+      thresholdMode: "meet" | "exceed", // default "meet"; read only as a count evaluation's per-die test
       rollFormula: string,             // default ""; total drives progressive awarding
       evaluation: CheckEvaluation,
       advantage: CheckAdvantage,
@@ -137,6 +138,7 @@ CraftingSystem = {
     enabled: boolean,                  // default false
     progressive: {
       awardMode: "partial" | "equal" | "exceed",
+      thresholdMode: "meet" | "exceed", // default "meet"; read only as a count evaluation's per-die test
       rollFormula: string,
       evaluation: CheckEvaluation,
       advantage: CheckAdvantage,
@@ -196,6 +198,7 @@ CraftingSystem = {
     routed: RoutedCheck,
     progressive: {
       awardMode: "partial" | "equal" | "exceed",
+      thresholdMode: "meet" | "exceed", // default "meet"; read only as a count evaluation's per-die test
       rollFormula: string,         // default ""; total drives progressive awarding
       evaluation: CheckEvaluation,
       advantage: CheckAdvantage,
@@ -443,6 +446,7 @@ CraftingSystem = {
 ### Check evaluation record
 
 Each of the eight normalized check subobjects — crafting and salvage `simple`, `routed` and `progressive`, and gathering `routed` and `progressive` — MUST carry `evaluation` with `product: "sum" | "count"` and `direction: "over" | "under"`, defaulting to `sum/over`.
+Every `progressive` subobject also carries `thresholdMode: "meet" | "exceed"`, defaulting to `meet` and read only as a `count` evaluation's per-die test (#2067); the Checks Studio draft and schema-6 export/import preserve it.
 Its `target` contains `source: "fixed" | "attribute"`, `expression`, `adjustmentKind: "add" | "multiply"` and nullable `baseAdjustment`.
 Its `pool` contains integer `die` (at least 2), string `base` and `threshold` expressions, integer `required` (0–20), `modifierDestination: "pool" | "threshold"`, `zeroPoolFails`, `explode` and `cancel` face configurations, and `additionalDice` enabled/source/path/read-macro/spend-macro/max/label fields.
 The normalized defaults are an empty fixed target expression, additive adjustment, d10, base `"2"`, threshold `"8"`, required 1, pool destination, zero-pool failure on, and explode, cancel and additional dice off with additional maximum 1 and an empty resource name.

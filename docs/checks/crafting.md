@@ -500,6 +500,7 @@ A character value can also be arithmetic on more than one value, for example `@a
 **Success on** sets the threshold each die is tested against, with the same **Number** / **Character value** choice **Base pool** offers.
 Beside it, a per-die test reads **At or above** or **Above** on a check set to **Higher is better**, and **At or under** or **Under** on one set to **Lower is better**, matching [Which way is better]({% link checks/index.md %}#which-way-is-better) exactly.
 This is the only place that comparison is edited for a counting check: the Difficulty card's own comparison control does not apply here, because there is no single roll total left to compare.
+A progressive counting check offers the same per-die test, so switching a check to progressive never changes which dice count.
 
 ### Explode and cancel
 

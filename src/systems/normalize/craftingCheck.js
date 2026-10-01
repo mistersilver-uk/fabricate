@@ -108,9 +108,9 @@ export function normalizeSimpleCraftingCheck(simple = {}) {
 }
 
 // Progressive crafting check: a roll formula whose total is the value progressive awarding
-// spends against result difficulties — no DC, no comparison, no recipe tiers. This allowlist
-// literal is SHARED by the crafting, salvage and gathering checks, so a key omitted here is
-// dropped from all three on every normalize.
+// spends against result difficulties — no DC and no recipe tiers; `thresholdMode` is read only as
+// a counting check's per-die test (issue 2067). This allowlist literal is SHARED by the crafting,
+// salvage and gathering checks, so a key omitted here is dropped from all three on every normalize.
 export function normalizeProgressiveCraftingCheck(progressive = {}) {
   const source = !progressive || typeof progressive !== 'object' ? {} : progressive;
   const rollFormula = typeof source.rollFormula === 'string' ? source.rollFormula : '';
@@ -123,6 +123,7 @@ export function normalizeProgressiveCraftingCheck(progressive = {}) {
     awardMode: ['partial', 'equal', 'exceed'].includes(source.awardMode)
       ? source.awardMode
       : 'equal',
+    thresholdMode: source.thresholdMode === 'exceed' ? 'exceed' : 'meet',
     rollFormula,
     evaluation: normalizeCheckEvaluation(source.evaluation),
     offerSituationalBonus: normalizeSituationalBonusOffer(source.offerSituationalBonus),

@@ -2175,14 +2175,18 @@ export const CASES = Object.freeze([
   }),
   authoringCase({
     id: 'manager-checks-v3-count-progressive',
-    label: 'a progressive pool with no difficulty card',
+    label: 'a progressive pool testing each die by exceed, with no difficulty card',
     frame: '09',
     state: 'dice-pool-extended',
-    steps: [{ selector: '[data-check-count-fields]', scroll: true }],
+    // A progressive pool has the same per-die test as every other slot (issue 2067).
+    steps: [
+      { selector: '[data-check-count-test-option="exceed"]' },
+      { selector: '[data-check-count-fields]', scroll: true },
+    ],
     expectSelector:
       COUNTING +
       ':not(:has([data-check-difficulty-card]))' +
-      ':not(:has([data-check-count-test]))' +
+      ':has([data-check-count-test-option="exceed"].is-active)' +
       ' [data-check-count-fields]',
   }),
   authoringCase({

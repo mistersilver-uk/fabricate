@@ -561,6 +561,33 @@ test('gathering legacy progressive executes count: a refusal before any roll, el
   assert.equal(control.actor.items.length, 1, 'a budget of one awards the difficulty-1 herb');
 });
 
+test('every progressive site forwards the slot comparison to the count runner (issue 2067)', async () => {
+  const exceed = (evaluation) => ({ ...progressiveCheck(evaluation), thresholdMode: 'exceed' });
+  const craft = async (config) => {
+    const world = craftingWorld({ resolutionMode: 'progressive', slot: 'progressive', config });
+    const checks = recordChecks(world.engine);
+    await withDice([1, 8, 8, 9], () => world.craft());
+    return checks[0].value;
+  };
+  assert.deepEqual([await craft(progressiveCheck(countEvaluation())), await craft(exceed(countEvaluation()))], [3, 1]);
+
+  const engine = Object.create(CraftingEngine.prototype);
+  const salvage = (config) =>
+    withDice([1, 8, 8, 9], () =>
+      engine._runSalvageProgressiveCheck(config, { name: 'Scrap', salvage: {} }, { system: {} }, {
+        toolItems: SALVAGE_TOOL_ITEMS,
+      })
+    );
+  assert.deepEqual(
+    [(await salvage(progressiveCheck(countEvaluation()))).value, (await salvage(exceed(countEvaluation()))).value],
+    [3, 1]
+  );
+
+  const gather = async (config) =>
+    (await gatheringAttempt('progressive', config, { faces: [8, 3] })).actor.items.length;
+  assert.deepEqual([await gather(progressiveCheck(countEvaluation())), await gather(exceed(countEvaluation()))], [1, 0]);
+});
+
 test('gathering legacy progressive: a pool above 999 dice refuses at settlement, never a failed attempt', async () => {
   const refused = await gatheringAttempt('progressive', progressiveCheck(countEvaluation({ base: '1000' })));
   assert.equal(refused.response.accepted, false);
@@ -1082,8 +1109,8 @@ test('the interactive count prompt reads the pre-modifier pool and each runner\'
   assert.deepEqual(prompted.map(fields), [
     { ...expected, required: 2 },
     { ...expected, required: 4 },
-    // The progressive runner takes no threshold mode, so it compares as it rolls: met.
-    { ...expected, comparison: 'meet', required: null },
+    // The progressive runner honours the per-die test too (issue 2067).
+    { ...expected, required: null },
   ], 'the pool 3.6 is handed unfloored for the prompt to floor after its benefits, and a progressive check needs no count');
   for (const input of prompted) {
     assert.deepEqual([input.dc, input.target, input.formula, input.allowAdvantage], [null, null, '', true]);
@@ -1250,6 +1277,16 @@ test('a zero pool keeps the evidence of a modifier it already rolled', async () 
   assert.deepEqual(result.data.preRolls, [
     { source: 'situational', label: '', expression: '1d4', total: 3, destination: 'threshold' },
   ]);
+});
+
+test('a count progressive check qualifies each die by its comparison, as simple and routed do (issue 2067)', async () => {
+  const evaluation = normalized({ base: '3', threshold: '8' });
+  const progressive = (thresholdMode) =>
+    withDice([8, 8, 9], () =>
+      runFormulaProgressive({ formula: '', triggers: [], actor: ACTOR, evaluation, thresholdMode })
+    );
+  assert.equal((await progressive(undefined)).value, 3, 'meet by default: 8, 8 and 9 qualify');
+  assert.equal((await progressive('exceed')).value, 1, 'exceed: only the 9 beats 8');
 });
 
 test('progressive spends max(0, net): progressiveValue reads the budget, rollTotal the raw botch', async () => {

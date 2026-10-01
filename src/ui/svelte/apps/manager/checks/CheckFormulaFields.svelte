@@ -55,7 +55,7 @@
     // character expression); a check with no target passes none. `underNote` is false where the
     // runtime refuses a roll-under check, so the note does not describe a roll that never happens.
     evaluation = null,
-    // Null where the slot has no comparison (progressive), so a counting pool offers no per-die test.
+    // Null where the check has no comparison (a summed progressive check).
     thresholdMode = null,
     targetChip = '',
     underNote = true,

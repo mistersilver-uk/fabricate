@@ -834,7 +834,8 @@ export async function runFormulaPassFail({
 /**
  * A progressive check: the total becomes the `value` progressive awarding spends, and the
  * activity always proceeds unless the roll itself throws or the prompt is cancelled. A forced
- * success awards everything (`MAX_SAFE_INTEGER`), a forced failure nothing.
+ * success awards everything (`MAX_SAFE_INTEGER`), a forced failure nothing. `thresholdMode` is
+ * read only as a counting check's per-die test, else the slot's own from `rollOptions`.
  */
 export async function runFormulaProgressive({
   formula: rawFormula,
@@ -843,18 +844,13 @@ export async function runFormulaProgressive({
   label = 'Crafting',
   rollOptions = null,
   craftingModifier = null,
+  thresholdMode,
   ...input
 }) {
   const evaluation = ownEvaluation(input, rollOptions);
   if (evaluation.product === 'count') {
-    return runCountProgressive({
-      rollOptions,
-      evaluation,
-      craftingModifier,
-      triggers,
-      actor,
-      label,
-    });
+    const count = { rollOptions, evaluation, thresholdMode, craftingModifier };
+    return runCountProgressive({ ...count, triggers, actor, label });
   }
   const refusal = progressiveTargetRefusal(evaluation);
   if (refusal) return checkTargetRefusal(refusal, label);
