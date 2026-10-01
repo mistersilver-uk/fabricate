@@ -299,7 +299,7 @@
     display: flex;
     align-items: center;
     gap: var(--fab-space-3);
-    padding: var(--fab-space-2) var(--fab-space-3);
+    padding: var(--fab-space-2) 0;
   }
 
   .manager-checks-prompt-options-copy {
@@ -326,7 +326,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-2);
-    padding: var(--fab-space-2) var(--fab-space-3) var(--fab-space-3);
+    padding-top: var(--fab-space-2);
     border-top: 1px solid var(--fab-border);
   }
 

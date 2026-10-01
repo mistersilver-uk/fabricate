@@ -190,8 +190,9 @@
 {/snippet}
 
 {#snippet macroZone(slot)}
-  <div
-    class="manager-checks-additional-dice-macro"
+  <Field
+    as="div"
+    class="manager-checks-difficulty-field"
     tabindex="-1"
     data-keyboard-focus="true"
     data-validation-target={slot.target}
@@ -214,7 +215,7 @@
       onUnlink={() => write(slot.key, '')}
       onDrop={(data) => dropMacro(slot.key, data)}
     />
-  </div>
+  </Field>
 {/snippet}
 
 {#snippet fields()}
@@ -242,8 +243,11 @@
         {/each}
       </div>
     {:else}
-      <!-- The Difficulty card's caption column, not `Field`, whose rules restyle the value field. -->
-      <div class="manager-checks-difficulty-field" data-check-additional-dice-path-field>
+      <Field
+        as="div"
+        class="manager-checks-difficulty-field"
+        data-check-additional-dice-path-field=""
+      >
         <span class="manager-checks-difficulty-label">{titles.path}</span>
         <CheckCharacterValueField
           value={rule.path}
@@ -258,7 +262,7 @@
           documentPath={pathCopy}
           onChange={(next) => write('path', next)}
         />
-      </div>
+      </Field>
     {/if}
     <div class="manager-checks-additional-dice-name" data-check-additional-dice-label-field>
       <Field as="label" class="manager-checks-difficulty-field">
@@ -316,7 +320,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-3);
-    padding: var(--fab-space-3);
   }
 
   .manager-checks-additional-dice-source {
@@ -329,13 +332,6 @@
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: var(--fab-space-2);
-  }
-
-  .manager-checks-additional-dice-macro {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    min-width: 0;
   }
 
   .manager-checks-additional-dice-hint {

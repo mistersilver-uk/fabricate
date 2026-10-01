@@ -264,6 +264,11 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-import-report',
     'manager-components-add-from-catalogue',
   ]),
+  // The well below a card (issue 2008): the Formula card's roll-prompt and additional-dice groups.
+  'src/ui/svelte/components/Well.svelte': Object.freeze([
+    'manager-checks-crafting-advantage-keep',
+    'manager-checks-v3-count-under',
+  ]),
   // The sheet itself, and the first entry here whose key is not a component (issue 1515).
   'styles/fabricate.css': Object.freeze([
     'manager-gathering-task-editor-normal',

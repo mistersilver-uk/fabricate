@@ -135,26 +135,27 @@
     min-width: 0;
   }
 
-  .manager-checks-value-resolution {
+  /* Ancestor-qualified, so a `Field` around the value field cannot restyle its reading line. */
+  .manager-checks-value-field .manager-checks-value-resolution {
     font-size: 10px;
     font-weight: 500;
     line-height: 1.45;
   }
 
-  .manager-checks-value-resolution.is-muted {
+  .manager-checks-value-field .manager-checks-value-resolution.is-muted {
     color: var(--fab-text-subtle);
   }
 
-  .manager-checks-value-resolution.is-resolved {
+  .manager-checks-value-field .manager-checks-value-resolution.is-resolved {
     color: var(--fab-text-secondary);
   }
 
-  .manager-checks-value-resolution.is-unresolved,
-  .manager-checks-value-resolution.is-danger {
+  .manager-checks-value-field .manager-checks-value-resolution.is-unresolved,
+  .manager-checks-value-field .manager-checks-value-resolution.is-danger {
     color: var(--fab-danger-text);
   }
 
-  .manager-checks-value-resolution.is-warning {
+  .manager-checks-value-field .manager-checks-value-resolution.is-warning {
     color: var(--fab-warning-text);
   }
 
@@ -164,11 +165,11 @@
     font-weight: 500;
   }
 
-  .manager-checks-value-path.is-danger {
+  .manager-checks-value-field .manager-checks-value-path.is-danger[aria-invalid='true'] {
     border-color: var(--fab-danger-border);
   }
 
-  .manager-checks-value-path.is-warning {
+  .manager-checks-value-field .manager-checks-value-path.is-warning[aria-invalid='true'] {
     border-color: var(--fab-warning-border);
   }
 </style>

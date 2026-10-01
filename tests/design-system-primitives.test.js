@@ -160,6 +160,8 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/Stepper.svelte',
   'src/ui/svelte/components/ThresholdBandStrip.svelte',
   'src/ui/svelte/components/ToggleCard.svelte',
+  // Issue 2008: the well below a card, a primitive ARRIVING, on the Formula card's option groups.
+  'src/ui/svelte/components/Well.svelte',
   // Issue 1515: THE SHEET, and the first key here that is not a component path. It sorts last
   // because this list is compared against `Object.keys(...).sort()` and `'src/'` < `'styles/'`.
   'src/ui/svelte/components/WorldClockChip.svelte',
@@ -229,8 +231,9 @@ test('the inputs every property below quantifies over are alive', () => {
   // executed check evidence rows; 70 as of issue 2006, whose result boxes promoted the die tiles;
   // 71 as of issue 2008, whose additional-dice group extracted the Formula card's option well.
   assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 71, 'the shipped primitive set changed size');
-  // 16 as of issue 2006, which promoted the die tiles once the result boxes drew them.
-  assert.equal(NOT_A_PRIMITIVE.length, 16, 'the recorded non-member set changed size');
+  // 16 as of issue 2006, which promoted the die tiles once the result boxes drew them; 17 as of
+  // issue 2008, which built the library's `<Well>` on its first caller.
+  assert.equal(NOT_A_PRIMITIVE.length, 17, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(
     PUBLISHING_CASE_IDS.size > 0,

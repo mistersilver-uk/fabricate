@@ -234,6 +234,7 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   // The pool's additional-dice group and the option well it shares with the roll-prompt group.
   'src/ui/svelte/apps/manager/checks/CheckAdditionalDiceFields.svelte',
   'src/ui/svelte/apps/manager/checks/CheckOptionGroup.svelte',
+  'src/ui/svelte/components/Well.svelte',
   'src/ui/svelte/components/ItemDropZone.svelte',
   'src/ui/svelte/apps/manager/checks/CheckOutcomeRow.svelte',
   // The progressive editor's roll-under refusal (issue 2005).

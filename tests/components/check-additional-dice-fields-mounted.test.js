@@ -241,6 +241,12 @@ for (const editor of EDITORS) {
       assert.equal(toggle().getAttribute('aria-pressed'), 'false');
       assert.ok(!toggle().hasAttribute('aria-controls'), 'nothing to control while off');
       assert.ok(!state.query('[data-check-additional-dice-fields]'), 'no nested region while off');
+      assert.ok(
+        Boolean(
+          state.query('[data-check-additional-dice-group] > .fab-well [data-check-additional-dice]')
+        ),
+        'the group draws its frame through the shared well, toggle at its head'
+      );
 
       await state.act(() => toggle().click());
       assert.deepEqual(state.record(), { ...STORED, enabled: true });

@@ -190,9 +190,9 @@ test('every manifest library name resolves to a library entry', () => {
 });
 
 /**
- * The 26 library entries with no shipped implementation (issue 1505). Re-derived from the array
- * rather than carried forward: `SortableList` left it at issue 1512, when the specified primitive
- * shipped, and the count this docblock states is the array's own length.
+ * The 25 library entries with no shipped implementation (issue 1505). Re-derived from the array
+ * rather than carried forward: `SortableList` left it at issue 1512 and `Well` at issue 2008, when
+ * each specified primitive shipped, and the count this docblock states is the array's own length.
  */
 const SPECIFIED_ONLY = [
   'AppRail', 'AppTitleBar', 'BandedBar', 'BrowseCard', 'ChoiceGroup',
@@ -200,7 +200,7 @@ const SPECIFIED_ONLY = [
   'Meter', 'NavSidebar', 'PageHeader', 'PickerRow', 'Rail',
   'RequirementChooser', 'RuleRow', 'RuleSentence', 'Search', 'SetPicker',
   'StageBars', 'TierTrack', 'ValidationList', 'ValidationSummary',
-  'ViewToggle', 'Well', 'XrefList',
+  'ViewToggle', 'XrefList',
 ];
 
 test('every library entry is either recorded as shipped or recorded as unbuilt', () => {
@@ -635,6 +635,8 @@ const UNDOCUMENTED_ROWS = [
   // Issue 2005's Preview-as picker and the check overrides' Player sees block: no specimen names a
   // character picker or a player-view line, and each composes entries that do exist.
   'src/ui/svelte/apps/manager/checks/CheckCharacterValueField.svelte',
+  // Issue 2008's option group: a titled `<Well>` composition, which no specimen names.
+  'src/ui/svelte/apps/manager/checks/CheckOptionGroup.svelte',
   'src/ui/svelte/apps/manager/checks/PreviewAsPicker.svelte',
   'src/ui/svelte/apps/manager/component/OverridePlayerSees.svelte',
   'src/ui/svelte/apps/manager/downtime/WorldDowntimeTabs.svelte',
