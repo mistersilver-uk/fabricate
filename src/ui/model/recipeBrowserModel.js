@@ -234,6 +234,7 @@ const CHECK_FACTS = {
   dynamicSuccesses: ['FABRICATE.Admin.Manager.Recipe.CheckDynamicShort', 'Dynamic'],
   progressive: ['FABRICATE.Admin.Manager.Recipe.CheckProgressive', 'Progressive'],
   ingredients: ['FABRICATE.Admin.Manager.Recipe.CheckByIngredients', 'By ingredients'],
+  checkOff: ['FABRICATE.Admin.Manager.Recipe.CheckOff', 'Check off'],
   none: ['FABRICATE.Admin.Manager.Recipe.CheckNone', 'No check'],
 };
 
