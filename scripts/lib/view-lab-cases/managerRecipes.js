@@ -158,6 +158,22 @@ export const CASES = Object.freeze([
       CHECKS_ROUTE_MODEL_PATTERN,
     ],
   }),
+  // The inspector names a switched-off check as the row pill does, never "No check" (issue 2136).
+  managerCase({
+    id: 'manager-recipes-inspector-check-off',
+    label: 'Manager — Recipes inspector, check switched off',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-tidewrack' },
+    steps: [
+      'Crafting',
+      { selector: '.manager-recipe-row[data-recipe-id="tw-r-tidewater"] .manager-recipe-identity' },
+    ],
+    expectView: 'recipes',
+    expectSelector: '.fabricate-manager [data-recipe-fact="check"]:has-text("Check off")',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [/^src\/ui\/model\/recipeBrowserModel\.js$/],
+  }),
   managerCase({
     id: 'manager-recipes-grouped-continuation',
     label: 'Manager — Recipes grouped continuation',
