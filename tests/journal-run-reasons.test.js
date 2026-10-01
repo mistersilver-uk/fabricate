@@ -30,6 +30,7 @@ const AUTHORITY_SOURCE_PATTERN = /^journalRun[A-Za-z]*\.js$/;
 // authority modules reaches them and every reason minted here was unmapped until issue 1648.
 const EDGE_SOURCES = [
   'src/bootstrap/journalOperations.js',
+  'src/systems/journalPreparedCheck.js',
   'src/ui/SvelteFabricateApp.svelte.js',
 ];
 

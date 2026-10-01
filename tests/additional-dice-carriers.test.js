@@ -6,26 +6,26 @@
  * core-faithful double and the resource is a stored path whose `update` writes what it reads.
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, test } from 'node:test';
-import { compileFunction } from 'node:vm';
 
-import { promptJournalStageCheck } from '../src/bootstrap/journalOperations.js';
-import { publicAdvantageOffer } from '../src/systems/checkAdvantage.js';
+import { Fabricate } from '../src/bootstrap/Fabricate.js';
+import { setGatheringEngine } from '../src/bootstrap/gatheringRuntime.js';
 import {
-  evaluatePreparedCraftingCheck,
-  evaluatePreparedRunCheck,
-  runFormulaPassFail,
-} from '../src/systems/checkRoll.js';
+  createJournalCommandsForFabricate,
+  promptJournalStageCheck,
+} from '../src/bootstrap/journalOperations.js';
+import { evaluatePreparedRunCheck, runFormulaPassFail } from '../src/systems/checkRoll.js';
 import { countDecisionPolicy, preparedCountEvaluation } from '../src/systems/countCheck.js';
 import { CountRollRefusal } from '../src/systems/countRoll.js';
 import { GatheringEngine } from '../src/systems/GatheringEngine.js';
-import { safeRollDecision } from '../src/systems/journalPreparedCheck.js';
+import {
+  safeRollDecision,
+  withPreparedAdditionalDiceOffer,
+} from '../src/systems/journalPreparedCheck.js';
 import { createJournalRunAuthority } from '../src/systems/journalRunAuthority.js';
 import {
   createGatheringJournalRunOperations,
   createJournalRunCommandService,
-  createManagerMutation,
 } from '../src/systems/journalRunCommands.js';
 import { normalizeCheckEvaluation } from '../src/systems/normalize/checkEvaluation.js';
 import {
@@ -33,11 +33,10 @@ import {
   preparedDecisionPolicy,
   validatedPreparedDecision,
 } from '../src/systems/preparedDecisionPolicy.js';
-import { resolvedComponentsFor } from '../src/systems/scopedEntityReads.js';
-import { resolveAlchemySubmissions } from '../src/utils/alchemySubmissions.js';
 
 import { installCountDice } from './helpers/countEngineDice.js';
 import { countEvaluation, preparedCountCheck } from './helpers/countFixtures.js';
+import { gatheringFixture } from './helpers/real-gathering-attempt.js';
 
 const PATH = 'system.resources.focus.value';
 const PAID = Object.freeze({
@@ -61,7 +60,9 @@ const walk = (object, path) =>
 
 const saved = {};
 beforeEach(() => {
-  for (const key of ['foundry', 'game', 'fromUuid']) saved[key] = globalThis[key];
+  for (const key of ['foundry', 'game', 'fromUuid', 'additionalDiceReads']) {
+    saved[key] = globalThis[key];
+  }
   const utils = {
     getProperty: walk,
     hasProperty: (object, path) => walk(object, path) !== undefined,
@@ -820,47 +821,41 @@ describe('the Journal command offers, validates and spends on the claim holder',
 // ── the activities' own evaluators forward the sender ───────────────────────
 
 describe('crafting and gathering evaluate for the attested sender (AD28)', () => {
-  function craftingCheckOperations(fabricate) {
-    const source = readFileSync(
-      new URL('../src/bootstrap/journalOperations.js', import.meta.url),
-      'utf8'
-    );
-    const start = source.indexOf('async function resolveJournalSourceActors(');
-    const end = source.indexOf('export function createJournalCommandsForFabricate(', start);
-    const names = [
-      'resolveAlchemySubmissions',
-      'resolvedComponentsFor',
-      'createManagerMutation',
-      'publicAdvantageOffer',
-      'evaluatePreparedCraftingCheck',
-    ];
-    return compileFunction(
-      `${source.slice(start, end)}\nreturn createCraftingJournalOperations;`,
-      names
-    )(
-      resolveAlchemySubmissions,
-      resolvedComponentsFor,
-      createManagerMutation,
-      publicAdvantageOffer,
-      evaluatePreparedCraftingCheck
-    )(fabricate, () => null);
-  }
-
-  test('crafting refuses a spend on an actor the sender may not change, though the GM may', async () => {
-    const { actor, writes } = heroWith(3, { writers: ['gm'] });
-    Object.assign(globalThis, { fromUuid: async () => actor });
-    const operations = craftingCheckOperations({
-      recipeManager: { getRecipe: () => ({ id: 'recipe', craftingSystemId: 'system' }) },
-      recipeVisibilityService: { getVisibleRecipes: () => [{ recipe: { id: 'recipe' } }] },
+  test('crafting refuses a spend the sender may no longer make, though the GM still may', async () => {
+    const writers = ['player', 'gm'];
+    const { actor, writes } = heroWith(3, { writers });
+    const active = { gm: GM };
+    const run = { id: 'run-1', lifecycleVersion: 1, runRevision: 3, status: 'waiting' };
+    let ids = 0;
+    Object.assign(globalThis, {
+      game: { user: GM, users: { activeGM: GM, get: (id) => USERS.get(id) ?? null } },
+      foundry: { utils: { ...globalThis.foundry.utils, randomID: () => `craft-${(ids += 1)}` } },
+      fromUuid: async () => actor,
     });
+    const recipe = { id: 'recipe', craftingSystemId: 'system' };
+    const service = createJournalCommandsForFabricate(
+      {
+        craftingEngine: {
+          installVersionedRunAuthority: () => {},
+          describeVersionedStageCheck: async () =>
+            paidDescriptor({ privateEvaluation: paidPreparation(PAID, { recipeId: 'recipe' }) }),
+          executeVersionedStage: async () => completed(),
+        },
+        craftingRunManager: { getRun: () => run },
+        recipeManager: { getRecipe: () => recipe },
+        recipeVisibilityService: { getVisibleRecipes: () => [{ recipe }] },
+      },
+      memoryAuthority(active)
+    );
+    const described = await playerRequest(service);
+    assert.equal(described.promptDescriptor.additionalDiceOffer.limit, 3, 'offered while writable');
+    writers.shift();
     await withDice([9, 3, 8], async () => {
-      const result = await operations.evaluateCheck({
-        actor,
-        privateEvaluation: paidPreparation(PAID, { recipeId: 'recipe' }),
-        decision: bound(1),
-        sender: PLAYER,
+      const executed = await playerRequest(service, {
+        prepareToken: described.prepareToken,
+        rollDecision: { additionalDice: 1 },
       });
-      assert.equal(result.additionalDiceRefusal, 'resourceNotWritable');
+      assert.equal(executed.additionalDiceRefusal, 'resourceNotWritable', JSON.stringify(executed));
     });
     assert.deepEqual(writes, []);
   });
@@ -899,5 +894,90 @@ describe('crafting and gathering evaluate for the attested sender (AD28)', () =>
     assert.deepEqual(prompted.additionalDiceOffer, offer);
     await promptJournalStageCheck({ ...COUNT_PROMPT }, async (options) => (prompted = options));
     assert.equal('additionalDiceOffer' in prompted, false);
+  });
+});
+
+describe('the gathering facade and the prepared gathering read', () => {
+  test('a public gather forwards its non-interactive bought dice to the Journal command', async () => {
+    const executed = [];
+    setGatheringEngine({
+      requestStart: () => ({
+        accepted: true,
+        requiresExecution: true,
+        canExecuteImmediately: true,
+        runId: 'gather-1',
+        runRevision: 2,
+      }),
+    });
+    try {
+      const settings = { lastGatheringActor: '', additionalPlayerCharacterActorTypes: [] };
+      const game = { user: PLAYER, actors: [], settings: { get: (_scope, key) => settings[key] } };
+      Object.assign(globalThis, { game });
+      const facade = Object.assign(new Fabricate(), {
+        ready: true,
+        executeJournalRunCommand: async (command, options) => {
+          executed.push(options);
+          return { success: true };
+        },
+      });
+      await facade.startGatheringAttempt({ actor: heroWith(3).actor, additionalDice: 2 });
+      await facade.startGatheringAttempt({ actor: heroWith(3).actor });
+    } finally {
+      setGatheringEngine(null);
+    }
+    assert.deepEqual(executed, [{ interactive: false, additionalDice: 2 }, { interactive: false }]);
+  });
+
+  test('the prepared gathering read names its activity, at the describe and the evaluation', async () => {
+    const reads = [];
+    const macro = {
+      type: 'script',
+      command: 'globalThis.additionalDiceReads.push(scope); return 2;',
+    };
+    Object.assign(globalThis, {
+      additionalDiceReads: reads,
+      fromUuid: async (uuid) => (uuid.startsWith('Macro.') ? macro : null),
+    });
+    const fixture = gatheringFixture({ mode: 'routed' });
+    const additionalDice = {
+      ...PAID,
+      source: 'macro',
+      path: '',
+      readMacroUuid: 'Macro.read',
+      spendMacroUuid: 'Macro.spend',
+    };
+    fixture.system.gatheringCraftingCheck.routed = {
+      ...fixture.system.gatheringCraftingCheck.routed,
+      rollFormula: '',
+      dc: 1,
+      evaluation: countEvaluation({ additionalDice }),
+    };
+    const { actor } = heroWith(3);
+    const engine = new GatheringEngine({ localize: (key) => key });
+    const descriptor = engine._versionedCheckDescriptor({
+      actor,
+      run: { taskId: fixture.task.id },
+      ...fixture,
+    });
+    const prompt = await withPreparedAdditionalDiceOffer(descriptor, { actor, sender: PLAYER });
+    assert.equal(prompt.additionalDiceOffer.limit, 2, 'the read macro answered 2');
+    await withDice([9, 3], async () => {
+      const result = await evaluatePreparedRunCheck(
+        descriptor.privateEvaluation,
+        actor,
+        {},
+        {
+          user: PLAYER,
+        }
+      );
+      assert.equal(result.engineEvaluated, true, JSON.stringify(result));
+    });
+    assert.deepEqual(
+      reads.map((payload) => [payload.activity, payload.user]),
+      [
+        ['gathering', PLAYER],
+        ['gathering', PLAYER],
+      ]
+    );
   });
 });

@@ -71,6 +71,7 @@ export const JOURNAL_RUN_REASON_KEYS = Object.freeze({
   'operation-unavailable': 'FABRICATE.App.Journal.Reason.OperationUnavailable',
   'unsupported-operation': 'FABRICATE.App.Journal.Reason.UnsupportedOperation',
   // ── Check prompt and roll ─────────────────────────────────────────────────
+  'additional-dice-refused': 'FABRICATE.App.Journal.Reason.AdditionalDiceRefused',
   'check-evaluator-unavailable': 'FABRICATE.App.Journal.Reason.CheckEvaluatorUnavailable',
   'check-prompt-unavailable': 'FABRICATE.App.Journal.Reason.CheckPromptUnavailable',
   'invalid-dismissal': 'FABRICATE.App.Journal.Reason.InvalidDismissal',

@@ -1429,6 +1429,7 @@
         "Reason": {
           "ActiveRun": "This character already has a run of this kind in progress. Finish or cancel it first.",
           "ActorNotFound": "That character could not be found. Reopen Fabricate and choose the character again.",
+          "AdditionalDiceRefused": "The additional dice could not be bought, so nothing was spent or rolled.",
           "CheckEvaluatorUnavailable": "The check for this run could not be evaluated. Ask your GM to review the activity's check settings.",
           "CheckPromptUnavailable": "The roll prompt could not be opened. Reload Foundry and try again.",
           "ClaimMismatch": "Another Journal operation took over the execution claim. Refresh the Journal for this run's current state.",

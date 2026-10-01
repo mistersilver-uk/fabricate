@@ -124,6 +124,7 @@ const DEFAULT_BLOCKED_REASON_KEYS = Object.freeze({
 });
 
 const BLIND_TASK_LABEL_KEY = 'FABRICATE.Gathering.BlindTaskLabel';
+const PREPARED_ACTIVITY = Object.freeze({ activity: 'gathering' });
 const UNKNOWN_TOOL_LABEL_KEY = 'FABRICATE.App.Gathering.Detail.UnknownTool';
 const DEFAULT_TOOL_IMG = 'icons/svg/item-bag.svg';
 const VERSIONED_START_CONTEXT = Symbol('versionedGatheringStartContext');
@@ -783,8 +784,7 @@ export class GatheringEngine {
       : null;
     const dc = count ? null : target.target;
     const label = secret ? this.localize(BLIND_TASK_LABEL_KEY) : stringOrEmpty(task?.name);
-    // A fixed-range routed check grades the raw roll, never a target, and a hidden task names no
-    // numbers, so both keep the prompt's target fields empty, as a count check's already are.
+    // Fixed ranges grade the raw roll and hidden tasks name no numbers: neither shows a target.
     const routedFixed = mode === 'routed' && config?.type === 'fixed';
     const showTarget = !secret && !count && !routedFixed && Number.isFinite(dc);
     // A count check shows its pool line, never a formula, and a hidden task names neither the
@@ -843,7 +843,7 @@ export class GatheringEngine {
         mode: checkMode,
         slot,
         rollFormula,
-        checkConfig: config ? cloneJson(config) : null,
+        checkConfig: config && { ...cloneJson(config), craftingModifier: PREPARED_ACTIVITY },
         decisionPolicy: {
           dc: target.source === 'fixed' ? dc : null,
           target: dc,
