@@ -15,6 +15,7 @@ player-crafting-roll-result-under-fail
 player-crafting-chat-card-under-public
 player-crafting-chat-card-under-whispered
 player-crafting-chat-card-under-blind
+player-crafting-chat-card-under-fail
 player-crafting-chat-card-over-control
 player-crafting-roll-prompt-count
 player-crafting-roll-prompt-count-threshold

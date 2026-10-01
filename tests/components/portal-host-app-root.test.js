@@ -195,7 +195,7 @@ test('the portal population is the set of components that actually portal', () =
 
   for (const anchor of [
     'src/ui/svelte/components/SearchablePopover.svelte',
-    'src/ui/svelte/apps/manager/ManagerModal.svelte',
+    'src/ui/svelte/components/ManagerModal.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
     // A SCREEN REGION rather than a shared component.
     'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte',

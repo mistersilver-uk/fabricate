@@ -769,6 +769,12 @@
   --fab-on-badge-gold: #171208;
 }
 
+/* ratchet-exempt(design-system): a derived token is declared once on every root a palette is, :root included, so each resolves against its own palette. --fab-control-outline outlines an unchecked selection control at 3:1 on its surface in every palette (issue 2047). */
+:root,
+.fabricate[data-fabricate-theme] {
+  --fab-control-outline: var(--fab-text-subtle);
+}
+
 /* ========================================== Every Fabricate window ========================================== */
 
 /* Heading normalization for every Fabricate window: core colours and re-faces bare `h1`-`h6` in `@layer elements.typography` and scopes its own antidote to the ApplicationV1 `.app` root, so this is the V2 counterpart core does not ship. `color` and `font-family` only — measured as the two properties that actually reach a Fabricate heading — at (0,1,1), deliberately below a Svelte scoped rule's (0,2,0) so this is a floor components override. See `design-system/spec.md`'s `The Foundry contract binds every primitive` (issue 972). */
@@ -7805,7 +7811,7 @@
   margin: 0;
   margin-top: 0.15rem;
   padding: 0;
-  border: 1.5px solid var(--fab-border);
+  border: 1.5px solid var(--fab-control-outline);
   border-radius: 50%;
   appearance: none;
   -webkit-appearance: none;
@@ -7822,7 +7828,7 @@
   margin: 0;
   margin-top: 0.15rem;
   padding: 0;
-  border: 1.5px solid var(--fab-border);
+  border: 1.5px solid var(--fab-control-outline);
   border-radius: 50%;
   appearance: none;
   -webkit-appearance: none;
@@ -8009,8 +8015,9 @@
   order: 3;
   align-self: center;
   margin-top: 0;
-  border: 1px solid var(--fab-border-strong);
+  border: 1px solid var(--fab-control-outline);
   background: var(--fab-bg-1);
+  background-clip: padding-box;
 }
 
 .fabricate-option-cards.manager-resolution-mode-card.is-config-cards .manager-resolution-option input[type='radio']:checked {
@@ -16273,7 +16280,7 @@
 }
 
 .fabricate-gather-chat__section--event .fabricate-gather-chat__heading {
-  color: var(--fab-danger);
+  color: color-mix(in srgb, var(--fab-danger) 45%, currentcolor);
   opacity: 0.95;
 }
 
@@ -16283,8 +16290,9 @@
   opacity: 0.8;
 }
 
+/* The danger tone mixed into the chat's own ink, as the result pill is, so it reads on parchment. */
 .fabricate-craft-chat--failure .fabricate-craft-chat__notice {
-  color: var(--fab-danger);
+  color: color-mix(in srgb, var(--fab-danger) 45%, currentcolor);
   opacity: 0.95;
 }
 
@@ -16410,9 +16418,9 @@
   opacity: 0.58;
 }
 
-/* A macro only the GM can repair is not narration, so it reads in the danger ramp the failure notice above already uses rather than in the neutral one its neighbours use. */
+/* A macro only the GM can repair is not narration, so it reads in the danger tone mixed into the chat's own ink, as the failure notice and the result pill do, rather than in the neutral one its neighbours use. */
 .fabricate-craft-chat--gm .fabricate-craft-chat__complication-fault {
-  color: var(--fab-danger);
+  color: color-mix(in srgb, var(--fab-danger) 45%, currentcolor);
 }
 
 /* Its heading keeps the eyebrow's SHAPE and drops the eyebrow's fade. 0.58 of the danger ramp on a parchment chat background is the lowest-contrast run on the card, and this is the one run that has to be read: everything else here is narration a GM can skim, and this is a broken link only they can repair. */

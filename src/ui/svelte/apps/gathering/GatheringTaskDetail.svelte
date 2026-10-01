@@ -15,6 +15,7 @@
 <script>
   import { DEFAULT_GATHERING_TASK_IMG } from '../../../../gatheringImageDefaults.js';
   import { localize } from '../../util/foundryBridge.js';
+  import { withRollPromptOrigin } from '../../util/rollPromptOrigin.js';
   import { formatRespawnDuration } from '../../util/formatDuration.js';
   import { describeBlockedReasons } from './gatheringBlockedReasons.js';
   import { descriptionOrDefault } from '../../util/gatheringFormat.js';
@@ -117,9 +118,9 @@
       : (task?.successChance ?? null)
   );
 
-  function handleAttempt() {
+  function handleAttempt(event) {
     if (!attemptable || busy) return;
-    onAttempt?.({ environmentId, taskId: id });
+    withRollPromptOrigin(event, () => onAttempt?.({ environmentId, taskId: id }));
   }
 
   $effect(() => {

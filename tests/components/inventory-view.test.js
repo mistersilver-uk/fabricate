@@ -41,6 +41,7 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-inventory-view-',
   rawModules: [
+    'src/ui/svelte/util/rollPromptOrigin.js',
     // Issue 1506: the one tone map the converted status pills read at a dynamic site.
     ...STATUS_TONE_RAW_MODULES,
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
@@ -3084,6 +3085,30 @@ describe('InventoryView (mounted) — bulk salvage and destroy (issue 859)', () 
     assert.deepEqual(calls.bulkSalvage, [true]);
     assert.deepEqual(calls.bulkRemove, ['sys:c1']);
     assert.deepEqual(calls.bulkClear, [true]);
+  });
+
+  it('records the window the bulk Salvage came from as its roll prompt origin (issue 2053)', async () => {
+    const { activeRollPromptOrigin } = await harness.loadRawModule(
+      'src/ui/svelte/util/rollPromptOrigin.js'
+    );
+    const { services, store } = makeServices(makeItem(), {
+      selectedKeys: ['sys:c1'],
+      entries: [bulkEntry()],
+      salvageable: [bulkEntry()],
+      counts: { selected: 1, salvageable: 1, blocked: 0, atMax: false },
+    });
+    let origin = 'unread';
+    store.bulkSalvage = async () => {
+      origin = activeRollPromptOrigin();
+    };
+    const target = await harness.mount({ services });
+    await settle();
+
+    target.querySelector('[data-inventory-bulk-salvage]').click();
+    await settle();
+
+    assert.ok(origin === target, 'the panel forwards the click and the view records its window');
+    assert.ok(activeRollPromptOrigin() === null, 'the origin is released once the salvage settles');
   });
 
   it('names BOTH the row count and the unit count on the destroy prompt', async () => {

@@ -370,6 +370,8 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/systems/scopedDefinitions.js',
   'src/systems/worldScopeEntityGrouping.js',
   'src/ui/svelte/actions/dismissOnOutsideClick.js',
+  // Issue 2053: the Craft button records the window a roll prompt opens in.
+  'src/ui/svelte/util/rollPromptOrigin.js',
   ...CHECK_EVIDENCE_RAW_MODULES
 ]);
 
@@ -481,6 +483,8 @@ export function createMountedComponentHarness({ repoRoot, tmpPrefix, rawModules 
     async loadRuneModule(modulePath) {
       return import(pathToFileURL(join(tempRoot, `${modulePath}.js`)).href);
     },
+    // The same for a declared raw module, so a test reads the module state the mounted tree writes.
+    loadRawModule: (modulePath) => import(pathToFileURL(join(tempRoot, modulePath)).href),
     teardown() {
       if (mounted) { mounted.$destroy(); mounted = null; }
       if (target) { target.remove(); target = null; }

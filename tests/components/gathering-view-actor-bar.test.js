@@ -147,7 +147,8 @@ describe('GatheringView ↔ actor bar wiring', () => {
 
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
-    for (const rawModule of SEARCHABLE_POPOVER_RAW_MODULES) {
+    // Issue 2053: the attempt buttons record the window a roll prompt opens in.
+    for (const rawModule of [...SEARCHABLE_POPOVER_RAW_MODULES, 'src/ui/svelte/util/rollPromptOrigin.js']) {
       const rawDestination = join(tempRoot, rawModule);
       mkdirSync(dirname(rawDestination), { recursive: true });
       writeFileSync(rawDestination, readFileSync(resolve(repoRoot, rawModule), 'utf8'));

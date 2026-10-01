@@ -612,7 +612,7 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/ui\/managerServices\.js$/,
       /^src\/ui\/presenters\/importReportContent\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/ImportReportModal\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/ManagerModal\.svelte$/,
+      /^src\/ui\/svelte\/components\/ManagerModal\.svelte$/,
       // The model that opens both import-flow modals (issue 1721).
       /^src\/ui\/svelte\/apps\/manager\/importFlowModel\.svelte\.js$/,
     ],
@@ -626,7 +626,7 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-import-folder-mapping'],
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/ImportFolderMappingModal\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/ManagerModal\.svelte$/,
+      /^src\/ui\/svelte\/components\/ManagerModal\.svelte$/,
       /^src\/ui\/SvelteCraftingSystemManagerApp\.svelte\.js$/,
       /^src\/ui\/managerServices\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/importFlowModel\.svelte\.js$/,

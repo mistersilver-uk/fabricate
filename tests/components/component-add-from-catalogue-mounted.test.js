@@ -31,7 +31,7 @@ const dialog = createComponentScopeHarness({
     'src/ui/svelte/actions/portal.js',
     'src/ui/svelte/util/overlayHost.js',
   ],
-  compiledExtras: ['src/ui/svelte/apps/manager/ManagerModal.svelte'],
+  compiledExtras: ['src/ui/svelte/components/ManagerModal.svelte'],
 });
 
 /** A world corpus in which `sys-forge` holds EXACTLY ONE of the four records. */

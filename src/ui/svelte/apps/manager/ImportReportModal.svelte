@@ -22,7 +22,7 @@
   import Chip from '../../components/Chip.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
-  import ManagerModal from './ManagerModal.svelte';
+  import ManagerModal from '../../components/ManagerModal.svelte';
   import { localize } from '../../util/foundryBridge.js';
 
   let {

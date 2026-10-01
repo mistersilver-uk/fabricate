@@ -16,6 +16,7 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import { withRollPromptOrigin } from '../../util/rollPromptOrigin.js';
   import Callout from '../../components/Callout.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import Pagination from '../../components/Pagination.svelte';
@@ -119,7 +120,8 @@
         class="gathering-detail-blind-attempt"
         data-gathering-blind-attempt
         disabled={!blindAttemptable || busy}
-        onclick={() => onAttempt?.({ environmentId: envId, taskId: null })}
+        onclick={(event) =>
+          withRollPromptOrigin(event, () => onAttempt?.({ environmentId: envId, taskId: null }))}
       >
         <i class="fas fa-dice" aria-hidden="true"></i>
         {localize('FABRICATE.App.Gathering.Detail.BlindAttempt')}

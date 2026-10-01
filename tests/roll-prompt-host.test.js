@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import { Window } from 'happy-dom';
 import { findApplicationHost, openRollPromptModal } from '../src/ui/svelte/apps/crafting/rollPromptHost.js';
+import { withRollPromptOrigin } from '../src/ui/svelte/util/rollPromptOrigin.js';
 
 let window;
 let doc;
@@ -79,6 +80,43 @@ describe('roll prompt host', () => {
     chat.blur();
     player.frame.classList.add('minimized');
     assert.equal(findApplicationHost(doc), null, 'a minimized window never hosts');
+  });
+
+  it('hosts in the origin its call site recorded, over focus, until the action it started settles', async () => {
+    doc.body.replaceChildren();
+    const player = appWindow('fabricate-app', 110);
+    const manager = appWindow('fabricate-manager', 120);
+    manager.button.focus();
+    let release;
+    const running = withRollPromptOrigin({ target: player.button }, () => new Promise((done) => { release = done; }));
+    assert.ok(findApplicationHost(doc) === player.root, 'the recorded origin wins over the focused window');
+    player.frame.classList.add('minimized');
+    assert.ok(findApplicationHost(doc) === manager.root, 'a minimized origin falls back to focus');
+    player.frame.classList.remove('minimized');
+    release('done');
+    assert.equal(await running, 'done', 'the action answers through the wrapper');
+    assert.ok(findApplicationHost(doc) === manager.root, 'the origin ends with its action');
+  });
+
+  it('releases an origin whose action throws while an overlapping action keeps its own', async () => {
+    doc.body.replaceChildren();
+    const first = appWindow('fabricate-app', 110);
+    const second = appWindow('fabricate-app', 120);
+    let release;
+    const running = withRollPromptOrigin({ target: first.button }, () => new Promise((done) => { release = done; }));
+    await assert.rejects(
+      withRollPromptOrigin({ target: second.button }, async () => { throw new Error('boom'); }),
+      /boom/
+    );
+    assert.ok(findApplicationHost(doc) === first.root, 'the still-running action keeps its origin');
+    const outside = doc.createElement('button');
+    doc.body.append(outside);
+    await withRollPromptOrigin({ target: outside }, async () => {
+      assert.ok(findApplicationHost(doc) === null, 'an activation outside every root records none');
+    });
+    release();
+    await running;
+    assert.ok(findApplicationHost(doc) === null, 'no origin outlives its action');
   });
 
   it('takes the standalone layer when focus is outside every Fabricate root', async () => {

@@ -21,6 +21,7 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-journal-view-',
   rawModules: [
+    'src/ui/svelte/util/rollPromptOrigin.js',
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...STATUS_TONE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
@@ -913,6 +914,30 @@ describe('JournalView mounted behavior', () => {
     harness.remount();
     const cleared = await harness.mount({ services });
     assert.ok(!cleared.querySelector('[data-journal-command-error]'));
+  });
+
+  it('records the window a retry came from as the host of the roll it starts (issue 2053)', async () => {
+    const { activeRollPromptOrigin } = await harness.loadRawModule(
+      'src/ui/svelte/util/rollPromptOrigin.js'
+    );
+    const run = makeCraftingRun({ lifecycleContract: 'current', lifecycleVersion: 1 });
+    const { store } = makeJournal({
+      selectedRun: run,
+      selectedRunKey: run.key,
+      commandError: { runKey: run.key, actorUuid: run.actorUuid, message: 'The run changed.' },
+    });
+    let origin = 'unread';
+    store.retryCommandError = async () => {
+      origin = activeRollPromptOrigin();
+    };
+    const target = await harness.mount({ services: makeServices(store) });
+    const notice = target.querySelector('[data-journal-command-error]');
+    const retry = notice.querySelector('[data-notice-action]');
+    retry.click();
+    await Promise.resolve();
+    const root = retry.closest('.fabricate-app, .fabricate-manager');
+    assert.ok(root && origin === root, 'the retry runs with its own window recorded as the origin');
+    assert.ok(activeRollPromptOrigin() === null, 'the origin is released once the retry settles');
   });
 
   it('offers the GM the release on the very run whose own evidence is uncertain', async () => {

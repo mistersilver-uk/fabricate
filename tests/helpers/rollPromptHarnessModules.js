@@ -39,7 +39,7 @@ export const ROLL_PROMPT_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Select.svelte',
   'src/ui/svelte/components/SelectionCheckbox.svelte',
   'src/ui/svelte/components/IconButton.svelte',
-  'src/ui/svelte/apps/manager/ManagerModal.svelte',
+  'src/ui/svelte/components/ManagerModal.svelte',
   'src/ui/svelte/apps/crafting/RollPromptTarget.svelte',
   ROLL_PROMPT_PATH,
 ]);

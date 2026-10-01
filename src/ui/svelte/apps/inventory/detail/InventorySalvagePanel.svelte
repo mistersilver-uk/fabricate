@@ -24,6 +24,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import { withRollPromptOrigin } from '../../../util/rollPromptOrigin.js';
   import Callout from '../../../components/Callout.svelte';
   import Kicker from '../../../components/Kicker.svelte';
   import SalvageMisconfiguredBody from './salvage/SalvageMisconfiguredBody.svelte';
@@ -286,7 +287,7 @@
         disabled={busy || misconfigured || waiting || depleted || !toolsAvailable}
         aria-describedby={toolBlocked ? 'salvage-footer-note' : undefined}
         aria-busy={busy}
-        onclick={() => onSalvage?.()}
+        onclick={(event) => withRollPromptOrigin(event, () => onSalvage?.())}
       >
         <i
           class="fas"

@@ -15,7 +15,11 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-alchemy-view-',
-  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
+  rawModules: [
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
+    'src/ui/svelte/util/rollPromptOrigin.js',
+    'src/ui/svelte/util/overlayHost.js',
+  ],
   compiledModules: [
     // The shared not-yet-ready chrome, the standing statement the workbench composes.
     ...PLAYER_APP_COMPILED_MODULES,
@@ -125,6 +129,29 @@ describe('AlchemyView mounted behavior', () => {
       !readyTarget.querySelector('[aria-busy]'),
       'nothing in the ready view claims to be busy'
     );
+  });
+
+  it('records the window a Brew came from as its roll prompt origin (issue 2053)', async () => {
+    const { activeRollPromptOrigin } = await harness.loadRawModule(
+      'src/ui/svelte/util/rollPromptOrigin.js'
+    );
+    let origin = 'unread';
+    const store = fakeAlchemyStore({
+      brewEnabled: true,
+      brew: async () => {
+        origin = activeRollPromptOrigin();
+      },
+    });
+    const target = await harness.mount({ services: services(store) });
+
+    target.querySelector('[data-alchemy-brew]').click();
+    await Promise.resolve();
+
+    assert.ok(
+      origin === target,
+      'the workbench forwards the click and the view records its window'
+    );
+    assert.ok(activeRollPromptOrigin() === null, 'the origin is released once the brew settles');
   });
 
   it('renders the error state when the store reports an error', async () => {
