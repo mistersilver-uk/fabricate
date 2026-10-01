@@ -7,6 +7,7 @@ import { resolve } from 'node:path';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { installLangBackedI18n } from '../helpers/langBackedI18n.js';
 import { buildRequirementSlots } from '../../src/ui/svelte/util/requirementSlots.js';
+import { essenceChoiceCraftability } from '../helpers/crafting-fixtures.js';
 import {
   SPENDABLE_GOLD_UNITS,
   UNSPENDABLE_GOLD_UNITS,
@@ -261,6 +262,25 @@ describe('RequirementRail mounted behavior', () => {
       !/--fab-medallion-tint/.test(glyph.getAttribute('style')),
       'and no custom property, so the primitive own `var()` fallback paints the theme accent'
     );
+  });
+
+  // Issue 2142: the caption states the alternative count whichever option is chosen.
+  it('captions a choice slot whose chosen option is an essence by its alternatives', async () => {
+    const restoreI18n = installLangBackedI18n(repoRoot);
+    try {
+      const target = await harness.mount({
+        slots: buildRequirementSlots(essenceChoiceCraftability()),
+        openSlotId: 'g-primal',
+      });
+      const [tile] = tilesIn(target);
+      assert.equal(tile.getAttribute('aria-expanded'), 'true');
+      assert.equal(
+        tile.querySelector('.requirement-slot-disclosure').textContent.trim(),
+        '2 alternatives'
+      );
+    } finally {
+      restoreI18n();
+    }
   });
 
   it('reports the opened slot id on click', async () => {

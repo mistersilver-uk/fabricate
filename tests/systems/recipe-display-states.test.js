@@ -548,6 +548,40 @@ test('a currency option choice labels its cost through the positional units arra
   assert.equal(choice.options[1].costLabel, '');
 });
 
+// Issue 2142: an essence alternative counts the essence held stacks carry, not matching items.
+function essenceAlternativeCard(essenceId, selectionExtras = {}) {
+  const deps = makeDeps({ essences: { fire: { name: 'Fire', icon: 'fas fa-fire' } } });
+  const options = [componentOption('c-iron'), essenceOption(essenceId, 4)];
+  const groups = [{ id: 'g-1', name: 'Iron or fire', options }];
+  const selection = { selectedIngredients: [options[1]], missingGroups: [], plan: [] };
+  const [choice] = buildIngredientChoices(
+    RECIPE,
+    deps,
+    { ingredientGroups: groups },
+    { ...selection, ...selectionExtras },
+    [item({ id: 'ember', quantity: 2 })],
+    null,
+    null
+  );
+  return choice.options[1];
+}
+
+test('an essence alternative card reads have from the selection essence ceiling', () => {
+  const card = essenceAlternativeCard('fire', { essenceCeiling: { fire: 6 } });
+  assert.deepEqual([card.need, card.have, card.satisfied], [4, 6, true]);
+  assert.deepEqual([card.isEssence, card.icon, card.isCurrency], [true, 'fas fa-fire', false]);
+});
+
+test('an essence alternative card with no ceiling holds nothing and is unsatisfied', () => {
+  const card = essenceAlternativeCard('fire');
+  assert.deepEqual([card.need, card.have, card.satisfied], [4, 0, false]);
+});
+
+test('an essence alternative card with a blank essence id is satisfied, as the resolver settles it', () => {
+  const card = essenceAlternativeCard('  ', { essenceCeiling: {} });
+  assert.equal(card.satisfied, true);
+});
+
 test('essence display states report the definition name, icon and colour token', () => {
   const deps = makeDeps({
     essences: { 'e-fire': { name: '  Fire  ', icon: 'fa-fire', colorToken: '--fab-tag-red' } },

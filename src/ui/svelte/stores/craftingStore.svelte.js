@@ -61,6 +61,7 @@ import {
   composeSlotKey,
   resolveOpenSlotId,
   suggestChoiceOverrides,
+  switchesOntoEssence,
 } from '../util/requirementSlots.js';
 import { createListingLoad, createPageWindow, firstVisible } from './browseListing.svelte.js';
 import { createPlayerResultOrder } from './playerResultOrder.svelte.js';
@@ -380,22 +381,23 @@ export function createCraftingStore({ services } = {}) {
     // would refill themselves the moment the player zeroed their last carrier.
     const hasAllocation = allocation !== null;
     if (!set?.id || (!hasOverrides && !hasAllocation)) return baked;
-    const recomputed = services?.evaluateSelectedSet?.({
+    return evaluateSet(set.id, overrides, allocation) ?? baked;
+  });
+
+  // Re-evaluate one set through the resolver seam the engine consumes.
+  function evaluateSet(setId, overrides, allocation) {
+    return services?.evaluateSelectedSet?.({
       recipeId: selectedRecipe?.id ?? null,
-      setId: set.id,
+      setId,
       optionOverrides: overrides,
-      // NULL, not `{}`, for an untouched pool. The model reads a supplied allocation
-      // as authoritative and never tops it up, and `{}` is a supplied allocation — so
-      // sending it for an untouched pool zeroed every essence bar and blocked the
-      // craft as soon as the player picked an ingredient OPTION, which allocates
-      // nothing. Only an explicitly emptied pool may send `{}`.
+      // `null` for an untouched pool: the model never tops up a supplied allocation, and
+      // `{}` is one, so only an explicitly emptied pool may send it.
       essenceAllocation: allocation,
       stepId: selectedRecipe?.activeStepId ?? null,
       actorId: currentActorId(),
       componentSourceActorIds: currentSourceIds(),
     });
-    return recomputed ?? baked;
-  });
+  }
 
   // The rail's ordered slot list, and the chooser that is open for it.
   const railSlots = $derived(
@@ -558,30 +560,26 @@ export function createCraftingStore({ services } = {}) {
 
   /**
    * "Pick for me": fill the set's unmade choices and adopt the resolver's suggested
-   * essence allocation.
-   *
-   * BOTH halves are read off the craftability the resolver produced — the allocation
-   * is `essencePool.suggested`, the choices come from `ingredientChoices`' own
-   * held/satisfied numbers. Nothing is recomputed in the UI, because a second
-   * implementation of "what is best here" would drift from the plan the engine
-   * consumes, which is the defect class this whole surface exists to remove. On an
-   * infeasible inventory the resolver's suggestion is the best PARTIAL one, so the
-   * shortfall stays visible on the tiles instead of this throwing or looping.
+   * essence allocation. Both halves are read off the resolver's craftability, never
+   * recomputed in the UI; on an infeasible inventory its suggestion is the best partial one.
    *
    * @param {string} [announcement] pre-formatted live-region text (the component
    *   owns the i18n, exactly as the progressive reorder path does).
    */
   function pickForMe(announcement = '') {
-    const craftability = selectedCraftability;
-    const suggestedOptions = suggestChoiceOverrides(craftability);
+    const current = selectedCraftability;
+    const suggestedOptions = suggestChoiceOverrides(current);
     if (Object.keys(suggestedOptions).length > 0) {
       selectedIngredientOptions = { ...selectedIngredientOptions, ...suggestedOptions };
     }
-    // Adopting the suggestion is itself an EDIT — the player asked for it — so the
-    // write happens whenever the set has a pool at all, marking the scope funded even
-    // when the suggestion is empty. Sizing the suggestion instead would leave the
-    // scope reading as untouched, and a later manual zeroing would then revert to the
-    // suggestion rather than honouring the empty selection on screen.
+    // Only a switch onto an essence alternative re-evaluates, to suggest the new pool.
+    const setId = selectedSet?.id ?? null;
+    const craftability =
+      setId && switchesOntoEssence(current, suggestedOptions)
+        ? (evaluateSet(setId, selectedIngredientOptions, null) ?? current)
+        : current;
+    // Adopting the suggestion is an edit, so any pool writes the scope even when the
+    // suggestion is empty; otherwise a later manual zeroing would revert to it.
     const pool = craftability?.essencePool ?? null;
     const scopeKey = essenceScopeKey;
     if (scopeKey && pool) {
