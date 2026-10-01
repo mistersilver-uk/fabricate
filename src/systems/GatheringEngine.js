@@ -60,6 +60,7 @@ import {
   cloneJson,
   idOf,
   isBlindWaitingTaskId,
+  mergeCharacterModifierSnapshots,
   normalizeActorList,
   normalizeInteractableRef,
   normalizeList,
@@ -4012,7 +4013,7 @@ export class GatheringEngine {
       return misconfiguredOutcome({
         code: normalizedCheck.reasonCode || 'CHECK_DIAGNOSTIC',
         message: normalizedCheck.diagnostic.message,
-        checkResult: normalizedCheck,
+        checkResult: { ...normalizedCheck, additionalDiceNotice: checkResult.additionalDiceNotice },
       });
     }
 
@@ -4090,7 +4091,8 @@ export class GatheringEngine {
       const cancelled = { success: false, status: null, value: null, cancelled: true };
       if (rolled.cancelled) return carryAdditionalDice(cancelled, rolled);
       // A pool the settled modifiers push past 999 dice, or Foundry's explosion limit.
-      if (rolled.misconfigured) return progressiveCheckTargetInvalid(rolled);
+      if (rolled.misconfigured)
+        return carryAdditionalDice(progressiveCheckTargetInvalid(rolled), rolled);
       // Value-driven: `status` stays null so `resolveProgressiveAward` decides from `value`; a
       // roll error surfaces `success: false`, a terminal failure.
       return {
@@ -5247,15 +5249,6 @@ function awardsResultsFor(outcome, system) {
   if (outcome?.failureAward !== true) return false;
   if (!activityPermitsFailureResults(system, 'gathering')) return false;
   return normalizeList(outcome?.resultGroups).length > 0;
-}
-
-function mergeCharacterModifierSnapshots(base, environmental) {
-  const baseSnapshot = plainObjectOrNull(base) ?? {};
-  const environmentalSnapshot = plainObjectOrNull(environmental) ?? {};
-  return {
-    rows: normalizeList(baseSnapshot.rows),
-    events: normalizeList(environmentalSnapshot.events),
-  };
 }
 
 function normalizeVisibilityResult(result) {

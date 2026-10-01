@@ -798,16 +798,7 @@ for (const site of [SITES[6], SITES[7]]) {
     });
     assert.equal(run.result.accepted, false);
     assert.deepEqual(run.result.data?.boughtDice, { count: 1, source: 'path' });
+    assert.equal(run.result.additionalDiceNotice?.label, 'Momentum');
     assert.deepEqual(run.writes, [1], 'the spend stands');
   });
 }
-
-test('gathering routed: a roll refused after the spend names the resource on the misconfigured result', async () => {
-  const run = await SITES[6].run(SITES[6], {
-    faces: [],
-    options: { additionalDice: 1 },
-    refuseRoll: true,
-  });
-  assert.equal(run.result.accepted, false);
-  assert.equal(run.result.additionalDiceNotice?.label, 'Momentum');
-});
