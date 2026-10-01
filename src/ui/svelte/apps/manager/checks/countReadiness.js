@@ -9,6 +9,7 @@ import {
   MAX_COUNT_POOL,
   resolvePool,
 } from '../../../../../systems/countEvaluation.js';
+import { poolCanFire } from '../../../../../systems/countTriggerReach.js';
 import { normalizeNullableSuccesses } from '../../../../../systems/normalize/checkEvaluation.js';
 import { parseDiceGroups } from '../../../../../utils/craftingCheckExpression.js';
 import { trimString as trimmed } from '../../../../../utils/scalars.js';
@@ -60,24 +61,6 @@ function countFaceReadiness(result, evaluation, thresholdMode, raise) {
     resolvePool({ evaluation: literal, thresholdMode }).reason === 'explode-unbounded';
   result.checks.push({ id: 'countExplosionStops', satisfied: !unbounded });
   if (unbounded) raise(result.issues, 'countExplodeUnbounded', 'critical');
-}
-
-const FACE_TESTS = Object.freeze({
-  '==': (face, value) => face === value,
-  '<=': (face, value) => face <= value,
-  '>=': (face, value) => face >= value,
-  '<': (face, value) => face < value,
-  '>': (face, value) => face > value,
-});
-
-/** Whether a dice condition can fire on the pool's one group: group 0, a face the die shows. */
-function poolCanFire(condition, { groupId, sides }) {
-  if (Number(condition?.groupId) !== groupId) return false;
-  if (condition.aggregate === 'total') return true;
-  const test = FACE_TESTS[condition.operator];
-  const value = Number(condition.value);
-  for (let face = 1; face <= sides; face += 1) if (test?.(face, value)) return true;
-  return false;
 }
 
 /**

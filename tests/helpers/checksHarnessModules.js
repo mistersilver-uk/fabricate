@@ -114,6 +114,13 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/systems/countCheckRoll.js',
   'src/systems/countDisplayEvidence.js',
   'src/systems/countRoll.js',
+  // Additional dice's read, spend and reach (issue 2008), and the acknowledgment the spend reuses.
+  'src/systems/additionalDice.js',
+  'src/systems/additionalDiceReach.js',
+  'src/systems/countTriggerReach.js',
+  'src/utils/MacroExecutor.js',
+  'src/systems/runHistoryEvidence.js',
+  'src/systems/runLifecycleState.js',
   'src/systems/normalize/checkEvaluation.js',
   'src/systems/normalize/checkAdvantage.js',
   'src/systems/checkRollDecision.js',

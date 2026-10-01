@@ -2005,6 +2005,29 @@
         "SpentResource": "{count} bought · spent {count} {resource}",
         "TileLabel": "{label}, bought",
         "Legend": "{legend} · dashed = bought"
+      },
+      "AdditionalDiceRefusal": {
+        "SourceMissing": "Additional dice are unavailable: this check has no source to pay for them.",
+        "ResourceUnreadable": "Additional dice are unavailable: {actor} has no readable {resource} value.",
+        "ResourceUnreadableUnlabelled": "Additional dice are unavailable: {actor} has no readable value to spend.",
+        "ResourceOverridden": "Additional dice are unavailable: an active effect sets {actor}'s {resource}, so it cannot be spent.",
+        "ResourceOverriddenUnlabelled": "Additional dice are unavailable: an active effect sets the value, so it cannot be spent.",
+        "ResourceNotWritable": "Additional dice are unavailable: you cannot change {actor}'s {resource}.",
+        "ResourceNotWritableUnlabelled": "Additional dice are unavailable: you cannot change the value that pays for them.",
+        "ResourceMacroFailed": "Additional dice are unavailable: the macro that reads {resource} did not return a number.",
+        "ResourceMacroFailedUnlabelled": "Additional dice are unavailable: the macro that reads what can be spent did not return a number.",
+        "BroadcastCallSite": "Additional dice are unavailable: this roll was requested from every client, so nothing can be spent.",
+        "NotOffered": "This check does not allow additional dice.",
+        "ChoiceInvalid": "Additional dice must be a whole number of 0 or more.",
+        "ChoiceAboveLimit": "{n} additional dice is more than the {limit} that can be added.",
+        "ResourceChanged": "{actor}'s {resource} changed before the roll, and {available} is fewer than the {n} chosen. Nothing was spent or rolled.",
+        "ResourceChangedUnlabelled": "What {actor} can spend changed before the roll, and {available} is fewer than the {n} chosen. Nothing was spent or rolled.",
+        "SpendRefused": "Fabricate could not spend {actor}'s {resource}, so the check was not rolled.",
+        "SpendRefusedUnlabelled": "Fabricate could not spend the value that pays for {actor}'s additional dice, so the check was not rolled.",
+        "SpendRefusedMacro": "The macro that spends {resource} failed, so the check was not rolled.",
+        "SpendRefusedMacroUnlabelled": "The macro that spends what pays for additional dice failed, so the check was not rolled.",
+        "SpendUnconfirmed": "{actor}'s {resource} did not fall by {n} as expected, so the check was not rolled. Check the value on the character.",
+        "SpendUnconfirmedUnlabelled": "The value that pays for {actor}'s additional dice did not fall by {n} as expected, so the check was not rolled. Check the value on the character."
       }
     },
     "Knowledge": {
