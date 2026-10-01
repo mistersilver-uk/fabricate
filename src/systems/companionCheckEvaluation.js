@@ -44,7 +44,7 @@ const COUNT_UNDER = Object.freeze({
 export const CHECK_EVALUATION_CAPABILITIES = Object.freeze({
   version: 1,
   modes: Object.freeze([SUM_OVER_FIXED, SUM_OVER_ATTRIBUTE, SUM_UNDER, COUNT_OVER, COUNT_UNDER]),
-  additionalDice: false,
+  additionalDice: true,
 });
 
 const expression = (value) => typeof value === 'string' || Number.isFinite(value);

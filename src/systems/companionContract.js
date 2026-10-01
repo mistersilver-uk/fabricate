@@ -131,6 +131,7 @@ export const COMPANION_OUTCOMES = Object.freeze({
   evaluationUnsupported: 'evaluationUnsupported',
   targetUnresolved: 'targetUnresolved',
   poolUnresolved: 'poolUnresolved',
+  additionalDiceRefused: 'additionalDiceRefused',
 
   // Shared by the call-site members. `cancelled` is the shipped word for a dismissed roll prompt.
   cancelled: 'cancelled',
@@ -254,8 +255,8 @@ export const AFFORDABILITY_MESSAGE_KEYS = Object.freeze({
  * and `NotElected` interpolate nothing: they are answered before a label exists.
  * `checkPassedTarget`/`checkFailedTarget` (issue 2003) and `checkPassedCount`/`checkFailedCount`/
  * `checkFailedZeroPool` (issue 2004) are auxiliary re-keys, not outcomes: a graded answer stays
- * `checkPassed`/`checkFailed` and `checkRollResult` alone decides which key names its total, by
- * whether it was graded against a resolved target, a success count, or a plain `dc`.
+ * `checkPassed`/`checkFailed` and `checkRollResult` alone decides which key names its total.
+ * `AdditionalDiceRefused` (issue 2008) stands in only when a refusal brings no reason key.
  */
 export const CHECK_ROLL_MESSAGE_KEYS = Object.freeze({
   [COMPANION_OUTCOMES.checkPassed]: 'FABRICATE.Check.Roll.Passed',
@@ -275,6 +276,7 @@ export const CHECK_ROLL_MESSAGE_KEYS = Object.freeze({
   [COMPANION_OUTCOMES.evaluationUnsupported]: 'FABRICATE.Check.Roll.EvaluationUnsupported',
   [COMPANION_OUTCOMES.targetUnresolved]: 'FABRICATE.Check.Roll.TargetUnresolved',
   [COMPANION_OUTCOMES.poolUnresolved]: 'FABRICATE.Check.Roll.PoolUnresolved',
+  [COMPANION_OUTCOMES.additionalDiceRefused]: 'FABRICATE.Check.Roll.AdditionalDiceRefused',
   [COMPANION_OUTCOMES.invalidCallSite]: 'FABRICATE.Check.Roll.InvalidCallSite',
   [COMPANION_OUTCOMES.notElected]: 'FABRICATE.Check.Roll.NotElected',
   [COMPANION_OUTCOMES.gmOnly]: 'FABRICATE.Check.Roll.GMOnly',
@@ -545,35 +547,28 @@ const ROLLED_OUTCOMES = Object.freeze([
   COMPANION_OUTCOMES.rolled,
 ]);
 
+/** The key re-keying a graded answer (target, count, zero pool) or naming a refusal's reason. */
+function checkRollMessageKey(outcome, roll) {
+  if (outcome === COMPANION_OUTCOMES.additionalDiceRefused) return roll?.refusalKey ?? null;
+  const passed = outcome === COMPANION_OUTCOMES.checkPassed;
+  if (!passed && outcome !== COMPANION_OUTCOMES.checkFailed) return null;
+  const keys = CHECK_ROLL_MESSAGE_KEYS;
+  if (roll?.targetGraded === true) return passed ? keys.checkPassedTarget : keys.checkFailedTarget;
+  if (roll?.product !== 'count') return null;
+  if (passed) return keys.checkPassedCount;
+  return roll.zeroPool === true ? keys.checkFailedZeroPool : keys.checkFailedCount;
+}
+
 /**
  * Build `rollActorCheck`'s answer from the outcome and the runner-owned record, never a caller bag.
  * `passed` is `null` when ungraded and `total` is `null` for a refusal, while rolled `0` stays `0`.
  * Refusals use empty dice data and omit executed evaluation fields, which come only from the runner.
- * `roll.targetGraded` (issue 2003) picks `checkPassedTarget`/`checkFailedTarget` over the plain
- * `dc`-graded keys for a summed answer graded against a resolved target rather than a caller `dc`.
- * `roll.product === 'count'` (issue 2004) similarly picks `checkPassedCount`/`checkFailedCount`, or
- * `checkFailedZeroPool` when `roll.zeroPool` is set, over the summed keys.
  */
 export function checkRollResult(outcome, messageData = null, roll = null) {
   const rolled = ROLLED_OUTCOMES.includes(outcome);
   let passed = null;
   if (outcome === COMPANION_OUTCOMES.checkPassed) passed = true;
   else if (outcome === COMPANION_OUTCOMES.checkFailed) passed = false;
-  const targetGraded = rolled && roll?.targetGraded === true;
-  const countGraded = rolled && roll?.product === 'count';
-  let messageOverride;
-  if (targetGraded && outcome === COMPANION_OUTCOMES.checkPassed) {
-    messageOverride = CHECK_ROLL_MESSAGE_KEYS.checkPassedTarget;
-  } else if (targetGraded && outcome === COMPANION_OUTCOMES.checkFailed) {
-    messageOverride = CHECK_ROLL_MESSAGE_KEYS.checkFailedTarget;
-  } else if (countGraded && outcome === COMPANION_OUTCOMES.checkPassed) {
-    messageOverride = CHECK_ROLL_MESSAGE_KEYS.checkPassedCount;
-  } else if (countGraded && outcome === COMPANION_OUTCOMES.checkFailed) {
-    messageOverride =
-      roll?.zeroPool === true
-        ? CHECK_ROLL_MESSAGE_KEYS.checkFailedZeroPool
-        : CHECK_ROLL_MESSAGE_KEYS.checkFailedCount;
-  }
   return buildResult(
     outcome,
     CHECK_ROLL_MESSAGE_KEYS,
@@ -592,9 +587,10 @@ export function checkRollResult(outcome, messageData = null, roll = null) {
         margin: roll?.margin ?? null,
         successes: roll?.successes ?? null,
         cancelled: roll?.cancelled ?? null,
+        boughtDice: roll?.boughtDice ?? 0,
       }),
     },
-    messageOverride
+    checkRollMessageKey(outcome, roll)
   );
 }
 
@@ -872,6 +868,10 @@ export function gateCompanionCallSite(request, seams) {
   }
   return null;
 }
+
+/** A purchase's call-site refusal (issue 2008): a broadcast runs on every client, so none spends. */
+export const additionalDiceCallSiteRefusal = (request) =>
+  request?.callSite === COMPANION_CALL_SITES.broadcast ? 'broadcastCallSite' : null;
 
 /**
  * Resolve one address, logging a throw and answering `null` so a `stable` member never throws.

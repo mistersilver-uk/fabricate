@@ -23,7 +23,7 @@ describe('companion check evaluation boundary', () => {
         { product: 'count', direction: 'over', targetSources: ['fixed', 'attribute'], interactive: true },
         { product: 'count', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: true },
       ],
-      additionalDice: false,
+      additionalDice: true,
     });
     assert.ok(Object.isFrozen(CHECK_EVALUATION_CAPABILITIES));
     assert.ok(Object.isFrozen(CHECK_EVALUATION_CAPABILITIES.modes));

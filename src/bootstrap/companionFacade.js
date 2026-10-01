@@ -279,6 +279,7 @@ export const companionFacade = {
       label = null,
       interactive = false,
       rollDecision = null,
+      additionalDice = 0,
     } = request;
     const gate = this._requireGmActor(actorId, ROLL_ACTOR_CHECK_GATE_KEYS);
     if (gate.outcome || this.ready !== true) {
@@ -294,6 +295,7 @@ export const companionFacade = {
         label,
         interactive,
         rollDecision,
+        additionalDice,
         evaluation: readRequestEvaluation(request),
       },
       this._companionCheckSeams()

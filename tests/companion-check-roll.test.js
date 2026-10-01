@@ -3,6 +3,10 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import {
+  ADDITIONAL_DICE_REFUSALS,
+  additionalDiceRefusalKey,
+} from '../src/systems/additionalDiceReach.js';
 import { runFormulaPassFail, runFormulaProgressive } from '../src/systems/checkRoll.js';
 import { CHECK_EVALUATION_CAPABILITIES } from '../src/systems/companionCheckEvaluation.js';
 import { resolveBulkCheckDecision, rollActorCheck } from '../src/systems/companionCheckRoll.js';
@@ -11,6 +15,7 @@ import {
   CHECK_ROLL_MESSAGE_KEYS,
   COMPANION_OUTCOMES,
 } from '../src/systems/companionContract.js';
+import { CountRollRefusal } from '../src/systems/countRoll.js';
 import {
   buildInteractiveRollOptions,
   promptCheckRoll,
@@ -223,7 +228,16 @@ function assertCheckAnswerShape(result) {
       'diceGroups',
       'resolvedFormula',
       ...(executed
-        ? ['product', 'direction', 'comparison', 'target', 'margin', 'successes', 'cancelled']
+        ? [
+            'product',
+            'direction',
+            'comparison',
+            'target',
+            'margin',
+            'successes',
+            'cancelled',
+            'boughtDice',
+          ]
         : []),
       'outcome',
       'message',
@@ -231,9 +245,21 @@ function assertCheckAnswerShape(result) {
     "the answer's key set (and its order) is the published contract"
   );
   assertLocalizationKey(result.message, `rollActorCheck's ${result.outcome}`);
-  assertMessageIsFromTable(result, CHECK_ROLL_MESSAGE_KEYS, "rollActorCheck's answer");
+  // An additional-dice refusal (issue 2008) speaks in its reason's words from `additionalDice.js`.
+  const refused = result.outcome === COMPANION_OUTCOMES.additionalDiceRefused;
+  const table = refused ? ADDITIONAL_DICE_REFUSED_KEYS : CHECK_ROLL_MESSAGE_KEYS;
+  assertMessageIsFromTable(result, table, "rollActorCheck's answer");
   assertMessageDataCovers(result, `rollActorCheck's ${result.outcome} answer`);
 }
+
+/** Every key an additional-dice refusal may answer with: each reason, labelled or not, by source. */
+const ADDITIONAL_DICE_REFUSED_KEYS = Object.freeze(
+  ADDITIONAL_DICE_REFUSALS.flatMap((reason) =>
+    ['path', 'macro'].flatMap((source) =>
+      ['', 'Momentum'].map((label) => additionalDiceRefusalKey(reason, { label, source }))
+    )
+  )
+);
 
 function assertBulkAnswerShape(result) {
   assert.ok(Object.isFrozen(result), 'a contract answer crosses the boundary frozen');
@@ -657,6 +683,8 @@ describe('AC-9 — the module rolls nothing and reaches nothing it was not given
             '../utils/craftingCheckExpression.js',
             // The one advantage offer derivation (issue 2007), called with no dice engine.
             './checkAdvantage.js',
+            // The refusal keys an additional-dice refusal answers with (issue 2008); it rolls nothing.
+            './additionalDiceReach.js',
             './checkTarget.js',
             './companionCheckEvaluation.js',
             './companionContract.js',
@@ -673,7 +701,11 @@ describe('AC-9 — the module rolls nothing and reaches nothing it was not given
   // re-derivation would be invisible to every behavioural case here: both copies would agree on
   // the fixtures at hand, and drift only later.
   defineStructureContract('takes the CALL-SITE rule from the contract', MODULE, {
-    importsName: [['./companionContract.js', 'gateCompanionCallSite']],
+    importsName: [
+      ['./companionContract.js', 'gateCompanionCallSite'],
+      // Buying is the contract's call-site rule too (issue 2008): a broadcast spends nothing.
+      ['./companionContract.js', 'additionalDiceCallSiteRefusal'],
+    ],
     namesNo: ['COMPANION_CALL_SITES'],
     spellsNo: ['gmAction', 'broadcast'],
   });
@@ -729,16 +761,8 @@ describe('AC-10 — every REAL answer carries a key from its own member table', 
     );
     record(await rollActorCheck(request({ rollDecision: { bonus: '+1' } }), makeSeams().seams));
     record(await rollActorCheck(request({ evaluation: null }), makeSeams().seams));
-    // Additional dice stay unsupported on an interactive count until issue 2008.
-    record(
-      await rollActorCheck(
-        request({
-          interactive: true,
-          evaluation: { product: 'count', pool: { additionalDice: { enabled: true } } },
-        }),
-        makeSeams().seams
-      )
-    );
+    // A summed check offers no additional dice (issue 2008).
+    record(await rollActorCheck(request({ additionalDice: 1 }), makeSeams().seams));
     record(
       await rollActorCheck(
         request({ evaluation: { product: 'count', pool: { base: '@missing.pool' } } }),
@@ -773,12 +797,12 @@ describe('AC-10 — every REAL answer carries a key from its own member table', 
     assert.deepEqual(
       [...emitted].sort(),
       [
+        'additionalDiceRefused',
         'cancelled',
         'checkFailed',
         'checkPassed',
         'engineUnavailable',
         'evaluationInvalid',
-        'evaluationUnsupported',
         'invalidCallSite',
         'invalidRollDecision',
         'noFormula',
@@ -872,15 +896,8 @@ describe('AC-12 — compare at the boundary, where total EQUALS dc', () => {
 });
 
 describe('evaluation dispatch and executed evidence', () => {
-  it('refuses malformed and unavailable modes before formula, engine, prompt or runners', async () => {
-    const cases = [
-      [{ product: 'count', pool: { die: '6' } }, 'evaluationInvalid'],
-      [{ product: 'count', pool: { additionalDice: { enabled: true } } }, 'evaluationUnsupported'],
-      [
-        { product: 'count', direction: 'under', pool: { additionalDice: { enabled: true } } },
-        'evaluationUnsupported',
-      ],
-    ];
+  it('refuses malformed modes before formula, engine, prompt or runners', async () => {
+    const cases = [[{ product: 'count', pool: { die: '6' } }, 'evaluationInvalid']];
     for (const [evaluation, outcome] of cases) {
       const { seams, calls } = makeSeams({ hasDiceEngine: () => { throw new Error('engine read'); } });
       const result = await rollActorCheck(
@@ -1105,14 +1122,14 @@ describe('attribute dispatch and roll-under (QE15, F1, D10)', () => {
     }
   });
 
-  it('keeps additional dice refused on an interactive count request, before any prompt or roll (issue 2008)', async () => {
-    const additional = { additionalDice: { enabled: true, source: 'path', path: 'system.momentum', max: 2 } };
+  it('rolls an interactive count with additional dice enabled rather than refusing it (issue 2008)', async () => {
+    const additional = { additionalDice: { enabled: true, source: 'path', path: '', max: 2 } };
     const cases = [
-      ['additional dice, prompted', {}],
-      ['additional dice, forwarded', { rollDecision: { bonus: null, advantage: 'normal' } }],
+      ['additional dice, prompted', {}, 1],
+      ['additional dice, forwarded', { rollDecision: { bonus: null, advantage: 'normal' } }, 0],
     ];
     for (const direction of ['over', 'under']) {
-      for (const [name, extra] of cases) {
+      for (const [name, extra, prompts] of cases) {
         installChat();
         const dice = installCountDice({ faces: [9, 9] });
         try {
@@ -1125,9 +1142,14 @@ describe('attribute dispatch and roll-under (QE15, F1, D10)', () => {
             }),
             seams
           );
-          assert.equal(result.outcome, 'evaluationUnsupported', `${direction}: ${name}`);
-          assert.equal(calls.prompt.length, 0, `${direction}: ${name} opens no prompt`);
-          assert.deepEqual(dice.constructed, [], `${direction}: ${name} constructs no Roll`);
+          assert.notEqual(result.outcome, 'evaluationUnsupported', `${direction}: ${name}`);
+          assert.equal(result.success, true, `${direction}: ${name} rolled`);
+          assert.equal(result.boughtDice, 0, `${direction}: ${name} bought nothing`);
+          assert.equal(calls.prompt.length, prompts, `${direction}: ${name} prompts`);
+          assert.equal(dice.posts.length, 1, `${direction}: ${name} posts its count Roll`);
+          if (prompts) {
+            assert.equal(calls.prompt[0].additionalDiceOffer.unavailable, 'sourceMissing');
+          }
         } finally {
           dice.restore();
         }
@@ -1557,7 +1579,7 @@ describe('AC-14 — nothing a caller supplies reaches the runner or the roll opt
   });
 });
 
-describe('AC-14 — the rollDecision the caller forwards is read as THREE NAMED KEYS', () => {
+describe('AC-14 — the rollDecision the caller forwards is read as FOUR NAMED KEYS', () => {
   it('cannot widen the nested decision either, however much it carries', async () => {
     // The third level, and the one the hostile case above cannot reach: a `rollDecision` is
     // refused outright for a non-interactive roll, so the criterion's own hostile request —
@@ -1590,13 +1612,14 @@ describe('AC-14 — the rollDecision the caller forwards is read as THREE NAMED 
     const [bag] = calls.runPassFail;
     assert.deepEqual(
       Object.keys(bag.rollOptions.rollDecision),
-      ['bonus', 'rollMode', 'advantage'],
-      'the decision is read as three NAMED keys, so nothing else the caller attached survives'
+      ['bonus', 'rollMode', 'advantage', 'additionalDice'],
+      'the decision is read as four NAMED keys, so nothing else the caller attached survives'
     );
     assert.deepEqual(bag.rollOptions.rollDecision, {
       bonus: '+3',
       rollMode: 'blindroll',
       advantage: 'advantage',
+      additionalDice: undefined,
     });
     assert.equal(bag.rollOptions.prompt, seams.prompt, 'and the SEAM prompt still stands');
   });
@@ -1988,5 +2011,389 @@ describe('interactive summed rows compose with the shared prompt and a forwarded
       assert.ok(rolled.evaluated.includes(EXPECTED[key].formula), `${key}: ${rolled.evaluated}`);
       assert.equal(result.target, EXPECTED[key].target, key);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Additional dice through the standalone check roll (issue 2008)
+// ---------------------------------------------------------------------------
+
+const MOMENTUM = 'system.resources.momentum.value';
+const PAID = Object.freeze({
+  enabled: true,
+  source: 'path',
+  path: MOMENTUM,
+  max: 2,
+  label: 'Momentum',
+});
+const MACRO_PAID = Object.freeze({
+  enabled: true,
+  source: 'macro',
+  readMacroUuid: 'Macro.read',
+  spendMacroUuid: 'Macro.spend',
+  max: 2,
+  label: '',
+});
+const CALLING_GM = Object.freeze({ id: 'user-gm', isGM: true });
+
+const pathValue = (object, path) =>
+  String(path)
+    .split('.')
+    .reduce((node, key) => node?.[key], object);
+
+/**
+ * A character whose `_source` holds `momentum`, which `update` writes and records as core does:
+ * `refuse` resolves `undefined`, as a vetoed write does, and `writable` answers `canUserModify`.
+ */
+function payingActor(momentum, { writable = true, refuse = false } = {}) {
+  const source = { system: { resources: { momentum: { value: momentum } } } };
+  const writes = [];
+  const actor = {
+    id: 'actor-1',
+    uuid: 'Actor.actor-1',
+    name: 'Idrin',
+    getRollData: () => ({}),
+    overrides: {},
+    canUserModify: () => writable,
+    async update(patch) {
+      writes.push(patch[MOMENTUM]);
+      if (refuse) return undefined;
+      source.system.resources.momentum.value = patch[MOMENTUM];
+      return actor;
+    },
+  };
+  Object.defineProperty(actor, '_source', { get: () => source });
+  return { actor, writes, held: () => source.system.resources.momentum.value };
+}
+
+/** Read and spend script macros that record each payload; `spent` is the spend's answer. */
+function installPayingMacros({ available = 2, spent = true } = {}) {
+  const calls = { reads: [], spends: [] };
+  const probe = { calls, available, spent };
+  const script = (list, answer) => ({
+    type: 'script',
+    command: `const p = globalThis.companionMacroProbe; p.calls.${list}.push(scope); return p.${answer};`,
+  });
+  const macros = { 'Macro.read': script('reads', 'available'), 'Macro.spend': script('spends', 'spent') };
+  Object.assign(globalThis, {
+    companionMacroProbe: probe,
+    fromUuid: async (uuid) => macros[uuid] ?? null,
+  });
+  return calls;
+}
+
+/** Count dice scripted with `faces`, the calling GM and core's two read helpers, all restored. */
+async function withPaidDice(faces, body) {
+  const saved = ['foundry', 'fromUuid', 'companionMacroProbe'].map((key) => [key, globalThis[key]]);
+  installChat();
+  Object.assign(globalThis.game, { user: CALLING_GM });
+  Object.assign(globalThis, {
+    foundry: {
+      utils: {
+        getProperty: pathValue,
+        hasProperty: (object, path) => pathValue(object, path) !== undefined,
+      },
+    },
+  });
+  const dice = installCountDice({ faces });
+  try {
+    return await body(dice);
+  } finally {
+    dice.restore();
+    for (const [key, value] of saved) {
+      if (value === undefined) delete globalThis[key];
+      else Object.assign(globalThis, { [key]: value });
+    }
+  }
+}
+
+/** A d10 pool of 2 at ≥ 8 needing 1, paid for by `additionalDice`. */
+const paidEvaluation = (additionalDice = PAID) => countEvaluation({ additionalDice });
+
+/** A seam bag whose prompt records each offer and answers `answer`. */
+function promptingSeams(answer) {
+  const offers = [];
+  const made = makeSeams({
+    real: true,
+    prompt: async (input) => {
+      offers.push(input.additionalDiceOffer);
+      return { confirmed: true, ...answer };
+    },
+  });
+  return { ...made, offers };
+}
+
+describe('additional dice through the standalone check roll (issue 2008)', () => {
+  it('buys a gmAction request its dice, spends them before the roll and reports boughtDice', async () => {
+    await withPaidDice([9, 9, 3], async (dice) => {
+      const { actor, writes, held } = payingActor(2);
+      const { seams, calls } = makeSeams({ real: true });
+      const result = await rollActorCheck(
+        request({ actor, evaluation: paidEvaluation(), additionalDice: 1 }),
+        seams
+      );
+      assertCheckAnswerShape(result);
+      assert.equal(result.outcome, 'checkPassed');
+      assert.equal(result.boughtDice, 1);
+      assert.deepEqual([writes, held()], [[1], 1], 'one Momentum spent');
+      assert.equal(calls.runPassFail[0].rollOptions.additionalDice, 1);
+      assert.equal(calls.prompt.length, 0, 'a non-interactive purchase opens no prompt');
+      assert.equal(dice.constructed.length, 1, 'one count Roll');
+      assert.equal(result.diceGroups[0].results.length, 3, 'two authored dice and one bought');
+    });
+  });
+
+  it('answers boughtDice 0 on an executed roll that bought none, and spends nothing', async () => {
+    await withPaidDice([9, 9], async () => {
+      const { actor, writes } = payingActor(2);
+      const counted = await rollActorCheck(
+        request({ actor, evaluation: paidEvaluation() }),
+        makeSeams({ real: true }).seams
+      );
+      assertCheckAnswerShape(counted);
+      assert.deepEqual([counted.outcome, counted.boughtDice, writes], ['checkPassed', 0, []]);
+    });
+    installChat();
+    installRoll();
+    const summed = await rollActorCheck(request({ dc: 15 }), makeSeams({ real: true }).seams);
+    assert.deepEqual([summed.outcome, summed.boughtDice], ['checkPassed', 0]);
+  });
+
+  it('opens the prompt for an interactive count with the offer, and buys what the player answers', async () => {
+    await withPaidDice([9, 9, 3], async (dice) => {
+      const { actor, writes } = payingActor(2);
+      const { seams, offers } = promptingSeams({ additionalDice: 1 });
+      const result = await rollActorCheck(
+        request({ actor, interactive: true, evaluation: paidEvaluation() }),
+        seams
+      );
+      assert.equal(offers.length, 1, 'one prompt, rather than an evaluationUnsupported refusal');
+      const { reach, ...offer } = offers[0];
+      assert.deepEqual(offer, {
+        available: 2,
+        limit: 2,
+        max: 2,
+        resourceLabel: 'Momentum',
+        unavailable: null,
+      });
+      assert.ok(reach, 'the prompt may judge reach');
+      assert.deepEqual([result.outcome, result.boughtDice, writes], ['checkPassed', 1, [1]]);
+      assert.equal(dice.posts[0].rolls[0].dice[0].results.length, 3);
+    });
+  });
+
+  it('buys a forwarded rollDecision.additionalDice without a prompt, and simulates nothing', async () => {
+    await withPaidDice([9, 9, 3, 9, 9], async (dice) => {
+      const { actor, writes } = payingActor(2);
+      const { seams, calls } = makeSeams({ real: true });
+      const result = await rollActorCheck(
+        {
+          ...request({ actor, interactive: true, evaluation: paidEvaluation() }),
+          rollDecision: { bonus: null, advantage: 'normal', additionalDice: 1, simulatedAdditionalDice: 2 },
+          simulatedAdditionalDice: 2,
+        },
+        seams
+      );
+      const { rollOptions } = calls.runPassFail[0];
+      assert.equal(calls.prompt.length, 0);
+      assert.deepEqual(rollOptions.rollDecision, {
+        bonus: null,
+        rollMode: undefined,
+        advantage: 'normal',
+        additionalDice: 1,
+      });
+      assert.equal('simulatedAdditionalDice' in rollOptions, false, 'the preview seam is never reachable');
+      assert.equal('additionalDice' in rollOptions, false, 'only the decision buys on an interactive request');
+      assert.deepEqual([result.boughtDice, writes], [1, [1]]);
+      assert.equal(dice.posts[0].rolls[0].dice[0].results.length, 3, 'one bought die, none simulated');
+    });
+  });
+
+  it('buys nothing on a broadcast: it refuses before any read and shows the prompt why', async () => {
+    await withPaidDice([9, 9], async (dice) => {
+      const macroCalls = installPayingMacros();
+      const { actor } = payingActor(2);
+      const broadcast = { actor, callSite: 'broadcast', evaluation: paidEvaluation(MACRO_PAID) };
+      const direct = makeSeams({ real: true });
+      const refused = await rollActorCheck(request({ ...broadcast, additionalDice: 1 }), direct.seams);
+      assertCheckAnswerShape(refused);
+      assert.deepEqual(
+        [refused.outcome, refused.messageData.reason, refused.message],
+        ['additionalDiceRefused', 'broadcastCallSite', additionalDiceRefusalKey('broadcastCallSite')]
+      );
+      assert.equal(direct.calls.runPassFail.length, 0, 'refused before the runner');
+
+      const buying = promptingSeams({ additionalDice: 1 });
+      const answered = await rollActorCheck(request({ ...broadcast, interactive: true }), buying.seams);
+      assert.equal(buying.offers[0].unavailable, 'broadcastCallSite', 'the prompt shows the reason');
+      assert.deepEqual(buying.offers[0].available, 0);
+      assert.deepEqual(
+        [answered.outcome, answered.messageData.reason],
+        ['additionalDiceRefused', 'broadcastCallSite']
+      );
+
+      const plain = promptingSeams({ additionalDice: 0 });
+      const rolled = await rollActorCheck(request({ ...broadcast, interactive: true }), plain.seams);
+      assert.deepEqual([rolled.outcome, rolled.boughtDice], ['checkPassed', 0]);
+      assert.deepEqual(macroCalls, { reads: [], spends: [] }, 'no read or spend macro ran');
+      assert.equal(dice.posts.length, 1, 'only the roll that bought nothing posted');
+    });
+  });
+
+  it('refuses invalidRollDecision for a top-level additionalDice on an interactive request', async () => {
+    await withPaidDice([9, 9, 9, 9], async (dice) => {
+      const { actor, writes } = payingActor(2);
+      for (const additionalDice of [1, '0', -1]) {
+        const { seams, calls } = makeSeams({ real: true });
+        const result = await rollActorCheck(
+          request({ actor, interactive: true, evaluation: paidEvaluation(), additionalDice }),
+          seams
+        );
+        assertCheckAnswerShape(result);
+        assert.equal(result.outcome, 'invalidRollDecision', JSON.stringify(additionalDice));
+        assert.deepEqual([calls.prompt.length, calls.runPassFail.length], [0, 0]);
+      }
+      assert.deepEqual([writes, dice.posts.length], [[], 0]);
+      for (const additionalDice of [0, null]) {
+        const { seams, calls } = makeSeams({ real: true });
+        const result = await rollActorCheck(
+          request({ actor, interactive: true, evaluation: paidEvaluation(), additionalDice }),
+          seams
+        );
+        assert.equal(result.outcome, 'checkPassed', `${additionalDice} names no dice`);
+        assert.equal(calls.prompt.length, 1);
+      }
+    });
+  });
+
+  it('answers every refusal additionalDiceRefused, in its reason words, with nothing rolled', async () => {
+    const off = { ...PAID, enabled: false };
+    const cases = [
+      ['a summed check', { evaluation: { product: 'sum' }, additionalDice: 1 }, {}, 'notOffered'],
+      ['additional dice off', { evaluation: paidEvaluation(off), additionalDice: 1 }, {}, 'notOffered'],
+      ['a negative count', { additionalDice: -1 }, {}, 'choiceInvalid'],
+      ['a fractional count', { additionalDice: 1.5 }, {}, 'choiceInvalid'],
+      ['a numeric string', { additionalDice: '1' }, {}, 'choiceInvalid'],
+      ['a count above the limit', { additionalDice: 3 }, {}, 'choiceAboveLimit'],
+      [
+        'a forwarded count above the limit',
+        { interactive: true, rollDecision: { advantage: 'normal', additionalDice: 3 } },
+        {},
+        'choiceAboveLimit',
+      ],
+      ['a resource the GM cannot change', { additionalDice: 1 }, { writable: false }, 'resourceNotWritable'],
+      [
+        'an unlabelled resource the GM cannot change',
+        { evaluation: paidEvaluation({ ...PAID, label: '' }), additionalDice: 1 },
+        { writable: false },
+        'resourceNotWritable',
+      ],
+      ['a vetoed write', { additionalDice: 1 }, { refuse: true }, 'spendRefused'],
+      ['a failing spend macro', { evaluation: paidEvaluation(MACRO_PAID), additionalDice: 1 }, {}, 'spendRefused'],
+    ];
+    for (const [name, extra, holding, reason] of cases) {
+      await withPaidDice([9, 9, 9], async (dice) => {
+        installPayingMacros({ available: 5, spent: false });
+        const { actor } = payingActor(5, holding);
+        const evaluation = extra.evaluation ?? paidEvaluation();
+        const { seams } = makeSeams({ real: true });
+        const result = await rollActorCheck(request({ actor, evaluation, ...extra }), seams);
+        assertCheckAnswerShape(result);
+        const { label = '', source } = evaluation.pool?.additionalDice ?? {};
+        assert.equal(result.outcome, 'additionalDiceRefused', name);
+        assert.deepEqual([result.success, result.total], [false, null], name);
+        assert.equal(result.messageData.reason, reason, name);
+        assert.equal(result.message, additionalDiceRefusalKey(reason, { label, source }), name);
+        assert.equal('boughtDice' in result, false, `${name}: a refusal carries no executed field`);
+        assert.deepEqual(dice.constructed, [], `${name}: no Roll constructed`);
+      });
+    }
+  });
+
+  it('names the facts its sentence needs once the engine read a budget', async () => {
+    await withPaidDice([9, 9, 9], async () => {
+      const { actor } = payingActor(5);
+      const result = await rollActorCheck(
+        request({ actor, evaluation: paidEvaluation(), additionalDice: 3 }),
+        makeSeams({ real: true }).seams
+      );
+      assert.deepEqual(result.messageData, {
+        label: 'Fabricate',
+        reason: 'choiceAboveLimit',
+        actor: 'Idrin',
+        resource: 'Momentum',
+        n: 3,
+        limit: 2,
+        available: 5,
+      });
+      assertMessageDataCovers(result, 'an above-limit refusal');
+    });
+  });
+
+  it('discriminates a refusal before the cancelled shape it shares (AD63)', async () => {
+    const shared = { success: false, cancelled: true, outcome: null, value: null, data: {} };
+    const notice = { dice: 2, limit: 2, available: 1, label: 'Momentum', source: 'path' };
+    const refusal = { ...shared, additionalDiceRefusal: 'resourceChanged', additionalDiceNotice: notice };
+    const evaluation = paidEvaluation();
+    for (const [result, outcome] of [
+      [refusal, 'additionalDiceRefused'],
+      [shared, 'cancelled'],
+    ]) {
+      const { seams } = makeSeams({ runPassFail: async () => result });
+      const answer = await rollActorCheck(request({ evaluation }), seams);
+      assertCheckAnswerShape(answer);
+      assert.equal(answer.outcome, outcome);
+    }
+    const { seams } = makeSeams({ runPassFail: async () => refusal });
+    const answer = await rollActorCheck(request({ evaluation }), seams);
+    assert.equal(answer.message, additionalDiceRefusalKey('resourceChanged', { label: 'Momentum' }));
+    assert.deepEqual(answer.messageData, {
+      label: 'Fabricate',
+      reason: 'resourceChanged',
+      actor: 'Idrin',
+      resource: 'Momentum',
+      n: 2,
+      limit: 2,
+      available: 1,
+    });
+  });
+
+  it('answers evaluationInvalid naming the spent dice when the Roll refuses after the spend', async () => {
+    await withPaidDice([], async (dice) => {
+      dice.CountRoll.prototype.evaluate = async () => {
+        throw new CountRollRefusal('explode-unbounded', 'explode');
+      };
+      const { actor, writes } = payingActor(2);
+      const result = await rollActorCheck(
+        request({ actor, evaluation: paidEvaluation(), additionalDice: 1 }),
+        makeSeams({ real: true }).seams
+      );
+      assertCheckAnswerShape(result);
+      assert.equal(result.outcome, 'evaluationInvalid');
+      assert.deepEqual(result.messageData, { label: 'Fabricate', boughtDice: 1 });
+      assert.deepEqual(writes, [1], 'nothing refunds');
+    });
+  });
+
+  it('hands the read and spend macros the calling GM and no crafting subject', async () => {
+    await withPaidDice([9, 9, 3], async () => {
+      const macroCalls = installPayingMacros();
+      const { actor } = payingActor(0);
+      const result = await rollActorCheck(
+        request({ actor, evaluation: paidEvaluation(MACRO_PAID), additionalDice: 1 }),
+        makeSeams({ real: true }).seams
+      );
+      assert.equal(result.boughtDice, 1);
+      assert.equal(macroCalls.spends.length, 1);
+      for (const payload of [macroCalls.reads[0], macroCalls.spends[0]]) {
+        assert.equal(payload.actor, actor);
+        assert.equal(payload.user, CALLING_GM);
+        assert.deepEqual(
+          [payload.craftingSystem, payload.activity, payload.recipe, payload.component, payload.task],
+          [null, null, null, null, null]
+        );
+      }
+      assert.deepEqual([macroCalls.spends[0].dice, macroCalls.spends[0].delta], [1, -1]);
+    });
   });
 });

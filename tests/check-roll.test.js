@@ -3,6 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { installCountDice } from './helpers/countEngineDice.js';
 import { installTermBearingRoll } from './helpers/termBearingRoll.js';
 
 const {
@@ -1788,26 +1789,35 @@ test('executed simple evidence records the raw sum/over comparison under a force
   );
 });
 
-test('standalone companion check refuses an unpublished mode before the current over runner', async () => {
-  stubRoll(8);
-  // Active additional dice are unpublished on an interactive count until issue 2008.
-  const result = await rollActorCheck(
-    { actor: ACTOR, callSite: 'gmAction', formula: '1d20', dc: 10, interactive: true,
-      evaluation: { product: 'count', direction: 'under', pool: { additionalDice: { enabled: true } } } },
-    {
-      isElectedExecutor: () => true,
-      hasDiceEngine: () => true,
-      localize: (_key, fallback) => fallback,
-      buildRollOptions: () => ({ post: false }),
-      prompt: async () => ({ confirmed: true }),
-      runPassFail: runFormulaPassFail,
-      runProgressive: runFormulaProgressive,
-    }
-  );
-  assert.equal(result.outcome, 'evaluationUnsupported');
-  assert.equal(result.success, false);
-  assert.equal(result.total, null);
-  assert.deepEqual(evaluateArgs, [], 'the unsupported mode never reached the dice engine');
+test('standalone companion check prompts and rolls an interactive count with additional dice enabled', async () => {
+  // The interim refusal is gone (issue 2008): the prompt offers the dice, here with no source set.
+  const dice = installCountDice({ faces: [9, 3] });
+  const offers = [];
+  try {
+    const result = await rollActorCheck(
+      { actor: ACTOR, callSite: 'gmAction', formula: '1d20', dc: 10, interactive: true,
+        evaluation: { product: 'count', direction: 'under', pool: { additionalDice: { enabled: true } } } },
+      {
+        isElectedExecutor: () => true,
+        hasDiceEngine: () => true,
+        localize: (_key, fallback) => fallback,
+        buildRollOptions: ({ interactive }) => ({ interactive, post: false }),
+        prompt: async ({ additionalDiceOffer }) => {
+          offers.push(additionalDiceOffer);
+          return { confirmed: true };
+        },
+        runPassFail: runFormulaPassFail,
+        runProgressive: runFormulaProgressive,
+      }
+    );
+    assert.equal(result.outcome, 'checkPassed', 'one of the two authored dice at or under 8');
+    assert.deepEqual([result.total, result.boughtDice], [1, 0]);
+    assert.equal(offers.length, 1, 'the prompt opened, offering the additional dice');
+    assert.equal(offers[0].unavailable, 'sourceMissing');
+    assert.equal(dice.constructed.length, 1, 'the count Roll reached the dice engine');
+  } finally {
+    dice.restore();
+  }
 });
 
 test('gathering routed adapter keeps inert count pool data while executing sum/over', async () => {

@@ -5,6 +5,7 @@
 
 import { stripRetiredModifierPlaceholder } from '../utils/craftingCheckExpression.js';
 
+import { additionalDiceRefusalKey } from './additionalDiceReach.js';
 import { intersectAdvantageOffers, resolveAdvantageOffer } from './checkAdvantage.js';
 import { isFixedSumOver, resolveCheckTarget, selectTargetAdjustment } from './checkTarget.js';
 import {
@@ -14,6 +15,7 @@ import {
 import {
   CHECK_ROLL_DEFAULT_LABEL,
   COMPANION_OUTCOMES,
+  additionalDiceCallSiteRefusal,
   bulkCheckDecisionResult,
   checkRollResult,
   gateCompanionCallSite,
@@ -53,13 +55,15 @@ function countRefusalOutcome(result) {
 }
 
 /**
- * The ordered outcome ladder for both runners: `cancelled === true` first, then (for a count
- * request only) a `misconfigured` pool refusal, then `value === null` (strictly: a rolled `0` is
- * falsy) as `rollFailed`, then `outcome`, ungraded answering `rolled`. The null step is sound only
- * because both pre-dispatch gates ran: `evaluateCheckRoll` also answers `value: null` with no
+ * The ordered outcome ladder for both runners: an additional-dice refusal (issue 2008) before the
+ * `cancelled === true` shape it shares, then that dismissal, then (for a count request only) a
+ * `misconfigured` pool refusal, then `value === null` (strictly: a rolled `0` is falsy) as
+ * `rollFailed`, then `outcome`, ungraded answering `rolled`. The null step is sound only because
+ * both pre-dispatch gates ran: `evaluateCheckRoll` also answers `value: null` with no
  * `globalThis.Roll` and for a post-shim-empty formula.
  */
 function discriminateCheckOutcome(result, graded, counted = false) {
+  if (result?.additionalDiceRefusal) return COMPANION_OUTCOMES.additionalDiceRefused;
   if (result?.cancelled === true) return COMPANION_OUTCOMES.cancelled;
   if (counted && result?.misconfigured === true) return countRefusalOutcome(result);
   if (result?.value === null) return COMPANION_OUTCOMES.rollFailed;
@@ -70,7 +74,7 @@ function discriminateCheckOutcome(result, graded, counted = false) {
 }
 
 async function runStandaloneCheck(
-  { formula, dc, compare, actor, label, interactive, rollDecision, evaluation },
+  { formula, dc, compare, actor, label, interactive, rollDecision, evaluation, purchase },
   seams
 ) {
   const graded = Number.isFinite(dc);
@@ -85,11 +89,13 @@ async function runStandaloneCheck(
   // Fabricate's own prompt owns dismissal, since Foundry's RollResolver fulfils rather than aborts on close; set after the builder so a test seam can inject a dismissing prompt.
   rollOptions.prompt = seams.prompt;
   rollOptions.advantage = COMPANION_ADVANTAGE;
+  Object.assign(rollOptions, purchase);
   if (rollDecision) {
     rollOptions.rollDecision = {
       bonus: rollDecision.bonus,
       rollMode: rollDecision.rollMode,
       advantage: rollDecision.advantage,
+      additionalDice: rollDecision.additionalDice,
     };
   }
   const result = graded
@@ -175,12 +181,69 @@ function companionCheckMessageData({
   return fixedOver ? { label, total, dc } : { label, total, target };
 }
 
+/** Whether a request names bought dice at all: any value but absent, `null` or `0`. */
+function namesAdditionalDice(value) {
+  return value !== undefined && value !== null && value !== 0;
+}
+
 /**
- * Discriminate a settled runner result into `rollActorCheck`'s answer: a dismissal, a count pool
- * refusal (before any executed evidence), a generic roll failure, or the executed evidence.
+ * The additional-dice refusal a request earns before any budget read (issue 2008), or null: a
+ * count its evaluation does not offer, one that is not a whole number of 0 or more, or any
+ * purchase on a `broadcast` call site. The limit, availability and the spend are the engine's.
  */
-function buildCheckRollAnswer({ result, graded, counted, evaluation, label, dc }) {
+function additionalDiceRequestRefusal({ requested, request }, evaluation) {
+  if (!namesAdditionalDice(requested)) return null;
+  if (evaluation.product !== 'count' || evaluation.pool.additionalDice.enabled !== true) {
+    return 'notOffered';
+  }
+  if (!Number.isInteger(requested) || requested < 0) return 'choiceInvalid';
+  return additionalDiceCallSiteRefusal(request);
+}
+
+/**
+ * The roll options a purchase adds: a non-interactive request's count, and the unavailable reason
+ * a call site that may not spend shows on the prompt.
+ */
+function additionalDiceOptions({ interactive, requested, request }) {
+  const forcedUnavailable = additionalDiceCallSiteRefusal(request);
+  return {
+    ...(!interactive && namesAdditionalDice(requested) && { additionalDice: requested }),
+    ...(forcedUnavailable && { forcedUnavailable }),
+  };
+}
+
+/**
+ * An `additionalDiceRefused` answer: its reason, the reason's key for the authored Resource name
+ * and source, and every fact that key names, from the engine's notice once it read a budget.
+ */
+function additionalDiceRefusedAnswer({ reason, label, evaluation, actor, notice = {} }) {
+  const { label: resource, source } = evaluation.pool.additionalDice;
+  return checkRollResult(
+    COMPANION_OUTCOMES.additionalDiceRefused,
+    {
+      label,
+      reason,
+      actor: actor?.name ?? '',
+      resource,
+      n: Number.isInteger(notice.dice) ? notice.dice : null,
+      limit: notice.limit ?? 0,
+      available: notice.available ?? 0,
+    },
+    { refusalKey: additionalDiceRefusalKey(reason, { label: resource, source }) }
+  );
+}
+
+/**
+ * Discriminate a settled runner result into `rollActorCheck`'s answer: an additional-dice refusal,
+ * a dismissal, a count pool refusal (before any executed evidence, naming any dice a refused Roll
+ * already spent), a generic roll failure, or the executed evidence.
+ */
+function buildCheckRollAnswer({ result, graded, counted, evaluation, label, dc, actor }) {
   const outcome = discriminateCheckOutcome(result, graded, counted);
+  if (outcome === COMPANION_OUTCOMES.additionalDiceRefused) {
+    const { additionalDiceRefusal: reason, additionalDiceNotice: notice } = result;
+    return additionalDiceRefusedAnswer({ reason, label, evaluation, actor, notice });
+  }
   if (outcome === COMPANION_OUTCOMES.cancelled) {
     return checkRollResult(COMPANION_OUTCOMES.cancelled, { label });
   }
@@ -194,7 +257,8 @@ function buildCheckRollAnswer({ result, graded, counted, evaluation, label, dc }
     outcome === COMPANION_OUTCOMES.poolUnresolved ||
     outcome === COMPANION_OUTCOMES.evaluationInvalid
   ) {
-    return checkRollResult(outcome, { label });
+    const bought = result.data?.boughtDice?.count;
+    return checkRollResult(outcome, bought ? { label, boughtDice: bought } : { label });
   }
   // `data.total`, never `value`: on the ungraded arm `value` is the awarding value a forced
   // outcome can overwrite.
@@ -225,6 +289,7 @@ function buildCheckRollAnswer({ result, graded, counted, evaluation, label, dc }
     cancelled: result.data.cancelled,
     targetGraded: graded && !counted && !fixedOver,
     zeroPool,
+    boughtDice: result.data.boughtDice?.count ?? 0,
   });
 }
 
@@ -247,23 +312,21 @@ export async function rollActorCheck(request, seams) {
 }
 
 /**
- * An interactive count request asking for what its prompt cannot offer yet: active additional
- * dice (issue 2008). Advantage and Disadvantage are supported (issue 2007): the shared advantage
- * offer moves the pool by `±countDice`. A non-interactive count rolls its authored pool alone.
+ * Whether a request carries a choice the evaluator would silently discard: a `rollDecision` with
+ * `interactive: false`, which `evaluateCheckRoll` reads only in its interactive branch, or an
+ * interactive request's top-level `additionalDice`, where the prompt or decision chooses instead.
  */
-function unsupportedInteractiveCount(evaluation, interactive) {
-  return (
-    interactive && evaluation.product === 'count' && evaluation.pool.additionalDice.enabled === true
-  );
+function discardsDecision(request, interactive) {
+  return interactive
+    ? namesAdditionalDice(request?.additionalDice)
+    : Boolean(request?.rollDecision);
 }
 
 async function settleRollActorCheck(request, seams) {
   const label = resolveCheckLabel(request?.label, seams);
   const interactive = request?.interactive === true;
   const rollDecision = request?.rollDecision ?? null;
-  // A decision with `interactive: false` is refused, not discarded: `evaluateCheckRoll` reads it
-  // only in its interactive branch, so the base formula would silently roll.
-  if (rollDecision && !interactive) {
+  if (discardsDecision(request, interactive)) {
     return checkRollResult(COMPANION_OUTCOMES.invalidRollDecision, { label });
   }
   // A forwarded prompt answer with `confirmed: false` is a decline; `confirmed` is read as a named
@@ -275,13 +338,21 @@ async function settleRollActorCheck(request, seams) {
   const resolved = resolveCompanionCheckEvaluation(request?.evaluation);
   if (!resolved.ok) return checkRollResult(COMPANION_OUTCOMES.evaluationInvalid, { label });
   const evaluation = resolved.evaluation;
-  if (
-    !supportsCompanionCheckEvaluation(evaluation, interactive) ||
-    unsupportedInteractiveCount(evaluation, interactive)
-  ) {
+  if (!supportsCompanionCheckEvaluation(evaluation, interactive)) {
     return checkRollResult(COMPANION_OUTCOMES.evaluationUnsupported, { label });
   }
   const counted = evaluation.product === 'count';
+  const actor = request?.actor ?? null;
+  const purchase = {
+    interactive,
+    requested: interactive ? rollDecision?.additionalDice : request?.additionalDice,
+    request,
+  };
+  const reason = additionalDiceRequestRefusal(purchase, evaluation);
+  if (reason) {
+    const notice = { dice: purchase.requested };
+    return additionalDiceRefusedAnswer({ reason, label, evaluation, actor, notice });
+  }
 
   // `noFormula` applies to sum only (issue 2004): `hasActiveCheck` reads a count evaluation as
   // active regardless of `formula`. Checked before `engineUnavailable`; safe either way, as the
@@ -294,7 +365,6 @@ async function settleRollActorCheck(request, seams) {
     return checkRollResult(COMPANION_OUTCOMES.engineUnavailable, { label });
   }
 
-  const actor = request?.actor ?? null;
   const targeting = resolveCompanionDc(evaluation, counted, request?.dc, actor);
   if (targeting.refusal) return checkRollResult(targeting.refusal, { label });
   const dc = targeting.dc;
@@ -312,6 +382,7 @@ async function settleRollActorCheck(request, seams) {
         interactive,
         rollDecision,
         evaluation,
+        purchase: additionalDiceOptions(purchase),
       },
       seams
     ));
@@ -322,7 +393,7 @@ async function settleRollActorCheck(request, seams) {
     });
   }
 
-  return buildCheckRollAnswer({ result, graded, counted, evaluation, label, dc });
+  return buildCheckRollAnswer({ result, graded, counted, evaluation, label, dc, actor });
 }
 
 /**
