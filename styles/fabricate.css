@@ -16280,7 +16280,7 @@
 }
 
 .fabricate-gather-chat__section--event .fabricate-gather-chat__heading {
-  color: var(--fab-danger);
+  color: color-mix(in srgb, var(--fab-danger) 45%, currentcolor);
   opacity: 0.95;
 }
 
@@ -16418,9 +16418,9 @@
   opacity: 0.58;
 }
 
-/* A macro only the GM can repair is not narration, so it reads in the danger ramp the failure notice above already uses rather than in the neutral one its neighbours use. */
+/* A macro only the GM can repair is not narration, so it reads in the danger tone mixed into the chat's own ink, as the failure notice and the result pill do, rather than in the neutral one its neighbours use. */
 .fabricate-craft-chat--gm .fabricate-craft-chat__complication-fault {
-  color: var(--fab-danger);
+  color: color-mix(in srgb, var(--fab-danger) 45%, currentcolor);
 }
 
 /* Its heading keeps the eyebrow's SHAPE and drops the eyebrow's fade. 0.58 of the danger ramp on a parchment chat background is the lowest-contrast run on the card, and this is the one run that has to be read: everything else here is narration a GM can skim, and this is a broken link only they can repair. */

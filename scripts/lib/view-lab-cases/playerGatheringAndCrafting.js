@@ -379,7 +379,7 @@ export const CASES = Object.freeze([
     },
     steps: [...CRAFT_HORSESHOE, TYPE_ROLLED_BONUS, ROLL],
     allowedConsoleErrors: [/Your crafting check failed/],
-    expectSelector: `${CHAT_CARD}:has(.fabricate-craft-chat__result) .fabricate-craft-chat__notice`,
+    expectSelector: `${CHAT_CARD}.fabricate-craft-chat--failure:has(.fabricate-craft-chat__result) .fabricate-craft-chat__notice`,
     expectVisible: `${LAB_CHAT('public')} .fabricate-craft-chat__notice`,
     kinds: ['player', 'crafting'],
     sourceMatches: CHAT_SOURCES,

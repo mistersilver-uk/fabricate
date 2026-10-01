@@ -549,7 +549,7 @@ export function renderComplications({
 export function buildResultCard(model = {}, keys, localize = (key) => key) {
   const loc = (key) => localize(key) ?? key;
   const succeeded = model.status === 'succeeded';
-  const stateModifier = succeeded ? 'success' : 'failure';
+  const stateClass = succeeded ? 'fabricate-craft-chat--success' : 'fabricate-craft-chat--failure';
   const title = loc(succeeded ? keys.success : keys.failure);
 
   const subtitleParts = [`${esc(loc(keys.actor))}: ${esc(model.actorName)}`];
@@ -618,7 +618,7 @@ export function buildResultCard(model = {}, keys, localize = (key) => key) {
   });
 
   return [
-    `<div class="fabricate-craft-chat fabricate-craft-chat--${stateModifier}">`,
+    `<div class="fabricate-craft-chat ${stateClass}">`,
     '<header class="fabricate-craft-chat__header">',
     `<div class="fabricate-craft-chat__title">${esc(title)}</div>`,
     `<div class="fabricate-craft-chat__subtitle">${subtitleParts.join(' · ')}</div>`,
