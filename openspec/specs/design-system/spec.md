@@ -1842,6 +1842,19 @@ Widening the composition with a background prop for one such caller is not the a
 - **THEN** it carries `aria-busy`
 - **AND** a visible label states what is loading
 
+### Requirement: A well is the one container level below a card
+
+A nested container inside a card MUST be drawn by `<Well>` (`src/ui/svelte/components/Well.svelte`, issue 2008), the level below `<Card>` that the library specifies, and never hand-rolled at a call site.
+Its geometry is fixed — a 1px `--fab-border` frame, radius 9 and `--fab-space-3` padding on `--fab-bg-1` — and it takes no radius, padding or fill prop, because a well a caller could re-shape would be the drift the pair exists to end.
+An optional `label` draws a kicker at its head and names the well as a group; it renders a plain element, never a section, and its rest spread lands last so a caller's role, name and hooks win.
+The Checks Studio's titled option groups and the roll prompt's additional-dice control draw their frame through it.
+
+#### Scenario: A Studio option group and the prompt's additional-dice control share one frame
+
+- **WHEN** the Checks Studio renders "In the roll prompt" or the additional-dice group, or the roll prompt renders its additional-dice control
+- **THEN** each frame is a `<Well>` with the same border, radius, padding and fill
+- **AND** no call site declares its own well geometry
+
 ### Requirement: The die tiles of a success-counting roll are one primitive
 
 A success-counting roll's dice MUST be drawn by `DiceTiles`, one implementation whose pure tile model (`src/ui/presenters/countDiceTiles.js`) is shared by the Svelte component and by the escaped-HTML renderer a stored chat card uses, so the Studio simulator, the result boxes and the chat cards cannot mark one roll differently.
@@ -1851,12 +1864,21 @@ Every tile carries `data-dice-tile-face` and space-separated `data-dice-tile-mar
 An optional legend sits under the tiles; the model caps at 40 tiles and adds a `+{n} more` item, and the tiles wrap inside their host with no sideways scroll at chat-sidebar width.
 The `fabricate-dice-tiles` class family is styled ONCE in `styles/fabricate.css` from the root tokens, because a chat card sits outside every Fabricate window, and no core Foundry dice class is used or restyled.
 `Medallion` owns record art and is not a die tile.
+A tile may be `bought` (issue 2008): the last original dice in roll order that bought additional dice added to the pool, shown by a dashed border that keeps the tile's state colour, plus the `bought` mark token and the `, bought` label.
+An explosion roll a bought die produces is `generated`, not bought.
+The optional legend appends `dashed = bought` only when bought dice are present.
 
 #### Scenario: A die explodes and qualifies
 
 - **WHEN** a die qualifies and explodes, and its explosion rolls another qualifying die
 - **THEN** the first tile carries both the qualified and the exploded mark
 - **AND** the explosion's die is its own tile, straight after it
+
+#### Scenario: A bought die explodes
+
+- **WHEN** a roll bought one die, and that die explodes
+- **THEN** the last original tile carries the `bought` mark and a dashed border in its own state colour
+- **AND** the explosion's tile is `generated`, not bought
 
 ### Requirement: The set is extended by an explicit, recorded decision
 

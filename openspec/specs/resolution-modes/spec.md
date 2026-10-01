@@ -294,9 +294,9 @@ It does not extend to arbitrary external macro effects, and it does not promise 
 
 ### Modifier Placement and Pre-roll Evidence
 
-After actor resolution, eligibility, bounds, ranking and selection, one immutable placement plan routes Tool, library, situational and advantage contributions by source and by scalar or rolling form.
+After actor resolution, eligibility, bounds, ranking and selection, one immutable placement plan routes Tool, library, situational, advantage and bought-dice contributions by source and by scalar or rolling form.
 Sum/over appends in this exact order: authored post-shim formula (its first group kept on the Roll when chosen), numeric Tool terms in Tool order, combined library scalar, library rolling fragments in eligible order, parenthesized situational bonus, then the bonus-die expression.
-Sum/under routes scalars and separately evaluated expressions to the target; count routes them to the pool or threshold according to `pool.modifierDestination`, while count advantage always changes the pool.
+Sum/under routes scalars and separately evaluated expressions to the target; count routes them to the pool or threshold according to `pool.modifierDestination`, while count advantage and bought dice always change the pool; bought dice are a count-only scalar contribution placed after advantage.
 Under sum/under the keep transform keeps the lowest `n` of the first group for advantage and the highest for disadvantage, for any die size, because a sum that must come in under its target benefits from the lower dice.
 The plan retains fractional and negative benefits without rounding; a count check's effective pool floors, with float noise rounded away first, only after every pool benefit aggregates, and its effective threshold stays fractional or out of range without clamping.
 `targetDelta`, `thresholdDelta` and `poolDelta` are amounts to add to the effective target, per-die threshold and pool; a count/over threshold benefit is therefore stored negated and a count/under one unchanged.
@@ -367,8 +367,58 @@ A routed count check's relative threshold is `required + outcome.dc`, has no Oth
 A progressive count check spends `max(0, net)` as its budget; `progressiveValue` reads that clamped budget while `rollTotal` reads the raw net, so the two can resolve a trigger differently on the same roll, and a count/under progressive slot is valid.
 Gathering's legacy progressive mode executes a `product: 'count'` evaluation through the same progressive runner as every other activity; its d100 drop roll is untouched.
 Every usability gate and the one active-check predicate, `hasActiveCheck` (a count evaluation, or the trimmed post-shim formula each resolver already computes), recognize a structured count as active with no retained formula, and a count check never enters the formula path.
-A versioned crafting or gathering descriptor privately captures `decisionPolicy.count = { die, direction, base, threshold, required, comparison, explode, cancel, zeroPoolFails, modifierDestination }`, resolved before Tool preparation, with `decisionPolicy.dc` staying null; the prepared evaluator grades from that policy and the settled placement alone and never re-resolves the pool or threshold from the live actor, and the secret projection keeps the count projection and settled placement inside the authority only.
+A versioned crafting or gathering descriptor privately captures `decisionPolicy.count = { thresholdSource, die, direction, base, threshold, required, comparison, explode, cancel, zeroPoolFails, modifierDestination }`, plus `additionalDice` (`enabled`, `source`, `path`, `readMacroUuid`, `spendMacroUuid`, `max`, `label`) only while additional dice are enabled, resolved before Tool preparation, with `decisionPolicy.dc` staying null; the prepared evaluator grades from that policy and the settled placement alone, replays its additional-dice policy without re-reading the live configuration and never re-resolves the pool or threshold from the live actor, and the secret projection keeps the count projection and settled placement inside the authority only.
 `checkResolutionEvidence` accepts an agreeing count snapshot and result, returning `{ product: 'count', direction }` only when the snapshot and the executed `data` agree and the result carries a finite `total` or `zeroPool: true`.
+
+### Additional Dice
+
+A count check whose `pool.additionalDice.enabled` is true lets the roller buy up to `limit = min(max, floor(available / rolls))` dice per roll, where `max` is an integer from 1 to 20 and each die costs one unit of the resource (issue 2008).
+While it is off, no nested field is validated or read at roll time.
+On a `sum` check the policy is inert.
+The resource is either a finite, non-negative number stored at a document path in the acting actor's `_source`, never prepared data, written with `Actor#update`, or a read/spend macro pair (`data-models/spec.md` § Additional Dice Macro Contract).
+A read macro must be free of side effects, because the authority runs it whenever it describes a prepared count check with additional dice enabled.
+The budget is read only for an interactive decision or a non-interactive request naming a non-zero count, so a call that buys nothing runs no read macro.
+Additional dice are unavailable, with a stated reason, before the prompt opens when:
+
+- the source is missing (`sourceMissing`);
+- the stored value is absent, not a number (a numeric string included) or negative (`resourceUnreadable`);
+- an active effect overrides the path (`resourceOverridden`);
+- the acting user cannot update the actor (`resourceNotWritable`);
+- the read macro is not a script macro, throws or returns no amount (`resourceMacroFailed`); or
+- a companion request arrived on a `broadcast` call site (`broadcastCallSite`).
+
+The check still rolls without them, and only a non-zero choice refuses.
+A choice refuses `notOffered`, `choiceInvalid`, its unavailable reason or `choiceAboveLimit`, and a spend refuses `resourceChanged`, `spendRefused` or `spendUnconfirmed`; a value is never clamped.
+Those twelve reasons are one closed, exported list, `ADDITIONAL_DICE_REFUSALS`, whose first six are the unavailable reasons.
+A pre-resolved decision, a bulk row's or a prepared check's, is validated against a fresh read of the resource.
+Bought dice always add to the pool, whatever `modifierDestination` says.
+They settle with every other pool change, so the pool floor, `zeroPoolFails` and the 999-die limit apply to the total, dice bought below the one-die floor add nothing, and one count Roll carries them.
+They are not modifiers, and the pool's modifier terms never include them.
+An attempt is unreachable when, even with `limit` bought dice and every pending rolled contribution at its most favourable value, its pool is still a zero pool, or its dice times the most one die can contribute (0, 1, 2 with explode once, unbounded with a recursive explode) is below the needed count.
+
+- The needed count is the graded required count on a simple check, and the lowest succeeding tier's threshold on a routed check: 0 when a clamped relative check's lowest tier succeeds, and none when no tier succeeds.
+- A progressive check has none, so only its zero-pool limb applies.
+- Neither limb holds for a pending rolled contribution whose most favourable value cannot be computed purely.
+- Each offered advantage action is its own attempt, including its count advantage dice.
+
+The shortfall is the fewest bought dice whose settled pool is no zero pool and holds the needed count, with every pending rolled contribution at its least favourable value.
+The interactive prompt disables an action whose attempt is unreachable unless the check has a trigger that can fire in count mode and forces success or, on a routed check, steps or targets a tier.
+A zero-pool attempt has no such rescue.
+A secret or unentitled prompt never disables an action and never shows the needed count.
+A progressive check and a prepared routed prompt never judge or show the needed count, but still disable an action whose pool stays at zero.
+A prompt learns all of this from its offer, `additionalDiceOffer = { available, limit, max, resourceLabel, unavailable, reach }`, allowlisted by `publicAdditionalDiceOffer` and carrying no path or macro UUID; `reach` (`{ needed, perDieMost, explode, rescued }`) is `null` for a secret or unentitled prompt, whose pool is redacted, and `reach.needed` is `null` for a progressive check and a prepared routed prompt.
+Non-interactive callers are not blocked.
+The cost is spent once per roll, immediately before that roll's main dice and after every refusal decidable without them, pre-roll refusals and `pool-too-large` included.
+A pool still at zero after bought dice fails as a zero pool and spends nothing.
+A path spend re-reads the stored value inside the spend and succeeds only when the update is acknowledged and the stored value fell by exactly the cost.
+A refused choice or spend aborts that roll with the dismissed-prompt zero-mutation result plus its reason, and a timed FINISH stays resumable.
+Spent resource is never refunded, whatever happens after the spend, a main Roll that throws or a stage that refuses after a GM-evaluated check included.
+Spends on one client are serialized per actor and resource.
+Across clients a path spend is not atomic, because Foundry has no compare-and-set.
+One bulk choice buys the same number for every roll it covers, offered only while those rolls share one actor and one resource, and spends per roll.
+Each bulk footer action is disabled only when every roll the batch rolls would be disabled under it on its own prompt; a roll with no additional dice, or one whose pool a Check Modifier or a Tool could move, keeps every action enabled, and a routed roll is judged by its zero-pool limb alone.
+When a spend fails mid-batch, or a roll's fresh read no longer affords the choice, the batch stops, its remaining rolls are skipped as `resourceExhausted`, and rolls already made stand.
+The Checks Studio simulator places simulated bought dice through the same contribution, reading and spending nothing.
 
 ### Check Target Resolution
 
@@ -432,6 +482,11 @@ Initial secret prompts MUST omit protected subject, artwork, formula, DC and mod
 A secret check classifies inside the authority with its full settled modifier placement, so a sum/under `targetDelta` still moves its target, while the answer returned to the requester carries no placement, pre-roll evidence, formula or roll handoff.
 Secret checks use GM private posting without serialized roll-data handoff; non-secret roll handoff additionally requires a fresh post-commit entitlement check and never rolls a second time.
 Roll delivery and chat posting are separate from run settlement; missing chat delivery MUST NOT authorize replay of spending or awards.
+A prepared count check snapshots its additional-dice policy at prepare time (issue 2008).
+The authority reads the budget for the attested sender and publishes only an allowlisted offer of numbers, a reason and the resource name, never a path or macro UUID; an unentitled or secret offer carries no reachability, and only an entitled simple check's offer carries the needed count.
+It validates the player's choice against that offer and a fresh read, and spends on its own client after the active-authority check, inside request replay deduplication, so a replayed settled request never spends again.
+Releasing a prepared check spends nothing.
+A refused choice or spend answers `additional-dice-refused` with its reason, and a non-success reply after a non-zero spend carries `boughtDice`, so the initiating client can state what was spent.
 
 ## Simple Mode
 

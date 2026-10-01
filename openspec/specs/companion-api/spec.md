@@ -146,6 +146,7 @@ N unelected clients running the pooled holdings consume delete N times the compo
 There is no absorbing repeat and no natural key: a second take is indistinguishable from a first, so nothing in the answer or the world tells a GM which one was intended.
 Reversing a duplicated award means finding value that arrived; reversing a duplicated take means reconstructing inventory that left, from a ledger of whichever call happened to be looked at.
 That is why the member requires a `callSite` and refuses `notElected`, and why the declaration being **truthful** is a contract obligation on the caller rather than a hint.
+A Standalone Check Roll that buys additional dice **removes value** from the actor in the same way: it is not idempotent, and this value-removing case applies to it in full.
 
 ## The Standalone Check Roll
 
@@ -163,7 +164,7 @@ A count row's forwarded Advantage answers ±1 die on the pool, the same default 
 Two members publish it.
 
 `rollActorCheck` rolls one formula for one actor and answers `{ success, passed, total, diceGroups, resolvedFormula, outcome, message }`, with executed evaluation fields on rolled outcomes.
-Its request key set is **closed**: exactly `{ actorId, callSite, formula, dc, compare, label, interactive, rollDecision, evaluation }`, and nothing else is read.
+Its request key set is **closed**: exactly `{ actorId, callSite, formula, dc, compare, label, interactive, rollDecision, evaluation, additionalDice }`, and nothing else is read.
 No caller-supplied bag is spread into the options builder, the runner, or the nested roll options: a spread would let a companion inject its own prompt and bypass the dialog, or a speaker impersonating another actor in chat, while satisfying every behavioural assertion.
 `img`, `subjects` and `speaker` are deliberately absent from the first version — `speaker` is derived from the resolved actor and is never caller-supplied — because a member MAY gain an optional argument without a version bump but may not lose one.
 There is no bare top-level `rollMode` key: the roll uses the client's own default unless the caller supplies a `rollDecision`, in which case `rollDecision.rollMode` overrides the default exactly as `rollDecision.bonus` and `rollDecision.advantage` do.
@@ -177,10 +178,10 @@ Answering before anything starts is what makes zero mutation on a dismissal stru
 **Derived answer fields are computed from the outcome and from the member's own internal record, never from a caller-supplied bag.**
 `passed` is `true` for `checkPassed`, `false` for `checkFailed`, and `null` for everything else including the ungraded `rolled`, which is not graded and so has no pass.
 `total` is **always the raw roll total** and is `null` for every refusal, `engineUnavailable` and `noFormula` included; a legitimate rolled `0` answers `0` and never `null`.
-An executed answer additionally carries `product`, `direction`, `comparison`, `target`, `margin`, `successes`, and `cancelled`, projected from the shared runner's `data` without changing the raw total or outcome.
+An executed answer additionally carries `product`, `direction`, `comparison`, `target`, `margin`, `successes`, `cancelled` and `boughtDice`, projected from the shared runner's `data` without changing the raw total or outcome; `boughtDice` is the dice bought for the roll, `0` when none.
 For sum checks, `successes` and `cancelled` are `null`; for an ungraded sum, `comparison`, `target`, and `margin` are `null`.
 The public `cancelled` field counts cancelled successes in future count checks and is distinct from the runner's top-level `cancelled: true` dismissal sentinel, which answers a refusal and has no execution fields.
-Every refusal omits the seven executed fields rather than supplying synthetic values.
+Every refusal omits the eight executed fields rather than supplying synthetic values.
 The member never forces an outcome — it passes an empty trigger list explicitly — so the runner's forced-award divergence between the awarding value and the raw total is unreachable, and a later change that admits triggers cannot silently redefine a published field.
 `diceGroups` and `covered` are **lists**, so their absence is `[]`; a `null` would force every caller to guard a length read.
 The scalars are `null` for the opposite reason: their absence is meaningful, and `0` or `false` would be a confident wrong answer.
@@ -191,16 +192,22 @@ Absent or `undefined` evaluation receives complete shared defaults; a supplied e
 An `evaluation` inherited from the request's prototype chain below `Object.prototype` refuses `evaluationInvalid` without invoking an accessor, while a key present only on `Object.prototype` is ignored as absent.
 A nested key whose own value is `undefined` is treated as omitted, so its default applies exactly as it does for a top-level `evaluation: undefined`.
 Validation checks even inactive fields without coercing types, clamping numbers or replacing invalid enum values, then applies the shared normalizer only to valid partial records.
-Expressions accept strings or finite numbers; the pool die is an integer at least 2, required is an integer from 0 through 20, additional-dice max is an integer from 1 through 20, and face values are `null` or integers from 1 through the effective die.
+Expressions accept strings or finite numbers; the pool die is an integer at least 2, required is an integer from 0 through 20, additional-dice max is an integer from 1 through 20 and its `label` a string, and face values are `null` or integers from 1 through the effective die.
 The standalone `compare` key remains the sole inclusive versus strict comparison choice: `exceed` is strict and every other legacy value meets the target.
 For schemaVersion 1, `features.checkEvaluation` is a recursively frozen `{ version, modes, additionalDice }`, where each `modes` row is `{ product, direction, targetSources, interactive }`; a normalized evaluation is supported when a row matches its `product` and `direction`, lists its `target.source` in `targetSources`, and allows `interactive` when the request is interactive.
 `version` versions that shape; activating a mode appends a row without changing it.
-At version 1 the descriptor publishes five rows: `{ version: 1, modes: [{ product: 'sum', direction: 'over', targetSources: ['fixed'], interactive: true }, { product: 'sum', direction: 'over', targetSources: ['attribute'], interactive: true }, { product: 'sum', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: true }, { product: 'count', direction: 'over', targetSources: ['fixed', 'attribute'], interactive: true }, { product: 'count', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: true }], additionalDice: false }`.
+At version 1 the descriptor publishes five rows: `{ version: 1, modes: [{ product: 'sum', direction: 'over', targetSources: ['fixed'], interactive: true }, { product: 'sum', direction: 'over', targetSources: ['attribute'], interactive: true }, { product: 'sum', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: true }, { product: 'count', direction: 'over', targetSources: ['fixed', 'attribute'], interactive: true }, { product: 'count', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: true }], additionalDice: true }`, where `additionalDice: true` publishes that a count request may buy additional dice (issue 2008).
 Malformed evaluation refuses `evaluationInvalid`; a valid combination absent from the capability rows refuses `evaluationUnsupported`, both before any rolling or prompting.
 Sum-under and attribute-target requests are active on the rows above interactively too, through the shared roll prompt and a forwarded decision (issue 2005), and so are count requests (issue 2006).
 An interactive count request opens the shared roll prompt through its ManagerModal host, on the standalone overlay when no Fabricate window started it, showing the settled pool line and the successes needed; it posts the count Roll and grades against `pool.required`.
 A forwarded count decision opens no prompt, and its bonus adds dice or moves the threshold as the pool's `modifierDestination` says, graded the same way.
-An interactive or forwarded count request that carries Advantage or Disadvantage moves `poolDelta` by the check's `countDice` (issue 2007), the same rule a crafting or salvage count check honours, rather than refusing; a count request whose pool has additional dice enabled still refuses `evaluationUnsupported` before any prompt or roll until the additional-dice successor, and a non-interactive count request naming neither rolls its authored pool alone.
+An interactive or forwarded count request that carries Advantage or Disadvantage moves `poolDelta` by the check's `countDice` (issue 2007), the same rule a crafting or salvage count check honours, rather than refusing, and a non-interactive count request naming neither and buying no additional dice rolls its authored pool alone.
+`additionalDice`, when present, is a non-negative integer honoured on a non-interactive request with a count evaluation whose additional dice are enabled; a non-zero value on any other evaluation refuses `notOffered`.
+It buys that many dice under `resolution-modes/spec.md` § Additional Dice and spends them on the executing GM client, with the calling GM as the user, before the main roll.
+Buying requires `callSite: 'gmAction'`: a non-zero value on a `broadcast` request refuses `additionalDiceRefused` with reason `broadcastCallSite` before any read, and a `broadcast` interactive request shows the prompt's additional-dice control as unavailable for that reason.
+A non-zero value on an interactive request refuses `invalidRollDecision`; an interactive request buys through the prompt or a forwarded `rollDecision.additionalDice`, which is validated the same way and is the only additional-dice key the forwarded decision carries.
+Macro payloads carry `null` for the crafting system, activity and subject.
+A post-spend roll refusal answers `evaluationInvalid` with `messageData.boughtDice`, because the spend stands.
 An interactive request for any non-interactive row, a forwarded decision included, refuses `evaluationUnsupported` before any prompt or roll.
 A count request ignores `formula` (`noFormula` applies to sum only, through the shared active-check predicate) and grades exclusively against `pool.required`, ignoring any `dc` or target.
 An unresolved or non-numeric pool `base` or `threshold` refuses `poolUnresolved` before any roll, and every other pool refusal — an invalid `die`, `explode`, `cancel`, or the settled pool itself — refuses `evaluationInvalid` before any Roll is constructed.
@@ -212,7 +219,6 @@ On the advertised `sum/over/fixed` row the validated evaluation selects the mode
 There `target.expression`, `target.adjustmentKind` and `target.baseAdjustment` are validated and then ignored: an evaluation whose `target.expression` differs from `dc` rolls against `dc`, and one sent without a finite `dc` rolls ungraded.
 On an attribute row those same fields drive target resolution instead, and a `sum/under` fixed row grades `formula` under `dc`.
 Every `pool` field stays validated and ignored on every sum row, inactive count-pool data included.
-Active additional dice on count remain unavailable until the additional-dice successor.
 
 **Two pre-dispatch gates are required, not one.**
 First a **post-shim usability test**, defined identically to `resolveActiveCraftingCheckFormula`'s — the retirement shim, then a trim, then an emptiness test — refusing `noFormula`.
@@ -222,8 +228,9 @@ Without the first gate, a formula such as `@craftingmod` reaches the pass/fail r
 That free pass remains reachable from a direct runner caller and is tracked as `fabricate#1296`; this contract closes it at the published member by refusing in front of it.
 `noFormula` is tested first because "you gave me nothing to roll" is the better answer than "this client cannot roll" when both are true; the order is safe in either direction, because with no dice engine the shim fails **open** and keeps the residue rather than emptying it.
 
-**The runner's answer is discriminated by a three-step ladder, and the ladder is normative.**
-First `cancelled === true`, tested first because it is the one fact true on both arms and at every `interactive` setting.
+**The runner's answer is discriminated by a four-step ladder, and the ladder is normative.**
+First an additional-dice refusal (`additionalDiceRefused`), tested ahead of the dismissal because a refused choice or spend shares the dismissal's `cancelled: true` shape.
+Then `cancelled === true`, the one fact true on both arms and at every `interactive` setting.
 Then **strictly `value === null`**, never a falsy test, because a legitimate rolled `0` is falsy and a falsy test reports it as a failed roll.
 Otherwise grade on the runner's own `outcome`.
 The naive discriminator — a false `success` with a null value — is true of a throw, a dismissal and a cancel alike; derived, it reports a broken formula as "the GM declined", and the companion silently does nothing forever with nothing in the console.
@@ -262,7 +269,8 @@ The shipped internal `caller` discriminator is required of an internal call site
 
 ## The Outcome Vocabulary Added By The Standalone Check Roll
 
-The Standalone Check Roll adds exactly these outcomes: `checkPassed`, `checkFailed`, `rolled`, `rollFailed`, `cancelled`, `engineUnavailable`, `noFormula`, `invalidCallSite`, `notElected`, `invalidRollDecision`, `evaluationInvalid`, `evaluationUnsupported`, `poolUnresolved`, `targetUnresolved`, `decided`, and `nothingToDecide`.
+The Standalone Check Roll adds exactly these outcomes: `checkPassed`, `checkFailed`, `rolled`, `rollFailed`, `cancelled`, `engineUnavailable`, `noFormula`, `invalidCallSite`, `notElected`, `invalidRollDecision`, `evaluationInvalid`, `evaluationUnsupported`, `poolUnresolved`, `targetUnresolved`, `additionalDiceRefused`, `decided`, and `nothingToDecide`.
+`additionalDiceRefused` (issue 2008) is a `success: false` refusal answered before any main roll with no executed fields; its `messageData` is `{ label, reason, actor, resource, n, limit, available }`, `reason` one of `ADDITIONAL_DICE_REFUSALS`, and its message is that reason's own sentence for the authored resource name and source.
 `targetUnresolved` answers an attribute target Fabricate could not read as a number from the actor, with the message "{label} check could not read a number for its target from this character."
 `poolUnresolved` answers a count's `pool.base` or `pool.threshold` Fabricate could not read as a number from the actor, with the message "{label} check could not read a number for its dice pool from this character."
 A graded sum answer against a resolved target — `sum/over/attribute`, or `sum/under` with either source — keeps the `checkPassed`/`checkFailed` outcome but reports through the auxiliary `FABRICATE.Check.Roll.PassedTarget`/`FailedTarget` message keys with `{ label, total, target }`, where `target` is the runner's executed `data.target` and never the request `dc`; only `sum/over/fixed` keeps `Passed`/`Failed` with `{ dc }`.
@@ -274,6 +282,7 @@ A bare `failed` answering `success: true` is a trap, because `success: false` al
 
 `invalidRollDecision` exists because a pre-resolved roll decision supplied alongside a non-interactive roll is **silently discarded** by the shared evaluator, which consults one only on its interactive path.
 The caller's bonus, Advantage and roll mode would otherwise all vanish with no error while the base formula rolled, so the decision is **refused** rather than dropped.
+A non-zero top-level `additionalDice` on an interactive request is refused the same way, because there the prompt or the forwarded decision chooses and the top-level count would be discarded.
 
 ## The Award Members
 

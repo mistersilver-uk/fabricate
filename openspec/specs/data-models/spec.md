@@ -279,7 +279,8 @@ CraftingSystem = {
   //       explode: { enabled: boolean, faces: { kind: "best" | "from", value: number | null }, once: boolean },
   //       cancel: { enabled: boolean, faces: { kind: "worst" | "from", value: number | null } },
   //       additionalDice: { enabled: boolean, source: "path" | "macro", path: string,
-  //                         readMacroUuid: string, spendMacroUuid: string, max: number },
+  //                         readMacroUuid: string, spendMacroUuid: string, max: number,
+  //                         label: string },
   //     },
   //   }
   //
@@ -443,8 +444,9 @@ CraftingSystem = {
 
 Each of the eight normalized check subobjects — crafting and salvage `simple`, `routed` and `progressive`, and gathering `routed` and `progressive` — MUST carry `evaluation` with `product: "sum" | "count"` and `direction: "over" | "under"`, defaulting to `sum/over`.
 Its `target` contains `source: "fixed" | "attribute"`, `expression`, `adjustmentKind: "add" | "multiply"` and nullable `baseAdjustment`.
-Its `pool` contains integer `die` (at least 2), string `base` and `threshold` expressions, integer `required` (0–20), `modifierDestination: "pool" | "threshold"`, `zeroPoolFails`, `explode` and `cancel` face configurations, and `additionalDice` enabled/source/path/read-macro/spend-macro/max fields.
-The normalized defaults are an empty fixed target expression, additive adjustment, d10, base `"2"`, threshold `"8"`, required 1, pool destination, zero-pool failure on, and explode, cancel and additional dice off with additional maximum 1.
+Its `pool` contains integer `die` (at least 2), string `base` and `threshold` expressions, integer `required` (0–20), `modifierDestination: "pool" | "threshold"`, `zeroPoolFails`, `explode` and `cancel` face configurations, and `additionalDice` enabled/source/path/read-macro/spend-macro/max/label fields.
+The normalized defaults are an empty fixed target expression, additive adjustment, d10, base `"2"`, threshold `"8"`, required 1, pool destination, zero-pool failure on, and explode, cancel and additional dice off with additional maximum 1 and an empty resource name.
+The additional-dice `label` is a string, trimmed, default `''`, and retained whatever `enabled` or `source` is; it is the resource's name on player surfaces (issue 2008 ruling R2, amending decision 22's key set by one optional key).
 Normalization MUST retain inactive mode fields and finite/null sibling adjustments; unknown enum tokens take their defaults, an invalid die reads d10, a finite numeric expression is kept as its string, integer counts clamp to 0–20 and additional maximum clamps to 1–20, and a non-integer count takes its default (1 for `required`, null for a sibling).
 An explode or cancel face `value` is a positive integer or null and is not clamped to `die`, so changing the die loses no authored face; a face the die cannot roll is left for readiness to flag rather than repaired by normalization.
 Checks studio drafts carry the normalized record and the tier and outcome siblings, so a studio save preserves them, and schema-6 export/import MUST preserve the normalized record without a migration.
@@ -3474,6 +3476,10 @@ CraftingRunStepState = {
    A `product: "count"` result's `data.dc` is always null, `data.target` is the effective per-die threshold (never null, even for a fixed-range or progressive result), `data.comparison` is the per-die comparison, `data.successes` and numeric `data.cancelled` count qualifying and cancelling dice, `total` is the raw net (qualified minus cancelled), and `margin` is `total` minus the required count of the tier the roll matched — simple: the required count; relative: required plus `outcome.dc`; null for a fixed-range, progressive or zero-pool result, all before forcing or stepping.
    A zero-pool count result carries `zeroPool: true` with a null `total`, `successes`, `cancelled` and `margin`, no main Roll, and the same populated `target` and `comparison` a rolled result on the same check would carry.
    A count refusal carries `misconfigured: true`, `data.targetRefusal` naming the reason and `data.refusedInput` naming the input (`'base' | 'threshold' | 'die' | 'explode' | 'cancel' | 'pool'`), and no executed evidence, exactly as a sum target refusal does.
+   An executed count result's `data.boughtDice`, when present, is `{ count, source }`: the integer dice bought for that roll, at least 1, and `'path' | 'macro'` (`resolution-modes/spec.md` § Additional Dice).
+   It is omitted when no die was bought and never written as 0 or null.
+   It never carries the resource path, a macro UUID, the resource name or an amount.
+   An `explode-unbounded` refusal raised after a spend also carries it, because the spend stands.
 6. `failureReason` is required when `status` is `failed`.
 7. `preparedConsumption.currencySpends` records what was actually deducted, never what was intended.
    It is the sole input to the cancel reversal's refund, so a spend that did not settle must not appear in it; an empty array is the correct record for a step whose currency deduction settled nothing.
@@ -4281,6 +4287,32 @@ This keeps player-initiated workflows from being blocked by Foundry's current-us
 The direct evaluation bypasses only the client-side Macro document check and grants no additional server or document authority; the script still runs as the current player.
 Foundry runtime globals `game`, `foundry`, `ui`, and `fromUuid` remain directly available and are not injected as payload parameters.
 Errors thrown by a configured macro propagate unchanged to the owning Fabricate workflow, which decides whether to abort or apply a documented fallback such as the anchor fallback above, as does the executor's own `Macro not found or invalid` error when the configured uuid resolves to no document or to one carrying no string `command`.
+
+### Additional Dice Macro Contract
+
+A count check whose `pool.additionalDice` is enabled with `source: 'macro'` names a read macro and a spend macro (`resolution-modes/spec.md` § Additional Dice).
+Both must be `script` macros, checked at the call site before either runs: a read macro of any other type makes additional dice unavailable (`resourceMacroFailed`), and a spend macro of any other type refuses the spend (`spendRefused`) without running.
+Both run through the shared executor on the client that executes the roll: the acting player's for an immediate roll, bulk salvage included, the claim-holding GM authority for a prepared check, and the executing GM for a Standalone Check Roll.
+Each receives one payload object, exposed with identity as `scope`, `context` and `args`.
+Macros must read the payload, not the globals, because on GM-executed paths `actor`, `character` and `game.user` resolve on the GM's client.
+The read payload is `{ actor, user, craftingSystem, activity, recipe, component, task, evaluation, rolls }`:
+
+- `actor` is the acting actor;
+- `user` is the acting user: the rolling client's user on an immediate roll, the attested sender on a prepared check, and the calling GM on a Standalone Check Roll;
+- `activity` is `'crafting' | 'salvage' | 'gathering'`, and `null` on a Standalone Check Roll;
+- `craftingSystem` is the attempt's crafting system, and `recipe`, `component` and `task` its subject, each `null` when the attempt has none to name;
+- on a prepared check and on a Standalone Check Roll, `craftingSystem`, `recipe`, `component` and `task` are `null`, and on the one read a bulk choice is offered from, so is any of them its covered rows do not share;
+- `evaluation` is a structured clone of the normalized evaluation;
+- `rolls` is 1, or the number of rolls one bulk choice covers.
+
+The read macro returns the amount available.
+A finite number of 0 or more is floored; anything else, a numeric string included, or a throw, makes additional dice unavailable (`resourceMacroFailed`) for that attempt, which still rolls without them.
+The spend first runs the read macro again: a failed re-read refuses `resourceMacroFailed`, and an amount now below this roll's dice refuses `resourceChanged`.
+The spend payload is the read payload plus `dice`, the dice bought for this roll, and `delta`, which is `−dice` in resource units at one unit per die; a macro applying another exchange rate converts it.
+The spend macro returns a truthy value once it has deducted.
+A falsy result or a throw aborts that roll before its main dice (`spendRefused`).
+Whatever the macro already changed stands, and Fabricate never refunds or retries.
+On a prepared check it must settle within the 15-second command budget; the executor itself enforces no timeout.
 
 ### Crafting Check Macro Contract (Removed in 1.8.0)
 
