@@ -22,6 +22,7 @@ import {
   craftingOutcomeBand,
   ladderRule,
   routedOutcomeBand,
+  taskCountRequired,
   withCountBotch,
 } from '../../systems/runJournalOutcomeBands.js';
 import { getRunLifecycleContract } from '../../systems/runLifecycleState.js';
@@ -42,7 +43,18 @@ import { activityPermitsFailureResults } from '../../utils/failureResultPolicy.j
 import { cloneJson } from '../../utils/scalars.js';
 import { resolveRecipeImage } from '../svelte/util/craftingImageDefaults.js';
 
-import { executedCount, journalCheckAnchor, journalCheckLabel } from './journalCheckText.js';
+import {
+  activeModeLabelKey,
+  executedTargetFields,
+  historicalModeLabelKey,
+  journalActiveCheck,
+  journalCheckAnchor,
+  journalCheckLabel,
+  journalCountNeeded,
+  journalModeLabelKey,
+  recordedNumber,
+  taskCountNeed,
+} from './journalCheckText.js';
 
 const DEFAULT_RUN_IMAGE = 'icons/svg/item-bag.svg';
 const DEFAULT_GATHERING_IMAGE = 'icons/containers/bags/pouch-leather-brown-green.webp';
@@ -50,19 +62,6 @@ const DEFAULT_GATHERING_IMAGE = 'icons/containers/bags/pouch-leather-brown-green
 // gathering listing so both surfaces say the same thing.
 const BLIND_TASK_LABEL_KEY = 'FABRICATE.Gathering.BlindTaskLabel';
 const DAY_SECONDS = 24 * 60 * 60;
-
-function recordedNumber(value) {
-  if (typeof value !== 'number' && typeof value !== 'string') return null;
-  return typeof value === 'string' && value.trim() === '' ? null : numberOrNull(value);
-}
-
-/** Outside sum/over/fixed a roll names its executed target and margin, never a DC (issue 2005). */
-function executedTargetFields(data) {
-  // A count's `target` is a per-die face: its line reads its net and required count (issue 2006).
-  if (data.product === 'count') return { target: null, margin: null, count: executedCount(data) };
-  if (data.direction !== 'under' && data.targetSource !== 'attribute') return null;
-  return { target: recordedNumber(data.target), margin: recordedNumber(data.margin) };
-}
 
 /** What a surface states about a ROLLED amount, or null for a fixed one (issue 1645): an award's
  *  recorded roll BESIDE the real quantity it produced, an authored expression INSTEAD of a number no
@@ -116,18 +115,6 @@ function historicalStepAttempted(step, run, index) {
     (effect) => effect?.phase === 'applied'
   );
 }
-
-// Localized player-facing resolution-mode label keys. The crafting
-// `resolutionMode` token is system-internal, so the projection maps it to a
-// localized enum (never emitting the raw token). There is no canonical
-// "Standard" mode — `simple` (a DC pass/fail check) renders as "Standard (DC)".
-const MODE_LABEL_KEYS = Object.freeze({
-  simple: 'FABRICATE.App.Journal.Mode.Standard',
-  routedByIngredients: 'FABRICATE.App.Journal.Mode.RoutedByIngredients',
-  routedByCheck: 'FABRICATE.App.Journal.Mode.RoutedByCheck',
-  progressive: 'FABRICATE.App.Journal.Mode.Progressive',
-  alchemy: 'FABRICATE.App.Journal.Mode.Alchemy',
-});
 
 const TERMINAL_STATUSES = new Set(['succeeded', 'failed', 'cancelled']);
 const EXECUTION_JOURNAL_STATUSES = new Set(['planned', 'committed', 'recoveryRequired']);
@@ -804,7 +791,7 @@ export class RunJournalBuilder {
       updatedAt: numberOrNull(run.updatedAt),
       finishedAt: numberOrNull(run.finishedAt),
       structureLabel: '',
-      resolutionModeLabel: this.localize(MODE_LABEL_KEYS.alchemy),
+      resolutionModeLabel: this.localize(journalModeLabelKey('alchemy')),
       recipeId: null,
       taskId: null,
       flavor: '',
@@ -927,7 +914,7 @@ export class RunJournalBuilder {
         historyEntitled,
         toolStates,
       }),
-      lastCheckResult: this._checkResultModel(runStep?.lastCheckResult),
+      lastCheckResult: this._stepCheckResult(runStep, system, recipe),
       // Requirements retain their authored identity; consumption retains physical receipts.
       // Only entitled consumption receives the separate historical metadata enrichment.
       requirements: normalizeList(runStep?.requirements).map((entry) =>
@@ -1262,7 +1249,7 @@ export class RunJournalBuilder {
           ),
         };
       });
-      return withCountBotch(tiers, routed, botch);
+      return withCountBotch(tiers, routed, botch, dc);
     } catch {
       return null;
     }
@@ -1800,14 +1787,19 @@ export class RunJournalBuilder {
     };
   }
 
-  _checkResultModel(lastCheckResult) {
+  _stepCheckResult(runStep, system, recipe) {
+    const need = system && journalCountNeeded(this._activeCheck(system, recipe));
+    return this._checkResultModel(runStep?.lastCheckResult, need);
+  }
+
+  _checkResultModel(lastCheckResult, need = null) {
     if (!lastCheckResult || typeof lastCheckResult !== 'object') return null;
     // The roll detail lives on `data` (dc, resolved formula, raw total) — surface it
     // so the run journal can show the ACTUAL roll (e.g. "1d20 + 3 = 11 vs DC 16"),
     // not just the authored requirement.
     const data =
       lastCheckResult.data && typeof lastCheckResult.data === 'object' ? lastCheckResult.data : {};
-    const executed = executedTargetFields(data);
+    const executed = executedTargetFields(data, need);
     return {
       success: lastCheckResult.success === true,
       outcome: stringOrNull(lastCheckResult.outcome),
@@ -1837,10 +1829,11 @@ export class RunJournalBuilder {
 
   /** The step's check label through {@link journalCheckLabel}, for the recipe's active check. */
   _checkLabel({ system, recipe }) {
-    if (!system) return null;
-    const mode = this._resolveMode(recipe, system);
-    const active = resolveActiveCraftingCheckFormula({ ...system, resolutionMode: mode });
-    return journalCheckLabel({ ...active, recipe, mode }, this.localize);
+    return system ? journalCheckLabel(this._activeCheck(system, recipe), this.localize) : null;
+  }
+
+  _activeCheck(system, recipe) {
+    return journalActiveCheck({ system, recipe, mode: this._resolveMode(recipe, system) });
   }
 
   _activeCheckKind({ system, recipe }) {
@@ -1951,14 +1944,12 @@ export class RunJournalBuilder {
   }
 
   _resolutionModeLabel(recipe, system) {
-    const mode = this._resolveMode(recipe, system);
-    return this.localize(MODE_LABEL_KEYS[mode] || MODE_LABEL_KEYS.simple);
+    return this.localize(activeModeLabelKey(this._activeCheck(system, recipe)));
   }
 
   _historicalModeLabel(steps) {
-    const mode = steps.find((step) => step.attempted && step.resolutionSnapshot)?.resolutionSnapshot
-      .mode;
-    return MODE_LABEL_KEYS[mode] ? this.localize(MODE_LABEL_KEYS[mode]) : '';
+    const key = historicalModeLabelKey(steps.find((s) => s.attempted && s.resolutionSnapshot));
+    return key ? this.localize(key) : '';
   }
 
   /**
@@ -2263,7 +2254,12 @@ export class RunJournalBuilder {
       roll: evidence.roll,
       rollModel: evidence.rollModel,
       unattributedAwardIndexes: evidence.unattributedAwardIndexes,
-      check: ['routed', 'progressive'].includes(mode) ? this._checkResultModel(result) : null,
+      check: ['routed', 'progressive'].includes(mode)
+        ? this._checkResultModel(
+            result,
+            taskCountNeed(system?.gatheringCraftingCheck?.routed, task)
+          )
+        : null,
       tiers: [],
     };
   }
@@ -2367,7 +2363,8 @@ export class RunJournalBuilder {
         ),
       };
     });
-    return withCountBotch(tiers, routed, this.localize('FABRICATE.Check.CountEvidence.Botch'));
+    const botch = this.localize('FABRICATE.Check.CountEvidence.Botch');
+    return withCountBotch(tiers, routed, botch, taskCountRequired(routed, task));
   }
 
   _tierYield(result, systemId, index) {

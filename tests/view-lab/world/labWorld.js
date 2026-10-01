@@ -92,13 +92,21 @@ function seedGatheringTaskMode(content, mode) {
  * Ashfall Runework's routed crafting check graded roll-under (issue 2005): `routed-under` against
  * its fixed DC 12, and `routed-under-multiply` against a character value whose Ruined tier is
  * Otherwise, so the Journal ladder states `≤` bands or labelled multipliers. `routed-count` counts
- * five d10s at 7 or more against two needed, cancelling on the worst face (issue 2006).
+ * five d10s at 7 or more against two needed, cancelling on the worst face (issue 2006), and
+ * `routed-count-unordered` needs three from tiers authored out of order (issue 2135).
  */
 function seedRuneworkCheckMode(content, mode) {
   const system = content.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.RUNEWORK);
   const routed = system?.craftingCheck?.routed;
-  if (routed && mode === 'routed-count') {
-    const extra = { 'rw-masterwork': 2, 'rw-standard': 0, 'rw-ruined': -2 };
+  if (routed && mode?.startsWith('routed-count')) {
+    const unordered = mode === 'routed-count-unordered';
+    const extra = unordered
+      ? { 'rw-masterwork': 1, 'rw-standard': 0, 'rw-ruined': -2 }
+      : { 'rw-masterwork': 2, 'rw-standard': 0, 'rw-ruined': -2 };
+    const order = unordered ? ['rw-standard', 'rw-ruined', 'rw-masterwork'] : null;
+    const outcomes = order
+      ? order.map((id) => routed.relativeOutcomes.find((outcome) => outcome.id === id))
+      : routed.relativeOutcomes;
     system.craftingCheck = {
       ...system.craftingCheck,
       routed: {
@@ -110,14 +118,11 @@ function seedRuneworkCheckMode(content, mode) {
             die: 10,
             base: '5',
             threshold: '7',
-            required: 2,
+            required: unordered ? 3 : 2,
             cancel: { enabled: true, faces: { kind: 'worst' } },
           },
         },
-        relativeOutcomes: routed.relativeOutcomes.map((outcome) => ({
-          ...outcome,
-          dc: extra[outcome.id],
-        })),
+        relativeOutcomes: outcomes.map((outcome) => ({ ...outcome, dc: extra[outcome.id] })),
       },
     };
     return;

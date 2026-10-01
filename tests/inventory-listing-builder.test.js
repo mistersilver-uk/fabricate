@@ -2329,4 +2329,40 @@ describe('InventoryListingBuilder - a roll-under or character-value salvage targ
     );
     assert.ok(salvage.results.length > 0);
   });
+
+  // Issue 2137: a routed counting salvage states the Journal's net-success bands, never no band.
+  it("bands a routed count salvage's tiers in net successes from its own successes needed", () => {
+    const routed = (cancel) => ({
+      routed: {
+        type: 'relative',
+        rollFormula: '',
+        dc: 15,
+        relativeOutcomes: [
+          { id: 'o3', name: 'Crit', success: true, dc: 5 },
+          { id: 'o2', name: 'Pass', success: true, dc: 0 },
+          { id: 'o1', name: 'Fail', success: false, dc: -5 },
+        ],
+        evaluation: { product: 'count', pool: { base: '4', threshold: '8', required: 2, cancel: { enabled: cancel } } },
+      },
+    });
+    const bands = (cancel, salvage = {}) =>
+      salvageFor('routed', routed(cancel), { salvage }).routedOutcomes.map((o) => [o.id, o.band, o.threshold]);
+    assert.deepEqual(bands(false), [
+      ['o3', '7+', null],
+      ['o2', '2–6', null],
+      ['o1', '0–1', null],
+    ]);
+    // The component's successes override moves every band; cancelling adds the Journal's Botch row.
+    assert.deepEqual(bands(true, { successesOverride: 4 }), [
+      ['o3', '9+', null],
+      ['o2', '4–8', null],
+      ['o1', '−1 – 3', null],
+      ['count-botch', '<−1', null],
+    ]);
+    const botch = salvageFor('routed', routed(true), { salvage: { successesOverride: 4 } }).routedOutcomes.at(-1);
+    assert.equal(botch.below, -1, 'the Botch row carries its floor, so the panel can mark a roll below it');
+    const summed = salvageFor('routed', { routed: { ...routed(false).routed, rollFormula: '1d20', evaluation: undefined } });
+    assert.ok(summed.routedOutcomes.every((o) => o.band === undefined), 'a summed DC keeps its thresholds');
+    assert.deepEqual(summed.routedOutcomes.map((o) => o.threshold), [20, 15, 10]);
+  });
 });

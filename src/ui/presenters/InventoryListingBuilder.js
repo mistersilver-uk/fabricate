@@ -97,7 +97,7 @@ import { matchRecipeItemDefinition, resolveToolForItem } from '../../utils/sourc
 // item-bag literal (the "treat as no image" sentinel).
 import { GENERIC_ITEM_IMAGE } from '../svelte/util/craftingImageDefaults.js';
 
-import { salvageCheckTarget, salvageDisplayDc } from './salvageCheckNeed.js';
+import { salvageCheckTarget, salvageDisplayDc, withSalvageCountBands } from './salvageCheckNeed.js';
 
 // A shared empty set for the GM path, where no entity is visibility-hidden — avoids
 // allocating a throwaway Set per system on every listing build.
@@ -1722,14 +1722,8 @@ export class InventoryListingBuilder {
    * @private
    */
   _salvageRoutedOutcomes({ salvage, config, routedType, component, componentById }) {
-    const authored =
-      routedType === 'fixed'
-        ? Array.isArray(config?.fixedOutcomes)
-          ? config.fixedOutcomes
-          : []
-        : Array.isArray(config?.relativeOutcomes)
-          ? config.relativeOutcomes
-          : [];
+    const outcomes = routedType === 'fixed' ? config?.fixedOutcomes : config?.relativeOutcomes;
+    const authored = Array.isArray(outcomes) ? outcomes : [];
     const baseDc = salvageDisplayDc({ mode: 'routed', routedType: 'relative', config, component });
     const routing = salvage?.outcomeRouting || {};
     const groupById = new Map(
@@ -1738,7 +1732,7 @@ export class InventoryListingBuilder {
         .map((group) => [group.id, group])
     );
 
-    return authored.map((outcome) => {
+    const rows = authored.map((outcome) => {
       const name = stringOrEmpty(outcome?.name);
       const routedGroupId = name ? routing[name] : null;
       const delta = Number(outcome?.dc);
@@ -1759,6 +1753,7 @@ export class InventoryListingBuilder {
           : [],
       };
     });
+    return withSalvageCountBands(rows, { config, component, localize: this.localize });
   }
 
   /**

@@ -72,16 +72,20 @@ export function formatGradedRoll({ formula, total, value, target, margin }, loca
 }
 
 /**
- * A count roll's line (issue 2006): `{net} of {required} successes`, its net alone where the
- * required count was not recorded, or the zero-pool sentence for a pool that rolled nothing.
+ * A count roll's line (issue 2006): `{net} successes, {required} needed`, its net alone where no
+ * required count was recorded, a botch's net with no required count (issue 2133), or the
+ * zero-pool sentence for a pool that rolled nothing.
  */
 export function formatCountRoll({ net, required, zeroPool }, localize) {
   if (zeroPool) return localize('FABRICATE.Check.CountEvidence.ZeroPoolResult');
   if (!Number.isFinite(net)) return '';
   const text = formatNet(net);
+  if (net < 0) {
+    return localize('FABRICATE.App.Journal.StepDetails.Count.RollResultBotch', { net: text });
+  }
   if (Number.isFinite(required) && required > 0) {
-    return required === 1
-      ? localize('FABRICATE.App.Journal.StepDetails.Count.RollResultOne', { net: text })
+    return net === 1
+      ? localize('FABRICATE.App.Journal.StepDetails.Count.RollResultOne', { required })
       : localize('FABRICATE.App.Journal.StepDetails.Count.RollResult', { net: text, required });
   }
   return net === 1

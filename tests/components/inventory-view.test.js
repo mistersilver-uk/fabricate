@@ -1475,6 +1475,32 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     assert.equal(target.querySelector('[data-inventory-outcome-range]'), null);
   });
 
+  // Issue 2137: a counting check's tier states its net-success band, as the Journal does.
+  it("routed + relative under a counting check renders each tier's band in net successes", async () => {
+    const tier = (id, band) => ({ id, name: id, success: true, threshold: null, band, results: [] });
+    const { services } = salvageServices(
+      salvageItem({
+        mode: 'routed',
+        checkUsable: true,
+        routedType: 'relative',
+        dc: null,
+        routedOutcomes: [tier('crit', '7+'), tier('pass', '2–6'), tier('count-botch', '<0')],
+      })
+    );
+    const target = await openSalvage(services);
+    const bands = [...target.querySelectorAll('[data-inventory-outcome-band]')];
+    assert.deepEqual(
+      bands.map((node) => [node.dataset.inventoryOutcomeBand, node.textContent.trim()]),
+      [['7+', '7+'], ['2–6', '2–6'], ['<0', '<0']]
+    );
+    assert.ok(
+      bands.every((node) => node.querySelector('.manager-chip.is-neutral')),
+      'each band is the shared Chip, as the Journal ladder draws it'
+    );
+    assert.ok(!target.querySelector('[data-inventory-outcome-threshold]'), 'no Reached-at threshold');
+    assert.ok(!target.querySelector('[data-inventory-salvage-dc]'), 'a count names no DC');
+  });
+
   // AC2. A routed/progressive salvage with no formula aborts in the engine with a
   // GM-config message and zero mutation, so showing its tiers would put a plausible
   // contract under a footer that ALWAYS fails.
@@ -2224,6 +2250,39 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     assert.equal(marked.length, 1, 'exactly one tier is marked');
     assert.equal(marked[0].dataset.inventorySalvageOutcome, 'o2', 'and it is the one that matched');
     assert.ok(marked[0].querySelector('[data-inventory-outcome-your-roll]'));
+  });
+
+  // Issue 2137: a successful count whose net is below the Botch row's floor marks that row, in
+  // place of the least demanding tier it routed to; a failed salvage marks no row at all.
+  it('routed count: a net below the Botch floor marks the Botch row "Your roll"', async () => {
+    const ruined = { id: 'o1', name: 'Ruined', success: true, threshold: null, band: '−4 – 0', results: [] };
+    const routed = {
+      mode: 'routed',
+      checkUsable: true,
+      routedType: 'relative',
+      dc: null,
+      routedOutcomes: [
+        { id: 'o2', name: 'Pass', success: true, threshold: null, band: '1+', results: [] },
+        ruined,
+        { ...ruined, id: 'count-botch', name: 'Botch', band: '<−4', below: -4 },
+      ],
+    };
+    const marked = async (salvageResult) => {
+      harness.remount();
+      const { services } = salvageServices(salvageItem(routed), { salvageResult });
+      const target = await openSalvage(services);
+      return [...target.querySelectorAll('[data-outcome-rolled="true"]')].map(
+        (node) => node.dataset.inventorySalvageOutcome
+      );
+    };
+    const success = (rollValue) => ({ systemId: 'sys', componentId: 'c1', state: 'success',
+      message: '', awarded: [], awardedComponentIds: [], outcomeId: 'o1', rollValue });
+    assert.deepEqual(await marked(success(-5)), ['count-botch'], 'below the floor');
+    assert.deepEqual(await marked(success(-4)), ['o1'], 'a net Ruined meets stays on Ruined');
+    // As the store's `failureSnapshot` builds it: no roll value and no outcome id.
+    const failure = { systemId: 'sys', componentId: 'c1', state: 'failure', message: 'Salvage check failed',
+      check: null, awarded: [] };
+    assert.deepEqual(await marked(failure), [], 'a failed salvage marks no row');
   });
 });
 

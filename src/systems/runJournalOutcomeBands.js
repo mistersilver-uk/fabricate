@@ -5,7 +5,7 @@
  * adjustment instead (issue 2005). A counting ladder is stated in net successes (issue 2006).
  */
 
-import { formatCheckAdjustment } from '../utils/checkAdjustmentFormat.js';
+import { formatCheckAdjustment, formatNet } from '../utils/checkAdjustmentFormat.js';
 
 import { better } from './checkEvaluation.js';
 import { sumGrading } from './checkRouting.js';
@@ -24,12 +24,11 @@ export function routedOutcomeBand(outcome, routed, task, labels = {}) {
   if (routed?.type === 'fixed') {
     const start = numberOrNull(outcome?.start) ?? 0;
     const end = numberOrNull(outcome?.end) ?? start;
-    return start === end ? String(start) : `${start}–${end}`;
+    return netRange(start, end);
   }
   const evaluation = activeCheckEvaluation(routed);
-  if (evaluation.product === 'count') {
-    return countBand(outcome, routed, countRequired(evaluation, task?.successesOverride));
-  }
+  if (evaluation.product === 'count')
+    return countBand(outcome, routed, taskCountRequired(routed, task));
   const grading = ladderGrading(routed);
   if (grading.source === 'attribute') return adjustmentBand(outcome, grading, labels);
   // Mirrors GatheringEngine._resolveGatheringRoutedDc exactly: a finite task
@@ -142,21 +141,43 @@ function countThresholds(routed, required) {
   );
 }
 
+/** A routed gathering count's successes needed: the task's override, else the pool's; else null. */
+export function taskCountRequired(routed, task) {
+  const evaluation = activeCheckEvaluation(routed);
+  if (evaluation.product !== 'count' || routed?.type === 'fixed') return null;
+  return countRequired(evaluation, task?.successesOverride);
+}
+
 /**
  * A count tier's band in net successes (issue 2006), ranked by net whatever the per-die direction:
- * from its threshold up to the next tier's, the best met winning as the runner routes it. The
- * least demanding tier starts at 0, since a net below zero is the Botch row.
+ * from its threshold up to the next tier's, the best met winning as the runner routes it.
  */
 function countBand(outcome, routed, required) {
   const threshold = required + (numberOrNull(outcome?.dc) ?? 0);
   const thresholds = countThresholds(routed, required);
   const higher = thresholds.filter((value) => value > threshold);
+  const next = higher.length > 0 ? Math.min(...higher) : null;
   const lowest = thresholds.every((value) => value >= threshold);
-  if (higher.length === 0) return `${lowest ? 0 : threshold}+`;
-  const next = Math.min(...higher);
-  if (lowest && next <= 0) return `<${next}`;
-  const low = lowest ? 0 : threshold;
-  return low === next - 1 ? String(low) : `${low}–${next - 1}`;
+  const low = lowest ? lowestTierStart(routed, threshold, next) : threshold;
+  if (next === null) return `${formatNet(low)}+`;
+  return netRange(low, next - 1);
+}
+
+/** `low–high`, spaced (`−2 – 1`) when either end is negative so its minus reads apart from the dash. */
+function netRange(low, high) {
+  if (low === high) return formatNet(low);
+  const dash = low < 0 || high < 0 ? ' – ' : '–';
+  return `${formatNet(low)}${dash}${formatNet(high)}`;
+}
+
+/**
+ * Where the least demanding tier's band starts (issue 2135): at 0, every net below its threshold
+ * clamping to it, or at its own threshold when cancelling can carry a net that low, a net below
+ * every tier being the Botch row. A tier no net can reach still states its own range.
+ */
+function lowestTierStart(routed, threshold, next) {
+  const cancels = activeCheckEvaluation(routed).pool.cancel.enabled;
+  return cancels || (next !== null && next <= 0) ? Math.min(0, threshold) : 0;
 }
 
 /**
@@ -172,17 +193,27 @@ function relativeCountBand(outcome, routed, word) {
 }
 
 /**
- * A relative count ladder's `Botch` row while cancelling is on (issue 2006), beside the least
- * demanding tier on the ladder's outer end: a net below zero routes to that tier, so the row
- * carries its outcome and yields under the band `<0`. Any other ladder is returned as it is.
+ * A relative count ladder's `Botch` row while cancelling is on (issue 2006): the nets no tier
+ * meets, below 0 or below the least demanding tier's threshold when that is lower (issue 2135),
+ * routed to that tier, so the row carries its outcome, and its floor as `below`. It sits beside
+ * that tier, before it on a ladder authored worst-first and after it on one authored best-first.
+ * `required` is null under a macro. Any other ladder is returned as it is.
  */
-export function withCountBotch(tiers, routed, name) {
+export function withCountBotch(tiers, routed, name, required = null) {
   const evaluation = activeCheckEvaluation(routed);
   const relative = evaluation.product === 'count' && routed?.type !== 'fixed';
   if (!relative || !evaluation.pool.cancel.enabled || tiers.length === 0) return tiers;
   const thresholds = countThresholds(routed, 0);
-  const at = thresholds.indexOf(Math.min(...thresholds));
-  const botch = { ...tiers[at], id: 'count-botch', name, band: '<0' };
-  // A best-first ladder ends on its least demanding tier, so its Botch row closes the ladder.
-  return at === tiers.length - 1 && tiers.length > 1 ? [...tiers, botch] : [botch, ...tiers];
+  const least = Math.min(...thresholds);
+  const at = thresholds.indexOf(least);
+  const floor = Number.isInteger(required) ? Math.min(0, required + least) : 0;
+  const botch = {
+    ...tiers[at],
+    id: 'count-botch',
+    name,
+    band: `<${formatNet(floor)}`,
+    below: floor,
+  };
+  const after = at + (thresholds[0] > thresholds.at(-1) ? 1 : 0);
+  return [...tiers.slice(0, after), botch, ...tiers.slice(after)];
 }

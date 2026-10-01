@@ -130,7 +130,8 @@ describe('recorded Journal presentation', () => {
     assert.equal(stage(count({ net: 4, required: null, zeroPool: false })), `RollResultNet${JSON.stringify({ net: '4' })}`);
     assert.equal(stage({ ...count({ net: null, required: null, zeroPool: true }), total: null, value: 0 }), 'ZeroPoolResult');
     const gathering = presentHistory({ gatheringYield: { check: count({ net: 1, required: 1, zeroPool: false }) } }, text);
-    assert.equal(gathering.gatheringCheck, `RollResultOne${JSON.stringify({ net: '1' })}`);
+    assert.equal(gathering.gatheringCheck, `RollResultOne${JSON.stringify({ required: 1 })}`);
+    assert.equal(stage(count({ net: -1, required: 2, zeroPool: false })), `RollResultBotch${JSON.stringify({ net: '−1' })}`);
   });
 
   for (const [checked, kind] of [[true, 'check'], [false, 'none']]) {
