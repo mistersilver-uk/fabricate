@@ -561,7 +561,9 @@ The clamp is relative-only; **fixed** tiers keep the "outside every range → no
 Fixed outcome tiers own explicit, non-overlapping `[start, end]` value ranges and the roll total is matched by range, so the check DC and the meet/exceed `thresholdMode` comparison are unused in fixed mode — DC and the comparison are relative-only.
 A fixed-range check therefore reads no target, and its target source is inert: runtime never resolves or refuses it.
 Under sum/under the matched value is `total − targetDelta` against the inclusive ranges, so a benefit shifts the match toward the better, lower end; `data.total` stays raw and no threshold or margin is invented, and sum/over fixed ranges still match the raw total.
-A matched value that is not a whole number falls between two inclusive integer ranges and matches none, so a fractional appended scalar over, or a fractional `targetDelta` under, can leave the attempt rolled but unrouted; how such a value maps to a range awaits a ruling (#2059).
+The matched value floors before matching, in both directions, so a whole-number range `start`–`end` covers `[start, end + 1)`: a fractional appended scalar over, or a fractional `targetDelta` under, routes to the range its whole part lands in, as targets floor (#2059).
+A sum/over total of 10.5 therefore routes to 1–10, and under a `targetDelta` of 1.5 a total of 12 matches 10.5, which floors to 10 and routes to 1–10.
+Adjacent whole-number ranges therefore leave no fractional hole, so a set readiness reports gap-free routes every value inside its span.
 **A fixed tier set MUST leave no GAP inside its own span**, and a set that does is the BLOCKING readiness issue `rangeGap` (`critical`), alongside the `rangeInvalid` and `rangeOverlap` its two siblings raise.
 A gap is a value BETWEEN two authored tiers that no tier claims — Slag 1–9, Rough 11–17, with 10 claimed by nobody — and it is reachable by ordinary authoring: edit one boundary and stop.
 It is `critical` rather than a warning because fixed mode has no `clampToNearest` rescue: a roll landing in the hole matches no tier at all, so the attempt is rolled but UNROUTED, which fails it rather than degrading it.

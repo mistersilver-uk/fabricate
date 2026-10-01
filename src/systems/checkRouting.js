@@ -108,14 +108,15 @@ function rankableTiers(routing) {
 
 /**
  * Match a total to a routed tier, or `null`. The best qualifying tier wins. Under, a fixed range
- * matches `total − targetDelta`, so a benefit shifts toward the better, lower end (ruling D3).
+ * matches `total − targetDelta`, so a benefit shifts toward the better, lower end (ruling D3); the
+ * matched value floors, so a whole-number range covers `[start, end + 1)` (issue 2059).
  * With nothing qualifying, Otherwise applies, else `clampToNearest` routes to the least demanding
  * tier; there is no top-end clamp.
  */
 function matchRoutedOutcome(routing, { total, comparison, clampToNearest }) {
   const { valueOf, direction } = tierRanking(routing);
   if (routing.type === 'fixed') {
-    const value = total - routing.delta;
+    const value = Math.floor(total - routing.delta);
     const matching = rankableTiers(routing).filter((outcome) => {
       const end = Number(outcome.end);
       return Number.isFinite(end) && value >= Number(outcome.start) && value <= end;
