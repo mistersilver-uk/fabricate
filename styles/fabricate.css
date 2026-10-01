@@ -2567,12 +2567,12 @@
   text-overflow: ellipsis;
 }
 
-/* THE ONE ELASTIC CELL. The expression takes the row's slack, which is what puts the bounds chip and the eligibility control against the row's right edge with no auto margin anywhere — exactly how the prototype lays the row out. It never shrinks below its own text: a long name ellipsises first, so a roll such as a counting die is never cut short (issue 2044). */
+/* THE ONE ELASTIC CELL. The expression takes the row's slack, which is what puts the bounds chip and the eligibility control against the row's right edge with no auto margin anywhere — exactly how the prototype lays the row out. It gives way only past twelve characters, sharing the shrink with the name, so a counting die stays whole and neither cell can push the control out (issue 2044). */
 .fabricate-manager .manager-checks-card .manager-modifier-readonly-expression,
 .fabricate-manager .manager-tool-prerequisite-list .manager-modifier-readonly-expression,
 .fabricate-manager .manager-tool-bonus-list .manager-modifier-readonly-expression {
-  flex: 1 0 auto;
-  min-width: 0;
+  flex: 1 1 auto;
+  min-width: 12ch;
   overflow: hidden;
   color: var(--fab-text-secondary);
   background: none;
@@ -2602,7 +2602,7 @@
   min-width: 0;
 }
 
-/* The expression cell is `flex: 1 1 0` in the inline row, which is what puts a trailing control against the row's right edge with no auto margin anywhere. */
+/* The expression cell is `flex: 1 1 auto` in the inline row, which is what puts a trailing control against the row's right edge with no auto margin anywhere. */
 .fabricate-manager .manager-modifier-readonly-row.is-text-stacked .manager-modifier-readonly-expression {
   flex: 0 0 auto;
   margin-top: var(--fab-space-2xs);

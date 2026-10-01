@@ -19,6 +19,7 @@ manager-recipe-edit-results-failure-tier
 manager-checks-crafting-modifiers
 manager-checks-crafting-modifier-max-picks
 manager-checks-crafting-modifier-long-name
+manager-checks-crafting-modifier-long-expression-narrow
 manager-checks-crafting-modifiers-multi-name-notice
 manager-checks-crafting-modifier-entries
 manager-checks-salvage-modifiers

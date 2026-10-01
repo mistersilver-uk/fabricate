@@ -834,6 +834,47 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/ModifierLibraryRow\.svelte$/,
     ],
   }),
+  // The narrow twin: a short name beside a long expression, and both controls inside their rows (issue 2044).
+  managerCase({
+    id: 'manager-checks-crafting-modifier-long-expression-narrow',
+    label: 'Manager — Checks crafting modifier long expression, narrow',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      ...AUTHOR_TRANSFORMED_MODIFIER,
+      { selector: '[data-world-modifier="hb-mod-tools"] [data-toggle-modifier]' },
+      {
+        selector: '[data-world-modifier="hb-mod-tools"] [data-world-modifier-field="expression"]',
+        fill: '@skills.nat.total + @abilities.wis.mod + @abilities.int.mod + @prof + 2',
+      },
+      { selector: '[data-world-modifier-done="hb-mod-tools"]' },
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-modifiers' },
+      { selector: '[data-crafting-modifier-row="hb-mod-tools"]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    expectSelector:
+      '.fabricate-manager [data-crafting-modifier-row="hb-mod-tools"]' +
+      ':has([data-crafting-modifier-readonly="expression"]:has-text("@abilities.int.mod + @prof"))',
+    position: { width: 1180, height: 820 },
+    expectContained: [
+      {
+        container: '[data-crafting-modifier-row="hb-mod-tools"]',
+        target: '[data-crafting-modifier-eligibility="hb-mod-tools"]',
+      },
+      {
+        container: '[data-crafting-modifier-row="hb-mod-luck"]',
+        target: '[data-crafting-modifier-eligibility="hb-mod-luck"]',
+      },
+    ],
+    kinds: ['manager', 'checks', 'responsive'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/ModifierLibraryRow\.svelte$/,
+    ],
+  }),
   // Two modifiers sharing one fault, so the notice's detail names both and must wrap (issue 2082).
   managerCase({
     id: 'manager-checks-crafting-modifiers-multi-name-notice',

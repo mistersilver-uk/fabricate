@@ -759,7 +759,7 @@ test('the stacked-text variant is the row own, not the Tool tab', () => {
   assert.match(stackDeclarations, /flex-direction: column/, '`proto:2333` sets name over value');
   assert.match(stackDeclarations, /min-width: 0/, 'so a long expression ellipses inside the row');
 
-  // The expression cell is `flex: 1 1 0` in the INLINE row.
+  // The expression cell is `flex: 1 1 auto` in the INLINE row.
   const expression =
     '.fabricate-manager .manager-modifier-readonly-row.is-text-stacked ' +
     '.manager-modifier-readonly-expression {';
