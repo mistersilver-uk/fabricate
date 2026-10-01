@@ -3588,12 +3588,18 @@ export function registerChecksCases() {
       },
     });
     await openChecksActivity('validation');
-    const detailOf = (id) =>
+    const detailNode = (id) =>
       target
-        .querySelector(`[data-checks-all-checks-row="${id}"] .manager-checks-rail-row-detail`)
-        .textContent.trim();
+        .querySelector(`[data-checks-all-checks-row="${id}"]`)
+        .querySelector('.manager-checks-rail-row-detail');
+    const detailOf = (id) => detailNode(id).textContent.trim();
     assert.equal(detailOf('salvage'), 'Routed by check · 6d10 each ≥ 8');
     assert.equal(detailOf('crafting'), 'Routed by check · 1d20', 'a summing check keeps its formula');
+    assert.equal(
+      detailNode('salvage').getAttribute('title'),
+      'Routed by check · 6d10 each ≥ 8',
+      'the line ellipsises in the rail, so it carries its full text'
+    );
   });
 
   it('does not re-apply a standing deep link when the GM changes ACTIVITY', async () => {

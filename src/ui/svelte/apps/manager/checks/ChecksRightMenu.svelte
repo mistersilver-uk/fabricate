@@ -334,7 +334,7 @@
   <span class="manager-checks-rail-row-body">
     <span class="manager-checks-rail-row-text">{row.title}</span>
     {#if row.detail}
-      <span class="manager-checks-rail-row-detail">{row.detail}</span>
+      <span class="manager-checks-rail-row-detail" title={row.detail}>{row.detail}</span>
     {/if}
   </span>
 {/snippet}
