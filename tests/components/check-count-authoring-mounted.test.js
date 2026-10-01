@@ -423,6 +423,21 @@ describe('the composed roll (N3)', () => {
   const insetTerms = (root) =>
     [...root.querySelector('[data-check-count-composed]').children].map((node) => node.textContent.trim());
 
+  it('shows the pool that rolls under What actually gets rolled, never the retained formula (issue 2084)', async () => {
+    const state = await mountControlled(
+      simpleHarness,
+      simpleCheck(evaluation({ pool: { ...AUTHORED_POOL, base: '6' } }))
+    );
+    const boxes = state.root.querySelectorAll('[data-check-formula-resolved]');
+    assert.equal(boxes.length, 1, 'one resolved box, the count inset');
+    assert.ok(boxes[0].classList.contains('is-count'));
+    assert.deepEqual(insetTerms(state.root).slice(0, 3), ['6d10', 'each', '> 8']);
+    assert.ok(
+      !boxes[0].textContent.includes('2d20cs<=@skills.survival.value'),
+      'the summing formula the record retains is not what a counting check rolls'
+    );
+  });
+
   it('attaches the chips inside the pool brackets, or after the threshold, with the face clauses', async () => {
     const state = await mountControlled(simpleHarness, simpleCheck(evaluation()), {
       appliedModifiers: KNACK,
