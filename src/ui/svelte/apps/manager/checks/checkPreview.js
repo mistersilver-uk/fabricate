@@ -11,6 +11,7 @@
  * `Actor#getRollData()` returns, {@link cloneRollData} existing for a caller that must augment. */
 
 import { isPlayerCharacterActor } from '../../../../../config/playerCharacterTypes.js';
+import { readStoredResource } from '../../../../../systems/additionalDiceReach.js';
 import { buildCheckModifierContext } from '../../../../../systems/checkModifierResolver.js';
 import { planModifierPlacement } from '../../../../../systems/checkModifierRouter.js';
 import {
@@ -95,6 +96,22 @@ export function cloneRollData(actor) {
   const live = actor?.getRollData?.() ?? actor?.system ?? {};
   const clone = globalThis.foundry?.utils?.deepClone;
   return typeof clone === 'function' ? clone(live) : structuredClone(live);
+}
+
+/** The Preview-as actor as the Studio reads it: its name, a roll-data copy, and its stored value
+ *  at a document path through the engine's own `readStoredResource`; null for "No actor". */
+export function previewCharacter(actor) {
+  if (!actor) return null;
+  return {
+    name: actor.name,
+    rollData: cloneRollData(actor),
+    readStored: (path) => readStoredResource(actor, path),
+  };
+}
+
+/** {@link previewCharacter} for an actor id, through {@link resolvePreviewActor}. */
+export function resolvePreviewCharacter(id, options) {
+  return previewCharacter(resolvePreviewActor(id, options));
 }
 
 /**

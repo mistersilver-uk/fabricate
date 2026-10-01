@@ -537,6 +537,14 @@
       "why": "Promoted at issue 2006 on its second independent caller: the Difficulty card's roll-under target (`checks/CheckDifficultyCard.svelte`) and the success-counting pool's base and threshold (`checks/CheckCountInputField.svelte`) author a character-value expression through this one field, with its live reading for the Preview-as character. `library: null` stands: `<ExprInput>` (`RollDataExpressionInput.svelte`) is the library entry it wraps, and this adds only the reading beneath it. Scoped `manager-only`: it authors a check in the Checks Studio."
     },
     {
+      "path": "src/ui/svelte/apps/manager/checks/CheckOptionGroup.svelte",
+      "library": null,
+      "status": "target",
+      "evidence": "targeted",
+      "scope": "manager-only",
+      "why": "Extracted at issue 2008 on its second independent caller: the Formula card's roll-prompt group (`checks/CheckPromptOptions.svelte`) and a counting pool's additional-dice group (`checks/CheckAdditionalDiceFields.svelte`) both draw this option well, which the roll-prompt group shipped inline until then. It draws the library's `<Well>` geometry, the one container level below `<Card>`: a 1px `--fab-border` frame with a 9px radius and `--fab-space-3` padding on `--fab-bg-1`, named by its title through `aria-labelledby`, with an optional action at the head's end and a top rule over the body only when that action is given. `library: null` rather than `<Well>`: that entry is still recorded unbuilt, and its specified API is a kicker label with no head action, so claiming it is the library's own adjudication rather than this extraction's. Targeted: the Checks cases claim it through the `checks/` pattern. Scoped `manager-only`: both callers author a check in the Checks Studio, which only the GM manager does."
+    },
+    {
       "path": "src/ui/svelte/apps/manager/checks/PreviewAsPicker.svelte",
       "library": null,
       "status": "target",

@@ -1,7 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <!--
   `In the roll prompt`: what a player may change before the dice are rolled, rendered once inside
-  the Formula card as a group named by its title. The situational-bonus offer is a display flag only; `allowsSituationalModifier`
+  the Formula card as a `CheckOptionGroup`. The situational-bonus offer is a display flag only; `allowsSituationalModifier`
   stays the runtime's authority gate. `extra` is the slot later prompt options extend. A counting
   check passes its `destination`, `pool` or `threshold`, and the offer's help follows it (issue 2006).
   Below the offer sits the check's advantage rule (issue 2007): the mode, extra dice, bonus
@@ -24,6 +24,7 @@
     keepWords,
     parseKeepTotal,
   } from './checkAdvantageCopy.js';
+  import CheckOptionGroup from './CheckOptionGroup.svelte';
 
   let {
     offer = true,
@@ -43,7 +44,6 @@
   }
 
   const uid = $props.id();
-  const titleId = `${uid}-prompt-options-title`;
   const offered = $derived(offer !== false);
   const title = $derived(
     text('FABRICATE.Admin.Manager.Checks.Evaluation.OfferBonus', 'Offer a situational bonus')
@@ -137,23 +137,14 @@
   };
 </script>
 
-<div
-  class="manager-checks-prompt-options"
-  role="group"
-  aria-labelledby={titleId}
-  data-check-prompt-options
+<CheckOptionGroup
+  title={text('FABRICATE.Admin.Manager.Checks.Evaluation.PromptTitle', 'In the roll prompt')}
+  description={text(
+    'FABRICATE.Admin.Manager.Checks.Evaluation.PromptLead',
+    'What the player can change before the dice are rolled.'
+  )}
+  data-check-prompt-options=""
 >
-  <div class="manager-checks-prompt-options-head">
-    <p class="manager-checks-prompt-options-title" id={titleId}>
-      {text('FABRICATE.Admin.Manager.Checks.Evaluation.PromptTitle', 'In the roll prompt')}
-    </p>
-    <p class="manager-checks-prompt-options-hint">
-      {text(
-        'FABRICATE.Admin.Manager.Checks.Evaluation.PromptLead',
-        'What the player can change before the dice are rolled.'
-      )}
-    </p>
-  </div>
   <!-- A switch row inside the group rather than a nested card: the group is the one frame. -->
   <div class="manager-checks-prompt-options-row">
     <div class="manager-checks-prompt-options-copy">
@@ -301,20 +292,9 @@
     {/if}
   </div>
   {@render extra?.()}
-</div>
+</CheckOptionGroup>
 
 <style>
-  .manager-checks-prompt-options {
-    margin-top: var(--fab-space-3);
-    border: 1px solid var(--fab-border);
-    border-radius: 9px;
-    background: var(--fab-bg-1);
-  }
-
-  .manager-checks-prompt-options-head {
-    padding: var(--fab-space-2) var(--fab-space-3) 0;
-  }
-
   .manager-checks-prompt-options-row {
     display: flex;
     align-items: center;
@@ -327,19 +307,10 @@
     min-width: 0;
   }
 
-  .manager-checks-prompt-options-title,
   .manager-checks-prompt-options-label {
     margin: 0;
-    font-size: 11.5px;
-  }
-
-  .manager-checks-prompt-options-title {
-    color: var(--fab-text);
-    font-weight: 600;
-  }
-
-  .manager-checks-prompt-options-label {
     color: var(--fab-text-secondary);
+    font-size: 11.5px;
     font-weight: 500;
   }
 

@@ -62,8 +62,8 @@
     NO_ACTOR_ID,
     buildPreviewCheckArgs,
     buildPreviewRecords,
-    cloneRollData,
     listPreviewActors,
+    previewCharacter as characterOf,
     resolvePreviewActor,
     runCheckPreview,
   } from './checkPreview.js';
@@ -446,9 +446,7 @@
   let previewActorId = $state(NO_ACTOR_ID);
   const previewActor = $derived(resolvePreviewActor(previewActorId));
   // The Preview-as actor as the editors' character-value fields and strips read it: a copy.
-  const previewCharacter = $derived(
-    previewActor ? { name: previewActor.name, rollData: cloneRollData(previewActor) } : null
-  );
+  const previewCharacter = $derived(characterOf(previewActor));
 
   const activeReadiness = $derived(
     activeActivity
