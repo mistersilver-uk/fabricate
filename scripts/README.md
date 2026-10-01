@@ -696,6 +696,7 @@ That module takes a Playwright `page` but never imports Playwright, and reportin
 
 `node scripts/foundry-test.mjs --check=roll-terms [--arm=v13]` boots the arm's Foundry and runs `scripts/foundry-roll-terms-record.mjs`, which records `new Roll(formula, data).terms` for every formula in `scripts/lib/rollTermsCorpus.js`, plus keep-transform probes that read every formula surface before and after `resetFormula()`.
 It writes `tests/fixtures/recorded-roll-terms/foundry-<version>.json`, already Prettier-formatted.
+It also records, under `fragments`, each check-modifier fragment in `FRAGMENT_VALIDITY_CORPUS`: its `Roll.validate` verdict, its maximized evaluation, and whether a real roll completes; `tests/check-modifier-dice.test.js` fails when `RECORDED_FRAGMENT_VALIDITY` disagrees with the 14.365 recording.
 The test doubles replay those recordings (`tests/helpers/termBearingRoll.js`), and `tests/roll-terms-recording.test.js` fails when a corpus formula lacks a recording on either build, so a formula added to the corpus has to be recorded on both arms.
 
 ### Phases

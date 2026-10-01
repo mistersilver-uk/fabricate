@@ -5034,5 +5034,262 @@
         ]
       }
     }
-  ]
+  ],
+  "fragments": {
+    "(1d4)": {
+      "validates": true,
+      "evaluates": "rolls",
+      "completes": true
+    },
+    "(1d8)": {
+      "validates": true,
+      "evaluates": "rolls",
+      "completes": true
+    },
+    "(1d4[fire])": {
+      "validates": true,
+      "evaluates": "rolls",
+      "completes": true
+    },
+    "({1d6,1d8}kh1)": {
+      "validates": true,
+      "evaluates": "rolls",
+      "completes": true
+    },
+    "(1d4 + 2)": {
+      "validates": true,
+      "evaluates": "rolls",
+      "completes": true
+    },
+    "(2d20kh1)": {
+      "validates": true,
+      "evaluates": "rolls",
+      "completes": true
+    },
+    "(2)": {
+      "validates": true,
+      "evaluates": "rolls",
+      "completes": true
+    },
+    "(1d6x)": {
+      "validates": true,
+      "evaluates": "rolls",
+      "completes": true
+    },
+    "(2d10r1)": {
+      "validates": true,
+      "evaluates": "rolls",
+      "completes": true
+    },
+    "min(max((1d8), -1), 6)": {
+      "validates": true,
+      "evaluates": "rolls",
+      "completes": true
+    },
+    "max((1d8), 2)": {
+      "validates": true,
+      "evaluates": "rolls",
+      "completes": true
+    },
+    "min((1d8), 6)": {
+      "validates": true,
+      "evaluates": "rolls",
+      "completes": true
+    },
+    "min(max((1d8), 0), 0)": {
+      "validates": true,
+      "evaluates": "rolls",
+      "completes": true
+    },
+    "max((1d8), -1)": {
+      "validates": true,
+      "evaluates": "rolls",
+      "completes": true
+    },
+    "min((1d4), 2.5)": {
+      "validates": true,
+      "evaluates": "rolls",
+      "completes": true
+    },
+    "min(max((1d4 + 2), 1), 9)": {
+      "validates": true,
+      "evaluates": "rolls",
+      "completes": true
+    },
+    "(pow(1d4,2))": {
+      "validates": true,
+      "evaluates": "rolls",
+      "completes": true
+    },
+    "(sqrt(1d4))": {
+      "validates": true,
+      "evaluates": "rolls",
+      "completes": true
+    },
+    "(clamp(1d8,1,6))": {
+      "validates": true,
+      "evaluates": "rolls",
+      "completes": true
+    },
+    "(999d6)": {
+      "validates": true,
+      "evaluates": "rolls",
+      "completes": true
+    },
+    "(1d4])": {
+      "validates": false,
+      "evaluates": "throws",
+      "completes": false
+    },
+    "(1d4[fire)": {
+      "validates": false,
+      "evaluates": "throws",
+      "completes": false
+    },
+    "(1d4))": {
+      "validates": false,
+      "evaluates": "throws",
+      "completes": false
+    },
+    "()": {
+      "validates": false,
+      "evaluates": "throws",
+      "completes": false
+    },
+    "(1d20 +)": {
+      "validates": false,
+      "evaluates": "throws",
+      "completes": false
+    },
+    "(MAX(1d4,2))": {
+      "validates": true,
+      "evaluates": "throws",
+      "completes": false
+    },
+    "(Min(1d4,2))": {
+      "validates": true,
+      "evaluates": "throws",
+      "completes": false
+    },
+    "(FLOOR(1d8))": {
+      "validates": true,
+      "evaluates": "throws",
+      "completes": false
+    },
+    "(Abs(1d4))": {
+      "validates": true,
+      "evaluates": "throws",
+      "completes": false
+    },
+    "(1000d6)": {
+      "validates": true,
+      "evaluates": "throws",
+      "completes": false
+    },
+    "(1d4 + .5)": {
+      "validates": true,
+      "evaluates": "throws",
+      "completes": false
+    },
+    "min(max((MAX(1d4,2)), -1), 6)": {
+      "validates": true,
+      "evaluates": "throws",
+      "completes": false
+    },
+    "(pow(2, 1d10 * 103))": {
+      "validates": true,
+      "evaluates": "nonFinite",
+      "completes": true
+    },
+    "min(max((pow(2, 1d10 * 103)), -1), 6)": {
+      "validates": true,
+      "evaluates": "rolls",
+      "completes": true
+    },
+    "max(, 2)": {
+      "validates": true,
+      "evaluates": "nonFinite",
+      "completes": true
+    },
+    "(1d20cs>)": {
+      "validates": true,
+      "evaluates": "rolls",
+      "completes": true
+    },
+    "(1d20cs<)": {
+      "validates": true,
+      "evaluates": "rolls",
+      "completes": true
+    },
+    "(1d20cs>=)": {
+      "validates": true,
+      "evaluates": "rolls",
+      "completes": true
+    },
+    "(1d20cs<=)": {
+      "validates": true,
+      "evaluates": "rolls",
+      "completes": true
+    },
+    "(1d20cs=)": {
+      "validates": true,
+      "evaluates": "rolls",
+      "completes": true
+    },
+    "(1d20cs)": {
+      "validates": true,
+      "evaluates": "rolls",
+      "completes": true
+    },
+    "(2d6cs)": {
+      "validates": true,
+      "evaluates": "rolls",
+      "completes": true
+    },
+    "(1d20cf>)": {
+      "validates": true,
+      "evaluates": "rolls",
+      "completes": true
+    },
+    "(1d20cf)": {
+      "validates": true,
+      "evaluates": "rolls",
+      "completes": true
+    },
+    "(2d6cf<)": {
+      "validates": true,
+      "evaluates": "rolls",
+      "completes": true
+    },
+    "(1d20df<)": {
+      "validates": true,
+      "evaluates": "rolls",
+      "completes": true
+    },
+    "(1d20df)": {
+      "validates": true,
+      "evaluates": "rolls",
+      "completes": true
+    },
+    "(2d6x>)": {
+      "validates": true,
+      "evaluates": "rolls",
+      "completes": true
+    },
+    "(2d6r<)": {
+      "validates": true,
+      "evaluates": "rolls",
+      "completes": true
+    },
+    "(2d6cs>5>)": {
+      "validates": true,
+      "evaluates": "rolls",
+      "completes": true
+    },
+    "min(max((1d20cs>), -1), 6)": {
+      "validates": true,
+      "evaluates": "rolls",
+      "completes": true
+    }
+  }
 }
