@@ -99,6 +99,11 @@ describe('the check-modifier catalogue card (mounted)', () => {
       assert.equal(rows.length, CATALOGUE.length, 'every entry is read out');
       assert.equal(rows[0].textContent.trim(), 'Medicine');
       assert.equal(
+        rows[0].getAttribute('title'),
+        'Medicine',
+        'the name carries its full text, since a long one ellipsises (issue 2044)'
+      );
+      assert.equal(
         card.querySelector('[data-crafting-modifier-readonly="expression"]').textContent.trim(),
         '@abilities.med.mod'
       );

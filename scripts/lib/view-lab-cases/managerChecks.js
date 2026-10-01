@@ -807,6 +807,33 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
     ],
   }),
+  // A long name ellipsises beside a whole counting expression and an in-row Selectable control (issue 2044).
+  managerCase({
+    id: 'manager-checks-crafting-modifier-long-name',
+    label: 'Manager — Checks crafting modifier long name',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      ...AUTHOR_TRANSFORMED_MODIFIER,
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-modifiers' },
+      { selector: '[data-crafting-modifier-policy-option="playerPicks"] input' },
+      { selector: '[data-crafting-modifier-row="hb-mod-luck"]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    // The title is the state: before issue 2044 the name had none and pushed the control out.
+    expectSelector:
+      '.fabricate-manager [data-crafting-modifier-row="hb-mod-luck"]' +
+      ':has([data-crafting-modifier-readonly="label"][title^="Lucky find with a deliberately long"])' +
+      ':has([data-crafting-modifier-eligibility="hb-mod-luck"])',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/ModifierLibraryRow\.svelte$/,
+    ],
+  }),
   // Two modifiers sharing one fault, so the notice's detail names both and must wrap (issue 2082).
   managerCase({
     id: 'manager-checks-crafting-modifiers-multi-name-notice',
