@@ -244,12 +244,18 @@ export function buildConsumptionPlan(craftability, { chosenGroupIds = [] } = {})
   };
 }
 
+// Held over needed, so an essence amount is never compared against an item count.
+function coverageOf(option) {
+  const need = toCount(option?.need);
+  return need > 0 ? toCount(option?.have) / need : toCount(option?.have);
+}
+
 function bestOption(options) {
   const ranked = [...options].sort((left, right) => {
     const satisfied = Number(right?.satisfied === true) - Number(left?.satisfied === true);
     if (satisfied !== 0) return satisfied;
-    const held = toCount(right?.have) - toCount(left?.have);
-    if (held !== 0) return held;
+    const covered = coverageOf(right) - coverageOf(left);
+    if (covered !== 0) return covered;
     return toCount(left?.optionIndex) - toCount(right?.optionIndex);
   });
   return ranked[0] ?? null;
@@ -280,7 +286,7 @@ function applyStackChoice(overrides, choice) {
   });
 }
 
-// The option the player holds most of, preferring one that satisfies, with the authored option
+// The option that satisfies, then the best covered (held over needed), with the authored option
 // order as the final tie-break so the suggestion is stable across renders. Read STRAIGHT off the
 // craftability's `ingredientChoices`: a second implementation would drift from the engine's plan.
 export function suggestChoiceOverrides(craftability) {
@@ -294,4 +300,20 @@ export function suggestChoiceOverrides(craftability) {
     else if (choice.kind === 'stack') applyStackChoice(overrides, choice);
   }
   return Object.fromEntries(overrides);
+}
+
+// Whether a "Pick for me" suggestion moves any group onto an essence alternative it
+// was not already on.
+export function switchesOntoEssence(craftability, suggestedOptions) {
+  const choices = Array.isArray(craftability?.ingredientChoices)
+    ? craftability.ingredientChoices
+    : [];
+  return choices.some((choice) => {
+    const index = suggestedOptions?.[choice?.groupId]?.optionIndex;
+    if (choice?.kind !== 'option' || index == null || index === choice.selectedOptionIndex) {
+      return false;
+    }
+    const options = Array.isArray(choice.options) ? choice.options : [];
+    return options.some((option) => option?.optionIndex === index && option.isEssence === true);
+  });
 }
