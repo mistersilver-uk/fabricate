@@ -104,7 +104,7 @@
     align-items: center;
     justify-content: center;
     flex: 0 0 auto;
-    border: 1px solid var(--fab-border-strong);
+    border: 1px solid var(--fab-control-outline);
     color: transparent;
   }
 

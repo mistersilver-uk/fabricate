@@ -769,6 +769,12 @@
   --fab-on-badge-gold: #171208;
 }
 
+/* ratchet-exempt(design-system): a derived token is declared once on every root a palette is, :root included, so each resolves against its own palette. --fab-control-outline outlines an unchecked selection control at 3:1 on its surface in every palette (issue 2047). */
+:root,
+.fabricate[data-fabricate-theme] {
+  --fab-control-outline: var(--fab-text-subtle);
+}
+
 /* ========================================== Every Fabricate window ========================================== */
 
 /* Heading normalization for every Fabricate window: core colours and re-faces bare `h1`-`h6` in `@layer elements.typography` and scopes its own antidote to the ApplicationV1 `.app` root, so this is the V2 counterpart core does not ship. `color` and `font-family` only — measured as the two properties that actually reach a Fabricate heading — at (0,1,1), deliberately below a Svelte scoped rule's (0,2,0) so this is a floor components override. See `design-system/spec.md`'s `The Foundry contract binds every primitive` (issue 972). */
@@ -7805,7 +7811,7 @@
   margin: 0;
   margin-top: 0.15rem;
   padding: 0;
-  border: 1.5px solid var(--fab-border-strong);
+  border: 1.5px solid var(--fab-control-outline);
   border-radius: 50%;
   appearance: none;
   -webkit-appearance: none;
@@ -7822,7 +7828,7 @@
   margin: 0;
   margin-top: 0.15rem;
   padding: 0;
-  border: 1.5px solid var(--fab-border-strong);
+  border: 1.5px solid var(--fab-control-outline);
   border-radius: 50%;
   appearance: none;
   -webkit-appearance: none;
@@ -8009,7 +8015,7 @@
   order: 3;
   align-self: center;
   margin-top: 0;
-  border: 1px solid var(--fab-border-strong);
+  border: 1px solid var(--fab-control-outline);
   background: var(--fab-bg-1);
 }
 
