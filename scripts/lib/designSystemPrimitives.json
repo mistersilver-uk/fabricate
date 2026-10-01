@@ -558,7 +558,7 @@
       "status": "target",
       "evidence": "broad",
       "scope": "shared",
-      "why": "Issue 2006 implements the specified die tiles of a success-counting roll: one tile per active die in roll order, each explosion's die straight after its parent, every mark on one tile. Promoted at task 8 on its second independent importer: the Checks Studio simulator (`apps/manager/checks/CheckOutcomePreview.svelte`) and the player result boxes' executed evidence (`apps/crafting/detail/CheckEvidenceRows.svelte`, rendered by both `RollResultBox` and `SalvageRollSummary`). The chat cards render the same model through `countDiceTiles.js`'s escaped renderer and do not import the component. Library target status and screenshot requirements remain in force."
+      "why": "Issue 2006 implements the specified die tiles of a success-counting roll: one tile per active die in roll order, each explosion's die straight after its parent, every mark on one tile. Promoted at task 8 on its second independent importer: the Checks Studio simulator (`apps/manager/checks/CheckOutcomePreview.svelte`) and the player result boxes' executed evidence (`apps/crafting/detail/CheckEvidenceRows.svelte`, rendered by both `RollResultBox` and `SalvageRollSummary`). The chat cards render the same model through `countDiceTiles.js`'s escaped renderer and do not import the component. Issue 2008 adds the bought die: one of the last original dice in roll order, painted by a dashed border that keeps its tone, marked `bought` and labelled so, with the legend's dashed key, all only on a public, non-secret roll. Library target status and screenshot requirements remain in force."
     }
   ],
   "notAPrimitive": [
