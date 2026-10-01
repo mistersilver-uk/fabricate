@@ -5,6 +5,9 @@
  * with the owning check's tick/cross riding the SAME row, rather than twice: once as a generic
  * warning checklist row and again as the issue's own row (issue 2083).
  */
+import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
+
+import { countAuthoredTerms } from './countInsetModel.js';
 
 /**
  * The issue(s) a check borrows its severity and copy from when unsatisfied. Two owners cover a
@@ -86,4 +89,19 @@ export function checksValidationRowStates(readiness = {}) {
     rows.push({ checkId: '', satisfied: false, issue, status: issueRowStatus(issue) });
   }
   return rows;
+}
+
+/**
+ * The Validation rail's "All checks" second line: the authored mode, then what the check rolls. A
+ * counting check names its pool as the Formula card's inset does, never its retained formula.
+ */
+export function allChecksDetail({ authoredMode, check }, text) {
+  const evaluation = normalizeCheckEvaluation(check?.evaluation);
+  let rolled = check?.rollFormula || '';
+  if (evaluation.product === 'count') {
+    const thresholdMode = check?.thresholdMode ?? null;
+    const { terms, clauses } = countAuthoredTerms({ evaluation, thresholdMode }, text);
+    rolled = [terms.map((term) => term.text).join(' '), ...clauses].join(' · ');
+  }
+  return [authoredMode, rolled].filter(Boolean).join(' · ');
 }

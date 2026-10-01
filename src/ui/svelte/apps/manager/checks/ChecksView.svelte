@@ -46,7 +46,7 @@
     recordNounPluralFor,
     subsystemModeLabel as modeLabelFor,
   } from './checksActivityCopy.js';
-  import { issueRowStatus } from './checksValidationRows.js';
+  import { allChecksDetail, issueRowStatus } from './checksValidationRows.js';
   import {
     buildCheckModifierContext,
     resolveActiveCraftingCheckFormula,
@@ -580,7 +580,7 @@
         id: row.subsystem,
         icon: SUBSYSTEM_ICONS[row.subsystem] || 'fas fa-dice-d20',
         label: `${label} · ${state}`,
-        detail: [row.authoredMode, row.check?.rollFormula || ''].filter(Boolean).join(' · '),
+        detail: allChecksDetail(row, text),
       };
     })
   );

@@ -3569,6 +3569,33 @@ export function registerChecksCases() {
     assert.match(detailOf('salvage'), /Routed by check/, 'and the salvage row the same one');
   });
 
+  it('names the pool a counting check rolls in the ALL CHECKS rail, never its retained formula (issue 2084)', async () => {
+    await mountChecks([], {
+      ...routedCraftingOptions('1d20'),
+      salvageResolutionMode: 'routed',
+      salvageCraftingCheck: {
+        enabled: true,
+        routed: {
+          rollFormula: '1d20+@abilities.int.mod',
+          type: 'relative',
+          relativeOutcomes: [{ id: 's1', name: 'Scrap', success: true, dc: 0 }],
+          evaluation: {
+            product: 'count',
+            direction: 'over',
+            pool: { die: 10, base: '6', threshold: '8', required: 2 },
+          },
+        },
+      },
+    });
+    await openChecksActivity('validation');
+    const detailOf = (id) =>
+      target
+        .querySelector(`[data-checks-all-checks-row="${id}"] .manager-checks-rail-row-detail`)
+        .textContent.trim();
+    assert.equal(detailOf('salvage'), 'Routed by check · 6d10 each ≥ 8');
+    assert.equal(detailOf('crafting'), 'Routed by check · 1d20', 'a summing check keeps its formula');
+  });
+
   it('does not re-apply a standing deep link when the GM changes ACTIVITY', async () => {
     // The mirror defect, which is why the latch cannot simply be removed.
     await mountChecks([], {
