@@ -48,7 +48,7 @@ export const SALVAGE_CHAT_KEYS = Object.freeze({
  * @param {Array<{name:string,img:string,quantity:number}>} [model.results]  - Recovered items.
  * @param {Array<{name:string,img:string,quantity:number}>} [model.consumed] - The source broken down.
  * @param {Array<{name:string,img:string}>}                 [model.tools]    - Tools that broke.
- * @param {number}  [model.rollValue] - The rolled check total; rendered only when finite.
+ * @param {number}  [model.rollValue] - Rendered only when finite and `model.check` is public.
  * @param {{mode:'target'|'up'|'down',steps:number}} [model.tierStep] - Realized routed
  *   tier-step evidence (`data.tierStepApplied`), present only on an actual tier change.
  * @param {object|null} [model.check] - The executed check's display projection (issue 2005).

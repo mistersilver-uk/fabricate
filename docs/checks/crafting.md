@@ -73,6 +73,7 @@ An entry that is not a valid modifier is ignored, and the check rolls with its b
 
 Clicking **Roll** evaluates the check and posts the result to chat as a normal roll card.
 The roll uses your current chat roll mode, so a private or blind roll stays hidden from other players in the usual way.
+The result card states the roll total only for a public roll; a private, blind, self or secret check's card states its outcome alone.
 If the [Dice So Nice](https://foundryvtt.com/packages/dice-so-nice) module is installed, it animates the 3D dice for that roll.
 Dice So Nice is optional.
 Without it the roll still posts to chat as a normal roll card, just with no 3D animation.
@@ -390,7 +391,7 @@ The Target row names the source: the character and the typed formula for a chara
 A bonus that is itself rolled, such as a `1d4` situational bonus, states its own **Pre-rolled** row naming the formula and what it rolled, because raising the target is still something that happened during the roll.
 The Margin row reads "under the target" for a **Lower is better** check, so a positive margin always means the roll did better, whichever way the check reads.
 
-The chat card states these rows only for a public roll, the same rule its plain roll evidence follows: a private, blind, or self roll's card states neither.
+The chat card states these rows only for a public roll, the same rule its roll total follows: a private, blind, self, or secret roll's card states neither the rows nor the total.
 The result box, and a salvage's own result summary, are more forgiving: both still state the rows for a private roll or a self roll, and withhold them only for a blind roll or one marked secret.
 
 A pass-or-fail check's chat message also names the settled target in its flavor line outside a **Higher is better** check against a **Fixed difficulty**, reading, for example, "Crafting check (Target 14)" once every benefit has raised or adjusted it.
@@ -566,7 +567,7 @@ You can still author a trigger by hand against **Net successes** directly, for a
 
 An executed success-counting check states its dice tiles, one per die, and its count rows, **Success on**, **Count**, and **Needed**, on the roll's chat card and on the crafter's own result box.
 
-The chat card states them only for a public roll, the same rule its plain roll evidence follows: a private, blind, or self roll's card states neither.
+The chat card states them only for a public roll, the same rule its roll total follows: a private, blind, self, or secret roll's card states neither the tiles, the rows, nor the net.
 The result box, and a salvage's own result summary, are more forgiving: both still state the tiles and the rows for a private roll or a self roll, and withhold them only for a blind roll or one marked secret.
 
 ### Converting a free-text formula that counts successes

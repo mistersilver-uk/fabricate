@@ -1783,7 +1783,7 @@ Spec reference: openspec/specs/data-models/spec.md, openspec/specs/resolution-mo
 
 `buildCheckDisplay` (`src/ui/presenters/checkDisplay.js`) rebuilds one deep-frozen plain-data record from an allowlist: `evaluation` (only `product` and `direction`), `target`, `comparison`, `terms` (sanitized **Target Terms**), `destination` (`'target'` for a summed under check, `'append'` for over, `null` for a count), `evidence` (an **Executed Check Evidence** projection or `null`), `visibility`, and, for a count, `count` (the **Count Display Evidence** projection).
 `executedCheckDisplay(checkResult)` builds one from a posted check result's `data`, `visibility` and `countDisplay`, and is the only site that ever supplies `evidence`.
-`isPublicCheckDisplay` is the one gate a chat card consults before stating any evidence: `visibility.rollMode === 'publicroll'` and `visibility.secret !== true`, because Foundry sends a ChatMessage's `content` to every client whatever its whisper, so an unknown visibility is never treated as public.
+`isPublicCheckDisplay` is the one gate a chat card consults before stating any evidence or its roll total (issue 2054): `visibility.rollMode === 'publicroll'` and `visibility.secret !== true`, because Foundry sends a ChatMessage's `content` to every client whatever its whisper, so an unknown visibility is never treated as public.
 A result box and a salvage summary read the same projection but apply their own narrower withholding rule instead (see **Executed Check Evidence** and **Count Display Evidence**): they withhold only for a blind or a secret roll, so a gmroll or a selfroll still states it there.
 `evaluation` is never spread into the projection, so a hidden `target.expression` or policy field can never leak through it.
 

@@ -79,6 +79,9 @@ export function executedCheck(data = UNDER_DATA, visibility = PUBLIC) {
   return executedCheckDisplay({ data: structuredClone(data), visibility });
 }
 
+/** A public check that recorded no evidence: a card states its bare total and nothing more. */
+export const PUBLIC_BARE = executedCheck({});
+
 /**
  * A count check (issue 2006): a d10 pool of 3 grown by a library +1, succeeding on 8 or above read
  * from Sera Vane at 9 and moved +1; the 10 exploded into a 5 and a 1 cancelled, netting 2 of 2.

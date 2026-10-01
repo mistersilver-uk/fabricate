@@ -7,7 +7,7 @@
  * label-key map, and salvage renders through it verbatim so a salvage card IS this card.
  *
  * The markup ATOMS — {@link esc}, {@link renderItem}, {@link renderSection},
- * {@link renderRollTotal}, {@link tierStepText} and {@link renderComplications} — are exported
+ * {@link renderCheckTotal}, {@link tierStepText} and {@link renderComplications} — are exported
  * because the bulk salvage and gathering cards compose rows this core cannot express, and a second
  * spelling of one `<li>` would drift from the stylesheet the moment either side is edited.
  * {@link renderComplications} is parameterised by the BEM block token its caller's card uses.
@@ -168,7 +168,7 @@ export function renderItem({ name, img, quantity, rolled }, localize = (key) => 
  * printing "0"/"null". The number is set apart from its label so it reads as the
  * roll result, not more subtitle metadata.
  */
-export function renderRollTotal(value, label) {
+function renderRollTotal(value, label) {
   if (!Number.isFinite(value)) return '';
   return [
     '<div class="fabricate-craft-chat__roll">',
@@ -176,6 +176,11 @@ export function renderRollTotal(value, label) {
     `<span class="fabricate-craft-chat__roll-value">${esc(value)}</span>`,
     '</div>',
   ].join('');
+}
+
+/** {@link renderRollTotal} for a public, non-secret check only (issue 2054), or ''. */
+export function renderCheckTotal(check, value, label) {
+  return isPublicCheckDisplay(check) ? renderRollTotal(value, label) : '';
 }
 
 /**
@@ -257,15 +262,16 @@ function renderCheckPill(model, keys, loc) {
  * The rolled check's head (issue 2005, frames 37 and 38): a key map naming `checkSuccess` adds the
  * Success or Failure pill, and a public check's dice line replaces the bare total. A public count
  * check states its summary line instead, even for a pool that rolled nothing (issue 2006, frames
- * 39 to 41). Without a rolled total, or for another card's keys, it is {@link renderRollTotal}.
+ * 39 to 41). A check that is not public states its pill alone, with no total (issue 2054).
  */
 function renderCheckHead(model, keys, loc) {
   const countSummary = renderCountSummary(model.check, loc);
   if (countSummary) {
     return keys.checkSuccess ? `${renderCheckPill(model, keys, loc)}${countSummary}` : countSummary;
   }
-  const total = renderRollTotal(model.rollValue, loc(keys.roll));
-  if (!total || !keys.checkSuccess) return total;
+  const total = renderCheckTotal(model.check, model.rollValue, loc(keys.roll));
+  const rolled = Number.isFinite(model.rollValue) || model.check?.evidence?.total === null;
+  if (!rolled || !keys.checkSuccess) return total;
   const pill = renderCheckPill(model, keys, loc);
   const diceLine = isPublicCheckDisplay(model.check) ? checkDiceLine(model.check, loc) : '';
   return diceLine
@@ -525,8 +531,8 @@ export function renderComplications({
  *   [model.results] - A `rolled` entry states its roll; `quantity` 0 is an empty award (issue 1645).
  * @param {Array<{name:string,img:string,quantity:number}>} [model.consumed]
  * @param {Array<{name:string,img:string}>}                 [model.tools]
- * @param {number}  [model.rollValue] - The rolled check total; rendered only when
- *   finite (a no-check "Guaranteed" craft/salvage omits it).
+ * @param {number}  [model.rollValue] - The rolled check total; rendered only when finite
+ *   (a no-check "Guaranteed" craft/salvage omits it) and `model.check` is public.
  * @param {{mode:'target'|'up'|'down',steps:number}} [model.tierStep] - Realized routed
  *   tier-step evidence (`data.tierStepApplied`), present only on an actual tier change.
  * @param {object|null} [model.check] - The executed check's display projection, whose evidence

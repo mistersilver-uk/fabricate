@@ -6,7 +6,7 @@
  * {@link module:src/ui/presenters/CraftingChatCard}'s `buildResultCard` cannot express that
  * — it carries one `subjectName`, one `rollValue` and one `status` — so this module
  * composes its own layout out of that module's exported markup ATOMS (`esc`,
- * `renderSection` — which renders each entry through `renderItem` — `renderRollTotal`,
+ * `renderSection` — which renders each entry through `renderItem` — `renderCheckTotal`,
  * `tierStepText` and `renderComplications`). Every class it emits is an existing
  * `fabricate-craft-chat` class, so the aggregate card inherits the shipped stylesheet
  * verbatim and needs no new CSS.
@@ -43,9 +43,9 @@
 import {
   esc,
   renderCheckEvidenceRows,
+  renderCheckTotal,
   renderComplications,
   renderCountSummary,
-  renderRollTotal,
   renderSection,
   tierStepText,
 } from './CraftingChatCard.js';
@@ -138,11 +138,11 @@ function substituteCounts(text, counts) {
 }
 
 /**
- * Render one subject row: the salvaged source, what became of it, and — when a check
- * actually rolled — its own total.
+ * Render one subject row: the salvaged source, what became of it, and — when a public
+ * check actually rolled — its own total.
  *
  * The row is a `fabricate-craft-chat__item`, the same leaf `renderItem` produces, so
- * it sits in the same grid under the same rules. The roll is `renderRollTotal`'s
+ * it sits in the same grid under the same rules. The roll is `renderCheckTotal`'s
  * shipped label/value pair rather than a bare number, so an aggregate row reads
  * exactly like the single card's roll line.
  *
@@ -172,7 +172,7 @@ function renderSubject(subject, loc) {
     `<span class="fabricate-craft-chat__label">${parts.join(' — ')}</span>`,
     // A public count subject states its dice as a summary line, never a bare net (issue 2006).
     renderCountSummary(subject?.check, loc) ||
-      renderRollTotal(subject?.rollValue, loc(SALVAGE_CHAT_KEYS.roll)),
+      renderCheckTotal(subject?.check, subject?.rollValue, loc(SALVAGE_CHAT_KEYS.roll)),
     evidence,
     '</li>',
   ]

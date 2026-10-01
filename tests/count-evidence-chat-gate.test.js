@@ -136,11 +136,12 @@ for (const version of [13, 14]) {
   });
 
   for (const rollMode of ROLL_MODES.slice(1)) {
-    test(`V${version} ${rollMode}: a count craft card states no tiles or count rows`, async () => {
+    test(`V${version} ${rollMode}: a count craft card states no net, tiles or count rows`, async () => {
       const { cards } = await craftCount({ version, rollMode, pool: PASS_POOL, faces: PASS_FACES });
       const content = readable(cards[0]);
       assert.doesNotMatch(content, /data-dice-tile|data-check-evidence|data-check-count-summary/);
-      assert.match(content, /__roll-value">4</, 'it keeps the bare net');
+      assert.doesNotMatch(content, /__roll-value/, 'nor the bare net (issue 2054)');
+      assert.match(content, /fa-circle-check/, 'it keeps its pill');
     });
   }
 }
@@ -181,6 +182,41 @@ test('a zero pool states no total and no tile, only why nothing was rolled (N32)
   assert.doesNotMatch(content, /__roll-value|data-dice-tile/);
   assert.ok(content.includes('data-check-count-summary>0d6 = 0 dice</div>'));
   assert.ok(content.includes('A pool reduced to zero fails automatically. Nothing was rolled.'));
+});
+
+/** Anything a zero-pool card that is not public may not state beside its pill. */
+const PILL_ALONE = /__roll|data-dice-tile|data-check-count-summary|data-check-evidence/;
+
+test('a gmroll zero-pool card states its Failure pill alone (issue 2054)', async () => {
+  const { result, cards } = await craftCount({ rollMode: 'gmroll', pool: ZERO_POOL });
+  assert.equal(result.success, false);
+  const content = readable(cards[0]);
+  assert.match(content, /fa-circle-xmark" aria-hidden="true"><\/i>Failure<\/div>/);
+  assert.doesNotMatch(content, PILL_ALONE);
+});
+
+test('a secret zero-pool card states its Failure pill alone (issue 2054)', async () => {
+  const dice = installCountDice({ faces: [], chat: false });
+  const secret = await evaluatePreparedRunCheck(
+    preparedCountCheck({ count: { base: 0 } }),
+    { getRollData: () => ({}) },
+    { rollMode: 'publicroll' },
+    { secret: true }
+  ).finally(dice.restore);
+  assert.equal(secret.data.zeroPool, true, 'positive control: the pool was reduced to zero');
+  const world = craftProbe({
+    features: { craftingChecks: true, chatOutput: true },
+    craftingCheck: { enabled: true, consumption: {}, simple: simpleCheck(ZERO_POOL) },
+    resolutionService: probeResolutionService({ mode: 'simple' }),
+    checkResult: secret,
+  });
+  globalThis.game.i18n.localize = shippedLocalize;
+  const created = [];
+  installChatMessage(14, created);
+  await world.craft();
+  const content = readable(resultCards(created)[0]);
+  assert.match(content, /fa-circle-xmark" aria-hidden="true"><\/i>Failure<\/div>/);
+  assert.doesNotMatch(content, PILL_ALONE);
 });
 
 test('the card states the executed threshold, never the live actor or check (N31)', async () => {
@@ -257,7 +293,7 @@ for (const version of [13, 14]) {
         assert.ok(result.check.count, 'the salvage result carries the projection for its summary');
       } else {
         assert.doesNotMatch(content, /data-dice-tile|data-check-evidence|data-check-count-summary/);
-        assert.match(content, /__roll-value">4</);
+        assert.doesNotMatch(content, /__roll-value/, 'nor the bare net (issue 2054)');
       }
     });
   }
@@ -303,7 +339,7 @@ test('a bulk subject states its count summary and rows in place of its net only 
   assert.doesNotMatch(shown, /Chat\.Roll/, 'the summary replaces the roll row');
   const hidden = await bulkCount({ rollMode: 'gmroll', pool: PASS_POOL, faces: PASS_FACES });
   assert.doesNotMatch(hidden, /CountEvidence|Simulator/);
-  assert.match(hidden, /Chat\.Roll 4/, 'a private subject keeps its net');
+  assert.doesNotMatch(hidden, /Chat\.Roll/, 'a private subject states no net (issue 2054)');
 });
 
 test('a zero-pool bulk subject states no total (N32)', async () => {
