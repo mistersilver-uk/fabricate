@@ -543,7 +543,7 @@ export class GatheringEngine {
     return this._versionedCheckDescriptor({ actor, run, ...resolved });
   }
 
-  evaluatePreparedVersionedCheck({ actor, privateEvaluation, decision = {} } = {}) {
+  evaluatePreparedVersionedCheck({ actor, privateEvaluation, decision = {}, sender = null } = {}) {
     const evaluate = this.versionedRunAuthority?.evaluatePreparedRunCheck;
     if (typeof evaluate !== 'function') {
       throw gatheringLifecycleError(
@@ -551,13 +551,13 @@ export class GatheringEngine {
         'AUTHORITY_UNAVAILABLE'
       );
     }
-    // The gathering card states no roll (R4), and a check result persists whole on the run, so
-    // the executed visibility and count display the crafting and salvage cards read are dropped.
+    // The card states no roll (R4) and the run persists the result whole: drop the display.
     return Promise.resolve(
       evaluate(privateEvaluation, actor, decision, {
         secret: privateEvaluation?.secret === true,
         failureMessage: 'Gathering check failed',
         label: 'Gathering',
+        user: sender,
       })
     ).then(withoutVisibility);
   }

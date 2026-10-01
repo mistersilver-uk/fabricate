@@ -1,5 +1,11 @@
 import { checkDisplayForCard } from './craftCardFields.js';
-import { preparedDecisionPolicy } from './preparedDecisionPolicy.js';
+import {
+  evaluatePreparedJournalCheck,
+  safeRollDecision,
+  withPreparedAdditionalDiceOffer,
+  withSpentAdditionalDice,
+} from './journalPreparedCheck.js';
+import { decisionAdditionalDice, preparedDecisionPolicy } from './preparedDecisionPolicy.js';
 import { applyGuardedRunMutation } from './runLifecycleState.js';
 
 /** Request/reply discriminators multiplexed on the existing module socket. */
@@ -54,20 +60,6 @@ function replyMatches(pending, payload) {
     pending.runId === payload.runId &&
     pending.expectedRevision === payload.expectedRevision
   );
-}
-
-function safeRollDecision(value) {
-  const decision = value && typeof value === 'object' ? value : {};
-  const modifierIds = decision.modifierIds ?? decision.chosenModifierIds;
-  return {
-    bonus: typeof decision.bonus === 'string' ? decision.bonus : null,
-    rollMode: typeof decision.rollMode === 'string' ? decision.rollMode : null,
-    advantage: typeof decision.advantage === 'string' ? decision.advantage : null,
-    // `null` when no choice was offered, so the prepared defaults roll; `[]` is an answer.
-    modifierIds: Array.isArray(modifierIds)
-      ? modifierIds.filter((id) => typeof id === 'string')
-      : null,
-  };
 }
 
 /**
@@ -228,7 +220,7 @@ export async function executePublicCraft({
     // The caller's flag, never a constant (issue 1780): the crafting UI passes `true` and expects
     // the roll dialog, while a macro omits it and `craftRecipe` defaults it to the non-interactive
     // route issue 1683 added, so the API never waits on a prompt nobody answers.
-    { interactive: options?.interactive === true }
+    { interactive: options?.interactive === true, ...decisionAdditionalDice(options) }
   );
   if (!Array.isArray(settled?.createdResultUuids) || typeof resolveUuid !== 'function') {
     return settled;
@@ -260,6 +252,7 @@ export async function executePublicGather({
   actor,
   executeCommand = null,
   interactive = false,
+  additionalDice = 0,
 } = {}) {
   if (typeof requestStart !== 'function') return operationUnavailable();
   const started = await requestStart();
@@ -289,7 +282,7 @@ export async function executePublicGather({
     },
     // The caller's flag, for the reason `executePublicCraft` gives (issue 1780): the gathering
     // screen passes `interactive: true` and expects its roll dialog.
-    { interactive: interactive === true }
+    { interactive: interactive === true, ...decisionAdditionalDice({ additionalDice }) }
   );
   return { ...started, ...settled };
 }
@@ -529,12 +522,12 @@ export function createGatheringJournalRunOperations({
         requestId,
       });
     },
-    evaluateCheck: ({ actor, privateEvaluation, decision }) => {
+    evaluateCheck: ({ actor, privateEvaluation, decision, sender }) => {
       const runtime = currentEngine();
       if (typeof runtime?.evaluatePreparedVersionedCheck !== 'function') {
         return operationUnavailable();
       }
-      return runtime.evaluatePreparedVersionedCheck({ actor, privateEvaluation, decision });
+      return runtime.evaluatePreparedVersionedCheck({ actor, privateEvaluation, decision, sender });
     },
     execute: ({ actor, run, payload, executionGrant, requestId, expectedRevision }) => {
       const runtime = currentEngine();
@@ -749,7 +742,7 @@ export function createJournalRunCommandService({
     return { success: true, sender, actor, operation, run, revision };
   }
 
-  async function executeOperation(request, context, helpers) {
+  async function executeOperation(request, context, helpers, spent) {
     const { actor, operation, run } = context;
     const binding = {
       operation: request.action === 'releaseCheck' ? 'execute' : request.action,
@@ -790,23 +783,15 @@ export function createJournalRunCommandService({
       preparedPayload = prepared?.payload ?? preparedPayload;
       executionOperation = prepared?.executionOperation ?? executionOperation;
     }
-    const prepareToken = request.payload?.prepareToken;
-    if (request.action === 'execute' && prepareToken) {
-      const token = helpers.consumePrepareToken(prepareToken, binding);
-      if (!token) return failure('prepare-token-invalid');
-      privateEvaluation = token.binding?.privateEvaluation;
+    if (request.action === 'execute' && request.payload?.prepareToken) {
       const evaluate = operation.evaluateCheck;
       if (typeof evaluate !== 'function') return failure('check-evaluator-unavailable');
-      const resolvedCheckResult = await evaluate({
-        actor,
-        run,
-        sender: context.sender,
-        privateEvaluation,
-        decision: {
-          ...safeRollDecision(request.payload?.rollDecision),
-          ...token.binding?.decisionPolicy,
-        },
-      });
+      const { consumePrepareToken } = helpers;
+      const seams = { evaluate, consumePrepareToken, currentRealmIsActiveGm, spent };
+      const prepared = await evaluatePreparedJournalCheck({ request, context, binding, ...seams });
+      if (prepared.response) return prepared.response;
+      const resolvedCheckResult = prepared.checkResult;
+      privateEvaluation = prepared.privateEvaluation;
       // A check that cannot roll carries its refusal sentence, which the player sees.
       if (resolvedCheckResult?.misconfigured === true) {
         return failure('roll-unavailable', { message: resolvedCheckResult.message ?? null });
@@ -841,18 +826,19 @@ export function createJournalRunCommandService({
       });
       if (descriptor?.blocked) return failure(descriptor.blocked);
       if (descriptor?.required) {
+        const publicPrompt = await withPreparedAdditionalDiceOffer(descriptor, context);
         const token = helpers.issuePrepareToken(
           {
             ...binding,
             privateEvaluation: descriptor.privateEvaluation,
-            decisionPolicy: preparedDecisionPolicy(descriptor.publicPrompt),
+            decisionPolicy: preparedDecisionPolicy(publicPrompt),
           },
           { expiresAt: now() + 60_000 }
         );
         return {
           success: true,
           checkRequired: true,
-          promptDescriptor: descriptor.publicPrompt ?? {},
+          promptDescriptor: publicPrompt ?? {},
           prepareToken: token,
         };
       }
@@ -921,13 +907,16 @@ export function createJournalRunCommandService({
     if (!currentRealmIsActiveGm()) {
       return failure('active-gm-required');
     }
+    const spent = {};
     // A run command's logical identity is its request, whatever the payload names.
-    return authority.run({ ...request, operationId: undefined, senderId }, async (helpers) => {
+    const claimed = { ...request, operationId: undefined, senderId };
+    const response = await authority.run(claimed, async (helpers) => {
       // Every lookup occurs after the server-arbitrated claim has been acquired.
       const context = await resolveCommandContext(request, senderId);
       if (!context.success) return context;
-      return executeOperation({ ...request, senderId }, context, helpers);
+      return executeOperation({ ...request, senderId }, context, helpers, spent);
     });
+    return withSpentAdditionalDice(response, spent, request.expectedRevision);
   }
 
   function buildReply(request, recipientId, response) {
@@ -1006,15 +995,17 @@ export function createJournalRunCommandService({
    * Run one Journal command, resolving a required check on the way. `interactive` is the CALLER'S:
    * the public API defaults it to `false`, because `promptCheck` awaits a human with no timeout of
    * its own, so a non-interactive caller settles the check on the engine's defaults, the route a
-   * player takes after answering (issue 1683).
+   * player takes after answering (issue 1683), buying only the `additionalDice` it names.
    */
-  async function executeJournalRunCommand(command, { interactive = true } = {}) {
+  async function executeJournalRunCommand(command, options = {}) {
+    const { interactive = true } = options;
     const first = await sendCommand(command);
     if (!first?.checkRequired) return first;
     if (!interactive) {
+      const rollDecision = decisionAdditionalDice(options);
       return sendCommand({
         ...command,
-        payload: { ...command.payload, prepareToken: first.prepareToken, rollDecision: {} },
+        payload: { ...command.payload, prepareToken: first.prepareToken, rollDecision },
       });
     }
     if (typeof promptCheck !== 'function') return failure('check-prompt-unavailable');
