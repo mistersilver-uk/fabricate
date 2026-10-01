@@ -1142,12 +1142,13 @@ test('the capture runner threads the per-case console allowance into the render'
     declaring,
     // The Knowledge error frame's rejected read is rethrown by the store (issue 1969), and a failed
     // roll-under or counting craft or salvage raises the resolved-failure toast the lab reports as
-    // a warning (issues 2005, 2092, 2006 and 2007).
+    // a warning (issues 2005, 2092, 2006, 2007 and 2132).
     [
       'manager-recipes-blocked-enable-flash',
       'manager-knowledge-error',
       'player-salvage-under-result-fail',
       'player-crafting-roll-result-under-fail',
+      'player-crafting-chat-card-under-fail',
       'player-crafting-roll-result-count-fail',
       'player-crafting-roll-result-count-botch',
       'player-crafting-roll-result-count-botch-light',

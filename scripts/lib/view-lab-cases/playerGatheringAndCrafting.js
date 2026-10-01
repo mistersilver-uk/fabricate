@@ -365,6 +365,25 @@ export const CASES = Object.freeze([
     kinds: ['player', 'crafting'],
     sourceMatches: CHAT_SOURCES,
   }),
+  // Issue 2132: a failed card's reason line, inked into the chat's own ink as the pill is.
+  playerCase({
+    id: 'player-crafting-chat-card-under-fail',
+    label: 'Player app — failed roll-under crafting result card, with its failure reason',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: {
+      tab: 'crafting',
+      dialog: 'open',
+      rollPromptState: 'under-evidence-fail',
+      chatLog: '1',
+    },
+    steps: [...CRAFT_HORSESHOE, TYPE_ROLLED_BONUS, ROLL],
+    allowedConsoleErrors: [/Your crafting check failed/],
+    expectSelector: `${CHAT_CARD}:has(.fabricate-craft-chat__result) .fabricate-craft-chat__notice`,
+    expectVisible: `${LAB_CHAT('public')} .fabricate-craft-chat__notice`,
+    kinds: ['player', 'crafting'],
+    sourceMatches: CHAT_SOURCES,
+  }),
   // The control: a sum/over fixed card gains the pill, dice line, and Needed and Margin rows (M1, M3).
   playerCase({
     id: 'player-crafting-chat-card-over-control',

@@ -16283,8 +16283,9 @@
   opacity: 0.8;
 }
 
+/* The danger tone mixed into the chat's own ink, as the result pill is, so it reads on parchment. */
 .fabricate-craft-chat--failure .fabricate-craft-chat__notice {
-  color: var(--fab-danger);
+  color: color-mix(in srgb, var(--fab-danger) 45%, currentcolor);
   opacity: 0.95;
 }
 
