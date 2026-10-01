@@ -19,6 +19,11 @@ export const COUNT_POOL_RAW_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/checks/checkTargetStatus.js',
   'src/ui/svelte/apps/manager/checks/countInsetModel.js',
   'src/ui/svelte/apps/manager/checks/countPoolOptions.js',
+  // The pool's additional-dice group and its macro wells (issue 2008).
+  'src/ui/svelte/actions/dragDrop.js',
+  'src/ui/svelte/util/dropUtils.js',
+  'src/ui/model/macroReference.js',
+  'src/ui/svelte/apps/manager/checks/checksCopy.js',
 ]);
 
 export const COUNT_POOL_COMPILED_MODULES = Object.freeze([
@@ -34,4 +39,12 @@ export const COUNT_POOL_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/checks/CheckCountInputField.svelte',
   'src/ui/svelte/apps/manager/checks/CheckCountInset.svelte',
   'src/ui/svelte/apps/manager/checks/CheckCountPoolFields.svelte',
+  'src/ui/svelte/apps/manager/checks/CheckAdditionalDiceFields.svelte',
+  'src/ui/svelte/apps/manager/checks/CheckOptionGroup.svelte',
+  'src/ui/svelte/components/IconButton.svelte',
+  'src/ui/svelte/components/ItemDropZone.svelte',
+  'src/ui/svelte/components/Kicker.svelte',
+  'src/ui/svelte/components/SegmentedControl.svelte',
+  'src/ui/svelte/components/StatusToggle.svelte',
+  'src/ui/svelte/components/Well.svelte',
 ]);
