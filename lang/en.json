@@ -6662,7 +6662,21 @@
             "IssueCountTriggerGroupUnreachableOne": "The trigger “{names}” reads dice this pool never rolls, so it cannot fire while the check counts successes. It is kept and works again if the check adds the dice.",
             "IssueCountTriggerGroupUnreachableTitle": "A trigger reads dice the pool never rolls",
             "CountTriggerDiceGroup": "dice group {n}",
-            "QuotedName": "“{name}”"
+            "QuotedName": "“{name}”",
+            "CheckCountAdditionalDiceSourceSet": "Additional dice have a source to pay for them",
+            "CheckCountAdditionalDicePathStored": "The additional-dice value is a stored path on the character",
+            "CheckCountAdditionalDiceMacrosScript": "Both additional-dice macros are script macros",
+            "IssueCountAdditionalDiceSourceMissing": "Set the value on the crafting character or the macro pair that pays for them, or turn additional dice off.",
+            "IssueCountAdditionalDiceSourceMissingTitle": "Additional dice are allowed but have no source",
+            "IssueCountAdditionalDicePathInvalid": "The value that pays for additional dice must be a path on the character, such as system.resources.momentum.value, not an expression or a list entry.",
+            "IssueCountAdditionalDicePathInvalidTitle": "The additional-dice value is not a stored path",
+            "IssueCountAdditionalDiceMacroInvalid": "The {kind} macro is missing or is not a script macro, so players cannot buy additional dice. Link a script macro.",
+            "IssueCountAdditionalDiceMacroInvalidTitle": "An additional-dice macro is not a script macro",
+            "IssueCountAdditionalDicePathUnresolvedForPreview": "{actor} has no stored number at {path}, so no dice can be added for them.",
+            "IssueCountAdditionalDicePathOverriddenForPreview": "An active effect changes {actor}'s {path}, so no dice can be added for them.",
+            "IssueCountAdditionalDicePathUnresolvedForPreviewTitle": "The additional-dice value cannot be spent",
+            "MacroKindRead": "read",
+            "MacroKindSpend": "spend"
           },
           "Breakage": {
             "LeadOutcomeOnly": "Each trigger can force the check outcome. Switch the tool-breakage authority to check-driven to let triggers break tools.",

@@ -182,7 +182,7 @@ describe('count readiness raises each id with its copy, section and severity', (
     assert.equal(issue(salvage, 'countTierWithoutSuccesses'), undefined);
   });
 
-  it('countRequiredExceedsMaxPool, the ceiling being the base while additional dice wait', () => {
+  it('countRequiredExceedsMaxPool, the ceiling being the base plus the additional-dice max', () => {
     const result = evaluateCheckReadiness(FAULTS, { mode: 'simple', activity: 'crafting' });
     assert.deepEqual(
       described(result, 'countRequiredExceedsMaxPool', 'countRequiredWithinMaxPool'),
@@ -192,14 +192,40 @@ describe('count readiness raises each id with its copy, section and severity', (
         tick: 'Successes needed fit within the most dice this check allows',
         satisfied: false,
         sentence:
-          'The successes needed by Arcane Work, Impossible Work exceed the 2 dice this check allows before any explode, so an attempt succeeds only when dice explode or are added. Lower the successes needed or allow more dice.',
+          'The successes needed by Impossible Work exceed the 3 dice this check allows before any explode, so an attempt succeeds only when dice explode or are added. Lower the successes needed or allow more dice.',
       }
     );
-    assert.equal(issue(result, 'countRequiredExceedsBasePool'), undefined);
+    assert.deepEqual(
+      described(result, 'countRequiredExceedsBasePool', 'countRequiredWithinBasePool'),
+      {
+        severity: 'warning',
+        section: 'roll',
+        tick: 'Successes needed fit within the base pool',
+        satisfied: false,
+        sentence:
+          'The successes needed by Arcane Work exceed the base pool of 2 dice, so an attempt succeeds only when dice explode or are added to the pool.',
+      }
+    );
     const fits = evaluateCheckReadiness(check({ base: '4.5', required: 4 }), { mode: 'simple' });
     assert.equal(tick(fits, 'countRequiredWithinMaxPool').satisfied, true, 'a 4.5 base rolls 4');
     const over = evaluateCheckReadiness(check({ base: '3.9', required: 4 }), { mode: 'simple' });
     assert.ok(issue(over, 'countRequiredExceedsMaxPool'), 'a 3.9 base rounds down to 3');
+  });
+
+  it('keeps the ceiling at the base while additional dice are off, whatever max they retain', () => {
+    const off = (max) => ({
+      ...FAULTS,
+      evaluation: count({
+        ...FAULTS.evaluation.pool,
+        additionalDice: { ...FAULTS.evaluation.pool.additionalDice, enabled: false, max },
+      }),
+    });
+    for (const max of [1, 5]) {
+      const result = evaluateCheckReadiness(off(max), { mode: 'simple', activity: 'crafting' });
+      const entry = issue(result, 'countRequiredExceedsMaxPool');
+      assert.deepEqual(entry.data, { names: 'Arcane Work, Impossible Work', ceiling: 2 }, `max ${max}`);
+      assert.equal(issue(result, 'countRequiredExceedsBasePool'), undefined, `max ${max}`);
+    }
   });
 
   it('floors a literal base as the runtime does: float noise, the one-die minimum, no negative dice', () => {
@@ -566,5 +592,270 @@ describe('the three new ids carry titles', () => {
     assert.equal(checkIssueText('freeTextCountingFormula', { formula: 'x' }, text).title, 'This formula counts successes, but the check adds the dice');
     assert.equal(checkIssueText('countFaceMissing', { kind: 'cancel' }, text).title, 'A face to explode or cancel from is not chosen');
     assert.equal(checkIssueText('countTriggerGroupUnreachable', { triggers: [] }, text).title, 'A trigger reads dice the pool never rolls');
+  });
+});
+
+// ── Issue 2008: the additional-dice rows ──────────────────────────────────────────────────────
+
+const PATH = 'system.resources.momentum.value';
+const extra = (additionalDice, pool = {}) =>
+  check({ ...pool, additionalDice: { enabled: true, source: 'path', path: PATH, max: 1, ...additionalDice } });
+const macros = (readMacroUuid, spendMacroUuid) =>
+  extra({ source: 'macro', path: '', readMacroUuid, spendMacroUuid });
+
+/** `fromUuidSync` as core answers it, restored after the test; `calls` records each lookup. */
+function stubFromUuidSync(t, answers) {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'fromUuidSync');
+  const calls = [];
+  const value = (uuid, options) => {
+    calls.push([uuid, options]);
+    const answer = answers[uuid];
+    if (answer instanceof Error) throw answer;
+    return answer === undefined ? null : answer;
+  };
+  Object.defineProperty(globalThis, 'fromUuidSync', { value, configurable: true, writable: true });
+  t.after(() => {
+    if (previous) Object.defineProperty(globalThis, 'fromUuidSync', previous);
+    else delete globalThis.fromUuidSync;
+  });
+  return calls;
+}
+
+describe('countAdditionalDiceSourceMissing blocks additional dice with nothing to pay for them', () => {
+  it('is critical, ticks, and reads frame 22’s title over its sentence', () => {
+    const result = evaluateCheckReadiness(extra({ path: '  ' }), { mode: 'simple' });
+    assert.deepEqual(described(result, 'countAdditionalDiceSourceMissing', 'countAdditionalDiceSourceSet'), {
+      severity: 'critical',
+      section: 'roll',
+      tick: 'Additional dice have a source to pay for them',
+      satisfied: false,
+      sentence:
+        'Set the value on the crafting character or the macro pair that pays for them, or turn additional dice off.',
+    });
+    assert.equal(
+      checkIssueText('countAdditionalDiceSourceMissing', { input: 'path' }, text).title,
+      'Additional dice are allowed but have no source'
+    );
+    assert.equal(issueControl(issue(result, 'countAdditionalDiceSourceMissing')), 'checks-additional-dice-path');
+  });
+
+  it('names the first missing macro, read before spend', (t) => {
+    stubFromUuidSync(t, { 'Macro.read': { documentName: 'Macro', type: 'script' } });
+    const control = (draft) =>
+      issueControl(issue(evaluateCheckReadiness(draft, { mode: 'simple' }), 'countAdditionalDiceSourceMissing'));
+    assert.equal(control(macros('', '')), 'checks-additional-dice-read-macro');
+    assert.equal(control(macros('', 'Macro.read')), 'checks-additional-dice-read-macro');
+    assert.equal(control(macros('Macro.read', ' ')), 'checks-additional-dice-spend-macro');
+  });
+
+  it('is satisfied by a path, or by both macros, whichever source pays', (t) => {
+    stubFromUuidSync(t, { 'Macro.read': { documentName: 'Macro', type: 'script' } });
+    for (const draft of [extra({}), macros('Macro.read', 'Macro.read'), extra({ readMacroUuid: '' })]) {
+      const result = evaluateCheckReadiness(draft, { mode: 'simple' });
+      assert.equal(issue(result, 'countAdditionalDiceSourceMissing'), undefined);
+      assert.equal(tick(result, 'countAdditionalDiceSourceSet').satisfied, true);
+    }
+  });
+});
+
+describe('countAdditionalDicePathInvalid blocks a value that is not a stored path', () => {
+  it('flags an expression, a roll-data reference, a list entry or a numeric segment', () => {
+    for (const path of [
+      '@resources.momentum.value',
+      'system.resources.momentum.value + 1',
+      'system.items[0].value',
+      'system.items.0.value',
+      'system resources',
+      'system..value',
+      'flags.my-module',
+    ]) {
+      const result = evaluateCheckReadiness(extra({ path }), { mode: 'simple' });
+      assert.deepEqual(
+        described(result, 'countAdditionalDicePathInvalid', 'countAdditionalDicePathStored'),
+        {
+          severity: 'critical',
+          section: 'roll',
+          tick: 'The additional-dice value is a stored path on the character',
+          satisfied: false,
+          sentence:
+            'The value that pays for additional dice must be a path on the character, such as system.resources.momentum.value, not an expression or a list entry.',
+        },
+        path
+      );
+      assert.equal(issueControl(issue(result, 'countAdditionalDicePathInvalid')), 'checks-additional-dice-path');
+    }
+  });
+
+  it('passes a dotted path of identifiers, trimmed', () => {
+    for (const path of [PATH, ` ${PATH} `, 'system.attributes.ki_2.value']) {
+      const result = evaluateCheckReadiness(extra({ path }), { mode: 'simple' });
+      assert.equal(issue(result, 'countAdditionalDicePathInvalid'), undefined, path);
+      assert.equal(tick(result, 'countAdditionalDicePathStored').satisfied, true, path);
+    }
+  });
+
+  it('leaves a blank path to the source row', () => {
+    const result = evaluateCheckReadiness(extra({ path: '' }), { mode: 'simple' });
+    assert.equal(issue(result, 'countAdditionalDicePathInvalid'), undefined);
+    assert.equal(tick(result, 'countAdditionalDicePathStored'), undefined);
+  });
+});
+
+describe('countAdditionalDiceMacroInvalid reads each linked macro synchronously', () => {
+  const INDEX_ENTRY = {
+    _id: 'idx',
+    uuid: 'Compendium.world.macros.Macro.idx',
+    pack: 'world.macros',
+    name: 'Spend momentum',
+    img: 'icons/svg/dice-target.svg',
+    sort: 0,
+    folder: null,
+  };
+  const ANSWERS = {
+    'Macro.script': { documentName: 'Macro', type: 'script', name: 'Momentum' },
+    'Macro.chat': { documentName: 'Macro', type: 'chat', name: 'Say' },
+    'Actor.vosk': { documentName: 'Actor', type: 'character', name: 'Vosk' },
+    'Item.script': { documentName: 'Item', type: 'script', name: 'A system item type' },
+    'JournalEntry.notes': { documentName: 'JournalEntry', name: 'Notes' },
+    'Compendium.world.macros.Macro.idx': INDEX_ENTRY,
+    'Macro.throws': new Error('malformed'),
+  };
+
+  it('flags a missing uuid, a loaded non-Macro document and a non-script macro', (t) => {
+    const calls = stubFromUuidSync(t, ANSWERS);
+    for (const uuid of ['Macro.gone', 'Actor.vosk', 'Item.script', 'JournalEntry.notes', 'Macro.chat']) {
+      const result = evaluateCheckReadiness(macros(uuid, 'Macro.script'), { mode: 'simple' });
+      assert.deepEqual(
+        described(result, 'countAdditionalDiceMacroInvalid', 'countAdditionalDiceMacrosScript'),
+        {
+          severity: 'critical',
+          section: 'roll',
+          tick: 'Both additional-dice macros are script macros',
+          satisfied: false,
+          sentence:
+            'The read macro is missing or is not a script macro, so players cannot buy additional dice. Link a script macro.',
+        },
+        uuid
+      );
+      assert.equal(issueControl(issue(result, 'countAdditionalDiceMacroInvalid')), 'checks-additional-dice-read-macro');
+    }
+    assert.ok(calls.length > 0 && calls.every(([, options]) => options?.strict === false), 'non-strict');
+    const spend = evaluateCheckReadiness(macros('Macro.script', 'Macro.chat'), { mode: 'simple' });
+    const entry = issue(spend, 'countAdditionalDiceMacroInvalid');
+    assert.equal(issueControl(entry), 'checks-additional-dice-spend-macro');
+    assert.match(checkIssueSentence(entry.id, entry.data, text), /^The spend macro is missing/);
+    const both = evaluateCheckReadiness(macros('Macro.chat', 'Actor.vosk'), { mode: 'simple' });
+    assert.deepEqual(
+      both.issues.filter((row) => row.id === 'countAdditionalDiceMacroInvalid').map((row) => row.data),
+      [{ kind: 'read' }, { kind: 'spend' }]
+    );
+  });
+
+  it('raises nothing for a script macro, a compendium index entry or a lookup that throws', (t) => {
+    stubFromUuidSync(t, ANSWERS);
+    for (const uuid of ['Macro.script', 'Compendium.world.macros.Macro.idx', 'Macro.throws']) {
+      const result = evaluateCheckReadiness(macros(uuid, uuid), { mode: 'simple' });
+      assert.equal(issue(result, 'countAdditionalDiceMacroInvalid'), undefined, uuid);
+      assert.equal(tick(result, 'countAdditionalDiceMacrosScript').satisfied, true, uuid);
+    }
+  });
+
+  it('localizes which macro through the Studio’s text', () => {
+    const spendWord = (key, fallback) => (key.endsWith('MacroKindSpend') ? 'SPEND' : fallback);
+    const localized = checkIssueSentence('countAdditionalDiceMacroInvalid', { kind: 'spend' }, spendWord);
+    assert.match(localized, /^The SPEND macro is missing/);
+  });
+});
+
+describe('the additional-dice rows stay silent while additional dice cannot apply', () => {
+  const ROW_IDS = new Set([
+    'countAdditionalDiceSourceMissing',
+    'countAdditionalDicePathInvalid',
+    'countAdditionalDiceMacroInvalid',
+    'countAdditionalDicePathUnresolvedForPreview',
+  ]);
+  const raised = (result) => [...ids(result.issues), ...ids(result.transient)].filter((id) => ROW_IDS.has(id));
+  const vosk = { name: 'Vosk', rollData: {}, readStored: () => ({ value: undefined, overridden: false }) };
+
+  it('raises no row and no tick with the toggle off', (t) => {
+    stubFromUuidSync(t, {});
+    for (const additionalDice of [
+      { enabled: false, path: '' },
+      { enabled: false, path: '@momentum' },
+      { enabled: false, path: PATH },
+      { enabled: false, source: 'macro', readMacroUuid: 'Macro.gone', spendMacroUuid: '' },
+    ]) {
+      const result = evaluateCheckReadiness(extra(additionalDice), { mode: 'simple', previewActor: vosk });
+      assert.deepEqual(raised(result), [], JSON.stringify(additionalDice));
+      assert.ok(result.checks.every((row) => !row.id.startsWith('countAdditionalDice')));
+    }
+  });
+
+  it('raises no row on a summing check', (t) => {
+    stubFromUuidSync(t, {});
+    for (const additionalDice of [
+      { enabled: true, source: 'path', path: '' },
+      { enabled: true, source: 'macro', readMacroUuid: 'Macro.gone' },
+    ]) {
+      const summing = { rollFormula: '1d20', evaluation: { product: 'sum', pool: { additionalDice } } };
+      const result = evaluateCheckReadiness(summing, { mode: 'simple', previewActor: vosk });
+      assert.deepEqual(raised(result), [], JSON.stringify(additionalDice));
+    }
+  });
+});
+
+describe('countAdditionalDicePathUnresolvedForPreview names the Preview-as actor, and nothing counts it', () => {
+  const actor = (value, overridden = false) => ({
+    name: 'Vosk',
+    rollData: {},
+    readStored: (path) => (path === PATH ? { value, overridden } : { value: undefined, overridden: false }),
+  });
+  const read = (previewActor, draft = extra({})) => evaluateCheckReadiness(draft, { mode: 'simple', previewActor });
+
+  it('warns when the stored value is not a finite number', () => {
+    for (const value of [undefined, '3', NaN, null]) {
+      const result = read(actor(value));
+      assert.deepEqual(
+        described(result, 'countAdditionalDicePathUnresolvedForPreview', null),
+        {
+          severity: 'warning',
+          section: 'roll',
+          tick: null,
+          satisfied: null,
+          sentence: `Vosk has no stored number at ${PATH}, so no dice can be added for them.`,
+        },
+        String(value)
+      );
+      assert.deepEqual(ids(result.issues), [], 'never in the counted issues');
+      assert.equal(issueControl(result.transient[0]), 'checks-additional-dice-path');
+    }
+  });
+
+  it('warns when an active effect overrides the stored value', () => {
+    const result = read(actor(2, true));
+    assert.equal(
+      described(result, 'countAdditionalDicePathUnresolvedForPreview', null).sentence,
+      `An active effect changes Vosk's ${PATH}, so no dice can be added for them.`
+    );
+  });
+
+  it('is silent for a stored number, with no actor, or for a path no row lets it read', () => {
+    assert.deepEqual(ids(read(actor(2)).transient), []);
+    assert.deepEqual(ids(read(actor(0)).transient), []);
+    assert.deepEqual(ids(read(null).transient), []);
+    assert.deepEqual(ids(read(actor(undefined), extra({ path: '@momentum' })).transient), []);
+    assert.deepEqual(ids(read(actor(undefined), extra({ path: '' })).transient), []);
+  });
+
+  it('titles each additional-dice row', () => {
+    const titles = {
+      countAdditionalDiceSourceMissing: 'Additional dice are allowed but have no source',
+      countAdditionalDicePathInvalid: 'The additional-dice value is not a stored path',
+      countAdditionalDiceMacroInvalid: 'An additional-dice macro is not a script macro',
+      countAdditionalDicePathUnresolvedForPreview: 'The additional-dice value cannot be spent',
+    };
+    for (const [id, title] of Object.entries(titles)) {
+      assert.equal(checkIssueText(id, { actor: 'Vosk', path: PATH, kind: 'read' }, text).title, title, id);
+    }
   });
 });

@@ -533,6 +533,63 @@ describe('ChecksValidationTab (mounted)', () => {
     harness.remount();
   });
 
+  it('blocks additional dice with no source beside the base-pool ceiling, View focusing the path (issue 2008)', async () => {
+    const pool = (path) => ({
+      die: 20,
+      base: '2',
+      threshold: '13',
+      required: 2,
+      additionalDice: { enabled: true, source: 'path', path, max: 1 },
+    });
+    const section = (path) => ({
+      subsystem: 'crafting',
+      mode: 'simple',
+      check: {
+        rollFormula: '',
+        evaluation: { product: 'count', direction: 'over', pool: pool(path) },
+        tiers: [{ id: 'arcane', name: 'Arcane Work', successes: 3 }],
+      },
+    });
+    const calls = [];
+    const target = await harness.mount({
+      sections: [section('')],
+      onSelectIssue: (route, focusTarget) => {
+        calls.push([route, focusTarget]);
+      },
+    });
+    const row = target.querySelector('[data-issue="countAdditionalDiceSourceMissing"]');
+    assert.ok(Boolean(row), 'the source row is listed');
+    assert.equal(row.dataset.check, 'countAdditionalDiceSourceSet', 'on its own tick');
+    assert.equal(row.dataset.issueSeverity, 'critical');
+    assert.equal(
+      row.querySelector('.manager-recipe-val-title').textContent.trim(),
+      'Additional dice are allowed but have no source'
+    );
+    assert.ok(
+      Boolean(target.querySelector('[data-issue="countRequiredExceedsBasePool"]')),
+      'the base-pool ceiling row is listed beside it'
+    );
+    assert.ok(!target.querySelector('[data-issue="countRequiredExceedsMaxPool"]'), 'Arcane Work fits the ceiling');
+    row.querySelector('.manager-recipe-val-view').click();
+    assert.deepEqual(calls, [[{ activity: 'crafting', section: 'roll' }, 'checks-additional-dice-path']]);
+    assert.equal(target.querySelector('[data-editor-validation-summary]').dataset.editorValidationSummary, 'block');
+    harness.remount();
+
+    const stored = section('system.resources.momentum.value');
+    const without = await harness.mount({ sections: [stored] });
+    const counted = railCounts(without);
+    assert.ok(!without.querySelector('[data-issue^="countAdditionalDice"]'), 'a stored path raises nothing');
+    harness.remount();
+    const withActor = await harness.mount({
+      sections: [stored],
+      previewActor: { name: 'Vosk', rollData: {}, readStored: () => ({ value: 2, overridden: true }) },
+    });
+    const transient = withActor.querySelector('[data-issue="countAdditionalDicePathUnresolvedForPreview"]');
+    assert.ok(transient?.hasAttribute('data-issue-transient'), 'the overridden value is a transient row');
+    assert.deepEqual(railCounts(withActor), counted, 'the tally is what it was with no actor');
+    harness.remount();
+  });
+
   it('never renders a false-green pass beside a progressive roll-under blocker (issue 2106 review)', async () => {
     // `progressiveHigherIsBetter` had no `CHECK_TO_ISSUES` owner, so this used to render BOTH a
     // real critical `progressiveUnderUnsupported` row AND a separate green pass tick for the very
@@ -733,10 +790,10 @@ describeValidationAddressPairing({
   // From the two per-kind maps through the table, which names them by reference (issue 2006).
   tablePattern: /(const FACE_CONTROLS[\s\S]*?const CHECK_ISSUE_CONTROLS = Object\.freeze\(\{[\s\S]*?\n\}\);)/u,
   addressPattern: /'(checks-[^']+)'/gu,
-  expectedAddressCount: 12,
+  expectedAddressCount: 15,
   expectation:
-    'the roll field, the character-value field, the trigger list, the seven count controls and ' +
-    'the two advantage controls',
+    'the roll field, the character-value field, the trigger list, the seven count controls, ' +
+    'the two advantage controls and the three additional-dice sources',
   // WHICH FILE IS SUPPOSED TO CARRY WHICH ADDRESS. This is the half a producer cannot check.
   destinations: {
     'checks-roll-formula': 'checks/CheckFormulaFields.svelte',
@@ -751,6 +808,9 @@ describeValidationAddressPairing({
     'checks-count-tier-successes': 'checks/CheckRecipeTiers.svelte',
     'checks-advantage-mode': 'checks/CheckPromptOptions.svelte',
     'checks-advantage-bonus': 'checks/CheckPromptOptions.svelte',
+    'checks-additional-dice-path': 'checks/CheckAdditionalDiceFields.svelte',
+    'checks-additional-dice-read-macro': 'checks/CheckAdditionalDiceFields.svelte',
+    'checks-additional-dice-spend-macro': 'checks/CheckAdditionalDiceFields.svelte',
   },
   // Stamped through a primitive's attribute bag or prop; the mounted Review tests focus each one
   // (`check-preview-mounted`, `check-count-readiness-mounted`). `checks-advantage-mode` is the
@@ -767,6 +827,9 @@ describeValidationAddressPairing({
     'checks-count-required',
     'checks-count-tier-successes',
     'checks-advantage-mode',
+    'checks-additional-dice-path',
+    'checks-additional-dice-read-macro',
+    'checks-additional-dice-spend-macro',
   ],
   routeNoun: 'route',
   destinationNoun: 'section',

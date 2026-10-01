@@ -74,6 +74,18 @@ export const CHECK_TICK_LABELS = Object.freeze({
     'CheckCountTriggersReachable',
     'Every dice trigger can fire on the pool',
   ],
+  countAdditionalDiceSourceSet: [
+    'CheckCountAdditionalDiceSourceSet',
+    'Additional dice have a source to pay for them',
+  ],
+  countAdditionalDicePathStored: [
+    'CheckCountAdditionalDicePathStored',
+    'The additional-dice value is a stored path on the character',
+  ],
+  countAdditionalDiceMacrosScript: [
+    'CheckCountAdditionalDiceMacrosScript',
+    'Both additional-dice macros are script macros',
+  ],
 });
 
 /** The ISSUES a check can raise, keyed by `CHECK_READINESS_ISSUE_IDS` member. */
@@ -246,6 +258,22 @@ export const CHECK_ISSUE_LABELS = Object.freeze({
     'IssueCountTriggerGroupUnreachable',
     'The triggers {names} read dice this pool never rolls, so they cannot fire while the check counts successes. They are kept and work again if the check adds the dice.',
   ],
+  countAdditionalDiceSourceMissing: [
+    'IssueCountAdditionalDiceSourceMissing',
+    'Set the value on the crafting character or the macro pair that pays for them, or turn additional dice off.',
+  ],
+  countAdditionalDicePathInvalid: [
+    'IssueCountAdditionalDicePathInvalid',
+    'The value that pays for additional dice must be a path on the character, such as system.resources.momentum.value, not an expression or a list entry.',
+  ],
+  countAdditionalDiceMacroInvalid: [
+    'IssueCountAdditionalDiceMacroInvalid',
+    'The {kind} macro is missing or is not a script macro, so players cannot buy additional dice. Link a script macro.',
+  ],
+  countAdditionalDicePathUnresolvedForPreview: [
+    'IssueCountAdditionalDicePathUnresolvedForPreview',
+    '{actor} has no stored number at {path}, so no dice can be added for them.',
+  ],
 });
 
 /** The one-trigger sentence of `countTriggerGroupUnreachable`, its name quoted in the copy. */
@@ -255,11 +283,19 @@ const ONE_TRIGGER_UNREACHABLE = Object.freeze({
     'The trigger “{names}” reads dice this pool never rolls, so it cannot fire while the check counts successes. It is kept and works again if the check adds the dice.',
 });
 
-/** The words a `countFaceBeyondDie` issue's coded `kind` and `effect` fill its sentence with. */
+/** The overridden sentence of `countAdditionalDicePathUnresolvedForPreview`. */
+const PATH_OVERRIDDEN_FOR_PREVIEW = Object.freeze({
+  key: 'FABRICATE.Admin.Manager.Checks.Validation.IssueCountAdditionalDicePathOverriddenForPreview',
+  fallback: "An active effect changes {actor}'s {path}, so no dice can be added for them.",
+});
+
+/** The words an issue's coded `kind` (a face rule or a macro) and `effect` fill its sentence with. */
 const ISSUE_PHRASES = Object.freeze({
   kind: {
     explode: ['FaceKindExplode', 'explode'],
     cancel: ['FaceKindCancel', 'cancel'],
+    read: ['MacroKindRead', 'read'],
+    spend: ['MacroKindSpend', 'spend'],
   },
   effect: {
     neverExplodes: ['FaceEffectNeverExplodes', 'it never explodes'],
@@ -313,6 +349,10 @@ const TITLE_FALLBACKS = {
   freeTextCountingFormula: 'This formula counts successes, but the check adds the dice',
   countFaceMissing: 'A face to explode or cancel from is not chosen',
   countTriggerGroupUnreachable: 'A trigger reads dice the pool never rolls',
+  countAdditionalDiceSourceMissing: 'Additional dice are allowed but have no source',
+  countAdditionalDicePathInvalid: 'The additional-dice value is not a stored path',
+  countAdditionalDiceMacroInvalid: 'An additional-dice macro is not a script macro',
+  countAdditionalDicePathUnresolvedForPreview: 'The additional-dice value cannot be spent',
 };
 
 /** Each title's key is its id's `Issue<Id>Title`, so the table above holds only the fallbacks. */
@@ -451,11 +491,21 @@ export function convertActionCopy(issue) {
   };
 }
 
+/** The copy an issue's data selects: a one-trigger or overridden variant, else its own. */
+function sentenceCopy(id, data) {
+  if (id === 'countTriggerGroupUnreachable' && data?.triggers?.length === 1) {
+    return ONE_TRIGGER_UNREACHABLE;
+  }
+  if (id === 'countAdditionalDicePathUnresolvedForPreview' && data?.overridden) {
+    return PATH_OVERRIDDEN_FOR_PREVIEW;
+  }
+  return checkIssueCopy(id);
+}
+
 /** A readiness issue's one sentence, as `checkIssueText` fills it. */
 export function checkIssueSentence(id, data, text) {
   const resolved = issueData(data, text);
-  const one = id === 'countTriggerGroupUnreachable' && data?.triggers?.length === 1;
-  const copy = one ? ONE_TRIGGER_UNREACHABLE : checkIssueCopy(id);
+  const copy = sentenceCopy(id, data);
   const sentence = interpolate(text(copy.key, copy.fallback, resolved), resolved);
   if (id !== 'freeTextCountingFormula') return sentence;
   return [sentence, ...conversionNotes(data, text)].join(' ');
