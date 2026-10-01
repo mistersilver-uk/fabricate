@@ -10,6 +10,8 @@ import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 import { rewriteClientImports } from '../helpers/rewriteClientImports.js';
 // The raw `.js` closure of `SearchablePopover`.
 import {
+  ADDITIONAL_DICE_NOTICE_RAW_MODULES,
+  CHECK_TARGET_RAW_MODULES,
   PLAYER_APP_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
@@ -143,6 +145,15 @@ describe('GatheringView ↔ actor bar wiring', () => {
     // GatheringView routes its crafting-data subscription through the invalidation-domain
     // taxonomy (issue 1078 part B1); omitting it HANGS this suite (# cancelled).
     copyModule('src/systems/invalidationDomains.js');
+    // Issue 2008: an attempt's additional-dice notice is worded by the prompt presenter.
+    for (const modulePath of [
+      ...ADDITIONAL_DICE_NOTICE_RAW_MODULES,
+      ...CHECK_TARGET_RAW_MODULES,
+      'src/systems/countEvaluation.js',
+      'src/utils/fillPlaceholders.js',
+    ]) {
+      copyModule(modulePath);
+    }
     writeCompiledModule('src/ui/svelte/stores/actorBarStore.svelte.js');
 
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
@@ -561,6 +572,56 @@ describe('GatheringView ↔ actor bar wiring', () => {
       assert.notEqual(warns[0], undefined);
     } finally {
       delete globalThis.ui;
+    }
+  });
+
+  it('warns once for a refused additional-dice choice and stays silent for a dismissal (issue 2008)', async () => {
+    const refused = {
+      success: false,
+      cancelled: true,
+      additionalDiceRefusal: 'choiceInvalid',
+      additionalDiceNotice: { dice: null, limit: 1, available: 1, label: '', source: 'path' },
+    };
+    const misconfigured = {
+      success: false,
+      misconfigured: true,
+      message: 'The check is misconfigured.',
+      data: { boughtDice: { count: 1, source: 'path' } },
+    };
+    const cases = [
+      [refused, ['FABRICATE.Check.AdditionalDiceRefusal.ChoiceInvalid']],
+      [misconfigured, ['1 spent; the roll could not be completed.', 'The check is misconfigured.']],
+      [{ success: false, cancelled: true }, []],
+    ];
+    for (const [reply, expected] of cases) {
+      const warns = [];
+      const notifications = {
+        warn: (msg) => {
+          warns.push(msg);
+        },
+      };
+      Object.defineProperty(globalThis, 'ui', { value: { notifications }, configurable: true, writable: true });
+      try {
+        const services = {
+          listGatheringForActor: () => Promise.resolve(listing([attemptableEnv()], 'a1')),
+          startGatheringAttempt: () => Promise.resolve(reply)
+        };
+        const store = makeStore({ actors: [{ id: 'a1', uuid: 'Actor.a1', name: 'Bromm' }], seededId: 'a1' });
+        store.loadSelectableActors();
+        flushSync();
+        services.actorBar = store;
+        await mountView(services);
+
+        target.querySelector(':scope [data-gathering-task-detail] [data-gathering-attempt]').click();
+        await settle();
+
+        assert.deepEqual(warns, expected, JSON.stringify(reply));
+      } finally {
+        delete globalThis.ui;
+        if (mounted) unmount(mounted);
+        mounted = null;
+        target?.remove();
+      }
     }
   });
 

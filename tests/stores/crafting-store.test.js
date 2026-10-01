@@ -1651,3 +1651,54 @@ describe('craftingStore check evidence (issue 2005)', () => {
     assert.ok(Boolean(store.lastRollResult.r1), 'a refusal that is not the check changes nothing');
   });
 });
+
+describe('craftingStore additional-dice notices (issue 2008)', () => {
+  let compiler;
+  let createCraftingStore;
+
+  before(async () => {
+    ({ compiler, createCraftingStore } = await setupCraftingStoreCompiler('fabricate-craft-dice-'));
+  });
+  after(() => compiler.cleanup());
+
+  const notice = { dice: 2, limit: 1, available: 1, label: 'Momentum', source: 'path' };
+  const craftWith = async (reply) => {
+    const { services, calls } = makeServices({
+      craftRecipe: async () => reply,
+      sourceActors: [{ id: 'actor-1', name: 'Brenna' }],
+    });
+    const result = await createCraftingStore({ services }).craft({ id: 'r1' });
+    return { result, calls };
+  };
+
+  it('raises one notice for a refused choice before the quiet cancelled return', async () => {
+    const reply = {
+      success: false,
+      cancelled: true,
+      additionalDiceRefusal: 'resourceChanged',
+      additionalDiceNotice: notice,
+    };
+    const { result, calls } = await craftWith(reply);
+    assert.equal(result, reply, 'the cancelled result returns as before');
+    assert.deepEqual(calls.notify, [
+      "Brenna's Momentum changed before the roll, and 1 is fewer than the 2 chosen. Nothing was spent or rolled.",
+    ]);
+    assert.equal(calls.listCraftingForActor.length, 0, 'no listing churn');
+  });
+
+  it('says what a misconfigured roll spent, beside its refusal, and nothing for a dismissal', async () => {
+    const spent = await craftWith({
+      success: false,
+      misconfigured: true,
+      message: 'The check is misconfigured.',
+      data: { boughtDice: { count: 1, source: 'path' } },
+      additionalDiceNotice: { dice: 1, label: 'Momentum', source: 'path' },
+    });
+    assert.deepEqual(spent.calls.notify, [
+      '1 Momentum spent; the roll could not be completed.',
+      'The check is misconfigured.',
+    ]);
+    const dismissed = await craftWith({ success: false, cancelled: true });
+    assert.deepEqual(dismissed.calls.notify, [], 'a dismissal stays silent');
+  });
+});

@@ -139,6 +139,20 @@ describe('alchemyStore', () => {
     // Issue 1648: the authority-refusal wording the brew path now falls back to. A
     // dependency the store imports but the compiler does not copy CANCELS this suite.
     compiler.copyPlain('src/ui/svelte/util/journalRunReasons.js');
+    // Issue 2008: the additional-dice notice a brew raises, and its import closure.
+    for (const module of [
+      'src/ui/presenters/additionalDicePrompt.js',
+      'src/systems/additionalDiceReach.js',
+      'src/systems/countTriggerReach.js',
+      'src/systems/countEvaluation.js',
+      'src/systems/checkEvaluation.js',
+      'src/systems/checkTarget.js',
+      'src/systems/normalize/checkEvaluation.js',
+      'src/utils/fillPlaceholders.js',
+      'src/utils/localizeWithFallback.js',
+    ]) {
+      compiler.copyPlain(module);
+    }
     compiler.compile('src/ui/svelte/stores/browseListing.svelte.js');
     ({ createAlchemyStore } = await compiler.load('src/ui/svelte/stores/alchemyStore.svelte.js'));
   });
@@ -468,6 +482,45 @@ describe('alchemyStore', () => {
     assert.equal(store.benchEmpty, true, 'the bench clears after a brew');
     assert.equal(store.lastBrew.status, 'success');
     assert.equal(store.lastBrew.discovered, 'Smoke Bomb');
+  });
+
+  it('raises one additional-dice notice for a refused brew and returns it quietly (issue 2008)', async () => {
+    const replies = [
+      {
+        success: false,
+        cancelled: true,
+        additionalDiceRefusal: 'spendUnconfirmed',
+        additionalDiceNotice: { dice: 1, limit: 1, available: 2, label: '', source: 'path' },
+      },
+      {
+        success: false,
+        misconfigured: true,
+        message: 'The check is misconfigured.',
+        data: { boughtDice: { count: 2, source: 'macro' } },
+      },
+      { success: false, cancelled: true },
+    ];
+    const harness = makeServices({ submitAlchemyAttempt: async () => replies.shift() });
+    harness.services.getCraftingSourceActors = () => [{ id: 'pc', name: 'Brenna' }];
+    const store = createAlchemyStore({ services: harness.services });
+    await store.load();
+    flushSync();
+    const brewOnce = async () => {
+      store.add('ashsalt');
+      flushSync();
+      return store.brew();
+    };
+    const refused = await brewOnce();
+    assert.equal(refused.cancelled, true);
+    assert.deepEqual(harness.calls.notify, [
+      "The value that pays for Brenna's additional dice did not fall by 1 as expected, so the check was not rolled. Check the value on the character.",
+    ]);
+    assert.equal(store.lastBrew, null, 'a refused brew records no banner');
+    await brewOnce();
+    assert.equal(harness.calls.notify[1], '2 spent; the roll could not be completed.');
+    const before = harness.calls.notify.length;
+    assert.equal((await brewOnce()).cancelled, true, 'positive control: the dismissal ran');
+    assert.equal(harness.calls.notify.length, before, 'a dismissal raises nothing');
   });
 
   it('a fizzled brew banners a no-reaction (no discovery) and runs no roll expectation', async () => {

@@ -49,6 +49,7 @@
  * @returns {object} The reactive crafting store.
  */
 
+import { notifyAdditionalDice } from '../../presenters/additionalDicePrompt.js';
 import { aggregateShoppingList } from '../util/shoppingListAggregator.js';
 import {
   isResolvedFailureOutcome,
@@ -711,12 +712,11 @@ export function createCraftingStore({ services } = {}) {
         // chat (Dice So Nice). Automation/macros omit this and stay silent.
         interactive: true,
       });
-      // Dismissing the roll dialog is a user choice, not a failure: a cancelled
-      // result is also `success: false`, so it MUST be handled first and returned
-      // quietly (no error notification, no listing refresh churn).
-      if (result && result.cancelled === true) {
-        return result;
-      }
+      const actor = resolveCraftingActorFrom(services?.getCraftingSourceActors?.() ?? []);
+      notifyAdditionalDice(result, services, actor?.name);
+      // A dismissal is a choice, not a failure: a cancelled result (also `success: false`) returns
+      // first and quietly, its only notice a refused additional-dice choice's (issue 2008).
+      if (result?.cancelled === true) return result;
       // A versioned-run authority refusal carries `reason` and NO `message`, so
       // notifying `result.message` alone showed the literal text "undefined".
       if (result && result.success === false && !isResolvedFailureOutcome(result)) {

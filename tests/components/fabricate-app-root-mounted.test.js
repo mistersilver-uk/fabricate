@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { tick } from '../../node_modules/svelte/src/index-client.js';
 import {
+  ADDITIONAL_DICE_NOTICE_RAW_MODULES,
   CHECK_EVIDENCE_RAW_MODULES,
   CHECK_TARGET_RAW_MODULES,
   MARKS_AND_NOTICES_COMPILED_MODULES,
@@ -109,6 +110,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/formatDuration.js',
     ...FOUNDRY_BRIDGE_RAW_MODULES,
     ...CHECK_EVIDENCE_RAW_MODULES,
+    // Issue 2008: the player stores and GatheringView word additional-dice notices through it.
+    ...ADDITIONAL_DICE_NOTICE_RAW_MODULES,
     // Issue 1648: the shared authority-refusal wording the Journal panels and stores read.
     'src/ui/svelte/util/journalRunReasons.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
