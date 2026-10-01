@@ -9,6 +9,8 @@ player-journal-check-roll-prompt
 player-journal-check-roll-prompt-bonus
 player-gathering-journal-check-roll-prompt
 player-journal-check-roll-prompt-count
+player-journal-check-roll-prompt-count-additional
+player-journal-check-roll-prompt-count-additional-secret
 player-journal-routed-bands-under
 player-journal-routed-bands-under-crafting
 player-journal-routed-bands-under-attribute

@@ -79,6 +79,9 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/components/DiceTiles.svelte': Object.freeze([
     'manager-checks-count-over-rolled',
     'manager-checks-count-botch',
+    // Issue 2008: the dashed bought tile, on the result box and the simulator.
+    'player-crafting-roll-result-count-bought',
+    'manager-checks-count-simulator-bought',
   ]),
   // The shared icon picker (issue 1269).
   'src/ui/svelte/components/IconPicker.svelte': Object.freeze(['manager-system-edit-lists']),
@@ -264,10 +267,12 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-import-report',
     'manager-components-add-from-catalogue',
   ]),
-  // The well below a card (issue 2008): the Formula card's roll-prompt and additional-dice groups.
+  // The well below a card (issue 2008): the Formula card's roll-prompt and additional-dice groups,
+  // and the roll prompt's additional-dice control.
   'src/ui/svelte/components/Well.svelte': Object.freeze([
     'manager-checks-crafting-advantage-keep',
     'manager-checks-v3-count-under',
+    'player-crafting-roll-prompt-count-additional',
   ]),
   // The sheet itself, and the first entry here whose key is not a component (issue 1515).
   'styles/fabricate.css': Object.freeze([

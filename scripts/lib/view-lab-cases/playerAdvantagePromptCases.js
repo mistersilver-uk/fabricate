@@ -35,7 +35,7 @@ const OVER_2D6 =
 
 const PROMPT_SOURCES = Object.freeze([
   CRAFTING_SIMPLE,
-  /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target)?\.svelte$/,
+  /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target|Footer)?\.svelte$/,
   /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
 ]);
 const RESULT_SOURCES = Object.freeze([
@@ -132,6 +132,7 @@ export function playerAdvantagePromptCases() {
       state: 'count-advantage',
       expectSelector:
         THREE('−2 dice', '+2 dice') +
+        ':not(:has([data-roll-prompt-additional-dice-group]))' +
         ':has(.formula-content .formula[data-roll-prompt-count="over"]:text-is("6d10 · each ≥ 8"))',
     }),
     promptCase({

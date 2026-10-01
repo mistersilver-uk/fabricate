@@ -14,6 +14,7 @@ import {
 import { seedCheckPreviewState } from './labCheckPreviews.js';
 import { seedLabInteractables } from './labInteractables.js';
 import { stockJournalPrototype } from './labJournalPrototype.js';
+import { registerLabMacros } from './labMacros.js';
 import { installUpdateSemantics, makeGetFlag } from './labFlags.js';
 import {
   buildLabBlindRunSecret,
@@ -494,6 +495,7 @@ export async function buildLabWorld({
   const actors = buildLabActors(content);
   seedCheckPreviewState(content, actors, checkPreviewState);
   const documents = buildDocumentIndex(content, actors);
+  registerLabMacros(documents);
   const shippedLocalize = await createLocalizer();
   const localize = (key) =>
     longTravelLabels && key === 'FABRICATE.Admin.Manager.Travel.Tabs.MapLinks'

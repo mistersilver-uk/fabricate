@@ -4,35 +4,38 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { getCaseById } from '../scripts/lib/viewLabCases.js';
-import { resolveSalvageCheck } from '../src/systems/salvageCheckUsability.js';
-import { hasPlainD20 } from '../src/utils/craftingCheckExpression.js';
-
-import { createLabRoll } from './view-lab/foundry/labRoll.js';
-import { installLabRandom } from './view-lab/foundry/labRandom.js';
-import { installFoundryShim } from './view-lab/foundry/installFoundryShim.js';
-import { buildLabContent } from './view-lab/world/labContent.js';
-import { buildLabActors } from './view-lab/world/labActors.js';
-import { seedRollPromptFixture } from './view-lab/rollPromptFixtures.js';
-import {
-  rolledDiceGroups,
-  evaluateCheckRoll,
-  evaluatePreparedRunCheck,
-  postCheckRollHandoff,
-} from '../src/systems/checkRoll.js';
+import { resolveModifierLibrary } from '../src/systems/characterLibraries.js';
 import {
   buildCheckModifierChoice,
   buildCheckModifierContext,
   resolveActiveCraftingCheckFormula,
   resolveModifierPolicy,
 } from '../src/systems/checkModifierResolver.js';
-import { resolveModifierLibrary } from '../src/systems/characterLibraries.js';
-import { CraftingEngine } from '../src/systems/CraftingEngine.js';
-import { installCountDice } from './helpers/countEngineDice.js';
+import {
+  rolledDiceGroups,
+  evaluateCheckRoll,
+  evaluatePreparedRunCheck,
+  postCheckRollHandoff,
+} from '../src/systems/checkRoll.js';
 import { evaluateCountCheckRoll } from '../src/systems/countCheckRoll.js';
 import { findCountRoll, registerCountRoll } from '../src/systems/countRoll.js';
+import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { normalizeCheckEvaluation } from '../src/systems/normalize/checkEvaluation.js';
-import { stubInteractiveRollEnvironment, stubPromptSurface } from './helpers/rollPromptDialogStub.js';
+import { resolveSalvageCheck } from '../src/systems/salvageCheckUsability.js';
 import { rollPromptTarget } from '../src/ui/svelte/apps/crafting/rollPromptTarget.js';
+import { hasPlainD20 } from '../src/utils/craftingCheckExpression.js';
+
+import { installCountDice } from './helpers/countEngineDice.js';
+import { stubInteractiveRollEnvironment, stubPromptSurface } from './helpers/rollPromptDialogStub.js';
+import { installFoundryPropertyUtils } from './helpers/storedResourceActor.js';
+import { ADDITIONAL_DICE_PROMPT_STATES } from './view-lab/additionalDiceFixtures.js';
+import { installFoundryShim } from './view-lab/foundry/installFoundryShim.js';
+import { installLabRandom } from './view-lab/foundry/labRandom.js';
+import { createLabRoll } from './view-lab/foundry/labRoll.js';
+import { seedRollPromptFixture } from './view-lab/rollPromptFixtures.js';
+import { buildLabActors } from './view-lab/world/labActors.js';
+import { buildLabContent } from './view-lab/world/labContent.js';
+import { registerLabMacros } from './view-lab/world/labMacros.js';
 
 test('roll-prompt View Lab variants project valid checks and long world modifier labels', async () => {
   const content = buildLabContent();
@@ -67,6 +70,7 @@ test('roll-prompt View Lab variants project valid checks and long world modifier
   assert.equal(manager.getSystem('lab-herbalism').craftingCheck.maxModifierPicks, 1);
   await underPromptView(world);
   await countPromptView(world);
+  await additionalDicePromptView(world);
   await seedRollPromptFixture(world, 'overflow');
   const herbalism = manager.getSystem('lab-herbalism');
   assert.equal(herbalism.craftingCheck.maxModifierPicks, 2);
@@ -154,6 +158,103 @@ async function countPromptView(world) {
       surface.restore();
       dice.restore();
     }
+  }
+}
+
+/**
+ * Each issue 2008 prompt state's offer, as the real engine reads it from the lab Actor: the most
+ * Sera Vane may buy, why nothing can be bought, and what the prompt may judge (`reach`).
+ */
+const ADDITIONAL_DICE_OFFERS = {
+  'count-additional': { limit: 1, unavailable: null, needed: 2 },
+  'count-additional-floor': { limit: 2, unavailable: null, needed: 3 },
+  'count-additional-insufficient': { limit: 0, unavailable: null, needed: 3 },
+  'count-additional-disadvantage-only': { limit: 0, unavailable: null, needed: 2 },
+  'count-additional-impossible': { limit: 1, unavailable: null, needed: 5 },
+  'count-additional-rescued': { limit: 1, unavailable: null, needed: 5, rescued: true },
+  'count-additional-explode': {
+    limit: 1,
+    unavailable: null,
+    needed: 5,
+    perDieMost: null,
+    explode: 'recursive',
+  },
+  'count-additional-zero-pool': { limit: 0, unavailable: null, needed: 2 },
+  'count-additional-single-roll': { limit: 1, unavailable: null, needed: 4 },
+  'count-additional-unaffordable': { limit: 0, unavailable: null, needed: 1 },
+  'count-additional-unlabelled': { limit: 1, unavailable: null, needed: 2, label: '' },
+  'count-additional-unreadable': { limit: 0, unavailable: 'resourceUnreadable', needed: 1 },
+  'count-additional-overridden': { limit: 0, unavailable: 'resourceOverridden', needed: 1 },
+  'count-additional-not-writable': { limit: 0, unavailable: 'resourceNotWritable', needed: 1 },
+  'count-additional-macro-failed': { limit: 0, unavailable: 'resourceMacroFailed', needed: 1 },
+  'count-result-bought': { limit: 1, unavailable: null, needed: 3 },
+};
+
+/** Drive one additional-dice state's horseshoe craft to its prompt, which is dismissed. */
+async function offerFor(world, state) {
+  await seedRollPromptFixture(world, state);
+  const system = world.fabricate.craftingSystemManager.getSystem('lab-smithing');
+  const recipe = world.fabricate.recipeManager.getRecipe('sm-r-horseshoe');
+  const crafter = world.actorList.find((actor) => actor.id === 'lab-actor-brenna');
+  const before = structuredClone(crafter.system.resources ?? {});
+  const surface = stubPromptSurface(() => null);
+  const dice = installCountDice();
+  try {
+    await new CraftingEngine(null)._runPassFailCheck(
+      system, system.craftingCheck.simple, recipe, null, crafter, { interactive: true }
+    );
+    assert.deepEqual(dice.constructed, [], `${state}: a dismissed prompt rolls nothing`);
+    assert.deepEqual(crafter.system.resources ?? {}, before, `${state}: and spends nothing`);
+    return surface.view.additionalDiceOffer;
+  } finally {
+    dice.restore();
+    surface.restore();
+  }
+}
+
+/** Issue 2008: every new `rollPromptState` through the real engine, as the lab renders it. */
+async function additionalDicePromptView(world) {
+  assert.deepEqual(
+    new Set(Object.keys(ADDITIONAL_DICE_OFFERS)),
+    new Set(Object.keys(ADDITIONAL_DICE_PROMPT_STATES)),
+    'every prompt state is asserted here'
+  );
+  const documents = new Map();
+  registerLabMacros(documents);
+  const previous = { game: globalThis.game, fromUuid: globalThis.fromUuid };
+  const store = world.fabricate.characterLibrariesStore;
+  Object.assign(globalThis, {
+    game: { fabricate: { getCharacterLibrariesStore: () => store } },
+    fromUuid: async (uuid) => documents.get(uuid) ?? null,
+  });
+  const restoreFoundry = installFoundryPropertyUtils();
+  const crafter = world.actorList.find((actor) => actor.id === 'lab-actor-brenna');
+  const permission = crafter.canUserModify;
+  const manager = world.fabricate.craftingSystemManager;
+  const smithing = manager.getSystem('lab-smithing');
+  try {
+    for (const [state, expected] of Object.entries(ADDITIONAL_DICE_OFFERS)) {
+      // Each lab frame boots its own world, so no state inherits another's check or stamp.
+      await manager.updateSystem(smithing.id, smithing);
+      crafter.overrides = {};
+      crafter.canUserModify = permission;
+      const offer = await offerFor(world, state);
+      const { limit, unavailable, needed, label = 'Momentum', ...reach } = expected;
+      assert.deepEqual(
+        [offer?.limit, offer?.unavailable, offer?.resourceLabel],
+        [limit, unavailable, label],
+        `${state}: the offer's limit, reason and Resource name`
+      );
+      assert.deepEqual(
+        offer.reach,
+        { needed, perDieMost: 1, explode: 'off', rescued: false, ...reach },
+        `${state}: what the prompt may judge`
+      );
+    }
+  } finally {
+    restoreFoundry();
+    Object.assign(globalThis, previous);
+    if (previous.game === undefined) delete globalThis.game;
   }
 }
 

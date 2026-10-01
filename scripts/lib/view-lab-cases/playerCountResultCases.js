@@ -47,6 +47,16 @@ function rolledCase({ id, label, state, expectSelector, failed = false, ...rest 
   });
 }
 
+/** Buy one additional die on the standing prompt (issue 2008). */
+const BUY_ONE = Object.freeze({
+  selector: `${SINGLE_PROMPT} [data-roll-prompt-additional-dice-stepper] [data-stepper-increment]`,
+});
+/** Frame 39: three d20s at or under 20, the third bought, so the last original tile is dashed. */
+const BOUGHT_TILES =
+  ':has([data-dice-tile-marks~="qualified"]:not([data-dice-tile-marks~="bought"]))' +
+  ':has(.fabricate-dice-tiles__tile:last-child[data-dice-tile-marks~="bought"])';
+const BOUGHT_ROW = ROW('additionalDice', '1 bought · spent 1 Momentum');
+
 /** Two d6s both meet 1 and explode once: each original tile is ✓↻, each explosion its own ✓. */
 const PASS =
   `${RESULT_BOX}[data-roll-success="true"]` +
@@ -131,6 +141,49 @@ export function playerCountResultCases() {
         ROW('pool', 'Reduced to zero by a situational penalty of −6') +
         ROW('result', 'A pool reduced to zero fails automatically. Nothing was rolled.'),
     }),
+    // Issue 2008, frame 39: one bought die joins the pool, marked on the last original tile.
+    rolledCase({
+      id: 'player-crafting-roll-result-count-bought',
+      label: 'Player app — success-counting result box with one bought die (prototype frame 39)',
+      state: 'count-result-bought',
+      steps: [BUY_ONE],
+      expectSelector:
+        `${RESULT_BOX}[data-roll-success="true"]` +
+        BOUGHT_ROW +
+        ROW('count', '3 qualified − 0 cancelled = 3 net') +
+        ':has([data-dice-tiles-legend]:has-text("dashed = bought"))' +
+        ` [data-check-count-tiles]${BOUGHT_TILES}`,
+    }),
+    // A blind roll withholds the bought dice with every other executed fact.
+    rolledCase({
+      id: 'player-crafting-roll-result-count-bought-secret',
+      label: 'Player app — success-counting result box after a blind roll with a bought die',
+      state: 'count-result-bought',
+      steps: [
+        BUY_ONE,
+        { selector: `${SINGLE_PROMPT} .mode-field .fabricate-select-trigger` },
+        {
+          selector: '.fabricate-app > .fabricate-select-popover [data-popover-option="blindroll"]',
+        },
+      ],
+      expectSelector:
+        `${RESULT_BOX}[data-roll-success="true"]` +
+        ':not(:has([data-check-count-tiles])):not(:has([data-check-evidence-rows]))' +
+        ':not(:has([data-dice-tiles-legend]))',
+    }),
+    // The posted card states the summary the result box has no room for (frame 39's chat card).
+    rolledCase({
+      id: 'player-crafting-roll-result-count-bought-chat',
+      label: 'Player app — success-counting result card with one bought die (prototype frame 39)',
+      state: 'count-result-bought',
+      steps: [BUY_ONE],
+      query: { chatLog: '1' },
+      expectSelector:
+        '.fabricate-craft-chat:has-text("Crafting Successful")' +
+        ':has([data-check-count-summary]:has-text("3d20 (2 + 1 bought), each ≤ 20"))' +
+        ':has([data-check-evidence="additionalDice"]:has-text("1 bought · spent 1 Momentum"))' +
+        ' .fabricate-dice-tiles__tile:last-child[data-dice-tile-marks~="bought"]',
+    }),
     // The crafting app reaches no secret check, so its withheld state is the roll it cannot see.
     rolledCase({
       id: 'player-crafting-roll-result-count-secret',
@@ -162,7 +215,7 @@ export function playerCountResultCases() {
         ' .formula-content .manager-chip[data-roll-prompt-required="2"]',
       kinds: ['player', 'crafting'],
       sourceMatches: [
-        /^src\/ui\/svelte\/apps\/crafting\/(?:RollPrompt(?:Target)?\.svelte|rollPrompt(?:Target|Host)?\.js)$/,
+        /^src\/ui\/svelte\/apps\/crafting\/(?:RollPrompt(?:Target|Footer)?\.svelte|rollPrompt(?:Target|Host)?\.js)$/,
         /^src\/systems\/companionCheck(?:Roll|Evaluation)\.js$/,
         /^src\/bootstrap\/companionFacade\.js$/,
       ],

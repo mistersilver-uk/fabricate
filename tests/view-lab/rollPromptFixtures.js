@@ -2,6 +2,14 @@
 import { resolveModifierLibrary } from '../../src/systems/characterLibraries.js';
 import { normalizeCheckEvaluation } from '../../src/systems/normalize/checkEvaluation.js';
 
+import {
+  ADDITIONAL_DICE_BULK_STATES,
+  ADDITIONAL_DICE_JOURNAL_STATES,
+  ADDITIONAL_DICE_PROMPT_STATES,
+  seedAdditionalDiceBulk,
+  seedAdditionalDiceJournal,
+  seedAdditionalDicePrompt,
+} from './additionalDiceFixtures.js';
 import { COUNT_RESULT_STATES, seedCountResult } from './countResultFixtures.js';
 
 export async function seedRollPromptFixture(world, state) {
@@ -34,6 +42,13 @@ export async function seedRollPromptFixture(world, state) {
   }
   if (state === 'journal-bonus') await seedJournalBonus(world);
   if (Object.hasOwn(COUNT_RESULT_STATES, state)) await seedCountResult(world, state);
+  if (Object.hasOwn(ADDITIONAL_DICE_PROMPT_STATES, state)) {
+    await seedAdditionalDicePrompt(world, state);
+  }
+  if (Object.hasOwn(ADDITIONAL_DICE_BULK_STATES, state)) await seedAdditionalDiceBulk(world, state);
+  if (Object.hasOwn(ADDITIONAL_DICE_JOURNAL_STATES, state)) {
+    await seedAdditionalDiceJournal(world, state);
+  }
   if (state === 'pick-one' || state === 'overflow') {
     const system = manager.getSystem('lab-herbalism');
     await manager.updateSystem(system.id, {

@@ -1,6 +1,12 @@
 /** Duck-typed actors, items, and the uuid document index. */
 
-import { installUpdateSemantics, makeGetFlag, makeSetFlag, seedFabricateFlag } from './labFlags.js';
+import {
+  installSourceSemantics,
+  installUpdateSemantics,
+  makeGetFlag,
+  makeSetFlag,
+  seedFabricateFlag,
+} from './labFlags.js';
 
 const PORTRAIT_BASE = '/@foundry-chrome/icons';
 
@@ -380,6 +386,7 @@ export function buildLabActors(content) {
     actor.getFlag = makeGetFlag(actor);
     actor.setFlag = makeSetFlag(actor);
     installUpdateSemantics(actor);
+    installSourceSemantics(actor);
     // Installed HERE rather than in `ownedItem`/`recipeItemCopy`, because an item can only remove
     // itself from a collection that exists — and the actor holding it is built after its items.
     for (const item of items) {

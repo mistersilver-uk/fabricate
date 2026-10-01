@@ -5,7 +5,12 @@
 import { registerCountRoll } from '../../../src/systems/countRoll.js';
 import { createLabDialogV2 } from '../foundryDialog.js';
 import { createLabRollPromptAnswerer } from '../rollPromptAnswer.js';
-import { installUpdateSemantics, makeGetFlag, makeSetFlag } from '../world/labFlags.js';
+import {
+  installSourceSemantics,
+  installUpdateSemantics,
+  makeGetFlag,
+  makeSetFlag,
+} from '../world/labFlags.js';
 
 import { installLabRandom } from './labRandom.js';
 import { createLabRoll } from './labRoll.js';
@@ -454,7 +459,9 @@ export function installFoundryShim(world) {
   globalThis.Actor = {
     async createDocuments(specs = []) {
       const created = specs.map((spec) =>
-        makeDocument(spec, 'Actor', { items: [], type: spec.type ?? 'character', isOwner: true })
+        installSourceSemantics(
+          makeDocument(spec, 'Actor', { items: [], type: spec.type ?? 'character', isOwner: true })
+        )
       );
       game.actors.contents.push(...created);
       return created;

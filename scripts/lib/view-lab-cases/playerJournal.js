@@ -18,6 +18,13 @@ const KEEP_FOOTER =
   ':has(.manager-modal-footer button[data-action="disadvantage"] .action-note:text-is("keep the worse"))' +
   ':has(.manager-modal-footer button[data-action="advantage"] .action-note:text-is("keep the better"))';
 
+/** The Journal's prepared prompt offering additional dice (issue 2008). */
+const JOURNAL_ADDITIONAL_DICE_SOURCES = Object.freeze([
+  /^src\/systems\/journalPreparedCheck\.js$/,
+  /^src\/systems\/preparedDecisionPolicy\.js$/,
+  /^src\/ui\/svelte\/apps\/crafting\/RollPromptAdditionalDice\.svelte$/,
+]);
+
 export const CASES = Object.freeze([
   playerCase({
     id: 'player-alchemy-chooser',
@@ -143,7 +150,7 @@ export const CASES = Object.freeze([
       JOURNAL_SOURCES,
       /^src\/bootstrap\/journalOperations\.js$/,
       /^src\/systems\/CraftingEngine\.js$/,
-      /^src\/ui\/svelte\/apps\/crafting\/(?:RollPrompt(?:Target)?\.svelte|rollPrompt(?:Target)?\.js)$/,
+      /^src\/ui\/svelte\/apps\/crafting\/(?:RollPrompt(?:Target|Footer)?\.svelte|rollPrompt(?:Target)?\.js)$/,
     ],
   }),
   // Issue 2007: the versioned prompt's notes come from the offer the stage check prepared.
@@ -172,7 +179,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       JOURNAL_SOURCES,
       /^src\/bootstrap\/journalOperations\.js$/,
-      /^src\/ui\/svelte\/apps\/crafting\/(?:RollPrompt\.svelte|rollPrompt\.js)$/,
+      /^src\/ui\/svelte\/apps\/crafting\/(?:RollPrompt(?:Footer)?\.svelte|rollPrompt\.js)$/,
     ],
   }),
   playerCase({
@@ -202,7 +209,7 @@ export const CASES = Object.freeze([
       JOURNAL_SOURCES,
       /^src\/bootstrap\/journalOperations\.js$/,
       /^src\/systems\/GatheringEngine\.js$/,
-      /^src\/ui\/svelte\/apps\/crafting\/(?:RollPrompt(?:Target)?\.svelte|rollPrompt(?:Target)?\.js)$/,
+      /^src\/ui\/svelte\/apps\/crafting\/(?:RollPrompt(?:Target|Footer)?\.svelte|rollPrompt(?:Target)?\.js)$/,
     ],
   }),
   // Issue 2006: a Journal-prompted count check opens the same count prompt, its faces named.
@@ -234,8 +241,62 @@ export const CASES = Object.freeze([
       JOURNAL_SOURCES,
       /^src\/bootstrap\/journalOperations\.js$/,
       /^src\/systems\/GatheringEngine\.js$/,
-      /^src\/ui\/svelte\/apps\/crafting\/(?:RollPrompt(?:Target)?\.svelte|rollPrompt(?:Target)?\.js)$/,
+      /^src\/ui\/svelte\/apps\/crafting\/(?:RollPrompt(?:Target|Footer)?\.svelte|rollPrompt(?:Target)?\.js)$/,
     ],
+  }),
+  // Issue 2008 (frame 30): the entitled prepared count prompt carries the additional-dice control.
+  playerCase({
+    id: 'player-journal-check-roll-prompt-count-additional',
+    label: 'Player Journal — versioned success-counting check prompt offering additional dice',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: {
+      tab: 'journal',
+      journalCaseState: 'journal-check-prompt',
+      runeworkCheckMode: 'routed-count',
+      rollPromptState: 'journal-count-additional',
+      dialog: 'open',
+    },
+    steps: [
+      { selector: '[data-run-id="lab-v1-journal-check-prompt"]' },
+      { selector: '[data-journal-detail] [data-run-action="primary"]' },
+    ],
+    expectTab: 'journal',
+    expectSelector:
+      '.fabricate-app .manager-modal[data-roll-prompt="single"]' +
+      ':has(.manager-modal-subtitle:has-text("Brenna Karrunsdottir · Inscribe a Runeblade"))' +
+      ':has([data-roll-prompt-additional-dice-resource]:text-is("Momentum 2 available"))' +
+      ' input[data-roll-prompt-additional-dice]:not(:disabled)',
+    kinds: ['player', 'journal'],
+    sourceMatches: JOURNAL_ADDITIONAL_DICE_SOURCES,
+  }),
+  // R3: a recipe the player cannot see is redacted, so the prompt states only what can be spent.
+  playerCase({
+    id: 'player-journal-check-roll-prompt-count-additional-secret',
+    label: 'Player Journal — a redacted check prompt offering additional dice (ruling R3)',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: {
+      tab: 'journal',
+      journalCaseState: 'journal-check-prompt',
+      runeworkCheckMode: 'routed-count',
+      rollPromptState: 'journal-count-additional-unentitled',
+      dialog: 'open',
+    },
+    steps: [
+      { selector: '[data-run-id="lab-v1-journal-check-prompt"]' },
+      { selector: '[data-journal-detail] [data-run-action="primary"]' },
+    ],
+    expectTab: 'journal',
+    expectSelector:
+      '.fabricate-app .manager-modal[data-roll-prompt="single"]' +
+      ':not(:has(.formula-content .manager-chip[data-roll-prompt-required]))' +
+      ':has([data-roll-prompt-additional-dice-resource]:text-is("Momentum 2 available"))' +
+      ':not(:has([data-roll-prompt-additional-dice-message]))' +
+      ':not(:has([data-roll-prompt-block-note]))' +
+      ' .manager-modal-footer button[data-action="normal"]:not([aria-disabled])',
+    kinds: ['player', 'journal'],
+    sourceMatches: JOURNAL_ADDITIONAL_DICE_SOURCES,
   }),
   // Issue 2005 (T6): a fixed roll-under ladder states `≤` bands, in ladder order.
   playerCase({
