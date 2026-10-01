@@ -66,6 +66,43 @@ const tilesOf = (root) =>
 const modelTiles = (countDisplay) =>
   tileModel(countDisplay).tiles.map((tile) => [tile.face, tile.marks.join(' ')]);
 
+/**
+ * Issue 2008 (frame 39): three d20s at or under 14, the third paid for with 1 Momentum, two
+ * qualifying; `countDisplay.bought` marks the last original die and names the Resource.
+ */
+const BOUGHT_DISPLAY = Object.freeze({
+  die: 20,
+  results: [
+    { index: 0, face: 11, active: true, explodedFrom: null, qualified: true },
+    { index: 1, face: 15, active: true, explodedFrom: null },
+    { index: 2, face: 8, active: true, explodedFrom: null, qualified: true },
+  ],
+  qualified: 2,
+  cancelled: 0,
+  net: 2,
+  required: 1,
+  margin: 1,
+  zeroPool: false,
+  pool: { base: 2, terms: [], rolled: 3 },
+  threshold: { anchor: 14, source: 'fixed', terms: [], effective: 14 },
+  bought: 1,
+  resourceLabel: 'Momentum',
+});
+const BOUGHT_DATA = Object.freeze({
+  ...COUNT_DATA,
+  direction: 'under',
+  target: 14,
+  boughtDice: { count: 1, source: 'path' },
+});
+
+/** The executed projection of the bought die, under `visibility`. */
+const boughtCheck = (visibility = { rollMode: 'publicroll', secret: false }) =>
+  executedCheckDisplay({
+    data: structuredClone(BOUGHT_DATA),
+    visibility,
+    countDisplay: structuredClone(BOUGHT_DISPLAY),
+  });
+
 /** The box's markup without Svelte's block anchors, for a byte comparison. */
 const markupOf = (root) => root.innerHTML.replaceAll('<!---->', '');
 
@@ -266,6 +303,38 @@ describe('RollResultBox evidence rows', () => {
     assert.ok(root.querySelector(':scope [data-check-evidence="count"] .journal-fact-row.is-danger'));
   });
 
+  it('marks the bought die on the last original tile and states its row (issue 2008)', async () => {
+    const root = await harness.mount({ result: { ...result(boughtCheck()), total: 2 } });
+    assert.deepEqual(tilesOf(root), [
+      [11, 'qualified'],
+      [15, ''],
+      [8, 'qualified bought'],
+    ]);
+    const dashed = root.querySelectorAll('.fabricate-dice-tiles__tile--bought');
+    assert.equal(dashed.length, 1, 'one tile paints dashed');
+    assert.equal(dashed[0].getAttribute('aria-label'), '8, qualified, bought');
+    assert.match(root.querySelector('[data-dice-tiles-legend]').textContent, /dashed = bought$/);
+    assert.deepEqual(rowsOf(root).at(-1), [
+      'additionalDice',
+      'Additional dice',
+      '1 bought · spent 1 Momentum',
+    ]);
+    // The result box carries no summary line; the posted card states `3d20 (2 + 1 bought)`.
+    assert.ok(!root.querySelector('[data-check-count-summary]'), 'no summary line in the box');
+  });
+
+  it('withholds a secret or blind bought die, its tile, row and legend alike', async () => {
+    for (const visibility of [{ rollMode: 'blindroll' }, { rollMode: 'publicroll', secret: true }]) {
+      const root = await harness.mount({ result: result(boughtCheck(visibility)) });
+      assert.ok(
+        !root.querySelector('[data-dice-tile-face], [data-dice-tiles-legend], .check-evidence'),
+        JSON.stringify(visibility)
+      );
+      assert.ok(!root.textContent.includes('bought'), `${JSON.stringify(visibility)}: no mention`);
+      harness.remount();
+    }
+  });
+
   it('renders nothing at all without a recorded result, which a refusal leaves (Q10)', async () => {
     const root = await harness.mount({ result: null });
     assert.ok(!root.querySelector('[data-recipe-section="roll-result"]'));
@@ -325,6 +394,19 @@ describe('SalvageRollSummary evidence rows', () => {
     });
     assert.ok(!zero.querySelector('[data-inventory-salvage-roll]'), 'no roll of 0');
     assert.ok(!zero.querySelector('[data-dice-tile-face]'));
+  });
+
+  it("marks a count salvage's bought die and states its row (issue 2008)", async () => {
+    const root = await harness.mount({
+      result: { state: 'success', message: 'Salvaged.', rollValue: 2, check: boughtCheck() },
+    });
+    assert.deepEqual(tilesOf(root).at(-1), [8, 'qualified bought']);
+    assert.match(root.querySelector('[data-dice-tiles-legend]').textContent, /dashed = bought$/);
+    assert.deepEqual(rowsOf(root).at(-1), [
+      'additionalDice',
+      'Additional dice',
+      '1 bought · spent 1 Momentum',
+    ]);
   });
 
   it("names a count salvage's number as net successes, singular and plural (issue 2006)", async () => {

@@ -516,6 +516,37 @@ describe('count readiness on the route', () => {
     assert.ok(!root.querySelector('[data-checks-section-notice="noRollFormula"]'));
   });
 
+  it('hands the ceiling to additional dice in the roll section, and only while on (issue 2008)', async () => {
+    const additionalDice = { enabled: true, source: 'path', path: 'system.resources.momentum.value', max: 1 };
+    const notices = async (enabled) => {
+      script([]);
+      const root = await mountSimple({
+        ...SMITHING,
+        evaluation: pool({ base: '2', additionalDice: { ...additionalDice, enabled } }),
+        tiers: [
+          { id: 'arcane', name: 'Arcane Work', dc: 12, successes: 3 },
+          { id: 'impossible', name: 'Impossible Work', dc: 12, successes: 4 },
+        ],
+      });
+      // The harness localizes to the key and its data, so each notice names its tiers as data.
+      const named = Object.fromEntries(
+        [...root.querySelectorAll(':scope [data-checks-section-notices="roll"] > [data-checks-section-notice]')].map(
+          (notice) => [notice.dataset.checksSectionNotice, /"names":"([^"]*)"/.exec(notice.textContent)?.[1]]
+        )
+      );
+      harness.remount();
+      return named;
+    };
+    assert.deepEqual(await notices(true), {
+      countRequiredExceedsMaxPool: 'Impossible Work',
+      countRequiredExceedsBasePool: 'Arcane Work',
+    });
+    // A disabled record keeps its maximum, and the ceiling ignores it.
+    assert.deepEqual(await notices(false), {
+      countRequiredExceedsMaxPool: 'Arcane Work, Impossible Work',
+    });
+  });
+
   it('ranks the preview actor warning with the warnings, below a blocking fault', async () => {
     script([]);
     const everyFace = { enabled: true, faces: { kind: 'from', value: 1 } };

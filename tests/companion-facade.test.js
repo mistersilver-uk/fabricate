@@ -55,6 +55,7 @@ import {
   installFacadeGame,
   makeFacadeActor,
 } from './helpers/fabricateFacadeHarness.js';
+import { installFoundryPropertyUtils, withStoredResource } from './helpers/storedResourceActor.js';
 
 const GM = { id: 'user-gm', isGM: true };
 const PLAYER = { id: 'user-player', isGM: false };
@@ -1426,42 +1427,18 @@ describe('each actor-targeted delegator refuses in its OWN words, GM -> actor ->
 
 describe('additionalDice through the facade (issue 2008)', () => {
   const PATH = 'system.resources.momentum.value';
-  const walk = (object, path) =>
-    path.split('.').reduce((node, key) => node?.[key], object);
 
   /** The rollable actor, holding 2 Momentum in `_source` that its `update` writes. */
   function momentumActor() {
-    const actor = makeGrantTargetActor('actor-1');
-    const source = { system: { resources: { momentum: { value: 2 } } } };
-    const writes = [];
-    const modifiers = [];
-    Object.defineProperty(actor, '_source', { get: () => source });
-    Object.assign(actor, {
-      overrides: {},
-      getRollData: () => ({}),
-      canUserModify: (user, action) => {
-        modifiers.push([user, action]);
-        return true;
-      },
-      async update(patch) {
-        writes.push(patch);
-        source.system.resources.momentum.value = patch[PATH];
-        return actor;
-      },
-    });
-    return { actor, writes, modifiers };
+    const actor = Object.assign(makeGrantTargetActor('actor-1'), { getRollData: () => ({}) });
+    return withStoredResource(actor, PATH, 2);
   }
 
   it('publishes the capability, forwards the key and spends it for the calling GM', async () => {
     assert.equal(COMPANION_CONTRACT.features.checkEvaluation.additionalDice, true);
-    const { actor, writes, modifiers } = momentumActor();
+    const { actor, writes, permissionChecks } = momentumActor();
     const { facade, checkCalls } = standUpFacade({ actors: [actor] });
-    const savedFoundry = globalThis.foundry;
-    Object.assign(globalThis, {
-      foundry: {
-        utils: { getProperty: walk, hasProperty: (object, path) => walk(object, path) !== undefined },
-      },
-    });
+    const restoreFoundry = installFoundryPropertyUtils();
     const dice = installCountDice({ faces: [9, 9, 3] });
     try {
       const additionalDice = { enabled: true, source: 'path', path: PATH, max: 2, label: 'Momentum' };
@@ -1475,10 +1452,10 @@ describe('additionalDice through the facade (issue 2008)', () => {
       assert.equal(result.boughtDice, 1);
       assert.equal(checkCalls.bags[0].rollOptions.additionalDice, 1, 'the facade forwarded the key');
       assert.deepEqual(writes, [{ [PATH]: 1 }], 'spent before the roll, on this GM client');
-      assert.deepEqual(modifiers[0], [globalThis.game.user, 'update'], 'as the calling GM');
+      assert.deepEqual(permissionChecks[0], [globalThis.game.user, 'update'], 'as the calling GM');
     } finally {
       dice.restore();
-      Object.assign(globalThis, { foundry: savedFoundry });
+      restoreFoundry();
     }
   });
 });

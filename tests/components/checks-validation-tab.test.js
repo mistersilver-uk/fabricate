@@ -590,6 +590,68 @@ describe('ChecksValidationTab (mounted)', () => {
     harness.remount();
   });
 
+  it('blocks a list-entry path and a chat spend macro, View focusing each control (issue 2008)', async () => {
+    const section = (additionalDice) => ({
+      subsystem: 'crafting',
+      mode: 'simple',
+      check: {
+        rollFormula: '',
+        evaluation: {
+          product: 'count',
+          direction: 'over',
+          pool: { die: 20, base: '2', threshold: '13', required: 2, additionalDice },
+        },
+      },
+    });
+    const enabled = { enabled: true, max: 1 };
+    const macros = {
+      'Macro.read': { documentName: 'Macro', type: 'script', name: 'Read' },
+      'Macro.chat': { documentName: 'Macro', type: 'chat', name: 'Announce' },
+    };
+    const savedSync = globalThis.fromUuidSync;
+    Object.assign(globalThis, { fromUuidSync: (uuid) => macros[uuid] ?? null });
+    const calls = [];
+    const onSelectIssue = (route, focusTarget) => {
+      calls.push(focusTarget);
+    };
+    try {
+      const invalid = await harness.mount({
+        sections: [section({ ...enabled, source: 'path', path: 'system.items.0.value' })],
+        onSelectIssue,
+      });
+      const path = invalid.querySelector('[data-issue="countAdditionalDicePathInvalid"]');
+      assert.equal(path?.dataset.issueSeverity, 'critical');
+      assert.equal(
+        path.querySelector('.manager-recipe-val-title').textContent.trim(),
+        'The additional-dice value is not a stored path'
+      );
+      assert.ok(!invalid.querySelector('[data-issue="countAdditionalDiceSourceMissing"]'));
+      path.querySelector('.manager-recipe-val-view').click();
+      harness.remount();
+
+      const pair = { ...enabled, source: 'macro', readMacroUuid: 'Macro.read' };
+      const chat = await harness.mount({
+        sections: [section({ ...pair, spendMacroUuid: 'Macro.chat' })],
+        onSelectIssue,
+      });
+      const macro = chat.querySelectorAll('[data-issue="countAdditionalDiceMacroInvalid"]');
+      assert.equal(macro.length, 1, 'only the spend macro is refused; the read macro is a script');
+      assert.equal(macro[0].dataset.issueSeverity, 'critical');
+      assert.match(macro[0].textContent, /spend/, 'the row names the spend macro');
+      macro[0].querySelector('.manager-recipe-val-view').click();
+      assert.deepEqual(calls, ['checks-additional-dice-path', 'checks-additional-dice-spend-macro']);
+      harness.remount();
+
+      // A pair of script macros raises neither row.
+      macros['Macro.chat'].type = 'script';
+      const scripts = await harness.mount({ sections: [section({ ...pair, spendMacroUuid: 'Macro.chat' })] });
+      assert.ok(!scripts.querySelector('[data-issue^="countAdditionalDice"]'), 'two script macros pass');
+      harness.remount();
+    } finally {
+      Object.assign(globalThis, { fromUuidSync: savedSync });
+    }
+  });
+
   it('never renders a false-green pass beside a progressive roll-under blocker (issue 2106 review)', async () => {
     // `progressiveHigherIsBetter` had no `CHECK_TO_ISSUES` owner, so this used to render BOTH a
     // real critical `progressiveUnderUnsupported` row AND a separate green pass tick for the very

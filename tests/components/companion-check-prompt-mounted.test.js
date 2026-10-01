@@ -23,6 +23,7 @@ import {
   ROLL_PROMPT_PATH,
   ROLL_PROMPT_RAW_MODULES,
 } from '../helpers/rollPromptHarnessModules.js';
+import { installFoundryPropertyUtils, withStoredResource } from '../helpers/storedResourceActor.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -203,16 +204,8 @@ describe('a companion interactive check through the real prompt host (issue 2006
 
   it('buys additional dice on the companion prompt, and a broadcast shows why it cannot (issue 2008)', async () => {
     const PATH = 'system.resources.momentum.value';
-    const walk = (object, path) => path.split('.').reduce((node, key) => node?.[key], object);
-    const saved = { foundry: globalThis.foundry, user: game.user, users: game.users };
-    Object.assign(globalThis, {
-      foundry: {
-        utils: {
-          getProperty: walk,
-          hasProperty: (object, path) => walk(object, path) !== undefined,
-        },
-      },
-    });
+    const saved = { user: game.user, users: game.users };
+    const restoreFoundry = installFoundryPropertyUtils();
     Object.assign(game, { user: { id: 'gm' }, users: { activeGM: { id: 'gm' } } });
     const loadComponent = () => harness.loadRuneModule(ROLL_PROMPT_PATH);
     const additionalDice = { enabled: true, source: 'path', path: PATH, max: 2, label: 'Momentum' };
@@ -222,17 +215,7 @@ describe('a companion interactive check through the real prompt host (issue 2006
         ['broadcast', [9, 9], 0],
       ]) {
         document.body.replaceChildren();
-        const source = { system: { resources: { momentum: { value: 2 } } } };
-        const actor = {
-          ...ACTOR,
-          overrides: {},
-          canUserModify: () => true,
-          async update(patch) {
-            source.system.resources.momentum.value = patch[PATH];
-            return actor;
-          },
-        };
-        Object.defineProperty(actor, '_source', { get: () => source });
+        const { actor, source } = withStoredResource({ ...ACTOR }, PATH, 2);
         const dice = installCountDice({ faces });
         const restoreSurface = overrideRollPromptSurface((view) =>
           openRollPromptModal(view, { loadComponent })
@@ -275,7 +258,7 @@ describe('a companion interactive check through the real prompt host (issue 2006
         }
       }
     } finally {
-      Object.assign(globalThis, { foundry: saved.foundry });
+      restoreFoundry();
       Object.assign(game, { user: saved.user, users: saved.users });
     }
   });
