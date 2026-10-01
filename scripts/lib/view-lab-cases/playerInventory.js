@@ -373,10 +373,13 @@ export const CASES = Object.freeze([
     expectSelector:
       '[data-inventory-salvage-body="routed"]' +
       ':has(.salvage-dc[data-inventory-salvage-dc="11"]:text-is("DC 11"))' +
-      ':has([data-inventory-salvage-outcome="rw-salv-masterwork"] [data-inventory-outcome-threshold="16"])' +
+      ':has([data-inventory-salvage-outcome="rw-salv-masterwork"] [data-inventory-outcome-threshold="16"] .manager-chip)' +
       ':not(:has([data-inventory-outcome-band]))',
     kinds: ['player', 'inventory'],
-    sourceMatches: SALVAGE_TARGET_SOURCES,
+    sourceMatches: [
+      ...SALVAGE_TARGET_SOURCES,
+      /^src\/ui\/presenters\/InventoryListingBuilder\.js$/,
+    ],
   }),
   // Issue 2137: a routed salvage counting one success needed states each tier's band in net
   // successes, as the Journal does, in place of a Reached-at threshold.
@@ -395,7 +398,32 @@ export const CASES = Object.freeze([
       '[data-inventory-salvage-body="routed"]:not(:has([data-inventory-salvage-dc]))' +
       ':has([data-inventory-salvage-outcome="rw-salv-masterwork"] [data-inventory-outcome-band="6+"])' +
       ':has([data-inventory-salvage-outcome="rw-salv-standard"] [data-inventory-outcome-band="1–5"])' +
-      ':has([data-inventory-salvage-outcome="rw-salv-ruined"] [data-inventory-outcome-band="0"])',
+      ':has([data-inventory-salvage-outcome="rw-salv-ruined"] [data-inventory-outcome-band="0"] .manager-chip.is-danger)',
+    kinds: ['player', 'inventory'],
+    sourceMatches: [
+      ...SALVAGE_TARGET_SOURCES,
+      /^src\/ui\/presenters\/InventoryListingBuilder\.js$/,
+      /^src\/systems\/runJournalOutcomeBands\.js$/,
+    ],
+  }),
+  // With cancelling on, the same salvage closes on the Journal's Botch row beside Ruined: Ruined
+  // (−5 from one needed) is met from a net of −4, so only a lower net is a Botch.
+  playerCase({
+    id: 'player-salvage-count-routed-botch',
+    label: 'Player app — Routed counting salvage with cancelling, its Botch row beside Ruined',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'inventory', rollPromptState: 'salvage-count-cancel' },
+    steps: [
+      { selector: '.inventory-filters input', fill: 'Ruined Slag' },
+      { selector: CARD_BUTTON('lab-runework:rw-slag') },
+      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+    ],
+    expectSelector:
+      '[data-inventory-salvage-body="routed"]' +
+      ':has([data-inventory-salvage-outcome="rw-salv-ruined"] [data-inventory-outcome-band="−4 – 0"])' +
+      ':has([data-inventory-salvage-outcome="rw-salv-ruined"] + [data-inventory-salvage-outcome="count-botch"]' +
+      ' [data-inventory-outcome-band="<−4"] .manager-chip)',
     kinds: ['player', 'inventory'],
     sourceMatches: [
       ...SALVAGE_TARGET_SOURCES,

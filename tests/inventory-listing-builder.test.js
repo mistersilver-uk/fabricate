@@ -2359,6 +2359,8 @@ describe('InventoryListingBuilder - a roll-under or character-value salvage targ
       ['o1', '−1 – 3', null],
       ['count-botch', '<−1', null],
     ]);
+    const botch = salvageFor('routed', routed(true), { salvage: { successesOverride: 4 } }).routedOutcomes.at(-1);
+    assert.equal(botch.below, -1, 'the Botch row carries its floor, so the panel can mark a roll below it');
     const summed = salvageFor('routed', { routed: { ...routed(false).routed, rollFormula: '1d20', evaluation: undefined } });
     assert.ok(summed.routedOutcomes.every((o) => o.band === undefined), 'a summed DC keeps its thresholds');
     assert.deepEqual(summed.routedOutcomes.map((o) => o.threshold), [20, 15, 10]);

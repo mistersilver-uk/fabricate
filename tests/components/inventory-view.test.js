@@ -1493,6 +1493,10 @@ describe('InventoryView (mounted) — player salvage surface', () => {
       bands.map((node) => [node.dataset.inventoryOutcomeBand, node.textContent.trim()]),
       [['7+', '7+'], ['2–6', '2–6'], ['<0', '<0']]
     );
+    assert.ok(
+      bands.every((node) => node.querySelector('.manager-chip.is-neutral')),
+      'each band is the shared Chip, as the Journal ladder draws it'
+    );
     assert.ok(!target.querySelector('[data-inventory-outcome-threshold]'), 'no Reached-at threshold');
     assert.ok(!target.querySelector('[data-inventory-salvage-dc]'), 'a count names no DC');
   });
@@ -2246,6 +2250,36 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     assert.equal(marked.length, 1, 'exactly one tier is marked');
     assert.equal(marked[0].dataset.inventorySalvageOutcome, 'o2', 'and it is the one that matched');
     assert.ok(marked[0].querySelector('[data-inventory-outcome-your-roll]'));
+  });
+
+  // Issue 2137: a count's net below the Botch row's floor marks that row, never the tier it routes to.
+  it('routed count: a net below the Botch floor marks the Botch row "Your roll"', async () => {
+    const ruined = { id: 'o1', name: 'Ruined', success: false, threshold: null, band: '−4 – 0', results: [] };
+    const routed = {
+      mode: 'routed',
+      checkUsable: true,
+      routedType: 'relative',
+      dc: null,
+      routedOutcomes: [
+        { id: 'o2', name: 'Pass', success: true, threshold: null, band: '1+', results: [] },
+        ruined,
+        { ...ruined, id: 'count-botch', name: 'Botch', band: '<−4', below: -4 },
+      ],
+    };
+    const marked = async (rollValue, state = 'failure') => {
+      harness.remount();
+      const { services } = salvageServices(salvageItem(routed), {
+        salvageResult: { systemId: 'sys', componentId: 'c1', state, message: '', awarded: [],
+          awardedComponentIds: [], outcomeId: 'o1', rollValue },
+      });
+      const target = await openSalvage(services);
+      return [...target.querySelectorAll('[data-outcome-rolled="true"]')].map(
+        (node) => node.dataset.inventorySalvageOutcome
+      );
+    };
+    assert.deepEqual(await marked(-5), ['count-botch'], 'below the floor');
+    assert.deepEqual(await marked(-4), [], 'a failed Ruined net is not a Botch');
+    assert.deepEqual(await marked(-4, 'success'), ['o1'], 'a net Ruined meets stays on Ruined');
   });
 });
 

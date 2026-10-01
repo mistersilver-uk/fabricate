@@ -39,6 +39,16 @@
   const rolledOutcomeId = $derived(
     result?.state === 'success' ? (result?.outcomeId ?? null) : null
   );
+  // A count's net below its Botch row's floor lands on that row, not on the tier it routes to.
+  const botchRolled = $derived.by(() => {
+    const below = outcomes.find((outcome) => outcome.id === 'count-botch')?.below;
+    return Number.isFinite(below) && Number.isFinite(result?.rollValue) && result.rollValue < below;
+  });
+  const isRolled = (outcome) =>
+    botchRolled
+      ? outcome.id === 'count-botch'
+      : rolledOutcomeId !== null && outcome.id === rolledOutcomeId;
+  const figureTone = (outcome) => (outcome.success ? 'neutral' : 'danger');
 </script>
 
 <div
@@ -75,7 +85,7 @@
   {:else}
     <ul class="salvage-outcome-list" data-inventory-salvage-outcomes>
       {#each outcomes as outcome, index (outcome.id ?? index)}
-        {@const rolled = rolledOutcomeId !== null && outcome.id === rolledOutcomeId}
+        {@const rolled = isRolled(outcome)}
         <li
           class="salvage-outcome"
           class:is-success={outcome.success}
@@ -99,22 +109,26 @@
                   class="salvage-outcome-threshold"
                   data-inventory-outcome-range={`${outcome.start}-${outcome.end}`}
                 >
-                  {outcome.start}–{outcome.end}
+                  <Chip density="list" mono tone={figureTone(outcome)}
+                    >{outcome.start}–{outcome.end}</Chip
+                  >
                 </span>
               {/if}
             {:else if outcome.band}
               <!-- A counting check's band in net successes, as the Journal states it (issue 2137). -->
               <span class="salvage-outcome-threshold" data-inventory-outcome-band={outcome.band}>
-                {outcome.band}
+                <Chip density="list" mono tone={figureTone(outcome)}>{outcome.band}</Chip>
               </span>
             {:else if outcome.threshold !== null}
               <span
                 class="salvage-outcome-threshold"
                 data-inventory-outcome-threshold={String(outcome.threshold)}
               >
-                {localize('FABRICATE.App.Inventory.Salvage.ReachedAt', {
-                  threshold: outcome.threshold,
-                })}
+                <Chip density="list" mono tone={figureTone(outcome)}
+                  >{localize('FABRICATE.App.Inventory.Salvage.ReachedAt', {
+                    threshold: outcome.threshold,
+                  })}</Chip
+                >
               </span>
             {/if}
           </div>
@@ -238,15 +252,11 @@
     font-weight: 600;
   }
 
+  /* A positioning wrapper only: the shared `Chip` inside owns the figure's type and ramp, as in
+     the Journal's `OutcomeLadder` (issue 2137). */
   .salvage-outcome-threshold {
+    display: inline-flex;
     flex: 0 0 auto;
-    font-family: var(--fab-font-mono);
-    font-size: 8.5px;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    text-transform: uppercase;
-    color: var(--fab-text-secondary);
-    white-space: nowrap;
   }
 
   .salvage-outcome-results {

@@ -191,9 +191,9 @@ function relativeCountBand(outcome, routed, word) {
 /**
  * A relative count ladder's `Botch` row while cancelling is on (issue 2006): the nets no tier
  * meets, below 0 or below the least demanding tier's threshold when that is lower (issue 2135),
- * routed to that tier, so the row carries its outcome. It sits beside that tier, before it on a
- * ladder authored worst-first and after it on one authored best-first. `required` is null under
- * a macro. Any other ladder is returned as it is.
+ * routed to that tier, so the row carries its outcome, and its floor as `below`. It sits beside
+ * that tier, before it on a ladder authored worst-first and after it on one authored best-first.
+ * `required` is null under a macro. Any other ladder is returned as it is.
  */
 export function withCountBotch(tiers, routed, name, required = null) {
   const evaluation = activeCheckEvaluation(routed);
@@ -203,7 +203,13 @@ export function withCountBotch(tiers, routed, name, required = null) {
   const least = Math.min(...thresholds);
   const at = thresholds.indexOf(least);
   const floor = Number.isInteger(required) ? Math.min(0, required + least) : 0;
-  const botch = { ...tiers[at], id: 'count-botch', name, band: `<${formatNet(floor)}` };
+  const botch = {
+    ...tiers[at],
+    id: 'count-botch',
+    name,
+    band: `<${formatNet(floor)}`,
+    below: floor,
+  };
   const after = at + (thresholds[0] > thresholds.at(-1) ? 1 : 0);
   return [...tiers.slice(0, after), botch, ...tiers.slice(after)];
 }

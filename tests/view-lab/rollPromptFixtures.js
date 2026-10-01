@@ -194,11 +194,11 @@ async function nameFrameSubject(world, recipeUpdates) {
 
 const under = (target) =>
   normalizeCheckEvaluation({ product: 'sum', direction: 'under', ...(target && { target }) });
-const pooled = (required) =>
+const pooled = (required, cancel = { enabled: false }) =>
   normalizeCheckEvaluation({
     product: 'count',
     direction: 'over',
-    pool: { die: 10, base: '4', threshold: '8', required, modifierDestination: 'pool' },
+    pool: { die: 10, base: '4', threshold: '8', required, modifierDestination: 'pool', cancel },
   });
 
 /** Smithing's simple salvage evaluation, then Runework's routed one, for each bulk salvage state. */
@@ -209,6 +209,11 @@ const SALVAGE_CHECKS = {
     under({ source: 'attribute', expression: '@abilities.int.value' }),
   ],
   'salvage-count': () => [pooled(2), pooled(1)],
+  // Issue 2137: Runework cancels on the worst face, so its routed panel closes on a Botch row.
+  'salvage-count-cancel': () => [
+    pooled(2),
+    pooled(1, { enabled: true, faces: { kind: 'worst' } }),
+  ],
   // Smithing stays at or under the salvager's Smithing level, so its Salvage tab names a source.
   'salvage-under-skill': () => [
     under({ source: 'attribute', expression: '@skills.smith.level' }),
