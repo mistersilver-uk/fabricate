@@ -114,6 +114,10 @@ For example, an option requiring "3 Fire essence" is satisfied by any combinatio
 Because an essence is an option like any other, it can sit inside a group as one of several **Accept instead** alternatives on the recipe editor's Ingredients tab, or stand alone in its own group as a hard requirement.
 A group holding only a single essence option is a required essence, meaning the crafter must supply that essence amount in addition to the recipe's other groups.
 
+On the Crafting tab, a group with an essence alternative shows it alongside its other alternatives, with a card that reports how much of that essence the player's items carry against the amount the recipe needs.
+Choosing it opens the essence pool beneath the alternatives, where the player picks which items fund it.
+The player can switch back to another alternative at any time.
+
 A disabled essence is withheld only from the **add new** picker in the recipe and component editors.
 Anywhere it is already referenced, such as an existing recipe requirement or an existing component quantity, it keeps showing, marked **Disabled**, and you can still edit or clear it.
 

@@ -34,7 +34,7 @@ export const SLOT_STATE = Object.freeze({
 
 /**
  * Every first-class essence requirement in a set is funded from ONE shared pool,
- * so every essence tile opens the same chooser. Its tiles stay individually keyed
+ * so every plain essence tile opens the same chooser. Its tiles stay individually keyed
  * (by group id) for rendering; only the chooser key is shared.
  */
 export const ESSENCE_POOL_SLOT_ID = 'essence-pool';
@@ -108,7 +108,7 @@ function buildSlot(state, index, chosenGroupIds) {
     key: groupId ?? `requirement-${index}`,
     groupId,
     // Fixed slots are not selectable, so they open nothing.
-    slotId: pickSlotId(kind, groupId),
+    slotId: pickSlotId(kind, groupId, state?.hasChoice === true),
     kind,
     state: stateOf(kind, state, chosenGroupIds.has(groupId)),
     interactive: kind !== SLOT_KIND.FIXED,
@@ -135,7 +135,10 @@ function buildSlot(state, index, chosenGroupIds) {
   };
 }
 
-function pickSlotId(kind, groupId) {
+// A group with alternatives keeps its own chooser even when its chosen option is an
+// essence; only a plain essence requirement opens the shared pool.
+function pickSlotId(kind, groupId, hasChoice) {
+  if (hasChoice && groupId) return groupId;
   if (kind === SLOT_KIND.ESSENCE) return ESSENCE_POOL_SLOT_ID;
   return kind === SLOT_KIND.CHOICE ? groupId : null;
 }
@@ -323,12 +326,18 @@ export function buildConsumptionPlan(craftability, { chosenGroupIds = [] } = {})
   };
 }
 
+// Held over needed, so an essence amount is never compared against an item count.
+function coverageOf(option) {
+  const need = toCount(option?.need);
+  return need > 0 ? toCount(option?.have) / need : toCount(option?.have);
+}
+
 function bestOption(options) {
   const ranked = [...options].sort((left, right) => {
     const satisfied = Number(right?.satisfied === true) - Number(left?.satisfied === true);
     if (satisfied !== 0) return satisfied;
-    const held = toCount(right?.have) - toCount(left?.have);
-    if (held !== 0) return held;
+    const covered = coverageOf(right) - coverageOf(left);
+    if (covered !== 0) return covered;
     return toCount(left?.optionIndex) - toCount(right?.optionIndex);
   });
   return ranked[0] ?? null;
@@ -360,9 +369,9 @@ function applyStackChoice(overrides, choice) {
 }
 
 /**
- * "Pick for me" for the set's choice slots: the option the player holds most of,
- * preferring one that actually satisfies, with the authored option order as the
- * final tie-break so the suggestion is stable across renders.
+ * "Pick for me" for the set's choice slots: the option that satisfies, then the one
+ * best covered (held over needed), with the authored option order as the final
+ * tie-break so the suggestion is stable across renders.
  *
  * Read STRAIGHT off the craftability's own `ingredientChoices` — the UI never
  * re-derives what is held or what satisfies, because that is the resolver's answer

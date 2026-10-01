@@ -170,6 +170,90 @@ export function sharedEssenceCraftability(overrides = {}) {
   });
 }
 
+/**
+ * A choice group whose chosen alternative is an essence (issue 2142): the state is
+ * both `isEssence` and `hasChoice`, paired with that group's alternatives entry.
+ */
+export function essenceChoiceCraftability(overrides = {}) {
+  const primal = { essenceId: 'primal', name: 'Primal', icon: 'fas fa-leaf', colorToken: 'sage' };
+  return craftability({
+    canCraft: false,
+    ingredientStates: [
+      {
+        groupId: 'g-primal',
+        componentId: null,
+        name: primal.name,
+        img: null,
+        isEssence: true,
+        icon: primal.icon,
+        colorToken: primal.colorToken,
+        description: '1x Primal essence',
+        need: 1,
+        delivered: 0,
+        owned: 2,
+        satisfied: false,
+        hasChoice: true,
+        choiceCount: 2
+      }
+    ],
+    ingredientChoices: [
+      {
+        kind: 'option',
+        groupId: 'g-primal',
+        groupName: 'Catalyst',
+        selectedOptionIndex: 1,
+        options: [
+          {
+            optionIndex: 0,
+            name: 'Acidic Essence',
+            img: 'icons/consumables/potions/potion-tube-blue.webp',
+            need: 1,
+            have: 1,
+            satisfied: true,
+            isCurrency: false,
+            costLabel: '',
+            affordable: true
+          },
+          {
+            optionIndex: 1,
+            name: primal.name,
+            img: null,
+            need: 1,
+            have: 2,
+            satisfied: true,
+            isCurrency: false,
+            costLabel: '',
+            affordable: true,
+            isEssence: true,
+            icon: primal.icon,
+            colorToken: primal.colorToken
+          }
+        ]
+      }
+    ],
+    essencePool: essencePool({
+      requirements: [
+        { groupId: 'g-primal', ...primal, need: 1, delivered: 0, owned: 2, satisfied: false }
+      ],
+      carriers: [
+        {
+          itemKey: 'Item.moss-1',
+          componentId: 'c-wildmoss',
+          name: 'Wildmoss',
+          img: 'icons/commodities/materials/powder-pink.webp',
+          ownedUnits: 2,
+          allocatedUnits: 0,
+          perUnit: { primal: 1 }
+        }
+      ],
+      allocation: {},
+      totals: {},
+      suggested: { 'Item.moss-1': 1 }
+    }),
+    ...overrides
+  });
+}
+
 export function recipe(overrides = {}) {
   const setId = overrides.defaultSetId ?? 'set-a';
   return {

@@ -28,23 +28,30 @@ const AWARDED_QUANTITY_KEY = '_fabricateAwardedQuantity';
  * merged stack total after a stack. Non-enumerable and best-effort (a frozen stub
  * is tolerated; reporting then falls back to the item's own quantity).
  *
- * @param {object} item     - the produced or updated item.
- * @param {number} quantity - the amount awarded by this call.
+ * @param {object}      item       - the produced or updated item.
+ * @param {number}      quantity   - the amount awarded by this call.
+ * @param {object|null} [scope]    - identifies the award operation (one craft step's
+ *   results, or one salvage's results) this call belongs to. Pass the SAME object
+ *   reference for every `tagAwardedQuantity` call made within one award.
  * @returns {object} the same item.
  */
-export function tagAwardedQuantity(item, quantity) {
+export function tagAwardedQuantity(item, quantity, scope = null) {
   if (!item) return item;
   const amount = Number(quantity);
   const add = Number.isFinite(amount) && amount > 0 ? amount : 1;
-  // ACCUMULATE across awards: when the SAME produced item is stacked onto more than
-  // once in one craft/salvage (the same managed component listed in multiple result
-  // rows), the tag must sum every award so reporting shows the total produced, not
-  // just the last award (issue 858 review).
-  const prev = Number(item[AWARDED_QUANTITY_KEY]);
-  const value = (Number.isFinite(prev) && prev > 0 ? prev : 0) + add;
+  const prev = item[AWARDED_QUANTITY_KEY];
+  // SUM within one award scope only: when the SAME produced item is stacked onto
+  // more than once WITHIN ONE award (the same managed component listed in multiple
+  // result rows of one craft step or one salvage), the tag sums every call sharing
+  // that scope object so reporting shows the total produced by THIS award (issue
+  // 858). A call with a different scope — or no scope at all — never accumulates
+  // onto a previous award's tag: it overwrites with this award's own amount, so an
+  // item that was already tagged by an earlier, separate award never reports that
+  // award's running total (issue 2145).
+  const value = scope != null && prev?.scope === scope ? prev.value + add : add;
   try {
     Object.defineProperty(item, AWARDED_QUANTITY_KEY, {
-      value,
+      value: { scope, value },
       writable: true,
       configurable: true,
       enumerable: false,
@@ -65,7 +72,7 @@ export function tagAwardedQuantity(item, quantity) {
  * @returns {number} the awarded quantity (>= 1).
  */
 export function awardedQuantityOf(item) {
-  const tagged = Number(item?.[AWARDED_QUANTITY_KEY]);
+  const tagged = Number(item?.[AWARDED_QUANTITY_KEY]?.value);
   if (Number.isFinite(tagged) && tagged > 0) return tagged;
   return readStackQuantity(item);
 }

@@ -2595,6 +2595,8 @@ The prompt is not shown at all when no selected item has a usable check, and dis
 ### Result Chat Cards
 
 - Crafting and salvage share one card format (built by `buildResultCard`): the subject, recovered/produced results, consumed/forfeited items, broken tools, and failure reason.
+- A result's quantity is the amount that one award produced, summed across the result rows that land on the same item in that award; it is never the merged stack total and never includes an earlier award to the same item.
+  The run record's `createdResults` quantity follows the same rule.
 - The card appends the **rolled check total** as its own row, mirroring the salvage summary's "with a roll of N" rule: rendered only for a finite value and omitted for a no-check guaranteed craft/salvage (`rollValue` null).
   The total is the RAW roll (`checkResult.data.total`), not the progressive awarding value, so a forced crit shows the natural roll rather than the `MAX_SAFE_INTEGER`/`0` award sentinel.
 - The card is posted only on resolved success or rolled failure — never on cancelled, misconfigured, or time-gated outcomes.
@@ -2945,6 +2947,10 @@ The "DC N" value is `component.difficulty`, which the GM authors via the stepper
 - A currency requirement tile renders its cost in place of a have/need pip.
 - A currency configuration reason renders once per rail, not per tile: the reason belongs to the world's configuration rather than to any one requirement, so repeating it per tile would assert it as a property of each.
 - At most ONE chooser is open at a time; the open slot is the rail's single point of interaction.
+- A choice slot whose chosen option is an essence keeps its own chooser: its panel shows the alternatives with the shared essence pool beneath them, so the player can switch to any other alternative at any time.
+  A choice slot's caption states its alternative count whichever kind of option is chosen.
+- An essence alternative reports the essence the held stacks carry against its authored amount, and reads satisfied exactly when the resolver would consider that alternative fundable.
+  Fundable is not funded: the slot's own ratio still reports what the pool allocation delivers.
 - Focus auto-advances to the first unsatisfied slot until the player opens a slot themselves, after which the player's choice sticks.
   The remembered slot is re-validated on every read against the live slot list, falling back to the first unsatisfied slot and then to the first slot, so changing set, step or recipe can never leave a stale or absent chooser open.
   Clicking the open slot's tile again closes the chooser instead of reopening it, and the closed choice is remembered the same scoped way: it stays closed until the player opens a slot again (including re-clicking the same tile), while changing set, step or recipe re-derives the default open slot as before.
@@ -2956,6 +2962,8 @@ The "DC N" value is `component.difficulty`, which the GM authors via the stepper
 - Open state is drawn as an accent-soft fill plus a caption line, never as an accent ring: the app already paints an accent ring for `:focus-visible`, so a ring would make "focused" and "open" indistinguishable to a keyboard user.
   Open state and satisfaction are independent, so the open treatment sits on top of the status border rather than replacing it.
 - "Pick for me" fills the set's unmade choices and suggests an essence allocation.
+  It ranks a group's alternatives by whether they are satisfied, then by coverage (what is held over what is needed), then by authored order, so an essence amount is never compared against an item count.
+  When it switches a group onto an essence alternative, it suggests the allocation for the new selection rather than keeping the previous one.
   It lives in the rail header, scoped to the rail, rather than in the app footer: the rail renders inside step and routed bodies while Craft sits in a fixed footer outside the scrolling body.
   On an infeasible inventory it returns the best partial suggestion and an honest shortfall rather than throwing or looping.
 - Every rail control is keyboard-operable and named for assistive technology, and bar transitions honour `prefers-reduced-motion`.

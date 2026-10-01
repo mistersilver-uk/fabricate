@@ -1688,6 +1688,8 @@ An essence option satisfies its ingredient group by consuming essence-carrying i
 9. Each essence-block plan entry carries `essenceGroupIds: string[]` naming every essence requirement it funds, alongside `ingredient` (the first funded option, retained for back-compat).
    A reader resolving an essence requirement's consumed item MUST prefer `essenceGroupIds`, because one block entry names one `ingredient` and its sibling essence requirements would otherwise resolve to no consumed item.
    Consumption-plan entries are not persisted, so no migration follows.
+10. `resolveIngredientSelection` reports `essenceCeiling`, a frozen `{ essenceId: amount }` map of the essence the held stacks carry against the untouched ledger before any group claims, on both exits (the assignment found by the search and the greedy fallback); it is `{}` when the set carries no essence option.
+   It is the bound the resolver prunes an essence option against, reported for display only: it never caps or steers resolution.
 
 ## Alchemy Signature Uniqueness (Validation Contract)
 

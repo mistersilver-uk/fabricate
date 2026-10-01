@@ -20,6 +20,7 @@ import assert from 'node:assert/strict';
 
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
+import { awardedQuantityOf } from '../src/systems/componentStacking.js';
 
 // ---------------------------------------------------------------------------
 // Foundry / game globals
@@ -522,6 +523,60 @@ test('timed step FINISH produces results without the components present and comp
   assert.equal(consumed[0].componentId, 'wood', 'the timed-step run persists the componentId');
   assert.equal(consumed[0].itemUuid, 'Item.wood');
   assert.equal(consumed[0].quantity, 2);
+});
+
+test('timed FINISH stacking onto a held item reports only THIS finish\'s own award (issue 2145)', async () => {
+  // Unlike the previous test, `_createSingleResult` is NOT stubbed here — the real
+  // stacking/award-tagging path must run so the FINISH's own `awardScope` is exercised
+  // end to end, not a `plank` fixture that bypasses it entirely.
+  const system = {
+    id: 'sys-timed-award',
+    resolutionMode: 'simple',
+    features: { craftingChecks: false, essences: false },
+    craftingCheck: { enabled: false, consumption: {} },
+    components: [
+      { id: 'wood', name: 'Wood' },
+      { id: 'plank', name: 'Plank' },
+    ],
+  };
+  setupGame(system, 1000);
+
+  const wood = new FakeItem('wood', 'Wood', 2);
+  const heldPlank = new FakeItem('held-plank', 'Plank', 3);
+  const craftingActor = new FakeActor('Crafter', [heldPlank]);
+  const sourceActor = new FakeActor('Source', [wood]);
+  const resultGroups = [{ id: 'rg-1', results: [{ id: 'r-1', componentId: 'plank', quantity: 1 }] }];
+  const set = buildIngredientSet('set-1', [{ componentId: 'wood', quantity: 2 }]);
+  const recipe = buildRecipe({
+    craftingSystemId: 'sys-timed-award',
+    ingredientSets: [set],
+    resultGroups,
+    steps: [timedStep({ ingredientSets: [set], resultGroups })],
+  });
+
+  const runManager = new CraftingRunManager();
+  const engine = new CraftingEngine(buildRecipeManager({ ingredientSet: set }), runManager, null);
+  engine._runCraftingCheck = async () => ({ success: true, outcome: null, value: null, data: {} });
+
+  // START: arm gate + consume (wood 2 -> deleted). The held Plank is untouched.
+  const startResult = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+  assert.equal(startResult.success, false);
+  assert.equal(heldPlank.system.quantity, 3, 'the held Plank is not touched at START');
+
+  sourceActor.items = [];
+  game.time.worldTime = 1000 + 3600 + 1;
+
+  // FINISH: the produced Plank stacks onto the held one.
+  const finishResult = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+  assert.equal(finishResult.success, true);
+  assert.equal(finishResult.results.length, 1);
+  assert.equal(finishResult.results[0], heldPlank, 'the finish stacks onto the held Plank');
+  assert.equal(heldPlank.system.quantity, 4, '3 held + 1 produced by this finish');
+  assert.equal(
+    awardedQuantityOf(heldPlank),
+    1,
+    "the recorded quantity is THIS finish's own award, not the merged stack total of 4"
+  );
 });
 
 test('timed FINISH excludes partially consumed ingredient docs while revalidating replacement Tools', async () => {
