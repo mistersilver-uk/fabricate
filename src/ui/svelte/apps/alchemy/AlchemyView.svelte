@@ -9,7 +9,7 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
-  import { withRollPromptOrigin } from '../crafting/rollPromptOrigin.js';
+  import { withRollPromptOrigin } from '../../util/rollPromptOrigin.js';
   import KnownRecipesColumn from './KnownRecipesColumn.svelte';
   import Workbench from './Workbench.svelte';
   import ComponentInventoryColumn from './ComponentInventoryColumn.svelte';

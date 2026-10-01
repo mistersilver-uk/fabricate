@@ -15,7 +15,7 @@
 <script>
   import { DEFAULT_GATHERING_TASK_IMG } from '../../../../gatheringImageDefaults.js';
   import { localize } from '../../util/foundryBridge.js';
-  import { withRollPromptOrigin } from '../crafting/rollPromptOrigin.js';
+  import { withRollPromptOrigin } from '../../util/rollPromptOrigin.js';
   import { formatRespawnDuration } from '../../util/formatDuration.js';
   import { describeBlockedReasons } from './gatheringBlockedReasons.js';
   import { descriptionOrDefault } from '../../util/gatheringFormat.js';

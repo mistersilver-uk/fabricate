@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import { Window } from 'happy-dom';
 import { findApplicationHost, openRollPromptModal } from '../src/ui/svelte/apps/crafting/rollPromptHost.js';
-import { withRollPromptOrigin } from '../src/ui/svelte/apps/crafting/rollPromptOrigin.js';
+import { withRollPromptOrigin } from '../src/ui/svelte/util/rollPromptOrigin.js';
 
 let window;
 let doc;

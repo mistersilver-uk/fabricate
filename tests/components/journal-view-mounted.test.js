@@ -21,7 +21,7 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-journal-view-',
   rawModules: [
-    'src/ui/svelte/apps/crafting/rollPromptOrigin.js',
+    'src/ui/svelte/util/rollPromptOrigin.js',
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...STATUS_TONE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',

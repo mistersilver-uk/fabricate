@@ -1,7 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
-  import { withRollPromptOrigin } from '../crafting/rollPromptOrigin.js';
+  import { withRollPromptOrigin } from '../../util/rollPromptOrigin.js';
   import { journalRunReasonMessage } from '../../util/journalRunReasons.js';
   import RunActionBar from '../../components/RunActionBar.svelte';
   import { formatDurationHMS } from '../../util/formatDuration.js';

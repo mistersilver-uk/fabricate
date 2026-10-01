@@ -6,8 +6,7 @@ import {
   APPLICATION_HOST_SELECTOR,
   STANDALONE_OVERLAY_HOST_CLASS,
 } from '../../util/overlayHost.js';
-
-import { activeRollPromptOrigin } from './rollPromptOrigin.js';
+import { activeRollPromptOrigin } from '../../util/rollPromptOrigin.js';
 
 /**
  * The Fabricate root a player started the roll from: the origin its call site recorded, else the

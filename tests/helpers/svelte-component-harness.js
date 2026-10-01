@@ -371,7 +371,7 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/systems/worldScopeEntityGrouping.js',
   'src/ui/svelte/actions/dismissOnOutsideClick.js',
   // Issue 2053: the Craft button records the window a roll prompt opens in.
-  'src/ui/svelte/apps/crafting/rollPromptOrigin.js',
+  'src/ui/svelte/util/rollPromptOrigin.js',
   ...CHECK_EVIDENCE_RAW_MODULES
 ]);
 

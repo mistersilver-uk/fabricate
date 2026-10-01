@@ -17,7 +17,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-alchemy-view-',
   rawModules: [
     ...FOUNDRY_BRIDGE_RAW_MODULES,
-    'src/ui/svelte/apps/crafting/rollPromptOrigin.js',
+    'src/ui/svelte/util/rollPromptOrigin.js',
     'src/ui/svelte/util/overlayHost.js',
   ],
   compiledModules: [

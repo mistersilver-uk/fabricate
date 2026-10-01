@@ -24,7 +24,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import { withRollPromptOrigin } from '../../crafting/rollPromptOrigin.js';
+  import { withRollPromptOrigin } from '../../../util/rollPromptOrigin.js';
   import Callout from '../../../components/Callout.svelte';
   import Kicker from '../../../components/Kicker.svelte';
   import SalvageMisconfiguredBody from './salvage/SalvageMisconfiguredBody.svelte';

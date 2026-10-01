@@ -8,7 +8,7 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
-  import { withRollPromptOrigin } from './rollPromptOrigin.js';
+  import { withRollPromptOrigin } from '../../util/rollPromptOrigin.js';
 
   let {
     label = '',

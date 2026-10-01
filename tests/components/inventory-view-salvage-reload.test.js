@@ -21,7 +21,7 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-inventory-salvage-reload-',
   rawModules: [
-    'src/ui/svelte/apps/crafting/rollPromptOrigin.js',
+    'src/ui/svelte/util/rollPromptOrigin.js',
     // Issue 1506: the one tone map the converted status pills read at a dynamic site.
     ...STATUS_TONE_RAW_MODULES,
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.

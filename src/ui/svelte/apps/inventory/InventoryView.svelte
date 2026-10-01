@@ -31,7 +31,7 @@
   import InventoryDetail from './InventoryDetail.svelte';
   import InventoryBulkPanel from './bulk/InventoryBulkPanel.svelte';
   import PlayerViewState from '../PlayerViewState.svelte';
-  import { withRollPromptOrigin } from '../crafting/rollPromptOrigin.js';
+  import { withRollPromptOrigin } from '../../util/rollPromptOrigin.js';
 
   let { services = null } = $props();
 

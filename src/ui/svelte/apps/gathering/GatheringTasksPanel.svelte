@@ -16,7 +16,7 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
-  import { withRollPromptOrigin } from '../crafting/rollPromptOrigin.js';
+  import { withRollPromptOrigin } from '../../util/rollPromptOrigin.js';
   import Callout from '../../components/Callout.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import Pagination from '../../components/Pagination.svelte';

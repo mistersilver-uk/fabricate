@@ -1,5 +1,5 @@
 /** The Fabricate window a roll was started from, held while the action it started runs. */
-import { APPLICATION_HOST_SELECTOR } from '../../util/overlayHost.js';
+import { APPLICATION_HOST_SELECTOR } from './overlayHost.js';
 
 const activeOrigins = [];
 
