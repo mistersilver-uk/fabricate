@@ -1149,7 +1149,7 @@ describe('UI PR screenshot evidence', () => {
       'src/ui/presenters/importReportContent.js',
       // Issue 877 moved the rendering into a Svelte modal built on the shared chrome.
       'src/ui/svelte/apps/manager/ImportReportModal.svelte',
-      'src/ui/svelte/apps/manager/ManagerModal.svelte',
+      'src/ui/svelte/components/ManagerModal.svelte',
     ]) {
       const views = mapChangedFilesToViews([file]);
       assert.ok(
@@ -1165,7 +1165,7 @@ describe('UI PR screenshot evidence', () => {
   // change to it must republish both frames, not just the report's.
   it('maps the shared ManagerModal chrome to both import-flow frames', () => {
     const ids = mapChangedFilesToViews([
-      'src/ui/svelte/apps/manager/ManagerModal.svelte',
+      'src/ui/svelte/components/ManagerModal.svelte',
     ]).map(view => view.id);
     assert.ok(ids.includes('manager-import-report'));
     assert.ok(ids.includes('manager-import-folder-mapping'));

@@ -18,7 +18,7 @@ const SHARED_PRIMITIVES = [
   // The manager's ONE modal-dialog chrome (issue 877). Both import-flow modals render
   // through it, so adding it to a third screen would silently pull it into every suite
   // that mounts a tree containing that screen.
-  'src/ui/svelte/apps/manager/ManagerModal.svelte',
+  'src/ui/svelte/components/ManagerModal.svelte',
   // The manager's ONE "how this surface works" explainer card and ONE icon fact row
   // (issue 881). Both are side-panel primitives, so the shared scoped-entity preview and the
   // essence on-craft tab already pull them into two different mounted trees and the next side

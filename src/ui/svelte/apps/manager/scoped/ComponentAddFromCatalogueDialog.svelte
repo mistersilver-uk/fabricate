@@ -18,7 +18,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import { componentSourceLine } from './componentScoped.js';
   import ManagerButton from '../../../components/ManagerButton.svelte';
-  import ManagerModal from '../ManagerModal.svelte';
+  import ManagerModal from '../../../components/ManagerModal.svelte';
   import ManagerSearchField from '../../../components/ManagerSearchField.svelte';
   import SelectionCheckbox from '../../../components/SelectionCheckbox.svelte';
 

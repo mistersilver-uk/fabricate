@@ -219,8 +219,8 @@ That is a measured FACT about where those importers happen to live, and it MUST 
 The tree still contradicts such a prohibition: `apps/crafting/detail/ProgressiveStageList.svelte` and `apps/inventory/bulk/InventoryBulkComplicationGroup.svelte` both import `apps/manager/ComplicationSummaryRow.svelte` and are reachable from the player application's root.
 The absence of a prohibition is a fact about scope, not about the primitive's directory.
 So an adoption whose primitive still lives in `apps/manager/` is deferred on SCOPE — the move into `components/` with a shared scope is the shape and the mechanism of the change that owns it, and it carries its own path-repair surface — never on reachability.
-After issue 2021 exactly two member rows scoped `shared` live under `apps/manager/`: `ComplicationSummaryRow.svelte` and `ManagerModal.svelte`, which the player crafting application's roll prompt renders.
-Issue 2005 adds a third outside `components/`, under `apps/crafting/detail/`: `CheckEvidenceRows.svelte`, the executed check's evidence rows, which the crafting result box and the salvage summary both render, each row through `JournalFactRow`'s keyed `.k-fact` form.
+After issue 2046 exactly one member row scoped `shared` lives under `apps/manager/`: `ComplicationSummaryRow.svelte`; `ManagerModal.svelte`, which the player crafting application's roll prompt renders, moved into `components/` with that change.
+Issue 2005 adds a second outside `components/`, under `apps/crafting/detail/`: `CheckEvidenceRows.svelte`, the executed check's evidence rows, which the crafting result box and the salvage summary both render, each row through `JournalFactRow`'s keyed `.k-fact` form.
 The library's routing rule decides WHICH primitive an adoption wants; the deferral decides only WHEN the move happens, and the two answers are recorded separately.
 `Pagination.svelte:262-270` renders `<Select size="inline">` with no `label`, `hint` or `error`, so `Select.svelte:220` computes `labelled` false and the `<Field as="label">` at `Select.svelte:442-451` never renders.
 That CHAIN, rather than the importer list alone, is what makes the new `.fabricate-field` floor and chrome unreachable in the player application today.
@@ -280,7 +280,7 @@ That answer is PATH-CONDITIONAL and the condition is stated with it: it holds on
 
 The corollary is that a component OUTSIDE the shared directory may keep an area-scoped family, and doing so is correct rather than debt.
 Its markup cannot appear outside that area, so the ancestor is free, and unscoping it would spend specificity and widen the rule's blast radius for no reachable benefit.
-`RecipeDurationEditor`, `EnvironmentsBrowserView` and the manager modal keep `.fabricate-manager`-rooted overlay rules on exactly that basis.
+`RecipeDurationEditor` and `EnvironmentsBrowserView` keep `.fabricate-manager`-rooted overlay rules on exactly that basis.
 The CONVERSE belongs with it, and issue 1509 is the first change to exercise it.
 A recorded decision to LOCATE a component outside the shared directory rests on that area-scoping, so when a later change RE-ROOTS the family the component wears, it retires the premise of the location decision in the same commit.
 The component then moves, rather than keeping a location whose stated reason no longer holds, and the docblock that recorded the premise is restated rather than left to contradict the tree.

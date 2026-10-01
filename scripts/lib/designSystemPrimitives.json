@@ -185,12 +185,12 @@
       "why": "`library.html:769` — \"How a Fabricate record points at a game-world document. Three states in one component.\" 9 callers spread across the checks, component, essence, recipe-item and tool editors, which is why no single frame is the honest evidence; the count was re-measured with `componentImporters.js` at issue 1509 against the 6 this row had said, and the citation moved with issue 1508’s five `library.html` insertions. ROOTED AT `fabricate-link-field` as of issue 1509 and MOVED to `src/ui/svelte/components/` in the same change, which also replaced its thirteen `kind ===` attribute branches with one `hookAttrs` bag over a closed region set. It declares NEITHER a font floor NOR a focus pair, and the pair is the sharper refusal of the two: both action buttons are `IconButton`’s, and `.fabricate-link-field button:focus-visible` at (0,2,1) would out-rank that primitive’s own ring at (0,2,0) and REPLACE it on both."
     },
     {
-      "path": "src/ui/svelte/apps/manager/ManagerModal.svelte",
+      "path": "src/ui/svelte/components/ManagerModal.svelte",
       "library": "<Modal>",
       "status": "target",
       "evidence": "broad",
       "scope": "shared",
-      "why": "`library.html:1282` and `:1315` name it and its manager callers — the import folder-mapping step and the import report — and `:1315` records that ruling it out as single-caller was wrong. Scoped `shared` DESPITE its `apps/manager/` path, as `ComplicationSummaryRow` is: issue 2021 made it the roll prompt's chrome in the player crafting application (`apps/crafting/RollPrompt.svelte`), at the maintainer's direction that Fabricate dialogs use this modal rather than Foundry's."
+      "why": "`library.html:1282` and `:1315` name it and its manager callers — the import folder-mapping step and the import report — and `:1315` records that ruling it out as single-caller was wrong. Scoped `shared`, and MOVED to `src/ui/svelte/components/` at issue 2046 to match: issue 2021 made it the roll prompt's chrome in the player crafting application (`apps/crafting/RollPrompt.svelte`), at the maintainer's direction that Fabricate dialogs use this modal rather than Foundry's."
     },
     {
       "path": "src/ui/svelte/apps/manager/ModifierLibraryRow.svelte",

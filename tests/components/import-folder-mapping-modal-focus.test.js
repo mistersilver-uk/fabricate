@@ -35,7 +35,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/components/SelectionCheckbox.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
-    'src/ui/svelte/apps/manager/ManagerModal.svelte',
+    'src/ui/svelte/components/ManagerModal.svelte',
     'src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',

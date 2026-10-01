@@ -258,7 +258,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'player-salvage',
   ]),
   // The modal chrome's banded frame (issue 2021), which every dialog draws since epic 1997.
-  'src/ui/svelte/apps/manager/ManagerModal.svelte': Object.freeze([
+  'src/ui/svelte/components/ManagerModal.svelte': Object.freeze([
     'player-crafting-roll-prompt-basic',
     'player-crafting-roll-prompt-compact',
     'manager-import-report',

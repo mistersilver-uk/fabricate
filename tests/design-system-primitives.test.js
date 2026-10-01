@@ -73,14 +73,12 @@ const PUBLISHING_CASE_IDS = new Set(
 );
 
 /** The V8-escaped source of `BROAD_SIGNAL_PATTERN`, verbatim. */
-const EXPECTED_BROAD_SIGNAL_SOURCE = String.raw`^styles\/|^src\/ui\/svelte\/components\/|^src\/ui\/theme\.js$|^src\/ui\/svelte\/apps\/manager\/(ExplainerCard|IconFactRow|ManagerModal)\.svelte$`;
+const EXPECTED_BROAD_SIGNAL_SOURCE = String.raw`^styles\/|^src\/ui\/svelte\/components\/|^src\/ui\/theme\.js$|^src\/ui\/svelte\/apps\/manager\/(ExplainerCard|IconFactRow)\.svelte$`;
 
 /**
  * The keys `BROAD_SIGNAL_CASE_OVERRIDES` carries — the DOMAIN, pinned separately from the entries.
  */
 const EXPECTED_OVERRIDE_KEYS = [
-  // Issue 2021: the modal chrome's banded frame, which every dialog draws since epic 1997.
-  'src/ui/svelte/apps/manager/ManagerModal.svelte',
   // Issue 1477: the shared overflow action menu. Its entry names the one published frame that
   // OPENS a menu, which is the only state in which the primitive is visible at all.
   'src/ui/svelte/components/ActionMenu.svelte',
@@ -111,6 +109,8 @@ const EXPECTED_OVERRIDE_KEYS = [
   // Issue 1505: the uppercase micro-label, on sixteen converted eyebrow sites.
   'src/ui/svelte/components/Kicker.svelte',
   'src/ui/svelte/components/ListRow.svelte',
+  // Issue 2021: the modal chrome's banded frame, which every dialog draws since epic 1997.
+  'src/ui/svelte/components/ManagerModal.svelte',
   'src/ui/svelte/components/ManagerSearchField.svelte',
   'src/ui/svelte/components/ManagerToolbar.svelte',
   // Issue 1506: the app's ONE art tile, after it absorbed both crafting thumbnails. ONE frame,
@@ -245,7 +245,7 @@ test('BROAD_SIGNAL_PATTERN emits exactly the pinned source', () => {
       "frames away from the cases that claim a file, narrowing it hands a primitive's evidence " +
       'to whichever cases happen to name its path. Accept it by updating this pin deliberately.'
   );
-  assert.equal(BROAD_SIGNAL_PATTERN.source.length, 144);
+  assert.equal(BROAD_SIGNAL_PATTERN.source.length, 131);
 });
 
 test('(a) every override key is a broad-signal file that exists on disk', () => {
@@ -818,7 +818,7 @@ test('(e) the register gate reads the import graph and the manifest on each side
   ]);
 });
 
-test('(e) exactly three shared member rows live outside the primitive directory', () => {
+test('(e) exactly two shared member rows live outside the primitive directory', () => {
   assert.deepEqual(
     MANIFEST_ROWS.filter(
       (row) => row.scope === 'shared' && !row.path.startsWith(PRIMITIVE_DIRECTORY)
@@ -826,7 +826,6 @@ test('(e) exactly three shared member rows live outside the primitive directory'
     [
       'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
       'src/ui/svelte/apps/crafting/detail/CheckEvidenceRows.svelte',
-      'src/ui/svelte/apps/manager/ManagerModal.svelte',
     ],
     'the design-system spec names this set; a promotion or a new shared row outside ' +
       `${PRIMITIVE_DIRECTORY} must update that sentence with it`

@@ -18,10 +18,10 @@
   | `onSubmit(event)` | function | none | Wraps body and footer in one form; Enter submits through its first submit button. |
 -->
 <script>
-  import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
-  import { portal } from '../../actions/portal.js';
-  import IconButton from '../../components/IconButton.svelte';
-  import { resolveOverlayHost } from '../../util/overlayHost.js';
+  import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
+  import { portal } from '../actions/portal.js';
+  import IconButton from './IconButton.svelte';
+  import { resolveOverlayHost } from '../util/overlayHost.js';
 
   let {
     open = false,

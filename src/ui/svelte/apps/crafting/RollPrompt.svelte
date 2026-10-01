@@ -21,7 +21,7 @@
   import Field from '../../components/Field.svelte';
   import Select from '../../components/Select.svelte';
   import SelectionCheckbox from '../../components/SelectionCheckbox.svelte';
-  import ManagerModal from '../manager/ManagerModal.svelte';
+  import ManagerModal from '../../components/ManagerModal.svelte';
   import { modifierValue, rollPromptTarget } from './rollPromptTarget.js';
   import RollPromptTarget from './RollPromptTarget.svelte';
 

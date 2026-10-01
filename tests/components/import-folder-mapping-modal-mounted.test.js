@@ -56,7 +56,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/IconPicker.svelte',
     'src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte',
     // The shared modal chrome (issue 877): portal, centring, title/subtitle.
-    'src/ui/svelte/apps/manager/ManagerModal.svelte',
+    'src/ui/svelte/components/ManagerModal.svelte',
     'src/ui/svelte/components/Field.svelte',
     // THE manager's labelled push-button (issue 1118). Skip, New, the footer pair and InlineVocabularyAdd`s Add all render it.
     'src/ui/svelte/components/ManagerButton.svelte',
