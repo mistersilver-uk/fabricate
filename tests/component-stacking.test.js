@@ -19,6 +19,7 @@ import { SalvageRunManager } from '../src/systems/SalvageRunManager.js';
 import {
   awardedQuantityOf,
   createOrStackComponentItem,
+  tagAwardedQuantity,
 } from '../src/systems/componentStacking.js';
 
 // ---------------------------------------------------------------------------
@@ -216,11 +217,57 @@ test('createOrStackComponentItem returns null when it can neither stack nor crea
 
 test('awardedQuantityOf prefers the award tag and falls back to the item quantity', () => {
   const tagged = makeItem('t', 'Tagged', 9);
-  tagged._fabricateAwardedQuantity = 2;
+  tagAwardedQuantity(tagged, 2);
   assert.equal(awardedQuantityOf(tagged), 2, 'the award contribution, not the stack total');
 
   const untagged = makeItem('u', 'Untagged', 7);
   assert.equal(awardedQuantityOf(untagged), 7, 'falls back to the item quantity');
+});
+
+// ---------------------------------------------------------------------------
+// 1b. tagAwardedQuantity — the award-scope seam (issue 2145)
+// ---------------------------------------------------------------------------
+
+test('tagAwardedQuantity sums successive calls that share the SAME scope object', () => {
+  const item = makeItem('i1', 'Widget', 1);
+  const scope = {};
+  tagAwardedQuantity(item, 2, scope);
+  tagAwardedQuantity(item, 3, scope);
+  assert.equal(awardedQuantityOf(item), 5, 'two result rows in one award sum (issue 858)');
+});
+
+test('tagAwardedQuantity resets — never sums — across a DIFFERENT scope object', () => {
+  const item = makeItem('i1', 'Widget', 1);
+  const firstAward = {};
+  const secondAward = {};
+  tagAwardedQuantity(item, 2, firstAward);
+  tagAwardedQuantity(item, 1, secondAward);
+  assert.equal(
+    awardedQuantityOf(item),
+    1,
+    'a later, separate award overwrites rather than accumulating onto the earlier one'
+  );
+});
+
+test('tagAwardedQuantity called with no scope twice never accumulates', () => {
+  const item = makeItem('i1', 'Widget', 1);
+  tagAwardedQuantity(item, 1, null);
+  tagAwardedQuantity(item, 1, null);
+  assert.equal(awardedQuantityOf(item), 1, 'two unscoped calls each report 1, never a running total of 2');
+});
+
+test('the award tag stays non-enumerable', () => {
+  const item = makeItem('i1', 'Widget', 1);
+  tagAwardedQuantity(item, 1, {});
+  assert.ok(
+    !Object.keys(item).includes('_fabricateAwardedQuantity'),
+    'the tag does not show up in Object.keys'
+  );
+  assert.equal(
+    Object.prototype.propertyIsEnumerable.call(item, '_fabricateAwardedQuantity'),
+    false,
+    'the tag is not enumerable'
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -373,4 +420,249 @@ test('salvage() reports the SAME component listed in two result rows once, with 
     1,
     'the merged stack appears once in the results, not duplicated'
   );
+});
+
+// ---------------------------------------------------------------------------
+// 3. Award scope across SEPARATE awards (issue 2145)
+// ---------------------------------------------------------------------------
+
+test('two separate engine.salvage() calls onto one persistent held item each report their own amount, not the running total', async () => {
+  const existing = makeItem('have-scrap', 'Scrap Metal', 5, {
+    roles: { 'sys-1': { componentId: 'recovered' } },
+  });
+  // Enough "Broken Widget" stock to survive two separate salvages (ingredientQuantity 1
+  // each) without the source item being consumed to zero and deleted between calls.
+  const { engine, actor, system, source } = makeSalvageWorld({
+    existingRecovered: existing,
+    recoverQuantity: 1,
+  });
+  actor.items.contents.find((i) => i.id === 'broken').system.quantity = 2;
+
+  const first = await engine.salvage(actor.uuid, system.id, source.id);
+  assert.equal(first.success, true);
+  assert.equal(existing.system.quantity, 6, '5 held + 1 recovered on the first salvage');
+
+  const second = await engine.salvage(actor.uuid, system.id, source.id);
+  assert.equal(second.success, true);
+
+  const recorded = second.salvageRun.createdResults.find((r) => r.componentId === 'recovered');
+  assert.ok(recorded, 'the recovered component is recorded on the second run');
+  assert.equal(
+    recorded.quantity,
+    1,
+    "the second salvage's run record reports its own 1, not the running total of 2"
+  );
+  assert.equal(
+    awardedQuantityOf(existing),
+    1,
+    "awardedQuantityOf reflects the second award alone, not the stack's running total"
+  );
+  assert.equal(existing.system.quantity, 7, '6 held + 1 more recovered — the stack still grew correctly');
+
+  // The second salvage's chat card must not show the running total either.
+  system.features.chatOutput = true;
+  const chatCreated = [];
+  globalThis.ChatMessage = {
+    create(data) {
+      chatCreated.push(data);
+      return Promise.resolve({ id: `msg-${chatCreated.length}` });
+    },
+    getSpeaker: () => ({ alias: actor.name }),
+  };
+  await engine._postSalvageChatMessage({
+    success: true,
+    actor,
+    system,
+    component: source,
+    consumedQuantity: 1,
+    results: second.results,
+  });
+  assert.equal(chatCreated.length, 1, 'exactly one chat card posted');
+  assert.ok(
+    !chatCreated[0].content.includes('2×'),
+    'the second salvage card does not show the running total of 2'
+  );
+});
+
+test('a second salvage of two rows of the same component reports 4 again, not 8 (issue 858 + 2145)', async () => {
+  const systemId = 'sys-1';
+  const recovered = { id: 'recovered', name: 'Scrap Metal', registeredItemUuid: 'Item.recovered-src' };
+  const source = {
+    id: 'source',
+    name: 'Broken Widget',
+    salvage: {
+      enabled: true,
+      ingredientQuantity: 1,
+      toolIds: [],
+      resultGroups: [
+        {
+          id: 'rg-1',
+          name: 'Scraps',
+          results: [
+            { id: 'r-1', componentId: 'recovered', quantity: 2 },
+            { id: 'r-2', componentId: 'recovered', quantity: 2 },
+          ],
+        },
+      ],
+    },
+  };
+  const system = {
+    id: systemId,
+    features: { salvage: true },
+    salvageResolutionMode: 'simple',
+    salvageCraftingCheck: { enabled: false, outcomes: [], progressive: null },
+    components: [source, recovered],
+    tools: [],
+    craftingCheck: {},
+  };
+  const existing = makeItem('have-scrap', 'Scrap Metal', 5, {
+    roles: { 'sys-1': { componentId: 'recovered' } },
+  });
+  // Two units of "Broken Widget" stock so a second, separate salvage can run.
+  const actor = makeActor('actor-1', [makeItem('broken', 'Broken Widget', 2), existing]);
+  const engine = makeEngine(setupSalvageGame(system, actor));
+  engine._runSalvageCraftingCheck = async () => ({ success: true, outcome: null, value: null, data: {} });
+
+  const first = await engine.salvage(actor.uuid, system.id, source.id);
+  assert.equal(first.success, true);
+  const firstRecords = first.salvageRun.createdResults.filter((r) => r.componentId === 'recovered');
+  assert.equal(firstRecords[0].quantity, 4, 'first salvage sums its own two rows to 4');
+  assert.equal(existing.system.quantity, 9, '5 held + 2 + 2 recovered on the first salvage');
+
+  const second = await engine.salvage(actor.uuid, system.id, source.id);
+  assert.equal(second.success, true);
+  const secondRecords = second.salvageRun.createdResults.filter((r) => r.componentId === 'recovered');
+  assert.equal(secondRecords.length, 1, 'still one record, not per result row');
+  assert.equal(
+    secondRecords[0].quantity,
+    4,
+    'the second, separate salvage reports its own 4 again, never 8 (the running total)'
+  );
+  assert.equal(existing.system.quantity, 13, '9 held + 2 + 2 recovered on the second salvage');
+});
+
+// ---------------------------------------------------------------------------
+// 4. Award scope across SEPARATE crafts, through _createResultItems (issue 2145)
+// ---------------------------------------------------------------------------
+
+test('two separate crafts through _createResultItems each report their own award, not the running total', async () => {
+  const systemId = 'sys-craft-1';
+  const component = { id: 'widget', name: 'Widget' };
+  const system = {
+    id: systemId,
+    components: [component],
+    features: {},
+  };
+  const existing = makeItem('have-widget', 'Widget', 5, {
+    roles: { [systemId]: { componentId: 'widget' } },
+  });
+  const actor = makeActor('actor-1', [existing]);
+  globalThis.fromUuid = async () => null;
+  globalThis.game = {
+    fabricate: {
+      getCraftingSystemManager: () => ({ getSystem: () => system }),
+      getResolutionModeService: () => null,
+    },
+    i18n: { localize: (key) => key, format: (key) => key },
+    user: { id: 'user-1' },
+    time: { worldTime: 100 },
+  };
+  const engine = makeEngine(null);
+  const recipe = { craftingSystemId: systemId, name: 'Make Widget', transferEffects: false };
+  const step = {
+    resultGroups: [
+      { id: 'rg-1', results: [{ id: 'r-1', componentId: 'widget', quantity: 1 }] },
+    ],
+  };
+
+  const first = await engine._createResultItems(actor, recipe, step, null, [], []);
+  assert.equal(first.items.length, 1);
+  assert.equal(awardedQuantityOf(first.items[0]), 1, 'the first craft reports the 1 it produced');
+  assert.equal(existing.system.quantity, 6, '5 held + 1 crafted');
+
+  const second = await engine._createResultItems(actor, recipe, step, null, [], []);
+  assert.equal(second.items.length, 1);
+  assert.equal(
+    awardedQuantityOf(second.items[0]),
+    1,
+    "the second, separate craft reports its own 1, not the running total of 2"
+  );
+  assert.equal(existing.system.quantity, 7, '6 held + 1 more crafted — the stack still grew correctly');
+
+  const chatCreated = [];
+  globalThis.ChatMessage = {
+    create(data) {
+      chatCreated.push(data);
+      return Promise.resolve({ id: `msg-${chatCreated.length}` });
+    },
+    getSpeaker: () => ({ alias: actor.name }),
+  };
+  system.features.chatOutput = true;
+  await engine._postCraftChatMessage({
+    success: true,
+    craftingActor: actor,
+    recipe,
+    consumedIngredients: [],
+    tools: [],
+    createdResults: second.items,
+  });
+  assert.equal(chatCreated.length, 1, 'exactly one chat card posted');
+  assert.ok(
+    !chatCreated[0].content.includes('2×'),
+    'the second craft card does not show the running total of 2'
+  );
+});
+
+test('two result rows of the SAME component in one _createResultItems call sum, and a second call reports that sum again, not double', async () => {
+  // Craft-path counterpart of the salvage issue-858 test. Catches dropping `awardScope`
+  // from the `_createSingleResult` call inside `_createResultItems`: without it, two
+  // rows of the same component in ONE call would each tag 2 instead of summing to 4.
+  const systemId = 'sys-craft-2';
+  const component = { id: 'widget', name: 'Widget' };
+  const system = {
+    id: systemId,
+    components: [component],
+    features: {},
+  };
+  const existing = makeItem('have-widget', 'Widget', 5, {
+    roles: { [systemId]: { componentId: 'widget' } },
+  });
+  const actor = makeActor('actor-1', [existing]);
+  globalThis.fromUuid = async () => null;
+  globalThis.game = {
+    fabricate: {
+      getCraftingSystemManager: () => ({ getSystem: () => system }),
+      getResolutionModeService: () => null,
+    },
+    i18n: { localize: (key) => key, format: (key) => key },
+    user: { id: 'user-1' },
+    time: { worldTime: 100 },
+  };
+  const engine = makeEngine(null);
+  const recipe = { craftingSystemId: systemId, name: 'Make Widget', transferEffects: false };
+  const step = {
+    resultGroups: [
+      {
+        id: 'rg-1',
+        results: [
+          { id: 'r-1', componentId: 'widget', quantity: 2 },
+          { id: 'r-2', componentId: 'widget', quantity: 2 },
+        ],
+      },
+    ],
+  };
+
+  const first = await engine._createResultItems(actor, recipe, step, null, [], []);
+  assert.equal(first.items.length, 1, 'both rows stack onto the held item, no duplicate');
+  assert.equal(awardedQuantityOf(first.items[0]), 4, 'the two rows of one craft sum to 4 (2 + 2)');
+  assert.equal(existing.system.quantity, 9, '5 held + 2 + 2 crafted');
+
+  const second = await engine._createResultItems(actor, recipe, step, null, [], []);
+  assert.equal(second.items.length, 1);
+  assert.equal(
+    awardedQuantityOf(second.items[0]),
+    4,
+    'a second, separate craft with the same two rows reports its own 4 again, never 8'
+  );
+  assert.equal(existing.system.quantity, 13, '9 held + 2 + 2 crafted on the second call');
 });

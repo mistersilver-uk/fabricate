@@ -3505,6 +3505,11 @@ export class CraftingEngine {
 
     const groupsToCreate = Array.isArray(resolved?.groups) ? resolved.groups : [];
 
+    // One scope object per `_createResultItems` call — i.e. per craft step's award —
+    // so `tagAwardedQuantity` sums result rows landing on the same item WITHIN this
+    // award (issue 858) but never carries into a later, separate award on the same
+    // held item (issue 2145).
+    const awardScope = {};
     const createdItems = [];
     for (const group of groupsToCreate) {
       for (const result of group.results || []) {
@@ -3518,13 +3523,13 @@ export class CraftingEngine {
             ...checkResult,
             resolutionMeta: resolved?.meta || {},
           },
-          { step, precomputedEssences, essenceEnabled, resolveComponent }
+          { step, precomputedEssences, essenceEnabled, resolveComponent, awardScope }
         );
 
         // De-dup: when two result rows produce the SAME managed component, the second
         // stacks onto the first and `_createSingleResult` returns the same item object.
-        // The award tag accumulates both amounts, so the item is reported ONCE with the
-        // summed quantity rather than twice (issue 858 review).
+        // The award tag sums both amounts within this award's scope, so the item is
+        // reported ONCE with the summed quantity rather than twice (issue 858 review).
         if (resultItem && !createdItems.includes(resultItem)) {
           createdItems.push(resultItem);
         }
@@ -3548,7 +3553,13 @@ export class CraftingEngine {
     toolItems,
     recipe,
     checkResult = null,
-    { step = null, precomputedEssences = null, essenceEnabled = null, resolveComponent } = {}
+    {
+      step = null,
+      precomputedEssences = null,
+      essenceEnabled = null,
+      resolveComponent,
+      awardScope = null,
+    } = {}
   ) {
     // Get the source item
     let sourceItem;
@@ -3680,9 +3691,11 @@ export class CraftingEngine {
     if (!resultItem) return null;
 
     const stacked = matchingItems.includes(resultItem);
-    // Record THIS award's contribution so chat/run reporting shows the amount
-    // produced now, not the merged stack total after a stack.
-    tagAwardedQuantity(resultItem, awardedQuantity);
+    // Record THIS award's contribution, scoped to this craft step/salvage call, so
+    // chat/run reporting shows the amount produced by THIS award — not the merged
+    // stack total after a stack onto a held item from an earlier, separate award
+    // (issue 2145).
+    tagAwardedQuantity(resultItem, awardedQuantity, awardScope);
 
     // Transfer active effects if configured (requires both recipe- and system-level
     // flags). Only ever applies to a freshly created item — a stacked item keeps its
@@ -6156,6 +6169,11 @@ export class CraftingEngine {
     // `result.systemItemId`), the same accessor `_createSingleResult` and progressive
     // award use.
     const createdRecords = [];
+    // One scope object per `_awardSalvageResultGroups` call — i.e. per salvage — so
+    // `tagAwardedQuantity` sums result rows landing on the same item WITHIN this
+    // salvage (issue 858) but never carries into a later, separate salvage on the
+    // same held item (issue 2145).
+    const awardScope = {};
     for (const group of resultGroups) {
       for (const result of group.results || []) {
         const created = await this._createSingleResult(
@@ -6164,10 +6182,12 @@ export class CraftingEngine {
           consumedItems,
           tools,
           salvageRecipeView,
-          checkResult
+          checkResult,
+          { awardScope }
         );
         // De-dup a stacked-twice component (same object returned): the award tag
-        // accumulates, so one record carries the summed quantity (issue 858 review).
+        // sums within this salvage's scope, so one record carries the summed
+        // quantity (issue 858 review).
         if (created && !resultItems.includes(created)) {
           resultItems.push(created);
           createdRecords.push({

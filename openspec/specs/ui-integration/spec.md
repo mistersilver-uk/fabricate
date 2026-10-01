@@ -2595,6 +2595,8 @@ The prompt is not shown at all when no selected item has a usable check, and dis
 ### Result Chat Cards
 
 - Crafting and salvage share one card format (built by `buildResultCard`): the subject, recovered/produced results, consumed/forfeited items, broken tools, and failure reason.
+- A result's quantity is the amount that one award produced, summed across the result rows that land on the same item in that award; it is never the merged stack total and never includes an earlier award to the same item.
+  The run record's `createdResults` quantity follows the same rule.
 - The card appends the **rolled check total** as its own row, mirroring the salvage summary's "with a roll of N" rule: rendered only for a finite value and omitted for a no-check guaranteed craft/salvage (`rollValue` null).
   The total is the RAW roll (`checkResult.data.total`), not the progressive awarding value, so a forced crit shows the natural roll rather than the `MAX_SAFE_INTEGER`/`0` award sentinel.
 - The card is posted only on resolved success or rolled failure — never on cancelled, misconfigured, or time-gated outcomes.

@@ -17,6 +17,7 @@ import {
   BulkSalvageService,
   classifySalvageOutcome,
 } from '../src/systems/BulkSalvageService.js';
+import { tagAwardedQuantity } from '../src/systems/componentStacking.js';
 import { hasPlainD20 } from '../src/utils/craftingCheckExpression.js';
 import {
   bulkComponent,
@@ -837,6 +838,36 @@ describe('BulkSalvageService.run: what the run hands back', () => {
       { name: 'Iron Ingot', img: 'icons/ingot.webp', quantity: 2 },
     ]);
     assert.equal('delete' in result.items[0].results[0], false, 'no document leaked out');
+  });
+
+  it('reports each target\'s own awarded amount, not a running total, when two source rows stack onto the same held item (issue 2145)', async () => {
+    // Two DIFFERENT source components (comp-ore, comp-hide) both salvage into the same
+    // recovered item — the dedupe key is `actorId/systemId/componentId`, so two distinct
+    // source components never collide with the service's own duplicate-target guard.
+    // Each fake `salvage()` call tags the SAME held item with a FRESH scope object, the
+    // way `CraftingEngine#_awardSalvageResultGroups` creates one `awardScope` per call —
+    // so this proves the service reads each target's own tag rather than the item's
+    // merged running total.
+    const held = { name: 'Scrap Metal', img: 'icons/scrap.webp', system: { quantity: 5 } };
+    const service = makeService({
+      systems: [bulkSystem({ components: [ORE, HIDE] })],
+      salvage: async () => {
+        tagAwardedQuantity(held, 2, {});
+        return { success: true, results: [held] };
+      },
+    });
+
+    const result = await service.run({
+      targets: [bulkTarget({ componentId: 'comp-ore' }), bulkTarget({ componentId: 'comp-hide' })],
+      interactive: false,
+    });
+
+    assert.equal(result.items[0].results[0].quantity, 2, 'the first target reports its own 2');
+    assert.equal(
+      result.items[1].results[0].quantity,
+      2,
+      'the second target reports its own 2, not the running total of 4'
+    );
   });
 
   it('prefers the run record total over the top-level value for a subject roll', async () => {
