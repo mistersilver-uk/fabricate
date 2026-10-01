@@ -11,6 +11,7 @@ import { publicAdditionalDiceOffer } from '../src/systems/additionalDiceReach.js
 import {
   actionDeltas,
   additionalDiceCopy,
+  additionalDiceNoticeText,
   describeAdditionalDice,
   pendingDiceRange,
 } from '../src/ui/presenters/additionalDicePrompt.js';
@@ -237,13 +238,29 @@ describe('the additional-dice prompt presenter (issue 2008)', () => {
       offer: offerOf({ available: 0, limit: 0, unavailable: 'resourceUnreadable' }),
       chosen: 1,
     });
-    assert.equal(`${view.resourceLine} · ${view.spendLine}`, 'Momentum unavailable · Spends 0');
+    assert.equal(
+      `${view.resourceLine} · ${view.spendLine}`,
+      'Brenna has no Momentum value · Spends 0'
+    );
     assert.deepEqual(view.message, {
       tone: 'info',
       text: 'Additional dice are unavailable: Brenna has no readable Momentum value.',
     });
     assert.ok(!/available ·|\d available/.test(view.resourceLine));
     assert.equal(view.disabled, true);
+    const unreadable = describe2008({
+      offer: offerOf({
+        resourceLabel: '',
+        available: 0,
+        limit: 0,
+        unavailable: 'resourceUnreadable',
+      }),
+    });
+    assert.equal(unreadable.resourceLine, 'Brenna has no value to spend', 'frame 34, unlabelled');
+    const notWritable = describe2008({
+      offer: offerOf({ limit: 0, unavailable: 'resourceNotWritable' }),
+    });
+    assert.equal(notWritable.resourceLine, 'Momentum unavailable', 'every other reason');
     const unlabelled = describe2008({
       offer: offerOf({ resourceLabel: '', unavailable: 'resourceOverridden', limit: 0 }),
     });
@@ -403,5 +420,71 @@ describe('the additional-dice answer and view (issue 2008)', () => {
     assert.deepEqual(await promptCheckRoll({ ...input, additionalDiceOffer: undefined }), {
       confirmed: true,
     });
+  });
+});
+
+describe('the attempt notices an immediate surface raises (issue 2008)', () => {
+  const localize = (key) => shipped(key, undefined);
+  const notice = (result) => additionalDiceNoticeText(result, { actorName: 'Brenna', localize });
+  const refused = (additionalDiceRefusal, facts = {}) => ({
+    success: false,
+    cancelled: true,
+    data: {},
+    additionalDiceRefusal,
+    additionalDiceNotice: {
+      dice: 2,
+      limit: 1,
+      available: 1,
+      label: 'Momentum',
+      source: 'path',
+      ...facts,
+    },
+  });
+
+  it('words a refused choice or spend from its reason and the engine facts', () => {
+    assert.equal(
+      notice(refused('resourceChanged')),
+      "Brenna's Momentum changed before the roll, and 1 is fewer than the 2 chosen. Nothing was spent or rolled."
+    );
+    assert.equal(
+      notice(refused('spendRefused', { source: 'macro' })),
+      'The macro that spends Momentum failed, so the check was not rolled.'
+    );
+    assert.equal(
+      notice(refused('choiceAboveLimit')),
+      '2 additional dice is more than the 1 that can be added.'
+    );
+    assert.equal(
+      notice(refused('spendUnconfirmed', { label: '' })),
+      "The value that pays for Brenna's additional dice did not fall by 2 as expected, so the check was not rolled. Check the value on the character."
+    );
+  });
+
+  it('says what was spent when the roll could not complete after the spend, and nothing otherwise', () => {
+    const misconfigured = {
+      success: false,
+      misconfigured: true,
+      data: { boughtDice: { count: 1, source: 'path' } },
+      additionalDiceNotice: { dice: 1, label: 'Momentum', source: 'path' },
+    };
+    assert.equal(notice(misconfigured), '1 Momentum spent; the roll could not be completed.');
+    const { additionalDiceNotice, ...gathering } = misconfigured;
+    assert.equal(additionalDiceNotice.dice, 1);
+    assert.equal(
+      notice(gathering),
+      '1 spent; the roll could not be completed.',
+      'no label survives'
+    );
+    assert.equal(notice({ success: false, cancelled: true }), null, 'a dismissal is quiet');
+    assert.equal(
+      notice({ success: false, data: { boughtDice: { count: 1 } } }),
+      null,
+      'a rolled failure'
+    );
+    assert.equal(
+      notice({ success: false, misconfigured: true, data: {} }),
+      null,
+      'nothing was spent'
+    );
   });
 });

@@ -8,6 +8,7 @@ import {
   resolveAdditionalDiceReach,
 } from '../../systems/additionalDiceReach.js';
 import { fill } from '../../utils/fillPlaceholders.js';
+import { localizeWith } from '../../utils/localizeWithFallback.js';
 
 const PLAIN_TERM = /^(?:(\d*)d(\d+)|(\d+))$/i;
 const NO_RANGE = Object.freeze({ least: null, most: null });
@@ -63,6 +64,16 @@ const COPY = Object.freeze([
     'unavailableUnlabelled',
     'FABRICATE.App.RollPrompt.AdditionalDice.UnavailableUnlabelled',
     'Unavailable',
+  ],
+  [
+    'unreadable',
+    'FABRICATE.App.RollPrompt.AdditionalDice.Unreadable',
+    '{actor} has no {resource} value',
+  ],
+  [
+    'unreadableUnlabelled',
+    'FABRICATE.App.RollPrompt.AdditionalDice.UnreadableUnlabelled',
+    '{actor} has no value to spend',
   ],
   ['spends', 'FABRICATE.App.RollPrompt.AdditionalDice.Spends', 'Spends {n} {resource}'],
   ['spendsUnlabelled', 'FABRICATE.App.RollPrompt.AdditionalDice.SpendsUnlabelled', 'Spends {n}'],
@@ -206,6 +217,12 @@ function messageOf({ offer, reach, judged, chosen, values, labels, text }) {
   return offer.limit === 0 ? { tone: 'info', text: text('unaffordable') } : null;
 }
 
+/** The resource line's key: frame 34's copy for an unreadable value, else the reason-free one. */
+function resourceKey({ unavailable }) {
+  if (unavailable === 'resourceUnreadable') return 'unreadable';
+  return unavailable ? 'unavailable' : 'available';
+}
+
 function blockNoteOf(judged, labels) {
   const actions = Object.keys(judged);
   const disabled = actions.filter((action) => judged[action].blocked);
@@ -256,7 +273,7 @@ export function describeAdditionalDice({
   const text = (key) =>
     fill(labels[offer.resourceLabel ? key : `${key}Unlabelled`] ?? labels[key], values);
   return {
-    resourceLine: text(unavailable ? 'unavailable' : 'available'),
+    resourceLine: text(resourceKey(offer)),
     spendLine: unavailable ? fill(labels.spendsUnlabelled, values) : text('spends'),
     message: messageOf({ offer, reach, judged, chosen, values, labels, text }),
     disabled: unavailable || offer.limit === 0,
@@ -268,4 +285,43 @@ export function describeAdditionalDice({
     ),
     blockNote: blockNoteOf(judgedAll, labels),
   };
+}
+
+const SPENT = Object.freeze({
+  labelled: [
+    'FABRICATE.App.RollPrompt.AdditionalDice.Spent',
+    '{n} {resource} spent; the roll could not be completed.',
+  ],
+  unlabelled: [
+    'FABRICATE.App.RollPrompt.AdditionalDice.SpentUnlabelled',
+    '{n} spent; the roll could not be completed.',
+  ],
+});
+
+/**
+ * The one warning the surface that started an immediate attempt raises (issue 2008): a refused
+ * choice or spend, or a roll that could not complete after its dice were spent; null for neither.
+ * `localize(key)` is the surface's own; the engine's `additionalDiceNotice` supplies the facts.
+ */
+export function additionalDiceNoticeText(result, { actorName = '', localize } = {}) {
+  const notice = result?.additionalDiceNotice ?? {};
+  const label = typeof notice.label === 'string' ? notice.label.trim() : '';
+  const bought = result?.data?.boughtDice?.count;
+  const values = {
+    actor: actorName,
+    resource: label,
+    n: notice.dice ?? bought ?? 0,
+    available: notice.available ?? 0,
+    limit: notice.limit ?? 0,
+  };
+  if (result?.additionalDiceRefusal) {
+    const key = additionalDiceRefusalKey(result.additionalDiceRefusal, {
+      label,
+      source: notice.source,
+    });
+    return key ? fill(localizeWith(localize, key, undefined, key), values) : null;
+  }
+  if (result?.misconfigured !== true || !(bought > 0)) return null;
+  const [key, fallback] = label ? SPENT.labelled : SPENT.unlabelled;
+  return fill(localizeWith(localize, key, undefined, fallback), values);
 }

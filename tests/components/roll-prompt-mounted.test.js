@@ -991,7 +991,7 @@ describe('mounted roll prompt', () => {
     it('steps within the limit, settles the pool line and answers the chosen dice (frames 30-31, AD36)', async () => {
       const { dialog, pending } = await openCount({ additionalDiceOffer: diceOffer(3) });
       const control = controlOf(dialog);
-      const line = control.querySelector('.additional-dice-line');
+      const line = control.querySelector('[data-roll-prompt-additional-dice-line]');
       const input = stepperInput(dialog);
       assert.equal(line.textContent, 'Momentum 2 available · Spends 0 Momentum');
       assert.deepEqual([input.name, input.max, input.disabled], ['additionalDice', '1', false]);
@@ -1099,7 +1099,7 @@ describe('mounted roll prompt', () => {
       const control = controlOf(dialog);
       assert.equal(stepperInput(dialog).disabled, true);
       assert.equal(
-        control.querySelector('.additional-dice-line').textContent,
+        control.querySelector('[data-roll-prompt-additional-dice-line]').textContent,
         'Momentum unavailable · Spends 0'
       );
       assert.equal(control.querySelector('[data-notice-tone]').dataset.noticeTone, 'info');

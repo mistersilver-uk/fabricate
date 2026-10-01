@@ -1,7 +1,7 @@
 <!--
   The roll prompt's additional-dice control (issue 2008, frame 31): the title, the resource and
-  spend line, the shared `Stepper` at the row's end and the one message beneath. It renders only
-  while the check offers additional dice.
+  spend line, the shared `Stepper` at the row's end and the one message beneath, unframed until the
+  shared `<Well>` wraps it. It renders only while the check offers additional dice.
 
   Props:
   | prop | values | default | contract |
@@ -25,7 +25,7 @@
   <div class="additional-dice-row">
     <div class="additional-dice-text">
       <p class="additional-dice-title" data-roll-prompt-additional-dice-title>{labels.title}</p>
-      <p class="additional-dice-line" id={lineId}>
+      <p class="additional-dice-line" id={lineId} data-roll-prompt-additional-dice-line>
         <span data-roll-prompt-additional-dice-resource>{view.resourceLine}</span> ·
         <span data-roll-prompt-additional-dice-spend>{view.spendLine}</span>
       </p>
@@ -64,10 +64,6 @@
   .additional-dice {
     display: grid;
     gap: var(--fab-space-2);
-    padding: calc(var(--fab-space-3) - 1px) var(--fab-space-3);
-    border: 1px solid var(--fab-border);
-    border-radius: 9px;
-    background: var(--fab-bg-2);
   }
   .additional-dice-row {
     display: flex;

@@ -537,6 +537,8 @@
           "AvailableUnlabelled": "{available} available",
           "Unavailable": "{resource} unavailable",
           "UnavailableUnlabelled": "Unavailable",
+          "Unreadable": "{actor} has no {resource} value",
+          "UnreadableUnlabelled": "{actor} has no value to spend",
           "Spends": "Spends {n} {resource}",
           "SpendsUnlabelled": "Spends {n}",
           "Unreachable": "Cannot reach {needed} successes.",
@@ -558,7 +560,9 @@
           "BlockedAll": "Rolling is disabled: this attempt cannot reach the successes it needs.",
           "BlockedZeroPool": "Rolling is disabled: the pool is reduced to zero, and the dice you can add cannot lift it.",
           "BlockedOnlyAdvantage": "Only Advantage can reach the successes needed.",
-          "BlockedDisadvantage": "Disadvantage cannot reach the successes needed."
+          "BlockedDisadvantage": "Disadvantage cannot reach the successes needed.",
+          "Spent": "{n} {resource} spent; the roll could not be completed.",
+          "SpentUnlabelled": "{n} spent; the roll could not be completed."
         }
       },
       "Nav": {
