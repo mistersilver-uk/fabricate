@@ -28,7 +28,7 @@ export function routedOutcomeBand(outcome, routed, task, labels = {}) {
   }
   const evaluation = activeCheckEvaluation(routed);
   if (evaluation.product === 'count') {
-    return countBand(outcome, routed, countRequired(evaluation, task?.successesOverride));
+    return countBand(outcome, routed, taskCountRequired(routed, task));
   }
   const grading = ladderGrading(routed);
   if (grading.source === 'attribute') return adjustmentBand(outcome, grading, labels);
@@ -140,6 +140,13 @@ function countThresholds(routed, required) {
   return normalizeList(routed?.relativeOutcomes).map(
     (entry) => required + (numberOrNull(entry?.dc) ?? 0)
   );
+}
+
+/** A routed gathering count's successes needed: the task's override, else the pool's; else null. */
+export function taskCountRequired(routed, task) {
+  const evaluation = activeCheckEvaluation(routed);
+  if (evaluation.product !== 'count' || routed?.type === 'fixed') return null;
+  return countRequired(evaluation, task?.successesOverride);
 }
 
 /**

@@ -3765,6 +3765,48 @@ test('the Botch row sits beside the least demanding tier, whichever way the ladd
   );
 });
 
+// Issue 2133: the header's mode pill says DC only for a check graded against one.
+test('the Standard mode label names a DC only for a summed roll-high check against a fixed DC', () => {
+  const label = (simple, run = activeCraftingRun()) =>
+    makeBuilder({ active: [run], system: { ...SYSTEM, craftingCheck: { simple } } })
+      .buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0].resolutionModeLabel;
+  const simple = SYSTEM.craftingCheck.simple;
+  assert.equal(label(simple), 'FABRICATE.App.Journal.Mode.Standard');
+  assert.equal(label({ ...simple, dcMode: 'dynamic' }), 'FABRICATE.App.Journal.Mode.Standard', 'a macro DC');
+  for (const evaluation of [
+    { product: 'count', direction: 'over', pool: { die: 10, required: 2 } },
+    UNDER_FIXED,
+    attributeEvaluation('over', 'add'),
+  ]) {
+    assert.equal(label({ ...simple, evaluation }), 'FABRICATE.App.Journal.Mode.StandardCheck', evaluation.product);
+  }
+  const routed = makeBuilder({ active: [activeCraftingRun()], mode: 'routedByCheck' })
+    .buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0].resolutionModeLabel;
+  assert.equal(routed, 'FABRICATE.App.Journal.Mode.RoutedByCheck');
+});
+
+test('a closed Standard run names a DC only when its recorded check graded against one', () => {
+  const label = (snapshot, data) => {
+    const run = terminalCraftingRun({
+      steps: [{ stepId: 's0', index: 0, status: 'succeeded', createdResults: [],
+        resolutionSnapshot: { kind: 'check', mode: 'simple', ...snapshot },
+        lastCheckResult: { success: true, value: 3, data: { total: 3, ...data } } }],
+    });
+    return makeBuilder({ history: [run] }).buildListing({ actor: ACTOR, viewer: GM }).history[0].resolutionModeLabel;
+  };
+  assert.equal(label({ product: 'sum', direction: 'over' }, { dc: 12 }), 'FABRICATE.App.Journal.Mode.Standard');
+  assert.equal(label({}, { dc: 12 }), 'FABRICATE.App.Journal.Mode.Standard', 'a record before #2005');
+  const count = { product: 'count', direction: 'over' };
+  assert.equal(label(count, { ...count, dc: null, margin: 1 }), 'FABRICATE.App.Journal.Mode.StandardCheck');
+  const under = { product: 'sum', direction: 'under' };
+  assert.equal(label(under, { ...under, target: 14, margin: 3 }), 'FABRICATE.App.Journal.Mode.StandardCheck');
+  assert.equal(
+    label({}, { direction: 'over', targetSource: 'attribute', target: 16, margin: 2 }),
+    'FABRICATE.App.Journal.Mode.StandardCheck',
+    'a character value'
+  );
+});
+
 test('a count step label names the successes needed and the die, never the formula or a DC', () => {
   const detail = (system, recipe = RECIPE) =>
     makeBuilder({ active: [activeCraftingRun()], system: { ...SYSTEM, ...system }, recipe })
@@ -3788,35 +3830,74 @@ test('a count step label names the successes needed and the die, never the formu
   );
 });
 
+const COUNT_LINE_ENGLISH = {
+  'FABRICATE.App.Journal.StepDetails.Count.RollResult': '{net} successes, {required} needed',
+  'FABRICATE.App.Journal.StepDetails.Count.RollResultOne': '1 success, {required} needed',
+  'FABRICATE.App.Journal.StepDetails.Count.RollResultBotch': 'Botch: {net} net successes',
+  'FABRICATE.App.Journal.StepDetails.Count.RollResultNet': '{net} net successes',
+  'FABRICATE.App.Journal.StepDetails.Count.RollResultNetOne': '1 net success',
+  'FABRICATE.Check.CountEvidence.ZeroPoolResult': 'A pool reduced to zero fails automatically. Nothing was rolled.',
+};
+const countLineEnglish = (key, data = {}) =>
+  COUNT_LINE_ENGLISH[key].replaceAll(/\{(\w+)\}/g, (_whole, token) => String(data[token]));
+/** The English roll line of a recorded count, under `system` (the default simple sum check). */
+const countLine = (data, system = SYSTEM) => {
+  const run = terminalCraftingRun({
+    status: 'failed',
+    steps: [{ stepId: 's0', index: 0, status: 'failed', createdResults: [],
+      lastCheckResult: { success: false, value: data.total ?? 0, data: { product: 'count', direction: 'over', dc: null, target: 5, ...data } } }],
+  });
+  const check = makeBuilder({ history: [run], system, resolutionModeService: { getMode: () => system.resolutionMode } })
+    .buildListing({ actor: ACTOR, viewer: PLAYER }).history[0].steps[0].lastCheckResult;
+  return formatRoll({ ...check, formula: '' }, countLineEnglish);
+};
+
 test('a count roll line reads its net against the required count, or its net, never a DC', () => {
-  const english = (key, data = {}) =>
-    ({
-      'FABRICATE.App.Journal.StepDetails.Count.RollResult': '{net} of {required} successes',
-      'FABRICATE.App.Journal.StepDetails.Count.RollResultOne': '{net} of 1 success',
-      'FABRICATE.App.Journal.StepDetails.Count.RollResultNet': '{net} net successes',
-      'FABRICATE.App.Journal.StepDetails.Count.RollResultNetOne': '1 net success',
-      'FABRICATE.Check.CountEvidence.ZeroPoolResult': 'A pool reduced to zero fails automatically. Nothing was rolled.',
-    })[key].replaceAll(/\{(\w+)\}/g, (_whole, token) => String(data[token]));
-  const line = (data) => {
-    const run = terminalCraftingRun({
-      status: 'failed',
-      steps: [{ stepId: 's0', index: 0, status: 'failed', createdResults: [],
-        lastCheckResult: { success: false, value: data.total ?? 0, data: { product: 'count', direction: 'over', dc: null, target: 5, ...data } } }],
-    });
-    const check = makeBuilder({ history: [run] }).buildListing({ actor: ACTOR, viewer: PLAYER }).history[0].steps[0].lastCheckResult;
-    return formatRoll({ ...check, formula: '' }, english);
-  };
-  assert.equal(line({ total: 4, margin: 2 }), '4 of 2 successes');
-  assert.equal(line({ total: 3, margin: 1 }), '3 of 2 successes', 'a simple check reads its required');
-  assert.equal(line({ total: -1, margin: -2 }), '−1 of 1 success', 'the true minus, as the card');
+  const line = (data) => countLine(data);
+  assert.equal(line({ total: 4, margin: 2 }), '4 successes, 2 needed');
+  assert.equal(line({ total: 3, margin: 1 }), '3 successes, 2 needed', 'a simple check reads its required');
+  assert.equal(line({ total: 1, margin: -1 }), '1 success, 2 needed');
+  assert.equal(line({ total: -1, margin: -2 }), 'Botch: −1 net successes', 'a botch states no required count');
   assert.equal(line({ total: 1, margin: 1 }), '1 net success', 'never a required count of 0');
-  // A routed margin is taken from the matched tier, so its line reads the net alone.
-  assert.equal(line({ type: 'relative', total: -2, margin: -1 }), '−2 net successes');
-  assert.equal(line({ type: 'relative', total: -1, margin: -1 }), '−1 net successes');
+  // A routed margin is taken from the matched tier, so without the check's own count it reads the net.
+  assert.equal(line({ type: 'relative', total: -2, margin: -1 }), 'Botch: −2 net successes');
   assert.equal(line({ type: 'relative', total: 4, margin: 1 }), '4 net successes');
   assert.equal(line({ type: 'relative', total: 1, margin: 0 }), '1 net success');
   assert.equal(line({ total: 3, margin: null }), '3 net successes');
   assert.equal(line({ total: 1 }), '1 net success');
-  assert.equal(line({ total: null, margin: null, zeroPool: true }), english('FABRICATE.Check.CountEvidence.ZeroPoolResult'));
+  assert.equal(line({ total: null, margin: null, zeroPool: true }), countLineEnglish('FABRICATE.Check.CountEvidence.ZeroPoolResult'));
   assert.doesNotMatch(line({ total: 4, margin: 2, dc: 15 }), /DC|target/);
+});
+
+// Issue 2133: a routed count's line states the check's own successes needed, as its step label does.
+test('a routed count roll line states the check own successes needed, never total less margin', () => {
+  const routed = countRouted('over', true);
+  const system = { ...SYSTEM, resolutionMode: 'routedByCheck', craftingCheck: { routed } };
+  // Masterwork (+3) matched at net 6 records a margin of 1 against its own threshold of 5.
+  assert.equal(countLine({ type: 'relative', total: 6, margin: 1 }, system), '6 successes, 2 needed');
+  assert.equal(countLine({ type: 'relative', total: 1, margin: 1 }, system), '1 success, 2 needed');
+  assert.equal(countLine({ type: 'relative', total: -1, margin: -1 }, system), 'Botch: −1 net successes');
+  // A macro sets the count at roll time, and a fixed range grades the net itself: neither names one.
+  const macro = { ...system, craftingCheck: { routed: { ...routed, dcMode: 'dynamic' } } };
+  assert.equal(countLine({ type: 'relative', total: 6, margin: 1 }, macro), '6 net successes');
+  const fixed = { ...system, craftingCheck: { routed: { ...routed, type: 'fixed', fixedOutcomes: [] } } };
+  assert.equal(countLine({ type: 'fixed', total: 6, margin: null }, fixed), '6 net successes');
+  // A check no longer counting has no successes needed to state.
+  const summed = { ...system, craftingCheck: { routed: { ...routed, evaluation: undefined } } };
+  assert.equal(countLine({ type: 'relative', total: 6, margin: 1 }, summed), '6 net successes');
+});
+
+test('a routed gathering count roll line states the task successes needed', () => {
+  const task = { id: 'routed-task', name: 'Hunt', resolutionMode: 'routed', successesOverride: 1, resultGroups: [] };
+  const check = (routed) => makeBuilder({
+    system: { ...SYSTEM, gatheringCraftingCheck: { routed } },
+    gatheringHistory: [{
+      id: 'g-done', craftingSystemId: SYSTEM.id, environmentId: 'env-1', taskId: task.id, status: 'succeeded',
+      resolutionSnapshot: { mode: 'routed' },
+      economyEvidence: { runtimeSnapshot: { task } },
+      checkResult: { success: true, outcome: 'Fine', value: 4,
+        data: { product: 'count', direction: 'over', type: 'relative', total: 4, margin: 0 } },
+    }],
+  }).buildListing({ actor: ACTOR, viewer: GM }).history[0].gatheringYield?.check;
+  assert.equal(formatRoll({ ...check(countRouted('over')), formula: '' }, countLineEnglish), '4 successes, 1 needed');
 });

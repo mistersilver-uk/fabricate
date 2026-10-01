@@ -70,6 +70,8 @@ export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({
   'gathering-journal-check-prompt': 'lab-v1-gathering-journal-check-prompt',
   'finished-success': 'lab-v1-finished-success',
   'finished-failure': 'lab-v1-finished-failure',
+  // Issue 2133: a routed count that cleared Masterwork, its line against the check's own count.
+  'finished-routed-count': 'lab-v1-finished-routed-count',
   'finished-cancelled': 'lab-v1-finished-cancelled',
   'active-page-two': 'lab-v1-active-5',
   'finished-page-two': 'lab-v1-finished-5',
@@ -616,6 +618,7 @@ function journalCaseFactories(context) {
       }),
     'finished-success': () => finished(terminalCraftingCase(context, single(), 'succeeded')),
     'finished-failure': () => finished(terminalCraftingCase(context, checkRoute(), 'failed')),
+    'finished-routed-count': () => finished(routedCountCase(context, checkRoute())),
     'finished-cancelled': () => finished(cancelledCraftingCase(context, multi())),
     'active-page-two': () => pagingContainers(context, single()),
     'finished-page-two': () => pagingContainers(context, single()),
@@ -1432,6 +1435,30 @@ function terminalCraftingCase(context, recipe, status, id = null) {
       ],
     },
   });
+}
+
+/**
+ * Runework's routed count (`runeworkCheckMode=routed-count`, two needed) netting 6, so it routed
+ * to Masterwork (+2) and recorded a margin of 2 against that tier's 4, never against the 2.
+ */
+function routedCountCase(context, recipe) {
+  const run = terminalCraftingCase(context, recipe, 'succeeded', 'lab-v1-finished-routed-count');
+  run.steps[0].lastCheckResult = {
+    success: true,
+    outcome: 'Masterwork',
+    value: 6,
+    data: {
+      ...COUNT_STAGE_CHECK.data,
+      type: 'relative',
+      target: 7,
+      total: 6,
+      successes: 6,
+      margin: 2,
+      outcomeId: 'rw-masterwork',
+      success: true,
+    },
+  };
+  return run;
 }
 
 function cancelledCraftingCase(context, recipe) {

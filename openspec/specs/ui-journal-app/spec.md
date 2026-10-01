@@ -151,7 +151,8 @@ Outside a roll-high check against a fixed DC a crafting step's check label never
 A step's recorded roll line then reads `{formula} = {total} · target {target} · margin {margin}` from the executed target and benefit-positive margin, and a record without either reads its formula and total alone, never `vs DC n`.
 A counting check's ladder MUST be stated in net successes and ranked by net whatever the per-die direction, never by the summed comparison; while cancelling is enabled a `Botch` row with the band `<0` sits beside the least demanding tier at the ladder's outer end, carrying that tier's outcome.
 A counting step's check label reads `{n} successes needed · d{die}s` (`1 success needed`), or `Successes counted on d{die}s` where no required count applies, never the retained formula or a DC.
-Its recorded roll line reads `{net} of {required} successes`, with `required` derived from the recorded total less its margin, `{net} net successes` when the record cannot derive it, and the zero-pool sentence for a pool that rolled nothing — never `vs DC n`.
+Its recorded roll line reads `{net} successes, {required} needed` (`1 success, {required} needed`), a net below zero reads `Botch: {net} net successes` with no required count, `{net} net successes` when no required count applies, and a pool that rolled nothing reads the zero-pool sentence — never `vs DC n`.
+A pass/fail record's `required` is its recorded total less its margin; a routed record's margin is taken from its matched tier, so its `required` is the check's own successes needed, as the step label states it, and never the total less that margin.
 A secret check's rows stay withheld.
 
 A matching just-resolved notice may temporarily own a single-record summary and receipts; reselecting clears it and restores ordinary history.

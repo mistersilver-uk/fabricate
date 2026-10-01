@@ -17,6 +17,7 @@ player-journal-roll-line-under
 player-journal-future-stage-under
 player-journal-routed-bands-count
 player-journal-roll-line-count
+player-journal-roll-line-routed-count
 fabricate-journal-blind-run
 fabricate-journal-blind-run-gm
 fabricate-journal-lifecycle-ready-single

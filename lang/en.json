@@ -1046,6 +1046,7 @@
         },
         "Mode": {
           "Standard": "Standard (DC)",
+          "StandardCheck": "Standard",
           "RoutedByIngredients": "Routed by Ingredients",
           "RoutedByCheck": "Routed by Check",
           "Progressive": "Progressive",
@@ -1081,8 +1082,9 @@
             "Check": "{count} successes needed · d{die}s",
             "CheckOne": "1 success needed · d{die}s",
             "CheckDie": "Successes counted on d{die}s",
-            "RollResult": "{net} of {required} successes",
-            "RollResultOne": "{net} of 1 success",
+            "RollResult": "{net} successes, {required} needed",
+            "RollResultOne": "1 success, {required} needed",
+            "RollResultBotch": "Botch: {net} net successes",
             "RollResultNet": "{net} net successes",
             "RollResultNetOne": "1 net success"
           }

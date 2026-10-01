@@ -370,19 +370,49 @@ export const CASES = Object.freeze([
       /^src\/systems\/runJournalOutcomeBands\.js$/,
     ],
   }),
-  // The executed count's roll line on a past stage: its net against the required count it cleared.
+  // The executed count's roll line on a past stage: its net against the required count it cleared,
+  // under a counting check whose header names no DC (issue 2133).
   playerCase({
     id: 'player-journal-roll-line-count',
-    label: 'Player Journal — past stage that counted successes, net of required',
+    label: 'Player Journal — past stage that counted successes, net and successes needed',
     smokeLabels: [],
     reaches: 'beyond',
-    query: { tab: 'journal', journalCaseState: 'past-stage-count', checkPreviewState: 'dice-pool' },
+    query: {
+      tab: 'journal',
+      journalCaseState: 'past-stage-count',
+      checkPreviewState: 'dice-pool',
+      rollPromptState: 'count',
+    },
     steps: [
       { selector: '[data-run-id="lab-v1-stage-browser"]' },
       { selector: '[data-stage-nav-index="0"]' },
     ],
     expectTab: 'journal',
-    expectSelector: '[data-journal-detail]:has-text("3 of 2 successes")',
+    expectSelector:
+      '[data-journal-detail]:has(.journal-detail-meta span:text-is("Standard"))' +
+      ':has-text("3 successes, 2 needed")',
+    kinds: ['player', 'journal'],
+    sourceMatches: [
+      JOURNAL_SOURCES,
+      /^src\/ui\/presenters\/(?:RunJournalBuilder|journalCheckText)\.js$/,
+      /^src\/ui\/svelte\/apps\/journal\/runDetailPresentation\.js$/,
+    ],
+  }),
+  // Issue 2133: a routed count's line states the check's own two needed, never its total less the
+  // margin its matched Masterwork tier recorded.
+  playerCase({
+    id: 'player-journal-roll-line-routed-count',
+    label: 'Player Journal — finished routed count run, net and its check successes needed',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: {
+      tab: 'journal',
+      journalCaseState: 'finished-routed-count',
+      runeworkCheckMode: 'routed-count',
+    },
+    steps: [{ selector: '[data-history-run-id="lab-v1-finished-routed-count"]' }],
+    expectTab: 'journal',
+    expectSelector: '[data-journal-history-detail]:has-text("6 successes, 2 needed")',
     kinds: ['player', 'journal'],
     sourceMatches: [
       JOURNAL_SOURCES,
