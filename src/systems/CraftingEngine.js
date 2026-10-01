@@ -3277,10 +3277,8 @@ export class CraftingEngine {
       // GM-side gap: inputs stay consumed, and the run stays resumable for a fixed check.
       return { resolved: true, result: misconfiguredCheckResult(checkResult) };
     }
-    if (checkResult.cancelled) {
-      // A dismissed roll is retryable: inputs stay consumed and the run stays active.
-      return { resolved: true, result: cancelledCraftResult(checkResult) };
-    }
+    // A dismissed roll is retryable: inputs stay consumed and the run stays active.
+    if (checkResult.cancelled) return { resolved: true, result: cancelledCraftResult(checkResult) };
 
     await this._beginNativeStage({
       craftingActor,
@@ -5470,8 +5468,9 @@ export class CraftingEngine {
     // one, and a missing formula for either is a misconfiguration (zero-mutation abort).
     if (mode === 'alchemy') {
       const alchemyCheckMode = system?.alchemy?.checkMode || 'none';
-      if (alchemyCheckMode === 'none')
+      if (alchemyCheckMode === 'none') {
         return { success: true, outcome: null, value: null, data: {} };
+      }
       if (alchemyCheckMode === 'simple') {
         if (!activeCheck.checkUsable) {
           return {

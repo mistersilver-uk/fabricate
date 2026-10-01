@@ -321,9 +321,7 @@ test('a pool still at zero after the bought dice fails as a zero pool and spends
 test('a main Roll that throws after the spend keeps the spend and records it', async () => {
   const { actor, writes } = heldActor(2);
   await withDice([], async (dice) => {
-    dice.CountRoll.prototype.evaluate = async () => {
-      throw new CountRollRefusal('explode-unbounded', 'explode');
-    };
+    refuseCountRolls(dice);
     const result = await passFail(actor, paidEvaluation(), { additionalDice: 1 });
     assert.equal(result.misconfigured, true);
     assert.equal(result.data.targetRefusal, 'explode-unbounded');
@@ -607,8 +605,18 @@ async function salvageOnce({ mode, config }, { value = 2, faces, options, answer
   );
 }
 
+/** Makes every count Roll refuse as Foundry's explosion recursion limit would. */
+function refuseCountRolls(dice) {
+  dice.CountRoll.prototype.evaluate = async () => {
+    throw new CountRollRefusal('explode-unbounded', 'explode');
+  };
+}
+
 /** One immediate gathering attempt whose system check for `mode` is `config`. */
-async function gatherOnce({ mode, config }, { value = 2, faces, options, answer, evaluation }) {
+async function gatherOnce(
+  { mode, config },
+  { value = 2, faces, options, answer, evaluation, refuseRoll = false }
+) {
   const fixture = gatheringFixture({
     mode,
     resultGroups: [
@@ -632,6 +640,7 @@ async function gatherOnce({ mode, config }, { value = 2, faces, options, answer,
       beforeStart: ({ engine }) => {
         installReadHelpers();
         dice = installCountDice({ faces, chat: false });
+        if (refuseRoll) refuseCountRolls(dice);
         const start = engine.startAttempt.bind(engine);
         engine.startAttempt = (args) => start({ ...args, ...options });
       },
@@ -769,9 +778,7 @@ test('crafting: a check refused after the spend reports the bought dice on the m
   await withDice(
     [],
     async (dice) => {
-      dice.CountRoll.prototype.evaluate = async () => {
-        throw new CountRollRefusal('explode-unbounded', 'explode');
-      };
+      refuseCountRolls(dice);
       const result = await world.craft(null, { additionalDice: 1 });
       assert.equal(result.misconfigured, true);
       assert.deepEqual(result.data.boughtDice, { count: 1, source: 'path' });
@@ -781,3 +788,16 @@ test('crafting: a check refused after the spend reports the bought dice on the m
     { chat: false }
   );
 });
+
+for (const site of [SITES[6], SITES[7]]) {
+  test(`${site.name}: a roll refused after the spend still reports the bought dice`, async () => {
+    const run = await site.run(site, {
+      faces: [],
+      options: { additionalDice: 1 },
+      refuseRoll: true,
+    });
+    assert.equal(run.result.accepted, false);
+    assert.deepEqual(run.result.data?.boughtDice, { count: 1, source: 'path' });
+    assert.deepEqual(run.writes, [1], 'the spend stands');
+  });
+}
