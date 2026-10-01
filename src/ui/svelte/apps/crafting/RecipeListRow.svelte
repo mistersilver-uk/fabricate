@@ -7,10 +7,9 @@
   trailing button so a player can queue materials without opening the detail.
 
   An uncraftable recipe (the danger tone — missing materials, or a check that refuses this
-  character) is called out more
-  emphatically: the whole row takes a theme-appropriate error tint and the status
-  icon moves onto the (dimmed) thumbnail as a pip, rather than sitting as a small
-  meta chip. Warning/neutral/info blockers keep the compact meta badge.
+  character) is called out more emphatically: the whole row takes a theme-appropriate error
+  tint and the status icon moves onto the (dimmed) thumbnail as a pip, rather than sitting as a
+  small meta chip. Warning/neutral/info blockers keep the compact meta badge.
 -->
 <script>
   import Medallion from '../../components/Medallion.svelte';
@@ -42,9 +41,8 @@
   const redacted = $derived(recipe?.redaction?.redacted === true);
   const descriptor = $derived(craftingRecipeStatus(status));
   // Danger tone === the player cannot craft this (missing materials, or a check that refuses
-  // this character). Gate the
-  // emphatic error treatment on the tone so the presentation map stays the single
-  // source of truth for which statuses read as an error.
+  // this character). Gate the emphatic error treatment on the tone so the presentation map
+  // stays the single source of truth for which statuses read as an error.
   const uncraftable = $derived(descriptor.tone === 'danger');
   const statusLabel = $derived(localize(descriptor.labelKey));
 

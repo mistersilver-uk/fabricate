@@ -4249,8 +4249,8 @@ They are unrelated mechanisms.
 
 The dynamic DC macro is a **crafting-check** mechanism, and within crafting it reaches exactly the two DC-bearing check slots.
 Those are `craftingCheck.simple` — the shared pass/fail slot backing the `simple` and `routedByIngredients` modes and the alchemy `simple` check mode — and `craftingCheck.routed`, backing `routedByCheck` and the alchemy `tiered` check mode.
-Both resolve their target through `CraftingEngine._resolveCheckTarget`, which calls `CraftingEngine._resolveCheckAnchorDc` for the fixed anchor, and then through `CraftingEngine._resolveSimpleCheckDc`, the sole dynamic-DC caller of the shared macro executor.
-No other check reaches either symbol.
+Both resolve their target through `resolveCraftingCheckTarget` (`src/systems/craftingCheckRefusal.js`), which calls `craftingCheckAnchorDc` for the fixed anchor, and then through `CraftingEngine._resolveSimpleCheckDc`, the sole dynamic-DC caller of the shared macro executor.
+No other check reaches either symbol; the player listing's `craftingCheckRefuses` reads the same pre-roll resolution to decide `checkUnrollable` (#2139) and never runs the macro.
 The crafting `progressive` check has no DC at all, and salvage and gathering resolve theirs arithmetically through `CraftingEngine._resolveSalvageDc` and `GatheringEngine._resolveGatheringRoutedDc` — a per-record `dcOverride` when finite, else the slot's static `dc`, else a literal `15` — consulting no `checkTierId`, no `tiers`, and no macro.
 Their targets resolve through `CraftingEngine._resolveSalvageTarget` and `GatheringEngine._resolveGatheringRoutedTarget`, which delegate a fixed target to those DC resolvers and run no macro.
 Salvage and gathering nonetheless persist `dcMode`, `macroUuid`, and `tiers`, because they reuse the `SimpleCheck` and `RoutedCheck` shapes so the Checks-tab editors can be shared.
@@ -4263,11 +4263,11 @@ Dropping salvage's `simple.tiers` would therefore silently empty that preset lis
 Gathering task overrides have no preset source at all: gathering authors no recipe tiers, so a task's check override is a single number field.
 `macroUuid` is the one of the three with no reader at all on salvage or gathering, and gathering has no manager-side reader of any of them.
 
-Before the configured macro runs, `_resolveCheckTarget` computes an **anchor** for the crafting check slot being resolved, and validates it: a target refusal aborts before the macro runs.
-Under a fixed target source the anchor is the anchor DC `_resolveCheckAnchorDc` computes; under an attribute source it is the adjusted character value (see `resolution-modes/spec.md` § Check Target Resolution).
+Before the configured macro runs, `resolveCraftingCheckTarget` computes an **anchor** for the crafting check slot being resolved, and validates it: a target refusal aborts before the macro runs.
+Under a fixed target source the anchor is the anchor DC `craftingCheckAnchorDc` computes; under an attribute source it is the adjusted character value (see `resolution-modes/spec.md` § Check Target Resolution).
 The anchor DC is the recipe's selected difficulty tier — `Recipe.checkTierId` matched against that slot's `tiers[].id` — when it names a tier that still exists, and the slot's static `dc` otherwise.
 `CraftingSystemManager._normalizeSimpleCraftingCheck` and `_normalizeRoutedCraftingCheck` normalize that `dc` to a finite integer, defaulting to 15, on every save, so a normalized crafting check slot's static `dc` is never absent or non-finite.
-`_resolveCheckAnchorDc`'s own fallback to a literal `15` therefore guards only a check config that reached it without that normalization, and is not reachable through normal play.
+`craftingCheckAnchorDc`'s own fallback to a literal `15` therefore guards only a check config that reached it without that normalization, and is not reachable through normal play.
 
 When a crafting slot's `dcMode` is anything other than `dynamic`, or no `macroUuid` is configured, the anchor IS that check's resolved target and no macro runs.
 When `dcMode` is `dynamic` and a `macroUuid` is configured, `_resolveSimpleCheckDc` runs that macro and hands it one payload object containing:

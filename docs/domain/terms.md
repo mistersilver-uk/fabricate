@@ -1797,7 +1797,7 @@ An unresolved or non-numeric value is a **Target Refusal** and never reads as 0.
 A progressive check and a fixed-range routed check read no target, so their target source is inert.
 The crafting dynamic-DC macro runs after validation, receives the anchor (the adjusted character value under an attribute source) as `anchorDc` with a cloned `evaluation`, and its result replaces that anchor.
 
-Canonical mapping: `evaluation.target.source`/`expression`; `resolveCheckTarget`/`resolveActivityTarget`/`actorRollData` in `src/systems/checkTarget.js`; the `pathMode: 'foundry'` option of `resolveDeterministicExpression` in `src/systems/checkEvaluation.js`; `CraftingEngine._resolveCheckTarget`/`_resolveSalvageTarget`, `GatheringEngine._resolveGatheringRoutedTarget`
+Canonical mapping: `evaluation.target.source`/`expression`; `resolveCheckTarget`/`resolveActivityTarget`/`actorRollData` in `src/systems/checkTarget.js`; the `pathMode: 'foundry'` option of `resolveDeterministicExpression` in `src/systems/checkEvaluation.js`; `resolveCraftingCheckTarget` in `src/systems/craftingCheckRefusal.js`, `CraftingEngine._resolveSalvageTarget`, `GatheringEngine._resolveGatheringRoutedTarget`
 
 Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/data-models/spec.md
 
