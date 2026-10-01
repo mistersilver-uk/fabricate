@@ -153,7 +153,7 @@ A counting check's ladder MUST be stated in net successes and ranked by net what
 While cancelling is enabled a `Botch` row carrying the least demanding tier's outcome covers only the nets no tier meets: `<0`, or below that tier's threshold when it needs zero or fewer successes, whose own band then starts at its threshold, so no band repeats.
 The row sits beside that tier wherever the ladder authors it, after it on a ladder whose first tier needs more successes than its last and before it otherwise.
 With cancelling off the least demanding tier's band starts at 0, unless every net of 0 or more meets a higher tier, when it states its own threshold.
-A band whose ends include a negative net separates them with a spaced en dash (`−2 – −1`).
+A band or fixed range whose ends include a negative number separates them with a spaced en dash (`−2 – −1`, `−2 – 1`), and keeps the tight dash otherwise.
 A counting step's check label reads `{n} successes needed · d{die}s` (`1 success needed`), or `Successes counted on d{die}s` where no required count applies, never the retained formula or a DC.
 Its recorded roll line reads `{net} successes, {required} needed` (`1 success, {required} needed`), a net below zero reads `Botch: {net} net successes` with no required count, `{net} net successes` when no required count applies, and a pool that rolled nothing reads the zero-pool sentence — never `vs DC n`.
 A pass/fail record's `required` is its recorded total less its margin; a routed record's margin is taken from its matched tier, so its `required` is the check's own successes needed, as the step label states it, and never the total less that margin.

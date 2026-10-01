@@ -3689,6 +3689,12 @@ test('a count ladder states net successes ranked by net whatever the per-die dir
   }
   const fixed = { ...countRouted('under'), type: 'fixed', fixedOutcomes: [{ start: 0, end: 2 }] };
   assert.equal(craftingOutcomeBand(fixed.fixedOutcomes[0], fixed, 2), '0–2', 'fixed ranges are nets');
+  // Issue 2135: a fixed range with a negative end spaces its dash, as a count band does.
+  const range = (start, end) => routedOutcomeBand({ start, end }, { type: 'fixed' }, null);
+  assert.deepEqual(
+    [range(-2, 1), range(-3, -1), range(-2, -2), range(1, 9), range(4, 4)],
+    ['−2 – 1', '−3 – −1', '−2', '1–9', '4']
+  );
 });
 
 test('a macro-set count ladder states its bands relative to the unknown successes needed', () => {

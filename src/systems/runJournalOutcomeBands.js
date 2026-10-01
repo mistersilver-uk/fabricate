@@ -24,7 +24,7 @@ export function routedOutcomeBand(outcome, routed, task, labels = {}) {
   if (routed?.type === 'fixed') {
     const start = numberOrNull(outcome?.start) ?? 0;
     const end = numberOrNull(outcome?.end) ?? start;
-    return start === end ? String(start) : `${start}–${end}`;
+    return netRange(start, end);
   }
   const evaluation = activeCheckEvaluation(routed);
   if (evaluation.product === 'count')
@@ -160,10 +160,14 @@ function countBand(outcome, routed, required) {
   const lowest = thresholds.every((value) => value >= threshold);
   const low = lowest ? lowestTierStart(routed, threshold, next) : threshold;
   if (next === null) return `${formatNet(low)}+`;
-  if (low === next - 1) return formatNet(low);
-  // A negative end reads apart from the dash between them: `−2 – −1`, never `−2–−1`.
-  const dash = low < 0 ? ' – ' : '–';
-  return `${formatNet(low)}${dash}${formatNet(next - 1)}`;
+  return netRange(low, next - 1);
+}
+
+/** `low–high`, spaced (`−2 – 1`) when either end is negative so its minus reads apart from the dash. */
+function netRange(low, high) {
+  if (low === high) return formatNet(low);
+  const dash = low < 0 || high < 0 ? ' – ' : '–';
+  return `${formatNet(low)}${dash}${formatNet(high)}`;
 }
 
 /**
