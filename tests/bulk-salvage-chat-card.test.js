@@ -25,6 +25,7 @@ import {
 import {
   NOT_PUBLIC,
   OVER_FIXED_DATA,
+  PUBLIC_BARE,
   UNDER_DATA,
   executedCheck,
   shippedLocalize,
@@ -47,12 +48,13 @@ describe('buildBulkSalvageChatContent: N subjects, each with its own roll', () =
     actorNames: ['Akra'],
     counts: { total: 3, succeeded: 1, failed: 1, waiting: 1 },
     subjects: [
-      cardSubject({ name: 'Iron Ore', img: 'icons/ore.webp', rollValue: 17 }),
+      cardSubject({ name: 'Iron Ore', img: 'icons/ore.webp', rollValue: 17, check: PUBLIC_BARE }),
       cardSubject({
         name: 'Boar Hide',
         img: 'icons/hide.webp',
         outcome: 'failed',
         rollValue: 4,
+        check: PUBLIC_BARE,
         message: 'Nothing recovered',
       }),
       cardSubject({
@@ -471,7 +473,7 @@ describe('buildBulkSalvageChatContent: each subject states its own executed evid
     assert.match(rows[0], /fabricate-craft-chat__item--evidence/);
     assert.match(rows[0], /data-check-evidence="target"/);
     assert.ok(rows[0].includes('+5 under the target'));
-    assert.doesNotMatch(rows[1], /evidence/, 'the gmroll subject states nothing beyond its roll');
+    assert.doesNotMatch(rows[1], /evidence|__roll/, 'the gmroll subject states no total (issue 2054)');
   });
 
   it('every non-public subject leaves the card byte-identical (Q19)', () => {

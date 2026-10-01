@@ -19,6 +19,7 @@ import { buildSalvageChatContent } from '../src/ui/presenters/SalvageChatCard.js
 import {
   NOT_PUBLIC,
   OVER_FIXED_DATA,
+  PUBLIC_BARE,
   UNDER_DATA,
   UNDER_ROWS,
   executedCheck,
@@ -133,11 +134,18 @@ test('uses the item-bag fallback image when an entry has no img', () => {
   assert.ok(content.includes('src="icons/svg/item-bag.svg"'), 'fallback image used');
 });
 
-test('renders the roll total row when a finite check value is present', () => {
-  const content = buildCraftingChatContent(successModel({ rollValue: 17 }));
+test('renders the roll total row when a public check has a finite value', () => {
+  const content = buildCraftingChatContent(successModel({ rollValue: 17, check: PUBLIC_BARE }));
   assert.ok(content.includes('fabricate-craft-chat__roll'), 'roll row element');
   assert.ok(content.includes('FABRICATE.Chat.Roll'), 'roll label key');
   assert.ok(content.includes('fabricate-craft-chat__roll-value">17<'), 'roll value rendered');
+  for (const visibility of NOT_PUBLIC) {
+    const check = executedCheck({}, visibility);
+    const html = buildCraftingChatContent(successModel({ rollValue: 17, check }));
+    assert.ok(!html.includes('__roll-value'), `no total for ${JSON.stringify(visibility)}`);
+  }
+  const unknown = buildCraftingChatContent(successModel({ rollValue: 17 }));
+  assert.ok(!unknown.includes('__roll-value'), 'no total without a check projection (issue 2054)');
 });
 
 test('1645: a rolled result states its roll beside the produced line', () => {
@@ -197,7 +205,7 @@ test('1645: a fixed or malformed amount renders no rolled run at all', () => {
 });
 
 test('shows the roll total on failure cards too', () => {
-  const content = buildCraftingChatContent(failureModel({ rollValue: 4 }));
+  const content = buildCraftingChatContent(failureModel({ rollValue: 4, check: PUBLIC_BARE }));
   assert.ok(
     content.includes('fabricate-craft-chat__roll-value">4<'),
     'failure roll value rendered'
@@ -350,6 +358,7 @@ const NO_COMPLICATION_MODELS = Object.freeze({
     consumed: [{ name: 'Iron Ingot', img: 'icons/ingot.png', quantity: 3 }],
     tools: [{ name: 'Forge Hammer', img: 'icons/hammer.png' }],
     rollValue: 17,
+    check: PUBLIC_BARE,
   },
   salvage: {
     status: 'succeeded',
@@ -359,6 +368,7 @@ const NO_COMPLICATION_MODELS = Object.freeze({
     consumed: [{ name: 'Iron Ore', img: 'icons/ore.png', quantity: 1 }],
     tools: [],
     rollValue: 12,
+    check: PUBLIC_BARE,
   },
   gathering: {
     status: 'succeeded',
@@ -380,6 +390,7 @@ const NO_COMPLICATION_MODELS = Object.freeze({
         img: 'icons/ore.png',
         outcome: 'succeeded',
         rollValue: 12,
+        check: PUBLIC_BARE,
         tierStep: null,
         message: '',
       },
@@ -1035,7 +1046,7 @@ test('a public sum/over fixed card differs from the bare card only by the ruled 
   for (const status of ['succeeded', 'failed']) {
     const base = status === 'succeeded' ? successModel() : failureModel();
     const model = { ...base, rollValue: 15 };
-    const bare = buildCraftingChatContent(model, shippedKeyLocalize);
+    const bare = buildCraftingChatContent({ ...model, check: PUBLIC_BARE }, shippedKeyLocalize);
     const withCheck = buildCraftingChatContent(
       { ...model, check: executedCheck(data) },
       shippedKeyLocalize
@@ -1060,13 +1071,14 @@ test('every crafting card with a rolled total states the Success or Failure pill
   const pill = (tone, icon, text) =>
     `<div class="fabricate-craft-chat__result fabricate-craft-chat__result--${tone}">` +
     `<i class="fa-solid ${icon}" aria-hidden="true"></i>${text}</div>`;
-  const success = buildCraftingChatContent(successModel({ rollValue: 15 }), shippedKeyLocalize);
-  const failure = buildCraftingChatContent(failureModel({ rollValue: 4 }), shippedKeyLocalize);
+  const check = PUBLIC_BARE;
+  const success = buildCraftingChatContent(successModel({ rollValue: 15, check }), shippedKeyLocalize);
+  const failure = buildCraftingChatContent(failureModel({ rollValue: 4, check }), shippedKeyLocalize);
   assert.ok(success.includes(pill('success', 'fa-circle-check', 'Success') + rollLine(15)));
   assert.ok(failure.includes(pill('failure', 'fa-circle-xmark', 'Failure') + rollLine(4)));
   const noCheck = buildCraftingChatContent(successModel(), shippedKeyLocalize);
   assert.ok(!noCheck.includes('__result'), 'a craft that rolled nothing has no pill');
-  const salvage = buildSalvageChatContent({ status: 'succeeded', actorName: 'A', rollValue: 9 });
+  const salvage = buildSalvageChatContent({ status: 'succeeded', actorName: 'A', rollValue: 9, check });
   assert.ok(!salvage.includes('__result'), 'the pill is a crafting card addition');
 });
 
@@ -1086,7 +1098,7 @@ test('a public roll-under card reads frame 38: pill, dice line, then the ruled r
   assert.deepEqual(evidenceRowsOf(html), UNDER_ROWS);
 });
 
-test('a private card keeps its bare total and gains neither dice nor rows (M4)', () => {
+test('a private card states its pill alone: no total, dice or rows (M4, issue 2054)', () => {
   const data = {
     ...UNDER_DATA,
     resolvedFormula: '3d6',
@@ -1097,7 +1109,8 @@ test('a private card keeps its bare total and gains neither dice nor rows (M4)',
       successModel({ rollValue: 9, check: executedCheck(data, visibility) }),
       shippedKeyLocalize
     );
-    assert.ok(html.includes(rollLine(9)), JSON.stringify(visibility));
+    assert.ok(html.includes('fa-circle-check'), `the pill stays: ${JSON.stringify(visibility)}`);
+    assert.ok(!html.includes('__roll-value') && !html.includes('>9<'), 'no total');
     assert.ok(!html.includes('__dice') && !html.includes('data-check-evidence'));
   }
 });

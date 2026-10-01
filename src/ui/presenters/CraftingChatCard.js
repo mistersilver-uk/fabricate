@@ -178,6 +178,11 @@ export function renderRollTotal(value, label) {
   ].join('');
 }
 
+/** {@link renderRollTotal} for a public, non-secret check only (issue 2054), or ''. */
+export function renderCheckTotal(check, value, label) {
+  return isPublicCheckDisplay(check) ? renderRollTotal(value, label) : '';
+}
+
 /**
  * Escaped text in which no `[[`, `@` or game-system enricher shape (`&Name[…]`, `@Name[…]`) survives,
  * so neither Foundry's own enrichment pass nor a system-registered one (e.g. dnd5e's `&Reference[…]`)
@@ -257,15 +262,15 @@ function renderCheckPill(model, keys, loc) {
  * The rolled check's head (issue 2005, frames 37 and 38): a key map naming `checkSuccess` adds the
  * Success or Failure pill, and a public check's dice line replaces the bare total. A public count
  * check states its summary line instead, even for a pool that rolled nothing (issue 2006, frames
- * 39 to 41). Without a rolled total, or for another card's keys, it is {@link renderRollTotal}.
+ * 39 to 41). A check that is not public states its pill alone, with no total (issue 2054).
  */
 function renderCheckHead(model, keys, loc) {
   const countSummary = renderCountSummary(model.check, loc);
   if (countSummary) {
     return keys.checkSuccess ? `${renderCheckPill(model, keys, loc)}${countSummary}` : countSummary;
   }
-  const total = renderRollTotal(model.rollValue, loc(keys.roll));
-  if (!total || !keys.checkSuccess) return total;
+  const total = renderCheckTotal(model.check, model.rollValue, loc(keys.roll));
+  if (!Number.isFinite(model.rollValue) || !keys.checkSuccess) return total;
   const pill = renderCheckPill(model, keys, loc);
   const diceLine = isPublicCheckDisplay(model.check) ? checkDiceLine(model.check, loc) : '';
   return diceLine
@@ -525,8 +530,8 @@ export function renderComplications({
  *   [model.results] - A `rolled` entry states its roll; `quantity` 0 is an empty award (issue 1645).
  * @param {Array<{name:string,img:string,quantity:number}>} [model.consumed]
  * @param {Array<{name:string,img:string}>}                 [model.tools]
- * @param {number}  [model.rollValue] - The rolled check total; rendered only when
- *   finite (a no-check "Guaranteed" craft/salvage omits it).
+ * @param {number}  [model.rollValue] - The rolled check total; rendered only when finite
+ *   (a no-check "Guaranteed" craft/salvage omits it) and `model.check` is public.
  * @param {{mode:'target'|'up'|'down',steps:number}} [model.tierStep] - Realized routed
  *   tier-step evidence (`data.tierStepApplied`), present only on an actual tier change.
  * @param {object|null} [model.check] - The executed check's display projection, whose evidence

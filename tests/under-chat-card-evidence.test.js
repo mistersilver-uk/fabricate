@@ -181,10 +181,10 @@ test('the card must agree with the roll the execute posted', () => {
   );
 });
 
-test('a roll-under card rolled in any other mode keeps its roll row, so it fails every case', () => {
+test('a roll-under card rolled in any other mode states no dice line, so it fails every case', () => {
   for (const visibility of NOT_PUBLIC) {
     const failures = failuresOf('pass', underCard('pass', { visibility })).join('\n');
-    assert.match(failures, /the dice line must replace the roll row/, JSON.stringify(visibility));
+    assert.match(failures, /pass: dice line "null"/, JSON.stringify(visibility));
   }
 });
 

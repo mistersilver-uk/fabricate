@@ -320,7 +320,12 @@ The prompt is not shown at all when no selected item has a usable check, and dis
 - Crafting and salvage share one card format (built by `buildResultCard`): the subject, recovered/produced results, consumed/forfeited items, broken tools, and failure reason.
 - The card appends the **rolled check total** as its own row, mirroring the salvage summary's "with a roll of N" rule: rendered only for a finite value and omitted for a no-check guaranteed craft/salvage (`rollValue` null).
   The total is the RAW roll (`checkResult.data.total`), not the progressive awarding value, so a forced crit shows the natural roll rather than the `MAX_SAFE_INTEGER`/`0` award sentinel.
-  A public crafting card replaces that row with its dice line (below); every salvage card, and every card that is not public, keeps it.
+  A public crafting card replaces that row with its dice line (below), and a public salvage card keeps it.
+- **A card whose check is not public states no roll total.**
+  A check rolled as a gmroll, blindroll or selfroll, a secret prepared check, and a check whose executed visibility is unknown are not public, and their crafting, salvage and bulk salvage cards carry no `Roll n` row, no dice line, no evidence rows, no count summary or tiles and no Botch pill, in their content or their flags.
+  Every client receives a message's content and flags whatever its whisper or blind setting, so the card is not whispered to compensate, and a carried award roll would make a whispered card visible to every client anyway.
+  The outcome stays: a crafting card keeps its Success or Failure pill, and every card keeps what was produced, consumed and broken.
+  The check's own Roll is posted by its own message under its roll mode, and Foundry decides who sees it.
 - **A crafting card whose check rolled states its outcome.**
   Below the header it carries a `Success` or `Failure` pill (`fabricate-craft-chat__result`), its tone mixed into the chat ink so it reads inside Foundry's own message; salvage and bulk salvage cards carry no pill.
 - **A summed check states its executed evidence.**
@@ -336,7 +341,7 @@ The prompt is not shown at all when no selected item has a usable check, and dis
   A fixed range, an Otherwise tier and a progressive result have no target, so they state neither a target nor a margin, and a legacy record omits every row its evidence lacks.
   Every row is read from the executed check result alone, never from later actor or configuration state, and every `{token}` fills in one pass, so a label containing `{total}` is stated literally.
   Each row is escaped literal text in which no `[[`, `@path`, `@Name[…]` or `&Name[…]` shape survives for either Foundry enrichment pass or a game system's enricher, because a word joiner follows each; an `@path` may break only after its inner dots.
-  A gmroll, blindroll or selfroll card, or a secret one, keeps its `Roll n` row and states no dice line and no rows, because every client receives a message's content and flags whatever its whisper; the card is never whispered to compensate, no pre-roll Roll joins its `rolls`, and it gains no evidence flags.
+  A gmroll, blindroll or selfroll card, or a secret one, states no `Roll n` row, no dice line and no rows, because every client receives a message's content and flags whatever its whisper; the card is never whispered to compensate, no pre-roll Roll joins its `rolls`, and it gains no evidence flags.
 - **A ROLLED result amount states its roll beside the produced line** on the crafting and salvage card, in the same `{formula} = {total}` shape and the same treatment the card's rolled-check-total row uses, so the run that says what was produced also says what produced it.
   An EMPTY AWARD — a total of zero or less, which creates no item — is stated as its own row naming what produced nothing, never omitted, because a player who watched the dice fall is owed the outcome.
   The card reads the roll the award recorded and never re-rolls it.
@@ -348,7 +353,7 @@ The prompt is not shown at all when no selected item has a usable check, and dis
   The rows are `Success on` (only when the threshold read the character or modifiers moved it), `Count`, `Needed` (`{required} · margin {±m}`, or `{required} · a net below zero is a botch`) and `Pre-rolled`; a pool reduced to zero states `Pool` and `Result` instead, shows no tile and prints no roll total, and names dice that Disadvantage removed as a `disadvantage` penalty.
   A failed count that netted below zero reads `Botch` in place of the Failure pill.
   That evidence is handed to the card builder at post time from the engine's own execution and is never persisted into check data, run history, a roll handoff or message flags; a secret check keeps it inside the authority.
-  A gmroll, blindroll or selfroll count card, or a secret one, shows no count rows or tiles, and the card is never whispered to compensate.
+  A gmroll, blindroll or selfroll count card, or a secret one, shows no net, no count rows and no tiles, and the card is never whispered to compensate.
   No count Roll or pre-roll is attached to the card, whose only Foundry roll stays the count Roll's own post, and the gathering card stays roll-free.
 - The card is posted only on resolved success or rolled failure — never on cancelled, misconfigured, or time-gated outcomes.
 - Posting is gated by `features.chatOutput` (default on); `ChatMessage.create` failures are non-fatal (logged only), so a chat error never aborts the craft/salvage.
@@ -356,6 +361,7 @@ The prompt is not shown at all when no selected item has a usable check, and dis
 - **A bulk salvage run posts ONE aggregate card**, and the per-item cards are suppressed.
   Suppression is a `salvage()` option gating **both** poster call sites — the rolled-failure path and the success path — because a missed thread would post the aggregate card plus one stray per-item card for every failed row.
   The card carries N subjects, each with its own roll value, tier step, outcome and message, plus recovered / consumed / broken-tool lists aggregated by name, and it reuses the shared card markup atoms rather than a second copy of them.
+  A subject whose check is not public states no roll value, on the same rule as the single card.
   A subject appears iff **its own** system's `features.chatOutput` is true, and nothing is posted at all when no subject qualifies — not an empty card.
   Per-roll dice posts are deliberately **not** suppressed, since they are the Dice So Nice trigger, so N items produce N dice messages plus one aggregate card.
   A subject's roll total, tier step and broken-tool evidence reach the card only through the salvage **run record**, so a runless call correctly contributes no tool section and no tier step; the raw roll total is preferred over the top-level value for the same reason the single card prefers it, and because the top-level value is threaded only on the success return.
@@ -377,8 +383,14 @@ The prompt is not shown at all when no selected item has a usable check, and dis
 #### Scenario: A private or secret roll-under card states nothing more
 
 - **WHEN** the same craft is rolled as a private GM, blind or self roll, or its check is secret
-- **THEN** the card keeps its pill and its `Roll 9` row, and states no dice line and no evidence rows
+- **THEN** the card keeps its pill, and states no `Roll 9` row, no dice line and no evidence rows
 - **AND** it is not whispered, and carries no pre-roll Roll and no evidence flags
+
+#### Scenario: A private or secret check's total reaches no client
+
+- **WHEN** a craft, a salvage, a bulk salvage or a gathering attempt rolls its check as a private GM, blind or self roll, or its check is secret
+- **THEN** no ChatMessage the run creates carries the roll total or any check evidence in its content or flags
+- **AND** the same run rolled publicly states the total on its crafting, salvage and bulk salvage card, while the gathering card states no roll in either case
 
 #### Scenario: A routed roll-under craft lands on Otherwise
 

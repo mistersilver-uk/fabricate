@@ -136,11 +136,12 @@ for (const version of [13, 14]) {
   });
 
   for (const rollMode of ROLL_MODES.slice(1)) {
-    test(`V${version} ${rollMode}: a count craft card states no tiles or count rows`, async () => {
+    test(`V${version} ${rollMode}: a count craft card states no net, tiles or count rows`, async () => {
       const { cards } = await craftCount({ version, rollMode, pool: PASS_POOL, faces: PASS_FACES });
       const content = readable(cards[0]);
       assert.doesNotMatch(content, /data-dice-tile|data-check-evidence|data-check-count-summary/);
-      assert.match(content, /__roll-value">4</, 'it keeps the bare net');
+      assert.doesNotMatch(content, /__roll-value/, 'nor the bare net (issue 2054)');
+      assert.match(content, /fa-circle-check/, 'it keeps its pill');
     });
   }
 }
@@ -257,7 +258,7 @@ for (const version of [13, 14]) {
         assert.ok(result.check.count, 'the salvage result carries the projection for its summary');
       } else {
         assert.doesNotMatch(content, /data-dice-tile|data-check-evidence|data-check-count-summary/);
-        assert.match(content, /__roll-value">4</);
+        assert.doesNotMatch(content, /__roll-value/, 'nor the bare net (issue 2054)');
       }
     });
   }
@@ -303,7 +304,7 @@ test('a bulk subject states its count summary and rows in place of its net only 
   assert.doesNotMatch(shown, /Chat\.Roll/, 'the summary replaces the roll row');
   const hidden = await bulkCount({ rollMode: 'gmroll', pool: PASS_POOL, faces: PASS_FACES });
   assert.doesNotMatch(hidden, /CountEvidence|Simulator/);
-  assert.match(hidden, /Chat\.Roll 4/, 'a private subject keeps its net');
+  assert.doesNotMatch(hidden, /Chat\.Roll/, 'a private subject states no net (issue 2054)');
 });
 
 test('a zero-pool bulk subject states no total (N32)', async () => {

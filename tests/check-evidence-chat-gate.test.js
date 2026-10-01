@@ -122,7 +122,7 @@ for (const version of [13, 14]) {
         );
         assert.ok(content.includes('+4 under the target'));
       } else {
-        assert.doesNotMatch(content, /evidence|character value|under the target/);
+        assert.doesNotMatch(content, /evidence|character value|under the target|__roll-value/);
       }
     });
   }
@@ -191,11 +191,11 @@ for (const version of [13, 14]) {
   });
 
   for (const rollMode of ROLL_MODES.slice(1)) {
-    test(`V${version} ${rollMode}: a private craft card states no dice line or rows`, async () => {
+    test(`V${version} ${rollMode}: a private craft card states no total, dice line or rows`, async () => {
       const { cards } = await craftAs(version, rollMode);
       const content = readable(cards[0]);
-      assert.doesNotMatch(content, /evidence|__dice|under the target|Crafter @/);
-      assert.match(content, /__roll-value">9</, 'it keeps the bare total');
+      assert.doesNotMatch(content, /evidence|__dice|under the target|Crafter @|__roll-value/);
+      assert.match(content, /fa-circle-check/, 'it keeps its pill (issue 2054)');
     });
   }
 }
