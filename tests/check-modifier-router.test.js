@@ -163,3 +163,25 @@ test('a negated advantage expression keeps its roll unsigned and subtracts it (i
     /boolean/i
   );
 });
+
+test('bought dice land on the pool after advantage, whatever the destination, and never on a sum', () => {
+  const bought = { source: 'additionalDice', label: 'Momentum', form: 'scalar', value: 2 };
+  const advantage = { source: 'advantage', label: 'Advantage', form: 'scalar', value: 1 };
+  const situational = { source: 'situational', label: '', form: 'expression', expression: '1d4' };
+  const plan = planModifierPlacement({
+    evaluation: count('over', 'threshold'),
+    contributions: [bought, situational, advantage],
+  });
+  assert.deepEqual([plan.poolDelta, plan.thresholdDelta], [3, 0]);
+  assert.deepEqual(
+    plan.preRolls.map((entry) => entry.destination),
+    ['threshold'],
+    'only the situational expression follows the destination'
+  );
+  for (const evaluation of [sum('over'), sum('under')]) {
+    assert.throws(
+      () => planModifierPlacement({ evaluation, contributions: [bought] }),
+      /Bought dice belong only to a count pool/
+    );
+  }
+});

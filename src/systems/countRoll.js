@@ -36,8 +36,11 @@ export class CountRollRefusal extends Error {
   }
 }
 
-/** The numeric replay policy a resolved `resolvePool` policy stores; never expressions. */
-export function countReplayPolicy({ direction, comparison, threshold, explode, cancel }) {
+/**
+ * The numeric replay policy a resolved `resolvePool` policy stores; never expressions. `bought`,
+ * the original dice bought as additional dice, is kept only when some were, to render their tiles.
+ */
+export function countReplayPolicy({ direction, comparison, threshold, explode, cancel, bought }) {
   return {
     version: COUNT_POLICY_VERSION,
     direction,
@@ -45,6 +48,7 @@ export function countReplayPolicy({ direction, comparison, threshold, explode, c
     threshold,
     explode: explode ? { kind: explode.kind, value: explode.value, once: explode.once } : null,
     cancel: cancel ? { kind: cancel.kind, value: cancel.value } : null,
+    ...(Number.isInteger(bought) && bought > 0 && { bought }),
   };
 }
 

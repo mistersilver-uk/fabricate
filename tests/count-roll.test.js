@@ -706,3 +706,16 @@ test("the roll prompt's rule line names the same face rules as the chat card", a
   }
   assert.equal(surface.views.length, cases.length);
 });
+
+test('the replay policy keeps the bought original dice only when some were bought (issue 2008)', async () => {
+  const dice = countDice({ faces: [11, 15, 8] });
+  const policy = settledPolicy({ die: 20, base: '3', threshold: '10', direction: 'under' });
+  const bought = dice.CountRoll.fromPolicy({ ...policy, bought: 1 });
+  assert.equal(bought.options.fabricateCount.bought, 1);
+  assert.equal(bought._formula, '3d20', 'the bought die is one of the one term, never a second');
+  assert.equal((await bought.evaluate()).total, 1, 'an older reader ignores the extra key');
+  for (const none of [0, undefined, 1.5]) {
+    const roll = dice.CountRoll.fromPolicy({ ...policy, bought: none });
+    assert.equal('bought' in roll.options.fabricateCount, false, `bought ${none} is omitted`);
+  }
+});

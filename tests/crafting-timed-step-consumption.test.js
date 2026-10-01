@@ -890,7 +890,7 @@ async function maturedTimedCountCheck(pool) {
   return {
     craftingActor,
     runManager,
-    finish: () => engine.craft(craftingActor, [sourceActor], recipe, null, {}),
+    finish: (options = {}) => engine.craft(craftingActor, [sourceActor], recipe, null, options),
     consumedAgain: () => consumedAgain,
     /** Every item FINISH created on either actor: a refund or an award would appear here. */
     created: () => [...sourceActor._createdDocs, ...craftingActor._createdDocs],
@@ -938,6 +938,44 @@ for (const [name, pool, faces, rolled] of [
     }
   });
 }
+
+test('issue 2008: a refused spend at timed FINISH cancels with its reason and stays resumable', async (t) => {
+  const utils = globalThis.foundry.utils;
+  const previous = { getProperty: utils.getProperty, hasProperty: utils.hasProperty };
+  t.after(() => Object.assign(utils, previous));
+  const read = (object, path) => path.split('.').reduce((value, key) => value?.[key], object);
+  Object.assign(utils, {
+    getProperty: read,
+    hasProperty: (object, path) => read(object, path) !== undefined,
+  });
+  const path = 'system.resources.momentum.value';
+  const dice = installCountDice({ faces: [9, 3, 8] });
+  try {
+    const additionalDice = { enabled: true, source: 'path', path, max: 2, label: 'Momentum' };
+    const world = await maturedTimedCountCheck({ threshold: '8', additionalDice });
+    const writes = [];
+    Object.assign(world.craftingActor, {
+      _source: { system: { resources: { momentum: { value: 2 } } } },
+      overrides: {},
+      canUserModify: () => true,
+      update: async (patch) => {
+        writes.push(patch);
+      },
+    });
+    const finished = await world.finish({ additionalDice: 1 });
+    assert.deepEqual(
+      [finished.cancelled, finished.misconfigured, finished.additionalDiceRefusal],
+      [true, undefined, 'spendRefused'],
+      'the cancelled branch, never the misconfigured one'
+    );
+    assert.deepEqual(writes, [{ [path]: 1 }], 'the vetoed write was the only attempt');
+    assert.deepEqual(dice.constructed, [], 'no Roll is built');
+    assert.equal(world.created().length, 0, 'no refund and no award');
+    assert.equal(world.runManager.getActiveRuns(world.craftingActor).length, 1, 'still resumable');
+  } finally {
+    dice.restore();
+  }
+});
 
 // 6. Missing components at START: no lingering run + component names in message
 

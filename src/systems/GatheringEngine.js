@@ -46,6 +46,7 @@ import {
   progressiveCheckRefusal,
   resolveActivityCheck,
 } from './countCheck.js';
+import { carryAdditionalDice, checkRequest, checkRequestOptions } from './countCheckRoll.js';
 import {
   createGatheringAttemptResolution,
   noRefusal,
@@ -998,11 +999,11 @@ export class GatheringEngine {
       // Virtual-present tools from an active canvas Tool station (`{ systemId, componentIds }`)
       // satisfy a tool without an owned item, and skip breakage, only in the matching system.
       presentTools = null,
-      // Scene-interactable ref when the attempt targets an interactable's own node pool
-      // (issue 302).
+      // Scene-interactable ref when the attempt targets an interactable's own node pool (issue 302).
       interactableRef = null,
       // Opt-in confirm-roll dialog and chat post; off for the API and timed maturation.
       interactive = false,
+      additionalDice = 0,
       lifecycleVersion,
     } = {},
     versionedContext = null
@@ -1267,7 +1268,7 @@ export class GatheringEngine {
       richAttempt,
       presentTools,
       interactableRef,
-      interactive,
+      interactive: checkRequest({ interactive, additionalDice }, { craftingSystem: system, task }),
     });
   }
 
@@ -3053,7 +3054,8 @@ export class GatheringEngine {
   }
 
   _refuseImmediateAttempt(kind, { viewer, actor, environment, task, outcome, failureCode, error }) {
-    if (kind === 'cancelled') return this._cancelledStart({ viewer, actor, environment, task });
+    const start = { viewer, actor, environment, task };
+    if (kind === 'cancelled') return carryAdditionalDice(this._cancelledStart(start), outcome);
     const unwritten = kind === 'run-creation-failed' || kind === 'persist-failed';
     const code =
       failureCode || stringOrNull(error?.code) || stringOrNull(error?.name) || 'RUN_MANAGER_ERROR';
@@ -3064,7 +3066,7 @@ export class GatheringEngine {
       : this._blockedReason('TASK_MISCONFIGURED', {
           data: this._terminalMisconfigurationData({ environment, task, viewer, outcome }),
         });
-    return this._blockedStart({ viewer, actor, environment, task, reason });
+    return carryAdditionalDice(this._blockedStart({ ...start, reason }), outcome?.checkResult);
   }
 
   async _resolveTaskOutcome({
@@ -3775,10 +3777,7 @@ export class GatheringEngine {
         checkResult: { data: rolled.data },
       });
     }
-    // A cancelled interactive roll aborts `_resolveImmediateAttempt` with zero mutation.
-    if (rolled.cancelled) {
-      return { status: 'cancelled', resultGroups: [], checkResult: null };
-    }
+    if (rolled.cancelled) return cancelledOutcome(rolled);
 
     const outcomeName = stringOrNull(rolled.outcome);
     const checkResult = {
@@ -3867,6 +3866,7 @@ export class GatheringEngine {
           evaluation,
         }),
         ...authoredOfferOptions(routed),
+        ...checkRequestOptions(interactive),
       },
     });
   }
@@ -3922,7 +3922,7 @@ export class GatheringEngine {
     // Interactive d100: each row and event is its own percentile check, so there is no DC; the
     // prompt collects a flat situational modifier, and a dismissal is a zero-mutation cancel.
     let extraModifier = 0;
-    if (interactive) {
+    if (checkRequest(interactive).interactive) {
       const choice = await promptCheckRoll({
         label: `${rollLabel} — Gathering`,
         name: identityHidden ? rollLabel : task?.name,
@@ -3930,9 +3930,7 @@ export class GatheringEngine {
         activity: 'Gathering',
         img: identityHidden ? null : task?.img,
       });
-      if (!choice || choice.confirmed === false) {
-        return { status: 'cancelled', resultGroups: [], checkResult: null };
-      }
+      if (!choice || choice.confirmed === false) return cancelledOutcome();
       // The bonus is free text, so a dice expression is rolled to a scalar rather than becoming
       // NaN and then 0; each throw takes a flat modifier.
       extraModifier = await evaluateSituationalBonus(choice.bonus, actor);
@@ -3947,7 +3945,7 @@ export class GatheringEngine {
       gatheringModifier: Number.isFinite(gatheringModifier) ? gatheringModifier : 0,
       eventModifier: Number.isFinite(eventModifier) ? eventModifier : 0,
       // Dice So Nice and the bonus apply only to an interactive attempt.
-      animate: interactive === true,
+      animate: checkRequest(interactive).interactive,
       extraModifier,
       rollMode: globalThis.game?.settings?.get?.('core', 'rollMode'),
       speaker: globalThis.ChatMessage?.getSpeaker?.({ actor }),
@@ -4007,11 +4005,8 @@ export class GatheringEngine {
         task,
         interactive,
       }));
-    // A cancelled interactive roll aborts `_resolveImmediateAttempt` with zero mutation, before
-    // normalization, which does not model a cancel.
-    if (checkResult?.cancelled) {
-      return { status: 'cancelled', resultGroups: [], checkResult: null };
-    }
+    // Before normalization, which does not model a cancel.
+    if (checkResult?.cancelled) return cancelledOutcome(checkResult);
     const normalizedCheck = normalizeCheckResult(checkResult);
     if (normalizedCheck.diagnostic) {
       return misconfiguredOutcome({
@@ -4022,11 +4017,7 @@ export class GatheringEngine {
     }
 
     if (normalizedCheck.status === 'failure' || normalizedCheck.success === false) {
-      return {
-        status: 'failed',
-        resultGroups: [],
-        checkResult: normalizedCheck,
-      };
+      return { status: 'failed', resultGroups: [], checkResult: normalizedCheck };
     }
 
     const raw =
@@ -4092,12 +4083,12 @@ export class GatheringEngine {
             img: task?.img,
           }),
           ...authoredOfferOptions(progressive),
+          ...checkRequestOptions(interactive),
         },
       });
       // A cancelled roll makes `_resolveProgressiveOutcome` abort with zero mutation.
-      if (rolled.cancelled) {
-        return { success: false, status: null, value: null, cancelled: true };
-      }
+      const cancelled = { success: false, status: null, value: null, cancelled: true };
+      if (rolled.cancelled) return carryAdditionalDice(cancelled, rolled);
       // A pool the settled modifiers push past 999 dice, or Foundry's explosion limit.
       if (rolled.misconfigured) return progressiveCheckTargetInvalid(rolled);
       // Value-driven: `status` stays null so `resolveProgressiveAward` decides from `value`; a
@@ -5119,6 +5110,11 @@ function normalizeCheckStatus(status) {
 
 function hasOutcomeDiagnostics(raw) {
   return Boolean(raw.diagnostic) || normalizeList(raw.diagnostics).length > 0;
+}
+
+/** A dismissed or refused roll's outcome: the attempt aborts with zero mutation. */
+function cancelledOutcome(rolled = null) {
+  return carryAdditionalDice({ status: 'cancelled', resultGroups: [], checkResult: null }, rolled);
 }
 
 /** A progressive check refusal, before or during the roll: a diagnostic, never a failed attempt. */
