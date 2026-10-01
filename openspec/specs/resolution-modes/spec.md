@@ -564,7 +564,7 @@ A fixed-range check therefore reads no target, and its target source is inert: r
 Under sum/under the matched value is `total − targetDelta` against the inclusive ranges, so a benefit shifts the match toward the better, lower end; `data.total` stays raw and no threshold or margin is invented, and sum/over fixed ranges still match the raw total.
 The matched value floors before matching, in both directions, so a whole-number range `start`–`end` covers `[start, end + 1)`: a fractional appended scalar over, or a fractional `targetDelta` under, routes to the range its whole part lands in, as targets floor (#2059).
 A sum/over total of 10.5 therefore routes to 1–10, and under a `targetDelta` of 1.5 a total of 12 matches 10.5, which floors to 10 and routes to 1–10.
-Adjacent whole-number ranges therefore leave no fractional hole, so a set readiness reports gap-free routes every value inside its span.
+Adjacent whole-number ranges therefore leave no fractional hole, so every value inside the span of a set readiness reports gap-free routes to a tier.
 **A fixed tier set MUST leave no GAP inside its own span**, and a set that does is the BLOCKING readiness issue `rangeGap` (`critical`), alongside the `rangeInvalid` and `rangeOverlap` its two siblings raise.
 A gap is a value BETWEEN two authored tiers that no tier claims — Slag 1–9, Rough 11–17, with 10 claimed by nobody — and it is reachable by ordinary authoring: edit one boundary and stop.
 It is `critical` rather than a warning because fixed mode has no `clampToNearest` rescue: a roll landing in the hole matches no tier at all, so the attempt is rolled but UNROUTED, which fails it rather than degrading it.

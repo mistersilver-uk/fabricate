@@ -106,6 +106,13 @@ function rankableTiers(routing) {
   );
 }
 
+/** Whether a whole-number fixed range holds `value`, floored first so it covers `[start, end + 1)`. */
+export function fixedRangeHolds(outcome, value) {
+  const floored = Math.floor(value);
+  const end = Number(outcome?.end);
+  return Number.isFinite(end) && floored >= Number(outcome?.start) && floored <= end;
+}
+
 /**
  * Match a total to a routed tier, or `null`. The best qualifying tier wins. Under, a fixed range
  * matches `total − targetDelta`, so a benefit shifts toward the better, lower end (ruling D3); the
@@ -116,11 +123,8 @@ function rankableTiers(routing) {
 function matchRoutedOutcome(routing, { total, comparison, clampToNearest }) {
   const { valueOf, direction } = tierRanking(routing);
   if (routing.type === 'fixed') {
-    const value = Math.floor(total - routing.delta);
-    const matching = rankableTiers(routing).filter((outcome) => {
-      const end = Number(outcome.end);
-      return Number.isFinite(end) && value >= Number(outcome.start) && value <= end;
-    });
+    const value = total - routing.delta;
+    const matching = rankableTiers(routing).filter((outcome) => fixedRangeHolds(outcome, value));
     return rankBest(matching, valueOf, direction)[0] ?? null;
   }
   const graded = rankableTiers(routing);

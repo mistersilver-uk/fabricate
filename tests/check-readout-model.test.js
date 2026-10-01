@@ -121,6 +121,11 @@ describe('the target line', () => {
       outcome: null,
     });
     assert.equal(outside.targetLine, 'outside every band');
+    const fractional = readout(routedPlan, {
+      ...result(true, { total: 14.5, outcomeId: 'high', diceGroups: d20(12) }),
+      outcome: 'High',
+    });
+    assert.equal(fractional.targetLine, 'in the 10–14 band', 'a fractional total floors, as routing does (issue 2059)');
     assert.deepEqual([outside.card.title, outside.card.detail, outside.card.tone], [
       'Failure',
       'Nothing is produced',
