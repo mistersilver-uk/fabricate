@@ -3774,7 +3774,7 @@ export class GatheringEngine {
       return misconfiguredOutcome({
         code: 'CHECK_TARGET_INVALID',
         message: rolled.message,
-        checkResult: { data: rolled.data },
+        checkResult: { data: rolled.data, additionalDiceNotice: rolled.additionalDiceNotice },
       });
     }
     if (rolled.cancelled) return cancelledOutcome(rolled);
