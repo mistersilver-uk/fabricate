@@ -184,6 +184,41 @@ test('a zero pool states no total and no tile, only why nothing was rolled (N32)
   assert.ok(content.includes('A pool reduced to zero fails automatically. Nothing was rolled.'));
 });
 
+/** Anything a zero-pool card that is not public may not state beside its pill. */
+const PILL_ALONE = /__roll|data-dice-tile|data-check-count-summary|data-check-evidence/;
+
+test('a gmroll zero-pool card states its Failure pill alone (issue 2054)', async () => {
+  const { result, cards } = await craftCount({ rollMode: 'gmroll', pool: ZERO_POOL });
+  assert.equal(result.success, false);
+  const content = readable(cards[0]);
+  assert.match(content, /fa-circle-xmark" aria-hidden="true"><\/i>Failure<\/div>/);
+  assert.doesNotMatch(content, PILL_ALONE);
+});
+
+test('a secret zero-pool card states its Failure pill alone (issue 2054)', async () => {
+  const dice = installCountDice({ faces: [], chat: false });
+  const secret = await evaluatePreparedRunCheck(
+    preparedCountCheck({ count: { base: 0 } }),
+    { getRollData: () => ({}) },
+    { rollMode: 'publicroll' },
+    { secret: true }
+  ).finally(dice.restore);
+  assert.equal(secret.data.zeroPool, true, 'positive control: the pool was reduced to zero');
+  const world = craftProbe({
+    features: { craftingChecks: true, chatOutput: true },
+    craftingCheck: { enabled: true, consumption: {}, simple: simpleCheck(ZERO_POOL) },
+    resolutionService: probeResolutionService({ mode: 'simple' }),
+    checkResult: secret,
+  });
+  globalThis.game.i18n.localize = shippedLocalize;
+  const created = [];
+  installChatMessage(14, created);
+  await world.craft();
+  const content = readable(resultCards(created)[0]);
+  assert.match(content, /fa-circle-xmark" aria-hidden="true"><\/i>Failure<\/div>/);
+  assert.doesNotMatch(content, PILL_ALONE);
+});
+
 test('the card states the executed threshold, never the live actor or check (N31)', async () => {
   const { world, check, cards } = await craftCount({
     pool: CHARACTER_POOL,

@@ -7,7 +7,7 @@
  * label-key map, and salvage renders through it verbatim so a salvage card IS this card.
  *
  * The markup ATOMS — {@link esc}, {@link renderItem}, {@link renderSection},
- * {@link renderRollTotal}, {@link tierStepText} and {@link renderComplications} — are exported
+ * {@link renderCheckTotal}, {@link tierStepText} and {@link renderComplications} — are exported
  * because the bulk salvage and gathering cards compose rows this core cannot express, and a second
  * spelling of one `<li>` would drift from the stylesheet the moment either side is edited.
  * {@link renderComplications} is parameterised by the BEM block token its caller's card uses.
@@ -168,7 +168,7 @@ export function renderItem({ name, img, quantity, rolled }, localize = (key) => 
  * printing "0"/"null". The number is set apart from its label so it reads as the
  * roll result, not more subtitle metadata.
  */
-export function renderRollTotal(value, label) {
+function renderRollTotal(value, label) {
   if (!Number.isFinite(value)) return '';
   return [
     '<div class="fabricate-craft-chat__roll">',
@@ -270,7 +270,8 @@ function renderCheckHead(model, keys, loc) {
     return keys.checkSuccess ? `${renderCheckPill(model, keys, loc)}${countSummary}` : countSummary;
   }
   const total = renderCheckTotal(model.check, model.rollValue, loc(keys.roll));
-  if (!Number.isFinite(model.rollValue) || !keys.checkSuccess) return total;
+  const rolled = Number.isFinite(model.rollValue) || model.check?.evidence?.total === null;
+  if (!rolled || !keys.checkSuccess) return total;
   const pill = renderCheckPill(model, keys, loc);
   const diceLine = isPublicCheckDisplay(model.check) ? checkDiceLine(model.check, loc) : '';
   return diceLine

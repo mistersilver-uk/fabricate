@@ -389,8 +389,9 @@ The prompt is not shown at all when no selected item has a usable check, and dis
 #### Scenario: A private or secret check's total reaches no client
 
 - **WHEN** a craft, a salvage, a bulk salvage or a gathering attempt rolls its check as a private GM, blind or self roll, or its check is secret
-- **THEN** no ChatMessage the run creates carries the roll total or any check evidence in its content or flags
+- **THEN** no result card the run posts carries the roll total or any check evidence in its content or flags
 - **AND** the same run rolled publicly states the total on its crafting, salvage and bulk salvage card, while the gathering card states no roll in either case
+- **AND** the check's own Roll message is posted under its roll mode and is outside this rule
 
 #### Scenario: A routed roll-under craft lands on Otherwise
 

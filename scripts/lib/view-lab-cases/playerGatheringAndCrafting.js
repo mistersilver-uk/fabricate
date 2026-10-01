@@ -320,7 +320,7 @@ export const CASES = Object.freeze([
     kinds: ['player', 'crafting'],
     sourceMatches: RESULT_SOURCES,
   }),
-  // The posted result card, docked in a lab chat log: public states its rows, private and blind none.
+  // The posted result card: public states its rows, private and blind neither a total nor rows.
   playerCase({
     id: 'player-crafting-chat-card-under-public',
     label: 'Player app — roll-under crafting result card, public roll, with its evidence rows',
@@ -337,13 +337,14 @@ export const CASES = Object.freeze([
   }),
   playerCase({
     id: 'player-crafting-chat-card-under-whispered',
-    label: 'Player app — roll-under crafting result card after a private GM roll, no evidence rows',
+    label:
+      'Player app — roll-under crafting result card after a private GM roll, no total or evidence rows',
     smokeLabels: [],
     reaches: 'beyond',
     query: { tab: 'crafting', dialog: 'open', rollPromptState: 'under-evidence', chatLog: '1' },
     steps: [...CRAFT_HORSESHOE, TYPE_ROLLED_BONUS, ...ROLL_MODE('gmroll'), ROLL],
     expectSelector:
-      `${CHAT_CARD}:has(.fabricate-craft-chat__result):has(.fabricate-craft-chat__roll)` +
+      `${CHAT_CARD}:has(.fabricate-craft-chat__result):not(:has(.fabricate-craft-chat__roll))` +
       ':not(:has(.fabricate-craft-chat__dice)):not(:has(.fabricate-craft-chat__evidence))',
     expectVisible: LAB_CHAT('whisper'),
     kinds: ['player', 'crafting'],
@@ -351,13 +352,14 @@ export const CASES = Object.freeze([
   }),
   playerCase({
     id: 'player-crafting-chat-card-under-blind',
-    label: 'Player app — roll-under crafting result card after a blind roll, no evidence rows',
+    label:
+      'Player app — roll-under crafting result card after a blind roll, no total or evidence rows',
     smokeLabels: [],
     reaches: 'beyond',
     query: { tab: 'crafting', dialog: 'open', rollPromptState: 'under-evidence', chatLog: '1' },
     steps: [...CRAFT_HORSESHOE, TYPE_ROLLED_BONUS, ...ROLL_MODE('blindroll'), ROLL],
     expectSelector:
-      `${CHAT_CARD}:has(.fabricate-craft-chat__result):has(.fabricate-craft-chat__roll)` +
+      `${CHAT_CARD}:has(.fabricate-craft-chat__result):not(:has(.fabricate-craft-chat__roll))` +
       ':not(:has(.fabricate-craft-chat__dice)):not(:has(.fabricate-craft-chat__evidence))',
     expectVisible: LAB_CHAT('blind'),
     kinds: ['player', 'crafting'],

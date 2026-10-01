@@ -46,8 +46,8 @@ function assertWithheld(created, label) {
   }
 }
 
-/** A `1d20` that always rolls the total; posted check rolls are counted, never created here. */
-function installRoll(rollPosts) {
+/** A `1d20` that always rolls the total. */
+function installRoll() {
   const TotalRoll = class {
     constructor(formula) {
       this.formula = String(formula);
@@ -65,9 +65,8 @@ function installRoll(rollPosts) {
     toJSON() {
       return { formula: this.formula, total: this.total };
     }
-    async toMessage(_data, options) {
-      rollPosts.push(options);
-    }
+    // The check's own Roll message is Foundry's to show, so it is never recorded as a card.
+    async toMessage() {}
     static replaceFormulaData(formula) {
       return formula;
     }
@@ -115,7 +114,7 @@ async function craftCards({ rollMode = 'publicroll', checkResult = null } = {}) 
   });
   globalThis.game.i18n.localize = shippedLocalize;
   const created = [];
-  installRoll([]);
+  installRoll();
   installChatMessage(created);
   const prompt = stubPromptSurface(() => ({ confirmed: true, rollMode }));
   const result = await world.craft(null, { interactive: true }).finally(prompt.restore);
@@ -127,7 +126,7 @@ async function craftCards({ rollMode = 'publicroll', checkResult = null } = {}) 
 async function salvageCards(rollMode) {
   const world = salvageProbe({ salvageCraftingCheck: { simple: SIMPLE_CHECK, consumption: {} } });
   const created = [];
-  installRoll([]);
+  installRoll();
   installChatMessage(created);
   const result = await world.salvage({ interactive: true, rollDecision: { rollMode } });
   delete globalThis.Roll;
@@ -152,7 +151,7 @@ async function bulkCards(rollMode) {
     ],
   });
   const created = [];
-  installRoll([]);
+  installRoll();
   installChatMessage(created);
   const service = new BulkSalvageService({
     salvage: (...args) => world.engine.salvage(...args),
@@ -178,7 +177,7 @@ async function bulkCards(rollMode) {
 
 /** The GM-side answer a secret (or visible) prepared check sends back to the crafting client. */
 async function preparedCheck(secret) {
-  installRoll([]);
+  installRoll();
   try {
     return await evaluatePreparedRunCheck(
       { rollFormula: '1d20', slot: 'simple', checkConfig: {}, decisionPolicy: { dc: 10 } },
