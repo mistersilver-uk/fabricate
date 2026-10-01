@@ -106,3 +106,25 @@ test('every unchecked radio ring and checkbox box outlines with the token', () =
     `an unchecked selection control outlines with something other than ${TOKEN}`
   );
 });
+
+/** The resting compound of an unchecked control, size modifiers included, never a state. */
+const RESTING_COMPOUND = /(?:input\[type='radio'\]|\.fab-selection-check(?:\.is-(?:sm|md|lg))?)$/u;
+
+test('a filled unchecked control clips its fill, so the outline composites over the surround', () => {
+  const filled = [];
+  for (const [file, css] of Object.entries(corpus)) {
+    for (const rule of rulesIn(css)) {
+      const resting = splitSelectorList(rule.selector).some((s) => RESTING_COMPOUND.test(s));
+      const properties = propertiesOf(rule);
+      const fill = properties.get('background');
+      if (!resting || !fill || fill === 'transparent') continue;
+      filled.push({ file, selector: rule.selector, clip: properties.get('background-clip') });
+    }
+  }
+  assert.equal(filled.length, 3, `expected the three filled controls, found ${filled.length}`);
+  assert.deepEqual(
+    filled.filter(({ clip }) => clip !== 'padding-box'),
+    [],
+    'a filled control lets its fill run under the outline, so the outline reads over its own fill'
+  );
+});

@@ -8017,6 +8017,7 @@
   margin-top: 0;
   border: 1px solid var(--fab-control-outline);
   background: var(--fab-bg-1);
+  background-clip: padding-box;
 }
 
 .fabricate-option-cards.manager-resolution-mode-card.is-config-cards .manager-resolution-option input[type='radio']:checked {

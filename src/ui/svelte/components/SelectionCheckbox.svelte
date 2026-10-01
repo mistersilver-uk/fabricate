@@ -120,6 +120,7 @@
     height: 20px;
     border-radius: 6px;
     background: var(--fab-bg-0);
+    background-clip: padding-box;
     font-size: 10px;
   }
 
@@ -128,6 +129,7 @@
     height: 22px;
     border-radius: 6px;
     background: var(--fab-bg-0);
+    background-clip: padding-box;
     font-size: 10px;
   }
 
