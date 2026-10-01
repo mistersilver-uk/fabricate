@@ -389,7 +389,7 @@
     min-width: 0;
     margin: 0;
     padding: 0;
-    border: 1.5px solid var(--fab-border);
+    border: 1.5px solid var(--fab-border-strong);
     border-radius: 50%;
     appearance: none;
     -webkit-appearance: none;

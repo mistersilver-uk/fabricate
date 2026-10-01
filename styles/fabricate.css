@@ -7805,7 +7805,7 @@
   margin: 0;
   margin-top: 0.15rem;
   padding: 0;
-  border: 1.5px solid var(--fab-border);
+  border: 1.5px solid var(--fab-border-strong);
   border-radius: 50%;
   appearance: none;
   -webkit-appearance: none;
@@ -7822,7 +7822,7 @@
   margin: 0;
   margin-top: 0.15rem;
   padding: 0;
-  border: 1.5px solid var(--fab-border);
+  border: 1.5px solid var(--fab-border-strong);
   border-radius: 50%;
   appearance: none;
   -webkit-appearance: none;
