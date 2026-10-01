@@ -12,6 +12,7 @@ import {
   resolveOpenSlotId,
   suggestChoiceOverrides,
 } from '../../src/ui/svelte/util/requirementSlots.js';
+import { essenceChoiceCraftability } from '../helpers/crafting-fixtures.js';
 
 function fixedState(overrides = {}) {
   return {
@@ -108,6 +109,26 @@ describe('buildRequirementSlots', () => {
       ingredientStates: [{ groupId: 'g', isEssence: true, need: 2, have: 1 }],
     });
     assert.equal(slot.have, 1);
+  });
+
+  // Issue 2142: a choice group whose chosen alternative is an essence keeps its own
+  // chooser, so the player can still switch to another alternative.
+  it('keys a choice slot whose chosen option is an essence to its own group', () => {
+    const [slot] = buildRequirementSlots(essenceChoiceCraftability());
+    assert.equal(slot.slotId, 'g-primal');
+    assert.equal(slot.kind, SLOT_KIND.ESSENCE, 'the essence ratio and state rules still apply');
+    assert.equal(slot.choiceCount, 2);
+    assert.equal(slot.state, SLOT_STATE.SHORT);
+  });
+
+  it('keeps a plain essence requirement on the shared pool chooser', () => {
+    const slots = buildRequirementSlots({
+      ingredientStates: [essenceState(), ...essenceChoiceCraftability().ingredientStates],
+    });
+    assert.deepEqual(
+      slots.map((slot) => slot.slotId),
+      [ESSENCE_POOL_SLOT_ID, 'g-primal']
+    );
   });
 
   const ESSENCE_CASES = [
@@ -235,6 +256,17 @@ describe('resolveOpenSlotId', () => {
     assert.equal(
       resolveOpenSlotId({ slots, scopeKey: 'set-b', rememberedKey: 'set-a:g-choice' }),
       ESSENCE_POOL_SLOT_ID
+    );
+  });
+
+  it('keeps a remembered group open once its chosen alternative becomes an essence', () => {
+    const essenceChosen = buildRequirementSlots({
+      ingredientStates: [essenceState(), ...essenceChoiceCraftability().ingredientStates],
+    });
+    // The pool slot comes first, so only the remembered key can open the group.
+    assert.equal(
+      resolveOpenSlotId({ slots: essenceChosen, scopeKey: 'set-a', rememberedKey: 'set-a:g-primal' }),
+      'g-primal'
     );
   });
 
@@ -386,6 +418,17 @@ describe('buildConsumptionPlan', () => {
       ]
     );
     assert.deepEqual(plan.pending, [], 'neither is "still to choose"');
+  });
+
+  it('plans a choice slot funded by an essence through the pool, not as a row', () => {
+    const plan = buildConsumptionPlan(essenceChoiceCraftability(), {
+      chosenGroupIds: ['g-primal'],
+    });
+    assert.deepEqual(plan.rows, [], 'no carrier is allocated yet, and the slot is no item row');
+    assert.deepEqual(
+      plan.pending.map((entry) => [entry.kind, entry.name]),
+      [[SLOT_KIND.ESSENCE, 'Primal']]
+    );
   });
 
   it('is empty for a null craftability', () => {

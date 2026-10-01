@@ -107,13 +107,14 @@
       : localize('FABRICATE.App.Crafting.Slots.OptionsMany', { count });
   }
 
+  // A slot with alternatives states their count whichever kind of option is chosen.
   function disclosureText(slot) {
+    if (slot.choiceCount > 1) return optionsLabel(slot.choiceCount);
     if (slot.kind === SLOT_KIND.ESSENCE) {
       return slot.have > 0
         ? localize('FABRICATE.App.Crafting.Slots.EditPool')
         : localize('FABRICATE.App.Crafting.Slots.AddItems');
     }
-    if (slot.choiceCount > 1) return optionsLabel(slot.choiceCount);
     return localize('FABRICATE.App.Crafting.Slots.Change');
   }
 
