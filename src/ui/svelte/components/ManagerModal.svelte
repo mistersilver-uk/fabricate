@@ -1,6 +1,7 @@
 <!--
-  The manager's ONE modal-dialog chrome (issue 877): every centred, portaled manager dialog renders
-  through it, so "modal dialog" has a single implementation rather than one per feature. It owns the
+  Fabricate's ONE modal-dialog chrome (issue 877), a shared primitive: every centred, portaled
+  dialog renders through it, the manager's and the player roll prompt's alike, so "modal dialog" has
+  a single implementation rather than one per feature. It owns the
   chrome only — the portal, the fixed centring and panel surface, the title/subtitle heading, the
   close control and the right-aligned footer rail. Everything between header and footer is the
   caller's `body` snippet, which keeps its own style scope, and `rootAttributes` lets a caller keep
