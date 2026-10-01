@@ -17,8 +17,8 @@ export const SLOT_STATE = Object.freeze({
   SHORT: 'short',
 });
 
-// Every essence requirement in a set is funded from ONE pool, so every essence tile opens the same
-// chooser. The tiles stay individually keyed for rendering; only the chooser key is shared.
+// Every essence requirement in a set is funded from ONE pool, so every plain essence tile opens
+// one chooser. The tiles stay individually keyed for rendering; only the chooser key is shared.
 export const ESSENCE_POOL_SLOT_ID = 'essence-pool';
 
 // A rail with any openable slot always resolves SOMETHING open, so without this sentinel a click on
@@ -76,7 +76,7 @@ function buildSlot(state, index, chosenGroupIds) {
     key: groupId ?? `requirement-${index}`,
     groupId,
     // Fixed slots are not selectable, so they open nothing.
-    slotId: pickSlotId(kind, groupId),
+    slotId: pickSlotId(kind, groupId, state?.hasChoice === true),
     kind,
     state: stateOf(kind, state, chosenGroupIds.has(groupId)),
     interactive: kind !== SLOT_KIND.FIXED,
@@ -100,7 +100,10 @@ function buildSlot(state, index, chosenGroupIds) {
   };
 }
 
-function pickSlotId(kind, groupId) {
+// A group with alternatives keeps its own chooser even when its chosen option is an
+// essence; only a plain essence requirement opens the shared pool.
+function pickSlotId(kind, groupId, hasChoice) {
+  if (hasChoice && groupId) return groupId;
   if (kind === SLOT_KIND.ESSENCE) return ESSENCE_POOL_SLOT_ID;
   return kind === SLOT_KIND.CHOICE ? groupId : null;
 }

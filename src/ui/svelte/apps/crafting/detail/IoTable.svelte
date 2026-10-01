@@ -2,9 +2,9 @@
 <!--
   IoTable is the recipe detail's material-economy region and, since issue 917, the
   COMPOSITION ROOT for the requirement surface: the slot rail, the single open
-  chooser (an alternatives picker or the shared essence pool), and the
-  consumption-plan panel — followed by the unchanged legacy set-level essence rows,
-  the tool rows and the produced outputs.
+  chooser (an alternatives picker, the shared essence pool, or both when a group's
+  chosen alternative is an essence), and the consumption-plan panel — followed by
+  the unchanged legacy set-level essence rows, the tool rows and the produced outputs.
 
   The three-surface presentation it replaces (a flat image grid, a separately
   stacked alternatives picker and an essence list) could not tell a player which
@@ -24,7 +24,7 @@
   import { formatList as localeFormatList, localize } from '../../../util/foundryBridge.js';
   import { normalizeEssenceIcon } from '../../../util/essenceIcons.js';
   import {
-    ESSENCE_POOL_SLOT_ID,
+    SLOT_KIND,
     buildConsumptionPlan,
     buildRequirementSlots,
   } from '../../../util/requirementSlots.js';
@@ -73,15 +73,17 @@
   const outputs = $derived(Array.isArray(result?.items) ? result.items : []);
 
   const panelId = $derived(`${idPrefix}-panel`);
-  // The tile the open panel is labelled back at. Every essence tile opens the same
+  // The tile the open panel is labelled back at. Every plain essence tile opens the same
   // pool, so the first of them owns the label.
   const openSlot = $derived(
     slots.find((slot) => slot.interactive && slot.slotId === openSlotId) ?? null
   );
   const openTileId = $derived(openSlot ? `fabricate-slot-${openSlot.key}` : null);
-  const poolOpen = $derived(!readOnly && openSlotId === ESSENCE_POOL_SLOT_ID && Boolean(openSlot));
+  // Any open essence slot shows the pool: the shared pool slot, or a group whose chosen
+  // alternative is an essence (beneath that group's alternatives).
+  const poolOpen = $derived(!readOnly && openSlot?.kind === SLOT_KIND.ESSENCE);
   const openChoices = $derived(
-    readOnly || !openSlotId || poolOpen
+    readOnly || !openSlotId
       ? []
       : ingredientChoices.filter((choice) => choice?.groupId === openSlotId)
   );
@@ -106,22 +108,33 @@
         {onOpenSlot}
         {onPickForMe}
       />
-      {#if poolOpen}
+      {#snippet essencePool(id, labelledBy)}
         <EssencePoolPanel
           pool={craftability?.essencePool ?? null}
           {readOnly}
-          {panelId}
-          labelledBy={openTileId}
+          panelId={id}
+          {labelledBy}
           onAllocate={(itemKey, units) => onAllocateEssence?.(itemKey, units)}
         />
-      {:else if openChoices.length > 0}
+      {/snippet}
+      {#if openChoices.length > 0}
         <!-- `role="region"` is load-bearing: `aria-labelledby` on a roleless `<div>` is
              not exposed at all, so without it the panel the open tile points
-             `aria-controls` at would be an unnamed generic. The essence pool is a real
-             `<section>` and gets the same treatment for free. -->
-        <div id={panelId} role="region" aria-labelledby={openTileId ?? undefined}>
+             `aria-controls` at would be an unnamed generic. A pool nested here carries
+             no id of its own, so exactly one element is the panel. -->
+        <div
+          class="crafting-io-chooser"
+          id={panelId}
+          role="region"
+          aria-labelledby={openTileId ?? undefined}
+        >
           <IngredientOptionSelector choices={openChoices} onChoose={onChooseOption} />
+          {#if poolOpen}
+            {@render essencePool(null, null)}
+          {/if}
         </div>
+      {:else if poolOpen}
+        {@render essencePool(panelId, openTileId)}
       {/if}
       <ConsumptionPlanPanel {plan} {formatList} />
     </div>
@@ -208,6 +221,13 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
+  }
+
+  /* The open group's alternatives, with the essence pool beneath when one is chosen. */
+  .crafting-io-chooser {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-2);
   }
 
   .crafting-io-list {

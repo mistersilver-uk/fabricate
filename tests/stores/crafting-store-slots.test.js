@@ -5,6 +5,7 @@ import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 
 import { createSvelteModuleCompiler } from '../helpers/compile-svelte-module.js';
 import { ESSENCE_POOL_SLOT_ID } from '../../src/ui/svelte/util/requirementSlots.js';
+import { essenceChoiceCraftability } from '../helpers/crafting-fixtures.js';
 
 let compiler;
 let createCraftingStore;
@@ -178,6 +179,36 @@ function makeServices({ recipes = [poolRecipe()], recomputed = null } = {}) {
     getFavouriteRecipeIds: () => [],
   };
   return { services, calls };
+}
+
+/**
+ * The g-primal group with its unheld component alternative chosen, so no essence block
+ * resolves; the resolver fake answers with the essence-chosen state once g-primal's
+ * override names the essence alternative.
+ */
+function componentChosenCraftability(overrides = {}) {
+  const [choice] = essenceChoiceCraftability().ingredientChoices;
+  const [component, essence] = choice.options;
+  return essenceChoiceCraftability({
+    ingredientStates: [
+      { groupId: 'g-primal', name: 'Acidic Essence', need: 1, have: 0, satisfied: false, hasChoice: true, choiceCount: 2 },
+    ],
+    ingredientChoices: [
+      { ...choice, selectedOptionIndex: 0, options: [{ ...component, have: 0, satisfied: false }, essence] },
+    ],
+    essencePool: null,
+    ...overrides,
+  });
+}
+
+function primalChoiceStore(baked = componentChosenCraftability()) {
+  return {
+    recipes: [poolRecipe({ ingredientSets: [{ id: 'set-a', craftability: baked }] })],
+    recomputed: ({ optionOverrides }) =>
+      optionOverrides?.['g-primal']?.optionIndex === 1
+        ? essenceChoiceCraftability()
+        : componentChosenCraftability(),
+  };
 }
 
 async function loadedStore(overrides = {}) {
@@ -413,6 +444,18 @@ describe('craftingStore requirement rail and essence pool', () => {
     store.chooseIngredientSet('set-b');
     flushSync();
     assert.equal(store.openSlotId, ESSENCE_POOL_SLOT_ID, 'back to the first unsatisfied slot');
+  });
+
+  // Issue 2142: choosing a group's essence alternative must not move the open chooser
+  // onto the shared pool, or the other alternatives become unreachable.
+  it('keeps the group open after the player chooses its essence alternative', async () => {
+    const { store } = await loadedStore(primalChoiceStore());
+    assert.equal(store.openSlotId, 'g-primal');
+
+    store.chooseIngredientOption('g-primal', { optionIndex: 1 });
+    flushSync();
+    assert.equal(store.railSlots[0].kind, 'essence', 'the essence option is now chosen');
+    assert.equal(store.openSlotId, 'g-primal', 'and its group keeps the chooser');
   });
 
   it('closes the chooser on a nullish slot id', async () => {

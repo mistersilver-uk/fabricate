@@ -8,7 +8,12 @@ import {
   CRAFTING_APP_RAW_MODULES,
   CRAFTING_APP_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
-import { craftability, sharedEssenceCraftability } from '../helpers/crafting-fixtures.js';
+import {
+  craftability,
+  essenceChoiceCraftability,
+  essenceCraftability,
+  sharedEssenceCraftability,
+} from '../helpers/crafting-fixtures.js';
 import { chipToneOf } from '../helpers/chipTone.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -173,6 +178,120 @@ describe('IoTable mounted behavior', () => {
     const panel = target.querySelector('[role="radiogroup"]').closest('[aria-labelledby]');
     assert.equal(panel.getAttribute('role'), 'region');
     assert.equal(panel.getAttribute('aria-labelledby'), 'fabricate-slot-g-herb');
+  });
+
+  // Issue 2142: choosing an essence alternative must not strand the player in the pool.
+  it('shows the alternatives with the pool beneath for a group whose chosen option is an essence', async () => {
+    const target = await harness.mount({
+      craftability: essenceChoiceCraftability(),
+      openSlotId: 'g-primal',
+    });
+    const regions = [...target.querySelectorAll('[role="region"]')];
+    assert.equal(regions.length, 1, 'one panel holds both choosers');
+    const [region] = regions;
+    assert.equal(region.getAttribute('id'), 'fabricate-req-panel');
+    assert.equal(region.getAttribute('aria-labelledby'), 'fabricate-slot-g-primal');
+    assert.equal(
+      region.querySelector('[role="radiogroup"]').getAttribute('data-alt-group'),
+      'g-primal'
+    );
+    const pool = region.querySelector('[data-recipe-section="essence-pool"]');
+    assert.ok(pool, 'the pool renders inside the alternatives region');
+    assert.ok(!pool.hasAttribute('id'), 'only the region carries the panel id');
+    assert.ok(!pool.hasAttribute('aria-labelledby'));
+    assert.equal(target.querySelectorAll('#fabricate-req-panel').length, 1);
+  });
+
+  it('routes an alternative chosen inside the merged region back through onChooseOption', async () => {
+    const calls = [];
+    const target = await harness.mount({
+      craftability: essenceChoiceCraftability(),
+      openSlotId: 'g-primal',
+      onChooseOption: (groupId, choice) => {
+        calls.push([groupId, choice]);
+      },
+    });
+    target.querySelector('[role="region"]').querySelectorAll('[role="radio"]')[0].click();
+    assert.deepEqual(calls.at(-1), ['g-primal', { optionIndex: 0 }]);
+  });
+
+  it('routes an allocation made in the nested pool back through onAllocateEssence', async () => {
+    const calls = [];
+    const target = await harness.mount({
+      craftability: essenceChoiceCraftability(),
+      openSlotId: 'g-primal',
+      onAllocateEssence: (itemKey, units) => {
+        calls.push([itemKey, units]);
+      },
+    });
+    target
+      .querySelector(':scope [role="region"] [data-essence-carrier="Item.moss-1"] [data-stepper-increment]')
+      .click();
+    assert.deepEqual(calls.at(-1), ['Item.moss-1', 1]);
+  });
+
+  it('keeps a plain essence slot on the standalone pool beside a choice-essence group', async () => {
+    const base = essenceChoiceCraftability();
+    const plain = essenceCraftability();
+    const mixed = essenceChoiceCraftability({
+      ingredientStates: [...plain.ingredientStates, ...base.ingredientStates],
+      essencePool: {
+        ...base.essencePool,
+        requirements: [...plain.essencePool.requirements, ...base.essencePool.requirements],
+      },
+    });
+    const target = await harness.mount({ craftability: mixed, openSlotId: 'essence-pool' });
+    const pool = target.querySelector('[data-recipe-section="essence-pool"]');
+    assert.equal(pool.getAttribute('id'), 'fabricate-req-panel');
+    assert.equal(pool.getAttribute('aria-labelledby'), 'fabricate-slot-g-radiant');
+    assert.ok(!target.querySelector('[role="radiogroup"]'), 'no group was opened');
+  });
+
+  it('shows only the open group when two choice groups both chose an essence', async () => {
+    const base = essenceChoiceCraftability();
+    const ember = (entry) => ({ ...entry, groupId: 'g-ember', name: 'Ember' });
+    const target = await harness.mount({
+      craftability: essenceChoiceCraftability({
+        ingredientStates: [...base.ingredientStates, ember(base.ingredientStates[0])],
+        ingredientChoices: [...base.ingredientChoices, ember(base.ingredientChoices[0])],
+        essencePool: {
+          ...base.essencePool,
+          requirements: [
+            ...base.essencePool.requirements,
+            ember(base.essencePool.requirements[0]),
+          ],
+        },
+      }),
+      openSlotId: 'g-ember',
+    });
+    const groups = [...target.querySelectorAll('[role="radiogroup"]')];
+    assert.deepEqual(
+      groups.map((group) => group.getAttribute('data-alt-group')),
+      ['g-ember']
+    );
+    assert.equal(target.querySelectorAll('[data-recipe-section="essence-pool"]').length, 1);
+    assert.equal(target.querySelectorAll('#fabricate-req-panel').length, 1);
+  });
+
+  it('keeps the alternatives region when the essence pool is absent', async () => {
+    const target = await harness.mount({
+      craftability: essenceChoiceCraftability({ essencePool: null }),
+      openSlotId: 'g-primal',
+    });
+    const region = target.querySelector('[role="region"]');
+    assert.equal(region.getAttribute('id'), 'fabricate-req-panel');
+    assert.ok(region.querySelector('[role="radiogroup"]'));
+    assert.ok(!target.querySelector('[data-recipe-section="essence-pool"]'));
+  });
+
+  it('opens neither chooser for a read-only choice-essence group', async () => {
+    const target = await harness.mount({
+      craftability: essenceChoiceCraftability(),
+      openSlotId: 'g-primal',
+      readOnly: true,
+    });
+    assert.ok(!target.querySelector('[role="region"]'));
+    assert.ok(!target.querySelector('[data-recipe-section="essence-pool"]'));
   });
 
   it('opens no chooser at all on a read-only rail', async () => {
