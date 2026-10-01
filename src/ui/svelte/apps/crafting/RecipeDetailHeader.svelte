@@ -45,7 +45,8 @@
     )
   );
   const descriptor = $derived(craftingRecipeStatus(status));
-  // Danger tone === the player cannot craft this (missing materials). Gate on the
+  // Danger tone === the player cannot craft this (missing materials, or a check that refuses
+  // this character). Gate on the
   // tone so the presentation map stays the single source of truth, mirroring the
   // RecipeListRow treatment.
   const uncraftable = $derived(descriptor.tone === 'danger');

@@ -49,8 +49,9 @@ export const BROWSE_BLOCKING_REASON_KEYS = Object.freeze({
  * Browse-status precedence, highest first:
  *
  *   teaser → discovery, locked → locked, knowledge → unknown,
- *   recipe-item exhausted → exhausted, materials missing → missingMaterials,
- *   a check that refuses this character → checkUnrollable (issue 2139), otherwise available.
+ *   recipe-item exhausted → exhausted, a check that refuses this character → checkUnrollable
+ *   (issue 2139, which gathering cannot clear), materials missing → missingMaterials,
+ *   otherwise available.
  *
  * `materialsAvailable` is deliberately a TRISTATE read: `false` means a material check ran
  * and came back short, while `null`/`undefined` means no check ran at all. Only the first
@@ -83,7 +84,7 @@ export function deriveBrowseStatus({
   if (reason === 'locked') return CRAFTING_BROWSE_STATUS.LOCKED;
   if (reason === 'knowledge') return CRAFTING_BROWSE_STATUS.UNKNOWN;
   if (exhausted === true) return CRAFTING_BROWSE_STATUS.EXHAUSTED;
-  if (materialsAvailable === false) return CRAFTING_BROWSE_STATUS.MISSING_MATERIALS;
   if (checkRefused === true) return CRAFTING_BROWSE_STATUS.CHECK_UNROLLABLE;
+  if (materialsAvailable === false) return CRAFTING_BROWSE_STATUS.MISSING_MATERIALS;
   return CRAFTING_BROWSE_STATUS.AVAILABLE;
 }

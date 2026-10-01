@@ -54,6 +54,15 @@ describe('craftingRecipeStatus', () => {
     assert.equal(descriptor.labelKey, 'FABRICATE.App.Crafting.Status.Unknown');
   });
 
+  it('reads a check that cannot roll as uncraftable, as missing materials does (issue 2139)', () => {
+    const tone = (status) => craftingRecipeStatus(status).tone;
+    assert.equal(tone(CRAFTING_BROWSE_STATUS.CHECK_UNROLLABLE), 'danger');
+    assert.equal(
+      tone(CRAFTING_BROWSE_STATUS.CHECK_UNROLLABLE),
+      tone(CRAFTING_BROWSE_STATUS.MISSING_MATERIALS)
+    );
+  });
+
   it('returns frozen descriptors (presentation is immutable)', () => {
     const descriptor = craftingRecipeStatus(CRAFTING_BROWSE_STATUS.AVAILABLE);
     assert.ok(Object.isFrozen(descriptor));

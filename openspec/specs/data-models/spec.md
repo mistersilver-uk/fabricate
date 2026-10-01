@@ -4703,7 +4703,7 @@ This is the same rule the inventory snapshot introduced as the **indexed availab
 
 ### Browse-status precedence
 
-A row's browse status is derived by ONE rule, highest precedence first: teaser, then locked, then knowledge-gated, then recipe-item exhausted, then a material shortfall, otherwise available.
+A row's browse status is derived by ONE rule, highest precedence first: teaser, then locked, then knowledge-gated, then recipe-item exhausted, then a check that refuses the acting character before any roll (`checkUnrollable`, #2139), then a material shortfall, otherwise available.
 Exhaustion is READ from the knowledge access evaluation that already established it and MUST NOT be recomputed — see `recipe-visibility/spec.md` § One Candidate Collection Per Evaluation.
 The material term reads the cheap-availability rule's tristate: only a definitive negative yields a material shortfall, and "not asked" does not.
 

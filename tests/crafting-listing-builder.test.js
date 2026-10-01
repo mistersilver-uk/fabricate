@@ -1639,8 +1639,12 @@ describe('CraftingListingBuilder — a check that cannot roll for this character
   const smith = { source: 'attribute', expression: '@skills.smith.level' };
   const SERA = { id: 'actor-1', items: [], getRollData: () => ({ skills: { smith: { level: 12 } } }) };
   const BARE = { id: 'actor-1', items: [], getRollData: () => ({}) };
-  const statusFor = (actor, { resolutionMode = 'simple', simple = {}, progressive = {} } = {}) => {
+  const statusFor = (
+    actor,
+    { resolutionMode = 'simple', simple = {}, progressive = {}, craftability = makeCraftability() } = {}
+  ) => {
     const builder = makeBuilder({
+      craftability,
       system: makeSystem({
         resolutionMode,
         craftingCheck: { simple: { rollFormula: '1d20', dc: 12, ...simple }, routed: {}, progressive },
@@ -1662,6 +1666,14 @@ describe('CraftingListingBuilder — a check that cannot roll for this character
       CRAFTING_BROWSE_STATUS.AVAILABLE,
       CRAFTING_BROWSE_STATUS.AVAILABLE,
     ]);
+  });
+
+  it('ranks a check that cannot roll above missing materials, which gathering can clear', () => {
+    const simple = { evaluation: { direction: 'under', target: smith } };
+    const craftability = makeCraftability({ canCraft: false });
+    assert.deepEqual(statusFor(BARE, { simple, craftability }).slice(0, 2), [UNROLLABLE, UNROLLABLE]);
+    // The detail model reads exact craftability; this fixture's summary snapshot holds no shortfall.
+    assert.equal(statusFor(SERA, { simple, craftability })[1], CRAFTING_BROWSE_STATUS.MISSING_MATERIALS);
   });
 
   it('reads a counting pool path the character lacks the same way', () => {

@@ -780,8 +780,8 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
   authoring state.
 - Status precedence (highest first): Discovery-Mode teaser → `discovery`, locked →
   `locked`, unlearned knowledge → `unknown`, recipe-item uses exhausted →
-  `exhausted`, materials missing → `missingMaterials`, a check that refuses this character →
-  `checkUnrollable`, otherwise `available`.
+  `exhausted`, a check that refuses this character → `checkUnrollable`, materials missing →
+  `missingMaterials`, otherwise `available`.
 
 ##### Discovery-Mode Redaction
 
