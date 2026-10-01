@@ -67,6 +67,35 @@ export const INGREDIENT_SET_OMITTED_WHEN_DEFAULT = {
 export const INGREDIENT_SEARCH_NODE_CAP = 200_000;
 
 /**
+ * An essence option's block membership terms: its trimmed essence id and its
+ * non-negative authored amount. Blank ids and non-positive amounts are runtime no-ops.
+ *
+ * @param {object|null} option
+ * @returns {{essenceId: string, need: number}}
+ */
+export function essenceMemberOf(option) {
+  return {
+    essenceId: String(option?.match?.essenceId || '').trim(),
+    need: Math.max(0, Number(option?.match?.amount) || 0),
+  };
+}
+
+/**
+ * Whether an essence member is fundable from `essence.ceiling` (essence id -> amount the
+ * untouched ledger carries). A degenerate member (blank id, non-positive need) and a
+ * missing index are always fundable. The resolver's prune and the option card share it.
+ *
+ * @param {{essenceId: string, need: number}} member
+ * @param {{ceiling: Map<string, number>}|null} essence
+ * @returns {boolean}
+ */
+export function essenceMemberIsFundable(member, essence) {
+  if (!member.essenceId || member.need <= 0) return true;
+  if (!essence) return true;
+  return (essence.ceiling.get(member.essenceId) ?? 0) >= member.need;
+}
+
+/**
  * The SCAN context: everything the candidate generators read that is neither the option
  * being considered nor the group it belongs to.
  *
@@ -393,7 +422,10 @@ export class IngredientSet {
    *   currencySpends: Array<{unit: string, amount: number, ingredient: Ingredient}>,
    *   missingGroups: Array<object>, essenceAllocation: Record<string, number>,
    *   essencePool: object|null,
-   *   searchStats: {nodes: number, capHit: boolean} }}
+   *   searchStats: {nodes: number, capHit: boolean},
+   *   essenceCeiling: Readonly<Record<string, number>> }}
+   *   `essenceCeiling` is what the held stacks carry per essence id before any group
+   *   claims; `{}` when the set has no essence option.
    */
   resolveIngredientSelection(
     availableItems,
@@ -446,7 +478,9 @@ export class IngredientSet {
     // Frozen so a consumer cannot mutate a shared statistic, and attached on BOTH exits
     // so a caller never has to branch on which one produced the result.
     const searchStats = Object.freeze({ nodes: search.nodes, capHit: search.capHit });
-    if (search.selection) return { ...search.selection, searchStats };
+    // Display-only: the bound the essence prune uses, on both exits; it steers nothing.
+    const essenceCeiling = Object.freeze(Object.fromEntries(ctx.index.essence?.ceiling ?? []));
+    if (search.selection) return { ...search.selection, searchStats, essenceCeiling };
 
     // Proven unsatisfiable, or the generous search bound was reached (a safeguard
     // degradation that is never worse than the pre-663 behaviour and never
@@ -459,7 +493,7 @@ export class IngredientSet {
           '(a satisfiable assignment may be missed for this pathological input).'
       );
     }
-    return { ...this._resolveGreedy(availableItems, matcher, ctx), searchStats };
+    return { ...this._resolveGreedy(availableItems, matcher, ctx), searchStats, essenceCeiling };
   }
 
   /**
@@ -874,9 +908,7 @@ export class IngredientSet {
    * @private
    */
   _essenceOptionIsFeasible(member, essence) {
-    if (!member.essenceId || member.need <= 0) return true;
-    if (!essence) return true;
-    return (essence.ceiling.get(member.essenceId) ?? 0) >= member.need;
+    return essenceMemberIsFundable(member, essence);
   }
 
   /**
@@ -1622,8 +1654,7 @@ export class IngredientSet {
       group,
       option,
       groupId: group?.id ?? null,
-      essenceId: String(option?.match?.essenceId || '').trim(),
-      need: Math.max(0, Number(option?.match?.amount) || 0),
+      ...essenceMemberOf(option),
     };
   }
 

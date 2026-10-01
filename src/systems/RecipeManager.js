@@ -1,6 +1,7 @@
 import { getFabricateFlag, isSafeFlagKeySegment } from '../config/flags.js';
 import { SETTING_KEYS } from '../config/settings.js';
 import { matchGatheringTools, classifyGatheringToolStates } from '../gatheringToolRuntime.js';
+import { essenceMemberIsFundable, essenceMemberOf } from '../models/IngredientSet.js';
 import { getIngredientComponentId, getMatchHandler } from '../models/match/matchTypes.js';
 import { DEFAULT_RECIPE_IMAGE, Recipe } from '../models/Recipe.js';
 import { matchComponentByName } from '../utils/componentNameMatch.js';
@@ -2129,7 +2130,7 @@ export class RecipeManager {
   _buildEssenceIngredientState(recipe, group, option, selection, context) {
     const { requirement, isMissing, missingEntry, availableItems, ...base } = context;
     const consumedItem = this._consumedItemForGroup(selection, group, option);
-    const need = Math.max(0, Number(option?.match?.amount) || 0);
+    const { need } = essenceMemberOf(option);
     // A selection with no pool at all (a duck-typed set that never resolved one) falls
     // back to the missing-group verdict rather than silently reading satisfied.
     const delivered = requirement
@@ -2295,14 +2296,16 @@ export class RecipeManager {
           groupName,
           selectedOptionIndex,
           options: options.map((option, idx) =>
-            this._buildOptionChoice(
-              recipe,
-              option,
-              idx,
-              availableItems,
-              affordCurrency,
-              currencyUnits
-            )
+            option?.match?.type === 'essence'
+              ? this._buildEssenceOptionChoice(recipe, option, idx, availableItems, selection)
+              : this._buildOptionChoice(
+                  recipe,
+                  option,
+                  idx,
+                  availableItems,
+                  affordCurrency,
+                  currencyUnits
+                )
           ),
         });
       }
@@ -2376,7 +2379,7 @@ export class RecipeManager {
     );
     const have = matchingItems.reduce((sum, item) => sum + readStackQuantity(item), 0);
     const need = Number(option?.quantity || 1);
-    const choice = {
+    return {
       optionIndex,
       name: visual.name || this._resolveIngredientDescription(recipe, option),
       img: visual.img,
@@ -2387,12 +2390,32 @@ export class RecipeManager {
       costLabel: '',
       affordable: true,
     };
-    if (visual.isEssence === true) {
-      choice.isEssence = true;
-      choice.icon = visual.icon ?? null;
-      choice.colorToken = visual.colorToken ?? null;
-    }
-    return choice;
+  }
+
+  /**
+   * One essence alternative's card: `have` is what the held stacks carry for its essence
+   * before any group claims, `need` its authored amount, and `satisfied` the resolver's
+   * own fundability predicate. Fundable is not funded: the slot reports the allocation.
+   * @private
+   */
+  _buildEssenceOptionChoice(recipe, option, optionIndex, availableItems, selection) {
+    const visual = this._resolveIngredientVisual(recipe, option, availableItems);
+    const member = essenceMemberOf(option);
+    const ceiling = selection?.essenceCeiling ?? {};
+    return {
+      optionIndex,
+      name: visual.name || this._resolveIngredientDescription(recipe, option),
+      img: visual.img,
+      need: member.need,
+      have: Number(ceiling[member.essenceId]) || 0,
+      satisfied: essenceMemberIsFundable(member, { ceiling: new Map(Object.entries(ceiling)) }),
+      isCurrency: false,
+      costLabel: '',
+      affordable: true,
+      isEssence: true,
+      icon: visual.icon ?? null,
+      colorToken: visual.colorToken ?? null,
+    };
   }
 
   /**

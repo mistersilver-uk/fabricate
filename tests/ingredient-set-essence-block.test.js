@@ -466,6 +466,40 @@ test('a set with no essence requirement has a null pool and an empty allocation'
   assert.equal(selection.essencePool, null);
   assert.deepEqual(selection.essenceAllocation, {});
   assert.equal(selection.success, true);
+  assert.deepEqual(selection.essenceCeiling, {}, 'no essence option, so no ceiling');
+});
+
+// Issue 2142: the ceiling is what the held stacks carry before any group claims, so a
+// display can state an essence alternative's fundability in the resolver's own terms.
+test('essenceCeiling on the search exit counts the untouched ledger, not the leftovers', () => {
+  const set = new IngredientSet({
+    id: 's',
+    ingredientGroups: [tagGroup('g-tag', ['metal']), essenceGroup('g-ess', 'fire', 2)],
+  });
+  const matcher = matcherFor({ tags: new Set(['y', 'x']) });
+
+  const selection = set.resolveIngredientSelection([item('y', 2), item('x', 2)], matcher, {
+    resolveItemEssences: essenceProbe({ y: { fire: 1 }, x: { earth: 5 } }),
+  });
+
+  assert.equal(selection.success, true);
+  assert.deepEqual(selection.essenceCeiling, { fire: 2 }, 'only essence ids the set requires are counted');
+  assert.ok(Object.isFrozen(selection.essenceCeiling));
+});
+
+test('essenceCeiling on the greedy exit of an unsatisfiable set still reports what is held', () => {
+  const set = new IngredientSet({
+    id: 's',
+    ingredientGroups: [essenceGroup('g-fire', 'fire', 5), essenceGroup('g-earth', 'earth', 1)],
+  });
+
+  const selection = set.resolveIngredientSelection([item('ember', 2)], null, {
+    resolveItemEssences: essenceProbe({ ember: { fire: 2 } }),
+  });
+
+  assert.equal(selection.success, false, 'the search found nothing, so greedy answered');
+  assert.deepEqual(selection.essenceCeiling, { fire: 4 }, 'an essence nobody holds is absent');
+  assert.ok(Object.isFrozen(selection.essenceCeiling));
 });
 
 test('the pool carries per-carrier units and per-requirement amounts as distinct quantities', () => {
