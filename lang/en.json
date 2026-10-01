@@ -1046,7 +1046,7 @@
         },
         "Mode": {
           "Standard": "Standard (DC)",
-          "StandardCheck": "Standard",
+          "StandardCheck": "Standard check",
           "RoutedByIngredients": "Routed by Ingredients",
           "RoutedByCheck": "Routed by Check",
           "Progressive": "Progressive",

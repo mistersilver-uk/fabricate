@@ -252,7 +252,7 @@ The player-facing Journal screen (see `ui-journal-app/spec.md` *Journal App*) ma
 | Mode                  | Localization key                                 | Player label          |
 |-----------------------|--------------------------------------------------|-----------------------|
 | `simple`              | `FABRICATE.App.Journal.Mode.Standard`            | Standard (DC)         |
-| `simple`, no DC       | `FABRICATE.App.Journal.Mode.StandardCheck`       | Standard              |
+| `simple`, no DC       | `FABRICATE.App.Journal.Mode.StandardCheck`       | Standard check        |
 | `routedByIngredients` | `FABRICATE.App.Journal.Mode.RoutedByIngredients` | Routed by Ingredients |
 | `routedByCheck`       | `FABRICATE.App.Journal.Mode.RoutedByCheck`       | Routed by Check       |
 | `progressive`         | `FABRICATE.App.Journal.Mode.Progressive`         | Progressive           |
@@ -263,7 +263,7 @@ The player-facing Journal screen (see `ui-journal-app/spec.md` *Journal App*) ma
 
 - There is no canonical "Standard" resolution mode.
 `simple` (a DC pass/fail check) renders as "Standard (DC)" for players, even though its internal token stays `simple`.
-- Only a summed roll-high check against a DC reads "Standard (DC)": a `simple` run whose check counts successes, rolls under its target or reads a character value reads "Standard".
+- Only a summed roll-high check against a DC reads "Standard (DC)": a `simple` run whose check counts successes, rolls under its target or reads a character value reads "Standard check".
 An active run reads its active check; a terminal run reads its first attempted stage's recorded product and direction and its executed target.
 - Active crafting mode labels fall back to `simple` ("Standard (DC)") for an unknown or absent resolved mode rather than emitting a raw token.
 - Terminal recipe-backed crafting mode labels MUST use the first attempted stage carrying a captured resolution mode; an absent or unrecognized captured mode yields no mode label, never a fallback inferred from current configuration.

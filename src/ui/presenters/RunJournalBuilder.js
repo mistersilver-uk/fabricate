@@ -53,6 +53,7 @@ import {
   journalCountNeeded,
   journalModeLabelKey,
   recordedNumber,
+  taskCountNeed,
 } from './journalCheckText.js';
 
 const DEFAULT_RUN_IMAGE = 'icons/svg/item-bag.svg';
@@ -1787,18 +1788,18 @@ export class RunJournalBuilder {
   }
 
   _stepCheckResult(runStep, system, recipe) {
-    const needed = system && journalCountNeeded(this._activeCheck(system, recipe));
-    return this._checkResultModel(runStep?.lastCheckResult, needed);
+    const need = system && journalCountNeeded(this._activeCheck(system, recipe));
+    return this._checkResultModel(runStep?.lastCheckResult, need);
   }
 
-  _checkResultModel(lastCheckResult, needed = null) {
+  _checkResultModel(lastCheckResult, need = null) {
     if (!lastCheckResult || typeof lastCheckResult !== 'object') return null;
     // The roll detail lives on `data` (dc, resolved formula, raw total) — surface it
     // so the run journal can show the ACTUAL roll (e.g. "1d20 + 3 = 11 vs DC 16"),
     // not just the authored requirement.
     const data =
       lastCheckResult.data && typeof lastCheckResult.data === 'object' ? lastCheckResult.data : {};
-    const executed = executedTargetFields(data, needed);
+    const executed = executedTargetFields(data, need);
     return {
       success: lastCheckResult.success === true,
       outcome: stringOrNull(lastCheckResult.outcome),
@@ -2256,7 +2257,7 @@ export class RunJournalBuilder {
       check: ['routed', 'progressive'].includes(mode)
         ? this._checkResultModel(
             result,
-            taskCountRequired(system?.gatheringCraftingCheck?.routed, task)
+            taskCountNeed(system?.gatheringCraftingCheck?.routed, task)
           )
         : null,
       tiers: [],

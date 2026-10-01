@@ -307,15 +307,21 @@ export const CASES = Object.freeze([
     label: 'Player Journal — past stage rolled roll-under, target and margin',
     smokeLabels: [],
     reaches: 'beyond',
-    query: { tab: 'journal', journalCaseState: 'past-stage-under' },
+    // Its live check rolls under a character value too, so the header names no DC (issue 2133).
+    query: { tab: 'journal', journalCaseState: 'past-stage-under', rollPromptState: 'under' },
     steps: [
       { selector: '[data-run-id="lab-v1-stage-browser"]' },
       { selector: '[data-stage-nav-index="0"]' },
     ],
     expectTab: 'journal',
-    expectSelector: '[data-journal-detail]:has-text("1d20 = 11 · target 14 · margin +3")',
+    expectSelector:
+      '[data-journal-detail]:has(.journal-detail-meta span:text-is("Standard check"))' +
+      ':has-text("1d20 = 11 · target 14 · margin +3")',
     kinds: ['player', 'journal'],
-    sourceMatches: [JOURNAL_SOURCES, /^src\/ui\/presenters\/RunJournalBuilder\.js$/],
+    sourceMatches: [
+      JOURNAL_SOURCES,
+      /^src\/ui\/presenters\/(?:RunJournalBuilder|journalCheckText)\.js$/,
+    ],
   }),
   // Issue 2103: a future stage under a roll-under crafting check names its Target, never a DC.
   playerCase({
@@ -389,7 +395,7 @@ export const CASES = Object.freeze([
     ],
     expectTab: 'journal',
     expectSelector:
-      '[data-journal-detail]:has(.journal-detail-meta span:text-is("Standard"))' +
+      '[data-journal-detail]:has(.journal-detail-meta span:text-is("Standard check"))' +
       ':has-text("3 successes, 2 needed")',
     kinds: ['player', 'journal'],
     sourceMatches: [
@@ -412,7 +418,9 @@ export const CASES = Object.freeze([
     },
     steps: [{ selector: '[data-history-run-id="lab-v1-finished-routed-count"]' }],
     expectTab: 'journal',
-    expectSelector: '[data-journal-history-detail]:has-text("6 successes, 2 needed")',
+    expectSelector:
+      '[data-journal-detail]:has(.journal-detail-meta span:text-is("Routed by Check"))' +
+      ' [data-journal-history-detail]:has-text("6 successes, 2 needed")',
     kinds: ['player', 'journal'],
     sourceMatches: [
       JOURNAL_SOURCES,

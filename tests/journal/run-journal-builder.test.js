@@ -3912,18 +3912,38 @@ test('a count roll line reads its net against the required count, or its net, ne
 test('a routed count roll line states the check own successes needed, never total less margin', () => {
   const routed = countRouted('over', true);
   const system = { ...SYSTEM, resolutionMode: 'routedByCheck', craftingCheck: { routed } };
+  const record = (outcomeId, total, margin) => ({ type: 'relative', outcomeId, total, margin });
   // Masterwork (+3) matched at net 6 records a margin of 1 against its own threshold of 5.
-  assert.equal(countLine({ type: 'relative', total: 6, margin: 1 }, system), '6 successes, 2 needed');
-  assert.equal(countLine({ type: 'relative', total: 1, margin: 1 }, system), '1 success, 2 needed');
-  assert.equal(countLine({ type: 'relative', total: -1, margin: -1 }, system), 'Botch: −1 net successes');
+  assert.equal(countLine(record('masterwork', 6, 1), system), '6 successes, 2 needed');
+  assert.equal(countLine(record('ruined', 1, 1), system), '1 success, 2 needed');
+  assert.equal(countLine(record('ruined', -1, -1), system), 'Botch: −1 net successes');
   // A macro sets the count at roll time, and a fixed range grades the net itself: neither names one.
   const macro = { ...system, craftingCheck: { routed: { ...routed, dcMode: 'dynamic' } } };
-  assert.equal(countLine({ type: 'relative', total: 6, margin: 1 }, macro), '6 net successes');
+  assert.equal(countLine(record('masterwork', 6, 1), macro), '6 net successes');
   const fixed = { ...system, craftingCheck: { routed: { ...routed, type: 'fixed', fixedOutcomes: [] } } };
-  assert.equal(countLine({ type: 'fixed', total: 6, margin: null }, fixed), '6 net successes');
+  assert.equal(countLine({ type: 'fixed', total: 6, margin: 1 }, fixed), '6 net successes');
   // A check no longer counting has no successes needed to state.
   const summed = { ...system, craftingCheck: { routed: { ...routed, evaluation: undefined } } };
-  assert.equal(countLine({ type: 'relative', total: 6, margin: 1 }, summed), '6 net successes');
+  assert.equal(countLine(record('masterwork', 6, 1), summed), '6 net successes');
+});
+
+// Issue 2133 review: history is never chosen by a later-edited configuration.
+test('a closed routed count states its needed count only while the record agrees with the check', () => {
+  const routed = countRouted('over', true);
+  const system = (edited) => ({ ...SYSTEM, resolutionMode: 'routedByCheck', craftingCheck: { routed: edited } });
+  const record = (outcomeId, total, margin) => ({ type: 'relative', outcomeId, total, margin });
+  assert.equal(countLine(record('masterwork', 6, 1), system(routed)), '6 successes, 2 needed');
+  // The pool now needs 3, so the recorded margin no longer measures against today's count.
+  const raised = { ...routed, evaluation: { ...routed.evaluation, pool: { ...routed.evaluation.pool, required: 3 } } };
+  assert.equal(countLine(record('masterwork', 6, 1), system(raised)), '6 net successes');
+  // Masterwork's step moved from +3 to +4 after the roll.
+  const moved = { ...routed, relativeOutcomes: COUNT_LADDER.map((tier) => (tier.id === 'masterwork' ? { ...tier, dc: 4 } : tier)) };
+  assert.equal(countLine(record('masterwork', 6, 1), system(moved)), '6 net successes');
+  // A tier step or forced outcome records a margin taken from another tier than the one matched.
+  assert.equal(countLine(record('fine', 6, 1), system(routed)), '6 net successes');
+  assert.equal(countLine(record('deleted-tier', 6, 1), system(routed)), '6 net successes');
+  assert.equal(countLine({ type: 'relative', total: 6, margin: 1 }, system(routed)), '6 net successes');
+  assert.equal(countLine({ ...record('masterwork', 6, null) }, system(routed)), '6 net successes');
 });
 
 test('a routed gathering count roll line states the task successes needed', () => {
@@ -3935,7 +3955,7 @@ test('a routed gathering count roll line states the task successes needed', () =
       resolutionSnapshot: { mode: 'routed' },
       economyEvidence: { runtimeSnapshot: { task } },
       checkResult: { success: true, outcome: 'Fine', value: 4,
-        data: { product: 'count', direction: 'over', type: 'relative', total: 4, margin: 0 } },
+        data: { product: 'count', direction: 'over', type: 'relative', outcomeId: 'masterwork', total: 4, margin: 0 } },
     }],
   }).buildListing({ actor: ACTOR, viewer: GM }).history[0].gatheringYield?.check;
   assert.equal(formatRoll({ ...check(countRouted('over')), formula: '' }, countLineEnglish), '4 successes, 1 needed');

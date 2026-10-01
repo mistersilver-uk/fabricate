@@ -1443,6 +1443,12 @@ function terminalCraftingCase(context, recipe, status, id = null) {
  */
 function routedCountCase(context, recipe) {
   const run = terminalCraftingCase(context, recipe, 'succeeded', 'lab-v1-finished-routed-count');
+  run.steps[0].resolutionSnapshot = {
+    kind: 'check',
+    mode: 'routedByCheck',
+    product: 'count',
+    direction: 'over',
+  };
   run.steps[0].lastCheckResult = {
     success: true,
     outcome: 'Masterwork',
