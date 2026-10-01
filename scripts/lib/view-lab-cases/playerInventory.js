@@ -357,6 +357,52 @@ export const CASES = Object.freeze([
     kinds: ['player', 'inventory'],
     sourceMatches: SALVAGE_TARGET_SOURCES,
   }),
+  // Issue 2137: the control, a routed salvage summing against the slag's DC 11, its kicker and its
+  // Reached-at thresholds.
+  playerCase({
+    id: 'player-salvage-routed-dc',
+    label: 'Player app — Routed salvage against a DC, its kicker and thresholds',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'inventory' },
+    steps: [
+      { selector: '.inventory-filters input', fill: 'Ruined Slag' },
+      { selector: CARD_BUTTON('lab-runework:rw-slag') },
+      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+    ],
+    expectSelector:
+      '[data-inventory-salvage-body="routed"]' +
+      ':has(.salvage-dc[data-inventory-salvage-dc="11"]:text-is("DC 11"))' +
+      ':has([data-inventory-salvage-outcome="rw-salv-masterwork"] [data-inventory-outcome-threshold="16"])' +
+      ':not(:has([data-inventory-outcome-band]))',
+    kinds: ['player', 'inventory'],
+    sourceMatches: SALVAGE_TARGET_SOURCES,
+  }),
+  // Issue 2137: a routed salvage counting one success needed states each tier's band in net
+  // successes, as the Journal does, in place of a Reached-at threshold.
+  playerCase({
+    id: 'player-salvage-count-routed',
+    label: 'Player app — Routed salvage that counts successes, its tiers in net successes',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'inventory', rollPromptState: 'salvage-count' },
+    steps: [
+      { selector: '.inventory-filters input', fill: 'Ruined Slag' },
+      { selector: CARD_BUTTON('lab-runework:rw-slag') },
+      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+    ],
+    expectSelector:
+      '[data-inventory-salvage-body="routed"]:not(:has([data-inventory-salvage-dc]))' +
+      ':has([data-inventory-salvage-outcome="rw-salv-masterwork"] [data-inventory-outcome-band="6+"])' +
+      ':has([data-inventory-salvage-outcome="rw-salv-standard"] [data-inventory-outcome-band="1–5"])' +
+      ':has([data-inventory-salvage-outcome="rw-salv-ruined"] [data-inventory-outcome-band="0"])',
+    kinds: ['player', 'inventory'],
+    sourceMatches: [
+      ...SALVAGE_TARGET_SOURCES,
+      /^src\/ui\/presenters\/InventoryListingBuilder\.js$/,
+      /^src\/systems\/runJournalOutcomeBands\.js$/,
+    ],
+  }),
   playerCase({
     id: 'player-salvage-misconfigured',
     label: 'Player app — Salvage misconfigured',

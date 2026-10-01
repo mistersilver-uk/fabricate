@@ -1475,6 +1475,28 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     assert.equal(target.querySelector('[data-inventory-outcome-range]'), null);
   });
 
+  // Issue 2137: a counting check's tier states its net-success band, as the Journal does.
+  it("routed + relative under a counting check renders each tier's band in net successes", async () => {
+    const tier = (id, band) => ({ id, name: id, success: true, threshold: null, band, results: [] });
+    const { services } = salvageServices(
+      salvageItem({
+        mode: 'routed',
+        checkUsable: true,
+        routedType: 'relative',
+        dc: null,
+        routedOutcomes: [tier('crit', '7+'), tier('pass', '2–6'), tier('count-botch', '<0')],
+      })
+    );
+    const target = await openSalvage(services);
+    const bands = [...target.querySelectorAll('[data-inventory-outcome-band]')];
+    assert.deepEqual(
+      bands.map((node) => [node.dataset.inventoryOutcomeBand, node.textContent.trim()]),
+      [['7+', '7+'], ['2–6', '2–6'], ['<0', '<0']]
+    );
+    assert.ok(!target.querySelector('[data-inventory-outcome-threshold]'), 'no Reached-at threshold');
+    assert.ok(!target.querySelector('[data-inventory-salvage-dc]'), 'a count names no DC');
+  });
+
   // AC2. A routed/progressive salvage with no formula aborts in the engine with a
   // GM-config message and zero mutation, so showing its tiers would put a plausible
   // contract under a footer that ALWAYS fails.

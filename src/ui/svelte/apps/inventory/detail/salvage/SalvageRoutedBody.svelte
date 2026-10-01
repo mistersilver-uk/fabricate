@@ -102,6 +102,11 @@
                   {outcome.start}–{outcome.end}
                 </span>
               {/if}
+            {:else if outcome.band}
+              <!-- A counting check's band in net successes, as the Journal states it (issue 2137). -->
+              <span class="salvage-outcome-threshold" data-inventory-outcome-band={outcome.band}>
+                {outcome.band}
+              </span>
             {:else if outcome.threshold !== null}
               <span
                 class="salvage-outcome-threshold"

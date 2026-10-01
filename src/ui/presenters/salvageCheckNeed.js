@@ -6,6 +6,7 @@ import {
 import { activeCheckEvaluation, isFixedSumOver } from '../../systems/checkTarget.js';
 import { countRequired } from '../../systems/countCheck.js';
 import { countFormulaValues, resolvePool } from '../../systems/countEvaluation.js';
+import { craftingOutcomeBand, withCountBotch } from '../../systems/runJournalOutcomeBands.js';
 import { isCountCheck } from '../../systems/salvageCheckUsability.js';
 import { salvageToolsFor } from '../../systems/scopedEntityReads.js';
 
@@ -140,4 +141,25 @@ export function salvageCheckNeed({ mode, config, checkUsable, component }) {
   if (!Number.isFinite(dc)) return { kind: 'noSingleTarget' };
   // Only a summed check reaches here: a count check returned above.
   return evaluation.direction === 'under' ? { kind: 'target', target: dc } : { kind: 'dc', dc };
+}
+
+/**
+ * Routed salvage rows under a counting check, each with the Journal's band in net successes and
+ * a Botch row while cancelling is on (issue 2137), from the same presenter and the salvage's own
+ * successes needed. Rows of any other check are returned as they are.
+ */
+export function withSalvageCountBands(rows, { config, component, localize }) {
+  const need = salvageCheckNeed({ mode: 'routed', config, checkUsable: true, component });
+  if (need.kind !== 'successes') return rows;
+  const outcomes = config.relativeOutcomes;
+  const banded = rows.map((row, index) => ({
+    ...row,
+    band: craftingOutcomeBand(outcomes[index], config, need.count),
+  }));
+  return withCountBotch(
+    banded,
+    config,
+    localize('FABRICATE.Check.CountEvidence.Botch'),
+    need.count
+  );
 }
