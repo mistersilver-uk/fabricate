@@ -454,6 +454,23 @@ describe('suggestChoiceOverrides', () => {
     assert.deepEqual(overrides, { g1: { optionIndex: 2, heldItemId: null } });
   });
 
+  // Issue 2142: an essence amount is not an item count, so rank by held over needed.
+  it('ranks unsatisfied options by coverage, never by the raw held number', () => {
+    const overrides = suggestChoiceOverrides({
+      ingredientChoices: [
+        {
+          kind: 'option',
+          groupId: 'g1',
+          options: [
+            { optionIndex: 0, have: 4, need: 10, satisfied: false, isEssence: true },
+            { optionIndex: 1, have: 1, need: 2, satisfied: false },
+          ],
+        },
+      ],
+    });
+    assert.deepEqual(overrides, { g1: { optionIndex: 1, heldItemId: null } });
+  });
+
   it('breaks an all-equal tie on the authored option order', () => {
     const overrides = suggestChoiceOverrides({
       ingredientChoices: [

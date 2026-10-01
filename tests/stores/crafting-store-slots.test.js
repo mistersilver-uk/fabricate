@@ -171,7 +171,7 @@ function poolRecipe(overrides = {}) {
   };
 }
 
-function makeServices({ recipes = [poolRecipe()], recomputed = null } = {}) {
+function makeServices({ recipes = [poolRecipe()], recomputed = null, evaluate = true } = {}) {
   const calls = { evaluateSelectedSet: [], craftRecipe: [] };
   const services = {
     // Since issue 1075 the listing carries cheap SUMMARY rows and the rich model is
@@ -194,6 +194,7 @@ function makeServices({ recipes = [poolRecipe()], recomputed = null } = {}) {
     getCraftingComponentSourceIds: () => ['hero'],
     getFavouriteRecipeIds: () => [],
   };
+  if (!evaluate) delete services.evaluateSelectedSet;
   return { services, calls };
 }
 
@@ -550,7 +551,7 @@ describe('craftingStore requirement rail and essence pool', () => {
   });
 
   it('pickForMe adopts the resolver suggestion and the most-held choice option', async () => {
-    const { store } = await loadedStore();
+    const { store, calls } = await loadedStore();
     store.pickForMe('Picked for you.');
     flushSync();
 
@@ -559,6 +560,54 @@ describe('craftingStore requirement rail and essence pool', () => {
       'g-herb': { optionIndex: 1, heldItemId: null },
     });
     assert.equal(store.slotAnnouncement, 'Picked for you.');
+    assert.equal(calls.evaluateSelectedSet.length, 0, 'a component switch needs no second pass');
+  });
+
+  // Issue 2142: the pool a switch onto an essence alternative needs is not the one the
+  // previous selection suggested, so the store asks the resolver for the new one.
+  it('pickForMe re-suggests the pool when it switches a group onto an essence alternative', async () => {
+    const { store, calls } = await loadedStore(primalChoiceStore());
+    store.chooseIngredientOption('g-other', { optionIndex: 2 });
+    // An emptied pool, so passing the current allocation would send {} rather than null.
+    store.setEssenceAllocation('Item.moss-1', 0);
+    flushSync();
+    void store.selectedCraftability;
+    const before = calls.evaluateSelectedSet.length;
+
+    store.pickForMe('Picked for you.');
+    flushSync();
+    const expected = {
+      'g-other': { optionIndex: 2, heldItemId: null },
+      'g-primal': { optionIndex: 1, heldItemId: null },
+    };
+    assert.deepEqual(store.selectedIngredientOptions, expected);
+    const pass = calls.evaluateSelectedSet[before];
+    assert.deepEqual(pass?.optionOverrides, expected, 'the new selection, earlier choices kept');
+    assert.equal(pass?.essenceAllocation, null, 'with no allocation, so the resolver suggests');
+    assert.deepEqual(store.selectedEssenceAllocation['set-a::step-1'], { 'Item.moss-1': 1 });
+  });
+
+  it('pickForMe falls back to the current craftability when nothing can re-evaluate', async () => {
+    const current = { ...essenceChoiceCraftability().essencePool, suggested: { 'Item.current': 1 } };
+    const { store } = await loadedStore({
+      ...primalChoiceStore(componentChosenCraftability({ essencePool: current })),
+      evaluate: false,
+    });
+    store.pickForMe('Picked for you.');
+    flushSync();
+    assert.deepEqual(store.selectedEssenceAllocation['set-a::step-1'], { 'Item.current': 1 });
+  });
+
+  it('pickForMe keeps one pass when the group already sits on its essence alternative', async () => {
+    const { store, calls } = await loadedStore({
+      recipes: [
+        poolRecipe({ ingredientSets: [{ id: 'set-a', craftability: essenceChoiceCraftability() }] }),
+      ],
+    });
+    store.pickForMe('Picked for you.');
+    flushSync();
+    assert.equal(calls.evaluateSelectedSet.length, 0);
+    assert.deepEqual(store.selectedEssenceAllocation['set-a::step-1'], { 'Item.moss-1': 1 });
   });
 
   it('pickForMe on an infeasible inventory suggests what it can and reports the shortfall', async () => {

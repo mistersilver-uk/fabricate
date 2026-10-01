@@ -76,6 +76,22 @@ const RECIPE_STATUS_AVAILABLE = 'available';
 // interleaved alphabetically). A local copy keeps the store import-free.
 const GENERAL_RECIPE_CATEGORY = 'general';
 
+// Whether a "Pick for me" suggestion moves any group onto an essence alternative it
+// was not already on.
+function switchesOntoEssence(craftability, suggestedOptions) {
+  const choices = Array.isArray(craftability?.ingredientChoices)
+    ? craftability.ingredientChoices
+    : [];
+  return choices.some((choice) => {
+    const index = suggestedOptions?.[choice?.groupId]?.optionIndex;
+    if (choice?.kind !== 'option' || index == null || index === choice.selectedOptionIndex) {
+      return false;
+    }
+    const options = Array.isArray(choice.options) ? choice.options : [];
+    return options.some((option) => option?.optionIndex === index && option.isEssence === true);
+  });
+}
+
 export function createCraftingStore({ services } = {}) {
   let listing = $state(null);
   let loading = $state(false);
@@ -396,9 +412,14 @@ export function createCraftingStore({ services } = {}) {
     // would refill themselves the moment the player zeroed their last carrier.
     const hasAllocation = allocation !== null;
     if (!set?.id || (!hasOverrides && !hasAllocation)) return baked;
-    const recomputed = services?.evaluateSelectedSet?.({
+    return evaluateSet(set.id, overrides, allocation) ?? baked;
+  });
+
+  // Re-evaluate one set through the resolver seam the engine consumes.
+  function evaluateSet(setId, overrides, allocation) {
+    return services?.evaluateSelectedSet?.({
       recipeId: selectedRecipe?.id ?? null,
-      setId: set.id,
+      setId,
       optionOverrides: overrides,
       // NULL, not `{}`, for an untouched pool. The model reads a supplied allocation
       // as authoritative and never tops it up, and `{}` is a supplied allocation — so
@@ -410,8 +431,7 @@ export function createCraftingStore({ services } = {}) {
       actorId: currentActorId(),
       componentSourceActorIds: currentSourceIds(),
     });
-    return recomputed ?? baked;
-  });
+  }
 
   // The rail's ordered slot list, and the chooser that is open for it.
   const railSlots = $derived(
@@ -704,11 +724,18 @@ export function createCraftingStore({ services } = {}) {
    *   owns the i18n, exactly as the progressive reorder path does).
    */
   function pickForMe(announcement = '') {
-    const craftability = selectedCraftability;
-    const suggestedOptions = suggestChoiceOverrides(craftability);
+    const current = selectedCraftability;
+    const suggestedOptions = suggestChoiceOverrides(current);
     if (Object.keys(suggestedOptions).length > 0) {
       selectedIngredientOptions = { ...selectedIngredientOptions, ...suggestedOptions };
     }
+    // A switch onto an essence alternative needs the pool the new selection suggests,
+    // so that one case re-evaluates with no allocation; every other pick is one pass.
+    const setId = selectedSet?.id ?? null;
+    const craftability =
+      setId && switchesOntoEssence(current, suggestedOptions)
+        ? (evaluateSet(setId, selectedIngredientOptions, null) ?? current)
+        : current;
     // Adopting the suggestion is itself an EDIT — the player asked for it — so the
     // write happens whenever the set has a pool at all, marking the scope funded even
     // when the suggestion is empty. Sizing the suggestion instead would leave the

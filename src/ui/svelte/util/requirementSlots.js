@@ -326,12 +326,18 @@ export function buildConsumptionPlan(craftability, { chosenGroupIds = [] } = {})
   };
 }
 
+// Held over needed, so an essence amount is never compared against an item count.
+function coverageOf(option) {
+  const need = toCount(option?.need);
+  return need > 0 ? toCount(option?.have) / need : toCount(option?.have);
+}
+
 function bestOption(options) {
   const ranked = [...options].sort((left, right) => {
     const satisfied = Number(right?.satisfied === true) - Number(left?.satisfied === true);
     if (satisfied !== 0) return satisfied;
-    const held = toCount(right?.have) - toCount(left?.have);
-    if (held !== 0) return held;
+    const covered = coverageOf(right) - coverageOf(left);
+    if (covered !== 0) return covered;
     return toCount(left?.optionIndex) - toCount(right?.optionIndex);
   });
   return ranked[0] ?? null;
@@ -363,9 +369,9 @@ function applyStackChoice(overrides, choice) {
 }
 
 /**
- * "Pick for me" for the set's choice slots: the option the player holds most of,
- * preferring one that actually satisfies, with the authored option order as the
- * final tie-break so the suggestion is stable across renders.
+ * "Pick for me" for the set's choice slots: the option that satisfies, then the one
+ * best covered (held over needed), with the authored option order as the final
+ * tie-break so the suggestion is stable across renders.
  *
  * Read STRAIGHT off the craftability's own `ingredientChoices` — the UI never
  * re-derives what is held or what satisfies, because that is the resolver's answer
