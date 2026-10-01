@@ -1248,7 +1248,7 @@ export class RunJournalBuilder {
           ),
         };
       });
-      return withCountBotch(tiers, routed, botch);
+      return withCountBotch(tiers, routed, botch, dc);
     } catch {
       return null;
     }
@@ -2362,7 +2362,8 @@ export class RunJournalBuilder {
         ),
       };
     });
-    return withCountBotch(tiers, routed, this.localize('FABRICATE.Check.CountEvidence.Botch'));
+    const botch = this.localize('FABRICATE.Check.CountEvidence.Botch');
+    return withCountBotch(tiers, routed, botch, taskCountRequired(routed, task));
   }
 
   _tierYield(result, systemId, index) {

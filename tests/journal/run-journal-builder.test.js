@@ -3744,9 +3744,10 @@ test('the crafting and gathering count ladders open with a Botch row only while 
       getGatheringTask: () => task,
     }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0].gatheringYield.tiers;
   };
+  // The task needs 1, so Ruined (−2) is met from a net of −1 and only a lower net is a Botch.
   assert.deepEqual(
     gatheringTiers(countRouted('over', true)).map((tier) => tier.band),
-    ['<0', '0', '1', '2–3', '4+']
+    ['<−1', '−1–0', '1', '2–3', '4+']
   );
   assert.equal(gatheringTiers(countRouted('over')).length, 4);
 });
@@ -3763,6 +3764,44 @@ test('the Botch row sits beside the least demanding tier, whichever way the ladd
     ['masterwork', 'fine', 'success', 'ruined', 'count-botch'],
     'a best-first ladder closes on its Botch row rather than opening on it'
   );
+});
+
+// Issue 2135: the Botch row covers only the nets no tier meets, beside the least demanding tier.
+const offsetLadder = (...offsets) =>
+  offsets.map((dc, index) => ({ id: String.fromCodePoint(65 + index), name: '', success: dc >= 0, dc }));
+const countLadder = (required, offsets, cancel = true) => {
+  const routed = { ...countRouted('over', cancel), relativeOutcomes: offsets };
+  const tiers = offsets.map((outcome) => ({ id: outcome.id, band: craftingOutcomeBand(outcome, routed, required) }));
+  return withCountBotch(tiers, routed, 'Botch', required).map((tier) => `${tier.id} ${tier.band}`);
+};
+
+test('a non-positive tier keeps its own band and the Botch row starts below it (issue 2135)', () => {
+  // Required 0 at offsets −2/0/+1: a net of −2 or −1 meets A, so only a net below −2 is a Botch.
+  assert.deepEqual(countLadder(0, offsetLadder(-2, 0, 1)), ['count-botch <−2', 'A −2–−1', 'B 0', 'C 1+']);
+  // Two negative tiers: a net of −1 meets B, the higher of them, never the least demanding one.
+  assert.deepEqual(
+    countLadder(0, offsetLadder(-3, -1, 2)),
+    ['count-botch <−3', 'A −3–−2', 'B −1–1', 'C 2+']
+  );
+  assert.deepEqual(countLadder(0, offsetLadder(-2)), ['count-botch <−2', 'A −2+']);
+  // Without cancelling no net falls below zero, so the least demanding tier starts at 0.
+  assert.deepEqual(countLadder(1, offsetLadder(-4, 0, 5), false), ['A 0', 'B 1–5', 'C 6+']);
+  assert.deepEqual(countLadder(1, offsetLadder(-4, 0, 5)), ['count-botch <−3', 'A −3–0', 'B 1–5', 'C 6+']);
+  for (const [required, offsets] of [[0, [-2, 0, 1]], [0, [-3, -1, 2]], [3, [0, -2, 1]], [2, [-2, 0, 2]]]) {
+    const ladder = countLadder(required, offsetLadder(...offsets)).map((row) => row.split(' ', 2)[1]);
+    assert.equal(new Set(ladder).size, ladder.length, `no band repeats at ${offsets}`);
+  }
+});
+
+test('the Botch row sits beside the least demanding tier of an unordered ladder (issue 2135)', () => {
+  // Offsets 0/−2/+1 from 3: A needs 3, B 1 and C 4, so the Botch row precedes B, not A.
+  assert.deepEqual(countLadder(3, offsetLadder(0, -2, 1)), ['A 3', 'count-botch <0', 'B 0–2', 'C 4+']);
+  // Read best-first at its ends, the row follows the least demanding tier instead.
+  assert.deepEqual(countLadder(3, offsetLadder(2, -2, 0, 1)), ['A 5+', 'B 0–2', 'count-botch <0', 'C 3', 'D 4']);
+  // A macro-set count cannot place its Botch row below an unknown count, so it stays below 0.
+  const routed = { ...countRouted('over', true), relativeOutcomes: offsetLadder(-2, 0) };
+  const macro = withCountBotch(routed.relativeOutcomes.map(({ id }) => ({ id })), routed, 'Botch', null);
+  assert.deepEqual(macro.map((tier) => [tier.id, tier.band]), [['count-botch', '<0'], ['A', undefined], ['B', undefined]]);
 });
 
 // Issue 2133: the header's mode pill says DC only for a check graded against one.
