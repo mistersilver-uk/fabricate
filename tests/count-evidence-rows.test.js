@@ -13,7 +13,7 @@ import {
   statesCountEvidence,
 } from '../src/ui/presenters/countEvidenceRows.js';
 
-import { shippedLocalize } from './helpers/checkEvidenceFixtures.js';
+import { NOT_PUBLIC, shippedLocalize } from './helpers/checkEvidenceFixtures.js';
 
 const PUBLIC = { rollMode: 'publicroll', secret: false };
 
@@ -195,5 +195,81 @@ test('a summed check or a count without executed dice states no count evidence',
     assert.equal(statesCountEvidence(display), false);
     assert.equal(countSummaryText(display, shippedLocalize), '');
     assert.deepEqual(countEvidenceRows(display, shippedLocalize), []);
+  }
+});
+
+/** Frame 39: three d20s under 14, the last of them bought with a point of Momentum. */
+function bought({ visibility = PUBLIC, resourceLabel = 'Momentum', pool, terms = [] } = {}) {
+  return executedCheckDisplay({
+    data: {
+      product: 'count',
+      direction: 'under',
+      comparison: 'meet',
+      total: 1,
+      target: 14,
+      boughtDice: { count: 1, source: 'macro' },
+    },
+    visibility,
+    countDisplay: {
+      die: 20,
+      bought: 1,
+      resourceLabel,
+      results: [
+        { index: 0, face: 1, active: true, qualified: true },
+        { index: 1, face: 20, active: true, cancelled: true },
+        { index: 2, face: 11, active: true, qualified: true },
+      ],
+      qualified: 2,
+      cancelled: 1,
+      net: 1,
+      required: 1,
+      margin: 0,
+      zeroPool: false,
+      pool: { base: 2, terms, rolled: 3, ...pool },
+      threshold: { anchor: 14, source: 'fixed', terms: [], effective: 14 },
+    },
+  });
+}
+
+test('a count that bought dice states them in its summary and its Additional dice row', () => {
+  const display = bought();
+  assert.equal(countSummaryText(display, shippedLocalize), '3d20 (2 + 1 bought), each ≤ 14');
+  assert.deepEqual(rows(display), [
+    ['count', '2 qualified − 1 cancelled = 1 net', undefined],
+    ['needed', '1 · margin +0', undefined],
+    ['additionalDice', '1 bought · spent 1 Momentum', undefined],
+  ]);
+  assert.equal(
+    countEvidenceRows(display, shippedLocalize).at(-1).label,
+    'Additional dice',
+    'the row is labelled'
+  );
+});
+
+test('an unlabelled resource drops its noun, and a grown pool keeps its modifier suffix', () => {
+  assert.deepEqual(rows(bought({ resourceLabel: '' })).at(-1), [
+    'additionalDice',
+    '1 bought · spent 1',
+    undefined,
+  ]);
+  const grown = bought({ pool: { rolled: 4 }, terms: [{ source: 'library', value: 1 }] });
+  assert.equal(
+    countSummaryText(grown, shippedLocalize),
+    '4d20 (3 + 1 bought), each ≤ 14 (pool grown +1 by modifiers)'
+  );
+});
+
+test('a secret or non-public count states no bought dice in its summary or rows', () => {
+  for (const visibility of NOT_PUBLIC) {
+    const display = bought({ visibility });
+    assert.equal(
+      countSummaryText(display, shippedLocalize),
+      '3d20, each ≤ 14',
+      JSON.stringify(visibility)
+    );
+    assert.ok(
+      rows(display).every(([id]) => id !== 'additionalDice'),
+      JSON.stringify(visibility)
+    );
   }
 });

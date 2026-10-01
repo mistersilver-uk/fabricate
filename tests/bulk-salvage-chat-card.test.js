@@ -4,16 +4,18 @@
  * plain model in and a string out with no Foundry stubs.
  */
 
-import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 
+import { BulkSalvageService } from '../src/systems/BulkSalvageService.js';
 import {
   BULK_SALVAGE_CHAT_KEYS,
   buildBulkSalvageChatContent,
   sumChatEntriesByName,
 } from '../src/ui/presenters/BulkSalvageChatCard.js';
-import { BulkSalvageService } from '../src/systems/BulkSalvageService.js';
+import { executedCheckDisplay } from '../src/ui/presenters/checkDisplay.js';
 import { SALVAGE_CHAT_KEYS } from '../src/ui/presenters/SalvageChatCard.js';
+
 import {
   bulkComponent,
   bulkSystem,
@@ -529,5 +531,57 @@ describe('buildBulkSalvageChatContent: each subject states its own executed evid
       interactive: false,
     });
     assert.equal(occurrences(posted[0].content, 'data-check-evidence="target"'), 1);
+  });
+});
+
+describe('bought dice on a bulk card (issue 2008)', () => {
+  /** A pool of none lifted to one d8 by the die bought from an unnamed resource, under 4. */
+  const boughtSubject = (name, visibility) =>
+    cardSubject({
+      name,
+      rollValue: 1,
+      check: executedCheckDisplay({
+        data: {
+          product: 'count',
+          direction: 'under',
+          comparison: 'meet',
+          total: 1,
+          target: 4,
+          boughtDice: { count: 1, source: 'macro' },
+        },
+        visibility,
+        countDisplay: {
+          die: 8,
+          bought: 1,
+          results: [{ index: 0, face: 3, active: true, qualified: true }],
+          qualified: 1,
+          cancelled: 0,
+          net: 1,
+          required: null,
+          zeroPool: false,
+          pool: { base: 0, terms: [], rolled: 1 },
+          threshold: { anchor: 4, source: 'fixed', terms: [], effective: 4 },
+        },
+      }),
+    });
+
+  it('states each subject’s bought dice under that subject’s own visibility', () => {
+    const html = buildBulkSalvageChatContent(
+      {
+        status: 'succeeded',
+        actorNames: ['Akra'],
+        counts: { total: 2, succeeded: 2, failed: 0 },
+        subjects: [
+          boughtSubject('Iron Ore', { rollMode: 'publicroll', secret: false }),
+          boughtSubject('Boar Hide', NOT_PUBLIC[0]),
+        ],
+      },
+      shippedLocalize
+    );
+    const [ore, hide] = html.split('Boar Hide');
+    assert.equal(occurrences(ore, '1d8 (0 + 1 bought), each ≤ 4'), 1);
+    assert.equal(occurrences(ore, 'data-dice-tile-marks="qualified bought"'), 1);
+    assert.equal(occurrences(ore, '>1 bought · spent 1</dd>'), 1, 'no noun for an unnamed resource');
+    assert.doesNotMatch(hide, /bought|Additional dice/, 'the GM-only subject states none');
   });
 });

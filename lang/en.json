@@ -1996,6 +1996,15 @@
         "Disadvantage": "Disadvantage",
         "PreRollLowering": "{label} {formula} rolled {total}, lowering the target",
         "SourceDisadvantage": "disadvantage"
+      },
+      "BoughtDice": {
+        "Summary": "{pool}d{die} ({unbought} + {bought} bought), each {symbol} {threshold}",
+        "SummaryGrown": "{pool}d{die} ({unbought} + {bought} bought), each {symbol} {threshold} (pool grown {grown} by modifiers)",
+        "Row": "Additional dice",
+        "Spent": "{count} bought · spent {count}",
+        "SpentResource": "{count} bought · spent {count} {resource}",
+        "TileLabel": "{label}, bought",
+        "Legend": "{legend} · dashed = bought"
       }
     },
     "Knowledge": {

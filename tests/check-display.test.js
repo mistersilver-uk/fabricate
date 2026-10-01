@@ -12,6 +12,8 @@ import {
 } from '../src/ui/presenters/checkDisplay.js';
 import { pathBreakSegments } from '../src/ui/presenters/checkEvidenceRows.js';
 
+import { NOT_PUBLIC } from './helpers/checkEvidenceFixtures.js';
+
 const PRIVATE = /SECRET_PATH|SECRET_LABEL|SECRET_POLICY|@skills/;
 
 /** An authored evaluation carrying every private field a projection must never repeat. */
@@ -335,5 +337,86 @@ describe('the count projection (issue 2006)', () => {
     assert.equal(executedCheckEvidence(zero).total, null);
     assert.equal(executedCheckEvidence({ ...zero, product: 'sum' }), null, 'only a count pool');
     assert.equal(executedCheckEvidence({ ...zero, zeroPool: false }), null);
+  });
+});
+
+/** The dice a public count bought, salted with every private field a projection must drop. */
+const BOUGHT_DICE = Object.freeze({
+  count: 2,
+  source: 'path',
+  path: 'system.resources.SECRET_PATH.value',
+  readMacroUuid: 'Macro.SECRET_UUID',
+  spendMacroUuid: 'Macro.SECRET_UUID',
+  label: 'SECRET_LABEL',
+  amount: 7,
+});
+
+function boughtDisplay({ visibility = { rollMode: 'publicroll', secret: false }, ...display } = {}) {
+  return executedCheckDisplay({
+    data: { ...COUNT_DATA, boughtDice: BOUGHT_DICE },
+    visibility,
+    countDisplay: { ...COUNT_DISPLAY, bought: 2, resourceLabel: 'Momentum', ...display },
+  });
+}
+
+describe('the bought dice of a count (issue 2008)', () => {
+  it('admits the count, the marked dice and the Resource name alone, marking the last original', () => {
+    const display = boughtDisplay();
+    assert.deepEqual(display.count.boughtDice, { count: 2, marked: 2, resourceLabel: 'Momentum' });
+    assert.doesNotMatch(JSON.stringify(display), /SECRET|"path"|amount|Macro|"source":"path"/);
+    assert.deepEqual(
+      display.count.tiles.tiles.map((tile) => [tile.face, tile.bought === true]),
+      [
+        [10, false],
+        [8, false],
+        [1, true],
+      ],
+      'the last two originals, the 1 and the inactive 4 that draws no tile; never the 10’s explosion'
+    );
+    assert.equal(display.count.tiles.bought, 2);
+    assert.ok(Object.isFrozen(display.count.boughtDice));
+  });
+
+  it('breaks every enricher shape in the Resource name and trims it', () => {
+    const display = boughtDisplay({ resourceLabel: '  [[/r 1d20]] @UUID[Actor.x]{y} &Reference[z] ' });
+    assert.equal(
+      display.count.boughtDice.resourceLabel,
+      '[\u{2060}[/r 1d20]] @\u{2060}UUID[Actor.x]{y} &\u{2060}Reference[z]'
+    );
+    assert.equal(boughtDisplay({ resourceLabel: undefined }).count.boughtDice.resourceLabel, '');
+    assert.equal(boughtDisplay({ resourceLabel: 42 }).count.boughtDice.resourceLabel, '');
+  });
+
+  it('bounds the marked dice by the dice bought, and reads none for a missing count', () => {
+    assert.equal(boughtDisplay({ bought: 5 }).count.boughtDice.marked, 2);
+    assert.equal(boughtDisplay({ bought: 1 }).count.boughtDice.marked, 1);
+    assert.equal(boughtDisplay({ bought: undefined }).count.boughtDice.marked, 0);
+    assert.ok(!Object.hasOwn(boughtDisplay({ bought: undefined }).count.tiles, 'bought'));
+  });
+
+  it('states nothing bought for a secret or non-public check, its tiles unmarked', () => {
+    for (const visibility of NOT_PUBLIC) {
+      const display = boughtDisplay({ visibility });
+      const label = JSON.stringify(visibility);
+      assert.ok(!Object.hasOwn(display.count, 'boughtDice'), label);
+      assert.ok(!Object.hasOwn(display.count.tiles, 'bought'), label);
+      assert.ok(display.count.tiles.tiles.every((tile) => !Object.hasOwn(tile, 'bought')), label);
+    }
+  });
+
+  it('carries no key for a count that bought nothing, so its projection is unchanged', () => {
+    const plain = executedCheckDisplay({
+      data: COUNT_DATA,
+      visibility: { rollMode: 'publicroll', secret: false },
+      countDisplay: COUNT_DISPLAY,
+    });
+    for (const boughtDice of [undefined, null, { count: 0 }, { count: 1.5 }, { count: '1' }]) {
+      const display = executedCheckDisplay({
+        data: { ...COUNT_DATA, boughtDice },
+        visibility: { rollMode: 'publicroll', secret: false },
+        countDisplay: { ...COUNT_DISPLAY, bought: 1, resourceLabel: 'Momentum' },
+      });
+      assert.deepEqual(display, plain, JSON.stringify(boughtDice));
+    }
   });
 });

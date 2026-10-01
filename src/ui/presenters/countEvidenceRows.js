@@ -38,6 +38,18 @@ const KEYS = Object.freeze({
   zeroPoolResult: 'FABRICATE.Check.CountEvidence.ZeroPoolResult',
   modifiers: 'FABRICATE.Check.CountEvidence.SourceModifiers',
   disadvantage: 'FABRICATE.Check.Advantage.SourceDisadvantage',
+  additionalDice: 'FABRICATE.Check.BoughtDice.Row',
+  spent: 'FABRICATE.Check.BoughtDice.Spent',
+  spentResource: 'FABRICATE.Check.BoughtDice.SpentResource',
+});
+
+/** The summary keys of a pool without and with bought dice (issue 2008). */
+const SUMMARY_KEYS = Object.freeze({
+  plain: { line: KEYS.summary, grown: KEYS.summaryGrown },
+  bought: {
+    line: 'FABRICATE.Check.BoughtDice.Summary',
+    grown: 'FABRICATE.Check.BoughtDice.SummaryGrown',
+  },
 });
 
 /** The word each settled source reads as in a zero-pool sentence. */
@@ -83,8 +95,8 @@ function sourceWord(terms, loc) {
 
 /**
  * The line a result states in place of a roll total: `6d10, each ≥ 8 (pool grown +1 by
- * modifiers)`, or for a pool reduced to zero `6d10 − 6 situational = 0 dice`. '' without count
- * evidence.
+ * modifiers)`, `3d20 (2 + 1 bought), each ≤ 14` with bought dice, or for a pool reduced to zero
+ * `6d10 − 6 situational = 0 dice`. '' without count evidence.
  */
 export function countSummaryText(display, localize = (key) => key) {
   if (!statesCountEvidence(display)) return '';
@@ -98,9 +110,11 @@ export function countSummaryText(display, localize = (key) => key) {
     return fill(loc(KEYS.summaryZero), { ...base, change: spacedChange(grown), source });
   }
   const values = formulaValues(display, count.pool.rolled, count.threshold.effective);
-  const line = { ...values, symbol: values.comparison };
-  if (grown === 0) return fill(loc(KEYS.summary), line);
-  return fill(loc(KEYS.summaryGrown), { ...line, grown: formatSignedStep(grown) });
+  const bought = count.boughtDice?.marked ?? 0;
+  const keys = bought > 0 ? SUMMARY_KEYS.bought : SUMMARY_KEYS.plain;
+  const line = { ...values, symbol: values.comparison, unbought: values.pool - bought, bought };
+  if (grown === 0) return fill(loc(keys.line), line);
+  return fill(loc(keys.grown), { ...line, grown: formatSignedStep(grown) });
 }
 
 /**
@@ -171,6 +185,15 @@ function preRolledRow(display, loc) {
   return text ? { id: 'preRolled', label: loc(KEYS.preRolled), text } : null;
 }
 
+/** `1 bought · spent 1 Momentum`, or without a Resource name `1 bought · spent 1` (issue 2008). */
+function additionalDiceRow(count, loc) {
+  const bought = count.boughtDice;
+  if (!bought) return null;
+  const { count: dice, resourceLabel: resource } = bought;
+  const text = fill(loc(resource ? KEYS.spentResource : KEYS.spent), { count: dice, resource });
+  return { id: 'additionalDice', label: loc(KEYS.additionalDice), text };
+}
+
 function zeroPoolRows(count, loc) {
   const { terms } = count.pool;
   const change = formatSignedStep(sum(terms));
@@ -188,7 +211,8 @@ function zeroPoolRows(count, loc) {
 
 /**
  * `[{ id, label, text, tone? }]` for an executed count check, empty without count evidence; the
- * Count row reads `danger` below zero. A progressive or fixed-range check states no Needed row.
+ * Count row reads `danger` below zero. A progressive or fixed-range check states no Needed row,
+ * and a check that bought no dice no Additional dice row.
  */
 export function countEvidenceRows(display, localize = (key) => key) {
   if (!statesCountEvidence(display)) return [];
@@ -197,6 +221,12 @@ export function countEvidenceRows(display, localize = (key) => key) {
   const preRolled = preRolledRow(display, loc);
   const rows = count.zeroPool
     ? [preRolled, ...zeroPoolRows(count, loc)]
-    : [successOnRow(display, loc), countRow(count, loc), neededRow(count, loc), preRolled];
+    : [
+        successOnRow(display, loc),
+        countRow(count, loc),
+        neededRow(count, loc),
+        preRolled,
+        additionalDiceRow(count, loc),
+      ];
   return rows.filter(Boolean);
 }

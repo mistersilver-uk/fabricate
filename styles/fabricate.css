@@ -16510,6 +16510,11 @@
   color: var(--fab-danger-text);
 }
 
+/* A bought die (issue 2008) dashes the border it already has, so its tone's colour stands. */
+.fabricate-dice-tiles__tile--bought {
+  border-style: dashed;
+}
+
 /* On a chat card a tile mixes its tone into the chat's own ink, as the result pill does, so it reads on parchment and on a dark chat theme alike. */
 .fabricate-craft-chat .fabricate-dice-tiles__tile {
   --fabricate-dice-tile-tone: currentcolor;
