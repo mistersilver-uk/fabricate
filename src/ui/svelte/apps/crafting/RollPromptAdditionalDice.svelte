@@ -1,0 +1,100 @@
+<!--
+  The roll prompt's additional-dice control (issue 2008, frame 31): the title, the resource and
+  spend line, the shared `Stepper` at the row's end and the one message beneath. It renders only
+  while the check offers additional dice.
+
+  Props:
+  | prop | values | default | contract |
+  | --- | --- | --- | --- |
+  | `view` | `describeAdditionalDice`'s result | none | The prepared lines, message and `disabled`. |
+  | `labels` | the view's `labels.additionalDice` | none | Title and the stepper's localized names. |
+  | `value` / `limit` | integers | none | The chosen dice and the most that may be bought. |
+  | `onChange(value)` | function | no-op | The stepper's clamped value. |
+-->
+<script>
+  import Notice from '../../components/Notice.svelte';
+  import Stepper from '../../components/Stepper.svelte';
+
+  let { view, labels, value, limit, onChange = () => {} } = $props();
+  const instanceId = $props.id();
+  const lineId = `${instanceId}-line`;
+  const messageId = `${instanceId}-message`;
+</script>
+
+<section class="additional-dice" data-roll-prompt-additional-dice-group>
+  <div class="additional-dice-row">
+    <div class="additional-dice-text">
+      <p class="additional-dice-title" data-roll-prompt-additional-dice-title>{labels.title}</p>
+      <p class="additional-dice-line" id={lineId}>
+        <span data-roll-prompt-additional-dice-resource>{view.resourceLine}</span> ·
+        <span data-roll-prompt-additional-dice-spend>{view.spendLine}</span>
+      </p>
+    </div>
+    <span class="additional-dice-stepper" data-roll-prompt-additional-dice-stepper>
+      <Stepper
+        density="comfortable"
+        min={0}
+        max={limit}
+        {value}
+        disabled={view.disabled}
+        ariaLabel={labels.title}
+        decrementLabel={labels.decrease}
+        incrementLabel={labels.increase}
+        inputProps={{
+          name: 'additionalDice',
+          'data-roll-prompt-additional-dice': '',
+          'aria-describedby': view.message ? `${lineId} ${messageId}` : lineId,
+        }}
+        {onChange}
+      />
+    </span>
+  </div>
+  {#if view.message}
+    <div id={messageId}>
+      <Notice
+        tone={view.message.tone}
+        title={view.message.text}
+        dataAttr="data-roll-prompt-additional-dice-message"
+      />
+    </div>
+  {/if}
+</section>
+
+<style>
+  .additional-dice {
+    display: grid;
+    gap: var(--fab-space-2);
+    padding: calc(var(--fab-space-3) - 1px) var(--fab-space-3);
+    border: 1px solid var(--fab-border);
+    border-radius: 9px;
+    background: var(--fab-bg-2);
+  }
+  .additional-dice-row {
+    display: flex;
+    align-items: center;
+    gap: var(--fab-space-3);
+  }
+  .additional-dice-text {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .additional-dice-stepper {
+    display: inline-flex;
+    flex: none;
+  }
+  .additional-dice-title {
+    margin: 0;
+    color: var(--fab-text);
+    font-size: 11.5px;
+    font-weight: 600;
+    line-height: normal;
+  }
+  .additional-dice-line {
+    margin: var(--fab-space-2xs) 0 0;
+    color: var(--fab-text-subtle);
+    font-size: 10.5px;
+    font-weight: 500;
+    line-height: normal;
+    overflow-wrap: anywhere;
+  }
+</style>

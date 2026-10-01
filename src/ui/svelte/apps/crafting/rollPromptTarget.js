@@ -82,10 +82,11 @@ function basisParts(basis, labels, actorName) {
  * Any other chip keeps its prepared `chipText`. A summed roll-under chip names the target after
  * its flat modifiers, Tool bonus and typed flat bonus, which raise it, so it follows the player's
  * picks and typing; a rolled contribution is named as pending, never averaged in. The line names a
- * character-value basis always, and a fixed target only when something raised it.
+ * character-value basis always, and a fixed target only when something raised it. A count pool
+ * also settles the `additionalDice` the player chose (issue 2008).
  */
-export function rollPromptTarget(data, selectedIds, bonus = '') {
-  if (data.count) return countTarget(data, selectedIds, bonus);
+export function rollPromptTarget(data, selectedIds, bonus = '', additionalDice = 0) {
+  if (data.count) return countTarget(data, selectedIds, bonus, additionalDice);
   if (data.direction !== 'under') return { chipText: data.chipText, source: '' };
   const { labels } = data;
   const comparison = data.comparison === 'exceed' ? labels.exceed : labels.meet;
@@ -113,9 +114,10 @@ export function rollPromptTarget(data, selectedIds, bonus = '') {
 /**
  * A count check's line as the player's picks and typed bonus settle onto its pool or threshold
  * through the router, the pool floored after them (issue 2006): `{ chipText, source, formula, note,
- * zeroPool }`. A rolled contribution is named as pending, and nothing is rolled or averaged.
+ * zeroPool }`, plus the pool before bought dice (`reachPool`) and the formulas still to roll into it
+ * (`pendingPool`). A rolled contribution is named as pending, and nothing is rolled or averaged.
  */
-function countTarget(data, selectedIds, bonus) {
+function countTarget(data, selectedIds, bonus, additionalDice) {
   const { count, labels, direction, comparison } = data;
   const unresolved = { chipText: data.chipText, source: '', formula: '', note: '', zeroPool: '' };
   if (![count.pool, count.die, count.threshold].every(Number.isFinite)) return unresolved;
@@ -130,7 +132,8 @@ function countTarget(data, selectedIds, bonus) {
       value,
     })),
   });
-  const settled = settledPoolDice(count.pool, plan.poolDelta, count.zeroPoolFails !== false);
+  const zeroPoolFails = count.zeroPoolFails !== false;
+  const settled = settledPoolDice(count.pool, plan.poolDelta + additionalDice, zeroPoolFails);
   const threshold = count.threshold + plan.thresholdDelta;
   const values = countFormulaValues({
     dice: settled.dice,
@@ -153,6 +156,13 @@ function countTarget(data, selectedIds, bonus) {
       settled.zeroPool && !(pending.length > 0 && destination === 'pool')
         ? labels.countZeroPool
         : '',
+    reachPool: {
+      base: count.pool,
+      poolDelta: plan.poolDelta,
+      zeroPoolFails,
+      dice: settledPoolDice(count.pool, plan.poolDelta, zeroPoolFails).dice,
+    },
+    pendingPool: destination === 'pool' ? pending : [],
   };
 }
 

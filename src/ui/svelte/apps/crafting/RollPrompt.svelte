@@ -9,32 +9,52 @@
   | `data` | the view `rollPrompt.js` prepares | none | Localized, pre-formatted labels, roll modes, the choice plan, the footer `actions` and either the single formula or the bulk subject rows. |
   | `onSubmit(answer)` | function | no-op | Called once with the raw form answer; `rollPrompt.js` translates it. |
   | `onDismiss()` | function | no-op | Called once when Escape or the close control dismisses the prompt. |
-
-  Invariants:
-  - Roll is the form's only submit button, so Enter from any field rolls normally; Disadvantage and
-    Advantage are `type="button"` — pinned by `tests/components/roll-prompt-mounted.test.js`.
 -->
 <script>
-  import { noteOverflow } from './noteOverflow.js';
   import { untrack } from 'svelte';
+  import {
+    actionDeltas,
+    describeAdditionalDice,
+  } from '../../../presenters/additionalDicePrompt.js';
   import Chip from '../../components/Chip.svelte';
   import Field from '../../components/Field.svelte';
   import Select from '../../components/Select.svelte';
   import SelectionCheckbox from '../../components/SelectionCheckbox.svelte';
   import ManagerModal from '../../components/ManagerModal.svelte';
   import { modifierValue, rollPromptTarget } from './rollPromptTarget.js';
+  import RollPromptAdditionalDice from './RollPromptAdditionalDice.svelte';
+  import RollPromptFooter from './RollPromptFooter.svelte';
   import RollPromptTarget from './RollPromptTarget.svelte';
+
+  // The first in document order wins, so Advantage takes focus only once Roll is blocked.
+  const INITIAL_FOCUS =
+    "input[name='situationalBonus'], input[name='additionalDice']:not(:disabled), " +
+    "button[type='submit']:not([aria-disabled='true']), " +
+    "button[data-action='advantage']:not([aria-disabled='true'])";
 
   let { data, onSubmit = () => {}, onDismiss = () => {} } = $props();
   let selectedIds = $state(untrack(() => [...data.choicePlan.defaultSelectedIds]));
   let rollMode = $state(untrack(() => data.defaultRollMode));
   let bonus = $state('');
+  let additionalDice = $state(0);
   let settled = false;
   const instanceId = $props.id();
   const modeCaptionId = `${instanceId}-roll-mode`;
   const multiPick = $derived(data.choicePlan.maxPicks > 1);
   const atCap = $derived(selectedIds.length >= data.choicePlan.maxPicks);
-  const target = $derived(rollPromptTarget(data, selectedIds, bonus));
+  const target = $derived(rollPromptTarget(data, selectedIds, bonus, additionalDice));
+  const dice = $derived(
+    data.additionalDiceOffer &&
+      describeAdditionalDice({
+        offer: data.additionalDiceOffer,
+        pool: target.reachPool,
+        deltas: actionDeltas(data.actions, data.advantageOffer),
+        pending: target.pendingPool,
+        chosen: additionalDice,
+        labels: data.labels.additionalDice,
+        actorName: data.actorName,
+      })
+  );
 
   function selectCheckbox(id, checked) {
     if (checked && atCap) return;
@@ -46,7 +66,7 @@
   }
 
   function answer(form, advantage) {
-    if (settled || !form) return;
+    if (settled || !form || dice?.blocked[advantage]) return;
     settled = true;
     const checked = form.querySelectorAll('input[name="craftingModifier"]:checked');
     onSubmit({
@@ -55,6 +75,7 @@
       rollMode,
       advantage,
       chosenModifierIds: [...checked].map((input) => input.value),
+      ...(dice && { additionalDice }),
     });
   }
 
@@ -63,10 +84,6 @@
     settled = true;
     onDismiss();
   }
-
-  // A note earns a `title` only when it clips (see `noteOverflow.js`).
-  let truncatedNotes = $state({});
-  const markTruncated = (key, clipped) => (truncatedNotes = { ...truncatedNotes, [key]: clipped });
 </script>
 
 <ManagerModal
@@ -78,7 +95,7 @@
   rootAttributes={{ 'data-roll-prompt': data.kind }}
   closeOnOutsideClick={false}
   trapFocus
-  initialFocus="input[name='situationalBonus'], button[type='submit']"
+  initialFocus={INITIAL_FOCUS}
   footerLayout="equal"
   onClose={dismiss}
   onSubmit={(event) => answer(event.target, 'normal')}
@@ -201,6 +218,16 @@
         </div>
       {/if}
 
+      {#if dice}
+        <RollPromptAdditionalDice
+          view={dice}
+          labels={data.labels.additionalDice}
+          value={additionalDice}
+          limit={data.additionalDiceOffer.limit}
+          onChange={(next) => (additionalDice = next)}
+        />
+      {/if}
+
       <!-- A `div`, not a `label`: a caption click would re-open the list its mousedown dismissed. -->
       <Field as="div" class="prompt-field mode-field">
         <span class="eyebrow field-caption" id={modeCaptionId}>{data.labels.rollMode}</span>
@@ -218,24 +245,12 @@
   {/snippet}
 
   {#snippet footer()}
-    {#each data.actions as action (action.action)}
-      <button
-        type={action.submit ? 'submit' : 'button'}
-        class="prompt-action"
-        class:is-primary={action.submit}
-        data-action={action.action}
-        data-keyboard-focus="true"
-        aria-label={action.name}
-        title={action.note && truncatedNotes[action.action] ? action.note : undefined}
-        onclick={action.submit
-          ? undefined
-          : (event) => answer(event.currentTarget.form, action.action)}
-        ><span>{action.label}</span>{#if action.note}<small
-            class="action-note"
-            use:noteOverflow={{ key: action.action, onMeasure: markTruncated }}>{action.note}</small
-          >{/if}</button
-      >
-    {/each}
+    <RollPromptFooter
+      actions={data.actions}
+      blocked={dice?.blocked}
+      blockNote={dice?.blockNote}
+      onAction={answer}
+    />
   {/snippet}
 </ManagerModal>
 
@@ -449,48 +464,5 @@
      where `vh` would overflow the window. */
   :global(.manager-modal[data-manager-modal][data-roll-prompt]) {
     max-height: min(640px, calc(100% - (2 * var(--fab-space-4))));
-  }
-  .prompt-action {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: calc(var(--fab-space-2xs) / 2);
-    box-sizing: border-box;
-    height: 44px;
-    min-height: 44px;
-    margin: 0;
-    padding: 0 calc(var(--fab-space-2) + var(--fab-space-2xs));
-    border: 1px solid var(--fab-border-strong);
-    border-radius: 9px;
-    appearance: none;
-    -webkit-appearance: none;
-    background: var(--fab-bg-1);
-    color: var(--fab-text-secondary);
-    font-size: 12px;
-    font-weight: 700;
-    line-height: normal;
-    cursor: pointer;
-  }
-  .prompt-action:hover {
-    border-color: var(--fab-accent-border);
-    color: var(--fab-text);
-  }
-  .prompt-action.is-primary {
-    border-color: var(--fab-accent-border);
-    background: var(--fab-accent);
-    color: var(--fab-on-accent);
-  }
-  /* One line: the full note is always the button's accessible name, and its `title` too once this
-     ellipsis actually clips it (measured in the script above). */
-  .action-note {
-    display: block;
-    max-width: 100%;
-    overflow: hidden;
-    color: var(--fab-text-secondary);
-    font-size: 9.5px;
-    font-weight: 500;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 </style>

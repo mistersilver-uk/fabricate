@@ -927,4 +927,195 @@ describe('mounted roll prompt', () => {
       assert.equal((await pending).advantage, DECISION[clicked], `${label}: ${clicked}`);
     }
   });
+
+  describe('additional dice (issue 2008)', () => {
+    const countCheck = {
+      product: 'count',
+      direction: 'under',
+      comparison: 'meet',
+      pool: 2,
+      die: 20,
+      threshold: 14,
+      thresholdAnchor: 14,
+      thresholdSource: 'fixed',
+      modifierDestination: 'pool',
+      actorName: 'Brenna',
+    };
+    const diceOffer = (needed, over = {}) => ({
+      available: 2,
+      limit: 1,
+      max: 1,
+      resourceLabel: 'Momentum',
+      unavailable: null,
+      reach: { needed, perDieMost: 1, explode: 'off', rescued: false },
+      ...over,
+    });
+    const openCount = (input) =>
+      openThroughEntry(() =>
+        promptCheckRoll({
+          ...countCheck,
+          required: input.additionalDiceOffer.reach?.needed,
+          ...input,
+        })
+      );
+    const controlOf = (dialog) => dialog.querySelector('[data-roll-prompt-additional-dice-group]');
+    const stepperInput = (dialog) =>
+      dialog.querySelector('input[data-roll-prompt-additional-dice]');
+    const actionOf = (dialog, action) =>
+      dialog.querySelector(`:scope .manager-modal-footer button[data-action="${action}"]`);
+    const blockNote = (dialog) => dialog.querySelector('[data-roll-prompt-block-note]');
+    const answered = (pending) => {
+      const state = { done: false };
+      pending.then(() => (state.done = true));
+      return state;
+    };
+
+    it('opens at 0 between the bonus and roll mode, and an immediate Enter buys nothing (AD37)', async () => {
+      const { dialog, pending } = await openCount({ additionalDiceOffer: diceOffer(3) });
+      const control = controlOf(dialog);
+      assert.ok(
+        control.previousElementSibling.matches('.bonus-group'),
+        'after the situational bonus'
+      );
+      assert.ok(control.nextElementSibling.classList.contains('mode-field'), 'before roll mode');
+      assert.equal(stepperInput(dialog).value, '0', 'the shortfall is stated, never pre-selected');
+      assert.equal(control.querySelector('[data-notice-tone]').dataset.noticeTone, 'warning');
+      dialog.querySelector('form').requestSubmit();
+      const answer = await pending;
+      assert.deepEqual(
+        [answer.confirmed, answer.advantage, answer.additionalDice],
+        [true, 'normal', 0]
+      );
+    });
+
+    it('steps within the limit, settles the pool line and answers the chosen dice (frames 30-31, AD36)', async () => {
+      const { dialog, pending } = await openCount({ additionalDiceOffer: diceOffer(3) });
+      const control = controlOf(dialog);
+      const line = control.querySelector('.additional-dice-line');
+      const input = stepperInput(dialog);
+      assert.equal(line.textContent, 'Momentum 2 available · Spends 0 Momentum');
+      assert.deepEqual([input.name, input.max, input.disabled], ['additionalDice', '1', false]);
+      const message = control.querySelector('[data-roll-prompt-additional-dice-message]');
+      assert.deepEqual(input.getAttribute('aria-describedby').split(' '), [
+        line.id,
+        message.parentElement.id,
+      ]);
+      control.querySelector('[data-stepper-increment]').click();
+      flushSync();
+      assert.equal(input.value, '1');
+      assert.equal(line.textContent, 'Momentum 2 available · Spends 1 Momentum');
+      assert.equal(
+        dialog.querySelector(':scope .formula-content .formula').textContent,
+        '3d20 · each ≤ 14'
+      );
+      assert.equal(
+        control.querySelector('[data-notice-tone]').textContent.trim(),
+        'At least 1 additional die is needed. You have enough.'
+      );
+      assert.equal(
+        control.querySelector('[data-stepper-increment]').disabled,
+        true,
+        'no step past the limit'
+      );
+      input.value = '5';
+      input.dispatchEvent(new document.defaultView.Event('input', { bubbles: true }));
+      flushSync();
+      assert.equal(
+        line.textContent,
+        'Momentum 2 available · Spends 1 Momentum',
+        'a typed 5 clamps to 1'
+      );
+      dialog.querySelector('form').requestSubmit();
+      assert.equal((await pending).additionalDice, 1);
+    });
+
+    it('disables a single Roll that cannot reach and refuses Enter and clicks until a bonus reaches (AD38, AD65)', async () => {
+      const { dialog, pending } = await openCount({ additionalDiceOffer: diceOffer(4) });
+      const roll = actionOf(dialog, 'roll');
+      assert.equal(roll.getAttribute('aria-disabled'), 'true');
+      assert.equal(roll.disabled, false, 'never the native disabled');
+      assert.equal(
+        blockNote(dialog).textContent,
+        'Rolling is disabled: this attempt cannot reach the successes it needs.'
+      );
+      assert.deepEqual(
+        [blockNote(dialog).getAttribute('role'), roll.getAttribute('aria-describedby')],
+        ['status', blockNote(dialog).id]
+      );
+      assert.equal(document.activeElement, dialog.querySelector('input[name="situationalBonus"]'));
+      const state = answered(pending);
+      dialog.querySelector('form').requestSubmit();
+      roll.click();
+      await settleUi();
+      assert.equal(state.done, false, 'neither Enter nor a click rolls a blocked action');
+      const bonus = dialog.querySelector('input[name="situationalBonus"]');
+      bonus.value = '2';
+      bonus.dispatchEvent(new document.defaultView.Event('input', { bubbles: true }));
+      flushSync();
+      assert.ok(!roll.hasAttribute('aria-disabled'), 'a bonus that reaches unblocks Roll');
+      assert.ok(!blockNote(dialog), 'and the note leaves');
+      dialog.querySelector('form').requestSubmit();
+      assert.deepEqual([(await pending).bonus, state.done], ['2', true]);
+    });
+
+    it('keeps Advantage rollable when only it reaches, and focuses it with no bonus field (R1, AD34, AD64)', async () => {
+      const advantageOffer = offerFor({}, { product: 'count' });
+      const { dialog, pending } = await openCount({
+        additionalDiceOffer: diceOffer(3, { available: 0, limit: 0 }),
+        advantageOffer,
+        allowAdvantage: true,
+        offerSituationalBonus: false,
+      });
+      assert.deepEqual(
+        ['disadvantage', 'normal', 'advantage'].map((action) =>
+          actionOf(dialog, action).getAttribute('aria-disabled')
+        ),
+        ['true', 'true', null]
+      );
+      assert.equal(blockNote(dialog).textContent, 'Only Advantage can reach the successes needed.');
+      assert.equal(stepperInput(dialog).disabled, true, 'nothing to buy');
+      assert.equal(
+        document.activeElement,
+        actionOf(dialog, 'advantage'),
+        'never the close control or a blocked action'
+      );
+      const state = answered(pending);
+      actionOf(dialog, 'disadvantage').click();
+      await settleUi();
+      assert.equal(state.done, false);
+      actionOf(dialog, 'advantage').click();
+      const answer = await pending;
+      assert.deepEqual([answer.advantage, answer.additionalDice], ['advantage', 0]);
+    });
+
+    it('shows an unavailable control disabled with its reason and no path (frame 34)', async () => {
+      const { dialog, pending } = await openCount({
+        additionalDiceOffer: diceOffer(2, {
+          available: 0,
+          limit: 0,
+          unavailable: 'resourceNotWritable',
+        }),
+      });
+      const control = controlOf(dialog);
+      assert.equal(stepperInput(dialog).disabled, true);
+      assert.equal(
+        control.querySelector('.additional-dice-line').textContent,
+        'Momentum unavailable · Spends 0'
+      );
+      assert.equal(control.querySelector('[data-notice-tone]').dataset.noticeTone, 'info');
+      assert.ok(!/system\.|Macro\./.test(dialog.textContent));
+      dialog.querySelector('[data-manager-modal-close]').click();
+      await pending;
+    });
+
+    it('renders no control for a check that offers no additional dice', async () => {
+      const { dialog, pending } = await openThroughEntry(() =>
+        promptCheckRoll({ ...countCheck, required: 2 })
+      );
+      assert.ok(!controlOf(dialog));
+      assert.ok(!dialog.querySelector(':scope .manager-modal-footer [aria-disabled]'));
+      dialog.querySelector('form').requestSubmit();
+      assert.ok(!('additionalDice' in (await pending)));
+    });
+  });
 });
