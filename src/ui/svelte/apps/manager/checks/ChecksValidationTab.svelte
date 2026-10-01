@@ -172,10 +172,13 @@
     if (counts.blocking > 0) {
       return {
         status: 'block',
-        title: text('FABRICATE.Admin.Manager.Checks.Validation.HeroBlocked', 'Blocking issues'),
+        title: text(
+          'FABRICATE.Admin.Manager.Checks.Validation.HeroBlocked',
+          'Blocked from enabling'
+        ),
         sub: text(
           'FABRICATE.Admin.Manager.Checks.Validation.HeroBlockedSub',
-          'This system saves while incomplete, but it will not enable until every blocking issue is cleared.'
+          'Clear the blocking issues before this crafting system can be enabled.'
         ),
       };
     }
@@ -185,7 +188,7 @@
         status: 'warn',
         title: text(
           'FABRICATE.Admin.Manager.Checks.Validation.HeroUnsaved',
-          'Clean, but not saved yet'
+          'No blocking issues, but not saved yet'
         ),
         sub: text(
           'FABRICATE.Admin.Manager.Checks.Validation.HeroUnsavedSub',

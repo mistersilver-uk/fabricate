@@ -298,6 +298,28 @@ describe('ChecksValidationTab (mounted)', () => {
     harness.remount();
   });
 
+  it('words the blocked and the unsaved hero as the prototype does (issue 2130)', async () => {
+    const heroText = (root) =>
+      ['title', 'sub'].map((part) =>
+        root.querySelector(`.manager-recipe-rail-summary-${part}`).textContent.trim()
+      );
+    const blocked = await harness.mount({
+      sections: [unfinishedRoutedSection('crafting', '1d20', '  ')],
+    });
+    assert.deepEqual(heroText(blocked), [
+      'Blocked from enabling',
+      'Clear the blocking issues before this crafting system can be enabled.',
+    ]);
+    harness.remount();
+    const unsaved = await harness.mount({
+      sections: [{ subsystem: 'crafting', mode: 'simple', check: { rollFormula: '' } }],
+      dirty: true,
+      dirtyActivities: ['crafting'],
+    });
+    assert.equal(heroText(unsaved)[0], 'No blocking issues, but not saved yet', 'never "Clean"');
+    harness.remount();
+  });
+
   it('renders the tier-step target issues and their shared green tick (issue 975)', async () => {
     const target = await harness.mount({
       sections: [tierStepTargetSection(['t1', '<=', 1, 'gone'], ['t2', '>=', 20, 'a'])],
