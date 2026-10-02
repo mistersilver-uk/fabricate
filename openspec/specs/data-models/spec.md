@@ -111,6 +111,7 @@ CraftingSystem = {
     routed: RoutedCheck,               // { type, rollFormula, evaluation, advantage, dc, thresholdMode, dcMode, macroUuid, tiers, relativeOutcomes, fixedOutcomes, checkBreakage }
     progressive: {
       awardMode: "partial" | "equal" | "exceed",
+      thresholdMode: "meet" | "exceed", // default "meet"; read only as a count evaluation's per-die test
       rollFormula: string,             // default ""; total drives progressive awarding
       evaluation: CheckEvaluation,
       advantage: CheckAdvantage,
@@ -137,6 +138,7 @@ CraftingSystem = {
     enabled: boolean,                  // default false
     progressive: {
       awardMode: "partial" | "equal" | "exceed",
+      thresholdMode: "meet" | "exceed", // default "meet"; read only as a count evaluation's per-die test
       rollFormula: string,
       evaluation: CheckEvaluation,
       advantage: CheckAdvantage,
@@ -196,6 +198,7 @@ CraftingSystem = {
     routed: RoutedCheck,
     progressive: {
       awardMode: "partial" | "equal" | "exceed",
+      thresholdMode: "meet" | "exceed", // default "meet"; read only as a count evaluation's per-die test
       rollFormula: string,         // default ""; total drives progressive awarding
       evaluation: CheckEvaluation,
       advantage: CheckAdvantage,
@@ -443,6 +446,7 @@ CraftingSystem = {
 ### Check evaluation record
 
 Each of the eight normalized check subobjects — crafting and salvage `simple`, `routed` and `progressive`, and gathering `routed` and `progressive` — MUST carry `evaluation` with `product: "sum" | "count"` and `direction: "over" | "under"`, defaulting to `sum/over`.
+Every `progressive` subobject also carries `thresholdMode: "meet" | "exceed"`, defaulting to `meet` and read only as a `count` evaluation's per-die test (#2067); the Checks Studio draft and schema-6 export/import preserve it.
 Its `target` contains `source: "fixed" | "attribute"`, `expression`, `adjustmentKind: "add" | "multiply"` and nullable `baseAdjustment`.
 Its `pool` contains integer `die` (at least 2), string `base` and `threshold` expressions, integer `required` (0–20), `modifierDestination: "pool" | "threshold"`, `zeroPoolFails`, `explode` and `cancel` face configurations, and `additionalDice` enabled/source/path/read-macro/spend-macro/max/label fields.
 The normalized defaults are an empty fixed target expression, additive adjustment, d10, base `"2"`, threshold `"8"`, required 1, pool destination, zero-pool failure on, and explode, cancel and additional dice off with additional maximum 1 and an empty resource name.
@@ -4245,8 +4249,8 @@ They are unrelated mechanisms.
 
 The dynamic DC macro is a **crafting-check** mechanism, and within crafting it reaches exactly the two DC-bearing check slots.
 Those are `craftingCheck.simple` — the shared pass/fail slot backing the `simple` and `routedByIngredients` modes and the alchemy `simple` check mode — and `craftingCheck.routed`, backing `routedByCheck` and the alchemy `tiered` check mode.
-Both resolve their target through `CraftingEngine._resolveCheckTarget`, which calls `CraftingEngine._resolveCheckAnchorDc` for the fixed anchor, and then through `CraftingEngine._resolveSimpleCheckDc`, the sole dynamic-DC caller of the shared macro executor.
-No other check reaches either symbol.
+Both resolve their target through `resolveCraftingCheckTarget` (`src/systems/craftingCheckRefusal.js`), which calls `craftingCheckAnchorDc` for the fixed anchor, and then through `CraftingEngine._resolveSimpleCheckDc`, the sole dynamic-DC caller of the shared macro executor.
+No other check reaches either symbol; the player listing's `craftingCheckRefuses` reads the same pre-roll resolution to decide `checkUnrollable` (#2139) and never runs the macro.
 The crafting `progressive` check has no DC at all, and salvage and gathering resolve theirs arithmetically through `CraftingEngine._resolveSalvageDc` and `GatheringEngine._resolveGatheringRoutedDc` — a per-record `dcOverride` when finite, else the slot's static `dc`, else a literal `15` — consulting no `checkTierId`, no `tiers`, and no macro.
 Their targets resolve through `CraftingEngine._resolveSalvageTarget` and `GatheringEngine._resolveGatheringRoutedTarget`, which delegate a fixed target to those DC resolvers and run no macro.
 Salvage and gathering nonetheless persist `dcMode`, `macroUuid`, and `tiers`, because they reuse the `SimpleCheck` and `RoutedCheck` shapes so the Checks-tab editors can be shared.
@@ -4259,11 +4263,11 @@ Dropping salvage's `simple.tiers` would therefore silently empty that preset lis
 Gathering task overrides have no preset source at all: gathering authors no recipe tiers, so a task's check override is a single number field.
 `macroUuid` is the one of the three with no reader at all on salvage or gathering, and gathering has no manager-side reader of any of them.
 
-Before the configured macro runs, `_resolveCheckTarget` computes an **anchor** for the crafting check slot being resolved, and validates it: a target refusal aborts before the macro runs.
-Under a fixed target source the anchor is the anchor DC `_resolveCheckAnchorDc` computes; under an attribute source it is the adjusted character value (see `resolution-modes/spec.md` § Check Target Resolution).
+Before the configured macro runs, `resolveCraftingCheckTarget` computes an **anchor** for the crafting check slot being resolved, and validates it: a target refusal aborts before the macro runs.
+Under a fixed target source the anchor is the anchor DC `craftingCheckAnchorDc` computes; under an attribute source it is the adjusted character value (see `resolution-modes/spec.md` § Check Target Resolution).
 The anchor DC is the recipe's selected difficulty tier — `Recipe.checkTierId` matched against that slot's `tiers[].id` — when it names a tier that still exists, and the slot's static `dc` otherwise.
 `CraftingSystemManager._normalizeSimpleCraftingCheck` and `_normalizeRoutedCraftingCheck` normalize that `dc` to a finite integer, defaulting to 15, on every save, so a normalized crafting check slot's static `dc` is never absent or non-finite.
-`_resolveCheckAnchorDc`'s own fallback to a literal `15` therefore guards only a check config that reached it without that normalization, and is not reachable through normal play.
+`craftingCheckAnchorDc`'s own fallback to a literal `15` therefore guards only a check config that reached it without that normalization, and is not reachable through normal play.
 
 When a crafting slot's `dcMode` is anything other than `dynamic`, or no `macroUuid` is configured, the anchor IS that check's resolved target and no macro runs.
 When `dcMode` is `dynamic` and a `macroUuid` is configured, `_resolveSimpleCheckDc` runs that macro and hands it one payload object containing:
@@ -4699,7 +4703,7 @@ This is the same rule the inventory snapshot introduced as the **indexed availab
 
 ### Browse-status precedence
 
-A row's browse status is derived by ONE rule, highest precedence first: teaser, then locked, then knowledge-gated, then recipe-item exhausted, then a material shortfall, otherwise available.
+A row's browse status is derived by ONE rule, highest precedence first: teaser, then locked, then knowledge-gated, then recipe-item exhausted, then a check that refuses the acting character before any roll (`checkUnrollable`, #2139), then a material shortfall, otherwise available.
 Exhaustion is READ from the knowledge access evaluation that already established it and MUST NOT be recomputed — see `recipe-visibility/spec.md` § One Candidate Collection Per Evaluation.
 The material term reads the cheap-availability rule's tristate: only a definitive negative yields a material shortfall, and "not asked" does not.
 

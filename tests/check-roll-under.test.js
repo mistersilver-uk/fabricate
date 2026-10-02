@@ -308,6 +308,17 @@ test('R6: under fixed ranges match total − targetDelta, keeping the raw total'
   assert.equal(await outcomeOf(5, multiply), 'great', 'a range is never an Otherwise tier');
 });
 
+test('R6: a fractional matched value floors, so ranges cover [start, end + 1) in both directions', async () => {
+  const under = { type: 'fixed', evaluation: SUM_UNDER, outcomes: RANGES };
+  const over = { type: 'fixed', evaluation: SUM_OVER, outcomes: RANGES };
+  assert.equal(await outcomeOf(12, { ...under, delta: 1.5 }), 'great', 'issue 2059: 10.5 is 10');
+  assert.equal(await outcomeOf(11, { ...under, delta: 0.5 }), 'great');
+  assert.equal(await outcomeOf(10.5, over), 'great', 'a fractional sum/over total floors');
+  assert.equal(await outcomeOf(20.9, over), 'poor', 'the top range covers up to end + 1');
+  const below = await routed(0.5, over);
+  assert.equal(below.data.outcomeId ?? null, null, 'below every range still routes nowhere');
+});
+
 test('R6: the minimum gate compares starts in the direction, and equal starts pass', async () => {
   const ranges = [
     { id: 'fine', name: 'Fine', success: true, start: 1, end: 10 },

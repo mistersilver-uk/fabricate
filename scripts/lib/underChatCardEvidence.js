@@ -204,13 +204,13 @@ const UNRESOLVED_REFUSAL = /the character value its target reads was not found/;
 
 /**
  * Whether the craft refused for the unresolved path. The public craft runs the versioned
- * lifecycle, whose descriptor refuses by throwing `CHECK_TARGET_INVALID`, so it answers
- * `success: false` with the refusal sentence and no `misconfigured` flag; a direct runner answers
- * `misconfigured` with `data.targetRefusal`.
+ * lifecycle, whose descriptor refusal the run authority answers as `roll-unavailable` with the
+ * refusal sentence (issue 2139); a direct runner answers `misconfigured` with `data.targetRefusal`.
  */
 function refusedUnresolved(result) {
   if (result?.success !== false || !UNRESOLVED_REFUSAL.test(result?.message ?? '')) return false;
-  return result.misconfigured !== true || result.data?.targetRefusal === 'unresolved-path';
+  if (result.misconfigured === true) return result.data?.targetRefusal === 'unresolved-path';
+  return result.reason === 'roll-unavailable';
 }
 
 /**

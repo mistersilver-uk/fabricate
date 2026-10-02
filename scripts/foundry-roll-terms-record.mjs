@@ -16,6 +16,7 @@ import { deriveRunIdentity, reconcileFoundryEndpoint } from './lib/foundryRunIde
 import { resolveSmokeArmFromEnv } from './lib/foundrySmokeArms.js';
 import {
   describeRecordedTerm,
+  FRAGMENT_VALIDITY_CORPUS,
   ROLL_TERMS_CORPUS,
   ROLL_TERMS_DATA,
   ROLL_TERMS_PROBES,
@@ -94,6 +95,38 @@ function recordInPage({ corpus, probes, dataSets }) {
   };
 }
 
+/**
+ * Runs in the page: each check-modifier fragment's `Roll.validate` verdict, the maximized roll
+ * `formulaRolls` (`src/utils/rollFormulaRollability.js`) proves it with, and whether a real roll
+ * completes, since a maximized roll applies no dice modifier.
+ */
+async function recordFragmentsInPage(fragments) {
+  const { Roll } = foundry.dice;
+  const outcome = async (run) => {
+    try {
+      const roll = await run();
+      return Number.isFinite(roll.total) ? 'rolls' : 'nonFinite';
+    } catch {
+      return 'throws';
+    }
+  };
+  const verdicts = [];
+  for (const fragment of fragments) {
+    let validates;
+    try {
+      validates = Roll.validate(fragment);
+    } catch {
+      validates = 'throws';
+    }
+    const evaluates = await outcome(() => new Roll(fragment).evaluateSync({ maximize: true }));
+    const rolled = await outcome(() => new Roll(fragment).evaluate({ allowInteractive: false }));
+    // A real roll's total is random, so only whether it completes is recorded.
+    const completes = rolled !== 'throws';
+    verdicts.push([fragment, { validates, evaluates, completes }]);
+  }
+  return verdicts;
+}
+
 async function main() {
   log(
     `Recording Roll terms on the ${ARM.id} arm (Foundry ${ARM.foundryVersion}) at ${FOUNDRY_URL}\n`
@@ -117,6 +150,7 @@ async function main() {
       probes: ROLL_TERMS_PROBES,
       dataSets: ROLL_TERMS_DATA,
     });
+    const fragmentVerdicts = await page.evaluate(recordFragmentsInPage, FRAGMENT_VALIDITY_CORPUS);
     if (recorded.version !== ARM.foundryVersion) {
       throw new Error(
         `expected Foundry ${ARM.foundryVersion}, the page reports ${recorded.version}`
@@ -130,6 +164,7 @@ async function main() {
       data: ROLL_TERMS_DATA,
       entries: Object.fromEntries(recorded.entries.map((entry) => [rollTermsKey(entry), entry])),
       probes: recorded.probeResults,
+      fragments: Object.fromEntries(fragmentVerdicts),
     };
     await mkdir(OUT_DIR, { recursive: true });
     const file = join(OUT_DIR, `foundry-${recorded.version}.json`);

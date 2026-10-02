@@ -2,18 +2,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { FRAGMENT_VALIDITY_CORPUS } from '../scripts/lib/rollTermsCorpus.js';
+
 import {
   RECORDED_CHECK_FORMULAS,
   RECORDED_FRAGMENT_VALIDITY,
   VALIDATE_ONLY_HOLES,
   recordedModifierRoll,
 } from './helpers/recordedModifierRollShapes.js';
+import { RECORDED_ROLL_TERMS } from './helpers/recordedRollParse.js';
 
 const {
   appendResolvedCheckModifier,
   buildCheckModifierChoice,
   buildCheckModifierContext,
   makeRollDataExpressionResolver,
+  modifierExpressionResolves,
   resolveCheckModifierContribution,
   resolveSelectedCheckModifiers,
 } = await import('../src/systems/checkModifierResolver.js');
@@ -447,6 +451,44 @@ test('the recorded oracle carries fragments Roll.validate accepts and the engine
   for (const [fragment, validates, evaluates] of VALIDATE_ONLY_HOLES) {
     assert.equal(validates, true, `${fragment} parses`);
     assert.notEqual(evaluates, 'rolls', `${fragment} cannot actually be rolled`);
+  }
+});
+
+test('the oracle is the 14.365 recording, row for row (issue 2043)', () => {
+  const { fragments } = RECORDED_ROLL_TERMS['14.365'];
+  assert.deepEqual(
+    RECORDED_FRAGMENT_VALIDITY.map(([fragment]) => fragment),
+    [...FRAGMENT_VALIDITY_CORPUS],
+    'record a new shape with `node scripts/foundry-test.mjs --check=roll-terms`'
+  );
+  for (const [fragment, validates, evaluates] of RECORDED_FRAGMENT_VALIDITY) {
+    assert.deepEqual(
+      [validates, evaluates],
+      [fragments[fragment].validates, fragments[fragment].evaluates],
+      fragment
+    );
+    // The maximized proof applies no dice modifier, so a real roll is recorded beside it.
+    assert.equal(
+      fragments[fragment].completes,
+      evaluates !== 'throws',
+      `${fragment}: a real roll agrees`
+    );
+  }
+});
+
+test('an incomplete comparator is accepted or blocked as its recording says', () => {
+  const Roll = recordedModifierRoll();
+  const counted = ['1d20cs>', '1d20cs<', '1d20cs>=', '1d20cs<=', '1d20cs=', '1d20cs', '2d6cs'];
+  const others = ['1d20cf>', '1d20cf', '2d6cf<', '1d20df<', '1d20df', '2d6x>', '2d6r<', '2d6cs>5>'];
+  const entries = [
+    ...[...counted, ...others].map((expression) => [{ expression }, `(${expression})`]),
+    [{ expression: '1d20cs>', min: -1, max: 6 }, 'min(max((1d20cs>), -1), 6)'],
+  ];
+  const recorded = new Map(RECORDED_FRAGMENT_VALIDITY.map((row) => [row[0], row[2]]));
+  for (const [entry, fragment] of entries) {
+    assert.ok(recorded.has(fragment), `${fragment} is recorded`);
+    const rolls = recorded.get(fragment) === 'rolls';
+    assert.equal(modifierExpressionResolves(entry, Roll), rolls, fragment);
   }
 });
 

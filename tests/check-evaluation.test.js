@@ -338,3 +338,11 @@ test('the additional-dice resource name is trimmed text kept whatever the toggle
     assert.deepEqual(normalize(once).evaluation, once.evaluation, 'idempotent');
   }
 });
+
+test('the progressive slot keeps a per-die comparison, meet unless exceed (issue 2067)', () => {
+  assert.equal(normalizeProgressiveCraftingCheck({}).thresholdMode, 'meet');
+  assert.equal(normalizeProgressiveCraftingCheck({ thresholdMode: 'exceed' }).thresholdMode, 'exceed');
+  assert.equal(normalizeProgressiveCraftingCheck({ thresholdMode: 'sideways' }).thresholdMode, 'meet');
+  const again = normalizeProgressiveCraftingCheck(normalizeProgressiveCraftingCheck({ thresholdMode: 'exceed' }));
+  assert.equal(again.thresholdMode, 'exceed', 'idempotent');
+});

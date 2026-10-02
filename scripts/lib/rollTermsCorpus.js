@@ -141,6 +141,66 @@ export const ROLL_TERMS_PROBES = Object.freeze(
   ].map((entry) => Object.freeze(entry))
 );
 
+/**
+ * Check-modifier fragments whose `Roll.validate` verdict and maximized evaluation are recorded
+ * (issues 1118, 2043); `RECORDED_FRAGMENT_VALIDITY` in `tests/helpers/recordedModifierRollShapes.js`
+ * must agree with the recording.
+ */
+export const FRAGMENT_VALIDITY_CORPUS = Object.freeze([
+  '(1d4)',
+  '(1d8)',
+  '(1d4[fire])',
+  '({1d6,1d8}kh1)',
+  '(1d4 + 2)',
+  '(2d20kh1)',
+  '(2)',
+  '(1d6x)',
+  '(2d10r1)',
+  'min(max((1d8), -1), 6)',
+  'max((1d8), 2)',
+  'min((1d8), 6)',
+  'min(max((1d8), 0), 0)',
+  'max((1d8), -1)',
+  'min((1d4), 2.5)',
+  'min(max((1d4 + 2), 1), 9)',
+  '(pow(1d4,2))',
+  '(sqrt(1d4))',
+  '(clamp(1d8,1,6))',
+  '(999d6)',
+  '(1d4])',
+  '(1d4[fire)',
+  '(1d4))',
+  '()',
+  '(1d20 +)',
+  '(MAX(1d4,2))',
+  '(Min(1d4,2))',
+  '(FLOOR(1d8))',
+  '(Abs(1d4))',
+  '(1000d6)',
+  '(1d4 + .5)',
+  'min(max((MAX(1d4,2)), -1), 6)',
+  '(pow(2, 1d10 * 103))',
+  'min(max((pow(2, 1d10 * 103)), -1), 6)',
+  'max(, 2)',
+  // Incomplete comparators (issue 2043).
+  '(1d20cs>)',
+  '(1d20cs<)',
+  '(1d20cs>=)',
+  '(1d20cs<=)',
+  '(1d20cs=)',
+  '(1d20cs)',
+  '(2d6cs)',
+  '(1d20cf>)',
+  '(1d20cf)',
+  '(2d6cf<)',
+  '(1d20df<)',
+  '(1d20df)',
+  '(2d6x>)',
+  '(2d6r<)',
+  '(2d6cs>5>)',
+  'min(max((1d20cs>), -1), 6)',
+]);
+
 /** The key a recording is filed under: the formula, qualified by any non-default data set. */
 export function rollTermsKey({ formula, data }) {
   return data === 'default' ? formula : `${formula} ⟨${data}⟩`;

@@ -8,7 +8,7 @@
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `evaluation` | normalized evaluation | — | Every control writes `{ evaluation }` with one pool field changed. |
-  | `thresholdMode` | `'meet'` \| `'exceed'` \| `null` | `null` | Under count it is the per-die test, edited only here; `null` is a slot with no comparison (progressive), which offers no test. |
+  | `thresholdMode` | `'meet'` \| `'exceed'` \| `null` | `null` | Under count it is the per-die test, edited only here, on every slot (issue 2067); `null` offers no test. |
   | `character` | `{ name, rollData, readStored }` \| `null` | `null` | The Preview-as actor the value fields and the actor line read. |
   | `modifiers` | `[{ id, name, icon }]` | `[]` | The applied modifiers, drawn as chips on the term they move. |
   | `placement` / `odds` | placement plan / odds model \| `null` | `null` | The preview's own placement and odds model; the reading is the odds panel's expected net. |

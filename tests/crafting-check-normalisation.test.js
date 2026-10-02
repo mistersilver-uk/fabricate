@@ -557,6 +557,7 @@ test('_normalizeCraftingCheck defaults the progressive check when absent', () =>
   const result = mgr._normalizeCraftingCheck({});
   assert.deepEqual(result.progressive, {
     awardMode: 'equal',
+    thresholdMode: 'meet',
     rollFormula: '',
     evaluation: normalizeCheckEvaluation(),
     offerSituationalBonus: true,

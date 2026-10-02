@@ -32,6 +32,10 @@ const EXPECTED = {
     tone: 'info',
     labelKey: 'FABRICATE.App.Crafting.Status.Discovery',
   },
+  [CRAFTING_BROWSE_STATUS.CHECK_UNROLLABLE]: {
+    tone: 'danger',
+    labelKey: 'FABRICATE.App.Crafting.Status.CheckUnrollable',
+  },
 };
 
 describe('craftingRecipeStatus', () => {
@@ -48,6 +52,15 @@ describe('craftingRecipeStatus', () => {
   it('falls back to the neutral "unknown" descriptor for an unrecognized status', () => {
     const descriptor = craftingRecipeStatus('not-a-real-status');
     assert.equal(descriptor.labelKey, 'FABRICATE.App.Crafting.Status.Unknown');
+  });
+
+  it('reads a check that cannot roll as uncraftable, as missing materials does (issue 2139)', () => {
+    const tone = (status) => craftingRecipeStatus(status).tone;
+    assert.equal(tone(CRAFTING_BROWSE_STATUS.CHECK_UNROLLABLE), 'danger');
+    assert.equal(
+      tone(CRAFTING_BROWSE_STATUS.CHECK_UNROLLABLE),
+      tone(CRAFTING_BROWSE_STATUS.MISSING_MATERIALS)
+    );
   });
 
   it('returns frozen descriptors (presentation is immutable)', () => {

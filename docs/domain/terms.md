@@ -1005,7 +1005,7 @@ Spec reference: openspec/specs/ui-crafting-app/spec.md, openspec/specs/recipe-vi
 ## Crafting Browse Status
 
 `discovery` is the Discovery-Mode teaser-redacted state (player copy "Undiscovered"); `incomplete` is deliberately NOT a player status, because an unfinished recipe is either visible-and-projected or filtered out upstream.
-Precedence (highest first): teaser → `discovery`, locked → `locked`, unlearned knowledge → `unknown`, recipe-item uses exhausted → `exhausted`, materials missing → `missingMaterials`, else `available`.
+Precedence (highest first): teaser → `discovery`, locked → `locked`, unlearned knowledge → `unknown`, recipe-item uses exhausted → `exhausted`, a check that would refuse the acting character before any roll → `checkUnrollable` (issue 2139), materials missing → `missingMaterials`, else `available`.
 The `exhausted` status reads `RecipeVisibilityService.isKnowledgeItemExhausted` (item-limited knowledge owned but every matching item capped); owning no matching item is `unknown`, not `exhausted`.
 Since issue 1091 the vocabulary AND the precedence rule live in ONE import-free leaf, `src/ui/presenters/craftingBrowseStatus.js`, so the detail model and the **Summary Projection** the page rows are built from cannot label the same recipe differently; `CraftingListingBuilder` re-exports the vocabulary and delegates the rule.
 `materialsAvailable` is a TRISTATE there — `false` is a material check that ran and came back short, `null`/absent is no check at all, and only `false` yields `missingMaterials` — so a surface holding no inventory (the GM browser projects definitions, not one actor’s view of them) does not paint every row short of materials.
@@ -1797,7 +1797,7 @@ An unresolved or non-numeric value is a **Target Refusal** and never reads as 0.
 A progressive check and a fixed-range routed check read no target, so their target source is inert.
 The crafting dynamic-DC macro runs after validation, receives the anchor (the adjusted character value under an attribute source) as `anchorDc` with a cloned `evaluation`, and its result replaces that anchor.
 
-Canonical mapping: `evaluation.target.source`/`expression`; `resolveCheckTarget`/`resolveActivityTarget`/`actorRollData` in `src/systems/checkTarget.js`; the `pathMode: 'foundry'` option of `resolveDeterministicExpression` in `src/systems/checkEvaluation.js`; `CraftingEngine._resolveCheckTarget`/`_resolveSalvageTarget`, `GatheringEngine._resolveGatheringRoutedTarget`
+Canonical mapping: `evaluation.target.source`/`expression`; `resolveCheckTarget`/`resolveActivityTarget`/`actorRollData` in `src/systems/checkTarget.js`; the `pathMode: 'foundry'` option of `resolveDeterministicExpression` in `src/systems/checkEvaluation.js`; `resolveCraftingCheckTarget` in `src/systems/craftingCheckRefusal.js`, `CraftingEngine._resolveSalvageTarget`, `GatheringEngine._resolveGatheringRoutedTarget`
 
 Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/data-models/spec.md
 

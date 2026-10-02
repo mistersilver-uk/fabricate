@@ -197,7 +197,7 @@ test('the assertions bind to the one crafting card the execute created', () => {
 test('the refusal passes only when nothing is posted and the Crafting tab names it', () => {
   const sentence = shippedLocalize('FABRICATE.Check.TargetRefusal.UnresolvedPath');
   const refused = {
-    result: { success: false, misconfigured: false, reason: null, data: null, message: sentence },
+    result: { success: false, reason: 'roll-unavailable', message: sentence },
     createdMessages: [],
     cardCount: { before: 7, after: 7 },
     promptOpened: false,
@@ -222,6 +222,7 @@ test('the refusal passes only when nothing is posted and the Crafting tab names 
       result: { success: false, message: 'Crafting check cannot roll: no target formula is set.' },
     },
     { result: { ...direct, message: sentence, data: { targetRefusal: 'non-finite' } } },
+    { result: { success: false, reason: 'operation-failed', message: sentence } },
     { promptOpened: true },
     { createdMessages: [{ id: 'roll' }] },
     { cardCount: { before: 7, after: 8 } },

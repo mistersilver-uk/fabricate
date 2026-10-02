@@ -6,10 +6,10 @@
   and highlights the row. An "add to shopping list" affordance is exposed via a
   trailing button so a player can queue materials without opening the detail.
 
-  An uncraftable recipe (the danger tone — missing materials) is called out more
-  emphatically: the whole row takes a theme-appropriate error tint and the status
-  icon moves onto the (dimmed) thumbnail as a pip, rather than sitting as a small
-  meta chip. Warning/neutral/info blockers keep the compact meta badge.
+  An uncraftable recipe (the danger tone — missing materials, or a check that refuses this
+  character) is called out more emphatically: the whole row takes a theme-appropriate error
+  tint and the status icon moves onto the (dimmed) thumbnail as a pip, rather than sitting as a
+  small meta chip. Warning/neutral/info blockers keep the compact meta badge.
 -->
 <script>
   import Medallion from '../../components/Medallion.svelte';
@@ -40,9 +40,9 @@
   const status = $derived(String(recipe?.browseStatus ?? ''));
   const redacted = $derived(recipe?.redaction?.redacted === true);
   const descriptor = $derived(craftingRecipeStatus(status));
-  // Danger tone === the player cannot craft this (missing materials). Gate the
-  // emphatic error treatment on the tone so the presentation map stays the single
-  // source of truth for which statuses read as an error.
+  // Danger tone === the player cannot craft this (missing materials, or a check that refuses
+  // this character). Gate the emphatic error treatment on the tone so the presentation map
+  // stays the single source of truth for which statuses read as an error.
   const uncraftable = $derived(descriptor.tone === 'danger');
   const statusLabel = $derived(localize(descriptor.labelKey));
 
@@ -177,7 +177,7 @@
     background: var(--fab-accent-soft);
   }
 
-  /* Uncraftable (missing materials): tint the whole row with the error family.
+  /* Uncraftable (missing materials, or a check that refuses this character): tint the whole row with the error family.
      Declared after .is-selected so the error identity survives selection. */
   .crafting-recipe-row.is-uncraftable {
     border-color: var(--fab-danger-border);

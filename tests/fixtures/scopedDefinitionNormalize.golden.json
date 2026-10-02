@@ -113,6 +113,7 @@
       "failureResultPolicy": "perRecord",
       "progressive": {
         "awardMode": "equal",
+        "thresholdMode": "meet",
         "rollFormula": "",
         "evaluation": {
           "product": "sum",
@@ -445,6 +446,7 @@
       },
       "progressive": {
         "awardMode": "equal",
+        "thresholdMode": "meet",
         "rollFormula": "",
         "evaluation": {
           "product": "sum",
@@ -515,6 +517,7 @@
       "failureResultPolicy": "perRecord",
       "progressive": {
         "awardMode": "equal",
+        "thresholdMode": "meet",
         "rollFormula": "",
         "evaluation": {
           "product": "sum",
@@ -1070,6 +1073,7 @@
       "failureResultPolicy": "perRecord",
       "progressive": {
         "awardMode": "equal",
+        "thresholdMode": "meet",
         "rollFormula": "",
         "evaluation": {
           "product": "sum",
@@ -1402,6 +1406,7 @@
       },
       "progressive": {
         "awardMode": "equal",
+        "thresholdMode": "meet",
         "rollFormula": "",
         "evaluation": {
           "product": "sum",
@@ -1472,6 +1477,7 @@
       "failureResultPolicy": "perRecord",
       "progressive": {
         "awardMode": "equal",
+        "thresholdMode": "meet",
         "rollFormula": "",
         "evaluation": {
           "product": "sum",
@@ -1816,6 +1822,7 @@
       "failureResultPolicy": "perRecord",
       "progressive": {
         "awardMode": "equal",
+        "thresholdMode": "meet",
         "rollFormula": "",
         "evaluation": {
           "product": "sum",
@@ -2148,6 +2155,7 @@
       },
       "progressive": {
         "awardMode": "equal",
+        "thresholdMode": "meet",
         "rollFormula": "",
         "evaluation": {
           "product": "sum",
@@ -2218,6 +2226,7 @@
       "failureResultPolicy": "perRecord",
       "progressive": {
         "awardMode": "equal",
+        "thresholdMode": "meet",
         "rollFormula": "",
         "evaluation": {
           "product": "sum",
@@ -2754,6 +2763,7 @@
       "failureResultPolicy": "perRecord",
       "progressive": {
         "awardMode": "equal",
+        "thresholdMode": "meet",
         "rollFormula": "",
         "evaluation": {
           "product": "sum",
@@ -3086,6 +3096,7 @@
       },
       "progressive": {
         "awardMode": "equal",
+        "thresholdMode": "meet",
         "rollFormula": "",
         "evaluation": {
           "product": "sum",
@@ -3156,6 +3167,7 @@
       "failureResultPolicy": "perRecord",
       "progressive": {
         "awardMode": "equal",
+        "thresholdMode": "meet",
         "rollFormula": "",
         "evaluation": {
           "product": "sum",
@@ -3703,6 +3715,7 @@
       "failureResultPolicy": "perRecord",
       "progressive": {
         "awardMode": "equal",
+        "thresholdMode": "meet",
         "rollFormula": "",
         "evaluation": {
           "product": "sum",
@@ -4035,6 +4048,7 @@
       },
       "progressive": {
         "awardMode": "equal",
+        "thresholdMode": "meet",
         "rollFormula": "",
         "evaluation": {
           "product": "sum",
@@ -4105,6 +4119,7 @@
       "failureResultPolicy": "perRecord",
       "progressive": {
         "awardMode": "equal",
+        "thresholdMode": "meet",
         "rollFormula": "",
         "evaluation": {
           "product": "sum",

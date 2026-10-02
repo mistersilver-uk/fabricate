@@ -2,8 +2,9 @@
 <!--
   Progressive crafting check editor. A progressive check rolls a FORMULA for a numeric value and
   spends it against each result's difficulty in order, the award mode deciding how the spend
-  stops. There is no DC, comparison or recipe tier — just the formula, the award mode and the
-  unified `CheckTriggers` editor, whose outcome select is relabelled for this numeric context.
+  stops. There is no DC or recipe tier — just the formula, the award mode and the unified
+  `CheckTriggers` editor, whose outcome select is relabelled for this numeric context. A counting
+  check also edits `thresholdMode`, its per-die test (issue 2067), in the Formula card's pool.
   Controlled: renders `value` (`{ awardMode, rollFormula, checkBreakage }`) and emits the next.
   The runtime refuses a summed roll-under progressive check, so that state carries a warning.
 -->
@@ -44,7 +45,12 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  const refusal = $derived(progressiveTargetRefusal(normalizeCheckEvaluation(value?.evaluation)));
+  const evaluation = $derived(normalizeCheckEvaluation(value?.evaluation));
+  const refusal = $derived(progressiveTargetRefusal(evaluation));
+  // Null for a summed check, which has no comparison; a counting check tests each die by it.
+  const perDieTest = $derived(
+    evaluation.product === 'count' ? (value?.thresholdMode === 'exceed' ? 'exceed' : 'meet') : null
+  );
 
   function emit(patch) {
     onChange({ ...value, ...patch });
@@ -77,6 +83,7 @@
           {recordNoun}
           {foundrySystemId}
           evaluation={value?.evaluation ?? null}
+          thresholdMode={perDieTest}
           underNote={!refusal}
           offerSituationalBonus={value?.offerSituationalBonus !== false}
           advantage={value?.advantage ?? null}

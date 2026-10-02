@@ -1633,3 +1633,56 @@ describe('CraftingListingBuilder — the check card names a roll-under or charac
     );
   });
 });
+
+describe('CraftingListingBuilder — a check that cannot roll for this character (issue 2139)', () => {
+  const UNROLLABLE = CRAFTING_BROWSE_STATUS.CHECK_UNROLLABLE;
+  const smith = { source: 'attribute', expression: '@skills.smith.level' };
+  const SERA = { id: 'actor-1', items: [], getRollData: () => ({ skills: { smith: { level: 12 } } }) };
+  const BARE = { id: 'actor-1', items: [], getRollData: () => ({}) };
+  const statusFor = (
+    actor,
+    { resolutionMode = 'simple', simple = {}, progressive = {}, craftability = makeCraftability() } = {}
+  ) => {
+    const builder = makeBuilder({
+      craftability,
+      system: makeSystem({
+        resolutionMode,
+        craftingCheck: { simple: { rollFormula: '1d20', dc: 12, ...simple }, routed: {}, progressive },
+      }),
+    });
+    const listing = builder.buildListing({ craftingActor: actor, viewer: PLAYER });
+    const detail = builder.buildRecipeDetail({ recipeId: 'recipe-1', craftingActor: actor, viewer: PLAYER });
+    return [listing.summaries[0].browseStatus, detail.browseStatus, detail.blockingReasons];
+  };
+
+  it('labels the row and the detail when the target path is missing, not Ready to craft', () => {
+    const simple = { evaluation: { direction: 'under', target: smith } };
+    assert.deepEqual(statusFor(BARE, { simple }), [
+      UNROLLABLE,
+      UNROLLABLE,
+      ['FABRICATE.App.Crafting.Blocking.CheckUnrollable'],
+    ]);
+    assert.deepEqual(statusFor(SERA, { simple }).slice(0, 2), [
+      CRAFTING_BROWSE_STATUS.AVAILABLE,
+      CRAFTING_BROWSE_STATUS.AVAILABLE,
+    ]);
+  });
+
+  it('ranks a check that cannot roll above missing materials, which gathering can clear', () => {
+    const simple = { evaluation: { direction: 'under', target: smith } };
+    const craftability = makeCraftability({ canCraft: false });
+    assert.deepEqual(statusFor(BARE, { simple, craftability }).slice(0, 2), [UNROLLABLE, UNROLLABLE]);
+    // The detail model reads exact craftability; this fixture's summary snapshot holds no shortfall.
+    assert.equal(statusFor(SERA, { simple, craftability })[1], CRAFTING_BROWSE_STATUS.MISSING_MATERIALS);
+  });
+
+  it('reads a counting pool path the character lacks the same way', () => {
+    const progressive = {
+      evaluation: { product: 'count', direction: 'over', pool: { base: '@skills.smith.level', threshold: '8' } },
+      checkBreakage: { triggers: [] },
+    };
+    const options = { resolutionMode: 'progressive', progressive };
+    assert.equal(statusFor(BARE, options)[0], UNROLLABLE);
+    assert.equal(statusFor(SERA, options)[0], CRAFTING_BROWSE_STATUS.AVAILABLE);
+  });
+});

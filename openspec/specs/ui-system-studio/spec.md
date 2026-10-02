@@ -399,6 +399,7 @@ With a Preview-as actor chosen and a valid path, the TRANSIENT `countAdditionalD
 The Formula card's first axis row pairs "What the roll produces" (`Add the dice` / `Count successes`) with "Which way is better" on every slot that rolls, and is absent for gathering `d100` and alchemy `none`.
 The product control writes only `evaluation.product`: a switch rewrites nothing, so `rollFormula`, `dc`, tier `dc`, adjustments, `target`, `pool`, `thresholdMode`, tier `successes`, overrides and triggers all survive both ways, and a never-counted record shows the normalizer's defaults.
 Each field has one editor: under count, `thresholdMode` is edited only by the per-die test under `Success on`, and the Difficulty card's Comparison does not render.
+A progressive counting check offers the same per-die test and writes the progressive slot's own `thresholdMode`; a summed progressive check shows no comparison control (#2067).
 
 In count mode the Formula card replaces the free-text formula, its `avg` and its token row with the structured pool: `Die`, `Base pool`, `Success on` with its per-die test, `Explode`, `Cancel`, `Modifiers and bonuses` (move the threshold or add dice) and `Zero pool`.
 The base pool and the threshold each offer `Number` or `Character value`; the choice is view state derived from the stored string, switching writes nothing, and the Stepper writes a string.

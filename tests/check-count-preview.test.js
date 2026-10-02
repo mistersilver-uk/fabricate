@@ -517,6 +517,17 @@ describe('the count readout', () => {
     );
   });
 
+  it('tests each die of a counting progressive check by its comparison (issue 2067)', async () => {
+    const evaluation = count({ die: 6, base: '3', threshold: '5', required: 1 });
+    const draft = (thresholdMode) => ({ evaluation, thresholdMode, checkBreakage: { triggers: [] } });
+    const value = async (thresholdMode) =>
+      (await rolled(plan({ draft: draft(thresholdMode), mode: 'progressive', actor: null }), [5, 5, 6]))
+        .result.value;
+    assert.deepEqual([await value('meet'), await value('exceed')], [3, 1]);
+    const summed = plan({ draft: { rollFormula: '1d20', thresholdMode: 'exceed' }, mode: 'progressive' });
+    assert.ok(!Object.hasOwn(summed.args, 'thresholdMode'), 'a summed progressive check has no comparison');
+  });
+
   it('states that a dynamic required count was not previewed by running its macro', () => {
     const readout = buildReadoutModel(
       { plan: plan({ draft: { ...SMITHING, dcMode: 'dynamic' } }), result: null },

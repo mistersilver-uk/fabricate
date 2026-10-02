@@ -47,6 +47,7 @@
 import { buildCheckModifierContext } from '../../systems/checkModifierResolver.js';
 import { activeCheckEvaluation, actorRollData, isFixedSumOver } from '../../systems/checkTarget.js';
 import { countFormulaValues, resolvePool } from '../../systems/countEvaluation.js';
+import { craftingCheckRefuses, memoizedRollData } from '../../systems/craftingCheckRefusal.js';
 import { buildPassInventorySnapshot } from '../../systems/passInventorySnapshot.js';
 import { hasActiveCheck } from '../../systems/salvageCheckUsability.js';
 import { resolvedComponentsFor } from '../../systems/scopedEntityReads.js';
@@ -64,7 +65,11 @@ import {
 import { resolveRecipeImage } from '../svelte/util/craftingImageDefaults.js';
 
 import { countSuccessesNeeded, describeCheckTarget } from './checkDescriptor.js';
-import { CRAFTING_BROWSE_STATUS, deriveBrowseStatus } from './craftingBrowseStatus.js';
+import {
+  BROWSE_BLOCKING_REASON_KEYS,
+  CRAFTING_BROWSE_STATUS,
+  deriveBrowseStatus,
+} from './craftingBrowseStatus.js';
 import { heldToolBonus } from './heldToolBonus.js';
 import { SUMMARY_AUDIENCE, projectRecipeSummary } from './summaryProjection.js';
 
@@ -94,18 +99,6 @@ const RESOLUTION_MODE_LABEL_KEYS = {
  * imported it from the builder has to move.
  */
 export { CRAFTING_BROWSE_STATUS } from './craftingBrowseStatus.js';
-
-/**
- * Localization keys for a recipe's primary blocking reason, keyed by browse
- * status. `available` has no blocking reason.
- */
-const BLOCKING_REASON_KEYS = {
-  [CRAFTING_BROWSE_STATUS.LOCKED]: 'FABRICATE.App.Crafting.Blocking.Locked',
-  [CRAFTING_BROWSE_STATUS.UNKNOWN]: 'FABRICATE.App.Crafting.Blocking.Unknown',
-  [CRAFTING_BROWSE_STATUS.EXHAUSTED]: 'FABRICATE.App.Crafting.Blocking.Exhausted',
-  [CRAFTING_BROWSE_STATUS.DISCOVERY]: 'FABRICATE.App.Crafting.Blocking.Discovery',
-  [CRAFTING_BROWSE_STATUS.MISSING_MATERIALS]: 'FABRICATE.App.Crafting.Blocking.MissingMaterials',
-};
 
 const DEFAULT_TEASER_HIDDEN_FIELDS = ['ingredients', 'results', 'description'];
 const UNKNOWN_COMPONENT_KEY = 'FABRICATE.Labels.UnknownComponent';
@@ -238,6 +231,7 @@ export class CraftingListingBuilder {
     );
 
     const summaries = [];
+    const readRollData = memoizedRollData(craftingActor);
     for (const entry of visibleEntries) {
       const recipe = entry?.recipe;
       if (!recipe) continue;
@@ -250,6 +244,7 @@ export class CraftingListingBuilder {
           snapshot,
           craftingActor,
           knowledgeSources,
+          readRollData,
         })
       );
     }
@@ -388,11 +383,20 @@ export class CraftingListingBuilder {
    * summary, so it is emitted as its "not asserted here" value.
    * @private
    */
-  _buildRecipeSummary({ recipe, access, isGM, snapshot, craftingActor, knowledgeSources }) {
+  _buildRecipeSummary({
+    recipe,
+    access,
+    isGM,
+    snapshot,
+    craftingActor,
+    knowledgeSources,
+    readRollData,
+  }) {
     const redacted = !isGM && stringOrEmpty(access?.reason) === 'teaser';
+    const system = this.craftingSystemManager?.getSystem?.(recipe.craftingSystemId) ?? null;
     return projectRecipeSummary({
       recipe,
-      system: this.craftingSystemManager?.getSystem?.(recipe.craftingSystemId) ?? null,
+      system,
       audience: isGM ? SUMMARY_AUDIENCE.GM : SUMMARY_AUDIENCE.PLAYER,
       access,
       snapshot,
@@ -400,6 +404,7 @@ export class CraftingListingBuilder {
         !isGM &&
         !redacted &&
         this._isKnowledgeExhausted(access, recipe, craftingActor, knowledgeSources, snapshot),
+      checkRefused: !redacted && craftingCheckRefuses(system, recipe, craftingActor, readRollData),
       favourite: false,
       localize: this.localize,
     });
@@ -539,9 +544,7 @@ export class CraftingListingBuilder {
       this.recipeManager?.evaluateCraftability?.(
         craftSources,
         this._stepRecipeView(recipe, firstStep),
-        {
-          craftingActor,
-        }
+        { craftingActor }
       ) ?? null;
     const canCraftMaterials = fullCraftability?.canCraft === true;
     const defaultSetId =
@@ -560,7 +563,8 @@ export class CraftingListingBuilder {
     const exhausted =
       !isGM && this._isKnowledgeExhausted(access, recipe, craftingActor, knowledgeSources);
 
-    const browseStatus = this._deriveBrowseStatus({ reason, canCraftMaterials, exhausted });
+    const refused = craftingCheckRefuses(system, recipe, craftingActor);
+    const browseStatus = this._browseStatus({ reason, canCraftMaterials, exhausted, refused });
     const blockingReasons = this._blockingReasons(browseStatus);
 
     return {
@@ -829,31 +833,18 @@ export class CraftingListingBuilder {
     return this.localize('FABRICATE.App.Crafting.Detail.StepFallback', { index: index + 1 });
   }
 
-  /**
-   * Browse-status precedence (highest first):
-   *   teaser → discovery, locked → locked, knowledge → unknown,
-   *   recipe-item exhausted → exhausted, materials missing → missingMaterials,
-   *   otherwise available.
-   * Teaser is handled before this is reached (redacted recipes short-circuit), so
-   * the `reason === 'teaser'` branch is a defensive fallback.
-   *
-   * Delegates to the shared rule (issue 1091) so this detail model and the summary
-   * projection the page rows are built from cannot label the same recipe differently.
-   * The rule reads `materialsAvailable` as a TRISTATE — `null` means no material check
-   * ran — and this builder always ran one, so it passes a boolean and behaves exactly
-   * as the inlined version did.
-   * @private
-   */
-  _deriveBrowseStatus({ reason, canCraftMaterials, exhausted }) {
+  /** The shared rule (issue 1091), so this detail and the summary row cannot disagree. */
+  _browseStatus({ reason, canCraftMaterials, exhausted, refused }) {
     return deriveBrowseStatus({
       reason,
       materialsAvailable: canCraftMaterials === true,
       exhausted: exhausted === true,
+      checkRefused: refused === true,
     });
   }
 
   _blockingReasons(browseStatus) {
-    const key = BLOCKING_REASON_KEYS[browseStatus];
+    const key = BROWSE_BLOCKING_REASON_KEYS[browseStatus];
     return key ? [this.localize(key)] : [];
   }
 

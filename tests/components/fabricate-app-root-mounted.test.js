@@ -48,6 +48,7 @@ const harness = createMountedComponentHarness({
     'src/ui/presenters/checkDescriptor.js',
     // Issue 2006: a count card's successes needed, read as the engine reads it.
     'src/systems/countCheck.js',
+    'src/systems/craftingCheckRefusal.js',
     'src/ui/presenters/heldToolBonus.js',
     ...CHECK_TARGET_RAW_MODULES,
     'src/systems/countEvaluation.js',

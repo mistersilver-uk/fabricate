@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { compileFunction } from 'node:vm';
+import { setGatheringEngine } from '../src/bootstrap/gatheringRuntime.js';
 import { IngredientSet } from '../src/models/IngredientSet.js';
 import { publicAdvantageOffer } from '../src/systems/checkAdvantage.js';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
@@ -10,7 +11,11 @@ import { GatheringEngine } from '../src/systems/GatheringEngine.js';
 import { RunJournalBuilder } from '../src/ui/presenters/RunJournalBuilder.js';
 import { resolveAlchemySubmissions } from '../src/utils/alchemySubmissions.js';
 import { resolvedComponentsFor } from '../src/systems/scopedEntityReads.js';
-import { promptJournalStageCheck } from '../src/bootstrap/journalOperations.js';
+import {
+  promptJournalStageCheck,
+  withUnrollableCheckRefusal,
+  createJournalCommandsForFabricate,
+} from '../src/bootstrap/journalOperations.js';
 import { createJournalRunAuthority } from '../src/systems/journalRunAuthority.js';
 import { evaluatePreparedRunCheck } from '../src/systems/checkRoll.js';
 import { installCountDice } from './helpers/countEngineDice.js';
@@ -1395,6 +1400,89 @@ describe('journal run command protocol', () => {
       reason: null,
     });
     assert.equal(posts, 0);
+  });
+
+  it('answers a check refused at describe as roll-unavailable with its sentence (issue 2139)', async () => {
+    const run = { id: 'run-1', lifecycleVersion: 1, runRevision: 3, status: 'waiting' };
+    const message = 'Crafting check cannot roll: the character value its target reads was not found.';
+    const { service } = commandHarness({
+      currentUserId: 'gm',
+      run,
+      operations: {
+        crafting: withUnrollableCheckRefusal({
+          getRun: () => run,
+          describeCheck: async () => {
+            throw Object.assign(new Error(message), { code: 'CHECK_TARGET_INVALID' });
+          },
+          execute: async () => {
+            throw new Error('a refused check must never execute');
+          },
+        }),
+      },
+    });
+    const response = await service.executeJournalRunCommand({
+      actorUuid: 'Actor.a', runType: 'crafting', runId: run.id,
+      expectedRevision: 3, action: 'execute',
+    });
+    assert.deepEqual(response, { success: false, reason: 'roll-unavailable', message });
+  });
+
+  it('keeps any other describe failure an operation failure', async () => {
+    const failing = withUnrollableCheckRefusal({
+      describeCheck: async () => {
+        throw Object.assign(new Error('stale'), { code: 'STALE_RUN_STAGE' });
+      },
+    });
+    await assert.rejects(failing.describeCheck({}), { code: 'STALE_RUN_STAGE' });
+  });
+
+  it('the composed crafting and gathering tables both answer a describe refusal (issue 2139)', async () => {
+    const run = { id: 'run-1', lifecycleVersion: 1, runRevision: 3, status: 'waiting' };
+    const actor = { uuid: 'Actor.a', id: 'a' };
+    const message = 'Crafting check cannot roll: the character value its target reads was not found.';
+    const refuse = () => {
+      throw Object.assign(new Error(message), { code: 'CHECK_TARGET_INVALID' });
+    };
+    const { game, foundry, Hooks, fromUuid } = globalThis;
+    const gm = { id: 'gm', isGM: true };
+    Object.assign(globalThis, {
+      game: {
+        user: gm,
+        users: { activeGM: gm, get: (id) => (id === 'gm' ? gm : null) },
+        socket: { emit: () => {} },
+        settings: { get: () => undefined },
+      },
+      foundry: { utils: { randomID: () => 'request-id' } },
+      Hooks: { callAll: () => true },
+      fromUuid: async (uuid) => (uuid === actor.uuid ? actor : null),
+    });
+    setGatheringEngine({ describeVersionedStageCheck: refuse });
+    const lookup = { getRun: () => run };
+    const authority = {
+      availability: () => ({ available: true, reason: null }),
+      run: async (_request, handler) =>
+        handler({ createExecutionGrant: () => ({ grant: true }), issuePrepareToken: () => 'token' }),
+    };
+    try {
+      const service = createJournalCommandsForFabricate(
+        {
+          craftingEngine: { installVersionedRunAuthority: () => {}, describeVersionedStageCheck: refuse },
+          craftingRunManager: lookup,
+          gatheringRunManager: lookup,
+        },
+        authority
+      );
+      for (const runType of ['crafting', 'gathering']) {
+        const response = await service.executeJournalRunCommand(
+          { actorUuid: actor.uuid, runType, runId: run.id, expectedRevision: 3, action: 'execute' },
+          { interactive: false }
+        );
+        assert.deepEqual(response, { success: false, reason: 'roll-unavailable', message }, runType);
+      }
+    } finally {
+      setGatheringEngine(null);
+      Object.assign(globalThis, { game, foundry, Hooks, fromUuid });
+    }
   });
 
   it('answers a count check that cannot roll with its refusal sentence, and executes nothing', async () => {

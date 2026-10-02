@@ -495,9 +495,10 @@ describe('a progressive counting check (N1)', () => {
   after(() => progressiveHarness.teardown());
   afterEach(() => progressiveHarness.remount());
 
-  it('offers the product axis and no per-die test, since the slot has no comparison', async () => {
+  it('offers the product axis and, while counting, the same per-die test (issue 2067)', async () => {
     const start = {
       awardMode: 'equal',
+      thresholdMode: 'meet',
       rollFormula: '1d20',
       checkBreakage: { triggers: [] },
       evaluation: evaluation({ product: 'sum', direction: 'under' }),
@@ -505,13 +506,18 @@ describe('a progressive counting check (N1)', () => {
     };
     const state = await mountControlled(progressiveHarness, start, { previewCharacter: IDRIN });
     assert.ok(state.root.querySelector('[data-check-progressive-refusal]'), 'sum/under is refused');
+    assert.ok(!state.root.querySelector('[data-check-count-test]'), 'a summed check has no test');
     await state.act((root) => choose(root, 'data-check-product-option', 'count'));
     assert.ok(!state.root.querySelector('[data-check-progressive-refusal]'), 'count/under is valid');
     assert.ok(state.root.querySelector('[data-check-count-fields]'));
-    assert.ok(!state.root.querySelector('[data-check-count-test]'), 'no per-die test on progressive');
+    assert.deepEqual(texts(state.root, '[data-check-count-test-option]'), ['At or under', 'Under']);
+    await state.act((root) => choose(root, 'data-check-count-test-option', 'exceed'));
+    assert.equal(state.value.thresholdMode, 'exceed');
+    assert.match(state.root.querySelector('[data-check-direction-note]').textContent, /rolls under its/);
     assert.ok(!state.root.querySelector('[data-check-difficulty-card]'), 'no Difficulty card');
     await state.act((root) => choose(root, 'data-check-product-option', 'sum'));
-    assert.deepEqual(state.value, start);
+    assert.ok(!state.root.querySelector('[data-check-count-test]'));
+    assert.deepEqual(state.value, { ...start, thresholdMode: 'exceed' });
   });
 });
 

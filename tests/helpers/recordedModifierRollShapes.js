@@ -6,6 +6,7 @@
 /**
  * Every clamped fragment shape the resolver can emit, as `[fragment, validates, evaluates]` — the
  * verdict `Roll.validate` returned, AND what really happens when the fragment is rolled maximized.
+ * `--check=roll-terms` records them into `fragments`, and the dice suite fails on any drift.
  */
 export const RECORDED_FRAGMENT_VALIDITY = Object.freeze([
   ['(1d4)', true, 'rolls'],
@@ -47,6 +48,23 @@ export const RECORDED_FRAGMENT_VALIDITY = Object.freeze([
   ['min(max((pow(2, 1d10 * 103)), -1), 6)', true, 'rolls'],
   // The empty-head trap, kept because it is the shape `Roll.validate` is famous for accepting.
   ['max(, 2)', true, 'nonFinite'],
+  // Incomplete comparators (issue 2043): every one rolls, maximized and for real.
+  ['(1d20cs>)', true, 'rolls'],
+  ['(1d20cs<)', true, 'rolls'],
+  ['(1d20cs>=)', true, 'rolls'],
+  ['(1d20cs<=)', true, 'rolls'],
+  ['(1d20cs=)', true, 'rolls'],
+  ['(1d20cs)', true, 'rolls'],
+  ['(2d6cs)', true, 'rolls'],
+  ['(1d20cf>)', true, 'rolls'],
+  ['(1d20cf)', true, 'rolls'],
+  ['(2d6cf<)', true, 'rolls'],
+  ['(1d20df<)', true, 'rolls'],
+  ['(1d20df)', true, 'rolls'],
+  ['(2d6x>)', true, 'rolls'],
+  ['(2d6r<)', true, 'rolls'],
+  ['(2d6cs>5>)', true, 'rolls'],
+  ['min(max((1d20cs>), -1), 6)', true, 'rolls'],
 ]);
 
 /** The fragments `Roll.validate` accepts but the engine cannot actually roll. */

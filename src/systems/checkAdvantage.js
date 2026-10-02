@@ -143,11 +143,13 @@ export function advantageOfferFields(config, evaluation, formula, Roll = diceEng
 
 /**
  * The roll options a check sub-object's own offers contribute at every check site: its
- * situational-bonus offer and its normalized advantage rule, which the engine enforces.
+ * situational-bonus offer and its normalized advantage rule, which the engine enforces, and its
+ * per-die test, which a counting runner reads when its caller passes none (issue 2067).
  */
 export function authoredOfferOptions(config) {
   return {
     offerSituationalBonus: config?.offerSituationalBonus !== false,
     advantage: normalizeCheckAdvantage(config?.advantage),
+    thresholdMode: config?.thresholdMode === 'exceed' ? 'exceed' : 'meet',
   };
 }

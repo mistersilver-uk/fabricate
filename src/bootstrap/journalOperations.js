@@ -92,6 +92,27 @@ export function withPromptActivity(operations, activity) {
   };
 }
 
+/**
+ * A check that cannot roll refuses at describe as it does at evaluate, `roll-unavailable` with its
+ * sentence (issue 2139), so the client clears a stale result as for any misconfigured check. Any
+ * other describe failure still throws.
+ */
+export function withUnrollableCheckRefusal(operations) {
+  const describeCheck = operations.describeCheck;
+  if (typeof describeCheck !== 'function') return operations;
+  return {
+    ...operations,
+    describeCheck: async (request) => {
+      try {
+        return await describeCheck(request);
+      } catch (error) {
+        if (error?.code !== 'CHECK_TARGET_INVALID') throw error;
+        return { required: false, blocked: 'roll-unavailable', detail: { message: error.message } };
+      }
+    },
+  };
+}
+
 async function resolveJournalSourceActors(run, payload = {}, fallbackActor = null) {
   const supplied = Array.isArray(payload.sourceActorUuids) ? payload.sourceActorUuids : null;
   const persisted = Array.isArray(run?.componentSourceActorUuids)
@@ -505,14 +526,18 @@ export function createJournalCommandsForFabricate(
   service = createJournalRunCommandService({
     authority,
     operations: {
-      crafting: createCraftingJournalOperations(fabricate, () => service),
+      crafting: withUnrollableCheckRefusal(
+        createCraftingJournalOperations(fabricate, () => service)
+      ),
       gathering: withPromptActivity(
-        createGatheringJournalRunOperations({
-          getEngine: () => getGatheringEngine(),
-          runManager: fabricate.gatheringRunManager,
-          getService: () => service,
-          getUser: (userId) => game.users?.get(userId) ?? null,
-        }),
+        withUnrollableCheckRefusal(
+          createGatheringJournalRunOperations({
+            getEngine: () => getGatheringEngine(),
+            runManager: fabricate.gatheringRunManager,
+            getService: () => service,
+            getUser: (userId) => game.users?.get(userId) ?? null,
+          })
+        ),
         () =>
           localizeWith(
             (key) => globalThis.game?.i18n?.localize?.(key),

@@ -740,6 +740,7 @@ describe('browse-status precedence', () => {
     ['knowledge', { reason: 'knowledge' }, CRAFTING_BROWSE_STATUS.UNKNOWN],
     ['exhausted', { exhausted: true }, CRAFTING_BROWSE_STATUS.EXHAUSTED],
     ['short', { materialsAvailable: false }, CRAFTING_BROWSE_STATUS.MISSING_MATERIALS],
+    ['check refused', { checkRefused: true }, CRAFTING_BROWSE_STATUS.CHECK_UNROLLABLE],
     ['ok', { materialsAvailable: true }, CRAFTING_BROWSE_STATUS.AVAILABLE],
     ['not asked', { materialsAvailable: null }, CRAFTING_BROWSE_STATUS.AVAILABLE],
   ];
@@ -756,15 +757,31 @@ describe('browse-status precedence', () => {
     ['teaser over everything below it', { reason: 'teaser' }, CRAFTING_BROWSE_STATUS.DISCOVERY],
     ['locked over everything below it', { reason: 'locked' }, CRAFTING_BROWSE_STATUS.LOCKED],
     ['knowledge over everything below it', { reason: 'knowledge' }, CRAFTING_BROWSE_STATUS.UNKNOWN],
-    ['exhaustion over a material shortfall', {}, CRAFTING_BROWSE_STATUS.EXHAUSTED],
+    [
+      'exhaustion over a refused check and a material shortfall',
+      {},
+      CRAFTING_BROWSE_STATUS.EXHAUSTED,
+    ],
   ];
+
+  it('resolves a check that cannot roll over a material shortfall, which gathering can clear (issue 2139)', () => {
+    assert.equal(
+      deriveBrowseStatus({ materialsAvailable: false, checkRefused: true }),
+      CRAFTING_BROWSE_STATUS.CHECK_UNROLLABLE
+    );
+  });
 
   for (const [label, higher, expected] of precedencePairs) {
     it(`resolves ${label} with every lower condition also set`, () => {
       // Every condition BELOW the one under test is set too, so the assertion is about
       // order rather than about the branch in isolation.
       assert.equal(
-        deriveBrowseStatus({ ...higher, exhausted: true, materialsAvailable: false }),
+        deriveBrowseStatus({
+          ...higher,
+          exhausted: true,
+          checkRefused: true,
+          materialsAvailable: false,
+        }),
         expected
       );
     });

@@ -8,6 +8,7 @@ import {
   boundAdditionalDice,
   spendableAmount,
 } from '../../../../../systems/additionalDiceReach.js';
+import { fixedRangeHolds } from '../../../../../systems/checkRouting.js';
 import { evaluateCheckBreakage } from '../../../../../toolBreakageRuntime.js';
 import { resolveProgressiveAward } from '../../../../../utils/progressiveAward.js';
 import { tileModel } from '../../../../presenters/countDiceTiles.js';
@@ -338,7 +339,7 @@ function readoutMedallion(facts, text) {
 /** The fixed range the total fell in, the highest start winning, whatever a trigger stepped to. */
 function rolledBand(plan, total) {
   const bands = Array.isArray(plan.args?.fixedOutcomes) ? plan.args.fixedOutcomes : [];
-  const holding = bands.filter((band) => Number(band.start) <= total && total <= Number(band.end));
+  const holding = bands.filter((band) => fixedRangeHolds(band, total));
   return holding.toSorted((left, right) => Number(right.start) - Number(left.start))[0] ?? null;
 }
 
