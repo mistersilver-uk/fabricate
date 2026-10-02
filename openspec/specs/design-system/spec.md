@@ -221,6 +221,8 @@ The absence of a prohibition is a fact about scope, not about the primitive's di
 So an adoption whose primitive still lives in `apps/manager/` is deferred on SCOPE — the move into `components/` with a shared scope is the shape and the mechanism of the change that owns it, and it carries its own path-repair surface — never on reachability.
 After issue 2046 exactly one member row scoped `shared` lives under `apps/manager/`: `ComplicationSummaryRow.svelte`; `ManagerModal.svelte`, which the player crafting application's roll prompt renders, moved into `components/` with that change.
 Issue 2005 adds a second outside `components/`, under `apps/crafting/detail/`: `CheckEvidenceRows.svelte`, the executed check's evidence rows, which the crafting result box and the salvage summary both render, each row through `JournalFactRow`'s keyed `.k-fact` form.
+`JournalFactRow`'s keyed form takes a per-site `prose` prop for a value that is a sentence rather than a figure (issue 2134): the value sets in the inherited body face at 12px with tabular numerals and wraps by word, and every other keyed row keeps the atom's 13px mono, so the prop extends the one row rather than forking it.
+`CheckEvidenceRows` passes it for a counting check's `Count`, `Pool` and `Result` rows.
 The library's routing rule decides WHICH primitive an adoption wants; the deferral decides only WHEN the move happens, and the two answers are recorded separately.
 `Pagination.svelte:262-270` renders `<Select size="inline">` with no `label`, `hint` or `error`, so `Select.svelte:220` computes `labelled` false and the `<Field as="label">` at `Select.svelte:442-451` never renders.
 That CHAIN, rather than the importer list alone, is what makes the new `.fabricate-field` floor and chrome unreachable in the player application today.
@@ -1861,7 +1863,7 @@ The Checks Studio's titled option groups and the roll prompt's additional-dice c
 ### Requirement: The die tiles of a success-counting roll are one primitive
 
 A success-counting roll's dice MUST be drawn by `DiceTiles`, one implementation whose pure tile model (`src/ui/presenters/countDiceTiles.js`) is shared by the Svelte component and by the escaped-HTML renderer a stored chat card uses, so the Studio simulator, the result boxes and the chat cards cannot mark one roll differently.
-The model draws one tile per active die in roll order, each explosion's die straight after the die that produced it, and combines every mark — ✓ qualified, ✕ cancelled, ↻ exploded — on one tile.
+The model draws one tile per active die in roll order, each explosion's die straight after the die that produced it, and combines every mark — qualified (`fa-check`), cancelled (`fa-xmark`), exploded (`fa-rotate`) — on one tile.
 Each glyph is a Font Awesome Free icon with `aria-hidden`, and each tile is a list item whose `aria-label` names its face and every mark, so colour is never the only signal.
 Every tile carries `data-dice-tile-face` and space-separated `data-dice-tile-marks`, unless its host names its own hooks.
 An optional legend sits under the tiles; the model caps at 40 tiles and adds a `+{n} more` item, and the tiles wrap inside their host with no sideways scroll at chat-sidebar width.
@@ -1871,6 +1873,9 @@ A tile may be `bought` (issue 2008): the last original dice in roll order that b
 A bought die that does not qualify has no tone, so its dash is inked `--fab-text-muted` to meet WCAG 1.4.11's 3:1, and a toned tile keeps its tone's border.
 An explosion roll a bought die produces is `generated`, not bought.
 The optional legend appends `dashed = bought` only when bought dice are present.
+Each legend key draws the very Font Awesome glyph its tile draws, `aria-hidden`, beside the word that names the mark (issue 2134), so one mark reads by one glyph on the tile and in its key and a screen reader hears the words alone; the chat renderer writes the same keys.
+A toned tile keeps its tone's fill inside a toned result box, a RECORDED deviation from prototype frame 39, which sets success tiles on a neutral box: the design system names no neutral tile ground for a toned container, so a qualified tile inside a success-toned box separates by its border.
+Measured against that box over the run column, its fill reaches 1.16:1 (`foundry-native`) to 1.37:1 (`starglass-arcana`) and its `--fab-success-border` 2.08:1 to 3.14:1, under 3:1 in five of the seven palettes; the face, the marks and the `aria-label` carry the state, so no information rests on that edge.
 
 #### Scenario: A die explodes and qualifies
 

@@ -386,7 +386,7 @@ A refused choice cancels the whole batch with zero mutation, and a resource that
   The gathering card states no roll — it has its own builder and its own row shape — and the run journal is where a gathered amount's roll is read.
 - **A counting check states its executed dice.**
   For a public, non-secret counting check (`publicroll` on V13, `public` on V14) the crafting, salvage and bulk salvage cards show the die tiles and the count rows, and the summary line `{pool}d{die}, each {sym} {threshold}` replaces the numeric roll row.
-  Each active die is one tile in roll order with its marks combined (✓ qualified, ✕ cancelled, ↻ exploded), and each explosion roll is its own tile straight after the die that produced it.
+  Each active die is one tile in roll order with its marks combined (qualified, cancelled and exploded, each by its Font Awesome glyph), and each explosion roll is its own tile straight after the die that produced it.
   The rows are `Success on` (only when the threshold read the character or modifiers moved it), `Count`, `Needed` (`{required} · margin {±m}`, or `{required} · a net below zero is a botch`) and `Pre-rolled`; a pool reduced to zero states `Pool` and `Result` instead, shows no tile and prints no roll total, and names dice that Disadvantage removed as a `disadvantage` penalty.
   A failed count that netted below zero reads `Botch` in place of the Failure pill.
   That evidence is handed to the card builder at post time from the engine's own execution and is never persisted into check data, run history, a roll handoff or message flags; a secret check keeps it inside the authority.
@@ -1001,6 +1001,8 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
   carries no separate run id; the engine advances the active step).
 - The Run Summary's result box keeps its `Craft complete` or failure head and rolled total, and states the executed check's evidence rows — the same `Needed`, `Target`, `Pre-rolled` and `Margin` rows the chat card states (§Result Chat Cards) — through `CheckEvidenceRows.svelte`, rendered as keyed fact rows.
   It withholds them only for a blind or secret roll, so a private or self roll still shows its roller the evidence.
+  A counting check's sentence rows — `Count` (`{q} qualified − {c} cancelled = {n} net`) and a zero pool's `Pool` and `Result` — set in the body face as prose and wrap by word, while its figure rows keep the keyed row's mono (issue 2134); the salvage summary renders the same rows.
+  The legend under its tiles keys each mark by the very glyph the tile draws, beside the word that names it.
   A box whose check states evidence also states the outcome: "The result group is produced." on success, and "Nothing is produced; the failure policy applies." on a failure that awarded nothing; a failure that still awarded items states no sentence.
   The salvage summary never states that sentence.
 - The unified player-facing Journal screen (see `ui-journal-app/spec.md` _Journal App (Player)_) is the cross-activity
