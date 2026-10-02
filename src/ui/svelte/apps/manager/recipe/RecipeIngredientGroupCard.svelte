@@ -17,12 +17,12 @@
   // choice is made, in `RecipeIngredientOption`'s own field. `essenceOptions` stays UNFILTERED,
   // because `hasEssences` gates the whole essence match TYPE on it and filtering would take
   // essence requirements away from a system whose essences are all disabled.
-  import RecipeIngredientOption from './RecipeIngredientOption.svelte';
+  import RecipeIngredientOption from './PickerRow.svelte';
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   // The ONE kind table, shared with the row's plate and kind select: the `or…` menu's entries and
   // the choice group's adders read their glyph, tint class and one-word name from it.
-  import { ingredientKindMarkClass, ingredientKindMeta } from './ingredientKindMeta.js';
+  import { ingredientKindMarkClass, ingredientKindMeta } from './pickerRowKinds.js';
 
   let {
     group = {},

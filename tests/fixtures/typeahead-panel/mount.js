@@ -8,7 +8,7 @@ import { mount } from 'svelte';
 import en from '../../../lang/en.json';
 import GatheringModifierEditor from '../../../src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte';
 import GatheringTaskEditView from '../../../src/ui/svelte/apps/manager/GatheringTaskEditView.svelte';
-import RecipeIngredientOption from '../../../src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte';
+import RecipeIngredientOption from '../../../src/ui/svelte/apps/manager/recipe/PickerRow.svelte';
 import RecipeItemLimitsTab from '../../../src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte';
 import { installFixtureI18n } from '../select-fixture-shared.js';
 

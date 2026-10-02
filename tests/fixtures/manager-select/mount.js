@@ -14,7 +14,7 @@ import CharacterPrerequisitesCard from '../../../src/ui/svelte/apps/manager/syst
 import GatheringEconomyView from '../../../src/ui/svelte/apps/manager/GatheringEconomyView.svelte';
 import SystemsBrowserView from '../../../src/ui/svelte/apps/manager/SystemsBrowserView.svelte';
 import ImportFolderMappingModal from '../../../src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte';
-import RecipeIngredientOption from '../../../src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte';
+import RecipeIngredientOption from '../../../src/ui/svelte/apps/manager/recipe/PickerRow.svelte';
 import EnvironmentOverviewTab from '../../../src/ui/svelte/apps/manager/environment/EnvironmentOverviewTab.svelte';
 import EnvironmentsBrowserView from '../../../src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte';
 import GatheringEventsBrowserView from '../../../src/ui/svelte/apps/manager/GatheringEventsBrowserView.svelte';

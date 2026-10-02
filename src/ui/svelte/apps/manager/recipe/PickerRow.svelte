@@ -42,7 +42,7 @@
   import Stepper from '../../../components/Stepper.svelte';
   // The ONE kind table: the plate's glyph and tint and the kind select's four words are read from
   // it rather than restated here.
-  import { INGREDIENT_KIND_ORDER, ingredientKindMeta } from './ingredientKindMeta.js';
+  import { INGREDIENT_KIND_ORDER, ingredientKindMeta } from './pickerRowKinds.js';
   import { typeaheadPanel } from '../../../actions/typeaheadPanel.js';
   import { createTypeaheadCombobox } from '../../../util/typeaheadCombobox.svelte.js';
 

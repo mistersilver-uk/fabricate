@@ -66,7 +66,7 @@ const harness = createMountedComponentHarness({
     // The repair block's plain-language readback (issue 1373, maintainer round 5).
     'src/ui/svelte/apps/manager/tools/toolRepairSummary.js',
     // The ONE ingredient-kind table (issue 1373, round 8).
-    'src/ui/svelte/apps/manager/recipe/ingredientKindMeta.js',
+    'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
     // `toolStudio.js` delegates the Tool display precedence to this layering-neutral leaf
     // so the engines and chat cards can reuse it too (issue 1119).
     'src/models/toolDisplay.js',
@@ -108,7 +108,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/tools/ToolInheritCard.svelte',
     'src/ui/svelte/apps/manager/tools/ToolSystemScopeCards.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeIngredientGroupCard.svelte',
-    'src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte',
+    'src/ui/svelte/apps/manager/recipe/PickerRow.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeIngredientSetCard.svelte',
     // The shared scoped-entity patterns the Tool Studio is converted onto (issue 1362).
     'src/ui/svelte/apps/manager/scoped/ScopedEntityPreview.svelte',

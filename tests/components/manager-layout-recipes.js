@@ -1455,7 +1455,7 @@ test("the requirement row's two dashed affordances paint at all, and at the desi
   );
   assert.doesNotMatch(
     readFileSync(
-      resolve(__dirname, '../../src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte'),
+      resolve(__dirname, '../../src/ui/svelte/apps/manager/recipe/PickerRow.svelte'),
       'utf8'
     ),
     /\n\s+triggerChip\b/,

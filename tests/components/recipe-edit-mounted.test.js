@@ -78,7 +78,7 @@ const RAW_MODULES = [
   // Ingredient + recipeReadiness dispatch through the match-type registry.
   'src/models/match/matchTypes.js',
   // The ONE ingredient-kind table (issue 1373, round 8).
-  'src/ui/svelte/apps/manager/recipe/ingredientKindMeta.js',
+  'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
   // The validation tab consumes the pure readiness evaluator.
   'src/ui/svelte/apps/manager/recipe/recipeReadiness.js',
   // RecipeEditView resolves, focuses and marks the control a validation row addresses
@@ -162,7 +162,7 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/apps/manager/recipe/RecipeIngredientsSection.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeIngredientSetCard.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeIngredientGroupCard.svelte',
-  'src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte',
+  'src/ui/svelte/apps/manager/recipe/PickerRow.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte',
