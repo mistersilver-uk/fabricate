@@ -61,9 +61,6 @@ const foundryGlobals = {
   Macro: 'readonly',
   Scene: 'readonly',
   User: 'readonly',
-  // Fabricate's OWN public global, assigned at `src/main.js`. The documentation macros under
-  // `examples/` call it bare, and they are right to: it really is a global at runtime.
-  fabricate: 'readonly',
 };
 
 // Svelte 5 RUNES. In a `.svelte.js` module these are compiler-provided, so ESLint sees bare
@@ -461,6 +458,26 @@ export default [
     rules: { 'no-restricted-globals': ['error', ...DOMAIN_RESTRICTED_GLOBALS] },
   },
 
+  // 5e. Fabricate's OWN macro global (issue 2153). `src/main.js` assigns `globalThis.fabricate`
+  //     for macros, and module code must not read it back: it carries only the macro API, so a
+  //     service read through it is always undefined. Module code reads `game.fabricate`. The bare
+  //     spelling is `no-undef` here, since only block 6c declares it.
+  {
+    files: ['src/**/*.js', 'src/**/*.svelte'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "MemberExpression[object.name='globalThis'][property.name='fabricate']" +
+            ':not(AssignmentExpression > MemberExpression.left)',
+          message:
+            '`globalThis.fabricate` is the macro API, not the module; read `game.fabricate`.',
+        },
+      ],
+    },
+  },
+
   // 6. Node tooling (build/release scripts and root config files). These are
   //    CLI entry points, so process control and console output are expected.
   //
@@ -548,7 +565,8 @@ export default [
   {
     files: ['examples/**/*.js'],
     languageOptions: {
-      globals: { ...globals.browser, ...foundryGlobals },
+      // Fabricate's own macro global, assigned at `src/main.js`, which a macro calls bare.
+      globals: { ...globals.browser, ...foundryGlobals, fabricate: 'readonly' },
     },
   },
 
