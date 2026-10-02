@@ -83,6 +83,11 @@ function slotsIn(target) {
   return [...target.querySelectorAll('[data-requirement-slot]')];
 }
 
+/** The face the shared tile paints a slot with. */
+function paintOf(slot) {
+  return slot.querySelector('.fab-slot-tile-shell').dataset.slotState;
+}
+
 function alternativesIn(target) {
   return [...target.querySelectorAll('[data-requirement-alternative]')];
 }
@@ -124,7 +129,7 @@ describe('RequirementChooser mounted behavior', () => {
     assert.ok(!essence.querySelector('.fab-requirement-slot-affordance'), 'none was supplied');
   });
 
-  it('states each state, and paints partial as short until the tile has a partial face', async () => {
+  it('states each state, and paints an unchosen choice as open, never as short', async () => {
     const target = await harness.mount({ slots: SLOTS });
     assert.deepEqual(
       slotsIn(target).map((slot) => slot.getAttribute('data-slot-state')),
@@ -132,13 +137,31 @@ describe('RequirementChooser mounted behavior', () => {
     );
     // The shared tile's own state hook is what it paints from.
     assert.deepEqual(
-      slotsIn(target).map((slot) => slot.querySelector('.fab-slot-tile-shell').dataset.slotState),
-      ['met', 'short', 'short']
+      slotsIn(target).map((slot) => paintOf(slot)),
+      ['met', 'open', 'short']
     );
+    const pip = slotsIn(target)[1].querySelector('.fab-slot-pip');
+    assert.ok(pip.classList.contains('is-candidate'), 'and its pill takes the accent, not success');
     assert.deepEqual(
       slotsIn(target).map((slot) => slot.querySelector('.fab-slot-pip').textContent.trim()),
       ['2/2', '0/2', '0/4']
     );
+  });
+
+  it('paints short for a chosen short choice and for a partly met essence', async () => {
+    const target = await harness.mount({
+      slots: [
+        { ...CHOICE, state: 'short' },
+        { ...ESSENCE, state: 'partial', pip: '2/4' },
+      ],
+    });
+    assert.deepEqual(
+      slotsIn(target).map((slot) => paintOf(slot)),
+      ['short', 'short']
+    );
+    for (const slot of slotsIn(target)) {
+      assert.ok(slot.querySelector('.fab-slot-pip').classList.contains('is-ratio'));
+    }
   });
 
   it('draws no pip for a slot that supplies none', async () => {

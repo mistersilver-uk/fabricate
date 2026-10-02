@@ -27,8 +27,9 @@
   - `{...rest}` lands on the root `div`, written after `class={…}`.
 
   Invariants:
-  - `partial` paints as `short`: the shared tile has no partial face, so the difference is carried
-    by `label` and by `data-slot-state` only.
+  - A `partial` choice slot is one the player has not picked from, a to-do and never an error:
+    it paints the shared tile's `open` face. Any other `partial` slot paints as `short`, because
+    the tile has no partial face; `label` and `data-slot-state` carry the difference.
   - A short alternative is dimmed and stays a pressable button; its `reading` is rendered as text.
   - `pip` is caller-formatted, so a face that states an amount rather than a held-against-needed
     pair supplies its own text and this component draws nothing extra for it.
@@ -69,8 +70,9 @@
   const shortfalls = $derived(alternatives.filter((entry) => entry.short && entry.reading));
   const hasPanel = $derived(Boolean(opened) && (alternatives.length > 0 || Boolean(panel)));
 
-  function tileState(state) {
-    return state === 'met' ? 'met' : 'short';
+  function tileState(slot) {
+    if (slot.state === 'met') return 'met';
+    return slot.kind === 'choice' && slot.state === 'partial' ? 'open' : 'short';
   }
 
   function toggle(slot) {
@@ -87,8 +89,9 @@
     art={slot.art || ''}
     icon={slot.icon || 'fas fa-circle'}
     tint={slot.tint || ''}
-    state={tileState(slot.state)}
+    state={tileState(slot)}
     pip={slot.pip || ''}
+    pipKind={tileState(slot) === 'open' ? 'candidate' : 'ratio'}
   />
 {/snippet}
 
