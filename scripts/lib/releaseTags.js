@@ -26,6 +26,13 @@ function describe(value) {
   }
 }
 
+/** A hand-typed tag with exactly one lowercase `v` prefix, whether or not one was typed. */
+export function normalizeReleaseTagInput(value) {
+  if (typeof value !== 'string') return value;
+  const bare = value.trim().replace(/^v/i, '');
+  return bare ? `v${bare}` : value;
+}
+
 /** Parse a release tag into its kind, its bare version, and its base version. */
 export function parseReleaseTag(tag) {
   if (typeof tag !== 'string') return null;

@@ -31,7 +31,7 @@ on:
   workflow_dispatch:
     inputs:
       beta_tag:
-        description: "The tested beta tag to promote (e.g. v1.4.0-beta.3)"
+        description: "The tested beta tag to promote, with or without its v (e.g. 1.4.0-beta.3 or v1.4.0-beta.3)"
         required: true
         type: string
 
@@ -59,15 +59,16 @@ jobs:
         env:
           BETA_TAG: ${{ inputs.beta_tag }}
         run: |
-          # Rejects a non-beta tag (stable, malformed, empty) via the shared validator. Prints the
-          # bare version (`v` stripped) — the version the beta channel must already advertise.
-          VERSION=$(node scripts/validate-release-tag.mjs "$BETA_TAG" --kind beta)
+          # Rejects a non-beta tag (stable, malformed, empty) via the shared validator. The typed
+          # `v` is optional, so later steps read this step's `tag` output, never the raw input.
+          VERSION=$(node scripts/validate-release-tag.mjs "$BETA_TAG" --kind beta --optional-prefix)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "Promoting $BETA_TAG (version $VERSION)"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Promoting v$VERSION (version $VERSION)"
 
       - name: Assert the tag exists and its commit is an ancestor of origin/main
         env:
-          BETA_TAG: ${{ inputs.beta_tag }}
+          BETA_TAG: ${{ steps.validate.outputs.tag }}
         run: |
           git fetch origin main release --tags --force
           if ! git tag -l "$BETA_TAG" | grep -q .; then
@@ -173,7 +174,7 @@ jobs:
       - name: Merge the beta tag into release and push (triggers release.yml)
         env:
           GH_TOKEN: ${{ steps.apptoken.outputs.token }}
-          BETA_TAG: ${{ inputs.beta_tag }}
+          BETA_TAG: ${{ steps.validate.outputs.tag }}
         run: |
           git config user.name "fabricate-release-bot"
           git config user.email "release-bot@users.noreply.github.com"

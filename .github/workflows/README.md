@@ -247,6 +247,7 @@ Prefer prose that cites nothing, or cite only paths you have confirmed exist on 
 File: `.github/workflows/promote-to-early-access.yml`
 
 Trigger: `workflow_dispatch(beta_tag)`.
+The tag's `v` is optional when typed: `1.4.0-beta.3` and `v1.4.0-beta.3` both name the tag `v1.4.0-beta.3`, and every step after validation reads that canonical tag rather than the raw input.
 
 This is the **prerelease promotion**: it does the MERGE ONLY of a tested beta commit onto `release`, which then triggers `release.yml` to mint the stable version and publish early access.
 It is a `git merge --no-ff` (**never a squash** — squashing collapses the Conventional Commit types semantic-release reads and mis-computes the version, per the **Version authority and promotion mechanics** requirement).
