@@ -575,6 +575,14 @@
       "evidence": "broad",
       "scope": "shared",
       "why": "Issue 2008 builds the specified library container the level below `<Card>`: a 1px `--fab-border` frame, radius 9 and `--fab-space-3` padding on `--fab-bg-1`, with the optional kicker `label` at its head. Promoted in the same issue on its second independent importer: the Checks Studio's titled option group (`apps/manager/checks/CheckOptionGroup.svelte`), whose roll-prompt and additional-dice groups draw their frame through it, and the player roll prompt's additional-dice control (`apps/crafting/RollPromptAdditionalDice.svelte`), so neither site hand-rolls a well. `shipped`: its props and its geometry are the specimen's own, and where the prototype paints the prompt's well a step lighter the library's `--fab-bg-1` decides it. Scoped `shared`: the player window draws it as well as the manager. Its broad-signal override names the Formula card's two option-group frames, because no published case yet opens the prompt with additional dice offered."
+    },
+    {
+      "path": "src/ui/svelte/components/SlotTile.svelte",
+      "library": "<SlotTile>",
+      "status": "target",
+      "evidence": "broad",
+      "scope": "shared",
+      "why": "Issue 1648 implemented the specified tile for the Journal through `components/SlotRow`. Issue 1518 gave it its second importer, `components/RequirementChooser`, which draws every requirement slot and every alternative as this tile, so it clears the two-importer bar and becomes a member. Its `partial` face and its rendered acceptance stay with issue 1644, which is why the specimen and this row remain `target`."
     }
   ],
   "notAPrimitive": [
@@ -687,15 +695,6 @@
       "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/apps/journal/StepDetails.svelte`, is below the two-importer membership bar. Broader shared adoption remains coordinated through #1644; this records the current production import graph without claiming a second consumer. Library target status and screenshot requirements remain in force."
     },
     {
-      "path": "src/ui/svelte/components/SlotTile.svelte",
-      "library": "<SlotTile>",
-      "evidence": "broad",
-      "callers": [
-        "src/ui/svelte/components/SlotRow.svelte"
-      ],
-      "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/components/SlotRow.svelte`, is below the two-importer membership bar. Broader shared adoption remains coordinated through #1644; this records the current production import graph without claiming a second consumer. Library target status and screenshot requirements remain in force."
-    },
-    {
       "path": "src/ui/svelte/components/ChoiceOptionList.svelte",
       "library": "<ChoiceOptionList>",
       "evidence": "broad",
@@ -721,6 +720,15 @@
         "src/ui/svelte/apps/journal/RunDetail.svelte"
       ],
       "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/apps/journal/RunDetail.svelte`, is below the two-importer membership bar. Broader shared adoption remains coordinated through #1644; this records the current production import graph without claiming a second consumer. Library target status and screenshot requirements remain in force."
+    },
+    {
+      "path": "src/ui/svelte/components/RequirementChooser.svelte",
+      "library": "<RequirementChooser>",
+      "evidence": "broad",
+      "callers": [
+        "src/ui/svelte/apps/crafting/detail/RequirementRail.svelte"
+      ],
+      "why": "Issue 1518 ships the specified player-side chooser as one component (maintainer ruling, 2026-09-18): a row of slot tiles over `SlotTile`, one open slot through a bindable `openSlotId`, the open slot's alternatives as pressable tiles with `onChoose` as the only selection event, and a `panel` snippet for the caller's essence pool. ONE independent importer, `src/ui/svelte/apps/crafting/detail/RequirementRail.svelte`, is below the two-importer membership bar; the award face of issue 1773 is the second, and the `pip` text is caller-formatted for it. The specimen declares it `shipped`, and `player-crafting-chooser-open` draws it open on a choice slot."
     }
   ],
   "ruledOut": [

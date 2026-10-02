@@ -37,8 +37,6 @@
     // `craftability.essencePool` — requirements, carriers, allocation, suggested.
     pool = null,
     readOnly = false,
-    panelId = null,
-    labelledBy = null,
     onAllocate = null,
   } = $props();
 
@@ -118,12 +116,7 @@
 </script>
 
 {#if requirements.length > 0}
-  <section
-    class="essence-pool"
-    id={panelId ?? undefined}
-    aria-labelledby={labelledBy ?? undefined}
-    data-recipe-section="essence-pool"
-  >
+  <section class="essence-pool" data-recipe-section="essence-pool">
     <Kicker as="p">{title}</Kicker>
 
     <div class="essence-pool-meters">

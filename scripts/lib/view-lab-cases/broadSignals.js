@@ -286,6 +286,11 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'player-inventory',
     'player-crafting-simple',
   ]),
+  // The requirement chooser (issue 1518): open on a choice slot, and the rail's three slot states.
+  'src/ui/svelte/components/RequirementChooser.svelte': Object.freeze([
+    'player-crafting-chooser-open',
+    'player-crafting-slot-rail',
+  ]),
   // The sheet itself, and the first entry here whose key is not a component (issue 1515).
   'styles/fabricate.css': Object.freeze([
     'manager-gathering-task-editor-normal',

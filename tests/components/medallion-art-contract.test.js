@@ -15,11 +15,12 @@ const ART_RESOLVER = 'resolveCraftingArt(';
 /** EVERY MEDALLION RENDER SITE IN `src/`, PINNED, so no clause below can pass over nothing. */
 // #1648: RunDetail -1, StepDetails -2, ChoiceOptionList +1. #2080: the simulator's number tile and
 // its result-card icon +2. #2006: the count face tile -1, now the shared DiceTiles' own tile.
-// #1518: the recipe, inventory and run identity tiles -3, PlayerDetailHeader's one tile +1.
-const MEDALLION_SITES = 83;
+// #1518: the recipe, inventory and run identity tiles -3, PlayerDetailHeader's one tile +1; the
+// retired RequirementTile's two -2, its slots now the shared SlotTile's one site.
+const MEDALLION_SITES = 81;
 
 /** How many of them bind artwork at all. The rest are glyph-only and `alt` is moot for them. */
-const ART_BEARING_SITES = 64;
+const ART_BEARING_SITES = 63;
 
 /** `<Medallion …>` opening tags in `src/`, as `{ path, tag }`. */
 const TAGS = Object.entries(SOURCES).flatMap(([path, source]) =>

@@ -116,15 +116,12 @@ describe('EssencePoolPanel mounted behavior', () => {
     );
   });
 
-  it('labels the panel back at the tile that opened it', async () => {
-    const target = await harness.mount({
-      pool: SHARED,
-      panelId: 'panel-1',
-      labelledBy: 'fabricate-slot-g-radiant',
-    });
+  // The chooser's panel region is the named one, so the pool carries no identity of its own.
+  it('leaves the panel identity to the region that holds it', async () => {
+    const target = await harness.mount({ pool: SHARED });
     const panel = target.querySelector('[data-recipe-section="essence-pool"]');
-    assert.equal(panel.getAttribute('id'), 'panel-1');
-    assert.equal(panel.getAttribute('aria-labelledby'), 'fabricate-slot-g-radiant');
+    assert.ok(!panel.hasAttribute('id'));
+    assert.ok(!panel.hasAttribute('aria-labelledby'));
   });
 
   describe('an overshoot', () => {

@@ -1,39 +1,47 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  RequirementRail is the player Crafting tab's single requirement surface (issue
-  917): the set's fixed, choice and essence requirements as ONE wrapping row of
-  slot tiles, with at most one chooser open at a time and a "Pick for me" wand in
-  its own header.
+  The player Crafting tab's requirement surface: a header with "Pick for me", the shared
+  requirement chooser over the set's slots, and the rail's own live region.
 
-  The wand lives HERE rather than in the app footer because the rail renders inside
-  step and routed bodies while Craft sits in a fixed footer outside the scrolling
-  body — a footer control could not be scoped to the set the rail is showing.
+  Props:
+  | prop | values | default | contract |
+  | --- | --- | --- | --- |
+  | `slots` | `buildRequirementSlots` output | `[]` | The set's slots in author order. |
+  | `openSlotId` | slot id | `null` | Resolved and re-validated by the store; the rail never remembers it. |
+  | `readOnly` | boolean | `false` | True when the displayed step is not the step the engine would execute, or its time gate is armed. |
+  | `announcement` | localized string | `''` | Wins over the open-chooser sentence in the live region. |
+  | `panelId` | DOM id | `null` | The id the open slot's panel takes. |
 
-  Auto-advance announces through this component's OWN live region, never the
-  progressive stage list's reorder region: a progressive recipe can render both
-  surfaces at once and a shared region would have them overwrite each other.
+  Snippets:
+  - `chooser(slot)` — the open slot's panel content; omitted when the open slot has none.
 
-  The rail renders read-only whenever the displayed step is not the step the engine
-  would execute, or while that step's time gate is armed — what is shown then does
-  not drive the craft the button fires.
+  Callbacks:
+  - `onOpenSlot(slotId)` — a selectable tile was pressed; the store opens or closes it.
+  - `onPickForMe()` — the wand was pressed.
+
+  Invariants:
+  - The wand lives here, not in the app footer: the rail renders inside step and routed bodies.
+  - Auto-advance announces through this component's own live region, never the progressive stage
+    list's reorder region, because a progressive recipe renders both at once.
+  - Pinned by `tests/components/requirement-rail-mounted.test.js`.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
   import { normalizeEssenceIcon } from '../../../util/essenceIcons.js';
   import { SLOT_KIND, SLOT_STATE } from '../../../util/requirementSlots.js';
-  import RequirementTile from './RequirementTile.svelte';
+  import RequirementChooser from '../../../components/RequirementChooser.svelte';
   import Kicker from '../../../components/Kicker.svelte';
 
   let {
     slots = [],
     openSlotId = null,
     readOnly = false,
-    // Live-region text for auto-advance and "Pick for me".
     announcement = '',
-    // DOM id of the panel the open slot controls, for `aria-controls`.
     panelId = null,
     onOpenSlot = null,
     onPickForMe = null,
+    chooser = null,
   } = $props();
 
   const items = $derived(Array.isArray(slots) ? slots : []);
@@ -47,30 +55,16 @@
     [SLOT_STATE.SHORT]: 'FABRICATE.App.Crafting.Slots.TileShort',
   };
 
-  // A currency requirement has no have/need ratio to announce (issue 1493). The shared
-  // TileMet/TileShort keys interpolate BOTH — so leaving currency on them announced
-  // "100 gp needs 1 and you have 0", which is the very defect the pip was removed for,
-  // surviving in the one place a screen-reader user actually receives it (the pip is
-  // aria-hidden, and a fixed slot's `role="img"` exposes no inner text at all). Two whole
-  // literal keys mirroring STATE_LABEL_KEYS above, because a currency slot's state is
-  // binary by construction — `satisfied === true ? MET : SHORT`.
+  // A currency slot's state is binary and it has no have/need ratio to announce (issue 1493),
+  // so it takes its own whole keys rather than the ratio sentences above.
   const CURRENCY_LABEL_KEYS = {
     [SLOT_STATE.MET]: 'FABRICATE.App.Crafting.Slots.TileCurrencyMet',
     [SLOT_STATE.SHORT]: 'FABRICATE.App.Crafting.Slots.TileCurrencyShort',
   };
 
+  // A cost the world's configuration cannot resolve is not a shortfall, so it is named by its
+  // reason through a key of its own; the joining sentence is copy a translator must reach.
   function currencyTileLabel(slot) {
-    // A cost the world's configuration cannot resolve is NOT a shortfall, and announcing
-    // "you cannot afford this" to a player carrying ten times the price is the original
-    // defect in a new voice. Keyed like the other two rather than composed: both halves
-    // arrive non-localized (the caption from `formatCurrencyRequirement`, the reason from
-    // the affordance layer), but the SENTENCE that joins them is copy, and a composed one
-    // is the single accessible name on this path that a translator cannot reach.
-    //
-    // No English fallback behind any of the three (issue 1493). All of them ship in
-    // `lang/en.json` in this same change, and Foundry already merges `en` under every
-    // other language, so a fallback here could only ever mirror the shipped copy — a
-    // second wording of the same sentence that nothing forces to agree with the first.
     if (slot.issue) {
       return localize('FABRICATE.App.Crafting.Slots.TileCurrencyUnavailable', {
         name: slot.name,
@@ -87,21 +81,12 @@
     return localize(key, { name: slot.name, have: slot.have, need: slot.need });
   }
 
-  // The world's currency configuration reason, rendered ONCE for the whole rail.
-  //
-  // It is a property of the WORLD's currency configuration, not of any one requirement,
-  // so per-tile rendering would assert it as a property of each and repeat it verbatim
-  // for a set with two currency options. It also cannot live in the tile: the column is
-  // 80px with no wrapping siblings, so a sentence there wraps to roughly ten lines and
-  // doubles the tile height — and a fixed currency tile renders the `role="img"` branch,
-  // inside which text is not exposed at all.
-  //
-  // Not localized, deliberately: it is composed in English by the affordance layer, as
-  // are every other currency sentence on this path and the cost caption beside it.
+  // The currency reason belongs to the world's configuration, not to one requirement, so it
+  // renders once for the rail. It arrives composed in English from the affordance layer.
   const currencyIssue = $derived(items.find((slot) => slot.isCurrency && slot.issue)?.issue ?? '');
 
-  // Plurals are TWO whole literal keys chosen by a ternary. A concatenated suffix
-  // credits only the prefix under the lang-key orphan guard and strands the leaf.
+  // Plurals are two whole literal keys: a concatenated suffix strands the leaf under the
+  // lang-key orphan guard.
   function optionsLabel(count) {
     return count === 1
       ? localize('FABRICATE.App.Crafting.Slots.OptionsOne', { count })
@@ -119,19 +104,37 @@
     return localize('FABRICATE.App.Crafting.Slots.Change');
   }
 
-  function tileDomId(slot) {
-    return `fabricate-slot-${slot.key}`;
+  function tileArt(slot) {
+    if (slot.isEssence) {
+      return { art: '', icon: normalizeEssenceIcon(slot.icon), tint: slot.colorToken || '' };
+    }
+    return resolveCraftingArt(slot.img, 'fa-solid fa-cube');
   }
 
-  function isOpen(slot) {
-    return slot.interactive && slot.slotId === openSlotId;
+  // A currency slot draws no pip: its `need` is a price and its `have` is always 0.
+  function chooserSlot(slot) {
+    return {
+      ...tileArt(slot),
+      key: slot.key,
+      slotId: slot.interactive ? slot.slotId : null,
+      kind: slot.kind,
+      state: slot.state,
+      name: slot.name,
+      label: tileLabel(slot),
+      description: slot.description,
+      pip: slot.isCurrency ? '' : `${slot.have}/${slot.need}`,
+      affordance: disclosureText(slot),
+      tileId: `fabricate-slot-${slot.key}`,
+    };
   }
 
-  // Auto-advance moves which chooser is OPEN without moving focus, so the change has
-  // to be spoken rather than shown. Naming the open slot here means the region's text
-  // changes exactly when the open chooser does — whether the rail advanced by itself
-  // or the player clicked — and an explicit `announcement` ("Pick for me") wins.
-  const openSlot = $derived(items.find(isOpen) ?? null);
+  const chooserSlots = $derived(items.map(chooserSlot));
+
+  // Auto-advance moves the open chooser without moving focus, so the change is spoken; naming
+  // the open slot makes the text change exactly when the open chooser does.
+  const openSlot = $derived(
+    items.find((slot) => slot.interactive && slot.slotId === openSlotId) ?? null
+  );
   const liveText = $derived.by(() => {
     if (announcement) return announcement;
     if (readOnly || !openSlot) return '';
@@ -146,11 +149,8 @@
         {localize('FABRICATE.App.Crafting.Slots.Title')}
       </Kicker>
       {#if canPickForMe}
-        <!-- NO aria-label. The visible label is "Pick for me" and the hint is a whole
-             sentence, so labelling the button with the hint would leave an accessible
-             name that does not contain its visible text: speech activation by the
-             visible label then fails (WCAG 2.5.3 Label in Name). The `<span>` names the
-             button; `title` carries the hint for everyone. -->
+        <!-- No aria-label: the visible span names the button and `title` carries the hint, so
+             the accessible name contains the visible label (WCAG 2.5.3). -->
         <button
           type="button"
           class="requirement-rail-wand"
@@ -172,16 +172,9 @@
       <p class="requirement-rail-hint">{localize('FABRICATE.App.Crafting.Slots.Hint')}</p>
     {/if}
 
-    <!-- Before the tiles, so assistive tech reaches the cause in document order rather
-         than after every requirement it explains.
-
-         The reason and the DIRECTIVE are one paragraph, because to this reader they are
-         one statement (issue 1493). The reason alone is an engine sentence — the shipped
-         "Currency unit Gold is missing an actor data path" means nothing to a player, who has no
-         idea what an actor data path is, whether it is their fault, or what to do about
-         it. This is the primary pre-craft discovery surface, so it names the person who
-         can fix it and where they fix it. The reason stays unlocalized (the affordance
-         layer composes it in English); the directive is copy and is keyed. -->
+    <!-- Before the tiles, so assistive tech reaches the cause before the requirements it
+         explains. Reason and directive are one paragraph: the reason alone names nobody who
+         can fix it. -->
     {#if currencyIssue}
       <p class="requirement-rail-issue" data-requirement-rail-issue>
         {currencyIssue}
@@ -189,25 +182,17 @@
       </p>
     {/if}
 
-    <div class="requirement-rail-slots" data-requirement-rail-slots>
-      {#each items as slot (slot.key)}
-        <RequirementTile
-          {slot}
-          {readOnly}
-          iconClass={slot.isEssence ? normalizeEssenceIcon(slot.icon) : ''}
-          open={isOpen(slot)}
-          label={tileLabel(slot)}
-          caption={slot.name}
-          disclosure={disclosureText(slot)}
-          tileId={tileDomId(slot)}
-          controlsId={isOpen(slot) ? panelId : null}
-          onOpen={(slotId) => onOpenSlot?.(slotId)}
-        />
-      {/each}
-    </div>
+    <RequirementChooser
+      slots={chooserSlots}
+      {openSlotId}
+      {readOnly}
+      {panelId}
+      ariaLabel={localize('FABRICATE.App.Crafting.Slots.Title')}
+      panel={chooser}
+      onToggle={(slotId) => onOpenSlot?.(slotId)}
+      data-requirement-rail-slots
+    />
 
-    <!-- Auto-advance never steals focus, so the change of open chooser is announced
-         here instead. Its own region: ProgressiveStageList owns the reorder one. -->
     <p class="requirement-rail-live" role="status" aria-live="polite" data-requirement-rail-live>
       {liveText}
     </p>
@@ -266,24 +251,12 @@
     color: var(--fab-text-muted);
   }
 
-  /* Same shape as the hint above it, in the warning-TEXT token rather than the base
-     `--fab-warning` fill hue: this is a sentence, not a fill.
-     WARNING, not danger (issue 1493): the world's currency setup is unfinished, which is
-     not the player's fault and not something they can act on beyond asking their GM. Red
-     here reads as "you have done something wrong" on the one surface whose red already
-     means "you cannot afford this". */
+  /* Warning, not danger (issue 1493): an unfinished currency setup is not the player's fault,
+     and red on this surface already means "you cannot afford this". */
   .requirement-rail-issue {
     margin: 0;
     font-size: 12px;
     color: var(--fab-warning-text);
-  }
-
-  /* Slots WRAP rather than shrink: below the tile's minimum the artwork and the pip
-     stop being legible, so a narrow app gets more rows, not smaller tiles. */
-  .requirement-rail-slots {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--fab-space-2);
   }
 
   .requirement-rail-live {

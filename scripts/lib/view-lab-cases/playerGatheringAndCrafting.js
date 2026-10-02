@@ -1089,6 +1089,27 @@ export const CASES = Object.freeze([
     sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),
   playerCase({
+    id: 'player-crafting-chooser-open',
+    label: 'Player app — Crafting requirement chooser open on a choice slot',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting' },
+    // The chooser open on a choice slot the player has picked from: the picked alternative is
+    // selected, and the other is short and still offered.
+    steps: [
+      { selector: '.crafting-browser-search input', fill: 'Temper a Tidebound' },
+      { selector: '.crafting-recipe-row[data-recipe-id="sm-r-tidebound"]' },
+      { selector: '[data-alt-group="sm-set-tidebound-g2"] [data-option-index="1"]' },
+    ],
+    expectSelector:
+      '[data-recipe-section="requirement-rail"]' +
+      ':has([data-requirement-slot][data-slot-kind="choice"][aria-expanded="true"])' +
+      ':has(.crafting-alt-option.is-selected[data-option-index="1"])' +
+      ':has(.crafting-alt-option.is-short[data-option-index="0"])',
+    kinds: ['player', 'crafting'],
+    sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
+  }),
+  playerCase({
     id: 'player-crafting-tag-unmatched',
     label: 'Player app — Crafting tag unmatched',
     smokeLabels: ['player-crafting-tag-unmatched'],

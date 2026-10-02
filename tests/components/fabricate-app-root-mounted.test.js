@@ -182,7 +182,6 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/RowDisclosure.svelte',
     'src/ui/svelte/apps/crafting/detail/RecipeBodyShell.svelte',
     'src/ui/svelte/apps/crafting/detail/RequirementRail.svelte',
-    'src/ui/svelte/apps/crafting/detail/RequirementTile.svelte',
     'src/ui/svelte/apps/crafting/detail/RollResultBox.svelte',
     'src/ui/svelte/apps/crafting/detail/RoutedByCheckBody.svelte',
     'src/ui/svelte/apps/crafting/detail/SimpleRecipeBody.svelte',

@@ -249,6 +249,9 @@ export const PLAYER_APP_COMPILED_MODULES = Object.freeze([
   // The identity row every player detail pane leads with (issue 1518), and the primary it draws.
   'src/ui/svelte/apps/PlayerDetailHeader.svelte',
   'src/ui/svelte/components/ManagerButton.svelte',
+  // The requirement chooser the crafting rail renders (issue 1518), and the tile it draws.
+  'src/ui/svelte/components/RequirementChooser.svelte',
+  'src/ui/svelte/components/SlotTile.svelte',
 ]);
 
 // The raw `.js` modules the player Crafting tab tree needs in a mounted test.
@@ -431,10 +434,11 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/crafting/detail/IngredientOptionSelector.svelte',
   'src/ui/svelte/apps/crafting/detail/CraftingCheckCard.svelte',
   'src/ui/svelte/apps/crafting/detail/IoTable.svelte',
-  // IoTable is the requirement surface's composition root (issue 917) and renders all four of
-  // these.
+  // IoTable is the requirement surface's composition root (issue 917) and renders these; the
+  // rail renders the shared chooser, which draws the shared slot tile.
   'src/ui/svelte/apps/crafting/detail/RequirementRail.svelte',
-  'src/ui/svelte/apps/crafting/detail/RequirementTile.svelte',
+  'src/ui/svelte/components/RequirementChooser.svelte',
+  'src/ui/svelte/components/SlotTile.svelte',
   'src/ui/svelte/apps/crafting/detail/EssencePoolPanel.svelte',
   'src/ui/svelte/apps/crafting/detail/ConsumptionPlanPanel.svelte',
   // The one "N Radiant" contribution chip both of the two panels above render. They

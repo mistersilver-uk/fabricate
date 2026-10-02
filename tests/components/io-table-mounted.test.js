@@ -165,7 +165,7 @@ describe('IoTable mounted behavior', () => {
       openSlotId: 'essence-pool',
       idPrefix: 'fabricate-req-step-1',
     });
-    const panel = target.querySelector('[data-recipe-section="essence-pool"]');
+    const panel = target.querySelector('[data-recipe-section="essence-pool"]').closest('[role="region"]');
     const tile = target.querySelector('[data-slot-kind="essence"]');
     assert.equal(panel.getAttribute('id'), 'fabricate-req-step-1-panel');
     assert.equal(tile.getAttribute('aria-controls'), 'fabricate-req-step-1-panel');
@@ -244,9 +244,9 @@ describe('IoTable mounted behavior', () => {
       },
     });
     const target = await harness.mount({ craftability: mixed, openSlotId: 'essence-pool' });
-    const pool = target.querySelector('[data-recipe-section="essence-pool"]');
-    assert.equal(pool.getAttribute('id'), 'fabricate-req-panel');
-    assert.equal(pool.getAttribute('aria-labelledby'), 'fabricate-slot-g-radiant');
+    const panel = target.querySelector('[data-recipe-section="essence-pool"]').closest('[role="region"]');
+    assert.equal(panel.getAttribute('id'), 'fabricate-req-panel');
+    assert.equal(panel.getAttribute('aria-labelledby'), 'fabricate-slot-g-radiant');
     assert.ok(!target.querySelector('[role="radiogroup"]'), 'no group was opened');
   });
 

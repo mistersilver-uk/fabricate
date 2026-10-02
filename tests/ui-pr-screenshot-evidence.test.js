@@ -815,7 +815,6 @@ describe('UI PR screenshot evidence', () => {
     // chooser is open all route to the whole set.
     for (const file of [
       'src/ui/svelte/apps/crafting/detail/RequirementRail.svelte',
-      'src/ui/svelte/apps/crafting/detail/RequirementTile.svelte',
       'src/ui/svelte/apps/crafting/detail/EssencePoolPanel.svelte',
       'src/ui/svelte/apps/crafting/detail/ConsumptionPlanPanel.svelte',
       'src/ui/svelte/util/requirementSlots.js',

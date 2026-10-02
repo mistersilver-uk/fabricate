@@ -1,8 +1,10 @@
-/** RequirementRail + RequirementTile (issue 917). */
+/** RequirementRail over the shared RequirementChooser (issues 917 and 1518). */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+
+import { createRawSnippet } from 'svelte';
 
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { installLangBackedI18n } from '../helpers/langBackedI18n.js';
@@ -97,7 +99,8 @@ const harness = createMountedComponentHarness({
   ],
   compiledModules: [
     'src/ui/svelte/components/Medallion.svelte',
-    'src/ui/svelte/apps/crafting/detail/RequirementTile.svelte',
+    'src/ui/svelte/components/SlotTile.svelte',
+    'src/ui/svelte/components/RequirementChooser.svelte',
     // The shared eyebrow (issue 1505). The rail's header title is a `<Kicker>`.
     'src/ui/svelte/components/Kicker.svelte',
     'src/ui/svelte/apps/crafting/detail/RequirementRail.svelte',
@@ -138,6 +141,16 @@ function tilesIn(target) {
   return [...target.querySelectorAll('[data-requirement-slot]')];
 }
 
+/** A slot's accessible name: the button's own, or the labelled image inside a fixed slot. */
+function nameOf(tile) {
+  return (
+    tile.getAttribute('aria-label') ?? tile.querySelector('[role="img"]').getAttribute('aria-label')
+  );
+}
+
+/** A stand-in for the panel content the composition root supplies. */
+const PANEL = createRawSnippet(() => ({ render: () => '<p data-test-panel>panel</p>' }));
+
 describe('RequirementRail mounted behavior', () => {
   before(harness.setup);
   after(harness.teardown);
@@ -160,14 +173,18 @@ describe('RequirementRail mounted behavior', () => {
   it('exposes a fixed slot as a labelled image, never as a control', async () => {
     const target = await harness.mount({ slots: slots() });
     const [fixed] = tilesIn(target);
-    assert.equal(fixed.tagName, 'SPAN');
-    assert.equal(fixed.getAttribute('role'), 'img');
-    assert.ok(fixed.getAttribute('aria-label').includes('Iron'));
+    assert.notEqual(fixed.tagName, 'BUTTON');
+    assert.ok(nameOf(fixed).includes('Iron'), 'the shared tile is the labelled image');
     assert.ok(!fixed.hasAttribute('aria-expanded'), 'and promises no disclosure');
   });
 
   it('exposes a choice or essence slot as a button with the disclosure contract', async () => {
-    const target = await harness.mount({ slots: slots(), openSlotId: 'g-choice', panelId: 'panel-1' });
+    const target = await harness.mount({
+      slots: slots(),
+      openSlotId: 'g-choice',
+      panelId: 'panel-1',
+      chooser: PANEL,
+    });
     const [, choice, essence] = tilesIn(target);
 
     assert.equal(choice.tagName, 'BUTTON');
@@ -175,6 +192,18 @@ describe('RequirementRail mounted behavior', () => {
     assert.equal(choice.getAttribute('aria-controls'), 'panel-1');
     assert.equal(essence.getAttribute('aria-expanded'), 'false');
     assert.ok(!essence.hasAttribute('aria-controls'), 'a closed slot controls nothing');
+
+    const panel = target.querySelector('#panel-1');
+    assert.equal(panel.getAttribute('role'), 'region', 'a roleless labelled element exposes nothing');
+    assert.equal(panel.getAttribute('aria-labelledby'), choice.id, 'and it is named by its tile');
+  });
+
+  it('opens no panel, and points at none, when the open slot has nothing to show', async () => {
+    const target = await harness.mount({ slots: slots(), openSlotId: 'g-choice', panelId: 'panel-1' });
+    const [, choice] = tilesIn(target);
+    assert.equal(choice.getAttribute('aria-expanded'), 'true');
+    assert.ok(!choice.hasAttribute('aria-controls'));
+    assert.ok(!target.querySelector('#panel-1'));
   });
 
   it('opens exactly one chooser at a time', async () => {
@@ -211,7 +240,7 @@ describe('RequirementRail mounted behavior', () => {
   it('renders the have/need pip from the delivered amount for an essence slot', async () => {
     const target = await harness.mount({ slots: slots() });
     const pips = tilesIn(target).map((tile) =>
-      tile.querySelector('.requirement-slot-pip').textContent.trim()
+      tile.querySelector('.fab-slot-pip').textContent.trim()
     );
     assert.deepEqual(pips, ['2/2', '0/1', '2/4']);
   });
@@ -235,9 +264,8 @@ describe('RequirementRail mounted behavior', () => {
     const glyph = tilesIn(target)[2].querySelector('[data-medallion]');
     assert.ok(Boolean(glyph), 'the shared tile renders it, and the smoke harness can find it');
     const style = glyph.getAttribute('style');
-    assert.match(style, /width:\s*44px;\s*height:\s*44px/);
-    // 44 * 0.42 rounded to the 18px the retired tile computed.
-    assert.match(style, /--fab-medallion-glyph:\s*18px/);
+    assert.match(style, /width:\s*56px;\s*height:\s*56px/, 'the slot tile is the 56px rung');
+    assert.match(style, /--fab-medallion-glyph:\s*19px/);
   });
 
   // WCAG 2.5.3 Label in Name: the accessible name must CONTAIN the visible label.
@@ -275,7 +303,7 @@ describe('RequirementRail mounted behavior', () => {
       const [tile] = tilesIn(target);
       assert.equal(tile.getAttribute('aria-expanded'), 'true');
       assert.equal(
-        tile.querySelector('.requirement-slot-disclosure').textContent.trim(),
+        tile.querySelector('.fab-requirement-slot-affordance').textContent.trim(),
         '2 alternatives'
       );
     } finally {
@@ -312,10 +340,7 @@ describe('RequirementRail mounted behavior', () => {
   it('renders read-only with no controls and an explanation', async () => {
     const target = await harness.mount({ slots: slots(), readOnly: true, openSlotId: 'g-choice' });
     assert.equal(target.querySelectorAll('button').length, 0, 'no control anywhere in the rail');
-    assert.deepEqual(
-      tilesIn(target).map((tile) => tile.getAttribute('role')),
-      ['img', 'img', 'img']
-    );
+    assert.equal(tilesIn(target).filter((tile) => tile.querySelector('[role="img"]')).length, 3);
     assert.ok(target.querySelector('[data-requirement-rail-readonly]'));
   });
 
@@ -347,10 +372,10 @@ describe('RequirementRail mounted behavior', () => {
     for (const ladder of [SPENDABLE_GOLD_UNITS, UNSPENDABLE_GOLD_UNITS]) {
       const target = await harness.mount({ slots: buildRequirementSlots(craftabilityFor(ladder)) });
       const [plank, toll] = tilesIn(target);
-      assert.ok(plank.querySelector('.requirement-slot-pip'), 'an item tile keeps its ratio');
+      assert.ok(plank.querySelector('.fab-slot-pip'), 'an item tile keeps its ratio');
       // `have` is always 0 and `need` is a PRICE.
-      assert.ok(!toll.querySelector('.requirement-slot-pip'), 'a currency tile draws none');
-      assert.match(toll.querySelector('.requirement-slot-caption').textContent, /100 gp/);
+      assert.ok(!toll.querySelector('.fab-slot-pip'), 'a currency tile draws none');
+      assert.match(toll.querySelector('.fab-slot-caption').textContent, /100 gp/);
       harness.remount();
     }
   });
@@ -359,10 +384,9 @@ describe('RequirementRail mounted behavior', () => {
     const target = await harness.mount({
       slots: buildRequirementSlots(craftabilityFor(SPENDABLE_GOLD_UNITS)),
     });
-    const label = tilesIn(target)[1].getAttribute('aria-label');
-    // The pip is aria-hidden, so this sentence is what a screen-reader user actually
-    // receives. Left on the shared TileMet/TileShort keys it read "100 gp is ready with
-    // 0 of 100" — the removed pip surviving in the one place it is still spoken.
+    const label = nameOf(tilesIn(target)[1]);
+    // This sentence is what a screen-reader user receives. Left on the shared
+    // TileMet/TileShort keys it read "100 gp is ready with 0 of 100".
     assert.ok(label.includes('100 gp'), 'the cost is named');
     assert.ok(!/have/i.test(label), 'and no held count is interpolated into it');
     assert.ok(!/\bneed\b/i.test(label));
@@ -372,7 +396,7 @@ describe('RequirementRail mounted behavior', () => {
     const target = await harness.mount({
       slots: buildRequirementSlots(craftabilityFor(UNSPENDABLE_GOLD_UNITS)),
     });
-    const label = tilesIn(target)[1].getAttribute('aria-label');
+    const label = nameOf(tilesIn(target)[1]);
     // The player is carrying 1000 gp. Telling them they cannot afford 100 gp is the
     // original defect wearing the redesign's clothes.
     assert.ok(label.includes('100 gp'));
@@ -419,7 +443,7 @@ describe('RequirementRail mounted behavior', () => {
       const target = await harness.mount({
         slots: buildRequirementSlots(craftabilityFor(UNSPENDABLE_GOLD_UNITS)),
       });
-      const label = tilesIn(target)[1].getAttribute('aria-label');
+      const label = nameOf(tilesIn(target)[1]);
       assert.match(label, /^TRANSLATED 100 gp :: /, 'the key owns the sentence, not a join');
       assert.match(label, /Currency configuration is invalid/, 'and the reason is interpolated');
     } finally {
@@ -440,10 +464,10 @@ describe('RequirementRail mounted behavior', () => {
         { ...STATES[0], name: 'Exquisitely Refined Moonsilver Filigree Wire, Half-Drawn' },
       ]),
     });
-    const caption = target.querySelector('.requirement-slot-caption');
+    const caption = target.querySelector('.fab-slot-caption');
     assert.match(caption.textContent, /Moonsilver/);
-    // The tile column is fixed width and the caption ellipsises rather than growing it.
-    assert.ok(tilesIn(target)[0].classList.contains('requirement-slot'));
+    // The shared tile's shell is a fixed 56px column and its caption clamps rather than growing it.
+    assert.ok(Boolean(caption.closest('.fab-slot-tile-shell')));
   });
 });
 
@@ -464,7 +488,7 @@ describe('RequirementRail currency copy (issue 1493)', () => {
 
   async function tollLabel(units, gp) {
     const target = await harness.mount({ slots: buildRequirementSlots(craftabilityFor(units, gp)) });
-    return tilesIn(target)[1].getAttribute('aria-label');
+    return nameOf(tilesIn(target)[1]);
   }
 
   it('speaks the shipped sentence for a cost the player can pay', async () => {

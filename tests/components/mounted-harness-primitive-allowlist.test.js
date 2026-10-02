@@ -140,6 +140,9 @@ const SHARED_PRIMITIVES = [
   // The identity row every player detail pane leads with (issue 1518): the crafting, inventory and
   // journal trees all render it, so an omission is named here rather than cancelling a suite.
   'src/ui/svelte/apps/PlayerDetailHeader.svelte',
+  // The requirement chooser (issue 1518): every tree holding the crafting rail renders it, and it
+  // is a new file, so an omission would cancel a suite silently rather than fail it by name.
+  'src/ui/svelte/components/RequirementChooser.svelte',
 ];
 
 /** Components adjudicated AGAINST membership, and why a non-entry is worth recording. */

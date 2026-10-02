@@ -130,6 +130,8 @@ const EXPECTED_OVERRIDE_KEYS = [
   // Issue 1518: the pager, on the player frames that draw its persistent and threshold forms.
   'src/ui/svelte/components/Pagination.svelte',
   'src/ui/svelte/components/RadioCardGroup.svelte',
+  // Issue 1518: the requirement chooser, on the frame that opens it on a choice slot.
+  'src/ui/svelte/components/RequirementChooser.svelte',
   // Issue 1512: the product's ONE row disclosure, promoted on its second importer. Its frame is the
   // open step row, where `aria-expanded="true"` over a visible body is the only state in which the
   // control is more than a chevron. It sorts here rather than beside the entry it arrived with.
@@ -233,8 +235,11 @@ test('the inputs every property below quantifies over are alive', () => {
   // 68 as of issue 2005, which promoted the shared Preview-as picker, the Player sees block and the
   // executed check evidence rows; 70 as of issue 2006, whose result boxes promoted the die tiles;
   // 72 as of issue 2008: the Formula card's option well, and the `<Well>` on its second caller.
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 72, 'the shipped primitive set changed size');
+  // 73 as of issue 1518: the slot tile, on the requirement chooser as its second importer.
+  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 73, 'the shipped primitive set changed size');
   // 16 as of issue 2006's die tiles, and again once issue 2008 promoted the `<Well>` it built.
+  // Still 16 at issue 1518: the slot tile left on promotion and the requirement chooser, with one
+  // importer, arrived.
   assert.equal(NOT_A_PRIMITIVE.length, 16, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(

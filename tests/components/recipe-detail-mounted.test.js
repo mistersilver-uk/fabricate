@@ -208,18 +208,23 @@ describe('RecipeDetail mounted behavior', () => {
     assert.equal(sufficient.getAttribute('data-slot-state'), 'met');
     assert.equal(short.getAttribute('data-slot-state'), 'short');
     // A fixed requirement is not selectable.
-    assert.equal(sufficient.getAttribute('role'), 'img', 'a fixed slot is not a button');
-    assert.ok(sufficient.getAttribute('aria-label').includes('Iron'), 'and carries a name');
+    assert.notEqual(sufficient.tagName, 'BUTTON', 'a fixed slot is not a button');
+    assert.ok(
+      sufficient.querySelector('[role="img"]').getAttribute('aria-label').includes('Iron'),
+      'and its tile carries a name'
+    );
 
     assert.ok(sufficient.querySelector('[data-medallion="image"] img'), 'tile renders the image');
     assert.equal(
-      sufficient.querySelector('.requirement-slot-pip').textContent.trim(),
+      sufficient.querySelector('.fab-slot-pip').textContent.trim(),
       '2/2',
       'pip shows have/need'
     );
-    const shortPip = short.querySelector('.requirement-slot-pip');
-    assert.equal(shortPip.textContent.trim(), '1/3', 'short pip shows have/need');
-    assert.ok(shortPip.classList.contains('is-short'), 'short pip is red');
+    assert.equal(short.querySelector('.fab-slot-pip').textContent.trim(), '1/3');
+    assert.ok(
+      short.querySelector('.fab-slot-tile').classList.contains('is-short'),
+      'the short tile paints from the danger state'
+    );
   });
 
   it('renders authored essence glyphs with fallback while preserving ordinary images', async () => {
@@ -265,7 +270,7 @@ describe('RecipeDetail mounted behavior', () => {
     assert.ok(!tiles[0].querySelector('img'), 'essence does not render an image');
     // `delivered`, never `have`: the essence branch upstream stopped answering the
     // have question, so a `have` read would print 0/2 on a partly funded tile.
-    assert.equal(tiles[0].querySelector('.requirement-slot-pip').textContent.trim(), '1/2');
+    assert.equal(tiles[0].querySelector('.fab-slot-pip').textContent.trim(), '1/2');
     assert.equal(
       tiles[1].querySelector('[data-medallion="image"] img').getAttribute('src'),
       'icons/iron.webp'
@@ -737,7 +742,10 @@ describe('RecipeDetail mounted behavior', () => {
     );
     // Every rail in the list gets its OWN DOM id namespace.
     assert.equal(
-      steps[0].querySelector('[data-recipe-section="essence-pool"]').getAttribute('id'),
+      steps[0]
+        .querySelector('[data-recipe-section="essence-pool"]')
+        .closest('[role="region"]')
+        .getAttribute('id'),
       'fabricate-req-step-step-ess-1-panel'
     );
   });
