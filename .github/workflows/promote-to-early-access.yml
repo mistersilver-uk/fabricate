@@ -59,10 +59,8 @@ jobs:
         env:
           BETA_TAG: ${{ inputs.beta_tag }}
         run: |
-          # Rejects a non-beta tag (stable, malformed, empty) via the shared validator. The input's
-          # `v` is optional and is stripped when present: the step prints the bare version — the
-          # version the beta channel must already advertise — and every later step reads the
-          # canonical `v`-prefixed tag from this step's output, never the raw input.
+          # Rejects a non-beta tag (stable, malformed, empty) via the shared validator. The typed
+          # `v` is optional, so later steps read this step's `tag` output, never the raw input.
           VERSION=$(node scripts/validate-release-tag.mjs "$BETA_TAG" --kind beta --optional-prefix)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
