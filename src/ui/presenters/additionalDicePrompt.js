@@ -253,8 +253,8 @@ export function additionalDiceCopy(offer, localize) {
   return copy;
 }
 
-/** Why the Roll cannot reach, led by Advantage when only it can; a zero pool names its floor. */
-function unreachableReason(reach, judgedAll, values, labels) {
+/** Why the Roll cannot reach, led by Advantage when only it can; a pool below zero names it. */
+function unreachableReason(reach, judgedAll, values, labels, below) {
   const judged = judgedAll.normal;
   const one = (key, count) => labels[count === 1 ? `${key}One` : key];
   if (reach.perDieMost === 0 || judged.shortfall === null) {
@@ -264,14 +264,14 @@ function unreachableReason(reach, judgedAll, values, labels) {
   const lead = fill(one(advantage ? 'unreachableNormal' : 'unreachable', values.needed), values);
   const reason = judged.shortfall > values.max ? 'unreachableMax' : 'unreachableAfford';
   const why =
-    values.pool === 0
+    values.pool === 0 && below
       ? fill(one(`${reason}Zero`, judged.shortfall), values)
       : fill(one(reason, values.pool), values);
   return `${lead} ${why}`;
 }
 
-function unreachableText(reach, judgedAll, values, labels) {
-  const text = unreachableReason(reach, judgedAll, values, labels);
+function unreachableText(reach, judgedAll, values, labels, below) {
+  const text = unreachableReason(reach, judgedAll, values, labels, below);
   return reach.rescued ? `${text} ${labels.rescued}` : text;
 }
 
@@ -281,12 +281,12 @@ function shortfallText(reach, shortfall, chosen, text) {
   return { tone: 'warning', text: text(key(reach.explode === 'off' ? 'short' : 'shortExplode')) };
 }
 
-function messageOf({ offer, reach, judgedAll, chosen, values, labels, text, rolls }) {
+function messageOf({ offer, reach, judgedAll, chosen, values, labels, text, rolls, below }) {
   const judged = judgedAll.normal;
   if (offer.unavailable) return { tone: 'info', text: fill(labels.unavailableMessage, values) };
   if (reach && reach.needed !== null) {
     if (judged.unreachable) {
-      return { tone: 'danger', text: unreachableText(reach, judgedAll, values, labels) };
+      return { tone: 'danger', text: unreachableText(reach, judgedAll, values, labels, below) };
     }
     if (judged.shortfall > 0) return shortfallText(reach, judged.shortfall, chosen, text);
   }
@@ -409,6 +409,7 @@ export function describeAdditionalDice({
     pool: pool?.dice,
     shortfall: judged?.shortfall,
   };
+  const below = Boolean(pool) && pool.base + pool.poolDelta < 0;
   const text = (key) =>
     fill(labels[offer.resourceLabel ? key : `${key}Unlabelled`] ?? labels[key], values);
   return {
@@ -416,7 +417,7 @@ export function describeAdditionalDice({
     spendLine: unavailable
       ? fill(labels.spendsUnlabelled, values)
       : text(rolls > 1 ? 'spendsAcross' : 'spends'),
-    message: messageOf({ offer, reach, judgedAll, chosen, values, labels, text, rolls }),
+    message: messageOf({ offer, reach, judgedAll, chosen, values, labels, text, rolls, below }),
     disabled: unavailable || offer.limit === 0,
     blocked: Object.fromEntries(
       ['disadvantage', 'normal', 'advantage'].map((action) => [

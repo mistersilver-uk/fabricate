@@ -230,12 +230,12 @@ describe('the additional-dice prompt presenter (issue 2008)', () => {
       text: 'Cannot reach 2 successes. Modifiers reduce the pool below zero, so at least 4 dice are needed, and at most 1 can ever be added.',
     });
     const broke = describe2008({
-      offer: offerOf({ limit: 0, available: 0, reach: reach({ needed: 1 }) }),
-      at: pool(1, -1),
+      offer: offerOf({ limit: 0, available: 0, max: 2, reach: reach({ needed: 1 }) }),
+      at: pool(1, -2),
     });
     assert.equal(
       broke.message.text,
-      'Cannot reach 1 success. Modifiers reduce the pool below zero, so at least 1 die is needed, and you can afford 0.'
+      'Cannot reach 1 success. Modifiers reduce the pool below zero, so at least 2 dice are needed, and you can afford 0.'
     );
     const liftable = describe2008({
       offer: offerOf({ reach: reach({ needed: 1 }) }),
@@ -243,6 +243,20 @@ describe('the additional-dice prompt presenter (issue 2008)', () => {
       deltas: THREE,
     });
     assert.equal(liftable.blocked.normal, false, 'one bought die lifts a pool of zero');
+  });
+
+  it('names modifiers taking the pool below zero only when they did', () => {
+    const offer = offerOf({ reach: reach({ needed: 3 }) });
+    for (const at of [pool(0), pool(1, -1)]) {
+      assert.equal(
+        describe2008({ offer, at }).message.text,
+        'Cannot reach 3 successes. 0 dice need at least 3 more, and at most 1 can ever be added.'
+      );
+    }
+    assert.equal(
+      describe2008({ offer, at: pool(1, -2) }).message.text,
+      'Cannot reach 3 successes. Modifiers reduce the pool below zero, so at least 4 dice are needed, and at most 1 can ever be added.'
+    );
   });
 
   it('never blocks a secret or unentitled prompt, nor states its needed count (R3)', () => {
@@ -408,7 +422,7 @@ describe('the additional-dice answer and view (issue 2008)', () => {
     assert.deepEqual(rollPromptTarget(data, [], '1d4').pendingPool, ['1d4']);
   });
 
-  // QE probe P1 (R1): base 0, a rolled 1d4 Tool bonus on the pool, nothing to spend.
+  // Base 0, a rolled 1d4 Tool bonus on the pool, nothing to spend.
   it('counts a rolled Tool bonus as pending pool dice, never blocking what it could lift', async () => {
     const walk = (object, path) =>
       String(path)
