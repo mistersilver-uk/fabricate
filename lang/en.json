@@ -20,7 +20,8 @@
       },
       "DiceTiles": {
         "Generated": "rolled by an explosion",
-        "More": "+{count} more"
+        "More": "+{count} more",
+        "LegendSeparator": " · "
       }
     },
     "Migration": {
@@ -2059,7 +2060,7 @@
         "Spent": "{count} bought · spent {count}",
         "SpentResource": "{count} bought · spent {count} {resource}",
         "TileLabel": "{label}, bought",
-        "Legend": "{legend} · dashed\u00a0=\u00a0bought"
+        "Legend": "dashed\u00a0=\u00a0bought"
       },
       "AdditionalDiceRefusal": {
         "SourceMissing": "Additional dice are unavailable: this check has no source to pay for them.",
@@ -6859,7 +6860,6 @@
             "FactAsListed": "as listed",
             "FactTools": "Required tools break",
             "DynamicRequired": "This check takes its successes needed from a macro at craft time. The preview never runs that macro, so it reads against the successes needed set here instead.",
-            "CountLegend": "✓ qualified · ✕ cancelled · ↻ exploded",
             "CountNet": "{qualified} qualified − {cancelled} cancelled = {net} net",
             "FaceMarked": "{face}, {marks}",
             "MarkQualified": "qualified",
