@@ -1,6 +1,6 @@
 /**
  * Reads and spends the resource that pays for additional dice (issue 2008). One per-client queue
- * serializes every spend of one actor's resource, and a spend stands once made: nothing refunds.
+ * serializes every spend of one actor's path or one spend macro; a spend stands: nothing refunds.
  */
 import { MacroExecutor } from '../utils/MacroExecutor.js';
 import { trimString } from '../utils/scalars.js';
@@ -125,7 +125,7 @@ export async function spendAdditionalDice({ budget, dice, actor, user, payload =
   if (dice === 0) return { ok: true, spent: 0, source: budget?.source ?? null };
   if (!budget?.ok) return refuse(budget?.reason ?? 'sourceMissing');
   const macro = budget.source === 'macro';
-  const key = JSON.stringify([actor?.uuid ?? '', macro ? budget.spendMacroUuid : budget.path]);
+  const key = JSON.stringify(macro ? [budget.spendMacroUuid] : [actor?.uuid ?? '', budget.path]);
   return enqueue(key, () =>
     macro ? spendThroughMacro(budget, dice, payload) : spendStoredPath(budget, dice, actor, user)
   );

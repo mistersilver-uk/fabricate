@@ -88,13 +88,27 @@ function writePath(object, key, value) {
   target[leaf] = value;
 }
 
-/** An actor whose `update` writes `_source` after a tick, vetoes, rejects, answers a copy or clamps. */
+/** A promise a test settles itself, so concurrent work interleaves in the order it states. */
+function deferred() {
+  let resolve;
+  const promise = new Promise((settle) => (resolve = settle));
+  return { promise, resolve };
+}
+
+/** A hold on one `update`: `entered` settles once it starts, and it writes once `release` settles. */
+const hold = () => ({ entered: deferred(), release: deferred() });
+
+/**
+ * An actor whose `update` writes `_source` asynchronously, vetoes, rejects, answers a copy or
+ * clamps; the nth `update` waits on `holds[n]`, when one is given.
+ */
 function fakeActor({
   stored = 2,
   prepared = 9,
   overrides = {},
   canModify = true,
   update = 'write',
+  holds = [],
 } = {}) {
   const source = { system: { resources: { ap: {} } } };
   if (stored !== ABSENT) source.system.resources.ap.value = stored;
@@ -111,7 +125,9 @@ function fakeActor({
     },
     async update(changes) {
       actor.updates.push(changes);
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      const held = holds[actor.updates.length - 1];
+      held?.entered.resolve();
+      await (held?.release.promise ?? null);
       if (update === 'reject') throw new Error('validation failed');
       if (update === 'veto') return undefined;
       const [[key, value]] = Object.entries(changes);
@@ -331,26 +347,58 @@ test('zero dice spend nothing and an unavailable budget refuses a non-zero choic
   assert.deepEqual(actor.updates, []);
 });
 
-test('concurrent spends of one resource are serialized per client (AD5)', async () => {
-  const actor = fakeActor({ stored: 2 });
+/** Two spends of 1 started together on `actor`, the first held mid-write until the second starts. */
+async function raceTwoSpends(actor, holds) {
   const budget = await pathBudget(actor);
-  const both = await Promise.all([
-    spendAdditionalDice({ budget, dice: 1, actor, user }),
-    spendAdditionalDice({ budget, dice: 1, actor, user }),
-  ]);
+  const spends = [1, 2].map(() => spendAdditionalDice({ budget, dice: 1, actor, user }));
+  await holds[0].entered.promise;
+  const waiting = actor.updates.length;
+  holds[0].release.resolve();
+  holds[1].release.resolve();
+  return { waiting, spent: await Promise.all(spends) };
+}
+
+test('concurrent spends of one resource are serialized per client (AD5)', async () => {
+  const holds = [hold(), hold()];
+  const actor = fakeActor({ stored: 2, holds });
+  const both = await raceTwoSpends(actor, holds);
+  assert.equal(both.waiting, 1, 'the second spend waits while the first writes');
   assert.deepEqual(
-    both.map((spent) => spent.ok),
+    both.spent.map((spent) => spent.ok),
     [true, true]
   );
-  assert.equal(actor._source.system.resources.ap.value, 0);
-  const last = fakeActor({ stored: 1 });
-  const lastBudget = await pathBudget(last);
-  const raced = await Promise.all([
-    spendAdditionalDice({ budget: lastBudget, dice: 1, actor: last, user }),
-    spendAdditionalDice({ budget: lastBudget, dice: 1, actor: last, user }),
-  ]);
-  assert.deepEqual(raced[1], { ok: false, reason: 'resourceChanged', available: 0 });
+  assert.deepEqual(actor.updates, [{ [PATH]: 1 }, { [PATH]: 0 }]);
+  const lastHolds = [hold(), hold()];
+  const last = fakeActor({ stored: 1, holds: lastHolds });
+  const raced = await raceTwoSpends(last, lastHolds);
+  assert.deepEqual(raced.spent[1], { ok: false, reason: 'resourceChanged', available: 0 });
   assert.equal(last._source.system.resources.ap.value, 0);
+});
+
+test('spends through one spend macro are serialized across actors', async () => {
+  const held = hold();
+  Object.assign(probe, { available: 1, held });
+  macros['Macro.spend'] = {
+    type: 'script',
+    command: [
+      'const p = globalThis.additionalDiceProbe;',
+      'p.spends.push(scope);',
+      'p.held.entered.resolve();',
+      'await p.held.release.promise;',
+      'p.available -= scope.dice;',
+      'return true;',
+    ].join(' '),
+  };
+  const budget = await resolveAdditionalDiceBudget({ additionalDice: macroPolicy() });
+  const spends = ['Actor.brenna', 'Actor.tamsin'].map((uuid) =>
+    spendAdditionalDice({ budget, dice: 1, actor: { uuid }, payload: { actor: uuid } })
+  );
+  await held.entered.promise;
+  assert.equal(probe.reads.length, 2, 'the second actor does not re-read while the first spends');
+  held.release.resolve();
+  const [first, second] = await Promise.all(spends);
+  assert.deepEqual(first, { ok: true, spent: 1, source: 'macro' });
+  assert.deepEqual(second, { ok: false, reason: 'resourceChanged', available: 0 });
 });
 
 test('a macro spend re-reads, then runs the script spend macro with dice and delta', async () => {
