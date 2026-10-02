@@ -1071,7 +1071,7 @@ describe('mounted roll prompt', () => {
       assert.deepEqual([(await pending).bonus, state.done], ['2', true]);
     });
 
-    // QE probe P1 (R1): a zero pool with nothing to spend that a rolled Tool bonus may still lift.
+    // A zero pool with nothing to spend that a rolled Tool bonus may still lift.
     it('keeps Roll enabled while a rolled Tool bonus could still lift a zero pool (R1)', async () => {
       const zero = { pool: 0, additionalDiceOffer: diceOffer(1, { available: 0, limit: 0 }) };
       const blocked = await openCount(zero);

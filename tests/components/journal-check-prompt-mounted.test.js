@@ -115,7 +115,7 @@ describe('the Journal-prepared prompt offers additional dice (issue 2008)', () =
     }
   });
 
-  // QE probe P1 (R1): the GM read nothing to spend, and a rolled Tool bonus may lift a zero pool.
+  // The GM read nothing to spend, and a rolled Tool bonus may lift a zero pool.
   it('keeps Roll enabled while a rolled Tool bonus could still lift a zero pool (R1)', async () => {
     const offer = { ...DESCRIPTOR.additionalDiceOffer, available: 0, limit: 0 };
     const zero = { ...DESCRIPTOR, pool: 0, required: 1, additionalDiceOffer: offer };
