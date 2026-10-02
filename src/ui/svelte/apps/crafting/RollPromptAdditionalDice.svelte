@@ -61,7 +61,7 @@
         <Notice
           tone={view.message.tone}
           title={view.message.text}
-          dataAttr="data-roll-prompt-additional-dice-message"
+          data-roll-prompt-additional-dice-message=""
         />
       </div>
     {/if}

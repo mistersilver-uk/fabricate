@@ -7,7 +7,7 @@
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `checked` / `indeterminate` / `disabled` | booleans | `false` | The three input states. `indeterminate` is a DOM PROPERTY, not an attribute, so it is applied through an effect rather than markup — written in markup it would do nothing at all, silently. |
-  | `size` | `'sm'` \| `'md'` \| `'lg'` | `'md'` | 18px/r5, 20px/r6, 22px/r6. Each size is DECLARED, never derived: a scale that multiplied one number would make the shipped 18px box a function of the new ones. An unrecognised value falls back rather than emitting an unstyled class. |
+  | `density` | `'compact'` \| `'default'` \| `'comfortable'` | `'default'` | 18px/r5, 20px/r6, 22px/r6. Each box is declared, never derived: a scale that multiplied one number would make the shipped 18px box a function of the new ones. An unrecognised value falls back rather than emitting an unstyled class. |
   | `wrapper` | `'label'` \| `'contents'` | `'label'` | `label` renders a `<label>` around the input and box, for a host whose action group would otherwise leave the visible box with no label association and no click target. `contents` renders the two as bare siblings, for a host whose OWN root is a `<label>` — nesting labels is invalid HTML and an ambiguous click target. |
   | `ariaLabel` / `element` | already-localized string / bindable | `''` / `null` | The accessible name — this is an import-free leaf — and the real input, exposed so a host can manage focus, since it is visually hidden and cannot be reached by query without reaching through this component's internals. |
   | `onChange(checked)` | function | no-op | The input's new checked state. |
@@ -28,7 +28,7 @@
     checked = false,
     indeterminate = false,
     disabled = false,
-    size = 'md',
+    density = 'default',
     wrapper = 'label',
     ariaLabel = '',
     onChange = () => {},
@@ -36,8 +36,10 @@
     ...rest
   } = $props();
 
-  const SIZES = new Set(['sm', 'md', 'lg']);
-  const sizeClass = $derived(SIZES.has(size) ? `is-${size}` : 'is-md');
+  const SIZE_CLASSES = Object.freeze({ compact: 'is-sm', default: 'is-md', comfortable: 'is-lg' });
+  const sizeClass = $derived(
+    Object.hasOwn(SIZE_CLASSES, density) ? SIZE_CLASSES[density] : 'is-md'
+  );
 
   const glyph = $derived(indeterminate ? 'fas fa-minus' : 'fas fa-check');
 

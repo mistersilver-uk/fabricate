@@ -173,9 +173,8 @@
         icon="fas fa-triangle-exclamation"
         title={calloutReasons[0]}
         detail={calloutReasons.slice(1).join(' ')}
-        dataAttr="data-recipe-blocking"
-        stateDataAttr={refusal ? 'data-recipe-authority-blocked' : ''}
-        stateDataValue="true"
+        data-recipe-blocking=""
+        data-recipe-authority-blocked={refusal ? 'true' : undefined}
       />
     {/if}
   {/if}

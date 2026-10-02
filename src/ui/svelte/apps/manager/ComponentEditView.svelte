@@ -1214,8 +1214,8 @@
       ariaLabelKey="FABRICATE.Admin.Manager.Component.TabsLabel"
       ariaLabel="Component rules sections"
       idStem="component-rules"
-      hookAttribute="data-component-edit-tab"
-      badgeAttribute="data-component-edit-tab-badge"
+      tabDataAttr="data-component-edit-tab"
+      badgeDataAttr="data-component-edit-tab-badge"
     />
 
     <!--
@@ -1270,7 +1270,7 @@
               </div>
             </div>
             <!-- The shared one-of-N picker since issue 1510, so the app draws the list. Both hooks
-            ride `triggerData` onto the trigger button; `class` lands on the picker root, which is
+            ride `triggerProps` onto the trigger button; `class` lands on the picker root, which is
             where the sheet hangs the trigger's width and its `border-strong` hairline. No tick: the
             trigger states the value and the six rows are distinct names (design-system/spec.md, the
             configurable tick). -->
@@ -1284,7 +1284,7 @@
                 'Component category'
               )}
               disabled={saving}
-              triggerData={{
+              triggerProps={{
                 'data-component-edit-category': '',
                 ...(categoryLocked ? { 'data-component-edit-category-locked': '' } : {}),
               }}
@@ -1616,11 +1616,11 @@
                 )}
               valueClass="manager-salvage-component-name"
               triggerTitle={selected?.name || ''}
-              triggerAriaLabel={text(
+              ariaLabel={text(
                 'FABRICATE.Admin.Manager.Component.SalvageEditor.ResultComponent',
                 'Result component'
               )}
-              dialogAriaLabel={text(
+              panelLabel={text(
                 'FABRICATE.Admin.Manager.Component.SalvageEditor.ResultComponent',
                 'Result component'
               )}
@@ -1628,7 +1628,7 @@
                 'FABRICATE.Admin.Manager.Component.SalvageEditor.ComponentSearchPlaceholder',
                 'Search components...'
               )}
-              searchAriaLabel={text(
+              searchLabel={text(
                 'FABRICATE.Admin.Manager.Component.SalvageEditor.ComponentSearchPlaceholder',
                 'Search components...'
               )}
@@ -1636,7 +1636,7 @@
                 'FABRICATE.Admin.Manager.Component.SalvageEditor.NoComponentsDefined',
                 'No components defined'
               )}
-              onChoose={(id) => updateSalvageResult(groupId, result.id, { componentId: id })}
+              onSelect={(id) => updateSalvageResult(groupId, result.id, { componentId: id })}
             />
           </span>
         {/snippet}
@@ -1728,7 +1728,7 @@
               <Callout
                 tone="neutral"
                 icon="fas fa-circle-info"
-                dataAttr="data-salvage-roll-budget"
+                data-salvage-roll-budget
                 text={text(
                   'FABRICATE.Admin.Manager.Component.SalvageEditor.RollBudget',
                   'Roll budget flows down the list: each result is claimed in order while the check total still covers its DC.'
@@ -2156,7 +2156,7 @@
                           options={salvageRouteOptions}
                           ariaLabelledBy={`${instanceId}-salvage-route-${routeIndex}`}
                           disabled={saving}
-                          triggerData={{ 'data-salvage-route': outcomeName }}
+                          triggerProps={{ 'data-salvage-route': outcomeName }}
                           onChange={(next) => setSalvageRoute(outcomeName, next)}
                         />
                       </div>

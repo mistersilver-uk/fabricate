@@ -151,8 +151,7 @@
       <EmptyState
         note
         hint={localize('FABRICATE.App.Gathering.Environments.NoMatches')}
-        dataAttr="data-gathering-env-empty"
-        dataValue="no-matches"
+        data-gathering-env-empty="no-matches"
       />
     </div>
   {:else if visible.length === 0}
@@ -165,8 +164,7 @@
       <EmptyState
         filtered
         hint={localize('FABRICATE.App.Gathering.Environments.AllUnavailableHidden')}
-        dataAttr="data-gathering-env-empty"
-        dataValue="all-unavailable"
+        data-gathering-env-empty="all-unavailable"
       >
         <button
           type="button"

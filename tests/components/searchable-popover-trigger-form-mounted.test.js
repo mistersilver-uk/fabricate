@@ -31,11 +31,11 @@ const mountPicker = (props) =>
   harness.mount({
     options: OPTIONS,
     triggerLabel: 'Register item',
-    triggerAriaLabel: 'Register item',
-    dialogAriaLabel: 'Register item',
+    ariaLabel: 'Register item',
+    panelLabel: 'Register item',
     searchPlaceholder: 'Search world items…',
     emptyHint: 'Nothing to register',
-    onChoose: () => {},
+    onSelect: () => {},
     ...props,
   });
 
@@ -104,7 +104,7 @@ describe('1371 SearchablePopover — the ManagerButton trigger form', () => {
   it('hands the popover`s OWN contract through, rather than replacing it', async () => {
     await mountPicker({
       triggerButton: { size: '38' },
-      triggerData: { 'data-scoped-list-register-item': '' },
+      triggerProps: { 'data-scoped-list-register-item': '' },
       triggerTitle: 'Register an Item',
     });
     const trigger = harness.target.querySelector('button');
@@ -114,7 +114,7 @@ describe('1371 SearchablePopover — the ManagerButton trigger form', () => {
     assert.equal(trigger.getAttribute('title'), 'Register an Item');
     assert.ok(
       trigger.hasAttribute('data-scoped-list-register-item'),
-      '`triggerData` still lands on the control itself, not on a wrapper around it'
+      '`triggerProps` still lands on the control itself, not on a wrapper around it'
     );
     harness.remount();
   });

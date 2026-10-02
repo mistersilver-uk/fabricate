@@ -96,5 +96,5 @@
   ariaLabelKey="FABRICATE.Admin.Manager.Recipe.Tabs.Label"
   ariaLabel="Recipe editor sections"
   idStem="recipe"
-  hookAttribute="data-recipe-tab-button"
+  tabDataAttr="data-recipe-tab-button"
 />

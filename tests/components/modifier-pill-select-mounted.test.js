@@ -92,7 +92,7 @@ async function mountPills(selectedIds, props = {}) {
   const root = await harness.mount({
     options: OPTIONS,
     selectedIds,
-    testId: 'pill',
+    'data-modifier-pill-select': 'pill',
     noneSelectedLabel: NONE_LABEL,
     onToggle: (id, next) =>
       toggles.push({ id, next, focused: focusDescriptor(globalThis.document.activeElement) }),

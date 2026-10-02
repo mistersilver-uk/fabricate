@@ -180,7 +180,7 @@
 
 <div class="salvage-panel" data-inventory-salvage-panel={mode}>
   {#if actingSystemLabel}
-    <Kicker dataAttr="data-inventory-salvage-acting-system">{actingSystemLabel}</Kicker>
+    <Kicker data-inventory-salvage-acting-system="">{actingSystemLabel}</Kicker>
   {/if}
   <!-- SUPPRESSED when misconfigured (issue 764). The banner derives a mode/usability
        tone — for a Simple no-check config that is the green "you'll recover this" ramp —
@@ -192,8 +192,7 @@
       icon={banner.icon}
       title={bannerTitle}
       text={bannerRule}
-      dataAttr="data-inventory-salvage-banner"
-      dataValue={mode}
+      data-inventory-salvage-banner={mode || true}
     />
   {/if}
 

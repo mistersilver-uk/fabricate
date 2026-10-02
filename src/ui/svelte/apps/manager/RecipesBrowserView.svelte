@@ -377,7 +377,7 @@
           detail={flashDetail}
           dismissable
           dismissLabel={text('FABRICATE.Admin.Manager.Recipe.DismissFlash', 'Dismiss')}
-          dataAttr="data-recipe-flash"
+          data-recipe-flash=""
         />
       {/if}
     {/key}
@@ -396,7 +396,7 @@
     <div class="manager-recipe-filter-row">
       <ManagerSearchField
         value={recipeSearchTerm || ''}
-        onInput={(next) => onSearchChange(next)}
+        onChange={(next) => onSearchChange(next)}
         placeholder={text('FABRICATE.Admin.Manager.Recipe.SearchPlaceholder', 'Search recipes...')}
         ariaLabel={text('FABRICATE.Admin.Manager.Recipe.SearchLabel', 'Search recipes')}
       />
@@ -408,7 +408,7 @@
           'FABRICATE.Admin.Manager.Recipe.StatusFilterLabel',
           'Filter recipes by status'
         )}
-        dataAttr="data-recipe-status-filter"
+        data-recipe-status-filter
         optionDataAttr="data-recipe-status-option"
         onChange={(value) => {
           ui.statusFilter = value;
@@ -423,7 +423,7 @@
           'FABRICATE.Admin.Manager.Recipe.LockFilterLabel',
           'Filter recipes by lock state'
         )}
-        dataAttr="data-recipe-lock-filter"
+        data-recipe-lock-filter
         optionDataAttr="data-recipe-lock-option"
         onChange={(value) => {
           ui.lockFilter = value;
@@ -448,7 +448,7 @@
             'FABRICATE.Admin.Manager.Recipe.CategoryFilterLabel',
             'Filter recipes by category'
           )}
-          triggerData={{ 'data-recipe-category-filter': '' }}
+          triggerProps={{ 'data-recipe-category-filter': '' }}
           onChange={(next) => {
             ui.categoryFilter = next;
             ui.pageIndex = 0;
@@ -477,7 +477,7 @@
           value={ui.sortKey}
           options={sortSelectOptions}
           ariaLabel={text('FABRICATE.Admin.Manager.Recipe.SortLabel', 'Sort recipes')}
-          triggerData={{ 'data-recipe-sort': '' }}
+          triggerProps={{ 'data-recipe-sort': '' }}
           onChange={(next) => (ui.sortKey = next)}
         />
         <ManagerButton
@@ -768,7 +768,7 @@
                         primitive renders its own `<label>` for the association and click target.
                       -->
                       <SelectionCheckbox
-                        size="lg"
+                        density="comfortable"
                         wrapper="label"
                         checked={bulkSelectedIds.has(recipe.id)}
                         ariaLabel={format(

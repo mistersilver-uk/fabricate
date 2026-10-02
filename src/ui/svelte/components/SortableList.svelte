@@ -8,6 +8,10 @@
   Snippets: `row(item, index)` between the badge and the trailing cluster, `body(item, index)`
   below the row's line, and `footer` as the list's own last child.
 
+  Rest spread:
+  - `{...rest}` lands on the list root, written after `class`, and carries a caller's `data-*`
+    hook; `class` is appended to the root's own.
+
   Invariants:
   - The row is never a button: no `role`, no `tabindex`, no `onclick`, because a whole-row button
     would nest this list's own grip, chevrons, disclosure and delete.
@@ -47,10 +51,12 @@
     rowClass = () => '',
     rowData = () => ({}),
     removeData = () => ({}),
-    dataAttr = '',
-    dataValue = '',
     ariaLabel = '',
+    class: extraClass = '',
+    ...rest
   } = $props();
+
+  const extraClasses = $derived(extraClass ? ` ${extraClass}` : '');
 
   // The rocker reuses the three existing callers' keys verbatim, so it adds none (issue 1512).
   const MOVE_UP_KEY = 'FABRICATE.Admin.Manager.ListErgonomics.MoveUp';
@@ -65,7 +71,6 @@
   const list = $derived(Array.isArray(items) ? items : []);
   const ordered = $derived(reorderable !== false);
   const hasBody = $derived(Boolean(body) && (alwaysOpen || expandable));
-  const hookAttributes = $derived(dataAttr ? { [dataAttr]: dataValue || true } : {});
 
   let dragIndex = $state(-1);
   let announcement = $state('');
@@ -207,11 +212,11 @@
 </script>
 
 <ul
-  class="fabricate-sortable-list"
+  class={`fabricate-sortable-list${extraClasses}`}
   role="list"
   aria-label={ariaLabel || undefined}
   bind:this={listElement}
-  {...hookAttributes}
+  {...rest}
 >
   {#each list as item, index (idOf(item) || index)}
     <li
@@ -264,9 +269,8 @@
             side="leading"
             expanded={isOpen(item)}
             controls={bodyId(item)}
-            label={nameOf(item)}
-            dataAttr="data-sortable-disclosure"
-            dataValue={idOf(item)}
+            ariaLabel={nameOf(item)}
+            data-sortable-disclosure={idOf(item) || true}
             onToggle={() => toggle(item)}
           />
         {/if}

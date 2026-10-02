@@ -310,7 +310,7 @@
               value={previewRecordId}
               options={previewRecordOptions}
               ariaLabelledBy={`${instanceId}-band-record`}
-              triggerData={{ 'data-simple-band-record': '' }}
+              triggerProps={{ 'data-simple-band-record': '' }}
               onChange={onSelectPreviewRecord}
             />
           </Field>
@@ -324,7 +324,7 @@
           {previewLabel}
           min={editableBands ? stripMin : null}
           max={editableBands ? stripMax : null}
-          groupLabel={text(
+          ariaLabel={text(
             'FABRICATE.Admin.Manager.Checks.Crafting.TwoOutcomesTitle',
             'Two outcomes'
           )}
@@ -340,7 +340,7 @@
                 'FABRICATE.Admin.Manager.Checks.Crafting.SimpleBandsFallback',
                 'This check has no reachable range to draw against yet. Set a roll formula and a DC.'
               )}
-          dataAttr="data-simple-band-strip"
+          data-simple-band-strip
           onChange={applyBandStripChange}
         />
         {#if editableBands}

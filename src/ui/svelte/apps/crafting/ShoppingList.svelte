@@ -210,24 +210,21 @@
       value={plannedRecipes}
       label={localize('FABRICATE.App.Crafting.Shopping.PlannedRecipes')}
       icon="fas fa-scroll"
-      dataAttr="data-summary"
-      dataValue="recipes"
+      data-summary="recipes"
     />
     <StatBox
       value={missingComponentsCount}
       label={localize('FABRICATE.App.Crafting.Shopping.MissingComponents')}
       icon="fas fa-cubes"
       tone={missingComponentsCount > 0 ? 'danger' : 'default'}
-      dataAttr="data-summary"
-      dataValue="components"
+      data-summary="components"
     />
     <StatBox
       value={unavailableToolsCount}
       label={localize('FABRICATE.App.Crafting.Shopping.UnavailableTools')}
       icon="fas fa-screwdriver-wrench"
       tone={unavailableToolsCount > 0 ? 'danger' : 'default'}
-      dataAttr="data-summary"
-      dataValue="tools"
+      data-summary="tools"
     />
   </div>
 
@@ -242,9 +239,9 @@
       this change's path. So `.crafting-shopping-empty` survives as a caller-owned WRAPPER
       declaring the fill and the centring and nothing else.
 
-      The hook stays ON THE WRAPPER, which is the element it has always sat on, so it keeps
-      rendering `data-crafting-shopping-empty=""` rather than the `="true"` `EmptyState` coerces
-      a bare hook to (`EmptyState.svelte:84`, `dataValue || true`).
+      The hook stays on the wrapper, which is the element it has always sat on, so it keeps
+      rendering `data-crafting-shopping-empty=""` rather than the `="true"` a bare hook on the
+      `<EmptyState>` tag renders.
     -->
     <div class="crafting-shopping-empty" data-crafting-shopping-empty>
       <EmptyState

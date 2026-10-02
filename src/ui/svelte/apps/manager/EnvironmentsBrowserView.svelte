@@ -714,7 +714,7 @@
       >
         <ManagerSearchField
           value={searchTerm}
-          onInput={(next) => (ui.searchTerm = next)}
+          onChange={(next) => (ui.searchTerm = next)}
           placeholder={text(
             'FABRICATE.Admin.Manager.Environment.SearchPlaceholder',
             'Search environments...'
@@ -988,7 +988,7 @@
                     </IconButton>
                     <ActionMenu
                       items={rowMenuItems()}
-                      triggerLabel={text(
+                      ariaLabel={text(
                         'FABRICATE.Admin.Manager.Environment.ActionsFor',
                         'Environment actions for {name}'
                       ).replace('{name}', environmentName(displayEnvironment))}
@@ -1152,7 +1152,7 @@
             <IconPicker
               value={conditionAddIcon(condition.kind)}
               iconOnly={true}
-              buttonTitle={text(
+              ariaLabel={text(
                 'FABRICATE.Admin.Manager.Environment.Conditions.NewIcon',
                 'New value icon'
               )}
@@ -1192,7 +1192,7 @@
                 <IconPicker
                   value={conditionIcon(option, condition.kind)}
                   iconOnly={true}
-                  buttonTitle={text(
+                  ariaLabel={text(
                     'FABRICATE.Admin.Manager.Environment.Conditions.EditIcon',
                     'Edit icon'
                   )}
@@ -1270,7 +1270,7 @@
               <IconPicker
                 value={biomeIconInput}
                 iconOnly={true}
-                buttonTitle={text(
+                ariaLabel={text(
                   'FABRICATE.Admin.Manager.Environment.Vocabularies.NewBiomeIcon',
                   'New biome icon'
                 )}
@@ -1279,7 +1279,7 @@
               <ManagerColorPicker
                 colorToken={biomeColorTokenInput}
                 customColor={biomeCustomColorInput}
-                buttonTitle={text(
+                ariaLabel={text(
                   'FABRICATE.Admin.Manager.Environment.Vocabularies.NewBiomeColor',
                   'New biome colour'
                 )}
@@ -1345,7 +1345,7 @@
                       iconOnly={true}
                       triggerClass="manager-biome-combined-trigger"
                       triggerStyle={biomeSwatchStyle(option)}
-                      buttonTitle={text(
+                      ariaLabel={text(
                         'FABRICATE.Admin.Manager.Environment.Vocabularies.EditBiomeIcon',
                         'Edit biome icon'
                       )}

@@ -334,7 +334,7 @@
         options={regionSelectOptions}
         onChange={(next) => (selectedRegionId = next)}
         maxWidth={OPTION_PANEL_MAX_WIDTH}
-        triggerData={{ 'data-interactable-manager-region': '' }}
+        triggerProps={{ 'data-interactable-manager-region': '' }}
       />
 
       <Select
@@ -343,7 +343,7 @@
         options={systemSelectOptions}
         onChange={(next) => (selectedSystemId = next)}
         maxWidth={OPTION_PANEL_MAX_WIDTH}
-        triggerData={{ 'data-interactable-manager-system': '' }}
+        triggerProps={{ 'data-interactable-manager-system': '' }}
       />
 
       <!-- THE THREE RADIO FIELDSETS ARE SEGMENTED TRACKS (issue 1520). Each is a closed set of
@@ -370,7 +370,7 @@
           groupName="fab-im-source-type"
           ariaLabel={text('FABRICATE.Canvas.Manage.PromoteSourceType', 'Source type')}
           fill
-          dataAttr="data-interactable-manager-source-type"
+          data-interactable-manager-source-type
           optionDataAttr="data-interactable-manager-source-type-option"
         />
       </Field>
@@ -381,7 +381,7 @@
         options={sourceSelectOptions}
         onChange={(next) => (selectedReferenceId = next)}
         maxWidth={OPTION_PANEL_MAX_WIDTH}
-        triggerData={{ 'data-interactable-manager-source': '' }}
+        triggerProps={{ 'data-interactable-manager-source': '' }}
       />
 
       <Field as="label">
@@ -406,7 +406,7 @@
           groupName="fab-im-visual-mode"
           ariaLabel={text('FABRICATE.Canvas.Manage.PromoteMarker', 'Marker')}
           fill
-          dataAttr="data-interactable-manager-visual-mode"
+          data-interactable-manager-visual-mode
           optionDataAttr="data-interactable-manager-visual-mode-option"
         />
       </Field>
@@ -421,7 +421,7 @@
             groupName="fab-im-marker-kind"
             ariaLabel={text('FABRICATE.Canvas.Manage.PromoteMarkerKind', 'Marker kind')}
             fill
-            dataAttr="data-interactable-manager-marker-kind"
+            data-interactable-manager-marker-kind
             optionDataAttr="data-interactable-manager-marker-kind-option"
           />
         </Field>

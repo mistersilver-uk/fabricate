@@ -518,7 +518,7 @@
       selectedValue={selectedPolicy}
       groupName={`check-modifier-policy-${activity}`}
       columns={2}
-      dataAttr="data-crafting-modifier-policy"
+      data-crafting-modifier-policy
       optionDataAttr={MODIFIER_POLICY_OPTION_ATTR}
       onChange={selectPolicy}
     />

@@ -98,14 +98,14 @@
     </Field>
     {#if showIcon}
       <!-- A `<div>`, not a `<label>`: the control is a button, which is not a labelable element,
-        so a wrapping label would name nothing. `buttonTitle` carries the accessible name. -->
+        so a wrapping label would name nothing. `ariaLabel` carries the accessible name. -->
       <Field as="div" class="manager-vocabulary-icon-field" data-vocabulary-add-icon="">
         <span>{iconLabel}</span>
         <IconPicker
           value={iconValue.trim() || defaultIcon}
           iconOnly={true}
           triggerClass="manager-vocabulary-icon-trigger"
-          buttonTitle={changeIconLabel || iconLabel}
+          ariaLabel={changeIconLabel || iconLabel}
           onChange={(icon) => (iconValue = icon)}
         />
       </Field>

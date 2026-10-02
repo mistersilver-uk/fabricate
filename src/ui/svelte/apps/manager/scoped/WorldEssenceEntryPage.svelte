@@ -525,8 +525,7 @@
         'FABRICATE.Admin.Manager.Scoped.Essence.EntryMissingHint',
         'This entry is open on an essence the world corpus no longer holds. Return to the catalogue and choose one.'
       )}
-      dataAttr="data-scoped-entry-state"
-      dataValue="missing"
+      data-scoped-entry-state="missing"
     >
       <ManagerButton data-scoped-entry-back onclick={() => onBackToCatalogue()}>
         {text('FABRICATE.Admin.Manager.Scoped.Essence.BackToCatalogue', 'Back to the catalogue')}
@@ -546,8 +545,8 @@
         ariaLabelKey="FABRICATE.Admin.Manager.Scoped.Essence.EntryTabsLabel"
         ariaLabel="Essence definition sections"
         idStem="scoped-essence-entry"
-        hookAttribute="data-scoped-entry-tab"
-        badgeAttribute="data-scoped-entry-tab-badge"
+        tabDataAttr="data-scoped-entry-tab"
+        badgeDataAttr="data-scoped-entry-tab-badge"
       />
 
       <div
@@ -603,7 +602,7 @@
                   />
                   <IconPicker
                     value={normalizedIcon}
-                    buttonTitle={text('FABRICATE.Admin.Manager.Essence.ChangeIcon', 'Change icon')}
+                    ariaLabel={text('FABRICATE.Admin.Manager.Essence.ChangeIcon', 'Change icon')}
                     onChange={(iconClass) => patchIdentity('icon', iconClass)}
                   />
                   <!--
@@ -743,7 +742,7 @@
                         title={text(ui?.promptKey ?? '', ui?.prompt ?? label)}
                         hint={sectionAddressLine(section, value)}
                         documentType={ui?.documentType ?? 'Item'}
-                        unlinkAttr="data-scoped-world-default-clear"
+                        unlinkDataAttr="data-scoped-world-default-clear"
                         unlinkLabel={format(
                           'FABRICATE.Admin.Manager.Scoped.Essence.DefaultClearNamed',
                           'Clear the world default for {section}',

@@ -146,14 +146,13 @@
 <div class="journal-history-detail" data-journal-history-detail>
   {#if !recovery}
     {#if account.settling}
-      <Notice tone="info" title={text('SettlementTitle')} dataAttr="data-journal-settling" />
+      <Notice tone="info" title={text('SettlementTitle')} data-journal-settling="" />
     {:else if showTransient || account.failed}
       <Notice
         tone={account.failed ? 'danger' : 'success'}
         title={localize(`FABRICATE.App.Journal.Verdict.${run.status}`)}
         detail={account.failed ? account.failureDetail : ''}
-        dataAttr="data-journal-verdict"
-        dataValue={run.status}
+        data-journal-verdict={run.status === undefined ? '' : run.status}
         evidence={hasVerdictEvidence ? verdictEvidence : null}
       />
     {/if}
@@ -253,7 +252,7 @@
     {@render items(text('ToolsUsed'), account.tools, 'tools')}
   {/if}
   <ThisRun {run} {services} />
-  <Callout tone="neutral" text={account.closed} dataAttr="data-journal-guidance" />
+  <Callout tone="neutral" text={account.closed} data-journal-guidance />
 </div>
 
 <style>

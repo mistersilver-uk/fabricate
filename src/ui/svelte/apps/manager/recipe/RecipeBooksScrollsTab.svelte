@@ -179,7 +179,7 @@
           'Not in any book or scroll yet.'
         )}
         contextClass="manager-recipe-tab-empty"
-        dataAttr="data-recipe-item-empty"
+        data-recipe-item-empty
       />
     {/if}
 

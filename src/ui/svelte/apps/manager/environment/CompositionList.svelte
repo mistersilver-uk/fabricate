@@ -467,7 +467,7 @@
               {/if}
               <ActionMenu
                 items={includedMenuItems()}
-                triggerLabel={moreActionsLabel}
+                ariaLabel={moreActionsLabel}
                 onSelect={(action) => runMenuAction(action, entry)}
               />
             </div>
@@ -556,7 +556,7 @@
                 {/if}
                 <ActionMenu
                   items={availableMenuItems(entry)}
-                  triggerLabel={moreActionsLabel}
+                  ariaLabel={moreActionsLabel}
                   onSelect={(action) => runMenuAction(action, entry)}
                 />
               </div>
@@ -623,7 +623,7 @@
                 {#if kind === 'task'}
                   <ActionMenu
                     items={excludedMenuItems()}
-                    triggerLabel={moreActionsLabel}
+                    ariaLabel={moreActionsLabel}
                     onSelect={(action) => runMenuAction(action, entry)}
                   />
                 {:else}
@@ -709,7 +709,7 @@
                 {#if kind === 'task'}
                   <ActionMenu
                     items={nonMatchingMenuItems(entry)}
-                    triggerLabel={moreActionsLabel}
+                    ariaLabel={moreActionsLabel}
                     onSelect={(action) => runMenuAction(action, entry)}
                   />
                 {:else}

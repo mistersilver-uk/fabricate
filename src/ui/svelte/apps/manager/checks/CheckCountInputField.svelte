@@ -118,7 +118,7 @@
       value={mode}
       groupName="check-count-base-mode"
       ariaLabel={sourceLabel}
-      dataAttr="data-check-count-base-mode"
+      data-check-count-base-mode
       optionDataAttr="data-check-count-base-mode-option"
       onChange={choose}
     />
@@ -130,7 +130,7 @@
       value={mode}
       groupName="check-count-threshold-mode"
       ariaLabel={sourceLabel}
-      dataAttr="data-check-count-threshold-mode"
+      data-check-count-threshold-mode
       optionDataAttr="data-check-count-threshold-mode-option"
       onChange={choose}
     />

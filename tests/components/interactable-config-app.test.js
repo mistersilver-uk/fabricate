@@ -753,9 +753,11 @@ describe('InteractableConfigRoot body', () => {
       renders: ['Notice'],
       passesValues: [
         ['Notice', 'tone', 'warning'],
-        ['Notice', 'dataAttr', 'data-interactable-needs-config'],
       ],
-      passesProps: [['Notice', 'title']],
+      passesProps: [
+        ['Notice', 'title'],
+        ['Notice', 'data-interactable-needs-config'],
+      ],
       // The section-wide accent box left with the banner; nothing puts the class back.
       writesNo: ['is-unconfigured'],
     }

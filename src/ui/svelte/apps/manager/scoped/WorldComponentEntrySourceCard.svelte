@@ -242,7 +242,7 @@
             : '{count} other catalogue entries name the same source item, so an import can create a second record for one item.',
           { count: duplicateCount }
         )}
-        dataAttr="data-scoped-entry-duplicate-source"
+        data-scoped-entry-duplicate-source
       />
       {#if onReviewDuplicates}
         <ManagerButton

@@ -100,7 +100,7 @@
       <Kicker as="span">{localize(captionKey)}</Kicker>
     {/if}
     <span class="chance-bar-row">
-      <FillBar value={pct} color={fillColour} dataAttr="data-chance-bar-track" />
+      <FillBar value={pct} color={fillColour} data-chance-bar-track />
       <span class="chance-bar-percent">{pct}%</span>
     </span>
   </div>

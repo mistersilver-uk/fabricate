@@ -974,7 +974,7 @@ test('every primitive writes the namespace roots its rules are anchored on', () 
     const attributes = classValuesFor(primitive, primitive.components[0]);
     const emitted = new Set(
       primitive.components.flatMap((file) =>
-        classValuesFor(primitive, file).flatMap((value) => value.split(/\s+/))
+        classValuesFor(primitive, file).flatMap((value) => value.split(/\s+|(?=\$\{)/))
       )
     );
     assert.ok(

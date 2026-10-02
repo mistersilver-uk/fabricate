@@ -919,9 +919,8 @@ describe('RecipeDetail mounted behavior', () => {
     assert.equal(
       blocking.getAttribute('data-recipe-blocking'),
       '',
-      'the hook was written BARE on the deleted element, so it is passed with an empty ' +
-        '`dataValue` rather than being coerced to `="true"` the way a bare attribute on a ' +
-        'component tag would be'
+      'the hook was written bare on the deleted element, so it is passed `=""` rather ' +
+        'than being coerced to `="true"` the way a bare attribute on a component tag would be'
     );
     assert.ok(
       !blocking.querySelector('li'),

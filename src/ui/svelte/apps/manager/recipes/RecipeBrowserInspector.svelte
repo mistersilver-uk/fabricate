@@ -513,7 +513,7 @@
           'FABRICATE.Admin.Manager.Recipe.SelectIngredientSet',
           'Select ingredient set'
         )}
-        triggerData={{ 'data-recipe-route': 'ingredient-set' }}
+        triggerProps={{ 'data-recipe-route': 'ingredient-set' }}
         onChange={selectRoutingSet}
       />
     {/if}

@@ -113,7 +113,7 @@
       </h4>
       <ManagerSearchField
         value={availableSearch}
-        onInput={(next) => (ui.availableSearchTerm = next)}
+        onChange={(next) => (ui.availableSearchTerm = next)}
         placeholder={text(
           'FABRICATE.Admin.Manager.Travel.Realms.EnvSearchPlaceholder',
           'Search environments...'
@@ -188,7 +188,7 @@
       </h4>
       <ManagerSearchField
         value={includedSearch}
-        onInput={(next) => (ui.includedSearchTerm = next)}
+        onChange={(next) => (ui.includedSearchTerm = next)}
         placeholder={text(
           'FABRICATE.Admin.Manager.Travel.Realms.EnvSearchPlaceholder',
           'Search environments...'

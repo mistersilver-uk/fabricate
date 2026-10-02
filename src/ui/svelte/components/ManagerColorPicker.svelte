@@ -11,7 +11,7 @@
   let {
     colorToken = 'sage',
     customColor = '',
-    buttonTitle = 'Choose colour',
+    ariaLabel = '',
     presetGridLabel = 'Colour presets',
     customHexLabel = 'Custom hex',
     allowCustom = true,
@@ -95,8 +95,8 @@
     class="manager-color-picker-trigger"
     class:is-unset={unset}
     aria-expanded={open}
-    aria-label={buttonTitle}
-    title={buttonTitle}
+    aria-label={ariaLabel || undefined}
+    title={ariaLabel || undefined}
     style={unset ? UNSET_SWATCH : swatchStyle()}
     onclick={togglePicker}
   >

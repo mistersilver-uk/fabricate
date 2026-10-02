@@ -36,7 +36,7 @@
   let {
     value = DEFAULT_ESSENCE_ICON,
     disabled = false,
-    buttonTitle = '',
+    ariaLabel = '',
     iconOnly = false,
     triggerClass = '',
     triggerStyle = '',
@@ -57,7 +57,7 @@
     )?.iconClass ?? selectedOption.iconClass
   );
   const triggerName = $derived(
-    buttonTitle || localize('FABRICATE.Admin.Features.Essences.ChooseIcon')
+    ariaLabel || localize('FABRICATE.Admin.Features.Essences.ChooseIcon')
   );
   const dialogLabel = $derived(localize('FABRICATE.Admin.Features.Essences.IconDialogLabel'));
 
@@ -135,9 +135,9 @@
   searchClass="essence-icon-picker-search"
   listClass="essence-icon-picker-options"
   optionClass="essence-icon-picker-option"
-  dialogAriaLabel={dialogLabel}
+  panelLabel={dialogLabel}
   searchPlaceholder={localize('FABRICATE.Admin.Features.Essences.SearchIconPlaceholder')}
-  searchAriaLabel={localize('FABRICATE.Admin.Features.Essences.SearchIconLabel')}
+  searchLabel={localize('FABRICATE.Admin.Features.Essences.SearchIconLabel')}
   noMatchesHint={localize('FABRICATE.Admin.Features.Essences.NoIconsFound')}
   horizontalAlign={iconOnly ? 'left' : 'right'}
   minWidth={260}
@@ -146,7 +146,7 @@
   ignoreScrollWithin={true}
   triggerOnKeydown={handleTriggerKeydown}
   {bounds}
-  onChoose={selectIcon}
+  onSelect={selectIcon}
 >
   {#snippet trigger({ attributes, open })}
     <button

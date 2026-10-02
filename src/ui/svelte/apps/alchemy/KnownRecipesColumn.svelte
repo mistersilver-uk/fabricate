@@ -110,8 +110,7 @@
       <EmptyState
         filtered
         hint={localize('FABRICATE.App.Alchemy.NoRecipeMatchesHint')}
-        dataAttr="data-alchemy-known-no-matches"
-        dataValue=""
+        data-alchemy-known-no-matches
       />
     </div>
   {:else if recipes.length === 0}
@@ -120,8 +119,7 @@
         icon="fas fa-flask-vial"
         title={localize('FABRICATE.App.Alchemy.ZeroKnownTitle')}
         hint={localize('FABRICATE.App.Alchemy.ZeroKnownHint')}
-        dataAttr="data-alchemy-zero-known"
-        dataValue=""
+        data-alchemy-zero-known
       />
     </div>
   {:else}
@@ -186,8 +184,7 @@
       icon="fas fa-flask-vial"
       title={localize('FABRICATE.App.Alchemy.Undiscovered', { count: undiscoveredCount })}
       text={localize('FABRICATE.App.Alchemy.UndiscoveredHint')}
-      dataAttr="data-alchemy-undiscovered"
-      dataValue=""
+      data-alchemy-undiscovered
     />
   </div>
 </div>

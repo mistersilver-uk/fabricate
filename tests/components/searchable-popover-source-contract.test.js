@@ -93,16 +93,16 @@ const popover = definePrimitiveAdoptionContract({
   rawRemedy:
     'these components hand-roll the trigger-plus-popover that ' +
     '`src/ui/svelte/components/SearchablePopover.svelte` owns. Render `<SearchablePopover ' +
-    'options={…} onChoose={…}>` instead — a per-site modifier travels on `triggerClass`, ' +
+    'options={…} onSelect={…}>` instead — a per-site modifier travels on `triggerClass`, ' +
     '`popoverClass`, `valueClass` or `pickerClass`, a `data-*` hook on the trigger rides ' +
-    '`triggerData` and one on an option rides that option`s `data` map. If the site is a ' +
+    '`triggerProps` and one on an option rides that option`s `data` map. If the site is a ' +
     'typeahead COMBOBOX with no trigger, or a `role="menu"` of actions, it is a different ' +
     'widget and belongs in `scripts/lib/designSystemPrimitives.json`, not here',
   valuelessRemedy:
     'write `attribute=""` instead — that renders identically on a raw element and through the ' +
     'rest spread, where a bare `data-x` arrives as the boolean `true` and renders `="true"`. ' +
     'Presence selectors resolve either way, which is why the mounted suites and the smoke ' +
-    'steps that use them would not catch it. The same is true of a `triggerData` entry and of ' +
+    'steps that use them would not catch it. The same is true of a `triggerProps` entry and of ' +
     'an option`s `data` map: spell the value `\'\'`',
 });
 
@@ -209,8 +209,11 @@ function propsBlock() {
   return source.slice(start, end + closer.length);
 }
 
-/** The destructure as it stood before the panel was extracted (issue 1719). */
-const PROPS_BLOCK_DIGEST = 'e01ee104cdd7442f362b3e569cdf14c3d62d2fccf399b176bdf72181ea0d69c0';
+/**
+ * The destructure as it stood before the panel was extracted (issue 1719), with nine names
+ * re-spelled to the API convention at issue 1507 and no order or default moved.
+ */
+const PROPS_BLOCK_DIGEST = '2d703e11311a156897b414f0863280abc69cc8ddd34b4e92cd038763d9339218';
 const PROPS_BLOCK_NAMES = 59;
 
 test('the declared prop surface is byte-identical to the pre-decomposition block', () => {
@@ -260,8 +263,8 @@ test('the snippet-trigger naming route reads the element the spread lands on', (
         'place of the primitive`s own has no accessible name'
     );
     assert.ok(
-      !site.attribute('triggerAriaLabel'),
-      `${site.file} passes BOTH a \`trigger\` snippet and \`triggerAriaLabel\`. The primitive ` +
+      !site.attribute('ariaLabel'),
+      `${site.file} passes both a \`trigger\` snippet and \`ariaLabel\`. The primitive ` +
         'renders no button of its own in that shape, and the prop rides the spread — so it ' +
         'would silently override the name the snippet writes rather than naming anything.'
     );
@@ -334,14 +337,14 @@ test('every popover names its trigger and the panel that opens', () => {
 
   const unnamed = [];
   for (const site of popover.callSites) {
-    // The TRIGGER is named by `triggerAriaLabel` or by a visible `triggerLabel`.
+    // The trigger is named by `ariaLabel` or by a visible `triggerLabel`.
     const triggerName =
-      site.attribute('triggerAriaLabel') ??
+      site.attribute('ariaLabel') ??
       site.attribute('triggerLabel') ??
       snippetTriggerName(site);
     if (!triggerName) unnamed.push(`${site.file}: the trigger has no accessible name`);
-    // The PANEL is named by `dialogAriaLabel` or by `dialogAriaLabelledBy`.
-    const panelName = ['dialogAriaLabel', 'dialogAriaLabelledBy']
+    // The panel is named by `panelLabel` or by `panelLabelledBy`.
+    const panelName = ['panelLabel', 'panelLabelledBy']
       .map((prop) => site.attribute(prop))
       .find((written) => written && !/=(""|'')$/.test(written));
     if (!panelName) {
@@ -353,7 +356,7 @@ test('every popover names its trigger and the panel that opens', () => {
     unnamed.sort((left, right) => left.localeCompare(right)),
     [],
     'a `<SearchablePopover>` renders a portaled `role="dialog"` containing a `role="listbox"`, ' +
-      'and it names both from `dialogAriaLabel`, or from `dialogAriaLabelledBy` where the ' +
+      'and it names both from `panelLabel`, or from `panelLabelledBy` where the ' +
       'caller has a caption rather than a string. With neither, a GM using a screen reader ' +
       'is told a dialog opened and is not told what it is for, then lands in a list with no ' +
       'name either. Nothing else reports this: it is invisible in a frame, it is not a ' +

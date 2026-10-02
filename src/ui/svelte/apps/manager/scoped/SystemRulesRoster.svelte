@@ -129,10 +129,10 @@
         ? 'manager-scoped-roster-search manager-scoped-roster-search-well'
         : 'manager-scoped-roster-search'}
       value={systemQuery}
-      onInput={(next) => changeSystemQuery(next)}
+      onChange={(next) => changeSystemQuery(next)}
       placeholder={text('FABRICATE.Admin.Manager.Scoped.List.SearchSystems', 'Search systems')}
       ariaLabel={text('FABRICATE.Admin.Manager.Scoped.List.SearchSystemsLabel', 'Search systems')}
-      inputAttrs={{ 'data-scoped-list-system-search': '' }}
+      inputProps={{ 'data-scoped-list-system-search': '' }}
     />
 
     {#if rosterEmptyNote && memberCount === 0}

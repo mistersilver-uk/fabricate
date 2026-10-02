@@ -7,11 +7,14 @@
   | --- | --- | --- | --- |
   | `options` | `[{ value, labelKey, fallback, icon?, variant?, disabled?, count?, badge?, validationTarget? }]` | `[]` | the segments, in order. `variant` tints the ACTIVE segment only; `disabled` is carried onto the radio ITSELF, because `select()` only guards `next !== value` and a dimmed-but-live segment would still fire `onChange`; a caller passes `count` or `badge`, never both; and `validationTarget` stamps `data-validation-target` on that segment's radio, the focusable half a Validation row lands on. |
   | `value` / `groupName` / `ariaLabel` | strings | | the selection, the shared radio `name` (unique per rendered control) and the radiogroup's accessible name |
-  | `dataAttr` / `optionDataAttr` / `fill` / `iconOnly` | | `''` / `false` | the two data-* hook names, whether segments share the track `flex: 1 1 0`, and whether each renders its `icon` alone with the label CLIPPED |
+  | `optionDataAttr` / `fill` / `iconOnly` / `class` | | `''` / `false` / `''` | the per-segment data-* hook name, whether segments share the track `flex: 1 1 0`, whether each renders its `icon` alone with the label clipped, and an extra class appended to the root's own |
   | `shape` \| `density` \| `tone` | `'pill'` \| `'compact'`/`'field'` \| `'tag'`/`'accent'`/`'accent-soft'` | `''`/`'default'`/`''` | the CONSTRUCTION, the SCALE and the PAINT, as variants ON the primitive: the design system forbids a layout-context rule restyling a primitive's `font-*`, `border`, `border-radius` and `background`. `is-accent` is a PREFIX of `is-accent-soft`, so only a whole-token match tells the two apart. |
 
   Callbacks:
   - `onChange(value)` — the chosen option's `value`.
+
+  Rest spread:
+  - `{...rest}` lands on the radiogroup root, written after `class`, and carries a caller's hook.
 -->
 <script>
   import { localize } from '../util/foundryBridge.js';
@@ -22,7 +25,6 @@
     onChange = () => {},
     groupName = '',
     ariaLabel = '',
-    dataAttr = '',
     optionDataAttr = '',
     fill = false,
     iconOnly = false,
@@ -31,7 +33,11 @@
     // the track's SCALE too, so a `tone="tag"` consumer passes no `density`.
     tone = '',
     shape = '',
+    class: extraClass = '',
+    ...rest
   } = $props();
+
+  const extraClasses = $derived(extraClass ? ` ${extraClass}` : '');
 
   function text(key, fallback) {
     if (!key) return fallback ?? '';
@@ -52,10 +58,10 @@
 </script>
 
 <div
-  class={`manager-segmented${fill ? ' is-fill' : ''}${iconOnly ? ' is-icon-only' : ''}${density === 'compact' ? ' is-compact' : ''}${density === 'field' ? ' is-field' : ''}${tone === 'tag' ? ' is-tag' : ''}${tone === 'accent' ? ' is-accent' : ''}${tone === 'accent-soft' ? ' is-accent-soft' : ''}${shape === 'pill' ? ' is-pill' : ''}`}
+  class={`manager-segmented${fill ? ' is-fill' : ''}${iconOnly ? ' is-icon-only' : ''}${density === 'compact' ? ' is-compact' : ''}${density === 'field' ? ' is-field' : ''}${tone === 'tag' ? ' is-tag' : ''}${tone === 'accent' ? ' is-accent' : ''}${tone === 'accent-soft' ? ' is-accent-soft' : ''}${shape === 'pill' ? ' is-pill' : ''}${extraClasses}`}
   role="radiogroup"
   aria-label={ariaLabel || undefined}
-  {...dataAttr ? { [dataAttr]: true } : {}}
+  {...rest}
 >
   {#each options as option (option.value)}
     <!-- `title` ONLY in the icon-only variant, the pointer half of what the clipped label already

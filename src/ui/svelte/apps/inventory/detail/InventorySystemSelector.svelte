@@ -107,7 +107,7 @@
   <!-- A `<span>` RATHER THAN THE `<label for>` THIS WAS (issue 1511). This was the only `for`/`id`
        pair of the app's six selects, and there is no longer an `id`-bearing labelable control for
        a `for` to address: the control is a `<button>`, named by this caption through
-       `aria-labelledby`. The stable hook rides onto that button through `triggerData`, so the
+       `aria-labelledby`. The stable hook rides onto that button through `triggerProps`, so the
        smoke's own wait on `[data-inventory-system-select]` keeps resolving; the per-option hook
        goes, because the primitive stamps `data-popover-option` from each option's value. -->
   <span class="inventory-system-selector-label" id={captionId}>{label}</span>
@@ -118,7 +118,7 @@
     ariaLabelledBy={captionId}
     minWidth={PARTICIPATION_PANEL_MIN_WIDTH}
     maxWidth={PARTICIPATION_PANEL_MAX_WIDTH}
-    triggerData={{ 'data-inventory-system-select': '' }}
+    triggerProps={{ 'data-inventory-system-select': '' }}
     onChange={choose}
   />
 </div>

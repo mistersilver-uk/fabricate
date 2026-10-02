@@ -515,7 +515,7 @@
           'FABRICATE.Admin.Manager.Component.Complications.Empty',
           'Nothing goes wrong with this component yet. Add a complication to give a missed, partial or unlucky stage a consequence.'
         )}
-        dataAttr="data-complications-empty"
+        data-complications-empty
       />
     {:else}
       <div class="fab-complications-list">
@@ -583,7 +583,7 @@
                     'FABRICATE.Admin.Manager.Component.Complications.SeverityLabel',
                     'Severity'
                   )}
-                  dataAttr="data-complication-severity"
+                  data-complication-severity
                   optionDataAttr="data-complication-severity-option"
                   density="field"
                   onChange={(value) => setField(complication.id, 'severity', value)}
@@ -695,7 +695,7 @@
                     'FABRICATE.Admin.Manager.Component.Complications.MatchLabel',
                     'How the conditions combine'
                   )}
-                  dataAttr="data-complication-match"
+                  data-complication-match
                   optionDataAttr="data-complication-match-option"
                   density="compact"
                   onChange={(value) => setField(complication.id, 'match', value)}
@@ -773,7 +773,7 @@
                         'Check trigger'
                       )}
                       disabled={saving}
-                      triggerData={{ 'data-complication-trigger': '' }}
+                      triggerProps={{ 'data-complication-trigger': '' }}
                       onChange={(next) => setWhen(complication.id, 'checkTrigger', next || null)}
                     />
                   </ComplicationEffectRow>
@@ -852,7 +852,7 @@
                         'Comparison'
                       )}
                       disabled={saving}
-                      triggerData={{ 'data-complication-roll-condition-cmp': '' }}
+                      triggerProps={{ 'data-complication-roll-condition-cmp': '' }}
                       onChange={(next) => setNested(complication.id, 'rollCondition', 'cmp', next)}
                     />
                     <!-- A SIGNED INTEGER STEPPER, not a bare field. `min`/`max` stay at the
@@ -990,12 +990,12 @@
                           'FABRICATE.Admin.Manager.Component.Complications.Macro.Browse',
                           'Browse macros'
                         )}
-                        triggerData={{ 'data-complication-macro-browse': 'true' }}
-                        triggerAriaLabel={text(
+                        triggerProps={{ 'data-complication-macro-browse': 'true' }}
+                        ariaLabel={text(
                           'FABRICATE.Admin.Manager.Component.Complications.Macro.Browse',
                           'Browse macros'
                         )}
-                        dialogAriaLabel={text(
+                        panelLabel={text(
                           'FABRICATE.Admin.Manager.Component.Complications.Macro.Browse',
                           'Browse macros'
                         )}
@@ -1003,7 +1003,7 @@
                           'FABRICATE.Admin.Manager.Component.Complications.Macro.Search',
                           'Search macros...'
                         )}
-                        searchAriaLabel={text(
+                        searchLabel={text(
                           'FABRICATE.Admin.Manager.Component.Complications.Macro.Search',
                           'Search macros...'
                         )}
@@ -1011,7 +1011,7 @@
                           'FABRICATE.Admin.Manager.Component.Complications.Macro.None',
                           'No script macros in this world'
                         )}
-                        onChoose={(uuid) => setMacro(complication.id, uuid)}
+                        onSelect={(uuid) => setMacro(complication.id, uuid)}
                       />
                     {/snippet}
                     <div class="fab-complication-macro-controls">

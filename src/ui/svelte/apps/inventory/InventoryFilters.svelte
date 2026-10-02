@@ -154,7 +154,7 @@
         options={sortOptions}
         ariaLabelledBy={sortCaptionId}
         minWidth={SORT_PANEL_MIN_WIDTH}
-        triggerData={{ 'data-inventory-sort': '' }}
+        triggerProps={{ 'data-inventory-sort': '' }}
         onChange={(next) => onSort?.(next)}
       />
     </span>

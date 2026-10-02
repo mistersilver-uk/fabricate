@@ -200,9 +200,9 @@ describe('EditorTabs draws the Rail Marker Family (issue 1429)', () => {
     const root = await harness.mount({
       tabs: TABS,
       activeTab: 'roll',
-      countAttribute: 'data-x-count',
-      dotAttribute: 'data-x-dot',
-      badgeAttribute: 'data-x-badge',
+      countDataAttr: 'data-x-count',
+      dotDataAttr: 'data-x-dot',
+      badgeDataAttr: 'data-x-badge',
       badges: {
         roll: [
           { vehicle: 'count', label: 2 },
@@ -262,7 +262,7 @@ describe('EditorTabs draws the Rail Marker Family (issue 1429)', () => {
     const root = await harness.mount({
       tabs: TABS,
       activeTab: 'roll',
-      containerAttribute: 'data-checks-sections',
+      'data-checks-sections': '',
     });
     assert.ok(
       Boolean(root.querySelector('[role="tablist"][data-checks-sections]')),

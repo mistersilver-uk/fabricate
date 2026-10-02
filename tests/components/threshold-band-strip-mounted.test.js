@@ -79,7 +79,7 @@ describe('ThresholdBandStrip: geometry and handles', () => {
       bands: RELATIVE_BANDS,
       previewDc: 12,
       previewLabel: 'Uncommon Craft',
-      groupLabel: 'Outcome bands',
+      ariaLabel: 'Outcome bands',
     });
     assert.match(
       root.querySelector('[data-band-strip-track]').getAttribute('aria-label'),

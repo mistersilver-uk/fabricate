@@ -227,14 +227,14 @@
     triggerIcon={FALLBACK_PORTRAIT_ICON}
     triggerLabel={triggerName}
     triggerTitle={triggerName}
-    triggerAriaLabel={triggerName}
-    dialogAriaLabel={localize('FABRICATE.App.ActorBar.DialogLabel')}
+    ariaLabel={triggerName}
+    panelLabel={localize('FABRICATE.App.ActorBar.DialogLabel')}
     searchPlaceholder={localize('FABRICATE.App.ActorBar.SearchPlaceholder')}
-    searchAriaLabel={localize('FABRICATE.App.ActorBar.SearchLabel')}
+    searchLabel={localize('FABRICATE.App.ActorBar.SearchLabel')}
     emptyHint={pickerEmptyHint}
     emptyDetail={pickerEmptyDetail}
     noMatchesHint={pickerNoMatchesHint}
-    onChoose={chooseActor}
+    onSelect={chooseActor}
   />
 
   {#if hasRightContext}
@@ -268,7 +268,7 @@
                  element that used to BE the track survives as the pin: it declares the 72px and
                  nothing else, and the bar inside it fills exactly that. -->
             <span class="actor-bar-stamina-track">
-              <FillBar size="sm" value={staminaPct} tone="accent" />
+              <FillBar density="compact" value={staminaPct} tone="accent" />
             </span>
             <span class="actor-bar-stamina-value">{staminaPool.current}/{staminaPool.max}</span>
           </span>

@@ -210,7 +210,7 @@
         'FABRICATE.Admin.Manager.Tools.Editor.IdentityMissing',
         'This Tool names no game-world Item. Its identity is set on the world Tool, not here, and it cannot be saved until that link is restored.'
       )}
-      dataAttr="data-tool-identity-notice"
+      data-tool-identity-notice
       actions={worldRecordExists ? worldToolAction : undefined}
     />
   {/if}

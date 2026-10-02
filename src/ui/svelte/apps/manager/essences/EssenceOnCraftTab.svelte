@@ -214,7 +214,7 @@
         'FABRICATE.Admin.Manager.Essence.OnCraft.BothOffHint',
         'Turn on Effect transfer or Property macros in this system’s crafting settings to give essences behaviour.'
       )}
-      dataAttr="data-essence-on-craft-empty"
+      data-essence-on-craft-empty
     />
   {/if}
 
@@ -311,7 +311,7 @@
             onDrop={onSourceDrop}
             onCopy={onCopySourceUuid && sourceUuid ? () => onCopySourceUuid(sourceUuid) : null}
             onUnlink={() => onSourceClear()}
-            unlinkAttr="data-scoped-source-unlink"
+            unlinkDataAttr="data-scoped-source-unlink"
           />
         {:else}
           <!-- UNLINKED only. The PICK half is why `EssenceSourceSelector` survives: an essence
@@ -431,7 +431,7 @@
           unlinkLabel={text('FABRICATE.Admin.Manager.Essence.Macro.Unlink', 'Unlink macro')}
           onDrop={onMacroDrop}
           onUnlink={macroUuid ? onMacroUnlink : null}
-          unlinkAttr="data-scoped-macro-unlink"
+          unlinkDataAttr="data-scoped-macro-unlink"
         />
       {/if}
       {#if macroWarning}

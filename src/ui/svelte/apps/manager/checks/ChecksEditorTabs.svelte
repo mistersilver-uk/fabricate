@@ -67,10 +67,10 @@
   buttonIdStem="checks-section"
   panelIdStem="checks-panel"
   activePanelOnly
-  hookAttribute="data-checks-section-button"
-  containerAttribute="data-checks-sections"
-  countAttribute="data-checks-section-count"
-  dotAttribute="data-checks-section-dot"
+  tabDataAttr="data-checks-section-button"
+  data-checks-sections=""
+  countDataAttr="data-checks-section-count"
+  dotDataAttr="data-checks-section-dot"
   containerClass="manager-environment-tabs manager-checks-sections"
   buttonClass="manager-environment-tab-button"
 />

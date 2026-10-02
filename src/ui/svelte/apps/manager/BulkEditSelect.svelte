@@ -1,7 +1,7 @@
 <!--
   The manager's ONE bulk edit SELECT (issue 1504): the full-width `Select` a bulk panel stages a
-  single-valued axis with. Options and `showTick` stay the CALLER'S, because a sentinel's meaning
-  differs per studio and axis, and `...rest` routes to the TRIGGER through `Select`'s `triggerData`.
+  single-valued axis with. Options and `showTick` stay the caller's, because a sentinel's meaning
+  differs per studio and axis, and `...rest` routes to the trigger through `Select`'s `triggerProps`.
   The root class is load-bearing: `Select` has no trigger-box prop, so this rail's full-width field
   comes from a descendant rule on it in `styles/fabricate.css`.
 -->
@@ -18,7 +18,7 @@
     ...rest
   } = $props();
 
-  const triggerData = $derived({ ...rest });
+  const triggerProps = $derived({ ...rest });
 </script>
 
 <Select
@@ -27,7 +27,7 @@
   {options}
   {showTick}
   {disabled}
-  {triggerData}
+  {triggerProps}
   {ariaLabel}
   {onChange}
   class="fab-bulk-edit-select"

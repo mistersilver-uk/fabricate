@@ -812,7 +812,7 @@
     fill={true}
     groupName="recipe-bulk-status"
     ariaLabel={text('FABRICATE.Admin.Manager.Recipe.Status', 'Status')}
-    dataAttr="data-recipe-bulk-status"
+    data-recipe-bulk-status
     optionDataAttr="data-recipe-bulk-status-option"
     onChange={(value) => setStatus(value)}
   />
@@ -820,8 +820,7 @@
     <Callout
       tone="warning"
       text={blockedWarningText}
-      dataAttr="data-recipe-bulk-blocked-warning"
-      dataValue={String(blockedCount)}
+      data-recipe-bulk-blocked-warning={String(blockedCount) || true}
     />
   {/if}
 
@@ -832,7 +831,7 @@
     fill={true}
     groupName="recipe-bulk-lock"
     ariaLabel={text('FABRICATE.Admin.Manager.BulkEdit.Lock', 'Lock')}
-    dataAttr="data-recipe-bulk-lock"
+    data-recipe-bulk-lock
     optionDataAttr="data-recipe-bulk-lock-option"
     onChange={(value) => setLock(value)}
   />
@@ -860,8 +859,7 @@
     <Callout
       tone="info"
       text={checkTierMessage}
-      dataAttr="data-recipe-bulk-check-tier-unavailable"
-      dataValue={checkTierReason}
+      data-recipe-bulk-check-tier-unavailable={checkTierReason || true}
     />
   {/if}
 
@@ -950,18 +948,18 @@
           'FABRICATE.Admin.Manager.Recipe.BulkEdit.BookPick',
           'Pick a book or scroll'
         )}
-        triggerAriaLabel={text(
+        ariaLabel={text(
           'FABRICATE.Admin.Manager.Recipe.BulkEdit.BookPick',
           'Pick a book or scroll'
         )}
-        dialogAriaLabel={booksLabel}
+        panelLabel={booksLabel}
         searchPlaceholder={bookSearchPlaceholder}
-        searchAriaLabel={bookSearchPlaceholder}
+        searchLabel={bookSearchPlaceholder}
         emptyHint={text(
           'FABRICATE.Admin.Manager.Recipe.BulkEdit.BookNoMatch',
           'No book or scroll by that name.'
         )}
-        onChoose={(id) => pickBook(id)}
+        onSelect={(id) => pickBook(id)}
       />
     {/if}
     {#if stagedBooks.length > 0}

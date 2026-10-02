@@ -371,7 +371,7 @@
     <div class="manager-essence-filter-row">
       <ManagerSearchField
         value={searchTerm}
-        onInput={(next) => {
+        onChange={(next) => {
           ui.searchTerm = next;
           ui.pageIndex = 0;
         }}
@@ -400,7 +400,7 @@
             'FABRICATE.Admin.Manager.Essence.MembershipFilterLabel',
             'Filter essences by membership of this system'
           )}
-          dataAttr="data-essence-membership-filter"
+          data-essence-membership-filter
           optionDataAttr="data-essence-membership-option"
           onChange={(value) => {
             membershipFilter = value;
@@ -423,7 +423,7 @@
           value={ui.sortKey}
           options={sortSelectOptions}
           ariaLabel={text('FABRICATE.Admin.Manager.Essence.SortLabel', 'Sort essences')}
-          triggerData={{ 'data-essence-sort': '' }}
+          triggerProps={{ 'data-essence-sort': '' }}
           onChange={(next) => (ui.sortKey = next)}
         />
         <ManagerButton
@@ -457,7 +457,7 @@
         iconOnly
         groupName="manager-essence-view-mode"
         ariaLabel={text('FABRICATE.Admin.Manager.Essence.ViewModeLabel', 'Essence presentation')}
-        dataAttr="data-essence-view-mode"
+        data-essence-view-mode
         optionDataAttr="data-essence-view-option"
         onChange={(value) => (ui.viewMode = value)}
       />

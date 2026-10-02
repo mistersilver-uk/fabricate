@@ -32,17 +32,15 @@ export function runBlockerCode(run) {
  *
  * @param {object|null} run The RunModel.
  * @param {(key: string, data?: object) => string} localize
- * @returns {{tone: string, blocking: boolean, title: string, detail: string, dataAttr: string,
- *   dataValue: string, stateDataAttr: string, stateDataValue: string, evidence: boolean,
- *   claim: object|null}|null} `null` when the run has nothing to report.
+ * @returns {{tone: string, blocking: boolean, title: string, detail: string,
+ *   hooks: Record<string, string>, evidence: boolean, claim: object|null}|null} `hooks` is the
+ *   notice's own `data-*` hook followed by the paused one; `null` when the run has nothing to report.
  */
 export function runStateNotice(run, localize) {
   const text = (key, ...data) => localize(`FABRICATE.App.Journal.Notice.${key}`, ...data);
   const paused = Boolean(run?.pauseState);
   const blocker = runBlockerCode(run);
-  const pausedHook = paused
-    ? { stateDataAttr: 'data-journal-paused', stateDataValue: 'true' }
-    : { stateDataAttr: '', stateDataValue: '' };
+  const pausedHook = paused ? { 'data-journal-paused': 'true' } : {};
 
   // The run's OWN uncertain effect. It outranks every other state because no other change
   // may happen until a person has looked at the receipts it publishes beneath this notice.
@@ -57,9 +55,7 @@ export function runStateNotice(run, localize) {
       blocking: true,
       title: text('RecoveryTitle'),
       detail: text('RecoveryDetail', { count: run.recoveryEvidence.appliedEffectCount ?? 0 }),
-      dataAttr: 'data-journal-recovery',
-      dataValue: 'true',
-      ...pausedHook,
+      hooks: { 'data-journal-recovery': 'true', ...pausedHook },
       evidence: true,
       claim: run?.actions?.recoveryClaim ?? null,
     };
@@ -72,9 +68,7 @@ export function runStateNotice(run, localize) {
       blocking: false,
       title: text('UnsupportedTitle'),
       detail: localize('FABRICATE.App.Journal.Actions.UnsupportedLifecycle'),
-      dataAttr: 'data-journal-unsupported',
-      dataValue: 'true',
-      ...pausedHook,
+      hooks: { 'data-journal-unsupported': 'true', ...pausedHook },
       evidence: false,
       claim: null,
     };
@@ -89,9 +83,7 @@ export function runStateNotice(run, localize) {
         journalRunReasonMessage(blocker, localize) ||
         localize('FABRICATE.App.Journal.Actions.Unavailable'),
       detail: claim ? retainedClaimDetail(claim, localize) : paused ? text('PausedInline') : '',
-      dataAttr: 'data-journal-action-blocker',
-      dataValue: blocker,
-      ...pausedHook,
+      hooks: { 'data-journal-action-blocker': blocker, ...pausedHook },
       evidence: false,
       claim,
     };
@@ -107,9 +99,7 @@ export function runStateNotice(run, localize) {
       blocking: false,
       title: text('ChoiceTitle'),
       detail: text('ChoiceDetail'),
-      dataAttr: 'data-journal-awaiting-choice',
-      dataValue: 'true',
-      ...pausedHook,
+      hooks: { 'data-journal-awaiting-choice': 'true', ...pausedHook },
       evidence: false,
       claim: null,
     };
@@ -121,10 +111,7 @@ export function runStateNotice(run, localize) {
       blocking: false,
       title: text('PausedTitle'),
       detail: text('PausedDetail'),
-      dataAttr: 'data-journal-paused',
-      dataValue: 'true',
-      stateDataAttr: '',
-      stateDataValue: '',
+      hooks: pausedHook,
       evidence: false,
       claim: null,
     };

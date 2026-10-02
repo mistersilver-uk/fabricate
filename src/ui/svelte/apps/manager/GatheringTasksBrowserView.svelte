@@ -339,7 +339,7 @@
   >
     <ManagerSearchField
       value={searchTerm}
-      onInput={(next) => (ui.searchTerm = next)}
+      onChange={(next) => (ui.searchTerm = next)}
       placeholder={text(
         'FABRICATE.Admin.Manager.Environment.Tasks.SearchPlaceholder',
         'Search gathering tasks...'
@@ -540,7 +540,7 @@
               </IconButton>
               <ActionMenu
                 items={rowMenuItems()}
-                triggerLabel={text(
+                ariaLabel={text(
                   'FABRICATE.Admin.Manager.Environment.Tasks.ActionsFor',
                   'Gathering task actions for {name}'
                 ).replace('{name}', taskName(task))}

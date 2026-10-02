@@ -48,7 +48,7 @@ function items() {
 function props(chosen = []) {
   return {
     items: items(),
-    triggerLabel: 'More actions',
+    ariaLabel: 'More actions',
     onSelect: (id) => chosen.push(id),
   };
 }

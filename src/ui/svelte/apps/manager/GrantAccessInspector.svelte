@@ -238,10 +238,10 @@
           <ManagerSearchField
             class="manager-access-roster-search"
             value={section.query}
-            onInput={(next) => section.onSearch(next)}
+            onChange={(next) => section.onSearch(next)}
             placeholder={section.searchPlaceholder}
             ariaLabel={section.searchPlaceholder}
-            inputAttrs={{ 'data-access-roster-search': section.key }}
+            inputProps={{ 'data-access-roster-search': section.key }}
           />
         {/if}
         {#if section.slice.filtered.length === 0}
@@ -251,8 +251,7 @@
           <EmptyState
             note
             title={text('FABRICATE.Admin.Manager.Access.NoMatches', 'No matches')}
-            dataAttr="data-access-roster-empty"
-            dataValue={section.key}
+            data-access-roster-empty={section.key || true}
           />
         {:else}
           <div class="manager-access-roster-rows">
@@ -277,14 +276,14 @@
                [data-access-roster], and that placement is load-bearing: the primitive stamps a
                bare `data-pagination-prev`/`-next` with no per-instance key, so the roster section
                is the only thing that tells the two bars apart FOR A TEST OR A CAPTURE. A
-               screen-reader user cannot reach the ancestor, which is what `label`/`navLabel`
+               screen-reader user cannot reach the ancestor, which is what `ariaLabel`/`navLabel`
                answer. -->
           <Pagination
             totalCount={section.slice.filtered.length}
             pageSize={ROSTER_PAGE_SIZE}
             pageIndex={section.page}
             showPageSize={false}
-            label={rosterLandmarks(section.title).label}
+            ariaLabel={rosterLandmarks(section.title).label}
             navLabel={rosterLandmarks(section.title).navLabel}
             onPageChange={section.onPageChange}
           />

@@ -553,7 +553,7 @@
         size="38"
         data-component-search=""
         value={itemSearchTerm || ''}
-        onInput={(next) => onSearchChange(next)}
+        onChange={(next) => onSearchChange(next)}
         placeholder={text(
           'FABRICATE.Admin.Manager.Component.SearchPlaceholder',
           'Search name or tags…'
@@ -575,7 +575,7 @@
           'FABRICATE.Admin.Manager.Component.CategoryFilterLabel',
           'Filter components by category'
         )}
-        triggerData={{ 'data-component-category-filter': '' }}
+        triggerProps={{ 'data-component-category-filter': '' }}
         onChange={setCategoryFilter}
       />
 
@@ -590,7 +590,7 @@
             'FABRICATE.Admin.Manager.Component.EssenceFilterLabel',
             'Filter components by essence'
           )}
-          triggerData={{ 'data-component-essence-filter': '' }}
+          triggerProps={{ 'data-component-essence-filter': '' }}
           onChange={setEssenceFilter}
         />
       {/if}
@@ -603,7 +603,7 @@
         density="compact"
         tone="accent"
         groupName="component-membership"
-        dataAttr="data-component-membership-filter"
+        data-component-membership-filter
         optionDataAttr="data-component-membership-option"
         ariaLabel={text(
           'FABRICATE.Admin.Manager.Component.MembershipFilterLabel',
@@ -664,7 +664,7 @@
           value={ui.sortKey}
           options={sortOptions}
           ariaLabel={text('FABRICATE.Admin.Manager.Component.SortLabel', 'Sort components')}
-          triggerData={{ 'data-component-sort': '' }}
+          triggerProps={{ 'data-component-sort': '' }}
           onChange={setSortKey}
         />
         <ManagerButton

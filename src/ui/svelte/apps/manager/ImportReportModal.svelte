@@ -59,7 +59,7 @@
   subtitle={content?.headline || ''}
   closeLabel={text('FABRICATE.Admin.ImportReport.Close', 'Close')}
   width="620px"
-  rootAttributes={{ 'data-import-report': '' }}
+  dialogProps={{ 'data-import-report': '' }}
   {onClose}
 >
   {#snippet body()}
@@ -90,7 +90,7 @@
         icon="fas fa-circle-check"
         title={text('FABRICATE.Admin.ImportReport.EmptyStateTitle', 'Nothing needs attention')}
         hint={content?.emptyStateLabel || ''}
-        dataAttr="data-import-report-empty"
+        data-import-report-empty
       />
     {/if}
 

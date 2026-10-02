@@ -124,10 +124,10 @@
   <ManagerToolbar ariaLabel={text('FABRICATE.Admin.Manager.Access.Filters', 'Access filters')}>
     <ManagerSearchField
       value={recipeSearchTerm || ''}
-      onInput={(next) => onSearchChange(next)}
+      onChange={(next) => onSearchChange(next)}
       placeholder={text('FABRICATE.Admin.Manager.Recipe.SearchPlaceholder', 'Search recipes...')}
       ariaLabel={text('FABRICATE.Admin.Manager.Recipe.SearchLabel', 'Search recipes')}
-      inputAttrs={{ 'data-access-search': '' }}
+      inputProps={{ 'data-access-search': '' }}
     />
     <!-- Both wrappers are a `<span>` rather than the `<label>` they were: `Select.svelte`'s host
          invariant, and each trigger keeps the `aria-label` its select carried (issue 1510). -->
@@ -142,7 +142,7 @@
           'FABRICATE.Admin.Manager.Recipe.CategoryFilterLabel',
           'Filter recipes by category'
         )}
-        triggerData={{ 'data-access-category-filter': '' }}
+        triggerProps={{ 'data-access-category-filter': '' }}
         onChange={(next) => (categoryFilter = next)}
       />
     </span>
@@ -154,7 +154,7 @@
         options={accessSelectOptions}
         showTick={false}
         ariaLabel={text('FABRICATE.Admin.Manager.Access.FilterLabel', 'Filter recipes by access')}
-        triggerData={{ 'data-access-filter': '' }}
+        triggerProps={{ 'data-access-filter': '' }}
         onChange={(next) => (accessFilter = next)}
       />
     </span>

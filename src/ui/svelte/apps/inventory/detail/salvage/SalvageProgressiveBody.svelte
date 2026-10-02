@@ -164,7 +164,7 @@
     tone="neutral"
     icon="fas fa-arrow-down-long"
     text={localize('FABRICATE.App.Inventory.Salvage.ProgressiveFlow')}
-    dataAttr="data-inventory-salvage-flow"
+    data-inventory-salvage-flow
   />
 
   <!-- The eyebrow's right slot tracks the list's state rather than emptying out: before
@@ -217,7 +217,7 @@
         tone="neutral"
         icon="fas fa-hand-pointer"
         text={localize('FABRICATE.App.Inventory.Salvage.StageOrderYours')}
-        dataAttr="data-inventory-salvage-reorder-note"
+        data-inventory-salvage-reorder-note
       >
         {#snippet actions()}
           <button

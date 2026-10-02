@@ -233,7 +233,7 @@ describe('ImportFolderMappingModal (mounted)', () => {
   });
 
   // The smoke harness pins `[data-import-mapping]` on the dialog ROOT; the root is now
-  // rendered by ManagerModal, so the hook survives only via its `rootAttributes` prop.
+  // rendered by ManagerModal, so the hook survives only via its `dialogProps` prop.
   it('keeps the mapping automation hook on the shared modal root', async () => {
     await harness.mount({ open: true, folders: FOLDERS, ...VOCAB });
     const root = dialog();

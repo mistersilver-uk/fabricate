@@ -6324,7 +6324,7 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
       'Category',
       'the demoted wrapper still names its trigger, through `aria-labelledby`'
     );
-    // The tooltip rides `triggerTitle`: `triggerData` cannot carry one (issue 1510).
+    // The tooltip rides `triggerTitle`: `triggerProps` cannot carry one (issue 1510).
     assert.equal(
       target.querySelector(CATEGORY_TRIGGER).getAttribute('title'),
       'Select recipe category',

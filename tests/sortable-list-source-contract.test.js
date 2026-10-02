@@ -41,8 +41,6 @@ const DECLARED_PROPS = Object.freeze([
   'rowClass',
   'rowData',
   'removeData',
-  'dataAttr',
-  'dataValue',
   'ariaLabel',
 ]);
 
@@ -80,7 +78,7 @@ function publishedProps() {
   const block = library.slice(apiStart, apiEnd);
   const names = new Set();
   // A `<b>` may carry several names on one line — the block writes `numbered · removable · onRemove`
-  // and `dataAttr / dataValue` that way — so each bold run is split on the two separators it uses.
+  // that way — so each bold run is split on the two separators it uses.
   for (const [, run] of block.matchAll(/<b>([^<]+)<\/b>/gu)) {
     for (const name of run.split(/[·/]/u)) {
       const trimmed = name.trim();
@@ -113,7 +111,8 @@ test('every published prop is one the component actually accepts', () => {
       'the clause below would pass over almost nothing.'
   );
 
-  const accepted = new Set(DECLARED_PROPS);
+  // `class` is declared as `class: extraClass`, a shape the destructure reader above does not list.
+  const accepted = new Set([...DECLARED_PROPS, 'class']);
   const unaccepted = [...published].filter(
     (name) => !accepted.has(name) && !['SHIPPED'].includes(name)
   );

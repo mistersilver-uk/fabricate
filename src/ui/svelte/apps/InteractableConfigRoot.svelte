@@ -375,11 +375,10 @@
          unconfigured; collapsed re-target affordance once configured. -->
     <section class="fab-ic-section fab-ic-identity" data-interactable-identity-section>
       {#if unconfigured}
-        <!-- THE HOOK RIDES A DECLARED PROP, NOT A SPREAD. `Notice` takes no `class`, no
-             `style` and no rest spread, so `dataAttr` is the only route for
-             `data-interactable-needs-config` - which the Foundry smoke and the View Lab both
-             locate, and which this root's source contract asserts is present. It renders as
-             `data-interactable-needs-config=""` rather than bare; every reader of it is a
+        <!-- The hook rides `Notice`'s rest spread, which exists for hooks: the Foundry smoke
+             and the View Lab both locate `data-interactable-needs-config`, and this root's
+             source contract asserts it is present. It is written `=""` rather than bare,
+             because a bare hook on a component tag renders `="true"`; every reader of it is a
              presence selector.
 
              THE SECTION'S OWN ACCENT BOX LEFT WITH THE BANNER rather than being retargeted.
@@ -397,7 +396,7 @@
             'FABRICATE.Canvas.Interactable.Config.Identity.NeedsConfigHint',
             'This interactable has no source yet. It stays hidden and inert to players until you choose its type and source below.'
           )}
-          dataAttr="data-interactable-needs-config"
+          data-interactable-needs-config=""
         />
       {:else}
         <div class="fab-ic-identity-head">
@@ -424,7 +423,7 @@
             options={typeOptions}
             onChange={(next) => onSelectType(next)}
             maxWidth={OPTION_PANEL_MAX_WIDTH}
-            triggerData={{ 'data-interactable-identity-type': '' }}
+            triggerProps={{ 'data-interactable-identity-type': '' }}
           />
 
           <Select
@@ -436,7 +435,7 @@
             options={systemSelectOptions}
             onChange={(next) => onSelectSystem(next)}
             maxWidth={OPTION_PANEL_MAX_WIDTH}
-            triggerData={{ 'data-interactable-identity-system': '' }}
+            triggerProps={{ 'data-interactable-identity-system': '' }}
           />
 
           <Select
@@ -448,7 +447,7 @@
             disabled={!selSystemId}
             onChange={(next) => (selReferenceId = next)}
             maxWidth={OPTION_PANEL_MAX_WIDTH}
-            triggerData={{ 'data-interactable-identity-source': '' }}
+            triggerProps={{ 'data-interactable-identity-source': '' }}
           />
 
           {#if selType === 'gatheringTask'}
@@ -461,7 +460,7 @@
               options={environmentSelectOptions}
               onChange={(next) => (selEnvironmentId = next)}
               maxWidth={OPTION_PANEL_MAX_WIDTH}
-              triggerData={{ 'data-interactable-identity-environment': '' }}
+              triggerProps={{ 'data-interactable-identity-environment': '' }}
             />
           {/if}
 
@@ -664,7 +663,7 @@
             options={depleteOptions}
             onChange={(next) => setNodeDeplete(next)}
             maxWidth={OPTION_PANEL_MAX_WIDTH}
-            triggerData={{ 'data-interactable-node-deplete': '' }}
+            triggerProps={{ 'data-interactable-node-deplete': '' }}
           />
 
           <Select
@@ -673,7 +672,7 @@
             options={respawnOptions}
             onChange={(next) => setNodeRespawnPolicy(next)}
             maxWidth={OPTION_PANEL_MAX_WIDTH}
-            triggerData={{ 'data-interactable-node-respawn': '' }}
+            triggerProps={{ 'data-interactable-node-respawn': '' }}
           />
 
           {#if nodeIsNonRegenerating}
@@ -785,7 +784,7 @@
         options={missingPolicyOptions}
         onChange={(next) => setMissingPolicy(next)}
         maxWidth={OPTION_PANEL_MAX_WIDTH}
-        triggerData={{ 'data-interactable-missing-policy': '' }}
+        triggerProps={{ 'data-interactable-missing-policy': '' }}
       />
     </section>
 
@@ -819,7 +818,7 @@
         options={audienceOptions}
         onChange={(next) => setAudience(next)}
         maxWidth={OPTION_PANEL_MAX_WIDTH}
-        triggerData={{ 'data-interactable-audience': '' }}
+        triggerProps={{ 'data-interactable-audience': '' }}
       />
     </section>
 

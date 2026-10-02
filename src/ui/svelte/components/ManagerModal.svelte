@@ -4,8 +4,8 @@
   a single implementation rather than one per feature. It owns the
   chrome only — the portal, the fixed centring and panel surface, the title/subtitle heading, the
   close control and the right-aligned footer rail. Everything between header and footer is the
-  caller's `body` snippet, which keeps its own style scope, and `rootAttributes` lets a caller keep
-  its own stable automation hook on the dialog root without this component knowing the feature.
+  caller's `body` snippet, which keeps its own style scope, and `dialogProps` lets a caller keep
+  its own stable automation hook on the dialog element without this component knowing the feature.
   It draws ONE frame, the library's banded Modal measured off the prototype: a 60px `--fab-bg-2`
   header band, a padded body and a `--fab-bg-2` footer band (maintainer rulings 2026-09-28).
 
@@ -30,7 +30,7 @@
     subtitle = '',
     closeLabel = 'Close',
     width = '560px',
-    rootAttributes = {},
+    dialogProps = {},
     onClose = () => {},
     body = undefined,
     footer = undefined,
@@ -147,7 +147,7 @@
       aria-label={title}
       style={`--manager-modal-width: ${width};`}
       data-manager-modal
-      {...rootAttributes}
+      {...dialogProps}
       use:portal={(node) => getHost(node)}
       use:dismissOnOutsideClick={{ enabled: open && closeOnOutsideClick, onDismiss: onClose }}
       use:modalFocus={trapFocus}

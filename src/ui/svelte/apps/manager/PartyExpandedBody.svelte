@@ -303,7 +303,7 @@
             'FABRICATE.Admin.Manager.World.Parties.Members.Empty',
             "No members yet. Only the travel actor's own location resolves until you add characters."
           )}
-          dataAttr="data-manager-party-members-empty"
+          data-manager-party-members-empty
         />
       {/if}
 

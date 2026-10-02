@@ -2449,7 +2449,7 @@ describe('InventoryView (mounted) — one card per unified physical stack (issue
     await settle();
 
     // THE HOOK SURVIVED THE CONVERSION (issue 1511). It was an attribute on the `<select>` and
-    // rides `triggerData` onto the trigger button now, which is what keeps the smoke's own
+    // rides `triggerProps` onto the trigger button now, which is what keeps the smoke's own
     // `[data-inventory-system-select]` visibility wait resolving without Docker to prove it.
     const trigger = target.querySelector('[data-inventory-system-select]');
     assert.ok(Boolean(trigger), 'the selector still answers to its stable hook');
@@ -3377,8 +3377,8 @@ describe('Inventory primitive adoption (issue 1514)', () => {
     assert.equal(
       banner.getAttribute('data-inventory-broken-banner'),
       '',
-      'the bare hook still renders bare: `Notice` passes `dataValue` as written where ' +
-        '`EmptyState` and `Callout` coerce it to "true"'
+      'the bare hook still renders bare: it is written `=""` on the `<Notice>` tag, where a ' +
+        'bare attribute on a component tag renders "true"'
     );
   });
 
@@ -3485,7 +3485,7 @@ describe('Inventory primitive adoption (issue 1514)', () => {
     assert.equal(
       eyebrow.getAttribute('data-inventory-salvage-acting-system'),
       '',
-      '`Kicker` passes `dataValue` as written, so a hook written bare stays bare'
+      'the hook is written `=""` on the `<Kicker>` tag, so a hook written bare stays bare'
     );
   });
 

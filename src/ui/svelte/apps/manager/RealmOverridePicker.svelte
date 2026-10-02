@@ -68,11 +68,8 @@
     'FABRICATE.Admin.Manager.Travel.Parties.OverrideCount',
     '{matched} of {total}'
   )}
-  triggerAriaLabel={text(
-    'FABRICATE.Admin.Manager.Travel.Parties.OverrideLabel',
-    'Current realm override'
-  )}
-  dialogAriaLabel={text(
+  ariaLabel={text('FABRICATE.Admin.Manager.Travel.Parties.OverrideLabel', 'Current realm override')}
+  panelLabel={text(
     'FABRICATE.Admin.Manager.Travel.Parties.OverrideLabel',
     'Current realm override'
   )}
@@ -80,13 +77,10 @@
     'FABRICATE.Admin.Manager.Travel.Parties.OverrideSearchPlaceholder',
     'Search realms...'
   )}
-  searchAriaLabel={text(
-    'FABRICATE.Admin.Manager.Travel.Parties.OverrideSearchLabel',
-    'Search realms'
-  )}
+  searchLabel={text('FABRICATE.Admin.Manager.Travel.Parties.OverrideSearchLabel', 'Search realms')}
   emptyHint={text(
     'FABRICATE.Admin.Manager.Travel.Parties.NoRealmMatches',
     'No realms match your search.'
   )}
-  onChoose={(id) => onChoose(id || null)}
+  onSelect={(id) => onChoose(id || null)}
 />

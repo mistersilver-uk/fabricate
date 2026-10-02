@@ -374,7 +374,7 @@ describe('RecipeItemContentsTab (mounted)', () => {
   });
 
   // ── THE PANEL AND ITS LIST ARE NAMED (issue 1513, review r1) ───────────────────────
-  // `dialogAriaLabel` feeds BOTH the portaled `role="dialog"` and the `role="listbox"` inside it,
+  // `panelLabel` feeds both the portaled `role="dialog"` and the `role="listbox"` inside it,
   // and a source read cannot finish that job: the call site's string is present and non-empty
   // there while resolving to '' at runtime for any caller naming the control by a caption.
   it('renders a non-empty accessible name on the panel and on its option list', async () => {

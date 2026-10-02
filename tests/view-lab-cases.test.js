@@ -1724,7 +1724,7 @@ test('the World Parties fixture is legal, and its search and pager cases claim w
   const filtered = getCaseById('manager-world-parties-search-filtered');
   // The hook on the INPUT, not the row's own class: the field is `ManagerSearchField` as of
   // issue 1515, whose `class` prop lands on the `<label>` — a `fill` step targeting the label
-  // would throw — so the case types into the `inputAttrs` hook the caller passes through.
+  // would throw — so the case types into the `inputProps` hook the caller passes through.
   assert.deepEqual(filtered.steps.at(-1), {
     selector: '[data-manager-party-search]',
     fill: WORLD_PARTIES_SEARCH_TERM,

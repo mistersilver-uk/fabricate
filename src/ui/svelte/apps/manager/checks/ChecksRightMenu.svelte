@@ -483,7 +483,7 @@
               'FABRICATE.Admin.Manager.Checks.PreviewAs.Record',
               'Preview against record'
             )}
-            triggerData={{ 'data-checks-preview-record': '' }}
+            triggerProps={{ 'data-checks-preview-record': '' }}
             onChange={onSelectPreviewRecord}
           />
         {/if}

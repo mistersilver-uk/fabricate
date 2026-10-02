@@ -365,22 +365,22 @@
     triggerLabel={progressive
       ? text('FABRICATE.Admin.Manager.Recipe.AddResultStage', 'Add result stage')
       : text('FABRICATE.Admin.Manager.Recipe.AddResultItem', 'Add item')}
-    triggerAriaLabel={progressive
+    ariaLabel={progressive
       ? text('FABRICATE.Admin.Manager.Recipe.AddResultStage', 'Add result stage')
       : text('FABRICATE.Admin.Manager.Recipe.AddResultItem', 'Add item')}
     triggerAddMarker="result-item"
-    dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
+    panelLabel={text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
     searchPlaceholder={text(
       'FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder',
       'Search components...'
     )}
-    searchAriaLabel={text(
+    searchLabel={text(
       'FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder',
       'Search components...'
     )}
     emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoComponentsDefined', 'No components defined')}
     showChevron={false}
-    onChoose={(id) => addItem(id)}
+    onSelect={(id) => addItem(id)}
   />
 {/snippet}
 

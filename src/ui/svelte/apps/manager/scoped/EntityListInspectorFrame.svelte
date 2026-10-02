@@ -554,8 +554,7 @@
               'FABRICATE.Admin.Manager.Scoped.List.Unavailable',
               'This world corpus could not be read, so nothing here can be listed or edited. Reload the world once its settings are readable.'
             )}
-            dataAttr="data-scoped-list-state"
-            dataValue="unavailable"
+            data-scoped-list-state="unavailable"
           />
         </div>
       {:else}
@@ -591,7 +590,7 @@
                   'FABRICATE.Admin.Manager.Scoped.List.MembershipLabel',
                   'Membership filter'
                 )}
-                dataAttr="data-scoped-list-membership"
+                data-scoped-list-membership
                 optionDataAttr="data-scoped-list-membership-option"
                 onChange={(next) => changeMembership(next)}
               />
@@ -613,7 +612,7 @@
               value={sortKey}
               options={sortSelectOptions}
               ariaLabelledBy="scoped-list-sort-label"
-              triggerData={{ 'data-scoped-list-sort': '' }}
+              triggerProps={{ 'data-scoped-list-sort': '' }}
               onChange={(next) => changeSortKey(next)}
             />
 
@@ -695,21 +694,14 @@
                 'FABRICATE.Admin.Manager.Scoped.List.FilteredEmpty',
                 'Nothing here matches the current search and filters.'
               )}
-              dataAttr="data-scoped-list-state"
-              dataValue="filtered"
+              data-scoped-list-state="filtered"
             >
               <ManagerButton data-scoped-list-clear-filters onclick={clearFilters}>
                 {text('FABRICATE.Admin.Manager.Scoped.List.ClearFilters', 'Clear filters')}
               </ManagerButton>
             </EmptyState>
           {:else if page.rows.length === 0}
-            <EmptyState
-              {icon}
-              title={emptyTitle}
-              hint={emptyHint}
-              dataAttr="data-scoped-list-state"
-              dataValue="empty"
-            />
+            <EmptyState {icon} title={emptyTitle} hint={emptyHint} data-scoped-list-state="empty" />
           {:else}
             <ul class="manager-scoped-list" role="list" aria-label={title}>
               {#each page.rows as entry (entry.id)}
@@ -727,7 +719,7 @@
                 >
                   <!-- THE SELECTION BOX LEADS THE ROW. -->
                   <SelectionCheckbox
-                    size="lg"
+                    density="comfortable"
                     wrapper="label"
                     checked={bulkSelected}
                     ariaLabel={format(
@@ -945,8 +937,7 @@
               title={restingTitle ||
                 text('FABRICATE.Admin.Manager.Scoped.List.RestingTitle', 'Nothing selected')}
               hint={restingHint || subtitle}
-              dataAttr="data-scoped-list-inspector-state"
-              dataValue="resting"
+              data-scoped-list-inspector-state="resting"
             />
           </div>
         {/if}
@@ -960,11 +951,11 @@
   <ManagerSearchField
     value={query}
     size={toolbarLeadSize}
-    onInput={(next) => changeQuery(next)}
+    onChange={(next) => changeQuery(next)}
     placeholder={searchPlaceholder ||
       text('FABRICATE.Admin.Manager.Scoped.List.SearchPlaceholder', 'Search…')}
     ariaLabel={text('FABRICATE.Admin.Manager.Scoped.List.SearchLabel', 'Search')}
-    inputAttrs={{ 'data-scoped-list-search': '' }}
+    inputProps={{ 'data-scoped-list-search': '' }}
   />
 {/snippet}
 
@@ -994,7 +985,7 @@
         options={laneFilterOptions(filter)}
         ariaLabel={filter.microLabel ? undefined : filter.label}
         ariaLabelledBy={filter.microLabel ? `scoped-list-filter-label-${filter.id}` : undefined}
-        triggerData={{ 'data-scoped-list-filter': filter.id }}
+        triggerProps={{ 'data-scoped-list-filter': filter.id }}
         onChange={(next) => changeFilter(filter.id, next)}
       />
     {/if}

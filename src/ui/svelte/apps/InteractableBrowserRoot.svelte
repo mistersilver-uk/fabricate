@@ -251,7 +251,7 @@
       options={systemSelectOptions}
       onChange={(next) => (selectedSystemId = next)}
       maxWidth={OPTION_PANEL_MAX_WIDTH}
-      triggerData={{ 'data-interactable-browser-system': '' }}
+      triggerProps={{ 'data-interactable-browser-system': '' }}
     />
     <!-- NO caption span beside it. The shared field is a search PILL with a leading glyph and
          no visible label at any of its nineteen sites, and it names its control with
@@ -272,7 +272,7 @@
       size={38}
       placeholder={text('FABRICATE.Canvas.Browser.SearchPlaceholder', 'Search entries…')}
       ariaLabel={text('FABRICATE.Canvas.Browser.SearchLabel', 'Search')}
-      inputAttrs={{ 'data-interactable-browser-search': '' }}
+      inputProps={{ 'data-interactable-browser-search': '' }}
     />
   </ManagerToolbar>
 

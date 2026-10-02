@@ -163,7 +163,7 @@
             options={categoryOptions}
             ariaLabelledBy={categoryCaptionId}
             maxWidth={FILTER_PANEL_MAX_WIDTH}
-            triggerData={{ 'data-crafting-category-filter': '' }}
+            triggerProps={{ 'data-crafting-category-filter': '' }}
             onChange={chooseCategory}
           />
         </span>
@@ -179,7 +179,7 @@
             options={systemOptions}
             ariaLabelledBy={systemCaptionId}
             maxWidth={FILTER_PANEL_MAX_WIDTH}
-            triggerData={{ 'data-crafting-system-filter': '' }}
+            triggerProps={{ 'data-crafting-system-filter': '' }}
             onChange={chooseSystem}
           />
         </span>

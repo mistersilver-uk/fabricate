@@ -78,7 +78,7 @@
       <!-- The eyebrow sits between the trail and the title. -->
       {#if header.kicker}
         <div class="manager-page-kicker">
-          <Kicker dataAttr="data-page-kicker">{header.kicker}</Kicker>
+          <Kicker data-page-kicker="">{header.kicker}</Kicker>
         </div>
       {/if}
       {#if header.headingVariant === 'recipe-edit'}

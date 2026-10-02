@@ -126,7 +126,7 @@
         {#each targets as system (system.id)}
           <li class="manager-scoped-copy-option">
             <SelectionCheckbox
-              size="sm"
+              density="compact"
               checked={selectedIds.includes(system.id)}
               ariaLabel={formatted(
                 'FABRICATE.Admin.Manager.Scoped.CopyRules.SelectSystem',

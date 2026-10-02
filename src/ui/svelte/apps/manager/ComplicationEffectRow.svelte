@@ -55,7 +55,7 @@
     <!-- `wrapper="contents"`: this head is already the `<label>`, and nesting is invalid HTML. -->
     <SelectionCheckbox
       wrapper="contents"
-      size="sm"
+      density="compact"
       checked={on}
       {disabled}
       ariaLabel={accessibleName}

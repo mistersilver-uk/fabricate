@@ -595,7 +595,7 @@ describe('environment composition editor structure', () => {
       renders: ['EnvironmentSummaryInspector', 'RecordInspector', 'EmptyState'],
       compares: ['overview', 'event'],
       names: ['selectedKind', 'recordKind', 'recordEntry'],
-      passesProps: [['EmptyState', 'dataAttr']],
+      passesProps: [['EmptyState', 'data-record-inspector-empty']],
       spells: ['NoActiveTasks', 'NoActiveEvents'],
     }
   );
@@ -870,7 +870,7 @@ describe('environment composition editor structure', () => {
     TABS,
     {
       passesValues: [
-        ['EditorTabs', 'hookAttribute', 'data-environment-tab-button'],
+        ['EditorTabs', 'tabDataAttr', 'data-environment-tab-button'],
         ['EditorTabs', 'idStem', 'environment'],
         ['EditorTabs', 'ariaLabelKey', 'FABRICATE.Admin.Manager.EnvironmentEditor.Tabs.Label'],
         ['EditorTabs', 'containerClass', 'manager-environment-tabs'],

@@ -169,12 +169,12 @@
         {#if menuItems.length > 0}
           <ActionMenu
             items={menuItems}
-            triggerLabel={text(
+            ariaLabel={text(
               'FABRICATE.Admin.Manager.Component.MoreActions',
               'More component actions'
             )}
-            triggerData={{ 'data-component-inspector-menu': '' }}
-            menuAriaLabel={text(
+            triggerProps={{ 'data-component-inspector-menu': '' }}
+            panelLabel={text(
               'FABRICATE.Admin.Manager.Component.MoreActions',
               'More component actions'
             )}

@@ -152,17 +152,17 @@
     triggerClass="manager-recipe-or-trigger"
     triggerIcon="fa-solid fa-code-branch"
     triggerLabel={text('FABRICATE.Admin.Manager.Recipe.OrTrigger', 'or…')}
-    triggerAriaLabel={orMenuLabel}
+    ariaLabel={orMenuLabel}
     triggerTitle={text(
       'FABRICATE.Admin.Manager.Recipe.OrTriggerHint',
       'Accept another kind of ingredient in place of this one.'
     )}
-    dialogAriaLabel={orMenuLabel}
+    panelLabel={orMenuLabel}
     searchPlaceholder={text(
       'FABRICATE.Admin.Manager.Recipe.OrSearchPlaceholder',
       'Search options...'
     )}
-    searchAriaLabel={orMenuLabel}
+    searchLabel={orMenuLabel}
     emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoComponentsDefined', 'No components defined')}
     showChevron={false}
     showSearch={false}
@@ -171,7 +171,7 @@
     popoverClass="manager-recipe-or-popover"
     minWidth={150}
     maxWidth={150}
-    onChoose={(type) => appendAlternative(type)}
+    onSelect={(type) => appendAlternative(type)}
   />
 {/snippet}
 

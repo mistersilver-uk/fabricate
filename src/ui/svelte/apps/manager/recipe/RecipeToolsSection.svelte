@@ -89,7 +89,7 @@
       compact
       icon="fas fa-screwdriver-wrench"
       title={emptyToolLabel}
-      dataAttr="data-recipe-tools-empty"
+      data-recipe-tools-empty
     />
   {:else}
     <ul class="manager-recipe-tool-rows">
@@ -118,19 +118,16 @@
     triggerClass="fabricate-button manager-button is-dashed manager-recipe-tools-trigger"
     triggerIcon="fas fa-plus"
     triggerLabel={addToolLabel}
-    triggerAriaLabel={addToolLabel}
+    ariaLabel={addToolLabel}
     triggerAddMarker="tool"
-    dialogAriaLabel={addToolLabel}
+    panelLabel={addToolLabel}
     searchPlaceholder={text(
       'FABRICATE.Admin.Manager.Recipe.ToolSearchPlaceholder',
       'Search tools...'
     )}
-    searchAriaLabel={text(
-      'FABRICATE.Admin.Manager.Recipe.ToolSearchPlaceholder',
-      'Search tools...'
-    )}
+    searchLabel={text('FABRICATE.Admin.Manager.Recipe.ToolSearchPlaceholder', 'Search tools...')}
     emptyHint={toolsEmptyHint}
     showChevron={false}
-    onChoose={(id) => onAddTool(id)}
+    onSelect={(id) => onAddTool(id)}
   />
 </div>

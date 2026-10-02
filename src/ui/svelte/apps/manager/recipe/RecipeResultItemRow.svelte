@@ -100,13 +100,13 @@
           ? 'manager-recipe-stage-trigger-name'
           : 'manager-recipe-component-name'}
         triggerTitle={selectedComponent?.name || ''}
-        triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
-        dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
+        ariaLabel={text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
+        panelLabel={text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
         searchPlaceholder={text(
           'FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder',
           'Search components...'
         )}
-        searchAriaLabel={text(
+        searchLabel={text(
           'FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder',
           'Search components...'
         )}
@@ -114,7 +114,7 @@
           'FABRICATE.Admin.Manager.Recipe.NoComponentsDefined',
           'No components defined'
         )}
-        onChoose={(id) => chooseComponent(id)}
+        onSelect={(id) => chooseComponent(id)}
       />
     </div>
   </div>

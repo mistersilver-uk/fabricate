@@ -238,7 +238,7 @@
     'Assign a category and tags to each detected folder, or skip it.'
   )}
   closeLabel={text('FABRICATE.Admin.ImportReport.Close', 'Close')}
-  rootAttributes={{ 'data-import-mapping': '' }}
+  dialogProps={{ 'data-import-mapping': '' }}
   {onClose}
 >
   {#snippet body()}
@@ -246,7 +246,7 @@
          Foundry's default control chrome. -->
     <label class="manager-import-mapping-match" data-import-mapping-match>
       <SelectionCheckbox
-        size="sm"
+        density="compact"
         wrapper="contents"
         bind:input={matchToggle}
         checked={matchByName}
@@ -315,7 +315,7 @@
                   options={categorySelectOptions}
                   showTick={false}
                   ariaLabelledBy={categoryCaptionId(row.index)}
-                  triggerData={{ 'data-import-mapping-category': '' }}
+                  triggerProps={{ 'data-import-mapping-category': '' }}
                   onChange={(next) => setCategory(row.index, next)}
                 />
               </Field>

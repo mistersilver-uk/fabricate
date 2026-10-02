@@ -158,9 +158,9 @@ const LINK_FIELD_CLASSES = (() => {
 /** The class list `ModifierPillSelect` hands `Field`, read out of its own markup (issue 1515). */
 const PILL_SELECT_OWN_CLASSES = (() => {
   const source = read('src/ui/svelte/components/ModifierPillSelect.svelte');
-  const match = source.match(/class="(fabricate-pill-select[^"]*)"/u);
+  const match = source.match(/class=\{`(fabricate-pill-select[^`$]*)\$\{/u);
   assert.ok(match, 'ModifierPillSelect must write its family root at the head of the class it hands `Field`');
-  return match[1];
+  return match[1].trim();
 })();
 
 const PILL_SELECT_CLASSES = `${FIELD_CLASSES} ${PILL_SELECT_OWN_CLASSES}`;

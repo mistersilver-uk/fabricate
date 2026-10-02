@@ -421,10 +421,7 @@
         blocking={stateNotice.blocking}
         title={stateNotice.title}
         detail={stateNotice.detail}
-        dataAttr={stateNotice.dataAttr}
-        dataValue={stateNotice.dataValue}
-        stateDataAttr={stateNotice.stateDataAttr}
-        stateDataValue={stateNotice.stateDataValue}
+        {...stateNotice.hooks}
         action={stateNotice.claim
           ? {
               label: localize('FABRICATE.App.Journal.Recovery.Action'),
@@ -468,8 +465,7 @@
         label: localize('FABRICATE.App.Journal.Retry'),
         onClick: (event) => withRollPromptOrigin(event, () => journal?.retryCommandError?.()),
       }}
-      dataAttr="data-journal-command-error"
-      dataValue="true"
+      data-journal-command-error="true"
     />
   {/if}
 
@@ -576,15 +572,13 @@
         <Notice
           tone="info"
           title={localize('FABRICATE.App.Journal.Yields.LoadingPreview')}
-          dataAttr="data-journal-yield-loading"
-          dataValue="true"
+          data-journal-yield-loading="true"
         />
       {:else if yieldPreviewError}
         <Notice
           tone="warning"
           title={localize('FABRICATE.App.Journal.Yields.PreviewError')}
-          dataAttr="data-journal-yield-error"
-          dataValue="true"
+          data-journal-yield-error="true"
         />
       {/if}
       <YieldScale
@@ -752,7 +746,7 @@
       </div>{/if}
     <ThisRun {run} {services} />
     {#if run?.actions?.disabledReason !== 'unsupportedLifecycle'}
-      <Callout tone="neutral" text={guidance} dataAttr="data-journal-guidance" />
+      <Callout tone="neutral" text={guidance} data-journal-guidance />
     {/if}
   {/if}
 </article>

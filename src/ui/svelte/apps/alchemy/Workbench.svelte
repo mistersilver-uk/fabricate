@@ -405,9 +405,8 @@
           tone={bannerTone}
           icon="fas {bannerIcon}"
           title={bannerText}
-          dataAttr="data-alchemy-banner"
-          stateDataAttr="data-alchemy-banner-status"
-          stateDataValue={bannerStatus}
+          data-alchemy-banner=""
+          data-alchemy-banner-status={bannerStatus}
         />
       </div>
     {/if}

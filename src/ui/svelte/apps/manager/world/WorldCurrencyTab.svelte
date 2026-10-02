@@ -490,7 +490,7 @@
             showTick={false}
             ariaLabelledBy={strategyCaptionId}
             ariaDescribedBy={strategyHintId}
-            triggerData={{ 'data-world-currency-strategy-select': '' }}
+            triggerProps={{ 'data-world-currency-strategy-select': '' }}
             onChange={(next) => onSetCurrencySpendStrategy(next)}
           />
           <!-- THE PRIMITIVE'S OWN NOTE, MARKUP AND ALL (issue 1510). The provider below renders
@@ -534,7 +534,7 @@
               'FABRICATE.Admin.Manager.CurrencyUnits.ProviderHint',
               'A preconfigured adapter that reads and spends coins from the actor inventory.'
             )}
-            triggerData={{ 'data-world-currency-provider-select': '' }}
+            triggerProps={{ 'data-world-currency-provider-select': '' }}
             onChange={(next) => onSetCurrencyProvider(next)}
           />
         {:else if currencySpendStrategy === 'actorInventory'}
@@ -847,7 +847,7 @@
                       <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.Icon', 'Icon')}</span>
                       <IconPicker
                         value={unit.icon || 'fa-solid fa-coins'}
-                        buttonTitle={text(
+                        ariaLabel={text(
                           'FABRICATE.Admin.Manager.CurrencyUnits.ChangeIcon',
                           'Change icon'
                         )}

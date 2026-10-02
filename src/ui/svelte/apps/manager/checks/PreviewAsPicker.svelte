@@ -55,17 +55,17 @@
   {options}
   pickerClass="manager-checks-preview-actor"
   triggerClass="fabricate-button manager-button manager-travel-picker-trigger manager-checks-preview-actor-trigger"
-  {triggerData}
+  triggerProps={triggerData}
   triggerIcon={selected ? '' : 'fas fa-user-slash'}
   triggerImg={selected?.img || ''}
   triggerLabel={selected?.name || noActorLabel}
-  triggerAriaLabel={actorLabel}
-  dialogAriaLabel={actorLabel}
+  ariaLabel={actorLabel}
+  panelLabel={actorLabel}
   searchPlaceholder={text(
     'FABRICATE.Admin.Manager.Checks.PreviewAs.ActorSearchPlaceholder',
     'Search characters...'
   )}
-  searchAriaLabel={text(
+  searchLabel={text(
     'FABRICATE.Admin.Manager.Checks.PreviewAs.ActorSearchLabel',
     'Search characters'
   )}
@@ -73,5 +73,5 @@
     'FABRICATE.Admin.Manager.Checks.PreviewAs.NoActorMatches',
     'No characters match your search.'
   )}
-  onChoose={(id) => onChoose(id)}
+  onSelect={(id) => onChoose(id)}
 />

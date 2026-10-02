@@ -108,7 +108,7 @@ describe('RecipeEditView identity-only single column', () => {
       // to find as a WRITTEN attribute is handed to the primitive as trigger data instead. The
       // clause moves with it rather than being dropped: the hook is what every other suite finds
       // the control by.
-      passesProps: [['Select', 'triggerData']],
+      passesProps: [['Select', 'triggerProps']],
       spellsExactly: ['data-recipe-category-select'],
       // The issue-658 retrofit is a byte-faithful DOM no-op, so the section/field markers moved
       // from inlined attributes onto props.

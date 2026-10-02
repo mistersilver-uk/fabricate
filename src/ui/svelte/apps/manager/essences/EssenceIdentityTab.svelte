@@ -88,7 +88,7 @@
           <IconPicker
             value={icon}
             disabled={saving}
-            buttonTitle={text('FABRICATE.Admin.Manager.Essence.ChangeIcon', 'Change icon')}
+            ariaLabel={text('FABRICATE.Admin.Manager.Essence.ChangeIcon', 'Change icon')}
             onChange={(iconClass) => onIconChange(iconClass)}
           />
         </div>
@@ -196,7 +196,7 @@
     disabled={saving}
     section="enabled"
     field="essence-enabled"
-    subAttr="data-essence-enabled-state"
+    subDataAttr="data-essence-enabled-state"
     toggleLabel={enabled !== false
       ? text('FABRICATE.Admin.Manager.Essence.DisableThis', 'Disable this essence')
       : text('FABRICATE.Admin.Manager.Essence.EnableThis', 'Enable this essence')}

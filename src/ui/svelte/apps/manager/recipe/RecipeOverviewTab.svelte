@@ -240,6 +240,7 @@
   // beneath it, so the STATE decides the sentence rather than the emptiness alone.
   const allPicksSuppressed = $derived(pickedEligibleIds.length === 0 && suppressedPickCount > 0);
   const ALL_SUPPRESSED_KEY = 'FABRICATE.Admin.Manager.Recipe.CraftingModifierAllSuppressed';
+  const MODIFIER_ADD_KEY = 'FABRICATE.Admin.Manager.Recipe.CraftingModifierAdd';
   const emptyRowText = $derived(
     allPicksSuppressed
       ? text(
@@ -510,8 +511,7 @@
       <span class="manager-recipe-micro-label" id={categoryCaptionId}
         >{text('FABRICATE.Admin.Manager.Recipe.Category', 'Category')}</span
       >
-      <!-- The tooltip rides `triggerTitle`, not `triggerData`: the popover spreads that map FIRST
-           and then writes `title` from its own prop, so a `title` in the map is deleted green. -->
+      <!-- The tooltip rides `triggerTitle`: the primitive overwrites a `title` in `triggerProps`. -->
       <Select
         value={selectedCategory}
         options={categorySelectOptions}
@@ -524,7 +524,7 @@
               'FABRICATE.Admin.Manager.Recipe.CategoryNoneHint',
               'No categories defined. Add some under Tags and Categories.'
             )}
-        triggerData={{ 'data-recipe-category-select': '' }}
+        triggerProps={{ 'data-recipe-category-select': '' }}
         onChange={changeCategory}
       />
     </div>
@@ -538,7 +538,7 @@
           options={checkTierSelectOptions}
           ariaLabelledBy={checkTierCaptionId}
           disabled={saving}
-          triggerData={{ 'data-recipe-field': 'checkTierId' }}
+          triggerProps={{ 'data-recipe-field': 'checkTierId' }}
           onChange={(next) => onUpdateRecipe({ checkTierId: next || null })}
         />
       </div>
@@ -553,7 +553,7 @@
           options={minSuccessTierSelectOptions}
           ariaLabelledBy={minSuccessTierCaptionId}
           disabled={saving}
-          triggerData={{ 'data-recipe-field': 'minSuccessOutcomeId' }}
+          triggerProps={{ 'data-recipe-field': 'minSuccessOutcomeId' }}
           onChange={(next) => onUpdateRecipe({ minSuccessOutcomeId: next || null })}
         />
       </div>
@@ -588,7 +588,7 @@
               'Eligible modifiers source'
             )}
             disabled={saving}
-            triggerData={{ 'data-recipe-field': 'craftingModifierSet' }}
+            triggerProps={{ 'data-recipe-field': 'craftingModifierSet' }}
             onChange={changeModifierSetMode}
           />
         </div>
@@ -611,10 +611,10 @@
             selectedIds={overrideModifierIds}
             disabled={saving}
             addDisabled={atModifierPickCap}
-            testId="recipe-crafting-modifier"
-            labelledBy={MODIFIER_SET_LABEL_ID}
-            describedBy={modifierDescribedBy}
-            menuLabel={text('FABRICATE.Admin.Manager.Recipe.CraftingModifierAdd', 'Add modifier')}
+            data-modifier-pill-select="recipe-crafting-modifier"
+            ariaLabelledBy={MODIFIER_SET_LABEL_ID}
+            ariaDescribedBy={modifierDescribedBy}
+            triggerLabel={text(MODIFIER_ADD_KEY, 'Add modifier')}
             allSelectedLabel={text(
               'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillAllSelected',
               'All modifiers selected.'
@@ -715,7 +715,7 @@
       icon="fas fa-lock"
       title={text('FABRICATE.Admin.Manager.Recipe.Locked.Title', 'Locked')}
       sub={text('FABRICATE.Admin.Manager.Recipe.Locked.Sub', 'Visible but GM-only to craft')}
-      subAttr="data-recipe-locked-state"
+      subDataAttr="data-recipe-locked-state"
       on={locked}
       disabled={saving}
       toggleLabel={text('FABRICATE.Admin.Manager.Recipe.Locked.Toggle', 'Lock this recipe')}

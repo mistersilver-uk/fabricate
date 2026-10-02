@@ -113,13 +113,10 @@
         triggerImg={selected.img || ''}
         triggerLabel={selected.name}
         triggerMeta={sourceText}
-        triggerData={{ 'data-tool-replacement-source': sourceText || undefined }}
+        triggerProps={{ 'data-tool-replacement-source': sourceText || undefined }}
         valueClass="manager-tool-replacement-component-name"
-        triggerAriaLabel={text(
-          'FABRICATE.Admin.Manager.Tools.Editor.ChooseComponent',
-          'Choose component'
-        )}
-        dialogAriaLabel={text(
+        ariaLabel={text('FABRICATE.Admin.Manager.Tools.Editor.ChooseComponent', 'Choose component')}
+        panelLabel={text(
           'FABRICATE.Admin.Manager.Tools.Editor.ChooseComponent',
           'Choose component'
         )}
@@ -127,7 +124,7 @@
           'FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder',
           'Search components...'
         )}
-        {onChoose}
+        onSelect={onChoose}
       />
       <IconButton
         class="is-danger"
@@ -186,11 +183,8 @@
           'Click to search'
         )}
         valueClass="manager-tool-replacement-component-name"
-        triggerAriaLabel={text(
-          'FABRICATE.Admin.Manager.Tools.Editor.ChooseComponent',
-          'Choose component'
-        )}
-        dialogAriaLabel={text(
+        ariaLabel={text('FABRICATE.Admin.Manager.Tools.Editor.ChooseComponent', 'Choose component')}
+        panelLabel={text(
           'FABRICATE.Admin.Manager.Tools.Editor.ChooseComponent',
           'Choose component'
         )}
@@ -198,7 +192,7 @@
           'FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder',
           'Search components...'
         )}
-        {onChoose}
+        onSelect={onChoose}
       />
     </div>
   {/if}

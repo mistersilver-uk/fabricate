@@ -605,8 +605,7 @@
               detail={localize('FABRICATE.App.Extension.FaultDescription', {
                 providerId: activeSurface.provider.id,
               })}
-              dataAttr="data-player-extension-fault"
-              dataValue={activeSurface.surfaceId}
+              data-player-extension-fault={activeSurface.surfaceId}
             />
           </div>
         {:else if activeSurface}

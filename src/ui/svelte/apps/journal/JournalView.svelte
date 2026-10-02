@@ -123,7 +123,7 @@
                 class="journal-search-control"
                 size="30"
                 value={journal?.search ?? ''}
-                onInput={(value) => journal?.setSearch?.(value)}
+                onChange={(value) => journal?.setSearch?.(value)}
                 placeholder={localize('FABRICATE.App.Journal.Filters.SearchPlaceholder')}
                 ariaLabel={localize('FABRICATE.App.Journal.Filters.SearchLabel')}
                 data-journal-search="true"
@@ -137,7 +137,7 @@
                 value={journal?.kindFilter ?? 'all'}
                 options={kindOptions}
                 ariaLabel={localize('FABRICATE.App.Journal.Filters.Kind.Label')}
-                triggerData={{ 'data-journal-kind-filter': true }}
+                triggerProps={{ 'data-journal-kind-filter': true }}
                 onChange={(value) => journal?.setKindFilter?.(value)}
               />
             </div>
@@ -148,7 +148,7 @@
             onChange={(value) => journal?.setActiveStatusFilter?.(value)}
             groupName="journal-active-status"
             ariaLabel={localize('FABRICATE.App.Journal.Filters.Status.Label')}
-            dataAttr="data-journal-status-filter"
+            data-journal-status-filter
             fill
           />
 
@@ -198,8 +198,7 @@
             <EmptyState
               icon="fas fa-book-open"
               title={localize('FABRICATE.App.Journal.Empty.Detail')}
-              dataAttr="data-journal-empty"
-              dataValue="detail"
+              data-journal-empty="detail"
             />
           {/if}
         </main>

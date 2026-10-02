@@ -73,8 +73,7 @@
          `p` fallback (`Kicker.svelte:93-99`) — so converting would drop this section heading out
          of the document outline without a word;
        - the element carries `id="salvage-tools-title"` and the `<section>` above names it in
-         `aria-labelledby`. `Kicker` forwards no `id` and no rest spread, only a `dataAttr` hook,
-         so the section would lose its accessible name outright.
+         `aria-labelledby`, and `Kicker`'s rest spread exists for a hook, not for an `id`.
 
      An `h4` host and an `id` passthrough are what would close it. Both belong on the primitive. */
   .salvage-tools-title {

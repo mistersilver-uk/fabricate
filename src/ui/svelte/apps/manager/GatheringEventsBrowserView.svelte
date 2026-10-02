@@ -349,7 +349,7 @@
   >
     <ManagerSearchField
       value={searchTerm}
-      onInput={(next) => (ui.searchTerm = next)}
+      onChange={(next) => (ui.searchTerm = next)}
       placeholder={text(
         'FABRICATE.Admin.Manager.Environment.Events.SearchPlaceholder',
         'Search gathering events...'
@@ -570,7 +570,7 @@
               -->
               <ActionMenu
                 items={rowMenuItems()}
-                triggerLabel={text(
+                ariaLabel={text(
                   'FABRICATE.Admin.Manager.Environment.Events.ActionsFor',
                   'Gathering event actions for {name}'
                 ).replace('{name}', eventName(event))}
