@@ -275,6 +275,7 @@ export const CHECK_EVIDENCE_RAW_MODULES = Object.freeze([
  */
 export const ADDITIONAL_DICE_NOTICE_RAW_MODULES = Object.freeze([
   'src/ui/presenters/additionalDicePrompt.js',
+  'src/ui/svelte/util/journalRunReasons.js',
   'src/systems/additionalDiceReach.js',
   'src/systems/countTriggerReach.js',
 ]);
