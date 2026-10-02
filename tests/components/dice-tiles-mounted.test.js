@@ -213,7 +213,7 @@ describe('2006 DiceTiles', () => {
         assert.equal(borders[2][1], plain[1], `${host} a bought cancel keeps the danger border`);
         // An untoned bought die inks its dash (WCAG 1.4.11); a chat card mixes it into its own ink.
         if (host) assert.equal(borders[3][1], plain[0], `${host} a bought plain die keeps the hairline`);
-        else assert.equal(borders[3][1], 'rgba(217, 184, 156, 0.56)', 'a bought plain die inks its dash');
+        else assert.equal(borders[3][1], 'rgba(217, 184, 156, 0.74)', 'a bought plain die inks its dash');
         assert.ok(borders.every((border) => border[2] === '1px'), `${host} only the style changes`);
       } finally {
         await view.close();

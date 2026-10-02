@@ -16520,7 +16520,7 @@
     .fabricate-dice-tiles__tile--success,
     .fabricate-dice-tiles__tile--danger
   ) {
-  border-color: var(--fab-text-subtle);
+  border-color: var(--fab-text-muted);
 }
 
 /* On a chat card a tile mixes its tone into the chat's own ink, as the result pill does, so it reads on parchment and on a dark chat theme alike. */
