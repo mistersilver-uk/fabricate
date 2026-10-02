@@ -8096,7 +8096,7 @@
 }
 
 /* `:not(.fab-stepper-input)` — the shared `Stepper` supplies its OWN borderless chrome (48px wide, 22px tall, transparent) from its component-scoped \3c style> (issue 883). */
-.fabricate-field.manager-field input:not(.fab-stepper-input):not([type='radio']):not([type='range']),
+.fabricate-field.manager-field input:not(.fab-stepper-input):not([type='radio']):not([type='range']):not([type='checkbox']),
 .fabricate-field.manager-field select,
 .fabricate-field.manager-field textarea {
   width: 100%;
@@ -8108,7 +8108,7 @@
 }
 
 /* Same exclusion, same reason, and this half is why the event editor's slider also stood 36px tall with 8px of side padding instead of the 28px/0 the control asks for (issue 1523). */
-.fabricate-field.manager-field input:not(.fab-stepper-input):not([type='radio']):not([type='range']),
+.fabricate-field.manager-field input:not(.fab-stepper-input):not([type='radio']):not([type='range']):not([type='checkbox']),
 .fabricate-field.manager-field select {
   height: 36px;
   padding: 0 var(--fab-space-2);
