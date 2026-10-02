@@ -706,7 +706,7 @@ The caption MUST sit beside the image rather than in its alt text, which is read
 - **WHEN** a PR changes a file that is neither a render file nor one of the producer's own inputs, such as an engine module, and a case's own selection patterns name it
 - **THEN** that case is selected, unioned with whatever the PR's render files and producer inputs select
 - **AND** such a file selects nothing beyond the cases naming it: no representative set, no surface coverage and no fallback frame, so a file no case names selects nothing
-- **AND** it never arms the evidence gate, which still arms on render files alone, so a PR whose only changes are such files renders and publishes nothing
+- **AND** it never arms the evidence gate, which still arms on render files alone, yet the producer still renders and publishes the cases it selects, so a PR whose only changes are such files carries their frames as evidence without being required to
 - **AND** every selection pattern, and each alternative within one, names a tracked file, so a rename cannot silently stop a case being selected
 
 #### Scenario: the producer's own inputs change

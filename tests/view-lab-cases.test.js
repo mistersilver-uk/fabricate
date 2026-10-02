@@ -5145,7 +5145,7 @@ test('the capture workflow renders and publishes the one id list it computed', (
   // its own slice of it, and the merge is checked against the whole list before anything publishes.
   assert.match(
     workflow,
-    /view-lab-shards\.mjs plan "\$IDS" "\$HAS_UI"/,
+    /view-lab-shards\.mjs plan "\$IDS" "\$RENDER"/,
     'the shard plan must be cut from the one computed id list'
   );
   assert.match(workflow, /include: \$\{\{ fromJSON\(needs\.select\.outputs\.matrix\) }}/);

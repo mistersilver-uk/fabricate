@@ -13,12 +13,12 @@ import { fileURLToPath } from 'node:url';
 import {
   FALLBACK_CASE_ID,
   VIEW_LAB_CASES,
-  hasLabInputChanges,
   hasUiChanges,
   isUiFile,
   mapChangedFilesToCases,
   normalizePath,
   publishableCases,
+  rendersCapture,
 } from '../scripts/lib/viewLabCases.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -42,8 +42,8 @@ function casesNaming(file) {
     .map((viewCase) => viewCase.id);
 }
 
-/** A tracked file that is neither a render file nor a lab input. */
-const isProductNonRenderFile = (file) => !isUiFile(file) && !hasLabInputChanges([file]);
+/** A tracked product file that is not a render file: lab inputs live under `tests/` and `scripts/`. */
+const isProductNonRenderFile = (file) => !isUiFile(file) && !/^(?:tests|scripts)\//.test(file);
 
 const COMPLICATION_RUNTIME = 'src/systems/complicationRuntime.js';
 const OUTCOME_BANDS = 'src/systems/runJournalOutcomeBands.js';
@@ -102,24 +102,28 @@ test('a named non-render file is unioned with a render file, leaving its answer 
   }
 });
 
-test('the evidence gate still arms on render files alone', () => {
+test('a named engine file renders its frames while the evidence gate stays unarmed', () => {
   assert.equal(hasUiChanges([COMPLICATION_RUNTIME, OUTCOME_BANDS]), false);
-  assert.equal(hasLabInputChanges([COMPLICATION_RUNTIME]), false);
-  assert.equal(hasLabInputChanges(['tests/view-lab/world/labActors.js']), true);
-  assert.equal(
-    hasLabInputChanges([String.raw`.\scripts\lib\view-lab-cases\playerInventory.js`]),
-    true
-  );
+  assert.equal(rendersCapture([COMPLICATION_RUNTIME]), true);
+  assert.equal(rendersCapture([String.raw`.\src\systems\complicationRuntime.js`]), true);
+  assert.equal(rendersCapture([UNNAMED_ENGINE_FILE, 'lang/en.json']), false);
+  assert.equal(rendersCapture(['src/ui/svelte/apps/SomeBrandNewRoot.svelte']), true);
+
+  // A lab input alone selects coverage to verify, not to render; beside a named file it renders.
+  const labInput = 'tests/view-lab/world/labActors.js';
+  assert.ok(selectedIds([labInput]).length > 0);
+  assert.equal(rendersCapture([labInput]), false);
+  assert.equal(rendersCapture([labInput, COMPLICATION_RUNTIME]), true);
 });
 
-test('the capture workflow renders a named non-render file only beside a render file or lab input', () => {
-  // Unarmed and with no lab input there is nothing to render and no harvest to verify.
+test('the capture workflow selects for every PR and renders on rendersCapture, not the gate', () => {
   const workflow = readFileSync(resolve(ROOT, '.github/workflows/pr-screenshots.yml'), 'utf8');
   assert.match(
     workflow,
-    /const ids = hasUi \|\| hasLabInputChanges\(files\)\s*\?\s*mapChangedFilesToCases\(files, \{ patches \}\)/
+    /\n\s+const ids = mapChangedFilesToCases\(files, \{ patches \}\)\.map\(\(c\) => c\.id\);\n/
   );
-  assert.match(workflow, /process\.stdout\.write\(`\$\{hasUi\}\\n/);
+  assert.match(workflow, /process\.stdout\.write\(`\$\{rendersCapture\(files\)\}\\n/);
+  assert.doesNotMatch(workflow, /hasUiChanges/, 'the capture must not key rendering on the gate');
 });
 
 /** Unescaped `(…|…)` groups holding no nested group. */

@@ -784,7 +784,7 @@ Each case pins the size its smoke counterpart photographs rather than the app's 
 How many cases that is, and how many of them surface coverage selects, are deliberately not quoted anywhere in prose: `publishableCases()` and `LAB_SURFACE_CASE_IDS` in the registry are the only counts.
 Selection is targeted, and no single changed file selects the whole registry: a render file selects the cases whose `sourceMatches` claim it, a broad shared primitive or stylesheet selects a small representative set, and a change to one of the lab's OWN inputs (fixture world, capture driver, registry shared code) selects **surface coverage** — one frame of every route and tab the lab renders — rather than every state of every screen.
 A changed file that is neither a render file nor a lab input, such as an engine module, selects exactly the cases whose `sourceMatches` name it, and never a representative set, surface coverage or the fallback frame.
-It never arms `check-screenshots` either, so a PR changing only such files renders nothing, while beside a render file or a lab input its cases join the capture.
+It never arms `check-screenshots`, but its cases are still rendered and published, so an engine fix shipped alone carries the frames it changes as evidence the gate does not demand.
 A detailed state is captured when the files that govern it change; if you need one alongside such a change, name its case id in the run rather than widening the selection.
 Measured at a 155-frame registry: ~5.6s per frame locally (14 min for that whole corpus), a five-case subset in 36s, one case in 22s — against ~31s per frame for the smoke's `screenshots` profile.
 The per-frame rate is the durable figure; the whole-corpus total scales with the registry.

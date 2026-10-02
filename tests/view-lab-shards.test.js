@@ -130,7 +130,7 @@ test('a merge refuses shards that lose, repeat or invent a case, or disagree abo
   assert.throws(() => mergeShardManifests(ids, []), /no shard manifest/);
 });
 
-test('an unarmed gate renders no shard, and an armed one numbers its shards from one', () => {
+test('an unrendered selection has no shard, and a rendered one numbers its shards from one', () => {
   const cases = plain(100);
   assert.deepEqual(renderMatrix(cases, false), []);
   const matrix = renderMatrix(cases, true);

@@ -304,12 +304,17 @@ test('the capture workflow publishes only after every shard and the chrome verif
   assert.deepEqual(needsOf(jobs.capture).sort(), ['render', 'select', 'verify-chrome']);
   // A status function would let capture publish past a failed or skipped dependency.
   assert.doesNotMatch(unwrap(jobs.capture.if), /\b(?:always|failure|cancelled)\(/);
-  // capture only runs after render ran, so a step-level has_ui test there is always true.
+  // capture only runs after render ran, so a step-level render test there is always true.
   for (const step of jobs.capture.steps) {
-    assert.doesNotMatch(step.if, /has_ui/, `capture's "${step.name || step.uses}" re-tests has_ui`);
+    assert.doesNotMatch(step.if, /render/, `capture's "${step.name || step.uses}" re-tests render`);
   }
-  // An unarmed gate renders nothing, so no shard starts without it.
-  assert.match(unwrap(jobs.render.if), /needs\.select\.outputs\.has_ui == 'true'/);
+  // No shard starts for a selection that is not rendered (issue 2153: not keyed to the gate).
+  assert.match(unwrap(jobs.render.if), /needs\.select\.outputs\.render == 'true'/);
+  assert.doesNotMatch(source, /has_ui/, 'the capture keys rendering on `render`, not on the gate');
+  // The harvest is warmed and verified for any selection, rendered or not.
+  for (const name of ['warm-foundry', 'verify-chrome']) {
+    assert.equal(unwrap(jobs[name].if), "needs.select.outputs.ids != ''", `${name} must key on ids`);
+  }
 
   // Only the PNGs and the manifest leave a shard: exactly these two lines, nothing wider.
   const renderStart = source.indexOf('\n  render:\n');

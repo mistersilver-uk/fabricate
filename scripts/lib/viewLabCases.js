@@ -887,9 +887,15 @@ function isLabInput(file) {
   return LAB_INFRASTRUCTURE_PATTERN.test(file);
 }
 
-/** Whether a changed set touches one of the lab's own inputs. */
-export function hasLabInputChanges(files = []) {
-  return files.some((file) => isLabInput(normalizePath(file)));
+/**
+ * Whether the capture renders and publishes a changed set's frames: when it arms
+ * `check-screenshots`, or when a case names one of its non-render files (issue 2153). A change to
+ * the lab's own inputs alone is verified but not rendered.
+ */
+export function rendersCapture(files = []) {
+  if (hasUiChanges(files)) return true;
+  const productFiles = files.map((file) => normalizePath(file)).filter((file) => !isLabInput(file));
+  return mapChangedFilesToCases(productFiles).length > 0;
 }
 
 /** The render-file and lab-input selection, with the fallback frame when it found none. */

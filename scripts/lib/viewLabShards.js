@@ -63,11 +63,11 @@ export function sliceSelection(cases, count) {
 }
 
 /**
- * The render matrix the capture workflow runs: none when the gate is unarmed, since nothing is
- * rendered then and the chrome is verified by its own job either way.
+ * The render matrix the capture workflow runs: none when the selection is not rendered, and the
+ * chrome is verified by its own job either way.
  *
  * @param {Array<{id: string, distinctEvidenceGroup?: string}>} cases The selection, in order.
- * @param {boolean} armed Whether the changed set arms `check-screenshots`.
+ * @param {boolean} armed Whether the capture renders the selection (`rendersCapture`).
  * @returns {Array<{shard: number, ids: string}>} One entry per shard, numbered from 1.
  */
 export function renderMatrix(cases, armed) {
