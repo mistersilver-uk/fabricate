@@ -659,7 +659,7 @@ describe('countAdditionalDiceSourceMissing blocks additional dice with nothing t
 });
 
 describe('countAdditionalDicePathInvalid blocks a value that is not a stored path', () => {
-  it('flags an expression, a roll-data reference, a list entry or a numeric segment', () => {
+  it('flags an expression, a roll-data reference, a list entry or an all-digit segment', () => {
     for (const path of [
       '@resources.momentum.value',
       'system.resources.momentum.value + 1',
@@ -667,7 +667,8 @@ describe('countAdditionalDicePathInvalid blocks a value that is not a stored pat
       'system.items.0.value',
       'system resources',
       'system..value',
-      'flags.my-module',
+      'system.items.12',
+      'flags.my-module.0',
     ]) {
       const result = evaluateCheckReadiness(extra({ path }), { mode: 'simple' });
       assert.deepEqual(
@@ -686,8 +687,15 @@ describe('countAdditionalDicePathInvalid blocks a value that is not a stored pat
     }
   });
 
-  it('passes a dotted path of identifiers, trimmed', () => {
-    for (const path of [PATH, ` ${PATH} `, 'system.attributes.ki_2.value']) {
+  it('passes a dotted path of keys, a module flag scope included, trimmed', () => {
+    for (const path of [
+      PATH,
+      ` ${PATH} `,
+      'system.attributes.ki_2.value',
+      'flags.my-module',
+      'flags.my-module.momentum',
+      'flags.5e-helper.points',
+    ]) {
       const result = evaluateCheckReadiness(extra({ path }), { mode: 'simple' });
       assert.equal(issue(result, 'countAdditionalDicePathInvalid'), undefined, path);
       assert.equal(tick(result, 'countAdditionalDicePathStored').satisfied, true, path);

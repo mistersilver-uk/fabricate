@@ -207,8 +207,11 @@ function previewActorPoolWarnings(transient, evaluation, { thresholdMode, previe
   raise(transient, 'countPathUnresolvedForPreview', 'warning', { actor, path, input });
 }
 
-/** A stored document path: dot-separated identifiers, never `@`, an operator or a list index. */
-const STORED_PATH = /^[\p{L}_$][\p{L}\p{N}_$]*(?:\.[\p{L}_$][\p{L}\p{N}_$]*)*$/u;
+/**
+ * A stored document path: dot-separated keys (letters, digits, `_`, `$`, `-`; a module flag scope
+ * is a package id), never `@`, a space, an operator, a bracket or an all-digit list index.
+ */
+const STORED_PATH = /^(?!\d+(?:\.|$))[\p{L}\p{N}_$-]+(?:\.(?!\d+(?:\.|$))[\p{L}\p{N}_$-]+)*$/u;
 
 const MACRO_FIELDS = Object.freeze({ read: 'readMacroUuid', spend: 'spendMacroUuid' });
 
