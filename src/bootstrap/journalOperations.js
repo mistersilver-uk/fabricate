@@ -66,6 +66,7 @@ export function promptJournalStageCheck(descriptor, prompt = promptCheckRoll) {
       zeroPoolFails: descriptor.zeroPoolFails,
       required: descriptor.required,
       modifierDestination: descriptor.modifierDestination,
+      pendingTools: descriptor.pendingTools,
     }),
     ...(descriptor?.additionalDiceOffer && {
       additionalDiceOffer: publicAdditionalDiceOffer(descriptor.additionalDiceOffer),

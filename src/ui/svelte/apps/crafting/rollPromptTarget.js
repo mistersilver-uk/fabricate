@@ -134,6 +134,8 @@ function countTarget(data, selectedIds, bonus, additionalDice) {
   });
   const zeroPoolFails = count.zeroPoolFails !== false;
   const settled = settledPoolDice(count.pool, plan.poolDelta + additionalDice, zeroPoolFails);
+  // A rolled Tool bonus settles at evaluation, so it is pending like a rolled pick (issue 2008).
+  const pendingPool = destination === 'pool' ? [...pending, ...(count.pendingTools ?? [])] : [];
   const threshold = count.threshold + plan.thresholdDelta;
   const values = countFormulaValues({
     dice: settled.dice,
@@ -152,17 +154,14 @@ function countTarget(data, selectedIds, bonus, additionalDice) {
     formula: fill(template, { ...values, formula: pending.join(' + ') }),
     note: `${countRule(count, values, { threshold, direction }, labels)}${labels.countFaces}`,
     // A pending roll that adds dice may still lift the pool above zero.
-    zeroPool:
-      settled.zeroPool && !(pending.length > 0 && destination === 'pool')
-        ? labels.countZeroPool
-        : '',
+    zeroPool: settled.zeroPool && pendingPool.length === 0 ? labels.countZeroPool : '',
     reachPool: {
       base: count.pool,
       poolDelta: plan.poolDelta,
       zeroPoolFails,
       dice: settledPoolDice(count.pool, plan.poolDelta, zeroPoolFails).dice,
     },
-    pendingPool: destination === 'pool' ? pending : [],
+    pendingPool,
   };
 }
 

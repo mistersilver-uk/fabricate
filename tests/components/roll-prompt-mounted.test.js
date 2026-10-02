@@ -1071,6 +1071,21 @@ describe('mounted roll prompt', () => {
       assert.deepEqual([(await pending).bonus, state.done], ['2', true]);
     });
 
+    // QE probe P1 (R1): a zero pool with nothing to spend that a rolled Tool bonus may still lift.
+    it('keeps Roll enabled while a rolled Tool bonus could still lift a zero pool (R1)', async () => {
+      const zero = { pool: 0, additionalDiceOffer: diceOffer(1, { available: 0, limit: 0 }) };
+      const blocked = await openCount(zero);
+      assert.equal(actionOf(blocked.dialog, 'roll').getAttribute('aria-disabled'), 'true', 'control');
+      blocked.dialog.querySelector('input[name="situationalBonus"]').dispatchEvent(keydown('Escape'));
+      assert.deepEqual(await blocked.pending, { confirmed: false });
+      const { dialog, pending } = await openCount({ ...zero, pendingTools: ['1d4'] });
+      assert.ok(!actionOf(dialog, 'roll').hasAttribute('aria-disabled'), 'the Tool may lift it');
+      assert.ok(!blockNote(dialog), 'no block note');
+      assert.ok(!dialog.querySelector('[data-roll-prompt-zero-pool]'), 'no automatic failure');
+      dialog.querySelector('form').requestSubmit();
+      assert.equal((await pending).confirmed, true);
+    });
+
     it('keeps Advantage rollable when only it reaches, and focuses it with no bonus field (R1, AD34, AD64)', async () => {
       const advantageOffer = offerFor({}, { product: 'count' });
       const { dialog, pending } = await openCount({

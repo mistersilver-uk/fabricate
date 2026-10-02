@@ -8,6 +8,8 @@ import { resolve } from 'node:path';
 import { describe, it } from 'node:test';
 
 import { publicAdditionalDiceOffer } from '../src/systems/additionalDiceReach.js';
+import { runFormulaPassFail } from '../src/systems/checkRoll.js';
+import { normalizeCheckEvaluation } from '../src/systems/normalize/checkEvaluation.js';
 import {
   actionDeltas,
   additionalDiceCopy,
@@ -19,6 +21,7 @@ import {
   spentDiceNotice,
 } from '../src/ui/presenters/additionalDicePrompt.js';
 import {
+  buildInteractiveRollOptions,
   buildSinglePromptData,
   promptActions,
   promptCheckRoll,
@@ -26,6 +29,8 @@ import {
 } from '../src/ui/svelte/apps/crafting/rollPrompt.js';
 import { rollPromptTarget } from '../src/ui/svelte/apps/crafting/rollPromptTarget.js';
 
+import { installCountDice } from './helpers/countEngineDice.js';
+import { countEvaluation } from './helpers/countFixtures.js';
 import { stubPromptSurface } from './helpers/rollPromptDialogStub.js';
 
 const EN = JSON.parse(readFileSync(resolve(import.meta.dirname, '../lang/en.json'), 'utf8'));
@@ -381,6 +386,79 @@ describe('the additional-dice answer and view (issue 2008)', () => {
     assert.deepEqual([bought.formula, bought.zeroPool], ['1d6 · each ≥ 5', '']);
     assert.deepEqual(bought.reachPool, { base: 1, poolDelta: -1, zeroPoolFails: true, dice: 0 });
     assert.deepEqual(rollPromptTarget(data, [], '1d4').pendingPool, ['1d4']);
+  });
+
+  // QE probe P1 (R1): base 0, a rolled 1d4 Tool bonus on the pool, nothing to spend.
+  it('counts a rolled Tool bonus as pending pool dice, never blocking what it could lift', async () => {
+    const walk = (object, path) =>
+      String(path)
+        .split('.')
+        .reduce((node, key) => node?.[key], object);
+    const saved = { foundry: globalThis.foundry, game: globalThis.game };
+    Object.assign(globalThis, {
+      foundry: { utils: { getProperty: walk, hasProperty: (o, p) => walk(o, p) !== undefined } },
+      game: {
+        user: { id: 'player' },
+        i18n: { localize: (key) => key },
+        settings: { get: () => 'publicroll' },
+      },
+    });
+    const source = { system: { resources: { ap: { value: 0 } } } };
+    const actor = {
+      uuid: 'Actor.a',
+      name: 'A',
+      getRollData: () => ({}),
+      _source: source,
+      overrides: {},
+      canUserModify: () => true,
+      update: async () => actor,
+    };
+    const additionalDice = {
+      enabled: true,
+      source: 'path',
+      path: 'system.resources.ap.value',
+      max: 3,
+    };
+    const evaluation = normalizeCheckEvaluation(
+      countEvaluation({ base: '0', zeroPoolFails: true, required: 1, additionalDice })
+    );
+    const surface = stubPromptSurface(() => ({ confirmed: true }));
+    const dice = installCountDice({ faces: [3, 9, 9, 9, 9] });
+    try {
+      const interactive = { interactive: true, actor, name: 'X', activity: 'Crafting', dc: 1 };
+      const result = await runFormulaPassFail({
+        formula: '',
+        dc: 1,
+        actor,
+        evaluation,
+        rollOptions: {
+          ...buildInteractiveRollOptions({ ...interactive, evaluation }),
+          toolContributions: [
+            { source: 'tool', label: 'Hammer', form: 'expression', expression: '1d4' },
+          ],
+        },
+      });
+      assert.deepEqual(
+        [dice.formulas(), result.success],
+        [['1d4', '3d10'], true],
+        'the Tool lifts it'
+      );
+      const { view } = surface;
+      assert.deepEqual(view.count.pendingTools, ['1d4']);
+      const target = rollPromptTarget(view, [], '', 0);
+      assert.deepEqual([target.pendingPool, target.zeroPool], [['1d4'], '']);
+      const judged = describeAdditionalDice({
+        offer: view.additionalDiceOffer,
+        pool: target.reachPool,
+        pending: target.pendingPool,
+        labels: view.labels.additionalDice,
+      });
+      assert.deepEqual([judged.blocked, judged.blockNote], [NONE, '']);
+    } finally {
+      dice.restore();
+      surface.restore();
+      Object.assign(globalThis, saved);
+    }
   });
 
   it('allowlists the offer onto a count prompt, never a path or macro uuid, and answers 0 headless', async () => {

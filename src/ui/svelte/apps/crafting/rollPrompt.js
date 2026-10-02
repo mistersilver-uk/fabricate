@@ -435,7 +435,8 @@ function rollsUnder(need) {
 
 /**
  * A count check's view: the pool and threshold its picks and bonus settle onto, the threshold's
- * anchor and source, the faces it explodes and cancels on, and the required count.
+ * anchor and source, the faces it explodes and cancels on, the required count, and the rolled
+ * Tool formulas still to settle.
  */
 function countPromptView({
   pool,
@@ -448,8 +449,12 @@ function countPromptView({
   zeroPoolFails,
   required,
   modifierDestination,
+  pendingTools,
 }) {
   const finite = (value) => (Number.isFinite(value) ? value : null);
+  const rolled = Array.isArray(pendingTools)
+    ? pendingTools.filter((formula) => typeof formula === 'string' && formula.trim())
+    : [];
   return {
     pool: finite(pool),
     die: finite(die),
@@ -461,6 +466,7 @@ function countPromptView({
     zeroPoolFails: zeroPoolFails !== false,
     required: Number.isInteger(required) ? required : null,
     destination: modifierDestination === 'threshold' ? 'threshold' : 'pool',
+    ...(rolled.length > 0 && { pendingTools: rolled }),
   };
 }
 
@@ -508,6 +514,7 @@ export function buildSinglePromptData({
   zeroPoolFails,
   required,
   modifierDestination,
+  pendingTools,
   offerSituationalBonus,
   targetSource,
 } = {}) {
@@ -546,6 +553,7 @@ export function buildSinglePromptData({
         zeroPoolFails,
         required,
         modifierDestination,
+        pendingTools,
       }),
     };
   }

@@ -92,12 +92,11 @@ export function attributeTargetPromptField(evaluation) {
 }
 
 /**
- * A count prompt's fields, numbers and enums only, from the pool resolved before the prompt opens
- * (`policy`, or null): `pool` and `threshold` are the resolved base and threshold with any scalar
- * Tool benefit already settled on them, unfloored, which the prompt settles its picks and bonus
- * onto; `thresholdAnchor` is the resolved threshold before any benefit, read from the character or
- * `fixed` as `thresholdSource` says; `explode` and `cancel` name the face each acts from. The
- * required count is null when nothing grades against it: progressive, fixed-range routed, hidden.
+ * A count prompt's fields from the pool resolved before the prompt opens (`policy`, or null):
+ * `pool` and `threshold` carry any scalar Tool benefit, unfloored, and `pendingTools` the rolled
+ * Tool formulas still to settle; `thresholdAnchor` is the threshold before any benefit, read as
+ * `thresholdSource` says; `explode` and `cancel` name the face each acts from. The required
+ * count is null when nothing grades against it: progressive, fixed-range routed, hidden.
  */
 export function countPromptFields(evaluation, policy, required, toolContributions = []) {
   const direction = evaluation.direction === 'under' ? 'under' : 'over';
@@ -116,8 +115,10 @@ export function countPromptFields(evaluation, policy, required, toolContribution
     contributions: settledToolBenefits(toolContributions),
   });
   const { explode, cancel } = describeCountPolicy(policy);
+  const pendingTools = rolledToolFormulas(toolContributions);
   return {
     ...shared,
+    ...(pendingTools.length > 0 && { pendingTools }),
     pool: policy.resolved.base + tools.poolDelta,
     die: policy.die,
     threshold: policy.resolved.threshold + tools.thresholdDelta,
@@ -149,6 +150,14 @@ function settledToolBenefits(toolContributions) {
   return (Array.isArray(toolContributions) ? toolContributions : [])
     .filter((tool) => tool?.form === 'scalar' && Number.isFinite(tool.value))
     .map((tool) => ({ source: 'tool', label: '', form: 'scalar', value: tool.value }));
+}
+
+/** The Tool benefits still to roll at evaluation, which may yet add to the pool (issue 2008). */
+function rolledToolFormulas(toolContributions) {
+  return (Array.isArray(toolContributions) ? toolContributions : [])
+    .filter((tool) => tool?.form === 'expression' && tool.negate !== true)
+    .map((tool) => (typeof tool.expression === 'string' ? tool.expression.trim() : ''))
+    .filter(Boolean);
 }
 
 function promptInput({

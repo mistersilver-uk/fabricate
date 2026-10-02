@@ -9,7 +9,7 @@ import { dirname, resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { flushSync } from 'svelte';
+import { flushSync, tick } from 'svelte';
 
 import { promptJournalStageCheck } from '../../src/bootstrap/journalOperations.js';
 import { overrideRollPromptSurface } from '../../src/ui/svelte/apps/crafting/rollPrompt.js';
@@ -64,10 +64,11 @@ const REDACTED = Object.freeze({
   additionalDiceOffer: { ...DESCRIPTOR.additionalDiceOffer, reach: null },
 });
 
+/** The prompt the adapter opened: the component is loaded up front, so it mounts in microtasks. */
 async function openedPrompt() {
   let dialog = null;
   for (let attempt = 0; attempt < 50 && !dialog; attempt += 1) {
-    await new Promise((settle) => setImmediate(settle));
+    await tick();
     dialog = document.querySelector('.manager-modal[data-roll-prompt="single"]');
   }
   assert.ok(Boolean(dialog), 'the Journal prompt opened');
@@ -77,7 +78,8 @@ async function openedPrompt() {
 /** Open `descriptor` through the Journal's adapter, answering through the real modal. */
 async function promptFor(descriptor) {
   document.body.replaceChildren();
-  const loadComponent = () => harness.loadRuneModule(ROLL_PROMPT_PATH);
+  const component = await harness.loadRuneModule(ROLL_PROMPT_PATH);
+  const loadComponent = async () => component;
   const restore = overrideRollPromptSurface((view) => openRollPromptModal(view, { loadComponent }));
   const answer = promptJournalStageCheck(descriptor);
   return { dialog: await openedPrompt(), answer, restore };
@@ -108,6 +110,28 @@ describe('the Journal-prepared prompt offers additional dice (issue 2008)', () =
       const decided = await answer;
       assert.equal(decided.confirmed, true);
       assert.equal(decided.additionalDice, 1, 'the bought die rides the decision the GM evaluates');
+    } finally {
+      restore();
+    }
+  });
+
+  // QE probe P1 (R1): the GM read nothing to spend, and a rolled Tool bonus may lift a zero pool.
+  it('keeps Roll enabled while a rolled Tool bonus could still lift a zero pool (R1)', async () => {
+    const offer = { ...DESCRIPTOR.additionalDiceOffer, available: 0, limit: 0 };
+    const zero = { ...DESCRIPTOR, pool: 0, required: 1, additionalDiceOffer: offer };
+    const blocked = await promptFor(zero);
+    const rollOf = (dialog) => dialog.querySelector('button[data-action="roll"]');
+    try {
+      assert.equal(rollOf(blocked.dialog).getAttribute('aria-disabled'), 'true', 'control');
+    } finally {
+      blocked.restore();
+    }
+    const { dialog, answer, restore } = await promptFor({ ...zero, pendingTools: ['1d4'] });
+    try {
+      assert.ok(!rollOf(dialog).hasAttribute('aria-disabled'), 'the Tool may lift the pool');
+      assert.ok(!dialog.querySelector('[data-roll-prompt-block-note]'), 'nothing blocked');
+      rollOf(dialog).click();
+      assert.equal((await answer).confirmed, true);
     } finally {
       restore();
     }
