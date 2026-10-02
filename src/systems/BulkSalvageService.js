@@ -52,12 +52,15 @@ function subjectRollDecision(entry, rollDecision, dice) {
   };
 }
 
-/** The refusals that mean the resource ran out mid-batch, so the batch stops there (issue 2008). */
-const EXHAUSTING_REFUSALS = new Set([
+/** The refusals that stop a batch: its resource ran out or became unavailable (issue 2008). */
+const STOPPING_REFUSALS = new Set([
   'resourceChanged',
   'spendRefused',
   'spendUnconfirmed',
   'choiceAboveLimit',
+  'resourceMacroFailed',
+  'resourceOverridden',
+  'resourceNotWritable',
 ]);
 
 /** A batch that offers no additional dice. */
@@ -137,14 +140,15 @@ function readBudgetAsUser({ additionalDice, actor, payload }) {
   });
 }
 
-/** Mark a row the batch never ran because the resource ran out (issue 2008). */
-function markExhausted(entry, exhaustion) {
+/** Mark a row the batch never ran; the row that stopped it also carries `stop` (issue 2008). */
+function markExhausted(entry, exhaustion, stop = null) {
   entry.outcome = 'skipped';
   Object.assign(entry.item, {
     outcome: 'skipped',
     skipReason: BULK_SALVAGE_SKIP_REASONS.resourceExhausted,
     message: '',
     additionalDiceExhaustion: exhaustion,
+    ...stop,
   });
 }
 
@@ -331,13 +335,13 @@ export class BulkSalvageService {
           rollDecision: subjectRollDecision(entry, rollDecision, dice),
           additionalDiceRolls: covered ? dice.rolls : null,
         });
-        if (EXHAUSTING_REFUSALS.has(entry.additionalDiceRefusal)) {
+        if (entry.additionalDiceStop) {
           exhaustion = Object.freeze({
             resourceLabel: dice.label,
             done: rolled,
             rolls: dice.rolls,
           });
-          markExhausted(entry, exhaustion);
+          markExhausted(entry, exhaustion, entry.additionalDiceStop);
         } else if (covered) rolled += 1;
       }
       completed += 1;
@@ -581,7 +585,10 @@ export class BulkSalvageService {
         }
       );
       const outcome = classifySalvageOutcome(result);
-      entry.additionalDiceRefusal = result?.additionalDiceRefusal ?? null;
+      entry.additionalDiceStop = STOPPING_REFUSALS.has(result?.additionalDiceRefusal) && {
+        additionalDiceRefusal: result.additionalDiceRefusal,
+        additionalDiceNotice: result.additionalDiceNotice ?? null,
+      };
       const salvageRun = result?.salvageRun ?? null;
 
       entry.outcome = outcome;

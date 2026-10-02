@@ -1784,11 +1784,14 @@ describe('BulkSalvageService.run: additional dice (issue 2008)', () => {
     }
   });
 
-  for (const reason of ['resourceChanged', 'spendRefused', 'spendUnconfirmed', 'choiceAboveLimit']) {
+  const STOPPING = ['resourceChanged', 'spendRefused', 'spendUnconfirmed', 'choiceAboveLimit'];
+  const UNAVAILABLE = ['resourceMacroFailed', 'resourceOverridden', 'resourceNotWritable'];
+  for (const reason of [...STOPPING, ...UNAVAILABLE]) {
     it(`stops the batch when a spend refuses ${reason}, keeping the rolls already made (AD45)`, async () => {
+      const notice = { dice: 1, limit: 1, available: 0, label: 'Momentum', source: 'path' };
       const { seam, calls } = recordingSalvage((componentId) =>
         componentId === 'comp-hide'
-          ? { success: false, cancelled: true, additionalDiceRefusal: reason }
+          ? { success: false, cancelled: true, additionalDiceRefusal: reason, additionalDiceNotice: notice }
           : { success: true, results: [] }
       );
       const { service, posted } = diceService({
@@ -1819,14 +1822,23 @@ describe('BulkSalvageService.run: additional dice (issue 2008)', () => {
         done: 1,
         rolls: 3,
       });
+      assert.deepEqual(
+        [result.items[1].additionalDiceRefusal, result.items[1].additionalDiceNotice],
+        [reason, notice],
+        'the stopped row names its reason and notice facts, so the notice names them once'
+      );
+      assert.ok(
+        result.items.every((item, index) => index === 1 || !('additionalDiceRefusal' in item)),
+        'only the row that stopped the batch carries the refusal'
+      );
       assert.equal(posted.length, 1, 'the aggregate card posts for the rolls that stand');
     });
   }
 
-  it('carries on past a refusal that is not the resource running out', async () => {
+  it('carries on past a refusal that leaves the resource usable', async () => {
     const { seam, calls } = recordingSalvage((componentId) =>
       componentId === 'comp-ore'
-        ? { success: false, cancelled: true, additionalDiceRefusal: 'resourceOverridden' }
+        ? { success: false, cancelled: true, additionalDiceRefusal: 'notOffered' }
         : { success: true, results: [] }
     );
     const { service } = diceService({
