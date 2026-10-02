@@ -209,10 +209,7 @@ function propsBlock() {
   return source.slice(start, end + closer.length);
 }
 
-/**
- * The destructure as it stood before the panel was extracted (issue 1719), with nine names
- * re-spelled to the API convention at issue 1507 and no order or default moved.
- */
+/** The destructure's digest (issues 1719, 1507). */
 const PROPS_BLOCK_DIGEST = '2d703e11311a156897b414f0863280abc69cc8ddd34b4e92cd038763d9339218';
 const PROPS_BLOCK_NAMES = 59;
 
