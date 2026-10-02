@@ -27,6 +27,9 @@ const CONSUMERS = Object.freeze([
   ['src/ui/svelte/apps/manager/scoped/WorldComponentEntryPage.svelte', 'visibleEssenceOptions'],
 ]);
 
+/** Importers of `PickerRow.svelte` that hand it no essence catalogue: path to the reason. */
+const ROW_CALLERS_WITHOUT_ESSENCES = Object.freeze({});
+
 // TWO ENTRIES LEFT WITH THE CHOICE THEY MADE (issue 1373, maintainer round 5), and the removal is
 // recorded rather than performed silently.
 
@@ -75,17 +78,22 @@ test('1036/18: the consumer list is CLOSED — no unlisted file renders an essen
     /class="essence-card"/,
   ];
   const listed = new Set(CONSUMERS.map(([path]) => path));
-  // `PickerRow` draws the essence field from its caller's catalogue, so every caller that hands it
-  // essences is the consumer in its place.
-  const rowCallers = measureImporters(repoRoot)
-    .importersOf(PICKER_ROW)
-    .filter((path) => /essence/i.test(read(path)));
-  assert.ok(rowCallers.length > 0, 'no caller hands the row essences, so the clause below is vacuous');
+  // `PickerRow` draws the essence field from its caller's catalogue, so every importer is the
+  // consumer in its place unless it is excluded with a reason.
+  const rowCallers = measureImporters(repoRoot).importersOf(PICKER_ROW);
+  assert.ok(rowCallers.length > 0, 'nothing imports the row, so the clause below is vacuous');
   assert.deepEqual(
-    rowCallers.filter((path) => !listed.has(path)),
+    rowCallers.filter(
+      (path) => !listed.has(path) && !Object.hasOwn(ROW_CALLERS_WITHOUT_ESSENCES, path)
+    ),
     [],
-    'a caller builds the row an essence catalogue without the offer projection'
+    'an importer of the row is neither a listed consumer nor excluded with a reason'
   );
+  for (const [path, reason] of Object.entries(ROW_CALLERS_WITHOUT_ESSENCES)) {
+    assert.ok(rowCallers.includes(path), `${path} is excluded and no longer imports the row`);
+    assert.ok(!listed.has(path), `${path} is both a consumer and excluded`);
+    assert.ok(String(reason).trim() !== '', `${path} is excluded without a reason`);
+  }
 
   const rendering = uiSourceFiles().filter((path) => {
     const source = read(path);
