@@ -68,11 +68,14 @@ function renderItem({ name, img, quantity }, fallbackImg) {
   ].join('');
 }
 
-/** Render a titled section with an icon grid; returns '' when there are no entries. */
-function renderSection({ heading, entries, fallbackImg, modifier }) {
+/**
+ * Render a titled section with an icon grid; returns '' when there are no entries. A modifier is
+ * passed as its whole class, written literally, so a selector naming it can find it in source.
+ */
+function renderSection({ heading, entries, fallbackImg, modifierClass }) {
   if (!Array.isArray(entries) || entries.length === 0) return '';
-  const sectionClass = modifier
-    ? `fabricate-gather-chat__section fabricate-gather-chat__section--${modifier}`
+  const sectionClass = modifierClass
+    ? `fabricate-gather-chat__section ${modifierClass}`
     : 'fabricate-gather-chat__section';
   return [
     `<section class="${sectionClass}">`,
@@ -143,7 +146,10 @@ export function buildGatheringChatContent(model = {}, localize = (key) => key) {
     succeeded && (!Array.isArray(model.components) || model.components.length === 0);
   // A distinct modifier so a success that awarded nothing can be styled apart from a
   // full success without changing the title — the check DID succeed.
-  const stateModifier = succeeded ? (awardedNothing ? 'empty' : 'success') : 'failure';
+  const emptyOrSuccess = awardedNothing
+    ? 'fabricate-gather-chat--empty'
+    : 'fabricate-gather-chat--success';
+  const stateClass = succeeded ? emptyOrSuccess : 'fabricate-gather-chat--failure';
   const title = loc(succeeded ? CHAT_KEYS.success : CHAT_KEYS.failure);
 
   const subtitleParts = [`${esc(loc(CHAT_KEYS.actor))}: ${esc(model.actorName)}`];
@@ -163,13 +169,13 @@ export function buildGatheringChatContent(model = {}, localize = (key) => key) {
       heading: loc(CHAT_KEYS.events),
       entries: model.events,
       fallbackImg: EVENT_FALLBACK_IMG,
-      modifier: 'event',
+      modifierClass: 'fabricate-gather-chat__section--event',
     }),
     renderSection({
       heading: loc(CHAT_KEYS.toolsBroken),
       entries: model.brokenTools,
       fallbackImg: COMPONENT_FALLBACK_IMG,
-      modifier: 'tools',
+      modifierClass: 'fabricate-gather-chat__section--tools',
     }),
   ].filter(Boolean);
 
@@ -193,7 +199,7 @@ export function buildGatheringChatContent(model = {}, localize = (key) => key) {
   });
 
   return [
-    `<div class="fabricate-gather-chat fabricate-gather-chat--${stateModifier}">`,
+    `<div class="fabricate-gather-chat ${stateClass}">`,
     '<header class="fabricate-gather-chat__header">',
     `<div class="fabricate-gather-chat__title">${esc(title)}</div>`,
     `<div class="fabricate-gather-chat__subtitle">${subtitleParts.join(' · ')}</div>`,

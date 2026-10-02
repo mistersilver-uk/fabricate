@@ -423,10 +423,11 @@ function gmComplicationFaultFacts(entry, loc) {
 
 /** One labelled section, omitted when empty. `attention` carries its own class because
  *  `tests/crafting-chat-card.test.js` requires each complication rule branch to end on a
- *  complication-only class. */
+ *  complication-only class; it and the `--gm` modifier are written whole, so a View Lab
+ *  selector naming them finds them in source. */
 function gmComplicationSection(section, headingKey, facts, loc) {
   if (facts.length === 0) return '';
-  const fault = section === 'attention' ? ` ${GM_CARD_BLOCK}__complication-fault` : '';
+  const fault = section === 'attention' ? ' fabricate-craft-chat__complication-fault' : '';
   return [
     `<span class="${GM_CARD_BLOCK}__complication-block${fault}" data-fabricate-complication-section="${section}">`,
     `<span class="${GM_CARD_BLOCK}__complication-heading">${esc(loc(headingKey))}</span>`,
@@ -493,7 +494,7 @@ export function buildGmComplicationCardContent(
     reporterName ? `${esc(loc(GM_CARD_KEYS.reportedBy))}: ${esc(reporterName)}` : '',
   ].filter(Boolean);
   return [
-    `<div class="${GM_CARD_BLOCK} ${GM_CARD_BLOCK}--gm">`,
+    '<div class="fabricate-craft-chat fabricate-craft-chat--gm">',
     `<header class="${GM_CARD_BLOCK}__header">`,
     `<div class="${GM_CARD_BLOCK}__title">${esc(loc(GM_CARD_KEYS.title))}</div>`,
     subtitle.length > 0
