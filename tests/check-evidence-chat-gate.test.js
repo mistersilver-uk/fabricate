@@ -6,6 +6,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { openCardRollsCount } from '../src/systems/checkCardRolls.js';
+
 import { shippedLocalize } from './helpers/checkEvidenceFixtures.js';
 import { craftProbe, probeResolutionService, salvageProbe } from './helpers/craftPipelineProbe.js';
 import { stubPromptSurface } from './helpers/rollPromptDialogStub.js';
@@ -67,8 +69,14 @@ function installChatMessage(version, created, createOptions = []) {
   };
 }
 
-/** A real sum/under salvage against character value 12 with −2 and a rolled 1d4 library bonus. */
-async function salvageAs(version, rollMode) {
+const isCard = (data) => String(data.content).includes('fabricate-craft-chat');
+
+/**
+ * A real sum/under salvage against character value 12 with −2 and a rolled 1d4 library bonus.
+ * `arrange(world)` runs once the chat and roll doubles are installed, and a salvage that throws
+ * answers `{ threw }`.
+ */
+async function salvageAs(version, rollMode, arrange = () => {}) {
   const world = salvageProbe({
     salvageCraftingCheck: {
       simple: {
@@ -93,9 +101,11 @@ async function salvageAs(version, rollMode) {
   const rollMessages = [];
   installRoll(rollMessages);
   installChatMessage(version, created, createOptions);
-  const result = await world.salvage({ interactive: true, rollDecision: { rollMode } });
+  arrange(world);
+  const result = await world
+    .salvage({ interactive: true, rollDecision: { rollMode } })
+    .catch((error) => ({ threw: error }));
   delete globalThis.Roll;
-  const isCard = (data) => String(data.content).includes('fabricate-craft-chat');
   const cards = created.filter(isCard);
   const cardOptions = createOptions[created.findIndex(isCard)];
   // The check roll and its rolled 1d4 leave as one bundled message when no card carries them.
@@ -126,7 +136,7 @@ for (const version of [13, 14]) {
         assert.deepEqual(
           cardOptions,
           version === 13 ? { rollMode: 'publicroll' } : { messageMode: 'public' },
-          'and names the public mode, so the posting client\'s chat mode cannot whisper it'
+          'and states the public mode itself, the only mode a created message is given'
         );
         assert.equal(bundles.length, 0, 'so no separate roll message is posted');
       } else {
@@ -151,6 +161,50 @@ for (const version of [13, 14]) {
       }
     });
   }
+}
+
+const refuse = (message) => async () => {
+  throw new Error(message);
+};
+
+/** Each way a public salvage roll loses its card, and whether `salvage()` itself then throws. */
+const LOST_CARDS = [
+  [
+    'the card cannot be created',
+    () => {
+      const { create } = globalThis.ChatMessage;
+      globalThis.ChatMessage.create = (data, options) =>
+        isCard(data) ? refuse('create refused')() : create(data, options);
+    },
+    false,
+  ],
+  [
+    'the commit throws',
+    (world) => Object.assign(world.engine, { _consumeComponentItems: refuse('consume refused') }),
+    true,
+  ],
+  [
+    'the check throws after its roll',
+    (world) =>
+      Object.assign(world.engine, {
+        _markEngineEvaluated: () => {
+          throw new Error('grading failed');
+        },
+      }),
+    true,
+  ],
+];
+
+for (const [exit, arrange, throws] of LOST_CARDS) {
+  test(`a public salvage roll posts its own message once when ${exit}`, async (t) => {
+    t.mock.method(console, 'error', () => {});
+    const { result, cards, bundles, rollMessages } = await salvageAs(14, 'publicroll', arrange);
+    assert.equal(Boolean(result.threw), throws, String(result.threw?.message));
+    assert.equal(cards.length, 0, 'no card reached chat');
+    assert.equal(bundles.length + rollMessages.length, 1, 'the roll reached chat exactly once');
+    assert.equal(bundles[0].rolls.length, 2, 'with its pre-roll');
+    assert.equal(openCardRollsCount(), 0, 'and no offer is left open');
+  });
 }
 
 test('a hostile label posts with no inline-roll opener and no @ reference left to enrich', async () => {

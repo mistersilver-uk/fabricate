@@ -6433,11 +6433,20 @@ export class CraftingEngine {
     if (tools) return tools.result;
     const opened = await openSalvageRun(this, ctx);
     if (opened) return opened.result;
-    const checked = await runSalvageCheck(this, ctx);
-    if (checked) return checked.result;
-    // The settlement write stays outside the bracket: its rejection must escape uncaught, since
-    // inside it `_recordSalvageUncertainty` would answer with a second write to the same flag.
-    await beginSalvageSettlement(this, ctx);
+    try {
+      const checked = await runSalvageCheck(this, ctx);
+      if (checked) return checked.result;
+      // The settlement write stays outside the inner bracket: its rejection must escape uncaught,
+      // since inside it `_recordSalvageUncertainty` would answer with a second write to the flag.
+      await beginSalvageSettlement(this, ctx);
+      return await this._settleSalvage(ctx);
+    } finally {
+      await settleSalvageRoll(ctx);
+    }
+  }
+
+  /** The award bracket: a failure inside it is recorded as uncertain before it escapes. */
+  async _settleSalvage(ctx) {
     try {
       await resolveSalvageFailure(this, ctx);
       const failed = await publishSalvageFailure(this, ctx);
@@ -6449,8 +6458,6 @@ export class CraftingEngine {
     } catch (error) {
       await this._recordSalvageUncertainty(ctx, error);
       throw error;
-    } finally {
-      await settleSalvageRoll(ctx);
     }
   }
 

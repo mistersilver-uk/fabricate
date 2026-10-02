@@ -367,7 +367,10 @@ A refused choice cancels the whole batch with zero mutation, and a resource that
 - **A public check's Roll rides its result card.**
   For a public, non-secret check the crafting card of a Journal run and the single salvage card carry the check's evaluated Roll, followed by its pre-rolls and then any rolled result amounts, in the message's `rolls`, so one message both states the outcome and sounds and animates the dice, and no separate roll message is posted.
   The carried Rolls are the ones the check evaluated, rebuilt from their serialized data where the card is posted by the GM authority, and are never rerolled.
-  A card carrying a check Roll names the public mode in its create options, so its visibility never follows the creating client's own chat-mode selector.
+  A card carrying a check Roll names the public mode in its create options: `ChatMessage.create` applies a visibility mode only when one is passed, so the option states the card's visibility rather than leaving it to that default.
+  Where the GM authority posts the card, a card carrying a check Roll is authored as the user who asked for the check, taken from the sender the transport attested and never from the request's payload, so the dice are drawn as that user's; a card carrying no check Roll keeps the posting client's own author.
+  The carried Rolls are ordered so that one bearing dice leads whenever any does, and otherwise keep the order above, because a dice-animation module reads the first Roll to decide whether the message has dice at all.
+  An initiator the operation refuses the roll handoff to gets no Roll on the card either, so a roll they may not see is posted nowhere.
   A public roll whose card is not posted — the system's chat output is off, or the card could not be created — still posts its own roll message, so the dice are never lost.
   A bulk salvage run keeps one roll message per item beside its aggregate card, a craft resumed on a run that predates the Journal lifecycle keeps its separate roll message, and a gathering roll keeps its own message because the gathering card states no roll.
 - **A crafting card whose check rolled states its outcome.**

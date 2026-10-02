@@ -3,16 +3,18 @@ import { createJournalRunAuthority } from '../../src/systems/journalRunAuthority
 /**
  * A real Journal run authority for one elected GM over an in-memory ledger. `readable` collects
  * every document a replicated flag would carry, `state()` reads the ledger's current state and
- * `now` is the authority's clock.
+ * `now` is the authority's clock. `electedGM` answers the elected GM on each read, for a suite in
+ * which the election moves.
  */
-export function replicatedAuthorityFixture({ now = () => Date.now() } = {}) {
+export function replicatedAuthorityFixture({ now = () => Date.now(), electedGM = null } = {}) {
   let ledger = null;
   let sequence = 0;
   const readable = [];
   const gm = { id: 'gm', isGM: true };
+  const elected = electedGM ?? (() => gm);
   const authority = createJournalRunAuthority({
-    currentUser: () => gm,
-    activeGM: () => gm,
+    currentUser: elected,
+    activeGM: elected,
     listLedgers: async () => (ledger ? [ledger] : []),
     listLedgerRecords: async () => (ledger ? [{ id: ledger.id, createdTime: 1 }] : []),
     createLedger: async (source) => {

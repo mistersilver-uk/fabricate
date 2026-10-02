@@ -11,7 +11,9 @@ import {
   claimCardRolls,
   handoffRolls,
   offerCardRolls,
+  offeredCardAuthor,
   offeredCardRolls,
+  openCardRollsCount,
   settleCardRolls,
   withOfferedHandoff,
 } from '../src/systems/checkCardRolls.js';
@@ -107,14 +109,29 @@ describe('the card roll offer', () => {
     }
   });
 
-  it('drops the oldest open offer past its bound, so an unsettled caller cannot grow it', async () => {
-    const first = offerCardRolls({ rolls: () => [roll('first')] });
+  it('settles the oldest open offer past its bound, so its roll is posted rather than lost', async () => {
+    let fallbacks = 0;
+    const first = offerCardRolls({
+      rolls: () => [roll('first')],
+      post: async () => (fallbacks += 1),
+    });
     const later = Array.from({ length: 50 }, (_, index) =>
       offerCardRolls({ rolls: () => [roll(`later-${index}`)] })
     );
-    assert.deepEqual(offeredCardRolls(first), [], 'the oldest offer was dropped');
+    assert.deepEqual(offeredCardRolls(first), [], 'the oldest offer was closed');
+    assert.equal(fallbacks, 1, 'and its roll posted its own message');
     assert.deepEqual(offeredCardRolls(later.at(-1)), [roll('later-49')]);
     for (const key of later) await settleCardRolls(key);
+    assert.equal(openCardRollsCount(), 0);
+  });
+
+  it('names the user its card is authored as, and no one once it is settled', async () => {
+    const key = offerCardRolls({ rolls: () => [roll('1d20')], author: 'player' });
+    assert.equal(offeredCardAuthor(key), 'player');
+    assert.equal(offeredCardAuthor(offerCardRolls({ rolls: () => [] }, 'plain')), null);
+    await settleCardRolls(key);
+    await settleCardRolls('plain');
+    assert.equal(offeredCardAuthor(key), null);
   });
 });
 
@@ -166,6 +183,14 @@ describe('postCheckRoll', () => {
     }
   });
 
+  it('opens the offer under the key its caller minted, so the caller can settle it unanswered', async () => {
+    installChatMessage();
+    const { messages, input } = posting({ ...carrying, cardRolls: 'minted-key' });
+    assert.deepEqual(await postCheckRoll(input), { cardRolls: 'minted-key' });
+    assert.equal(await settleCardRolls('minted-key'), false);
+    assert.equal(messages.length, 1);
+  });
+
   it('neither posts nor offers a roll that is not interactive, or told not to post', async () => {
     installChatMessage();
     for (const options of [
@@ -199,10 +224,47 @@ describe('postResultCard', () => {
       assert.deepEqual(created[0].data.rolls, [roll('1d20'), roll('1d4'), roll('2d6')]);
       assert.deepEqual(created[0].data.speaker, { alias: 'Tinker' });
       assert.deepEqual(created[0].options, mode);
-      assert.ok(!('whisper' in created[0].data), 'the card is never whispered');
+      assert.ok(!('whisper' in created[0].data), 'the card data names no whisper');
+      assert.ok(!('author' in created[0].data), 'an offer with no author leaves it to the client');
       assert.equal(await settleCardRolls(key), true);
     });
   }
+
+  it("authors a card carrying check rolls as the offer's user, and no other card", async () => {
+    const created = installChatMessage();
+    const authored = (result) => {
+      const key = offerCardRolls({ rolls: () => [roll('1d20')], author: 'player' });
+      return { key, check: checkDisplayForCard({ ...result, cardRolls: key }) };
+    };
+    const carried = authored(checkResult());
+    await card(carried.check);
+    assert.equal(created[0].data.author, 'player');
+    const kept = authored(checkResult('gmroll'));
+    await card(kept.check);
+    assert.ok(!('author' in created[1].data), 'a card with no check roll keeps its own author');
+    await settleCardRolls(carried.key);
+    await settleCardRolls(kept.key);
+  });
+
+  it('leads with a dice-bearing roll, since Dice So Nice reads the first roll alone', async () => {
+    const created = installChatMessage();
+    const flat = { formula: '5', dice: [] };
+    const rolled = { formula: '1d4', dice: [{ faces: 4 }] };
+    const award = { formula: '2d6', dice: [{ faces: 6 }] };
+    const key = offerCardRolls({ rolls: () => [flat, rolled] });
+    await card(checkDisplayForCard({ ...checkResult(), cardRolls: key }), [award]);
+    assert.deepEqual(created[0].data.rolls, [rolled, flat, award]);
+    await settleCardRolls(key);
+
+    const diceless = offerCardRolls({ rolls: () => [flat, { formula: '7', dice: [] }] });
+    await card(checkDisplayForCard({ ...checkResult(), cardRolls: diceless }));
+    assert.deepEqual(
+      created[1].data.rolls.map((entry) => entry.formula),
+      ['5', '7'],
+      'with no dice anywhere the order stands'
+    );
+    await settleCardRolls(diceless);
+  });
 
   for (const rollMode of ['gmroll', 'blindroll', 'selfroll']) {
     it(`a ${rollMode} card carries no check roll even when one is offered`, async () => {
@@ -313,6 +375,11 @@ async function executeThroughAuthority({
   rollMode = 'publicroll',
   runType = 'crafting',
   postsCard = true,
+  authorizeRollHandoff = null,
+  execute = null,
+  stageMethod = 'execute',
+  electedAfterEvaluation = true,
+  payload = undefined,
 }) {
   const created = installChatMessage();
   const previousRoll = globalThis.Roll;
@@ -322,10 +389,11 @@ async function executeThroughAuthority({
   const handoff = { serializedRoll: { formula: '1d20', total: 14 } };
   const posted = [];
   let id = 0;
+  let elected = true;
   const service = createJournalRunCommandService({
     authority: replicatedAuthorityFixture().authority,
     currentUser: () => gm,
-    activeGM: () => gm,
+    activeGM: () => (elected ? gm : null),
     getUser: () => gm,
     resolveUuid: async () => ({ uuid: 'Actor.a', name: 'Tinker' }),
     emit: () => {},
@@ -342,12 +410,13 @@ async function executeThroughAuthority({
           publicPrompt: { label: 'Forge' },
           privateEvaluation: { rollFormula: '1d20' },
         }),
-        evaluateCheck: async () => ({
-          ...checkResult(rollMode),
-          engineEvaluated: true,
-          rollHandoff: handoff,
-        }),
-        execute: async ({ actor, executionGrant, requestId }) => {
+        evaluateCheck: async () => {
+          elected = electedAfterEvaluation;
+          return { ...checkResult(rollMode), engineEvaluated: true, rollHandoff: handoff };
+        },
+        ...(authorizeRollHandoff && { authorizeRollHandoff }),
+        [stageMethod]: async ({ actor, executionGrant, requestId }) => {
+          if (execute) return execute();
           const trusted = service.consumeExecutionGrant(executionGrant, {
             operation: 'execute',
             requestId,
@@ -362,13 +431,16 @@ async function executeThroughAuthority({
     },
   });
   try {
-    const response = await service.executeJournalRunCommand({
-      actorUuid: 'Actor.a',
-      runType,
-      runId: run.id,
-      expectedRevision: 3,
-      action: 'execute',
-    });
+    const response = await service
+      .executeJournalRunCommand({
+        actorUuid: 'Actor.a',
+        runType,
+        runId: run.id,
+        expectedRevision: 3,
+        action: 'execute',
+        ...(payload && { payload }),
+      })
+      .catch((error) => ({ threw: error }));
     return { response, created, posted, handoff };
   } finally {
     if (previousRoll === undefined) delete globalThis.Roll;
@@ -407,6 +479,44 @@ describe('a Journal crafting check whose card carries the roll', () => {
     assert.deepEqual(response.rollHandoff, handoff);
     assert.deepEqual(posted, [handoff], 'the roll still animates, as its own message');
   });
+
+  it('authors the card as the attested sender, whatever the payload names', async () => {
+    const { created } = await executeThroughAuthority({
+      payload: { senderId: 'forged', author: 'forged' },
+    });
+    assert.equal(created[0].data.author, 'gm', 'the sender the transport attested');
+  });
+
+  it('keeps the roll off the card of an initiator the handoff is refused to', async () => {
+    const { response, created, posted } = await executeThroughAuthority({
+      authorizeRollHandoff: async () => false,
+    });
+    assert.equal(response.success, true, JSON.stringify(response));
+    assert.equal(created.length, 1);
+    assert.equal('rolls' in created[0].data, false, 'the card carries no check roll');
+    assert.equal(Object.hasOwn(response, 'rollHandoff'), false);
+    assert.deepEqual(posted, [], 'and no roll message is posted');
+    assert.equal(openCardRollsCount(), 0);
+  });
+
+  for (const [exit, options, reason] of [
+    ['the stage throws', { execute: () => Promise.reject(new Error('stage failed')) }, null],
+    [
+      'the election is lost after the check',
+      { electedAfterEvaluation: false },
+      'active-gm-required',
+    ],
+    ['the operation has no stage method', { stageMethod: 'absent' }, 'unsupported-operation'],
+  ]) {
+    it(`leaves no offer open when ${exit}`, async () => {
+      const { response, created, posted } = await executeThroughAuthority(options);
+      assert.notEqual(response.success, true);
+      if (reason) assert.match(JSON.stringify(response), new RegExp(reason));
+      assert.deepEqual(created, []);
+      assert.deepEqual(posted, []);
+      assert.equal(openCardRollsCount(), 0, 'the offer the check opened is closed');
+    });
+  }
 
   it('never offers a gathering roll, whose card states no roll', async () => {
     const { response, created, posted, handoff } = await executeThroughAuthority({

@@ -50,6 +50,8 @@ function commandHarness({
   promptCheck = null,
   postRollHandoff = null,
   authority = null,
+  now = undefined,
+  relay = null,
 } = {}) {
   const emitted = [];
   const emissionOptions = [];
@@ -82,9 +84,11 @@ function commandHarness({
     emit: (message, options) => {
       emitted.push(message);
       emissionOptions.push(options);
+      relay?.(message, options);
     },
-    randomId: () => `id-${++id}`,
+    randomId: () => `${currentUserId}-${++id}`,
     timeoutMs,
+    ...(now && { now }),
     operations: operations ?? {
       crafting: {
         getRun: () => run,
@@ -1923,6 +1927,71 @@ describe('journal run command protocol', () => {
       serializedRoll: { formula: '1d20', total: 17 },
       serializedPreRolls: [{ formula: '1d4[secret tool]', total: 3 }],
     });
+  });
+
+  it('re-prepares an expired token across the socket, bound to the attested sender', async () => {
+    const clock = { now: 1000 };
+    const now = () => clock.now;
+    const world = replicatedAuthorityFixture({ now });
+    const run = { id: 'run-1', lifecycleVersion: 1, runRevision: 3, status: 'waiting' };
+    const seen = { describes: 0, senders: [] };
+    const operations = {
+      crafting: {
+        getRun: () => run,
+        describeCheck: async ({ sender }) => {
+          seen.describes += 1;
+          seen.senders.push(sender.id);
+          return {
+            required: true,
+            publicPrompt: { label: 'Forge', target: 12 },
+            privateEvaluation: { rollFormula: '1d20' },
+          };
+        },
+        evaluateCheck: async () => ({ engineEvaluated: true, success: true, data: {} }),
+        execute: async ({ senderId }) => ({ success: true, senderId }),
+      },
+    };
+    const services = {};
+    // Each client's socket delivers to the other with the id the server attests for the sender.
+    services.player = commandHarness({
+      timeoutMs: 1000,
+      operations,
+      promptCheck: async () => {
+        clock.now += 61_000;
+        return { confirmed: true };
+      },
+      relay: (message) => services.gm.service.handleSocketMessage(message, 'player'),
+    });
+    services.gm = commandHarness({
+      currentUserId: 'gm',
+      authority: world.authority,
+      operations,
+      now,
+      relay: (message) => services.player.service.handleSocketMessage(message, 'gm'),
+    });
+
+    const response = await services.player.service.executeJournalRunCommand({
+      actorUuid: 'Actor.a',
+      runType: 'crafting',
+      runId: 'run-1',
+      expectedRevision: 3,
+      action: 'execute',
+      payload: { senderId: 'other' },
+    });
+
+    assert.equal(response.success, true, JSON.stringify(response));
+    assert.equal(seen.describes, 2, 'the expired token cost a second preparation, not the roll');
+    assert.deepEqual(seen.senders, ['player', 'player']);
+    const tokens = Object.values(world.state().prepareTokens);
+    assert.deepEqual(
+      tokens.map((record) => record.status),
+      ['released', 'consumed']
+    );
+    assert.deepEqual(
+      tokens.map((record) => record.binding.senderId),
+      ['player', 'player'],
+      'the fresh token is bound to the sender the socket attested, never the payload\'s'
+    );
   });
 
   it('sends a non-interactive check no modifier ids, so the prepared defaults roll', async () => {

@@ -1,11 +1,11 @@
-import { settleCardRolls, withOfferedHandoff } from './checkCardRolls.js';
-import { checkDisplayForCard } from './craftCardFields.js';
+import { settleCardRolls } from './checkCardRolls.js';
 import { settlePromptedCheck } from './journalCheckPrompt.js';
 import {
   evaluatePreparedJournalCheck,
   withPreparedAdditionalDiceOffer,
   withSpentAdditionalDice,
 } from './journalPreparedCheck.js';
+import { cardOffer, executedCheckFor, withEntitledFacts } from './journalRollFacts.js';
 import { decisionAdditionalDice, preparedDecisionPolicy } from './preparedDecisionPolicy.js';
 import { applyGuardedRunMutation } from './runLifecycleState.js';
 
@@ -614,63 +614,6 @@ function serializedOperationResult(result, { secret = false, runId = '' } = {}) 
 }
 
 /**
- * A crafting reply's executed check projection for the player's result box (issue 2005), or null:
- * a blind roll, which the roller never sees, a non-crafting run and a stage with no rolled check
- * have none. The caller attaches it only for an entitled initiator.
- */
-function executedCheckFor(runType, checkResult) {
-  const check = runType === 'crafting' ? checkDisplayForCard(checkResult) : null;
-  return check?.evidence && check.visibility?.rollMode !== 'blindroll' ? check : null;
-}
-
-/**
- * Whether the attested initiator may receive a visible roll's private facts (its handoff and its
- * executed evidence), re-read against the fresh actor, sender and run after the commit.
- */
-async function initiatorEntitled({ operation, request, resolveUuid, getUser, ...authorization }) {
-  if (typeof operation.authorizeRollHandoff !== 'function') return true;
-  try {
-    const freshActor = await resolveUuid(request.actorUuid);
-    const freshSender = getUser?.(request.senderId) ?? null;
-    const freshRun =
-      freshActor && validText(request.runId)
-        ? await operation.getRun?.({
-            actor: freshActor,
-            runId: request.runId,
-            includeHistory: true,
-          })
-        : null;
-    return Boolean(
-      freshActor &&
-      freshSender &&
-      (await operation.authorizeRollHandoff({
-        actor: freshActor,
-        run: freshRun,
-        sender: freshSender,
-        ...authorization,
-      }))
-    );
-  } catch {
-    return false;
-  }
-}
-
-/**
- * A public crafting check's result with its handoff offered to the stage's result card under the
- * request id. The gathering card states no roll, so a gathering roll keeps its own message.
- */
-function cardOffer(request, checkResult, handoff) {
-  if (request.runType !== 'crafting') return checkResult;
-  return withOfferedHandoff(checkResult, handoff, request.requestId);
-}
-
-/** Evidence and the handoff share one entitlement: an unentitled initiator receives neither. */
-async function withEntitledFacts(response, { check, handoff }, authorization) {
-  if (!(handoff || check) || !(await initiatorEntitled(authorization))) return response;
-  return { ...response, ...(check && { check }), ...(handoff && { rollHandoff: handoff }) };
-}
-
-/**
  * Server-attested commands revalidate identity, ownership, revision and expected stage under a claim.
  * Player checks use one-use tokens, local prompts and GM resolution; adapters own disclosure.
  * Replies correlate recipients/user/session/request/run/revision; dismissal preserves actor history.
@@ -824,7 +767,11 @@ export function createJournalRunCommandService({
       } = resolvedCheckResult;
       responseRollHandoff = rollHandoff;
       secretCheck = secret === true;
-      const offered = cardOffer(request, trustedResolvedCheckResult, rollHandoff);
+      const entitlement = { operation, request, resolveUuid, getUser, privateEvaluation };
+      const offered = await cardOffer(trustedResolvedCheckResult, rollHandoff, {
+        ...entitlement,
+        payload: request.payload ?? {},
+      });
       trustedContext = { operationId: request.requestId, resolvedCheckResult: offered };
     } else if (request.action === 'execute' && typeof operation.describeCheck === 'function') {
       const preparationGrant = helpers.createExecutionGrant({
@@ -867,6 +814,21 @@ export function createJournalRunCommandService({
       };
     }
 
+    const facts = { trustedContext, responseRollHandoff, secretCheck, privateEvaluation };
+    const plan = { binding, preparedPayload, executionOperation };
+    try {
+      return await commitOperation(request, context, helpers, { ...facts, ...plan });
+    } finally {
+      // Every way out closes the card offer; one the reply already settled is gone by now.
+      await settleCardRolls(trustedContext.resolvedCheckResult?.cardRolls);
+    }
+  }
+
+  /** Runs the operation under its execution grant and answers the reply an entitled sender reads. */
+  async function commitOperation(request, context, helpers, prepared) {
+    const { actor, operation, run } = context;
+    const { binding, preparedPayload, executionOperation, trustedContext } = prepared;
+    const { responseRollHandoff, secretCheck, privateEvaluation } = prepared;
     const method = operation[executionOperation];
     if (typeof method !== 'function') return failure('unsupported-operation');
     if (!currentRealmIsActiveGm()) return failure('active-gm-required');

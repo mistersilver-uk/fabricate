@@ -6,7 +6,7 @@
 import { publicComplications } from '../utils/complicationPlan.js';
 import { activityPermitsFailureResults } from '../utils/failureResultPolicy.js';
 
-import { settleCardRolls } from './checkCardRolls.js';
+import { cardRollsKey, settleCardRolls } from './checkCardRolls.js';
 import { refusalData } from './checkTarget.js';
 import { carryAdditionalDice, checkRequest } from './countCheckRoll.js';
 import { checkDisplayForCard, rollTotalForCard, tierStepForCard } from './craftCardFields.js';
@@ -194,8 +194,11 @@ export async function openSalvageRun(engine, ctx) {
 export async function runSalvageCheck(engine, ctx) {
   const { actor, component, options, salvageRunManager, system, toolValidation } = ctx;
   // The salvage card carries a public roll only when this call posts one: a bulk run posts an
-  // aggregate card instead, and its rolls keep their own messages.
-  const cardRolls = options?.suppressChat !== true && system?.features?.chatOutput === true;
+  // aggregate card instead, and its rolls keep their own messages. The key is on `ctx` before the
+  // check runs, so `settleSalvageRoll` closes an offer the check opened and then threw past.
+  const carries = options?.suppressChat !== true && system?.features?.chatOutput === true;
+  if (carries) ctx.cardRolls = cardRollsKey();
+  const cardRolls = ctx.cardRolls ?? false;
   const checkResult = await engine._runSalvageCraftingCheck(component, system, actor, {
     interactive: checkRequest({ ...options, cardRolls }, { craftingSystem: system, component }),
     toolItems: toolValidation.tools, // ratchet-exempt(world-scope): not-a-system
@@ -255,22 +258,17 @@ export async function beginSalvageSettlement(engine, ctx) {
         checkResult.success || failurePolicy.consumeComponentOnFail ? 'pending' : 'notApplicable',
       awards: 'pending',
     };
-    try {
-      await salvageRunManager.updateRun(actor, salvageRun);
-    } catch (error) {
-      await settleSalvageRoll(ctx);
-      throw error;
-    }
+    await salvageRunManager.updateRun(actor, salvageRun);
   }
   return null;
 }
 
 /**
  * Closes the offer a public salvage roll rode to its card under: a roll no card carried posts its
- * own message. `salvage()` calls it on every way out of its settlement bracket.
+ * own message. `salvage()` calls it on every way out once the check has begun.
  */
 export function settleSalvageRoll(ctx) {
-  return settleCardRolls(ctx.checkResult?.cardRolls);
+  return settleCardRolls(ctx.cardRolls);
 }
 
 /**

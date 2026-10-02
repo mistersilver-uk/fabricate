@@ -14,7 +14,8 @@ const TOKEN_REFUSED = 'prepare-token-invalid';
 /**
  * Prompts for `first`, the authority's `checkRequired` reply to `command`, and settles the answer.
  * A refused token re-sends `command` for a fresh preparation: the answer settles under it unasked
- * when `decisionStandsFor` holds, else `onCheckChanged` runs and the fresh descriptor is prompted.
+ * when `decisionStandsFor` holds, else `onCheckChanged` runs and the fresh descriptor is prompted
+ * with `{ changed: true }`, so the reopened prompt can say why it is back.
  * Past `PREPARE_RETRY_LIMIT` the refusal stands, and a preparation that fails answers its reason.
  */
 export async function settlePromptedCheck(
@@ -44,7 +45,7 @@ export async function settlePromptedCheck(
     if (!fresh?.checkRequired) return fresh;
     if (!decisionStandsFor(decision, prepared.promptDescriptor, fresh.promptDescriptor)) {
       onCheckChanged?.();
-      decision = await promptCheck(fresh.promptDescriptor);
+      decision = await promptCheck(fresh.promptDescriptor, { changed: true });
     }
     prepared = fresh;
   }

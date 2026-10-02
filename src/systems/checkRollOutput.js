@@ -79,9 +79,9 @@ async function postRollMessage({ roll, preRolls, speaker, flavor, rollMode }) {
 
 /**
  * Interactive rolls reach chat, which is what Dice So Nice animates; a failed post is swallowed.
- * A public roll whose caller posts a result card (`options.cardRolls`, with the visibility report
- * the card gates on) is offered to that card instead and answers `{ cardRolls }`, the offer its
- * caller settles; every other roll posts its own message now and answers nothing.
+ * A public roll whose caller posts a result card (`options.cardRolls`, `true` or the key the caller
+ * minted, with the visibility report the card gates on) is offered to that card instead and answers
+ * `{ cardRolls }`, the offer its caller settles; every other roll posts its own message now.
  */
 export async function postCheckRoll({ roll, preRolls, options, flavor, rollMode }) {
   if (
@@ -98,9 +98,11 @@ export async function postCheckRoll({ roll, preRolls, options, flavor, rollMode 
       console.error('Fabricate | Failed to post check roll to chat:', error);
     }
   };
-  const offered = options.cardRolls === true && options.reportVisibility === true;
+  const { cardRolls } = options;
+  const offered = Boolean(cardRolls) && options.reportVisibility === true;
   if (offered && rollMode === 'publicroll') {
-    return { cardRolls: offerCardRolls({ rolls: () => [roll, ...preRolls], post }) };
+    const key = typeof cardRolls === 'string' ? cardRolls : undefined;
+    return { cardRolls: offerCardRolls({ rolls: () => [roll, ...preRolls], post }, key) };
   }
   await post();
   return {};

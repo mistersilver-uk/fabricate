@@ -646,6 +646,8 @@ export async function promptCheckRoll(options = {}) {
     additionalDiceOffer,
     options.actorName
   );
+  // An already-localized sentence its caller wants stated above the check, such as why it reopened.
+  if (options.notice) data.notice = String(options.notice);
   return waitForPrompt(data, allowAdvantage, plan, open);
 }
 

@@ -21,13 +21,13 @@ const COMMAND = Object.freeze({
  * consumed and released by the production store. `describe(call)` answers each preparation, and
  * `clock.now` is shared by the service and the authority.
  */
-function promptHarness({ describe: describeCheck, promptCheck, now = null }) {
+function promptHarness({ describe: describeCheck, promptCheck, now = null, electedGM = null }) {
   const clock = { now: 1000 };
   const read = now ?? (() => clock.now);
-  const world = replicatedAuthorityFixture({ now: read });
+  const world = replicatedAuthorityFixture({ now: read, electedGM });
   const gm = { id: 'gm', isGM: true };
   const run = { id: COMMAND.runId, lifecycleVersion: 1, runRevision: 3, status: 'waiting' };
-  const seen = { describes: 0, evaluated: [], executes: 0, notices: 0, prompts: [] };
+  const seen = { describes: 0, evaluated: [], executes: 0, notices: 0, prompts: [], reopened: [] };
   let id = 0;
   const service = createJournalRunCommandService({
     authority: world.authority,
@@ -38,14 +38,18 @@ function promptHarness({ describe: describeCheck, promptCheck, now = null }) {
     emit: () => {},
     randomId: () => `request-${++id}`,
     now: read,
-    promptCheck: async (descriptor) => {
+    promptCheck: async (descriptor, options) => {
       seen.prompts.push(descriptor);
+      seen.reopened.push(options?.changed === true);
       return promptCheck(descriptor, clock, seen.prompts.length);
     },
     onCheckChanged: () => (seen.notices += 1),
     operations: {
       crafting: {
-        getRun: () => run,
+        getRun: () => {
+          seen.onRequest?.();
+          return run;
+        },
         describeCheck: async () => describeCheck((seen.describes += 1)),
         evaluateCheck: async ({ decision }) => {
           seen.evaluated.push(decision);
@@ -106,6 +110,7 @@ describe('a prepare token refused after the roll prompt', () => {
       'the second prompt shows the fresh descriptor'
     );
     assert.equal(seen.notices, 1, 'the player is told the details changed');
+    assert.deepEqual(seen.reopened, [false, true], 'and the reopened prompt is told so too');
     assert.equal(seen.evaluated.length, 1);
     assert.equal(seen.evaluated[0].bonus, '4', 'the second answer is the one that settled');
     assert.deepEqual(tokenStatuses(), ['released', 'consumed']);
@@ -163,6 +168,43 @@ describe('a prepare token refused after the roll prompt', () => {
     assert.deepEqual(response, { success: false, reason: 'source-actor-not-found' });
     assert.equal(seen.prompts.length, 1);
     assert.equal(seen.executes, 0);
+  });
+
+  it('treats a token as expired at exactly its minute', async () => {
+    const { service, seen, tokenStatuses } = promptHarness({
+      describe: () => required({ ...FORGE }),
+      promptCheck: async (_descriptor, clock) => {
+        clock.now += 60_000;
+        return { confirmed: true };
+      },
+    });
+    const response = await service.executeJournalRunCommand(COMMAND);
+
+    assert.equal(response.success, true, JSON.stringify(response));
+    assert.equal(seen.describes, 2, 'the token issued a minute ago is no longer honoured');
+    assert.deepEqual(tokenStatuses(), ['released', 'consumed']);
+  });
+
+  it('stops at the retry limit when the refusal is not an expiry, and answers it', async () => {
+    // The election moves on every request, so no token is ever consumed by the GM that issued it
+    // and the clock, which never advances, expires none of them.
+    let elections = 0;
+    const { service, seen, tokenStatuses } = promptHarness({
+      describe: () => required({ ...FORGE }),
+      promptCheck: async () => ({ confirmed: true }),
+      electedGM: () => ({ id: `gm-${elections}`, isGM: true }),
+    });
+    seen.onRequest = () => (elections += 1);
+    const response = await service.executeJournalRunCommand(COMMAND);
+
+    assert.deepEqual(response, { success: false, reason: 'prepare-token-invalid' });
+    assert.equal(seen.describes, 1 + PREPARE_RETRY_LIMIT, 'the loop is bounded');
+    assert.equal(seen.prompts.length, 1, 'and the player is not asked again for an equal check');
+    assert.equal(seen.executes, 0);
+    assert.ok(
+      tokenStatuses().every((status) => status === 'active'),
+      'no token expired: each was refused for its issuer'
+    );
   });
 
   it('settles a prompt answered inside the minute on its first token', async () => {
