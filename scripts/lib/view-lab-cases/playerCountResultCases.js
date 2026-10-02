@@ -20,6 +20,8 @@ const RESULT_SOURCES = Object.freeze([
   CRAFTING_SHARED,
   CRAFTING_SIMPLE,
   /^src\/ui\/svelte\/apps\/crafting\/detail\/(?:RollResultBox|CheckEvidenceRows)\.svelte$/,
+  // The fact row's keyed form draws every evidence row, its sentences as prose (issue 2134).
+  /^src\/ui\/svelte\/apps\/journal\/JournalFactRow\.svelte$/,
   /^src\/ui\/presenters\/(?:checkDisplay|countDiceTiles|countEvidenceRows)\.js$/,
   /^src\/systems\/countDisplayEvidence\.js$/,
 ]);
@@ -100,8 +102,9 @@ export function playerCountResultCases() {
         label: `Player app — success-counting result box, botched, every tile cancelled (${scheme})`,
         state: 'count-result-botch',
         failed: true,
-        // Fabricate's own surfaces keep their theme, so the light frame also docks the chat card.
-        ...(scheme === 'light' && { query: { colorScheme: 'light', chatLog: '1' } }),
+        // Fabricate's own surfaces keep their theme, so the light frame also docks the chat card,
+        // on the left so the result box the case names stays in view (issue 2134).
+        ...(scheme === 'light' && { query: { colorScheme: 'light', chatLog: 'left' } }),
         ...(scheme === 'light' && {
           expectVisible:
             '[data-view-lab-chat-log] > .chat-message[data-view-lab-chat-visibility="public"] ' +
@@ -212,7 +215,8 @@ export function playerCountResultCases() {
         `${RESULT_BOX}[data-roll-success="true"]` +
         ':not(:has([data-check-count-tiles])):not(:has([data-check-evidence-rows]))',
     }),
-    // A companion's interactive count request prompts on the standalone overlay, with no window.
+    // A companion's interactive count request prompts on the standalone overlay, with no window;
+    // its subtitle names the actor alone, as a request carries no recipe or tier (issue 2134).
     playerCase({
       id: 'player-crafting-roll-prompt-count-companion',
       label: 'Player app — a companion success-counting roll prompt on the standalone overlay',
@@ -222,6 +226,7 @@ export function playerCountResultCases() {
       steps: [{ selector: '[data-lab-companion-roll]' }],
       expectSelector:
         '.fabricate-standalone-overlay .manager-modal[data-roll-prompt="single"]' +
+        ':has(.manager-modal-subtitle:text-is("Brenna Karrunsdottir"))' +
         COUNT_ADVANTAGE_FOOTER +
         ':has(.formula-content .formula[data-roll-prompt-count="over"]:text-is("4d10 · each ≥ 8"))' +
         ':has(.formula-content .formula-note:text-is("Success on ≥ 8 · explodes on 10 · 1 cancels a success"))' +
@@ -229,7 +234,7 @@ export function playerCountResultCases() {
       kinds: ['player', 'crafting'],
       sourceMatches: [
         /^src\/ui\/svelte\/apps\/crafting\/(?:RollPrompt(?:Target|Footer)?\.svelte|rollPrompt(?:Target|Host)?\.js)$/,
-        /^src\/systems\/companionCheck(?:Roll|Evaluation)\.js$/,
+        /^src\/systems\/(?:companionCheck(?:Roll|Evaluation)|checkRollDecision)\.js$/,
         /^src\/bootstrap\/companionFacade\.js$/,
       ],
     }),
