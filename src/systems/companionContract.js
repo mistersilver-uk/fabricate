@@ -548,11 +548,10 @@ const ROLLED_OUTCOMES = Object.freeze([
 ]);
 
 /** The key re-keying a graded answer (target, count, zero pool) or naming a refusal's reason. */
-function checkRollMessageKey(outcome, roll) {
+function checkRollMessageKey(outcome, roll, keys = CHECK_ROLL_MESSAGE_KEYS) {
   if (outcome === COMPANION_OUTCOMES.additionalDiceRefused) return roll?.refusalKey ?? null;
   const passed = outcome === COMPANION_OUTCOMES.checkPassed;
   if (!passed && outcome !== COMPANION_OUTCOMES.checkFailed) return null;
-  const keys = CHECK_ROLL_MESSAGE_KEYS;
   if (roll?.targetGraded === true) return passed ? keys.checkPassedTarget : keys.checkFailedTarget;
   if (roll?.product !== 'count') return null;
   if (passed) return keys.checkPassedCount;
@@ -869,7 +868,8 @@ export function gateCompanionCallSite(request, seams) {
   return null;
 }
 
-/** A purchase's call-site refusal (issue 2008): a broadcast runs on every client, so none spends. */
+/** A purchase's call-site refusal (issue 2008): a broadcast request runs on the elected executor,
+ * never the acting player's own choice, so it buys nothing. */
 export const additionalDiceCallSiteRefusal = (request) =>
   request?.callSite === COMPANION_CALL_SITES.broadcast ? 'broadcastCallSite' : null;
 
