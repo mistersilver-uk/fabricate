@@ -191,6 +191,8 @@ function promptInput({
     ...attributeTargetPromptField(evaluation),
     ...underTargetPromptFields(evaluation, options),
     label: options.flavor,
+    // The rolling actor names the prompt on every path, a companion's bare prompt seam included.
+    ...(actor?.name && { actorName: actor.name }),
     name: options.name,
     activity: options.activity,
     img: options.img,

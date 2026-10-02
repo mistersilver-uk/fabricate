@@ -6,7 +6,8 @@
   code under the SonarCloud duplication budget). A `danger` flag tints the value
   with the danger token (used for a step's failure copy). A `null` icon draws none, and
   `keyed` sets the label as a key column (`--journal-fact-key-width`, default 120px)
-  beside a left-aligned, wrapping 13px value: recorded check evidence (issue 2005). An array
+  beside a left-aligned, wrapping 13px value: recorded check evidence (issue 2005). A keyed `prose`
+  value is a sentence, set in the body face at 12px so it wraps by word (issue 2134). An array
   `value` renders its segments with a `<wbr>` break opportunity between them.
 -->
 <script>
@@ -17,6 +18,7 @@
     danger = false,
     inline = false,
     keyed = false,
+    prose = false,
   } = $props();
 </script>
 
@@ -25,6 +27,7 @@
   class:is-danger={danger}
   class:is-inline={inline}
   class:is-keyed={keyed}
+  class:is-prose={keyed && prose}
   data-journal-fact
 >
   {#if icon}<i class={`fas ${icon} journal-fact-icon`} aria-hidden="true"></i>{/if}
@@ -83,6 +86,11 @@
     /* A typed path breaks at a space first, and only mid-word when a word alone overflows. */
     overflow-wrap: break-word;
     text-align: left;
+  }
+  .journal-fact-row.is-prose .journal-fact-value {
+    font-family: inherit;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
   }
   .journal-fact-row.is-inline .journal-fact-value {
     margin-left: var(--fab-space-1);
