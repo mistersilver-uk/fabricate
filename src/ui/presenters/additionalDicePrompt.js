@@ -109,6 +109,41 @@ const COPY = Object.freeze([
     '1 die needs at least {shortfall} more, and you can afford {limit}.',
   ],
   [
+    'unreachableNormal',
+    'FABRICATE.App.RollPrompt.AdditionalDice.UnreachableNormal',
+    'Without Advantage, these dice cannot reach {needed} successes.',
+  ],
+  [
+    'unreachableNormalOne',
+    'FABRICATE.App.RollPrompt.AdditionalDice.UnreachableNormalOne',
+    'Without Advantage, these dice cannot reach 1 success.',
+  ],
+  [
+    'unreachableMaxZero',
+    'FABRICATE.App.RollPrompt.AdditionalDice.UnreachableMaxZero',
+    'Modifiers reduce the pool below zero, so at least {shortfall} dice are needed, and at most {max} can ever be added.',
+  ],
+  [
+    'unreachableMaxZeroOne',
+    'FABRICATE.App.RollPrompt.AdditionalDice.UnreachableMaxZeroOne',
+    'Modifiers reduce the pool below zero, so at least 1 die is needed, and at most {max} can ever be added.',
+  ],
+  [
+    'unreachableAffordZero',
+    'FABRICATE.App.RollPrompt.AdditionalDice.UnreachableAffordZero',
+    'Modifiers reduce the pool below zero, so at least {shortfall} dice are needed, and you can afford {limit}.',
+  ],
+  [
+    'unreachableAffordZeroOne',
+    'FABRICATE.App.RollPrompt.AdditionalDice.UnreachableAffordZeroOne',
+    'Modifiers reduce the pool below zero, so at least 1 die is needed, and you can afford {limit}.',
+  ],
+  [
+    'rescued',
+    'FABRICATE.App.RollPrompt.AdditionalDice.Rescued',
+    'A trigger on this check can still succeed it.',
+  ],
+  [
     'unreachableFaces',
     'FABRICATE.App.RollPrompt.AdditionalDice.UnreachableFaces',
     'Cannot reach {needed} successes with these dice.',
@@ -218,13 +253,26 @@ export function additionalDiceCopy(offer, localize) {
   return copy;
 }
 
-function unreachableText(reach, judged, values, labels) {
+/** Why the Roll cannot reach, led by Advantage when only it can; a zero pool names its floor. */
+function unreachableReason(reach, judgedAll, values, labels) {
+  const judged = judgedAll.normal;
   const one = (key, count) => labels[count === 1 ? `${key}One` : key];
   if (reach.perDieMost === 0 || judged.shortfall === null) {
     return fill(one('unreachableFaces', values.needed), values);
   }
+  const advantage = judgedAll.advantage && !judgedAll.advantage.unreachable;
+  const lead = fill(one(advantage ? 'unreachableNormal' : 'unreachable', values.needed), values);
   const reason = judged.shortfall > values.max ? 'unreachableMax' : 'unreachableAfford';
-  return `${fill(one('unreachable', values.needed), values)} ${fill(one(reason, values.pool), values)}`;
+  const why =
+    values.pool === 0
+      ? fill(one(`${reason}Zero`, judged.shortfall), values)
+      : fill(one(reason, values.pool), values);
+  return `${lead} ${why}`;
+}
+
+function unreachableText(reach, judgedAll, values, labels) {
+  const text = unreachableReason(reach, judgedAll, values, labels);
+  return reach.rescued ? `${text} ${labels.rescued}` : text;
 }
 
 function shortfallText(reach, shortfall, chosen, text) {
@@ -233,11 +281,12 @@ function shortfallText(reach, shortfall, chosen, text) {
   return { tone: 'warning', text: text(key(reach.explode === 'off' ? 'short' : 'shortExplode')) };
 }
 
-function messageOf({ offer, reach, judged, chosen, values, labels, text, rolls }) {
+function messageOf({ offer, reach, judgedAll, chosen, values, labels, text, rolls }) {
+  const judged = judgedAll.normal;
   if (offer.unavailable) return { tone: 'info', text: fill(labels.unavailableMessage, values) };
   if (reach && reach.needed !== null) {
     if (judged.unreachable) {
-      return { tone: 'danger', text: unreachableText(reach, judged, values, labels) };
+      return { tone: 'danger', text: unreachableText(reach, judgedAll, values, labels) };
     }
     if (judged.shortfall > 0) return shortfallText(reach, judged.shortfall, chosen, text);
   }
@@ -367,7 +416,7 @@ export function describeAdditionalDice({
     spendLine: unavailable
       ? fill(labels.spendsUnlabelled, values)
       : text(rolls > 1 ? 'spendsAcross' : 'spends'),
-    message: messageOf({ offer, reach, judged, chosen, values, labels, text, rolls }),
+    message: messageOf({ offer, reach, judgedAll, chosen, values, labels, text, rolls }),
     disabled: unavailable || offer.limit === 0,
     blocked: Object.fromEntries(
       ['disadvantage', 'normal', 'advantage'].map((action) => [

@@ -547,6 +547,13 @@
           "UnreachableMaxOne": "1 die needs at least {shortfall} more, and at most {max} can ever be added.",
           "UnreachableAfford": "{pool} dice need at least {shortfall} more, and you can afford {limit}.",
           "UnreachableAffordOne": "1 die needs at least {shortfall} more, and you can afford {limit}.",
+          "UnreachableNormal": "Without Advantage, these dice cannot reach {needed} successes.",
+          "UnreachableNormalOne": "Without Advantage, these dice cannot reach 1 success.",
+          "UnreachableMaxZero": "Modifiers reduce the pool below zero, so at least {shortfall} dice are needed, and at most {max} can ever be added.",
+          "UnreachableMaxZeroOne": "Modifiers reduce the pool below zero, so at least 1 die is needed, and at most {max} can ever be added.",
+          "UnreachableAffordZero": "Modifiers reduce the pool below zero, so at least {shortfall} dice are needed, and you can afford {limit}.",
+          "UnreachableAffordZeroOne": "Modifiers reduce the pool below zero, so at least 1 die is needed, and you can afford {limit}.",
+          "Rescued": "A trigger on this check can still succeed it.",
           "UnreachableFaces": "Cannot reach {needed} successes with these dice.",
           "UnreachableFacesOne": "Cannot reach 1 success with these dice.",
           "Enough": "At least {shortfall} additional dice are needed. You have enough.",
@@ -2052,7 +2059,7 @@
         "Spent": "{count} bought · spent {count}",
         "SpentResource": "{count} bought · spent {count} {resource}",
         "TileLabel": "{label}, bought",
-        "Legend": "{legend} · dashed = bought"
+        "Legend": "{legend} · dashed\u00a0=\u00a0bought"
       },
       "AdditionalDiceRefusal": {
         "SourceMissing": "Additional dice are unavailable: this check has no source to pay for them.",
@@ -6928,7 +6935,8 @@
               "NotePath": "Up to {limit} for {actor} ({resource} {available}, at most {max} per roll).",
               "NotePathUnlabelled": "Up to {limit} for {actor} ({available} available, at most {max} per roll).",
               "NoteMacro": "The preview never runs the read macro, so up to {max} can be added here.",
-              "NoteUnreadable": "{actor} has no readable value at {path}, so no dice can be added.",
+              "NoteOverridden": "An active effect changes {actor}'s {path}, so no dice can be added.",
+              "NoteUnreadable": "{actor} has no stored number at {path}, so no dice can be added.",
               "NoteNoActor": "Choose a character to see how many they can add.",
               "NoteNoSource": "This check has no source to pay for additional dice."
             }
@@ -7077,7 +7085,7 @@
             "SourceMacro": "Read and spend macros",
             "PathTitle": "Path on the crafting character",
             "PathEmpty": "No source set. Players cannot be offered additional dice until one is.",
-            "PathUnresolved": "{actor} has no number at {path}, so they could not buy additional dice.",
+            "PathUnresolved": "{actor} has no stored number at {path}, so they could not buy additional dice.",
             "PathOverridden": "An active effect changes {actor}'s {path}, so spending it would not lower it. Use a stored value.",
             "ReadMacro": "Read macro",
             "ReadMacroHint": "Returns what the character can spend",

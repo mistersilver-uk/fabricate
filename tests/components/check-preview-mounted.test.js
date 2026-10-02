@@ -1658,7 +1658,7 @@ describe('the Preview’s additional-dice stepper (issue 2008)', () => {
     assert.deepEqual(readings(), before, 'the odds and the inset read the base pool alone');
     await rollFaces(root, [9, 3, 8]);
     assert.deepEqual(tileMarks(root), ['qualified', '', 'qualified bought']);
-    assert.match(root.querySelector('[data-checks-simulator-legend]').textContent, /dashed = bought/);
+    assert.match(root.querySelector('[data-checks-simulator-legend]').textContent, /dashed\u{A0}=\u{A0}bought/u);
     assert.deepEqual([calls.updates, calls.macros], [[], []], 'the preview reads and spends nothing');
   });
 
@@ -1671,7 +1671,7 @@ describe('the Preview’s additional-dice stepper (issue 2008)', () => {
     assert.equal(input(root).value, '0');
     assert.equal(
       note(root).textContent.trim(),
-      `Bare Hands has no readable value at ${PATH}, so no dice can be added.`
+      `Bare Hands has no stored number at ${PATH}, so no dice can be added.`
     );
     await rollFaces(root, [9, 3, 8, 8]);
     assert.deepEqual(tileMarks(root), ['qualified', ''], 'the base pool alone rolls');

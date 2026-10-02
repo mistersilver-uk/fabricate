@@ -114,7 +114,7 @@ export function playerAdditionalDicePromptCases() {
         STEPPER(true) +
         MESSAGE(
           'danger',
-          'Cannot reach 3 successes. 2 dice need at least 1 more, and you can afford 0.'
+          'Without Advantage, these dice cannot reach 3 successes. 2 dice need at least 1 more, and you can afford 0.'
         ) +
         BLOCKED('disadvantage') +
         BLOCKED('normal') +
@@ -157,7 +157,10 @@ export function playerAdditionalDicePromptCases() {
       id: 'player-crafting-roll-prompt-count-additional-rescued',
       label: 'no action able to reach, rescued by an automatic success',
       state: 'count-additional-rescued',
-      expectSelector: MESSAGE('danger', 'Cannot reach 5 successes.') + ALL_ENABLED + NO_BLOCK_NOTE,
+      expectSelector:
+        MESSAGE('danger', 'A trigger on this check can still succeed it.') +
+        ALL_ENABLED +
+        NO_BLOCK_NOTE,
     }),
     // A recursive explosion can always reach, so the shortfall reads as without exploding dice.
     promptCase({

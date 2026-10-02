@@ -1101,6 +1101,12 @@ describe('mounted roll prompt', () => {
         ['true', 'true', null]
       );
       assert.equal(blockNote(dialog).textContent, 'Only Advantage can reach the successes needed.');
+      const message = controlOf(dialog).querySelector('[data-roll-prompt-additional-dice-message]');
+      assert.match(
+        message.textContent.trim(),
+        /^Without Advantage, these dice cannot reach 3 successes\. /,
+        'never "Cannot reach" beside an Advantage that can'
+      );
       assert.equal(stepperInput(dialog).disabled, true, 'nothing to buy');
       assert.equal(
         document.activeElement,
@@ -1246,15 +1252,21 @@ describe('mounted roll prompt', () => {
         assert.equal((await pending).advantage, 'normal');
       });
 
-      it('notes a batch whose rows pay differently instead of offering the control', async () => {
+      it('notes a batch whose rows pay differently in the titled well, with no stepper', async () => {
         const { dialog, pending } = await openBatch(rowsNeeding(1, 1), {
           additionalDiceOffer: undefined,
           additionalDiceMixed: true,
         });
-        assert.ok(!controlOf(dialog));
-        assert.equal(
-          dialog.querySelector('[data-roll-prompt-additional-dice-mixed]').textContent,
-          'Rolls in this batch use different resources, so no dice can be added.'
+        const control = controlOf(dialog);
+        assert.ok(control.matches('.fab-well'), 'the shared well');
+        const title = control.querySelector('[data-roll-prompt-additional-dice-title]');
+        assert.equal(title.textContent, 'Additional dice');
+        assert.ok(!stepperInput(dialog), 'nothing to choose');
+        assert.ok(!control.querySelector('[data-roll-prompt-additional-dice-line]'), 'no spend line');
+        const message = control.querySelector('[data-roll-prompt-additional-dice-message]');
+        assert.deepEqual(
+          [message.dataset.noticeTone, message.textContent.trim()],
+          ['info', 'Rolls in this batch use different resources, so no dice can be added.']
         );
         dialog.querySelector('form').requestSubmit();
         assert.ok(!('additionalDice' in (await pending)));

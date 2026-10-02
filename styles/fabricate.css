@@ -16515,6 +16515,14 @@
   border-style: dashed;
 }
 
+/* An untoned tile's resting border is too faint to read as dashed (WCAG 1.4.11), so it inks. */
+.fabricate-dice-tiles__tile--bought:not(
+    .fabricate-dice-tiles__tile--success,
+    .fabricate-dice-tiles__tile--danger
+  ) {
+  border-color: var(--fab-text-subtle);
+}
+
 /* On a chat card a tile mixes its tone into the chat's own ink, as the result pill does, so it reads on parchment and on a dark chat theme alike. */
 .fabricate-craft-chat .fabricate-dice-tiles__tile {
   --fabricate-dice-tile-tone: currentcolor;

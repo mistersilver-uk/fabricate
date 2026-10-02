@@ -238,7 +238,7 @@ describe('bought dice (issue 2008)', () => {
     assert.equal(tileLabel({ ...tile, marks: [] }, shippedLocalize), '11, bought');
     assert.equal(tileLabel(tile, (key) => key), '11, qualified, bought', 'English fallback');
     assert.equal(DICE_TILE_BOUGHT, 'bought');
-    assert.equal(legendText(shippedLocalize, 1), '✓ qualified · ✕ cancelled · ↻ exploded · dashed = bought');
+    assert.equal(legendText(shippedLocalize, 1), '✓ qualified · ✕ cancelled · ↻ exploded · dashed\u{A0}=\u{A0}bought');
     assert.equal(legendText(shippedLocalize, 0), '✓ qualified · ✕ cancelled · ↻ exploded');
     assert.equal(legendText(shippedLocalize), '✓ qualified · ✕ cancelled · ↻ exploded');
   });
@@ -260,7 +260,7 @@ describe('bought dice (issue 2008)', () => {
     assert.ok(
       tiles.filter((_, index) => index !== 2).every((tile) => !tile.classes.includes('fabricate-dice-tiles__tile--bought'))
     );
-    assert.match(html, /data-dice-tiles-legend="">✓ qualified · ✕ cancelled · ↻ exploded · dashed = bought<\/p>/);
+    assert.match(html, /data-dice-tiles-legend="">✓ qualified · ✕ cancelled · ↻ exploded · dashed\u{A0}=\u{A0}bought<\/p>/u);
     const glyphs = html.split('<li ', 4)[3].match(/<i class="[^"]*"/g);
     assert.deepEqual(glyphs, ['<i class="fa-solid fa-check"', '<i class="fa-solid fa-rotate"'], 'no glyph for bought');
     assert.doesNotMatch(

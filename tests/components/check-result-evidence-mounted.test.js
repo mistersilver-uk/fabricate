@@ -313,7 +313,7 @@ describe('RollResultBox evidence rows', () => {
     const dashed = root.querySelectorAll('.fabricate-dice-tiles__tile--bought');
     assert.equal(dashed.length, 1, 'one tile paints dashed');
     assert.equal(dashed[0].getAttribute('aria-label'), '8, qualified, bought');
-    assert.match(root.querySelector('[data-dice-tiles-legend]').textContent, /dashed = bought$/);
+    assert.match(root.querySelector('[data-dice-tiles-legend]').textContent, /dashed\u{A0}=\u{A0}bought$/u);
     assert.deepEqual(rowsOf(root).at(-1), [
       'additionalDice',
       'Additional dice',
@@ -401,7 +401,7 @@ describe('SalvageRollSummary evidence rows', () => {
       result: { state: 'success', message: 'Salvaged.', rollValue: 2, check: boughtCheck() },
     });
     assert.deepEqual(tilesOf(root).at(-1), [8, 'qualified bought']);
-    assert.match(root.querySelector('[data-dice-tiles-legend]').textContent, /dashed = bought$/);
+    assert.match(root.querySelector('[data-dice-tiles-legend]').textContent, /dashed\u{A0}=\u{A0}bought$/u);
     assert.deepEqual(rowsOf(root).at(-1), [
       'additionalDice',
       'Additional dice',

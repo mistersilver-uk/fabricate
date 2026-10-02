@@ -188,6 +188,7 @@ const ADDITIONAL_DICE_OFFERS = {
   'count-additional-not-writable': { limit: 0, unavailable: 'resourceNotWritable', needed: 1 },
   'count-additional-macro-failed': { limit: 0, unavailable: 'resourceMacroFailed', needed: 1 },
   'count-result-bought': { limit: 1, unavailable: null, needed: 3 },
+  'count-result-bought-miss': { limit: 1, unavailable: null, needed: 2 },
 };
 
 /** Drive one additional-dice state's horseshoe craft to its prompt, which is dismissed. */

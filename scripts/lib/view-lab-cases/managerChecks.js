@@ -2324,12 +2324,12 @@ export const CASES = Object.freeze([
     expectSelector:
       PREVIEW_NOTE(
         'unreadable',
-        `Vosk has no readable value at ${MOMENTUM_PATH}, so no dice can be added.`
+        `Vosk has no stored number at ${MOMENTUM_PATH}, so no dice can be added.`
       ) +
       ` ${ADDITIONAL_DICE}` +
       PATH_LINE(
         'warning',
-        `Vosk has no number at ${MOMENTUM_PATH}, so they could not buy additional dice.`
+        `Vosk has no stored number at ${MOMENTUM_PATH}, so they could not buy additional dice.`
       ),
   }),
   additionalDiceCase({
@@ -2338,6 +2338,11 @@ export const CASES = Object.freeze([
     frame: '— (overridden)',
     steps: [...previewAsActor('lab-actor-brenna')],
     expectSelector:
+      PREVIEW_NOTE(
+        'overridden',
+        `An active effect changes Brenna Karrunsdottir's ${MOMENTUM_PATH}, so no dice can be added.`
+      ) +
+      ':has(input[data-checks-preview-additional-dice]:disabled)' +
       ` ${ADDITIONAL_DICE}` +
       PATH_LINE(
         'warning',

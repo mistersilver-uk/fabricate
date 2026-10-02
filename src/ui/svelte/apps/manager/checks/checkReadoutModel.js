@@ -134,9 +134,13 @@ const ADDITIONAL_DICE_NOTES = Object.freeze({
     'FABRICATE.Admin.Manager.Checks.Simulator.AdditionalDice.NoteMacro',
     'The preview never runs the read macro, so up to {max} can be added here.',
   ],
+  overridden: [
+    'FABRICATE.Admin.Manager.Checks.Simulator.AdditionalDice.NoteOverridden',
+    "An active effect changes {actor}'s {path}, so no dice can be added.",
+  ],
   unreadable: [
     'FABRICATE.Admin.Manager.Checks.Simulator.AdditionalDice.NoteUnreadable',
-    '{actor} has no readable value at {path}, so no dice can be added.',
+    '{actor} has no stored number at {path}, so no dice can be added.',
   ],
   'no-actor': [
     'FABRICATE.Admin.Manager.Checks.Simulator.AdditionalDice.NoteNoActor',
@@ -679,7 +683,9 @@ function additionalDiceBound(rule, character) {
   }
   if (blank(rule.path)) return { kind: 'no-source', limit: 0 };
   if (!character) return { kind: 'no-actor', limit: 0 };
-  const available = spendableAmount(character.readStored(rule.path).value);
+  const stored = character.readStored(rule.path);
+  if (stored.overridden) return { kind: 'overridden', limit: 0 };
+  const available = spendableAmount(stored.value);
   if (available === null) return { kind: 'unreadable', limit: 0 };
   return { kind: 'path', limit: boundAdditionalDice({ max: rule.max, available }), available };
 }

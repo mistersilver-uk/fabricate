@@ -72,6 +72,7 @@ player-crafting-roll-result-count-botch-light
 player-crafting-roll-result-count-zero
 player-crafting-roll-result-count-zero-penalty
 player-crafting-roll-result-count-bought
+player-crafting-roll-result-count-bought-miss
 player-crafting-roll-result-count-bought-secret
 player-crafting-roll-result-count-bought-chat
 player-crafting-roll-result-count-secret

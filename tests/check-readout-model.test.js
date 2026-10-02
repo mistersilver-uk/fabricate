@@ -545,7 +545,7 @@ describe('the Preview’s additional dice (issue 2008)', () => {
   });
 
   it('adds nothing for an unreadable balance, no actor or no source, and says which', () => {
-    const unreadable = 'Sera Vane has no readable value at system.resources.momentum.value, so no dice can be added.';
+    const unreadable = 'Sera Vane has no stored number at system.resources.momentum.value, so no dice can be added.';
     for (const value of [undefined, '3', -1, NaN]) {
       assert.deepEqual(bounds(paid(), stored(value)), {
         limit: 0,
@@ -562,6 +562,20 @@ describe('the Preview’s additional dice (issue 2008)', () => {
     };
     assert.deepEqual(bounds(paid({ path: '  ' })), noSource);
     assert.deepEqual(bounds(paid({ source: 'macro', readMacroUuid: 'Macro.read' })), noSource);
+  });
+
+  it('adds nothing for a balance an active effect sets, and says so (issue 2008)', () => {
+    const overridden = {
+      name: 'Sera Vane',
+      readStored: () => ({ value: 2, overridden: true }),
+    };
+    assert.deepEqual(bounds(paid(), overridden), {
+      limit: 0,
+      note: {
+        kind: 'overridden',
+        text: "An active effect changes Sera Vane's system.resources.momentum.value, so no dice can be added.",
+      },
+    });
   });
 
   it('bounds a macro source by its most per roll, reading nothing', () => {

@@ -125,9 +125,13 @@ describe('the additional-dice prompt presenter (issue 2008)', () => {
     assert.equal(view.blockNote, 'Only Advantage can reach the successes needed.');
     assert.deepEqual(view.message, {
       tone: 'danger',
-      text: 'Cannot reach 3 successes. 2 dice need at least 1 more, and you can afford 0.',
+      text: 'Without Advantage, these dice cannot reach 3 successes. 2 dice need at least 1 more, and you can afford 0.',
     });
     assert.equal(view.disabled, true, 'nothing to buy');
+    const single = describe2008({
+      offer: offerOf({ available: 0, limit: 0, reach: reach({ needed: 3 }) }),
+    });
+    assert.ok(single.message.text.startsWith('Cannot reach 3 successes.'), 'no Advantage to name');
     const disadvantageOnly = describe2008({
       offer: offerOf({ available: 0, limit: 0 }),
       deltas: THREE,
@@ -177,7 +181,10 @@ describe('the additional-dice prompt presenter (issue 2008)', () => {
       deltas: THREE,
     });
     assert.deepEqual([view.blocked, view.blockNote], [NONE, '']);
-    assert.equal(view.message.tone, 'danger');
+    assert.deepEqual(view.message, {
+      tone: 'danger',
+      text: 'Cannot reach 5 successes. 2 dice need at least 3 more, and at most 1 can ever be added. A trigger on this check can still succeed it.',
+    });
   });
 
   it('never says an exploding pool cannot reach, and warns without exploding dice', () => {
@@ -216,6 +223,19 @@ describe('the additional-dice prompt presenter (issue 2008)', () => {
       hidden.message,
       null,
       'a progressive or prepared routed prompt states no needed count'
+    );
+    const zero = describe2008({ offer: offerOf({ reach: reach({ needed: 2 }) }), at: pool(1, -3) });
+    assert.deepEqual(zero.message, {
+      tone: 'danger',
+      text: 'Cannot reach 2 successes. Modifiers reduce the pool below zero, so at least 4 dice are needed, and at most 1 can ever be added.',
+    });
+    const broke = describe2008({
+      offer: offerOf({ limit: 0, available: 0, reach: reach({ needed: 1 }) }),
+      at: pool(1, -1),
+    });
+    assert.equal(
+      broke.message.text,
+      'Cannot reach 1 success. Modifiers reduce the pool below zero, so at least 1 die is needed, and you can afford 0.'
     );
     const liftable = describe2008({
       offer: offerOf({ reach: reach({ needed: 1 }) }),

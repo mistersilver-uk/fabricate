@@ -227,16 +227,14 @@
         </div>
       {/if}
 
-      {#if dice}
+      {#if dice || data.labels.additionalDiceMixed}
         <RollPromptAdditionalDice
-          view={dice}
+          view={dice || { message: { tone: 'info', text: data.labels.additionalDiceMixed } }}
           labels={data.labels.additionalDice}
           value={additionalDice}
-          limit={data.additionalDiceOffer.limit}
+          limit={data.additionalDiceOffer?.limit}
           onChange={(next) => (additionalDice = next)}
         />
-      {:else if data.labels.additionalDiceMixed}
-        <p class="help" data-roll-prompt-additional-dice-mixed>{data.labels.additionalDiceMixed}</p>
       {/if}
 
       <!-- A `div`, not a `label`: a caption click would re-open the list its mousedown dismissed. -->

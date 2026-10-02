@@ -302,12 +302,12 @@ describe('the additional-dice group reads, writes and links what pays for the di
       [
         actor(undefined),
         'warning',
-        `Brenna has no number at ${PATH}, so they could not buy additional dice.`,
+        `Brenna has no stored number at ${PATH}, so they could not buy additional dice.`,
       ],
       [
         actor('3'),
         'warning',
-        `Brenna has no number at ${PATH}, so they could not buy additional dice.`,
+        `Brenna has no stored number at ${PATH}, so they could not buy additional dice.`,
       ],
       [
         actor(2, { system: { resources: { momentum: { value: 2 } } } }),

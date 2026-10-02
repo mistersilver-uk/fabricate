@@ -844,15 +844,17 @@ export const CASES = Object.freeze([
       ':has(.bulk-row:nth-child(2) > .bulk-need:text-is("1 needed"))' +
       ':not(:has(.bulk-row:nth-child(2) [data-roll-prompt-bulk-unreachable]))',
   }),
-  // Two resources in one batch: no control, and the note says why.
+  // Two resources in one batch: the titled well with no stepper, and its note says why.
   bulkAdditionalCase({
     id: 'player-inventory-bulk-roll-prompt-count-additional-mixed',
     label: 'paid from two different resources',
     state: 'salvage-count-additional-mixed',
     keys: THREE_ROWS,
     expectSelector:
-      ':not(:has([data-roll-prompt-additional-dice-group]))' +
-      ' [data-roll-prompt-additional-dice-mixed]:text-is("Rolls in this batch use different resources, so no dice can be added.")',
+      ' .fab-well[data-roll-prompt-additional-dice-group]' +
+      ':not(:has(input[data-roll-prompt-additional-dice]))' +
+      ':has([data-roll-prompt-additional-dice-title]:text-is("Additional dice"))' +
+      ' [data-roll-prompt-additional-dice-message].is-info:has-text("Rolls in this batch use different resources, so no dice can be added.")',
   }),
   playerCase({
     ...BULK_DEFAULTS,

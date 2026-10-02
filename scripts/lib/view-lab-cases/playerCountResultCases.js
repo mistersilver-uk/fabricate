@@ -154,6 +154,19 @@ export function playerCountResultCases() {
         ':has([data-dice-tiles-legend]:has-text("dashed = bought"))' +
         ` [data-check-count-tiles]${BOUGHT_TILES}`,
     }),
+    // The bought die misses, so its dashed border is the tile's only paint (WCAG 1.4.11).
+    rolledCase({
+      id: 'player-crafting-roll-result-count-bought-miss',
+      label: 'Player app — success-counting result box whose one bought die misses',
+      state: 'count-result-bought-miss',
+      steps: [BUY_ONE],
+      expectSelector:
+        `${RESULT_BOX}[data-roll-success="true"]` +
+        BOUGHT_ROW +
+        ROW('count', '2 qualified − 0 cancelled = 2 net') +
+        ' [data-check-count-tiles]' +
+        ':has(.fabricate-dice-tiles__tile:last-child[data-dice-tile-marks="bought"])',
+    }),
     // A blind roll withholds the bought dice with every other executed fact.
     rolledCase({
       id: 'player-crafting-roll-result-count-bought-secret',

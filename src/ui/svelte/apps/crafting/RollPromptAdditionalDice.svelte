@@ -1,7 +1,8 @@
 <!--
   The roll prompt's additional-dice control (issue 2008, frame 31): the title, the resource and
   spend line, the shared `Stepper` at the row's end and the one message beneath, framed by the
-  shared `<Well>`. It renders only while the check offers additional dice.
+  shared `<Well>`. A view with no lines (a batch whose rows pay differently) draws the title and
+  its message alone.
 
   Props:
   | prop | values | default | contract |
@@ -27,29 +28,33 @@
     <div class="additional-dice-row">
       <div class="additional-dice-text">
         <p class="additional-dice-title" data-roll-prompt-additional-dice-title>{labels.title}</p>
-        <p class="additional-dice-line" id={lineId} data-roll-prompt-additional-dice-line>
-          <span data-roll-prompt-additional-dice-resource>{view.resourceLine}</span> ·
-          <span data-roll-prompt-additional-dice-spend>{view.spendLine}</span>
-        </p>
+        {#if view.resourceLine}
+          <p class="additional-dice-line" id={lineId} data-roll-prompt-additional-dice-line>
+            <span data-roll-prompt-additional-dice-resource>{view.resourceLine}</span> ·
+            <span data-roll-prompt-additional-dice-spend>{view.spendLine}</span>
+          </p>
+        {/if}
       </div>
-      <span class="additional-dice-stepper" data-roll-prompt-additional-dice-stepper>
-        <Stepper
-          density="comfortable"
-          min={0}
-          max={limit}
-          {value}
-          disabled={view.disabled}
-          ariaLabel={labels.title}
-          decrementLabel={labels.decrease}
-          incrementLabel={labels.increase}
-          inputProps={{
-            name: 'additionalDice',
-            'data-roll-prompt-additional-dice': '',
-            'aria-describedby': view.message ? `${lineId} ${messageId}` : lineId,
-          }}
-          {onChange}
-        />
-      </span>
+      {#if view.resourceLine}
+        <span class="additional-dice-stepper" data-roll-prompt-additional-dice-stepper>
+          <Stepper
+            density="comfortable"
+            min={0}
+            max={limit}
+            {value}
+            disabled={view.disabled}
+            ariaLabel={labels.title}
+            decrementLabel={labels.decrease}
+            incrementLabel={labels.increase}
+            inputProps={{
+              name: 'additionalDice',
+              'data-roll-prompt-additional-dice': '',
+              'aria-describedby': view.message ? `${lineId} ${messageId}` : lineId,
+            }}
+            {onChange}
+          />
+        </span>
+      {/if}
     </div>
     {#if view.message}
       <div id={messageId}>
@@ -90,7 +95,7 @@
   }
   .additional-dice-line {
     margin: var(--fab-space-2xs) 0 0;
-    color: var(--fab-text-subtle);
+    color: var(--fab-text-muted);
     font-size: 10.5px;
     font-weight: 500;
     line-height: normal;

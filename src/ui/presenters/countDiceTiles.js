@@ -45,7 +45,7 @@ const COPY = Object.freeze({
   ],
   more: ['FABRICATE.Common.DiceTiles.More', '+{count} more'],
   bought: ['FABRICATE.Check.BoughtDice.TileLabel', '{label}, bought'],
-  boughtLegend: ['FABRICATE.Check.BoughtDice.Legend', '{legend} · dashed = bought'],
+  boughtLegend: ['FABRICATE.Check.BoughtDice.Legend', '{legend} · dashed\u{A0}=\u{A0}bought'],
 });
 
 function copy(localize, id) {

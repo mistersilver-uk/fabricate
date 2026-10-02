@@ -78,7 +78,7 @@
     ),
     unresolved: text(
       'FABRICATE.Admin.Manager.Checks.AdditionalDice.PathUnresolved',
-      '{actor} has no number at {path}, so they could not buy additional dice.'
+      '{actor} has no stored number at {path}, so they could not buy additional dice.'
     ),
     overridden: text(
       'FABRICATE.Admin.Manager.Checks.AdditionalDice.PathOverridden',

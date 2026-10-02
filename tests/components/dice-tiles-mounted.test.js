@@ -169,7 +169,7 @@ describe('2006 DiceTiles', () => {
     assert.equal(bought[0].getAttribute('aria-label'), '2, bought');
     assert.equal(
       root.querySelector('[data-dice-tiles-legend]').textContent.trim(),
-      '✓ qualified · ✕ cancelled · ↻ exploded · dashed = bought'
+      '✓ qualified · ✕ cancelled · ↻ exploded · dashed\u{A0}=\u{A0}bought'
     );
     assert.deepEqual(
       canonical(root.querySelector('.fabricate-dice-tiles')),
@@ -211,7 +211,9 @@ describe('2006 DiceTiles', () => {
         assert.equal(new Set([borders[0][1], ...plain]).size, 3, `${host} the three tones differ`);
         assert.equal(borders[1][1], borders[0][1], `${host} a bought success tile keeps the success border`);
         assert.equal(borders[2][1], plain[1], `${host} a bought cancel keeps the danger border`);
-        assert.equal(borders[3][1], plain[0], `${host} a bought plain die keeps the hairline`);
+        // An untoned bought die inks its dash (WCAG 1.4.11); a chat card mixes it into its own ink.
+        if (host) assert.equal(borders[3][1], plain[0], `${host} a bought plain die keeps the hairline`);
+        else assert.equal(borders[3][1], 'rgba(217, 184, 156, 0.56)', 'a bought plain die inks its dash');
         assert.ok(borders.every((border) => border[2] === '1px'), `${host} only the style changes`);
       } finally {
         await view.close();

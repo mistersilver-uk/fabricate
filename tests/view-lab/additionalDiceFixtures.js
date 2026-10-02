@@ -98,6 +98,8 @@ export const ADDITIONAL_DICE_PROMPT_STATES = Object.freeze({
     stored: 2,
     chatOutput: true,
   },
+  // The same faces counted at or over 5, so the bought third die (a 1) misses on a neutral tile.
+  'count-result-bought-miss': { pool: pool(2, { threshold: '5' }), stored: 2, direction: 'over' },
 });
 
 /** The bulk salvage batches (frame 36): Smithing's simple salvage, and Runework's routed one. */
@@ -134,6 +136,7 @@ export async function seedAdditionalDicePrompt(world, state) {
     modifier,
     advantage,
     chatOutput,
+    direction = 'under',
     ...actor
   } = ADDITIONAL_DICE_PROMPT_STATES[state];
   stampCrafter(world, actor);
@@ -151,7 +154,7 @@ export async function seedAdditionalDicePrompt(world, state) {
       simple: {
         ...simple,
         thresholdMode: 'meet',
-        evaluation: counted('under', poolSpec),
+        evaluation: counted(direction, poolSpec),
         ...(advantage && { advantage: { ...simple.advantage, ...advantage } }),
         ...(triggers && { checkBreakage: { ...simple.checkBreakage, triggers } }),
       },

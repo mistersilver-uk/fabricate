@@ -299,6 +299,9 @@ function formatCopy(data, choicePlan) {
     formatted.labels.additionalDice = additionalDiceCopy(data.additionalDiceOffer, localize);
   }
   if (data.additionalDiceMixed) {
+    formatted.labels.additionalDice = {
+      title: localize('FABRICATE.App.RollPrompt.AdditionalDice.Title', 'Additional dice'),
+    };
     formatted.labels.additionalDiceMixed = localize(
       'FABRICATE.App.RollPrompt.AdditionalDice.Bulk.Mixed',
       'Rolls in this batch use different resources, so no dice can be added.'
