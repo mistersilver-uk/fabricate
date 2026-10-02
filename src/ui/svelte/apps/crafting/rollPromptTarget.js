@@ -144,14 +144,15 @@ function countTarget(data, selectedIds, bonus, additionalDice) {
     comparison,
     threshold,
   });
+  const named = destination === 'pool' ? pendingPool : pending;
   let template = labels.countFormula;
-  if (pending.length > 0) {
+  if (named.length > 0) {
     template = destination === 'threshold' ? labels.countPendingThreshold : labels.countPendingDice;
   }
   return {
     chipText: data.chipText,
     source: '',
-    formula: fill(template, { ...values, formula: pending.join(' + ') }),
+    formula: fill(template, { ...values, formula: named.join(' + ') }),
     note: `${countRule(count, values, { threshold, direction }, labels)}${labels.countFaces}`,
     // A pending roll that adds dice may still lift the pool above zero.
     zeroPool: settled.zeroPool && pendingPool.length === 0 ? labels.countZeroPool : '',

@@ -800,6 +800,20 @@ describe('mounted roll prompt', () => {
     assert.deepEqual([answer.confirmed, answer.bonus], [true, '-3'], 'the player can still roll it');
   });
 
+  it('names a rolled pool Tool on the pool line and claims no zero pool it could lift (issue 2008)', async () => {
+    const view = buildSinglePromptData({
+      product: 'count', direction: 'over', comparison: 'meet', pool: 0, die: 10, threshold: 8, thresholdAnchor: 8,
+      thresholdSource: 'fixed', required: 1, modifierDestination: 'pool', zeroPoolFails: true, pendingTools: ['1d4'],
+    });
+    const { dialog, pending } = await openThroughHost(view, false, noChoice);
+    assert.equal(dialog.querySelector(':scope .formula-content .formula').textContent, '0d10 + 1d4 dice · each ≥ 8');
+    assert.ok(!dialog.querySelector('[data-roll-prompt-zero-pool]'), 'the Tool may lift the pool');
+    const roll = dialog.querySelector('button[type="submit"]');
+    assert.ok(!roll.disabled && !roll.hasAttribute('aria-disabled'), 'Roll stays enabled');
+    dialog.querySelector('form').requestSubmit();
+    assert.equal((await pending).confirmed, true);
+  });
+
   it('shows the base formula once and itemises each applied modifier as a chip', async () => {
     const view = buildSinglePromptData({
       formula: '1d20 + 3 + 6[Modifiers]', resolvedFormula: '1d20 + 3 + 6[Modifiers]',
