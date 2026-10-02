@@ -1191,7 +1191,7 @@ The panel MUST be portaled through the shared overlay-host resolver rather than 
 
 ### Requirement: One requirement row serves both sides of a recipe
 
-The row that authors what a craft CONSUMES and the row that authors what it PRODUCES are one primitive, and the choice group built from them is one component.
+The row that authors what a craft CONSUMES and the row that authors what it PRODUCES are one primitive, `PickerRow`, and the choice group built from them is one component.
 There is no "result" kind and no "ingredient" kind: the row does not name which side it is on.
 The CONTEXT the row is rendered in decides which kinds its select offers, and that is the only difference between the two sides.
 
@@ -1209,7 +1209,12 @@ Two of the six are NOT yet shipped in this repository and are marked as such, be
 
 `tag` and `essence` are ingredient-only because each describes a CLASS of thing to consume rather than a record, and a craft cannot produce a class.
 `knowledge` is result-only because knowing a recipe is something a craft grants and never something it consumes.
-The shipped ingredient side today offers `component`, `currency`, `essence` and `tag`; the shipped result side offers `component` alone.
+At the commit that promoted the row, the shipped ingredient side offered `component`, `currency`, `essence` and `tag`; the shipped result side offered `component` alone, as did gathering task results and salvage.
+
+The row's kind maps to the persisted model in one module and nowhere else.
+On the ingredient side the kind IS `Ingredient.match.type`, the row's `tag` being the model's `tags`; the subject is `match.componentId`, `match.essenceId` or `match.unit`, and the amount is `match.amount` for `currency` and `essence` and `Ingredient.quantity` otherwise.
+On the result side the kind is `Result.kind`, an absent `kind` being `component` as `data-models` specifies, and the amount is `quantity` beside `quantityFormula`.
+The row reads a result's kind and never writes it, and an unrecognised kind is rendered as a misconfiguration rather than as a component.
 
 Every row leads with a kind-tinted chip, and the tint is what makes a list of eight rows scannable before any label is read.
 `tag` MUST take the purple family, because it is the one kind in the set that matches any item carrying a value rather than naming one record, and that abstraction is the distinction the reader most needs at a glance.
