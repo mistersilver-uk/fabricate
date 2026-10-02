@@ -745,20 +745,22 @@ describe('the Journal command offers, validates and spends on the claim holder',
     });
   });
 
-  test('a roll refused after the spend answers its sentence with the dice spent', async () => {
-    const { actor, focus } = heroWith(3);
-    const { service } = gmService({ actor, describe: () => paidDescriptor(), stage: completed });
-    await withDice([], async (dice) => {
-      // As Foundry's explosion recursion limit refuses a Roll that has already been paid for.
-      dice.CountRoll.prototype.evaluate = async () => {
-        throw new CountRollRefusal('explode-unbounded', 'explode');
-      };
-      const { executed } = await describeThenExecute(service, { additionalDice: 1 });
-      assert.equal(executed.reason, 'roll-unavailable', JSON.stringify(executed));
-      assert.equal(executed.boughtDice, 1);
+  // As Foundry's explosion recursion limit refuses a Roll already paid for, or any other throw.
+  for (const thrown of [new CountRollRefusal('explode-unbounded', 'explode'), new Error('boom')]) {
+    test(`a roll that throws ${thrown.name} after the spend answers with the dice spent`, async () => {
+      const { actor, focus } = heroWith(3);
+      const { service } = gmService({ actor, describe: () => paidDescriptor(), stage: completed });
+      await withDice([], async (dice) => {
+        dice.CountRoll.prototype.evaluate = async () => {
+          throw thrown;
+        };
+        const { executed } = await describeThenExecute(service, { additionalDice: 1 });
+        assert.equal(executed.reason, 'roll-unavailable', JSON.stringify(executed));
+        assert.equal(executed.boughtDice, 1);
+      });
+      assert.equal(focus(), 2);
     });
-    assert.equal(focus(), 2);
-  });
+  }
 
   test('the non-interactive Journal command buys only the dice its caller names', async () => {
     for (const [options, expected] of [

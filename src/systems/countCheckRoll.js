@@ -90,20 +90,23 @@ export async function evaluateCountCheckRoll(actor, options = {}) {
   const spend = await spendPurchase(actor, purchase, dice);
   if (!spend.ok) return refusedPurchase(spend, purchase, dice);
   const bought = boughtEvidence(purchase, dice, { evaluation, policy: settled.policy, placement });
-  const roll = CountRoll.fromPolicy({ ...settled.policy, bought: bought?.marked });
   try {
-    await roll.evaluate({ allowInteractive: false });
+    return await rollCount(CountRoll, { rolled, bought, decision, options, preRolls });
   } catch (error) {
-    if (!(error instanceof CountRollRefusal) || !COUNT_CHECK_REFUSALS.includes(error.reason)) {
-      throw error;
-    }
-    const refusal = { ok: false, reason: error.reason, refusedInput: error.refusedInput };
+    const refusal = mainRollRefusal(error, bought);
+    if (!refusal) throw error;
     return { engine: true, refusal, modifierPlacement: placement, ...(bought && { bought }) };
   }
+}
+
+/** Rolls and posts the one count Roll from the settled `rolled.policy`, its bought dice marked. */
+async function rollCount(CountRoll, { rolled, bought, decision, options, preRolls }) {
+  const roll = CountRoll.fromPolicy({ ...rolled.policy, bought: bought?.marked });
+  await roll.evaluate({ allowInteractive: false });
   const flavor = countFlavor(decision.flavor, options);
   const posting = { roll, options, flavor, rollMode: decision.rollMode };
   await postCheckRoll({ ...posting, preRolls });
-  const handoff = checkRollHandoff({ ...posting, placement });
+  const handoff = checkRollHandoff({ ...posting, placement: rolled.modifierPlacement });
   return {
     ...rolled,
     total: roll.total,
@@ -113,6 +116,19 @@ export async function evaluateCountCheckRoll(actor, options = {}) {
     ...(bought && { bought }),
     ...(handoff && { rollHandoff: handoff }),
   };
+}
+
+/**
+ * The refusal a thrown main Roll answers: the count refusal it names or, once bought dice were
+ * spent, any throw at all, since the spend stands; null for a throw the runner reports.
+ */
+function mainRollRefusal(error, bought) {
+  if (error instanceof CountRollRefusal && COUNT_CHECK_REFUSALS.includes(error.reason)) {
+    return { ok: false, reason: error.reason, refusedInput: error.refusedInput };
+  }
+  if (!bought) return null;
+  console.error('Fabricate | A count check roll failed after its bought dice were spent', error);
+  return { ok: false, reason: 'roll-failed', thrown: error?.message ?? String(error) };
 }
 
 /** Whether the budget is read: a prompt offers it, or a decision or request buys dice. */
@@ -244,13 +260,14 @@ export function countRefusalResult(refusal, label) {
 }
 
 /**
- * A rolled count's refusal: a Roll refused after its bought dice were spent keeps them as
- * `data.boughtDice`, with the facts the surface's spent notice names, since nothing refunds.
+ * A rolled count's refusal: a Roll refused, or one that threw, after its bought dice were spent
+ * keeps them as `data.boughtDice`, with the facts the surface's spent notice names.
  */
 function refusedCountResult(rolled, label) {
-  const result = countRefusalResult(rolled.refusal, label);
-  const { bought } = rolled;
+  const { refusal, bought } = rolled;
+  const result = countRefusalResult(refusal, label);
   if (!bought) return result;
+  if ('thrown' in refusal) result.message = `${label} check roll failed: ${refusal.thrown}`;
   return {
     ...result,
     data: { ...result.data, ...boughtDiceEvidence(rolled) },

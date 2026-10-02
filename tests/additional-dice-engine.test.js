@@ -348,6 +348,26 @@ test('a main Roll that throws after the spend keeps the spend and records it', a
   });
 });
 
+for (const site of ['fromPolicy', 'evaluate']) {
+  test(`a throw from ${site} after the spend refuses with the bought dice, not a fail`, async () => {
+    const { actor, writes } = heldActor(2);
+    await withDice([], async (dice) => {
+      const owner = site === 'fromPolicy' ? dice.CountRoll : dice.CountRoll.prototype;
+      owner[site] = () => {
+        throw new Error('boom');
+      };
+      const result = await passFail(actor, paidEvaluation(), { additionalDice: 1 });
+      assert.deepEqual([result.misconfigured, result.outcome], [true, null]);
+      assert.equal(result.message, 'Crafting check roll failed: boom');
+      assert.deepEqual(result.data.boughtDice, { count: 1, source: 'path' });
+      assert.deepEqual(result.additionalDiceNotice, { dice: 1, label: 'Momentum', source: 'path' });
+      assert.deepEqual(writes, [1], 'nothing refunds');
+      const unpaid = await passFail(actor, paidEvaluation(), {});
+      assert.deepEqual([unpaid.outcome, unpaid.data], ['fail', {}], 'a throw with none bought');
+    });
+  });
+}
+
 for (const [name, request, evaluation, reason, held = {}] of [
   ['an unoffered count', 1, () => paidEvaluation({}, { ...PAID, enabled: false }), 'notOffered'],
   ['a negative count', -1, () => paidEvaluation(), 'choiceInvalid'],
