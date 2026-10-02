@@ -229,9 +229,9 @@ describe('1506 the icon-only chip — the accessible name it must carry', () => 
 
     assert.equal(
       sites.length,
-      1,
-      'the icon-only face has exactly one caller — the recipe browser row, whose status is ' +
-        'already spelled out in words beside it. The count is pinned so the clause above cannot ' +
+      2,
+      'the icon-only face has exactly two callers — the recipe browser row and the recipe detail ' +
+        'tile pip, each beside a status spelled out in words. The count is pinned so the clause above cannot ' +
         `be satisfied by a tree that has stopped rendering the face at all. Found: ${sites}`
     );
   });
