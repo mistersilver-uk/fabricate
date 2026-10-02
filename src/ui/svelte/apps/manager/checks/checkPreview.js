@@ -300,13 +300,13 @@ export async function runCheckPreview(plan, additionalDice = 0) {
 
 /**
  * The runner's arguments with the stepped dice placed through the engine's preview seam, which
- * reads and spends nothing (issue 2008); unchanged for a check that allows no additional dice.
+ * reads and spends nothing (issue 2008); unchanged at zero and for a check that allows none.
  */
 function simulatedArgs(plan, additionalDice) {
   const allowed = plan.evaluation?.pool?.additionalDice?.enabled === true;
-  if (plan.evaluation?.product !== 'count' || !allowed) return plan.args;
-  const dice = Number.isInteger(additionalDice) && additionalDice > 0 ? additionalDice : 0;
-  const rollOptions = { ...plan.args.rollOptions, simulatedAdditionalDice: dice };
+  const stepped = Number.isInteger(additionalDice) && additionalDice > 0;
+  if (plan.evaluation?.product !== 'count' || !allowed || !stepped) return plan.args;
+  const rollOptions = { ...plan.args.rollOptions, simulatedAdditionalDice: additionalDice };
   return { ...plan.args, rollOptions: { ...rollOptions, reportVisibility: true } };
 }
 

@@ -561,6 +561,8 @@ describe('the Preview’s additional dice reach the simulated roll only (issue 2
     assert.equal(result.data.boughtDice, undefined);
     assert.deepEqual([calls.updates, calls.macros], [[], []]);
     assert.equal(previewPlan.args.rollOptions, null, 'the stepper never reaches the plan');
+    const reported = ['countDisplay', 'rollMode'].filter((key) => key in result);
+    assert.deepEqual(reported, [], 'a stepper at zero reports what a check that buys none does');
   });
 
   it('ignores a count that is not a whole number of 0 or more, and a check that buys none', async () => {
