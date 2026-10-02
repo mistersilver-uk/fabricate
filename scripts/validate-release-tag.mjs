@@ -2,17 +2,24 @@
 /** Validate a Fabricate release tag against the shared patterns in `scripts/lib/releaseTags.js`. */
 import process from 'node:process';
 
-import { RELEASE_TAG_KINDS, assertReleaseTagKind, validateReleaseTag } from './lib/releaseTags.js';
+import {
+  RELEASE_TAG_KINDS,
+  assertReleaseTagKind,
+  normalizeReleaseTagInput,
+  validateReleaseTag,
+} from './lib/releaseTags.js';
 
 const PRINTABLE_FIELDS = ['version', 'base', 'tag'];
 
 const USAGE = `Usage:
   node scripts/validate-release-tag.mjs <tag> [--kind beta|stable|any] [--print version|base|tag]
+                                        [--optional-prefix]
   <tag stream> | node scripts/validate-release-tag.mjs --filter [--kind beta|stable|any]
 
 Options:
   --kind <kind>    Required tag kind: ${[...RELEASE_TAG_KINDS, 'any'].join(', ')} (default: any)
   --print <field>  Field to print on success: ${PRINTABLE_FIELDS.join(', ')} (default: version)
+  --optional-prefix  Accept a hand-typed tag with or without its leading v (1.4.0-beta.3)
   --filter         Read tags from stdin and print the valid ones
   --quiet          Suppress the failure message
   --help           Show this help`;
@@ -20,10 +27,17 @@ Options:
 /**
  * @param {string[]} args
  * @returns {{tag?: string, kind: string, print: string, filter: boolean, quiet: boolean,
- *   help: boolean}}
+ *   optionalPrefix: boolean, help: boolean}}
  */
 function parseArgs(args) {
-  const options = { kind: 'any', print: 'version', filter: false, quiet: false, help: false };
+  const options = {
+    kind: 'any',
+    print: 'version',
+    filter: false,
+    quiet: false,
+    optionalPrefix: false,
+    help: false,
+  };
 
   const valueFor = (flag, value) => {
     if (!value || value.startsWith('--')) throw new Error(`${flag} requires a value`);
@@ -44,6 +58,10 @@ function parseArgs(args) {
       }
       case '--quiet': {
         options.quiet = true;
+        break;
+      }
+      case '--optional-prefix': {
+        options.optionalPrefix = true;
         break;
       }
       case '--kind': {
@@ -119,7 +137,8 @@ async function main() {
     return;
   }
 
-  const result = validateReleaseTag(options.tag, options.kind);
+  const tag = options.optionalPrefix ? normalizeReleaseTagInput(options.tag) : options.tag;
+  const result = validateReleaseTag(tag, options.kind);
   if (!result.ok) {
     if (!options.quiet) reportError(result.error);
     process.exitCode = 1;

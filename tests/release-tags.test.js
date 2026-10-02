@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import {
   BETA_TAG_RE,
   STABLE_TAG_RE,
+  normalizeReleaseTagInput,
   parseReleaseTag,
   validateReleaseTag,
 } from '../scripts/lib/releaseTags.js';
@@ -172,6 +173,14 @@ const CLI_CASES = [
   [['v1.4.0', '--print', 'nonsense'], 2, 'an unknown print field is a usage error too'],
   [['v1.4.0', '--kind'], 2, 'a flag with no value is a usage error'],
   [[], 2, 'no tag at all is a usage error'],
+  [['1.4.0-beta.3', '--kind', 'beta'], 1, 'a bare version is still refused without the flag'],
+  [['1.4.0-beta.3', '--kind', 'beta', '--optional-prefix'], 0, 'the v is optional when asked'],
+  [['v1.4.0-beta.3', '--kind', 'beta', '--optional-prefix'], 0, 'and is accepted when present'],
+  [['V1.4.0-beta.3', '--kind', 'beta', '--optional-prefix'], 0, 'in either case'],
+  [['vv1.4.0-beta.3', '--kind', 'beta', '--optional-prefix'], 1, 'only one v is stripped'],
+  [['1.4.0', '--kind', 'beta', '--optional-prefix'], 1, 'a bare stable version is not a beta tag'],
+  [['', '--kind', 'beta', '--optional-prefix'], 1, 'an empty input stays a bad tag'],
+  [['v', '--kind', 'beta', '--optional-prefix'], 1, 'a lone v is a bad tag'],
 ];
 
 for (const [args, code, why] of CLI_CASES) {
@@ -194,6 +203,37 @@ for (const [field, expected] of PRINT_CASES) {
 
     assert.equal(result.status, 0, result.stderr);
     assert.equal(result.stdout.trim(), expected);
+  });
+}
+
+/** [typed input, canonical tag]: one leading v, either case, is optional and never doubled. */
+const PREFIX_CASES = [
+  ['1.4.0-beta.3', 'v1.4.0-beta.3'],
+  ['v1.4.0-beta.3', 'v1.4.0-beta.3'],
+  ['V1.4.0-beta.3', 'v1.4.0-beta.3'],
+  ['  1.4.0-beta.3  ', 'v1.4.0-beta.3'],
+  ['vv1.4.0', 'vv1.4.0'],
+  ['', ''],
+  ['v', 'v'],
+];
+
+for (const [input, expected] of PREFIX_CASES) {
+  test(`normalizeReleaseTagInput makes '${input}' the tag '${expected}'`, () => {
+    assert.equal(normalizeReleaseTagInput(input), expected);
+  });
+}
+
+test('normalizeReleaseTagInput returns a non-string unchanged, so it is refused as given', () => {
+  assert.equal(normalizeReleaseTagInput(undefined), undefined);
+  assert.equal(validateReleaseTag(normalizeReleaseTagInput(null)).ok, false);
+});
+
+for (const input of ['1.4.0-beta.3', 'v1.4.0-beta.3', 'V1.4.0-beta.3']) {
+  test(`--optional-prefix prints one version and one tag for '${input}'`, () => {
+    const args = [input, '--kind', 'beta', '--optional-prefix'];
+
+    assert.equal(runCli(args).stdout.trim(), '1.4.0-beta.3');
+    assert.equal(runCli([...args, '--print', 'tag']).stdout.trim(), 'v1.4.0-beta.3');
   });
 }
 

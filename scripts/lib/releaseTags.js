@@ -26,6 +26,18 @@ function describe(value) {
   }
 }
 
+/**
+ * A hand-typed tag with its `v` prefix made canonical: surrounding whitespace and one leading `v`
+ * or `V` are stripped and a lowercase `v` is put back, so `1.4.0`, `v1.4.0` and `V1.4.0` all
+ * name the tag `v1.4.0`. An empty or non-string value is returned unchanged, so it is refused as
+ * what was typed. Only a human-entered input is normalized; a tag read from git is validated as is.
+ */
+export function normalizeReleaseTagInput(value) {
+  if (typeof value !== 'string') return value;
+  const bare = value.trim().replace(/^v/i, '');
+  return bare ? `v${bare}` : value;
+}
+
 /** Parse a release tag into its kind, its bare version, and its base version. */
 export function parseReleaseTag(tag) {
   if (typeof tag !== 'string') return null;

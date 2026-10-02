@@ -947,6 +947,22 @@ test('promote-to-early-access runs its scripts from the workflow ref and moves t
   }
 });
 
+test('promote-to-early-access reads its typed tag once and uses the validated tag everywhere else', () => {
+  // The input's v is optional, so only the validate step may read it: a later step reading the raw
+  // input would look up or merge a tag name that does not exist.
+  const source = readFileSync(path.join(WORKFLOWS, 'promote-to-early-access.yml'), 'utf8');
+  const { steps } = parseJobs(source).promote;
+
+  const validate = steps.findIndex((step) => /validate-release-tag\.mjs .*--optional-prefix/.test(step.run));
+  assert.ok(validate !== -1, 'no step validates the tag with its prefix optional');
+  assert.match(steps[validate].run, /echo "tag=v\$VERSION" >> "\$GITHUB_OUTPUT"/);
+
+  assert.equal(source.split('inputs.beta_tag').length - 1, 1, 'the raw input is read more than once');
+  const users = steps.filter((step) => /\$\{?BETA_TAG\b/.test(step.run));
+  assert.ok(users.length >= 3, `only ${users.length} step(s) use the tag`);
+  assert.equal(source.split('BETA_TAG: ${{ steps.validate.outputs.tag }}').length - 1, users.length - 1);
+});
+
 test('every inline tester-segment resolution words its refusal through describeMissingTesterSecrets', () => {
   let resolutions = 0;
   for (const { file, source } of workflowSources()) {
