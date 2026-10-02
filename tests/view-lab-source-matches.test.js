@@ -126,50 +126,71 @@ test('the capture workflow selects for every PR and renders on rendersCapture, n
   assert.doesNotMatch(workflow, /hasUiChanges/, 'the capture must not key rendering on the gate');
 });
 
-/** Unescaped `(…|…)` groups holding no nested group. */
-const ALTERNATION_GROUP = /(?<!\\)\((?:\?:)?((?:[^()\\]|\\.)*\|(?:[^()\\]|\\.)*)\)/g;
+/**
+ * The first unescaped group holding no nested group, with the quantifier after it. A lookaround
+ * is never one: its branches are not paths.
+ */
+const INNERMOST_GROUP = /(?<!\\)\((?:\?:)?(?!\?)((?:[^()\\]|\\.)*)\)([?*+]?)/;
 
-/** One regex per alternative of each innermost alternation group, the rest of the pattern kept. */
-function alternativesOf(pattern) {
-  const { source, flags } = pattern;
-  return [...source.matchAll(ALTERNATION_GROUP)].flatMap((group) =>
-    group[1].split(/(?<!\\)\|/).map((alternative) => ({
-      alternative,
-      regex: new RegExp(
-        `${source.slice(0, group.index)}(?:${alternative})${source.slice(group.index + group[0].length)}`,
-        flags
-      ),
-    }))
+/** Every group-free path through a pattern; an optional group also takes its empty branch. */
+function alternativesOf(pattern, source = pattern.source) {
+  const group = INNERMOST_GROUP.exec(source);
+  if (!group) return source === pattern.source ? [] : [new RegExp(source, pattern.flags)];
+  const branches = group[1].split(/(?<!\\)\|/);
+  if (group[2] === '?' || group[2] === '*') branches.push('');
+  const head = source.slice(0, group.index);
+  const tail = source.slice(group.index + group[0].length);
+  return branches.flatMap((branch) => alternativesOf(pattern, `${head}${branch}${tail}`));
+}
+
+/** One result per distinct pattern source, since cases share most of their patterns. */
+function memoizedBySource(compute) {
+  const cache = new Map();
+  return (pattern) => {
+    const key = String(pattern);
+    if (!cache.has(key)) cache.set(key, compute(pattern));
+    return cache.get(key);
+  };
+}
+
+/** What one pattern strands: itself when it matches no tracked file, then each stranded path. */
+const strandedIn = memoizedBySource((pattern) => [
+  ...(tracked.some((file) => pattern.test(file)) ? [] : ['']),
+  ...alternativesOf(pattern)
+    .filter((regex) => tracked.every((file) => !regex.test(file)))
+    .map((regex) => ` (expansion ${regex})`),
+]);
+
+/** Each pattern, and each path through it, that matches no tracked file. */
+function strandedPatterns(cases) {
+  return cases.flatMap((viewCase) =>
+    viewCase.sourceMatches.flatMap((pattern) =>
+      strandedIn(pattern).map((suffix) => `${viewCase.id}: ${pattern}${suffix}`)
+    )
   );
 }
 
-/** Each pattern, and each of its alternatives, that matches no tracked file. */
-function strandedPatterns(cases) {
-  const stranded = new Set();
-  for (const viewCase of cases) {
-    for (const pattern of viewCase.sourceMatches) {
-      if (tracked.every((file) => !pattern.test(file))) stranded.add(`${viewCase.id}: ${pattern}`);
-      for (const { alternative, regex } of alternativesOf(pattern)) {
-        if (tracked.every((file) => !regex.test(file))) {
-          stranded.add(`${viewCase.id}: ${pattern} (alternative "${alternative}")`);
-        }
-      }
-    }
-  }
-  return [...stranded];
-}
-
-test('the stranded-pattern guard can fail, on a whole pattern and on one alternative', () => {
+test('the stranded-pattern guard can fail, on a pattern and on a path a sibling or ? hides', () => {
+  const behindSibling =
+    /^src\/(?:systems\/(?:complicationRuntime|noSuchModule)|bootstrap\/socketRouter)\.js$/;
+  const behindOptional = /^src\/systems\/complicationRuntime(?:NoSuchA|NoSuchB)?\.js$/;
+  const optionalInsideSibling =
+    /^src\/(?:systems\/complicationRuntime(?:NoSuchC)?|bootstrap\/socketRouter)\.js$/;
   const probe = {
     id: 'probe',
     sourceMatches: [
       /^src\/systems\/noSuchModule\.js$/,
-      /^src\/systems\/(?:complicationRuntime|noSuchModule)\.js$/,
+      behindSibling,
+      behindOptional,
+      optionalInsideSibling,
     ],
   };
   assert.deepEqual(strandedPatterns([probe]), [
     String.raw`probe: /^src\/systems\/noSuchModule\.js$/`,
-    String.raw`probe: /^src\/systems\/(?:complicationRuntime|noSuchModule)\.js$/ (alternative "noSuchModule")`,
+    String.raw`probe: ${behindSibling} (expansion /^src\/systems\/noSuchModule\.js$/)`,
+    String.raw`probe: ${behindOptional} (expansion /^src\/systems\/complicationRuntimeNoSuchA\.js$/)`,
+    String.raw`probe: ${behindOptional} (expansion /^src\/systems\/complicationRuntimeNoSuchB\.js$/)`,
+    String.raw`probe: ${optionalInsideSibling} (expansion /^src\/systems\/complicationRuntimeNoSuchC\.js$/)`,
   ]);
 });
 
@@ -177,10 +198,12 @@ test('every sourceMatches pattern, and each of its alternatives, names a tracked
   // A renamed or deleted file strands its pattern silently: now that a pattern selects from any
   // changed file, a stranded one is a frame that stops being captured with nothing to say so.
   assert.ok(tracked.length > 1000, `git ls-files listed only ${tracked.length} files`);
-  const expanded = VIEW_LAB_CASES.flatMap((viewCase) =>
-    viewCase.sourceMatches.flatMap(alternativesOf)
+  const distinct = new Map(
+    VIEW_LAB_CASES.flatMap(({ sourceMatches }) => sourceMatches).map((p) => [String(p), p])
   );
+  const expanded = [...distinct.values()].flatMap((pattern) => alternativesOf(pattern));
   assert.ok(expanded.length > 100, 'the alternation expansion found almost nothing to check');
+  assert.ok(expanded.length < 2000, `${expanded.length} expansions: some pattern has blown up`);
   assert.deepEqual(
     strandedPatterns(VIEW_LAB_CASES),
     [],

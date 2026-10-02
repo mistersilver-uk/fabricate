@@ -67,11 +67,11 @@ export function sliceSelection(cases, count) {
  * chrome is verified by its own job either way.
  *
  * @param {Array<{id: string, distinctEvidenceGroup?: string}>} cases The selection, in order.
- * @param {boolean} armed Whether the capture renders the selection (`rendersCapture`).
+ * @param {boolean} render Whether the capture renders the selection (`rendersCapture`).
  * @returns {Array<{shard: number, ids: string}>} One entry per shard, numbered from 1.
  */
-export function renderMatrix(cases, armed) {
-  const count = armed ? shardCountFor(cases.length) : 0;
+export function renderMatrix(cases, render) {
+  const count = render ? shardCountFor(cases.length) : 0;
   return sliceSelection(cases, count).map((ids, index) => ({
     shard: index + 1,
     ids: ids.join(','),
