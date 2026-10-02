@@ -1706,7 +1706,7 @@ An essence requirement has no single source: several components each contribute,
 An overshoot is stated rather than hidden, because spending more of an essence than the requirement asks is a real cost the player is choosing.
 
 A held-versus-needed count renders on a SOLID ground rather than a soft wash: it is read at a glance against artwork of unknown colour, and a translucent fill cannot be relied on to stay legible over it.
-The chip that draws those counts states no such ground today, and the `solid` face this sentence implies is NOT shipped: the requirement stands unmet rather than being read as satisfied by the conversion that moved those readings onto the shared chip.
+The shared chip states that ground as its `solid` emphasis, which a held-versus-needed chip takes: an opaque theme token under every tone, with a coloured tone filled in its own colour and inked to read on that fill.
 
 #### Scenario: Several held items carry the required tag
 

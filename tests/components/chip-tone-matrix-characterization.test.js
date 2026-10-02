@@ -98,6 +98,69 @@ function chipNode(target) {
   return target.querySelector('.manager-chip');
 }
 
+/** The stylesheet the mount injected, comments stripped. */
+function injectedCss() {
+  return withoutComments(
+    [...document.querySelectorAll('style')].map((node) => node.textContent).join('\n')
+  );
+}
+
+/** One selector list split into its selectors, with each trailing `:is()` list expanded. */
+function selectorsOf(head) {
+  return head
+    .replaceAll(/:where\(\.svelte-\w+\)|\.svelte-\w+/g, '')
+    .split(/,(?![^(]*\))/)
+    .map((selector) => selector.trim())
+    .flatMap((selector) => {
+      const [, stem, list] = /^(.*):is\(([^)]*)\)$/.exec(selector) ?? [];
+      return list ? list.split(',').map((leg) => stem + leg.trim()) : [selector];
+    });
+}
+
+/**
+ * The compiled rules that select the chip root by class alone, in sheet order.
+ *
+ * @returns {Array<{ classes: string[], order: number, declarations: Map<string, string> }>}
+ */
+function compiledRootRules() {
+  const rules = [];
+  for (const [, head, body] of injectedCss().matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+    const declarations = new Map(
+      body
+        .split(';')
+        .map((line) => line.split(':'))
+        .filter((parts) => parts.length > 1)
+        .map(([property, ...value]) => [property.trim(), value.join(':').trim()])
+    );
+    for (const selector of selectorsOf(head)) {
+      const classes = selector.split('.').slice(1);
+      if (selector.startsWith('.') && classes.every((name) => /^[\w-]+$/.exec(name))) {
+        rules.push({ classes, order: rules.length, declarations });
+      }
+    }
+  }
+  return rules;
+}
+
+/**
+ * What the compiled sheet paints on a mounted chip: the declaration that wins each property by
+ * specificity, then by sheet order.
+ *
+ * @param {Element} node the mounted chip root
+ * @returns {Map<string, string>}
+ */
+function compiledPaint(node) {
+  const held = new Set(node.classList);
+  const painted = new Map();
+  const applying = compiledRootRules()
+    .filter((rule) => rule.classes.every((name) => held.has(name)))
+    .toSorted((a, b) => a.classes.length - b.classes.length || a.order - b.order);
+  for (const rule of applying) {
+    for (const [property, value] of rule.declarations) painted.set(property, value);
+  }
+  return painted;
+}
+
 /** The authored classes, with Svelte's per-component scope hash removed. */
 function authoredClasses(node) {
   return [...node.classList].filter((name) => !name.startsWith('svelte-'));
@@ -555,17 +618,6 @@ describe('1506 Chip — the bare emphasis', () => {
   });
 
   /**
-   * The stylesheet the mount INJECTED, comments stripped.
-   *
-   * @returns {string}
-   */
-  function injectedCss() {
-    return withoutComments(
-      [...document.querySelectorAll('style')].map((node) => node.textContent).join('\n')
-    );
-  }
-
-  /**
    * The computed `font-size`, in px, of the glyph a chip rendered from its `icon` prop.
    *
    * @param {Element} target the mounted container
@@ -653,24 +705,139 @@ describe('1506 Chip — the closed vocabularies, pinned by exact count', () => {
     );
   });
 
-  it('declares exactly THREE emphases, and they are the three the specimen publishes', () => {
+  it('declares exactly four emphases, and they are the four the specimen publishes', () => {
     const emphases = declaredSetLiteral('EMPHASES');
 
     assert.equal(
       emphases.length,
-      3,
-      'the chip declares a different number of emphases than the three it ships. An EXACT count ' +
-        'rather than a ceiling, for the density clause\'s reason: a FOURTH value reds here, and ' +
-        'so does an `EMPHASES.has(…)` refactor that drops the count below three. A face a pixel ' +
-        `from a shipped one belongs on an existing value, not on a new one. Found: ${emphases}`
+      4,
+      'the chip declares a different number of emphases than the four it ships. An exact count ' +
+        "rather than a ceiling, for the density clause's reason: a fifth value reds here, and " +
+        'so does an `EMPHASES.has(…)` refactor that drops the count. A face a pixel from a ' +
+        `shipped one belongs on an existing value, not on a new one. Found: ${emphases}`
     );
 
     assert.deepEqual(
       emphases,
-      ['outlined', 'lit', 'bare'],
-      'the three shipped emphases are `outlined` (the flat plate), `lit` (the family colour on ' +
-        'the ink) and `bare` (no edge at all), in this order'
+      ['outlined', 'lit', 'bare', 'solid'],
+      'the four shipped emphases are `outlined` (the flat plate), `lit` (the family colour on ' +
+        'the ink), `bare` (no edge at all) and `solid` (an opaque ground), in this order'
     );
+  });
+});
+
+/** The solid emphasis (issue 1518): an opaque ground for a chip read over artwork. */
+describe('1518 Chip — the solid emphasis', () => {
+  before(async () => {
+    await harness.setup();
+  });
+
+  after(() => harness.teardown());
+
+  /** Each theme block's custom properties, read from the sheet that declares them. */
+  const THEMES = new Map(
+    [
+      ...readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8').matchAll(
+        /\.fabricate\[data-fabricate-theme="([\w-]+)"\]\s*\{([^}]*)\}/g
+      ),
+    ].map(([, theme, body]) => [
+      theme,
+      new Map([...body.matchAll(/(--fab-[\w-]+):\s*([^;]+);/g)].map(([, name, value]) => [name, value])),
+    ])
+  );
+
+  /** The token a `var(--fab-…)` declaration names, or `''` when the value is anything else. */
+  const tokenOf = (value) => /^var\((--fab-[\w-]+)\)$/.exec(value ?? '')?.[1] ?? '';
+
+  /** The themes in which `token` is not a six-digit hex, which is the only opaque form declared. */
+  const translucentIn = (token) =>
+    [...THEMES]
+      .filter(([, tokens]) => {
+        const value = tokens.get(token) ?? '';
+        return !(value.startsWith('#') && value.length === 7);
+      })
+      .map(([theme]) => theme);
+
+  async function paintOf(props) {
+    const paint = compiledPaint(chipNode(await harness.mount(props)));
+    harness.remount();
+    return paint;
+  }
+
+  it('emits is-solid only when asked, and composes with the tone and the scale', async () => {
+    const shipped = await harness.mount({ tone: 'positive' });
+    assert.deepEqual(
+      authoredClasses(chipNode(shipped)),
+      ['manager-chip', 'is-positive'],
+      'a chip that does not ask for the solid face is exactly what shipped'
+    );
+    harness.remount();
+
+    const solid = await harness.mount({ tone: 'positive', emphasis: 'solid', density: 'list' });
+    assert.deepEqual(
+      [...chipNode(solid).classList]
+        .filter((name) => name.startsWith('is-'))
+        .toSorted((a, b) => a.localeCompare(b)),
+      ['is-list', 'is-positive', 'is-solid'],
+      'the have chip draws as tone + emphasis + scale, three axes and three classes'
+    );
+  });
+
+  it('leaves the paint of a chip that did not ask for it untouched', async () => {
+    assert.equal(
+      (await paintOf({ tone: 'positive' })).get('background'),
+      'var(--fab-success-soft)',
+      'the soft wash is still the default face of a toned chip'
+    );
+    assert.equal(
+      (await paintOf({})).get('background'),
+      'var(--fab-overlay-light-06)',
+      'and the toneless chip keeps its base fill'
+    );
+  });
+
+  it('paints an opaque ground under every tone, in every theme', async () => {
+    assert.ok(THEMES.size > 1, `the theme blocks were read (${[...THEMES.keys()]})`);
+    for (const [tone] of [['', ''], ...TONE_MATRIX]) {
+      const ground = tokenOf((await paintOf({ tone, emphasis: 'solid' })).get('background'));
+      assert.ok(
+        Boolean(ground),
+        `tone "${tone}" with the solid emphasis must take its ground from one theme token`
+      );
+      assert.deepEqual(
+        translucentIn(ground),
+        [],
+        `tone "${tone}" stands on ${ground}, which is not opaque in every theme. A rule written ` +
+          'above a tone rule loses the fill to it, and a soft token is a wash, not a ground.'
+      );
+    }
+  });
+
+  it('fills a coloured tone with its own colour and inks it with the on-colour', async () => {
+    const pairs = [
+      ['positive', '--fab-success', '--fab-on-success'],
+      ['active', '--fab-success', '--fab-on-success'],
+      ['info', '--fab-info', '--fab-on-info'],
+      ['danger', '--fab-danger', '--fab-on-danger'],
+      ['negative', '--fab-danger', '--fab-on-danger'],
+      ['accent', '--fab-accent', '--fab-on-accent'],
+      // No theme declares an on-warning ink; the page ground is what the sheet already uses.
+      ['warning', '--fab-warning', '--fab-bg-0'],
+      ['disabled', '--fab-warning', '--fab-bg-0'],
+    ];
+    for (const [tone, ground, ink] of pairs) {
+      const paint = await paintOf({ tone, emphasis: 'solid' });
+      assert.equal(tokenOf(paint.get('background')), ground, `${tone} stands on ${ground}`);
+      assert.equal(tokenOf(paint.get('color')), ink, `${tone} is inked with ${ink}`);
+    }
+  });
+
+  it('gives a recessive chip the raised ground and leaves it its own edge and ink', async () => {
+    const plain = await paintOf({ tone: 'neutral' });
+    const solid = await paintOf({ tone: 'neutral', emphasis: 'solid' });
+    assert.equal(tokenOf(solid.get('background')), '--fab-bg-3');
+    assert.equal(solid.get('color'), plain.get('color'), 'the tone keeps its ink');
+    assert.equal(solid.get('border-color'), plain.get('border-color'), 'and its edge');
   });
 });
 

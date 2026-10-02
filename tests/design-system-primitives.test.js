@@ -90,6 +90,8 @@ const EXPECTED_OVERRIDE_KEYS = [
   // Issue 1508: the percentage slider, and the second key gained by a family being RE-ROOTED rather
   // than by a component arriving or acquiring a state.
   'src/ui/svelte/components/ChanceSlider.svelte',
+  // Issue 1518: the chip, on the player frame whose recipe header and rows draw it.
+  'src/ui/svelte/components/Chip.svelte',
   // Issue 1509: the editor tab strip, and the third key gained by neither of the two routes above —
   // the component did not acquire a state and it did not arrive.
   'src/ui/svelte/components/ChoiceOptionList.svelte',
@@ -109,6 +111,8 @@ const EXPECTED_OVERRIDE_KEYS = [
   // Issue 1505: the uppercase micro-label, on sixteen converted eyebrow sites.
   'src/ui/svelte/components/Kicker.svelte',
   'src/ui/svelte/components/ListRow.svelte',
+  // Issue 1518: the button, on the two journal frames whose run action bar draws its roles.
+  'src/ui/svelte/components/ManagerButton.svelte',
   // Issue 2021: the modal chrome's banded frame, which every dialog draws since epic 1997.
   'src/ui/svelte/components/ManagerModal.svelte',
   'src/ui/svelte/components/ManagerSearchField.svelte',
@@ -123,6 +127,8 @@ const EXPECTED_OVERRIDE_KEYS = [
   // Issue 1505: the surface that reports something that just happened.
   'src/ui/svelte/components/Notice.svelte',
   'src/ui/svelte/components/OutcomeLadder.svelte',
+  // Issue 1518: the pager, on the player frames that draw its persistent and threshold forms.
+  'src/ui/svelte/components/Pagination.svelte',
   'src/ui/svelte/components/RadioCardGroup.svelte',
   // Issue 1512: the product's ONE row disclosure, promoted on its second importer. Its frame is the
   // open step row, where `aria-expanded="true"` over a visible body is the only state in which the
@@ -203,13 +209,10 @@ const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/apps/manager/ExplainerCard.svelte',
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
   'src/ui/svelte/components/ArmedDangerButton.svelte',
-  'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
   'src/ui/svelte/components/FillBar.svelte',
-  'src/ui/svelte/components/ManagerButton.svelte',
   'src/ui/svelte/components/ManagerColorPicker.svelte',
   'src/ui/svelte/components/ManagerColorPopover.svelte',
-  'src/ui/svelte/components/Pagination.svelte',
   'src/ui/svelte/components/SegmentedControl.svelte',
 ];
 
@@ -347,6 +350,42 @@ test('(a) the two older overrides still name the frame that renders their state'
     assert.ok(
       selected.includes(caseId),
       `a ${file} change selected ${JSON.stringify(selected)}, which does not include '${caseId}'`
+    );
+  }
+});
+
+test('(a) the three player-window overrides name a frame that draws the primitive', () => {
+  // Each expected id is a player frame outside the representative pair, so repointing an entry
+  // at the pair, or at a manager frame, reds here rather than passing as an unchanged selection.
+  const expectations = [
+    ['src/ui/svelte/components/Chip.svelte', ['player-crafting-simple']],
+    [
+      'src/ui/svelte/components/ManagerButton.svelte',
+      [
+        'fabricate-journal-lifecycle-ready-single',
+        'fabricate-journal-lifecycle-cancel-confirmation',
+      ],
+    ],
+    ['src/ui/svelte/components/Pagination.svelte', ['player-inventory', 'player-crafting-simple']],
+  ];
+  for (const [file, caseIds] of expectations) {
+    assert.deepEqual([...BROAD_SIGNAL_CASE_OVERRIDES[file]], caseIds, `${file} names its frames`);
+    const selected = mapChangedFilesToCases([file]);
+    for (const caseId of caseIds) {
+      const viewCase = selected.find((candidate) => candidate.id === caseId);
+      assert.ok(Boolean(viewCase), `a ${file} change does not select '${caseId}'`);
+      assert.ok(viewCase.kinds.includes('player'), `'${caseId}' is not a player-window frame`);
+    }
+  }
+
+  // The button's frames anchor on the controls the run action bar renders through it.
+  const anchors = BROAD_SIGNAL_CASE_OVERRIDES['src/ui/svelte/components/ManagerButton.svelte']
+    .map((id) => VIEW_LAB_CASES.find((viewCase) => viewCase.id === id)?.expectSelector ?? '')
+    .join(' ');
+  for (const action of ['primary', 'cancel-confirm', 'cancel-keep']) {
+    assert.ok(
+      anchors.includes(`[data-run-action="${action}"]`),
+      `no ManagerButton frame anchors on the run action bar's ${action} control`
     );
   }
 });
