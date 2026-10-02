@@ -16,6 +16,7 @@
   states the missing materials. Renders nothing when no group offers a choice.
 
   `need` is the open slot's requirement, which a held stack is short of when it holds less.
+  A currency option has no held-against-needed pair, so its name never states one.
 -->
 <script>
   import Medallion from '../../../components/Medallion.svelte';
@@ -31,9 +32,11 @@
 
   const groups = $derived(Array.isArray(choices) ? choices : []);
 
-  // A shortfall is stated in words as well as in danger ink. A currency option has no ratio.
-  function shortfall(name, have, required) {
-    return localize('FABRICATE.App.Crafting.Slots.TileShort', { name, have, need: required });
+  // A shortfall is stated in the option's name as well as in danger ink.
+  function optionLabel(name, short, have, required) {
+    return short
+      ? localize('FABRICATE.App.Crafting.Io.ChooseShortOption', { name, have, need: required })
+      : localize('FABRICATE.App.Crafting.Io.ChooseOption', { name });
   }
 
   function commitOption(choice, optionIndex) {
@@ -100,14 +103,16 @@
               class:is-short={!option.satisfied}
               role="radio"
               aria-checked={selected}
-              aria-label={localize('FABRICATE.App.Crafting.Io.ChooseOption', { name: option.name })}
+              aria-label={optionLabel(
+                option.name,
+                !option.satisfied && !option.isCurrency,
+                option.have,
+                option.need
+              )}
               tabindex={selected ? 0 : -1}
               data-keyboard-focus="true"
               data-option-index={option.optionIndex}
               data-option-satisfied={option.satisfied ? 'true' : 'false'}
-              title={option.satisfied || option.isCurrency
-                ? undefined
-                : shortfall(option.name, option.have, option.need)}
               onclick={() => commitOption(choice, option.optionIndex)}
               onkeydown={(event) =>
                 onRadioKeydown(
@@ -165,12 +170,11 @@
               class:is-short={short}
               role="radio"
               aria-checked={selected}
-              aria-label={localize('FABRICATE.App.Crafting.Io.ChooseOption', { name: stack.name })}
+              aria-label={optionLabel(stack.name, short, stack.have, need)}
               tabindex={selected ? 0 : -1}
               data-keyboard-focus="true"
               data-held-id={stack.itemId}
               data-option-satisfied={short ? 'false' : 'true'}
-              title={short ? shortfall(stack.name, stack.have, need) : undefined}
               onclick={() => commitStack(choice, stack.itemId)}
               onkeydown={(event) =>
                 onRadioKeydown(

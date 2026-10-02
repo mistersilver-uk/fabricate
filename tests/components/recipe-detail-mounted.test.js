@@ -1,5 +1,6 @@
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 
@@ -8,6 +9,7 @@ import {
   CRAFTING_APP_RAW_MODULES,
   CRAFTING_APP_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
+import { chipGroundAlpha, themeTokens } from '../helpers/chipPaint.js';
 import { chipToneOf } from '../helpers/chipTone.js';
 import {
   craftability,
@@ -19,6 +21,7 @@ import {
 import { assertIdentityHeader, primaryButtons } from '../helpers/playerDetailHeaderAssertions.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
+const THEMES = themeTokens(readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8'));
 
 const harness = createMountedComponentHarness({
   repoRoot,
@@ -1004,6 +1007,17 @@ describe('RecipeDetail mounted behavior', () => {
       header.querySelector('.player-detail-header-tile.is-dimmed .crafting-detail-pip'),
       'error pip overlays the faded thumbnail'
     );
+    // The pip is the shared icon-only chip at its published default square, not a local disc.
+    const pip = header.querySelector('.crafting-detail-pip > .manager-chip');
+    assert.deepEqual(
+      ['is-icon-only', 'is-solid', 'is-danger'].filter((name) => !pip.classList.contains(name)),
+      []
+    );
+    assert.ok(!pip.classList.contains('is-list') && !pip.classList.contains('is-row'));
+    assert.equal(pip.getAttribute('role'), 'img');
+    assert.match(pip.getAttribute('aria-label'), /Status\.MissingMaterials/);
+    assert.equal(pip.getAttribute('data-crafting-status'), 'missingMaterials');
+    assert.equal(chipGroundAlpha(pip, THEMES), 1, 'opaque over the artwork it covers');
     assert.equal(
       header.querySelector('.player-detail-header-meta [data-crafting-status]'),
       null,

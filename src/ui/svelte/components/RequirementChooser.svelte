@@ -6,7 +6,7 @@
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `slots` | ordered slot records | `[]` | Each carries `key`, `slotId` (null opens nothing), `kind` `fixed` \| `choice` \| `essence`, `state` `met` \| `partial` \| `short`, `name`, `label` (the whole accessible sentence), `art` / `icon` / `tint`, `pip` (already formatted; empty draws none), `affordance`, `description`, `tileId` and optional `alternatives`. |
-  | `openSlotId` | bindable slot id | `null` | The one open slot. The caller owns it, so two open choosers cannot be represented. |
+  | `openSlotId` | slot id | `null` | The one open slot. The caller owns it and this component never writes it, so two open choosers cannot be represented. |
   | `readOnly` | boolean | `false` | Renders every slot as a labelled image and opens no panel. |
   | `panelId` | DOM id | `null` | The open panel's id, which the open tile names through `aria-controls`. |
   | `ariaLabel` / `alternativesLabel` | localized strings | `''` | The accessible names of the tile group and of the alternatives group. |
@@ -20,7 +20,8 @@
     the panel region after the alternatives. The region renders only when it has content to hold.
 
   Callbacks:
-  - `onToggle(slotId, open)` — a selectable tile was pressed; `open` says whether it is now open.
+  - `onToggle(slotId, open)` — a selectable tile was pressed; `open` says what the press asks
+    for, and nothing opens until the caller passes that slot back as `openSlotId`.
   - `onChoose(slot, alternative)` — the only selection event. There is no add and no remove.
 
   Rest spread:
@@ -30,7 +31,8 @@
   - A `partial` choice slot is one the player has not picked from, a to-do and never an error:
     it paints the shared tile's `open` face. Any other `partial` slot paints as `short`, because
     the tile has no partial face; `label` and `data-slot-state` carry the difference.
-  - A short alternative is dimmed and stays a pressable button; its `reading` is rendered as text.
+  - A short alternative is dimmed and stays a pressable button; its `reading` is rendered as text
+    its button names through `aria-describedby`.
   - `pip` is caller-formatted, so a face that states an amount rather than a held-against-needed
     pair supplies its own text and this component draws nothing extra for it.
   - Pinned by `tests/components/requirement-chooser-mounted.test.js`.
@@ -40,7 +42,7 @@
 
   let {
     slots = [],
-    openSlotId = $bindable(null),
+    openSlotId = null,
     readOnly = false,
     panelId = null,
     ariaLabel = '',
@@ -52,6 +54,7 @@
     ...rest
   } = $props();
 
+  const uid = $props.id();
   const items = $derived(Array.isArray(slots) ? slots : []);
   const classes = $derived(['fab-requirement-chooser', extraClass].filter(Boolean).join(' '));
 
@@ -76,9 +79,22 @@
   }
 
   function toggle(slot) {
-    const open = slot.slotId !== openSlotId;
-    openSlotId = open ? slot.slotId : null;
-    onToggle?.(slot.slotId, open);
+    onToggle?.(slot.slotId, slot.slotId !== openSlotId);
+  }
+
+  function shortfallId(alternative) {
+    return `${uid}-short-${alternative.id}`;
+  }
+
+  // The shared tile forwards no ARIA attribute, so the reading is tied to its button from here.
+  function describedBy(node, id) {
+    const apply = (value) => {
+      const button = node.querySelector('button');
+      if (value) button?.setAttribute('aria-describedby', value);
+      else button?.removeAttribute('aria-describedby');
+    };
+    apply(id);
+    return { update: apply };
   }
 </script>
 
@@ -155,6 +171,7 @@
               class:is-short={alternative.short === true}
               data-requirement-alternative={alternative.id}
               data-alternative-state={alternative.short ? 'short' : 'met'}
+              use:describedBy={shortfalls.includes(alternative) ? shortfallId(alternative) : null}
             >
               <SlotTile
                 label={alternative.name}
@@ -172,7 +189,11 @@
           {/each}
         </div>
         {#each shortfalls as alternative (alternative.id)}
-          <p class="fab-requirement-shortfall" data-requirement-shortfall={alternative.id}>
+          <p
+            class="fab-requirement-shortfall"
+            id={shortfallId(alternative)}
+            data-requirement-shortfall={alternative.id}
+          >
             {alternative.reading}
           </p>
         {/each}

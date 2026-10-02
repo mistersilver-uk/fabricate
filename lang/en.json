@@ -977,6 +977,7 @@
           "AlternativesHint": "Choose which alternative this craft will use.",
           "ChooseStackTitle": "Which {name} to use",
           "ChooseOption": "Choose {name}",
+          "ChooseShortOption": "Choose {name}: you have {have}, and this needs {need}.",
           "OptionSelected": "Selected",
           "CurrencyCost": "{amount} {unit}",
           "CurrencyUnaffordable": "Not enough {unit}"
@@ -998,6 +999,7 @@
           "CurrencySetupDirective": "Ask your GM to finish the world's currency setup (Crafting Systems → World → Currency).",
           "OptionsOne": "{count} alternative",
           "OptionsMany": "{count} alternatives",
+          "ChooseOne": "Choose 1 of {count}",
           "Change": "Change",
           "EditPool": "Edit selection",
           "AddItems": "Add items"

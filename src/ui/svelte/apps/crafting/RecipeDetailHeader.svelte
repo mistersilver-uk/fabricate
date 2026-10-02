@@ -109,14 +109,16 @@
     {#snippet tileOverlay()}
       {#if uncraftable}
         <span class="crafting-detail-thumb-scrim" aria-hidden="true"></span>
-        <span
-          class="crafting-detail-pip"
-          data-crafting-status={status}
-          role="img"
-          aria-label={statusLabel}
-          title={statusLabel}
-        >
-          <i class={descriptor.icon} aria-hidden="true"></i>
+        <span class="crafting-detail-pip">
+          <Chip
+            iconOnly
+            emphasis="solid"
+            tone="danger"
+            icon={descriptor.icon}
+            data-crafting-status={status}
+            aria-label={statusLabel}
+            title={statusLabel}
+          />
         </span>
       {/if}
     {/snippet}
@@ -210,29 +212,14 @@
     pointer-events: none;
   }
 
-  /* The status icon, moved onto the thumbnail as a solid error pip. on-accent is a
-     near-black foreground in every theme, legible over the mid-tone danger fill. */
+  /* Position only: the status icon is the shared icon-only chip, centred on the tile. */
   .crafting-detail-pip {
     position: absolute;
     top: 50%;
     left: 50%;
-    transform: translate(-50%, -50%);
     display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 26px;
-    height: 26px;
-    border-radius: 999px;
-    border: 1px solid var(--fab-danger-border);
-    background: var(--fab-danger);
-    color: var(--fab-on-accent);
-    box-shadow: var(--fab-shadow-sm);
+    transform: translate(-50%, -50%);
     pointer-events: none;
-  }
-
-  .crafting-detail-pip i {
-    font-size: 13px;
-    line-height: 1;
   }
 
   .crafting-detail-mode-chip {

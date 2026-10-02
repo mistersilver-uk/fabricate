@@ -745,12 +745,21 @@ describe('1518 Chip — the solid emphasis', () => {
     }
   });
 
-  it('gives a recessive chip the raised ground and leaves it its own edge and ink', async () => {
+  // At the chip's 9px the recessive inks fall below 4.5:1 on the raised ground, so every chip
+  // that has no fill of its own takes the one ink that clears it in each theme.
+  it('gives a recessive chip the raised ground and the secondary ink, and leaves its edge', async () => {
+    for (const tone of ['', 'neutral', 'muted', 'secondary', 'subtle', 'tag']) {
+      const solid = await paintOf({ tone, emphasis: 'solid' });
+      assert.equal(tokenOf(solid.get('background')), '--fab-bg-3', `${tone} stands on bg-3`);
+      assert.equal(
+        tokenOf(solid.get('color')),
+        '--fab-text-secondary',
+        `"${tone}" is inked --fab-text-secondary, never a weaker rung of the ladder`
+      );
+    }
     const plain = await paintOf({ tone: 'neutral' });
     const solid = await paintOf({ tone: 'neutral', emphasis: 'solid' });
-    assert.equal(tokenOf(solid.get('background')), '--fab-bg-3');
-    assert.equal(solid.get('color'), plain.get('color'), 'the tone keeps its ink');
-    assert.equal(solid.get('border-color'), plain.get('border-color'), 'and its edge');
+    assert.equal(solid.get('border-color'), plain.get('border-color'), 'the tone keeps its edge');
   });
 });
 

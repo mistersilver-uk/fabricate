@@ -42,9 +42,10 @@ const BOG = {
   reading: 'Bog Oak: you hold 1 and this needs 2.',
 };
 
+// A slot id on a fixed slot, so its kind alone is what keeps it from opening.
 const FIXED = {
   key: 'g-iron',
-  slotId: null,
+  slotId: 'g-iron',
   kind: 'fixed',
   state: 'met',
   name: 'Iron',
@@ -169,6 +170,22 @@ describe('RequirementChooser mounted behavior', () => {
     assert.ok(!target.querySelector('.fab-slot-pip'));
   });
 
+  it('inks each pip with the on-colour of the fill it stands on', async () => {
+    await harness.mount({ slots: SLOTS });
+    const css = injectedCss();
+    for (const [selector, ink] of [
+      [String.raw`\.fab-slot-pip`, '--fab-on-success'],
+      [String.raw`\.is-short\S* \.fab-slot-pip`, '--fab-on-danger'],
+      [String.raw`\.fab-slot-pip\S*\.is-candidate`, '--fab-on-accent'],
+    ]) {
+      assert.match(
+        css,
+        new RegExp(String.raw`${selector}[^{,]*\{[^}]*[^-]color:\s*var\(${ink}\)`),
+        `${selector} is inked ${ink}, the ink the solid chip takes on the same fill`
+      );
+    }
+  });
+
   it('opens at most one slot, moving and closing it through openSlotId', async () => {
     const toggled = [];
     const target = await harness.mount({
@@ -179,12 +196,18 @@ describe('RequirementChooser mounted behavior', () => {
         toggled.push([slotId, open]);
       },
     });
-    const [, choice, essence] = slotsIn(target);
+    /** The caller adopts what the last press asked for. */
+    const adopt = () => {
+      const [slotId, open] = toggled.at(-1);
+      return harness.setProps({ openSlotId: open ? slotId : null });
+    };
+    const [fixed, choice, essence] = slotsIn(target);
     assert.deepEqual(expandedIn(target), [choice]);
     assert.ok(choice.classList.contains('is-open'));
+    assert.ok(!fixed.hasAttribute('aria-expanded'), 'a fixed slot never opens, whatever its id');
 
     essence.click();
-    await harness.setProps({});
+    await adopt();
     assert.deepEqual(
       expandedIn(target),
       [slotsIn(target)[2]],
@@ -195,13 +218,35 @@ describe('RequirementChooser mounted behavior', () => {
     assert.ok(!target.querySelector('[data-requirement-alternative]'), 'the choice panel closed');
 
     slotsIn(target)[2].click();
-    await harness.setProps({});
+    await adopt();
     assert.deepEqual(expandedIn(target), [], 'pressing the open tile closes it');
     assert.ok(!target.querySelector('[data-requirement-panel]'));
     assert.deepEqual(toggled, [
       ['pool', true],
       ['pool', false],
     ]);
+  });
+
+  // The caller owns the open slot: a press the caller refuses must not open a second chooser
+  // beneath a panel the caller still draws for the first.
+  it('opens nothing itself when the caller does not adopt a press', async () => {
+    const toggled = [];
+    const target = await harness.mount({
+      slots: SLOTS,
+      openSlotId: 'g-haft',
+      panel: POOL,
+      onToggle: (slotId, open) => {
+        toggled.push([slotId, open]);
+      },
+    });
+    slotsIn(target)[2].click();
+    await harness.setProps({});
+    assert.deepEqual(toggled, [['pool', true]], 'the press is reported');
+    assert.deepEqual(expandedIn(target), [slotsIn(target)[1]], 'and the open slot is unchanged');
+    assert.equal(
+      target.querySelector('[data-requirement-panel]').dataset.requirementPanel,
+      'g-haft'
+    );
   });
 
   it('names the open panel by its tile, and points the tile at it', async () => {
@@ -266,6 +311,17 @@ describe('RequirementChooser mounted behavior', () => {
       'Bog Oak: you hold 1 and this needs 2.'
     );
     assert.ok(!target.querySelector('[data-requirement-shortfall="oak"]'), 'a met one states none');
+    const reading = target.querySelector('[data-requirement-shortfall="bog"]');
+    assert.ok(reading.id.length > 0);
+    assert.equal(
+      button.getAttribute('aria-describedby'),
+      reading.id,
+      'the reading describes the tile it is about'
+    );
+    assert.ok(
+      !alternativesIn(target)[0].querySelector('button').hasAttribute('aria-describedby'),
+      'and a met tile is described by nothing'
+    );
 
     button.click();
     assert.equal(chosen.length, 1);

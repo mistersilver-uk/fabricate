@@ -93,9 +93,15 @@
       : localize('FABRICATE.App.Crafting.Slots.OptionsMany', { count });
   }
 
-  // A slot with alternatives states their count whichever kind of option is chosen.
+  // A slot with alternatives states their count whichever kind of option is chosen. A choice the
+  // player has not picked from states the to-do instead: its tile differs from a short one by
+  // ink alone.
   function disclosureText(slot) {
-    if (slot.choiceCount > 1) return optionsLabel(slot.choiceCount);
+    if (slot.choiceCount > 1) {
+      return slot.kind === SLOT_KIND.CHOICE && slot.state === SLOT_STATE.PARTIAL
+        ? localize('FABRICATE.App.Crafting.Slots.ChooseOne', { count: slot.choiceCount })
+        : optionsLabel(slot.choiceCount);
+    }
     if (slot.kind === SLOT_KIND.ESSENCE) {
       return slot.have > 0
         ? localize('FABRICATE.App.Crafting.Slots.EditPool')
@@ -116,7 +122,7 @@
     return {
       ...tileArt(slot),
       key: slot.key,
-      slotId: slot.interactive ? slot.slotId : null,
+      slotId: slot.slotId,
       kind: slot.kind,
       state: slot.state,
       name: slot.name,

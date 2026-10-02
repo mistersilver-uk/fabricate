@@ -113,10 +113,13 @@ describe('IngredientOptionSelector mounted behavior', () => {
     assert.ok(radios[1].classList.contains('is-short'));
     assert.ok(!radios[0].classList.contains('is-short'));
     assert.equal(radios[1].hasAttribute('disabled'), false, 'but stays reachable (not disabled)');
-    // The shortfall is a sentence as well as danger ink.
-    assert.match(radios[1].getAttribute('title'), /Slots\.TileShort/);
-    assert.match(radios[1].getAttribute('title'), /"name":"Blue Herb"/);
-    assert.ok(!radios[0].hasAttribute('title'), 'a met option states none');
+    // The shortfall is part of the accessible name, which reaches keyboard and touch; a tooltip
+    // reaches neither.
+    const name = radios[1].getAttribute('aria-label');
+    assert.match(name, /Io\.ChooseShortOption/);
+    assert.match(name, /"name":"Blue Herb".*"have":0.*"need":1/);
+    assert.match(radios[0].getAttribute('aria-label'), /Io\.ChooseOption:/, 'a met option states none');
+    for (const radio of radios) assert.ok(!radio.hasAttribute('title'), 'and nothing rides a tooltip');
   });
 
   it('stands every have/need chip on a solid ground', async () => {
@@ -155,7 +158,10 @@ describe('IngredientOptionSelector mounted behavior', () => {
     assert.equal(chipToneOf(bog.querySelector('.manager-chip')), 'danger');
     assert.equal(chipGroundAlpha(bog.querySelector('.manager-chip'), THEMES), 1);
     assert.equal(bog.hasAttribute('disabled'), false);
-    assert.match(bog.getAttribute('title'), /"name":"Bog Oak".*"have":1.*"need":2/);
+    assert.match(bog.getAttribute('aria-label'), /Io\.ChooseShortOption/);
+    assert.match(bog.getAttribute('aria-label'), /"name":"Bog Oak".*"have":1.*"need":2/);
+    assert.match(oak.getAttribute('aria-label'), /Io\.ChooseOption:/);
+    assert.ok(!bog.hasAttribute('title'));
     bog.click();
     assert.deepEqual(calls.at(-1), ['g1', { optionIndex: 0, heldItemId: 'Item.bog' }]);
   });

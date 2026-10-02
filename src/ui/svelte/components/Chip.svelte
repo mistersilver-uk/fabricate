@@ -7,7 +7,7 @@
   | `tag` | `'span'` \| `'li'` \| `'button'` \| `'div'` | `'span'` | The rendered element. A chip inside a `role="list"` must be an `li`; a clickable chip must be a real `button`. |
   | `tone` | `active`, `positive`, `disabled`, `warning`, `info`, `danger`, `neutral`, `negative`, `accent`, `muted`, `secondary`, `subtle`, `tag` | `''` | Colour ONLY, never size. A CLOSED set: an unrecognised value is DROPPED rather than emitted as an unstyled `is-*`, so a typo shows as the default chip. See the invariants for how a caller picks one. |
   | `emphasis` | `'outlined'` \| `'lit'` \| `'bare'` \| `'solid'` | `''` | A second axis: `tone` says which family the chip belongs to, `emphasis` how that family arrives. The four are alternatives, not a composition, and the set is closed the same way. `solid` is the opaque ground for a chip read over artwork. |
-  | `density` | `'default'` \| `'row'` \| `'list'` \| `'action'` \| `'tag-run'` \| `'inspector'` | `'default'` | The scale, closed. It is THE variant-on-the-primitive escape hatch and the only one: a layout context may size a chip's POSITION from outside, never its own geometry, and a value within a pixel of a shipped one is that same drift. `manager-layout.test.js`'s hand-rolled-chip ratchet catches the alternative. |
+  | `density` | `'default'` \| `'row'` \| `'list'` \| `'action'` \| `'tag-run'` \| `'inspector'` | `'default'` | The scale, closed. It is THE variant-on-the-primitive escape hatch and the only one: a layout context may size a chip's POSITION from outside, never its own geometry, and a value within a pixel of a shipped one is that same drift. `manager-layout.test.js`'s hand-rolled-chip ratchet catches the alternative. `presentation="clock"` is `WorldClockChip`'s own opt-in geometry and no density. |
   | `mono` / `struck` / `icon` | booleans / Font Awesome classes | `false` / `false` / `''` | Numerals in the mono face with `tabular-nums`, so columns of counts, DCs and quantities line up; the MUTED VARIANT, a value switched off in the scope being read, composing with every tone, which owns the ink; and a leading glyph. |
   | `swatch` / `tint` | bare `--fab-tag-*` keys | `''` | A leading colour DOT (the chip is ABOUT a colour) and an ink for the WHOLE chip (the chip IS that colour). Both are validated to a bare key before interpolation into a `style` attribute, both ride `--fab-chip-color`, and the tint wins when both are set. |
   | `truncate` / `iconOnly` | booleans | `false` | `truncate` is single-line and clipped; wrapping is the DEFAULT because the label arrives as a snippet and no `title` can be derived from one, so a caller that truncates should pass one. `iconOnly` makes the chip its glyph — a square with equal insets and no label — and REQUIRES AN ACCESSIBLE NAME, which a source contract holds because a primitive cannot make a caller pass one. |
@@ -46,7 +46,6 @@
     disabled = false,
     element = $bindable(null),
     children,
-    // WorldClockChip opts into its owning geometry; ordinary density callers keep their face.
     presentation = '',
     ...rest
   } = $props();
@@ -488,8 +487,9 @@
     font-size: 7px;
   }
 
-  /* Every solid ground is an opaque token, written after each tone so its fill wins the tie. */
+  /* Every solid ground is an opaque token, written after each tone so its paint wins the tie. */
   .manager-chip.is-solid {
+    color: var(--fab-text-secondary);
     background: var(--fab-bg-3);
   }
 

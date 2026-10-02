@@ -113,7 +113,7 @@
     transform: translateX(-50%);
     border-radius: 999px;
     background: var(--fab-success);
-    color: var(--fab-bg-0);
+    color: var(--fab-on-success);
     font-family: var(--fab-font-mono);
     font-size: 9px;
     font-weight: 500;
@@ -124,10 +124,12 @@
 
   .is-short .fab-slot-pip {
     background: var(--fab-danger);
+    color: var(--fab-on-danger);
   }
 
   .fab-slot-pip.is-candidate {
     background: var(--fab-accent);
+    color: var(--fab-on-accent);
   }
 
   .fab-slot-caption {

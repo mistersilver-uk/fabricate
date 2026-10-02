@@ -328,6 +328,26 @@ describe('RequirementRail mounted behavior', () => {
     }
   });
 
+  // An unchosen choice and a short slot both read 0/N, so the to-do is stated in words.
+  it('captions an unchosen choice with its to-do, and a chosen one with its alternatives', async () => {
+    const restoreI18n = installLangBackedI18n(repoRoot);
+    try {
+      const caption = (target) =>
+        tilesIn(target)[1].querySelector('.fab-requirement-slot-affordance').textContent.trim();
+      const target = await harness.mount({ slots: slots() });
+      assert.equal(caption(target), 'Choose 1 of 3');
+      const chosen = await harness.setProps({
+        slots: buildRequirementSlots(
+          { ingredientStates: STATES },
+          { chosenGroupIds: ['g-choice'] }
+        ),
+      });
+      assert.equal(caption(chosen), '3 alternatives', 'a picked choice is no longer a to-do');
+    } finally {
+      restoreI18n();
+    }
+  });
+
   it('reports the opened slot id on click', async () => {
     const opened = [];
     const target = await harness.mount({ slots: slots(), onOpenSlot: (id) => opened.push(id) });
