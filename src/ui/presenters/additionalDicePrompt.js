@@ -448,6 +448,7 @@ const UNSPENDABLE_STOPS = new Set([
   'resourceMacroFailed',
   'resourceOverridden',
   'resourceNotWritable',
+  'resourceUnreadable',
 ]);
 
 /**
@@ -458,10 +459,10 @@ export function bulkAdditionalDiceNoticeText(result, { actorName = '', localize 
   if (result?.additionalDiceRefusal)
     return additionalDiceNoticeText(result, { actorName, localize });
   const items = Array.isArray(result?.items) ? result.items : [];
-  const stopped = items.find((item) => item?.additionalDiceExhaustion);
-  const stop = stopped?.additionalDiceExhaustion;
+  const stop = items.find((item) => item?.additionalDiceExhaustion)?.additionalDiceExhaustion;
   if (!stop) return null;
-  if (UNSPENDABLE_STOPS.has(stopped.additionalDiceRefusal)) {
+  const stopped = items.find((item) => UNSPENDABLE_STOPS.has(item?.additionalDiceRefusal));
+  if (stopped) {
     const additionalDiceNotice = { label: stop.resourceLabel, ...stopped.additionalDiceNotice };
     const refusal = { additionalDiceRefusal: stopped.additionalDiceRefusal, additionalDiceNotice };
     return additionalDiceNoticeText(refusal, { actorName, localize });

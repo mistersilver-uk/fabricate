@@ -549,6 +549,11 @@ describe('the attempt notices an immediate surface raises (issue 2008)', () => {
       additionalDiceNotice: { dice: 1, label: 'Momentum', source: 'path' },
     };
     assert.equal(notice(misconfigured), '1 Momentum spent; the roll could not be completed.');
+    const threw = {
+      ...misconfigured,
+      data: { ...misconfigured.data, targetRefusal: 'roll-failed' },
+    };
+    assert.equal(notice(threw), notice(misconfigured), 'a main roll that threw after the spend');
     const { additionalDiceNotice, ...gathering } = misconfigured;
     assert.equal(additionalDiceNotice.dice, 1);
     assert.equal(
@@ -631,6 +636,10 @@ describe('the attempt notices an immediate surface raises (issue 2008)', () => {
     assert.equal(
       bulk(stopped('resourceMacroFailed', { additionalDiceNotice: { label: '' } })),
       'Additional dice are unavailable: the macro that reads what can be spent did not return a number.'
+    );
+    assert.equal(
+      bulk(stopped('resourceUnreadable', { additionalDiceNotice: null })),
+      'Additional dice are unavailable: Brenna has no readable Momentum value.'
     );
     const ranOut = 'Momentum ran out after 1 of 3 rolls. The rolls already made stand.';
     assert.equal(bulk(stopped('spendRefused')), ranOut, 'a spend that ran out still says so');
