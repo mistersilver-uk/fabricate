@@ -148,12 +148,8 @@ export function salvageCheckNeed({ mode, config, checkUsable, component }) {
 }
 
 /**
- * A routed FIXED tier's band: its authored `[start, end]` segment through the same `netRange`
- * formatter the Journal ladder uses (issue 2152), so a negative bound reads with the true minus
- * sign. Fixed routing never reads a DC and matches on this segment directly, whether the
- * underlying check counts successes or sums a roll — so every fixed row is formatted here, not
- * just a counting one. A row missing either bound (should not occur; builder-guaranteed) is left
- * bandless, matching the prior no-range display.
+ * A routed fixed tier's authored [start, end] through `netRange`, as the Journal states it
+ * (issue 2152); a row missing a bound has no band.
  */
 function withFixedBands(rows) {
   return rows.map((row) => ({
@@ -165,9 +161,8 @@ function withFixedBands(rows) {
 /**
  * Routed salvage rows under a counting check, each with the Journal's band in net successes and
  * a Botch row while cancelling is on (issue 2137), from the same presenter and the salvage's own
- * successes needed. A routed FIXED check's rows are banded in their authored `[start, end]`
- * instead (issue 2152), since a fixed tier has no DC-relative threshold to count against. Rows of
- * any other check are returned as they are.
+ * successes needed. Rows of any other check are returned as they are.
+ * A routed fixed check's rows are banded in their authored range instead (issue 2152).
  */
 export function withSalvageCountBands(rows, { config, component, localize }) {
   if (config?.type === 'fixed') return withFixedBands(rows);

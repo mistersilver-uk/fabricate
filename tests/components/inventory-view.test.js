@@ -1421,9 +1421,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     assert.doesNotMatch(root.querySelector('[data-inventory-salvage-banner]').textContent, /unused/);
   });
 
-  // AC2, rendering half. The builder decides the numbers; the presenter formats the range
-  // through `netRange` (issue 2152), so the panel renders `outcome.band`, never a raw
-  // `outcome.start`–`outcome.end` interpolation.
+  // AC2, rendering half: the builder decides the numbers, the panel renders `outcome.band`.
   it('routed + fixed renders the presenter\'s band and NO DC; routed + relative renders thresholds', async () => {
     const fixed = salvageServices(
       salvageItem({
@@ -1452,8 +1450,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
             band: '10–20',
             results: [{ id: 'r1', componentId: 'c2', name: 'Iron Shard', img: null, quantity: 1 }],
           },
-          // A negative-ended fixed tier reads with the true minus sign, spaced apart from the
-          // dash — the Journal's own formatting, never `-2–-1`.
+          // A negative-ended tier reads with the true minus, never `-2–-1` (issue 2152).
           {
             id: 'o3',
             name: 'Fumble',

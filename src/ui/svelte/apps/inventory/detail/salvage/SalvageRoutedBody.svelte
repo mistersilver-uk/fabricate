@@ -13,9 +13,7 @@
     FIXED     each outcome carries an absolute, non-overlapping [start, end] segment
               of the roll range and matches on `start <= total <= end`. It never
               reads a DC, so an override shifts NOTHING and there is no DC to show.
-              Rendered as the presenter's `band` — `start–end`, through the shared
-              `netRange` formatter so a negative bound reads with the true minus
-              sign (issue 2152) — never a raw template interpolation.
+              Rendered as the presenter's `band` (issue 2152).
 
   All of that arithmetic is decided builder-side; this component only reads it.
 
@@ -112,10 +110,7 @@
               </span>
             {/if}
             {#if outcome.band}
-              <!-- The presenter's formatted range: a fixed tier's authored [start, end]
-                   (issue 2152) or a counting check's net-successes band (issue 2137), both
-                   through the shared `netRange` formatter so a negative bound reads with the
-                   true minus sign, spaced apart from the dash. -->
+              <!-- The presenter's band: a fixed tier's [start, end] or a count's net successes. -->
               <span class="salvage-outcome-threshold" data-inventory-outcome-band={outcome.band}>
                 <Chip density="list" mono tone={figureTone(outcome)}>{outcome.band}</Chip>
               </span>
