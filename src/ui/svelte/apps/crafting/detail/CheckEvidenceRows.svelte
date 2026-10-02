@@ -2,8 +2,9 @@
   The executed check's evidence rows in a player result box (issue 2005), read from the result's
   display projection and never from later actor or config state. Each row is the shared fact row
   in its keyed form; a box narrower than 360px sets the chat card's 88px key column. A count check
-  states its die tiles with their legend above its count rows (issue 2006); its sentence rows set
-  as prose, its figure rows as figures (issue 2134).
+  states its die tiles with their legend above its count rows (issue 2006), on the rows' own
+  neutral ground so a toned tile stands apart from a toned box; its sentence rows set as prose,
+  its figure rows as figures (issue 2134).
 
   Props:
   | prop | values | default | contract |
@@ -69,16 +70,22 @@
 {/if}
 
 <style>
-  .check-count-tiles {
+  .check-count-tiles,
+  .check-evidence {
     min-width: 0;
+    border: 1px solid var(--fab-border);
+    border-radius: 9px;
+  }
+
+  .check-count-tiles {
+    padding: var(--fab-space-2) var(--fab-space-3);
+    background: var(--fab-bg-2);
   }
 
   .check-evidence {
     --journal-fact-key-width: 120px;
     container-type: inline-size;
     overflow: hidden;
-    border: 1px solid var(--fab-border);
-    border-radius: 9px;
   }
 
   .check-evidence-row {
