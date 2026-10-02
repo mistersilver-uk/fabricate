@@ -262,7 +262,7 @@ describe('CraftingView mounted behavior', () => {
       const target = await harness.mount({
         services: services(store, { getJournalRunAuthorityAvailability: () => availability }),
       });
-      const chip = target.querySelector('.crafting-detail-header-meta [data-crafting-status]');
+      const chip = target.querySelector('.player-detail-header-meta [data-crafting-status]');
       assert.equal(Boolean(chip), ready, `the ready chip is ${ready ? 'kept' : 'withheld'}`);
       const notice = target.querySelector('[data-recipe-blocking]');
       assert.equal(

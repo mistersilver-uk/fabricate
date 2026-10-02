@@ -137,6 +137,9 @@ const SHARED_PRIMITIVES = [
   // suites: the alchemy view, the app root, the journal view and both inventory suites. Only
   // the three gathering suites are hand-rolled.
   'src/ui/svelte/apps/PlayerViewState.svelte',
+  // The identity row every player detail pane leads with (issue 1518): the crafting, inventory and
+  // journal trees all render it, so an omission is named here rather than cancelling a suite.
+  'src/ui/svelte/apps/PlayerDetailHeader.svelte',
 ];
 
 /** Components adjudicated AGAINST membership, and why a non-entry is worth recording. */

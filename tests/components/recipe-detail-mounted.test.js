@@ -16,6 +16,7 @@ import {
   recipe,
   steppedEssenceRecipe,
 } from '../helpers/crafting-fixtures.js';
+import { assertIdentityHeader, primaryButtons } from '../helpers/playerDetailHeaderAssertions.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -120,17 +121,56 @@ describe('RecipeDetail mounted behavior', () => {
           `${testCase.mode} body renders the ${section} section`
         );
       }
-      assert.ok(target.querySelector('[data-crafting-craft]'), 'craft button present');
-      // The craft button is a fixed footer OUTSIDE the scrolling detail region.
+      // The Craft primary lives in the identity header, outside the scrolling detail region.
+      assert.ok(
+        target.querySelector('[data-recipe-header]').querySelector('[data-crafting-craft]'),
+        'the craft primary is in the header'
+      );
       const scroll = target.querySelector('[data-crafting-detail-scroll]');
       assert.ok(scroll, 'the detail content has a dedicated scroll region');
-      assert.equal(
-        scroll.querySelector('[data-crafting-craft]'),
-        null,
-        'the craft button is not inside the scroll region'
+      assert.ok(
+        !scroll.querySelector('[data-crafting-craft]'),
+        'the craft primary is not inside the scroll region'
       );
     });
   }
+
+  for (const testCase of MODE_CASES) {
+    it(`draws one primary for a craftable ${testCase.mode} recipe, in the identity header`, async () => {
+      const crafted = [];
+      const target = await harness.mount({
+        recipe: testCase.fixture,
+        selectedSetId: testCase.fixture.defaultSetId,
+        craftability: craftability(),
+        onCraft: () => {
+          crafted.push(testCase.mode);
+        },
+      });
+
+      const pane = target.querySelector('[data-crafting-detail-state="selected"]');
+      const row = assertIdentityHeader(pane, { primaries: 1, name: testCase.fixture.name });
+      const [primary] = primaryButtons(row);
+      assert.ok(primary.hasAttribute('data-crafting-craft'), 'and it is the Craft verb');
+      assert.equal(primary.getAttribute('data-crafting-craft-disabled'), 'false');
+      primary.click();
+      assert.deepEqual(crafted, [testCase.mode]);
+    });
+  }
+
+  it('keeps the one primary, disabled and renamed, while a craft is in flight', async () => {
+    const target = await harness.mount({
+      recipe: recipe(),
+      selectedSetId: recipe().defaultSetId,
+      craftability: craftability({ canCraft: false }),
+      busy: true,
+    });
+
+    const [primary] = primaryButtons(assertIdentityHeader(target, { primaries: 1 }));
+    assert.equal(primary.disabled, true);
+    assert.equal(primary.getAttribute('data-crafting-craft-disabled'), 'true');
+    assert.match(primary.textContent, /Button\.Crafting/u);
+    assert.ok(Boolean(primary.querySelector('i.fa-spinner')));
+  });
 
   it('renders ingredients as rail slot tiles with state-coloured borders and pips', async () => {
     const target = await harness.mount({
@@ -808,7 +848,7 @@ describe('RecipeDetail mounted behavior', () => {
     });
 
     const chip = target.querySelector(
-      '.crafting-detail-header-meta [data-recipe-duration]'
+      '.player-detail-header-meta [data-recipe-duration]'
     );
     assert.ok(chip, 'the pre-craft duration chip renders for a timed recipe');
     // Largest-unit-first compact formatting (mirrors the manager Overview).
@@ -929,14 +969,12 @@ describe('RecipeDetail mounted behavior', () => {
         'most ONE reason for every browse status there is, so the bulleted list was always a ' +
         'one-item list. A second reason would land in `detail` rather than being dropped'
     );
-    // A non-craftable recipe still renders a (disabled) craft button.
-    const craftButton = target.querySelector('[data-crafting-craft]');
-    assert.ok(craftButton, 'craft button present');
-    assert.equal(
-      craftButton.getAttribute('data-crafting-craft-disabled'),
-      'true',
-      'craft button disabled when materials missing'
+    // An unavailable commit verb leaves the header with no primary, and nothing takes its place.
+    assert.ok(
+      !target.querySelector('[data-crafting-craft]'),
+      'no craft primary while the materials are missing'
     );
+    assert.equal(primaryButtons(target).length, 0, 'and no second-choice primary in its place');
   });
 
   it('moves the status onto a thumbnail pip and drops the header badge when uncraftable', async () => {
@@ -952,11 +990,11 @@ describe('RecipeDetail mounted behavior', () => {
 
     const header = target.querySelector('[data-recipe-header]');
     assert.ok(
-      header.querySelector('.crafting-detail-thumb.is-uncraftable .crafting-detail-pip'),
+      header.querySelector('.player-detail-header-tile.is-dimmed .crafting-detail-pip'),
       'error pip overlays the faded thumbnail'
     );
     assert.equal(
-      header.querySelector('.crafting-detail-header-meta [data-crafting-status]'),
+      header.querySelector('.player-detail-header-meta [data-crafting-status]'),
       null,
       'the labelled status badge is dropped in favour of the pip'
     );
@@ -976,7 +1014,7 @@ describe('RecipeDetail mounted behavior', () => {
 
     const header = target.querySelector('[data-recipe-header]');
     assert.ok(
-      header.querySelector('.crafting-detail-header-meta [data-crafting-status]'),
+      header.querySelector('.player-detail-header-meta [data-crafting-status]'),
       'craftable recipe keeps the labelled status badge'
     );
     assert.equal(
@@ -993,7 +1031,7 @@ describe('RecipeDetail mounted behavior', () => {
       selectedSetId: recipe().defaultSetId,
     });
 
-    const chip = target.querySelector('.crafting-detail-header-meta [data-crafting-status]');
+    const chip = target.querySelector('.player-detail-header-meta [data-crafting-status]');
     assert.ok(chip.classList.contains('manager-chip'), 'the badge IS the shared chip now');
     assert.equal(chipToneOf(chip), 'positive', 'and an available recipe still reads as green');
     assert.ok(chip.classList.contains('is-list'), 'at the browser row scale');

@@ -303,7 +303,7 @@ export function journalLifecycleCases() {
       '.journal-view-container' +
       has(
         '[data-run-id="lab-v1-awaiting-choice"] [data-run-attention="choice"]',
-        `${detail} .journal-detail-meta [data-run-attention="choice"]`,
+        `${detail} .player-detail-header-meta [data-run-attention="choice"]`,
         '[data-journal-awaiting-choice="true"][data-notice-tone="info"]',
         '[data-journal-route] input:not(:disabled)'
       ) +
@@ -480,7 +480,7 @@ export function journalLifecycleCases() {
       has(
         '[data-run-action="primary"]:not(:disabled)',
         '[data-journal-stage-consumed] [data-list-row]',
-        '.journal-detail-identity img[src$="bottle-bulb-corked-glowing-red.webp"]'
+        '.journal-detail-header [data-player-detail-header] img[src$="bottle-bulb-corked-glowing-red.webp"]'
       ) +
       lacks('[data-journal-verdict]', '[data-slot-row]'),
     salvage: terminal('succeeded', '[data-history-items="produced"]'),

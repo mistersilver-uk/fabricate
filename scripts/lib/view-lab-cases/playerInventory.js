@@ -6,6 +6,7 @@ import {
   ANCHORED_POPOVER_SOURCES,
   BULK_DEFAULTS,
   CRAFTING_SHARED,
+  PLAYER_DETAIL_HEADER,
   PLAYER_VIEW_STATE,
 } from './caseConstants.js';
 import {
@@ -161,6 +162,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/stores\/inventory/,
       /^src\/ui\/svelte\/apps\/crafting\/ComponentSourcesBar\.svelte$/,
       PLAYER_VIEW_STATE,
+      PLAYER_DETAIL_HEADER,
     ],
   }),
   playerCase({
@@ -367,7 +369,11 @@ export const CASES = Object.freeze([
       },
     ],
     kinds: ['player', 'inventory'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/inventory\//, /^src\/ui\/svelte\/stores\/inventory/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/inventory\//,
+      /^src\/ui\/svelte\/stores\/inventory/,
+      PLAYER_DETAIL_HEADER,
+    ],
   }),
   // Issue 2005: a roll-under salvage names its target and source in place of a DC, and its banner
   // says the total must stay at or under the target.
@@ -552,6 +558,8 @@ export const CASES = Object.freeze([
       `:has(${CARD('lab-smithing:sm-air-shard')}[data-inventory-card-bulk-selected="true"])` +
       ':has([data-inventory-bulk-yield] .manager-chip.is-positive)' +
       ':has([data-inventory-bulk-yield] .manager-chip.is-accent)',
+    // The bulk panel draws the same identity row through `InventoryDetailHeader`.
+    sourceMatches: [...BULK_DEFAULTS.sourceMatches, PLAYER_DETAIL_HEADER],
   }),
   playerCase({
     ...BULK_DEFAULTS,

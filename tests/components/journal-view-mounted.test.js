@@ -670,7 +670,7 @@ describe('JournalView mounted behavior', () => {
     const target = await harness.mount({ services: makeServices(store) });
     assert.equal(target.querySelectorAll('[data-yield-scale]').length, 1, 'active scale has no duplicate received aggregate');
     assert.ok(target.querySelector('[data-yield-cut]'));
-    assert.match(target.querySelector('.journal-detail-meta').textContent, /d100/u);
+    assert.match(target.querySelector('.player-detail-header-meta').textContent, /d100/u);
 
     harness.remount();
     const routed = makeGatheringRun({
@@ -688,8 +688,8 @@ describe('JournalView mounted behavior', () => {
     });
     const routedTarget = await harness.mount({ services: makeServices(routedStore) });
     assert.equal(routedTarget.querySelectorAll('[data-outcome-tier]').length, 2);
-    assert.match(routedTarget.querySelector('.journal-detail-meta').textContent, /Mode\.routed/u);
-    assert.doesNotMatch(routedTarget.querySelector('.journal-detail-meta').textContent, /null/u);
+    assert.match(routedTarget.querySelector('.player-detail-header-meta').textContent, /Mode\.routed/u);
+    assert.doesNotMatch(routedTarget.querySelector('.player-detail-header-meta').textContent, /null/u);
     const ruleHint = (root) => root.querySelector('[data-outcome-ladder] .fab-outcome-hint').textContent;
     assert.match(ruleHint(routedTarget), /Yields\.RoutedRule$/u);
 
@@ -720,7 +720,7 @@ describe('JournalView mounted behavior', () => {
     const straightTarget = await harness.mount({ services: makeServices(straightStore) });
     assert.ok(straightTarget.querySelector('[data-yield-entry="ore"]'));
     assert.equal(straightTarget.querySelector('[data-yield-cut]'), null);
-    assert.match(straightTarget.querySelector('.journal-detail-meta').textContent, /Mode\.straight/u);
+    assert.match(straightTarget.querySelector('.player-detail-header-meta').textContent, /Mode\.straight/u);
   });
 
   it('personalizes active d100 chances without replacing terminal evidence', async () => {

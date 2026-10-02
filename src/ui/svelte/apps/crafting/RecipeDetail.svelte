@@ -1,7 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  RecipeDetail is the centre-column dispatcher. It renders the shared
-  RecipeDetailHeader for ALL modes, then a mode-keyed body (simple /
+  RecipeDetail is the centre-column dispatcher. It renders the shared RecipeDetailHeader for ALL
+  modes, which carries the pane's Craft primary, then a mode-keyed body (simple /
   routedByIngredients / routedByCheck / progressive). A redaction teaser renders
   the header only — never any ingredient/result/check detail. When no recipe is
   selected it shows a select-a-recipe hint.
@@ -9,7 +9,6 @@
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import RecipeDetailHeader from './RecipeDetailHeader.svelte';
-  import CraftButton from './CraftButton.svelte';
   import SimpleRecipeBody from './detail/SimpleRecipeBody.svelte';
   import IngredientRoutedBody from './detail/IngredientRoutedBody.svelte';
   import RoutedByCheckBody from './detail/RoutedByCheckBody.svelte';
@@ -63,23 +62,21 @@
   const redacted = $derived(recipe?.redaction?.redacted === true);
   const mode = $derived(String(recipe?.modeToken ?? 'simple'));
 
-  // Craft-button gating (the button is a fixed footer below the scrolling body).
+  // The header's Craft primary. It renders only while the commit verb is available, and no other
+  // verb takes its place when it is not; a craft in flight keeps it, disabled.
   //
-  // Deliberately NOT gated on `authorityRefusal`. Availability is a CACHE the boot and journal
-  // hooks refresh, so a stale `false` would disable the only CTA this pane has and leave the
-  // player no way to clear it short of reloading Foundry — while an enabled button costs at
-  // worst one click answered by the same sentence the header is already showing, and "try again
-  // in a moment" is the documented remedy for every transient authority state. The header states
-  // the consequence in its callout instead (`RecipeDetailHeader.svelte`, `refusalLine`).
+  // Deliberately not gated on `authorityRefusal`: availability is a cache the boot and journal
+  // hooks refresh, so a stale `false` would remove the pane's only way forward, while a live
+  // primary costs at worst one click answered by the sentence the header already shows.
   const canCraft = $derived(craftability?.canCraft === true);
-  const craftLabel = $derived(
-    rollResult
-      ? localize('FABRICATE.App.Crafting.Button.CraftAnother')
-      : localize('FABRICATE.App.Crafting.Button.Craft')
-  );
-  const disabledReason = $derived(
-    canCraft ? '' : localize('FABRICATE.App.Crafting.Button.MissingMaterials')
-  );
+  const craftLabel = $derived.by(() => {
+    if (redacted || !(canCraft || busy)) return '';
+    return localize(
+      rollResult
+        ? 'FABRICATE.App.Crafting.Button.CraftAnother'
+        : 'FABRICATE.App.Crafting.Button.Craft'
+    );
+  });
 
   // Resolve the mode body once. Alchemy is handled by its own tab; an unknown
   // mode falls back to the simple body so a misconfigured system still renders.
@@ -119,7 +116,7 @@
   </div>
 {:else}
   <div class="crafting-detail" data-crafting-detail-state="selected" data-recipe-detail-mode={mode}>
-    <RecipeDetailHeader {recipe} {authorityRefusal} />
+    <RecipeDetailHeader {recipe} {authorityRefusal} {craftLabel} {busy} {onCraft} />
     {#if !redacted}
       <div class="crafting-detail-body" data-crafting-detail-scroll>
         <Body
@@ -140,9 +137,6 @@
           {displayedStepId}
         />
       </div>
-      <div class="crafting-detail-footer">
-        <CraftButton label={craftLabel} disabled={!canCraft} {disabledReason} {busy} {onCraft} />
-      </div>
     {/if}
   </div>
 {/if}
@@ -159,19 +153,12 @@
     overflow: hidden;
   }
 
-  /* The detail content scrolls here; the craft-button footer below stays fixed and
-     always visible without overlapping the content. */
+  /* The detail content scrolls here; the header above it, with the Craft primary, stays fixed. */
   .crafting-detail-body {
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
     padding-right: 2px;
-  }
-
-  .crafting-detail-footer {
-    flex: 0 0 auto;
-    padding-top: var(--fab-space-3);
-    border-top: 1px solid var(--fab-border);
   }
 
   /* The caller-owned wrapper for the no-selection panel: the fill, the centring and the inset

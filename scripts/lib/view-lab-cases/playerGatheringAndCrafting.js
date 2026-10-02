@@ -9,6 +9,7 @@ import {
   CRAFTING_ROUTED_CHECK,
   CRAFTING_ROUTED_INGREDIENTS,
   CRAFTING_SHARED,
+  PLAYER_DETAIL_HEADER,
   CRAFTING_SIMPLE,
 } from './caseConstants.js';
 import { playerCase, responsiveLayout } from './caseFactories.js';
@@ -766,7 +767,11 @@ export const CASES = Object.freeze([
     steps: [],
     position: { width: 1100, height: 760 },
     kinds: ['player', 'crafting'],
-    sourceMatches: [CRAFTING_SHARED, /^src\/ui\/svelte\/stores\/craftingStore/],
+    sourceMatches: [
+      CRAFTING_SHARED,
+      /^src\/ui\/svelte\/stores\/craftingStore/,
+      PLAYER_DETAIL_HEADER,
+    ],
   }),
   // The Crafting header withholds `Ready to craft` and leads the blocking callout with the authority's own reason.
   playerCase({
@@ -871,7 +876,12 @@ export const CASES = Object.freeze([
       { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
     ],
     kinds: ['player', 'crafting'],
-    sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
+    sourceMatches: [
+      CRAFTING_SHARED,
+      CRAFTING_SIMPLE,
+      /^src\/ui\/svelte\/stores\/craftingStore/,
+      PLAYER_DETAIL_HEADER,
+    ],
   }),
   playerCase({
     id: 'player-crafting-roll-result',
@@ -1312,7 +1322,11 @@ export const CASES = Object.freeze([
     position: { width: 1024, height: 860 },
     kinds: ['player', 'crafting', 'responsive'],
     expectLayout: responsiveLayout('.crafting-view-container', '.crafting-view-grid'),
-    sourceMatches: [CRAFTING_SHARED, /^src\/ui\/svelte\/stores\/craftingStore/],
+    sourceMatches: [
+      CRAFTING_SHARED,
+      /^src\/ui\/svelte\/stores\/craftingStore/,
+      PLAYER_DETAIL_HEADER,
+    ],
   }),
   ...playerCountResultCases(),
   ...playerAdvantagePromptCases(),

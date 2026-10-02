@@ -66,6 +66,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Medallion.svelte',
     // The actor portrait (issue 1514).
     'src/ui/svelte/components/Avatar.svelte',
+    // The identity row `InventoryDetailHeader` composes (issue 1518).
+    'src/ui/svelte/apps/PlayerDetailHeader.svelte',
     'src/ui/svelte/components/Pagination.svelte',
     // Issue 1504: the shared `<Select>`'s whole compiled closure.
     ...SELECT_COMPILED_MODULES,

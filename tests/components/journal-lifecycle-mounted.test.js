@@ -547,7 +547,7 @@ function assertScrollContract(target) {
 
 function assertActionAlignment(target) {
   const header = target.querySelector('.journal-detail-header');
-  const identity = header?.querySelector('.journal-detail-identity');
+  const identity = header?.querySelector('[data-player-detail-header]');
   const actions = header?.querySelector('[data-journal-actions]');
   assert.ok(header && identity && actions, 'identity and actions share the detail header');
 }
@@ -927,13 +927,13 @@ describe('Journal versioned lifecycle (mounted)', () => {
 
   it('retains readable identity and compact timing without expanded internal identifiers', async () => {
     const { target } = await mountState('ready-single');
-    assert.match(target.querySelector('.journal-detail-identity').textContent, /Bend Horseshoe/);
+    assert.match(target.querySelector('[data-player-detail-header]').textContent, /Bend Horseshoe/);
     assert.ok(!target.querySelector('[data-journal-record]'));
     assert.match(target.querySelector('[data-journal-this-run]').textContent, /Started/);
     await harness.remount();
     const gathering = await mountState('gathering-straight');
     assert.match(
-      gathering.target.querySelector('.journal-detail-identity').textContent,
+      gathering.target.querySelector('[data-player-detail-header]').textContent,
       /straight task/
     );
     assert.ok(!gathering.target.querySelector('[data-journal-record]'));
@@ -1668,7 +1668,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
       if (state === 'awaiting-choice') {
         const row = mounted.target.querySelector('[data-run-id="lab-v1-awaiting-choice"]');
         assert.equal(row.querySelector('[data-run-attention]')?.dataset.runAttention, 'choice');
-        const header = mounted.target.querySelector('.journal-detail-meta [data-run-attention]');
+        const header = mounted.target.querySelector('.player-detail-header-meta [data-run-attention]');
         assert.equal(header?.dataset.runAttention, 'choice');
         assert.ok(mounted.target.querySelector('[data-journal-awaiting-choice="true"]'), 'the one notice names the next move');
         assert.ok(!mounted.target.querySelector('[data-journal-action-blocker]'), 'guidance, never a refusal');

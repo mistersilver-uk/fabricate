@@ -246,6 +246,9 @@ export const PLAYER_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Kicker.svelte',
   'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/Notice.svelte',
+  // The identity row every player detail pane leads with (issue 1518), and the primary it draws.
+  'src/ui/svelte/apps/PlayerDetailHeader.svelte',
+  'src/ui/svelte/components/ManagerButton.svelte',
 ]);
 
 // The raw `.js` modules the player Crafting tab tree needs in a mounted test.
@@ -468,6 +471,8 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Avatar.svelte',
   'src/ui/svelte/components/FillBar.svelte',
   'src/ui/svelte/components/Notice.svelte',
+  // The identity row `RecipeDetailHeader` composes (issue 1518), flat for the same reason.
+  'src/ui/svelte/apps/PlayerDetailHeader.svelte',
   'src/ui/svelte/apps/crafting/CraftingView.svelte'
 ]);
 

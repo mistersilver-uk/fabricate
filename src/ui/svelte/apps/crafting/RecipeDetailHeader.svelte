@@ -1,21 +1,31 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  RecipeDetailHeader is the shared header for every recipe-detail mode: the
-  thumbnail, name, mode chip, flavor text, and the blocking-reasons callout (when
-  the recipe is not craftable). For a redaction teaser it shows only the generic
-  identity + a discovery hint — never any ingredient/result detail.
+  RecipeDetailHeader is the shared header for every recipe-detail mode: the identity row with the
+  pane's one Craft primary, the flavor text, and the blocking-reasons callout (when the recipe is
+  not craftable). For a redaction teaser it shows only the generic identity + a discovery hint —
+  never any ingredient/result detail.
+
+  Props: `recipe`, `authorityRefusal` (the localized refusal, or `''`), `craftLabel` (the commit
+  verb, or `''` when it is unavailable, which renders no primary), `busy`, `onCraft`.
 -->
 <script>
-  import Medallion from '../../components/Medallion.svelte';
+  import PlayerDetailHeader from '../PlayerDetailHeader.svelte';
   import { resolveCraftingArt } from '../../util/craftingArtResolution.js';
   import { localize } from '../../util/foundryBridge.js';
+  import { withRollPromptOrigin } from '../../util/rollPromptOrigin.js';
   import { statusChipTone } from '../../util/statusChipTone.js';
   import Chip from '../../components/Chip.svelte';
   import Notice from '../../components/Notice.svelte';
   import { craftingRecipeStatus } from '../../util/craftingRecipeStatus.js';
   import { TIME_UNITS, formatTimeRequirementCompact } from '../../util/recipeDuration.js';
 
-  let { recipe = null, authorityRefusal = '' } = $props();
+  let {
+    recipe = null,
+    authorityRefusal = '',
+    craftLabel = '',
+    busy = false,
+    onCraft = null,
+  } = $props();
 
   const name = $derived(String(recipe?.name ?? ''));
   const modeLabel = $derived(String(recipe?.modeLabel ?? ''));
@@ -53,23 +63,10 @@
   const blockingReasons = $derived(
     Array.isArray(recipe?.blockingReasons) ? recipe.blockingReasons : []
   );
-  // EVERY player-app craft is routed through the versioned-run authority
-  // (`CraftingEngine._routeVersionedCraft`, reached because `main.js` always sends
-  // `lifecycleVersion: 1`), so an authority refusal blocks this recipe whatever its own browse
-  // status says. It therefore drops the status chip — "Ready to craft" is a lie while the craft
-  // would be refused. The already-localized sentence arrives as a prop:
-  // `journalRunReasonMessage` is the ONE reason vocabulary and this header is not a second one.
-  //
-  // IT DOES NOT LEAD. It used to, and a transient authority state then outranked the recipe's
-  // own blocker: a player saw a claim-held sentence as the headline with "You're missing some
-  // required materials" demoted to the sub-line. The recipe's blocker is the one the player can
-  // ACT on, so it is the title and the authority's note is the detail; with no blocking reason
-  // of its own the refusal is the only cause there is and becomes the title itself.
-  //
-  // The refusal also STATES ITS CONSEQUENCE. The craft button below stays enabled on a craftable
-  // recipe on purpose — availability is a cache, and a stale `false` disabling the only CTA
-  // would leave a player with no way back — so the callout has to say what the click will do
-  // instead of leaving an accent-filled button contradicting it.
+  // An authority refusal blocks the craft whatever the recipe's own browse status says, so it
+  // drops the status chip. The recipe's own blocker leads the callout, because it is the one the
+  // player can act on, and the refusal states its consequence because the primary stays enabled:
+  // availability is a cache, and a stale `false` must not disable the pane's only way forward.
   const refusal = $derived(String(authorityRefusal ?? '').trim());
   const refusalLine = $derived(
     refusal ? `${refusal} ${localize('FABRICATE.App.Crafting.Blocking.AuthorityRefused')}` : ''
@@ -77,14 +74,23 @@
   const calloutReasons = $derived(
     refusalLine ? [...blockingReasons, refusalLine] : blockingReasons
   );
+  const primaryLabel = $derived(
+    busy && craftLabel ? localize('FABRICATE.App.Crafting.Button.Crafting') : craftLabel
+  );
 </script>
 
 <header class="crafting-detail-header" data-recipe-header>
-  <div class="crafting-detail-header-top">
-    <span class="crafting-detail-thumb" class:is-uncraftable={uncraftable}>
-      <span class="crafting-detail-thumb-media">
-        <Medallion {...resolveCraftingArt(recipe?.img)} alt="" size={56} />
-      </span>
+  <PlayerDetailHeader
+    {name}
+    {...resolveCraftingArt(recipe?.img)}
+    artDimmed={uncraftable}
+    {primaryLabel}
+    primaryIcon={busy ? 'fas fa-spinner fa-spin' : 'fas fa-hammer'}
+    primaryDisabled={busy}
+    primaryProps={{ 'data-crafting-craft': '', 'data-crafting-craft-disabled': String(busy) }}
+    onclick={(event) => withRollPromptOrigin(event, () => onCraft?.())}
+  >
+    {#snippet tileOverlay()}
       {#if uncraftable}
         <span class="crafting-detail-thumb-scrim" aria-hidden="true"></span>
         <span
@@ -97,47 +103,37 @@
           <i class={descriptor.icon} aria-hidden="true"></i>
         </span>
       {/if}
-    </span>
-    <div class="crafting-detail-header-copy">
-      <h2 class="crafting-detail-name" title={name}>{name}</h2>
-      <div class="crafting-detail-header-meta">
-        <!-- The mode chip reveals the crafting mechanism, so it is suppressed for a
-             redacted (discovery) teaser — only the generic identity + status show.
-             The {#if modeLabel} guard also avoids painting an empty bordered pill
-             when no label resolved. -->
-        {#if !redacted && modeLabel}
-          <span class="crafting-detail-mode-chip">{modeLabel}</span>
-        {/if}
-        <!-- Authored craft duration (timed recipes only). Suppressed for a redacted
-             teaser (a hidden recipe's timing is a spoiler) and omitted for instant
-             recipes so no misleading "0 min" is shown. -->
-        {#if !redacted && hasDuration}
-          <span
-            class="crafting-detail-duration-chip"
-            data-recipe-duration
-            data-recipe-duration-kind={isMultiStep ? 'total' : 'recipe'}
-            title={durationTitle}
-            aria-label={`${durationTitle}: ${durationLabel}`}
-          >
-            <i class="fas fa-clock" aria-hidden="true"></i>
-            <span>{durationTitle}: {durationLabel}</span>
-          </span>
-        {/if}
-        <!-- Uncraftable moves the status onto the thumbnail pip, so the labelled
-             badge is dropped here to avoid a duplicate icon; the blocking-reasons
-             callout below still spells out the reason. -->
-        {#if !uncraftable && !refusal}
-          <Chip
-            density="list"
-            tone={statusChipTone(descriptor.tone)}
-            icon={descriptor.icon}
-            data-crafting-status={status}
-            title={statusLabel}>{statusLabel}</Chip
-          >
-        {/if}
-      </div>
-    </div>
-  </div>
+    {/snippet}
+    {#snippet chips()}
+      <!-- The mode and duration chips reveal the crafting mechanism and its timing, so a
+           redacted teaser shows neither; an instant recipe shows no duration at all. -->
+      {#if !redacted && modeLabel}
+        <span class="crafting-detail-mode-chip">{modeLabel}</span>
+      {/if}
+      {#if !redacted && hasDuration}
+        <span
+          class="crafting-detail-duration-chip"
+          data-recipe-duration
+          data-recipe-duration-kind={isMultiStep ? 'total' : 'recipe'}
+          title={durationTitle}
+          aria-label={`${durationTitle}: ${durationLabel}`}
+        >
+          <i class="fas fa-clock" aria-hidden="true"></i>
+          <span>{durationTitle}: {durationLabel}</span>
+        </span>
+      {/if}
+      <!-- Uncraftable moves the status onto the tile's pip, so the labelled chip is dropped. -->
+      {#if !uncraftable && !refusal}
+        <Chip
+          density="list"
+          tone={statusChipTone(descriptor.tone)}
+          icon={descriptor.icon}
+          data-crafting-status={status}
+          title={statusLabel}>{statusLabel}</Chip
+        >
+      {/if}
+    {/snippet}
+  </PlayerDetailHeader>
 
   {#if redacted}
     <p class="crafting-detail-teaser" data-recipe-teaser>
@@ -189,31 +185,7 @@
     border-bottom: 1px solid var(--fab-border);
   }
 
-  .crafting-detail-header-top {
-    display: flex;
-    align-items: center;
-    gap: var(--fab-space-3);
-  }
-
-  /* Thumbnail wrapper: a positioning context for the uncraftable scrim + pip,
-     mirroring RecipeListRow. */
-  .crafting-detail-thumb {
-    position: relative;
-    flex: 0 0 auto;
-    display: inline-flex;
-  }
-
-  .crafting-detail-thumb-media {
-    display: inline-flex;
-  }
-
-  /* Fade the artwork so the error pip reads as the focal point. */
-  .crafting-detail-thumb.is-uncraftable .crafting-detail-thumb-media {
-    opacity: 0.4;
-  }
-
-  /* Flat error wash over the dimmed thumbnail (matches the shared tile's radius, which
-     issue 1506 moved from the retired thumb's 6px to the medallion's 9px). */
+  /* Flat error wash over the dimmed tile, at the tile's own radius. */
   .crafting-detail-thumb-scrim {
     position: absolute;
     inset: 0;
@@ -245,32 +217,6 @@
   .crafting-detail-pip i {
     font-size: 13px;
     line-height: 1;
-  }
-
-  .crafting-detail-header-copy {
-    flex: 1 1 auto;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .crafting-detail-name {
-    margin: 0;
-    font-size: 18px;
-    font-weight: 700;
-    line-height: 1.2;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .crafting-detail-header-meta {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
   }
 
   .crafting-detail-mode-chip {

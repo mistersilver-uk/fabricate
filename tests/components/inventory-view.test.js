@@ -29,6 +29,7 @@ import {
   multiSystemProgressiveCardRow,
 } from '../helpers/inventoryCollapseFixtures.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { assertIdentityHeader } from '../helpers/playerDetailHeaderAssertions.js';
 import { assertWholeHeaderDisclosure } from '../helpers/wholeHeaderDisclosure.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -367,6 +368,21 @@ describe('InventoryView (mounted)', () => {
       'renders the required-for recipe'
     );
     assert.match(detail.textContent, /Carve Bone Idol/, 'detail lists the tool recipe');
+  });
+
+  it('leads the detail with the identity row and draws no primary outside it', async () => {
+    const { services } = makeServices(makeItem());
+    const target = await harness.mount({ services });
+    await settle();
+
+    // No inventory verb is a `ManagerButton role="primary"` yet, so the budget is spent nowhere.
+    const detail = target.querySelector('[data-inventory-detail="sys:c1"]');
+    const row = assertIdentityHeader(detail, { primaries: 0, name: 'Mordant Gland' });
+    assert.ok(Boolean(row.querySelector('.inventory-detail-total')), 'the total is its meta');
+
+    target.querySelector('[data-inventory-detail-tab="salvage"]')?.click();
+    await settle();
+    assertIdentityHeader(target.querySelector('[data-inventory-detail="sys:c1"]'), { primaries: 0 });
   });
 
   it('hides the Required for section for a non-tool component', async () => {
@@ -2652,10 +2668,7 @@ describe('InventoryDetailHeader (source contract)', () => {
   const SHELL_OWNED = [
     '.inventory-detail',
     '.inventory-detail-header',
-    '.inventory-detail-heading',
-    '.inventory-detail-name',
     '.inventory-detail-total',
-    '.inventory-detail-chips',
     '.inventory-chip',
     '.inventory-detail-section',
     '.inventory-detail-section-title',
