@@ -373,12 +373,12 @@
     white-space: nowrap;
   }
 
-  /* ACTION density. 34px is the button's own figure, restated because a layered `min-height`
-     cannot be inherited by an unlayered block; `manager-header-geometry.test.js` measures BOTH in
-     one composed page and fails naming the pair — a duplicated figure with a gate on it. */
+  /* The button's geometry restated in full; `manager-header-geometry.test.js` gates the pair. */
   .manager-chip.is-action {
     min-height: 34px;
     padding: 0 var(--fab-space-3);
+    border-radius: 9px;
+    font-size: 0.72rem;
     white-space: nowrap;
   }
 
@@ -387,6 +387,11 @@
     border-radius: 999px;
     font-size: 11px;
     font-weight: 600;
+  }
+
+  /* The library states no tag-run glyph, so the prototype's 9px is taken (ruling 2026-09-28). */
+  .manager-chip.is-tag-run > i:not(.fa-circle) {
+    font-size: 9px;
   }
 
   .manager-chip.is-inspector {

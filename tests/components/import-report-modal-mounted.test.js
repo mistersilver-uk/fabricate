@@ -1,6 +1,7 @@
 /** Issue 877 — the post-import reference report. */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
@@ -23,7 +24,7 @@ const harness = createMountedComponentHarness({
     // harness omits HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/components/EmptyState.svelte',
-    'src/ui/svelte/apps/manager/ManagerModal.svelte',
+    'src/ui/svelte/components/ManagerModal.svelte',
     // THE manager's labelled push-button (issue 1118). The footer Close renders it.
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/IconButton.svelte',
@@ -201,5 +202,47 @@ describe('ImportReportModal (mounted)', () => {
     document.querySelector('[data-manager-modal-close]').click();
     document.querySelector('[data-import-report-close]').click();
     assert.equal(closed, 2);
+  });
+
+  it('keeps the chrome the roll prompt\'s additive ManagerModal props leave at their defaults', async () => {
+    let closed = 0;
+    const opener = document.createElement('button');
+    document.body.append(opener);
+    opener.focus();
+    await harness.mount({ open: true, content: REPORTED_CONTENT, onClose: () => (closed += 1) });
+    const root = modal();
+    assert.ok(!root.querySelector('form'), 'no form wraps body and footer without onSubmit');
+    assert.ok(!root.querySelector('.manager-modal-footer').classList.contains('is-equal'));
+    // Maintainer rulings 2026-09-28: ManagerModal draws one frame, the library's banded Modal.
+    assert.ok(root.querySelector('.manager-modal-body > .manager-import-report-list'), 'in a padded body');
+    const close = root.querySelector('[data-manager-modal-close]');
+    assert.ok(close.classList.contains('is-size-26'), 'the banded frame’s 26px close');
+    // The 26px box is IconButton's rung in the module sheet, so the sheet is loaded to measure it.
+    const moduleSheet = document.createElement('style');
+    moduleSheet.textContent = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+    document.head.append(moduleSheet);
+    const paint = getComputedStyle(close);
+    assert.equal(paint.width, '26px', 'a 26px square');
+    assert.equal(paint.height, '26px', 'a 26px square');
+    assert.equal(paint.borderRadius, '7px', 'on the radius ladder’s 26-32px corner');
+    assert.equal(paint.backgroundColor, 'transparent', 'unfilled');
+    assert.equal(paint.fontSize, '11px', 'with an 11px glyph');
+    moduleSheet.remove();
+    assert.ok(document.activeElement === opener, 'focus stays where it was without trapFocus');
+    const seen = [];
+    const onWindowKey = (event) => seen.push([event.key, event.defaultPrevented]);
+    document.defaultView.addEventListener('keydown', onWindowKey);
+    try {
+      root.querySelector('[data-manager-modal-close]').dispatchEvent(
+        new document.defaultView.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+      );
+    } finally {
+      document.defaultView.removeEventListener('keydown', onWindowKey);
+    }
+    assert.equal(closed, 1, 'Escape closes once, through the outside-click dismissal alone');
+    assert.deepEqual(seen, [['Escape', false]], 'the modal neither stops nor claims Escape');
+    document.body.dispatchEvent(new document.defaultView.MouseEvent('mousedown', { bubbles: true }));
+    assert.equal(closed, 2, 'an outside click still dismisses the report');
+    opener.remove();
   });
 });

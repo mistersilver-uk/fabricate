@@ -1,9 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
+import { registerModuleHooks } from '../src/bootstrap/hooks.js';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
 import { SalvageRunManager } from '../src/systems/SalvageRunManager.js';
 import {
@@ -14,8 +12,6 @@ import {
   FakeActor as SharedActor,
   setupRunManagerGlobals as setupGlobals,
 } from './helpers/run-manager-fakes.js';
-
-const HERE = dirname(fileURLToPath(import.meta.url));
 
 // Issue 739 (read side): the run managers cache an actor's runs in memory and never learn about a
 // write another client (or the primary-GM world-time resume) makes to the actor's run flags.
@@ -275,9 +271,41 @@ test('the default probe matches the injected one, so both seams see the operator
   assert.deepEqual(runContainersChanged(diff, 'not a function'), ['crafting'], 'and the fallback');
 });
 
-test('the hooks edge still routes the hook through the matcher it is filtered by', () => {
+test('the updateActor hook drops only the cache its diff touches, via core hasProperty', () => {
   // The filter is load-bearing: `updateActor` fires on every HP tick. An unfiltered hook
   // would be a performance defect, and a filter that never matches is this whole bug.
-  const source = readFileSync(resolve(HERE, '..', 'src', 'bootstrap', 'hooks.js'), 'utf8');
-  assert.match(source, /const changed = runContainersChanged\(changes, foundry\.utils\.hasProperty\);/);
+  const registered = new Map();
+  const probed = [];
+  const invalidated = [];
+  const previous = { Hooks: globalThis.Hooks, foundry: globalThis.foundry };
+  const record = (event, handler) => registered.set(event, handler);
+  globalThis.Hooks = { on: record, once: record };
+  globalThis.foundry = {
+    utils: { hasProperty: (object, path) => probed.push(path) && hasSegmentPath(object, path) },
+  };
+  const manager = (kind) => ({ invalidateCache: (key) => invalidated.push([kind, key]) });
+  const actor = { id: 'actor-1', uuid: 'Actor.actor-1' };
+  const update = (changes) => registered.get('updateActor')(actor, changes, {}, 'user-1');
+  try {
+    registerModuleHooks({
+      fabricate: {
+        craftingRunManager: manager('crafting'),
+        salvageRunManager: manager('salvage'),
+        gatheringRunManager: manager('gathering'),
+      },
+    });
+    update({ system: { attributes: { hp: { value: 3 } } } });
+    assert.deepEqual(invalidated, [], 'an HP tick drops nothing');
+    assert.ok(probed.length > 0, 'and was filtered through foundry.utils.hasProperty');
+    update(expandedDiff('flags.fabricate.fabricate.==craftingRuns'));
+    update(expandedDiff('flags.fabricate.fabricate.salvageRuns'));
+    update(expandedDiff('flags.fabricate.gatheringRuns'));
+    assert.deepEqual(invalidated, [
+      ['crafting', 'actor-1'],
+      ['salvage', 'actor-1'],
+      ['gathering', 'Actor.actor-1'],
+    ]);
+  } finally {
+    Object.assign(globalThis, previous);
+  }
 });

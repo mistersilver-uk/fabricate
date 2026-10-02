@@ -31,6 +31,14 @@ export const BULK_EDIT_CHROME_PATTERN =
  */
 export const BULK_DELETE_CARD_PATTERN = /^src\/ui\/svelte\/apps\/manager\/BulkDeleteCard\.svelte$/;
 
+/** The Checks Studio's route model and draft clones (issue 1721). */
+export const CHECKS_ROUTE_MODEL_PATTERN =
+  /^src\/ui\/svelte\/apps\/manager\/checks\/(checksRouteModel\.svelte|checkDraftClone)\.js$/;
+
+/** The gathering workspace's route model, presenters and draft and modifier handlers (issue 1721). */
+export const GATHERING_ROUTE_MODEL_PATTERN =
+  /^src\/ui\/svelte\/apps\/manager\/gathering(?:RouteModel|Display|DraftHandlers|ModifierHandlers)\./;
+
 /** The trigger set the three `manager-recipes-bulk-edit*` frames share (issue 1010). */
 export const RECIPE_BULK_EDIT_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/Recipe/,
@@ -117,6 +125,9 @@ export const BULK_DEFAULTS = Object.freeze({
     /^src\/ui\/svelte\/stores\/playerResultOrder/,
     /^src\/ui\/svelte\/util\/salvageYieldRows\.js$/,
     /^src\/utils\/progressiveResultOrder\.js$/,
+    // What a bulk row needs, and the two consumers that read it.
+    /^src\/ui\/presenters\/(?:salvageCheckNeed|InventoryListingBuilder)\.js$/,
+    /^src\/systems\/BulkSalvageService\.js$/,
   ],
 });
 
@@ -147,9 +158,23 @@ export const PLAYER_EXTENSION_SOURCES = Object.freeze([
 /** The shared positioning seam every open popover frame draws (issue 1500). */
 export const ANCHORED_POPOVER_SOURCES = Object.freeze([
   /^src\/ui\/svelte\/actions\/anchoredPopover\.js$/,
+  /^src\/ui\/svelte\/actions\/typeaheadPanel\.js$/,
   /^src\/ui\/svelte\/util\/overlayBounds\.js$/,
 ]);
+
+/** The typeahead combobox's holder contract, for a frame whose walk opens a suggestion list. */
+export const TYPEAHEAD_COMBOBOX_SOURCE = /^src\/ui\/svelte\/util\/typeaheadCombobox\.svelte\.js$/;
+
+/** An open requirement-row suggestion list, which renders as a child of the application root. */
+export const REQUIREMENT_SUGGESTION =
+  '.fabricate-manager > .manager-recipe-option-suggestions [data-recipe-option-suggestion]';
 
 /** The environment editor's directory, minus its validation tab (issue 1517). */
 export const ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB =
   /^src\/ui\/svelte\/apps\/manager\/environment\/(?!EnvironmentValidationTab\.svelte$)/;
+
+/** A count check's default advantage footer (issue 2007): one die either way around the one Roll. */
+export const COUNT_ADVANTAGE_FOOTER =
+  ':has(.manager-modal-footer button[data-action="disadvantage"] .action-note:text-is("−1 die"))' +
+  ':has(.manager-modal-footer button[data-action="normal"][type="submit"])' +
+  ':has(.manager-modal-footer button[data-action="advantage"] .action-note:text-is("+1 die"))';

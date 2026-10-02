@@ -5,11 +5,17 @@
  */
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { SvelteMap } from 'svelte/reactivity';
 
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { createSvelteModuleCompiler } from '../helpers/compile-svelte-module.js';
 import { expectedMemberKinds, storeMemberKinds } from '../helpers/storeMemberKinds.js';
+
+const EN = JSON.parse(readFileSync(resolve(import.meta.dirname, '../../lang/en.json'), 'utf8'));
+/** The shipped string at a dotted `lang/en.json` key, as the window's `localize` answers it. */
+const shipped = (key) => key.split('.').reduce((node, segment) => node?.[segment], EN) ?? key;
 
 const MODULE_PATH = 'src/ui/svelte/stores/inventoryBulkActions.svelte.js';
 
@@ -74,6 +80,10 @@ function setup({ rows = [], inspectedKey = null, flush = { ok: true }, results =
         reporter.dismiss = () => log.push(['dismiss']);
         return reporter;
       },
+      notify: (message) => {
+        log.push(['notify', message]);
+      },
+      localize: shipped,
     },
   });
   return { bulk, log, bag };
@@ -207,6 +217,74 @@ describe('createBulkActions', () => {
       outcome: 'succeeded',
     });
     assert.equal(bulk.bulkRunning, false, 'and the busy flag is discharged');
+  });
+
+  it('warns once when the resource ran out mid-batch, naming how many rolls stood (issue 2008)', async () => {
+    const exhaustion = { resourceLabel: 'Momentum', done: 1, rolls: 3 };
+    const exhausted = { outcome: 'skipped', skipReason: 'resourceExhausted' };
+    const { bulk, log } = setup({
+      rows: [listingRow('c1', 'Iron')],
+      results: {
+        salvage: {
+          cancelled: false,
+          items: [
+            { outcome: 'succeeded' },
+            { ...exhausted, additionalDiceExhaustion: exhaustion },
+            { ...exhausted, additionalDiceExhaustion: exhaustion },
+          ],
+        },
+      },
+    });
+    bulk.toggleBulkSelection('sys:c1');
+    flushSync();
+    await bulk.bulkSalvage();
+    assert.deepEqual(
+      log.filter(([name]) => name === 'notify'),
+      [['notify', 'Momentum ran out after 1 of 3 rolls. The rolls already made stand.']]
+    );
+  });
+
+  it('warns once, naming why, when the resource could not be spent mid-batch (issue 2008)', async () => {
+    const exhaustion = { resourceLabel: 'Momentum', done: 1, rolls: 3 };
+    const exhausted = { outcome: 'skipped', skipReason: 'resourceExhausted' };
+    const { bulk, log } = setup({
+      rows: [listingRow('c1', 'Iron')],
+      results: {
+        salvage: {
+          cancelled: false,
+          items: [
+            { outcome: 'succeeded' },
+            { ...exhausted, additionalDiceExhaustion: exhaustion, additionalDiceRefusal: 'resourceOverridden' },
+            { ...exhausted, additionalDiceExhaustion: exhaustion },
+          ],
+        },
+      },
+    });
+    bulk.toggleBulkSelection('sys:c1');
+    flushSync();
+    await bulk.bulkSalvage();
+    assert.deepEqual(
+      log.filter(([name]) => name === 'notify'),
+      [['notify', "Additional dice are unavailable: an active effect sets Akra's Momentum, so it cannot be spent."]]
+    );
+  });
+
+  it('warns once for a refused batch choice, naming the actor, and not for a plain run (issue 2008)', async () => {
+    const refused = {
+      cancelled: true,
+      items: [],
+      additionalDiceRefusal: 'choiceAboveLimit',
+      additionalDiceNotice: { dice: 2, limit: 1, available: 3, label: '', source: null },
+    };
+    const run = async (salvage) => {
+      const { bulk, log } = setup({ rows: [listingRow('c1', 'Iron')], results: { salvage } });
+      bulk.toggleBulkSelection('sys:c1');
+      flushSync();
+      await bulk.bulkSalvage();
+      return log.filter(([name]) => name === 'notify').map(([, message]) => message);
+    };
+    assert.deepEqual(await run(refused), ['2 additional dice is more than the 1 that can be added.']);
+    assert.deepEqual(await run(undefined), [], 'a run with no additional dice says nothing');
   });
 
   it('ABORTS the run before anything starts when the order flush rejects', async () => {

@@ -2,19 +2,31 @@
  * Unit tests for the pure crafting chat card formatter (`buildCraftingChatContent`). No Foundry
  * globals required (issue 1286).
  */
-import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import test, { after, before } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { chromium } from 'playwright';
 
-import { buildBulkSalvageChatContent } from '../src/ui/presenters/BulkSalvageChatCard.js';
-import { buildCraftingChatContent } from '../src/ui/presenters/CraftingChatCard.js';
+import { chatModeOption } from '../src/systems/bulkChatVisibility.js';
 import { buildGmComplicationCardContent } from '../src/systems/complicationRuntime.js';
+import { buildBulkSalvageChatContent } from '../src/ui/presenters/BulkSalvageChatCard.js';
+import { executedCheckDisplay } from '../src/ui/presenters/checkDisplay.js';
+import { buildCraftingChatContent, inertText } from '../src/ui/presenters/CraftingChatCard.js';
 import { buildGatheringChatContent } from '../src/ui/presenters/GatheringChatCard.js';
 import { buildSalvageChatContent } from '../src/ui/presenters/SalvageChatCard.js';
+
+import {
+  NOT_PUBLIC,
+  OVER_FIXED_DATA,
+  PUBLIC_BARE,
+  UNDER_DATA,
+  UNDER_ROWS,
+  executedCheck,
+  shippedLocalize as shippedKeyLocalize,
+} from './helpers/checkEvidenceFixtures.js';
 
 /** The SHIPPED localization, so a placeholder assertion reads the real string. */
 const LANG = JSON.parse(
@@ -124,11 +136,18 @@ test('uses the item-bag fallback image when an entry has no img', () => {
   assert.ok(content.includes('src="icons/svg/item-bag.svg"'), 'fallback image used');
 });
 
-test('renders the roll total row when a finite check value is present', () => {
-  const content = buildCraftingChatContent(successModel({ rollValue: 17 }));
+test('renders the roll total row when a public check has a finite value', () => {
+  const content = buildCraftingChatContent(successModel({ rollValue: 17, check: PUBLIC_BARE }));
   assert.ok(content.includes('fabricate-craft-chat__roll'), 'roll row element');
   assert.ok(content.includes('FABRICATE.Chat.Roll'), 'roll label key');
   assert.ok(content.includes('fabricate-craft-chat__roll-value">17<'), 'roll value rendered');
+  for (const visibility of NOT_PUBLIC) {
+    const check = executedCheck({}, visibility);
+    const html = buildCraftingChatContent(successModel({ rollValue: 17, check }));
+    assert.ok(!html.includes('__roll-value'), `no total for ${JSON.stringify(visibility)}`);
+  }
+  const unknown = buildCraftingChatContent(successModel({ rollValue: 17 }));
+  assert.ok(!unknown.includes('__roll-value'), 'no total without a check projection (issue 2054)');
 });
 
 test('1645: a rolled result states its roll beside the produced line', () => {
@@ -188,7 +207,7 @@ test('1645: a fixed or malformed amount renders no rolled run at all', () => {
 });
 
 test('shows the roll total on failure cards too', () => {
-  const content = buildCraftingChatContent(failureModel({ rollValue: 4 }));
+  const content = buildCraftingChatContent(failureModel({ rollValue: 4, check: PUBLIC_BARE }));
   assert.ok(
     content.includes('fabricate-craft-chat__roll-value">4<'),
     'failure roll value rendered'
@@ -341,6 +360,7 @@ const NO_COMPLICATION_MODELS = Object.freeze({
     consumed: [{ name: 'Iron Ingot', img: 'icons/ingot.png', quantity: 3 }],
     tools: [{ name: 'Forge Hammer', img: 'icons/hammer.png' }],
     rollValue: 17,
+    check: PUBLIC_BARE,
   },
   salvage: {
     status: 'succeeded',
@@ -350,6 +370,7 @@ const NO_COMPLICATION_MODELS = Object.freeze({
     consumed: [{ name: 'Iron Ore', img: 'icons/ore.png', quantity: 1 }],
     tools: [],
     rollValue: 12,
+    check: PUBLIC_BARE,
   },
   gathering: {
     status: 'succeeded',
@@ -371,6 +392,7 @@ const NO_COMPLICATION_MODELS = Object.freeze({
         img: 'icons/ore.png',
         outcome: 'succeeded',
         rollValue: 12,
+        check: PUBLIC_BARE,
         tierStep: null,
         message: '',
       },
@@ -387,7 +409,7 @@ const NO_COMPLICATION_MODELS = Object.freeze({
  */
 const PRE_CHANGE_CARDS = Object.freeze({
   crafting:
-    '<div class="fabricate-craft-chat fabricate-craft-chat--success"><header class="fabricate-craft-chat__header"><div class="fabricate-craft-chat__title">FABRICATE.Chat.CraftSuccess</div><div class="fabricate-craft-chat__subtitle">FABRICATE.Chat.Actor: Gandalf · FABRICATE.Chat.Recipe: Iron Sword</div></header><div class="fabricate-craft-chat__roll"><span class="fabricate-craft-chat__roll-label">FABRICATE.Chat.Roll</span><span class="fabricate-craft-chat__roll-value">17</span></div><section class="fabricate-craft-chat__section fabricate-craft-chat__section--results"><div class="fabricate-craft-chat__heading">FABRICATE.Chat.Results</div><ul class="fabricate-craft-chat__grid"><li class="fabricate-craft-chat__item"><img class="fabricate-craft-chat__icon" src="icons/sword.png" alt="" /><span class="fabricate-craft-chat__label">Iron Sword</span></li></ul></section><section class="fabricate-craft-chat__section fabricate-craft-chat__section--consumed"><div class="fabricate-craft-chat__heading">FABRICATE.Chat.Consumed</div><ul class="fabricate-craft-chat__grid"><li class="fabricate-craft-chat__item"><img class="fabricate-craft-chat__icon" src="icons/ingot.png" alt="" /><span class="fabricate-craft-chat__label">3× Iron Ingot</span></li></ul></section><section class="fabricate-craft-chat__section fabricate-craft-chat__section--tools"><div class="fabricate-craft-chat__heading">FABRICATE.Chat.Tools</div><ul class="fabricate-craft-chat__grid"><li class="fabricate-craft-chat__item"><img class="fabricate-craft-chat__icon" src="icons/hammer.png" alt="" /><span class="fabricate-craft-chat__label">Forge Hammer</span></li></ul></section></div>',
+    '<div class="fabricate-craft-chat fabricate-craft-chat--success"><header class="fabricate-craft-chat__header"><div class="fabricate-craft-chat__title">FABRICATE.Chat.CraftSuccess</div><div class="fabricate-craft-chat__subtitle">FABRICATE.Chat.Actor: Gandalf · FABRICATE.Chat.Recipe: Iron Sword</div></header><div class="fabricate-craft-chat__result fabricate-craft-chat__result--success"><i class="fa-solid fa-circle-check" aria-hidden="true"></i>FABRICATE.Check.Evidence.Success</div><div class="fabricate-craft-chat__roll"><span class="fabricate-craft-chat__roll-label">FABRICATE.Chat.Roll</span><span class="fabricate-craft-chat__roll-value">17</span></div><section class="fabricate-craft-chat__section fabricate-craft-chat__section--results"><div class="fabricate-craft-chat__heading">FABRICATE.Chat.Results</div><ul class="fabricate-craft-chat__grid"><li class="fabricate-craft-chat__item"><img class="fabricate-craft-chat__icon" src="icons/sword.png" alt="" /><span class="fabricate-craft-chat__label">Iron Sword</span></li></ul></section><section class="fabricate-craft-chat__section fabricate-craft-chat__section--consumed"><div class="fabricate-craft-chat__heading">FABRICATE.Chat.Consumed</div><ul class="fabricate-craft-chat__grid"><li class="fabricate-craft-chat__item"><img class="fabricate-craft-chat__icon" src="icons/ingot.png" alt="" /><span class="fabricate-craft-chat__label">3× Iron Ingot</span></li></ul></section><section class="fabricate-craft-chat__section fabricate-craft-chat__section--tools"><div class="fabricate-craft-chat__heading">FABRICATE.Chat.Tools</div><ul class="fabricate-craft-chat__grid"><li class="fabricate-craft-chat__item"><img class="fabricate-craft-chat__icon" src="icons/hammer.png" alt="" /><span class="fabricate-craft-chat__label">Forge Hammer</span></li></ul></section></div>',
   salvage:
     '<div class="fabricate-craft-chat fabricate-craft-chat--success"><header class="fabricate-craft-chat__header"><div class="fabricate-craft-chat__title">FABRICATE.Chat.SalvageSuccess</div><div class="fabricate-craft-chat__subtitle">FABRICATE.Chat.SalvageActor: Akra · FABRICATE.Chat.SalvageSource: Iron Ore</div></header><div class="fabricate-craft-chat__roll"><span class="fabricate-craft-chat__roll-label">FABRICATE.Chat.Roll</span><span class="fabricate-craft-chat__roll-value">12</span></div><section class="fabricate-craft-chat__section fabricate-craft-chat__section--results"><div class="fabricate-craft-chat__heading">FABRICATE.Chat.SalvageRecovered</div><ul class="fabricate-craft-chat__grid"><li class="fabricate-craft-chat__item"><img class="fabricate-craft-chat__icon" src="icons/shard.png" alt="" /><span class="fabricate-craft-chat__label">2× Iron Shard</span></li></ul></section><section class="fabricate-craft-chat__section fabricate-craft-chat__section--consumed"><div class="fabricate-craft-chat__heading">FABRICATE.Chat.SalvageConsumed</div><ul class="fabricate-craft-chat__grid"><li class="fabricate-craft-chat__item"><img class="fabricate-craft-chat__icon" src="icons/ore.png" alt="" /><span class="fabricate-craft-chat__label">Iron Ore</span></li></ul></section></div>',
   gathering:
@@ -974,3 +996,406 @@ test('1645: the rolled run stays readable at chat width where a label would be e
     await context.close();
   }
 });
+
+// ── executed check evidence rows (issue 2005) ──────────────────────────────────
+
+/** `[id, label, text]` for every evidence row a card renders, in order. */
+function evidenceRowsOf(html) {
+  return [
+    ...html.matchAll(
+      /data-check-evidence="(\w+)"><dt[^>]*>([^<]*)<\/dt><dd[^>]*>([^<]*)<\/dd>/g
+    ),
+  ].map(([, id, label, text]) => [id, label.replaceAll(/[\u2060\u200B]/g, ''), text.replaceAll(/[\u2060\u200B]/g, '')]);
+}
+
+test('a public sum/under card states the executed Target, Pre-rolled and Margin rows', () => {
+  const html = buildCraftingChatContent(successModel({ check: executedCheck() }), shippedKeyLocalize);
+  assert.deepEqual(evidenceRowsOf(html), UNDER_ROWS);
+  assert.ok(
+    html.indexOf('fabricate-craft-chat__evidence') < html.indexOf('fabricate-craft-chat__section'),
+    'the rows sit with the roll, above what the craft produced'
+  );
+});
+
+test('a card omits the rows for every secret, whispered, blind, self or unknown check (Q19)', () => {
+  const bare = buildCraftingChatContent(successModel(), shippedKeyLocalize);
+  for (const visibility of NOT_PUBLIC) {
+    const html = buildCraftingChatContent(
+      successModel({ check: executedCheck(UNDER_DATA, visibility) }),
+      shippedKeyLocalize
+    );
+    assert.equal(html, bare, `no evidence for ${JSON.stringify(visibility)}`);
+  }
+});
+
+/** The card's bare total line, which a public check's dice line replaces. */
+const rollLine = (value) =>
+  '<div class="fabricate-craft-chat__roll"><span class="fabricate-craft-chat__roll-label">Roll</span>' +
+  `<span class="fabricate-craft-chat__roll-value">${value}</span></div>`;
+
+/** One evidence row as the card writes it. */
+const evidenceRow = (id, label, text) =>
+  `<div class="fabricate-craft-chat__evidence-row" data-check-evidence="${id}">` +
+  `<dt class="fabricate-craft-chat__evidence-label">${label}</dt>` +
+  `<dd class="fabricate-craft-chat__evidence-value">${text}</dd></div>`;
+
+test('a public sum/over fixed card differs from the bare card only by the ruled additions (M1, M3)', () => {
+  const data = {
+    ...OVER_FIXED_DATA,
+    resolvedFormula: '1d20 + 3',
+    diceGroups: [{ groupId: 0, group: '1d20', sum: 12, results: [12] }],
+  };
+  for (const status of ['succeeded', 'failed']) {
+    const base = status === 'succeeded' ? successModel() : failureModel();
+    const model = { ...base, rollValue: 15 };
+    const bare = buildCraftingChatContent({ ...model, check: PUBLIC_BARE }, shippedKeyLocalize);
+    const withCheck = buildCraftingChatContent(
+      { ...model, check: executedCheck(data) },
+      shippedKeyLocalize
+    );
+    assert.ok(bare.includes(rollLine(15)), `${status}: the bare card keeps its total line`);
+    assert.equal(
+      withCheck,
+      bare.replace(
+        rollLine(15),
+        '<div class="fabricate-craft-chat__dice">1d20 (12) + 3 = 15</div>' +
+          '<dl class="fabricate-craft-chat__evidence">' +
+          evidenceRow('needed', 'Needed', 'DC 12, meet or beat') +
+          evidenceRow('margin', 'Margin', '+3') +
+          '</dl>'
+      ),
+      status
+    );
+  }
+});
+
+test('every crafting card with a rolled total states the Success or Failure pill (M1)', () => {
+  const pill = (tone, icon, text) =>
+    `<div class="fabricate-craft-chat__result fabricate-craft-chat__result--${tone}">` +
+    `<i class="fa-solid ${icon}" aria-hidden="true"></i>${text}</div>`;
+  const check = PUBLIC_BARE;
+  const success = buildCraftingChatContent(successModel({ rollValue: 15, check }), shippedKeyLocalize);
+  const failure = buildCraftingChatContent(failureModel({ rollValue: 4, check }), shippedKeyLocalize);
+  assert.ok(success.includes(pill('success', 'fa-circle-check', 'Success') + rollLine(15)));
+  assert.ok(failure.includes(pill('failure', 'fa-circle-xmark', 'Failure') + rollLine(4)));
+  const noCheck = buildCraftingChatContent(successModel(), shippedKeyLocalize);
+  assert.ok(!noCheck.includes('__result'), 'a craft that rolled nothing has no pill');
+  const salvage = buildSalvageChatContent({ status: 'succeeded', actorName: 'A', rollValue: 9, check });
+  assert.ok(!salvage.includes('__result'), 'the pill is a crafting card addition');
+});
+
+test('a public roll-under card reads frame 38: pill, dice line, then the ruled rows', () => {
+  const html = buildCraftingChatContent(
+    successModel({ rollValue: 9, check: executedCheck() }),
+    shippedKeyLocalize
+  );
+  assert.ok(
+    html.includes(
+      '<i class="fa-solid fa-circle-check" aria-hidden="true"></i>Success</div>' +
+        '<div class="fabricate-craft-chat__dice">3d6 (2 + 4 + 3) = 9, compared as rolled</div>' +
+        '<dl class="fabricate-craft-chat__evidence">'
+    )
+  );
+  assert.ok(!html.includes('__roll-value'), 'the dice line replaces the bare total');
+  assert.deepEqual(evidenceRowsOf(html), UNDER_ROWS);
+});
+
+test('a private card states its pill alone: no total, dice or rows (M4, issue 2054)', () => {
+  const data = {
+    ...UNDER_DATA,
+    resolvedFormula: '3d6',
+    diceGroups: [{ groupId: 0, group: '3d6', sum: 9, results: [2, 4, 3] }],
+  };
+  for (const visibility of NOT_PUBLIC) {
+    const html = buildCraftingChatContent(
+      successModel({ rollValue: 9, check: executedCheck(data, visibility) }),
+      shippedKeyLocalize
+    );
+    assert.ok(html.includes('fa-circle-check'), `the pill stays: ${JSON.stringify(visibility)}`);
+    assert.ok(!html.includes('__roll-value') && !html.includes('>9<'), 'no total');
+    assert.ok(!html.includes('__dice') && !html.includes('data-check-evidence'));
+  }
+});
+
+test('a fixed target, an over character value, a range and a legacy record word their own rows', () => {
+  const rows = (data) =>
+    evidenceRowsOf(buildCraftingChatContent(successModel({ check: executedCheck(data) }), shippedKeyLocalize));
+  const fixedUnder = {
+    ...UNDER_DATA,
+    total: 16,
+    target: 14,
+    margin: -2,
+    preRolls: [],
+    targetSource: 'fixed',
+    targetTerms: [
+      { kind: 'anchor', value: 12 },
+      { kind: 'benefit', value: 2, source: 'tool' },
+    ],
+  };
+  assert.deepEqual(rows(fixedUnder), [
+    ['target', 'Target', '14 · fixed, tools +2'],
+    ['margin', 'Margin', '−2 under the target'],
+  ]);
+  const overAttribute = {
+    ...OVER_FIXED_DATA,
+    dc: null,
+    target: 27,
+    total: 30,
+    targetSource: 'attribute',
+    targetTerms: [
+      { kind: 'anchor', value: 55 },
+      { kind: 'multiplier', value: 0.5 },
+    ],
+  };
+  assert.deepEqual(rows(overAttribute), [
+    ['target', 'Target', '27 · character value 55, difficulty ×½'],
+    ['margin', 'Margin', '+3'],
+  ]);
+  // A fixed range or Otherwise has no target, so it invents neither a target nor a margin.
+  assert.deepEqual(rows({ ...UNDER_DATA, target: null, margin: null }), [UNDER_ROWS[1]]);
+  const { preRolls: _preRolls, targetTerms: _terms, targetSource: _source, ...legacy } = UNDER_DATA;
+  assert.deepEqual(rows(legacy), [
+    ['target', 'Target', '14'],
+    ['margin', 'Margin', '+5 under the target'],
+  ]);
+});
+
+test('labels carrying [[ or @ reach the card with neither enrichment pattern left to match', () => {
+  const data = {
+    ...UNDER_DATA,
+    preRolls: [
+      {
+        source: 'library',
+        label: '[[1d20]] @abilities.str.value [[[/r 1d6]]]',
+        expression: '1d4',
+        total: 3,
+        destination: 'target',
+      },
+    ],
+  };
+  const html = buildCraftingChatContent(successModel({ check: executedCheck(data) }), shippedKeyLocalize);
+  const evidence = html.slice(html.indexOf('<dl'), html.indexOf('</dl>'));
+  assert.ok(evidence.replaceAll('\u200B', '').includes('abilities.str.value'), 'the label is still stated');
+  // Foundry's inline-roll opener and its `@path` / `@Type[` reference forms.
+  assert.doesNotMatch(evidence, /\[\[/);
+  assert.doesNotMatch(evidence, /@\w/);
+  assert.equal(
+    evidenceRowsOf(html)[1][2],
+    '[[1d20]] @abilities.str.value [[[/r 1d6]]] 1d4 rolled 3, raising the target',
+    'only invisible joiners were added'
+  );
+});
+
+test('a label naming a placeholder is stated literally, never substituted (QE6)', () => {
+  const data = {
+    ...UNDER_DATA,
+    preRolls: [{ ...UNDER_DATA.preRolls[0], label: 'Lucky {total}' }],
+  };
+  const html = buildCraftingChatContent(
+    successModel({ check: executedCheck(data) }),
+    shippedKeyLocalize
+  );
+  assert.equal(evidenceRowsOf(html)[1][2], 'Lucky {total} 1d4 rolled 3, raising the target');
+});
+
+test('an evidence label reaches a public card escaped, never as markup (QE2)', () => {
+  const data = {
+    ...UNDER_DATA,
+    preRolls: [{ ...UNDER_DATA.preRolls[0], label: '<img src=x onerror=alert(1)>&' }],
+  };
+  const html = buildCraftingChatContent(
+    successModel({ check: executedCheck(data) }),
+    shippedKeyLocalize
+  );
+  const evidence = html.slice(html.indexOf('<dl'), html.indexOf('</dl>'));
+  assert.ok(evidence.includes('&lt;img src=x onerror=alert(1)&gt;&amp;'));
+  assert.doesNotMatch(evidence, /<img/);
+});
+
+test('an evidence @path breaks only after its inner dots, and its @ stays inert (item 7 ruling)', () => {
+  const html = buildCraftingChatContent(
+    successModel({ rollValue: 9, check: executedCheck() }),
+    shippedKeyLocalize
+  );
+  const target = html.slice(html.indexOf('data-check-evidence="target"'), html.indexOf('</dd>'));
+  assert.ok(target.includes('@\u2060skills.\u200Bsmith.\u200Blevel 12'), 'a break after each path dot');
+  assert.equal((target.match(/\u200B/g) ?? []).length, 2, 'and nowhere else');
+  assert.doesNotMatch(target, /@\w/, 'the @ is still neutralized');
+  assert.equal(evidenceRowsOf(html)[0][2], UNDER_ROWS[0][2], 'the text reads unchanged');
+});
+
+test('a dice-line path breaks only after its inner dots, and its @ stays inert (issue 2098 F-b)', () => {
+  const data = {
+    product: 'sum',
+    direction: 'over',
+    comparison: 'meet',
+    dc: 12,
+    total: 26,
+    target: 12,
+    margin: 14,
+    rollFormula: '1d20 + @skills.smith.level',
+    resolvedFormula: '1d20 + 12',
+    diceGroups: [{ groupId: 0, group: '1d20', sum: 14, results: [14] }],
+  };
+  const html = buildCraftingChatContent(
+    successModel({ rollValue: 26, check: executedCheck(data) }),
+    shippedKeyLocalize
+  );
+  const start = html.indexOf('<div class="fabricate-craft-chat__dice">');
+  const dice = html.slice(start, html.indexOf('</div>', start));
+  assert.ok(dice.includes('@\u2060skills.\u200Bsmith.\u200Blevel = 26'), 'a break after each path dot');
+  assert.equal((dice.match(/\u200B/g) ?? []).length, 2, 'and nowhere else');
+  assert.doesNotMatch(dice, /@\w/, 'the @ is still neutralized');
+});
+
+// ── game-system enricher neutralization (issue 2093) ────────────────────────────
+
+test('inertText neutralizes a &Name[...] system-enricher shape as well as @Name[...] and [[', () => {
+  assert.equal(inertText('&Reference[prone]'), '&amp;\u{2060}Reference[prone]');
+  assert.equal(inertText('&Custom[x]'), '&amp;\u{2060}Custom[x]');
+  assert.equal(inertText('@UUID[Actor.abc]'), '@\u{2060}UUID[Actor.abc]', 'existing @Name[ behaviour holds');
+  assert.equal(inertText('[[1d20]]'), '[\u{2060}[1d20]]', 'existing [[ behaviour holds');
+});
+
+test('inertText leaves plain & and @ text reading unchanged', () => {
+  assert.equal(inertText('Salt & Pepper'), 'Salt &amp; Pepper', 'no joiner: & is not followed by Name[');
+  assert.equal(inertText('a@b'), 'a@\u{2060}b', 'the @ is inert but the text still reads as a@b');
+  assert.equal(
+    inertText('&amp;Reference[prone]'),
+    '&amp;amp;Reference[prone]',
+    'a literal &amp; in the input is not a real & and is left alone'
+  );
+  assert.equal(inertText('&nbsp;Reference[x]'), '&amp;nbsp;Reference[x]', 'nbsp; breaks the lookahead');
+  assert.equal(inertText('Ends with &'), 'Ends with &amp;', 'a trailing & has nothing to look ahead into');
+});
+
+/** A minimal stand-in for dnd5e 5.3.3's own `TextEditor` reference enricher (issue 2093). */
+const dnd5eReferencePattern = () => /&(?<type>Reference)\[(?<config>[^\]]+)]/i;
+
+test('a &Reference[...] label reaches the chat card unmatched by a dnd5e-style enricher, in a real browser', async () => {
+  const data = {
+    ...UNDER_DATA,
+    preRolls: [{ ...UNDER_DATA.preRolls[0], label: '&Reference[prone] &Custom[x]' }],
+  };
+  const html = buildCraftingChatContent(successModel({ check: executedCheck(data) }), shippedKeyLocalize);
+
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  try {
+    await page.setContent(`<div id="root">${html}</div>`);
+    const decoded = await page.evaluate(
+      () => document.querySelector('[data-check-evidence="preRolled"] dd').textContent
+    );
+    assert.ok(
+      decoded.includes('Reference[prone]') && decoded.includes('Custom[x]'),
+      `the label still reads literally: ${decoded}`
+    );
+    assert.doesNotMatch(decoded, dnd5eReferencePattern(), 'the shipped text does not match the enricher shape');
+
+    // Red control: the SAME decoded text, stripped of only its invisible joiners, WOULD match a
+    // dnd5e-style enricher — proving the assertion above is live rather than vacuous.
+    const withoutJoiners = decoded.replaceAll('⁠', '');
+    assert.match(withoutJoiners, dnd5eReferencePattern(), 'control: un-neutralized text matches the enricher');
+  } finally {
+    await context.close();
+  }
+});
+
+// ── bought dice (issue 2008) ────────────────────────────────────────────────────
+
+/** Two d6s at 5 or better, the second bought with Momentum and exploding into a 2. */
+function boughtCountCheck(visibility) {
+  return executedCheckDisplay({
+    data: {
+      product: 'count',
+      direction: 'over',
+      comparison: 'meet',
+      total: 2,
+      target: 5,
+      boughtDice: { count: 1, source: 'path' },
+    },
+    visibility,
+    countDisplay: {
+      die: 6,
+      bought: 1,
+      resourceLabel: 'Momentum @Ref[x]',
+      results: [
+        { index: 0, face: 5, active: true, qualified: true },
+        { index: 1, face: 6, active: true, qualified: true, exploded: true },
+        { index: 2, face: 2, active: true, explodedFrom: 1 },
+      ],
+      qualified: 2,
+      cancelled: 0,
+      net: 2,
+      required: 2,
+      margin: 0,
+      zeroPool: false,
+      pool: { base: 1, terms: [], rolled: 2 },
+      threshold: { anchor: 5, source: 'fixed', terms: [], effective: 5 },
+    },
+  });
+}
+
+/** Each result card that states a check, built over the check executed under `visibility`. */
+const BOUGHT_CARDS = Object.freeze({
+  crafting: (check) => buildCraftingChatContent(successModel({ check }), shippedKeyLocalize),
+  salvage: (check) =>
+    buildSalvageChatContent(
+      { status: 'succeeded', actorName: 'Akra', componentName: 'Iron Ore', check },
+      shippedKeyLocalize
+    ),
+  bulk: (check) =>
+    buildBulkSalvageChatContent(
+      {
+        status: 'succeeded',
+        actorNames: ['Akra'],
+        counts: { total: 1, succeeded: 1, failed: 0 },
+        subjects: [{ name: 'Iron Ore', img: '', outcome: 'succeeded', rollValue: 2, check }],
+      },
+      shippedKeyLocalize
+    ),
+});
+
+for (const version of [13, 14]) {
+  test(`V${version}: every result card states bought dice for a public roll and none otherwise`, () => {
+    const previous = globalThis.ChatMessage;
+    // ratchet-exempt(lint): the build's chat vocabulary is read from Foundry's global ChatMessage.
+    globalThis.ChatMessage =
+      version === 13 ? { applyRollMode: () => {} } : { applyMode: () => {} };
+    try {
+      const posted = chatModeOption(boughtCountCheck(NOT_PUBLIC[0]).visibility.rollMode);
+      assert.deepEqual(posted, version === 13 ? { rollMode: 'gmroll' } : { messageMode: 'gm' });
+      for (const [name, build] of Object.entries(BOUGHT_CARDS)) {
+        const check = boughtCountCheck({ rollMode: 'publicroll', secret: false });
+        assert.deepEqual(
+          chatModeOption(check.visibility.rollMode),
+          version === 13 ? { rollMode: 'publicroll' } : { messageMode: 'public' }
+        );
+        const html = build(check);
+        const readable = html.replaceAll(/[\u{2060}\u{200B}]/gu, '');
+        assert.ok(readable.includes('2d6 (1 + 1 bought), each ≥ 5'), `${name}: the summary`);
+        assert.match(
+          html,
+          /<li class="fabricate-dice-tiles__tile fabricate-dice-tiles__tile--success fabricate-dice-tiles__tile--bought" data-dice-tile-face="6" data-dice-tile-marks="qualified exploded bought" aria-label="6, qualified and exploded, bought">/,
+          `${name}: the bought tile`
+        );
+        assert.equal((html.match(/tile--bought/g) ?? []).length, 1, `${name}: its explosion is not`);
+        assert.ok(
+          readable.includes(
+            '<dt class="fabricate-craft-chat__evidence-label">Additional dice</dt>' +
+              '<dd class="fabricate-craft-chat__evidence-value">1 bought · spent 1 Momentum @Ref[x]</dd>'
+          ),
+          `${name}: the row`
+        );
+        assert.doesNotMatch(html, /@Ref/, `${name}: the Resource name stays inert`);
+        for (const visibility of NOT_PUBLIC) {
+          const withheld = build(boughtCountCheck(visibility));
+          assert.doesNotMatch(withheld, /bought|Additional dice/, `${name}: ${JSON.stringify(visibility)}`);
+        }
+      }
+    } finally {
+      // ratchet-exempt(lint): restores the global ChatMessage the test replaced.
+      globalThis.ChatMessage = previous;
+    }
+  });
+}

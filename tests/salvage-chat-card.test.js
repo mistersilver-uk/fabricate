@@ -7,6 +7,16 @@ import assert from 'node:assert/strict';
 
 import { buildSalvageChatContent } from '../src/ui/presenters/SalvageChatCard.js';
 
+import {
+  NOT_PUBLIC,
+  OVER_FIXED_DATA,
+  PUBLIC_BARE,
+  UNDER_DATA,
+  UNDER_ROWS,
+  executedCheck,
+  shippedLocalize,
+} from './helpers/checkEvidenceFixtures.js';
+
 function successModel(overrides = {}) {
   return {
     status: 'succeeded',
@@ -90,11 +100,16 @@ test('uses the item-bag fallback image when a recovered entry has no img', () =>
   assert.ok(content.includes('src="icons/svg/item-bag.svg"'), 'fallback image used');
 });
 
-test('renders the roll total row when a finite check value is present', () => {
-  const content = buildSalvageChatContent(successModel({ rollValue: 15 }));
+test('renders the roll total row when a public check has a finite value', () => {
+  const content = buildSalvageChatContent(successModel({ rollValue: 15, check: PUBLIC_BARE }));
   assert.ok(content.includes('fabricate-craft-chat__roll'), 'shared roll row element');
   assert.ok(content.includes('FABRICATE.Chat.Roll'), 'roll label key');
   assert.ok(content.includes('fabricate-craft-chat__roll-value">15<'), 'roll value rendered');
+  for (const visibility of NOT_PUBLIC) {
+    const check = executedCheck({}, visibility);
+    const html = buildSalvageChatContent(successModel({ rollValue: 15, check }));
+    assert.ok(!html.includes('__roll'), `no total for ${JSON.stringify(visibility)} (issue 2054)`);
+  }
 });
 
 test('omits the roll row for a guaranteed no-check salvage (null / absent value)', () => {
@@ -164,4 +179,39 @@ test('routes every label through the localize function', () => {
   for (const key of ['SalvageSuccess', 'SalvageActor', 'SalvageSource', 'SalvageRecovered', 'SalvageConsumed', 'SalvageTools']) {
     assert.ok(seen.includes(`FABRICATE.Chat.${key}`), `localize asked for FABRICATE.Chat.${key}`);
   }
+});
+
+test('a salvage card states public roll-under evidence and nothing for a private check (issue 2005)', () => {
+  const shown = buildSalvageChatContent(
+    successModel({ check: executedCheck() }),
+    shippedLocalize
+  ).replaceAll(/[\u2060\u200B]/g, '');
+  assert.ok(shown.includes('<dl class="fabricate-craft-chat__evidence">'));
+  for (const [, label, text] of UNDER_ROWS) {
+    assert.ok(shown.includes(label) && shown.includes(text), text);
+  }
+  const bare = buildSalvageChatContent(failureModel(), shippedLocalize);
+  for (const visibility of NOT_PUBLIC) {
+    const check = executedCheck(UNDER_DATA, visibility);
+    assert.equal(buildSalvageChatContent(failureModel({ check }), shippedLocalize), bare);
+  }
+});
+
+test('a public sum/over fixed salvage card gains only the Needed and Margin rows (M3)', () => {
+  const bare = buildSalvageChatContent(failureModel(), shippedLocalize);
+  const html = buildSalvageChatContent(
+    failureModel({ check: executedCheck(OVER_FIXED_DATA) }),
+    shippedLocalize
+  );
+  const rows =
+    '<dl class="fabricate-craft-chat__evidence">' +
+    '<div class="fabricate-craft-chat__evidence-row" data-check-evidence="needed">' +
+    '<dt class="fabricate-craft-chat__evidence-label">Needed</dt>' +
+    '<dd class="fabricate-craft-chat__evidence-value">DC 12, meet or beat</dd></div>' +
+    '<div class="fabricate-craft-chat__evidence-row" data-check-evidence="margin">' +
+    '<dt class="fabricate-craft-chat__evidence-label">Margin</dt>' +
+    '<dd class="fabricate-craft-chat__evidence-value">+3</dd></div></dl>';
+  const header = '</header>';
+  assert.equal(html, bare.replace(header, header + rows));
+  assert.ok(!html.includes('__dice') && !html.includes('__result'), 'no crafting-only head');
 });

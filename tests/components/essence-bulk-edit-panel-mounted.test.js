@@ -2,8 +2,8 @@
  * `EssenceBulkEditPanel` mounted, in isolation (issue 1036) — criteria 11 and 17.
  * The panel is where the maintainer's binding decision lands: *"Warn the GM about the impact
  * of the delete in the bulk edit sidebar and use the Arm/Confirm delete pattern on the bulk
- * delete button."* That DEVIATES from the `AGENTS.md` carve-out reserving `confirmDialog`
- * for bulk actions, and it is what this suite pins — including the two halves a
+ * delete button."* That DEVIATES from the foundry-and-architecture.md carve-out reserving
+ * `confirmDialog` for bulk actions, and it is what this suite pins — including the two halves a
  * confirmDialog would have made unobservable: that the impact is stated BEFORE the action is
  * armed, and that it RECOMPUTES when the selection changes.
  */
@@ -375,9 +375,9 @@ describe('1036/11 EssenceBulkEditPanel — the armed delete', () => {
   });
 
   it('is a real button rather than a dialog trigger', async () => {
-    // The deviation, pinned: `AGENTS.md` reserves `confirmDialog` for bulk actions and this
-    // action deliberately does not use one. A regression to a dialog would remove the impact
-    // statement's whole reason to exist, because a modal cannot carry it.
+    // The deviation, pinned: foundry-and-architecture.md reserves `confirmDialog` for bulk actions
+    // and this action deliberately does not use one. A regression to a dialog would remove the
+    // impact statement's whole reason to exist, because a modal cannot carry it.
     const root = await harness.mount(props(SELECTION));
     const button = deleteButton(root);
     assert.equal(button.tagName, 'BUTTON');

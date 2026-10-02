@@ -408,6 +408,7 @@ const ENUMERATED_SITES = new Set([
  */
 const NON_SITE_KEY_NAMES = new Set([
   'alchemy',
+  'adjustmentOverride',
   'aliasItemUuids',
   'allowPlayerResultReorder',
   'amount',
@@ -415,6 +416,7 @@ const NON_SITE_KEY_NAMES = new Set([
   'awardMode',
   'biomeModifierAggregation',
   'blindCandidateGate',
+  'bonusExpression',
   'breakToolsOnFail',
   'categories',
   'category',
@@ -426,11 +428,12 @@ const NON_SITE_KEY_NAMES = new Set([
   'complex',
   'consumeComponentOnFail',
   'consumeIngredientsOnFail',
+  'countDice',
+  'countEnabled',
   'crafting',
   'craftingChecks',
   'craftingSystemId',
   'created',
-  'currencyCost',
   'current',
   'customColor',
   'dangerTags',
@@ -458,6 +461,7 @@ const NON_SITE_KEY_NAMES = new Set([
   'eventVisibility',
   'expr',
   'expression',
+  'extraDice',
   'failureResultPolicy',
   'formula',
   'gateMode',
@@ -467,7 +471,6 @@ const NON_SITE_KEY_NAMES = new Set([
   'id',
   'img',
   'ingredientQuantity',
-  'itemPiles',
   'itemSelectionMode',
   'itemTags',
   'itemUuid',
@@ -482,6 +485,8 @@ const NON_SITE_KEY_NAMES = new Set([
   'modified',
   'multiStepRecipes',
   'name',
+  'offerDisadvantage',
+  'offerSituationalBonus',
   'originItemUuid',
   'outcomeRouting',
   'outcomes',
@@ -505,6 +510,7 @@ const NON_SITE_KEY_NAMES = new Set([
   'stageMissed',
   'stagePartial',
   'staminaCost',
+  'successesOverride',
   'tags',
   'thresholdMode',
   'tier',
@@ -520,9 +526,54 @@ const NON_SITE_KEY_NAMES = new Set([
 /** The two leaf key names issue 1654 moved out of {@link NON_SITE_KEY_NAMES}. */
 const ESSENCE_LEG_NON_SITE_KEY_NAMES = new Set(['essences', ESSENCE_KEY]);
 
+const EVALUATION_NON_SITE_KEY_NAMES = new Set([
+  'adjustmentKind',
+  'base',
+  'baseAdjustment',
+  'die',
+  'direction',
+  'kind',
+  'max',
+  'modifierDestination',
+  'once',
+  'path',
+  'product',
+  'readMacroUuid',
+  'required',
+  'source',
+  'spendMacroUuid',
+  'threshold',
+  'zeroPoolFails',
+]);
+
+test('evaluation leaves and external Macro UUIDs stay outside world entity reference rewriting', () => {
+  const evaluationLeaves = [...allLeaves.keys()].filter((path) =>
+    EVALUATION_NON_SITE_KEY_NAMES.has(leafKeyName(path))
+  );
+  assert.ok(evaluationLeaves.length > 0, 'the producer emits evaluation leaves');
+  assert.ok(
+    evaluationLeaves.every((path) => path.includes('.evaluation.')),
+    'evaluation value keys are excluded only in the evaluation record'
+  );
+  const macroUuids = evaluationLeaves.filter((path) =>
+    ['readMacroUuid', 'spendMacroUuid'].includes(leafKeyName(path))
+  );
+  assert.ok(macroUuids.length > 0, 'the producer emits external Macro UUID slots');
+  assert.ok(
+    macroUuids.every((path) =>
+      /\.evaluation\.pool\.additionalDice\.(readMacroUuid|spendMacroUuid)$/.test(path)
+    )
+  );
+  assert.ok(macroUuids.every((path) => !touched.has(path) && !essenceLeg.touched.has(path)));
+});
+
 test('the KEY-NAME closure: every leaf key in the derived corpus is a site key or a listed non-site', () => {
   const keyNames = new Set([...allLeaves.keys()].map((path) => leafKeyName(path)));
-  const nonSites = new Set([...NON_SITE_KEY_NAMES, ...ESSENCE_LEG_NON_SITE_KEY_NAMES]);
+  const nonSites = new Set([
+    ...NON_SITE_KEY_NAMES,
+    ...ESSENCE_LEG_NON_SITE_KEY_NAMES,
+    ...EVALUATION_NON_SITE_KEY_NAMES,
+  ]);
   const unclassified = [...keyNames].filter(
     (key) => !SITE_KEY_NAMES.has(key) && !nonSites.has(key)
   );

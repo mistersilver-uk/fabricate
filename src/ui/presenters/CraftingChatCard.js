@@ -7,7 +7,7 @@
  * label-key map, and salvage renders through it verbatim so a salvage card IS this card.
  *
  * The markup ATOMS — {@link esc}, {@link renderItem}, {@link renderSection},
- * {@link renderRollTotal}, {@link tierStepText} and {@link renderComplications} — are exported
+ * {@link renderCheckTotal}, {@link tierStepText} and {@link renderComplications} — are exported
  * because the bulk salvage and gathering cards compose rows this core cannot express, and a second
  * spelling of one `<li>` would drift from the stylesheet the moment either side is edited.
  * {@link renderComplications} is parameterised by the BEM block token its caller's card uses.
@@ -18,6 +18,18 @@
  * deliberately does not escape `'`. And an absent optional block renders '' rather than an empty
  * wrapper, so a card that has none is byte-identical — asserted, not assumed.
  */
+
+import { checkDiceLine } from './checkDiceLine.js';
+import { isPublicCheckDisplay } from './checkDisplay.js';
+import { checkEvidenceRows, pathBreakSegments } from './checkEvidenceRows.js';
+import { renderDiceTilesHtml } from './countDiceTiles.js';
+import {
+  countBotched,
+  countEvidenceRows,
+  countSummaryText,
+  statesCountEvidence,
+} from './countEvidenceRows.js';
+import { esc } from './htmlEscape.js';
 
 const ITEM_FALLBACK_IMG = 'icons/svg/item-bag.svg';
 
@@ -50,6 +62,9 @@ const COMPLICATIONS_HEADING_KEY = 'FABRICATE.Chat.Complications';
  * A FLAT leaf in the `Chat` namespace, on the same rule as the heading key above.
  */
 const COMPLICATION_POSITION_KEY = 'FABRICATE.Chat.ComplicationResult';
+
+/** The pill a failed count check that netted below zero reads (issue 2006). */
+const COUNT_BOTCH_KEY = 'FABRICATE.Check.CountEvidence.Botch';
 
 /**
  * The two keys a ROLLED result amount reads (issue 1645), on the `FABRICATE.Chat.Roll` precedent
@@ -96,16 +111,11 @@ export const CRAFTING_CHAT_KEYS = Object.freeze({
   consumedOnFailure: 'FABRICATE.Chat.ConsumedOnFailure',
   producedOnFailure: 'FABRICATE.Chat.ProducedOnFailure',
   complications: COMPLICATIONS_HEADING_KEY,
+  checkSuccess: 'FABRICATE.Check.Evidence.Success',
+  checkFailure: 'FABRICATE.Check.Evidence.Failure',
 });
 
-/** Escape text destined for HTML so user-authored names cannot inject markup. */
-export function esc(value) {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;');
-}
+export { esc } from './htmlEscape.js';
 
 /**
  * The localized sentence for an entry whose amount was ROLLED, or '' when it was fixed.
@@ -158,7 +168,7 @@ export function renderItem({ name, img, quantity, rolled }, localize = (key) => 
  * printing "0"/"null". The number is set apart from its label so it reads as the
  * roll result, not more subtitle metadata.
  */
-export function renderRollTotal(value, label) {
+function renderRollTotal(value, label) {
   if (!Number.isFinite(value)) return '';
   return [
     '<div class="fabricate-craft-chat__roll">',
@@ -166,6 +176,107 @@ export function renderRollTotal(value, label) {
     `<span class="fabricate-craft-chat__roll-value">${esc(value)}</span>`,
     '</div>',
   ].join('');
+}
+
+/** {@link renderRollTotal} for a public, non-secret check only (issue 2054), or ''. */
+export function renderCheckTotal(check, value, label) {
+  return isPublicCheckDisplay(check) ? renderRollTotal(value, label) : '';
+}
+
+/**
+ * Escaped text in which no `[[`, `@` or game-system enricher shape (`&Name[…]`, `@Name[…]`) survives,
+ * so neither Foundry's own enrichment pass nor a system-registered one (e.g. dnd5e's `&Reference[…]`)
+ * can match inside it: a word joiner (U+2060) follows every `@`, every `[` that opens a second, and
+ * every escaped `&` immediately followed by a word and `[`.
+ */
+export function inertText(value) {
+  return esc(value)
+    .replaceAll(/\[(?=\[)/g, '[\u{2060}')
+    .replaceAll(/&amp;(?=\w+\[)/g, '&amp;\u{2060}')
+    .replaceAll('@', '@\u{2060}');
+}
+
+/** Evidence text with a zero-width space after each inner `@path` dot, its only break points. */
+function withPathBreaks(text) {
+  return pathBreakSegments(text).join('\u{200B}');
+}
+
+/** Evidence rows as the card's definition list; a `danger` row gains its modifier. */
+function renderEvidenceList(rows) {
+  if (rows.length === 0) return '';
+  return [
+    '<dl class="fabricate-craft-chat__evidence">',
+    ...rows.map(({ id, label, text, tone }) => {
+      const danger = tone === 'danger' ? ' fabricate-craft-chat__evidence-row--danger' : '';
+      return (
+        `<div class="fabricate-craft-chat__evidence-row${danger}" data-check-evidence="${id}">` +
+        `<dt class="fabricate-craft-chat__evidence-label">${inertText(label)}</dt>` +
+        `<dd class="fabricate-craft-chat__evidence-value">${inertText(withPathBreaks(text))}</dd></div>`
+      );
+    }),
+    '</dl>',
+  ].join('');
+}
+
+/**
+ * The executed check's evidence (issue 2005), or '' for a check that is not public and non-secret,
+ * a sum/over/fixed check or no check: Target, Pre-rolled and Margin rows, or for a count check its
+ * die tiles and count rows (issue 2006). Text only: never a Roll or a flag.
+ */
+export function renderCheckEvidenceRows(check, localize = (key) => key) {
+  if (!isPublicCheckDisplay(check)) return '';
+  if (statesCountEvidence(check)) {
+    const tiles = renderDiceTilesHtml(check.count.tiles, localize);
+    return `${tiles}${renderEvidenceList(countEvidenceRows(check, localize))}`;
+  }
+  return renderEvidenceList(checkEvidenceRows(check, localize));
+}
+
+/**
+ * A public count check's summary line (issue 2006), stated in place of the numeric roll row, or ''
+ * for any other check.
+ */
+export function renderCountSummary(check, localize = (key) => key) {
+  if (!isPublicCheckDisplay(check) || !statesCountEvidence(check)) return '';
+  return (
+    '<div class="fabricate-craft-chat__dice" data-check-count-summary>' +
+    `${inertText(countSummaryText(check, localize))}</div>`
+  );
+}
+
+/** The Success or Failure pill, or Botch for a public failed count that netted below zero. */
+function renderCheckPill(model, keys, loc) {
+  const succeeded = model.status === 'succeeded';
+  const botched = !succeeded && isPublicCheckDisplay(model.check) && countBotched(model.check);
+  let icon = succeeded ? 'fa-circle-check' : 'fa-circle-xmark';
+  if (botched) icon = 'fa-skull';
+  let text = loc(succeeded ? keys.checkSuccess : keys.checkFailure);
+  if (botched) text = loc(COUNT_BOTCH_KEY);
+  return (
+    `<div class="fabricate-craft-chat__result fabricate-craft-chat__result--${succeeded ? 'success' : 'failure'}">` +
+    `<i class="fa-solid ${icon}" aria-hidden="true"></i>${esc(text)}</div>`
+  );
+}
+
+/**
+ * The rolled check's head (issue 2005, frames 37 and 38): a key map naming `checkSuccess` adds the
+ * Success or Failure pill, and a public check's dice line replaces the bare total. A public count
+ * check states its summary line instead, even for a pool that rolled nothing (issue 2006, frames
+ * 39 to 41). A check that is not public states its pill alone, with no total (issue 2054).
+ */
+function renderCheckHead(model, keys, loc) {
+  const countSummary = renderCountSummary(model.check, loc);
+  if (countSummary) {
+    return keys.checkSuccess ? `${renderCheckPill(model, keys, loc)}${countSummary}` : countSummary;
+  }
+  const total = renderCheckTotal(model.check, model.rollValue, loc(keys.roll));
+  const rolled = Number.isFinite(model.rollValue) || model.check?.evidence?.total === null;
+  if (!rolled || !keys.checkSuccess) return total;
+  const pill = renderCheckPill(model, keys, loc);
+  const diceLine = isPublicCheckDisplay(model.check) ? checkDiceLine(model.check, loc) : '';
+  return diceLine
+    ? `${pill}<div class="fabricate-craft-chat__dice">${inertText(withPathBreaks(diceLine))}</div>`
+    : `${pill}${total}`;
 }
 
 /**
@@ -420,10 +531,12 @@ export function renderComplications({
  *   [model.results] - A `rolled` entry states its roll; `quantity` 0 is an empty award (issue 1645).
  * @param {Array<{name:string,img:string,quantity:number}>} [model.consumed]
  * @param {Array<{name:string,img:string}>}                 [model.tools]
- * @param {number}  [model.rollValue] - The rolled check total; rendered only when
- *   finite (a no-check "Guaranteed" craft/salvage omits it).
+ * @param {number}  [model.rollValue] - The rolled check total; rendered only when finite
+ *   (a no-check "Guaranteed" craft/salvage omits it) and `model.check` is public.
  * @param {{mode:'target'|'up'|'down',steps:number}} [model.tierStep] - Realized routed
  *   tier-step evidence (`data.tierStepApplied`), present only on an actual tier change.
+ * @param {object|null} [model.check] - The executed check's display projection, whose evidence
+ *   rows render only for a public, non-secret check (issue 2005).
  * @param {string}  [model.failureReason]
  * @param {Array<{name:string,description:string,severity:string,componentName:string}>}
  *   [model.complications] - Component complications this resolution FIRED, already
@@ -436,7 +549,7 @@ export function renderComplications({
 export function buildResultCard(model = {}, keys, localize = (key) => key) {
   const loc = (key) => localize(key) ?? key;
   const succeeded = model.status === 'succeeded';
-  const stateModifier = succeeded ? 'success' : 'failure';
+  const stateClass = succeeded ? 'fabricate-craft-chat--success' : 'fabricate-craft-chat--failure';
   const title = loc(succeeded ? keys.success : keys.failure);
 
   const subtitleParts = [`${esc(loc(keys.actor))}: ${esc(model.actorName)}`];
@@ -444,8 +557,9 @@ export function buildResultCard(model = {}, keys, localize = (key) => key) {
     subtitleParts.push(`${esc(loc(keys.subject))}: ${esc(model.subjectName)}`);
   }
 
-  const rollTotal = renderRollTotal(model.rollValue, loc(keys.roll));
+  const rollTotal = renderCheckHead(model, keys, loc);
   const tierStep = renderTierStep(model.tierStep, keys, loc);
+  const evidence = renderCheckEvidenceRows(model.check, loc);
 
   const notice =
     !succeeded && model.failureReason
@@ -504,12 +618,13 @@ export function buildResultCard(model = {}, keys, localize = (key) => key) {
   });
 
   return [
-    `<div class="fabricate-craft-chat fabricate-craft-chat--${stateModifier}">`,
+    `<div class="fabricate-craft-chat ${stateClass}">`,
     '<header class="fabricate-craft-chat__header">',
     `<div class="fabricate-craft-chat__title">${esc(title)}</div>`,
     `<div class="fabricate-craft-chat__subtitle">${subtitleParts.join(' · ')}</div>`,
     '</header>',
     rollTotal,
+    evidence,
     tierStep,
     notice,
     ...sections,
@@ -541,6 +656,7 @@ export function buildCraftingChatContent(model = {}, localize = (key) => key) {
       tools: model.tools,
       rollValue: model.rollValue,
       tierStep: model.tierStep,
+      check: model.check,
       failureReason: model.failureReason,
       complications: model.complications,
     },

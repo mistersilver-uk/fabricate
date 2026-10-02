@@ -115,23 +115,19 @@ const groupNames = (secret) => secret.groups.map((feed) => feed.name);
 function fabricateDeclarations(config, repository) {
   const names = [...Object.keys(config?.channels ?? {}), config?.channel].filter(Boolean);
   const modules = [named(config?.moduleId)].filter(Boolean);
-  return [...new Set(names)].flatMap((channel) => {
-    const { testerGroups, testerSecretEnv } = resolveChannelConfig(config, channel);
-    return testerGroups.map((group) => ({
+  return [...new Set(names)].flatMap((channel) =>
+    resolveChannelConfig(config, channel).testers.map(({ group, testerSecretEnv }) => ({
       group: named(group),
       channel,
       modules,
       secretEnv: named(testerSecretEnv),
       repository,
       where: `${repository} channel "${channel}"`,
-    }));
-  });
+    }))
+  );
 }
 
-/**
- * The same, for the premium repository's schema: one `testerSecretEnv` per group. The asymmetry is
- * load-bearing — this repository publishes into exactly one early-access group.
- */
+/** The same, for the premium repository's schema: one `testerSecretEnv` per group. */
 function premiumDeclarations(config, repository) {
   const declarations = [];
   for (const [channel, entry] of Object.entries(config?.channels ?? {})) {

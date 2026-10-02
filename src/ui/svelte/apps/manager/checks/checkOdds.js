@@ -12,13 +12,18 @@
  * `StringTerm#isDeterministic` LIES. Every refusal carries a discriminated REASON CODE, and
  * `Roll` is a parameter, so a missing or throwing `parse` is a result rather than an exception. */
 
+import { compareToTarget } from '../../../../../systems/checkEvaluation.js';
+import { SUM_OVER_EVALUATION } from '../../../../../systems/checkModifierRouter.js';
 import {
   classifyCheckTotal,
+  deriveCheckRoll,
   resolveCheckFormulaDisplay,
   resolveForcedOutcome,
-  resolveRolledFormula,
   rolledDiceGroups,
 } from '../../../../../systems/checkRoll.js';
+import { effectiveTarget, routedOutcomeOrder } from '../../../../../systems/checkRouting.js';
+import { isFixedSumOver } from '../../../../../systems/checkTarget.js';
+import { COUNT_ODDS_REASONS, MAX_PRE_ROLL_OUTCOMES } from '../../../../../systems/countOdds.js';
 import { resolveProgressiveAward } from '../../../../../utils/progressiveAward.js';
 import { reduceRollExpression } from '../../../../../utils/rollExpressionAverage.js';
 
@@ -38,6 +43,13 @@ export const ODDS_REASONS = Object.freeze({
   nonDeterministicRemainder: 'non-deterministic-remainder',
   stringTerm: 'string-term',
   unresolvedRollData: 'unresolved-roll-data',
+  preRollNotEnumerable: COUNT_ODDS_REASONS.preRollNotEnumerable,
+  // A success-counting pool (issue 2004): the two the preview abstains with, then two refusals.
+  countPathUnresolved: 'count-path-unresolved',
+  countValueNotNumeric: 'count-value-not-numeric',
+  countResidualTooLarge: COUNT_ODDS_REASONS.residualTooLarge,
+  countFaceTriggerNotEnumerable: 'count-face-trigger-not-enumerable',
+  countPoolTooLarge: 'pool-too-large',
 });
 
 /**
@@ -46,10 +58,6 @@ export const ODDS_REASONS = Object.freeze({
  * where this says the missing input is the GM's own sandbox order. @type {string} */
 export const SANDBOX_ABSENT = 'no-sandbox-order';
 
-/** The largest joint outcome space this will walk. The enumeration is a cartesian product, so
- *  the cap REFUSES with a stated reason rather than sampling. */
-const MAX_ENUMERATED_OUTCOMES = 50_000;
-
 /** Foundry's non-numeric denominations, whose faces are not values (`1df`, `1dc`). */
 const NON_NUMERIC_DENOMINATION = /^[fc]$/i;
 
@@ -57,8 +65,8 @@ const refuse = (reason) => ({ enumerable: false, reason });
 
 /**
  * A term that carries a dice term's shape, whatever class it is, and deliberately STRUCTURAL:
- * the View Lab has no `foundry.dice.*` namespace, so an `instanceof` test would make this
- * untestable outside a live client.
+ * the odds tests replay recorded `Roll.parse` terms as plain objects, which no `instanceof`
+ * test against core's term classes would recognise.
  * @param {object} term A parsed roll term. @returns {boolean} True when it looks like a die. */
 function isDiceTermLike(term) {
   if (!term || typeof term !== 'object') return false;
@@ -162,23 +170,36 @@ function enumerateOutcomes(display, dice) {
 /**
  * Decide whether a formula's outcome space can be enumerated for a previewed actor.
  *
- * IT ENUMERATES THE FORMULA THE RUNNER WILL ACTUALLY ROLL, not the one the GM authored:
- * `evaluateCheckRoll` appends the check-modifier scalar itself, so a histogram on the authored
- * string spans `1..20` while the readout beside it rolls `5..24`. So the context IS a parameter
- * and the append is {@link resolveRolledFormula}, with no double application.
+ * It enumerates the formula the runner rolls, not the one the GM authored: the
+ * shared {@link deriveCheckRoll} places the check modifiers by `evaluation`, so sum/over appends
+ * them to the roll and every other evaluation moves them onto the target. Each outcome of a
+ * roll-under carries its own `targetDelta`: the scalar benefits plus one face of every separately
+ * rolled benefit, enumerated jointly with the main dice under the same whitelist and cap.
  * @param {string} formula The AUTHORED preview formula.
  * @param {object|null} actor The previewed actor, or null for "No actor".
- * @param {object} [options] Options.
- * @param {*} [options.Roll] The `Roll` class; defaults to `globalThis.Roll`.
- * @param {object|null} [options.craftingModifier] The check-modifier context, where there is one.
- * @returns {{enumerable: true, faces: number, remainder: number, display: string}
- *   | {enumerable: false, reason: string}} The verdict. */
+ * @param {object} [options] `Roll` (defaults to `globalThis.Roll`), the `craftingModifier`
+ *   context, the `evaluation` placing it, and any Tool `toolContributions`.
+ * @returns {{enumerable: true, faces: number, combinations: number, outcomes: Array<object>,
+ *   display: string} | {enumerable: false, reason: string}} The verdict. */
 export function describeFormulaEnumerability(
   formula,
   actor,
-  { Roll = globalThis.Roll, craftingModifier = null } = {}
+  {
+    Roll = globalThis.Roll,
+    craftingModifier = null,
+    evaluation = SUM_OVER_EVALUATION,
+    toolContributions = [],
+  } = {}
 ) {
-  const rolledFormula = resolveRolledFormula(formula, actor, craftingModifier, Roll);
+  const derived = deriveCheckRoll(
+    formula,
+    actor,
+    craftingModifier,
+    Roll,
+    evaluation,
+    toolContributions
+  );
+  const rolledFormula = derived.formula;
   // The SAME `Roll` drives the display resolution and the parse: two engines would let a test
   // grade the predicate against recorded output while the unresolved-key signal came elsewhere.
   const display = resolveCheckFormulaDisplay(rolledFormula, actor, null, Roll);
@@ -211,8 +232,12 @@ export function describeFormulaEnumerability(
   const plan = planDice(display.display);
   if (plan.enumerable === false) return plan;
 
-  const combinations = plan.dice.reduce((product, die) => product * die.faces, 1);
-  if (combinations > MAX_ENUMERATED_OUTCOMES) return refuse(ODDS_REASONS.tooManyOutcomes);
+  const placed = targetPlacement(derived.placement, rollData, Roll);
+  if (placed.enumerable === false) return placed;
+  const mainCombinations = plan.dice.reduce((product, die) => product * die.faces, 1);
+  if (mainCombinations * placed.deltas.length > MAX_PRE_ROLL_OUTCOMES) {
+    return refuse(ODDS_REASONS.tooManyOutcomes);
+  }
 
   const outcomes = enumerateOutcomes(display.display, plan.dice);
   if (outcomes.some((outcome) => !Number.isFinite(outcome.total))) {
@@ -221,16 +246,94 @@ export function describeFormulaEnumerability(
     return refuse(ODDS_REASONS.nonDeterministicRemainder);
   }
 
+  return { enumerable: true, ...jointSpace(plan.dice, outcomes, placed), display: display.display };
+}
+
+/**
+ * The main dice's outcomes crossed with every settled target delta a placement can reach.
+ * `bonuses` names each separately rolled bonus the joint space crosses in.
+ */
+function jointSpace(dice, outcomes, placed) {
+  const joint = placed.deltas.length > 1;
   return {
-    enumerable: true,
-    dice: plan.dice,
+    dice,
+    bonuses: placed.bonuses ?? [],
     // `faces` survives for the single-die reading the rail heading names; a multi-die formula
-    // has a COMBINATION count instead, which is a different sentence.
-    faces: plan.dice.length === 1 ? plan.dice[0].faces : null,
-    combinations,
-    outcomes,
-    display: display.display,
+    // or a joint space has a combination count instead, which is a different sentence.
+    faces: dice.length === 1 && !joint ? dice[0].faces : null,
+    combinations: outcomes.length * placed.deltas.length,
+    outcomes: placed.moves
+      ? outcomes.flatMap((outcome) =>
+          placed.deltas.map((targetDelta) => ({ ...outcome, targetDelta }))
+        )
+      : outcomes,
   };
+}
+
+/**
+ * The target deltas a placement can settle to, one per equally likely pre-roll assignment, or a
+ * refusal. `moves` is false where nothing is placed on the target (sum/over), so its outcomes keep
+ * their shape.
+ */
+function targetPlacement(placement, rollData, Roll) {
+  const scalar = Number(placement?.targetDelta) || 0;
+  const pending = (placement?.preRolls ?? []).filter(
+    (entry) => entry.destination === 'target' && !Object.hasOwn(entry, 'total')
+  );
+  const moves = placement?.direction === 'under';
+  const totals = enumeratePreRollTotals(pending, rollData, Roll);
+  if (!totals.ok) return refuse(totals.reason);
+  let deltas = [scalar];
+  for (const entry of totals.entries) {
+    if (deltas.length * entry.totals.length > MAX_PRE_ROLL_OUTCOMES) {
+      return refuse(ODDS_REASONS.tooManyOutcomes);
+    }
+    deltas = deltas.flatMap((delta) => entry.totals.map((total) => delta + total));
+  }
+  // The dice alone: a bounded modifier's expression carries its clamp, which no heading should read.
+  const bonuses = pending
+    .filter((_, index) => totals.entries[index].totals.length > 1)
+    .flatMap((entry) => String(entry.expression ?? '').match(/\d*d\d+/giu) ?? []);
+  return { moves, deltas, bonuses };
+}
+
+/**
+ * Every equally likely total of each pending pre-roll, `{ ok: true, entries: [{ index, totals }] }`,
+ * or `{ ok: false, reason }` when one falls outside the positive whitelist or the cap. A count
+ * check's odds take `entries` as their `preRollTotals`.
+ * @param {Array<{index: number, expression: string}>} preRolls The pending pre-roll entries.
+ * @param {object} rollData The previewed actor's roll data.
+ * @param {*} [Roll] The `Roll` class, for its `replaceFormulaData`.
+ */
+export function enumeratePreRollTotals(preRolls, rollData = {}, Roll = globalThis.Roll) {
+  const entries = [];
+  for (const entry of Array.isArray(preRolls) ? preRolls : []) {
+    const totals = preRollTotals(String(entry?.expression ?? ''), rollData, Roll);
+    if (!totals.ok) return totals;
+    entries.push({ index: entry.index, totals: totals.totals });
+  }
+  return { ok: true, entries };
+}
+
+/** One pre-roll's totals: a deterministic expression has one, a whitelisted one every face. */
+function preRollTotals(expression, rollData, Roll) {
+  const unusable = { ok: false, reason: ODDS_REASONS.preRollNotEnumerable };
+  if (typeof Roll?.replaceFormulaData !== 'function') return unusable;
+  const display = Roll.replaceFormulaData(expression, rollData, { missing: 'NaN', warn: false });
+  if (/NaN|@/.test(display)) return unusable;
+  const plan = planDice(display);
+  if (plan.enumerable === false) {
+    const { value } = reduceRollExpression(display);
+    return plan.reason === ODDS_REASONS.noDice && Number.isFinite(value)
+      ? { ok: true, totals: [value] }
+      : unusable;
+  }
+  const combinations = plan.dice.reduce((product, die) => product * die.faces, 1);
+  if (combinations > MAX_PRE_ROLL_OUTCOMES) {
+    return { ok: false, reason: ODDS_REASONS.tooManyOutcomes };
+  }
+  const totals = enumerateOutcomes(display, plan.dice).map((outcome) => outcome.total);
+  return totals.every(Number.isFinite) ? { ok: true, totals } : unusable;
 }
 
 /**
@@ -254,19 +357,22 @@ function diceGroupsFor(dice, assignment) {
 
 /**
  * A percentage, to one decimal place, that still sums to 100 across a partition.
- * @param {number} count Outcomes in this bucket.
+ * @param {number} count Outcomes in this bucket, or its probability with a `total` of 1.
  * @param {number} total Outcomes in the whole enumerated space. @returns {number} */
-function percentOf(count, total) {
+export function percentOf(count, total) {
   return Math.round((count / total) * 1000) / 10;
 }
 
 /**
- * Bucket every enumerated outcome of a routed check through the engine's own classifier.
+ * Bucket every enumerated outcome of a routed check through the engine's own classifier, each
+ * outcome supplying its own settled `targetDelta`.
  * @param {object} params Params.
  * @param {Array<{total: number, diceGroups: Array<object>}>} params.outcomes The outcome space.
  * @param {object} params.args The classifier arguments.
  * @returns {Array<{id: string, name: string, success: boolean, count: number, percent: number}>}
- *   One bucket per reachable tier, in tier order, zero-probability omitted. */
+ *   One bucket per reachable tier, zero-probability omitted. Sum/over against a fixed DC keeps
+ *   the order totals reach them in; every other evaluation lists the unrouted bucket, then tiers
+ *   worst to best by the routing's own ranking. */
 export function enumerateRoutedOdds({ outcomes, args }) {
   const buckets = new Map();
   for (const outcome of outcomes) {
@@ -284,31 +390,42 @@ export function enumerateRoutedOdds({ outcomes, args }) {
       count: 1,
     });
   }
-  return [...buckets.values()].map((bucket) => ({
+  const rows = [...buckets.values()].map((bucket) => ({
     ...bucket,
     percent: percentOf(bucket.count, outcomes.length),
   }));
+  return isFixedSumOver(args.evaluation) ? rows : worstFirst(rows, args);
+}
+
+function worstFirst(rows, args) {
+  const order = ['', ...routedOutcomeOrder(args)];
+  const rank = (row) => {
+    const position = order.indexOf(row.id);
+    return position === -1 ? order.length : position;
+  };
+  return rows.toSorted((left, right) => rank(left) - rank(right));
 }
 
 /**
  * Bucket every enumerated outcome of a pass/fail check, mirroring {@link runFormulaPassFail}'s
  * own two decisions — a matched forced outcome first, then the comparison — because a trigger
  * forcing a failure on a natural 1 changes the histogram and nothing else here would see it.
+ * Roll-under compares against `dc` plus the outcome's settled `targetDelta`.
  * @param {object} params Params.
  * @param {Array<{total: number, diceGroups: Array<object>}>} params.outcomes The outcome space.
- * @param {object} params.args `{ dc, comparison, triggers }`.
+ * @param {object} params.args `{ dc, comparison, triggers, direction }`.
  * @returns {Array<{id: string, name: string, success: boolean, count: number, percent: number}>}
  *   At most two buckets, failure first, zero-probability omitted.
  */
 export function enumeratePassFailOdds({ outcomes, args }) {
+  const direction = args.direction === 'under' ? 'under' : 'over';
   const tally = { failure: 0, success: 0 };
   for (const outcome of outcomes) {
     const forced = resolveForcedOutcome(args.triggers, outcome);
+    const target = effectiveTarget(args.dc, { direction }, outcome.targetDelta);
     const passed = forced
       ? forced.disposition === 'success'
-      : args.comparison === 'exceed'
-        ? outcome.total > args.dc
-        : outcome.total >= args.dc;
+      : compareToTarget(outcome.total, target, args.comparison, direction);
     tally[passed ? 'success' : 'failure'] += 1;
   }
   return ['failure', 'success']

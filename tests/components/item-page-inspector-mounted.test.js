@@ -19,6 +19,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
+    'src/ui/svelte/components/EmptyState.svelte',
     // The figure box and the eyebrow it COMPOSES (issue 1505). The three stat tiles are
     // `<StatBox>`es and each renders a `<Kicker>` as its label, so `Kicker` is a leaf two
     // rungs down that nothing here names — and omitting either HANGS this suite
@@ -136,8 +137,10 @@ describe('ItemPageInspector (mounted)', () => {
 
   it('renders a placeholder when no item is selected', async () => {
     const root = await harness.mount({ item: null, visibilityMode: 'item' });
-    assert.ok(root.querySelector('[data-item-page-empty]'));
-    assert.equal(root.querySelector('[data-item-page-stats]'), null);
+    const empty = root.querySelector('[data-item-page-empty]');
+    assert.ok(Boolean(empty));
+    assert.ok(empty.classList.contains('is-fill'));
+    assert.ok(!root.querySelector('[data-item-page-stats]'));
   });
 
   it('reads the unlimited use value as the infinity glyph', async () => {

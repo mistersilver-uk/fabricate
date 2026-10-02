@@ -183,6 +183,15 @@
     font-size: 12.5px;
   }
 
+  /* The wrapper draws the field, so focus lights the wrapper and the input draws no ring. */
+  .alchemy-inventory-search:focus-within {
+    border-color: var(--fab-accent);
+  }
+
+  .alchemy-inventory-search input:focus-visible {
+    outline: none;
+  }
+
   .alchemy-inventory-list {
     list-style: none;
     margin: 0;

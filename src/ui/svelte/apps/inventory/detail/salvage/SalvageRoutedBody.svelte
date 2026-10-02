@@ -13,6 +13,7 @@
     FIXED     each outcome carries an absolute, non-overlapping [start, end] segment
               of the roll range and matches on `start <= total <= end`. It never
               reads a DC, so an override shifts NOTHING and there is no DC to show.
+              Rendered as the presenter's `band` (issue 2152).
 
   All of that arithmetic is decided builder-side; this component only reads it.
 
@@ -34,9 +35,26 @@
   const routedType = $derived(salvage?.routedType === 'fixed' ? 'fixed' : 'relative');
   const outcomes = $derived(Array.isArray(salvage?.routedOutcomes) ? salvage.routedOutcomes : []);
   const dc = $derived(Number.isFinite(salvage?.dc) ? salvage.dc : null);
+  // A relative roll-under or character-value check's base target, in place of a DC (issue 2005).
+  const target = $derived(salvage?.target ?? null);
   const rolledOutcomeId = $derived(
     result?.state === 'success' ? (result?.outcomeId ?? null) : null
   );
+  // A count's net below its Botch row's floor lands on that row, not on the tier it routes to.
+  const botchRolled = $derived.by(() => {
+    const below = outcomes.find((outcome) => outcome.id === 'count-botch')?.below;
+    return (
+      result?.state === 'success' &&
+      Number.isFinite(below) &&
+      Number.isFinite(result?.rollValue) &&
+      result.rollValue < below
+    );
+  });
+  const isRolled = (outcome) =>
+    botchRolled
+      ? outcome.id === 'count-botch'
+      : rolledOutcomeId !== null && outcome.id === rolledOutcomeId;
+  const figureTone = (outcome) => (outcome.success ? 'neutral' : 'danger');
 </script>
 
 <div
@@ -48,19 +66,32 @@
     <Kicker as="span">{localize('FABRICATE.App.Inventory.Salvage.OutcomesTitle')}</Kicker>
     <!-- Present for RELATIVE only: a fixed check has no DC — checkRoll never reads one
          and the GM editor hides the field entirely for that pairing. -->
-    {#if dc !== null}
+    {#if !target?.text && dc !== null}
       <span class="salvage-dc" data-inventory-salvage-dc={String(dc)}>
         {localize('FABRICATE.App.Inventory.Salvage.Dc', { dc })}
       </span>
     {/if}
   </p>
+  <!-- A target or successes line is a sentence, not the kicker row's short "DC 15" figure. -->
+  {#if target?.text}
+    <p class="salvage-target-source" data-inventory-salvage-target={target.direction}>
+      {target.text}
+    </p>
+  {/if}
+  {#if target?.source}
+    <p class="salvage-target-source" data-inventory-salvage-target-source>{target.source}</p>
+  {:else if target?.unresolved}
+    <p class="salvage-target-source" data-inventory-salvage-target-unresolved>
+      {target.unresolved}
+    </p>
+  {/if}
 
   {#if outcomes.length === 0}
     <EmptyState note hint={localize('FABRICATE.App.Inventory.Salvage.NoOutcomes')} />
   {:else}
     <ul class="salvage-outcome-list" data-inventory-salvage-outcomes>
       {#each outcomes as outcome, index (outcome.id ?? index)}
-        {@const rolled = rolledOutcomeId !== null && outcome.id === rolledOutcomeId}
+        {@const rolled = isRolled(outcome)}
         <li
           class="salvage-outcome"
           class:is-success={outcome.success}
@@ -78,23 +109,21 @@
                 >
               </span>
             {/if}
-            {#if routedType === 'fixed'}
-              {#if outcome.start !== null && outcome.end !== null}
-                <span
-                  class="salvage-outcome-threshold"
-                  data-inventory-outcome-range={`${outcome.start}-${outcome.end}`}
-                >
-                  {outcome.start}–{outcome.end}
-                </span>
-              {/if}
+            {#if outcome.band}
+              <!-- The presenter's band: a fixed tier's [start, end] or a count's net successes. -->
+              <span class="salvage-outcome-threshold" data-inventory-outcome-band={outcome.band}>
+                <Chip density="list" mono tone={figureTone(outcome)}>{outcome.band}</Chip>
+              </span>
             {:else if outcome.threshold !== null}
               <span
                 class="salvage-outcome-threshold"
                 data-inventory-outcome-threshold={String(outcome.threshold)}
               >
-                {localize('FABRICATE.App.Inventory.Salvage.ReachedAt', {
-                  threshold: outcome.threshold,
-                })}
+                <Chip density="list" mono tone={figureTone(outcome)}
+                  >{localize('FABRICATE.App.Inventory.Salvage.ReachedAt', {
+                    threshold: outcome.threshold,
+                  })}</Chip
+                >
               </span>
             {/if}
           </div>
@@ -137,6 +166,12 @@
      and the ink — so what is left here is what was genuinely the CALLER's: the flex row that
      places the label beside its trailing figure, and the `line-height` that sets THAT figure's
      leading. The kicker declares its own 1.3 and is unaffected by the inherited value. */
+  .salvage-target-source {
+    margin: 0;
+    font-size: 11px;
+    color: var(--fab-text-muted);
+  }
+
   .salvage-body-title {
     display: flex;
     align-items: center;
@@ -212,15 +247,11 @@
     font-weight: 600;
   }
 
+  /* A positioning wrapper only: the shared `Chip` inside owns the figure's type and ramp, as in
+     the Journal's `OutcomeLadder` (issue 2137). */
   .salvage-outcome-threshold {
+    display: inline-flex;
     flex: 0 0 auto;
-    font-family: var(--fab-font-mono);
-    font-size: 8.5px;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    text-transform: uppercase;
-    color: var(--fab-text-secondary);
-    white-space: nowrap;
   }
 
   .salvage-outcome-results {

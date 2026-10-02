@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
+  TYPEAHEAD_RUNE_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import { stepMigratedNumberField, stepNativeNumberInput } from '../helpers/numericKeyboardStep.js';
@@ -26,12 +27,14 @@ const EDITOR_PATH = 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte';
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-gathering-task-stepper-',
+  runeModules: TYPEAHEAD_RUNE_MODULES,
   rawModules: [
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     // The SHARED subject check-modifier picker's resolver (issue 1095).
     'src/systems/characterLibraries.js',
     'src/systems/checkModifierResolver.js',
+    'src/systems/checkModifierRouter.js',
     'src/systems/salvageCheckUsability.js',
     'src/utils/checkModifierPicks.js',
     'src/systems/toolCheckBonus.js',
@@ -58,6 +61,22 @@ const harness = createMountedComponentHarness({
     'src/systems/characterPrerequisites.js',
     // The seven converted option vocabularies (issue 1510).
     'src/ui/svelte/apps/manager/gatheringTaskSelectOptions.js',
+    // The task check override reads the evaluation and formats an adjustment (issue 2005).
+    'src/systems/normalize/checkEvaluation.js',
+    'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
+    'src/utils/checkAdjustmentFormat.js',
+    'src/utils/scalars.js',
+    'src/ui/svelte/apps/manager/checks/checksCopy.js',
+    // Its Player sees line, which resolves the target and names the Preview-as character.
+    'src/systems/checkTarget.js',
+    'src/systems/checkEvaluation.js',
+    'src/utils/localizeWithFallback.js',
+    'src/ui/svelte/apps/manager/checks/previewActorId.js',
+    'src/ui/svelte/apps/manager/component/overridePlayerSees.js',
+    // A count check's override and line (issue 2006): its copy, and the count description.
+    'src/ui/svelte/apps/manager/component/taskOverrideCopy.js',
+    'src/systems/countCheck.js',
+    'src/systems/countEvaluation.js',
   ],
   // A component missing here does not fail this suite — it HANGS it, reported as `# cancelled`.
   compiledModules: [
@@ -85,6 +104,11 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/ModifierPillSelect.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/components/ManagerSearchField.svelte',
+    'src/ui/svelte/components/Notice.svelte',
+    'src/ui/svelte/apps/manager/checks/PreviewAsPicker.svelte',
+    'src/ui/svelte/components/Callout.svelte',
+    'src/ui/svelte/components/Kicker.svelte',
+    'src/ui/svelte/apps/manager/component/OverridePlayerSees.svelte',
     EDITOR_PATH,
   ],
   componentPath: EDITOR_PATH,
@@ -514,5 +538,311 @@ describe('Gathering task editor steppers (issue 1050)', () => {
       );
       harness.remount();
     }
+  });
+});
+
+// ── Issue 2005 (R3): one override field, labelled for the routed check's target ─────────
+describe('the task check override follows the routed check evaluation (issue 2005)', () => {
+  const evaluation = ({ direction = 'under', source = 'attribute', kind = 'add' } = {}) => ({
+    product: 'sum',
+    direction,
+    target: { source, expression: '@skills.smith.level', adjustmentKind: kind },
+  });
+
+  const CHARACTERS = {
+    'actor-sera': { name: 'Sera Vane', rollData: { skills: { smith: { level: 12 } } } },
+    'actor-idrin': { name: 'Idrin Ashfall', rollData: {} },
+  };
+  const ROSTER = [
+    { id: 'actor-sera', name: 'Sera Vane', img: '' },
+    { id: 'actor-idrin', name: 'Idrin Ashfall', img: '' },
+  ];
+
+  async function mountOverride(task, config, roster = ROSTER) {
+    const updates = [];
+    let current = { id: 'task-1', name: 'Riverbed Ore', dropRows: [], ...task };
+    const root = await harness.mount({
+      task: current,
+      resolutionMode: 'routed',
+      checkConfig: { thresholdMode: 'meet', ...config },
+      previewActors: roster,
+      resolvePreviewCharacter: (id) => CHARACTERS[id] ?? null,
+      onUpdateTask: (patch) => {
+        updates.push(patch);
+        current = { ...current, ...patch };
+      },
+    });
+    const card = () => root.querySelector('[data-gathering-task-dc]');
+    return {
+      root,
+      updates,
+      card,
+      sync: () => harness.setProps({ task: current }),
+      heading: () => card().querySelector('h3').textContent.trim(),
+      hint: () => card().querySelector('.manager-muted').textContent.trim(),
+      label: () => card().querySelector('.manager-task-dc-field > span').textContent.trim(),
+      input: () =>
+        card().querySelector(
+          '[data-gathering-task-dc-override], [data-gathering-task-adjustment-override]'
+        ),
+      kept: () =>
+        root.querySelector('[data-gathering-task-override-kept]')?.textContent.trim() ?? '',
+      sees: () =>
+        card().querySelector('[data-override-player-sees-line]')?.textContent.trim() ?? '',
+      note: () =>
+        card().querySelector('[data-override-player-sees-note]')?.textContent.trim() ?? '',
+      previewAs: async (actorId) => {
+        card().querySelector('[data-override-preview-actor]').click();
+        await harness.setProps({});
+        root.querySelector(`[data-popover-option="${actorId}"]`).click();
+        await harness.setProps({});
+      },
+    };
+  }
+
+  function commit(input, raw) {
+    input.value = raw;
+    input.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
+    input.dispatchEvent(
+      new globalThis.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+    );
+  }
+
+  it('a roll-under fixed target labels the one field Target, with no preset Select', async () => {
+    const view = await mountOverride(
+      { dcOverride: null, adjustmentOverride: 2 },
+      { evaluation: evaluation({ source: 'fixed' }) }
+    );
+    assert.equal(view.card().dataset.gatheringTaskOverrideField, 'dcOverride');
+    assert.equal(view.heading(), 'Target override');
+    assert.equal(
+      view.hint(),
+      'Replaces the system target for this task. The total must stay at or under it.'
+    );
+    assert.equal(view.label(), 'Target');
+    assert.equal(view.input().placeholder, 'System default');
+    assert.ok(!view.card().querySelector('.fabricate-select-trigger'), 'R3: no preset Select');
+    assert.equal(
+      view.kept(),
+      'A difficulty adjustment override of +2 is kept on this task. This system does not read it, so it is not shown for editing.'
+    );
+    assert.ok(
+      view.root.querySelector('[data-gathering-task-override-kept]').classList.contains('manager-callout'),
+      'the kept value is a standing Callout, as frame 24 draws it'
+    );
+
+    view.input().value = '12';
+    view.input().dispatchEvent(new globalThis.Event('input', { bubbles: true }));
+    assert.deepEqual(view.updates.at(-1), { dcOverride: 12 }, 'it writes only the DC override');
+    assert.equal(view.sees(), 'Riverbed Ore · stay at or under 15', 'the line read the system target');
+    await view.sync();
+    assert.equal(view.sees(), 'Riverbed Ore · stay at or under 12', 'and follows the override');
+    assert.ok(!view.card().querySelector('[data-override-preview-actor]'), 'a fixed target reads no one');
+    clear(view.input());
+    assert.deepEqual(view.updates.at(-1), { dcOverride: null }, 'clearing restores the default');
+  });
+
+  it('a character value edits the adjustment override, keeping the dormant DC', async () => {
+    const view = await mountOverride({ dcOverride: 15 }, { evaluation: evaluation() });
+    assert.equal(view.card().dataset.gatheringTaskOverrideField, 'adjustmentOverride');
+    assert.equal(view.heading(), 'Difficulty adjustment override');
+    assert.equal(
+      view.hint(),
+      'Adjusts the character value this task is attempted against. Added to the value.'
+    );
+    assert.equal(view.label(), 'Adjustment');
+    assert.equal(view.input().value, '', 'unset reads the placeholder');
+    assert.equal(view.input().placeholder, 'System default');
+    assert.equal(
+      view.kept(),
+      'A DC override of 15 is kept on this task. This system does not read it, so it is not shown for editing.'
+    );
+
+    assert.equal(
+      view.sees(),
+      'Riverbed Ore · stay at or under the character value (@skills.smith.level)'
+    );
+    assert.equal(view.note(), 'Choose a character in Preview as to see what this resolves to.');
+    await view.previewAs('actor-sera');
+    assert.equal(view.sees(), 'Riverbed Ore · stay at or under 12 (Sera Vane @skills.smith.level 12)');
+    assert.equal(view.note(), '');
+
+    commit(view.input(), '−2');
+    assert.deepEqual(view.updates.at(-1), { adjustmentOverride: -2 });
+    await view.sync();
+    assert.equal(
+      view.sees(),
+      'Riverbed Ore · stay at or under 10 (Sera Vane @skills.smith.level 12, −2)',
+      'the chosen character survives the edit'
+    );
+    assert.equal(view.input().value, '−2', 'the saved value reopens formatted');
+    assert.ok(
+      view.updates.every((patch) => !('dcOverride' in patch)),
+      'the DC override is never written'
+    );
+
+    clear(view.input());
+    view.input().dispatchEvent(new globalThis.Event('blur'));
+    assert.deepEqual(view.updates.at(-1), { adjustmentOverride: null }, 'System default is null');
+  });
+
+  it('a multiplier is typed and kept exactly, never truncated', async () => {
+    const view = await mountOverride(
+      { adjustmentOverride: 0.7 },
+      { evaluation: evaluation({ kind: 'multiply' }) }
+    );
+    assert.equal(
+      view.hint(),
+      'Adjusts the character value this task is attempted against. Multiplied, rounded down.'
+    );
+    assert.equal(view.input().value, '×0.7');
+    commit(view.input(), '×½');
+    assert.deepEqual(view.updates.at(-1), { adjustmentOverride: 0.5 });
+    commit(view.input(), '0.65');
+    assert.deepEqual(view.updates.at(-1), { adjustmentOverride: 0.65 });
+  });
+
+  it('a roll-high fixed DC reads as frame 23 and names a kept adjustment', async () => {
+    const view = await mountOverride(
+      { dcOverride: 14, adjustmentOverride: -2 },
+      { evaluation: evaluation({ direction: 'over', source: 'fixed' }) }
+    );
+    assert.equal(view.heading(), 'DC override');
+    assert.equal(view.hint(), 'Replaces the system DC for this task.');
+    assert.equal(view.label(), 'DC');
+    assert.equal(view.input().value, '14');
+    assert.equal(
+      view.kept(),
+      'A difficulty adjustment override of −2 is kept on this task. This system does not read it, so it is not shown for editing.'
+    );
+    assert.equal(view.sees(), 'Riverbed Ore · DC 14', 'frame 23: every check shows the line');
+  });
+
+  it('a fixed-range routed check is graded by its ranges, so it shows no Player sees line', async () => {
+    const view = await mountOverride(
+      { dcOverride: 14 },
+      { type: 'fixed', evaluation: evaluation({ direction: 'over', source: 'fixed' }) }
+    );
+    assert.ok(Boolean(view.input()), 'the override itself still renders');
+    assert.ok(!view.card().querySelector('[data-override-player-sees]'), 'no line, no picker');
+  });
+
+  it('with no characters in the world the line names the formula and the picker offers only No actor', async () => {
+    const view = await mountOverride({ adjustmentOverride: -2 }, { evaluation: evaluation() }, []);
+    assert.equal(
+      view.sees(),
+      'Riverbed Ore · stay at or under the character value (@skills.smith.level, −2)'
+    );
+    assert.equal(view.note(), 'Choose a character in Preview as to see what this resolves to.');
+    view.card().querySelector('[data-override-preview-actor]').click();
+    await harness.setProps({});
+    const options = [...view.root.querySelectorAll('[data-popover-option]')].map(
+      (option) => option.dataset.popoverOption
+    );
+    assert.deepEqual(options, ['no-actor']);
+  });
+
+  it('a character without the value is named rather than read as zero', async () => {
+    const view = await mountOverride({ adjustmentOverride: -2 }, { evaluation: evaluation() });
+    await view.previewAs('actor-idrin');
+    assert.equal(
+      view.sees(),
+      'Idrin Ashfall has no value at @skills.smith.level. The check cannot resolve for them.'
+    );
+    assert.equal(view.note(), '', 'a chosen character needs no note');
+  });
+
+  it('a kept override invalidated by a kind switch is marked invalid at the field', async () => {
+    const view = await mountOverride(
+      { adjustmentOverride: -2 },
+      { evaluation: evaluation({ kind: 'multiply' }) }
+    );
+    assert.equal(view.input().getAttribute('aria-invalid'), 'true');
+    const message = view.card().querySelector('[data-gathering-task-override-invalid]');
+    assert.ok(Boolean(message), 'the field names the invalid override');
+    assert.equal(
+      message.textContent.trim(),
+      'This override does not suit its kind: an added adjustment must be a finite number and a multiplier must be above zero.'
+    );
+    assert.equal(view.input().getAttribute('aria-describedby'), message.id);
+  });
+
+  it('clears the invalid-field warning once the kept override suits its kind again', async () => {
+    const view = await mountOverride(
+      { adjustmentOverride: -2 },
+      { evaluation: evaluation({ kind: 'multiply' }) }
+    );
+    assert.ok(Boolean(view.card().querySelector('[data-gathering-task-override-invalid]')));
+    await harness.setProps({
+      checkConfig: { thresholdMode: 'meet', evaluation: evaluation({ kind: 'add' }) },
+    });
+    assert.ok(
+      !view.card().querySelector('[data-gathering-task-override-invalid]'),
+      'an added adjustment of -2 is valid, so the warning clears'
+    );
+    assert.ok(!view.input().hasAttribute('aria-invalid'));
+  });
+
+  // Issue 2006: a count check reads `successesOverride`; the retained target's overrides lie dormant.
+  const countConfig = (required = 2) => ({
+    evaluation: {
+      ...evaluation(),
+      product: 'count',
+      direction: 'over',
+      pool: { die: 6, base: '3', threshold: '5', required },
+    },
+  });
+  const successesInput = (view) => view.card().querySelector('[data-gathering-task-successes-override]');
+
+  it('a count check edits the successes override in the one Stepper, with no presets (R3)', async () => {
+    const view = await mountOverride({ dcOverride: 14, adjustmentOverride: -2 }, countConfig());
+    assert.equal(view.card().dataset.gatheringTaskOverrideField, 'successesOverride');
+    assert.equal(view.heading(), 'Successes needed override');
+    assert.equal(
+      view.hint(),
+      'Replaces the successes needed for this task. The pool and threshold still come from the check.'
+    );
+    assert.equal(view.label(), 'Successes needed');
+    assert.ok(!view.input(), 'neither dormant override is offered for editing');
+    assert.equal(successesInput(view).placeholder, 'System default');
+    assert.equal(successesInput(view).getAttribute('aria-label'), 'Successes needed');
+    assert.ok(!view.card().querySelector('.fabricate-select-trigger'), 'R3: no preset Select');
+    assert.equal(
+      view.card().querySelectorAll('button').length,
+      2,
+      'R3: the Stepper\'s own − and + are the card\'s only buttons, so no preset buttons'
+    );
+    assert.deepEqual(
+      [...view.root.querySelectorAll('[data-gathering-task-override-kept]')].map((node) =>
+        node.textContent.trim()
+      ),
+      [
+        'A DC override of 14 is kept on this task. This system does not read it, so it is not shown for editing.',
+        'A difficulty adjustment override of −2 is kept on this task. This system does not read it, so it is not shown for editing.',
+      ]
+    );
+    assert.equal(view.sees(), 'Riverbed Ore · 2 successes needed');
+
+    commit(successesInput(view), '3');
+    assert.deepEqual(view.updates.at(-1), { successesOverride: 3 }, 'it writes only the successes');
+    await view.sync();
+    assert.equal(view.sees(), 'Riverbed Ore · 3 successes needed', 'the line follows the override');
+    view.card().querySelector('.fab-stepper button:first-of-type').click();
+    assert.deepEqual(view.updates.at(-1), { successesOverride: 2 }, 'the − button steps it down');
+    await view.sync();
+    clear(successesInput(view));
+    assert.deepEqual(view.updates.at(-1), { successesOverride: null }, 'clearing restores the default');
+    assert.ok(
+      view.updates.every((patch) => !('dcOverride' in patch) && !('adjustmentOverride' in patch)),
+      'no dormant override is ever written or cleared'
+    );
+  });
+
+  it('a count check names one success needed in the singular', async () => {
+    const view = await mountOverride({}, countConfig(3));
+    assert.equal(view.sees(), 'Riverbed Ore · 3 successes needed', 'the check\'s own count by default');
+    commit(successesInput(view), '1');
+    await view.sync();
+    assert.equal(view.sees(), 'Riverbed Ore · 1 success needed');
   });
 });

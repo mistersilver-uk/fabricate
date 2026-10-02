@@ -6,7 +6,7 @@
  * {@link module:src/ui/presenters/CraftingChatCard}'s `buildResultCard` cannot express that
  * — it carries one `subjectName`, one `rollValue` and one `status` — so this module
  * composes its own layout out of that module's exported markup ATOMS (`esc`,
- * `renderSection` — which renders each entry through `renderItem` — `renderRollTotal`,
+ * `renderSection` — which renders each entry through `renderItem` — `renderCheckTotal`,
  * `tierStepText` and `renderComplications`). Every class it emits is an existing
  * `fabricate-craft-chat` class, so the aggregate card inherits the shipped stylesheet
  * verbatim and needs no new CSS.
@@ -42,8 +42,10 @@
 
 import {
   esc,
+  renderCheckEvidenceRows,
+  renderCheckTotal,
   renderComplications,
-  renderRollTotal,
+  renderCountSummary,
   renderSection,
   tierStepText,
 } from './CraftingChatCard.js';
@@ -136,11 +138,11 @@ function substituteCounts(text, counts) {
 }
 
 /**
- * Render one subject row: the salvaged source, what became of it, and — when a check
- * actually rolled — its own total.
+ * Render one subject row: the salvaged source, what became of it, and — when a public
+ * check actually rolled — its own total.
  *
  * The row is a `fabricate-craft-chat__item`, the same leaf `renderItem` produces, so
- * it sits in the same grid under the same rules. The roll is `renderRollTotal`'s
+ * it sits in the same grid under the same rules. The roll is `renderCheckTotal`'s
  * shipped label/value pair rather than a bare number, so an aggregate row reads
  * exactly like the single card's roll line.
  *
@@ -159,12 +161,19 @@ function renderSubject(subject, loc) {
   // has to say in its outcome copy and its recovered items, so the message would only
   // repeat them.
   if (subject?.outcome !== 'succeeded' && subject?.message) parts.push(esc(subject.message));
+  // The subject's own executed evidence, gated on its own visibility (issue 2005).
+  const evidence = renderCheckEvidenceRows(subject?.check, loc);
 
   return [
-    '<li class="fabricate-craft-chat__item">',
+    evidence
+      ? '<li class="fabricate-craft-chat__item fabricate-craft-chat__item--evidence">'
+      : '<li class="fabricate-craft-chat__item">',
     `<img class="fabricate-craft-chat__icon" src="${esc(subject?.img || ITEM_FALLBACK_IMG)}" alt="" />`,
     `<span class="fabricate-craft-chat__label">${parts.join(' — ')}</span>`,
-    renderRollTotal(subject?.rollValue, loc(SALVAGE_CHAT_KEYS.roll)),
+    // A public count subject states its dice as a summary line, never a bare net (issue 2006).
+    renderCountSummary(subject?.check, loc) ||
+      renderCheckTotal(subject?.check, subject?.rollValue, loc(SALVAGE_CHAT_KEYS.roll)),
+    evidence,
     '</li>',
   ]
     .filter(Boolean)
@@ -186,8 +195,8 @@ function renderSubject(subject, loc) {
  * @param {Record<string, number>} [model.counts] Offered to the summary sentence as
  *   `{name}` placeholders; `total`, `succeeded` and `failed` are always present.
  * @param {Array<{name:string,img:string,outcome:string,rollValue:number|null,
- *   tierStep:object|null,message:string}>} [model.subjects] One row per salvaged
- *   source, in execution order.
+ *   tierStep:object|null,check:object|null,message:string}>} [model.subjects] One row per
+ *   salvaged source, in execution order; `check` is its executed display projection.
  * @param {Array<{name:string,img:string,quantity:number}>} [model.results] Everything
  *   recovered across the run, summed per component.
  * @param {Array<{name:string,img:string,quantity:number}>} [model.consumed] Every

@@ -1,9 +1,11 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { handleFabricateSettingChange } from '../src/config/settingChangeBridge.js';
+import { SETTING_KEYS } from '../src/config/settings.js';
+import { domainsForSystemFields } from '../src/systems/invalidationDomains.js';
+import { handlerOf } from './helpers/bootContractProbes.js';
+import { withFabricateLifecycleReplay } from './helpers/extension-composition-harness.js';
 
 describe('handleFabricateSettingChange', () => {
   it('reloads systems and re-emits craftingSystemsChanged when the setting changed', () => {
@@ -288,55 +290,6 @@ describe('handleFabricateSettingChange', () => {
   });
 });
 
-// The registrations live in a `ready` callback that no test under the `npm test` glob can reach —
-// nothing calls `fabricate.initialize()` — so they are pinned at the source, which is the
-// convention `player-character-actor-types.test.js` established for exactly this edge.
-describe('the hooks edge settings wiring', () => {
-  const mainSource = readFileSync(resolve(import.meta.dirname, '..', 'src/bootstrap/hooks.js'), 'utf8');
-
-  it('registers BOTH settings hooks on ONE shared listener', () => {
-    // The first-ever write to a world setting is a CREATE, not an update (issue 1024), so a world
-    // that has never stored `fabricate.recipes` propagates its first GM edit to nobody until reload
-    // without the `createSetting` leg.
-    assert.match(mainSource, /Hooks\.on\('updateSetting', handleFabricateSettingDocumentChange\);/);
-    assert.match(mainSource, /Hooks\.on\('createSetting', handleFabricateSettingDocumentChange\);/);
-  });
-
-  it('hands the bridge the LIVE collaborators, resolved per call', () => {
-    // `fabricate.recipeManager` is assembled during `ready`, so a value captured at wiring time
-    // would be stale for the rest of the session.
-    const targetsStart = mainSource.indexOf('const fabricateSettingChangeTargets = () => ({');
-    assert.ok(targetsStart > -1, 'the targets factory is still present');
-    // Anchored on the closing LINE (newline + the two-space indent), not on a bare `});`.
-    // A comment inside the factory containing `});` would otherwise truncate the slice and
-    // redden this test with the property untouched.
-    const targetsBody = mainSource.slice(
-      targetsStart,
-      mainSource.indexOf('\n  });', targetsStart) + 6
-    );
-    for (const property of [
-      'craftingSystemManager',
-      'recipeManager',
-      'gatheringEnvironmentStore',
-      // The world realm library's leg. Without it a replicated travel edit leaves every other
-      // client's realm store at its boot value for the whole session (issue 1858).
-      'travelStore',
-      'callAll',
-    ]) {
-      assert.ok(
-        targetsBody.includes(`\n    ${property}: `),
-        `the targets factory must carry ${property}`
-      );
-    }
-    // And the listener must INVOKE it.
-    assert.match(
-      mainSource,
-      /handleFabricateSettingChange\(key, fabricateSettingChangeTargets\(\)\);/,
-      'the shared listener must call the factory, not close over a snapshot'
-    );
-  });
-});
-
 // World scope stores (issue 1359, epic 1357) --------------------------------------------- A client
 // that booted before the migrating GM wrote keeps `isSeeded() === false` for the whole session.
 describe('the world scope legs', () => {
@@ -421,52 +374,115 @@ describe('the world scope legs', () => {
       assert.equal(handleFabricateSettingChange(scope.key, { callAll: () => {} }), true);
     });
   }
+});
 
-  it('drives EVERY store `src/bootstrap/hooks.js` hands the bridge, with the exemptions stated inline', () => {
-    // THE MIRROR THIS CLOSES ────────────────────────────────────────────────────────────
-    // `WORLD_STORE_LEGS` is an unexported frozen array, and the `SCOPES` table above is a
-    // hand-maintained copy of part of it.
-    const mainSource = readFileSync(resolve(import.meta.dirname, '..', 'src/bootstrap/hooks.js'), 'utf8');
-    const bridgeSource = readFileSync(
-      resolve(import.meta.dirname, '..', 'src/config/settingChangeBridge.js'),
-      'utf8'
-    );
-    const targetsStart = mainSource.indexOf('const fabricateSettingChangeTargets = () => ({');
-    assert.notEqual(targetsStart, -1, 'the targets factory is still present');
-    const targetsBody = mainSource.slice(
-      targetsStart,
-      mainSource.indexOf('\n  });', targetsStart) + 6
-    );
-    const targets = [...targetsBody.matchAll(/\n {4}(\w+): /g)].map((match) => match[1]);
-    const legsSource = bridgeSource.slice(
-      bridgeSource.indexOf('const WORLD_STORE_LEGS = Object.freeze(['),
-      bridgeSource.indexOf(']);', bridgeSource.indexOf('const WORLD_STORE_LEGS = Object.freeze(['))
-    );
-    const legs = [...legsSource.matchAll(/store: '(\w+)'/g)].map((match) => match[1]);
+// The listener `src/bootstrap/hooks.js` registers for BOTH setting hooks (one handler, the boot
+// contract's `createSettingSharesUpdateSettingListener`), called after a real boot as core calls
+// `createSetting`: `(document, options, userId)`.
 
-    // POSITIVE CONTROLS, because both slices are `indexOf` reads that answer an empty string on
-    // a miss and would make the subtraction below compare two empty sets.
-    assert.ok(targets.length > 5, 'the targets slice found the factory body');
-    assert.ok(targets.includes('componentScopeStore'), 'and it reaches the world-store block');
-    for (const known of ['componentScopeStore', 'essenceScopeStore', 'toolScopeStore']) {
-      assert.ok(legs.includes(known), `the legs slice found ${known}`);
-    }
+/** The collaborator each replicated key reloads, named by its `game.fabricate` field. */
+const RELOADED_BY_KEY = Object.freeze({
+  'fabricate.craftingSystems': ['craftingSystemManager.reload'],
+  'fabricate.recipes': ['recipeManager.reload'],
+  'fabricate.gatheringEnvironments': ['gatheringEnvironmentStore.load'],
+  'fabricate.currencyConfig': ['currencyConfigStore.load'],
+  'fabricate.travelConfig': ['gatheringRealmStore.load'],
+  'fabricate.characterLibraries': ['characterLibrariesStore.load'],
+  'fabricate.componentScope': ['componentScopeStore.load'],
+  'fabricate.essenceScope': ['essenceScopeStore.load'],
+  'fabricate.toolScope': ['toolScopeStore.load'],
+  'fabricate.worldVocabulary': ['worldVocabularyStore.load'],
+});
 
-    const EXEMPT = new Set([
-      // Not stores. The manager and the recipe manager have their own branches above the leg
-      // lookup, and `callAll` is the bound hook emitter every leg is handed.
-      'craftingSystemManager',
-      'recipeManager',
-      'callAll',
-      // Driven by its own listener branch rather than by a leg, because its announcement is a
-      // single dedicated hook rather than the systems-scoped invalidation the legs emit.
-      'gatheringEnvironmentStore',
-    ]);
-    assert.deepEqual(
-      targets.filter((name) => !EXEMPT.has(name)).sort(),
-      legs.slice().sort(),
-      'every store `src/bootstrap/hooks.js` hands the bridge must have a leg that reloads it, or be ' +
-        'exempted above with its reason. A store with no leg NO-OPS silently.'
-    );
+/** What every recorder's `getSystems` answers, so a hook payload can be traced to it. */
+const LIVE_SYSTEMS = Object.freeze([{ id: 'probe-system' }]);
+
+/** Swap every object-valued facade field for a recorder AFTER the boot, logging each read. */
+function recordFacadeFields(facade) {
+  const read = new Set();
+  const reached = [];
+  const restores = [];
+  for (const name of Object.keys(facade)) {
+    const own = Object.getOwnPropertyDescriptor(facade, name);
+    if (typeof own.value !== 'object' || own.value === null) continue;
+    const recorder = {
+      getSystems: () => LIVE_SYSTEMS,
+      load: () => reached.push(`${name}.load`),
+      reload: () => reached.push(`${name}.reload`) && false,
+    };
+    Object.defineProperty(facade, name, {
+      get: () => read.add(name) && recorder,
+      configurable: true,
+    });
+    restores.push(() => Object.defineProperty(facade, name, own));
+  }
+  return { read, reached, restore: () => restores.forEach((restore) => restore()) };
+}
+
+describe('the boot-registered settings listener', () => {
+  it('reloads the LIVE collaborator each key names, and hands the bridge nothing without a key', { timeout: 300000 }, async () => {
+    await withFabricateLifecycleReplay(async ({ ready, loadModule }) => {
+      const { default: facade } = await loadModule('/src/main.js');
+      await ready();
+      const listener = handlerOf('createSetting');
+      const hooks = globalThis.Hooks;
+      const { callAll } = hooks;
+      const emitted = [];
+      hooks.callAll = (hook, payload) => emitted.push([hook, payload]);
+      const fields = recordFacadeFields(facade);
+      const change = (key) => {
+        fields.reached.length = 0;
+        emitted.length = 0;
+        listener({ key, value: null }, {}, 'user-lab-gm');
+        return { reached: [...fields.reached], emitted: [...emitted] };
+      };
+      try {
+        fields.read.clear();
+        change('fabricate.theme');
+        const handed = [...fields.read].sort();
+
+        const reloadedByKey = {};
+        for (const setting of Object.values(SETTING_KEYS)) {
+          const { reached } = change(`fabricate.${setting}`);
+          if (reached.length > 0) reloadedByKey[`fabricate.${setting}`] = reached;
+        }
+        assert.deepEqual(reloadedByKey, RELOADED_BY_KEY);
+        const reloaded = new Set(Object.values(reloadedByKey).flatMap((calls) => calls));
+        assert.deepEqual(
+          handed,
+          [...reloaded].map((call) => call.split('.')[0]).sort(),
+          'every collaborator the listener hands the bridge is reloaded by some key; one with no ' +
+            'leg would no-op silently'
+        );
+
+        assert.deepEqual(change('fabricate.currencyConfig').emitted, [
+          ['fabricate.craftingSystemsChanged', LIVE_SYSTEMS],
+        ]);
+        assert.deepEqual(
+          change('fabricate.componentScope').emitted,
+          [
+            ['fabricate.craftingSystemsChanged', LIVE_SYSTEMS],
+            [
+              'fabricate.craftingDataChanged',
+              {
+                source: 'systems',
+                scopes: [
+                  { systemId: 'probe-system', domains: domainsForSystemFields(['components']) },
+                ],
+              },
+            ],
+          ],
+          'each hook carries its payload through the live Hooks.callAll'
+        );
+        assert.deepEqual(
+          change(`fabricate.${SETTING_KEYS.ADDITIONAL_PLAYER_CHARACTER_ACTOR_TYPES}`).emitted,
+          [['fabricate.playerCharacterTypesChanged', undefined]],
+          'the create leg carries the player-character types too, on the live Hooks.callAll'
+        );
+      } finally {
+        fields.restore();
+        hooks.callAll = callAll;
+      }
+    });
   });
 });

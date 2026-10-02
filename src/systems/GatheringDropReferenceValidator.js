@@ -4,6 +4,7 @@ function componentList(systemOrComponents = null) {
   if (Array.isArray(systemOrComponents)) return systemOrComponents;
   // Only the ID SET is consumed downstream, and the read union's row set is the in-system
   // array's row set, so this repoint cannot widen or narrow what the validator accepts.
+  // ratchet-exempt(world-scope): guard
   if (Array.isArray(systemOrComponents?.components)) {
     return resolvedComponentsFor(systemOrComponents);
   }

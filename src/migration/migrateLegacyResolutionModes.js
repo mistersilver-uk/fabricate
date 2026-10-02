@@ -1,8 +1,7 @@
 /**
- * `1.4.0` — hard-migrate the legacy `mapped`/`tiered` crafting resolution modes to the canonical
- * routed modes. Pure, idempotent, version-gated; spec § Resolution-Model Migration (Pre-Release)
- * owns the mapping and its five edge cases. A TRUE one-time read-legacy, write-canonical migration,
- * so NO live `tiered` branch and no `outcomeRouting` read-shim is retained in the runtime.
+ * `1.4.0`: legacy `mapped` and `tiered` modes to the routed modes. Pure, idempotent and one-time,
+ * so the runtime keeps no `tiered` branch or `outcomeRouting` shim; spec § Resolution-Model
+ * Migration (Pre-Release) owns the mapping and its five edge cases.
  */
 import { normalizeRoutedName, isReservedRoutedName } from '../utils/routedOutcomeKeywords.js';
 
@@ -31,10 +30,7 @@ export function migrateLegacyResolutionModes(data = {}) {
   return { systems, recipes: _migrateRecipes(recipes, modeBySystemId) };
 }
 
-/**
- * Rewrite every legacy system mode token in place, answering `systemId → the routed mode its
- * recipes now belong to`, derived BEFORE the token was rewritten.
- */
+/** In place; answers `systemId` to its recipes' routed mode, derived before the rewrite. */
 function _migrateSystems(systems) {
   const modeBySystemId = new Map();
   forEachSystem(systems, (system) => {
@@ -50,10 +46,7 @@ function _migrateSystems(systems) {
   return modeBySystemId;
 }
 
-/**
- * Migrate every recipe of a former mapped/tiered system, answering the survivors: an unmigratable
- * former-tiered recipe is dropped and logged.
- */
+/** Answers the survivors; an unmigratable former-tiered recipe is dropped and logged. */
 function _migrateRecipes(recipes, modeBySystemId) {
   const survivors = [];
   for (const recipe of recipes) {
@@ -71,8 +64,7 @@ function _migrateRecipes(recipes, modeBySystemId) {
       continue;
     }
 
-    // Former tiered: reconcile group names across the recipe container and every step, so canonical
-    // check name-matching reproduces the legacy `outcomeRouting` behaviour.
+    // Former tiered: group names reconciled so `check` name-matching reproduces `outcomeRouting`.
     if (_reconcileTieredRecipe(recipe)) {
       survivors.push(recipe);
     } else {
@@ -82,10 +74,7 @@ function _migrateRecipes(recipes, modeBySystemId) {
   return survivors;
 }
 
-/**
- * Reconcile a former-tiered recipe's `outcomeRouting` into canonical `check` group names across the
- * recipe and each step, then drop every routing map. False when any container is unmigratable.
- */
+/** Across the recipe and each step, dropping every routing map; false if any fails. */
 function _reconcileTieredRecipe(recipe) {
   let migratable = _reconcileContainer(recipe, recipe.id);
 
@@ -100,14 +89,10 @@ function _reconcileTieredRecipe(recipe) {
   return migratable;
 }
 
-/**
- * Reconcile ONE container, then delete its `outcomeRouting`. False on an unavoidable
- * normalized-name collision.
- */
+/** False on an unavoidable normalized-name collision. */
 function _reconcileContainer(container, contextId) {
   const routing = container.outcomeRouting;
-  // No routing here: nothing to reconcile. Still drop a present-but-empty map so the data becomes
-  // canonical.
+  // Still drop a present-but-empty map.
   if (!isPlainObject(routing)) {
     if ('outcomeRouting' in container) delete container.outcomeRouting;
     return true;
@@ -131,7 +116,6 @@ function _reconcileContainer(container, contextId) {
   return true;
 }
 
-/** Index plain-object groups by their stringified id. */
 function _indexGroupsById(groups) {
   const groupsById = new Map();
   for (const group of groups) {
@@ -140,15 +124,10 @@ function _indexGroupsById(groups) {
   return groupsById;
 }
 
-/**
- * Group the inbound outcomes by target groupId, dropping reserved-keyword outcomes (they take the
- * failure path, and no group is renamed to one) and orphan outcomes (logged, left as a craft-time
- * misconfiguration).
- */
+/** Drops reserved-keyword outcomes (the failure path) and orphans (logged, as before). */
 function _groupOutcomesByGroupId(routing, groupsById, contextId) {
   const outcomesByGroupId = new Map();
   for (const [outcome, groupId] of Object.entries(routing)) {
-    // Reserved-keyword outcome: the failure path handles it; never rename a group to one.
     if (isReservedRoutedName(outcome)) continue;
     const key = groupId == null ? '' : String(groupId);
     if (!groupsById.has(key)) {
@@ -162,17 +141,12 @@ function _groupOutcomesByGroupId(routing, groupsById, contextId) {
 }
 
 function _logOrphanOutcome(outcome, groupId, contextId) {
-  // Orphan: under the canonical `check` provider the outcome resolves to a craft-time
-  // misconfiguration, which matches the old behaviour.
   console.log(
     `Fabricate | migrateLegacyResolutionModes: orphan tiered outcome "${outcome}" → "${groupId}" in ${contextId} (no matching result group; left as craft-time misconfiguration)`
   );
 }
 
-/**
- * Seed the name space with the normalized names of groups that have NO inbound outcome — their
- * names are preserved and still occupy it. Null when those names already collide.
- */
+/** Groups with no inbound outcome keep their names; null when those already collide. */
 function _seedUnroutedNames(groups, outcomesByGroupId) {
   const seenNames = new Set();
   for (const group of groups) {
@@ -187,16 +161,11 @@ function _seedUnroutedNames(groups, outcomesByGroupId) {
   return seenNames;
 }
 
-/**
- * Apply renames and fan-in splits, tracking normalized names to detect collisions: the
- * lowest-sorted outcome keeps the original group and each other gets a fresh-id clone.
- * Answers the clones to append, or null on an unavoidable collision.
- */
+/** The lowest-sorted outcome keeps the group, the rest get clones; null on a collision. */
 function _applyRenamesAndSplits(outcomesByGroupId, groupsById, seenNames) {
   const clones = [];
   for (const [groupId, outcomes] of outcomesByGroupId) {
     const target = groupsById.get(groupId);
-    // Deterministic order: lowest-sorted outcome keeps the original group.
     const sorted = [...outcomes].sort((a, b) => a.localeCompare(b));
     for (const [index, outcome] of sorted.entries()) {
       const normalized = normalizeRoutedName(outcome);
@@ -222,8 +191,7 @@ function _logRemovedRecipe(recipe) {
 }
 
 function _randomId() {
-  // `crypto.randomUUID` exists in Node 22 and the Foundry browser context, so the migration stays
-  // pure and unit-testable without globals. Result-group ids are free-form internal strings.
+  // `crypto.randomUUID` exists in Node 22 and the browser, so no Foundry global is needed.
   return crypto.randomUUID();
 }
 

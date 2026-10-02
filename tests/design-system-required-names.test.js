@@ -3,23 +3,27 @@
  * 1497).
  */
 import assert from 'node:assert/strict';
-import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 
 import {
-  DESIGN_SYSTEM_PRIMITIVES,
-  NOT_A_PRIMITIVE,
-} from '../scripts/lib/designSystemPrimitives.js';
+  MANIFEST_CORPUS,
+  MANIFEST_PATH,
+  TEMPLATE_CORPUS,
+  assertFloor,
+  assertGateCases,
+  checkGate,
+  gateOver,
+  manifestRows,
+  templatesOf,
+  workingTree,
+} from './helpers/designSystemRatchet.js';
 import {
-  KNOWN_EMPTY_NAME_BINDINGS,
-  KNOWN_EMPTY_NAME_BINDING_TOTAL,
-  KNOWN_UNTRANSLATED_NAME_DEFAULTS,
-  KNOWN_UNTRANSLATED_NAME_DEFAULT_TOTAL,
-} from './components/design-system-known-debt.js';
-import { assertRatchet, byCodePoint, tallyByKey } from './helpers/ratchetBaseline.js';
-import { repoRoot } from './helpers/sourceScan.js';
-import { attributeText, parsedTemplates, walkElements } from './helpers/svelteTemplateScan.js';
+  attributeNamed,
+  attributeText,
+  lineOf,
+  walkElements,
+} from './helpers/svelteTemplateScan.js';
 
 /** The flat primitive directory. */
 const COMPONENTS_DIRECTORY = 'src/ui/svelte/components';
@@ -36,30 +40,29 @@ const LOCALIZATION_KEY = /^[A-Z][A-Za-z0-9]*(?:\.[A-Za-z0-9_]+)+$/u;
 /** `aria-label={someProp}` and nothing else — no `||`, no `?:`, no call. */
 const BARE_PROP_BINDING = /^aria-label=["']?\{([A-Za-z_$][\w$]*)\}["']?$/u;
 
-/** The corpus: the flat primitive directory plus every manifest row under `apps/manager/`. */
-function corpusFiles() {
-  const flat = readdirSync(path.join(repoRoot, COMPONENTS_DIRECTORY))
-    .filter((name) => name.endsWith('.svelte'))
-    .map((name) => `${COMPONENTS_DIRECTORY}/${name}`);
-  const manifest = [...DESIGN_SYSTEM_PRIMITIVES, ...NOT_A_PRIMITIVE]
+/** Every file this gate measures reads: the templates and the manifest naming the manager rows. */
+const CORPORA = [TEMPLATE_CORPUS, MANIFEST_CORPUS];
+
+/**
+ * One side's corpus: the flat primitive directory plus every manifest row under `apps/manager/`
+ * that exists on that side, parsed.
+ */
+function sharedComponents(readFile, files) {
+  const present = new Set(files);
+  const flat = files.filter(
+    (file) => path.posix.dirname(file) === COMPONENTS_DIRECTORY && file.endsWith('.svelte')
+  );
+  const rows = manifestRows(readFile)
     .map((row) => row.path)
     .filter((file) => file.startsWith(MANAGER_DIRECTORY));
-  return [...new Set([...flat, ...manifest])].filter((file) =>
-    existsSync(path.join(repoRoot, file))
-  );
+  const wanted = [...new Set([...flat, ...rows])].filter((file) => present.has(file));
+  return { wanted, templates: templatesOf(readFile, wanted) };
 }
 
-/** The corpus, parsed once. */
-let cached = null;
+/** The working tree's corpus. */
 function corpus() {
-  if (cached === null) {
-    const wanted = new Set(corpusFiles());
-    cached = {
-      wanted,
-      templates: parsedTemplates().filter((template) => wanted.has(template.file)),
-    };
-  }
-  return cached;
+  const tree = workingTree(...CORPORA);
+  return sharedComponents(tree.readFile, tree.listFiles());
 }
 
 /** Every prop destructured from `$props()` in one template, with what its default IS. */
@@ -80,6 +83,7 @@ function propsOf({ ast }) {
       const defaulted = value.type === 'AssignmentPattern';
       props.push({
         name: property.key.name ?? property.key.value,
+        start: property.start,
         defaultsToString:
           defaulted && value.right.type === 'Literal' && typeof value.right.value === 'string',
         stringDefault: defaulted && value.right.type === 'Literal' ? value.right.value : null,
@@ -103,29 +107,70 @@ function propsOf({ ast }) {
   return props;
 }
 
-/** Every `aria-label` attribute in one template, with its verbatim source text. */
+/** Every `aria-label` attribute in one template, with its verbatim source text and line. */
 function ariaLabelsOf({ source, ast }) {
   const found = [];
   walkElements(ast.fragment, (element) => {
     const text = attributeText(source, element, 'aria-label');
-    if (text !== null) found.push(text);
+    if (text === null) return;
+    found.push({ text, line: lineOf(source, attributeNamed(element, 'aria-label').start) });
   });
   return found;
 }
 
-/** Every name-bearing prop in the corpus, with the file it belongs to. */
-function nameBearingProps() {
-  return corpus().templates.flatMap((template) =>
+/** Every name-bearing prop in `templates`, with the file and line it belongs to. */
+function nameBearingProps(templates = corpus().templates) {
+  return templates.flatMap((template) =>
     propsOf(template)
       .filter((prop) => NAME_BEARING_PROP.test(prop.name))
-      .map((prop) => ({ ...prop, file: template.file }))
+      .map((prop) => ({ ...prop, file: template.file, line: lineOf(template.source, prop.start) }))
   );
 }
+
+/** A gate over one side's shared components, whose `find(templates)` gives its offending sites. */
+const sharedComponentGate = (find) =>
+  gateOver(CORPORA, (readFile, files) => find(sharedComponents(readFile, files).templates));
+
+/** A name-bearing prop defaulting to text that is not a localization key. */
+const untranslatedDefaults = (templates) =>
+  nameBearingProps(templates).filter(
+    (prop) =>
+      prop.defaultsToString &&
+      prop.stringDefault.length > 0 &&
+      !LOCALIZATION_KEY.test(prop.stringDefault)
+  );
+
+const UNTRANSLATED_DEFAULT_GATE = sharedComponentGate((templates) =>
+  untranslatedDefaults(templates).map((prop) => ({
+    file: prop.file,
+    line: prop.line,
+    id: `untranslated name default ${prop.name} = ${prop.stringDefault}`,
+    value: prop.stringDefault,
+  }))
+);
+
+/** Every bare `aria-label={prop}` whose prop defaults to the empty string. */
+function emptyNameBindings(templates) {
+  const findings = [];
+  for (const template of templates) {
+    const props = new Map(propsOf(template).map((prop) => [prop.name, prop]));
+    for (const { text, line } of ariaLabelsOf(template)) {
+      const match = BARE_PROP_BINDING.exec(text);
+      const prop = match === null ? undefined : props.get(match[1]);
+      if (prop?.defaultsToString && prop.stringDefault === '') {
+        findings.push({ file: template.file, line, id: `empty aria-label {${match[1]}}` });
+      }
+    }
+  }
+  return findings;
+}
+
+const EMPTY_BINDING_GATE = sharedComponentGate(emptyNameBindings);
 
 test('the corpus reaches both halves of the shared component set', () => {
   // A ratchet over an empty corpus passes forever, and this one has TWO ways to empty: the flat
   // directory read and the manifest filter.
-  const files = corpusFiles();
+  const files = corpus().wanted;
   const flat = files.filter((file) => file.startsWith(`${COMPONENTS_DIRECTORY}/`)).length;
 
   assert.ok(
@@ -141,7 +186,7 @@ test('the corpus reaches both halves of the shared component set', () => {
   );
   assert.equal(
     corpus().templates.length,
-    files.length,
+    corpus().wanted.length,
     'a file in the corpus did not come back from the template walk, so it is being scanned by ' +
       'nothing. The likeliest cause is a manifest path that no longer resolves under the UI root.'
   );
@@ -190,31 +235,16 @@ test('a localization key is a translatable default, and English text is not', ()
   );
 });
 
-test('no shared component defaults an accessible name to untranslated text', () => {
-  const props = nameBearingProps();
-  const untranslated = props.filter(
-    (prop) =>
-      prop.defaultsToString &&
-      prop.stringDefault.length > 0 &&
-      !LOCALIZATION_KEY.test(prop.stringDefault)
-  );
-
-  assertRatchet({
-    label: 'untranslated accessible-name defaults',
-    baseline: KNOWN_UNTRANSLATED_NAME_DEFAULTS,
-    pinnedTotal: KNOWN_UNTRANSLATED_NAME_DEFAULT_TOTAL,
-    observed: tallyByKey(
-      untranslated,
-      (prop) => `${prop.file} | ${prop.name} | ${prop.stringDefault}`
-    ),
-    scanned: corpus().templates.length,
-    floor: 50,
-    guidance:
-      'Naming is a component obligation, and a hard-coded English default is a name no world can ' +
+test('no shared component defaults an accessible name to untranslated text', (t) => {
+  assertFloor('untranslated accessible-name defaults', corpus().templates.length, 50);
+  checkGate(
+    t,
+    UNTRANSLATED_DEFAULT_GATE,
+    'Naming is a component obligation, and a hard-coded English default is a name no world can ' +
       'change — `game.i18n` never sees it. Default the prop to a localization KEY and let the ' +
       'lang files carry the words, as `EditorValidationSurface` does; or, where the caller always ' +
-      'has a better name than the primitive could invent, default to `undefined` and require it.',
-  });
+      'has a better name than the primitive could invent, default to `undefined` and require it.'
+  );
 });
 
 test('the binding pattern reads the quoted spelling of a prop binding too', () => {
@@ -222,7 +252,11 @@ test('the binding pattern reads the quoted spelling of a prop binding too', () =
   const bound = (text) => (BARE_PROP_BINDING.exec(text) ?? [])[1] ?? null;
 
   assert.equal(bound('aria-label={label}'), 'label', 'the unquoted spelling is the live one');
-  assert.equal(bound('aria-label="{label}"'), 'label', 'quotes around an expression change nothing');
+  assert.equal(
+    bound('aria-label="{label}"'),
+    'label',
+    'quotes around an expression change nothing'
+  );
   assert.equal(bound("aria-label='{label}'"), 'label', 'and Svelte accepts either quote');
 
   // The exclusions, which are what keeps this population down to the bindings that can render
@@ -235,23 +269,10 @@ test('the binding pattern reads the quoted spelling of a prop binding too', () =
   assert.equal(bound('aria-label={a ? b : c}'), null, 'nor has a conditional');
 });
 
-test('no aria-label can render empty and suppress the name the content already gives', () => {
+test('no aria-label can render empty and suppress the name the content already gives', (t) => {
   // THE SHAPE, NOT THE COUNT. An empty `aria-label` does not fall back to the element's text — it
   // REPLACES it with nothing, so a button reading "Delete" announces as an unnamed button.
-  const bindings = [];
-  const findings = [];
-  for (const template of corpus().templates) {
-    const props = new Map(propsOf(template).map((prop) => [prop.name, prop]));
-    for (const text of ariaLabelsOf(template)) {
-      bindings.push({ file: template.file, text });
-      const match = BARE_PROP_BINDING.exec(text);
-      if (match === null) continue;
-      const prop = props.get(match[1]);
-      if (prop?.defaultsToString && prop.stringDefault === '') {
-        findings.push({ file: template.file, expression: match[1] });
-      }
-    }
-  }
+  const bindings = corpus().templates.flatMap((template) => ariaLabelsOf(template));
 
   // Non-vacuity on the population, and on the GUARDED shape specifically.
   assert.ok(
@@ -265,35 +286,54 @@ test('no aria-label can render empty and suppress the name the content already g
       'requires has no live example. `IconButton` and `SelectionCheckbox` are the two that have ' +
       'shipped it.'
   );
-
-  assertRatchet({
-    label: 'aria-labels that can render empty',
-    baseline: KNOWN_EMPTY_NAME_BINDINGS,
-    pinnedTotal: KNOWN_EMPTY_NAME_BINDING_TOTAL,
-    observed: tallyByKey(findings, (finding) => `${finding.file} | ${finding.expression}`),
-    scanned: bindings.length,
-    floor: 30,
-    guidance:
-      'Write `aria-label={name || undefined}`. An empty string is not "no label" — it is a label ' +
+  checkGate(
+    t,
+    EMPTY_BINDING_GATE,
+    'Write `aria-label={name || undefined}`. An empty string is not "no label" — it is a label ' +
       'of nothing, and it overrides the accessible name the element would otherwise take from its ' +
-      'own content. `IconButton` and `SelectionCheckbox` already ship the guarded spelling.',
-  });
+      'own content. `IconButton` and `SelectionCheckbox` already ship the guarded spelling.'
+  );
 });
 
-test('every finding cites a file the corpus actually holds', () => {
-  // The mirror guard. Both baselines key on a path, and a path that no longer exists is a row that
-  // can never be observed — which `assertRatchet` reports as VANISHED, correctly but late.
-  const wanted = corpus().wanted;
-  const stale = [...KNOWN_UNTRANSLATED_NAME_DEFAULTS, ...KNOWN_EMPTY_NAME_BINDINGS]
-    .map((row) => row.key.split(' | ')[0])
-    .filter((file) => !wanted.has(file))
-    .sort(byCodePoint);
-
-  assert.deepEqual(
-    [...new Set(stale)],
-    [],
-    'a baseline row names a file that is not in this gate’s corpus. Either the component was ' +
-      'renamed and the row was not, or it left the shared set — in which case the row belongs in ' +
-      'the change that moved it, not in a later reader’s way.'
+test('the naming gates fail a new or grown offender, and read the manifest as an input', (t) => {
+  const PROBE = `${COMPONENTS_DIRECTORY}/Probe.svelte`;
+  const ROW = `${MANAGER_DIRECTORY}Row.svelte`;
+  const component = (...props) =>
+    [
+      `<script>let { ${props.join(', ')} } = $props();</script>`,
+      '<button aria-label={label}>x</button>',
+      '',
+    ].join('\n');
+  const manifest = (...paths) =>
+    `${JSON.stringify({ designSystemPrimitives: paths.map((file) => ({ path: file })), notAPrimitive: [] })}\n`;
+  const base = {
+    [PROBE]: component("label = 'Close'"),
+    [ROW]: component("label = 'Open'"),
+    [MANIFEST_PATH]: manifest(),
+    'README.md': 'x\n',
+  };
+  const untranslated = (file, what) => `${file}: untranslated name default ${what}`;
+  assertGateCases(t, UNTRANSLATED_DEFAULT_GATE, base, [
+    {
+      head: { [PROBE]: component("label = 'Close'", "ariaLabel = 'Shut'") },
+      failures: [`${untranslated(PROBE, 'ariaLabel = Shut')} is new (1)`],
+    },
+    {
+      head: { [MANIFEST_PATH]: manifest(ROW) },
+      failures: [`${untranslated(ROW, 'label = Open')} is new (1)`],
+    },
+    { head: { [PROBE]: component("title = 'Close'") }, failures: [] },
+    { head: { 'README.md': 'y\n' }, skipped: 'corpus-unchanged' },
+  ]);
+  const twice = component("label = ''").replace(
+    '</button>',
+    '</button><a aria-label={label}>y</a>'
   );
+  const binding = '{label}';
+  assertGateCases(t, EMPTY_BINDING_GATE, { ...base, [PROBE]: component("label = ''") }, [
+    {
+      head: { [PROBE]: twice },
+      failures: [`${PROBE}: empty aria-label ${binding} rose from 1 to 2`],
+    },
+  ]);
 });

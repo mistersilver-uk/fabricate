@@ -14,7 +14,10 @@
 <script>
   import FillBar from '../../../components/FillBar.svelte';
   import { localize } from '../../../util/foundryBridge.js';
+  import { bandToneFor } from './checkBandModel.js';
   import { ODDS_REASONS, SANDBOX_ABSENT } from './checkOdds.js';
+  import { PREVIEW_ABSTENTIONS } from './checkPreviewModel.js';
+  import { interpolate } from './checksCopy.js';
 
   let {
     /**
@@ -79,12 +82,57 @@
       'FABRICATE.Admin.Manager.Checks.Odds.ReasonNoSandboxOrder',
       'A progressive check is counted in results awarded. Type an order of result difficulties under “Preview as” to see how often each count comes up.',
     ],
+    [ODDS_REASONS.preRollNotEnumerable]: [
+      'FABRICATE.Admin.Manager.Checks.Odds.ReasonModifierPrerollNotEnumerable',
+      'A bonus on this check is rolled separately in a way that cannot be charted exactly, so no odds are shown.',
+    ],
+    // The preview abstains before enumerating: the check reads a value it cannot chart.
+    [PREVIEW_ABSTENTIONS.needsPreviewActor]: [
+      'FABRICATE.Admin.Manager.Checks.Odds.ReasonNeedsPreviewActor',
+      'This check reads the character, so there is nothing to chart without one. Choose a character in Preview as.',
+    ],
+    [PREVIEW_ABSTENTIONS.pathUnresolved]: [
+      'FABRICATE.Admin.Manager.Checks.Odds.ReasonAttributePathUnresolved',
+      '{actor} is missing a value this check reads ({path}), so it cannot resolve for them.',
+    ],
+    [PREVIEW_ABSTENTIONS.valueNotNumeric]: [
+      'FABRICATE.Admin.Manager.Checks.Odds.ReasonAttributeValueNotNumeric',
+      'The value this check reads from {actor} is not a number, so there is nothing to chart for them.',
+    ],
+    [PREVIEW_ABSTENTIONS.targetInvalid]: [
+      'FABRICATE.Admin.Manager.Checks.Odds.ReasonTargetInvalid',
+      "This check's target cannot be worked out, so there is nothing to chart. Fix it under The roll.",
+    ],
+    [PREVIEW_ABSTENTIONS.progressiveUnder]: [
+      'FABRICATE.Admin.Manager.Checks.Odds.ReasonProgressiveUnderUnsupported',
+      'A progressive check spends its total as a budget, so Lower is better cannot apply and there is nothing to chart.',
+    ],
+    [ODDS_REASONS.countPathUnresolved]: [
+      'FABRICATE.Admin.Manager.Checks.Odds.ReasonCountPathUnresolved',
+      '{actor} is missing a value this check reads ({path}), so it cannot resolve for them.',
+    ],
+    [ODDS_REASONS.countValueNotNumeric]: [
+      'FABRICATE.Admin.Manager.Checks.Odds.ReasonCountValueNotNumeric',
+      'A value this check reads from {actor} is not a number, so there is nothing to chart for them.',
+    ],
+    [ODDS_REASONS.countResidualTooLarge]: [
+      'FABRICATE.Admin.Manager.Checks.Odds.ReasonCountResidualTooLarge',
+      'These dice keep exploding too often to work every result out exactly, and an estimate here would be worse than none.',
+    ],
+    [ODDS_REASONS.countFaceTriggerNotEnumerable]: [
+      'FABRICATE.Admin.Manager.Checks.Odds.ReasonCountFaceTriggerNotEnumerable',
+      'A trigger on this check reads individual dice in a way the chart cannot follow, so no odds are shown.',
+    ],
+    [ODDS_REASONS.countPoolTooLarge]: [
+      'FABRICATE.Admin.Manager.Checks.Odds.ReasonCountPoolTooLarge',
+      'This pool is more dice than Foundry can roll at once, so there is nothing to chart.',
+    ],
   };
 
   const reasonNote = $derived.by(() => {
     const entry = REASON_COPY[odds?.reason];
     return entry
-      ? text(entry[0], entry[1])
+      ? interpolate(text(entry[0], entry[1]), odds?.reasonData)
       : text(
           'FABRICATE.Admin.Manager.Checks.Odds.ReasonUnknown',
           'The chances for this formula cannot be worked out.'
@@ -92,6 +140,10 @@
   });
 
   const rows = $derived(Array.isArray(odds?.rows) ? odds.rows : []);
+  // Rows run worst to best, so each bar takes its rank's hue on the tier strip's ramp; the
+  // unrouted bucket is the hazard whatever its position.
+  const toneOf = (row, index) =>
+    row.id === 'unrouted' ? 'danger' : bandToneFor(index, rows.length);
 </script>
 
 {#if !odds || odds.kind === null}
@@ -106,26 +158,36 @@
     class="manager-muted"
     data-checks-odds-state="not-enumerable"
     data-checks-odds-reason={odds.reason}
+    data-checks-odds-product={odds.product}
   >
     {reasonNote}
   </p>
 {:else if rows.length === 0}
-  <p class="manager-muted" data-checks-odds-state="no-outcomes">
+  <p
+    class="manager-muted"
+    data-checks-odds-state="no-outcomes"
+    data-checks-odds-product={odds.product}
+  >
     {text(
       'FABRICATE.Admin.Manager.Checks.Odds.NoOutcomes',
       'Add outcome bands to see how often each one comes up.'
     )}
   </p>
 {:else}
-  <div class="manager-checks-odds" data-checks-odds-state="enumerated">
+  <div
+    class="manager-checks-odds"
+    data-checks-odds-state="enumerated"
+    data-checks-odds-direction={odds.direction}
+    data-checks-odds-product={odds.product}
+  >
     <ul class="manager-checks-odds-list">
-      {#each rows as row (row.id)}
+      {#each rows as row, index (row.id)}
         <li class="manager-checks-odds-row" data-checks-odds-row={row.id}>
           <span class="manager-checks-odds-label">{row.label}</span>
           <FillBar
             value={row.percent}
             size="sm"
-            tone={row.success ? 'success' : 'danger'}
+            tone={toneOf(row, index)}
             dataAttr="data-checks-odds-bar"
             dataValue={row.id}
           />
@@ -142,7 +204,7 @@
   .manager-checks-odds-list {
     display: flex;
     flex-direction: column;
-    gap: var(--fab-space-2xs);
+    gap: var(--fab-space-chip);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -152,24 +214,28 @@
      squeeze the bar to nothing, and the percentage column is pinned so the numbers align. */
   .manager-checks-odds-row {
     display: grid;
-    grid-template-columns: minmax(0, 5.5rem) 1fr 2.6rem;
+    grid-template-columns: minmax(0, 80px) 1fr 34px;
     gap: var(--fab-space-2);
     align-items: center;
     min-width: 0;
+    margin: 0;
   }
 
+  /* The library's banded-bar row: an 11px name and a `k-count` reading. */
   .manager-checks-odds-label {
     overflow: hidden;
-    color: var(--fab-text);
-    font-size: 0.7rem;
+    color: var(--fab-text-secondary);
+    font-size: 11px;
+    font-weight: 500;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .manager-checks-odds-percent {
-    color: var(--fab-text-muted);
+    color: var(--fab-text-subtle);
     font-family: var(--fab-font-mono);
-    font-size: 0.68rem;
+    font-size: 10.5px;
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
     text-align: right;
   }

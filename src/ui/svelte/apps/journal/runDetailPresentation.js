@@ -5,6 +5,19 @@
  * Extracted from `RunDetail.svelte` so the component keeps its reactive state and markup and
  * nothing else; `localize` is injected so this module stays UI-free.
  */
+import { formatNet, formatSignedStep } from '../../../../utils/checkAdjustmentFormat.js';
+
+// The selection-rule hint a roll-under or character-value ladder states (issue 2005).
+const LADDER_RULE_KEYS = Object.freeze({
+  under: 'FABRICATE.App.Journal.Yields.RoutedRuleUnder',
+  underStrict: 'FABRICATE.App.Journal.Yields.RoutedRuleUnderStrict',
+  adjustment: 'FABRICATE.App.Journal.Yields.RoutedRuleAdjustment',
+});
+
+/** The lang key of a gathering ladder's selection-rule hint. */
+export function ladderRuleKey(rule) {
+  return LADDER_RULE_KEYS[rule] ?? 'FABRICATE.App.Journal.Yields.RoutedRule';
+}
 
 /** `NaN` for an absent value, so `Number.isFinite` alone decides whether it was recorded. */
 export function numberOrNaN(raw) {
@@ -54,12 +67,59 @@ export function applyPersonalizedDrops(entries, breakdown) {
   });
 }
 
-/** The recorded roll, preferring the resolved formula and total over a bare value. */
+/** A roll graded against an executed target: `… · target {target} · margin {margin}`, or `''`. */
+export function formatGradedRoll({ formula, total, value, target, margin }, localize) {
+  if (!Number.isFinite(target) || !Number.isFinite(margin)) return '';
+  const graded = { target, margin: formatSignedStep(margin) };
+  if (formula !== '' && Number.isFinite(total)) {
+    return localize('FABRICATE.App.Journal.StepDetails.RollResultWithTarget', {
+      formula,
+      total,
+      ...graded,
+    });
+  }
+  return Number.isFinite(value)
+    ? localize('FABRICATE.App.Journal.StepDetails.RollResultValueWithTarget', { value, ...graded })
+    : '';
+}
+
+/**
+ * A count roll's line (issue 2006): `{net} successes, {required} needed`, its net alone where no
+ * required count was recorded, a botch's net with no required count (issue 2133), or the
+ * zero-pool sentence for a pool that rolled nothing.
+ */
+export function formatCountRoll({ net, required, zeroPool }, localize) {
+  if (zeroPool) return localize('FABRICATE.Check.CountEvidence.ZeroPoolResult');
+  if (!Number.isFinite(net)) return '';
+  const text = formatNet(net);
+  if (net < 0) {
+    return localize('FABRICATE.App.Journal.StepDetails.Count.RollResultBotch', { net: text });
+  }
+  if (Number.isFinite(required) && required > 0) {
+    return net === 1
+      ? localize('FABRICATE.App.Journal.StepDetails.Count.RollResultOne', { required })
+      : localize('FABRICATE.App.Journal.StepDetails.Count.RollResult', { net: text, required });
+  }
+  return net === 1
+    ? localize('FABRICATE.App.Journal.StepDetails.Count.RollResultNetOne')
+    : localize('FABRICATE.App.Journal.StepDetails.Count.RollResultNet', { net: text });
+}
+
+/**
+ * The recorded roll, preferring the resolved formula and total over a bare value. Outside
+ * sum/over/fixed it names the executed target and margin, never a DC (issue 2005), and a count
+ * its net successes.
+ */
 export function formatRoll(check, localize) {
+  if (check?.count) return formatCountRoll(check.count, localize);
   const formula = String(check?.formula ?? '');
   const total = numberOrNaN(check?.total);
   const value = numberOrNaN(check?.value);
   const dc = numberOrNaN(check?.dc);
+  const target = numberOrNaN(check?.target);
+  const margin = numberOrNaN(check?.margin);
+  const graded = formatGradedRoll({ formula, total, value, target, margin }, localize);
+  if (graded) return graded;
   if (formula !== '' && Number.isFinite(total)) {
     return Number.isFinite(dc)
       ? localize('FABRICATE.App.Journal.StepDetails.RollResultWithDc', { formula, total, dc })

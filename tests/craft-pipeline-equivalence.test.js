@@ -17,7 +17,11 @@ const RELATIVE_TIERS = [
   { id: 't-botch', name: 'Botch', success: false, breakTools: false, dc: -10 },
 ];
 
+// A summed check that still carries authored count pool data, which stays inert.
+const INACTIVE_EVALUATION = { product: 'sum', direction: 'over', pool: { required: 3, base: '@missing' } };
+
 const ROUTED = {
+  evaluation: INACTIVE_EVALUATION,
   rollFormula: '1d20',
   dc: 15,
   thresholdMode: 'meet',
@@ -29,7 +33,7 @@ const ROUTED = {
   checkBreakage: { triggers: [] },
 };
 
-const PASS_FAIL = { rollFormula: '1d20', dc: 15, thresholdMode: 'meet' };
+const PASS_FAIL = { rollFormula: '1d20', dc: 15, thresholdMode: 'meet', evaluation: INACTIVE_EVALUATION };
 
 const TIMED_STEPS = [
   {
@@ -220,22 +224,6 @@ const REFUSALS = [
     },
     journal: refused('Not enough coin.', ['currency.check', { unit: 'gp', amount: 9 }]),
   },
-  {
-    name: 'Item Piles afford failure',
-    async run() {
-      const world = craftProbe({
-        recipeCurrencyCost: { currencies: [{ id: 'gold', amount: 3 }] },
-        itemPiles: { afford: false },
-      });
-      await world.craft();
-      return world.journal.entries;
-    },
-    journal: refused('Insufficient currency (Item Piles). Cannot afford recipe cost.', [
-      'itemPiles.canAfford',
-      'Actor:Crafter',
-      [{ id: 'gold', amount: 3 }],
-    ]),
-  },
 ];
 
 /** The journal a plain craft with no check, no tools and no currency commits. */
@@ -344,8 +332,8 @@ const SCENARIOS = [
       ['run.createRun', 'Actor:Crafter', 'Recipe:recipe-probe', ['Actor:Source'], 'user-probe'],
       ['visibility.guardCraftStart', { recipe: 'recipe-probe' }],
       ['run.updateRun', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 0c/0t/0r notApplicable/pending]'],
-      ['run.completeStepFailure', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 0c/0t/0r notApplicable/pending]', 0, 'Crafting check failed', { selectedIngredientSetId: 'set-1', lastCheckResult: { success: false, reason: 'Crafting check failed', outcome: 'fail', value: 5, data: { dc: 15, formula: '1d20', resolvedFormula: null, total: 5, comparison: 'meet', diceGroups: [{ groupId: 0, group: '1d20', sum: 5, results: [5] }] } }, consumedIngredients: [], usedTools: [], createdResults: [] }, {}],
-      ['chat.create', { alias: 'Crafter', rolls: 0, text: 'FABRICATE.Chat.CraftFailure FABRICATE.Chat.Actor: Crafter · FABRICATE.Chat.Recipe: Probe Recipe FABRICATE.Chat.Roll 5 FABRICATE.Chat.FailureReason: Crafting check failed' }],
+      ['run.completeStepFailure', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 0c/0t/0r notApplicable/pending]', 0, 'Crafting check failed', { selectedIngredientSetId: 'set-1', lastCheckResult: { success: false, reason: 'Crafting check failed', outcome: 'fail', value: 5, data: { dc: 15, formula: '1d20', resolvedFormula: null, total: 5, product: 'sum', direction: 'over', comparison: 'meet', target: 15, margin: -10, successes: null, cancelled: null, diceGroups: [{ groupId: 0, group: '1d20', sum: 5, results: [5] }] } }, consumedIngredients: [], usedTools: [], createdResults: [] }, {}],
+      ['chat.create', { alias: 'Crafter', rolls: 0, text: 'FABRICATE.Chat.CraftFailure FABRICATE.Chat.Actor: Crafter · FABRICATE.Chat.Recipe: Probe Recipe FABRICATE.Check.Evidence.Failure FABRICATE.Chat.Roll 5 FABRICATE.Check.Evidence.Needed FABRICATE.Check.Evidence.NeededDc FABRICATE.Check.Evidence.Margin −10 FABRICATE.Chat.FailureReason: Crafting check failed' }],
       ['returned', { success: false, results: null, message: 'Crafting check failed' }],
     ],
   },
@@ -374,8 +362,8 @@ const SCENARIOS = [
       ['item.update', 'Item:wood', { 'system.quantity': 3 }],
       ['run.updateRun', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 1c/0t/0r complete/pending]'],
       ['item.setFlag', 'Item:tool-hammer', 'fabricate.fabricate.toolUsage', { timesUsed: 1 }],
-      ['run.completeStepFailure', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 1c/0t/0r complete/pending]', 0, 'Crafting check failed', { selectedIngredientSetId: 'set-1', lastCheckResult: { success: false, reason: 'Crafting check failed', outcome: 'fail', value: 5, data: { dc: 15, formula: '1d20', resolvedFormula: null, total: 5, comparison: 'meet', diceGroups: [{ groupId: 0, group: '1d20', sum: 5, results: [5] }] } }, consumedIngredients: [{ actorUuid: 'Actor.Source', itemUuid: 'Item.wood', name: 'wood', img: 'icons/wood.png', quantity: 2 }], usedTools: [{ actorUuid: 'Actor.Source', itemUuid: 'Item.tool-hammer', quantity: 1, componentId: 'hammer', toolId: 'tool-hammer', broken: false }], createdResults: [] }, {}],
-      ['chat.create', { alias: 'Crafter', rolls: 0, text: 'FABRICATE.Chat.CraftFailure FABRICATE.Chat.Actor: Crafter · FABRICATE.Chat.Recipe: Probe Recipe FABRICATE.Chat.Roll 5 FABRICATE.Chat.FailureReason: Crafting check failed FABRICATE.Chat.ConsumedOnFailure 2× wood Hammer' }],
+      ['run.completeStepFailure', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 1c/0t/0r complete/pending]', 0, 'Crafting check failed', { selectedIngredientSetId: 'set-1', lastCheckResult: { success: false, reason: 'Crafting check failed', outcome: 'fail', value: 5, data: { dc: 15, formula: '1d20', resolvedFormula: null, total: 5, product: 'sum', direction: 'over', comparison: 'meet', target: 15, margin: -10, successes: null, cancelled: null, diceGroups: [{ groupId: 0, group: '1d20', sum: 5, results: [5] }] } }, consumedIngredients: [{ actorUuid: 'Actor.Source', itemUuid: 'Item.wood', name: 'wood', img: 'icons/wood.png', quantity: 2 }], usedTools: [{ actorUuid: 'Actor.Source', itemUuid: 'Item.tool-hammer', quantity: 1, componentId: 'hammer', toolId: 'tool-hammer', broken: false }], createdResults: [] }, {}],
+      ['chat.create', { alias: 'Crafter', rolls: 0, text: 'FABRICATE.Chat.CraftFailure FABRICATE.Chat.Actor: Crafter · FABRICATE.Chat.Recipe: Probe Recipe FABRICATE.Check.Evidence.Failure FABRICATE.Chat.Roll 5 FABRICATE.Check.Evidence.Needed FABRICATE.Check.Evidence.NeededDc FABRICATE.Check.Evidence.Margin −10 FABRICATE.Chat.FailureReason: Crafting check failed FABRICATE.Chat.ConsumedOnFailure 2× wood Hammer' }],
       ['returned', { success: false, results: null, message: 'Crafting check failed' }],
     ],
   },
@@ -401,9 +389,9 @@ const SCENARIOS = [
       ['run.updateRun', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 1c/0t/0r complete/pending]'],
       ['run.updateRun', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 1c/0t/0r complete/pending]'],
       ['actor.createEmbedded', 'Actor:Crafter', 'Item', [{ name: 'plank', quantity: 1 }]],
-      ['run.completeStepSuccess', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 1c/0t/0r complete/pending]', 0, { selectedIngredientSetId: 'set-1', lastCheckResult: { success: true, reason: 'Success', outcome: 'pass', value: 18, data: { dc: 10, formula: '1d20', resolvedFormula: null, total: 18, comparison: 'meet', diceGroups: [{ groupId: 0, group: '1d20', sum: 18, results: [18] }] } }, consumedIngredients: [{ actorUuid: 'Actor.Source', itemUuid: 'Item.wood', name: 'wood', img: 'icons/wood.png', quantity: 2 }], usedTools: [], createdResults: [{ actorUuid: 'Actor.Crafter', itemUuid: 'Actor.Crafter.Item.made-1', name: 'plank', img: 'icons/src-plank.png', quantity: 1, componentId: 'plank', resultRowId: 'rg-1:r-1-1:0', sourceItemUuid: 'Item.src-plank' }] }, {}],
+      ['run.completeStepSuccess', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 1c/0t/0r complete/pending]', 0, { selectedIngredientSetId: 'set-1', lastCheckResult: { success: true, reason: 'Success', outcome: 'pass', value: 18, data: { dc: 10, formula: '1d20', resolvedFormula: null, total: 18, product: 'sum', direction: 'over', comparison: 'meet', target: 10, margin: 8, successes: null, cancelled: null, diceGroups: [{ groupId: 0, group: '1d20', sum: 18, results: [18] }] } }, consumedIngredients: [{ actorUuid: 'Actor.Source', itemUuid: 'Item.wood', name: 'wood', img: 'icons/wood.png', quantity: 2 }], usedTools: [], createdResults: [{ actorUuid: 'Actor.Crafter', itemUuid: 'Actor.Crafter.Item.made-1', name: 'plank', img: 'icons/src-plank.png', quantity: 1, componentId: 'plank', resultRowId: 'rg-1:r-1-1:0', sourceItemUuid: 'Item.src-plank' }] }, {}],
       ['visibility.applyRecipeItemUseOnCraft', { recipe: 'recipe-probe' }],
-      ['chat.create', { alias: 'Crafter', rolls: 0, text: 'FABRICATE.Chat.CraftSuccess FABRICATE.Chat.Actor: Crafter · FABRICATE.Chat.Recipe: Probe Recipe FABRICATE.Chat.Roll 18 FABRICATE.Chat.Results plank FABRICATE.Chat.Consumed 2× wood' }],
+      ['chat.create', { alias: 'Crafter', rolls: 0, text: 'FABRICATE.Chat.CraftSuccess FABRICATE.Chat.Actor: Crafter · FABRICATE.Chat.Recipe: Probe Recipe FABRICATE.Check.Evidence.Success FABRICATE.Chat.Roll 18 FABRICATE.Check.Evidence.Needed FABRICATE.Check.Evidence.NeededDc FABRICATE.Check.Evidence.Margin +8 FABRICATE.Chat.Results plank FABRICATE.Chat.Consumed 2× wood' }],
       ['returned', { success: true, results: ['Item:made-1'], message: 'Successfully crafted Probe Recipe' }],
     ],
   },
@@ -429,9 +417,9 @@ const SCENARIOS = [
       ['run.updateRun', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 1c/0t/0r complete/pending]'],
       ['run.updateRun', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 1c/0t/0r complete/pending]'],
       ['actor.createEmbedded', 'Actor:Crafter', 'Item', [{ name: 'plank', quantity: 1 }]],
-      ['run.completeStepSuccess', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 1c/0t/0r complete/pending]', 0, { selectedIngredientSetId: 'set-1', lastCheckResult: { success: true, reason: 'Success', outcome: 'Fine', value: 18, data: { dc: 15, formula: '1d20', resolvedFormula: null, total: 18, type: 'relative', comparison: 'meet', outcomeId: 't-fine', success: true, breakTools: false, diceGroups: [{ groupId: 0, group: '1d20', sum: 18, results: [18] }] } }, consumedIngredients: [{ actorUuid: 'Actor.Source', itemUuid: 'Item.wood', name: 'wood', img: 'icons/wood.png', quantity: 2 }], usedTools: [], createdResults: [{ actorUuid: 'Actor.Crafter', itemUuid: 'Actor.Crafter.Item.made-1', name: 'plank', img: 'icons/src-plank.png', quantity: 1, componentId: 'plank', resultRowId: 'rg-1:r-1-1:0', sourceItemUuid: 'Item.src-plank' }] }, {}],
+      ['run.completeStepSuccess', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 1c/0t/0r complete/pending]', 0, { selectedIngredientSetId: 'set-1', lastCheckResult: { success: true, reason: 'Success', outcome: 'Fine', value: 18, data: { dc: 15, formula: '1d20', resolvedFormula: null, total: 18, type: 'relative', outcomeId: 't-fine', success: true, breakTools: false, product: 'sum', direction: 'over', comparison: 'meet', target: 15, margin: 3, successes: null, cancelled: null, diceGroups: [{ groupId: 0, group: '1d20', sum: 18, results: [18] }] } }, consumedIngredients: [{ actorUuid: 'Actor.Source', itemUuid: 'Item.wood', name: 'wood', img: 'icons/wood.png', quantity: 2 }], usedTools: [], createdResults: [{ actorUuid: 'Actor.Crafter', itemUuid: 'Actor.Crafter.Item.made-1', name: 'plank', img: 'icons/src-plank.png', quantity: 1, componentId: 'plank', resultRowId: 'rg-1:r-1-1:0', sourceItemUuid: 'Item.src-plank' }] }, {}],
       ['visibility.applyRecipeItemUseOnCraft', { recipe: 'recipe-probe' }],
-      ['chat.create', { alias: 'Crafter', rolls: 0, text: 'FABRICATE.Chat.CraftSuccess FABRICATE.Chat.Actor: Crafter · FABRICATE.Chat.Recipe: Probe Recipe FABRICATE.Chat.Roll 18 FABRICATE.Chat.Results plank FABRICATE.Chat.Consumed 2× wood' }],
+      ['chat.create', { alias: 'Crafter', rolls: 0, text: 'FABRICATE.Chat.CraftSuccess FABRICATE.Chat.Actor: Crafter · FABRICATE.Chat.Recipe: Probe Recipe FABRICATE.Check.Evidence.Success FABRICATE.Chat.Roll 18 FABRICATE.Check.Evidence.Needed FABRICATE.Check.Evidence.NeededDc FABRICATE.Check.Evidence.Margin +3 FABRICATE.Chat.Results plank FABRICATE.Chat.Consumed 2× wood' }],
       ['returned', { success: true, results: ['Item:made-1'], message: 'Successfully crafted Probe Recipe' }],
     ],
   },
@@ -464,8 +452,8 @@ const SCENARIOS = [
       ['item.update', 'Item:wood', { 'system.quantity': 3 }],
       ['run.updateRun', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 1c/0t/0r complete/pending]'],
       ['actor.createEmbedded', 'Actor:Crafter', 'Item', [{ name: 'ash', quantity: 1 }]],
-      ['run.completeStepFailure', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 1c/0t/0r complete/pending]', 0, 'Crafting check failed', { selectedIngredientSetId: 'set-1', lastCheckResult: { success: false, reason: 'Crafting check failed', outcome: 'Botch', value: 6, data: { dc: 15, formula: '1d20', resolvedFormula: null, total: 6, type: 'relative', comparison: 'meet', outcomeId: 't-botch', success: false, breakTools: false, diceGroups: [{ groupId: 0, group: '1d20', sum: 6, results: [6] }] } }, consumedIngredients: [{ actorUuid: 'Actor.Source', itemUuid: 'Item.wood', name: 'wood', img: 'icons/wood.png', quantity: 2 }], usedTools: [], createdResults: [{ actorUuid: 'Actor.Crafter', itemUuid: 'Actor.Crafter.Item.made-1', name: 'ash', img: 'icons/src-ash.png', quantity: 1, componentId: 'ash', resultRowId: 'rg-failure:rf-1:0', sourceItemUuid: 'Item.src-ash' }] }, {}],
-      ['chat.create', { alias: 'Crafter', rolls: 0, text: 'FABRICATE.Chat.CraftFailure FABRICATE.Chat.Actor: Crafter · FABRICATE.Chat.Recipe: Probe Recipe FABRICATE.Chat.Roll 6 FABRICATE.Chat.FailureReason: Crafting check failed FABRICATE.Chat.ProducedOnFailure ash FABRICATE.Chat.ConsumedOnFailure 2× wood' }],
+      ['run.completeStepFailure', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 1c/0t/0r complete/pending]', 0, 'Crafting check failed', { selectedIngredientSetId: 'set-1', lastCheckResult: { success: false, reason: 'Crafting check failed', outcome: 'Botch', value: 6, data: { dc: 15, formula: '1d20', resolvedFormula: null, total: 6, type: 'relative', outcomeId: 't-botch', success: false, breakTools: false, product: 'sum', direction: 'over', comparison: 'meet', target: 5, margin: 1, successes: null, cancelled: null, diceGroups: [{ groupId: 0, group: '1d20', sum: 6, results: [6] }] } }, consumedIngredients: [{ actorUuid: 'Actor.Source', itemUuid: 'Item.wood', name: 'wood', img: 'icons/wood.png', quantity: 2 }], usedTools: [], createdResults: [{ actorUuid: 'Actor.Crafter', itemUuid: 'Actor.Crafter.Item.made-1', name: 'ash', img: 'icons/src-ash.png', quantity: 1, componentId: 'ash', resultRowId: 'rg-failure:rf-1:0', sourceItemUuid: 'Item.src-ash' }] }, {}],
+      ['chat.create', { alias: 'Crafter', rolls: 0, text: 'FABRICATE.Chat.CraftFailure FABRICATE.Chat.Actor: Crafter · FABRICATE.Chat.Recipe: Probe Recipe FABRICATE.Check.Evidence.Failure FABRICATE.Chat.Roll 6 FABRICATE.Check.Evidence.Needed FABRICATE.Check.Evidence.NeededDc FABRICATE.Check.Evidence.Margin +1 FABRICATE.Chat.FailureReason: Crafting check failed FABRICATE.Chat.ProducedOnFailure ash FABRICATE.Chat.ConsumedOnFailure 2× wood' }],
       ['returned', { success: false, results: ['Item:made-1'], message: 'Crafting check failed', disposition: 'produced-on-failure' }],
     ],
   },
@@ -476,7 +464,7 @@ const SCENARIOS = [
         resolutionMode: 'progressive',
         craftingCheck: {
           enabled: true,
-          progressive: { rollFormula: '1d20', checkBreakage: { triggers: [] } },
+          progressive: { rollFormula: '1d20', evaluation: INACTIVE_EVALUATION, checkBreakage: { triggers: [] } },
           consumption: {},
         },
         complicationDelivery: true,
@@ -514,10 +502,10 @@ const SCENARIOS = [
       ['run.updateRun', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 1c/0t/0r complete/pending]'],
       ['run.updateRun', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 1c/0t/0r complete/pending]'],
       ['actor.createEmbedded', 'Actor:Crafter', 'Item', [{ name: 'plank', quantity: 1 }]],
-      ['run.completeStepSuccess', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 1c/0t/0r complete/pending]', 0, { selectedIngredientSetId: 'set-1', lastCheckResult: { success: true, reason: 'Success', value: 12, data: { formula: '1d20', resolvedFormula: null, total: 12, value: 12, diceGroups: [{ groupId: 0, group: '1d20', sum: 12, results: [12] }] } }, consumedIngredients: [{ actorUuid: 'Actor.Source', itemUuid: 'Item.wood', name: 'wood', img: 'icons/wood.png', quantity: 2 }], usedTools: [], createdResults: [{ actorUuid: 'Actor.Crafter', itemUuid: 'Actor.Crafter.Item.made-1', name: 'plank', img: 'icons/src-plank.png', quantity: 1, componentId: 'plank', resultRowId: 'rg-1:r-1-1:0', sourceItemUuid: 'Item.src-plank' }] }, {}],
+      ['run.completeStepSuccess', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 1c/0t/0r complete/pending]', 0, { selectedIngredientSetId: 'set-1', lastCheckResult: { success: true, reason: 'Success', value: 12, data: { formula: '1d20', resolvedFormula: null, total: 12, value: 12, product: 'sum', direction: 'over', comparison: null, target: null, margin: null, successes: null, cancelled: null, diceGroups: [{ groupId: 0, group: '1d20', sum: 12, results: [12] }] } }, consumedIngredients: [{ actorUuid: 'Actor.Source', itemUuid: 'Item.wood', name: 'wood', img: 'icons/wood.png', quantity: 2 }], usedTools: [], createdResults: [{ actorUuid: 'Actor.Crafter', itemUuid: 'Actor.Crafter.Item.made-1', name: 'plank', img: 'icons/src-plank.png', quantity: 1, componentId: 'plank', resultRowId: 'rg-1:r-1-1:0', sourceItemUuid: 'Item.src-plank' }] }, {}],
       ['visibility.applyRecipeItemUseOnCraft', { recipe: 'recipe-probe' }],
       ['complication.deliver', { complications: ['x1'] }],
-      ['chat.create', { alias: 'Crafter', rolls: 0, text: 'FABRICATE.Chat.CraftSuccess FABRICATE.Chat.Actor: Crafter · FABRICATE.Chat.Recipe: Probe Recipe FABRICATE.Chat.Roll 12 FABRICATE.Chat.Results plank FABRICATE.Chat.Consumed 2× wood' }],
+      ['chat.create', { alias: 'Crafter', rolls: 0, text: 'FABRICATE.Chat.CraftSuccess FABRICATE.Chat.Actor: Crafter · FABRICATE.Chat.Recipe: Probe Recipe FABRICATE.Check.Evidence.Success FABRICATE.Chat.Roll 12 FABRICATE.Chat.Results plank FABRICATE.Chat.Consumed 2× wood' }],
       ['returned', { success: true, results: ['Item:made-1'], message: 'Successfully crafted Probe Recipe' }],
     ],
   },
@@ -552,10 +540,10 @@ const SCENARIOS = [
       ['run.updateRun', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 1c/0t/0r complete/pending]'],
       ['run.updateRun', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 1c/0t/0r complete/pending]'],
       ['actor.createEmbedded', 'Actor:Crafter', 'Item', [{ name: 'ash', quantity: 1 }]],
-      ['run.completeStepFailure', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 1c/0t/0r complete/pending]', 0, 'Crafting check failed', { selectedIngredientSetId: 'set-1', lastCheckResult: { success: false, reason: 'Crafting check failed', outcome: 'fail', value: 4, data: { dc: 15, formula: '1d20', resolvedFormula: null, total: 4, comparison: 'meet', diceGroups: [{ groupId: 0, group: '1d20', sum: 4, results: [4] }] } }, consumedIngredients: [{ actorUuid: 'Actor.Source', itemUuid: 'Item.wood', name: 'wood', img: 'icons/wood.png', quantity: 2 }], usedTools: [] }, {}],
+      ['run.completeStepFailure', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 1c/0t/0r complete/pending]', 0, 'Crafting check failed', { selectedIngredientSetId: 'set-1', lastCheckResult: { success: false, reason: 'Crafting check failed', outcome: 'fail', value: 4, data: { dc: 15, formula: '1d20', resolvedFormula: null, total: 4, product: 'sum', direction: 'over', comparison: 'meet', target: 15, margin: -11, successes: null, cancelled: null, diceGroups: [{ groupId: 0, group: '1d20', sum: 4, results: [4] }] } }, consumedIngredients: [{ actorUuid: 'Actor.Source', itemUuid: 'Item.wood', name: 'wood', img: 'icons/wood.png', quantity: 2 }], usedTools: [] }, {}],
       ['visibility.applyRecipeItemUseOnCraft', { recipe: 'recipe-probe' }],
       ['visibility.learnRecipeOnCraft', { recipe: 'recipe-probe' }],
-      ['chat.create', { alias: 'Crafter', rolls: 0, text: 'FABRICATE.Chat.CraftFailure FABRICATE.Chat.Actor: Crafter · FABRICATE.Chat.Recipe: Probe Recipe FABRICATE.Chat.Roll 4 FABRICATE.Chat.FailureReason: Crafting check failed FABRICATE.Chat.ProducedOnFailure ash FABRICATE.Chat.ConsumedOnFailure 2× wood' }],
+      ['chat.create', { alias: 'Crafter', rolls: 0, text: 'FABRICATE.Chat.CraftFailure FABRICATE.Chat.Actor: Crafter · FABRICATE.Chat.Recipe: Probe Recipe FABRICATE.Check.Evidence.Failure FABRICATE.Chat.Roll 4 FABRICATE.Check.Evidence.Needed FABRICATE.Check.Evidence.NeededDc FABRICATE.Check.Evidence.Margin −11 FABRICATE.Chat.FailureReason: Crafting check failed FABRICATE.Chat.ProducedOnFailure ash FABRICATE.Chat.ConsumedOnFailure 2× wood' }],
       ['returned', { success: false, results: ['Item:made-1'], message: 'Crafting check failed', disposition: 'produced-on-failure' }],
     ],
   },
@@ -581,8 +569,8 @@ const SCENARIOS = [
       ['run.createRun', 'Actor:Crafter', 'Recipe:recipe-probe', ['Actor:Source'], 'user-probe'],
       ['visibility.guardCraftStart', { recipe: 'recipe-probe' }],
       ['run.updateRun', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 0c/0t/0r notApplicable/pending]'],
-      ['run.completeStepFailure', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 0c/0t/0r notApplicable/pending]', 0, 'Crafting check failed', { selectedIngredientSetId: 'set-1', lastCheckResult: { success: false, reason: 'Crafting check failed', outcome: 'Botch', value: 4, data: { dc: 15, formula: '1d20', resolvedFormula: null, total: 4, type: 'relative', comparison: 'meet', outcomeId: 't-botch', success: false, breakTools: false, diceGroups: [{ groupId: 0, group: '1d20', sum: 4, results: [4] }] } }, consumedIngredients: [], usedTools: [], createdResults: [] }, {}],
-      ['chat.create', { alias: 'Crafter', rolls: 0, text: 'FABRICATE.Chat.CraftFailure FABRICATE.Chat.Actor: Crafter · FABRICATE.Chat.Recipe: Probe Recipe FABRICATE.Chat.Roll 4 FABRICATE.Chat.FailureReason: Crafting check failed' }],
+      ['run.completeStepFailure', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 0c/0t/0r notApplicable/pending]', 0, 'Crafting check failed', { selectedIngredientSetId: 'set-1', lastCheckResult: { success: false, reason: 'Crafting check failed', outcome: 'Botch', value: 4, data: { dc: 15, formula: '1d20', resolvedFormula: null, total: 4, type: 'relative', outcomeId: 't-botch', success: false, breakTools: false, product: 'sum', direction: 'over', comparison: 'meet', target: 5, margin: -1, successes: null, cancelled: null, diceGroups: [{ groupId: 0, group: '1d20', sum: 4, results: [4] }] } }, consumedIngredients: [], usedTools: [], createdResults: [] }, {}],
+      ['chat.create', { alias: 'Crafter', rolls: 0, text: 'FABRICATE.Chat.CraftFailure FABRICATE.Chat.Actor: Crafter · FABRICATE.Chat.Recipe: Probe Recipe FABRICATE.Check.Evidence.Failure FABRICATE.Chat.Roll 4 FABRICATE.Check.Evidence.Needed FABRICATE.Check.Evidence.NeededDc FABRICATE.Check.Evidence.Margin −1 FABRICATE.Chat.FailureReason: Crafting check failed' }],
       ['returned', { success: false, results: null, message: 'Crafting check failed' }],
     ],
   },
@@ -639,7 +627,12 @@ const SCENARIOS = [
       ['visibility.guardCraftStart', { recipe: 'recipe-probe' }],
       ['run.getActiveRun', 'Actor:Crafter', 'rid-1'],
       ['run.discardRun', 'Actor:Crafter', 'rid-1'],
-      ['returned', { success: false, results: null, message: 'simple mode requires a configured crafting check roll formula' }],
+      ['returned', {
+        success: false,
+        results: null,
+        message: 'simple mode requires a configured crafting check roll formula',
+        misconfigured: true,
+      }],
     ],
   },
   {
@@ -880,7 +873,15 @@ const SCENARIOS = [
       const key = await versionedExecutionKey(world.engine);
       assert.equal(typeof key, 'symbol', 'the versioned-execution key must be reachable');
       await world.craft(null, {
-        [key]: { resolvedCheckResult: { success: true, outcome: null, value: 7, data: {} } },
+        [key]: {
+          resolvedCheckResult: {
+            success: true,
+            outcome: null,
+            value: 7,
+            data: {},
+            visibility: { rollMode: 'publicroll', secret: false },
+          },
+        },
       });
       return world.journal.entries;
     },
@@ -896,20 +897,18 @@ const SCENARIOS = [
       ['actor.createEmbedded', 'Actor:Crafter', 'Item', [{ name: 'plank', quantity: 1 }]],
       ['run.completeStepSuccess', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 1c/0t/0r complete/pending]', 0, { selectedIngredientSetId: 'set-1', lastCheckResult: { success: true, reason: 'Success', value: 7, data: {} }, consumedIngredients: [{ actorUuid: 'Actor.Source', itemUuid: 'Item.wood', name: 'wood', img: 'icons/wood.png', quantity: 2 }], usedTools: [], createdResults: [{ actorUuid: 'Actor.Crafter', itemUuid: 'Actor.Crafter.Item.made-1', name: 'plank', img: 'icons/src-plank.png', quantity: 1, componentId: 'plank', resultRowId: 'rg-1:r-1-1:0', sourceItemUuid: 'Item.src-plank' }] }, {}],
       ['visibility.applyRecipeItemUseOnCraft', { recipe: 'recipe-probe' }],
-      ['chat.create', { alias: 'Crafter', rolls: 0, text: 'FABRICATE.Chat.CraftSuccess FABRICATE.Chat.Actor: Crafter · FABRICATE.Chat.Recipe: Probe Recipe FABRICATE.Chat.Roll 7 FABRICATE.Chat.Results plank FABRICATE.Chat.Consumed 2× wood' }],
+      ['chat.create', { alias: 'Crafter', rolls: 0, text: 'FABRICATE.Chat.CraftSuccess FABRICATE.Chat.Actor: Crafter · FABRICATE.Chat.Recipe: Probe Recipe FABRICATE.Check.Evidence.Success FABRICATE.Chat.Roll 7 FABRICATE.Chat.Results plank FABRICATE.Chat.Consumed 2× wood' }],
       ['returned', { success: true, results: ['Item:made-1'], message: 'Successfully crafted Probe Recipe' }],
     ],
   },
   {
-    name: 'currency and Item Piles spend after consumption and before the award',
+    name: 'currency spends after consumption and before the award',
     async run() {
       const world = craftProbe({
         requirements: { currency: { enabled: true } },
         currencySpends: [{ unit: 'gp', amount: 2 }],
         currencyUnits: PROBE_CURRENCY_UNITS,
         actorCurrency: { gp: 5 },
-        recipeCurrencyCost: { currencies: [{ id: 'gold', amount: 3 }] },
-        itemPiles: { afford: true },
       });
       await world.craft();
       return world.journal.entries;
@@ -919,7 +918,6 @@ const SCENARIOS = [
       ['run.createRun', 'Actor:Crafter', 'Recipe:recipe-probe', ['Actor:Source'], 'user-probe'],
       ['visibility.guardCraftStart', { recipe: 'recipe-probe' }],
       ['currency.check', { unit: 'gp', amount: 2 }],
-      ['itemPiles.canAfford', 'Actor:Crafter', [{ id: 'gold', amount: 3 }]],
       ['run.updateRun', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 0c/0t/0r notApplicable/pending]'],
       ['run.updateRun', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 0c/0t/0r pending/pending]'],
       ['item.update', 'Item:wood', { 'system.quantity': 3 }],
@@ -927,7 +925,6 @@ const SCENARIOS = [
       ['run.updateRun', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 1c/0t/0r complete/pending]'],
       ['currency.spend', { unit: 'gp', amount: 2 }],
       ['actor.update', 'Actor:Crafter', { 'system.currency.gp': 3 }],
-      ['itemPiles.deductCurrency', 'Actor:Crafter', [{ id: 'gold', amount: 3 }]],
       ['actor.createEmbedded', 'Actor:Crafter', 'Item', [{ name: 'plank', quantity: 1 }]],
       ['run.completeStepSuccess', 'Actor:Crafter', 'Run:rid-1 inProgress@0 [inProgress 1c/0t/0r complete/pending]', 0, { selectedIngredientSetId: 'set-1', lastCheckResult: { success: true, reason: 'Success', data: {} }, consumedIngredients: [{ actorUuid: 'Actor.Source', itemUuid: 'Item.wood', name: 'wood', img: 'icons/wood.png', quantity: 2 }], usedTools: [], createdResults: [{ actorUuid: 'Actor.Crafter', itemUuid: 'Actor.Crafter.Item.made-1', name: 'plank', img: 'icons/src-plank.png', quantity: 1, componentId: 'plank', resultRowId: 'rg-1:r-1-1:0', sourceItemUuid: 'Item.src-plank' }] }, {}],
       ['visibility.applyRecipeItemUseOnCraft', { recipe: 'recipe-probe' }],
@@ -950,7 +947,7 @@ const SCENARIOS = [
     journal: [
       ['item.update', 'Item:ore', { 'system.quantity': 2 }],
       ['actor.createEmbedded', 'Actor:Salvager', 'Item', [{ name: 'Shard', quantity: 2 }]],
-      ['chat.create', { alias: 'Salvager', rolls: 0, text: 'FABRICATE.Chat.SalvageSuccess FABRICATE.Chat.SalvageActor: Salvager · FABRICATE.Chat.SalvageSource: Iron Ore FABRICATE.Chat.Roll 17 FABRICATE.Chat.SalvageRecovered 2× Shard FABRICATE.Chat.SalvageConsumed Iron Ore' }],
+      ['chat.create', { alias: 'Salvager', rolls: 0, text: 'FABRICATE.Chat.SalvageSuccess FABRICATE.Chat.SalvageActor: Salvager · FABRICATE.Chat.SalvageSource: Iron Ore FABRICATE.Chat.Roll 17 FABRICATE.Check.Evidence.Needed FABRICATE.Check.Evidence.NeededDc FABRICATE.Check.Evidence.Margin +7 FABRICATE.Chat.SalvageRecovered 2× Shard FABRICATE.Chat.SalvageConsumed Iron Ore' }],
       ['returned', { success: true, results: ['Item:made-1'], message: 'Successfully salvaged Iron Ore', value: 17, salvageRun: null }],
     ],
   },
@@ -970,7 +967,7 @@ const SCENARIOS = [
     },
     journal: [
       ['item.update', 'Item:ore', { 'system.quantity': 2 }],
-      ['chat.create', { alias: 'Salvager', rolls: 0, text: 'FABRICATE.Chat.SalvageFailure FABRICATE.Chat.SalvageActor: Salvager · FABRICATE.Chat.SalvageSource: Iron Ore FABRICATE.Chat.Roll 3 FABRICATE.Chat.FailureReason: Salvage check failed FABRICATE.Chat.ConsumedOnFailure Iron Ore' }],
+      ['chat.create', { alias: 'Salvager', rolls: 0, text: 'FABRICATE.Chat.SalvageFailure FABRICATE.Chat.SalvageActor: Salvager · FABRICATE.Chat.SalvageSource: Iron Ore FABRICATE.Chat.Roll 3 FABRICATE.Check.Evidence.Needed FABRICATE.Check.Evidence.NeededDc FABRICATE.Check.Evidence.Margin −7 FABRICATE.Chat.FailureReason: Salvage check failed FABRICATE.Chat.ConsumedOnFailure Iron Ore' }],
       ['returned', { success: false, results: null, message: 'Salvage check failed', salvageRun: null }],
     ],
   },
@@ -979,7 +976,7 @@ const SCENARIOS = [
     async run() {
       const world = salvageProbe({
         salvageResolutionMode: 'progressive',
-        salvageCraftingCheck: { progressive: { rollFormula: '1d20', checkBreakage: { triggers: [] } } },
+        salvageCraftingCheck: { progressive: { rollFormula: '1d20', evaluation: INACTIVE_EVALUATION, checkBreakage: { triggers: [] } } },
         awardDifficulty: 5,
         resultGroups: [{ id: 'sg-1', results: [{ id: 'sr-1', componentId: 'shard', quantity: 1 }] }],
       });

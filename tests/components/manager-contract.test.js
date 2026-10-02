@@ -51,7 +51,7 @@ import {
   claimsOverCode,
   classMemberAst,
   classRenderedExpressions,
-  comparedLiteral,
+  comparedLiterals,
   constantLiteral,
   declaredConstantValue,
   defineStructureContract,
@@ -117,6 +117,7 @@ const BOOTSTRAP_MODULES = [
   'src/bootstrap/Fabricate.js',
   'src/bootstrap/bulkFacade.js',
   'src/bootstrap/companionFacade.js',
+  'src/bootstrap/companionOperations.js',
   'src/bootstrap/composeServices.js',
   'src/bootstrap/craftingFacade.js',
   'src/bootstrap/gatheringFacade.js',
@@ -141,6 +142,22 @@ const MANAGER_HEADER_GATHERING_ACTIONS =
   'src/ui/svelte/apps/manager/ManagerHeaderGatheringActions.svelte';
 const NAV_RAIL_MODEL = 'src/ui/svelte/apps/manager/navRailModel.svelte.js';
 const HEADER_MODEL = 'src/ui/svelte/apps/manager/headerModel.svelte.js';
+// The Checks Studio's drafts and rail group, extracted out of the root (issue 1721).
+const CHECKS_ROUTE_MODEL = 'src/ui/svelte/apps/manager/checks/checksRouteModel.svelte.js';
+// The gathering workspace's read side and its pure presenters.
+const GATHERING_ROUTE_MODEL = 'src/ui/svelte/apps/manager/gatheringRouteModel.svelte.js';
+const GATHERING_DISPLAY = 'src/ui/svelte/apps/manager/gatheringDisplay.js';
+// Its write side: the library and draft actions, and the modifiers a drop or event carries.
+const GATHERING_DRAFT_HANDLERS = 'src/ui/svelte/apps/manager/gatheringDraftHandlers.svelte.js';
+const GATHERING_MODIFIER_HANDLERS =
+  'src/ui/svelte/apps/manager/gatheringModifierHandlers.svelte.js';
+const GATHERING_UNITS = [
+  MANAGER_ROOT,
+  GATHERING_ROUTE_MODEL,
+  GATHERING_DISPLAY,
+  GATHERING_DRAFT_HANDLERS,
+  GATHERING_MODIFIER_HANDLERS,
+];
 const MANAGER_SYSTEM_NAV = 'src/ui/svelte/apps/manager/ManagerSystemNav.svelte';
 const MANAGER_WORLD_NAV = 'src/ui/svelte/apps/manager/ManagerWorldNav.svelte';
 const MANAGER_WORLD_DOWNTIME_NAV_GROUP =
@@ -175,6 +192,8 @@ const RECIPE_BROWSER_INSPECTOR =
 const RESOLUTION_MODE_OPTIONS = 'src/ui/svelte/apps/manager/resolutionModeOptions.js';
 const ROUTE_EXIT_GUARDS = 'src/ui/svelte/apps/manager/routeExitGuards.js';
 const SYSTEMS_BROWSER = 'src/ui/svelte/apps/manager/SystemsBrowserView.svelte';
+// The systems library inspector, extracted out of the root (issue 1721).
+const SYSTEM_BROWSER_INSPECTOR = 'src/ui/svelte/apps/manager/SystemBrowserInspector.svelte';
 const SYSTEM_EDIT = 'src/ui/svelte/apps/manager/SystemEditView.svelte';
 const TAGS_CATEGORIES = 'src/ui/svelte/apps/manager/TagsCategoriesView.svelte';
 // The system screen's presentation model (issue 1915), the world screen's twin.
@@ -708,6 +727,60 @@ describe('CraftingSystemManager source contract', () => {
     readsNoGlobal: ['game', 'ui', 'Hooks', 'CONFIG'],
   });
 
+  defineStructureContract('keeps the systems library inspector free of Foundry globals', SYSTEM_BROWSER_INSPECTOR, {
+    readsNoGlobal: ['game', 'ui', 'Hooks', 'CONFIG'],
+  });
+
+  // The checks model owns no effect: the shell's `$effect` runs `reseed()`, and the system-switch
+  // cases in `manager-checks-mounted.js` go red without it.
+  defineStructureContract('leaves the checks route model effect-free', CHECKS_ROUTE_MODEL, {
+    callsNo: ['$effect'],
+    readsNo: ['$effect.pre', '$effect.root'],
+  });
+  defineStructureContract('reseeds the checks drafts from the shell', MANAGER_ROOT, {
+    reads: ['checks.reseed'],
+  });
+
+  // The gathering model owns no effect either: the shell runs its six reconcilers.
+  defineStructureContract('leaves the gathering route model effect-free', GATHERING_ROUTE_MODEL, {
+    callsNo: ['$effect'],
+    readsNo: ['$effect.pre', '$effect.root'],
+  });
+  defineStructureContract('runs the gathering reconcilers from the shell', MANAGER_ROOT, {
+    reads: [
+      'gathering.normalizeTab',
+      'gathering.resetOnSystemSwitch',
+      'gathering.resetTabOffRoute',
+      'gathering.reselectTask',
+      'gathering.reselectEvent',
+      'gathering.reselectDrop',
+      'modifiers.resetSearchOnDrop',
+      'modifiers.resetSearchOnEvent',
+      'modifiers.reconcileDropPickers',
+      'modifiers.reconcileEventPickers',
+    ],
+  });
+  for (const file of [GATHERING_DRAFT_HANDLERS, GATHERING_MODIFIER_HANDLERS]) {
+    defineStructureContract(`leaves ${file} effect-free`, file, {
+      callsNo: ['$effect'],
+      readsNo: ['$effect.pre', '$effect.root'],
+    });
+  }
+
+  // Its cards are direct flex children of the shell's `aside.manager-inspector`.
+  it('leaves the systems library inspector unwrapped and unstyled', () => {
+    const inspector = componentAstOf(SYSTEM_BROWSER_INSPECTOR);
+    const topLevel = inspector.fragment.nodes.filter(
+      (node) => node.type !== 'Comment' && !(node.type === 'Text' && !node.data.trim())
+    );
+    assert.deepEqual(
+      topLevel.map((node) => node.type),
+      ['IfBlock'],
+      'the top level is the branch chain alone, with no wrapper element'
+    );
+    assert.ok(!inspector.css, 'and it carries no <style>');
+  });
+
   defineStructureContract(
     'uses manager localization keys rather than hard-coded copy',
     [MANAGER_ROOT, MANAGER_SYSTEM_NAV, HEADER_MODEL],
@@ -842,17 +915,23 @@ describe('CraftingSystemManager source contract', () => {
   it('keeps changed manager and environment static localization fallbacks aligned with en.json', () => {
     const contractFiles = [
       MANAGER_ROOT,
+      SYSTEM_BROWSER_INSPECTOR,
       ENVIRONMENT_EDIT,
       ENVIRONMENTS_BROWSER,
       KNOWLEDGE_VIEW,
       ARMED_DANGER_BUTTON,
+      GATHERING_ROUTE_MODEL,
+      GATHERING_DISPLAY,
+      GATHERING_DRAFT_HANDLERS,
+      GATHERING_MODIFIER_HANDLERS,
       ...componentPathsIn('src/ui/svelte/apps/manager/environment'),
       ...componentPathsIn('src/ui/svelte/apps/manager/knowledge'),
     ];
     const failures = [];
 
     for (const file of contractFiles) {
-      for (const { key, fallback } of staticTextCalls(componentAstOf(file))) {
+      const ast = file.endsWith('.js') ? moduleAstOf(file).ast : componentAstOf(file);
+      for (const { key, fallback } of staticTextCalls(ast)) {
         if (!isChangedManagerEnvironmentLocalizationKey(key)) continue;
         const value = catalogValue(key);
         if (typeof value !== 'string') {
@@ -1184,15 +1263,15 @@ describe('CraftingSystemManager source contract', () => {
     ],
   });
 
-  // The tab the submenu reads is still the shell's; the placeholder it routes into moved to the
-  // gathering inspector rail with issue 1707, whose own contract claims the write.
-  defineStructureContract("keeps the gathering rail's active tab on the shell", MANAGER_ROOT, {
+  // The tab the submenu reads is the gathering route model's; the placeholder it routes into moved
+  // to the gathering inspector rail with issue 1707, whose own contract claims the write.
+  defineStructureContract("keeps the gathering rail's active tab in the route model", GATHERING_ROUTE_MODEL, {
     names: ['activeGatheringTab'],
   });
 
   defineStructureContract(
     'counts each gathering section for its own rail entry',
-    { file: MANAGER_ROOT, constant: 'gatheringNavCounts' },
+    { file: GATHERING_ROUTE_MODEL, constant: 'gatheringNavCounts' },
     { keys: ['environments', 'tasks', 'encounters', 'total'] }
   );
 
@@ -1200,7 +1279,7 @@ describe('CraftingSystemManager source contract', () => {
   // asked of the whole derivation, a rollup that had dropped one would still answer yes.
   defineStructureContract(
     'and summarises environments, tasks and events in the parent rollup',
-    { file: MANAGER_ROOT, constant: 'gatheringNavCounts', property: 'total' },
+    { file: GATHERING_ROUTE_MODEL, constant: 'gatheringNavCounts', property: 'total' },
     {
       reads: [
         'environmentList.length',
@@ -1212,13 +1291,13 @@ describe('CraftingSystemManager source contract', () => {
 
   defineStructureContract(
     'derives the reusable event count from the selected gathering config',
-    { file: MANAGER_ROOT, constant: 'gatheringEventDefinitions' },
+    { file: GATHERING_ROUTE_MODEL, constant: 'gatheringEventDefinitions' },
     { reads: ['selectedGatheringSystemConfig.events'] }
   );
 
   defineStructureContract(
     'owns the gathering tab state for inspector coordination',
-    { file: MANAGER_ROOT, constant: 'activeGatheringTab' },
+    { file: GATHERING_ROUTE_MODEL, constant: 'activeGatheringTab' },
     { spellsExactly: ['environments'] }
   );
 
@@ -1249,12 +1328,19 @@ describe('CraftingSystemManager source contract', () => {
     // The URLs in full: a substring claim on the essences page is satisfied by the
     // effect-transfer URL one card away, which leaves a moved link green.
     spellsExactly: [
-      'FABRICATE.Admin.Manager.EmptySetup.Title',
       'FABRICATE.Admin.Manager.Component.EmptySetup.Title',
       'FABRICATE.Admin.Manager.Essence.EmptySetup.Title',
       'https://mistersilver-uk.github.io/fabricate/help/quickstart',
       'https://mistersilver-uk.github.io/fabricate/components/',
       'https://mistersilver-uk.github.io/fabricate/essences',
+    ],
+  });
+
+  // The first-run card moved with the systems inspector chain (issue 1721).
+  defineStructureContract('routes the empty system library to its first step', SYSTEM_BROWSER_INSPECTOR, {
+    spellsExactly: [
+      'FABRICATE.Admin.Manager.EmptySetup.Title',
+      'https://mistersilver-uk.github.io/fabricate/help/quickstart',
     ],
   });
 
@@ -1455,7 +1541,7 @@ describe('CraftingSystemManager source contract', () => {
   });
 
   // `duplicate` is not in this set (issue 1372), and the armed bulk delete is a deliberate
-  // deviation from the `AGENTS.md` dialog carve-out.
+  // deviation from the foundry-and-architecture.md dialog carve-out.
   defineStructureContract('extracts the inspector and its bulk panel', ESSENCE_STUDIO, {
     imports: [
       '../../../components/IconPicker.svelte',
@@ -1675,14 +1761,16 @@ describe('CraftingSystemManager source contract', () => {
       'store.updateGatheringVocabularyValue',
       'store.deleteGatheringVocabularyValue',
     ],
-    names: ['updateSelectedGatheringRules', 'selectedGatheringConditionShortcuts'],
+  });
+  defineStructureContract('updates the selected system’s gathering rules', GATHERING_DRAFT_HANDLERS, {
+    names: ['updateSelectedGatheringRules'],
+  });
+
+  // The per-system condition shortcut card moved with the systems inspector chain (issue 1721).
+  defineStructureContract('draws the global condition shortcuts', SYSTEM_BROWSER_INSPECTOR, {
+    names: ['selectedGatheringConditionShortcuts'],
     calls: ['buildSelectedGatheringConditionShortcuts'],
-    // `data-gathering-inspector-rules` is the rules leaf's own hook now (issue 1707 phase 2) and
-    // `manager-environments-mounted.js` pins it through the DOM.
-    writes: [
-      'data-systems-gathering-conditions',
-      'data-systems-gathering-condition',
-    ],
+    writes: ['data-systems-gathering-conditions', 'data-systems-gathering-condition'],
   });
 
   // The rules card moved into `environment/GatheringRulesInspector.svelte` (issue 1707 phase 2):
@@ -1715,7 +1803,7 @@ describe('CraftingSystemManager source contract', () => {
   // whole point of a per-system shortcut card.
   defineStructureContract(
     'persists a condition shortcut against the selected system',
-    { file: MANAGER_ROOT, fn: 'updateSelectedGatheringCondition' },
+    { file: SYSTEM_BROWSER_INSPECTOR, fn: 'updateSelectedGatheringCondition' },
     {
       reads: ['store.updateGatheringConditions'],
       keys: ['systemId'],
@@ -1784,30 +1872,10 @@ describe('CraftingSystemManager source contract', () => {
   // What the library, its inspector and the focused editor draw and do — rows, drop rules,
   // component browser, sliders, paging, availability, Required Tools, toolbar delete — is driven
   // by `tests/components/manager-gathering-mounted.js`. What stays is the wiring behind them.
-  // The drop inspector moved into `environment/GatheringTaskInspector.svelte` (issue 1707 phase
-  // 2) and the rail that selects it into `environment/GatheringInspectorRail.svelte` (phase 3), so
-  // the root renders the editor and the rail.
+  // The root renders the editor and the rail; the handlers it hands them live in the gathering units.
   defineStructureContract('wires the gathering task library and its inspector', MANAGER_ROOT, {
     renders: ['GatheringTaskEditView', 'GatheringInspectorRail'],
-    names: [
-      'selectedGatheringTaskId',
-      'selectGatheringTask',
-      'createGatheringTask',
-      'editGatheringTask',
-      'duplicateGatheringTask',
-      'deleteGatheringTask',
-      'toggleGatheringTaskEnabled',
-      'addGatheringDropModifier',
-      'updateGatheringDropModifier',
-      'gatheringDropRateTierClass',
-      'gatheringDropRateTierColor',
-      'onGatheringDropCountKeydown',
-      'deleteGatheringTaskDraft',
-      'selectedGatheringSystemTools',
-      'addToolReferenceToSelectedTask',
-      'removeToolReferenceFromSelectedTask',
-    ],
-    reads: ['store.duplicateGatheringLibraryTask'],
+    names: ['selectedGatheringSystemTools'],
     declares: ['itemCards'],
     passesProps: [
       ['EnvironmentsBrowserView', 'onSelectGatheringTask'],
@@ -1819,15 +1887,42 @@ describe('CraftingSystemManager source contract', () => {
       ['GatheringTaskEditView', 'itemCards'],
       ['GatheringTaskEditView', 'resolutionMode'],
     ],
+  });
+  defineStructureContract('handles the gathering task library and its drops', GATHERING_UNITS, {
+    names: [
+      'selectGatheringTask',
+      'createGatheringTask',
+      'editGatheringTask',
+      'duplicateGatheringTask',
+      'deleteGatheringTask',
+      'toggleGatheringTaskEnabled',
+      'addGatheringDropModifier',
+      'updateGatheringDropModifier',
+      'onGatheringDropCountKeydown',
+      'deleteGatheringTaskDraft',
+      'addToolReferenceToSelectedTask',
+      'removeToolReferenceFromSelectedTask',
+    ],
+    reads: ['store.duplicateGatheringLibraryTask'],
     // Issue 883: the inspector's slider is `ChanceSlider`. The track/fill structure and the
-    // input/blur/keydown trio it hand-rolled must be gone from the root, not merely unused — a
+    // input/blur/keydown trio it hand-rolled must be gone from every unit, not merely unused — a
     // surviving copy is what the next divergence gets written against.
     spellsNo: ['manager-drop-rate-control', 'manager-drop-rate-track', 'manager-drop-rate-fill'],
     namesNo: ['onGatheringDropRateInput', 'onGatheringDropRateBlur', 'onGatheringDropRateKeydown'],
-    // The selected drop inspector renders no component selector, and no second duplicate action.
-    readsNo: ['selectedGatheringDrop.componentId'],
+    // No second duplicate action.
     callsWithNo: [['duplicateGatheringTask', 'selectedGatheringTask']],
   });
+
+  // The shell and its gathering units select the task and tier its drop rates, and the selected
+  // drop inspector renders no component selector.
+  defineStructureContract(
+    'selects the task and tiers its drop rates for the inspector',
+    GATHERING_UNITS,
+    {
+      names: ['selectedGatheringTaskId', 'gatheringDropRateTierClass', 'gatheringDropRateTierColor'],
+      readsNo: ['selectedGatheringDrop.componentId', 'gathering.selectedGatheringDrop.componentId'],
+    }
+  );
 
   // The task and drop inspector markup moved into `environment/GatheringTaskInspector.svelte`
   // (issue 1707 phase 2): its hooks and the drop editor's classes are that leaf's own.
@@ -2757,7 +2852,7 @@ describe('world scoped-entity source contract (issue 1362)', () => {
     const viewTitle = namedCodeAst(moduleAstOf(HEADER_MODEL).ast, 'viewTitle');
     for (const node of walkNodes(viewTitle)) {
       if (node.type !== 'IfStatement') continue;
-      const view = comparedLiteral(node.test, 'currentView');
+      const [view] = comparedLiterals(node.test, 'currentView');
       const [key, fallback] = returnedTextArguments(node.consequent);
       if (String(view).startsWith('world-') && key !== undefined) titles.set(view, { key, fallback });
     }
@@ -2796,7 +2891,7 @@ describe('world scoped-entity source contract (issue 1362)', () => {
     const SCOPED_ENTRY_CHILDREN = new Set([
       'WorldComponentEntryPreviewRail.svelte',
       'WorldComponentEntrySourceCard.svelte',
-      'WorldComponentEntrySystemsCard.svelte',
+      'ScopedEntrySystemsCard.svelte',
     ]);
     const pages = readdirSync(resolve(repoRoot, SCOPED_DIR))
       .filter(

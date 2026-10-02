@@ -10,6 +10,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, it } from 'node:test';
 
+import { defineStructureContract } from './helpers/structureContract.js';
+
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const lang = JSON.parse(readFileSync(join(ROOT, 'lang/en.json'), 'utf8'));
 const bulkEdit = lang.FABRICATE.Admin.Manager.Essence.BulkEdit;
@@ -241,17 +243,16 @@ describe('the withheld-Colour note names the CONDITION it is gated on (issue 137
     assert.match(note, /not edited here/);
   });
 
-  it('is the SAME sentence the panel falls back to when the key is missing', () => {
-    // The panel's `text(key, fallback)` helper answers the fallback whenever `localize` echoes the
-    // key, which is the state of every mounted harness — so a reworded key and a stale fallback
-    // would ship two different sentences and the mounted assertion would read the wrong one.
-    const panel = readFileSync(
-      join(ROOT, 'src/ui/svelte/apps/manager/essences/EssenceBulkEditPanel.svelte'),
-      'utf8'
-    );
-    assert.ok(
-      panel.includes(`'${note}'`),
-      'the component fallback and the localized string must be the same sentence'
-    );
-  });
+  // The panel's `text(key, fallback)` helper answers the fallback whenever `localize` echoes the
+  // key, which is the state of every mounted harness — so a reworded key and a stale fallback
+  // would ship two different sentences and the mounted assertion would read the wrong one.
+  defineStructureContract(
+    'is the SAME sentence the panel falls back to when the key is missing',
+    'src/ui/svelte/apps/manager/essences/EssenceBulkEditPanel.svelte',
+    {
+      contains: [
+        `text('FABRICATE.Admin.Manager.Essence.BulkEdit.ColourWorldNote', ${JSON.stringify(note)})`,
+      ],
+    }
+  );
 });

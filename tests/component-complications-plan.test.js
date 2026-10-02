@@ -3,10 +3,7 @@
  * (issue 1286), and the two player-facing projections that live beside it.
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
 
 import {
   COMPLICATION_STAGE_BUCKETS,
@@ -16,8 +13,7 @@ import {
 } from '../src/utils/complicationPlan.js';
 import { authoredComplications } from '../src/utils/componentComplications.js';
 import { resolveProgressiveAward } from '../src/utils/progressiveAward.js';
-
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+import { defineStructureContract } from './helpers/structureContract.js';
 
 let minted = 0;
 const mintId = () => `cx${++minted}`;
@@ -689,31 +685,20 @@ test('1286: the run-record keys are a subset of the public projection', () => {
 
 // ── the leaf assertion ──────────────────────────────────────────────────────
 
-test('1286: complicationPlan.js imports NOTHING but the frozen vocabularies', () => {
-  // The `manager-color-tokens.js` precedent asserts ZERO imports, which would fail a module that
-  // legitimately imports one thing.
-  const source = readFileSync(join(ROOT, 'src', 'utils', 'complicationPlan.js'), 'utf8');
-  const specifiers = [...source.matchAll(/^\s*import\s[^'"]*['"]([^'"]+)['"]/gm)].map(
-    (match) => match[1]
-  );
+// The `manager-color-tokens.js` precedent asserts ZERO imports, which would fail a module that
+// legitimately imports one thing. The exact set holds static, re-exported and `import()` forms.
+defineStructureContract(
+  '1286: complicationPlan.js imports NOTHING but the frozen vocabularies',
+  'src/utils/complicationPlan.js',
+  { importSpecifiers: [['', ['./componentComplications.js']]] }
+);
 
-  assert.deepEqual(
-    specifiers,
-    ['./componentComplications.js'],
-    'complicationPlan.js may import the frozen vocabularies and nothing else'
-  );
-  assert.equal(
-    /\bimport\s*\(/.test(source),
-    false,
-    'a dynamic import would evade the allowlist above'
-  );
-});
-
-test('1286: componentComplications.js, the module it imports, is itself import-free', () => {
-  const source = readFileSync(join(ROOT, 'src', 'utils', 'componentComplications.js'), 'utf8');
-  assert.equal(
-    /^\s*import\s/m.test(source),
-    false,
-    'the allowlist is only worth anything while the allowed module is a leaf'
-  );
-});
+// The allowlist is only worth anything while the allowed module is a leaf.
+defineStructureContract(
+  '1286: componentComplications.js, the module it imports, is itself import-free',
+  'src/utils/componentComplications.js',
+  {
+    importSpecifiers: [['', []]],
+    exports: ['COMPLICATION_STAGE_CONDITIONS', 'authoredComplications'],
+  }
+);

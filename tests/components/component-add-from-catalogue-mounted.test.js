@@ -31,7 +31,7 @@ const dialog = createComponentScopeHarness({
     'src/ui/svelte/actions/portal.js',
     'src/ui/svelte/util/overlayHost.js',
   ],
-  compiledExtras: ['src/ui/svelte/apps/manager/ManagerModal.svelte'],
+  compiledExtras: ['src/ui/svelte/components/ManagerModal.svelte'],
 });
 
 /** A world corpus in which `sys-forge` holds EXACTLY ONE of the four records. */
@@ -586,6 +586,12 @@ describe('ComponentAddFromCatalogueDialog (mounted, issue 1371 M9)', () => {
     await open();
     const root = panel();
     assert.ok(root.hasAttribute('data-manager-modal'), 'it IS the shared chrome');
+    // Maintainer rulings 2026-09-28: ManagerModal draws one frame, the library's banded Modal.
+    assert.ok(root.querySelector('.manager-modal-body [data-component-add-from-catalogue-search]'));
+    assert.ok(
+      document.querySelector('[data-manager-modal-close]').classList.contains('is-size-26'),
+      'with the banded frame’s 26px close'
+    );
     assert.equal(root.getAttribute('role'), 'dialog');
     assert.equal(root.getAttribute('aria-modal'), 'true');
     assert.match(root.querySelector('h3').textContent, /Add from catalogue to Forge/);

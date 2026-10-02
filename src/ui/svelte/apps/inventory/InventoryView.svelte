@@ -31,6 +31,7 @@
   import InventoryDetail from './InventoryDetail.svelte';
   import InventoryBulkPanel from './bulk/InventoryBulkPanel.svelte';
   import PlayerViewState from '../PlayerViewState.svelte';
+  import { withRollPromptOrigin } from '../../util/rollPromptOrigin.js';
 
   let { services = null } = $props();
 
@@ -200,8 +201,8 @@
   function onBulkRemove(key) {
     store?.removeFromBulkSelection?.(key);
   }
-  function onBulkSalvage() {
-    return store?.bulkSalvage?.();
+  function onBulkSalvage(event) {
+    return withRollPromptOrigin(event, () => store?.bulkSalvage?.());
   }
   // The dialog names BOTH numbers, and its copy states plainly that destroying is
   // not salvaging — a tool sitting in the pack broken is there precisely because its

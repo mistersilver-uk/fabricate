@@ -36,7 +36,9 @@ const EXPECTED_KEYS = [
 const FIRE = { id: 'fire', name: 'Fire', icon: 'fas fa-fire', colorToken: '--fab-tag-mauve' };
 
 test('both rows carry exactly the builder essence-row keys', () => {
-  const { essence, component } = buildEssencePreviewRow(FIRE, { sampleComponentName: 'Ember Ash' });
+  const { essence, component } = buildEssencePreviewRow(FIRE, {
+    previewCarrier: { id: 'ember-ash', name: 'Ember Ash', img: SAMPLE_COMPONENT_IMAGE },
+  });
   for (const [label, row] of [
     ['essence tile', essence],
     ['carrying component', component],
@@ -71,8 +73,8 @@ test('an essence with no chosen colour yields a null colorToken (the tile keeps 
   assert.equal(essence.colorToken, null);
 });
 
-test('the carrying-component row is a normal item on a CORE Foundry icon, carrying the essence pip', () => {
-  const { component } = buildEssencePreviewRow(FIRE, { sampleComponentName: 'Ember Ash' });
+test('the absent-carrier row is a normal item on a CORE Foundry icon, carrying the essence pip', () => {
+  const { component } = buildEssencePreviewRow(FIRE, { fallbackComponentName: 'Inventory tile' });
   assert.equal(component.isEssenceSource, false, 'a normal item, so the card renders artwork');
   assert.equal(component.img, SAMPLE_COMPONENT_IMAGE);
   assert.equal(
@@ -88,23 +90,58 @@ test('the carrying-component row is a normal item on a CORE Foundry icon, carryi
     GENERIC_ITEM_IMAGE,
     'not the generic item-bag "no image" sentinel'
   );
-  assert.equal(component.name, 'Ember Ash');
+  assert.equal(component.name, 'Inventory tile');
   // The one essence pip the card reads off `essences[]` — id (keyed on), name, icon and
-  // colorToken, so the pip tints to the essence's own colour on the fake carrying component.
+  // colorToken, so the pip tints to the essence's own colour on the carrying component.
   assert.deepEqual(component.essences, [
     { id: 'fire', name: 'Fire', icon: 'fas fa-fire', colorToken: '--fab-tag-mauve' },
   ]);
 });
 
+test('a real carrier supplies both the component name and artwork', () => {
+  const { component } = buildEssencePreviewRow(FIRE, {
+    previewCarrier: {
+      id: 'ember-ash',
+      name: 'Ember Ash',
+      img: 'icons/commodities/materials/powder-black.webp',
+    },
+    fallbackComponentName: 'Inventory tile',
+  });
+
+  assert.equal(component.componentId, 'ember-ash');
+  assert.equal(component.name, 'Ember Ash');
+  assert.equal(component.img, 'icons/commodities/materials/powder-black.webp');
+});
+
+test('a real carrier without artwork keeps the normal card missing-art branch', () => {
+  const { component } = buildEssencePreviewRow(FIRE, {
+    previewCarrier: { id: 'ember-ash', name: 'Ember Ash', img: '' },
+    fallbackComponentName: 'Inventory tile',
+  });
+
+  assert.equal(component.name, 'Ember Ash');
+  assert.equal(component.img, '');
+});
+
+test('only an absent carrier uses the inventory-tile name and engraved pack', () => {
+  const { component } = buildEssencePreviewRow(FIRE, {
+    fallbackComponentName: 'Inventory tile',
+  });
+
+  assert.equal(component.componentId, null);
+  assert.equal(component.name, 'Inventory tile');
+  assert.equal(component.img, SAMPLE_COMPONENT_IMAGE);
+});
+
 test('an uncoloured essence yields a pip with a null colorToken (the pip keeps --fab-text)', () => {
   const { component } = buildEssencePreviewRow(
     { id: 'fire', name: 'Fire', icon: 'fas fa-fire' },
-    { sampleComponentName: 'Ember Ash' }
+    { previewCarrier: { id: 'ember-ash', name: 'Ember Ash', img: SAMPLE_COMPONENT_IMAGE } }
   );
   assert.equal(component.essences[0].colorToken, null);
 });
 
-test('an empty sample name passes through unchanged (the caller resolves the fallback copy)', () => {
+test('an empty fallback name passes through unchanged (the caller resolves the fallback copy)', () => {
   const { component } = buildEssencePreviewRow(FIRE);
   assert.equal(
     component.name,

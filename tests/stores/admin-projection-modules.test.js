@@ -309,6 +309,73 @@ describe('adminRecipeRowProjection.buildRecipeList (direct, no store)', () => {
     assert.deepEqual(sortedKeys(result.recipes[0]), RECIPE_ROW_FIELDS);
   });
 
+  it('names a counting check pill by its successes needed, never its DC or a missing formula (issue 2006)', () => {
+    const recipes = [
+      makeRecipe({ id: 'r-tier', checkTierId: 'tier-hard' }),
+      makeRecipe({ id: 'r-unset', checkTierId: 'tier-unset' }),
+      makeRecipe({ id: 'r-default' }),
+    ];
+    const pills = (routed) => {
+      const system = makeSystem();
+      Object.assign(system.craftingCheck.routed, routed);
+      return buildRecipeList(null, makeRecipeManager(recipes), system, '').recipes.map(
+        (row) => row.checkSummary
+      );
+    };
+    const counting = {
+      rollFormula: '',
+      evaluation: { product: 'count', direction: 'under', pool: { required: 2 } },
+      tiers: [
+        { id: 'tier-hard', dc: 18, successes: 4 },
+        { id: 'tier-unset', dc: 30, successes: null },
+      ],
+    };
+    // An unset tier falls back to the pool's count, as the engine's `countRequired` does.
+    assert.deepEqual(pills(counting), [
+      { kind: 'successes', dc: 4 },
+      { kind: 'successes', dc: 2 },
+      { kind: 'successes', dc: 2 },
+    ]);
+    assert.deepEqual(pills({ ...counting, dcMode: 'dynamic' })[0], { kind: 'dynamicSuccesses', dc: null });
+  });
+
+  it('names a roll-under Target and a character value in the check pill, never a DC (issue 2005)', () => {
+    const recipes = [
+      makeRecipe({ id: 'r-tier', checkTierId: 'tier-hard' }),
+      makeRecipe({ id: 'r-default' }),
+    ];
+    const pills = (evaluation) => {
+      const system = makeSystem();
+      system.craftingCheck.routed.evaluation = evaluation;
+      return buildRecipeList(null, makeRecipeManager(recipes), system, '').recipes.map(
+        (row) => row.checkSummary
+      );
+    };
+    assert.deepEqual(pills({ product: 'sum', direction: 'under', target: { source: 'fixed' } }), [
+      { kind: 'target', dc: 18 },
+      { kind: 'target', dc: 15 },
+    ]);
+    for (const direction of ['over', 'under']) {
+      const attribute = { product: 'sum', direction, target: { source: 'attribute', expression: '@a' } };
+      assert.deepEqual(pills(attribute), [
+        { kind: 'attribute', dc: null },
+        { kind: 'attribute', dc: null },
+      ], `${direction}: a character value sorts with the number-less rows`);
+    }
+    assert.deepEqual(pills({ product: 'sum', direction: 'over' })[0], { kind: 'dc', dc: 18 });
+
+    const dynamic = (evaluation) => {
+      const system = makeSystem();
+      Object.assign(system.craftingCheck.routed, { evaluation, dcMode: 'dynamic' });
+      return buildRecipeList(null, makeRecipeManager(recipes), system, '').recipes[0].checkSummary;
+    };
+    assert.deepEqual(dynamic({ product: 'sum', direction: 'under', target: { source: 'fixed' } }), {
+      kind: 'dynamicTarget',
+      dc: null,
+    });
+    assert.deepEqual(dynamic({ product: 'sum', direction: 'over' }), { kind: 'dynamic', dc: null });
+  });
+
   it('derives the structure, counts, check pill and membership a row cannot compute', () => {
     const recipes = [
       makeRecipe({ id: 'r-ok', checkTierId: 'tier-hard' }),
@@ -843,6 +910,19 @@ describe('adminSystemInspectorProjection (direct, no store)', () => {
       'an unbounded cap stays undefined rather than being forged into a number'
     );
     assert.equal(view.gatheringCraftingCheck.modifierFormulaInertCause, 'noCheck');
+  });
+
+  it('reads a counting check with no retained formula as live, never as missing its formula', () => {
+    const counting = { rollFormula: '', dc: 12, evaluation: { product: 'count' } };
+    const system = makeSystem();
+    system.craftingCheck.routed = { ...counting, tiers: [] };
+    system.salvageCraftingCheck.routed = counting;
+    const view = buildSelectedSystemViewData(system, [], [], [], [], []);
+    assert.equal(view.craftingCheck.modifierFormulaInertCause, null, 'the pool rolls, so modifiers apply');
+    assert.equal(view.salvageCraftingCheck.modifierFormulaInertCause, null);
+    system.craftingCheck.routed = { ...counting, evaluation: { product: 'sum' } };
+    const summed = buildSelectedSystemViewData(system, [], [], [], [], []);
+    assert.equal(summed.craftingCheck.modifierFormulaInertCause, 'noFormula', 'a sum still needs one');
   });
 
   it('projects the fields a hand-built allowlist has historically dropped', () => {

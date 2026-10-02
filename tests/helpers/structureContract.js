@@ -5,11 +5,13 @@
  */
 import { it } from 'node:test';
 import assert from 'node:assert/strict';
+import { isDeepStrictEqual } from 'node:util';
 
 import {
   calledName,
   declaredConstant as declaredConstantOf,
   identifierNames,
+  importedModules,
   importsModule as importsModuleOf,
   importsModuleLazily,
   literalStrings,
@@ -45,6 +47,23 @@ import {
   styleDeclares,
   styleRule,
 } from './svelteStructureContract.js';
+import {
+  attributeIs,
+  attributeLabel,
+  importFamily,
+  keyName,
+  locatedNodes,
+  locatorLabel,
+  namedCodeAst,
+  propertyReadTally,
+  renderedNodes,
+  sameSorted,
+  shapeCount,
+  takesParameters,
+  suppliesProps,
+  templateNodes,
+  unreadProps,
+} from './structureShapes.js';
 
 /** Every `text(key, fallback)` a component states with both arguments spelled out. */
 function staticTextCalls(component) {
@@ -67,21 +86,6 @@ function classMemberAst(ast, name) {
     if (node.type === 'MethodDefinition' && node.key?.name === name) return node;
   }
   throw new Error(`no class member \`${name}\``);
-}
-
-/** Every element or component node in a template, for the claims that count render sites. */
-function templateNodes(component) {
-  const nodes = [];
-  for (const node of walkNodes(component.fragment)) {
-    if (node.type === 'RegularElement' || node.type === 'Component') nodes.push(node);
-  }
-  return nodes;
-}
-
-/** A record key under either shipped spelling, so a quoted key cannot evade a claim about it. */
-function keyName(node) {
-  if (node.key?.name) return node.key.name;
-  return node.key?.type === 'Literal' ? String(node.key.value) : undefined;
 }
 
 function propertyAst(node, name) {
@@ -218,6 +222,31 @@ function callsWithLiteral(node, [name, value]) {
   return false;
 }
 
+/**
+ * The class members, or with `FunctionDeclaration` the named functions, whose own body calls
+ * `name`, sorted: the census a prune seam is held to.
+ */
+function sitesCalling(node, name, type = 'MethodDefinition') {
+  const sites = [];
+  for (const inner of walkNodes(node)) {
+    if (inner.type !== type || !callNames(inner).has(name)) continue;
+    sites.push(keyName(inner) ?? inner.id?.name);
+  }
+  return sites.sort((a, b) => a.localeCompare(b)).join('\n');
+}
+
+const sortedNames = (names) => [...names].sort((a, b) => a.localeCompare(b)).join('\n');
+
+/** Whether a `??` or `||` falls back from a call of `callee` to a `new constructorName(…)`. */
+function fallsBackFrom(node, [callee, constructorName]) {
+  for (const inner of walkNodes(node)) {
+    if (inner.type !== 'LogicalExpression' || !['??', '||'].includes(inner.operator)) continue;
+    if (inner.right?.type !== 'NewExpression' || inner.right.callee?.name !== constructorName) continue;
+    if (callNames(inner.left).has(callee)) return true;
+  }
+  return false;
+}
+
 /** Every literal a subtree assigns to one binding, which is what a route transition is. */
 function assignedLiterals(node, name) {
   const values = [];
@@ -246,15 +275,6 @@ function recordAst(node, [key, value]) {
     if (inner.properties.some((entry) => propertyValues(entry, key).includes(value))) return inner;
   }
   throw new Error(`no record with ${key} "${value}"`);
-}
-
-/** One named function or binding value out of a subtree — the AST of the slice it replaces. */
-function namedCodeAst(scope, name) {
-  for (const node of walkNodes(scope ?? {})) {
-    if (node.type === 'FunctionDeclaration' && node.id?.name === name) return node;
-    if (node.type === 'VariableDeclarator' && node.id?.name === name && node.init) return node.init;
-  }
-  throw new Error(`no binding \`${name}\``);
 }
 
 /** The first static value any template node gives an attribute — one of two shipped spellings. */
@@ -289,17 +309,31 @@ function templateSuffixes(component, name) {
   return suffixes;
 }
 
-/** The literal a subtree compares the named binding against — what a route branch tests. */
-function comparedLiteral(node, name) {
+/** Every literal a subtree tests the named binding `===` against — what a route branch tests. */
+function comparedLiterals(node, name) {
+  const values = new Set();
   for (const inner of walkNodes(node)) {
-    if (inner.type !== 'BinaryExpression') continue;
+    if (inner.type !== 'BinaryExpression' || inner.operator !== '===') continue;
     const sides = [inner.left, inner.right];
     if (!sides.some((side) => side?.type === 'Identifier' && side.name === name)) continue;
-    const literal = sides.find((side) => side?.type === 'Literal');
-    if (literal) return literal.value;
+    for (const side of sides) if (side?.type === 'Literal') values.add(side.value);
   }
-  return undefined;
+  return [...values];
 }
+
+/** Whether `specifier`'s `name` is imported under its own name, so no local copy can take it. */
+const importsNameUnaliased = (node, [specifier, name]) =>
+  importedModules(node, (declaration) => declaration).some(
+    (declaration) =>
+      declaration.type === 'ImportDeclaration' &&
+      declaration.source.value === specifier &&
+      declaration.specifiers.some(
+        (entry) =>
+          entry.type === 'ImportSpecifier' &&
+          keyName({ key: entry.imported }) === name &&
+          entry.local?.name === name
+      )
+  );
 
 /** The `(key, fallback)` pair a `return text(key, fallback);` states, or `[]` for any other. */
 function returnedTextArguments(node) {
@@ -330,11 +364,6 @@ function pushedRecord(node, arrayName) {
     if (record?.type === 'ObjectExpression') return record;
   }
   return undefined;
-}
-
-/** Every render site of one component, for the claims that count them or compare two. */
-function renderedNodes(component, name) {
-  return templateNodes(component).filter((node) => node.type === 'Component' && node.name === name);
 }
 
 /** The literal one node gives a prop, whether spelled as text or as a `{…}` expression. */
@@ -374,6 +403,7 @@ function claimsOverCode(code) {
   return {
     imports: (specifier) => importsModuleOf(code, specifier),
     importsLazily: (specifier) => importsModuleLazily(code, specifier),
+    importsName: (pair) => importsNameUnaliased(code, pair),
     declares: (name) => declaredConstantOf(code, name),
     names: (name) => referencesIdentifierOf(code, name),
     spells: (text) => literalStrings(code).some((literal) => literal.includes(text)),
@@ -391,6 +421,14 @@ function claimsOverCode(code) {
     assigns: ([name, value]) => assignedLiterals(code, name).includes(value),
     property: ([key, value]) => propertyValues(code, key).includes(value),
     key: (name) => propertyKeys(code).has(name),
+    callers: ([name, members]) => sitesCalling(code, name) === sortedNames(members),
+    fnCallers: ([name, fns]) => sitesCalling(code, name, 'FunctionDeclaration') === sortedNames(fns),
+    fallsBack: (pair) => fallsBackFrom(code, pair),
+    contains: (source) => shapeCount(code, source) > 0,
+    takes: (parameters) => takesParameters(code, parameters),
+    importSpecifiers: ([needle, list]) => sameSorted(importFamily(code, needle), list),
+    propertyReads: ([name, tally]) => isDeepStrictEqual(propertyReadTally(code, name), tally),
+    comparedLiterals: ([name, values]) => sameSorted(comparedLiterals(code, name), values),
   };
 }
 
@@ -420,6 +458,18 @@ function claimsForComponent(component) {
     requiresProp: (name) => requiresProp(component, name),
     rendersBefore: (pair) => rendersBefore(component, pair),
     styleDeclares: (row) => styleDeclares(component, row),
+    gives: (row) => {
+      const nodes = locatedNodes(component, row);
+      return nodes.length > 0 && nodes.every((node) => attributeIs(node, [row.attribute, row.is]));
+    },
+    attributeOrder: (row) => {
+      const nodes = locatedNodes(component, row);
+      const labels = (node) => (node.attributes ?? []).map(attributeLabel);
+      return nodes.length > 0 && nodes.every((node) => isDeepStrictEqual(labels(node), row.names));
+    },
+    rendersTimes: ([locator, count]) => locatedNodes(component, locator).length === count,
+    suppliesProps: (row) => suppliesProps(component, componentAstOf(row.file), row),
+    propsUnread: (names) => sameSorted(unreadProps(component), names),
   };
 }
 
@@ -453,6 +503,8 @@ function structureOf(target) {
   const { file, member, property, fn, constant, record } =
     typeof target === 'string' ? { file: target } : target;
   const binding = fn ?? constant;
+  // A property path narrows one key at a time: `['world-essence-entry', 'confirm']`.
+  const narrow = (scope) => [property ?? []].flat().reduce((node, name) => propertyAst(node, name), scope);
   if (file.endsWith('.svelte')) {
     const component = componentAstOf(file);
     if (!binding && !record) {
@@ -463,15 +515,13 @@ function structureOf(target) {
       ? namedCodeAst([component.instance, component.module], binding)
       : component;
     if (record) scoped = recordAst(scoped, record);
-    if (property) scoped = propertyAst(scoped, property);
-    return claimsOverCode(scoped);
+    return claimsOverCode(narrow(scoped));
   }
   const { ast } = moduleAstOf(file);
   let code = member ? classMemberAst(ast, member) : ast;
   if (binding) code = namedCodeAst(code, binding);
   if (record) code = recordAst(code, record);
-  if (property) code = propertyAst(code, property);
-  return claimsOverCode(code);
+  return claimsOverCode(narrow(code));
 }
 
 /** What a failure message calls the target, whichever of the four shapes it took. */
@@ -480,7 +530,8 @@ function labelOf(target) {
   if (typeof target === 'string') return target;
   if (target.dir) return `any of ${target.dir}`;
   const { file, member, constant, property, fn, record } = target;
-  const parts = [file, member, constant ?? fn, record?.join('='), property];
+  const path = property && [property].flat().join('.');
+  const parts = [file, member, constant ?? fn, record?.join('='), path];
   return parts.filter(Boolean).join(' > ');
 }
 
@@ -496,6 +547,11 @@ const CONTRACT_CLAIMS = Object.freeze({
   imports: { ask: 'imports', holds: true, says: (v) => `imports ${v}` },
   importsNo: { ask: 'imports', holds: false, says: (v) => `no longer imports ${v}` },
   importsLazily: { ask: 'importsLazily', holds: true, says: (v) => `imports ${v} lazily` },
+  importsName: {
+    ask: 'importsName',
+    holds: true,
+    says: ([s, n]) => `binds ${n} from ${s}, unaliased`,
+  },
   declares: { ask: 'declares', holds: true, says: (v) => `declares const ${v}` },
   names: { ask: 'names', holds: true, says: (v) => `names ${v}` },
   namesNo: { ask: 'names', holds: false, says: (v) => `no longer names ${v}` },
@@ -542,6 +598,65 @@ const CONTRACT_CLAIMS = Object.freeze({
   keys: { ask: 'key', holds: true, says: (v) => `gives some record a ${v} key` },
   keysNo: { ask: 'key', holds: false, says: (v) => `gives no record a ${v} key` },
   comparesNo: { ask: 'compares', holds: false, says: (v) => `hard-codes no comparison to ${v}` },
+  callers: {
+    ask: 'callers',
+    holds: true,
+    says: ([f, members]) => `calls ${f}() from exactly ${members.join(', ')}`,
+  },
+  fnCallers: {
+    ask: 'fnCallers',
+    holds: true,
+    says: ([f, fns]) => `calls ${f}() from exactly the functions [${fns.join(', ')}]`,
+  },
+  fallsBackNo: {
+    ask: 'fallsBack',
+    holds: false,
+    says: ([f, c]) => `never falls back from ${f}() to a new ${c}`,
+  },
+  contains: { ask: 'contains', holds: true, says: (v) => `holds \`${v}\`, shape for shape` },
+  // Matches one exact spelling, so a respelling evades it: always pair it with a positive leg.
+  containsNo: { ask: 'contains', holds: false, says: (v) => `holds no \`${v}\`` },
+  takes: { ask: 'takes', holds: true, says: (v) => `takes exactly (${v})` },
+  importSpecifiers: {
+    ask: 'importSpecifiers',
+    holds: true,
+    says: ([n, list]) => `imports exactly [${list.join(', ')}] of the specifiers naming "${n}"`,
+  },
+  propertyReads: {
+    ask: 'propertyReads',
+    holds: true,
+    says: ([p, tally]) => `reads .${p} only as ${JSON.stringify(tally)}`,
+  },
+  comparedLiterals: {
+    ask: 'comparedLiterals',
+    holds: true,
+    says: ([n, values]) => `tests ${n} === exactly ${values.join(', ')}`,
+  },
+  gives: {
+    ask: 'gives',
+    holds: true,
+    says: (row) => `gives ${row.attribute}={${row.is}} at every ${locatorLabel(row)}`,
+  },
+  attributeOrder: {
+    ask: 'attributeOrder',
+    holds: true,
+    says: (row) => `writes exactly ${row.names.join(', ')} on ${locatorLabel(row)}`,
+  },
+  rendersTimes: {
+    ask: 'rendersTimes',
+    holds: true,
+    says: ([locator, count]) => `renders ${locatorLabel(locator)} exactly ${count} time(s)`,
+  },
+  suppliesProps: {
+    ask: 'suppliesProps',
+    holds: true,
+    says: (row) => `supplies every prop <${row.component}> declares, bar [${row.exempt ?? []}]`,
+  },
+  propsUnread: {
+    ask: 'propsUnread',
+    holds: true,
+    says: (names) => `reads every declared prop but [${names.join(', ')}]`,
+  },
   passesProps: { ask: 'prop', holds: true, says: ([c, p]) => `passes ${p} to every <${c}>` },
   passesValues: {
     ask: 'passesValue',
@@ -598,7 +713,7 @@ export {
   claimsOverCode,
   classMemberAst,
   classRenderedExpressions,
-  comparedLiteral,
+  comparedLiterals,
   constantLiteral,
   declaredConstantValue,
   defineStructureContract,

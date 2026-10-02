@@ -16,7 +16,7 @@
   import { matchFolderNameToVocabulary } from '../../../model/matchFolderVocabulary.js';
   import InlineVocabularyAdd from './InlineVocabularyAdd.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
-  import ManagerModal from './ManagerModal.svelte';
+  import ManagerModal from '../../components/ManagerModal.svelte';
   import RecipeRoutingAssignment from './recipe/RecipeRoutingAssignment.svelte';
   import SelectionCheckbox from '../../components/SelectionCheckbox.svelte';
   import Select from '../../components/Select.svelte';

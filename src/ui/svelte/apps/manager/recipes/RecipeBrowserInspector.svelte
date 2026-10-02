@@ -30,6 +30,7 @@
     buildRecipeRoutingModel,
     buildRecipeStepModel,
     groupProduceRowsByResultGroup,
+    recipeCheckFact,
   } from '../../../../model/recipeBrowserModel.js';
   import IconButton from '../../../components/IconButton.svelte';
   import Select from '../../../components/Select.svelte';
@@ -75,20 +76,6 @@
   // The four questions a GM has about the recipe they just clicked: what it takes, what it makes,
   // how many steps, what they roll. `results` is the one stat with a DANGER state, because a recipe
   // producing nothing is a successful craft that makes nothing.
-  const CHECK_LABELS = {
-    dc: ['FABRICATE.Admin.Manager.Recipe.CheckDcValue', 'DC {dc}'],
-    dynamic: ['FABRICATE.Admin.Manager.Recipe.CheckDynamicShort', 'Dynamic'],
-    progressive: ['FABRICATE.Admin.Manager.Recipe.CheckProgressive', 'Progressive'],
-    ingredients: ['FABRICATE.Admin.Manager.Recipe.CheckByIngredients', 'By ingredients'],
-    none: ['FABRICATE.Admin.Manager.Recipe.CheckNone', 'No check'],
-  };
-
-  function checkValue(recipe) {
-    const summary = recipe?.checkSummary || { kind: 'none', dc: null };
-    const [labelKey, fallback] = CHECK_LABELS[summary.kind] || CHECK_LABELS.none;
-    return format(labelKey, fallback, { dc: summary.dc ?? '' });
-  }
-
   const stats = $derived(
     selectedRecipe
       ? [
@@ -114,7 +101,7 @@
           },
           {
             id: 'check',
-            value: checkValue(selectedRecipe),
+            value: recipeCheckFact(selectedRecipe.checkSummary, format),
             label: text('FABRICATE.Admin.Manager.Recipe.CraftingCheck', 'Crafting check'),
             // A system that cannot roll for this recipe is a WARNING, exactly as the row's
             // pill says. `ingredients` is not: it is a working, roll-free configuration.
@@ -824,6 +811,7 @@
   </section>
 {:else}
   <EmptyState
+    fill
     icon="fas fa-scroll"
     title={text('FABRICATE.Admin.Manager.Recipe.SelectRecipe', 'Select a recipe')}
     hint={text(

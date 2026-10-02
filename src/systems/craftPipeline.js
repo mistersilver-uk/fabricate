@@ -3,8 +3,11 @@
  * returns null to proceed or `{ result, resolved }` for `craft()` to return; only `craft()` reads
  * a Foundry global, assigns `ctx.resolved`, or handles the errors these propagate.
  */
+import { refusalData } from './checkTarget.js';
+import { carryAdditionalDice, checkRequest } from './countCheckRoll.js';
 import {
   VERSIONED_EXECUTION_CONTEXT,
+  checkDisplayForCard,
   rollTotalForCard,
   tierStepForCard,
 } from './craftCardFields.js';
@@ -21,6 +24,25 @@ const refuse = (message) => ({
   result: { success: false, results: null, message },
   resolved: false,
 });
+
+/** A misconfigured check's craft result, keeping the discriminator and any target refusal. */
+export function misconfiguredCheckResult(checkResult) {
+  const data = refusalData(checkResult);
+  const result = {
+    success: false,
+    results: null,
+    message: checkResult?.message,
+    misconfigured: true,
+    ...(data && { data }),
+  };
+  return carryAdditionalDice(result, checkResult);
+}
+
+/** A dismissed roll's zero-mutation result, or a refused additional-dice choice or spend's. */
+export function cancelledCraftResult(checkResult) {
+  const result = { success: false, cancelled: true, results: null, message: 'Crafting cancelled' };
+  return carryAdditionalDice(result, checkResult);
+}
 
 /** The recipe-access guard, the execution step this call runs, and mode validation of the recipe. */
 export async function openCraftStep(engine, ctx) {
@@ -238,7 +260,7 @@ export async function resolveCraftInputs(engine, ctx) {
   };
 }
 
-/** The tool, currency and Item Piles gates, all of them before any mutation. */
+/** The tool and currency gates, all of them before any mutation. */
 export async function runAffordGates(engine, ctx, craftInputs) {
   const { craftingActor, componentSourceActors, presentTools } = ctx;
   const { craftSelection, currencySpends, executionRecipe, ingredientSet } = craftInputs;
@@ -269,9 +291,6 @@ export async function runAffordGates(engine, ctx, craftInputs) {
     engine._currencySeams()
   );
   if (!currencyAffordCheck.valid) return refuse(currencyAffordCheck.message);
-
-  const itemPilesAffordCheck = await engine._checkItemPilesCurrencyCost(craftingActor, ctx.recipe);
-  if (!itemPilesAffordCheck.valid) return refuse(itemPilesAffordCheck.message);
   return null;
 }
 
@@ -291,24 +310,21 @@ export async function runCraftCheck(engine, ctx, craftInputs) {
       ingredientSet,
       ctx.step,
       {
-        interactive: options?.interactive === true,
-        toolItems: toolValidation.tools,
+        interactive: checkRequest(options),
+        toolItems: toolValidation.tools, // ratchet-exempt(world-scope): not-a-system
       }
     ));
   craftInputs.checkResult = checkResult;
   // A misconfigured required check (no authored roll formula for the active mode) is a
   // GM-side system gap, not a rolled failure: abort with ZERO mutation. The
   // failure-consumption policy in `resolveCheckFailure` applies only to genuine rolled failures.
-  if (checkResult.misconfigured) return refuse(checkResult.message);
+  if (checkResult.misconfigured) {
+    return { result: misconfiguredCheckResult(checkResult), resolved: false };
+  }
   // The player dismissed the interactive roll dialog: a user choice, not a
   // failure. Abort with ZERO mutation (no consumption, no breakage, no chat)
   // before the failure-consumption path in `resolveCheckFailure`.
-  if (checkResult.cancelled) {
-    return {
-      result: { success: false, cancelled: true, results: null, message: 'Crafting cancelled' },
-      resolved: false,
-    };
-  }
+  if (checkResult.cancelled) return { result: cancelledCraftResult(checkResult), resolved: false };
   return null;
 }
 
@@ -367,7 +383,7 @@ export async function resolveCheckFailure(engine, ctx, craftInputs) {
       await engine._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
     }
     if (failurePolicy.breakToolsOnFail) {
-      usedToolPairs = toolValidation.tools;
+      usedToolPairs = toolValidation.tools; // ratchet-exempt(world-scope): not-a-system
       // The shared `evaluateCheckBreakage` seam applies failure-path breakage too, gated
       // by `breakToolsOnFail`; only `checkDriven` lets the check's triggers force it.
       const breakDecision = engine._resolveCraftingBreakageDecision(
@@ -375,6 +391,7 @@ export async function resolveCheckFailure(engine, ctx, craftInputs) {
         executionRecipe,
         checkResult
       );
+      // ratchet-exempt(world-scope): not-a-system
       usedToolsOnFail = await engine._applyToolBreakage(executionRecipe, toolValidation.tools, {
         forceBreak: breakDecision.forceBreak,
         authority: breakDecision.authority,
@@ -392,7 +409,7 @@ export async function resolveCheckFailure(engine, ctx, craftInputs) {
     step,
     ingredientSet,
     consumedItems: consumedOnFail,
-    toolItems: toolValidation.tools,
+    toolItems: toolValidation.tools, // ratchet-exempt(world-scope): not-a-system
     checkResult,
     resultGroupId: options?.resultGroupId || null,
   });
@@ -446,6 +463,7 @@ async function publishCheckFailure(engine, ctx, craftInputs, failure) {
     failureReason: checkResult.message || 'Crafting check failed',
     rollValue: rollTotalForCard(checkResult),
     tierStep: tierStepForCard(checkResult),
+    check: checkDisplayForCard(checkResult),
   });
   return {
     result: {
@@ -487,7 +505,7 @@ export async function resolveModeValidationFailure(engine, ctx, craftInputs) {
       await engine._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
     }
     if (validationFailurePolicy.breakToolsOnFail) {
-      usedToolPairsOnValidationFail = toolValidation.tools;
+      usedToolPairsOnValidationFail = toolValidation.tools; // ratchet-exempt(world-scope): not-a-system
       // Resolution-mode validation failure: route through the shared seam so the
       // breakage authority (and immune handling) stay consistent. The check
       // itself succeeded, so a checkDriven trigger may still force breakage.
@@ -498,7 +516,7 @@ export async function resolveModeValidationFailure(engine, ctx, craftInputs) {
       );
       usedToolsOnValidationFail = await engine._applyToolBreakage(
         executionRecipe,
-        toolValidation.tools,
+        toolValidation.tools, // ratchet-exempt(world-scope): not-a-system
         {
           forceBreak: validationBreakDecision.forceBreak,
           authority: validationBreakDecision.authority,
@@ -542,6 +560,7 @@ export async function resolveModeValidationFailure(engine, ctx, craftInputs) {
     failureReason: message,
     rollValue: rollTotalForCard(checkResult),
     tierStep: tierStepForCard(checkResult),
+    check: checkDisplayForCard(checkResult),
   });
   return refuse(message);
 }
@@ -595,6 +614,7 @@ export async function runResolutionPreflight(engine, ctx, craftInputs) {
     failureReason: message,
     rollValue: rollTotalForCard(checkResult),
     tierStep: tierStepForCard(checkResult),
+    check: checkDisplayForCard(checkResult),
   });
   return {
     result: {
@@ -633,8 +653,7 @@ export async function commitCraft(engine, ctx, craftInputs) {
   });
 
   // Deduct the chosen currency spends after item consumption (`runAffordGates` already
-  // confirmed every spend is affordable). A mid-loop spend failure is logged
-  // like the Item-Piles deduct error below — not refunded.
+  // confirmed every spend is affordable). A mid-loop spend failure is logged, not refunded.
   await engine._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
 
   // Apply tool usage/breakage via the single shared `evaluateCheckBreakage` seam: under
@@ -645,16 +664,13 @@ export async function commitCraft(engine, ctx, craftInputs) {
     executionRecipe,
     checkResult
   );
+  // ratchet-exempt(world-scope): not-a-system
   const usedTools = await engine._applyToolBreakage(executionRecipe, toolValidation.tools, {
     forceBreak: successBreakDecision.forceBreak,
     authority: successBreakDecision.authority,
     reason: successBreakDecision.reason,
     triggerId: successBreakDecision.triggerId,
   });
-
-  // Deduct Item Piles currency cost after ingredients are consumed to avoid
-  // losing currency if ingredient consumption throws.
-  await engine._deductItemPilesCurrencyCost(craftingActor, ctx.recipe);
 
   // Create the result item(s). The awarded group was already resolved and validated by
   // `runResolutionPreflight`, so this re-resolution yields real groups.
@@ -664,7 +680,7 @@ export async function commitCraft(engine, ctx, craftInputs) {
     step,
     ingredientSet,
     consumedItems,
-    toolValidation.tools,
+    toolValidation.tools, // ratchet-exempt(world-scope): not-a-system
     checkResult,
     options?.resultGroupId || null,
     { resolveComponent }
@@ -724,10 +740,11 @@ export async function publishCraftSuccess(engine, ctx, craftInputs, award) {
     craftingActor,
     recipe,
     consumedIngredients: award.consumedItems,
-    tools: toolValidation.tools,
+    tools: toolValidation.tools, // ratchet-exempt(world-scope): not-a-system
     createdResults: award.resultItems,
     rollValue: rollTotalForCard(checkResult),
     tierStep: tierStepForCard(checkResult),
+    check: checkDisplayForCard(checkResult),
     // Redacted inside the poster, which holds the system the component names resolve
     // against. Null for every non-progressive craft (issue 1286).
     firedComplications: firedComplications?.fired ?? null,

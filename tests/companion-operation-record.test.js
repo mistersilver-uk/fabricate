@@ -8,6 +8,7 @@ import {
   observeCompanionOperationRecord,
   sameCompanionOperationPlan,
 } from '../src/systems/companionOperationRecord.js';
+import { effectEvidence } from './helpers/companionEffectEvidence.js';
 
 const OPERATION_ID = 'AbCdEfGhIjKlMn01';
 
@@ -51,7 +52,7 @@ function activeRecord(state = 'pending') {
   record.effectStates[0] = {
     effectId: 'reward',
     phase: 'applying',
-    evidence: { attempt: 1 },
+    evidence: effectEvidence('applying'),
     waiver: null,
   };
   return record;
@@ -62,7 +63,7 @@ function terminalRecord(state = 'completed') {
   record.effectStates[0] = {
     effectId: 'reward',
     phase: state === 'completed' ? 'applied' : 'waived',
-    evidence: { receipt: 'item-1' },
+    evidence: state === 'completed' ? effectEvidence('applied') : null,
     waiver:
       state === 'completed'
         ? null
@@ -99,13 +100,13 @@ function reviewPrecedenceRecord() {
   record.effectStates[0] = {
     effectId: 'review',
     phase: 'reviewRequired',
-    evidence: { reason: 'uncertain' },
+    evidence: effectEvidence('reviewRequired'),
     waiver: null,
   };
   record.effectStates[1] = {
     effectId: 'failure',
     phase: 'knownFailure',
-    evidence: { reason: 'refused' },
+    evidence: effectEvidence('knownFailure'),
     waiver: null,
   };
   return record;
@@ -116,7 +117,7 @@ function failurePrecedenceRecord() {
   record.effectStates[1] = {
     effectId: 'failure',
     phase: 'knownFailure',
-    evidence: { reason: 'refused' },
+    evidence: effectEvidence('knownFailure'),
     waiver: null,
   };
   return record;
@@ -127,7 +128,7 @@ function applyingPrecedenceRecord() {
   record.effectStates[0] = {
     effectId: 'review',
     phase: 'applying',
-    evidence: { attempt: 1 },
+    evidence: effectEvidence('applying'),
     waiver: null,
   };
   return record;
@@ -298,8 +299,10 @@ test('observes every state at its valid invariant boundary, including clock reve
 
   const review = activeRecord('reviewRequired');
   review.effectStates[0].phase = 'reviewRequired';
+  review.effectStates[0].evidence = effectEvidence('reviewRequired');
   const failed = activeRecord('failed');
   failed.effectStates[0].phase = 'knownFailure';
+  failed.effectStates[0].evidence = effectEvidence('knownFailure');
 
   for (const record of [
     acceptedRecord(),

@@ -2,7 +2,11 @@
  * World scope: travel, the parties route and the Downtime rollup, including the companion surfaces.
  */
 
-import { ANCHORED_POPOVER_SOURCES, WORLD_PARTIES_SEARCH_TERM } from './caseConstants.js';
+import {
+  ANCHORED_POPOVER_SOURCES,
+  GATHERING_ROUTE_MODEL_PATTERN,
+  WORLD_PARTIES_SEARCH_TERM,
+} from './caseConstants.js';
 import { managerCase } from './caseFactories.js';
 
 export const CASES = Object.freeze([
@@ -52,6 +56,7 @@ export const CASES = Object.freeze([
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'environments', 'world'],
     sourceMatches: [
+      GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(MapLinksTab|PartiesTab|RealmsTab)/,
@@ -112,6 +117,7 @@ export const CASES = Object.freeze([
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'environments', 'world'],
     sourceMatches: [
+      GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|EnvironmentsBrowserView|GatheringPartiesTab)\.svelte$/,
       // The gate lock this case is named for is drawn by `PartyExpandedBody`, in the card's right column.
       /^src\/ui\/svelte\/apps\/manager\/Party/,

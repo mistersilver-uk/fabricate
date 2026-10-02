@@ -9,17 +9,22 @@
   An `outcomeTier` condition cannot force an outcome — the routed tier resolves AFTER the forced
   outcome would run — so its outcome segments are pinned to No effect and disabled. It CAN step.
 
-  Controlled. Dice groups come from `parseDiceGroups`, so a `diceGroup` trigger targets a group
-  by its evaluated-term index, and `kind` selects which condition types are offered.
+  Controlled. Dice groups come from `triggerDiceGroups`, so a `diceGroup` trigger targets a group
+  by its evaluated-term index, and `kind` selects which condition types are offered. A counting
+  check reads its pool as the one group and its total as net successes (issue 2006).
 -->
 <script>
   import Field from '../../../components/Field.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import Select from '../../../components/Select.svelte';
   import { localize } from '../../../util/foundryBridge.js';
-  import { parseDiceGroups } from '../../../../../utils/craftingCheckExpression.js';
   import { interpolate } from './checksCopy.js';
-  import { buildPresetTrigger, checkTriggerPresets } from './checkTriggerPresets.js';
+  import {
+    buildPresetTrigger,
+    checkTriggerPresets,
+    countPoolDiceGroup,
+    triggerDiceGroups,
+  } from './checkTriggerPresets.js';
   import { summariseCondition, summariseEffect, summariseHeadline } from './checkTriggerSummary.js';
   import {
     CONDITION_OPERATORS,
@@ -42,6 +47,10 @@
     kind = 'simple',
     outcomeOptions = [],
     showBreakTools = false,
+    // The check's evaluation: a roll-under check's best face is 1, so the presets follow it.
+    evaluation = null,
+    // A routed check's lowest-ranked tier, which the count Botch preset targets.
+    lowestTierId = null,
     onChange = () => {},
   } = $props();
 
@@ -57,35 +66,15 @@
 
   const triggers = $derived(Array.isArray(value?.triggers) ? value.triggers : []);
 
-  // Dice groups in evaluated-term order, `groupId` matching the engine's `roll.dice` index.
-  const diceGroups = $derived(
-    (() => {
-      const parsed = parseDiceGroups(rollFormula);
-      // Function-local counters, discarded when the $derived IIFE returns.
-      // eslint-disable-next-line svelte/prefer-svelte-reactivity
-      const seen = new Map();
-      // eslint-disable-next-line svelte/prefer-svelte-reactivity
-      const counts = new Map();
-      for (const group of parsed) counts.set(group.raw, (counts.get(group.raw) || 0) + 1);
-      return parsed.map((group, groupId) => {
-        const occurrence = (seen.get(group.raw) || 0) + 1;
-        seen.set(group.raw, occurrence);
-        const duplicated = (counts.get(group.raw) || 0) > 1;
-        const label = duplicated
-          ? text('FABRICATE.Admin.Manager.Checks.Breakage.GroupOrdinal', '{die} #{n}')
-              .replace('{die}', group.raw)
-              .replace('{n}', String(occurrence))
-          : group.raw;
-        return { groupId, raw: group.raw, count: group.count, sides: group.sides, label };
-      });
-    })()
-  );
+  // Dice groups in evaluated-term order; a counting check reads its pool as the one group.
+  const diceGroups = $derived(triggerDiceGroups({ evaluation, rollFormula }, text));
+  const counting = $derived(countPoolDiceGroup(evaluation) !== null);
 
   const firstD20GroupId = $derived(diceGroups.find((group) => group.sides === 20)?.groupId ?? null);
 
   // The five converted lists' vocabularies and their picker rows (issue 1510). `conditionTypes`
   // keeps its `{value, labelKey}` shape because `addTrigger` reads the first entry's value.
-  const conditionTypes = $derived(conditionTypesFor(kind));
+  const conditionTypes = $derived(conditionTypesFor(kind, { counting }));
   const conditionTypeOptions = $derived(localizedOptions(conditionTypes, text));
   const aggregateOptions = $derived(localizedOptions(DICE_AGGREGATES, text));
   const operatorOptions = $derived(localizedOptions(CONDITION_OPERATORS, text));
@@ -348,7 +337,9 @@
   }
 
   function conditionSummary(trigger) {
-    return phrase(summariseCondition(trigger?.condition ?? {}, { diceGroups, tierNames }));
+    return phrase(
+      summariseCondition(trigger?.condition ?? {}, { diceGroups, tierNames, counting })
+    );
   }
 
   /** The collapsed head's glyph tile, tone and result chip. */
@@ -380,7 +371,7 @@
 
   // The preset row, withheld when the formula rolls no dice: a preset offered against one
   // would author a condition pointing at a group that does not exist.
-  const presets = $derived(checkTriggerPresets({ kind, diceGroups }));
+  const presets = $derived(checkTriggerPresets({ kind, diceGroups, evaluation, lowestTierId }));
 
   function addPreset(presetId) {
     const trigger = buildPresetTrigger({
@@ -389,6 +380,8 @@
       diceGroups,
       showBreakTools,
       newId,
+      evaluation,
+      lowestTierId,
     });
     if (!trigger) return;
     // Open and scroll to it for `addTrigger`'s reason, and MORE so: a preset's card lands at

@@ -6,6 +6,8 @@
  * ceiling. Localized copy arrives through an injected `text`, so this stays a pure leaf.
  */
 
+import { formatCheckAdjustment } from '../checks/checkAdjustmentLabel.js';
+
 import { buildSalvageDcOptions } from './salvageDcPresets.js';
 
 /** The inherit row, where `inheritValue` is non-empty, then one row per effective category. */
@@ -27,29 +29,83 @@ export function buildSalvageRouteOptions(resultGroups, unroutedLabel, groupFallb
   ];
 }
 
+/** `System default — {n} successes needed`, singular at one. */
+function successesDefaultLabel(count, text) {
+  if (count === 1) {
+    return text(
+      'FABRICATE.Admin.Manager.Checks.Count.Overrides.SystemDefaultOne',
+      'System default — 1 success needed'
+    );
+  }
+  return text(
+    'FABRICATE.Admin.Manager.Checks.Count.Overrides.SystemDefault',
+    'System default — {count} successes needed'
+  ).replace('{count}', String(count));
+}
+
+/** `{name} — {n} successes needed`, singular at one. */
+function successesTierLabel(name, count, text) {
+  const copy =
+    count === 1
+      ? text(
+          'FABRICATE.Admin.Manager.Checks.Count.Overrides.PresetOne',
+          '{name} — 1 success needed'
+        )
+      : text(
+          'FABRICATE.Admin.Manager.Checks.Count.Overrides.Preset',
+          '{name} — {count} successes needed'
+        );
+  return copy.replace('{name}', name).replace('{count}', String(count));
+}
+
 /**
- * System default, each usable tier, then Custom… — `buildSalvageDcOptions` with this screen's four
- * label keys bound to it, which is why the binding has a home here rather than in that pure leaf.
+ * System default, each usable tier, then Custom… — `buildSalvageDcOptions` with this screen's label
+ * keys bound to it, which is why the binding has a home here rather than in that pure leaf. A
+ * roll-under fixed target names a Target, a character-value target names adjustments, and a count
+ * check names successes needed.
  */
-export function buildSalvageDcSelectOptions(tiers, dcMode, systemDc, text) {
+export function buildSalvageDcSelectOptions(tiers, systemDc, text, evaluation = null) {
+  const under = evaluation?.direction === 'under';
+  const kind = evaluation?.target?.adjustmentKind === 'multiply' ? 'multiply' : 'add';
   return buildSalvageDcOptions({
     tiers,
-    dcMode,
     systemDc,
+    evaluation,
     systemDefaultLabel: (dc) =>
-      text(
-        'FABRICATE.Admin.Manager.Component.SalvageEditor.DcSystemDefault',
-        'System default — DC {dc}'
+      (under
+        ? text(
+            'FABRICATE.Admin.Manager.Component.SalvageEditor.DcSystemDefaultTarget',
+            'System default — Target {dc}'
+          )
+        : text(
+            'FABRICATE.Admin.Manager.Component.SalvageEditor.DcSystemDefault',
+            'System default — DC {dc}'
+          )
       ).replace('{dc}', String(dc)),
-    systemDefaultDynamicLabel: () =>
-      text(
-        'FABRICATE.Admin.Manager.Component.SalvageEditor.DcSystemDefaultDynamic',
-        'System default — set by macro'
-      ),
     tierLabel: (name, dc) =>
-      text('FABRICATE.Admin.Manager.Component.SalvageEditor.DcTier', '{name} — DC {dc}')
+      (under
+        ? text(
+            'FABRICATE.Admin.Manager.Component.SalvageEditor.DcTierTarget',
+            '{name} — Target {dc}'
+          )
+        : text('FABRICATE.Admin.Manager.Component.SalvageEditor.DcTier', '{name} — DC {dc}')
+      )
         .replace('{name}', name)
         .replace('{dc}', String(dc)),
+    adjustmentDefaultLabel: () =>
+      text(
+        'FABRICATE.Admin.Manager.Component.SalvageEditor.AdjustmentSystemDefault',
+        'System default — base adjustment'
+      ),
+    adjustmentTierLabel: (name, value) =>
+      text(
+        'FABRICATE.Admin.Manager.Component.SalvageEditor.AdjustmentTier',
+        '{name} — {adjustment}'
+      )
+        .replace('{name}', name)
+        .replace('{adjustment}', formatCheckAdjustment(kind, value)),
+    successesDefaultLabel: (count) => successesDefaultLabel(count, text),
+    successesTierLabel: (name, count) => successesTierLabel(name, count, text),
     customLabel: () => text('FABRICATE.Admin.Manager.Component.SalvageEditor.DcCustom', 'Custom…'),
   });
 }

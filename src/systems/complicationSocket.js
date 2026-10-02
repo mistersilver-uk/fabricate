@@ -1,61 +1,16 @@
 /**
- * GM-AUTHORITATIVE delivery of progressive component complications (issue 1286).
- *
- * A complication's GM-only chat output and its macro must run on a GM client. A player
- * cannot author a message as the GM — `#canCreate` forbids it, and a GM-only card a
- * player creates renders in that player's OWN sidebar because `ChatMessage#visible`
- * short-circuits on `isAuthor` — and a macro run on the acting client would carry the
- * acting client's authority rather than the GM's. The acting client therefore commits
- * the award, posts the player-facing card itself, and relays the complication to the
- * elected GM over the socket this module routes.
- *
- * THERE IS NO NEW SOCKET. Foundry registers exactly one event per package, so this is a
- * new `action` on the existing `module.fabricate` channel, dispatched from the single
- * router in `main.js` inside its own `try`/`catch` — a throw on one payload must never
- * starve the others sharing the channel.
- *
- * ADDRESSING ONLY. The payload names the crafting system, the component, the authored
- * complication, the stage occurrence and the acting actor, plus the outcome facts the
- * card reports. It carries NO `macroUuid`, NO `visibility`, and no name, description,
- * severity, chat content or speaker. The elected GM re-reads the authored complication
- * from its OWN copy of the `craftingSystems` world setting and takes every executable
- * and disclosure decision from that lookup; a payload naming a complication that does
- * not exist on that component is dropped. A forged message can therefore do no more
- * than fire a complication the GM themselves authored, for an actor the SENDER already
- * owns — and the sender is the server-attested second callback argument of the socket
- * handler, never a payload field.
- *
- * ABUSE SURFACE, stated precisely: an authenticated player can ask the GM to fire
- * complications their own actors are eligible for, at {@link COMPLICATION_RATE_LIMIT}.
- * That is a self-inflicted nuisance, not privilege escalation. `bucket`, `resultId` and
- * `effectRollTotal` are client-supplied outcome facts the GM cannot verify, so the GM
- * card presents them as the acting client's CLAIM rather than as GM-attested.
- *
- * ONE MESSAGE PER ADDRESSED (SYSTEM, ACTOR) PAIR. Every complication of one resolution
- * rides a single message with an array payload, and a bulk run batches its rows the same
- * way — but it batches per addressed pair rather than per RUN, because the payload names
- * one crafting system and one actor and BOTH are authorization inputs: the GM re-reads
- * the authored complication from that system's record and re-authorizes that actor
- * against the attested sender. Neither can be per-entry without moving the authorization
- * decision onto the wire. So the ordinary bulk run — one actor, one system — emits one
- * message however many rows it carries, and a run deliberately fanned out across N pairs
- * emits N. Per-ROW emits would collide with the rate limiter head-on, silently refusing
- * rows on a path the player never sees; batching also fixes emit ordering GM-side.
- *
- * This module is the PURE half of the channel: the routing decision (payload validation,
- * who applies, GM-on-GM local apply, per-sender throttle, per-context de-duplication) AND
- * the pure half of the GM-side apply (the authored re-read, the `script` discriminant, the
- * macro scope, and the per-entry isolation loop). It touches no Foundry global: `main.js`
- * registers the handler, mints the resolution id, and injects the thin Foundry edges
- * (`game.socket.emit`, `game.users.activeGM`, `fromUuid`, `MacroExecutor.run`,
- * `ChatMessage.create`).
- *
- * The apply half lives HERE rather than in `main.js` for the reason this split exists at
- * all: `src/main.js` cannot be imported under `node --test`, so anything left there can
- * only be pinned by source-TEXT assertions, and a source pin cannot tell an exact id match
- * apart from a match with a positional fallback. The addressing-only contract is the one
- * property of this channel that must be driven with real inputs, so the functions that
- * enforce it are importable.
+ * GM-authoritative delivery of progressive component complications (issue 1286), specified in
+ * `openspec/specs/recipes-and-steps/spec.md` § GM-authoritative execution and the sections after
+ * it. The acting client commits the award, posts the player card and relays the complication to
+ * the elected GM as an action on the existing `module.fabricate` channel. The payload is
+ * addressing only: the GM re-reads every executable and disclosure decision from its own
+ * `craftingSystems` setting and re-authorizes the actor against the server-attested sender. One
+ * message carries every complication for one addressed `(system, actor)` pair, because both are
+ * authorization inputs. This is the pure half (routing, validation, throttle, de-duplication and
+ * the GM-side apply loop) with the Foundry edges injected, so tests drive the addressing-only
+ * contract with real inputs. `main.js` registers the handler and injects the thin Foundry edges
+ * this module never calls directly: `game.socket.emit`, `game.users.activeGM` (elected-GM
+ * lookup), `fromUuid`, `MacroExecutor.run`, `ChatMessage.create`.
  */
 
 import { COMPLICATION_ACTIVITIES } from '../utils/componentComplications.js';
@@ -66,41 +21,12 @@ import { createDepletionRateLimiter } from './gatheringNodeSocket.js';
 export const COMPLICATION_DELIVER = 'complicationDeliver';
 
 /**
- * Complication messages one sender may deliver per window before the GM starts refusing.
- *
- * ## Derived from the SELECTION CAP, not from "one message per run"
- *
- * It is not one message per fired complication — a resolution emits one message however
- * many complications it carries. But it is not one per RUN either: a bulk run batches per
- * addressed `(craftingSystemId, actorUuid)` pair, because both are authorization inputs
- * (see the module docblock). The legitimate worst case is therefore a bulk selection
- * fanned all the way out — one target per pair — which at the bulk selection cap of 25
- * targets is 25 messages for ONE player gesture.
- *
- * A player may reasonably make several such gestures inside one 60-second window, so the
- * bound starts at roughly three fully fanned-out runs (75) and adds headroom for what
- * else is legitimately in flight beside them: deliberate one-at-a-time crafts and
- * salvages, one message each, and a collapsed crafting chain, which recurses into
- * `craft()` per step and so relays once per step.
- *
- * 100 in a minute covers that and still makes a scripted flood useless. The previous 30
- * was derived from the retired premise that a bulk run of any size emits exactly one
- * message: two fanned-out runs spent 50 against it and silently dropped the tail, which
- * is the failure the batching exists to close.
- *
- * The 25 is stated in prose and NOT imported from `BulkSalvageService`: this module is the
- * pure half of a socket channel and must not take a dependency on a crafting service to
- * describe its own budget. If the selection cap moves, this reasoning is what has to be
- * re-read — which is why it is written down rather than computed.
- */
-/*
- * The message count is not the only term in a sender's GM-side ceiling.
- * `COMPLICATION_DELIVERY_MAX_ENTRIES` bounds each message, so the worst case an authenticated
- * sender can put in front of the elected GM is the product of the two — each entry able to cost
- * one `ChatMessage.create` and one `MacroExecutor.run`. Raising either raises that product.
- * It is bounded abuse rather than a new hazard: the GM re-reads every complication from its own
- * world setting, so a forger can only replay complications the GM authored, and the rate limiter
- * is charged per message and applied last so a refused payload costs a sender nothing.
+ * Messages one sender may deliver per window, sized on the fanned-out worst case: a bulk run
+ * relays once per addressed pair, so one gesture at the 25-target bulk selection cap is 25
+ * messages, and 100 holds about three such runs plus one-at-a-time crafts and chained steps
+ * while leaving a scripted flood useless. The 25 is stated rather than imported to keep this
+ * module service-free; re-read this if the cap moves. A sender's GM-side ceiling is this times
+ * `COMPLICATION_DELIVERY_MAX_ENTRIES`, each entry able to cost one chat message and one macro.
  */
 export const COMPLICATION_RATE_LIMIT = 100;
 
@@ -108,35 +34,18 @@ export const COMPLICATION_RATE_LIMIT = 100;
 export const COMPLICATION_RATE_WINDOW_MS = 60_000;
 
 /**
- * Entries one message may address. Bounds a hostile payload. Excess entries are dropped
- * rather than refusing the whole message, so a forged tail cannot suppress the legitimate
- * head.
- *
- * The legitimate worst case is a bulk salvage of an entire inventory, and it carries THREE
- * terms rather than two: rows (capped at 25), the complications a row's yields author, and
- * the STAGE OCCURRENCES those yields take — a complication fires per result entry
- * (`openspec/specs/resolution-modes/spec.md`), so a component staged five times contributes
- * five entries. A deliberately extreme system can therefore reach this bound, and the tail
- * beyond it is dropped: a lost GM card and a lost macro, never a lost award, because
- * complications are strictly downstream of a committed award. Raising the number raises the
- * abuse product above in the same proportion, which is why it is not raised reflexively.
+ * Entries one message may address; the excess is dropped rather than refusing the message, so a
+ * forged tail cannot suppress the legitimate head. A bulk salvage multiplies rows, complications
+ * and stage occurrences (a complication fires per result entry), so an extreme system can reach
+ * this; the dropped tail loses its GM card and macro, never an award.
  */
 export const COMPLICATION_DELIVERY_MAX_ENTRIES = 250;
 
 /** Delivery keys the de-duplication set retains before evicting the oldest. */
 export const COMPLICATION_DEDUPE_LIMIT = 512;
 
-/**
- * Normalize one addressed complication, or `null` when it addresses nothing.
- *
- * `activity` is checked against the frozen vocabulary rather than a restated copy of it.
- * `bucket` and `effectRollTotal` are NOT validated beyond their type: they are the
- * acting client's outcome claim, which the GM cannot verify and does not act on.
- *
- * @param {unknown} entry
- * @returns {{ componentId: string, complicationId: string, resultId: string,
- *   activity: string, bucket: string, effectRollTotal: number|null } | null}
- */
+/** One addressed complication, or `null`. `bucket` and `effectRollTotal` are type-checked only:
+ *  they are the acting client's unverifiable claim, which the GM never acts on. */
 function normalizeComplicationEntry(entry) {
   if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return null;
   const componentId = trimString(entry.componentId);
@@ -156,18 +65,8 @@ function normalizeComplicationEntry(entry) {
   };
 }
 
-/**
- * Validate a complication-delivery payload. A well-formed payload names the crafting
- * system, the acting actor and the resolution, and addresses at least one complication.
- *
- * The normalized payload is REBUILT from the addressing fields, so a payload that also
- * carried a macro uuid, a visibility, a name, a description or a speaker loses them
- * here: nothing downstream can read an executable or disclosure decision off the wire.
- *
- * @param {object} payload
- * @returns {{ action: string, craftingSystemId: string, actorUuid: string,
- *   resolutionId: string, complications: object[] } | null}
- */
+/** Rebuilt from the addressing fields only, so a macro uuid, visibility, name, description or
+ *  speaker on the wire is discarded before anything downstream can read it. */
 export function validateComplicationDeliveryPayload(payload) {
   if (!payload || typeof payload !== 'object') return null;
   if (payload.action !== COMPLICATION_DELIVER) return null;
@@ -190,48 +89,17 @@ export function validateComplicationDeliveryPayload(payload) {
   };
 }
 
-/**
- * The de-duplication key of one addressed complication.
- *
- * `resolutionId` is what makes it unique: `(componentId, complicationId)` repeats across
- * two legitimate resolutions, and `resultId` distinguishes the stage OCCURRENCE, because
- * a component may legitimately appear several times in one resolution.
- *
- * @param {{ resolutionId?: string, resultId?: string, complicationId?: string }} parts
- * @returns {string}
- */
+/** `resolutionId` separates resolutions and `resultId` separates stage occurrences. */
 export function complicationDeliveryKey({ resolutionId, resultId, complicationId } = {}) {
   return [resolutionId, resultId, complicationId].map((part) => String(part ?? '')).join('|');
 }
 
 /**
- * Build the delivery writer: the elected GM applies locally (no socket round-trip,
- * because `handleCustomSocket` broadcasts and an emit never reaches the emitter); any
- * other client emits for the elected GM to apply. Mirrors
- * `createGatheringBlindStartWriter`.
- *
- * NO GM CONNECTED is a DROP here, deliberately unlike the blind-gathering relay, which
- * blocks. A complication is strictly downstream of a committed award, so blocking would
- * strand a completed craft: the award, the player-facing card and the run record are
- * already written and stay unaffected, while the GM-only card and the macro are lost and
- * reported through `onUnroutable` as a local warning on the acting client. There is no
- * store to defer them into — a non-GM client may not author a GM message, must not write
- * the run record, and cannot write a world setting — so "delivered when a GM connects"
- * would be a promise with no carrier.
- *
- * `mintResolutionId` is injected rather than called for the same reason the rest of the
- * module takes edges: minting reaches `foundry.utils.randomID()`, a Foundry global this
- * module must not touch. It mints ONCE per `deliver` call, which is once per resolution.
- *
- * @param {object} deps
- * @param {() => boolean} deps.isActiveGM
- * @param {() => boolean} [deps.hasActiveGM]
- * @param {(payload: object) => void} [deps.onUnroutable]
- * @param {(payload: object) => void} deps.emitComplications
- * @param {(payload: object) => (void|Promise<void>)} deps.applyComplications
- * @param {() => string} [deps.mintResolutionId]
- * @returns {{ deliver: (args: object) => boolean }} `deliver` reports whether the
- *   complications were routed (emitted or applied) at all.
+ * The delivery writer: the elected GM applies locally (a socket emit never reaches its emitter)
+ * and any other client emits. With no GM connected the delivery is dropped and reported through
+ * `onUnroutable`, unlike the blocking blind-gathering relay, because the award is already
+ * committed (spec § No GM connected). `mintResolutionId` is injected to keep Foundry out and runs
+ * once per `deliver`, which answers whether the complications were routed at all.
  */
 export function createComplicationDeliveryWriter({
   isActiveGM,
@@ -267,24 +135,9 @@ export function createComplicationDeliveryWriter({
 }
 
 /**
- * Route an inbound complication-delivery message: only the elected GM applies. The
- * request is authenticated against the server-attested socket SENDER — Foundry passes a
- * trusted, non-forgeable sender user id as the second callback argument of a custom
- * module socket broadcast. An absent/blank sender is treated as unauthenticated and
- * REFUSED (fail-closed).
- *
- * The sender id is handed to the applier, which re-authorizes the addressed actor
- * against THAT user before anything executes. Routing deliberately does not decide
- * authorization itself: the actor is a Foundry document this module may not reach.
- *
- * @param {object} payload
- * @param {object} deps
- * @param {() => boolean} deps.isActiveGM
- * @param {string} [deps.senderId] The server-attested socket sender's user id.
- * @param {(args: object) => (void|Promise<void>)} deps.applyComplications
- * @param {(senderId: string) => boolean} [deps.allowSender] Per-sender rate gate.
- * @param {(key: string) => boolean} [deps.isFreshDelivery] Per-context de-duplication.
- * @returns {boolean} `true` when this client applied at least one complication.
+ * Route an inbound delivery: only the elected GM applies. A blank sender is refused fail-closed,
+ * and the attested sender id goes to the applier, which re-authorizes the actor against it.
+ * Answers whether this client applied at least one complication.
  */
 export function routeComplicationDeliveryMessage(
   payload,
@@ -301,15 +154,7 @@ export function routeComplicationDeliveryMessage(
   return true;
 }
 
-/**
- * Resolve the attested sender of a delivery, or `''` when it must be refused. Rate
- * limiting runs LAST so a malformed or unauthenticated message never consumes a sender's
- * budget, and it is charged per MESSAGE rather than per complication so a batched bulk
- * salvage costs one unit however many rows it carries.
- *
- * @param {object} args
- * @returns {string} The sender id, or `''` when refused.
- */
+/** The attested sender, or `''` when refused. Rate limiting runs last and charges per message. */
 function authenticateComplicationSender({ senderId, allowSender, request }) {
   const sender = senderId === undefined || senderId === null ? '' : String(senderId);
   if (!sender) {
@@ -328,16 +173,7 @@ function authenticateComplicationSender({ senderId, allowSender, request }) {
   return sender;
 }
 
-/**
- * Drop the complications this context has already applied. Filtering per ENTRY rather
- * than per message is what the at-most-once contract is stated on, and it keeps a
- * re-delivered message that also carries a new stage occurrence from losing that
- * occurrence.
- *
- * @param {object} request
- * @param {((key: string) => boolean)|null} isFreshDelivery
- * @returns {object[]}
- */
+/** Filtered per entry, so a re-delivered message keeps any new stage occurrence it carries. */
 function freshComplications(request, isFreshDelivery) {
   if (typeof isFreshDelivery !== 'function') return request.complications;
   return request.complications.filter((entry) =>
@@ -345,21 +181,7 @@ function freshComplications(request, isFreshDelivery) {
   );
 }
 
-/**
- * Build a per-sender sliding-window rate limiter for inbound complication deliveries.
- *
- * The sliding-window mechanism is REUSED from the node-depletion channel rather than
- * copied — a second copy would fail the duplication gate — but this is its own INSTANCE
- * with its own budget, so a burst of gathers cannot starve a legitimate complication
- * through one shared allowance. State is per elected-GM client and in-memory only: a
- * throttle, not an audit log.
- *
- * @param {object} [deps]
- * @param {() => number} [deps.now]
- * @param {number} [deps.limit]
- * @param {number} [deps.windowMs]
- * @returns {(senderId: string) => boolean}
- */
+/** Reuses the node-depletion limiter as its own instance and budget; in-memory, per GM client. */
 export function createComplicationRateLimiter({
   now,
   limit = COMPLICATION_RATE_LIMIT,
@@ -369,27 +191,9 @@ export function createComplicationRateLimiter({
 }
 
 /**
- * Build the bounded de-duplication set for inbound deliveries.
- *
- * Foundry elects a USER, and a user may hold several sockets, so an elected GM with the
- * world open twice passes the election predicate in both contexts and `recipients` does
- * not help — the server iterates every socket of the user. This set suppresses a repeat
- * delivery WITHIN one context.
- *
- * STATED HONESTLY: it cannot cover the two-tab case, and this module does not pretend
- * otherwise. Two tabs are two JS realms with two module instances and two empty sets,
- * and broadcast delivery is per socket, so a single context never receives a duplicate
- * anyway. Foundry offers no per-CLIENT election primitive, and the alternatives are a
- * world write per resolution or accepting the duplicate; this change accepts it. A
- * complication macro must tolerate running more than once, and the addressing-only
- * contract means a duplicate can only re-run the macro the GM themselves authored.
- *
- * The set is bounded and non-persistent — a reconnecting GM starts fresh — which is
- * appropriate for a filter whose job is to make a repeat unlikely, not impossible.
- *
- * @param {object} [deps]
- * @param {number} [deps.limit]
- * @returns {(key: string) => boolean} True the first time a key is seen.
+ * Bounded, non-persistent de-duplication within one context. It cannot cover one GM user with
+ * two tabs (two realms, two sets; Foundry elects a user, not a client), so a complication macro
+ * must tolerate running twice (spec § Delivery is at-most-once). True on a key's first sight.
  */
 export function createComplicationDeliveryDedupe({ limit = COMPLICATION_DEDUPE_LIMIT } = {}) {
   const seen = new Set();
@@ -403,28 +207,9 @@ export function createComplicationDeliveryDedupe({ limit = COMPLICATION_DEDUPE_L
 }
 
 /**
- * Re-read ONE addressed complication from a client's OWN components (issue 1286).
- *
- * This is the whole point of the addressing-only payload: the macro uuid, the name, the
- * description, the severity and the visibility all come from the elected GM's own copy of
- * the `craftingSystems` world setting, and an addressing that names no such component or
- * no such complication resolves to `null` and is DROPPED. A forged message can therefore
- * do no more than fire a complication the GM themselves authored.
- *
- * ## Exact id match, with NO positional fallback
- *
- * The `find` has no `?? components[0]` / `?? authored[0]` tail and must never grow one.
- * With one, a payload naming a complication id that does not exist would fire the GM's
- * FIRST authored complication on that component — running a macro the GM never addressed,
- * from an id the sender chose. That is the exact behaviour
- * `openspec/specs/recipes-and-steps/spec.md` § "The relay payload carries ADDRESSING ONLY"
- * forbids when it says such a payload is dropped, and it is why this function is importable
- * rather than pinned by a text search of `main.js`.
- *
- * @param {Array<object>} components the components of the addressed crafting system, as
- *   THIS client holds them
- * @param {{componentId?: string, complicationId?: string}} [entry] the addressing
- * @returns {{component: object, complication: object}|null}
+ * Re-read one addressed complication from this client's own components, or `null` (dropped). An
+ * exact id match with no positional fallback, ever: a fallback would fire the GM's first authored
+ * complication for an id the sender chose (spec § The relay payload carries ADDRESSING ONLY).
  */
 export function findAuthoredComplication(components, { componentId, complicationId } = {}) {
   const wantedComponent = trimString(componentId);
@@ -438,39 +223,18 @@ export function findAuthoredComplication(components, { componentId, complication
   return complication ? { component, complication } : null;
 }
 
-/**
- * Whether a resolved Macro document may be EXECUTED as a complication's macro.
- *
- * A CALL-SITE check, for the reason `recipes-and-steps/spec.md` § Essence Property Macros
- * requirement 7 gives: `command` is a required string on a chat macro too and the Macro
- * type defaults to `chat`, so an imported system or a hand-edited world setting can carry a
- * uuid naming a chat macro whose command is not valid JavaScript. `MACRO_TYPES` is exactly
- * `{SCRIPT, CHAT}`, so this is a COMPLETE discriminant rather than a sample of one.
- *
- * @param {object|null} macro
- * @returns {boolean}
- */
+/** A call-site check (spec § Essence Property Macros requirement 7): a chat macro also has a
+ *  string `command` and Macro defaults to `chat`; `{SCRIPT, CHAT}` is the whole type set. */
 export function isRunnableComplicationMacro(macro) {
   return Boolean(macro) && macro.type === 'script' && typeof macro.command === 'string';
 }
 
 /**
- * The macro scope for a complication, built from the GM-side re-read.
- *
- * `MacroExecutor` binds only `('context','args','scope')` under `"use strict"`, so every
- * other name a macro author reaches for resolves as a global ON THE EXECUTING CLIENT — and
- * that client is now a GM rather than the acting player. `game.user.character` is the GM's
- * (normally none), `canvas` is whatever scene the GM is viewing, the token selection is the
- * GM's, and `game.user.isGM` is TRUE, so a macro branching on it flips. The speaker, the
- * acting actor and its token are therefore supplied EXPLICITLY, resolved by the caller from
- * the addressing. A complication macro that needs the acting player's own client — any UI
- * prompt — cannot work.
- *
- * `bucket`, `resultId` and `effectRollTotal` are the acting client's CLAIM about the
- * outcome, which the GM cannot verify; they are passed as reported and never acted on.
- *
- * @param {object} args
- * @returns {object}
+ * The macro scope, built from the GM-side re-read. `MacroExecutor` binds only `context`, `args`
+ * and `scope`, so any other name resolves on the executing GM client (its character, canvas,
+ * selection and `isGM === true`); the actor, token and speaker are therefore passed explicitly.
+ * A macro therefore cannot prompt the acting player. `bucket`, `resultId` and `effectRollTotal`
+ * are the acting client's claim, never acted on.
  */
 export function buildComplicationMacroContext({
   craftingSystemId,
@@ -506,29 +270,10 @@ export function buildComplicationMacroContext({
 }
 
 /**
- * Resolve every addressed complication against THIS client's own components and run the
- * injected executor for each, in order, containing one entry's failure from the next.
- *
- * ## Three properties, all of them assertable from here
- *
- * 1. **Dropped, not defaulted.** An entry whose component or complication does not resolve
- *    contributes nothing and runs nothing — see {@link findAuthoredComplication}.
- * 2. **Isolated.** The executor is awaited inside a `try`, so a macro that throws costs the
- *    resolution neither the entries after it nor the GM card: the row survives with a null
- *    report. Dropping that `await` would leave the loop looking correct while turning a
- *    contained GM-side failure into an unhandled rejection, which is why the report is
- *    asserted rather than merely the iteration count.
- * 3. **Sequential.** `Promise.all` would run every macro concurrently against one GM
- *    client's document state, which is the argument `BulkSalvageService` already makes for
- *    its own rows.
- *
- * @param {object} options
- * @param {Array<object>} [options.components] this client's components for the system
- * @param {Array<object>} [options.complications] the validated addressing entries
- * @param {(args: {component: object, complication: object, entry: object}) =>
- *   (object|Promise<object>)} [options.execute] the Foundry-side effect for one entry
- * @returns {Promise<Array<{component: object, complication: object, entry: object,
- *   report: object|null}>>} one row per entry that RESOLVED, in delivery order
+ * Resolve each addressed complication against this client's components and run `execute`
+ * sequentially, each awaited in its own `try`: an unresolved entry runs nothing, and a throwing
+ * macro costs neither later entries nor the GM card (its row survives with a `null` report).
+ * Answers one row per resolved entry, in delivery order.
  */
 export async function applyAuthoredComplications({
   components = [],

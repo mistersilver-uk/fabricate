@@ -33,6 +33,7 @@ import {
   normalizePath,
   parseLabActorTableRegions,
   parseMountRegions,
+  parseRunStateRegions,
   partitionConsoleErrors,
   publishableCases,
   WORLD_PARTIES_SEARCH_TERM,
@@ -51,16 +52,12 @@ import {
 } from '../src/ui/svelte/apps/manager/checks/checksNav.js';
 import { MODIFIER_POLICIES } from '../src/systems/checkModifierResolver.js';
 
-import {
-  TOTALS_DOCUMENT,
-  totalsRegion,
-  withTotalsRegion,
-} from '../scripts/view-lab-registry-totals.mjs';
-
 import { emittingHalfOf } from './helpers/interactablesSmokeLocators.js';
 import { collectWorkingTreeSources } from './helpers/sourceScan.js';
 import { SOURCES, walkTemplate } from './helpers/primitiveAdoptionContract.js';
 import { buildLabContent } from './view-lab/world/labContent.js';
+import { LAB_HISTORY_DATA_STATES } from './view-lab/world/labHistoryEvidence.js';
+import { LAB_JOURNAL_CASE_STATE_RUN_IDS } from './view-lab/world/labRunStates.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -175,6 +172,9 @@ const DRIVER_HOOKS = [
   // `fabricate-manager` is deliberately NOT here.
 ];
 
+/** The one module outside `src/ui/` that renders a chat card: the GM-only complication card. */
+const CHAT_CARD_EMITTERS = new Set(['src/systems/complicationRuntime.js']);
+
 /**
  * Every source file that can carry a UI hook, keyed by path so a check can be scoped to the
  * component that actually renders the thing rather than to the whole tree.
@@ -185,7 +185,8 @@ function renderSources() {
       ([file]) =>
         file.endsWith('.svelte') ||
         file === 'lang/en.json' ||
-        (file.startsWith('src/ui/') && file.endsWith('.js'))
+        (file.startsWith('src/ui/') && file.endsWith('.js')) ||
+        CHAT_CARD_EMITTERS.has(file)
     )
   );
 }
@@ -375,7 +376,9 @@ const FOUNDRY_CHROME_HOOKS = new Set(['dialog-content']);
 
 /** Hooks the LAB HARNESS renders rather than `src/`, matched by their reserved `lab-` prefix. */
 const LAB_HOOK = /^(?:data-)?lab-/;
-const labHarnessSource = readFileSync(resolve(ROOT, 'tests/view-lab/mount.js'), 'utf8');
+const labHarnessSource = ['tests/view-lab/mount.js', 'tests/view-lab/labCompanionRoll.js']
+  .map((file) => readFileSync(resolve(ROOT, file), 'utf8'))
+  .join('\n');
 
 /** A selector with every `:not(…)` group removed, brackets balanced. */
 function stripNegations(selector) {
@@ -1141,8 +1144,24 @@ test('the capture runner threads the per-case console allowance into the render'
   ).map((viewCase) => viewCase.id);
   assert.deepEqual(
     declaring,
-    // The Knowledge error frame's rejected read is rethrown by the store (issue 1969).
-    ['manager-recipes-blocked-enable-flash', 'manager-knowledge-error'],
+    // The Knowledge error frame's rejected read is rethrown by the store (issue 1969), and a failed
+    // roll-under or counting craft or salvage raises the resolved-failure toast the lab reports as
+    // a warning (issues 2005, 2092, 2006, 2007 and 2132). The GM complication card's skipped macro
+    // is reported as a warning beside the card that names it (issue 2153).
+    [
+      'manager-recipes-blocked-enable-flash',
+      'manager-knowledge-error',
+      'player-salvage-under-result-fail',
+      'player-crafting-roll-result-under-fail',
+      'player-crafting-chat-card-under-fail',
+      'player-crafting-chat-card-gm-complication-fault',
+      'player-crafting-roll-result-count-fail',
+      'player-crafting-roll-result-count-botch',
+      'player-crafting-roll-result-count-botch-light',
+      'player-crafting-roll-result-count-zero',
+      'player-crafting-roll-result-count-zero-penalty',
+      'player-crafting-roll-result-count-disadvantage-zero',
+    ],
     'a case gained or lost a console-error allowance; the console gate is what makes a lab frame ' +
       'evidence, so widening it is an accepted edit rather than an incidental one'
   );
@@ -1340,7 +1359,7 @@ test('environment empty membership evidence clears the actual fixture and is sel
 });
 
 test('every combination-rule value the registry targets is a real MODIFIER_POLICIES member', () => {
-  // Ten selectors in this registry pin a rule option by its VALUE, and NOTHING else could see them
+  // Eleven selectors in this registry pin a rule option by its VALUE, and NOTHING else could see them
   // go stale (issue 1095).
   const pattern = new RegExp(
     String.raw`\[` + escapeForRegExp(MODIFIER_POLICY_OPTION_ATTR) + String.raw`="([^"]*)"\]`,
@@ -1358,8 +1377,8 @@ test('every combination-rule value the registry targets is a real MODIFIER_POLIC
   // NON-EMPTY, and of the EXPECTED CARDINALITY (issue 1095).
   assert.equal(
     found.length,
-    10,
-    `expected 10 combination-rule selectors in the registry, found ${found.length} — ` +
+    11,
+    `expected 11 combination-rule selectors in the registry, found ${found.length} — ` +
       `either \`${MODIFIER_POLICY_OPTION_ATTR}\` was renamed in the registry without being ` +
       'renamed here, or cases carrying it were added or deleted'
   );
@@ -2211,7 +2230,8 @@ test('system Travel Map evidence is populated and long-label focus cannot duplic
   assert.equal(longLabel.distinctEvidenceGroup, stacked.distinctEvidenceGroup);
   assert.match(mountSource, /longTravelLabels: params\.get\('longTravelLabels'\) === '1'/);
   assert.match(worldSource, /Map Region Links Across the Active Scene/);
-  assert.match(runnerSource, /evidence frame is byte-identical to/);
+  // The check itself is exercised in `tests/view-lab-render-pool.test.js`; this pins that it runs.
+  assert.match(runnerSource, /rejectDuplicateEvidence\(cases, outcomes\)/);
 });
 
 test('system Travel Map no-regions evidence reaches its world through the lab flag', () => {
@@ -2288,12 +2308,11 @@ test('every crafting case claims exactly the resolution-mode body it renders', (
   );
 
   // The check above is only worth anything if it looked at the cases. It did not, in its first
-  // draft, and passed clean. 31 rather than 28 as of issue 1513, and the three that joined are
-  // three DIFFERENT things this scan now sees.
+  // draft, and passed clean.
   assert.equal(
     examined.length,
-    34,
-    `expected the 34 crafting-path cases to be examined, saw ${examined.length}`
+    123,
+    `expected the 123 crafting-path cases to be examined, saw ${examined.length}`
   );
   assert.ok(
     examined.filter((id) =>
@@ -2438,6 +2457,8 @@ test('changed files map to the windows they affect', () => {
     'fabricate-app-shell',
     'manager-components-normal',
     'manager-gathering-task-editor-normal',
+    // Its Hearth & Herb variant (issue 2151), which a palette's token change is photographed in.
+    'manager-gathering-task-editor-normal-hearth-herb',
     'manager-world-downtime-collapsed',
     'manager-world-downtime-tracking',
   ]);
@@ -2504,9 +2525,10 @@ test('the broad SearchablePopoverPanel signal captures every deliberate picker s
   );
 });
 
-// The thirty-three frames a change to the shared positioning seam must publish: every case whose
+// The thirty-five frames a change to the shared positioning seam must publish: every case whose
 // walk leaves a panel measured, clamped and portaled, across both application roots and the two GM
-// canvas windows (issues 1500, 1503, 1504, 1520). Issue 1510's thirteen are the converted manager
+// canvas windows (issues 1500, 1503, 1504, 1520). Issue 2157's two leave a typeahead combobox's
+// suggestion list open over the scroller that used to clip it. Issue 1510's thirteen are the converted manager
 // selects whose panel sits somewhere no other frame puts one: inside a card or a row the walk
 // authors, in an editor, in an inspector rail, in a browse toolbar row of siblings, under a trigger
 // wider than its rung's ceiling at a one-column window, addressed by a caption id, or at a panel
@@ -2528,6 +2550,7 @@ const ANCHORED_POPOVER_FRAMES = [
   'manager-gathering-tasks-availability-filter-list',
   'manager-recipe-edit-ingredients-kind-list',
   'manager-recipe-edit-ingredients-or-menu',
+  'manager-recipe-edit-ingredients-suggestions',
   'manager-recipe-edit-tag-picker',
   'manager-recipe-item-contents-picker',
   'manager-recipes-bulk-edit-check-tier',
@@ -2544,12 +2567,14 @@ const ANCHORED_POPOVER_FRAMES = [
   'player-inventory-page-size',
   'player-inventory-sort-list',
   'player-journal-sort-list',
+  'world-tool-entry-on-break-repair-suggestions',
   'world-tool-entry-on-break-repair-tag-picker-empty',
 ];
 
 // The anchored-panel class families a member's own `expectSelector` can name: every portaled panel
-// in the tree is either a `*-popover` or the action menu's `fabricate-action-menu-panel`.
-const ANCHORED_PANEL_CLAIM = /popover|action-menu-panel/u;
+// in the tree is a `*-popover`, the action menu's `fabricate-action-menu-panel`, or a typeahead
+// combobox's suggestion list addressed as a child of the application root.
+const ANCHORED_PANEL_CLAIM = /popover|action-menu-panel|> \.manager-recipe-option-suggestions/u;
 
 // The one member whose selector claims no panel. Its walk DOES open the shared icon picker, but its
 // `expectSelector` was spent on issue 1117's bounds pair, so it is listed here by name rather than
@@ -2579,6 +2604,7 @@ test('every anchored-popover frame claims an open panel in its own expectSelecto
 
 for (const seamFile of [
   'src/ui/svelte/actions/anchoredPopover.js',
+  'src/ui/svelte/actions/typeaheadPanel.js',
   'src/ui/svelte/util/overlayBounds.js',
 ]) {
   test(`${seamFile} publishes every frame that rests on an open panel`, () => {
@@ -3012,30 +3038,78 @@ function caseLiteralLines(id) {
   return Array.from({ length: end - start + 1 }, (_, offset) => start + offset);
 }
 
-test('a labRunStates change selects the player windows that render runs — not none, not all', () => {
-  // Its whole output is the three actor run containers and the `gatheringBlindRuns` world setting,
-  // and only the player window reads either: the Journal in its entirety, the Crafting tab's run
-  // summary, the Gathering tab's in-flight rows.
-  const selected = selectedIds(['tests/view-lab/world/labRunStates.js']);
-  const everything = publishableCases();
-  const players = everything.filter((viewCase) => viewCase.app === 'fabricate-app');
+const LAB_RUN_STATES_PATH = 'tests/view-lab/world/labRunStates.js';
+const labRunStatesFile = fileAt(LAB_RUN_STATES_PATH);
 
-  assert.ok(selected.length > 0, 'a run-state change must select evidence, not none');
-  assert.ok(
-    selected.length < everything.length,
-    'a run-state change must not still select every frame'
+/** Every line of one run state's entries, in both of the fixture's tables. */
+function runStateLines(state) {
+  const regions = parseRunStateRegions(labRunStatesFile.source).filter(
+    (region) => region.key === state
   );
+  assert.equal(regions.length, 2, `"${state}" must have a run-id entry and a factory entry`);
+  return regions.flatMap(({ start, end }) =>
+    Array.from({ length: end - start + 1 }, (_, offset) => start + offset)
+  );
+}
 
-  // Derived, not listed: EVERY player case and ONLY player cases, so a player case added tomorrow
-  // is covered without anyone remembering to add its id anywhere.
+/** The publishable cases whose query names one run state, derived rather than listed. */
+const casesOfRunState = (state) =>
+  publishableCases()
+    .filter((viewCase) => viewCase.query?.journalCaseState === state)
+    .map((viewCase) => viewCase.id);
+
+test('the run-state fixture parses into an entry for every state its run table names', () => {
+  const regions = parseRunStateRegions(labRunStatesFile.source);
+  assert.ok(regions, `${LAB_RUN_STATES_PATH} no longer parses into its run-state tables`);
+  // The spread history-data states are defined in their own module, which a patch names instead.
+  const named = Object.keys(LAB_JOURNAL_CASE_STATE_RUN_IDS).filter(
+    (state) => !LAB_HISTORY_DATA_STATES.includes(state)
+  );
+  assert.deepEqual([...new Set(regions.map((region) => region.key))].sort(), named.sort());
+});
+
+test('adding one run state to labRunStates selects only the cases that render it', () => {
+  const state = 'paused';
+  const expected = casesOfRunState(state);
+  const players = publishableCases().filter((viewCase) => viewCase.app === 'fabricate-app');
+  assert.ok(expected.length > 0, `no case renders "${state}", so this proves nothing`);
+  assert.ok(expected.length < players.length, 'one state must be narrower than every player case');
+
   assert.deepEqual(
-    selected,
-    players.map((viewCase) => viewCase.id)
+    selectedIds([LAB_RUN_STATES_PATH], labRunStatesFile.patches(runStateLines(state))),
+    expected
   );
-  assert.ok(
-    selected.includes('fabricate-journal'),
-    'the Journal is the run browser; it cannot be outside a run-state selection'
+  // A line inside a multi-line factory entry belongs to that entry, not to shared code.
+  const continuation = labRunStatesFile.lineOf("        waiting('lab-v1-paused', single(), {");
+  assert.deepEqual(
+    selectedIds([LAB_RUN_STATES_PATH], labRunStatesFile.patches([continuation])),
+    expected
   );
+});
+
+test('an unattributable labRunStates patch widens to every player-window case, by union', () => {
+  const helper = labRunStatesFile.lineOf('function stageBrowserRun(context, recipe, pastCheck = null) {');
+  const importLine = labRunStatesFile.lineOf("} from './labJournalPrototype.js';");
+  // Derived, not listed: every player case, so one added tomorrow is covered unmapped.
+  const players = publishableCases()
+    .filter((viewCase) => viewCase.app === 'fabricate-app')
+    .map((viewCase) => viewCase.id);
+
+  assert.deepEqual(selectedIds([LAB_RUN_STATES_PATH]), players, 'no patch at all');
+  for (const line of [helper, importLine]) {
+    assert.deepEqual(
+      selectedIds([LAB_RUN_STATES_PATH], labRunStatesFile.patches([line])),
+      players,
+      `line ${line} sits outside every run state's entry`
+    );
+  }
+
+  const withState = new Set(
+    selectedIds([LAB_RUN_STATES_PATH], labRunStatesFile.patches([helper, ...runStateLines('paused')]))
+  );
+  for (const id of [...players, ...casesOfRunState('paused')]) {
+    assert.ok(withState.has(id), `the union dropped "${id}"`);
+  }
 });
 
 test('every lab input the registry cannot attribute selects surface coverage', () => {
@@ -3059,6 +3133,9 @@ test('every lab input the registry cannot attribute selects surface coverage', (
     'tests/view-lab/world/labNobodyHasAttributedThisYet.js',
     'scripts/lib/foundryChromeSpec.js',
     'scripts/view-lab-screenshots.mjs',
+    'scripts/lib/viewLabRenderPool.js',
+    'scripts/lib/viewLabShards.js',
+    'scripts/view-lab-shards.mjs',
   ]) {
     assert.deepEqual(
       selectedIds([file]),
@@ -3406,20 +3483,20 @@ test('the two Access roster frames are pinned to the crowded roster the shim see
 });
 
 // The registry totals used to be hand-copied into four documents, and they drifted three separate
-// times: `AGENTS.md` once claimed 155 cases, `CONTRIBUTING.md` 181 and `scripts/README.md` 219 —
-// three different wrong answers, none of which anything failed on. They are generated now, and
-// these two tests are the gate: the region must say what the registry says, and no carrier may
-// quote a count again.
+// times: `AGENTS.md` once claimed 155 cases, `CONTRIBUTING.md` 181 and `scripts/README.md` 219.
+// A generated README region replaced them, but it changed with every case added or removed, so
+// every open PR conflicted with every other. No document states the counts now; the registry is
+// their only record, and this test keeps any of them from coming back.
 
-/** The documents that carried a hand-copied count, plus the one that carries the generated region. */
+/** The documents that have carried a registry count. */
 const TOTALS_CARRIERS = Object.freeze([
   'AGENTS.md',
   'CONTRIBUTING.md',
-  TOTALS_DOCUMENT,
+  'scripts/README.md',
   '.agents/skills/fabricate-orchestrator/SKILL.md',
 ]);
 
-/** The six sentence shapes the generated region retired, as each document used to state it. */
+/** Every sentence shape that has stated a registry count, including the retired generated region. */
 const RETIRED_COUNT_PATTERNS = Object.freeze([
   /the registry holds (\d+) cases: (\d+) `exact`, (\d+) `window`, (\d+) `beyond`/,
   /which is (\d+) of the (\d+) publishable cases/,
@@ -3427,49 +3504,18 @@ const RETIRED_COUNT_PATTERNS = Object.freeze([
   /the normal case, at (\d+) cases across five windows/,
   /one frame of every route and tab the lab renders, (\d+) cases/,
   /one frame of every route and tab the lab renders, (\d+) of (\d+) cases/,
+  /The registry holds (\d+) publishable cases/,
+  /the lab renders — is (\d+) of them/,
 ]);
 
-/** A carrier with the generated region cut out, so the guard cannot read the writer's own output. */
-function outsideGeneratedRegion(markdown) {
-  const lines = totalsRegion().split('\n');
-  const [start] = lines;
-  const end = lines.at(-1);
-  const from = markdown.indexOf(start);
-  if (from === -1) return markdown;
-  const to = markdown.indexOf(end, from);
-  assert.ok(to !== -1, `a totals region opened by ${start} has no ${end}`);
-  return markdown.slice(0, from) + markdown.slice(to + end.length);
-}
-
-test('the generated totals region says what the registry says, exactly once', () => {
-  const carrier = readFileSync(resolve(ROOT, TOTALS_DOCUMENT), 'utf8');
-  const expected = totalsRegion();
-  assert.equal(
-    carrier.split(expected).length,
-    2,
-    `${TOTALS_DOCUMENT}'s totals region is stale or duplicated — run \`npm run viewlab:totals\`. ` +
-      `It should read once:\n${expected}`
-  );
-});
-
-test('the totals writer replaces one region and refuses a missing or duplicated one', () => {
-  const region = totalsRegion();
-  const document = `intro\n\n${region}\n\nouter\n`;
-  assert.equal(withTotalsRegion(document, region), document, 'a current region is a no-op');
-  const stale = document.replace(region, `${region.split('\n')[0]}\nstale\n${region.split('\n').at(-1)}`);
-  assert.equal(withTotalsRegion(stale, region), document, 'a stale region is replaced in place');
-  assert.throws(() => withTotalsRegion('no region here\n', region), /has no/u);
-  assert.throws(() => withTotalsRegion(`${document}${region}\n`, region), /more than one/u);
-});
-
-test('no carrier quotes a registry count outside the generated region', () => {
+test('no carrier quotes a registry count', () => {
   for (const carrier of TOTALS_CARRIERS) {
-    const prose = outsideGeneratedRegion(readFileSync(resolve(ROOT, carrier), 'utf8'));
+    const prose = readFileSync(resolve(ROOT, carrier), 'utf8');
     for (const pattern of RETIRED_COUNT_PATTERNS) {
       assert.ok(
         !pattern.test(prose),
-        `${carrier} states a registry count in prose again (${pattern}). The numbers are ` +
-          `generated into ${TOTALS_DOCUMENT}; point at that region instead of copying it.`
+        `${carrier} states a registry count in prose again (${pattern}). The count changes ` +
+          'with every case, so no document states it; the registry is the only record.'
       );
     }
   }
@@ -3537,6 +3583,9 @@ const SHARED_CASE_MODULES = Object.freeze([
   'journalBlindRunCases.js',
   'journalHistoryCases.js',
   'journalLifecycleCases.js',
+  'playerAdditionalDicePromptCases.js',
+  'playerAdvantagePromptCases.js',
+  'playerCountResultCases.js',
 ]);
 
 const CASE_FILE_DIRECTORY = 'scripts/lib/view-lab-cases';
@@ -3635,7 +3684,9 @@ test('every case literal parses as its own attributable region', () => {
     assert.deepEqual(
       inline.filter((id) => {
         const selected = selectedIds([path], file.patches([caseIdLine(id)]));
-        return selected.length !== 1 || selected[0] !== id;
+        // The literal's own case, and the palette variants it declares (issue 2151).
+        const expected = cases.filter((entry) => [entry.id, entry.baseCaseId].includes(id));
+        return selected.join(',') !== expected.map((entry) => entry.id).join(',');
       }),
       [],
       `${path}: a patch confined to these case literals widens past them, so \`CASE_OPEN_PATTERN\` ` +
@@ -5095,12 +5146,47 @@ test('the capture workflow renders and publishes the one id list it computed', (
     1,
     'a second id list would let render and publish disagree about what the PR selected'
   );
+  // Sharded (issue 2119): the shard plan is cut from that same list, each render shard consumes
+  // its own slice of it, and the merge is checked against the whole list before anything publishes.
   assert.match(
     workflow,
-    /CASE_IDS: \$\{\{ steps\.select\.outputs\.ids }}/,
-    "the renderer must consume the selection step's own output"
+    /view-lab-shards\.mjs plan "\$IDS" "\$RENDER"/,
+    'the shard plan must be cut from the one computed id list'
   );
-  assert.match(workflow, /view-lab-screenshots\.mjs apps "\$CASE_IDS"/);
+  assert.match(workflow, /include: \$\{\{ fromJSON\(needs\.select\.outputs\.matrix\) }}/);
+  assert.match(
+    workflow,
+    /CASE_IDS: \$\{\{ matrix\.ids }}\n\s+run: node scripts\/view-lab-screenshots\.mjs apps "\$CASE_IDS"/,
+    'each render shard must render exactly its own slice'
+  );
+  assert.match(
+    workflow,
+    /CASE_IDS: \$\{\{ needs\.select\.outputs\.ids }}\n\s+run: node scripts\/view-lab-shards\.mjs merge "\$CASE_IDS" ui-screenshot-artifact\/shards ui-screenshot-artifact\/apps/,
+    'the merge must account for the whole selection and write the directory publish reads'
+  );
+  assert.match(workflow, /name: view-lab-shard-\$\{\{ matrix\.shard }}/);
+  assert.match(workflow, /pattern: view-lab-shard-\*\n\s+path: ui-screenshot-artifact\/shards/);
+  // Only PNGs and the manifest leave a shard, named file by file (the LICENSING header).
+  assert.match(
+    workflow,
+    /path: \|\n\s+ui-screenshot-artifact\/apps\/\*\.png\n\s+ui-screenshot-artifact\/apps\/manifest\.json\n/
+  );
+  assert.doesNotMatch(workflow, /path:[^\n]*foundry-chrome/);
+  // The chrome-dependent suites verify one harvest, so they run once, in their own job beside the
+  // shards, and the publish still waits for them.
+  const jobOf = (name) => {
+    const start = workflow.indexOf(`\n  ${name}:\n`);
+    assert.notEqual(start, -1, `pr-screenshots.yml has no ${name} job`);
+    const next = workflow.slice(start + 1).search(/\n {2}[a-z-]+:\n/);
+    return workflow.slice(start, next === -1 ? undefined : start + 1 + next);
+  };
+  assert.match(jobOf('verify-chrome'), /- name: Run every chrome-dependent suite/);
+  assert.doesNotMatch(jobOf('render'), /chrome-dependent suite, where/);
+  assert.match(jobOf('verify-chrome'), /\n {4}needs: \[select, warm-foundry]\n/);
+  assert.match(jobOf('capture'), /\n {4}needs: \[select, render, verify-chrome]\n/);
+  for (const name of ['render', 'verify-chrome']) {
+    assert.match(jobOf(name), /uses: \.\/\.github\/actions\/prepare-view-lab\n/);
+  }
 
   // The publish step names the directory the renderer writes. Derived from the runner rather than
   // trusted twice, so a moved output directory fails here instead of publishing an empty set.
@@ -5118,9 +5204,7 @@ test('the capture workflow renders and publishes the one id list it computed', (
 // `tests/view-lab-cases.test.js` asserted only that a case DECLARING `expectView` is a manager
 // case; the VALUE was never matched against any route id.
 function buildExpectViewPredicate() {
-  // The rail's entries are their own units since issue 1717 and the page header's model and five
-  // components since issue 1720, and a route literal is asserted wherever it is compared — so the
-  // scan reads the shell, the three entry units and the whole page header as one.
+  // Route literals live in the shell and in the units extracted from it, so the scan reads them all as one.
   const rootSource = [
     'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
     'src/ui/svelte/apps/manager/headerModel.svelte.js',
@@ -5132,6 +5216,10 @@ function buildExpectViewPredicate() {
     'src/ui/svelte/apps/manager/ManagerSystemNav.svelte',
     'src/ui/svelte/apps/manager/ManagerWorldNav.svelte',
     'src/ui/svelte/apps/manager/ManagerWorldDowntimeNavGroup.svelte',
+    'src/ui/svelte/apps/manager/checks/checksRouteModel.svelte.js',
+    'src/ui/svelte/apps/manager/gatheringRouteModel.svelte.js',
+    'src/ui/svelte/apps/manager/gatheringDraftHandlers.svelte.js',
+    'src/ui/svelte/apps/manager/gatheringModifierHandlers.svelte.js',
   ]
     .map((file) => readFileSync(resolve(ROOT, file), 'utf8'))
     .join('\n');

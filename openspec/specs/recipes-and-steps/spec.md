@@ -16,8 +16,16 @@ A virtual-present Tool binds those evaluations to the primary acting or check ac
 A failed `usability` gate makes the Tool absent at recipe, step, ingredient-set, salvage, and gathering availability gates and uses the existing missing-Tool feedback.
 A failed `bonus` gate preserves presence and suppresses only that Tool's numeric bonus.
 Crafting and salvage evaluate every distinct enabled eligible Tool's bonus expression once and compose every finite non-zero value additively.
-The resulting non-zero terms are appended to simple, routed, progressive, and alchemy formulas with bracket/control characters removed from their Tool labels.
-A missing evaluator, thrown evaluation, non-finite result, or otherwise failed bonus evaluation contributes zero without aborting the attempt.
+A versioned Journal crafting check applies the same bonuses: the issuing GM evaluates them once from the stage's validated Tools when preparing the check, the prepared descriptor retains the contributions, and the prompt and execution use that Tool-appended formula.
+Under the active sum/over evaluation, the resulting non-zero terms are appended to simple, routed, progressive, and alchemy formulas with bracket/control characters removed from their Tool labels.
+Under sum/over a dice-bearing Tool bonus appends only its numeric result, as before, and adds no roll evidence to the check's message, result or handoff.
+Under any other evaluation each Tool's resolved benefit is routed to its target, threshold, or pool instead; an evaluated dice-bearing Tool bonus retains its actual roll evidence and is never rolled again.
+Tools are prepared by the check's own normalized evaluation, and only after its target has resolved, because preparation rolls dice-bearing Tool bonuses.
+The supplying actor, distinct-Tool deduplication, prerequisite gates, evaluation timing, and failure-to-zero behavior are the same in every evaluation.
+A dice-bearing Tool bonus whose roll cannot be serialized aborts check preparation before its numeric benefit can be used.
+If its evidence must be reconstructed before a main check rolls, failure likewise aborts before that roll.
+An entitled handoff instead reports a failed chat post after GM execution, without rerolling or rolling back that check.
+Apart from those evidence failures, a missing evaluator, thrown evaluation, non-finite result, or otherwise failed bonus evaluation contributes zero without aborting the attempt.
 Gathering never applies numeric Tool bonuses.
 
 ## Purpose
@@ -207,6 +215,7 @@ Capture is gated by initiating-viewer entitlement at write time and by current-v
 The evidence records what that write actually did, so deleting the recipe, component, task or system configuration afterwards cannot change it.
 
 - **Executed resolution.** Every such write MUST record `resolutionSnapshot` as `{kind, mode}` for the resolution it executed, derived from the canonical active-check derivation at execution rather than from configuration read back later.
+An executed versioned crafting `kind: "check"` snapshot additionally retains validated `product: "sum"` and the executed `direction` (`"over"` or `"under"`) from the check result; neither field is inferred from authored future configuration or copied onto no-check, ingredient-routed, fizzle, legacy or gathering d100 records.
 A legacy timed crafting stage captures it on the finishing write rather than on the arming write, because the resolution is unknowable while the gate is still running.
 - **Physical effects.** Consumption and awards MUST be captured at the actual update or delete boundary: require the matching document's acknowledgment, derive each decrement from the captured source quantity, and capture name, image and actor-qualified identity before deletion.
 A requested plan, a swallowed failure, or a calculated after-value alone MUST NOT establish complete consumption.
@@ -262,19 +271,36 @@ They change no existing contract: the crafting and gathering economies, legacy c
    - **Progressive**: roll the progressive formula;
      its total is the numeric `value` spent against ordered result difficulties.
 
+   A simple or routed check grades in its evaluation's direction against its resolved target
+   (`resolution-modes/spec.md` § Check Target Resolution).
+   A fixed target is the resolved DC above; an attribute target reads the crafting actor's
+   character value, adjusted by the selected recipe tier's non-null `adjustment`, else the
+   evaluation's `target.baseAdjustment`, and is kept separate from the DC fields.
+   The target resolves and validates before Tool preparation and before any dynamic-DC macro.
+   A target refusal aborts the attempt as misconfigured before any roll, consumption or award:
+   `craft()` returns `{ success: false, results: null, message, misconfigured: true }` with
+   `data.targetRefusal` naming the reason.
+   Every misconfigured required check carries that additive `misconfigured: true`
+   discriminator, as salvage already does, including a sum/over check with no roll formula;
+   `success` and `message` are unchanged.
+   A timed FINISH refusal returns the same shape, rolls nothing, awards nothing and leaves the
+   run resumable, its inputs having been consumed at START.
+   Anything an arbitrary configured macro does cannot be rolled back.
+
    A crafting check is not optional-by-absence.
    Simple mode always carries a system-level check that is either active or deactivated;
    `routedByCheck` and progressive modes REQUIRE a configured check, while `routedByIngredients` (like simple) has an OPTIONAL check.
    A check is **usable** iff the active mode's check config carries an authored roll formula
-   (`simple.rollFormula` / `routed.rollFormula` / `progressive.rollFormula`), in which case it is
-   engine-evaluated as above; `craftingCheck.enabled` (or `features.craftingChecks`) is only the on/off toggle
+   (`simple.rollFormula` / `routed.rollFormula` / `progressive.rollFormula`) or an active
+   `product: 'count'` evaluation, in which case it is engine-evaluated as above; `craftingCheck.enabled` (or `features.craftingChecks`) is only the on/off toggle
    gating the OPTIONAL **simple**-mode check, not a proxy for "the check works" — `routedByIngredients` and
-   alchemy-Simple run on an authored formula alone, ungated by that toggle.
+   alchemy-Simple run on an authored formula or an active count evaluation alone, ungated by that toggle.
    The deprecated macro / built-in adapter check sources (root `macroUuid`, `successMacroUuid`,
    `failureMacroUuid`, `checkSource`, and the `builtIn` adapter config) were removed in 1.8.0;
    there is no longer a `checkSource` axis. (The dynamic-DC macro on `simple.macroUuid` is a
    different feature and is retained.)
-   A mode that requires a check but has no roll formula configured is a system misconfiguration
+   A mode that requires a check but has neither a roll formula nor an active `product: 'count'`
+   evaluation configured is a system misconfiguration
    surfaced by system-level validation (and a loud runtime failure), not a silent no-op.
    A `breakTools` flag is honoured for forced tool breakage ONLY from engine-evaluated
    roll-formula checks (`engineEvaluated === true`).
@@ -408,7 +434,7 @@ Applies only when `CraftingSystem.resolutionMode === "alchemy"`.
    - resolve the target recipe + ingredient set,
    - execute provider-specific routing (`ingredientSet` or `check`),
    - if routed output does not resolve to a valid result group, abort with a crafting-system misconfiguration error BEFORE any consumption — no ingredients, currency, or tools are consumed or broken — and report failure (never a player success with zero items),
-   - if routing returns a reserved failure keyword, apply alchemy failure policy (`consumeOnFail`, default true),
+   - if routing returns a reserved failure keyword, apply alchemy failure policy: consume ingredients per `alchemy.consumeOnFail` (default true), and apply tool breakage per `craftingCheck.consumption.breakToolsOnFail` (default false),
    - on success, consume inputs and create outputs normally.
 5. Learn flow:
    - recipes are learned only on successful completion,
@@ -659,6 +685,8 @@ Salvage is a single-step operation (no multi-step salvage):
 3. **Check**: Roll the salvage check for the active `salvageResolutionMode`.
 A salvage check is usable only when its mode has an authored roll formula (`salvageCraftingCheck.simple|routed|progressive.rollFormula`); the optional simple check runs only when `salvageCraftingCheck.simple.rollFormula` is authored.
 Routed and progressive salvage require their roll formula and fail loudly (with zero mutation) when it is missing.
+A simple or routed salvage check grades against its resolved target in its evaluation's direction: a fixed target is the component's finite `salvage.dcOverride`, else the slot's `dc`, else 15, and an attribute target reads the actor's character value adjusted by the component's non-null `salvage.adjustmentOverride`, else the evaluation's `target.baseAdjustment`, with no macro and no recipe tier.
+A target refusal, a progressive `sum/under` check included, aborts as misconfigured with zero mutation before any roll, and `salvage()` returns `misconfigured: true` with `data.targetRefusal` naming the reason.
 4. **Resolve**: Determine result group by `salvageResolutionMode` rules (same as recipe resolution per `resolution-modes/spec.md`, but using salvage-specific settings).
 5. **Consume**: remove N = `Component.salvage.ingredientQuantity` instances (default 1, any positive integer) of the component from the actor's inventory, matching §Implicit Ingredient and `data-models/spec.md`.
 Apply tool usage/breakage as applicable.

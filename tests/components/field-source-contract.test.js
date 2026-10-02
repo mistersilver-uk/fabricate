@@ -13,16 +13,13 @@ const FIELD_PATH = 'src/ui/svelte/components/Field.svelte';
 /** The components still writing a raw `class="manager-field …"`, with their EXACT site count. */
 const RAW_FIELD_ALLOWLIST = Object.freeze([
   Object.freeze({
-    path: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
+    path: 'src/ui/svelte/apps/manager/SystemBrowserInspector.svelte',
     sites: 1,
     why:
-      'The manager root, the file every manager lane touches. Its one remaining field is the ' +
-      'systems-list condition shortcut. It was seven until issue 1707 wrote the twice-authored ' +
-      'modifier panel once (four left, two landed in the row below, two de-duplicated rather ' +
-      'than converted), and three until its phase 2 moved the drop-rate and drop-count editors ' +
-      'into the row below with the branch that drew them. Deferred as a whole so the sweep and ' +
-      'the root are separately reviewable, not because the sites differ from the 81 that ' +
-      'converted.',
+      "The systems-list condition shortcut, the last of the manager root's seven. Issue 1721 " +
+      'relocated it with the systems inspector chain without converting it, so the deferral is ' +
+      "unchanged in substance; the file is now one screen's form, which a conversion lane can " +
+      'take on its own.',
   }),
   Object.freeze({
     path: 'src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte',

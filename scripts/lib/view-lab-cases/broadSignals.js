@@ -75,6 +75,14 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/components/OutcomeLadder.svelte': Object.freeze([
     'fabricate-journal-lifecycle-gathering-check',
   ]),
+  // The shared die tiles (issue 2006): the simulator's rolled pool, marked, and a botch's cancels.
+  'src/ui/svelte/components/DiceTiles.svelte': Object.freeze([
+    'manager-checks-count-over-rolled',
+    'manager-checks-count-botch',
+    // Issue 2008: the dashed bought tile, on the result box and the simulator.
+    'player-crafting-roll-result-count-bought',
+    'manager-checks-count-simulator-bought',
+  ]),
   // The shared icon picker (issue 1269).
   'src/ui/svelte/components/IconPicker.svelte': Object.freeze(['manager-system-edit-lists']),
   // The most-used control in the app, and until issue 1378 it published no frame that renders one.
@@ -251,6 +259,20 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/components/Callout.svelte': Object.freeze([
     'manager-tool-parity-04-requirements-1280x720',
     'player-salvage',
+  ]),
+  // The modal chrome's banded frame (issue 2021), which every dialog draws since epic 1997.
+  'src/ui/svelte/components/ManagerModal.svelte': Object.freeze([
+    'player-crafting-roll-prompt-basic',
+    'player-crafting-roll-prompt-compact',
+    'manager-import-report',
+    'manager-components-add-from-catalogue',
+  ]),
+  // The well below a card (issue 2008): the Formula card's roll-prompt and additional-dice groups,
+  // and the roll prompt's additional-dice control.
+  'src/ui/svelte/components/Well.svelte': Object.freeze([
+    'manager-checks-crafting-advantage-keep',
+    'manager-checks-v3-count-under',
+    'player-crafting-roll-prompt-count-additional',
   ]),
   // The sheet itself, and the first entry here whose key is not a component (issue 1515).
   'styles/fabricate.css': Object.freeze([

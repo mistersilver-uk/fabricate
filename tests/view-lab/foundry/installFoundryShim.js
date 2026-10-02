@@ -2,10 +2,19 @@
  * The Foundry globals the View Lab installs before it imports any Fabricate runtime module.
  * `game.settings` is the entire persistence layer.
  */
-import { createLabRoll } from './labRoll.js';
-import { installLabRandom } from './labRandom.js';
+import { registerCountRoll } from '../../../src/systems/countRoll.js';
 import { createLabDialogV2 } from '../foundryDialog.js';
-import { installUpdateSemantics, makeGetFlag, makeSetFlag } from '../world/labFlags.js';
+import { createLabRollPromptAnswerer } from '../rollPromptAnswer.js';
+import {
+  installSourceSemantics,
+  installUpdateSemantics,
+  makeGetFlag,
+  makeSetFlag,
+} from '../world/labFlags.js';
+
+import { installLabRandom } from './labRandom.js';
+import { createLabRoll } from './labRoll.js';
+import { LAB_TERM_CLASSES } from './labRollTerms.js';
 
 /**
  * Compose the Map key for one setting.
@@ -293,6 +302,7 @@ export function installFoundryShim(world) {
     foundry: globalThis.foundry,
     fromUuid: globalThis.fromUuid,
     fromUuidSync: globalThis.fromUuidSync,
+    CONFIG: globalThis.CONFIG,
   };
 
   const gmUser = { id: 'user-lab-gm', name: 'Lab GM', isGM: true, color: { css: '#f1d1b5' } };
@@ -449,7 +459,9 @@ export function installFoundryShim(world) {
   globalThis.Actor = {
     async createDocuments(specs = []) {
       const created = specs.map((spec) =>
-        makeDocument(spec, 'Actor', { items: [], type: spec.type ?? 'character', isOwner: true })
+        installSourceSemantics(
+          makeDocument(spec, 'Actor', { items: [], type: spec.type ?? 'character', isOwner: true })
+        )
       );
       game.actors.contents.push(...created);
       return created;
@@ -471,6 +483,14 @@ export function installFoundryShim(world) {
     random: random.random,
     replaceFormulaData: LAB_ROLL_STATICS.replaceFormulaData,
     validate: LAB_ROLL_STATICS.validate,
+  });
+  // `init` registers the count Roll over core `Roll`; the lab registers it over `LabRoll` through
+  // the same factory, so a count check reaches its prompt (issue 2004).
+  globalThis.CONFIG = { Dice: { rolls: [globalThis.Roll] } };
+  registerCountRoll({
+    config: globalThis.CONFIG,
+    BaseRoll: globalThis.Roll,
+    i18n: () => globalThis.game?.i18n,
   });
 
   // A run that SUCCEEDS posts a chat card.
@@ -570,6 +590,7 @@ export function installFoundryShim(world) {
 
   // A REAL DialogV2, drawn from Foundry's own `client/applications/api/dialog.mjs`.
   const dialogs = createLabDialogV2({ localize: world.i18n.localize });
+  const rollPrompts = createLabRollPromptAnswerer();
 
   globalThis.foundry = {
     utils,
@@ -583,6 +604,8 @@ export function installFoundryShim(world) {
       instances: new Map(),
     },
     documents: {},
+    // Core's dice namespace, whose `terms.Die` the keep transform checks a term against (issue 2007).
+    dice: { Roll: globalThis.Roll, terms: LAB_TERM_CLASSES },
     CONST: globalThis.CONST,
   };
 
@@ -627,13 +650,15 @@ export function installFoundryShim(world) {
      */
     setDialogAnswer(answer) {
       dialogs.setAnswer(answer);
+      rollPrompts.setAnswer(answer);
     },
-    /** @returns {HTMLElement[]} The dialog elements currently rendered into the page. */
+    /** @returns {HTMLElement[]} The dialogs and roll prompts currently rendered into the page. */
     openDialogs() {
-      return dialogs.openDialogs();
+      return [...dialogs.openDialogs(), ...rollPrompts.openPrompts()];
     },
     restore() {
       random.restore();
+      rollPrompts.disconnect();
       globalThis.game = previous.game;
       globalThis.ui = previous.ui;
       globalThis.Hooks = previous.Hooks;
@@ -641,6 +666,7 @@ export function installFoundryShim(world) {
       globalThis.foundry = previous.foundry;
       globalThis.fromUuid = previous.fromUuid;
       globalThis.fromUuidSync = previous.fromUuidSync;
+      globalThis.CONFIG = previous.CONFIG;
     },
   };
 }

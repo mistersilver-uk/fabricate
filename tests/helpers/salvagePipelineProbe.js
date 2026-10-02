@@ -286,7 +286,6 @@ export function salvageRunProbe(spec = {}) {
     { toolMatchesItem: (_recipe, tool, item) => item?.componentId === tool?.componentId },
     null,
     resolutionService,
-    null,
     manager.recording,
     probeCoinSpender(journal),
     probeCoinSpender(journal),
@@ -307,7 +306,9 @@ export function salvageRunProbe(spec = {}) {
   }
 
   const record = (result) => {
-    journal.push('returned', { ...result, salvageRun: salvageRunDigest(result.salvageRun) });
+    // The display projection (issue 2005) is pinned by the evidence suites, not this effect journal.
+    const { check: _check, ...returned } = result;
+    journal.push('returned', { ...returned, salvageRun: salvageRunDigest(result.salvageRun) });
     return result;
   };
   const recordThrow = (error) => {

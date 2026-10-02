@@ -538,8 +538,7 @@ describe('ComponentsBrowserView world cohort (issue 1371)', () => {
     );
   });
 
-  it('draws a ghost as the SAME row, dimmed and stated', async () => {
-    // Gap-list row 146. The ghost used to be a two-line stub — name.
+  it('draws an absent component with the canonical essence-row anatomy', async () => {
     const root = await browser.mount({
       itemCards: [],
       scope: ghostScope(),
@@ -551,29 +550,27 @@ describe('ComponentsBrowserView world cohort (issue 1371)', () => {
     const row = root.querySelector('[data-component-id="w-1"]');
     assert.ok(Boolean(row), 'the ghost row renders');
     assert.equal(row.dataset.componentMember, 'false');
-    assert.ok(row.classList.contains('is-ghost'), 'and reads as the dimmed cohort');
+    assert.ok(row.classList.contains('is-ghost'), 'and carries the absent-state hook');
     assert.ok(Boolean(row.querySelector('.fab-medallion')), 'the medallion stays');
     assert.equal(
       row.querySelector('.manager-component-name-line .manager-chip').textContent.trim(),
       'Not in this system',
       'the name line states the membership fact rather than a salvage state it cannot have'
     );
-    assert.equal(
-      row.querySelector('[data-component-recipes]').getAttribute('data-component-recipes'),
-      '\u2014',
-      'the Recipes column stays and answers with an em dash rather than being dropped'
+    assert.ok(
+      row.querySelector('.manager-component-name-line .manager-chip i.fa-circle-minus'),
+      'the state marker uses the same circle-minus icon as an absent essence'
     );
     assert.ok(
       !row.querySelector('.manager-component-essence-dots'),
       'and it states NO behaviour: this system has authored no essence contribution for it'
     );
+    assert.ok(!row.querySelector('[data-component-recipes]'), 'it omits the member-only recipe fact');
 
     const add = row.querySelector('[data-component-ghost-add="w-1"]');
     assert.ok(Boolean(add), 'its one control is the adoption verb');
-    assert.ok(
-      add.classList.contains('is-dashed'),
-      'DASHED, not the filled green primary that shipped: adopting is an offer, not the row primary'
-    );
+    assert.equal(add.textContent.trim(), 'Add to this system');
+    assert.ok(add.classList.contains('is-primary'), 'adoption is the row primary, as for an absent essence');
     assert.ok(
       !row.querySelector('[data-component-select]'),
       'and it carries no bulk box: the prune effect drops every id this system has no component ' +
@@ -581,8 +578,7 @@ describe('ComponentsBrowserView world cohort (issue 1371)', () => {
     );
   });
 
-  it("a ghost's identity opens the world catalogue entry, not an in-system selection", async () => {
-    // `onSelectComponent` writes `selectedComponentId`.
+  it("an absent component's identity selects it without leaving Component Rules", async () => {
     const opened = [];
     const selected = [];
     const root = await browser.mount({
@@ -598,13 +594,14 @@ describe('ComponentsBrowserView world cohort (issue 1371)', () => {
     root.querySelector('[data-component-id="w-2"] .manager-component-identity').click();
     flushSync();
 
-    assert.deepEqual(
-      opened,
-      [['world-component-entry', 'w-2']],
-      'the ROUTE TOKEN travels with the id: the token is the half that decides whether the ' +
-        'navigation resolves, and a page cannot route'
+    assert.deepEqual(selected, [['w-2']], 'the existing browser selection seam receives the world id');
+    assert.deepEqual(opened, [], 'identity activation stays in Component Rules');
+
+    await browser.setProps({ selectedComponentId: 'w-2' });
+    assert.ok(
+      root.querySelector('[data-component-id="w-2"]').classList.contains('is-selected'),
+      'the owner-fed selection uses the same selected-row state as a member'
     );
-    assert.deepEqual(selected, [], 'and the in-system selection is NOT also written');
   });
 
   it("a MEMBER's identity still selects it in this system", async () => {
@@ -646,6 +643,16 @@ describe('ComponentsBrowserView world cohort (issue 1371)', () => {
     flushSync();
 
     assert.deepEqual(calls, [['w-2', 'sys-1']]);
+
+    await browser.setProps({
+      itemCards: [makeComponent({ id: 'w-2', name: 'Unbound Salt' })],
+    });
+
+    const member = root.querySelector('[data-component-id="w-2"]');
+    assert.equal(member?.dataset.componentMember, 'true', 'the refreshed row becomes a member');
+    assert.ok(member.querySelector('[data-component-edit="w-2"]'), 'the member exposes Edit rules');
+    assert.ok(!member.querySelector('[data-component-ghost-add]'), 'the adoption action is gone');
+    assert.deepEqual(calls, [['w-2', 'sys-1']], 'refresh does not repeat the adoption call');
   });
 
   it('pages the GHOST half through the same window, so the pager and the body agree', async () => {

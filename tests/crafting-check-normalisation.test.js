@@ -14,6 +14,10 @@ globalThis.game = {
 globalThis.ui = { notifications: { warn: () => {}, error: () => {} } };
 
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
+const { normalizeCheckEvaluation, normalizeNullableSuccesses } = await import(
+  '../src/systems/normalize/checkEvaluation.js'
+);
+const { normalizeCheckAdvantage } = await import('../src/systems/normalize/checkAdvantage.js');
 
 // Helper: make a minimal manager
 function makeManager() {
@@ -87,6 +91,9 @@ test('_normalizeCraftingCheck defaults the routed config when absent', () => {
   assert.deepEqual(result.routed, {
     type: 'relative',
     rollFormula: '',
+    evaluation: normalizeCheckEvaluation(),
+    offerSituationalBonus: true,
+    advantage: normalizeCheckAdvantage(),
     dc: 15,
     thresholdMode: 'meet',
     // The routed slot carries its own DC SOURCE (issue 1096), absence-preserving: anything
@@ -99,6 +106,167 @@ test('_normalizeCraftingCheck defaults the routed config when absent', () => {
     fixedOutcomes: [],
     checkBreakage: { triggers: [] },
   });
+});
+
+test('all eight persisted check slots normalize complete defaults', () => {
+  const mgr = makeManager();
+  const slots = [
+    ...['simple', 'progressive', 'routed'].map((key) => mgr._normalizeCraftingCheck({})[key]),
+    ...['simple', 'progressive', 'routed'].map(
+      (key) => mgr._normalizeSalvageCraftingCheck({})[key]
+    ),
+    ...['progressive', 'routed'].map((key) => mgr._normalizeGatheringCraftingCheck({})[key]),
+  ];
+  assert.equal(slots.length, 8);
+  for (const slot of slots) assert.deepEqual(slot.evaluation, normalizeCheckEvaluation());
+});
+
+test('all eight check slots retain inactive evaluation choices through a second normalization', () => {
+  const mgr = makeManager();
+  const authored = {
+    product: 'count',
+    direction: 'under',
+    target: {
+      source: 'attribute',
+      expression: '@skills.repair.value + 2',
+      adjustmentKind: 'multiply',
+      baseAdjustment: 0.5,
+    },
+    pool: {
+      die: 20,
+      base: '@abilities.int.value + 1',
+      threshold: '@skills.repair.value',
+      required: 3,
+      modifierDestination: 'threshold',
+      zeroPoolFails: false,
+      explode: { enabled: true, faces: { kind: 'from', value: 19 }, once: true },
+      cancel: { enabled: true, faces: { kind: 'from', value: 2 } },
+      additionalDice: {
+        enabled: true,
+        source: 'macro',
+        path: 'system.resources.ap.value',
+        readMacroUuid: 'Macro.read',
+        spendMacroUuid: 'Macro.spend',
+        max: 4,
+        label: 'Momentum',
+      },
+    },
+  };
+  for (const [normalize, keys] of [
+    [(input) => mgr._normalizeCraftingCheck(input), ['simple', 'progressive', 'routed']],
+    [(input) => mgr._normalizeSalvageCraftingCheck(input), ['simple', 'progressive', 'routed']],
+    [(input) => mgr._normalizeGatheringCraftingCheck(input), ['progressive', 'routed']],
+  ]) {
+    const input = Object.fromEntries(keys.map((key) => [key, { evaluation: authored }]));
+    const once = normalize(input);
+    const twice = normalize(once);
+    for (const key of keys) {
+      assert.deepEqual(once[key].evaluation, authored, key);
+      assert.deepEqual(twice[key].evaluation, authored, `${key} is idempotent`);
+    }
+  }
+});
+
+/** Every persisted check slot, as `[label, slot]`, from one normalization of each activity. */
+function eightSlots(mgr, input = {}) {
+  const crafting = mgr._normalizeCraftingCheck(input.crafting ?? {});
+  const salvage = mgr._normalizeSalvageCraftingCheck(input.salvage ?? {});
+  const gathering = mgr._normalizeGatheringCraftingCheck(input.gathering ?? {});
+  return [
+    ...['simple', 'progressive', 'routed'].map((key) => [`crafting.${key}`, crafting[key]]),
+    ...['simple', 'progressive', 'routed'].map((key) => [`salvage.${key}`, salvage[key]]),
+    ...['progressive', 'routed'].map((key) => [`gathering.${key}`, gathering[key]]),
+  ];
+}
+
+test('a legacy record offers the situational bonus on all eight check slots (issue 2005)', () => {
+  const mgr = makeManager();
+  const legacy = { simple: { rollFormula: '1d20' }, routed: {}, progressive: {} };
+  const slots = eightSlots(mgr, { crafting: legacy, salvage: legacy, gathering: legacy });
+  assert.equal(slots.length, 8);
+  for (const [label, slot] of slots) assert.equal(slot.offerSituationalBonus, true, label);
+  for (const offer of [null, 0, '', 'false']) {
+    const simple = mgr._normalizeCraftingCheck({ simple: { offerSituationalBonus: offer } }).simple;
+    assert.equal(simple.offerSituationalBonus, true, `only false turns the offer off, not ${offer}`);
+  }
+});
+
+test('an explicit false offer survives a second normalization on all eight slots', () => {
+  const mgr = makeManager();
+  const off = {
+    simple: { offerSituationalBonus: false },
+    routed: { offerSituationalBonus: false },
+    progressive: { offerSituationalBonus: false },
+  };
+  const once = { crafting: off, salvage: off, gathering: off };
+  const first = eightSlots(mgr, once);
+  const twice = eightSlots(mgr, {
+    crafting: mgr._normalizeCraftingCheck(off),
+    salvage: mgr._normalizeSalvageCraftingCheck(off),
+    gathering: mgr._normalizeGatheringCraftingCheck(off),
+  });
+  for (const [label, slot] of [...first, ...twice]) {
+    assert.equal(slot.offerSituationalBonus, false, label);
+  }
+});
+
+test('evaluation clamps bounded integers while preserving finite adjustment values', () => {
+  const normalized = normalizeCheckEvaluation({
+    product: 'unknown',
+    direction: 'unknown',
+    target: { baseAdjustment: 0.2 },
+    pool: { die: 1, required: 99, additionalDice: { max: 40 } },
+  });
+  assert.equal(normalized.product, 'sum');
+  assert.equal(normalized.direction, 'over');
+  assert.equal(normalized.target.baseAdjustment, 0.2);
+  assert.equal(normalized.pool.die, 10);
+  assert.equal(normalized.pool.required, 20);
+  assert.equal(normalized.pool.additionalDice.max, 20);
+});
+
+test('explode and cancel faces keep authored values beyond the die for readiness to flag', () => {
+  const normalized = normalizeCheckEvaluation({
+    pool: {
+      die: 10,
+      explode: { enabled: true, faces: { kind: 'from', value: 18 } },
+      cancel: { enabled: true, faces: { kind: 'from', value: 0 } },
+    },
+  });
+  assert.deepEqual(normalized.pool.explode.faces, { kind: 'from', value: 18 });
+  assert.deepEqual(normalized.pool.cancel.faces, { kind: 'from', value: null });
+  assert.deepEqual(normalizeCheckEvaluation(normalized), normalized);
+});
+
+test('nullable success counts clamp to 0-20 like the required count', () => {
+  for (const [input, expected] of [
+    [25, 20],
+    [-1, 0],
+    [7, 7],
+    ['3', 3],
+    [2.5, null],
+    ['', null],
+    [null, null],
+  ]) {
+    assert.equal(normalizeNullableSuccesses(input), expected, String(input));
+  }
+});
+
+test('tier and routed outcome difficulty siblings retain inactive values', () => {
+  const mgr = makeManager();
+  const check = mgr._normalizeCraftingCheck({
+    simple: { tiers: [{ id: 't', dc: 12, adjustment: 0.5, successes: 3 }] },
+    routed: {
+      tiers: [{ id: 'r', dc: 13, adjustment: -2, successes: 2 }],
+      relativeOutcomes: [{ id: 'o', dc: 2, adjustment: 0.2 }],
+    },
+  });
+  assert.equal(check.simple.tiers[0].adjustment, 0.5);
+  assert.equal(check.simple.tiers[0].successes, 3);
+  assert.equal(check.routed.tiers[0].adjustment, -2);
+  assert.equal(check.routed.tiers[0].successes, 2);
+  assert.equal(check.routed.relativeOutcomes[0].adjustment, 0.2);
+  assert.deepEqual(mgr._normalizeCraftingCheck(check), check);
 });
 
 // Issue 975 — the legacy routed `natStepping` boolean converts on READ into the pair of
@@ -372,6 +540,9 @@ test('_normalizeCraftingCheck defaults the simple config when absent', () => {
   const result = mgr._normalizeCraftingCheck({});
   assert.deepEqual(result.simple, {
     rollFormula: '',
+    evaluation: normalizeCheckEvaluation(),
+    offerSituationalBonus: true,
+    advantage: normalizeCheckAdvantage(),
     dc: 15,
     thresholdMode: 'meet',
     dcMode: 'static',
@@ -386,7 +557,11 @@ test('_normalizeCraftingCheck defaults the progressive check when absent', () =>
   const result = mgr._normalizeCraftingCheck({});
   assert.deepEqual(result.progressive, {
     awardMode: 'equal',
+    thresholdMode: 'meet',
     rollFormula: '',
+    evaluation: normalizeCheckEvaluation(),
+    offerSituationalBonus: true,
+    advantage: normalizeCheckAdvantage(),
     checkBreakage: { triggers: [] },
   });
 });

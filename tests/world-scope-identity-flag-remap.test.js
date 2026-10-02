@@ -4,15 +4,14 @@
  */
 
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
 
 import { canonicalSignatureKey } from '../src/utils/alchemySignatureKey.js';
 import { mergeEquivalentWorldEssences } from '../src/migration/mergeEquivalentWorldEssences.js';
 import { buildEssenceMergeCorpus } from './helpers/worldScopeCorpus.js';
 import { createPersistedCraftingHistory } from './helpers/journal-fixtures.js';
+import { withFabricateLifecycleReplay } from './helpers/extension-composition-harness.js';
+import { SETTING_KEYS, WORLD_SCOPE_IDENTITY_FLAG_TARGET } from '../src/config/settings.js';
 import {
   forcedReplacementFlagPath,
   hasPendingWorldEssenceMerge,
@@ -29,7 +28,6 @@ import {
   worldEssenceMergeLegs,
 } from '../src/systems/remapWorldScopeIdentityFlags.js';
 
-const HERE = dirname(fileURLToPath(import.meta.url));
 
 test('actual equivalent-essence merge and flag remap preserve captured history through applied-prefix resume', async () => {
   let afterRemap;
@@ -387,57 +385,6 @@ test('the unsafe-systemId skips reach the SUMMARY, so the GM notice can name the
     writeBareFlag: async () => {},
   });
   assert.deepEqual(summary.unsafeSystemIdSkips, ['sys.dotted']);
-});
-
-// (b) the COMPOSITION mutation
-
-/** The index of a live `await io.<name>();` statement in the ready startup sequence, or `-1`. */
-function liveCallIndex(source, name) {
-  return source.search(new RegExp(`\n +await io\\.${name}\\(\\);`));
-}
-
-/** The module entry and the ready edge that runs its one-shots, in that order. */
-const ENTRY_AND_READY_EDGE = ['main.js', 'bootstrap/hooks.js'];
-
-test('the ready startup sequence calls the remap AFTER the owned-item restamp', () => {
-  // DELETING THE `ready`-BODY CALL SITE MUST FLIP THIS TO FAIL.
-  const source = ENTRY_AND_READY_EDGE.map((file) =>
-    readFileSync(resolve(HERE, '..', 'src', file), 'utf8')
-  ).join('\n');
-  const restampIndex = liveCallIndex(source, 'runOwnedItemComponentIdentityRestamp');
-  const remapIndex = liveCallIndex(source, 'runWorldScopeIdentityFlagRemap');
-  assert.ok(restampIndex > 0, 'the premise: the shipped owned-item restamp edge is still there');
-  assert.ok(remapIndex > 0, 'the ready body must CALL the world-scope identity flag remap');
-  assert.ok(
-    remapIndex > restampIndex,
-    'it runs after the restamp, which never reaches this population because its planner returns ' +
-      'early for any item already carrying a durable identity flag'
-  );
-  assert.match(
-    source,
-    /async function runWorldScopeIdentityFlagRemap\(\)/,
-    'and the pass is defined, not merely called'
-  );
-});
-
-test('the clear and the version advance are BOTH inside the same gate', () => {
-  // Whenever the clear is withheld the pass must ALSO withhold its own Number-version advance.
-  const source = readFileSync(resolve(HERE, '..', 'src', 'main.js'), 'utf8');
-  const body = source.slice(
-    source.indexOf('async function runWorldScopeIdentityFlagRemap()'),
-    source.indexOf('Run the env-node-driven marker image sync')
-  );
-  const gateIndex = body.indexOf('if (!mayClearWorldScopeRekeyMap(');
-  const clearIndex = body.indexOf('SETTING_KEYS.WORLD_SCOPE_REKEY_MAP, {}');
-  const versionIndex = body.indexOf('SETTING_KEYS.WORLD_SCOPE_IDENTITY_FLAG_VERSION,\n');
-  assert.ok(gateIndex > 0, 'the clear is gated on the producing migration having COMPLETED');
-  assert.ok(clearIndex > gateIndex, 'the clear sits AFTER the early return');
-  assert.ok(versionIndex > gateIndex, 'and so does the version advance');
-  assert.match(
-    body.slice(gateIndex, clearIndex),
-    /return;/,
-    'the gate returns rather than branching'
-  );
 });
 
 // (c) the `1.34.0` equivalent-essence merge arm (issue 1654). Here the merged ids are object keys,
@@ -831,51 +778,135 @@ test('a world with no pending merge never walks the actor corpus', async () => {
   assert.equal(summary.scannedActors, 0);
 });
 
-// --- the composition mutation ----------------------------------------------
+// --- the composition, through the real module entry --------------------------
 
-test('the ready startup sequence runs the essence remap AFTER the 1.30.0 remap', () => {
-  const source = ENTRY_AND_READY_EDGE.map((file) =>
-    readFileSync(resolve(HERE, '..', 'src', file), 'utf8')
-  ).join('\n');
-  // Matched as a live statement, never as a substring — see {@link liveCallIndex}.
-  const rekeyIndex = liveCallIndex(source, 'runWorldScopeIdentityFlagRemap');
-  const essenceIndex = liveCallIndex(source, 'runWorldEssenceMergeFlagRemap');
-  const descriptionsIndex = source.indexOf('notifyUnresolvedItemDescriptions();');
-  assert.ok(rekeyIndex > 0, 'the premise: the 1.30.0 ready-body edge is still there');
-  assert.ok(essenceIndex > 0, 'the ready body must CALL the essence remap, not mention it');
-  assert.ok(
-    essenceIndex > rekeyIndex,
-    'the component/tool repair must land FIRST: both passes rewrite the same run containers, ' +
-      'and this one writes with a forced replacement that would replace that repair away'
-  );
-  assert.ok(essenceIndex < descriptionsIndex, 'and it sits inside the same migration-repair block');
-  assert.match(source, /async function runWorldEssenceMergeFlagRemap\(\)/);
-});
+/** A lab world whose remap passes walk `actors` alone, as the `ready` sequence walks game.actors. */
+function walkingOnly(game, actors) {
+  const original = game.actors;
+  game.actors = Object.assign(Object.create(original), {
+    *[Symbol.iterator]() {
+      yield* actors;
+    },
+  });
+  return () => (game.actors = original);
+}
 
-test('the essence edge writes through the FORCED-REPLACEMENT path and never setFabricateFlag', () => {
-  // The highest-risk line in the change: a `setFabricateFlag` write here is a merge write and
-  // silently corrupts a consumed run snapshot, and both writes are indistinguishable at the seam,
-  // so the edge is pinned on its source text as well as through the merge document above.
-  const source = readFileSync(resolve(HERE, '..', 'src', 'main.js'), 'utf8');
-  const start = source.indexOf('async function applyWorldEssenceMergeFlagRemap(');
-  assert.ok(start > 0, 'the work half must exist');
-  const body = source.slice(start, source.indexOf('\n}\n', start));
-  assert.match(
-    body,
-    /replaceFabricateFlag: \(document, key, value\) =>\s*\n?\s*replace\(document, forcedReplacementFlagPath\(key\), value\)/
-  );
-  assert.match(body, /forcedReplacementFlagPath\(key, \{ bare: true \}\)/);
-  assert.doesNotMatch(
-    body,
-    /setFabricateFlag/,
-    'a plain merge write CANNOT persist a key-set rewrite'
-  );
-  assert.doesNotMatch(
-    body,
-    /recursive: false/,
-    'and that fix would destroy every other module’s flags'
-  );
-});
+test(
+  'the ready sequence gates both 1.30.0 writes together, then repairs restamp → 1.30.0 → 1.34.0 ' +
+    'by forced replacement, before the description check',
+  { timeout: 300000 },
+  async () => {
+    await withFabricateLifecycleReplay(async ({ ready, loadModule }) => {
+      const main = await loadModule('/src/main.js');
+      // The migration pass would advance `migrationVersion` before the one-shots read it.
+      main.default._runMigrations = async () => {};
+      const { game, ui } = globalThis;
+      const write = (key, value) => game.settings.set('fabricate', key, value);
+      const read = (key) => game.settings.get('fabricate', key);
+
+      // THE CLEAR AND THE ADVANCE SHARE ONE GATE: a torn 1.30.0 keeps both, a completed one
+      // moves both. Nothing is walked, so only the gate decides.
+      const pending = () => ({ 'sys-a': { components: { old: 'new' } } });
+      const restoreEmpty = walkingOnly(game, []);
+      for (const [migrationVersion, map, version] of [
+        ['1.29.0', pending(), 0],
+        ['1.30.0', {}, WORLD_SCOPE_IDENTITY_FLAG_TARGET],
+      ]) {
+        await write(SETTING_KEYS.MIGRATION_VERSION, migrationVersion);
+        await write(SETTING_KEYS.WORLD_SCOPE_IDENTITY_FLAG_VERSION, 0);
+        await write(SETTING_KEYS.WORLD_SCOPE_REKEY_MAP, pending());
+        const { warn } = console;
+        console.warn = () => {};
+        try {
+          await main.runWorldScopeIdentityFlagRemap();
+        } finally {
+          console.warn = warn;
+        }
+        assert.deepEqual(read(SETTING_KEYS.WORLD_SCOPE_REKEY_MAP), map, migrationVersion);
+        const advanced = read(SETTING_KEYS.WORLD_SCOPE_IDENTITY_FLAG_VERSION);
+        assert.equal(advanced, version, migrationVersion);
+      }
+      restoreEmpty();
+
+      // THE ORDER, read off what each pass writes when it completes.
+      await write(SETTING_KEYS.MIGRATION_VERSION, '1.34.0');
+      await write(SETTING_KEYS.OWNED_ITEM_COMPONENT_STAMP_VERSION, 0);
+      await write(SETTING_KEYS.WORLD_SCOPE_IDENTITY_FLAG_VERSION, 0);
+      await write(SETTING_KEYS.WORLD_SCOPE_REKEY_MAP, {});
+      await write(SETTING_KEYS.WORLD_ESSENCE_MERGE_FLAG_VERSION, 0);
+      await write(SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP, structuredClone(MERGE_MAP));
+      const item = makeMergeDocument({
+        fabricate: { fabricate: { essences: { 'fire-a': 1, 'fire-b': 2 } } },
+      });
+      const actor = makeMergeDocument({
+        fabricate: {
+          fabricate: { craftingRuns: craftingRunFlag() },
+          gatheringRuns: {
+            active: {
+              'g-1': { craftingSystemId: 'sys-a', resolvedEssences: { 'fire-a': 1, 'fire-b': 2 } },
+            },
+          },
+        },
+      });
+      actor.items = [item];
+      const writes = [];
+      for (const document of [actor, item]) {
+        const { update } = document;
+        document.update = (...args) => {
+          writes.push(args.length);
+          return update(...args);
+        };
+        document.setFlag = async (...args) => writes.push(['setFlag', ...args]);
+      }
+      const order = [];
+      const { set } = game.settings;
+      game.settings.set = (scope, key, value) => {
+        order.push(key);
+        return set.call(game.settings, scope, key, value);
+      };
+      const { info } = ui.notifications;
+      ui.notifications.info = () => order.push('info');
+      const restoreWalk = walkingOnly(game, [actor]);
+      try {
+        await ready();
+      } finally {
+        restoreWalk();
+        game.settings.set = set;
+        ui.notifications.info = info;
+      }
+
+      const passes = [
+        SETTING_KEYS.OWNED_ITEM_COMPONENT_STAMP_VERSION,
+        SETTING_KEYS.WORLD_SCOPE_IDENTITY_FLAG_VERSION,
+        SETTING_KEYS.WORLD_ESSENCE_MERGE_FLAG_VERSION,
+        'info',
+      ].map((entry) => order.indexOf(entry));
+      assert.ok(!passes.includes(-1), `a pass never completed: ${order}`);
+      assert.deepEqual(
+        [...passes].sort((left, right) => left - right),
+        passes,
+        'the 1.30.0 remap after the restamp that never reaches its population, the essence remap ' +
+          'after it (a forced replacement would replace its repair away), both before the ' +
+          'description check'
+      );
+      // A merge write leaves the retired key beside the survivor: only a forced replacement drops it.
+      assert.deepEqual(item.flags.fabricate.fabricate.essences, { 'fire-b': 3 });
+      assert.deepEqual(
+        actor.flags.fabricate.fabricate.craftingRuns.active['run-1'].steps[0].preparedConsumption
+          .resolvedEssences,
+        { 'fire-b': 3 }
+      );
+      // The bare container is replaced at ITS depth, never re-nested under the inner namespace.
+      assert.deepEqual(actor.flags.fabricate.gatheringRuns.active['g-1'].resolvedEssences, {
+        'fire-b': 3,
+      });
+      assert.equal(actor.flags.fabricate.fabricate.gatheringRuns, undefined);
+      // Every write a single `{path: value}` update: no `setFlag`, and no `{recursive: false}`,
+      // which would replace the whole `flags` field and every other module's flags with it.
+      assert.deepEqual(writes, [1, 1, 1], 'one forced replacement per container, nothing else');
+    });
+  }
+);
 
 test('a `__proto__` key lands as an OWN property rather than reaching the prototype setter', () => {
   // A plain-object accumulator loses the key silently: `next['__proto__'] = 1` on an object literal

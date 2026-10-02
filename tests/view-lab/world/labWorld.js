@@ -11,8 +11,10 @@ import {
   LAB_SYSTEM_IDS,
   seedJournalNoCheckFixture,
 } from './labContent.js';
+import { seedCheckPreviewState } from './labCheckPreviews.js';
 import { seedLabInteractables } from './labInteractables.js';
 import { stockJournalPrototype } from './labJournalPrototype.js';
+import { registerLabMacros } from './labMacros.js';
 import { installUpdateSemantics, makeGetFlag } from './labFlags.js';
 import {
   buildLabBlindRunSecret,
@@ -27,7 +29,31 @@ const FABRICATE_NAMESPACE = 'fabricate';
 // These variants change persisted authoring before the real services initialize. The default
 // world remains unchanged, including every existing d100 editor and gathering screenshot.
 function seedGatheringTaskMode(content, mode) {
-  if (!['straight', 'routed', 'routed-unmatched'].includes(mode)) return;
+  // Roll-under evaluations: `routed-under` reads Brenna's Intelligence (issue 2073), and
+  // `routed-under-fixed` is the fixed ladder whose Journal bands read `≤` (issue 2005); and
+  // `routed-count` counts five d10s at 7 or more, exploding once from 9 (issue 2006). Declared
+  // here because a fixture test evaluates this function's text on its own.
+  const underEvaluations = {
+    'routed-under': {
+      product: 'sum',
+      direction: 'under',
+      target: { source: 'attribute', expression: '@abilities.int.mod' },
+    },
+    'routed-under-fixed': { product: 'sum', direction: 'under', target: { source: 'fixed' } },
+    'routed-count': {
+      product: 'count',
+      direction: 'over',
+      pool: {
+        die: 10,
+        base: '5',
+        threshold: '7',
+        required: 2,
+        explode: { enabled: true, faces: { kind: 'from', value: 9 }, once: true },
+      },
+    },
+  };
+  const modes = ['straight', 'routed', 'routed-unmatched', ...Object.keys(underEvaluations)];
+  if (!modes.includes(mode)) return;
   const system = content.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.HERBALISM);
   const slice = content.gatheringConfig.systems[LAB_SYSTEM_IDS.HERBALISM];
   const task = structuredClone(slice.tasks.find((entry) => entry.id === 'hb-task-slowbloom'));
@@ -39,7 +65,10 @@ function seedGatheringTaskMode(content, mode) {
       results: [{ id: 'lab-gathering-emberbloom', componentId: 'hb-emberbloom', quantity: 2 }],
     },
   ];
+  // `routed-under`: issue 2073, a roll-under target read from Brenna's Intelligence, difficulty -1.
+  if (mode === 'routed-under') task.adjustmentOverride = -1;
   if (mode !== 'straight') {
+    const evaluation = underEvaluations[mode];
     system.gatheringCraftingCheck = {
       ...system.gatheringCraftingCheck,
       routed: {
@@ -47,6 +76,7 @@ function seedGatheringTaskMode(content, mode) {
         dc: 15,
         type: 'relative',
         thresholdMode: 'meet',
+        ...(evaluation && { evaluation }),
         relativeOutcomes: [
           { id: 'lab-abundant', name: 'Abundant', success: true, dc: 0 },
           { id: 'lab-failed', name: 'Failed', success: false, dc: -15 },
@@ -57,6 +87,194 @@ function seedGatheringTaskMode(content, mode) {
   const replaceTask = (entry) => (entry.id === task.id ? task : entry);
   slice.tasks = slice.tasks.map(replaceTask);
   content.gatheringConfig.tasks = content.gatheringConfig.tasks.map(replaceTask);
+}
+
+/**
+ * Ashfall Runework's routed crafting check graded roll-under (issue 2005): `routed-under` against
+ * its fixed DC 12, and `routed-under-multiply` against a character value whose Ruined tier is
+ * Otherwise, so the Journal ladder states `≤` bands or labelled multipliers. `routed-count` counts
+ * five d10s at 7 or more against two needed, cancelling on the worst face (issue 2006), and
+ * `routed-count-unordered` needs three from tiers authored out of order (issue 2135).
+ */
+function seedRuneworkCheckMode(content, mode) {
+  const system = content.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.RUNEWORK);
+  const routed = system?.craftingCheck?.routed;
+  if (routed && mode?.startsWith('routed-count')) {
+    const unordered = mode === 'routed-count-unordered';
+    const extra = unordered
+      ? { 'rw-masterwork': 1, 'rw-standard': 0, 'rw-ruined': -2 }
+      : { 'rw-masterwork': 2, 'rw-standard': 0, 'rw-ruined': -2 };
+    const order = unordered ? ['rw-standard', 'rw-ruined', 'rw-masterwork'] : null;
+    const outcomes = order
+      ? order.map((id) => routed.relativeOutcomes.find((outcome) => outcome.id === id))
+      : routed.relativeOutcomes;
+    system.craftingCheck = {
+      ...system.craftingCheck,
+      routed: {
+        ...routed,
+        evaluation: {
+          product: 'count',
+          direction: 'over',
+          pool: {
+            die: 10,
+            base: '5',
+            threshold: '7',
+            required: unordered ? 3 : 2,
+            cancel: { enabled: true, faces: { kind: 'worst' } },
+          },
+        },
+        relativeOutcomes: outcomes.map((outcome) => ({ ...outcome, dc: extra[outcome.id] })),
+      },
+    };
+    return;
+  }
+  if (!routed || !['routed-under', 'routed-under-multiply'].includes(mode)) return;
+  const multiply = mode === 'routed-under-multiply';
+  const adjustments = { 'rw-masterwork': 0.2, 'rw-standard': 0.5, 'rw-ruined': null };
+  system.craftingCheck = {
+    ...system.craftingCheck,
+    routed: {
+      ...routed,
+      evaluation: {
+        product: 'sum',
+        direction: 'under',
+        target: multiply
+          ? { source: 'attribute', expression: '@abilities.int.value', adjustmentKind: 'multiply' }
+          : { source: 'fixed' },
+      },
+      relativeOutcomes: routed.relativeOutcomes.map((outcome) =>
+        multiply ? { ...outcome, adjustment: adjustments[outcome.id] } : outcome
+      ),
+    },
+  };
+}
+
+/**
+ * The salvage and gathering-task check override states (issue 2005, prototype frames 23-24):
+ * Smithing's salvage and routed gathering checks read `evaluation`, and the Longsword and the
+ * Prospect task carry the overrides each state shows, with the other field kept dormant.
+ */
+const CHECK_OVERRIDE_STATES = Object.freeze({
+  'fixed-over': {
+    direction: 'over',
+    source: 'fixed',
+    kind: 'add',
+    salvage: [15, null],
+    task: [12, null],
+  },
+  'fixed-under': { source: 'fixed', kind: 'add', salvage: [15, null], task: [12, null] },
+  add: { source: 'attribute', kind: 'add', salvage: [15, -2], task: [15, 0] },
+  multiply: { source: 'attribute', kind: 'multiply', salvage: [15, 0.5], task: [15, 0.5] },
+  default: { source: 'attribute', kind: 'add', salvage: [15, null], task: [15, null] },
+  custom: { source: 'attribute', kind: 'multiply', salvage: [15, 0.7], task: [15, 0.7] },
+  // Routed salvage whose `routed` check alone reads a character value: the override must follow it.
+  routed: { source: 'attribute', kind: 'add', salvage: [15, -2], task: [15, -2], routed: true },
+  // A kept override authored under `add`, invalidated by a switch to `multiply` (issue 2078): the
+  // field itself, not just readiness, must name it.
+  invalid: { source: 'attribute', kind: 'multiply', salvage: [15, -2], task: [15, -2] },
+  // Counting checks (issue 2006, frame 25): the successes needed override, a Standard preset, a
+  // custom count, and the system default, each beside a kept DC override the count never reads.
+  'count-preset': { count: true, salvage: [15, null, 3], task: [12, null, null] },
+  'count-custom': { count: true, salvage: [15, null, 6], task: [12, null, null] },
+  'count-default': { count: true, salvage: [15, null, null], task: [12, null, null] },
+  count: { count: true, salvage: [15, null, null], task: [12, null, null] },
+});
+
+/** The counting evaluation the count override states read: d10s, success on 8 or more. */
+const OVERRIDE_COUNT = Object.freeze({
+  product: 'count',
+  direction: 'over',
+  pool: { die: 10, base: '4', threshold: '8', required: 2 },
+});
+
+/** A relative routed check over `evaluation`, as the salvage and gathering states seed it. */
+const routedCheck = (evaluation) => ({
+  rollFormula: '1d20',
+  dc: 15,
+  type: 'relative',
+  thresholdMode: 'meet',
+  relativeOutcomes: [
+    { id: 'lab-ov-found', name: 'Found', success: true, dc: 0 },
+    { id: 'lab-ov-missed', name: 'Missed', success: false, dc: -15 },
+  ],
+  evaluation,
+});
+
+function seedCheckOverride(content, state) {
+  const spec = CHECK_OVERRIDE_STATES[state];
+  if (!spec) return;
+  const evaluation = spec.count
+    ? OVERRIDE_COUNT
+    : {
+        product: 'sum',
+        direction: spec.direction ?? 'under',
+        target: {
+          source: spec.source,
+          expression: '@skills.med.mod + 8',
+          adjustmentKind: spec.kind,
+          baseAdjustment: null,
+        },
+      };
+  const multiply = spec.kind === 'multiply';
+  const tiers = [
+    ['Easy', 10, multiply ? 1 : 2, 2],
+    [spec.source === 'fixed' ? 'Medium' : 'Standard', 15, multiply ? 0.5 : 0, 3],
+    ['Hard', 20, multiply ? 0.2 : -2, 4],
+  ].map(([name, dc, adjustment, successes]) => ({
+    id: `lab-ov-${name.toLowerCase()}`,
+    name,
+    dc,
+    adjustment,
+    ...(spec.count && { successes }),
+  }));
+  const system = content.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.SMITHING);
+  // A routed state gives `simple` a fixed target, so an override reading it would edit the DC.
+  const simpleEvaluation = spec.routed
+    ? { ...evaluation, target: { ...evaluation.target, source: 'fixed' } }
+    : evaluation;
+  system.salvageCraftingCheck = {
+    enabled: true,
+    simple: {
+      rollFormula: '1d20',
+      dc: 15,
+      dcMode: 'static',
+      thresholdMode: 'meet',
+      tiers,
+      evaluation: simpleEvaluation,
+    },
+    ...(spec.routed && { routed: routedCheck(evaluation) }),
+  };
+  if (spec.routed) system.salvageResolutionMode = 'routed';
+  system.gatheringCraftingCheck = { routed: routedCheck(evaluation) };
+  const overrides = ([dcOverride, adjustmentOverride, successesOverride = null]) => ({
+    dcOverride,
+    adjustmentOverride,
+    successesOverride,
+  });
+  const sword = content.components.find((entry) => entry.id === 'sm-longsword');
+  sword.salvage = { ...sword.salvage, ...overrides(spec.salvage) };
+  const retask = (entry) =>
+    entry.id === 'sm-task-prospect'
+      ? { ...entry, resolutionMode: 'routed', ...overrides(spec.task) }
+      : entry;
+  const slice = content.gatheringConfig.systems[LAB_SYSTEM_IDS.SMITHING];
+  slice.tasks = slice.tasks.map(retask);
+  content.gatheringConfig.tasks = content.gatheringConfig.tasks.map(retask);
+}
+
+/**
+ * The Smithing crafting check graded roll-under against its fixed target (issue 2103), so the
+ * stage browser's future step label reads a Target rather than a DC.
+ */
+function seedJournalUnderCheck(content) {
+  const system = content.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.SMITHING);
+  system.craftingCheck = {
+    ...system.craftingCheck,
+    simple: {
+      ...system.craftingCheck.simple,
+      evaluation: { product: 'sum', direction: 'under', target: { source: 'fixed' } },
+    },
+  };
 }
 
 /** 14 days into the world's calendar, so relative timestamps render as something. */
@@ -255,7 +473,10 @@ export async function buildLabWorld({
   noInteractables = false,
   noSceneRegions = false,
   gatheringTaskMode = null,
+  runeworkCheckMode = null,
+  checkOverride = null,
   journalCaseState = null,
+  checkPreviewState = null,
 } = {}) {
   const content = buildLabContent({ journalCaseState });
   if (
@@ -263,13 +484,18 @@ export async function buildLabWorld({
   ) {
     seedJournalNoCheckFixture(content);
   }
+  if (journalCaseState === 'future-stage-under') seedJournalUnderCheck(content);
   seedGatheringTaskMode(content, gatheringTaskMode);
+  seedRuneworkCheckMode(content, runeworkCheckMode);
+  seedCheckOverride(content, checkOverride);
   if (noTools) stripTools(content);
   if (noAuthoredWorldComponents) stripAuthoredWorldComponents(content);
   // A real Manager refresh resolves an empty selection to the first available crafting system.
   if (clearSystem) content.systems = [];
   const actors = buildLabActors(content);
+  seedCheckPreviewState(content, actors, checkPreviewState);
   const documents = buildDocumentIndex(content, actors);
+  registerLabMacros(documents);
   const shippedLocalize = await createLocalizer();
   const localize = (key) =>
     longTravelLabels && key === 'FABRICATE.Admin.Manager.Travel.Tabs.MapLinks'

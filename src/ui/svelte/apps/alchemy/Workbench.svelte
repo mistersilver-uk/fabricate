@@ -417,7 +417,7 @@
       class:is-ready={mode === 'ready'}
       data-alchemy-brew
       disabled={!brewEnabled || brewInFlight}
-      onclick={() => onBrew?.()}
+      onclick={(event) => onBrew?.(event)}
     >
       <i class="fas {brewInFlight ? 'fa-spinner fa-spin' : brewIcon}" aria-hidden="true"></i>
       {brewLabel}

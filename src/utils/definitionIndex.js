@@ -1,64 +1,46 @@
 /**
- * Retained `Map` indexes over ONE crafting system's definition arrays, replacing the per-item
- * `Array.find()` scans identity resolution used to run (issue 1076). Keyed on the candidate ARRAY
- * itself through a `WeakMap`, because definition ids are unique per system only, and array-order
- * precedence is reproduced exactly — including the minimum-position rule for source references.
- * Staleness is the data-models requirement "Definition Index Invalidation", whose enforcement
- * point is {@link advanceDefinitionRevision}.
+ * Retained indexes over one system's definition arrays (issue 1076), keyed on the array through a
+ * `WeakMap` because ids are unique per system only. Array-order precedence is exact, including the
+ * minimum position for source references. Staleness is `data-models` "Definition Index
+ * Invalidation", enforced through {@link advanceDefinitionRevision}.
  */
 
 import { getItemMatchUuids } from './sourceReferenceUnion.js';
-
-// ── Instrumentation ──
 
 const _counters = {
   candidatesExamined: 0,
   indexBuilds: 0,
 };
 
-/** Read the identity-resolution operation counters. */
 export function readIdentityCounters() {
   return { ..._counters };
 }
 
-/** Reset the identity-resolution counters. */
 export function resetIdentityCounters() {
   _counters.candidatesExamined = 0;
   _counters.indexBuilds = 0;
 }
 
-// ── Revision bookkeeping ──
-
 const _revisions = new WeakMap();
 const _cache = new WeakMap();
 
-/**
- * Announce that a definition array was mutated IN PLACE, so its retained index is rebuilt on the
- * next read.
- */
+/** After an in-place mutation, so the next read rebuilds the index. */
 export function advanceDefinitionRevision(definitions) {
   if (!Array.isArray(definitions)) return;
   _revisions.set(definitions, (_revisions.get(definitions) ?? 0) + 1);
 }
 
-/** The current revision of a definition array. */
 export function readDefinitionRevision(definitions) {
   if (!Array.isArray(definitions)) return 0;
   return _revisions.get(definitions) ?? 0;
 }
 
-// ── The index ──
-
-/**
- * A definition id is indexable when it can be compared by `Map` lookup exactly as `def.id ===
- * claimed` compares it.
- */
+/** When a `Map` lookup compares it exactly as `def.id === claimed` does. */
 function indexableId(id) {
   if (id == null) return false;
   return !(typeof id === 'number' && Number.isNaN(id));
 }
 
-/** Walk a definition array once and build every facet. */
 function buildIndex(definitions) {
   const byId = new Map();
   const orderBySourceRef = new Map();
@@ -92,8 +74,7 @@ function buildIndex(definitions) {
         const bucket = byRecipeId.get(key);
         if (!bucket) {
           byRecipeId.set(key, [definition]);
-          // A definition listing the same recipe id twice must still appear ONCE, exactly as
-          // `filter(...some(...))` returned it once.
+          // Once per definition, even if it lists a recipe id twice.
         } else if (bucket.at(-1) !== definition) {
           bucket.push(definition);
         }
@@ -105,7 +86,7 @@ function buildIndex(definitions) {
   return { definitions, byId, orderBySourceRef, byName, byNameLower, byRecipeId };
 }
 
-/** The empty index handed back for a non-array argument, so callers need no guard. */
+/** For a non-array argument, so callers need no guard. */
 const EMPTY_INDEX = Object.freeze({
   definitions: Object.freeze([]),
   byId: new Map(),
@@ -115,10 +96,7 @@ const EMPTY_INDEX = Object.freeze({
   byRecipeId: new Map(),
 });
 
-/**
- * The retained index for one system's definition array, rebuilt only when the invalidation rule in
- * this module's header says it must be.
- */
+/** Rebuilt only when the header's invalidation rule says so. */
 export function getDefinitionIndex(definitions) {
   if (!Array.isArray(definitions)) return EMPTY_INDEX;
   const revision = _revisions.get(definitions) ?? 0;
@@ -131,10 +109,7 @@ export function getDefinitionIndex(definitions) {
   return index;
 }
 
-/**
- * The definition an id claim names, or `null` — the indexed form of `candidates.find((def) => def
- * && def.id === claimedId)`.
- */
+/** The indexed `candidates.find((def) => def && def.id === claimedId)`, or `null`. */
 export function findById(index, claimedId) {
   if (!indexableId(claimedId)) return null;
   const found = index.byId.get(claimedId);
@@ -143,10 +118,7 @@ export function findById(index, claimedId) {
   return found;
 }
 
-/**
- * The EARLIEST definition in array order carrying any of `refs` — the indexed form of
- * `candidates.find((def) => getItemMatchUuids(def).some((ref) => refs.has(ref)))`.
- */
+/** The earliest definition carrying any of `refs`, as `find` over the array would answer. */
 export function findBySourceRefs(index, refs) {
   let best = -1;
   for (const ref of refs) {
@@ -159,10 +131,7 @@ export function findBySourceRefs(index, refs) {
   return index.definitions[best];
 }
 
-/**
- * The first definition whose name matches `itemName` — the indexed form of `candidates.find((def)
- * => namesMatch(itemName, def.name, caseSensitive))`.
- */
+/** The indexed `find` by `namesMatch(itemName, def.name, caseSensitive)`. */
 export function findByName(index, itemName, caseSensitive) {
   if (!itemName) return null;
   const found = caseSensitive
@@ -173,10 +142,7 @@ export function findByName(index, itemName, caseSensitive) {
   return found;
 }
 
-/**
- * Every definition listing `recipeId` in its `recipeIds[]`, in array order — the indexed form of
- * `definitions.filter((def) => def.recipeIds.some((id) => String(id) === recipeId))`.
- */
+/** Every definition listing `recipeId` in `recipeIds[]`, in array order. */
 export function findByRecipeId(index, recipeId) {
   const bucket = index.byRecipeId.get(String(recipeId));
   if (!bucket) return [];
@@ -184,15 +150,11 @@ export function findByRecipeId(index, recipeId) {
   return bucket;
 }
 
-// ── The resolved scoped-definition union memo (issue 1359) ──
-
-/** The memoized READ union of a world scope corpus with one system's in-system array. */
 const _scopedUnions = new WeakMap();
 
 /** The memo for `resolveComponentScope` and its siblings (issue 1359, epic 1357). */
 export function getScopedDefinitionUnion(worldCorpus, systemDefinitions, build) {
-  // An absent corpus or a non-array system list has no stable identity to key on, so it is computed
-  // fresh rather than cached under a shared sentinel that two systems would collide in.
+  // No stable identity to key on, so computed fresh rather than under a shared sentinel.
   if (!worldCorpus || typeof worldCorpus !== 'object' || !Array.isArray(systemDefinitions)) {
     _counters.indexBuilds += 1;
     return build();
@@ -213,10 +175,7 @@ export function getScopedDefinitionUnion(worldCorpus, systemDefinitions, build) 
   return union;
 }
 
-/**
- * The membership lookups `utils/recipeItemMembership.js` accepts, backed by the retained index
- * (issue 1155).
- */
+/** For `recipeItemMembership.js`, backed by the retained index (issue 1155). */
 export const indexedMembershipLookups = Object.freeze({
   byRecipeId: (definitions, recipeId) => findByRecipeId(getDefinitionIndex(definitions), recipeId),
 });

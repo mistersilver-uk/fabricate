@@ -105,6 +105,35 @@ describe('recorded Journal presentation', () => {
     assert.equal(summary.value, `RollResult${JSON.stringify({ formula, total, value: total })}`);
   });
 
+  it('names a roll-under stage roll by its executed target and margin, never a DC (issue 2005)', () => {
+    const stage = (lastCheckResult) => presentStage({ lastCheckResult }, text).check;
+    const under = { formula: '1d20', total: 11, value: 11, dc: null, target: 14, margin: 3 };
+    assert.equal(
+      stage(under),
+      `RollResultWithTarget${JSON.stringify({ formula: '1d20', total: 11, target: 14, margin: '+3' })}`
+    );
+    assert.equal(
+      stage({ ...under, formula: null }),
+      `RollResultValueWithTarget${JSON.stringify({ value: 11, target: 14, margin: '+3' })}`
+    );
+    assert.equal(
+      stage({ formula: '1d20', total: 11, value: 11, dc: 16 }),
+      `RollResultWithDc${JSON.stringify({ formula: '1d20', total: 11, value: 11, dc: 16 })}`,
+      'roll-high keeps its DC line byte-identical'
+    );
+  });
+
+  it('names a count stage and gathering roll by its net successes, never a target or DC (issue 2006)', () => {
+    const stage = (lastCheckResult) => presentStage({ lastCheckResult }, text).check;
+    const count = (fields) => ({ formula: null, total: 4, value: 4, dc: null, target: null, margin: null, count: fields });
+    assert.equal(stage(count({ net: 4, required: 2, zeroPool: false })), `RollResult${JSON.stringify({ net: '4', required: 2 })}`);
+    assert.equal(stage(count({ net: 4, required: null, zeroPool: false })), `RollResultNet${JSON.stringify({ net: '4' })}`);
+    assert.equal(stage({ ...count({ net: null, required: null, zeroPool: true }), total: null, value: 0 }), 'ZeroPoolResult');
+    const gathering = presentHistory({ gatheringYield: { check: count({ net: 1, required: 1, zeroPool: false }) } }, text);
+    assert.equal(gathering.gatheringCheck, `RollResultOne${JSON.stringify({ required: 1 })}`);
+    assert.equal(stage(count({ net: -1, required: 2, zeroPool: false })), `RollResultBotch${JSON.stringify({ net: '−1' })}`);
+  });
+
   for (const [checked, kind] of [[true, 'check'], [false, 'none']]) {
     it(`classifies persisted ${kind} after live configuration changed`, async () => {
       const { deletedRecipeModel } = await createPersistedCraftingHistory({ stageCount: 1, checked });

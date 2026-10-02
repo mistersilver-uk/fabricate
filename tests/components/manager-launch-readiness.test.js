@@ -9,18 +9,11 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { entrySources } from '../helpers/bootstrapEntrySource.js';
-
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const appSource = readFileSync(
   resolve(__dirname, '../../src/ui/SvelteCraftingSystemManagerApp.svelte.js'),
   'utf8'
 );
-const mainSource = [
-  entrySources['src/bootstrap/publicApi.js'],
-  entrySources['src/bootstrap/Fabricate.js'],
-  entrySources['src/bootstrap/composeServices.js'],
-].join('\n');
 
 /** A faithful harness mirroring the static `show()` deferred-open decision. */
 function makeHarness({ readyAtStart = false } = {}) {
@@ -163,24 +156,8 @@ test('the shipped openWhenReady clears the latch and re-checks readiness before 
   );
 });
 
-test('main.js binds game.fabricate from BOTH init and ready via an idempotent helper (guards drift)', () => {
-  assert.ok(
-    mainSource.includes('function bindFabricateGlobal('),
-    'the global binding is extracted into a reusable helper'
-  );
-  // The `ready`-body order — the re-bind ahead of `initialize()` — is pinned behaviourally by
-  // `tests/bootstrap/fabricate-boot-contract.test.js`'s 29-entry hook array and composition log,
-  // which a source regex over one file could not follow across `src/bootstrap/` (issue 1715).
-});
-
-test('initialize() resolves the replay-safe readiness promise (guards drift)', () => {
-  assert.match(
-    mainSource,
-    /fabricate\.ready = true;\s*\n\s*fabricate\._resolveReady\?\.\(\);/,
-    'completing startup settles the whenReady() promise'
-  );
-  assert.ok(
-    mainSource.includes('whenReady()'),
-    'the Fabricate API exposes a whenReady() readiness method'
-  );
-});
+// The entry's half of the replay-safe launch is observed from a real boot by
+// `tests/bootstrap/fabricate-boot-contract.test.js`: `compositionLog` opens with the `ready`
+// backstop's `bind:game.fabricate`, ahead of `initialize()`, and `references.whenReadyResolution`
+// is `resolved` once startup completes. `tests/fabricate-api-surface.test.js` binds twice and gets
+// the same registries back.

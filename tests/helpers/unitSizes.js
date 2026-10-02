@@ -1,6 +1,6 @@
 /**
  * Measure oversized files and functions (issue 1659). Proved from inside the `npm test` glob by
- * `tests/file-size-ledger.test.js`. Boundaries come from a PARSE, never a brace-depth scan.
+ * `tests/file-size-ratchet.test.js`. Boundaries come from a PARSE, never a brace-depth scan.
  */
 import { parse } from 'svelte/compiler';
 
@@ -97,7 +97,7 @@ function enclosingFunctions(functions) {
 
 const lineOf = (text, index) => text.slice(0, index).split('\n').length;
 
-/** Every function in one parsed program, as `{ symbol, lines }`, measured in physical lines. */
+/** Every function in one program, as `{ symbol, lines, line }`: physical lines, and its first. */
 function measureProgram(ast, text, offset = 0, seen = new Map()) {
   const functions = [...walkNodes(ast)]
     .filter((node) => FUNCTION_TYPES.includes(node.type))
@@ -108,9 +108,11 @@ function measureProgram(ast, text, offset = 0, seen = new Map()) {
     const base = qualify(node, owners, byNode);
     const ordinal = (seen.get(base) ?? 0) + 1;
     seen.set(base, ordinal);
+    const line = lineOf(text, node.start + offset);
     return {
       symbol: ordinal === 1 ? base : `${base}#${ordinal}`,
-      lines: lineOf(text, node.end + offset) - lineOf(text, node.start + offset) + 1,
+      lines: lineOf(text, node.end + offset) - line + 1,
+      line,
     };
   });
 }

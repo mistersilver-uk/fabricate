@@ -6,7 +6,10 @@
 import { publicComplications } from '../utils/complicationPlan.js';
 import { activityPermitsFailureResults } from '../utils/failureResultPolicy.js';
 
-import { rollTotalForCard, tierStepForCard } from './craftCardFields.js';
+import { cardRollsKey, settleCardRolls } from './checkCardRolls.js';
+import { refusalData } from './checkTarget.js';
+import { carryAdditionalDice, checkRequest } from './countCheckRoll.js';
+import { checkDisplayForCard, rollTotalForCard, tierStepForCard } from './craftCardFields.js';
 import { readStackQuantity } from './itemStackQuantity.js';
 import {
   assertNativeEffectsUninvoked,
@@ -14,6 +17,7 @@ import {
   mapConsumedIngredientRef,
 } from './runHistoryEvidence.js';
 import { resolveSalvageCheck } from './salvageCheckUsability.js';
+import { SALVAGE_CHECK_FAILED_FALLBACK } from './salvageMessages.js';
 
 /** The five-key shape every salvage refusal returns, here and at `salvage()`'s own gates. */
 export const salvageRefusal = (message, extras = {}) => ({
@@ -189,9 +193,15 @@ export async function openSalvageRun(engine, ctx) {
 /** The salvage check, the failure policy, and the two zero-mutation aborts the result can carry. */
 export async function runSalvageCheck(engine, ctx) {
   const { actor, component, options, salvageRunManager, system, toolValidation } = ctx;
+  // The salvage card carries a public roll only when this call posts one: a bulk run posts an
+  // aggregate card instead, and its rolls keep their own messages. The key is on `ctx` before the
+  // check runs, so `settleSalvageRoll` closes an offer the check opened and then threw past.
+  const carries = options?.suppressChat !== true && system?.features?.chatOutput === true;
+  if (carries) ctx.cardRolls = cardRollsKey();
+  const cardRolls = ctx.cardRolls ?? false;
   const checkResult = await engine._runSalvageCraftingCheck(component, system, actor, {
-    interactive: options?.interactive === true,
-    toolItems: toolValidation.tools,
+    interactive: checkRequest({ ...options, cardRolls }, { craftingSystem: system, component }),
+    toolItems: toolValidation.tools, // ratchet-exempt(world-scope): not-a-system
     rollDecision: options?.rollDecision ?? null,
   });
   ctx.checkResult = checkResult;
@@ -202,17 +212,20 @@ export async function runSalvageCheck(engine, ctx) {
   // run created by THIS call so nothing is left `inProgress`; a reused pre-existing run is left
   // untouched. The failure-consumption policy below applies only to genuine rolled failures.
   if (checkResult.misconfigured) {
+    const refusal = refusalData(checkResult);
     if (salvageRunManager && ctx.salvageRun && ctx.salvageRunCreatedThisCall) {
       await salvageRunManager.discardRun(actor, ctx.salvageRun.id);
     }
-    return refuse(checkResult.message, {
+    const { result: misconfigured } = refuse(checkResult.message, {
       // Additive discriminator (issue 859): a GM-side config gap, NOT a rolled
       // failure. `success` is unchanged, so no existing consumer regresses; a caller
       // that cares can now say "not configured — tell your GM" instead of reporting a
       // failed roll that never happened.
       misconfigured: true,
       salvageRun: ctx.salvageRunCreatedThisCall ? null : ctx.salvageRun,
+      ...(refusal && { data: refusal }),
     });
+    return { result: carryAdditionalDice(misconfigured, checkResult) };
   }
 
   // The player dismissed the interactive roll dialog: a user choice, not a failure. Abort with
@@ -222,10 +235,11 @@ export async function runSalvageCheck(engine, ctx) {
     if (salvageRunManager && ctx.salvageRun && ctx.salvageRunCreatedThisCall) {
       await salvageRunManager.discardRun(actor, ctx.salvageRun.id);
     }
-    return refuse('Salvage cancelled', {
+    const { result: cancelled } = refuse('Salvage cancelled', {
       cancelled: true,
       salvageRun: ctx.salvageRunCreatedThisCall ? null : ctx.salvageRun,
     });
+    return { result: carryAdditionalDice(cancelled, checkResult) };
   }
   return null;
 }
@@ -247,6 +261,14 @@ export async function beginSalvageSettlement(engine, ctx) {
     await salvageRunManager.updateRun(actor, salvageRun);
   }
   return null;
+}
+
+/**
+ * Closes the offer a public salvage roll rode to its card under: a roll no card carried posts its
+ * own message. `salvage()` calls it on every way out once the check has begun.
+ */
+export function settleSalvageRoll(ctx) {
+  return settleCardRolls(ctx.cardRolls);
 }
 
 /**
@@ -273,6 +295,7 @@ export async function resolveSalvageFailure(engine, ctx) {
       // Salvage parity (issue 419): the FAILURE path breaks required tools only
       // when `breakToolsOnFail === true` (this gate), matching crafting.
       const salvageFailBreak = engine._resolveSalvageBreakageDecision(system, checkResult);
+      // ratchet-exempt(world-scope): not-a-system
       usedTools = await engine._applyToolBreakage(syntheticRecipe, toolValidation.tools, {
         forceBreak: salvageFailBreak.forceBreak,
         authority: salvageFailBreak.authority,
@@ -303,7 +326,7 @@ export async function resolveSalvageFailure(engine, ctx) {
           actor,
           resultGroups: failureResultGroups,
           consumedItems: consumedOnFail,
-          tools: toolValidation.tools,
+          tools: toolValidation.tools, // ratchet-exempt(world-scope): not-a-system
           salvageRecipeView: failureSalvageRecipeView,
           checkResult,
         })
@@ -337,7 +360,7 @@ export async function publishSalvageFailure(engine, ctx) {
         value: checkResult.value,
         data: checkResult.data || {},
       },
-      failureReason: checkResult.message || 'Salvage check failed',
+      failureReason: checkResult.message || SALVAGE_CHECK_FAILED_FALLBACK,
     });
   }
 
@@ -358,9 +381,10 @@ export async function publishSalvageFailure(engine, ctx) {
     // an empty list leaves every existing failure card byte-for-byte unchanged.
     results: failureResultItems,
     usedTools,
-    failureReason: checkResult.message || 'Salvage check failed',
+    failureReason: checkResult.message || SALVAGE_CHECK_FAILED_FALLBACK,
     rollValue: rollTotalForCard(checkResult),
     tierStep: tierStepForCard(checkResult),
+    check: checkDisplayForCard(checkResult),
     suppressed: options?.suppressChat === true,
   });
 
@@ -371,8 +395,10 @@ export async function publishSalvageFailure(engine, ctx) {
       // "a failed salvage produced nothing", and the bulk-salvage surfaces read THIS
       // value rather than the run record or the card (issue 1098, AF5/CF9).
       results: failureResultItems.length > 0 ? failureResultItems : null,
-      message: checkResult.message || 'Salvage check failed',
+      message: checkResult.message || SALVAGE_CHECK_FAILED_FALLBACK,
       salvageRun: ctx.salvageRun,
+      // The executed projection, whose visibility the run record never persists (issue 2005).
+      check: checkDisplayForCard(checkResult),
     },
   };
 }
@@ -407,6 +433,7 @@ export async function commitSalvage(engine, ctx) {
   // Salvage parity (issue 419): the SUCCESS path always applies breakage (no
   // `breakToolsOnFail` gate exists here), via the shared seam.
   const salvageSuccessBreak = engine._resolveSalvageBreakageDecision(system, checkResult);
+  // ratchet-exempt(world-scope): not-a-system
   const usedTools = await engine._applyToolBreakage(syntheticRecipe, toolValidation.tools, {
     forceBreak: salvageSuccessBreak.forceBreak,
     authority: salvageSuccessBreak.authority,
@@ -420,7 +447,7 @@ export async function commitSalvage(engine, ctx) {
     actor,
     resultGroups,
     consumedItems,
-    tools: toolValidation.tools,
+    tools: toolValidation.tools, // ratchet-exempt(world-scope): not-a-system
     salvageRecipeView,
     checkResult,
   });
@@ -512,6 +539,7 @@ export async function publishSalvageSuccess(engine, ctx) {
     failureReason: '',
     rollValue: rollTotalForCard(checkResult),
     tierStep: tierStepForCard(checkResult),
+    check: checkDisplayForCard(checkResult),
     suppressed: options?.suppressChat === true,
     firedComplications,
   });
@@ -535,6 +563,7 @@ export async function publishSalvageSuccess(engine, ctx) {
       // a no-check simple salvage (nothing was rolled); a finite number otherwise.
       value: checkResult.value ?? null,
       salvageRun: ctx.salvageRun,
+      check: checkDisplayForCard(checkResult),
     },
   };
 }

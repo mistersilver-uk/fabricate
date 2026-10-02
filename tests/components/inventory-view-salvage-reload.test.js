@@ -5,6 +5,8 @@ import { resolve } from 'node:path';
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 
 import {
+  ADDITIONAL_DICE_NOTICE_RAW_MODULES,
+  CHECK_EVIDENCE_RAW_MODULES,
   MARKS_AND_NOTICES_COMPILED_MODULES,
   PLAYER_APP_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
@@ -20,11 +22,15 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-inventory-salvage-reload-',
   rawModules: [
+    'src/ui/svelte/util/rollPromptOrigin.js',
     // Issue 1506: the one tone map the converted status pills read at a dynamic site.
     ...STATUS_TONE_RAW_MODULES,
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...CHECK_EVIDENCE_RAW_MODULES,
+    // Issue 2008: the salvage sub-stores word an additional-dice refusal through the presenter.
+    ...ADDITIONAL_DICE_NOTICE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
     'src/ui/svelte/util/craftingArtResolution.js',
@@ -35,6 +41,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/recipeItemAccessBadge.js',
     // The pure yield projection the bulk sub-store reads (issue 1695).
     'src/ui/svelte/util/salvageYieldRows.js',
+    // The shared salvage-failure fallback literal (issue 2092), read by SalvageRollSummary.
+    'src/systems/salvageMessages.js',
     // The REAL store imports these two leaves (unlike the mocked-store suite).
     'src/utils/progressiveResultOrder.js',
     'src/utils/progressiveStageThresholds.js',
@@ -71,6 +79,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
     'src/ui/svelte/components/RowDisclosure.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageRollSummary.svelte',
+    'src/ui/svelte/apps/crafting/detail/CheckEvidenceRows.svelte',
+    'src/ui/svelte/components/DiceTiles.svelte',
+    'src/ui/svelte/apps/journal/JournalFactRow.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageSimpleBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageRoutedBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageProgressiveBody.svelte',

@@ -201,7 +201,6 @@ function systemFieldScenarios() {
             craftingChecks: true,
             outcomeRouting: true,
             effectTransfer: true,
-            itemPiles: true,
           },
         },
       ],

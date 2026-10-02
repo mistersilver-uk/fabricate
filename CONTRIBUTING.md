@@ -38,6 +38,25 @@ We follow a **spec-driven approach** for development with agents:
 
 This ensures consistency, maintainability, and clear documentation of system behaviour.
 
+### Toolchain prerequisites
+
+#### Prereqs
+
+- Node.js 22+ (see `.nvmrc` / `.node-version`).
+On Windows with `nvm-windows`, run `nvm use` manually — it does not auto-switch on directory change.
+- npm (ships with Node).
+- Docker Desktop only required for `npm run test:foundry`.
+Not required for `npm test`, `npm run build`, or `npm run dev`.
+- No extra shell tools required. `npm run release:build` uses Windows' built-in `tar.exe` for zip creation; on Ubuntu it uses `zip`.
+
+#### `npm test`
+
+Its glob enumerates a fixed set of test directories (see the `test` script in `package.json`).
+A test placed in a directory the glob does not list is NOT gated, even though it passes when run directly with `node --test <file>`.
+When adding a test in a new directory, add that directory to the `test` script and confirm the total count rises under `npm test`.
+A mounted-component test that references a `.svelte` (or imported module) missing from its harness allowlist does not fail — it hangs and is reported as `# cancelled`, so after adding/rendering a component confirm `# cancelled 0`, not just `# fail 0` (see the implementer skill).
+The unit-test bar is `# cancelled 0` as well as `# fail 0`: a parallel run under machine load (a concurrent `npm ci` in another worktree, for instance) produces cancellations that read like failures, so on any cancellation re-run with `--test-concurrency=1` and account for the delta before diagnosing a real break.
+
 ## How releases work
 
 This section explains; it does not specify.
@@ -159,7 +178,8 @@ An absent or `unknown` provenance counts as an unidentified build and never sati
 Re-run it from the SAME commit.
 A target already written from this build is recognised by its provenance and skipped, and only the unwritten targets are completed — the resume path in the **Publish completeness** requirement.
 For a push-triggered stable release, re-dispatch `release.yml` via `workflow_dispatch` with `--ref` set to the branch that produced the tag and the already-minted `tag` supplied; for any channel, `release-s3.yml` can be dispatched directly with the same `tag` and `channel`.
-A `release-s3.yml` dispatch publishes the tag's bytes under the dispatch ref's deployment configuration, because the workflow captures `release.s3.config.json` from the ref it runs on before checking the tag out; dispatch from the ref carrying the tester configuration you intend to publish under, and expect a named refusal when the tag's `scripts/release-s3.js` predates `--config` (issue #1872).
+A `release-s3.yml` dispatch publishes the tag's bytes with the dispatch ref's publisher and deployment configuration, because the workflow builds the tag in a worktree beside its own checkout rather than moving that checkout to the tag; dispatch from the ref carrying the tester configuration you intend to publish under (issues #1872 and #1988).
+Republishing a version after a tester group is added writes only the added group's target: the targets already carrying that version from the same build are recognised by their provenance and skipped.
 
 Do NOT reach for `--overwrite` to get past a failed publish.
 `--overwrite` replaces the bytes of a version a target already advertises, and a version's published artefacts are immutable — clients already on it never re-fetch, and any CDN holding the immutable zip pins the old bytes — so overwriting splits one version string across two different builds.
@@ -169,7 +189,7 @@ The routine remedy for a failed publish is the resume above, not an override —
 #### Provenance metadata and `--source-sha`
 
 Every versioned zip is uploaded with its provenance triple as S3 metadata, and the guard reads it back on the next publish.
-`release-s3.js` takes the commit explicitly via `--source-sha`, because `release-s3.yml` checks out the release tag before invoking the script, which leaves `GITHUB_SHA` naming the ref that triggered the run rather than the built commit — the workflow passes `--source-sha "$(git rev-parse HEAD)"`.
+`release-s3.js` takes the commit explicitly via `--source-sha`, because `release-s3.yml` builds the release tag in its own worktree while `GITHUB_SHA` names the ref that triggered the run rather than the built commit — the workflow passes the worktree's `HEAD` as `--source-sha` and the worktree itself as `--source-root`, and the script refuses a sha that worktree does not hold.
 A build profile defaults to `community`, and every target of one publish must share it, so a mixed-profile publish fails before writing anything (keyed to issue 345) — see the **One build per publish** requirement.
 
 #### Backfilling provenance onto older zips
@@ -288,6 +308,36 @@ The `--no-zip` flag (`node scripts/release.js --no-zip`) is designed for use in 
     name: fabricate-dist
     path: dist/
 ```
+
+### Release Utilities
+
+- Use `node scripts/latest-module-versions.mjs --profile fabricate-beta` to query the current latest beta manifest versions for Fabricate and the premium sibling modules; substitute another `--profile <name>` when the local AWS profile differs.
+The script reads `release.s3.config.json` plus `../fabricate-premium/release.config.json`, uses exact S3 `GetObject` reads for `modules/<moduleId>/<channel>/latest/module.json`, and does not require `s3:ListBucket`.
+Useful flags: `--json`, `--include <moduleId>`, `--bucket <name>`, `--channel <name>`, `--premium-config <path>`, and `--no-premium`.
+- `node scripts/rotate-tester-secrets.mjs` rotates every tester path segment in one pass, across this repository and the premium sibling.
+It reads both committed release configs to derive which repository secrets each tester group's segment is written to, so no Patreon tier name is hard-coded here.
+It is **dry-run by default** and writes nothing until `--apply`; `--group <name>` narrows to one group, and refuses when that group's secret also serves groups you did not name.
+Useful flags: `--group <name>`, `--config <path>`, and `--premium-config <path>` when the premium sibling is not checked out beside this repository.
+`--no-premium` inspects this repository alone and is **refused together with `--apply`**, because rotating one repository leaves the other on the old segment and splits one cohort across two prefixes.
+Rotation is a cohort migration, never hygiene: it deletes nothing and republishes nothing, so every superseded prefix keeps serving its last manifest and the cohort on it silently stops receiving updates rather than failing.
+Under `--apply` it prints one full `testers/<group>/<segment>/<moduleId>/module.json` URL per rotated group and module, so the report pastes into the patron announcement as-is; `gh` cannot read a secret back, so it is also the only record of where each cohort now lives.
+Pair each run with the patron announcement carrying those URLs.
+It is deliberately absent from `package.json` and from every workflow, because it mutates repository secrets in two repositories and must stay a deliberate local act.
+It resolves `gh` to one absolute path before running it rather than searching `PATH` at spawn time; set `GH_BIN` to an absolute path for a non-standard install, and a relative `GH_BIN` is refused.
+- `node scripts/release-s3.js --channel <name>` publishes a built `dist/` to one channel's S3 targets: `beta` (closed testers, the default), `early-access` (patrons), `public` (everyone + the Foundry registry), or a hotfix line's own channel.
+`--channel early-access` and `--channel public` are the private-patron and public targets; each tester group derives its tester URLs from its own path secret, and a channel with any declared group whose secret is unset refuses to publish before building.
+`release.s3.config.json` declares each channel's `testerGroups` as an object keyed by group, each naming its own `testerSecretEnv`; early access serves `apprentice-crafter-2026` and `guild-artisan-2026`.
+Pair with `--dry-run` to print every planned key and URL without writing, and `--check-heads` to read each target's head and the monotonic-head guard verdict without publishing (note `--check-heads` is head-ordering only — it stages no build, so it does NOT evaluate the same-version resume/provenance decision, which needs a real publish).
+The tag supplies the built bytes and the publisher runs from the workflow ref: every CI publish checks the tag out beside the workflow ref with `.github/actions/release-source/action.yml` and passes `--source-root <worktree>` and `--source-sha <commit>`, so the ref's publisher and configuration build the tag's tree.
+In CI a build refuses without both flags, and it refuses a `--source-sha` that is not the commit checked out at `--source-root`.
+Run locally with neither, it builds this checkout and reads its own `release.s3.config.json`.
+A local `--source-sha` given without `--source-root` is checked against this checkout's `HEAD`.
+The three-channel model these serve is specified in `openspec/specs/release-and-distribution/spec.md`.
+- `release-s3.js` publishes through a **provenance guard**, not a byte check (the built zip is not byte-reproducible across builds).
+Every versioned zip carries `(fabricate-version, fabricate-source-sha, fabricate-build-profile)` metadata — pass `--source-sha` explicitly, since `GITHUB_SHA` names the workflow ref rather than the tag being built; manifest writes are conditional (`IfMatch`) and every write is read back.
+A publish that died between targets **resumes** from the same commit with no flag (matching provenance skips the already-written zip); `--overwrite` is only for an artefact no cohort has installed yet and must never be the routine fix for a failed publish of an already-distributed version; `--allow-downgrade` is only for an intentional backward move.
+`--backfill-provenance` (and the `backfill-provenance.yml` workflow dispatch, `dry_run` first) stamps provenance onto pre-existing zips so the guard does not fail closed on legacy artefacts; it derives each zip's sha from its `v<version>` tag and stamps `unknown` (treated as absent) where none maps.
+The immutability, completeness, and one-build-per-publish contracts are specified in `openspec/specs/release-and-distribution/spec.md`.
 
 ## UI Architecture (Svelte)
 
@@ -461,24 +511,76 @@ fix(#99): correct ingredient deduplication in alchemy mode
 The scope is optional for all other types.
 Header lines must be 100 characters or fewer.
 
+Recurring traps it enforces: the header type must be a single valid Conventional type (`test/refactor:` is invalid — `/` breaks parsing into `type-empty`/`subject-empty`; pick one type); the subject must **not** start capitalized (`subject-case` rejects sentence/start/pascal/upper-case — lead with a lowercase verb, e.g. `feat: add Map Region Links tab`, not `feat: Map Region Links tab`). `body-max-length` (>500 chars) is a warning only and does not fail the job.
+To reword a non-tip commit non-interactively (interactive rebase is unavailable), use `git filter-branch --msg-filter` then `git push --force-with-lease`.
+
+The `<type>(#<issue>):` title prefix and a bare `(#<issue>)` only *reference* the issue — GitHub does **not** auto-close from the title, so the body keyword is required (omitting it leaves resolved issues open, as happened with the #318–#326 sweep).
+Each issue needs its own keyword (`Closes #1, closes #2`).
+Use the non-closing `Refs #<issue>` instead only for a partial change that must leave the issue open.
+
+- Merge commits are linted too.
+A `merge:` prefix fails `commitlint` (`merge` is not an allowed type); `commitlint`'s default ignore only skips the standard capitalized `Merge branch …` / `Merge pull request …` messages.
+For a `--no-ff` integration merge, title it `chore: merge <x> into <y>` (or keep the default `Merge branch …` message). `git commit --amend -m "chore: …"` preserves both parents if a merge message needs fixing; re-run `npx commitlint --from=main --to=HEAD`, then `git push --force-with-lease`.
+- GitHub issue, PR, and comment bodies are written as normal prose with no manual line wrapping — one line per paragraph, and let GitHub soft-wrap.
+Do not hard-wrap at a fixed column, and do not apply the one-sentence-per-line rule here (GitHub renders single newlines as spaces, but unwrapped source is cleaner to read and edit).
+
 ## Linting & formatting
 
 Fabricate uses [ESLint](https://eslint.org/) (flat config in `eslint.config.js`) for JavaScript and Svelte static analysis, [Stylelint](https://stylelint.io/) (config in `stylelint.config.js`) for CSS, [Prettier](https://prettier.io/) for formatting, and [markdownlint-cli2](https://github.com/DavidAnson/markdownlint-cli2) (config in `.markdownlint-cli2.jsonc`) for Markdown.
 All of these run as a **required CI check** (`lint` job in `.github/workflows/ci.yml`).
 
 ```bash
-npm run lint           # ESLint over the whole repository (fails on any warning)
-npm run lint:fix       # …and auto-fix what can be fixed
-npm run lint:debt      # what is still wrong in the files eslint.debt.js carries (what CI runs)
+npm run lint           # ESLint over the whole repository, compared with the base commit (what CI runs)
+npm run lint:fix       # …and auto-fix the rules your change made worse
 npm run lint:svelte    # ESLint over every src/**/*.svelte (what CI runs)
 npm run lint:svelte:warnings  # Svelte COMPILER warnings, every component (what CI runs)
 npm run lint:css       # Stylelint over styles/**/*.{css,scss} (what CI runs)
 npm run lint:css:fix   # …and auto-fix what can be fixed
-npm run format         # Prettier-format the whole repository
-npm run format:check   # verify formatting (what CI runs)
+npm run format         # Prettier-format the files format:check fails
+npm run format:check   # verify formatting against the base commit (what CI runs)
 npm run lint:md        # markdownlint over all Markdown (what CI runs)
 npm run lint:md:fix    # …and auto-fix (splits prose to one sentence per line)
 ```
+
+ESLint and Prettier run over the whole repository (`scripts/lint.mjs` and `scripts/format-check.mjs`), and fail on what a change makes worse against the base commit — see [Reading a ratchet failure](#reading-a-ratchet-failure).
+Prettier additionally formats every `*.svelte` file under `src/` — `prettier-plugin-svelte` is registered in `.prettierrc.json` (Prettier 3 does not auto-load plugins, so the devDependency alone is not enough) and `format:check` covers `src/**/*.svelte`, so a component that is new, or was formatted at base, fails CI when it is not formatted.
+`npm run lint:svelte` runs the same base comparison over every `*.svelte` file under `src/` alone, so a component's script and markup are held to their base findings exactly as the `.js` around them under `src/ui/**` is, and a `ratchet-exempt(lint)` marker counts in both.
+That gate polices suppressions in both directions: `svelte/no-unused-svelte-ignore` is active, so a `svelte-ignore` comment that no longer suppresses anything is itself a lint failure and must be removed once it stops being needed.
+The same holds for an ESLint suppression — the `.svelte` block in `eslint.config.js` pins `linterOptions: { reportUnusedDisableDirectives: 'error' }`, so a stale `eslint-disable` directive fails the gate exactly as a stale `svelte-ignore` does.
+That is pinned rather than left to ESLint's default because it is half of what makes reformatting components safe: `eslint-disable-next-line` is anchored to a line and Prettier moves lines, so a directive that slips off its violation resurfaces the violation, and one that lands suppressing nothing is reported by this option.
+A suppression that must sit on a particular line therefore needs a `<!-- prettier-ignore -->` fence to keep it there — see the `{' '}` separators in `ExplainerCard.svelte` and `CraftingSystemManagerRoot.svelte`, where Prettier splits a `<span>` containing an `{#if}` across several lines whatever the print width; the fence protects the directive's line anchor, not the render.
+Svelte COMPILER warnings are gated too, as of issue 924: `onwarn` in `svelte.config.js` fails `npm run build`, and `npm run lint:svelte:warnings` runs the graph-independent sweep in `scripts/check-svelte-warnings.mjs` as its own step of the `lint` CI job.
+The sweep is the authoritative half — a Vite build compiles only the entry graph, so it is blind to a component nothing imports — and both read their compiler options from `svelte.config.js`, so a disagreement between them means graph reachability and never drift in `compilerOptions`.
+That qualifier is load-bearing: `emitCss` is a `vite-plugin-svelte` option rather than a compiler one, and `emitCss: false` makes the plugin drop every `css_unused_selector` before `onwarn` sees it, so the build would go quiet on a class the sweep still reports.
+`tests/svelte-warning-scope.test.js` pins `emitCss` at its default on both surfaces that can set it, and pins `compilerOptions` to carry no `warningFilter` — that one key would turn the sweep, the build and the whole-tree assertion clean while checking nothing.
+Stylelint still excludes `.svelte` (scoped `<style>` blocks are not linted) and SonarCloud runs no RULES against it, so ESLint plus the compiler sweep are the whole static-analysis story for a component.
+**But SonarCloud's DUPLICATION detector does read `.svelte`, and that distinction is not academic** — issue 1050 read this sentence as "Svelte is invisible to SonarCloud", concluded the duplication risk lived in `tests/**`, and shipped a PR whose quality gate failed at 5.3% on new code with 93 of its 98 duplicated lines in a single `.svelte` file.
+A token-level CPD run at SonarJS's 100-token minimum reproduces the gate closely; a line-based approximation does not, and neither does reasoning from the rule surface.
+So a change that repeats a component's markup — the same field pair written for two scopes, one row rendered per case — is a duplication risk exactly like repeated `.js`, and the remedy is the same: render it once from one component.
+`npm run lint` runs ESLint and `npm run format:check` runs Prettier over `.` — the whole repository, as of issue #1660.
+They used to enumerate about eighty paths each, so a new file was linted by nothing until somebody remembered to add it, which is the trap that let a new BUG and a new VULNERABILITY reach SonarCloud in issue 933.
+The not-yet-clean files are held at the base commit's findings rather than listed: a changed file fails on a `(file, rule)` count above its base content's, and every rule stays armed on it — deliberately not an `ignores` entry, which would take the file out of ESLint's reach entirely, `no-undef` included, while the linted-file count went up.
+Formatting debt is held the same way: a file Prettier-clean at base, or new, must stay clean.
+`npm run lint` compares with `RATCHET_BASE` when it is set and with the merge base of `origin/main` otherwise, so run `git fetch origin main` if it names code you did not touch; it runs as a step of the `lint` CI job rather than from `npm test`, because it lints the whole tree.
+`tests/new-violations.test.js` proves both comparisons against a temporary repository, including that `no-undef` and a parse error fail at any count.
+When you bring a file to green there is nothing to update, because the comparison reports the fall; widen nothing else in the same PR, since reformatting counts as new code and surfaces pre-existing Sonar findings.
+The `scripts/**` debt stays for a measured reason: the Foundry smoke harness alone accounted for 844 of the roughly one thousand ESLint findings there when the glob landed, and it pins its Phase D0 selectors by class, index and button text with no unit coverage, so clearing it is a large triage against the least-covered file here rather than a tidy-up.
+A new `.sh` under `scripts/` is the one thing still added by hand — to `SHELL_SCRIPTS` in `tests/scripts-lint-gate-coverage.test.js`, which with its `bash -n` parse is the only gate shell gets anywhere in this repository.
+`npm run lint:css` (Stylelint, config in `stylelint.config.js`) gates `styles/**/*.{css,scss}` and enforces quality, reliability, duplication, reuse/shorthand, and cross-browser support (against the `browserslist` in `package.json`); Svelte scoped `<style>` blocks are out of scope.
+Use `npm run lint:fix` / `npm run lint:css:fix` / `npm run format` to auto-fix.
+See the "Linting & formatting" section in `CONTRIBUTING.md`.
+
+- **SonarCloud quality gate** — a separate CI job evaluated on the PR's *new code*, distinct from `npm run lint`.
+It fails on `new_duplicated_lines_density > 3%`, and SonarCloud Automatic Analysis **does not honor `sonar.cpd.exclusions`** from `sonar-project.properties`: duplication in `tests/**` and `scripts/**` fixtures counts against the gate exactly like `src/`.
+Keep new test/fixture/script code DRY (shared helpers like `createMountedComponentHarness`, hoisted constants); the only durable way to exempt a path is the maintainer-set **Duplication Exclusion** in the SonarCloud project UI.
+The gate also fails on new bugs/code-smells that ESLint does not flag (e.g. a nested ternary), so a PR can be lint-green yet Sonar-red — read the gate's findings, don't assume `npm run lint` covers it.
+The commoner trap is the reverse one, and it is worth naming because it reads identically from the PR: the rule exists and simply never ran, because the FILE was outside the gate's path list.
+`Array#sort()` without a comparator is a worked example — `unicorn/require-array-sort-compare` flags it here, yet Sonar still reported it as a new BUG, because the file it sat in was ungated (issue 933).
+So when Sonar reports something, first check whether `npm run lint` covers that file at all; unlinted paths are the risk far more often than unlintable rules.
+- The gate also fails on `new_security_rating` — a single new-code finding above rating A fails the PR.
+The ones that bite in practice: `Math.random()` for an id or token (`S2245`, a MEDIUM vulnerability — use `crypto.randomUUID()` / `crypto.getRandomValues()` / `foundry.utils.randomID()`), and spawning a bare command name resolved through `PATH` such as `spawnSync('git', …)` (`S4036` — read the data from stdin, or pass a fixed executable path, rather than searching `PATH`).
+For GitHub Actions workflows the gate adds its own rules: no `${{ inputs.* }}` / `${{ github.* }}` interpolated into a `run:` block (`S7630` — pass them through `env:` and reference `$VAR`); declare `permissions:` at the **job** level on any new job (`S8264`); and SHA-pin third-party actions such as `aws-actions/*` (`S7637`; `actions/*` are allowlisted).
+A **composite action** (`.github/actions/release-setup/action.yml`) has **no `secrets`/`vars` context** — only `inputs`/`env`/`github`/`runner`/`steps`/`job` — so a `${{ vars.* }}` / `${{ secrets.* }}` moved into one resolves to an empty string silently; declare those as `inputs` the caller passes explicitly.
 
 ### Markdown linting (markdownlint)
 
@@ -487,6 +589,12 @@ The headline rule is **one sentence per line**: every sentence sits on its own p
 Run `npm run lint:md:fix` to auto-split prose, then re-run it until the count stops dropping, because a long paragraph splits one boundary per pass.
 A multi-sentence **table cell** cannot be split across lines, so wrap that table in a `<!-- markdownlint-disable markdownlint-sentences-per-line -->` / `<!-- markdownlint-enable markdownlint-sentences-per-line -->` region.
 Run this before finalising any change that touches Markdown.
+
+- `npm run lint:md:files -- <paths>` is the focused local and lane check and passes only the explicit paths to `markdownlint-cli2 --no-globs`, so configured repository globs cannot pull unrelated Markdown into the run.
+`npm run lint:md` remains the unchanged authoritative whole-repository gate in local development and CI; CI does not substitute the focused command for it.
+- Do not reflow existing documents wholesale just to apply these rules.
+Apply them to new content and to any section you are already editing.
+That is the steady-state rule, and it sits on top of the one-time reflow of the harness documents that issue #1661 sanctioned and `scripts/lib/markdownWraps.js` performed; a further wholesale reflow needs its own sanction.
 
 ### CSS linting (Stylelint)
 
@@ -503,33 +611,37 @@ Stylelint has **no** robust rule for detecting two near-identical rule blocks th
 A handful of standard rules are deliberately turned off with justification in `stylelint.config.js` (e.g. `no-descending-specificity` — reordering the single large global sheet is regression-prone and unreviewable; the cosmetic `selector-not-notation` / `media-feature-range-notation` modernizers — pure churn for no enforcement value).
 The Svelte components' scoped `<style>` blocks are not linted here (they compile to hashed classes and are owned by the Svelte toolchain).
 
-### The gate is a glob, and the debt is a list
+### The gate is a glob, and the debt is the base commit
 
-`npm run lint` is `eslint .` and `npm run format:check` is `prettier --check .`, over the whole repository, as of issue #1660.
+`npm run lint` runs ESLint and `npm run format:check` runs Prettier over `.`, the whole repository, as of issue #1660.
 
 They used to enumerate about eighty paths each.
 Linting had been introduced path by path so each step landed green, and the cost of that was a gate that could only be widened by hand: a file left off the list was linted by nothing, and the miss surfaced at SonarCloud after push rather than at any local gate (issue #933).
-The glob inverts it — a new file is gated the moment it lands — and the not-yet-clean files are carried explicitly instead.
+The glob inverts it — a new file is gated the moment it lands — and the not-yet-clean files are held at their base findings instead.
 
-`eslint.debt.js` records, **per file**, the rules that file fails today, and `eslint.config.js` switches off exactly those.
-Every other rule stays armed on it.
+`npm run lint` (`scripts/lint.mjs`) lints the base content of each changed file with the same config, and fails on a `(file, rule)` count above it.
+Every rule stays armed on every file.
 That is deliberately not an `ignores` entry: ignoring a file takes it out of ESLint's reach entirely, `no-undef` included, while the linted-file *count* goes up — which reads as progress in a diff and is a regression in fact.
 `src/main.js` is the file that settles the point; `tests/main-undefined-identifiers.test.js` exists because a `ReferenceError` shipped in it past lint, tests and build.
 
-So the debt shrinks along two axes: a rule leaves a file when that rule is fixed, and a file leaves when its last rule does.
+So the debt only shrinks: a finding fixed in a file lowers the base the next change to that file is compared with.
 
-- `npm run lint:debt` shows what is left in a baselined file, and **fails** when an entry reports nothing any more — an entry paid off and left in place is how "the baseline only shrinks" quietly stops being true.
-  It is a step of the `lint` CI job rather than a unit test because answering it means linting the largest files in the tree, and twenty-three CPU-bound seconds do not belong in the unit-test job.
-- `tests/lint-coverage.test.js` pins each group's size **exactly** (not as a ceiling — a ceiling banks a free slot on every debt payment), asserts the glob still covers everything the old enumeration reached, and asserts `no-undef` is never baselined.
-- Formatting debt is the marked section of `.prettierignore`, pinned and staleness-checked the same way.
+- `npm run lint` fails `no-undef` and a parse error at any count, and excuses a regression only where a `// ratchet-exempt(lint): <reason>` comment sits on the finding's line or in the comment lines right above it; an empty reason fails.
+  The cross-file import rules (`import-x/named`, `no-unresolved`, `namespace`, `default`, `export` and `no-cycle`) fail at any count too, since they report in a file the change did not touch.
+  A marker excuses only a finding new against the base, so marking one the base already had makes no room for another.
+  It is a step of the `lint` CI job rather than a unit test because it lints the whole tree, and more than a minute of CPU-bound work does not belong in the unit-test job.
+- `tests/lint-coverage.test.js` asserts `no-undef` is armed in every part of the tree and pins both ignore lists.
+- Formatting debt is held by `npm run format:check` (`scripts/format-check.mjs`) the same way, and `npm run format` formats exactly the files it fails.
 
-When you bring a file to green, delete its entry and lower the pinned count in the same commit.
+When you bring a file to green, commit it; there is no entry to delete and no count to lower.
+The debt is visible, not hidden: an editor shows it as errors, and a bare `npx eslint .` or `npx prettier --check .` exits non-zero, so the gate is the npm script and never the bare tool.
+`npm run lint:fix` fixes only the rules your change made worse, and `npm run format` formats only the files `format:check` fails, so neither rewrites debt you did not touch.
 
 A **second** gated script, `npm run lint:svelte`, covers every `*.svelte` file under `src/` and runs as its own step of the same required `lint` job.
 It is separate because components need the Svelte parser and their own rule set, not because they are optional.
-Note what this means for `src/ui/**`: that directory holds both halves and `npm run lint` now covers both, so the 394 plain `.js` files there that are clean are gated outright; only the 60 listed in `eslint-debt.txt` carry any exclusion, and only for the rules they fail.
+Note what this means for `src/ui/**`: that directory holds both halves and `npm run lint` now covers both, so its plain `.js` files that are clean are gated outright, and those that are not are held at their base findings, rule by rule.
 
-`lint:svelte` runs with `--max-warnings=0`, so the two WARN-level rules in `svelte.configs.recommended` (`svelte/no-at-debug-tags`, `svelte/no-inspect`) fail the build rather than printing and exiting 0 — a `{@debug}` tag or an `$inspect()` call left in a component is a CI failure.
+The base comparison counts warnings as it counts errors, so the two WARN-level rules in `svelte.configs.recommended` (`svelte/no-at-debug-tags`, `svelte/no-inspect`) fail the build rather than printing and exiting 0 — a new `{@debug}` tag or `$inspect()` call left in a component is a CI failure.
 A finding has three legitimate dispositions: fix the code, tune the rule in `eslint.config.js`, or suppress it.
 Suppressions use `eslint-disable-next-line` only — never a file-level disable — and carry a one-line rationale naming the contract they protect; a markup site needs the HTML-comment form `<!-- eslint-disable-next-line <rule> -->`, because a `//` in markup renders as literal on-screen text.
 The gate polices suppressions in **both** directions: with `svelte/no-unused-svelte-ignore` active, a stale `svelte-ignore` comment is itself a lint failure, so remove a suppression when it stops being needed rather than leaving it to mask a future warning.
@@ -565,19 +677,37 @@ A warning worth keeping is suppressed at its site with `<!-- svelte-ignore <code
 SonarCloud still indexes no `.svelte` at all (SonarJS ships no Svelte parser), so components contribute nothing to the quality gate's duplication or issue counts, and Stylelint still excludes their scoped `<style>` blocks.
 Both are tracked as their own follow-ups.
 
-Carried as debt rather than gated away (see `eslint.debt.js`, and `npm run lint:debt` to see what is left):
+Carried as debt rather than gated away (held at their base findings; `npx eslint <file>` shows what is left):
 
-- the `tests/` suite — one rule list across the tree rather than a per-file table, because 887 of its 1,040 files report something.
-  Every rule *not* on that list is now enforced there for the first time, `no-undef` among them.
-- 60 of the 454 plain `.js` files under `src/ui/**`; the other 394 are gated outright, as are the `.svelte` components beside them
+- the `tests/` suite — held per file and rule like the rest, where 887 of its 1,040 files reported something when the glob landed.
+  Every rule is now enforced there, `no-undef` at any count.
+- the plain `.js` files under `src/ui/**` that are not yet clean; the rest are gated outright, as are the `.svelte` components beside them
 - `src/main.js` and three root `src/gathering*.js` modules
-- 15 of the 33 files under `scripts/**`
+- part of `scripts/**`, for the reason below
 - the `examples/macros/*.js` documentation macros, and two root config files
 
-`scripts/**` is worth understanding before you add a script, because the reason its fifteen are still listed is a measurement rather than an oversight.
+`scripts/**` is worth understanding before you add a script, because the reason part of it still carries debt is a measurement rather than an oversight.
 The Foundry smoke harness alone accounts for 844 of the roughly one thousand ESLint findings across that directory, and it pins its Phase D0 selectors by class, index and button text with no unit coverage over any of them.
 Adding a script now lints it — that is the whole point of the glob — so the only thing left to remember is that a new `.sh` file joins `SHELL_SCRIPTS` in `tests/scripts-lint-gate-coverage.test.js` by hand.
 Shell is parsed by no linter and formatted by no formatter here, and that list plus its `bash -n` parse is the only gate a shell script gets.
+
+### Reading a ratchet failure
+
+A ratchet is a test that bounds a population of offenders: oversized units, comment share, source pins, design-system debt, world-scope reads and orphaned `lang/` keys.
+`npm run lint` and `npm run format:check` hold ESLint and Prettier findings the same way.
+Each compares the working tree with a base commit it computes at test time: `RATCHET_BASE` when that is set, as CI sets it to the commit the pushed change sits on, and otherwise the merge base of `HEAD` with `origin/main`.
+No ledger, baseline or pinned total is checked in, so there is nothing to regenerate or tighten.
+
+A failure names the family, the base commit and each regression, as an entry that is new or one that rose from its base value to its head value.
+Fix the code, or, when the regression is legitimate, record why at the site with a `ratchet-exempt(<family>): <reason>` comment in the file's own comment form: `//` in JavaScript, `/* */` in CSS, `<!-- -->` in HTML and Markdown, and any of the three in a Svelte file.
+`lang-orphan` alone takes no marker, because `lang/en.json` cannot carry a comment, so an orphaned key is wired up or deleted.
+The marker sits on the offending line or in the comment lines right above it, and a family that measures a whole file or unit, such as `file-size` or `comment-share`, also accepts it in the file's head comment.
+A marker with an empty reason fails, and a reviewer reads every marker a diff adds.
+A shrink never fails: it is reported as a `shrank` diagnostic, and the next change is compared with the smaller figure.
+
+A stale `origin/main` can give a false positive: run `git fetch origin main`.
+When a ratchet names code you did not touch, your local `origin/main` usually predates the commit your branch started from, so the comparison counts other people's changes as yours.
+Locally, with no `origin/main` and no `RATCHET_BASE`, the ratchets skip and name that fix; in CI they fail instead, and `RATCHET_BASE=none` is the explicit opt-out the beta and release jobs use.
 
 ## The View Lab (Foundry-free window captures)
 
@@ -588,7 +718,6 @@ It exists because PR screenshot evidence should not cost a container boot and a 
 npm run viewlab:chrome:harvest              # one-off; see below
 node scripts/view-lab-screenshots.mjs apps  # every registry case -> ui-screenshot-artifact/apps/
 npm run viewlab:index                       # regenerate the evidence index on its own
-npm run viewlab:totals                      # regenerate the registry totals in scripts/README.md
 ```
 
 The window chrome is Foundry's own, harvested from the release archive `npm run test:foundry:up` already caches under `.foundry-e2e/cache/`.
@@ -608,8 +737,12 @@ Every manager case declares `expectView`, which the capture asserts against the 
 A case also declares `reaches`: `exact` when the frame lands on its smoke counterpart's own condition, `window` when it reaches the right application window but not that condition (known remaining work), and `beyond` for a condition the live smoke never walks at all — the routed recipe resolution modes, the visibility modes it does not visit, Foundry's light application theme.
 A `beyond` case carries an empty `smokeLabels`, because there is nothing to compare it against.
 A `window` case's shortfall is accounted for by a class-level entry in the known-gaps register in `scripts/README.md`, not by a per-case comment.
-How many cases the registry holds, how they split across the three claims, and how many of them surface coverage selects are generated into `scripts/README.md` from the registry itself.
-Adding or removing a case means running `npm run viewlab:totals`; `npm test` reds if you forget.
+
+Every case renders the default `fabricate` palette unless it says otherwise.
+A case that lists palette ids in `themeVariants` gains one variant per palette, registered directly after it: the same case under the id `<case-id>-<palette>`, with `theme` set to that palette, `reaches: 'beyond'` and no smoke labels.
+The capture carries `theme` to the page as a query flag, and the page applies it with the production `applyFabricateTheme` to the document element and to every `.fabricate` root, including the roots that mount after the page is ready.
+An id that is not a shipped palette fails, both when the registry loads and in the page, so a variant can never quietly render the default palette.
+Whatever selects a case also selects its palette variants, but surface coverage never contains one, because a palette is not a surface.
 
 A change to the lab's own inputs is attributed rather than treated like an ordinary render-file change.
 By default a PR touching the case registry, `labActors.js`, `labRunStates.js`, or any other file the lab depends on selects **surface coverage**: one frame of every route and tab the lab renders — every manager route, every player tab, one per single-screen canvas window, plus the light-theme pair.
@@ -623,8 +756,9 @@ A patch to `scripts/lib/view-lab-cases/` selects only the case literals its hunk
 A patch to `tests/view-lab/mount.js` selects only the cases the marked regions it falls inside can render — the four player-only blocks are marked in the file rather than found by column, because two of them sit inside functions the manager window runs too.
 A change to `scripts/lib/viewLabLayoutAssertion.js` selects only the cases declaring `expectLayout`, whole-file, since every path through that helper validates those and no others.
 A patch to `tests/view-lab/world/labActors.js` selects only the cases that can render what the touched fixture table feeds: player cases alone for `INVENTORIES` and `BROKEN_STACKS`, and player cases plus the manager cases whose own `sourceMatches` claim a Knowledge or Books & Scrolls render file for `RECIPE_ITEM_COPIES` and `LEARNED_RECIPES`.
-A patch to `tests/view-lab/world/labRunStates.js` selects player cases alone, and it needs no content-anchoring, since its whole output is player-only.
-The three patch-narrowed inputs — the case registry, the actor fixture and the mount page — locate a hunk by searching the rendered file for its own content instead of trusting the hunk header's line numbers; where that content recurs, the hunk is attributed at every location it could be and the answer is their union, which contains wherever the edit really landed.
+A patch to `tests/view-lab/world/labRunStates.js` selects only the cases whose `journalCaseState` names a run state the patch touches, found by that state's entry in the run-id table or the factory table.
+A patch to anything else in `labRunStates.js`, such as a shared builder, an import or the default runs, selects every player-window case, as it did before run-state attribution.
+The four patch-narrowed inputs — the case registry, the actor fixture, the run-state fixture and the mount page — locate a hunk by searching the rendered file for its own content instead of trusting the hunk header's line numbers; where that content recurs, the hunk is attributed at every location it could be and the answer is their union, which contains wherever the edit really landed.
 A patch to anything else in `labActors.js`, such as `ACTOR_DEFINITIONS` or a shared builder function, keeps the coverage default.
 So does a patch to any lab input the registry does not attribute, or a hunk whose content cannot be anchored at all.
 Widening is always a UNION with whatever the change did attribute, never a replacement of it: a PR that edits one case literal and also touches shared code gets coverage AND that case's own frame.
@@ -641,10 +775,52 @@ The known-gaps register in `scripts/README.md` names them.
 Where a View Lab frame and a smoke frame of the same view disagree, the smoke frame is correct and the lab is defective.
 `scripts/README.md` carries the standing fidelity register (no canvas, no sidebar, a real `DialogV2` confirmation but otherwise no live Foundry JS, fixture world rather than the smoke world).
 
+- `node scripts/view-lab-screenshots.mjs apps <case-ids>` — **the default way to produce and inspect application screenshots.** Seconds per frame, no Docker, no Foundry container, and it runs in CI.
+- For UI/UX work, prefer the local Vite dev server first, using the user-provided dev URL when available.
+
+Each case pins the size its smoke counterpart photographs rather than the app's declared `DEFAULT_OPTIONS.position`: the two differ (the smoke shoots the manager at 1280x820, not its declared 1280x940), and responsive cases deliberately pin narrower geometry, so the registry spans twelve sizes and the size is a per-case fact rather than a per-app one.
+
+- For a view covered by the canonical registry (`scripts/lib/viewLabCases.js`) — which is the normal case — the **View Lab** is the producer, and it is what CI runs on every PR push: `node scripts/view-lab-screenshots.mjs apps` renders every case, or pass a comma-separated id list to render a subset, into `ui-screenshot-artifact/apps/`.
+How many cases that is, and how many of them surface coverage selects, are deliberately not quoted anywhere in prose: `publishableCases()` and `LAB_SURFACE_CASE_IDS` in the registry are the only counts.
+Selection is targeted, and no single changed file selects the whole registry: a render file selects the cases whose `sourceMatches` claim it, a broad shared primitive or stylesheet selects a small representative set, and a change to one of the lab's OWN inputs (fixture world, capture driver, registry shared code) selects **surface coverage** — one frame of every route and tab the lab renders — rather than every state of every screen.
+A changed file that is neither a render file nor a lab input, such as an engine module, selects exactly the cases whose `sourceMatches` name it, and never a representative set, surface coverage or the fallback frame.
+It never arms `check-screenshots`, but its cases are still rendered and published, so an engine fix shipped alone carries the frames it changes as evidence the gate does not demand.
+A detailed state is captured when the files that govern it change; if you need one alongside such a change, name its case id in the run rather than widening the selection.
+Measured at a 155-frame registry: ~5.6s per frame locally (14 min for that whole corpus), a five-case subset in 36s, one case in 22s — against ~31s per frame for the smoke's `screenshots` profile.
+The per-frame rate is the durable figure; the whole-corpus total scales with the registry.
+Those are serial figures.
+Cases now render concurrently, `VIEW_LAB_CONCURRENCY` at a time (by default the machine's core count, at most 8), each in its own browser context, and the frames, the manifest's order and the distinct-evidence check do not depend on which render finishes first.
+The speed-up is about twofold rather than proportional to the workers, because Chromium's software GPU process saturates the CPU: 59 cases took 367s serially and 186s six at a time on a six-core machine.
+In CI the selection is also split across runners: `.github/workflows/pr-screenshots.yml` renders up to twelve shards of about thirty cases each side by side (`scripts/lib/viewLabShards.js`), keeps every `distinctEvidenceGroup` on one shard, verifies the harvested chrome once in a job beside them, fills a cold Foundry archive cache once before any of them start, and merges and publishes once.
+An unknown case id aborts in a second naming the id, so a typo costs nothing.
+Browse the result at `ui-screenshot-artifact/apps/index.html`, which groups frames by screen and offers a multi-tag filter; `npm run viewlab:index` regenerates it.
+It needs a one-off `npm run viewlab:chrome:harvest` first, which extracts Foundry's real window chrome from the release archive `npm run test:foundry:up` already caches; nothing harvested is ever committed.
+The lab fails closed rather than approximating: no harvested chrome, no frame.
+
 ## Foundry integration (smoke) tests
 
 Moved to [`scripts/README.md`](scripts/README.md#foundry-integration-smoke-tests), beside the harness it describes (issue #1661).
 The scripts it documents are `scripts/foundry-test*.mjs` and `scripts/lib/foundry*.js`; the narrative now sits with them rather than four hundred lines from them.
+
+- Reading a smoke result: `test-results/summary.json` reports `passed: false` if any phase step fails OR if an un-waived `consoleErrors[]` entry remains, and also carries the split counts `stepFailures` and `consoleErrorCount` plus the flags `degraded` and `rendererCrashed` (all written in the harness's `finally` block, so an early phase abort still populates them, never `undefined`).
+Benign browser `404 (Not Found)` asset misses in the fixture world populate `consoleErrors` and flip `passed` to false even when every `steps[]` entry passed.
+A known-benign console or `pageerror` line can be admitted per run via `--allowed-console-error-patterns` (appended to the in-source `ignoredErrorPatternDefaults`, never replacing them; waived lines are echoed to the step summary), but a failing `steps[]` entry is NEVER waivable and still throws first.
+Reach for a waiver last, not first: the canvas-priority default that lived there for a year was suppressing a real harness defect rather than a browser artefact, and its removal is what surfaced it (issue 1010).
+`degraded: true` marks a run that tolerated a transient renderer/page teardown (a `screenshot-manager`/`player-journal` step recorded `skipped: true`) — the run stays exit 0 but is a flake, not a clean pass; `rendererCrashed: true` marks a Playwright page `crash` (canonically an OOM).
+A JS product bug surfaces via `consoleErrorCount` (the independent console-error gate), NOT the teardown-tolerance path — a tolerated teardown coincident with any non-waived console error still fails on the console gate; the tolerance can only mask a renderer PROCESS crash (OOM/target-destroyed) and only post-captures.
+A `rendererCrashed: true` exit-0 run warrants a confirming re-run, and a PERSISTENT `rendererCrashed` pattern is actionable (a systematic tail OOM), not cosmetic.
+Check `steps[]` for an actual failing step before treating a run as broken or discarding its screenshots — see the "Foundry integration (smoke) tests" section in `CONTRIBUTING.md`.
+- `npm run test:foundry` — use when a change depends on real Foundry RUNTIME behavior (document lifecycle, compendium APIs, cross-application context), or for a view the case registry does not cover.
+Do NOT run it to photograph a view the registry already covers: the `screenshots` profile costs ~31s per frame against the View Lab's ~5s, needs Docker and a licensed container, and cannot run on a GitHub Actions runner — so it produces nothing per-PR and serialises on one machine.
+- The live smoke remains the FIDELITY AUTHORITY.
+Where a View Lab frame and a smoke frame of the same view disagree, the smoke frame is right and the lab is defective — fix the lab, do not publish the lab's version.
+For a view the registry does not cover, the smoke is also the producer:
+use `npm run screenshots:ui:plan -- --base origin/main` to identify expected views, run the scoped `screenshots` profile (`npm run test:foundry:screenshots -- --target-labels=$(npm run --silent screenshots:ui:targets -- --base origin/main)`) to produce real Foundry screenshots for only the changed-file-affected views under `test-results/`, `npm run screenshots:ui -- --base origin/main --pr <number>` to collect the relevant smoke artifacts into `tmp/pr-screenshots/<number>/`, then `npm run screenshots:ui:publish -- --pr <number>` to upload them to S3 (under `pr-screenshots/<number>/`) and embed the returned `![pr-<number> ...]` image markdown into a managed block in the PR body's `Screenshots (if applicable)` section, then `npm run screenshots:ui:clean -- --pr <number>` so PR-scoped screenshots are not committed as repository assets.
+The reduced `rc`/`ci` smoke stays the CI/release gate and `full` remains the occasional outer-loop suite; do NOT run the `full` (or `screenshots`) smoke profile on a GitHub Actions runner — generation is local.
+- Smoke screenshot fixture data should use Foundry VTT core or dnd5e non-SVG raster icon paths directly when previews need imagery; do not invent custom SVG preview art.
+- The smoke harness Phase D0 (`screenshot-manager` step in `scripts/foundry-smoke/scenarios/`) pins many selectors by class, `.nth(N)` index, and visible button text.
+When changing any manager UI surface — environment row markup, env-edit view, composition list, header actions — grep the harness for the changed classes / text before declaring the change done.
+See the "Foundry integration (smoke) tests" section in `CONTRIBUTING.md`.
 
 ## UI PR screenshot evidence
 
@@ -652,6 +828,17 @@ UI changes must include screenshot evidence in the PR body.
 The CI `check-screenshots` job enforces this with `scripts/ui-pr-screenshot-evidence.mjs`: the body must contain a **Screenshots** heading (any ATX level, normally `##`) with at least one image beneath it.
 A frame the View Lab capture job published automatically must additionally match this PR's own head commit and one of the changed views, and the check now waits for that job to conclude before deciding — see "CI behavior" below.
 The smoke-harness/S3 workflow below is the recommended way to produce real screenshots, but any image under a Screenshots heading that a person put there directly — including a drag-and-dropped GitHub attachment — still satisfies the check outright, with no matching applied.
+
+Evidence is always a FULL APPLICATION WINDOW — never a component on a blank page.
+The evidence must DEMONSTRATE the change, not merely clear the gate: at least one published frame must show the changed state itself, and when that state is not reachable by the existing capture walk in `scripts/foundry-smoke/scenarios/` or by a registry case, the branch adds one that reaches it rather than publishing an unrelated frame.
+A View Lab case that navigates must declare `expectView`; the capture asserts the app reached that route and fails rather than screenshotting whichever screen it landed on.
+The `check-screenshots` gate cannot be self-satisfied: there is no `SCREENSHOTS_NEEDED:` bypass.
+It also now awaits the `capture` job in `pr-screenshots.yml` for this PR's own head SHA before deciding, then re-reads the live PR body those frames were published into, so a first push no longer reds by construction on a body the producer has not written yet.
+An explicit issue-specific maintainer instruction may replace automated screenshot production, but it leaves agent visual approval pending and does not itself satisfy or waive `check-screenshots`; qualifying maintainer-provided evidence or the maintainer label is still required.
+
+- For UI-touching PRs, the `Screenshots` section must embed at least one image (markdown `![alt](url)` or `<img>`) beneath the heading — the CI check looks for exactly that. `npm run screenshots:ui:publish -- --pr <number>` produces real smoke-harness screenshots (S3-hosted under `pr-screenshots/<number>/`) and embeds them automatically, but a drag-and-dropped GitHub attachment under the heading works too.
+There is no `SCREENSHOTS_NEEDED:` bypass; if capture is genuinely impossible, a maintainer applies the `screenshots-exempt` label.
+Do not commit PR-scoped screenshots under docs or other asset directories.
 
 ### When it applies
 

@@ -2,8 +2,18 @@
  * System scope: the recipe editor tabs, its crafting-modifier states and the Access route.
  */
 
-import { ACCESS_ROSTER_SEARCH_MISS_TERM, ANCHORED_POPOVER_SOURCES } from './caseConstants.js';
+import {
+  ACCESS_ROSTER_SEARCH_MISS_TERM,
+  ANCHORED_POPOVER_SOURCES,
+  CHECKS_ROUTE_MODEL_PATTERN,
+  REQUIREMENT_SUGGESTION,
+  TYPEAHEAD_COMBOBOX_SOURCE,
+} from './caseConstants.js';
 import { managerCase } from './caseFactories.js';
+
+/** A component row's name field: the two other kinds that share the field mark themselves. */
+const COMPONENT_NAME_FIELD =
+  '.manager-recipe-option-name-field:not([data-recipe-option-essence]):not([data-recipe-option-currency])';
 
 export const CASES = Object.freeze([
   managerCase({
@@ -22,6 +32,72 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+      CHECKS_ROUTE_MODEL_PATTERN,
+    ],
+  }),
+  // Issue 2005 (T6): the Check tier select names a roll-under Target, or a character value's adjustment.
+  ...[
+    [
+      'manager-recipe-edit-check-tier-under',
+      'roll-under-fixed',
+      'Masterwork (Target 8)',
+      'Target 12',
+    ],
+    [
+      'manager-recipe-edit-check-tier-under-attribute',
+      'roll-under-add',
+      'Masterwork (−2)',
+      'Character value',
+    ],
+  ].map(([id, state, text, subline]) =>
+    managerCase({
+      id,
+      label: `Manager — Recipe edit check tier list, ${state.replaceAll('-', ' ')}`,
+      smokeLabels: [],
+      reaches: 'beyond',
+      query: { system: 'lab-smithing', checkPreviewState: state },
+      steps: [
+        'Crafting',
+        { selector: '.manager-icon-button[aria-label^="Edit"]' },
+        { selector: '#recipe-tab-overview' },
+        { selector: '[data-recipe-field="checkTierId"]' },
+      ],
+      expectView: 'recipe-edit',
+      // The header subline names the check as the browser pill does, never a DC.
+      expectSelector:
+        `.fabricate-manager:has([data-recipe-edit-subline]:has-text("· ${subline}")) ` +
+        `.fabricate-select-popover [data-popover-option="sm-tier-masterwork"]:has-text("${text}")`,
+      kinds: ['manager', 'recipes'],
+      sourceMatches: [
+        /^src\/ui\/svelte\/apps\/manager\/recipe\/(?:RecipeOverviewTab\.svelte|recipeOverviewSelectOptions\.js)$/,
+        /^src\/ui\/model\/recipeBrowserModel\.js$/,
+        /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+      ],
+    })
+  ),
+  // Issue 2006: a counting check's tier options name each tier's successes needed, and the default's.
+  managerCase({
+    id: 'manager-recipe-edit-check-tier-count',
+    label: 'Manager — Recipe edit check tier list, success-counting check',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', checkPreviewState: 'dice-pool-recipes' },
+    steps: [
+      'Crafting',
+      { selector: '[data-recipe-edit="sm-r-horseshoe"]' },
+      { selector: '#recipe-tab-overview' },
+      { selector: '[data-recipe-field="checkTierId"]' },
+    ],
+    expectView: 'recipe-edit',
+    expectSelector:
+      '.fabricate-manager:has([data-recipe-edit-subline]:has-text("· 1 success")) ' +
+      '.fabricate-select-popover:has-text("Default · 3 successes")' +
+      ':has([data-popover-option="sm-tier-apprentice"]:has-text("Apprentice work · 1 success"))' +
+      ' [data-popover-option="sm-tier-masterwork"]:has-text("Masterwork · 5 successes")',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/(?:RecipeOverviewTab\.svelte|recipeOverviewSelectOptions\.js)$/,
+      /^src\/ui\/model\/recipeBrowserModel\.js$/,
     ],
   }),
   // Every frame below reaches its state by clicking the rule group rather than by authoring a second catalogued system.
@@ -250,6 +326,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+      CHECKS_ROUTE_MODEL_PATTERN,
     ],
   }),
   managerCase({
@@ -348,6 +425,39 @@ export const CASES = Object.freeze([
     ],
     kinds: ['manager', 'recipes'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/recipe\//, ...ANCHORED_POPOVER_SOURCES],
+  }),
+  // The name field's suggestion list, open over the tab panel that used to clip it (issue 2157).
+  // The walk clicks the last suggestion first, which a clipped row cannot receive, then reopens the
+  // list for the frame; clearing the row also lights the header's dirty chip.
+  managerCase({
+    id: 'manager-recipe-edit-ingredients-suggestions',
+    label: 'Manager — Recipe edit ingredients, a name field suggestion list open',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: {},
+    steps: [
+      'Crafting',
+      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '#recipe-tab-ingredients' },
+      { selector: `${COMPONENT_NAME_FIELD} [data-recipe-option-clear]` },
+      { selector: `${COMPONENT_NAME_FIELD} [data-recipe-option-search]`, fill: 'ingot' },
+      { selector: `${REQUIREMENT_SUGGESTION}:last-child` },
+      { selector: `${COMPONENT_NAME_FIELD} [data-recipe-option-clear]` },
+      { selector: `${COMPONENT_NAME_FIELD} [data-recipe-option-search]`, fill: 'ingot' },
+    ],
+    expectView: 'recipe-edit',
+    expectSelector: REQUIREMENT_SUGGESTION,
+    expectContained: [
+      { container: '.fabricate-manager', target: '.manager-recipe-option-suggestions' },
+    ],
+    expectCenterHit: `${REQUIREMENT_SUGGESTION}:last-child`,
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+      TYPEAHEAD_COMBOBOX_SOURCE,
+      ...ANCHORED_POPOVER_SOURCES,
+    ],
   }),
   managerCase({
     id: 'manager-recipe-edit-ingredients-cost',

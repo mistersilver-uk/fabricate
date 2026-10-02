@@ -324,7 +324,7 @@ export function withStepperHash(markup) {
   );
 }
 
-// ── The simulator's face tile and the odds row (issue 1097) ─────────────────────────────
+// ── The simulator's rolled readout and the odds row (issue 1097) ──
 export const previewScoped = scopedComponentCss(
   resolve(__dirname, '../../src/ui/svelte/apps/manager/checks/CheckOutcomePreview.svelte')
 );

@@ -28,3 +28,4 @@ coverage-experimental-off-player
 player-test-companion-surface
 player-test-companion-surface-narrow
 player-test-companion-fault
+manager-checks-count-simulator-bought

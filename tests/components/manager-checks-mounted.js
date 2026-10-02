@@ -26,6 +26,8 @@ let ProgressiveCraftingCheckEditorComponent;
 let ChecksViewComponent;
 let mounted;
 let target;
+// The store `mountManager` built, so a case can make one save refuse after mounting.
+let checksStore;
 
 // The locators read `target` through a getter rather than a captured element.
 const queries = createManagerQueries(() => target);
@@ -37,7 +39,9 @@ const { mountManager, mountWorldRulesDestination, openRecipeEditor } = createMan
     mounted = nextMounted;
     target = nextTarget;
   },
-  adoptStore: () => {},
+  adoptStore: (store) => {
+    checksStore = store;
+  },
 });
 
 /** Register this route’s cases in `manager-mounted.test.js`’s one describe. */
@@ -1060,10 +1064,9 @@ export function registerChecksCases() {
   it('Checks carries the progressive PREVIEW SANDBOX through the draft and into the save', async () => {
     // The THIRD allowlist rebuild the progressive block passes through (issue 1097). The
     // manager's normalizer and the store's projection are graded in
-    // `tests/progressive-preview-sandbox.test.js`; what only this suite can grade — it is
-    // the only one that mounts `CraftingSystemManagerRoot` — is `cloneProgressiveCheck`,
-    // whose whitelist would otherwise hold the GM's experiment for exactly as long as the
-    // panel stayed open and then write a block without it.
+    // `tests/progressive-preview-sandbox.test.js`; what this suite grades through the mounted
+    // root is `cloneProgressiveCheck`, whose whitelist would otherwise hold the GM's experiment
+    // for exactly as long as the panel stayed open and then write a block without it.
     const calls = [];
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -2665,7 +2668,7 @@ export function registerChecksCases() {
       'under Player picks it names the PLAYER — the same sentence, a different chooser'
     );
     assert.ok(
-      introText('highest').includes('only the largest of them is added'),
+      introText('highest').includes('only the largest of them applies'),
       'under Highest it states the reduction, because marking an entry enters it into a comparison'
     );
     for (const locked of ['addAll', 'highest']) {
@@ -3075,6 +3078,123 @@ export function registerChecksCases() {
     );
   });
 
+  /** A two-entry system whose Medicine entry is transformed, so ranking it needs an average. */
+  const transformedModifierSystem = (defaultModifierPolicy) => {
+    const system = modifierRuleSystem(defaultModifierPolicy);
+    system.modifiers = [{ ...MODIFIER_CATALOGUE[0], expression: '1d20cs>15' }, MODIFIER_CATALOGUE[1]];
+    system.craftingCheck.defaultModifierIds = ['med', 'alch'];
+    return system;
+  };
+
+  it('root: the pick cap drives manager-checks-crafting-modifier-max-picks’ warning selector (issue 2000)', async () => {
+    const selector = labCaseSelector('manager-checks-crafting-modifier-max-picks');
+    mountManager([], transformedModifierSystem('addAll'));
+    checksStore.saveCraftingCheckModifiers = (patch) => {
+      checksStore.viewState.update((state) => ({
+        ...state,
+        selectedSystem: {
+          ...state.selectedSystem,
+          craftingCheck: { ...state.selectedSystem.craftingCheck, ...patch },
+        },
+      }));
+    };
+    const settleControl = async (control) => {
+      control.click();
+      await tick();
+      flushSync();
+    };
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+    await openChecksSection('modifiers');
+    const noticeSelector = '[data-checks-section-notice="modifierAverageUnavailable"]';
+    assert.ok(!target.querySelector(noticeSelector), 'addAll has no transformed-ranking warning');
+
+    const highest = target.querySelector(
+      '[data-crafting-modifier-policy-option="highest"] input'
+    );
+    assert.ok(highest, 'the production highest policy input renders');
+    await settleControl(highest);
+    const highestWarning = target.querySelector(noticeSelector);
+    assert.ok(highestWarning, 'highest over two entries warns about the transformed one');
+    assert.equal(highestWarning.getAttribute('data-notice-tone'), 'warning');
+    assert.ok(highestWarning.textContent.includes('Medicine'), 'the warning names the entry');
+
+    const eligibility = target.querySelector('[data-crafting-modifier-eligibility-input="med"]');
+    assert.ok(eligibility, 'the production eligibility control renders');
+    await settleControl(eligibility);
+    assert.ok(!target.querySelector(noticeSelector), 'the warning clears when the entry is ineligible');
+    await settleControl(eligibility);
+    assert.ok(target.querySelector(noticeSelector), 'the warning returns when the entry is eligible');
+
+    const playerPicks = target.querySelector(
+      '[data-crafting-modifier-policy-option="playerPicks"] input'
+    );
+    assert.ok(playerPicks, 'the production playerPicks policy input renders');
+    await settleControl(playerPicks);
+    assert.ok(!target.querySelector(noticeSelector), 'an uncapped playerPicks ranks nothing out');
+    const maxPicksInput = target.querySelector('[data-crafting-modifier-max-picks-input]');
+    assert.ok(maxPicksInput, 'the selecting policy renders its cap input');
+    const typeCap = (value) => {
+      maxPicksInput.value = value;
+      maxPicksInput.dispatchEvent(new window.Event('input', { bubbles: true }));
+      flushSync();
+    };
+    typeCap('1');
+    assert.ok(target.querySelector(noticeSelector), 'a cap below the eligible count warns');
+    assert.ok(Boolean(target.querySelector(selector)), 'the capped, warning state is the frame');
+    typeCap('');
+    assert.ok(!target.querySelector(noticeSelector), 'clearing the cap clears the warning');
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    target = null;
+
+    // The negative control, freshly mounted: happy-dom caches a `:has()` result per selector, so a
+    // re-query after the cap is cleared would read the stale match. A cap of 1 over plain entries
+    // ranks nothing transformed out, so the frame's warning half refuses it.
+    mountManager([], modifierRuleSystem('playerPicks', 1));
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+    await openChecksSection('modifiers');
+    assert.ok(
+      Boolean(target.querySelector('[data-crafting-modifier-max-picks="1"]')),
+      'the cap still reads 1, so the refusal below is the warning and nothing else'
+    );
+    assert.ok(!target.querySelector(selector), 'a cap with no transformed entry is not the frame');
+  });
+
+  it('root: Validation satisfies manager-checks-validation-average-unavailable’s own selector (issue 2000)', async () => {
+    const selector = labCaseSelector('manager-checks-validation-average-unavailable');
+    const openValidation = async (system) => {
+      mountManager([], system);
+      navButton('Checks').click();
+      await tick();
+      flushSync();
+      target.querySelector('#manager-checks-nav-validation').click();
+      await tick();
+      flushSync();
+    };
+    await openValidation(transformedModifierSystem('highest'));
+    assert.ok(
+      Boolean(target.querySelector(selector)),
+      'ranking two entries by average lists the transformed one as a Validation warning row'
+    );
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    target = null;
+
+    // The negative control: adding every entry ranks nothing, so there is no row to photograph.
+    await openValidation(transformedModifierSystem('addAll'));
+    assert.ok(
+      Boolean(target.querySelector('[data-checks-panel="validation"]')),
+      'the Validation route still rendered, so the refusal below is the row and nothing else'
+    );
+    assert.ok(!target.querySelector(selector), 'addAll must not satisfy the warning frame');
+  });
+
   it('root: the recipe picker satisfies manager-recipe-edit-crafting-modifier-custom-set’s own selector (issue 1055)', async () => {
     const selector = labCaseSelector('manager-recipe-edit-crafting-modifier-custom-set');
     const custom = { craftingModifier: { modifierIds: ['med', 'alch'] } };
@@ -3449,6 +3569,39 @@ export function registerChecksCases() {
     assert.match(detailOf('salvage'), /Routed by check/, 'and the salvage row the same one');
   });
 
+  it('names the pool a counting check rolls in the ALL CHECKS rail, never its retained formula (issue 2084)', async () => {
+    await mountChecks([], {
+      ...routedCraftingOptions('1d20'),
+      salvageResolutionMode: 'routed',
+      salvageCraftingCheck: {
+        enabled: true,
+        routed: {
+          rollFormula: '1d20+@abilities.int.mod',
+          type: 'relative',
+          relativeOutcomes: [{ id: 's1', name: 'Scrap', success: true, dc: 0 }],
+          evaluation: {
+            product: 'count',
+            direction: 'over',
+            pool: { die: 10, base: '6', threshold: '8', required: 2 },
+          },
+        },
+      },
+    });
+    await openChecksActivity('validation');
+    const detailNode = (id) =>
+      target
+        .querySelector(`[data-checks-all-checks-row="${id}"]`)
+        .querySelector('.manager-checks-rail-row-detail');
+    const detailOf = (id) => detailNode(id).textContent.trim();
+    assert.equal(detailOf('salvage'), 'Routed by check · 6d10 each ≥ 8');
+    assert.equal(detailOf('crafting'), 'Routed by check · 1d20', 'a summing check keeps its formula');
+    assert.equal(
+      detailNode('salvage').getAttribute('title'),
+      'Routed by check · 6d10 each ≥ 8',
+      'the line ellipsises in the rail, so it carries its full text'
+    );
+  });
+
   it('does not re-apply a standing deep link when the GM changes ACTIVITY', async () => {
     // The mirror defect, which is why the latch cannot simply be removed.
     await mountChecks([], {
@@ -3527,24 +3680,134 @@ export function registerChecksCases() {
     );
   });
 
-  it('explains the open section’s warning dot IN the panel', async () => {
+  /** Click a section notice's Review and let the deferred focus move land. */
+  async function reviewNotice(id) {
+    target.querySelector(`[data-checks-section-notice="${id}"] [data-notice-action]`).click();
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      flushSync();
+      await tick();
+    }
+    return target.ownerDocument.activeElement;
+  }
+
+  const noticeIds = () =>
+    [...target.querySelectorAll('[data-checks-section-notice]')].map((notice) =>
+      notice.getAttribute('data-checks-section-notice')
+    );
+
+  it('explains the open section’s warning dot IN the panel, as an amber notice first', async () => {
     // The dot's legend (DN8). Without it the only route to the sentence is to leave for
-    // Validation and deep-link back.
+    // Validation and deep-link back. Issue 2082: every issue is a titled amber notice.
     await mountChecks([], routedCraftingOptions(''));
     await openChecksActivity('crafting');
-    const callout = target.querySelector('[data-checks-section-callout="noRollFormula"]');
-    assert.ok(callout, 'the roll section explains its own dot');
-    assert.match(callout.textContent, /no roll formula/i);
+    const notice = target.querySelector('[data-checks-section-notice="noRollFormula"]');
+    assert.ok(Boolean(notice), 'the roll section explains its own dot');
+    assert.equal(notice.getAttribute('data-notice-tone'), 'warning', 'amber, as the prototype draws it');
+    assert.equal(notice.querySelector('.fab-notice-title').textContent.trim(), 'The check has no roll formula');
     assert.equal(
-      callout.getAttribute('data-callout-tone'),
-      'info',
-      'a non-blocking issue is guidance, not a hazard'
+      notice.querySelector('.fab-notice-detail').textContent.trim(),
+      'Nothing is rolled, so this check cannot resolve until you enter a formula.'
+    );
+    const panel = target.querySelector('[role="tabpanel"]');
+    assert.ok(
+      panel.firstElementChild.matches('[data-checks-section-notices="roll"]'),
+      'the notices open the pane, above its heading and the mode callout'
+    );
+    assert.ok(!target.querySelector('[data-checks-section-callout]'), 'no readiness issue is a callout');
+    const focused = await reviewNotice('noRollFormula');
+    assert.ok(
+      focused === target.querySelector('[data-validation-target="checks-roll-formula"]'),
+      'Review focuses the roll formula the issue names'
     );
     // A section with no issue of its own carries none.
     await openChecksSection('triggers');
     assert.ok(
-      !target.querySelector('[data-checks-section-callout]'),
+      !target.querySelector('[data-checks-section-notices]'),
       'Triggers owns no open issue here, so it states nothing'
+    );
+  });
+
+  it('hides the section notices while the check is switched off, and restores them when it is on', async () => {
+    // Off is the GM's choice, so an off check reports nothing to fix until it is back on.
+    await mountChecks([], { alchemyResolutionMode: 'simple', craftingCheck: { enabled: true, simple: { rollFormula: '' } } });
+    await openChecksActivity('crafting');
+    assert.deepEqual(noticeIds(), ['noRollFormula'], 'an on check explains its missing formula');
+    const toggle = () => target.querySelector('[data-checks-active="crafting"] [data-checks-active-toggle]');
+    toggle().click();
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector('[data-checks-panel="crafting"][data-checks-off]'), 'the check reads off');
+    assert.ok(!target.querySelector('[data-checks-section-notices]'), 'and states no notice');
+    toggle().click();
+    await tick();
+    flushSync();
+    assert.deepEqual(noticeIds(), ['noRollFormula'], 'switched back on, the notice returns');
+  });
+
+  it('sorts a section’s blocking notices above its warnings, as Validation orders its rows', async () => {
+    // A refused placement raises the warning `noRollFormula` BEFORE the critical it causes.
+    // Advantage is off: a keep rule cannot keep a die multiplied by a reference (issue 2007).
+    const options = routedCraftingOptions('1d20 * @craftingmod');
+    options.craftingCheck.routed.advantage = { mode: 'off' };
+    await mountChecks([], options);
+    await openChecksActivity('crafting');
+    assert.deepEqual(noticeIds(), ['retiredPlaceholderBreaksFormula', 'noRollFormula']);
+    for (const notice of target.querySelectorAll('[data-checks-section-notice]')) {
+      assert.equal(notice.getAttribute('data-notice-tone'), 'warning', 'every notice is amber');
+    }
+  });
+
+  it('focuses the section itself when a notice’s issue names no control', async () => {
+    await mountChecks([], {
+      ...routedCraftingOptions('1d20'),
+      craftingCheck: {
+        enabled: true,
+        routed: {
+          rollFormula: '1d20',
+          type: 'relative',
+          relativeOutcomes: [{ id: 'x', name: '', success: true, dc: 0 }],
+        },
+      },
+    });
+    await openChecksActivity('crafting');
+    await openChecksSection('outcomes');
+    const notice = target.querySelector('[data-checks-section-notice="unnamedOutcome"]');
+    assert.ok(Boolean(notice), 'Outcomes explains its unnamed tier');
+    assert.equal(notice.querySelector('.fab-notice-title').textContent.trim(), 'An outcome tier has no name');
+    const focused = await reviewNotice('unnamedOutcome');
+    assert.ok(focused === target.querySelector('[role="tabpanel"]'), 'Review focuses the Outcomes panel');
+  });
+
+  it('focuses the trigger list when a trigger’s target tier is missing', async () => {
+    await mountChecks([], {
+      ...routedCraftingOptions('1d20'),
+      craftingCheck: {
+        enabled: true,
+        routed: {
+          rollFormula: '1d20',
+          type: 'relative',
+          relativeOutcomes: [{ id: 'x', name: 'Success', success: true, dc: 0 }],
+          checkBreakage: {
+            triggers: [
+              {
+                id: 't1',
+                condition: { type: 'rollTotal', operator: '<=', value: 1 },
+                outcome: 'none',
+                breakTools: false,
+                tierStep: { mode: 'target', steps: 1, tierId: 'gone' },
+              },
+            ],
+          },
+        },
+      },
+    });
+    await openChecksActivity('crafting');
+    await openChecksSection('triggers');
+    assert.deepEqual(noticeIds(), ['danglingTierStepTarget']);
+    const focused = await reviewNotice('danglingTierStepTarget');
+    assert.ok(
+      focused === target.querySelector('[data-validation-target="checks-triggers"]'),
+      'Review focuses the trigger list'
     );
   });
 
@@ -3766,31 +4029,6 @@ export function registerChecksCases() {
     );
   });
 
-  it('applies a staged salvage Active switch through Save checks, without rewriting its formula', async () => {
-    const calls = [];
-    await mountChecks(calls, {
-      salvageResolutionMode: 'simple',
-      salvageCraftingCheck: { enabled: true, simple: { rollFormula: '1d20', dc: 12 } },
-    });
-    await openChecksActivity('salvage');
-    target.querySelector('[data-checks-active="salvage"] [data-checks-active-toggle]').click();
-    await tick();
-    flushSync();
-
-    target.querySelector('[data-checks-save]').click();
-    await settleRouteExit();
-    assert.deepEqual(
-      calls.filter((call) => call[0] === 'saveSalvageCheckActive'),
-      [['saveSalvageCheckActive', false]],
-      'Save applies the staged switch'
-    );
-    assert.deepEqual(
-      calls.filter((call) => call[0] === 'saveSalvageCheckSimple'),
-      [],
-      'and the per-slot dirty guard keeps it from rewriting an untouched formula block'
-    );
-  });
-
   it('stays on the Checks route when a Save-on-navigate does not land', async () => {
     // The checks row's finisher returned `true` unconditionally after awaiting the save.
     const calls = [];
@@ -3839,6 +4077,239 @@ export function registerChecksCases() {
     assert.ok(written, 'the save is attempted');
     assert.equal(written[1].rollFormula, '1d20 + 7');
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'components');
+  });
+
+  /** The routed gathering economy the per-slot save cases below share. */
+  const routedGatheringOptions = {
+    gatheringResolutionMode: 'routed',
+    gatheringCraftingCheck: {
+      enabled: true,
+      routed: {
+        rollFormula: '2d6',
+        type: 'relative',
+        relativeOutcomes: [{ id: 'g1', name: 'Rich Vein', success: true, dc: 5 }],
+        fixedOutcomes: [],
+      },
+    },
+  };
+
+  async function toggleActive(activity) {
+    target.querySelector(`[data-checks-active="${activity}"] [data-checks-active-toggle]`).click();
+    await tick();
+    flushSync();
+  }
+
+  // A moved Active switch dirties its activity, so each slot save must still read its own flag.
+  for (const row of [
+    {
+      activity: 'crafting',
+      options: {
+        alchemyResolutionMode: 'simple',
+        craftingCheck: { enabled: true, simple: { rollFormula: '1d20', dc: 12 } },
+      },
+      active: 'saveCraftingCheckActive',
+      slot: 'saveCraftingCheckSimple',
+    },
+    {
+      activity: 'salvage',
+      options: {
+        salvageResolutionMode: 'simple',
+        salvageCraftingCheck: { enabled: true, simple: { rollFormula: '1d20', dc: 12 } },
+      },
+      active: 'saveSalvageCheckActive',
+      slot: 'saveSalvageCheckSimple',
+    },
+    {
+      activity: 'gathering',
+      options: routedGatheringOptions,
+      active: 'saveGatheringCheckActive',
+      slot: 'saveGatheringCheckRouted',
+    },
+  ]) {
+    it(`applies a staged ${row.activity} Active switch without rewriting its untouched slot`, async () => {
+      const calls = [];
+      await mountChecks(calls, row.options);
+      await openChecksActivity(row.activity);
+      await toggleActive(row.activity);
+
+      target.querySelector('[data-checks-save]').click();
+      await settleRouteExit();
+      assert.deepEqual(
+        calls.filter((call) => call[0] === row.active),
+        [[row.active, false]],
+        'Save applies the staged switch'
+      );
+      assert.deepEqual(
+        calls.filter((call) => call[0] === row.slot),
+        [],
+        'and the slot draft nobody touched is not written'
+      );
+    });
+  }
+
+  // A store save resolving `false` answers false, so the guard keeps the GM here, and it leaves
+  // the baseline where it was, so the activity still reads unsaved.
+  for (const row of [
+    {
+      activity: 'crafting',
+      options: { alchemyResolutionMode: 'simple', craftingCheck: { enabled: false } },
+      save: 'saveCraftingCheckActive',
+      edit: () => toggleActive('crafting'),
+    },
+    {
+      activity: 'crafting',
+      options: {
+        alchemyResolutionMode: 'alchemy',
+        alchemyConfig: { checkMode: 'simple', learnOnCraft: true, consumeOnFail: true },
+        craftingCheck: { enabled: true, simple: { rollFormula: '1d20', dc: 12 } },
+      },
+      save: 'setAlchemyCheckMode',
+      edit: () => toggleActive('crafting'),
+    },
+    {
+      activity: 'salvage',
+      options: {
+        salvageResolutionMode: 'progressive',
+        salvageCraftingCheck: { enabled: true, progressive: { awardMode: 'equal' } },
+      },
+      save: 'saveSalvageCheckProgressive',
+      edit: async () => {
+        await openChecksSection('outcomes');
+        target.querySelector('[data-award-mode-option="exceed"] input').click();
+        await tick();
+        flushSync();
+      },
+    },
+    {
+      activity: 'gathering',
+      options: routedGatheringOptions,
+      save: 'saveGatheringCheckRouted',
+      edit: async () => {
+        setInputValue(target.querySelector('[data-check-roll-formula]'), '2d6 + 1');
+        await tick();
+        flushSync();
+      },
+    },
+  ]) {
+    it(`keeps a refused ${row.save} unsaved and the GM on checks-${row.activity}`, async () => {
+      const calls = [];
+      await mountChecks(calls, { ...row.options, confirmDiscardChecksResult: 'save' });
+      checksStore[row.save] = (value) => {
+        calls.push([row.save, value]);
+        return false;
+      };
+      await openChecksActivity(row.activity);
+      await row.edit();
+
+      navButton('Component Rules').click();
+      await settleRouteExit();
+      assert.ok(
+        calls.some((call) => call[0] === row.save),
+        'the save is attempted'
+      );
+      assert.equal(
+        target.querySelector('.fabricate-manager').dataset.managerView,
+        `checks-${row.activity}`,
+        'a refused save keeps the GM on the studio'
+      );
+      assert.ok(
+        target.querySelector(`[data-checks-nav-dirty="${row.activity}"]`),
+        'and the activity is still marked unsaved, because the baseline was not moved'
+      );
+    });
+  }
+
+  // Each editor's update callback reaches its own slot draft, and Save sends that draft.
+  for (const row of [
+    {
+      activity: 'crafting',
+      options: {
+        alchemyResolutionMode: 'progressive',
+        craftingCheck: { enabled: true, progressive: { rollFormula: '1d20', awardMode: 'equal' } },
+      },
+      save: 'saveCraftingCheckProgressive',
+    },
+    {
+      activity: 'salvage',
+      options: {
+        salvageResolutionMode: 'routed',
+        salvageCraftingCheck: {
+          enabled: true,
+          routed: {
+            rollFormula: '1d20',
+            type: 'relative',
+            relativeOutcomes: [{ id: 's1', name: 'Scrap', success: true, dc: 0 }],
+          },
+        },
+      },
+      save: 'saveSalvageCheckRouted',
+    },
+  ]) {
+    it(`stages a ${row.activity} formula edit and saves it through ${row.save}`, async () => {
+      const calls = [];
+      await mountChecks(calls, row.options);
+      checksStore[row.save] = (draft) => calls.push([row.save, draft]);
+      await openChecksActivity(row.activity);
+      setInputValue(target.querySelector('[data-check-roll-formula]'), '2d10 + 4');
+      await tick();
+      flushSync();
+
+      target.querySelector('[data-checks-save]').click();
+      await settleRouteExit();
+      const saved = calls.filter((call) => call[0] === row.save);
+      assert.equal(saved.length, 1, 'Save writes the edited slot once');
+      assert.equal(saved[0][1].rollFormula, '2d10 + 4', 'and sends the staged formula');
+    });
+  }
+
+  it('reseeds the salvage and gathering drafts when the selected system switches', async () => {
+    await mountChecks([], {
+      ...routedGatheringOptions,
+      salvageResolutionMode: 'simple',
+      salvageCraftingCheck: { enabled: true, simple: { rollFormula: '1d20', dc: 12 } },
+    });
+    const formula = () => target.querySelector('[data-check-roll-formula]');
+    await openChecksActivity('salvage');
+    setInputValue(formula(), '1d20 + 3');
+    await openChecksActivity('gathering');
+    setInputValue(formula(), '2d6 + 1');
+    await tick();
+    flushSync();
+    for (const activity of ['salvage', 'gathering']) {
+      const marker = `[data-checks-nav-dirty="${activity}"]`;
+      assert.ok(target.querySelector(marker), `${activity} is staged`);
+    }
+
+    // Another system, whose gathering economy is routed too, so the same editor stays up.
+    checksStore.viewState.update((state) => ({
+      ...state,
+      selectedSystem: {
+        ...state.selectedSystem,
+        id: 'alchemy-reforged',
+        salvageCraftingCheck: { enabled: true, simple: { rollFormula: '3d6', dc: 12 } },
+        gatheringCraftingCheck: {
+          ...routedGatheringOptions.gatheringCraftingCheck,
+          routed: { ...routedGatheringOptions.gatheringCraftingCheck.routed, rollFormula: '4d4' },
+        },
+      },
+      gatheringConfig: {
+        ...state.gatheringConfig,
+        systems: {
+          ...state.gatheringConfig.systems,
+          'alchemy-reforged': state.gatheringConfig.systems.alchemy,
+        },
+      },
+    }));
+    await tick();
+    flushSync();
+
+    assert.equal(formula().value, '4d4', 'the gathering draft follows the new system');
+    await openChecksActivity('salvage');
+    assert.equal(formula().value, '3d6', 'and so does the salvage draft');
+    assert.ok(
+      !target.querySelector('[data-checks-nav-dirty]'),
+      'and the switch rebaselined both, so nothing reads unsaved'
+    );
   });
 
   it('gives every outcome band its OWN colour, and keys the strip from the tier rows', async () => {

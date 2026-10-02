@@ -4,11 +4,6 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { entryModuleSource } from './helpers/bootstrapEntrySource.js';
-
 
 function getProperty(object, path) {
   if (!object || !path) return undefined;
@@ -30,7 +25,7 @@ const { activeRunStepState, buildStepRecipeView, resolveStepIngredientSet } = aw
   '../src/systems/stepRecipeView.js'
 );
 
-const MAIN_SOURCE = entryModuleSource('src/bootstrap/craftingFacade.js');
+const { FabricateFacadeUnderTest } = await import('./helpers/fabricateFacadeHarness.js');
 
 // Fixtures — a two-step forge recipe whose FIRST step is essence-funded
 
@@ -355,37 +350,95 @@ test('a supplied allocation flows through the same seam and steers the pool', ()
   assert.equal(craftability.essencePool.requirements[0].delivered, 0);
 });
 
-// 6. Source contract — the facade is actually wired to the seam above
+// 6. The real crafting slice is wired to the seam above (issue 1933)
 
-test('the crafting slice resolves evaluateSelectedSet through the execution steps', () => {
-  // Both anchors are guarded: `slice(-1, n)` over a large corpus answers the last character, so a
-  // `body.length > 0` check passes on an anchor that moved out of the module.
-  const start = MAIN_SOURCE.indexOf('evaluateSelectedSet({');
-  const end = MAIN_SOURCE.indexOf('_getAlchemyListingBuilder()', start);
-  assert.notEqual(start, -1, 'located evaluateSelectedSet');
-  assert.ok(end > start, 'located the next member after it');
-  const body = MAIN_SOURCE.slice(start, end);
-  assert.ok(
-    body.includes('resolveStepIngredientSet({'),
-    'the step/set resolution runs through the shared helper'
+/** The real facade over the forge recipe, recording what reaches craftability and `craft`. */
+function forgeFacade({ run = null } = {}) {
+  const recipe = forgeRecipe();
+  const actor = { id: 'actor-1', items: [heldEmberwood()] };
+  globalThis.game = {
+    user: { isGM: true, name: 'GM' },
+    actors: { get: (id) => (id === actor.id ? actor : null) },
+    fabricate: {},
+    time: { worldTime: 0 },
+  };
+  const evaluated = [];
+  const crafted = [];
+  const facade = new FabricateFacadeUnderTest({
+    ready: true,
+    recipeManager: {
+      getRecipe: (id) => (id === recipe.id ? recipe : null),
+      evaluateCraftability: (sources, stepRecipe, options) => {
+        evaluated.push({ sources, stepRecipe, options });
+        return { craftable: true };
+      },
+    },
+    resolutionModeService: { getExecutionSteps: (subject) => subject.getExecutionSteps() },
+    craftingRunManager: runManagerAt(run),
+  });
+  facade.craft = async (...args) => {
+    crafted.push(args);
+    return { success: true };
+  };
+  return { facade, actor, evaluated, crafted };
+}
+
+test('evaluateSelectedSet resolves the ACTIVE execution step of an explicit multi-step recipe', () => {
+  const { facade, actor, evaluated } = forgeFacade({ run: { currentStepIndex: 1, steps: [{}, {}] } });
+  const allocation = { 'g-ember': { ember: 2 } };
+
+  const answer = facade.evaluateSelectedSet({
+    recipeId: 'recipe-forge',
+    setId: 'set-2',
+    essenceAllocation: allocation,
+    actorId: 'actor-1',
+    componentSourceActorIds: [],
+  });
+
+  assert.deepEqual(answer, { craftable: true }, 'the empty top-level ingredientSets is not read');
+  const [{ sources, stepRecipe, options }] = evaluated;
+  assert.deepEqual(sources, [actor]);
+  assert.deepEqual(
+    stepRecipe.ingredientSets.map((set) => set.id),
+    ['set-2'],
+    'narrowed to the one selected set of the active step'
   );
-  assert.ok(body.includes('getExecutionSteps?.(recipe)'), 'the steps are the resolution source');
-  assert.ok(body.includes('activeRunStepState('), 'the active step decides when stepId is absent');
-  assert.ok(body.includes('buildStepRecipeView(recipe, resolved.step)'), 'the step tool union applies');
-  assert.ok(body.includes('essenceAllocation,'), 'the allocation is threaded to craftability');
-  assert.ok(
-    !body.includes('recipe.ingredientSets.find'),
-    'the top-level scan that returned null for every stepped recipe is gone'
+  assert.equal(options.craftingActor, actor);
+  assert.equal(options.essenceAllocation, allocation, 'the allocation reaches craftability');
+});
+
+test('evaluateSelectedSet honours an explicit stepId over the active step', () => {
+  const { facade, evaluated } = forgeFacade({ run: { currentStepIndex: 1, steps: [{}, {}] } });
+
+  facade.evaluateSelectedSet({
+    recipeId: 'recipe-forge',
+    stepId: 'step-1',
+    setId: 'set-1',
+    actorId: 'actor-1',
+    componentSourceActorIds: [],
+  });
+
+  assert.deepEqual(
+    evaluated[0].stepRecipe.ingredientSets.map((set) => set.id),
+    ['set-1']
   );
 });
 
-test('the crafting slice wires the run manager into the listing builder and craftRecipe', () => {
-  assert.ok(
-    MAIN_SOURCE.includes('craftingRunManager: this.craftingRunManager,'),
-    'the builder receives the run manager as a constructor dependency'
-  );
-  assert.ok(
-    MAIN_SOURCE.includes('ingredientEssenceAllocation,'),
-    'craftRecipe forwards the scoped allocation payload to the engine'
-  );
+test('the crafting slice wires the run manager into the listing builder and craftRecipe', async () => {
+  const { facade, actor, crafted } = forgeFacade();
+  assert.equal(facade._getCraftingListingBuilder().craftingRunManager, facade.craftingRunManager);
+
+  const allocation = { 'g-ember': { ember: 2 } };
+  await facade.craftRecipe({
+    actorId: 'actor-1',
+    recipeId: 'recipe-forge',
+    ingredientEssenceAllocation: allocation,
+    componentSourceActorIds: [],
+  });
+
+  const [[craftActor, recipeId, options]] = crafted;
+  assert.equal(craftActor, actor);
+  assert.equal(recipeId, 'recipe-forge');
+  assert.equal(options.ingredientEssenceAllocation, allocation, 'forwarded to the engine');
+  assert.equal(options.lifecycleVersion, 1, 'a new craft starts a versioned run');
 });

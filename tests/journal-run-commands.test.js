@@ -2,14 +2,28 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { compileFunction } from 'node:vm';
+import { setGatheringEngine } from '../src/bootstrap/gatheringRuntime.js';
 import { IngredientSet } from '../src/models/IngredientSet.js';
+import { publicAdvantageOffer } from '../src/systems/checkAdvantage.js';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
+import { GatheringEngine } from '../src/systems/GatheringEngine.js';
 import { RunJournalBuilder } from '../src/ui/presenters/RunJournalBuilder.js';
 import { resolveAlchemySubmissions } from '../src/utils/alchemySubmissions.js';
 import { resolvedComponentsFor } from '../src/systems/scopedEntityReads.js';
+import {
+  promptJournalStageCheck,
+  withUnrollableCheckRefusal,
+  createJournalCommandsForFabricate,
+} from '../src/bootstrap/journalOperations.js';
 import { createJournalRunAuthority } from '../src/systems/journalRunAuthority.js';
+import { evaluatePreparedRunCheck } from '../src/systems/checkRoll.js';
+import { installCountDice } from './helpers/countEngineDice.js';
+import { preparedCountCheck } from './helpers/countFixtures.js';
 import { mergeHistoryFlag } from './helpers/journal-fixtures.js';
+import { gatheringFixture } from './helpers/real-gathering-attempt.js';
+import { replicatedAuthorityFixture } from './helpers/replicatedJournalAuthority.js';
+import { UNDER_DATA } from './helpers/checkEvidenceFixtures.js';
 
 import {
   JOURNAL_RUN_SOCKET_KIND,
@@ -36,6 +50,8 @@ function commandHarness({
   promptCheck = null,
   postRollHandoff = null,
   authority = null,
+  now = undefined,
+  relay = null,
 } = {}) {
   const emitted = [];
   const emissionOptions = [];
@@ -68,9 +84,11 @@ function commandHarness({
     emit: (message, options) => {
       emitted.push(message);
       emissionOptions.push(options);
+      relay?.(message, options);
     },
-    randomId: () => `id-${++id}`,
+    randomId: () => `${currentUserId}-${++id}`,
     timeoutMs,
+    ...(now && { now }),
     operations: operations ?? {
       crafting: {
         getRun: () => run,
@@ -86,15 +104,143 @@ function commandHarness({
   return { service, emitted, emissionOptions, actor };
 }
 
+it('Journal prompt adapter forwards only named, permitted display fields', async () => {
+  const descriptor = {
+    label: 'Old subject label', subject: 'Steep tea', activity: 'Crafting', actorName: 'Tinker',
+    img: 'icons/tea.webp', formula: '1d20 + 3[Modifiers]',
+    resolvedFormula: '1d20 + 3[Modifiers]', displayFormula: '1d20', target: 14, direction: 'under',
+    comparison: 'exceed', selectedModifiers: [{ label: 'Focus', display: '+3' }],
+    targetBasis: { expression: '@skills.brew', value: 16, adjustment: null }, toolBonus: 1,
+    allowAdvantage: true, allowsSituationalModifier: true, offerSituationalBonus: false,
+    advantageOffer: {
+      advantage: true, disadvantage: false, kind: 'bonus', rule: 'SECRET',
+      detail: { expression: '1d8 + 1', destination: 'target', formula: 'SECRET' },
+    },
+    modifierChoice: null, privateEvaluation: { rollFormula: 'SECRET' },
+  };
+  let received;
+  await promptJournalStageCheck(descriptor, async (options) => { received = options; });
+  assert.deepEqual(received, {
+    name: 'Steep tea', actorName: 'Tinker', activity: 'Crafting', img: 'icons/tea.webp',
+    formula: '1d20 + 3', resolvedFormula: '1d20 + 3', displayFormula: '1d20',
+    dc: 14, direction: 'under', comparison: 'exceed', thresholdMode: 'exceed',
+    targetBasis: { expression: '@skills.brew', value: 16, adjustment: null }, toolBonus: 1,
+    selectedModifiers: [{ label: 'Focus', display: '+3' }],
+    allowAdvantage: true, offerSituationalBonus: false, modifierChoice: null,
+    advantageOffer: {
+      advantage: true, disadvantage: false, kind: 'bonus',
+      detail: { expression: '1d8 + 1', destination: 'target' },
+    },
+  });
+  await promptJournalStageCheck(
+    { ...descriptor, target: null, comparison: null, offerSituationalBonus: undefined },
+    async (options) => { received = options; });
+  assert.equal(received.dc, null);
+  assert.equal(received.comparison, null);
+  assert.equal(received.thresholdMode, null);
+  assert.equal(received.offerSituationalBonus, true, 'a descriptor without the flag offers it');
+});
+
 describe('journal run command protocol', () => {
+  for (const hidden of [false, true]) {
+    it(`keeps ${hidden ? 'hidden' : 'visible'} prepared check secrets out of player-readable flags`, async () => {
+      const { authority, readable } = replicatedAuthorityFixture();
+      let prompted;
+      let evaluated;
+      let effects = 0;
+      const run = { id: 'run-1', lifecycleVersion: 1, runRevision: 3, status: 'waiting' };
+      const { service } = commandHarness({
+        currentUserId: 'gm', authority, run,
+        promptCheck: async (descriptor) => {
+          prompted = descriptor;
+          return { confirmed: true, bonus: 2 };
+        },
+        operations: {
+          crafting: {
+            getRun: () => run,
+            describeCheck: async () => ({
+              required: true,
+              publicPrompt: hidden ? { label: 'Hidden work' } : {
+                label: 'VISIBLE_PROMPT', allowsSituationalModifier: true, allowAdvantage: true,
+                advantageOffer: { advantage: true, disadvantage: false, kind: 'keep', detail: null },
+              },
+              privateEvaluation: {
+                rollFormula: 'PRIVATE_FORMULA', modifierCatalogue: ['PRIVATE_CHOICE'],
+              },
+            }),
+            evaluateCheck: async ({ privateEvaluation, decision }) => {
+              evaluated = { privateEvaluation, decision };
+              return { engineEvaluated: true, success: true, secret: hidden, data: {},
+                rollHandoff: { serializedRoll: { formula: 'PRIVATE_HANDOFF' } } };
+            },
+            execute: async () => ({ success: true, effects: ++effects }),
+          },
+        },
+      });
+      const response = await service.executeJournalRunCommand({
+        actorUuid: 'Actor.a', runType: 'crafting', runId: run.id,
+        expectedRevision: 3, action: 'execute',
+      });
+      assert.equal(response.success, true);
+      assert.equal(prompted.label, hidden ? 'Hidden work' : 'VISIBLE_PROMPT');
+      assert.equal(evaluated.privateEvaluation.rollFormula, 'PRIVATE_FORMULA');
+      assert.equal(evaluated.decision.allowsSituationalModifier, !hidden);
+      assert.equal(evaluated.decision.allowAdvantage, !hidden);
+      // The token binds the whole offer the authority enforces (issue 2007).
+      assert.deepEqual(evaluated.decision.advantageOffer, {
+        advantage: !hidden, disadvantage: false, kind: hidden ? null : 'keep', detail: null,
+      });
+      assert.equal(effects, 1);
+      assert.ok(readable.length >= 3, 'creation and state writes are captured');
+      for (const document of readable) {
+        assert.doesNotMatch(JSON.stringify(document),
+          /PRIVATE_FORMULA|PRIVATE_CHOICE|PRIVATE_HANDOFF|VISIBLE_PROMPT/);
+      }
+    });
+  }
+
+  it('keeps a non-issuing same-GM tab silent before claim or reply', async () => {
+    let claims = 0;
+    const { service, emitted } = commandHarness({
+      currentUserId: 'gm',
+      authority: {
+        shouldHandleRequest: async () => false,
+        run: async () => { claims += 1; return { success: true }; },
+      },
+    });
+    const reply = await service.handleSocketMessage({
+      kind: JOURNAL_RUN_SOCKET_KIND.REQUEST,
+      requestId: 'one', sessionId: 'player-tab', actorUuid: 'Actor.a',
+      runType: 'crafting', runId: 'run-1', expectedRevision: 3,
+      action: 'execute', payload: { prepareToken: 'issued-by-other-tab' },
+    }, 'player');
+    assert.equal(reply, null);
+    assert.equal(claims, 0);
+    assert.equal(emitted.length, 0);
+  });
+
+  it('lets an issuer-closed request reach the existing caller timeout', async () => {
+    const caller = commandHarness({ timeoutMs: 5 });
+    const otherTab = commandHarness({
+      currentUserId: 'gm',
+      authority: { shouldHandleRequest: async () => false },
+    });
+    const pending = caller.service.executeJournalRunCommand({
+      actorUuid: 'Actor.a', runType: 'crafting', runId: 'run-1',
+      expectedRevision: 3, action: 'execute', payload: { prepareToken: 'old' },
+    });
+    assert.equal(await otherTab.service.handleSocketMessage(caller.emitted[0], 'player'), null);
+    assert.deepEqual(await pending, { success: false, reason: 'command-timeout' });
+  });
+
   function loadCraftingOperations() {
     const source = readFileSync(new URL('../src/bootstrap/journalOperations.js', import.meta.url), 'utf8');
     const start = source.indexOf('async function resolveJournalSourceActors(');
     const end = source.indexOf('export function createJournalCommandsForFabricate(', start);
     assert.ok(start >= 0 && end > start, 'the production operation factory must be present');
     return compileFunction(`${source.slice(start, end)}\nreturn createCraftingJournalOperations;`,
-      ['resolveAlchemySubmissions', 'resolvedComponentsFor', 'createManagerMutation'])(
-        resolveAlchemySubmissions, resolvedComponentsFor, createManagerMutation);
+      ['resolveAlchemySubmissions', 'resolvedComponentsFor', 'createManagerMutation', 'publicAdvantageOffer'])(
+        resolveAlchemySubmissions, resolvedComponentsFor, createManagerMutation, publicAdvantageOffer);
   }
 
   for (const kind of ['crafting', 'matched-alchemy', 'fizzle']) {
@@ -176,9 +322,14 @@ describe('journal run command protocol', () => {
       const canary = 'PROTECTED-RECIPE-CANARY';
       const run = { id: 'run-1', recipeId: 'recipe', lifecycleVersion: 1, runRevision: 3 };
       const publicPrompt = {
-        label: canary, recipeName: canary, formula: '1d20+987', dc: 987,
+        label: canary, recipeName: canary, subject: canary, actorName: canary,
+        activity: 'Crafting', img: canary, formula: '1d20+987', resolvedFormula: '1d20+987',
+        target: 987, comparison: 'exceed', dc: 987,
         mode: 'simple', allowsSituationalModifier: true, allowAdvantage: true,
+        offerSituationalBonus: false,
+        advantageOffer: { advantage: true, disadvantage: true, kind: 'keep', detail: { canary } },
         modifierChoice: { modifiers: [{ id: canary, label: canary }] },
+        selectedModifiers: [{ label: canary, display: '+987' }],
         allowedModifierIds: [canary], protectedFields: { nested: canary },
       };
       const privateEvaluation = { recipeId: 'recipe', rollFormula: '1d20+987' };
@@ -206,7 +357,8 @@ describe('journal run command protocol', () => {
       const hidden = await service.handleSocketMessage(request, 'player');
       assert.equal(hidden.response.checkRequired, true);
       assert.deepEqual(hidden.response.promptDescriptor, {
-        allowsSituationalModifier: true, allowAdvantage: true,
+        allowsSituationalModifier: true, allowAdvantage: true, offerSituationalBonus: false,
+        advantageOffer: { advantage: true, disadvantage: true, kind: 'keep', detail: null },
       });
       assert.equal(JSON.stringify(hidden).includes(canary), false);
       assert.equal(JSON.stringify(hidden).includes('987'), false);
@@ -223,6 +375,52 @@ describe('journal run command protocol', () => {
       assert.equal(denied.response.reason, 'owner-required');
       assert.equal(JSON.stringify(denied).includes(canary), false);
       assert.equal(publicPrompt.label, canary, 'redaction must not mutate the engine descriptor');
+    } finally {
+      globalThis.game = originalGame;
+      globalThis.fromUuid = originalFromUuid;
+    }
+  });
+
+  it('lets only a count check\'s wording keys through a redacted prompt, never its numbers (issue 2004)', async () => {
+    const originalGame = globalThis.game;
+    const originalFromUuid = globalThis.fromUuid;
+    try {
+      globalThis.game = { user: { id: 'gm', isGM: true } };
+      const canary = 'PROTECTED-COUNT-CANARY';
+      const run = { id: 'run-1', recipeId: 'recipe', lifecycleVersion: 1, runRevision: 3 };
+      const publicPrompt = {
+        label: canary, subject: canary, actorName: canary, activity: 'Crafting', img: canary,
+        formula: '', target: null, mode: 'simple', allowsSituationalModifier: true, allowAdvantage: false,
+        selectedModifiers: [{ label: canary, display: '+987' }],
+        product: 'count', direction: 'under', comparison: 'exceed', modifierDestination: 'threshold',
+        pool: 987, threshold: 986, thresholdSource: `@${canary} + 985`, die: 984, required: 983,
+        explode: { kind: 'from', value: 982, once: true }, cancel: { kind: 'from', value: 981 },
+      };
+      const fabricate = {
+        craftingRunManager: { getRun: () => run },
+        craftingEngine: {
+          describeVersionedStageCheck: async () => ({ required: true, publicPrompt, privateEvaluation: { recipeId: 'recipe' } }),
+        },
+        recipeManager: { getRecipe: () => ({ id: 'recipe', craftingSystemId: 'system' }) },
+        recipeVisibilityService: { getVisibleRecipes: () => [] },
+      };
+      const operations = loadCraftingOperations()(fabricate, () => harness.service);
+      const harness = commandHarness({ currentUserId: 'gm', operations: { crafting: operations } });
+      const { service, actor } = harness;
+      actor.isOwner = true;
+      globalThis.fromUuid = async () => actor;
+      const hidden = await service.handleSocketMessage({
+        kind: JOURNAL_RUN_SOCKET_KIND.REQUEST, requestId: 'count-prompt', sessionId: 'player-tab',
+        actorUuid: actor.uuid, runType: 'crafting', runId: run.id, expectedRevision: 3,
+        action: 'execute', senderId: 'gm', payload: {},
+      }, 'player');
+      assert.deepEqual(hidden.response.promptDescriptor, {
+        allowsSituationalModifier: true, allowAdvantage: false, offerSituationalBonus: true,
+        advantageOffer: { advantage: false, disadvantage: false, kind: null, detail: null },
+        product: 'count', direction: 'under', comparison: 'exceed', modifierDestination: 'threshold',
+      });
+      assert.equal(JSON.stringify(hidden).includes(canary), false);
+      assert.equal(/98\d/.test(JSON.stringify(hidden.response.promptDescriptor)), false, 'no pool, threshold, die, rule or required number');
     } finally {
       globalThis.game = originalGame;
       globalThis.fromUuid = originalFromUuid;
@@ -1172,6 +1370,181 @@ describe('journal run command protocol', () => {
     assert.equal(posts, 0);
   });
 
+  it('answers a check refused at describe as roll-unavailable with its sentence (issue 2139)', async () => {
+    const run = { id: 'run-1', lifecycleVersion: 1, runRevision: 3, status: 'waiting' };
+    const message = 'Crafting check cannot roll: the character value its target reads was not found.';
+    const { service } = commandHarness({
+      currentUserId: 'gm',
+      run,
+      operations: {
+        crafting: withUnrollableCheckRefusal({
+          getRun: () => run,
+          describeCheck: async () => {
+            throw Object.assign(new Error(message), { code: 'CHECK_TARGET_INVALID' });
+          },
+          execute: async () => {
+            throw new Error('a refused check must never execute');
+          },
+        }),
+      },
+    });
+    const response = await service.executeJournalRunCommand({
+      actorUuid: 'Actor.a', runType: 'crafting', runId: run.id,
+      expectedRevision: 3, action: 'execute',
+    });
+    assert.deepEqual(response, { success: false, reason: 'roll-unavailable', message });
+  });
+
+  it('keeps any other describe failure an operation failure', async () => {
+    const failing = withUnrollableCheckRefusal({
+      describeCheck: async () => {
+        throw Object.assign(new Error('stale'), { code: 'STALE_RUN_STAGE' });
+      },
+    });
+    await assert.rejects(failing.describeCheck({}), { code: 'STALE_RUN_STAGE' });
+  });
+
+  it('the composed crafting and gathering tables both answer a describe refusal (issue 2139)', async () => {
+    const run = { id: 'run-1', lifecycleVersion: 1, runRevision: 3, status: 'waiting' };
+    const actor = { uuid: 'Actor.a', id: 'a' };
+    const message = 'Crafting check cannot roll: the character value its target reads was not found.';
+    const refuse = () => {
+      throw Object.assign(new Error(message), { code: 'CHECK_TARGET_INVALID' });
+    };
+    const { game, foundry, Hooks, fromUuid } = globalThis;
+    const gm = { id: 'gm', isGM: true };
+    Object.assign(globalThis, {
+      game: {
+        user: gm,
+        users: { activeGM: gm, get: (id) => (id === 'gm' ? gm : null) },
+        socket: { emit: () => {} },
+        settings: { get: () => undefined },
+      },
+      foundry: { utils: { randomID: () => 'request-id' } },
+      Hooks: { callAll: () => true },
+      fromUuid: async (uuid) => (uuid === actor.uuid ? actor : null),
+    });
+    setGatheringEngine({ describeVersionedStageCheck: refuse });
+    const lookup = { getRun: () => run };
+    const authority = {
+      availability: () => ({ available: true, reason: null }),
+      run: async (_request, handler) =>
+        handler({ createExecutionGrant: () => ({ grant: true }), issuePrepareToken: () => 'token' }),
+    };
+    try {
+      const service = createJournalCommandsForFabricate(
+        {
+          craftingEngine: { installVersionedRunAuthority: () => {}, describeVersionedStageCheck: refuse },
+          craftingRunManager: lookup,
+          gatheringRunManager: lookup,
+        },
+        authority
+      );
+      for (const runType of ['crafting', 'gathering']) {
+        const response = await service.executeJournalRunCommand(
+          { actorUuid: actor.uuid, runType, runId: run.id, expectedRevision: 3, action: 'execute' },
+          { interactive: false }
+        );
+        assert.deepEqual(response, { success: false, reason: 'roll-unavailable', message }, runType);
+      }
+    } finally {
+      setGatheringEngine(null);
+      Object.assign(globalThis, { game, foundry, Hooks, fromUuid });
+    }
+  });
+
+  it('answers a count check that cannot roll with its refusal sentence, and executes nothing', async () => {
+    const run = { id: 'count-run', lifecycleVersion: 1, runRevision: 3, status: 'waiting' };
+    const prepared = preparedCountCheck({
+      toolContributions: [{ source: 'tool', label: 'Hammer', form: 'scalar', value: 2 }],
+      count: { base: 998 },
+    });
+    const dice = installCountDice({ faces: [] });
+    try {
+      const { service } = commandHarness({
+        currentUserId: 'gm',
+        run,
+        promptCheck: async () => ({ confirmed: true }),
+        operations: {
+          crafting: {
+            getRun: () => run,
+            describeCheck: async () => ({ required: true, publicPrompt: {}, privateEvaluation: {} }),
+            evaluateCheck: () => evaluatePreparedRunCheck(prepared, { getRollData: () => ({}) }),
+            execute: async () => {
+              throw new Error('a refused check must never execute');
+            },
+          },
+        },
+      });
+      const response = await service.executeJournalRunCommand({
+        actorUuid: 'Actor.a', runType: 'crafting', runId: run.id,
+        expectedRevision: 3, action: 'execute',
+      });
+      assert.deepEqual(response, {
+        success: false,
+        reason: 'roll-unavailable',
+        message: 'Crafting check cannot roll: its dice pool is more than 999 dice once modifiers apply.',
+      });
+      assert.deepEqual(dice.constructed, [], 'the 1000-die pool never rolls');
+    } finally {
+      dice.restore();
+    }
+  });
+
+  it('prompts with the offer captured at prepare, not a config edited after it (issue 2005)', async () => {
+    const run = { id: 'run-1', lifecycleVersion: 1, runRevision: 3, status: 'waiting' };
+    const fixture = gatheringFixture({ mode: 'routed' });
+    const routed = fixture.system.gatheringCraftingCheck.routed;
+    routed.offerSituationalBonus = false;
+    const gathering = new GatheringEngine({ localize: (key) => key });
+    let prompted = null;
+    let evaluated = null;
+    const engine = {
+      describeVersionedStageCheck: async () => {
+        const descriptor = gathering._versionedCheckDescriptor({
+          actor: { uuid: 'Actor.a', system: {} },
+          run: { taskId: fixture.task.id },
+          ...fixture,
+        });
+        // The GM turns the offer back on while the player's prompt is still to open.
+        routed.offerSituationalBonus = true;
+        return descriptor;
+      },
+      evaluatePreparedVersionedCheck: async ({ privateEvaluation, decision }) => {
+        evaluated = { privateEvaluation, decision };
+        return { engineEvaluated: true, success: true, data: {} };
+      },
+      executeVersionedStage: async () => ({ success: true, runId: run.id, status: 'completed' }),
+    };
+    const operations = createGatheringJournalRunOperations({
+      engine,
+      runManager: { getRun: () => run },
+      getService: () => service,
+      getUser: () => ({ id: 'gm', isGM: true }),
+    });
+    const { service } = commandHarness({
+      currentUserId: 'gm',
+      authority: replicatedAuthorityFixture().authority,
+      run,
+      operations: { gathering: operations },
+      promptCheck: (descriptor) =>
+        promptJournalStageCheck(descriptor, async (options) => {
+          prompted = options;
+          return { confirmed: true, bonus: '2' };
+        }),
+    });
+    const response = await service.executeJournalRunCommand({
+      actorUuid: 'Actor.a', runType: 'gathering', runId: run.id, expectedRevision: 3,
+      action: 'execute',
+    });
+
+    assert.equal(response.success, true, JSON.stringify(response));
+    assert.equal(prompted.offerSituationalBonus, false, 'the prompt reads the prepared offer');
+    assert.equal(evaluated.privateEvaluation.checkConfig.offerSituationalBonus, false, 'snapshot');
+    assert.equal(evaluated.decision.allowsSituationalModifier, true, 'the gate is not the offer');
+    assert.equal(evaluated.decision.bonus, '2');
+  });
+
   /**
    * QE2-8 reported that `journalStore`'s cancel discriminator now lets the prepare-token RELEASE
    * fall through to a refresh.
@@ -1342,6 +1715,34 @@ describe('journal run command protocol', () => {
     }
   });
 
+  it('keeps a run command identified by its request, whatever operationId the payload names', async () => {
+    const seen = [];
+    const { service } = commandHarness({
+      currentUserId: 'gm',
+      authority: {
+        availability: () => ({ available: true, reason: null }),
+        run: async (request) => (seen.push(request), { success: true }),
+      },
+    });
+    await service.handleRequest(
+      {
+        requestId: 'r1',
+        operationId: 'Forged0000000001',
+        sessionId: 's1',
+        actorUuid: 'Actor.a',
+        runType: 'crafting',
+        runId: 'run-1',
+        expectedRevision: 3,
+        action: 'execute',
+      },
+      'player'
+    );
+    assert.equal(seen.length, 1);
+    assert.equal(seen[0].operationId, undefined, 'the authority defaults it to the request id');
+    assert.equal(seen[0].requestId, 'r1');
+    assert.equal(seen[0].senderId, 'player');
+  });
+
   it('rejects stale revision before invoking an operation', async () => {
     const { service } = commandHarness({ currentUserId: 'gm' });
     const reply = await service.handleRequest(
@@ -1491,7 +1892,10 @@ describe('journal run command protocol', () => {
               success: true,
               value: 17,
               data: {},
-              rollHandoff: { serializedRoll: { formula: '1d20', total: 17 } },
+              rollHandoff: {
+                serializedRoll: { formula: '1d20', total: 17 },
+                serializedPreRolls: [{ formula: '1d4[secret tool]', total: 3 }],
+              },
             };
           },
           execute: async (args) => {
@@ -1519,7 +1923,109 @@ describe('journal run command protocol', () => {
     assert.equal(Object.hasOwn(executeArgs.payload, 'total'), false);
     assert.equal(Object.hasOwn(executeArgs.payload, 'roll'), false);
     assert.deepEqual(executeArgs.payload.selectionPlan, { setId: 'one' });
-    assert.deepEqual(posted, { serializedRoll: { formula: '1d20', total: 17 } });
+    assert.deepEqual(posted, {
+      serializedRoll: { formula: '1d20', total: 17 },
+      serializedPreRolls: [{ formula: '1d4[secret tool]', total: 3 }],
+    });
+  });
+
+  it('re-prepares an expired token across the socket, bound to the attested sender', async () => {
+    const clock = { now: 1000 };
+    const now = () => clock.now;
+    const world = replicatedAuthorityFixture({ now });
+    const run = { id: 'run-1', lifecycleVersion: 1, runRevision: 3, status: 'waiting' };
+    const seen = { describes: 0, senders: [] };
+    const operations = {
+      crafting: {
+        getRun: () => run,
+        describeCheck: async ({ sender }) => {
+          seen.describes += 1;
+          seen.senders.push(sender.id);
+          return {
+            required: true,
+            publicPrompt: { label: 'Forge', target: 12 },
+            privateEvaluation: { rollFormula: '1d20' },
+          };
+        },
+        evaluateCheck: async () => ({ engineEvaluated: true, success: true, data: {} }),
+        execute: async ({ senderId }) => ({ success: true, senderId }),
+      },
+    };
+    const services = {};
+    // Each client's socket delivers to the other with the id the server attests for the sender.
+    services.player = commandHarness({
+      timeoutMs: 1000,
+      operations,
+      promptCheck: async () => {
+        clock.now += 61_000;
+        return { confirmed: true };
+      },
+      relay: (message) => services.gm.service.handleSocketMessage(message, 'player'),
+    });
+    services.gm = commandHarness({
+      currentUserId: 'gm',
+      authority: world.authority,
+      operations,
+      now,
+      relay: (message) => services.player.service.handleSocketMessage(message, 'gm'),
+    });
+
+    const response = await services.player.service.executeJournalRunCommand({
+      actorUuid: 'Actor.a',
+      runType: 'crafting',
+      runId: 'run-1',
+      expectedRevision: 3,
+      action: 'execute',
+      payload: { senderId: 'other' },
+    });
+
+    assert.equal(response.success, true, JSON.stringify(response));
+    assert.equal(seen.describes, 2, 'the expired token cost a second preparation, not the roll');
+    assert.deepEqual(seen.senders, ['player', 'player']);
+    const tokens = Object.values(world.state().prepareTokens);
+    assert.deepEqual(
+      tokens.map((record) => record.status),
+      ['released', 'consumed']
+    );
+    assert.deepEqual(
+      tokens.map((record) => record.binding.senderId),
+      ['player', 'player'],
+      'the fresh token is bound to the sender the socket attested, never the payload\'s'
+    );
+  });
+
+  it('sends a non-interactive check no modifier ids, so the prepared defaults roll', async () => {
+    let evaluatedDecision = null;
+    let prompts = 0;
+    const run = { id: 'run-1', lifecycleVersion: 1, runRevision: 3, status: 'waiting' };
+    const { service } = commandHarness({
+      currentUserId: 'gm',
+      run,
+      promptCheck: async () => { prompts += 1; return { confirmed: true, modifierIds: [] }; },
+      operations: {
+        crafting: {
+          getRun: () => run,
+          describeCheck: async () => ({
+            required: true,
+            publicPrompt: { label: 'Forge' },
+            privateEvaluation: { rollFormula: '1d20' },
+          }),
+          evaluateCheck: async ({ decision }) => {
+            evaluatedDecision = decision;
+            return { engineEvaluated: true, success: true, data: {} };
+          },
+          execute: async () => ({ success: true }),
+        },
+      },
+    });
+    const result = await service.executeJournalRunCommand(
+      { actorUuid: 'Actor.a', runType: 'crafting', runId: 'run-1', expectedRevision: 3,
+        action: 'execute', payload: {} },
+      { interactive: false }
+    );
+    assert.equal(result.success, true, JSON.stringify(result));
+    assert.equal(prompts, 0);
+    assert.equal(evaluatedDecision.modifierIds, null, 'absent, never an empty answer');
   });
 
   it('drops a visible roll handoff when post-commit entitlement is lost', async () => {
@@ -1602,6 +2108,51 @@ describe('journal run command protocol', () => {
     assert.equal(posts, 1);
   });
 
+  for (const disposition of ['fail', 'botch']) {
+    it(`hands an entitled player a rolled craft's handoff even when it ${disposition}s (issue 2006)`, async () => {
+      let posts = 0;
+      const run = { id: 'run-1', lifecycleVersion: 1, runRevision: 3, status: 'waiting' };
+      const { service } = commandHarness({
+        currentUserId: 'gm',
+        run,
+        promptCheck: async () => ({ confirmed: true }),
+        postRollHandoff: async () => { posts += 1; },
+        operations: {
+          crafting: {
+            getRun: () => run,
+            describeCheck: async () => ({
+              required: true,
+              publicPrompt: { label: 'Known recipe' },
+              privateEvaluation: { recipeId: 'recipe', rollFormula: '1d20' },
+            }),
+            evaluateCheck: async () => ({
+              engineEvaluated: true,
+              success: false,
+              data: {},
+              rollHandoff: { serializedRoll: { formula: '1d20', total: 3 } },
+            }),
+            execute: async () => ({ success: false, disposition, runId: run.id, runRevision: 4 }),
+            authorizeRollHandoff: async () => true,
+          },
+        },
+      });
+
+      const response = await service.executeJournalRunCommand({
+        actorUuid: 'Actor.a',
+        runType: 'crafting',
+        runId: run.id,
+        expectedRevision: 3,
+        action: 'execute',
+      });
+
+      assert.equal(posts, 1, `a ${disposition} craft must still hand its roll to the player`);
+      assert.ok(
+        Object.hasOwn(response, 'rollHandoff'),
+        `a ${disposition} response must carry its roll handoff`
+      );
+    });
+  }
+
   it('releases a prepared check on local dismissal without invoking the mutation', async () => {
     let releases = 0;
     let mutations = 0;
@@ -1661,7 +2212,14 @@ describe('journal run command protocol', () => {
             success: true,
             outcome: 'hidden-tier',
             value: 19,
-            data: { diceGroups: [{ group: '1d20', results: [19] }] },
+            data: {
+              diceGroups: [{ group: '1d20', results: [19] }],
+              preRolls: [{ source: 'library', expression: '1d4[secret]', total: 3 }],
+            },
+            rollHandoff: {
+              serializedRoll: { formula: '1d20+9', total: 19 },
+              serializedPreRolls: [{ formula: '1d4[secret]', total: 3 }],
+            },
           }),
           execute: async () => ({
             success: true,
@@ -1694,6 +2252,129 @@ describe('journal run command protocol', () => {
       0,
       'a check evaluated as secret stays secret even if visibility is gained during execution'
     );
+  });
+
+  /** A crafting (or other) execute reply over a check the operations describe and evaluate. */
+  const evidenceReply = async ({
+    secret = false,
+    rollMode = 'publicroll',
+    runType = 'crafting',
+    required = true,
+    entitled = null,
+    data = { ...UNDER_DATA, targetTerms: [{ kind: 'anchor', value: 14, path: '@x' }] },
+    success = true,
+    handoff = false,
+  } = {}) => {
+    const run = { id: 'run-1', lifecycleVersion: 1, runRevision: 3, status: 'waiting' };
+    const { service } = commandHarness({
+      currentUserId: 'gm',
+      run,
+      promptCheck: async () => ({ confirmed: true }),
+      operations: {
+        [runType]: {
+          getRun: () => run,
+          describeCheck: async () =>
+            required
+              ? {
+                  required: true,
+                  publicPrompt: { label: 'Known recipe' },
+                  privateEvaluation: { rollFormula: '3d6' },
+                }
+              : { required: false },
+          evaluateCheck: async () => ({
+            engineEvaluated: true,
+            success,
+            secret,
+            data,
+            visibility: { rollMode, secret },
+            ...(handoff && { rollHandoff: { serializedRoll: { formula: '3d6', total: 9 } } }),
+          }),
+          execute: async () => ({ success: true, runId: run.id, runRevision: 4 }),
+          ...(entitled !== null && {
+            authorizeRollHandoff: async () => {
+              if (entitled === 'throws') throw new Error('lookup failed');
+              return entitled;
+            },
+          }),
+        },
+      },
+    });
+    return service.executeJournalRunCommand({
+      actorUuid: 'Actor.a',
+      runType,
+      runId: run.id,
+      expectedRevision: 3,
+      action: 'execute',
+    });
+  };
+
+  it('hands a visible crafting reply its executed check projection, and a secret one none (issue 2005)', async () => {
+    const visible = await evidenceReply();
+    assert.equal(visible.check.evidence.target, 14);
+    assert.deepEqual(visible.check.visibility, { rollMode: 'publicroll', secret: false });
+    assert.doesNotMatch(JSON.stringify(visible.check), /@x|path/, 'the projection is an allowlist');
+    assert.ok(!Object.hasOwn(await evidenceReply({ secret: true }), 'check'), 'a secret reply carries no evidence');
+  });
+
+  it('hands a blind roll no evidence, and the roller its own private roll (R8)', async () => {
+    const blind = await evidenceReply({ rollMode: 'blindroll' });
+    assert.equal(blind.success, true, 'positive control: the command still succeeds');
+    assert.ok(!Object.hasOwn(blind, 'check'), 'the roller never sees a blind roll');
+    for (const rollMode of ['gmroll', 'selfroll']) {
+      assert.equal((await evidenceReply({ rollMode })).check.evidence.target, 14, rollMode);
+    }
+  });
+
+  it('adds no check key for a stage with no rolled check, or for a gathering run (QE8 P3, P4)', async () => {
+    const unrolled = await evidenceReply({ required: false });
+    assert.equal(unrolled.success, true);
+    assert.ok(!Object.hasOwn(unrolled, 'check'), 'no rolled check, no key');
+    const gathering = await evidenceReply({ runType: 'gathering' });
+    assert.equal(gathering.success, true);
+    assert.ok(!Object.hasOwn(gathering, 'check'), 'the projection is a crafting reply field');
+  });
+
+  it('hands executed evidence only to an initiator the post-commit entitlement admits (G1)', async () => {
+    const hidden = await evidenceReply({ entitled: false });
+    assert.equal(hidden.success, true, 'positive control: the command still succeeds');
+    assert.ok(!Object.hasOwn(hidden, 'check'), 'an unentitled initiator receives no evidence');
+    assert.equal((await evidenceReply({ entitled: true })).check.evidence.target, 14);
+    const failedRoll = await evidenceReply({ entitled: true, success: false });
+    assert.equal(failedRoll.check.evidence.target, 14, 'a resolved failure shows its rows too');
+  });
+
+  it('fails closed when the entitlement lookup throws: no evidence and no handoff (QE r3 2)', async () => {
+    const entitledReply = await evidenceReply({ entitled: true, handoff: true });
+    assert.ok(Object.hasOwn(entitledReply, 'check'), 'positive control: evidence when entitled');
+    assert.ok(Object.hasOwn(entitledReply, 'rollHandoff'), 'positive control: and the handoff');
+    const errored = await evidenceReply({ entitled: 'throws', handoff: true });
+    assert.equal(errored.success, true);
+    assert.ok(!Object.hasOwn(errored, 'check') && !Object.hasOwn(errored, 'rollHandoff'));
+  });
+
+  it('never lets a seeded private marker reach an unentitled reply (G1)', async () => {
+    const data = {
+      ...UNDER_DATA,
+      resolvedFormula: '3d6 + 7',
+      rollFormula: '3d6 + @secret.formula',
+      targetExpression: '@secret.sentinel',
+      targetActor: 'Hidden NPC',
+      targetTerms: [
+        { kind: 'anchor', value: 12 },
+        { kind: 'adjustment', value: -2, label: 'PRIVATE-TIER' },
+      ],
+      preRolls: [
+        { source: 'library', label: 'PRIVATE-LABEL', expression: '1d4+@priv', total: 3, destination: 'target' },
+      ],
+    };
+    const markers = /PRIVATE-LABEL|PRIVATE-TIER|@secret\.sentinel|@secret\.formula|Hidden NPC|@priv|3d6 \+ 7/;
+    for (const rollMode of ['publicroll', 'gmroll', 'selfroll']) {
+      const hidden = await evidenceReply({ entitled: false, rollMode, data });
+      assert.doesNotMatch(JSON.stringify(hidden), markers, rollMode);
+    }
+    const shown = await evidenceReply({ entitled: true, data });
+    assert.match(JSON.stringify(shown), /PRIVATE-LABEL/, 'positive control: the markers were seeded');
+    assert.equal(shown.check.evidence.rollFormula, '3d6 + @secret.formula', 'an entitled reply has it');
   });
 
   it('accepts replies only from the elected GM for this recipient/session/correlation', async () => {
@@ -1793,7 +2474,8 @@ describe('journal run pause lifecycle at the real command boundary', () => {
       'resolveAlchemySubmissions',
       'resolvedComponentsFor',
       'createManagerMutation',
-    ])(resolveAlchemySubmissions, resolvedComponentsFor, createManagerMutation);
+      'publicAdvantageOffer',
+    ])(resolveAlchemySubmissions, resolvedComponentsFor, createManagerMutation, publicAdvantageOffer);
   }
 
   // A merging flag write, like Foundry's: `setFlag` never removes a key deleted from a nested

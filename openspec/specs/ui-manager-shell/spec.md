@@ -189,6 +189,8 @@ Rail and count layout:
   Enabled facts render as an inline phrase that keeps the value and first label word together when wrapping, for example `3 Gathering` on the first line and `environments` on the next.
 - Disabled feature counts are label-first with the disabled value emphasized, for example `Gathering environments Off`, not `Off Gathering environments`.
 - Count fact labels wrap at word boundaries and are not clipped or ellipsized except where a fixed navigation/control region explicitly requires truncation.
+- A right inspector with no selected system, recipe, component, essence, tool, environment, task, event, recipe item, realm, or map region fills its bounded sidebar allocation with the shared centred no-selection panel and the existing inset.
+  Populated inspector cards and empty collections inside a selected record remain content-sized.
 
 Component browser display data:
 

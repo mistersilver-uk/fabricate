@@ -1,780 +1,749 @@
-/**
- * System-agnostic interactive roll-prompt dialog for Fabricate checks.
- *
- * Fabricate supports many game systems (dnd5e / pf2e / …) and has no
- * system-specific roll API, so this dialog is deliberately generic. Styled to
- * resemble the dnd5e roll-configuration dialog: a die glyph on its own row above
- * an icon-first header (subject icon then name), the (optionally @-resolved)
- * formula with a "Formula" label, a DC chip, a free-form "Situational Bonus?"
- * input, and a
- * Configuration section with a Roll Mode picker. When the check formula has a
- * plain `1d20`, the footer offers Advantage / Normal / Disadvantage; otherwise a
- * single Roll button. The actual rolling + chat posting happens in
- * `evaluateCheckRoll` (`src/systems/checkRoll.js`); this module only gathers the
- * player's confirm/cancel choice, modifier, roll mode, and advantage selection.
- *
- * Built on Foundry V13 `foundry.applications.api.DialogV2` (matching the
- * `DialogV2.wait` button-callback style used elsewhere in the repo — see
- * `src/config/repairItemData.js`). When DialogV2 is unavailable
- * (headless/tests) it resolves `{ confirmed: true }` so nothing blocks.
- *
- * ## Two dialogs, one set of shared leaves
- *
- * {@link promptCheckRoll} answers for ONE subject; {@link promptBulkCheckRoll} answers
- * once for a whole batch (issue 859). They are deliberately separate exports rather
- * than one function behind a `bulk` flag: `promptCheckRoll`'s body is already a dense
- * conditional matrix (formula / DC / `playerPicks` / advantage), and a batch has NO
- * single formula and NO single DC to render, so a flag would add a fourth axis whose
- * every branch turns other branches off. What they genuinely share — the die row, the
- * situational-bonus input, the roll-mode picker, the form reader and the footer buttons
- * — is extracted into the leaves below, so the two dialogs cannot drift on the fields
- * `evaluateCheckRoll` reads.
- *
- * ## Everything emitted here passes through Foundry's `cleanHTML`
- *
- * `cleanHTML` is a TAG AND ATTRIBUTE ALLOWLIST, not an escaper: an attribute outside
- * the list is stripped silently, and so is every inline `on*` handler. So these builders
- * emit only allowlisted tags/attributes, and all state is read in the button callback
- * through `button.form.elements` rather than from a handler that would never survive.
- *
- * The one piece of live behaviour here — holding a multi-pick modifier group at its cap
- * ({@link bindModifierPickCap}) — is wired from `DialogV2.wait`'s `render` callback for
- * exactly that reason: it binds listeners to the already-sanitised DOM, so nothing about
- * it depends on an attribute surviving the allowlist.
- */
+/** The single and bulk check prompt: view preparation, the modal surface and answer translation. */
+import { publicAdditionalDiceOffer } from '../../../../systems/additionalDiceReach.js';
+import {
+  bracketBonusExpression,
+  publicAdvantageOffer,
+} from '../../../../systems/checkAdvantage.js';
+import { isFixedSumOver } from '../../../../systems/checkTarget.js';
+import { describeCountPolicy } from '../../../../systems/countEvaluation.js';
+import { fill } from '../../../../utils/fillPlaceholders.js';
+import { additionalDiceCopy } from '../../../presenters/additionalDicePrompt.js';
+import { countFaceClauses } from '../manager/checks/countInsetModel.js';
+
+import { openRollPromptModal } from './rollPromptHost.js';
+import { rollPromptTarget } from './rollPromptTarget.js';
+
+// Legacy tokens on both versions (issue 1043): V14 maps them in Roll#toMessage, and core.messageMode is unregistered on V13, where reading it throws.
+const ROLL_MODES = [
+  ['publicroll', 'RollModePublic', 'Public roll'],
+  ['gmroll', 'RollModePrivate', 'Private GM roll'],
+  ['blindroll', 'RollModeBlind', 'Blind GM roll'],
+  ['selfroll', 'RollModeSelf', 'Self roll'],
+];
+
+const ADVANTAGES = new Set(['normal', 'advantage', 'disadvantage']);
+
+let surfaceOverride = null;
 
 /**
- * Fabricate's roll modes with i18n keys + English fallbacks, in the order the
- * Roll Mode picker lists them (mirrors Foundry core's `CONFIG.Dice.rollModes`).
- *
- * ## The vocabulary here is deliberately the LEGACY one
- *
- * `publicroll | gmroll | blindroll | selfroll`. Foundry V14 introduces a disjoint
- * message-mode vocabulary (`public | gm | blind | self | ic`), and migrating this picker
- * is its own change with its own V13 verification burden (issue 1043). Keeping the
- * legacy token here is what lets the aggregate bulk card and the N dice messages carry
- * the SAME token on both Foundry versions — the dice through `Roll#toMessage`'s own
- * `_mapLegacyRollMode`, the card through the poster's version edge using the identical
- * map — so card visibility and dice visibility cannot diverge.
- *
- * Do NOT read `core.messageMode` as a fallback: `ClientSettings#assertSetting` THROWS
- * for an unregistered key on V13, and `??` does not catch a throw.
+ * Replace the modal surface for a Node suite that drives engine code with no DOM, returning the
+ * restore. The surface receives the prepared view and answers like the modal, or `null`.
  */
-const ROLL_MODE_CHOICES = Object.freeze([
-  ['publicroll', 'CHAT.RollPublic', 'Public Roll'],
-  ['gmroll', 'CHAT.RollPrivate', 'Private GM Roll'],
-  ['blindroll', 'CHAT.RollBlind', 'Blind GM Roll'],
-  ['selfroll', 'CHAT.RollSelf', 'Self Roll'],
-]);
+export function overrideRollPromptSurface(open) {
+  const previous = surfaceOverride;
+  surfaceOverride = open;
+  return () => {
+    surfaceOverride = previous;
+  };
+}
 
-/**
- * The check-modifier catalogue's own default icon class (mirrors
- * `CraftingModifierCatalogueCard.svelte`'s `DEFAULT_MODIFIER_ICON`). An option whose
- * catalogue entry carries no icon still renders an `<i>` with this class: the modifier
- * row is a flex row, so omitting the element would collapse the icon gutter and start
- * that option's label ~1.1rem left of its siblings.
- */
-const DEFAULT_MODIFIER_ICON = 'fa-solid fa-dice-d20';
+function resolveSurface() {
+  if (surfaceOverride) return surfaceOverride;
+  return globalThis.document?.body ? openRollPromptModal : null;
+}
 
-/**
- * Localize a Foundry i18n key, falling back to an English default when the
- * runtime (or a test harness) cannot resolve it (echoes the key or is absent).
- * @param {string} key
- * @param {string} fallback
- * @returns {string}
- */
+function supportedRollMode(value, fallback = 'publicroll') {
+  return ROLL_MODES.some(([mode]) => mode === value) ? value : fallback;
+}
+
 function localize(key, fallback) {
-  const resolved = globalThis.game?.i18n?.localize?.(key);
-  return typeof resolved === 'string' && resolved && resolved !== key ? resolved : fallback;
+  const value = globalThis.game?.i18n?.localize?.(key);
+  return typeof value === 'string' && value && value !== key ? value : fallback;
 }
 
-/* -------------------------------------------------------------------------- */
-/* The `playerPicks` modifier choice (issues 770, 1055).                       */
-/* -------------------------------------------------------------------------- */
-
-/**
- * The prompt-facing plan for a `modifierChoice` descriptor: the options to render, how
- * many of them the player may take, and which to open pre-selected.
- *
- * `maxPicks` is clamped into `[1, options.length]` and DEFAULTS TO 1 when the descriptor
- * carries no usable cap, so a descriptor built before `playerPicks` became multi-pick
- * still renders the single-select radio group it was written for. `defaultSelectedIds`
- * falls back to the legacy singular `defaultSelectedId` for the same reason, and is
- * truncated to the cap so the dialog can never OPEN in a state it forbids.
- *
- * @param {{modifiers?: Array<object>, maxPicks?: number, defaultSelectedIds?: string[],
- *   defaultSelectedId?: string}|null|undefined} modifierChoice
- * @returns {{options: Array<object>, maxPicks: number, defaultSelectedIds: string[]}}
- */
-function planModifierChoice(modifierChoice) {
-  const options = Array.isArray(modifierChoice?.modifiers) ? modifierChoice.modifiers : [];
-  const rawCap = Number(modifierChoice?.maxPicks);
-  const cap = Number.isInteger(rawCap) && rawCap > 0 ? rawCap : 1;
-  const maxPicks = Math.max(Math.min(cap, options.length), 1);
-  const rawDefaults = Array.isArray(modifierChoice?.defaultSelectedIds)
-    ? modifierChoice.defaultSelectedIds
-    : [modifierChoice?.defaultSelectedId];
-  const defaultSelectedIds = rawDefaults
-    .filter((id) => typeof id === 'string' && id !== '')
-    .slice(0, maxPicks);
-  return { options, maxPicks, defaultSelectedIds };
+function promptLabel(name, fallback) {
+  return localize(`FABRICATE.App.RollPrompt.${name}`, fallback);
 }
 
-/**
- * Read the checked modifier ids off a submitted form field.
- *
- * The field is a same-named group, so it arrives as a `RadioNodeList` — and
- * `RadioNodeList#value` is specified to inspect RADIO inputs only, returning `''` for a
- * checkbox group however many boxes are ticked. Reading `.value` alone would therefore
- * report "nothing picked" for every multi-pick roll, so the entries are walked and their
- * `checked` flags read directly.
- *
- * The return distinguishes two cases a single array cannot:
- *
- * - `[]` — the field was present and the player checked NOTHING. A deliberate empty
- *   selection, which `evaluateCheckRoll` reduces to 0.
- * - `null` — no answer is readable (the field is absent, or it is a bare `{ value }`
- *   stand-in with nothing in it). The caller then opens the descriptor's pre-selection,
- *   which is what the headless/no-form path has always done.
- *
- * @param {object|null|undefined} field `button.form.elements.craftingModifier`.
- * @returns {string[]|null}
- */
-function readSelectedModifierIds(field) {
-  if (!field) return null;
-  const entries = typeof field.length === 'number' ? [...field] : [field];
-  const checkable = entries.filter((entry) => typeof entry?.checked === 'boolean');
-  if (checkable.length > 0) {
-    return checkable.filter((entry) => entry.checked).map((entry) => String(entry.value ?? ''));
-  }
-  // No `checked` flags to read (a headless form stand-in): fall back to a plain value,
-  // and report an empty one as "no answer" rather than as an empty selection.
-  const value = field.value;
-  return value ? [String(value)] : null;
-}
-
-/**
- * Hold a multi-pick modifier fieldset at its cap by disabling the unchecked boxes once
- * `maxPicks` are ticked, and releasing them again when one is cleared.
- *
- * This runs from `DialogV2.wait`'s `render` callback rather than from markup, because
- * everything this module emits passes through `cleanHTML`, which strips every inline
- * `on*` handler — an attribute-based guard would be silently deleted and the cap would
- * read as enforced while doing nothing.
- *
- * It is a UI affordance, not the invariant: `evaluateCheckRoll` re-imposes the same cap
- * on whatever the prompt returns, so a selection that gets past this (an out-of-date
- * client, a scripted submit) is still truncated before it reaches the formula.
- *
- * @param {object|null|undefined} dialog The rendered dialog (or its element).
- * @param {number} maxPicks
- * @returns {void}
- */
-function bindModifierPickCap(dialog, maxPicks) {
-  const root = dialog?.element ?? dialog;
-  const inputs = [...(root?.querySelectorAll?.('input[name="craftingModifier"]') ?? [])];
-  if (inputs.length === 0) return;
-  const sync = () => {
-    const checked = inputs.filter((input) => input.checked).length;
-    for (const input of inputs) input.disabled = !input.checked && checked >= maxPicks;
+function copy() {
+  return {
+    modifiers: promptLabel('Modifiers', 'Modifiers'),
+    modifierChoice: promptLabel('CheckModifier', 'Check modifier'),
+    unnamedModifier: promptLabel('UnnamedModifier', 'Unnamed modifier'),
+    unnamedSubject: promptLabel('UnnamedSubject', 'Unnamed item'),
+    pickUpTo: promptLabel('PickUpTo', 'Pick up to {count}'),
+    eachAdds: promptLabel('EachAdds', 'Each adds to the total.'),
+    bonus: promptLabel('SituationalBonus', 'Situational bonus'),
+    bonusPlaceholder: promptLabel('BonusPlaceholder', '+2 or 1d4'),
+    bonusHelp: promptLabel(
+      'BonusHelp',
+      'A bonus adds to the total. A rolled bonus such as 1d4 is rolled with the check.'
+    ),
+    rollMode: promptLabel('RollMode', 'Roll mode'),
+    meet: promptLabel('MeetOrBeat', 'meet or beat'),
+    exceed: promptLabel('Beat', 'beat'),
+    bulkNote: promptLabel('BulkNote', 'One choice below applies to every roll in the batch.'),
+    bulkRows: promptLabel('BulkRows', 'Rolls in this batch'),
+    noCheck: promptLabel('NoCheck', 'No check'),
+    noSingleTarget: promptLabel('NoSingleTarget', 'No single target'),
+    dcValue: promptLabel('DcValue', 'DC {dc}'),
+    targetValue: promptLabel('TargetValue', 'Target {target}'),
+    countNeed: promptLabel('CountNeed', '{count} needed'),
+    roll: promptLabel('roll', 'Roll'),
+    advantage: promptLabel('advantage', 'Advantage'),
+    disadvantage: promptLabel('disadvantage', 'Disadvantage'),
+    close: promptLabel('Close', 'Close'),
   };
-  for (const input of inputs) input.addEventListener('change', sync);
-  sync();
 }
 
-/**
- * One modifier row: the control, the icon slot, the label and the signed value chip.
- *
- * The icon slot and the chip are ALWAYS emitted (see {@link DEFAULT_MODIFIER_ICON}): the
- * row is a flex row, so an icon-less or value-less catalogue entry that omitted either
- * would collapse its gutter and misalign against its siblings.
- *
- * THE CHIP PREFERS THE DESCRIPTOR'S OWN `display` (issue 1118). A check modifier may roll,
- * and a rolling one's `value` is `null` while its `average` is a number the roll can never
- * produce — a `1d4` chipped as `+2.5` would be a promise the dice cannot keep. The resolver
- * builds `display` (`+1d4`, `+min(max(1d8, -1), 6)`, or the signed number for a flat entry)
- * beside the resolution it describes, so the chip and the appended term are one derivation.
- * {@link formatSigned} remains the fallback for a descriptor built before that field.
- *
- * @param {{id?: string, label?: string, icon?: string, value?: unknown, display?: unknown}} modifier
- * @param {{inputType: 'radio'|'checkbox', preSelected: Set<string>, unnamedLabel: string}} context
- * @returns {string}
- */
-function renderModifierOption(modifier, { inputType, preSelected, unnamedLabel }) {
-  const id = escapeHtml(modifier?.id ?? '');
-  const checked = preSelected.has(modifier?.id) ? ' checked' : '';
-  const iconClass = modifier?.icon || DEFAULT_MODIFIER_ICON;
-  const iconHtml = `<i class="fabricate-roll-prompt__modifier-icon ${escapeHtml(iconClass)}" aria-hidden="true"></i>`;
-  // The catalogue editor creates entries with an empty label and never forces a value,
-  // so an unnamed modifier would otherwise render as icon + chip only and announce as
-  // bare "+3". Fall back to a localized placeholder name.
-  const label = modifier?.label || unnamedLabel;
-  const chipText =
-    typeof modifier?.display === 'string' && modifier.display !== ''
-      ? modifier.display
-      : formatSigned(modifier?.value);
-  const chip = `<span class="fabricate-roll-prompt__modifier-value">${escapeHtml(chipText)}</span>`;
-  return (
-    `<label class="fabricate-roll-prompt__modifier-option">` +
-    `<input type="${inputType}" name="craftingModifier" value="${id}"${checked} />` +
-    `${iconHtml}<span class="fabricate-roll-prompt__modifier-label">${escapeHtml(label)}</span>${chip}</label>`
+function planModifierChoice(choice) {
+  const options = Array.isArray(choice?.modifiers) ? choice.modifiers : [];
+  const rawCap = Number(choice?.maxPicks);
+  const maxPicks = Math.max(
+    Math.min(Number.isInteger(rawCap) && rawCap > 0 ? rawCap : 1, options.length),
+    1
   );
-}
-
-/**
- * The "Check modifier" fieldset: one row per eligible modifier, opened on the
- * descriptor's pre-selection.
- *
- * The control TYPE follows the cap, because the two say different things to the player
- * and a checkbox that behaves like a radio is a lie about the control: at `maxPicks === 1`
- * this is the pick-one radio group it has always been, and above 1 it is a checkbox group
- * whose legend states the bound in words ("Pick up to 3"). The bound is also enforced
- * live by {@link bindModifierPickCap} — and again, authoritatively, in
- * `evaluateCheckRoll`, since a UI control's constraint is never the invariant.
- *
- * @param {{options: Array<object>, maxPicks: number, defaultSelectedIds: string[]}} plan
- * @returns {string} Empty when there is nothing to offer.
- */
-function renderModifierFieldset({ options, maxPicks, defaultSelectedIds }) {
-  if (options.length === 0) return '';
-  const multiPick = maxPicks > 1;
-  const context = {
-    inputType: multiPick ? 'checkbox' : 'radio',
-    preSelected: new Set(defaultSelectedIds),
-    unnamedLabel: localize('FABRICATE.App.RollPrompt.UnnamedModifier', 'Unnamed modifier'),
+  const defaults = Array.isArray(choice?.defaultSelectedIds)
+    ? choice.defaultSelectedIds
+    : [choice?.defaultSelectedId];
+  return {
+    options,
+    maxPicks,
+    defaultSelectedIds: defaults.filter((id) => typeof id === 'string' && id).slice(0, maxPicks),
   };
-  const optionsHtml = options.map((modifier) => renderModifierOption(modifier, context)).join('');
-  const legend = escapeHtml(localize('FABRICATE.App.RollPrompt.CheckModifier', 'Check modifier'));
-  // The cap has to be legible BEFORE the player runs into it: a box that silently stops
-  // responding reads as a broken dialog, whereas "Pick up to 3" explains the disabling.
-  // Single-pick renders no hint — a radio group already says "one" by construction.
-  const hint = multiPick
-    ? `<span class="fabricate-roll-prompt__modifiers-hint">${escapeHtml(
-        localize('FABRICATE.App.RollPrompt.PickUpTo', 'Pick up to {count}').replace(
-          '{count}',
-          String(maxPicks)
-        )
-      )}</span>`
-    : '';
-  return (
-    `<fieldset class="fabricate-roll-prompt__modifiers">` +
-    `<legend class="fabricate-roll-prompt__modifiers-legend">${legend}${hint}</legend>` +
-    `${optionsHtml}</fieldset>`
-  );
 }
 
-/* -------------------------------------------------------------------------- */
-/* Shared leaves — used by BOTH dialogs and by `buildInteractiveRollOptions`.  */
-/* -------------------------------------------------------------------------- */
-
-/**
- * The client's configured default roll mode, as a STRING.
- *
- * `?? ''` so this types as a string rather than possibly-undefined: SonarCloud's
- * inference otherwise reads the `value === defaultRollMode` comparison in the picker as
- * always-false (S3403), because the value is reached through optional chaining on an
- * untyped Foundry global.
- *
- * That normalization is now shared with `buildInteractiveRollOptions`, which previously
- * read the same setting WITHOUT the coalesce and could therefore emit `undefined` where
- * this emits `''`. Unifying has to pick one, and `''` is the safe pick because the two
- * are equivalent everywhere downstream: `evaluateCheckRoll` gates on
- * `if (choice.rollMode)` and `Roll#toMessage` gates on `if (rollMode)`, so an empty
- * string and an absent value both mean "use the client default". Recorded here so
- * neither a later editor "restores" the difference nor a reviewer reads it as drift.
- *
- * Never falls back to `core.messageMode` — see {@link ROLL_MODE_CHOICES}.
- *
- * @returns {string}
- */
-function readDefaultRollMode() {
-  return globalThis.game?.settings?.get?.('core', 'rollMode') ?? '';
-}
-
-/**
- * The die glyph row: a d20 for an advantage-eligible check, else a generic die.
- * Decorative — hidden from assistive tech (the formula/DC, or the batch heading, carry
- * the meaning).
- *
- * @param {boolean} allowAdvantage
- * @returns {string}
- */
-function renderDieRow(allowAdvantage) {
-  const dieIcon = allowAdvantage === true ? 'fa-dice-d20' : 'fa-dice';
-  return `<div class="fabricate-roll-prompt__die"><i class="fa-solid ${dieIcon}" aria-hidden="true"></i></div>`;
-}
-
-/**
- * The free-form situational-bonus input.
- *
- * No `inputmode` attribute: `cleanHTML`'s `input` allowlist does not carry one, so the
- * `inputmode="text"` this markup used to emit was stripped before it ever reached the
- * DOM. It is dropped rather than kept as decoration.
- *
- * @returns {string}
- */
-function renderBonusInput() {
-  return (
-    `<input class="fabricate-roll-prompt__bonus" type="text" name="situationalBonus" ` +
-    `aria-label="Situational Bonus" placeholder="Situational Bonus?" autofocus />`
-  );
-}
-
-/**
- * The Configuration section with the Roll Mode picker.
- *
- * @param {string} defaultRollMode The client default, pre-selected.
- * @returns {string}
- */
-function renderRollModePicker(defaultRollMode) {
-  const rollModeOptions = ROLL_MODE_CHOICES.map(([value, key, fallback]) => {
-    const selected = value === defaultRollMode ? ' selected' : '';
-    return `<option value="${escapeHtml(value)}"${selected}>${escapeHtml(localize(key, fallback))}</option>`;
-  }).join('');
-  return (
-    `<div class="fabricate-roll-prompt__config">` +
-    `<p class="fabricate-roll-prompt__config-heading">Configuration</p>` +
-    `<label>Roll Mode <select name="rollMode">${rollModeOptions}</select></label>` +
-    `</div>`
-  );
-}
-
-/**
- * Read the fields both dialogs share off a clicked button's form: normalize the
- * situational bonus (strip one leading `+`, trim, empty → null), read the chosen roll
- * mode, and tag the advantage disposition the button represents.
- *
- * @param {object} button The DialogV2 button the player clicked.
- * @param {string} defaultRollMode The client default, used when the field is absent.
- * @param {'advantage'|'normal'|'disadvantage'} advantage
- * @returns {{confirmed: true, bonus: string|null, rollMode: string|undefined,
- *   advantage: 'advantage'|'normal'|'disadvantage'}}
- */
-function readSharedRollChoice(button, defaultRollMode, advantage) {
-  const rawBonus = button?.form?.elements?.situationalBonus?.value ?? '';
-  const bonus = String(rawBonus)
+/** A leading `+` is dropped and blank input means no bonus; anything else is the player's text. */
+export function normalizeSituationalBonus(value) {
+  const bonus = String(value ?? '')
     .replace(/^\s*\+/, '')
     .trim();
-  const rollModeValue = button?.form?.elements?.rollMode?.value;
-  return {
-    confirmed: true,
-    bonus: bonus === '' ? null : bonus,
-    rollMode: rollModeValue || defaultRollMode || undefined,
-    advantage,
-  };
+  return bonus || null;
+}
+
+/** Why a choice of `dice` additional dice refuses under `offer`, else null; zero never refuses. */
+function additionalDiceChoiceRefusal(dice, offer) {
+  if (dice === 0) return null;
+  if (!offer) return 'notOffered';
+  if (!Number.isInteger(dice) || dice < 0) return 'choiceInvalid';
+  if (offer.unavailable) return offer.unavailable;
+  return dice > offer.limit ? 'choiceAboveLimit' : null;
 }
 
 /**
- * The footer: three Advantage / Normal / Disadvantage buttons when the check can honour
- * them, else a single Roll. `readChoice` is the caller's reader so each dialog can
- * decorate the shared choice with its own extra fields.
- *
- * @param {boolean} allowAdvantage
- * @param {(button: object, advantage: string) => object} readChoice
- * @returns {object[]} DialogV2 button descriptors.
+ * Any answer but an explicit confirmation is a dismissal; the pick cap is re-imposed here, and an
+ * additional-dice choice the offer does not admit keeps its value, never clamped, with its refusal.
  */
-function buildRollButtons(allowAdvantage, readChoice) {
-  if (allowAdvantage === true) {
-    return [
-      {
-        action: 'advantage',
-        label: 'Advantage',
-        callback: (_event, button) => readChoice(button, 'advantage'),
-      },
-      {
-        action: 'normal',
-        default: true,
-        label: 'Normal',
-        callback: (_event, button) => readChoice(button, 'normal'),
-      },
-      {
-        action: 'disadvantage',
-        label: 'Disadvantage',
-        callback: (_event, button) => readChoice(button, 'disadvantage'),
-      },
-    ];
+export function translatePromptAnswer(
+  answer,
+  { defaultRollMode, choicePlan, additionalDiceOffer = null }
+) {
+  if (answer?.confirmed !== true) return { confirmed: false };
+  const result = {
+    confirmed: true,
+    bonus: normalizeSituationalBonus(answer.bonus),
+    rollMode: supportedRollMode(answer.rollMode, defaultRollMode),
+    advantage: ADVANTAGES.has(answer.advantage) ? answer.advantage : 'normal',
+  };
+  if (choicePlan.options.length > 0) {
+    const picked = Array.isArray(answer.chosenModifierIds)
+      ? answer.chosenModifierIds
+      : choicePlan.defaultSelectedIds;
+    const ids = picked.map(String).slice(0, choicePlan.maxPicks);
+    result.chosenModifierIds = ids;
+    if (ids.length > 0) result.chosenModifierId = ids[0];
   }
+  const dice = answer.additionalDice ?? 0;
+  if (additionalDiceOffer || dice !== 0) {
+    const refusal = additionalDiceChoiceRefusal(dice, additionalDiceOffer);
+    result.additionalDice = dice;
+    if (refusal) result.additionalDiceRefusal = refusal;
+  }
+  return result;
+}
+
+/** A summed roll-under check's wording: the chip names a target, and every bonus raises it. */
+function underCopy() {
+  return {
+    meet: promptLabel('StayAtOrUnder', 'stay at or under'),
+    exceed: promptLabel('StayUnder', 'stay under'),
+    formulaNote: promptLabel('ComparedAsRolled', 'The dice are compared as rolled.'),
+    targetBase: promptLabel('TargetBase', 'Base {value}'),
+    targetValueOf: promptLabel('TargetValueOf', '{actor} {source} {value}'),
+    targetAdjustment: promptLabel('TargetAdjustment', '{label} {value}'),
+    targetDifficulty: promptLabel('TargetDifficulty', 'difficulty {value}'),
+    targetTools: promptLabel('TargetTools', 'tools {value}'),
+    targetModifiers: promptLabel('TargetModifiers', 'modifiers {value}'),
+    targetSituational: promptLabel('TargetSituational', 'situational {value}'),
+    targetPending: promptLabel('TargetPending', '{target} + {formula}'),
+    eachAdds: promptLabel('EachRaises', 'Each raises the target.'),
+    bonusHelp: promptLabel(
+      'BonusHelpUnder',
+      'A bonus raises the target. A rolled bonus such as 1d4 is rolled first, and its result is applied.'
+    ),
+  };
+}
+
+/** A count check's wording: every modifier and bonus adds dice or moves the threshold. */
+function countCopy(destination) {
+  const threshold = destination === 'threshold';
+  return {
+    eachAdds: threshold
+      ? promptLabel('EachMovesThreshold', 'Each moves the threshold.')
+      : promptLabel('EachAddsDice', 'Each adds dice.'),
+    bonusHelp: threshold
+      ? promptLabel(
+          'BonusHelpThreshold',
+          'A bonus moves the threshold by that much. A rolled bonus such as 1d4 is rolled first, and its result is applied.'
+        )
+      : promptLabel(
+          'BonusHelpDice',
+          'A bonus adds that many dice. A rolled bonus such as 1d4 is rolled first, and its result is applied.'
+        ),
+  };
+}
+
+function needText(need, labels) {
+  if (need?.kind === 'dc') return fill(labels.dcValue, { dc: need.dc });
+  if (need?.kind === 'target') return fill(labels.targetValue, { target: need.target });
+  if (need?.kind === 'successes') return fill(labels.countNeed, { count: need.count });
+  return need?.kind === 'noSingleTarget' ? labels.noSingleTarget : labels.noCheck;
+}
+
+/** A count check's successes chip, `{count} successes needed`, blank when nothing is required. */
+function countNeededText({ required }) {
+  if (required === 1)
+    return localize('FABRICATE.App.RollPrompt.CountNeededOne', '1 success needed');
+  if (required === null) return '';
+  return fill(localize('FABRICATE.App.RollPrompt.CountNeeded', '{count} successes needed'), {
+    count: required,
+  });
+}
+
+/**
+ * The templates a count line and its note settle into as the player picks and types, and the
+ * face clauses (issue 2006), which no pick or bonus moves, formatted once from the actual faces.
+ */
+function countLabels({ count, direction, comparison }) {
+  const rule = (face) =>
+    face && { kind: face.kind, value: face.kind === 'from' ? face.face : null, once: face.once };
+  const described = describeCountPolicy({
+    die: count.die,
+    direction,
+    comparison,
+    explode: rule(count.explode),
+    cancel: rule(count.cancel),
+  });
+  return {
+    // The chat card's own pool line, so the two cannot word it differently.
+    countFormula: localize(
+      'FABRICATE.Check.CountRoll.Pool',
+      '{pool}d{die} · each {comparison} {threshold}'
+    ),
+    countPendingDice: localize(
+      'FABRICATE.App.RollPrompt.CountPendingDice',
+      '{pool}d{die} + {formula} dice · each {comparison} {threshold}'
+    ),
+    countPendingThreshold: localize(
+      'FABRICATE.App.RollPrompt.CountPendingThreshold',
+      '{pool}d{die} · each {comparison} {threshold} + {formula}'
+    ),
+    countRule: localize(
+      'FABRICATE.App.RollPrompt.CountRule',
+      'Success on {comparison} {threshold}'
+    ),
+    countRuleCharacter: localize(
+      'FABRICATE.App.RollPrompt.CountRuleCharacter',
+      'Success on {comparison} {threshold} (character value {value})'
+    ),
+    countRuleMoved: localize(
+      'FABRICATE.App.RollPrompt.CountRuleMoved',
+      '{rule}, moved {moved} by modifiers'
+    ),
+    countFaces: countFaceClauses(described, localize)
+      .map((clause) => ` · ${clause}`)
+      .join(''),
+    countZeroPool: localize(
+      'FABRICATE.App.RollPrompt.CountZeroPool',
+      'This roll fails automatically: the pool is reduced to zero.'
+    ),
+  };
+}
+
+function targetText(data, labels) {
+  if (!Number.isFinite(data.dc)) return '';
+  return data.direction === 'under' || data.targetSource === 'attribute'
+    ? fill(labels.targetValue, { target: data.dc })
+    : fill(labels.dcValue, { dc: data.dc });
+}
+
+/** The labels a check's product and direction word the prompt with. */
+function labelsFor(data) {
+  if (data.count) {
+    return { ...copy(), ...countCopy(data.count.destination), ...countLabels(data) };
+  }
+  if (data.countDestination) return { ...copy(), ...countCopy(data.countDestination) };
+  return data.direction === 'under' ? { ...copy(), ...underCopy() } : copy();
+}
+
+/** The target, bulk-need and pick-cap copy, formatted here so the component renders strings only. */
+function formatCopy(data, choicePlan) {
+  const labels = labelsFor(data);
+  const formatted = {
+    labels: { ...labels, pickUpTo: fill(labels.pickUpTo, { count: choicePlan.maxPicks }) },
+    dcText: data.count ? '' : targetText(data, labels),
+  };
+  if (data.count) {
+    // The line and note as they open, with the default picks and no bonus yet.
+    const line = rollPromptTarget(
+      { ...data, labels: formatted.labels, choicePlan },
+      choicePlan.defaultSelectedIds,
+      ''
+    );
+    formatted.formula = line.formula;
+    formatted.neededText = countNeededText(data.count);
+    if (line.note) formatted.labels.formulaNote = line.note;
+  }
+  // The one target chip: a count's successes needed, else the DC or target and its comparison.
+  if (data.additionalDiceOffer) {
+    formatted.labels.additionalDice = additionalDiceCopy(data.additionalDiceOffer, localize);
+  }
+  if (data.additionalDiceMixed) {
+    formatted.labels.additionalDice = {
+      title: localize('FABRICATE.App.RollPrompt.AdditionalDice.Title', 'Additional dice'),
+    };
+    formatted.labels.additionalDiceMixed = localize(
+      'FABRICATE.App.RollPrompt.AdditionalDice.Bulk.Mixed',
+      'Rolls in this batch use different resources, so no dice can be added.'
+    );
+  }
+  formatted.chipText = data.count
+    ? formatted.neededText
+    : formatted.dcText &&
+      `${formatted.dcText} · ${data.comparison === 'exceed' ? labels.exceed : labels.meet}`;
+  if (Array.isArray(data.subjects)) {
+    formatted.subjects = data.subjects.map((subject) => ({
+      ...subject,
+      needText: needText(subject?.need, labels),
+    }));
+  }
+  return formatted;
+}
+
+/** The notes under Disadvantage and Advantage that the offer's rule states; none when mixed. */
+function actionNotes({ kind, detail }) {
+  if (kind === 'keep') {
+    return {
+      disadvantage: localize('FABRICATE.App.RollPrompt.KeepWorse', 'keep the worse'),
+      advantage: localize('FABRICATE.App.RollPrompt.KeepBetter', 'keep the better'),
+    };
+  }
+  if (kind === 'bonus' && detail) {
+    const values = { expression: bracketBonusExpression(detail.expression) };
+    const [down, up] =
+      detail.destination === 'target'
+        ? [
+            localize(
+              'FABRICATE.App.RollPrompt.BonusTargetDisadvantage',
+              '−{expression} to the target'
+            ),
+            localize(
+              'FABRICATE.App.RollPrompt.BonusTargetAdvantage',
+              '+{expression} to the target'
+            ),
+          ]
+        : [
+            localize(
+              'FABRICATE.App.RollPrompt.BonusTotalDisadvantage',
+              '−{expression} to the total'
+            ),
+            localize('FABRICATE.App.RollPrompt.BonusTotalAdvantage', '+{expression} to the total'),
+          ];
+    return { disadvantage: fill(down, values), advantage: fill(up, values) };
+  }
+  if (kind === 'count' && detail) {
+    if (detail.dice === 1) {
+      return {
+        disadvantage: localize('FABRICATE.App.RollPrompt.CountDisadvantageOne', '−1 die'),
+        advantage: localize('FABRICATE.App.RollPrompt.CountAdvantageOne', '+1 die'),
+      };
+    }
+    const values = { count: detail.dice };
+    return {
+      disadvantage: fill(
+        localize('FABRICATE.App.RollPrompt.CountDisadvantage', '−{count} dice'),
+        values
+      ),
+      advantage: fill(localize('FABRICATE.App.RollPrompt.CountAdvantage', '+{count} dice'), values),
+    };
+  }
+  return {};
+}
+
+function promptAction(action, label, note = '') {
+  const name = note
+    ? fill(localize('FABRICATE.App.RollPrompt.ActionName', '{label}, {note}'), { label, note })
+    : label;
+  return { action, label, note, name, submit: action === 'normal' || action === 'roll' };
+}
+
+/**
+ * The footer, left to right (issue 2007): Disadvantage when offered, Roll and Advantage, each
+ * outer action with the note its check's rule states. An empty offer is the single Roll.
+ */
+export function promptActions(offer, labels) {
+  if (offer?.advantage !== true) return [promptAction('roll', labels.roll)];
+  const notes = actionNotes(offer);
   return [
-    {
-      action: 'roll',
-      default: true,
-      label: 'Roll',
-      callback: (_event, button) => readChoice(button, 'normal'),
-    },
+    ...(offer.disadvantage === true
+      ? [promptAction('disadvantage', labels.disadvantage, notes.disadvantage)]
+      : []),
+    promptAction('normal', labels.roll),
+    promptAction('advantage', labels.advantage, notes.advantage),
   ];
 }
 
+/** A producer that names no offer keeps the one rule it had before issue 2007: keep, both ways. */
+function viewOffer(data, allowAdvantage) {
+  if (data.advantageOffer) return publicAdvantageOffer(data.advantageOffer);
+  return allowAdvantage === true
+    ? { advantage: true, disadvantage: true, kind: 'keep', detail: null }
+    : { advantage: false, disadvantage: false, kind: null, detail: null };
+}
+
+/** Open the surface for a prepared view; a failed or rejected open is a dismissal. */
+export async function waitForPrompt(data, allowAdvantage, choicePlan, open = resolveSurface()) {
+  const defaultRollMode = supportedRollMode(globalThis.game?.settings?.get?.('core', 'rollMode'));
+  const formatted = formatCopy(data, choicePlan);
+  const offer = viewOffer(data, allowAdvantage);
+  const view = {
+    ...data,
+    ...formatted,
+    allowAdvantage: offer.advantage,
+    actions: promptActions(offer, formatted.labels),
+    rollModes: ROLL_MODES.map(([value, key, fallback]) => ({
+      value,
+      label: promptLabel(key, fallback),
+    })),
+    defaultRollMode,
+    choicePlan,
+  };
+  let answer = null;
+  try {
+    answer = await open(view);
+  } catch (error) {
+    console.error('Fabricate | Roll prompt failed:', error);
+  }
+  return translatePromptAnswer(answer, {
+    defaultRollMode,
+    choicePlan,
+    additionalDiceOffer: data.additionalDiceOffer ?? null,
+  });
+}
+
+/** A bulk row's need rolls under when it names a target or reads an under character value. */
+function rollsUnder(need) {
+  return need?.kind === 'target' || (need?.kind === 'noSingleTarget' && need.direction === 'under');
+}
+
 /**
- * Prompt the player to confirm an interactive check roll.
- *
- * @param {object} args
- * @param {string} [args.formula] The authored roll formula (with `@` placeholders).
- * @param {string|null} [args.resolvedFormula] The `@`-resolved formula for display
- *   (preferred over `formula` when present).
- * @param {number} [args.dc] The check DC; only shown when finite.
- * @param {string} [args.name] The subject name (recipe/component/task), shown as
- *   the header title (icon-first); the frame title is "<Activity> check".
- * @param {string} [args.activity] Activity label ("Crafting"/"Salvage"/"Gathering").
- * @param {string} [args.img] Optional subject icon shown in the header.
- * @param {boolean} [args.allowAdvantage] When true, offer Advantage/Normal/
- *   Disadvantage buttons (the formula has a plain `1d20`); else a single Roll.
- * @param {{modifiers: Array<{id:string,label:string,icon:string,value:number}>,
- *   maxPicks: number, defaultSelectedIds: string[], defaultSelectedId: string}}
- *   [args.modifierChoice] The interactive `playerPicks` descriptor (issues 770, 1055).
- *   When present, a "Check modifier" fieldset is rendered (icon + label + value chip per
- *   option, `defaultSelectedIds` pre-checked) and `readChoice` returns the selection as
- *   `chosenModifierIds`. The control follows `maxPicks`: a pick-one radio group at 1, a
- *   capped checkbox group above it. Absent → no fieldset renders (byte-identical dialog).
- * @returns {Promise<{confirmed: true, bonus: string|null, rollMode: string|undefined,
- *   advantage: 'advantage'|'normal'|'disadvantage', chosenModifierIds?: string[],
- *   chosenModifierId?: string} | {confirmed: false}>}
- *   `{ confirmed: true, … }` when the player rolls; `{ confirmed: false }` on
- *   Cancel (window close / Escape) or dismissal. `chosenModifierIds` is the selection;
- *   `chosenModifierId` is its first entry, kept so a single-pick consumer's contract is
- *   unchanged — it mirrors the descriptor's own `defaultSelectedId`/`defaultSelectedIds`
- *   pairing and is meaningful only at a cap of 1.
+ * A count check's view: the pool and threshold its picks and bonus settle onto, the threshold's
+ * anchor and source, the faces it explodes and cancels on, the required count, and the rolled
+ * Tool formulas still to settle.
  */
-export async function promptCheckRoll({
+function countPromptView({
+  pool,
+  die,
+  threshold,
+  thresholdAnchor,
+  thresholdSource,
+  explode,
+  cancel,
+  zeroPoolFails,
+  required,
+  modifierDestination,
+  pendingTools,
+}) {
+  const finite = (value) => (Number.isFinite(value) ? value : null);
+  const rolled = Array.isArray(pendingTools)
+    ? pendingTools.filter((formula) => typeof formula === 'string' && formula.trim())
+    : [];
+  return {
+    pool: finite(pool),
+    die: finite(die),
+    threshold: finite(threshold),
+    thresholdAnchor: finite(thresholdAnchor),
+    thresholdSource: ['fixed', 'character'].includes(thresholdSource) ? thresholdSource : null,
+    explode: faceRule(explode, 'best'),
+    cancel: faceRule(cancel, 'worst'),
+    zeroPoolFails: zeroPoolFails !== false,
+    required: Number.isInteger(required) ? required : null,
+    destination: modifierDestination === 'threshold' ? 'threshold' : 'pool',
+    ...(rolled.length > 0 && { pendingTools: rolled }),
+  };
+}
+
+/** `{ kind, face }` (plus `once` to explode) for a face the dice can show, else null. */
+function faceRule(rule, extreme) {
+  if (!rule || typeof rule !== 'object' || !Number.isInteger(rule.face) || rule.face < 1) {
+    return null;
+  }
+  const kind = rule.kind === 'from' ? 'from' : extreme;
+  return extreme === 'best'
+    ? { kind, face: rule.face, once: rule.once === true }
+    : { kind, face: rule.face };
+}
+
+/**
+ * `displayFormula` is the producer's base without the itemised modifier terms, shown as chips.
+ * `target` (else `dc`) is the pre-modifier number; `direction: 'under'` names it a target, which
+ * `targetBasis` and `toolBonus` explain (see `rollPromptTarget`). A `product: 'count'` check shows
+ * its pool line and required count instead of any formula or DC.
+ */
+export function buildSinglePromptData({
   formula,
   resolvedFormula,
+  displayFormula,
   dc,
+  target,
+  direction,
   name,
+  actorName,
   activity,
   img,
-  allowAdvantage,
-  modifierChoice,
+  selectedModifiers,
+  thresholdMode,
+  comparison,
+  targetBasis = null,
+  toolBonus = 0,
+  product,
+  pool,
+  die,
+  threshold,
+  thresholdAnchor,
+  thresholdSource,
+  explode,
+  cancel,
+  zeroPoolFails,
+  required,
+  modifierDestination,
+  pendingTools,
+  offerSituationalBonus,
+  targetSource,
 } = {}) {
-  const DialogV2 = globalThis.foundry?.applications?.api?.DialogV2;
-  const {
-    options: modifierOptions,
-    maxPicks,
-    defaultSelectedIds,
-  } = planModifierChoice(modifierChoice);
-  // Headless / no dialog API (tests): do not block the roll. When a `playerPicks`
-  // choice was offered, confirm with the pre-selected default so the deferred modifier
-  // term still resolves to the value an optimally-playing player would have picked.
-  if (!DialogV2?.wait) {
-    return modifierChoice
-      ? {
-          confirmed: true,
-          chosenModifierIds: defaultSelectedIds,
-          ...(defaultSelectedIds.length > 0 && { chosenModifierId: defaultSelectedIds[0] }),
-        }
-      : { confirmed: true };
-  }
-
-  const defaultRollMode = readDefaultRollMode();
-  const displayFormula = resolvedFormula || formula || '';
-  const activityLabel = activity || 'Roll';
-
-  // Header: the subject icon FIRST, then the subject name as the title. The
-  // activity ("<Activity> check") is the dialog window (frame) title, so it is
-  // not repeated in the body. Falls back to the activity title when unnamed.
-  const iconHtml = img
-    ? `<img class="fabricate-roll-prompt__icon" src="${escapeHtml(img)}" alt="" />`
-    : '';
-  const titleText = name ? escapeHtml(name) : `${escapeHtml(activityLabel)} check`;
-  const headerHtml =
-    `<div class="fabricate-roll-prompt__header">${iconHtml}` +
-    `<div class="fab-stack" data-gap="2xs">` +
-    `<h2 class="fabricate-roll-prompt__title">${titleText}</h2>` +
-    `</div></div>`;
-
-  const dieHtml = renderDieRow(allowAdvantage);
-
-  // The DC chip sits with the formula (right side) rather than floating alone.
-  const dcChip = Number.isFinite(dc)
-    ? `<span class="fabricate-roll-prompt__dc">DC ${escapeHtml(String(dc))}</span>`
-    : '';
-  let formulaHtml = '';
-  if (displayFormula) {
-    formulaHtml =
-      `<div class="fabricate-roll-prompt__formula"><code>${escapeHtml(displayFormula)}</code>` +
-      `<div class="fabricate-roll-prompt__formula-meta">${dcChip}` +
-      `<span class="fabricate-roll-prompt__formula-label">Formula</span></div></div>`;
-  } else if (dcChip) {
-    formulaHtml = `<div class="fabricate-roll-prompt__formula fabricate-roll-prompt__formula--dc-only">${dcChip}</div>`;
-  }
-
-  // Interactive `playerPicks` (issues 770, 1055): a fieldset of the eligible modifiers
-  // (icon + label + signed value chip), opened on the best legal pre-selection. Only
-  // rendered when a `modifierChoice` descriptor is supplied — every other roll leaves
-  // this empty, so the dialog is byte-identical. The formula line ends in a NEUTRAL
-  // trailing `+ (modifier)[Modifiers]` term (appended by `evaluateCheckRoll`), not a
-  // default number a non-default pick would contradict; the per-option chips carry each
-  // option's value and the posted roll reflects the SUM of the player's final selection.
-  const modifierChoiceHtml = renderModifierFieldset({
-    options: modifierOptions,
-    maxPicks,
-    defaultSelectedIds,
+  const offer = offerSituationalBonus !== false;
+  const title = fill(promptLabel('CheckTitle', '{activity} check'), {
+    activity: activity || promptLabel('roll', 'Roll'),
   });
-
-  const bonusHtml = renderBonusInput();
-  const configHtml = renderRollModePicker(defaultRollMode);
-
-  // Die glyph on its own row ABOVE the icon + name row, then the formula/DC,
-  // situational bonus, and configuration.
-  const content =
-    `<div class="fabricate-roll-prompt">` +
-    `${dieHtml}${headerHtml}${formulaHtml}${modifierChoiceHtml}${bonusHtml}${configHtml}</div>`;
-
-  // The shared reader owns bonus/roll-mode/advantage; this path adds the one field
-  // that is unique to it.
-  const readChoice = (button, advantage) => {
-    const choice = readSharedRollChoice(button, defaultRollMode, advantage);
-    // Interactive `playerPicks`: the checked controls' values are the chosen modifier
-    // ids; fall back to the pre-selection when no answer is readable (headless). Only
-    // added when a modifier choice was offered, so the non-`playerPicks` choice object
-    // is byte-identical. The cap is re-applied here as well as in the live control
-    // binding, so a submit that bypassed the binding cannot over-report.
-    if (modifierOptions.length > 0) {
-      const selected = readSelectedModifierIds(button?.form?.elements?.craftingModifier);
-      const ids = (selected ?? defaultSelectedIds).slice(0, maxPicks);
-      choice.chosenModifierIds = ids;
-      // The legacy singular field, mirroring the descriptor's own
-      // `defaultSelectedId = defaultSelectedIds[0]`. Omitted for an empty selection so
-      // it is never present-but-undefined.
-      if (ids.length > 0) choice.chosenModifierId = ids[0];
-    }
-    return choice;
-  };
-
-  const buttons = buildRollButtons(allowAdvantage, readChoice);
-
-  const result = await DialogV2.wait({
-    window: { title: `${activityLabel} check` },
-    classes: ['fabricate', 'fabricate-dialog', 'fabricate-roll-prompt-dialog'],
-    content,
-    rejectClose: false,
-    buttons,
-    // Attached only for a multi-pick fieldset, so every other dialog's config stays
-    // byte-identical and no `render` hook runs where there is nothing to bound.
-    ...(modifierOptions.length > 0 &&
-      maxPicks > 1 && {
-        render: (_event, dialog) => bindModifierPickCap(dialog, maxPicks),
+  const value = Number.isFinite(target) ? target : dc;
+  const subtitle =
+    actorName && name
+      ? fill(promptLabel('ActorSubject', '{actor} · {subject}'), {
+          actor: actorName,
+          subject: name,
+        })
+      : actorName || name || '';
+  if (product === 'count') {
+    return {
+      kind: 'single',
+      title,
+      subtitle,
+      img: img || '',
+      formula: '',
+      dc: null,
+      direction: direction === 'under' ? 'under' : 'over',
+      comparison: (comparison ?? thresholdMode) === 'exceed' ? 'exceed' : 'meet',
+      selectedModifiers: Array.isArray(selectedModifiers) ? selectedModifiers : [],
+      offerSituationalBonus: offer,
+      count: countPromptView({
+        pool,
+        die,
+        threshold,
+        thresholdAnchor,
+        thresholdSource,
+        explode,
+        cancel,
+        zeroPoolFails,
+        required,
+        modifierDestination,
+        pendingTools,
       }),
-  }).catch(() => ({ confirmed: false }));
-
-  // A dismissed dialog (rejectClose:false) resolves to null → treat as cancel.
-  if (!result || result.confirmed !== true) return { confirmed: false };
-  return result;
-}
-
-/**
- * How many subject thumbnails the strip shows before it collapses the rest into a
- * "+K more" chip. Eight is what fits one row at the dialog's shipped width without
- * wrapping; the cap exists so a 25-item batch does not push the bonus input and the
- * roll-mode picker below the fold, where the player would answer a prompt they cannot
- * see the controls for.
- */
-const BULK_SUBJECT_STRIP_LIMIT = 8;
-
-/**
- * The thumbnail a subject with no authored image falls back to.
- *
- * Spelled locally rather than imported, matching `BulkSalvageChatCard.js`: this module
- * is a string builder handed to `DialogV2` and deliberately imports nothing, so it does
- * not drag a UI utility graph into every consumer that only wanted a roll prompt.
- */
-const BULK_SUBJECT_FALLBACK_IMG = 'icons/svg/item-bag.svg';
-
-/**
- * Prompt the player ONCE for a whole batch of checks (issue 859).
- *
- * ## What it deliberately does NOT show
- *
- * **No formula and no DC.** A batch has no single subject: each item rolls its OWN
- * system's formula against its own DC / tiers / stages, and nothing about a bulk answer
- * is shared across those rolls except the three fields below. Rendering one item's
- * formula would be a claim about the other twenty-four, and rendering all of them would
- * be a wall of text the player cannot act on. The subject strip is what tells them what
- * they are about to roll for.
- *
- * ## What the answer applies to
- *
- * The situational bonus, the roll mode AND the advantage disposition apply to EVERY
- * roll in the batch — an accepted consequence of the one-prompt design, so the note in
- * the body says it in words rather than leaving the player to infer it from a `+2` that
- * lands twenty-five times.
- *
- * `allowAdvantage` is computed by the caller (`BulkSalvageService`) over the AUTHORED
- * formulas, all-or-nothing: offering Advantage that only some rolls could honour would
- * be a lie about half the batch.
- *
- * @param {object} args
- * @param {boolean} [args.allowAdvantage] When true, offer Advantage / Normal /
- *   Disadvantage; else a single Roll.
- * @param {number} [args.count] How many items the batch will roll for. Defaults to the
- *   number of subjects, so a caller that passes only `subjects` still reads correctly.
- * @param {Array<{name?: string, img?: string}>} [args.subjects] The batch's subjects, in
- *   the order the player queued them.
- * @returns {Promise<{confirmed: true, bonus: string|null, rollMode: string|undefined,
- *   advantage: 'advantage'|'normal'|'disadvantage'} | {confirmed: false}>}
- *   `{ confirmed: false }` on dismissal, matching {@link promptCheckRoll}, because
- *   `DialogV2.wait` with the default `rejectClose = false` resolves `result ?? null` on
- *   BOTH Escape and the window X — neither rejects, so a `catch` alone cannot see them.
- */
-export async function promptBulkCheckRoll({ allowAdvantage, count, subjects } = {}) {
-  const DialogV2 = globalThis.foundry?.applications?.api?.DialogV2;
-  // Headless / no dialog API (tests): do not block the run. `advantage: 'normal'` is
-  // supplied so a headless caller threads the same shape a confirmed click produces.
-  if (!DialogV2?.wait) {
-    return { confirmed: true, bonus: null, rollMode: undefined, advantage: 'normal' };
+    };
   }
-
-  const defaultRollMode = readDefaultRollMode();
-  const rows = Array.isArray(subjects) ? subjects : [];
-  const total = Number.isFinite(count) ? count : rows.length;
-
-  // The frame title carries no count — the body heading does, and repeating it in the
-  // window chrome buys nothing on a dialog this small.
-  const title = localize('FABRICATE.App.RollPrompt.BulkTitle', 'Bulk check');
-  const heading = escapeHtml(
-    localize('FABRICATE.App.RollPrompt.BulkHeading', 'One roll setting for {count} items').replace(
-      '{count}',
-      String(total)
-    )
-  );
-  const headerHtml =
-    `<div class="fabricate-roll-prompt__header">` +
-    `<div class="fab-stack" data-gap="2xs">` +
-    `<h2 class="fabricate-roll-prompt__title">${heading}</h2>` +
-    `</div></div>`;
-
-  // The strip, then the overflow chip. Both branches are single expressions on purpose:
-  // a combined `shown.length < rows.length ? … : ''` nested inside the thumb map would
-  // be the nested ternary SonarCloud flags in this file, which ESLint does not reach.
-  const shown = rows.slice(0, BULK_SUBJECT_STRIP_LIMIT);
-  const hidden = rows.length - shown.length;
-  const thumbsHtml = shown
-    .map((subject) => {
-      const src = escapeHtml(subject?.img || BULK_SUBJECT_FALLBACK_IMG);
-      // The name is the thumbnail's ALT text rather than a caption: eight captions do
-      // not fit the row, but a screen-reader user still needs to know what is queued.
-      return `<img class="fabricate-roll-prompt__subject" src="${src}" alt="${escapeHtml(subject?.name || '')}" />`;
-    })
-    .join('');
-  const moreLabel = escapeHtml(
-    localize('FABRICATE.App.RollPrompt.BulkMore', '+{count} more').replace(
-      '{count}',
-      String(hidden)
-    )
-  );
-  const moreHtml =
-    hidden > 0 ? `<span class="fabricate-roll-prompt__subjects-more">${moreLabel}</span>` : '';
-  const subjectsHtml =
-    rows.length > 0
-      ? `<div class="fabricate-roll-prompt__subjects">${thumbsHtml}${moreHtml}</div>`
-      : '';
-
-  const noteHtml =
-    `<p class="fabricate-roll-prompt__bulk-note">` +
-    `${escapeHtml(
-      localize(
-        'FABRICATE.App.RollPrompt.BulkNote',
-        'The situational bonus, roll mode and advantage apply to every roll in this batch.'
-      )
-    )}</p>`;
-
-  const content =
-    `<div class="fabricate-roll-prompt">` +
-    `${renderDieRow(allowAdvantage)}${headerHtml}${subjectsHtml}` +
-    `${renderBonusInput()}${renderRollModePicker(defaultRollMode)}${noteHtml}</div>`;
-
-  const buttons = buildRollButtons(allowAdvantage, (button, advantage) =>
-    readSharedRollChoice(button, defaultRollMode, advantage)
-  );
-
-  const result = await DialogV2.wait({
-    window: { title },
-    classes: ['fabricate', 'fabricate-dialog', 'fabricate-roll-prompt-dialog'],
-    content,
-    rejectClose: false,
-    buttons,
-  }).catch(() => ({ confirmed: false }));
-
-  if (!result || result.confirmed !== true) return { confirmed: false };
-  return result;
+  const under = direction === 'under' && Number.isFinite(value);
+  return {
+    kind: 'single',
+    title,
+    subtitle,
+    img: img || '',
+    formula: displayFormula || resolvedFormula || formula || '',
+    dc: Number.isFinite(value) ? value : null,
+    direction: under ? 'under' : 'over',
+    ...(under && { targetBasis, toolBonus, actorName: actorName || '' }),
+    // A character value is a target to name in either direction, never a DC (issue 2005).
+    ...(targetSource === 'attribute' && Number.isFinite(value) && { targetSource }),
+    comparison:
+      comparison === undefined ? (thresholdMode === 'exceed' ? 'exceed' : 'meet') : comparison,
+    selectedModifiers: Array.isArray(selectedModifiers) ? selectedModifiers : [],
+    offerSituationalBonus: offer,
+  };
 }
 
 /**
- * Build the interactive `rollOptions` bag threaded into a `runFormula*` check so a
- * UI-triggered crafting / salvage / gathering roll prompts the player (confirm +
- * optional situational modifier) and posts the evaluated roll to chat (Dice So
- * Nice). With `interactive` false — the default for automated/headless callers —
- * the returned bag carries a false `interactive` flag and `evaluateCheckRoll`
- * skips both the prompt and the chat post, preserving the original silent
- * behaviour. Shared by `CraftingEngine` and `GatheringEngine` (kept in one place
- * to avoid a duplicated builder).
- *
- * @param {object} args
- * @param {boolean} args.interactive
- * @param {object|null} args.actor The rolling actor (for the chat speaker).
- * @param {string} [args.name] The recipe/component/task name (chat flavor + dialog subtitle).
- * @param {string} args.activity Human-readable activity label ("Crafting" / "Salvage" / "Gathering").
- * @param {number} [args.dc] The DC surfaced to the prompt + flavor when finite.
- * @param {string} [args.img] The subject icon shown in the dialog header.
- * @param {{modifiers: Array, maxPicks: number, defaultSelectedIds: string[],
- *   defaultSelectedId: string}} [args.modifierChoice] The deferred interactive
- *   `playerPicks` descriptor (issues 770, 1055); forwarded to `evaluateCheckRoll` → the
- *   prompt. Omitted from the bag when absent, so every non-`playerPicks` path builds a
- *   byte-identical rollOptions object.
- * @returns {object} rollOptions for `evaluateCheckRoll`.
+ * The bulk heading names the activity and the one actor when the caller knows them. The bonus
+ * field is hidden only when every row with a check has its offer off; a row without one says nothing.
  */
-export function buildInteractiveRollOptions({
-  interactive,
-  actor,
-  name,
+export function buildBulkPromptData({ count, subjects, activity, actorName } = {}) {
+  const rows = Array.isArray(subjects) ? subjects : [];
+  const checked = rows.filter((row) => row?.need && row.need.kind !== 'noCheck');
+  const items = fill(promptLabel('BulkHeading', '{count} items'), {
+    count: Number.isFinite(count) ? count : rows.length,
+  });
+  const destinations = new Set(rows.map((row) => row?.need?.destination));
+  return {
+    kind: 'bulk',
+    // Every row rolling under (a fixed target or a character value) gets the roll-under bonus
+    // help; any other row (or an empty batch) keeps the roll-over copy.
+    direction: rows.length > 0 && rows.every((row) => rollsUnder(row?.need)) ? 'under' : 'over',
+    // Likewise every row a count check with one modifier destination gets that count's help.
+    countDestination:
+      destinations.size === 1 && rows.every((row) => row?.need?.kind === 'successes')
+        ? ([...destinations].find((entry) => entry === 'pool' || entry === 'threshold') ?? null)
+        : null,
+    title: activity
+      ? fill(promptLabel('CheckTitlePlural', '{activity} checks'), { activity })
+      : promptLabel('BulkTitle', 'Bulk check'),
+    subtitle: actorName
+      ? fill(promptLabel('ActorSubject', '{actor} · {subject}'), {
+          actor: actorName,
+          subject: items,
+        })
+      : items,
+    subjects: rows,
+    offerSituationalBonus:
+      checked.length === 0 || checked.some((row) => row.offerSituationalBonus !== false),
+  };
+}
+
+/** The prompt data with the check's advantage offer, when its producer supplied one. */
+function withAdvantageOffer(data, offer) {
+  return offer ? { ...data, advantageOffer: publicAdvantageOffer(offer) } : data;
+}
+
+/** A count prompt's allowlisted additional-dice offer and the actor it names (issue 2008). */
+function withAdditionalDiceOffer(data, offer, actorName) {
+  const publicOffer = data.count ? publicAdditionalDiceOffer(offer) : null;
+  return publicOffer
+    ? { ...data, additionalDiceOffer: publicOffer, actorName: actorName || '' }
+    : data;
+}
+
+export async function promptCheckRoll(options = {}) {
+  const { modifierChoice, allowAdvantage, advantageOffer, additionalDiceOffer } = options;
+  const plan = planModifierChoice(modifierChoice);
+  const open = resolveSurface();
+  if (!open) {
+    return {
+      confirmed: true,
+      ...(modifierChoice && { chosenModifierIds: plan.defaultSelectedIds }),
+      ...(modifierChoice &&
+        plan.defaultSelectedIds.length > 0 && { chosenModifierId: plan.defaultSelectedIds[0] }),
+      ...(additionalDiceOffer && { additionalDice: 0 }),
+    };
+  }
+  const data = withAdditionalDiceOffer(
+    withAdvantageOffer(buildSinglePromptData(options), advantageOffer),
+    additionalDiceOffer,
+    options.actorName
+  );
+  // An already-localized sentence its caller wants stated above the check, such as why it reopened.
+  if (options.notice) data.notice = String(options.notice);
+  return waitForPrompt(data, allowAdvantage, plan, open);
+}
+
+/** A batch row's pool and reach facts, numbers and enums only; null for a row with none. */
+function bulkRowDice(row) {
+  const { countDice, reach } = row?.additionalDice ?? {};
+  const finite = (value) => (Number.isFinite(value) ? value : null);
+  return {
+    countDice: countDice && {
+      base: finite(countDice.base),
+      poolDelta: finite(countDice.poolDelta) ?? 0,
+      zeroPoolFails: countDice.zeroPoolFails !== false,
+      destination: countDice.destination === 'threshold' ? 'threshold' : 'pool',
+    },
+    reach: publicAdditionalDiceOffer({ reach })?.reach ?? null,
+  };
+}
+
+/**
+ * A batch's additional-dice offer (issue 2008), the rolls one choice covers and the one actor it
+ * names, each covered row keeping its own pool and reach; else the note that rows differ.
+ */
+function withBulkAdditionalDice(data, { additionalDiceOffer, additionalDiceMixed, actorName }) {
+  const offer = publicAdditionalDiceOffer(additionalDiceOffer);
+  if (!offer) return additionalDiceMixed === true ? { ...data, additionalDiceMixed: true } : data;
+  const subjects = data.subjects.map((row) =>
+    row?.additionalDice ? { ...row, additionalDice: bulkRowDice(row) } : row
+  );
+  return {
+    ...data,
+    subjects,
+    additionalDiceOffer: offer,
+    additionalDiceRolls: subjects.filter((row) => row?.additionalDice).length,
+    actorName: actorName || '',
+  };
+}
+
+export async function promptBulkCheckRoll({
+  allowAdvantage,
+  advantageOffer,
+  count,
+  subjects,
   activity,
-  dc,
-  img,
-  modifierChoice,
-}) {
-  const dcLabel = Number.isFinite(dc) ? ` (DC ${dc})` : '';
-  const flavor = `${name ? `${name} — ` : ''}${activity} check${dcLabel}`;
+  actorName,
+  additionalDiceOffer,
+  additionalDiceMixed,
+} = {}) {
+  const open = resolveSurface();
+  if (!open) {
+    return {
+      confirmed: true,
+      bonus: null,
+      rollMode: undefined,
+      advantage: 'normal',
+      ...(additionalDiceOffer && { additionalDice: 0 }),
+    };
+  }
+  return waitForPrompt(
+    withBulkAdditionalDice(
+      withAdvantageOffer(
+        buildBulkPromptData({ count, subjects, activity, actorName }),
+        advantageOffer
+      ),
+      { additionalDiceOffer, additionalDiceMixed, actorName }
+    ),
+    allowAdvantage,
+    planModifierChoice(null),
+    open
+  );
+}
+
+/**
+ * The chat flavor's ` (DC n)` suffix, which names only a summed roll-over fixed DC. Any other
+ * target is named once its benefits settle, by the pass/fail runner (`flavorTarget`).
+ */
+export function checkFlavorSuffix(dc, evaluation) {
+  return Number.isFinite(dc) && isFixedSumOver(evaluation) ? ` (DC ${dc})` : '';
+}
+
+export function buildInteractiveRollOptions(
+  { interactive, actor, name, activity, dc, img, modifierChoice, targetBasis, ...input },
+  prompt = promptCheckRoll
+) {
+  const dcLabel = checkFlavorSuffix(dc, input.evaluation);
   const rollOptions = {
     interactive: interactive === true,
-    prompt: promptCheckRoll,
-    // Shared with the dialog since issue 859 — see `readDefaultRollMode` for why this
-    // read now normalizes an absent setting to `''` rather than leaving it `undefined`.
-    rollMode: readDefaultRollMode(),
-    flavor,
+    prompt: (rollOptions) => prompt({ ...rollOptions, actorName: actor?.name }),
+    rollMode: supportedRollMode(globalThis.game?.settings?.get?.('core', 'rollMode')),
+    flavor: `${name ? `${name} — ` : ''}${activity} check${dcLabel}`,
     speaker: globalThis.ChatMessage?.getSpeaker?.({ actor }),
     dc,
     name,
     activity,
     img,
   };
-  // Only attach the choice when a `playerPicks` descriptor exists, so a non-playerPicks
-  // craft's rollOptions bag stays byte-identical (no stray `modifierChoice` key).
   if (modifierChoice) rollOptions.modifierChoice = modifierChoice;
+  if (targetBasis) rollOptions.targetBasis = targetBasis;
   return rollOptions;
-}
-
-/**
- * Format a modifier value as a signed chip label (`+3`, `+0`, `-2`) — zero renders as
- * `+0`, matching the sign every other non-negative value carries. A missing or
- * non-finite value renders as an unsigned `0`; this is the ONLY fallback for that case
- * (the caller always renders a chip, so the row's icon/label/chip columns stay aligned).
- * @param {unknown} value
- * @returns {string}
- */
-function formatSigned(value) {
-  const num = Number(value);
-  if (!Number.isFinite(num)) return '0';
-  return num >= 0 ? `+${num}` : String(num);
-}
-
-/**
- * Minimal HTML escaper for interpolated user/authored content (recipe names,
- * formulas). Mirrors the helper in `src/canvas/environmentDialog.js`.
- * @param {unknown} value
- * @returns {string}
- */
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;');
 }

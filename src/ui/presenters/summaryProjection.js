@@ -408,6 +408,7 @@ function redactionOf(audience, access) {
  *   reached its cap, as already established by the knowledge access evaluation. NOT
  *   recomputed here — recipe-visibility/spec.md forbids a second candidate collection.
  *   Ignored for the GM audience, which bypasses the knowledge gate.
+ * @param {boolean} [input.checkRefused] Whether the recipe's check refuses the acting character.
  * @param {boolean} [input.favourite] Whether this viewer has favourited the recipe, from
  *   the player's stored favourites. Ignored for the GM audience.
  * @param {Function|null} [input.localize] `(key) => string`, for `categoryLabel` alone —
@@ -423,6 +424,7 @@ export function projectRecipeSummary({
   access = null,
   snapshot = null,
   exhausted = false,
+  checkRefused = false,
   favourite = false,
   localize = null,
 } = {}) {
@@ -451,6 +453,7 @@ export function projectRecipeSummary({
       // have exactly one. The builder's suite pins the outcome as "a GM never sees an
       // exhausted status".
       exhausted: !isGM && exhausted === true,
+      checkRefused: checkRefused === true,
     }),
     category: normalizeRecipeCategory(recipe?.category),
     // The display facet of `category`, through the SAME helper the shipped listing model

@@ -2,7 +2,6 @@
 
 import { resolve } from 'node:path';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, it } from 'node:test';
 
 import { getMatchHandler } from '../src/models/match/matchTypes.js';
@@ -11,7 +10,10 @@ import {
   describeWorldIdentityDrift,
 } from '../src/systems/worldScopeEntityNotice.js';
 import { reportWorldIdentityDrift } from '../src/systems/worldIdentityDrift.js';
-import { entryModuleSource } from './helpers/bootstrapEntrySource.js';
+import { MIGRATION_NOTICE_DETAIL_CONSOLE_MESSAGE } from '../src/migration/migrationNoticeDetail.js';
+import { ASSISTANT_GM, asLabUser, recordNoticeOutput } from './helpers/bootContractProbes.js';
+import { withFabricateLifecycleReplay } from './helpers/extension-composition-harness.js';
+import { defineStructureContract } from './helpers/structureContract.js';
 
 import {
   resolvedComponentsFor,
@@ -27,8 +29,6 @@ import {
 
 installFoundryStubs();
 
-/** `src/main.js` statically imports CSS and cannot load under `node --test`. */
-const MAIN_SOURCE = entryModuleSource('src/bootstrap/composeServices.js');
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 
 const SYSTEM_ID = 'sys-a';
@@ -330,28 +330,23 @@ describe('the seam resolves its world half through the global store probe', () =
 
 // Criterion 5 — the basis, the duplicate id, and the row that must NOT come back
 
-describe('a repointed reader never narrows a Valid Id Basis', () => {
-  const MANAGER_SOURCE = new URL('../src/systems/CraftingSystemManager.js', import.meta.url);
+/** Every union read a consumer could be repointed through. */
+const UNION_SEAMS = [
+  'resolveScopedComponents',
+  'resolvedComponentsFor',
+  'resolvedEssencesFor',
+  'resolvedToolsFor',
+  'getComponentsForSystem',
+  'resolveScopedEntityRead',
+];
 
-  it('leaves _scopeBasis reading the RAW arrays', () => {
-    const source = readFileSync(MANAGER_SOURCE, 'utf8');
-    const start = source.indexOf('  _scopeBasis(system) {');
-    assert.notEqual(start, -1, 'src/systems/CraftingSystemManager.js still declares _scopeBasis');
-    const body = source.slice(start, source.indexOf('\n  }', start));
-    assert.ok(body.includes('system?.components'), 'non-vacuity: the slice IS the basis derivation');
-    for (const seam of [
-      'resolveScopedComponents',
-      'resolvedComponentsFor',
-      'getComponentsForSystem',
-      'resolveScopedEntityRead',
-    ]) {
-      assert.equal(
-        body.includes(seam),
-        false,
-        `wiring ${seam} into the basis makes an UNKNOWN half prunable, which deletes real data`
-      );
-    }
-  });
+describe('a repointed reader never narrows a Valid Id Basis', () => {
+  // Wiring a union seam into the basis makes an UNKNOWN half prunable, which deletes real data.
+  defineStructureContract(
+    '_scopeBasis reads the RAW arrays',
+    { file: 'src/systems/CraftingSystemManager.js', member: '_scopeBasis' },
+    { reads: ['system.components'], callsNo: UNION_SEAMS }
+  );
 
   it('still answers a world id the in-system array does not carry', () => {
     const manager = componentManager({ id: 'w-only', name: 'World Only' });
@@ -631,32 +626,46 @@ describe('the world identity drift report', () => {
     assert.equal(describeWorldIdentityDrift([]), '', 'and nothing to say when there is no drift');
   });
 
-  it('LOGS that list in src/main.js at `info`, and raises NO toast for it', () => {
-    // The drift report is CONSOLE ONLY (maintainer, 2026-09-06): the toast this used to raise
-    // repeated the whole drifted list in the notification bar and read as an alarm for a state its
-    // own copy called harmless.
-    const dump = MAIN_SOURCE.indexOf('describeWorldIdentityDrift(worldIdentityDrift)');
-    assert.notEqual(dump, -1, 'src/main.js must compose the uncapped list');
-    const after = MAIN_SOURCE.slice(dump, dump + 600);
-    // THE LEVEL IS PART OF THE PROMISE: `console.debug` maps to DevTools' VERBOSE level, which
-    // Chromium's default filter excludes, so a GM who presses F12 would not see the dump at all
-    // (issue 1737).
-    assert.match(
-      after,
-      /logMigrationNoticeDetail\('world identity drift', driftDetail\)/,
-      'the dump must go through the info-level detail helper'
-    );
-    assert.doesNotMatch(after, /console\.(debug|info)\(/, 'no bare console statement');
-    assert.equal(
-      MAIN_SOURCE.includes('ui.notifications?.info?.(driftNotice)'),
-      false,
-      'the drift report must not reach the notification bar'
-    );
-    assert.equal(
-      MAIN_SOURCE.includes('buildWorldIdentityDriftNotice('),
-      false,
-      'src/main.js composes no drift toast at all'
-    );
+  it('is LOGGED at info through the detail helper by the active GM alone, and never toasted', { timeout: 300000 }, async () => {
+    // The drift report is CONSOLE ONLY (maintainer, 2026-09-06): the toast it used to raise read as
+    // an alarm for a state its own copy called harmless. `console.debug` is DevTools' VERBOSE
+    // level, which Chromium hides by default (issue 1737). A drifted world is booted three times.
+    await withFabricateLifecycleReplay(async ({ ready, loadModule }) => {
+      const { default: facade } = await loadModule('/src/main.js');
+      // Drift is not a migration event: the audit must run on a boot whose migration pass did not.
+      facade._runMigrations = async () => {};
+      const settings = globalThis.game.settings;
+      const system = settings.get('fabricate', 'craftingSystems').find((entry) => entry.components?.length);
+      const [component] = system.components;
+      await settings.set('fabricate', 'componentScope', {
+        entities: [{ ...component, name: `${component.name} (world)` }],
+        defaults: {},
+        membership: {
+          [`${component.id}|${system.id}`]: {
+            entityId: component.id,
+            systemId: system.id,
+            inherit: {},
+          },
+        },
+      });
+      const boot = async (user) => {
+        const { logged, posted } = await recordNoticeOutput(() => asLabUser(user, ready));
+        return {
+          drift: logged.filter(([, , detail]) => String(detail).startsWith('world identity drift')),
+          toasted: posted.filter(([, message]) => String(message).includes(component.id)),
+        };
+      };
+
+      const audited = await boot(globalThis.game.user);
+      assert.equal(audited.drift.length, 1, 'the active GM logs the report once');
+      const [[level, message, detail]] = audited.drift;
+      assert.deepEqual([level, message], ['info', MIGRATION_NOTICE_DETAIL_CONSOLE_MESSAGE]);
+      assert.ok(detail.includes(component.id), 'naming the drifted record');
+      assert.deepEqual(audited.toasted, [], 'and nothing reaches the notification bar');
+      for (const user of [ASSISTANT_GM, globalThis.game.users.get('user-lab-player')]) {
+        assert.deepEqual((await boot(user)).drift, [], `${user.id} does not run the audit`);
+      }
+    });
   });
 
   it('says nothing at all when there is no drift', () => {
@@ -691,7 +700,7 @@ describe('the world identity drift report', () => {
   });
 });
 
-// Criterion 10 — the deliberate exclusions, asserted by SOURCE CONTRACT
+// Criterion 10 — the deliberate exclusions, asserted by STRUCTURE CONTRACT
 
 /**
  * The five reads PR 8a deliberately did NOT repoint, each pinned so a later lane "finishing the
@@ -699,67 +708,51 @@ describe('the world identity drift report', () => {
  * BE PINNED ANYWHERE ELSE.
  */
 describe('the deliberate exclusions are unchanged', () => {
-  const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
-  const SEAM_NAMES = [
-    'resolvedComponentsFor',
-    'resolvedEssencesFor',
-    'resolvedToolsFor',
-    'resolveScopedEntityRead',
-  ];
+  defineStructureContract(
+    'getItems still answers the PERSISTED record, because it is the authoring accessor',
+    { file: 'src/systems/CraftingSystemManager.js', member: 'getItems' },
+    { reads: ['system.components'], callsNo: UNION_SEAMS }
+  );
 
-  /** The lines of `source` between `open` and the next line that closes at `closeIndent`. */
-  function bodyAfter(source, open, closeIndent = '  ') {
-    const start = source.indexOf(open);
-    assert.notEqual(start, -1, `the anchor \`${open}\` is gone`);
-    const end = source.indexOf(`\n${closeIndent}}`, start);
-    assert.notEqual(end, -1, `the anchor \`${open}\` has no closing brace`);
-    return source.slice(start, end);
-  }
+  defineStructureContract(
+    'the pre-persist alchemy injector still validates the PROPOSED record',
+    { file: 'src/systems/CraftingSystemManager.js', member: '_assertNoAlchemySignatureCollisions' },
+    { reads: ['system.components'], callsNo: UNION_SEAMS }
+  );
 
-  it('getItems still answers the PERSISTED record, because it is the authoring accessor', () => {
-    const body = bodyAfter(read('src/systems/CraftingSystemManager.js'), "  getItems(systemId, search = '') {");
-    assert.ok(body.includes('const managedItems = system.components || [];'));
-    for (const seam of SEAM_NAMES) assert.equal(body.includes(seam), false);
+  defineStructureContract(
+    'the durable-identity restamp still reads the in-system arrays',
+    'src/systems/SourceIdentityService.js',
+    {
+      property: [['bucket', 'components'], ['bucket', 'tools']],
+      reads: ['system.components', 'system.tools'],
+      namesNo: UNION_SEAMS,
+      spellsNo: ['scopedEntityReads'],
+    }
+  );
+
+  // Re-expressed as membership it must DENY on an unknown corpus - widening presence would let a
+  // station satisfy a tool gate the GM never granted - so it is 8b's change, not 8a's.
+  defineStructureContract(
+    'resolvePresentIds still decides presence by comparing SYSTEM IDS, reading no entity array',
+    { file: 'src/gatheringToolRuntime.js', fn: 'resolvePresentIds' },
+    { names: ['toolSystemId', 'scopeSystemId'], namesNo: ['tools', ...UNION_SEAMS] }
+  );
+  defineStructureContract('the gathering tool runtime imports no union read', 'src/gatheringToolRuntime.js', {
+    calls: ['resolvePresentIds'],
+    spellsNo: ['scopedEntityReads'],
   });
 
-  it('the durable-identity restamp still reads the in-system arrays', () => {
-    const source = read('src/systems/SourceIdentityService.js');
-    assert.ok(source.includes("bucket: 'components',"), 'non-vacuity: the restamp kinds exist');
-    assert.ok(source.includes('definitions: system.components || [],'));
-    assert.ok(source.includes('definitions: (system.tools || []).filter('));
-  });
-
-  it('the pre-persist alchemy injector still validates the PROPOSED record', () => {
-    const body = bodyAfter(
-      read('src/systems/CraftingSystemManager.js'),
-      '  _assertNoAlchemySignatureCollisions(system) {'
-    );
-    assert.ok(body.includes('const components = Array.isArray(system.components) ? system.components : [];'));
-    for (const seam of SEAM_NAMES) assert.equal(body.includes(seam), false);
-  });
-
-  it('resolvePresentIds still decides presence by comparing SYSTEM IDS', () => {
-    // Re-expressed as membership it must DENY on an unknown corpus - widening presence would let
-    // a station satisfy a tool gate the GM never granted - so it is 8b's change, not 8a's.
-    const source = read('src/gatheringToolRuntime.js');
-    const body = bodyAfter(source, 'function resolvePresentIds({ presentTools, systemId, key }) {', '');
-    assert.ok(body.includes('toolSystemId !== scopeSystemId'), 'the scope guard is still an id compare');
-    assert.equal(body.includes('.tools'), false, 'and it still reads no entity array at all');
-    assert.equal(source.includes('scopedEntityReads'), false);
-  });
-
-  it('the drift detector still reads the RAW setting through its computed key', () => {
-    const source = read('src/systems/worldIdentityDrift.js');
-    assert.ok(
-      source.includes('for (const record of arrayOf(system[ENTITY_FIELDS[entityType]])) {'),
-      'a migration-class reader reads the RAW corpus by construction'
-    );
-    assert.equal(
-      source.includes('scopedEntityReads'),
-      false,
-      'repointing it would have the detector compare the union against the world corpus, report ' +
-        'zero drift every session, and void the disclosure obligation entirely'
-    );
+  // Repointing it would have the detector compare the union against the world corpus, report zero
+  // drift every session, and void the disclosure obligation entirely.
+  defineStructureContract(
+    'the drift detector still reads the RAW setting through its computed key',
+    { file: 'src/systems/worldIdentityDrift.js', fn: 'reportWorldIdentityDrift' },
+    { names: ['ENTITY_FIELDS'], calls: ['arrayOf'], callsNo: UNION_SEAMS }
+  );
+  defineStructureContract('the drift detector imports no union read', 'src/systems/worldIdentityDrift.js', {
+    exports: ['reportWorldIdentityDrift'],
+    spellsNo: ['scopedEntityReads'],
   });
 });
 

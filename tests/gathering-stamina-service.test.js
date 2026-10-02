@@ -216,7 +216,7 @@ test('regenerateActorStamina no-ops when regen is off or the pool is unmateriali
 });
 
 // persistence: cleared keys must not resurrect (issue 1648). `writeState` persists through
-// `Actor#setFlag` (`src/systems/gatheringRichStateInternals.js:70`), and Foundry's `setFlag` writes
+// `Actor#setFlag` (`src/systems/gatheringRichStateInternals.js`), and Foundry's `setFlag` writes
 // via `Document#update`, whose recursive merge NEVER removes a key that is merely absent from the
 // written payload.
 

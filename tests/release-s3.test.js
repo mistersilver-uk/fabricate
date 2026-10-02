@@ -1,20 +1,25 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+
+import { createTempGitRepo } from './helpers/temp-git-repo.js';
 
 const {
   deriveS3Layout,
   getFlag,
   redactSegment,
+  renderFatalError,
   provenanceMetadata,
   assertUniformBuildProfile,
   buildCopyObjectParams,
   CACHE_IMMUTABLE,
   main,
   runBackfill,
+  runCheckHeads,
+  runCli,
 } = await import('../scripts/release-s3.js');
 const { assertPublishSafety, fetchPublishState } = await import('../scripts/lib/publishGuard.js');
 const { zipDirectory } = await import('../scripts/lib/zip.js');
@@ -195,6 +200,63 @@ test('redactSegment masks the secret segment, and is a no-op without one', () =>
   );
   assert.equal(redactSegment('no secret here', ''), 'no secret here');
   assert.equal(redactSegment('no secret here'), 'no secret here');
+});
+
+test('redactSegment masks every segment, longest first, and skips empty values', () => {
+  // Shortest-first would leave `***def` behind: the longer segment must go before its prefix.
+  assert.equal(redactSegment('x/abcdef/y abc', ['abc', 'abcdef']), 'x/***/y ***');
+  assert.equal(redactSegment('no secret here', ['', undefined]), 'no secret here');
+  // Two groups sharing one segment is tolerated, not a double-redaction.
+  assert.equal(redactSegment('a/seg/b seg', ['seg', 'seg']), 'a/***/b ***');
+});
+
+// Per-group tester segments (issue 1988)
+
+const TWO_GROUPS = {
+  moduleId: 'fabricate',
+  channel: 'early-access',
+  version: '0.2.0-rc.1',
+  baseUrl: 'https://releases.example.io',
+};
+
+test('deriveS3Layout gives each tester group its own segment', () => {
+  const { testerTargets } = deriveS3Layout({
+    ...TWO_GROUPS,
+    testers: [
+      { group: 'apprentice-crafter-2026', segment: '/ap-seg/' },
+      { group: 'guild-artisan-2026', segment: 'ga-seg' },
+    ],
+  });
+  assert.deepEqual(
+    testerTargets.map((t) => [t.label, t.manifestKey]),
+    [
+      ['tester-apprentice-crafter-2026', 'testers/apprentice-crafter-2026/ap-seg/fabricate/module.json'],
+      ['tester-guild-artisan-2026', 'testers/guild-artisan-2026/ga-seg/fabricate/module.json'],
+    ]
+  );
+});
+
+test('deriveS3Layout refuses a blank per-group segment, and refuses both forms at once', () => {
+  for (const segment of ['', '  ', '///', undefined]) {
+    assert.throws(
+      () => deriveS3Layout({ ...TWO_GROUPS, testers: [{ group: 'guild-artisan-2026', segment }] }),
+      /guild-artisan-2026" has a blank segment/,
+      `segment ${JSON.stringify(segment)} must refuse`
+    );
+  }
+  const testers = [{ group: 'guild-artisan-2026', segment: 'ga-seg' }];
+  assert.throws(() => deriveS3Layout({ ...TWO_GROUPS, testers, testerGroups: ['x'] }), /not both/);
+  assert.throws(() => deriveS3Layout({ ...TWO_GROUPS, testers, testerSegment: 'seg' }), /not both/);
+});
+
+test('deriveS3Layout maps the legacy groups + one segment onto the same keys as testers', () => {
+  const legacy = deriveS3Layout({ ...baseOpts, testerSegment: 's3cr3t' });
+  const perGroup = deriveS3Layout({
+    ...TWO_GROUPS,
+    channel: 'beta',
+    testers: [{ group: 'closed-beta-2026', segment: 's3cr3t' }],
+  });
+  assert.deepEqual(perGroup.targets, legacy.targets);
 });
 
 // getFlag() tests
@@ -501,6 +563,8 @@ async function makeMain({
   distFiles = {},
   builtManifestExtra = {},
   realArchiveGate = false,
+  treeSha,
+  env = { S3_TESTER_PATH_SECRET: 'seg' },
 } = {}) {
   const dir = await mkdtemp(join(tmpdir(), 'fab-s3-main-'));
   const distDir = join(dir, 'dist');
@@ -536,31 +600,40 @@ async function makeMain({
       copies.push(input);
     },
   };
+  const builds = [];
+  let namedSha = null;
   const deps = {
     log: () => {},
     stagingDir: join(dir, 'staging'),
-    build: async ({ version }) => ({
-      distDir,
-      manifest: {
-        id: 'fabricate',
-        title: 'Fabricate',
-        version,
-        compatibility: { minimum: '13' },
-        ...builtManifestExtra,
-      },
-    }),
+    resolveTreeSha: () => (treeSha === undefined ? namedSha : treeSha),
+    build: async (request) => {
+      builds.push(request);
+      return {
+        distDir,
+        manifest: {
+          id: 'fabricate',
+          title: 'Fabricate',
+          version: request.version,
+          compatibility: { minimum: '13' },
+          ...builtManifestExtra,
+        },
+      };
+    },
     zip: realArchiveGate ? zipDirectory : (from, to) => writeFileSync(to, 'zip-bytes'),
     assertArchiveChunks: realArchiveGate ? assertArchiveChunkCompleteness : () => {},
     createS3Client: async () => s3,
     resolveSha,
   };
-  const run = (...flags) =>
-    main({
-      argv: ['node', 'release-s3.js', '--config', configPath, ...flags],
-      env: { S3_TESTER_PATH_SECRET: 'seg' },
-      deps,
-    });
-  return { run, puts, copies, store, distDir };
+  const argvFor = (flags) => {
+    const at = flags.indexOf('--source-sha');
+    namedSha = at === -1 ? null : flags[at + 1];
+    return ['node', 'release-s3.js', '--config', configPath, ...flags];
+  };
+  const run = (...flags) => main({ argv: argvFor(flags), env, deps });
+  // The command-line entry, with `extraEnv` over the harness env and the process seams captured.
+  const cli = ({ extraEnv, stderr, exit }, ...flags) =>
+    runCli({ argv: argvFor(flags), env: { ...env, ...extraEnv }, deps, stderr, exit });
+  return { run, cli, puts, copies, store, distDir, builds, deps, configPath };
 }
 
 const manifestPut = (puts, key) =>
@@ -772,4 +845,194 @@ test('a zip backfilled with an "unknown" sha is treated by the guard as absent (
     ],
   });
   assert.equal(verdict.ok, false);
+});
+
+// Issue 1988 — the workflow ref's publisher builds the release tag's tree, never the tag's publisher
+
+test('main() hands the build the version and the resolved --source-root', async () => {
+  const harness = await makeMain();
+  const tagTree = await mkdtemp(join(tmpdir(), 'fab-s3-tag-'));
+
+  await harness.run('--version', '1.4.0-beta.1', '--source-root', tagTree, '--dry-run');
+  await harness.run('--version', '1.4.0-beta.1', '--dry-run');
+
+  assert.deepEqual(harness.builds[0], { version: '1.4.0-beta.1', sourceRoot: tagTree });
+  // Without the flag the tree is this checkout, resolved to an absolute path.
+  assert.equal(harness.builds[1].sourceRoot, join(import.meta.dirname, '..'));
+});
+
+test('the default build runs the source tree\'s own `scripts/release.js` and ships its manifest', async () => {
+  // A stand-in tag tree: its release.js records the argv it was given and writes a marker manifest.
+  const tagTree = await mkdtemp(join(tmpdir(), 'fab-s3-tag-'));
+  await mkdir(join(tagTree, 'scripts'), { recursive: true });
+  await writeFile(
+    join(tagTree, 'scripts', 'release.js'),
+    [
+      "import { mkdirSync, writeFileSync } from 'node:fs';",
+      "const args = process.argv.slice(2);",
+      "writeFileSync('argv.json', JSON.stringify(args));",
+      "mkdirSync('dist', { recursive: true });",
+      "const version = args[args.indexOf('--dist-version') + 1];",
+      "const manifest = { id: 'fabricate', title: 'Fabricate', version, compatibility: { minimum: '13' }, marker: 'built-in-the-tag-tree' };",
+      "writeFileSync('dist/module.json', JSON.stringify(manifest));",
+    ].join('\n')
+  );
+  await writeFile(join(tagTree, 'package.json'), '{"type":"module"}');
+  const harness = await makeMain();
+  delete harness.deps.build;
+
+  const result = await harness.run('--version', '1.4.0-beta.1', '--source-root', tagTree, '--dry-run');
+
+  // The cross-version build contract: the ref's publisher drives any tag's release.js this way.
+  assert.deepEqual(JSON.parse(await readFile(join(tagTree, 'argv.json'), 'utf8')), [
+    '--dist-version',
+    '1.4.0-beta.1',
+    '--no-zip',
+  ]);
+  assert.ok(result.staged.length > 0);
+  for (const { body } of result.staged) assert.equal(body.marker, 'built-in-the-tag-tree');
+});
+
+test('a --source-root or --source-sha present with no value refuses', async () => {
+  const harness = await makeMain();
+  for (const flags of [
+    ['--source-root'],
+    ['--source-root', ''],
+    ['--source-root', '  '],
+    ['--source-root', '--dry-run'],
+    ['--source-sha'],
+    ['--source-sha', ''],
+  ]) {
+    await assert.rejects(
+      harness.run('--version', '1.4.0-beta.1', '--dry-run', ...flags),
+      new RegExp(`${flags[0]} was given without a value`),
+      `${JSON.stringify(flags)} must refuse`
+    );
+  }
+  assert.deepEqual(harness.builds, []);
+});
+
+test('a --source-sha that is not the source tree\'s commit refuses before building', async () => {
+  const harness = await makeMain({ treeSha: 'the-commit-actually-checked-out' });
+  await assert.rejects(
+    harness.run('--version', '1.4.0-beta.1', '--source-sha', 'deadbeef'),
+    /--source-sha deadbeef is not the commit checked out at [\s\S]*the-commit-actually-checked-out/
+  );
+  assert.deepEqual(harness.builds, [], 'a provenance mismatch must build nothing');
+  assert.deepEqual(harness.puts, []);
+});
+
+test('the default tree reader checks --source-sha against the source root\'s own HEAD', async () => {
+  // No injected resolveTreeSha: real git reads a temp repository, never this checkout.
+  const repo = createTempGitRepo('fab-s3-source-');
+  try {
+    const earlier = repo.commit('earlier');
+    const head = repo.commit('head');
+    const harness = await makeMain();
+    delete harness.deps.resolveTreeSha;
+
+    await harness.run('--version', '1.4.0-beta.1', '--dry-run', '--source-root', repo.dir, '--source-sha', head);
+    assert.equal(harness.builds.length, 1, 'the commit the tree holds must pass the check');
+
+    await assert.rejects(
+      harness.run('--version', '1.4.0-beta.1', '--dry-run', '--source-root', repo.dir, '--source-sha', earlier),
+      new RegExp(`--source-sha ${earlier} is not the commit checked out at [\\s\\S]*\\(${head}\\)`)
+    );
+    assert.equal(harness.builds.length, 1, 'a mismatch must refuse before building');
+  } finally {
+    repo.dispose();
+  }
+});
+
+test('a CI build refuses unless both --source-root and --source-sha are given', async () => {
+  const tagTree = await mkdtemp(join(tmpdir(), 'fab-s3-tag-'));
+  for (const ci of [{ GITHUB_ACTIONS: 'true' }, { CI: 'true' }]) {
+    const harness = await makeMain({ env: { S3_TESTER_PATH_SECRET: 'seg', ...ci } });
+    for (const flags of [[], ['--source-root', tagTree], ['--source-sha', 'deadbeef']]) {
+      await assert.rejects(
+        harness.run('--version', '1.4.0-beta.1', '--dry-run', ...flags),
+        /a CI build needs both --source-root <dir>[\s\S]*and --source-sha <sha>/
+      );
+    }
+    assert.deepEqual(harness.builds, []);
+    // Both given: it builds the tag tree.
+    await harness.run('--version', '1.4.0-beta.1', '--dry-run', '--source-root', tagTree, '--source-sha', 'deadbeef');
+    assert.equal(harness.builds.length, 1);
+  }
+});
+
+test('renderFatalError leaks no tester segment from a main, check-heads or backfill failure', async () => {
+  const config = {
+    moduleId: 'fabricate',
+    bucket: 'test-bucket',
+    baseUrl: 'https://releases.example.io',
+    channels: {
+      'early-access': {
+        testerGroups: {
+          'apprentice-crafter-2026': { testerSecretEnv: 'S3_APPRENTICE_PATH_SECRET' },
+          'guild-artisan-2026': { testerSecretEnv: 'S3_GUILD_ARTISAN_PATH_SECRET' },
+        },
+      },
+    },
+  };
+  // The last target's first read fails echoing every key read so far, as an AWS error can.
+  const echoing = (failOn) => async () => {
+    const seen = [];
+    const read = (absent) => async (key) => {
+      seen.push(key);
+      if (key.includes(failOn)) throw new Error(`SlowDown: ${seen.join(', ')}`);
+      return absent;
+    };
+    return {
+      headObject: read(null),
+      getObject: read({ status: 404, body: null }),
+      listObjects: read([]),
+    };
+  };
+
+  const failure = (promise) =>
+    promise.then(
+      () => assert.fail('expected the run to fail'),
+      (caught) => caught
+    );
+  // Each mode renders its failure under `ci` and gets segments of its own, so a mode that failed to
+  // record its segments cannot pass on the ones the previous mode left in the renderer's list. The
+  // publish goes through the command-line entry, so the redaction proven is the one the CLI prints.
+  const modes = {
+    main: async ({ harness, ci }) => {
+      const written = [];
+      const exits = [];
+      const sourceRoot = await mkdtemp(join(tmpdir(), 'fab-s3-tag-'));
+      await harness.cli(
+        { extraEnv: ci, stderr: { write: (text) => written.push(text) }, exit: (code) => exits.push(code) },
+        ...['--channel', 'early-access', '--version', '1.4.0', '--source-root', sourceRoot, '--source-sha', 'deadbeef']
+      );
+      assert.deepEqual(exits, [1], 'a failed publish must exit 1');
+      return written.join('');
+    },
+    'check-heads': async ({ env, guild, ci }) =>
+      renderFatalError(
+        await failure(
+          runCheckHeads({ config, version: '1.4.0', channel: 'early-access', deps: { env, createS3Client: echoing(guild) } })
+        ),
+        ci
+      ),
+    backfill: async ({ harness, ci }) =>
+      renderFatalError(await failure(harness.run('--channel', 'early-access', '--backfill-provenance')), ci),
+  };
+  for (const [mode, render] of Object.entries(modes)) {
+    const [apprentice, guild] = [`ap${mode}secret`, `ga${mode}secret`];
+    const env = { S3_APPRENTICE_PATH_SECRET: apprentice, S3_GUILD_ARTISAN_PATH_SECRET: guild };
+    const harness = await makeMain({ config, env });
+    harness.deps.createS3Client = echoing(guild);
+
+    // Non-vacuity: the unredacted text really does carry both segments.
+    const raw = await render({ harness, env, guild, ci: {} });
+    assert.ok(raw.includes(apprentice) && raw.includes(guild), `nothing to redact in: ${raw}`);
+    for (const ci of [{ GITHUB_ACTIONS: 'true' }, { CI: 'true' }]) {
+      const rendered = await render({ harness, env, guild, ci });
+      assert.ok(!rendered.includes(apprentice) && !rendered.includes(guild), `${mode}: ${rendered}`);
+      assert.match(rendered, /\*\*\*/);
+    }
+  }
 });

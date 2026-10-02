@@ -25,15 +25,12 @@ import {
 
 export const journalFacade = {
   /**
-   * Submit a current-lifecycle operation through active-GM authority after initialization. Actor
-   * UUIDs address this authenticated command boundary, whose GM handler rechecks the attested
-   * sender's ownership; they do not replace actor IDs in the player crafting facades. A timeout is
-   * an unknown response, not proof of failure and not permission to replay. `command` start uses an
-   * empty runId and revision zero, and alchemy uses runType `crafting`.
-   * `options` MUST BE FORWARDED: it carries `interactive`, and this signature once took `command`
-   * alone while its caller passed both, so `game.fabricate.craft()` on a checked recipe opened a
-   * dialog nobody could answer and waited forever — the source pin covered the CALL, not this
-   * signature (issue 1759).
+   * Submit a current-lifecycle operation through active-GM authority. Actor UUIDs address this
+   * boundary, whose GM handler rechecks the attested sender's ownership; the player crafting
+   * facades keep actor ids. A timeout is an unknown response, not failure and not permission to
+   * replay. A start uses an empty runId and revision zero; alchemy uses runType `crafting`.
+   * `options` must be forwarded: it carries `interactive`, without which a checked craft waits
+   * forever (issue 1759).
    */
   executeJournalRunCommand(command, options) {
     this._requireReady();
@@ -43,10 +40,7 @@ export const journalFacade = {
     );
   },
 
-  /**
-   * Hide a terminal entry for the current user in this world, preserving actor history. The awaited
-   * user-scoped write follows the user across devices and can reject.
-   */
+  /** Hide a terminal entry for this user, keeping actor history; the write can reject. */
   dismissJournalRun(options) {
     this._requireReady();
     return (
@@ -73,12 +67,11 @@ export const journalFacade = {
   },
 
   /**
-   * Record manual disposition of an exact retained execution claim as the active GM. Inspect actual
-   * receipts and the uncertain applying boundary first, after confirming no other GM realm is still
-   * executing; planned amounts are not proof of awards or spending. `claimId` is the claim's random
-   * token (the `journalRunClaimId` flag on the ledger's `FabRunAuthority1` page), never the page id
-   * or a run id. THIS RELEASES AUTHORITY ONLY: the old request stays non-replayable, an uncertain
-   * run effect remains recovery-required, and it performs no replay, compensation or rollback.
+   * Record a disposition for an exact retained claim, as the active GM, after confirming no
+   * other GM realm is executing and checking actual receipts; planned amounts prove nothing.
+   * `claimId` is the `journalRunClaimId` flag on the ledger's `FabRunAuthority1` page, never a
+   * page or run id. It releases authority only: no replay, compensation or rollback, the request
+   * stays non-replayable and an uncertain run effect stays recovery-required.
    */
   reconcileJournalRunAuthority(options) {
     return (
@@ -87,10 +80,7 @@ export const journalFacade = {
     );
   },
 
-  /**
-   * Calendar components for an absolute world time, plus `daysPerYear` where derivable, so the pure
-   * `worldTimeLabel` util can compose a campaign day without touching `game.*`.
-   */
+  /** Calendar components plus `daysPerYear` where derivable, for the pure `worldTimeLabel`. */
   getWorldTimeComponents(worldTime = this.getWorldTime()) {
     const calendar = game.time?.calendar ?? null;
     if (typeof calendar?.timeToComponents !== 'function') return null;
@@ -105,7 +95,6 @@ export const journalFacade = {
     }
   },
 
-  /** Lazily construct the singleton `RunJournalBuilder`, so it is not rebuilt per listing call. */
   _getRunJournalBuilder() {
     if (!this._runJournalBuilder) {
       this._runJournalBuilder = new RunJournalBuilder({
@@ -119,11 +108,10 @@ export const journalFacade = {
         getTool: (systemId, toolId) => this._resolveJournalTool(systemId, toolId),
         getGatheringTask: (environmentId, taskId) =>
           this._resolveJournalGatheringTask(environmentId, taskId),
-        // GM-only secret preview of an in-flight blind run's drawn task (issue 901). The builder
-        // consults it only for a GM viewer; a player's journal shows the generic blind label.
+        // Consulted only for a GM viewer; a player sees the generic blind label (issue 901).
         getGatheringBlindSecret: (runId) => this.gatheringBlindRunStore?.get(runId) ?? null,
-        // D-027: history names a blind task only once the reveal policy has disclosed it, never
-        // because the viewer owns the actor. The engine owns the chat card's identical decision.
+        // History names a blind task only once the reveal policy disclosed it, never because the
+        // viewer owns the actor (D-027); the engine makes the chat card's identical decision.
         isGatheringIdentityHidden: (args) =>
           getGatheringEngine()?.isHistoricalBlindIdentityHidden?.(args) === true,
         getResultItem: (itemUuid) => this._resolveJournalResultItem(itemUuid),
@@ -132,8 +120,7 @@ export const journalFacade = {
         getViewer: () => game.user,
         localize: (key, data) => localizeGathering(key, data),
         nowWorldTime: () => this.getWorldTime(),
-        // The per-pass inventory snapshot's component resolver (issue 1228): the Journal reads no
-        // tallies itself, but its snapshot must be the same complete value every other pass builds.
+        // Unread here, but the snapshot must match every other pass's (issue 1228).
         resolveComponentForItem: findMatchingComponent,
         getComponentSourceActors: ({ actor, run }) => {
           const uuids = Array.isArray(run?.componentSourceActorUuids)
@@ -160,8 +147,7 @@ export const journalFacade = {
             recipe,
             this.craftingEngine?._currencySeams?.() ?? {}
           )(match),
-        // The AGGREGATE answer the per-option probe above cannot give: two currency ingredients
-        // each affordable alone but not together (issue 1648, F2).
+        // The aggregate: two currency ingredients affordable alone but not together (issue 1648).
         affordCurrencySpends: ({ actor, recipe, currencySpends }) =>
           affordsCurrencySpends(
             actor,
@@ -178,9 +164,8 @@ export const journalFacade = {
   },
 
   /**
-   * Resolve a system library tool to `{ id, name, img }` through `data-models` requirement 13's
-   * precedence. THE SNAPSHOT RUNG IS LOAD-BEARING: an item-sourced Tool has a null `componentId` by
-   * construction and without it printed its raw id (issue 1119).
+   * `data-models` requirement 13's precedence. The snapshot rung is load-bearing: an item-sourced
+   * Tool has a null `componentId`, so without it the raw id prints (issue 1119).
    */
   _resolveJournalTool(systemId, toolId) {
     const system = this.craftingSystemManager?.getSystem(systemId);
@@ -192,15 +177,12 @@ export const journalFacade = {
     return {
       id: tool.id,
       name: resolveToolDisplayName(tool, component, tool.id),
-      // The Journal renders its own default artwork, so the generic sentinel stays null.
+      // The Journal draws its own default artwork.
       img: img === TOOL_IMAGE_SENTINEL ? null : img,
     };
   },
 
-  /**
-   * Resolve a gathering run's task to `{ name, img }` via the COMPOSED environment, which alone
-   * carries the authored name and image; null leaves the raw-id fallback.
-   */
+  /** Only the composed environment carries the authored name and image; null keeps the raw id. */
   _resolveJournalGatheringTask(environmentId, taskId) {
     if (!environmentId || !taskId) return null;
     const environment = getGatheringEngine()?._findEnvironment?.(environmentId);
@@ -209,25 +191,19 @@ export const journalFacade = {
     return task ? { name: task.name, img: task.img } : null;
   },
 
-  /**
-   * Resolve a run's awarded item to `{ name, img }` by recorded uuid, labelling history written
-   * before name and img were captured at award time. Best-effort and synchronous.
-   */
+  /** Labels history written before awards captured name and img. Best-effort and synchronous. */
   _resolveJournalResultItem(itemUuid) {
     if (!itemUuid || typeof fromUuidSync !== 'function') return null;
     let doc = null;
     try {
       doc = fromUuidSync(itemUuid);
     } catch {
-      // An unresolvable uuid leaves the raw-id fallback in place.
+      // An unresolvable uuid keeps the raw-id fallback.
     }
     return doc ? { name: doc.name ?? null, img: doc.img ?? null } : null;
   },
 
-  /**
-   * Resolve a system component to `{ name, img }` for the Journal: a salvage run's title and the
-   * fallback for a result that captured neither; null leaves the raw-id fallback.
-   */
+  /** A salvage run's title, and the fallback for a result that captured neither field. */
   _resolveJournalComponent(systemId, componentId) {
     if (!systemId || !componentId) return null;
     const system = this.craftingSystemManager?.getSystem(systemId);
@@ -235,10 +211,7 @@ export const journalFacade = {
     return component ? { name: component.name ?? null, img: component.img ?? null } : null;
   },
 
-  /**
-   * Resolve the Journal's selected actor against the bar-selectable list, remembered id first, then
-   * the first selectable — the gathering listing's remembered-actor seam.
-   */
+  /** The remembered id among the bar-selectable actors, else the first of them. */
   _resolveJournalActor(rememberedActorId) {
     const selectable = getBarSelectableActors({ viewer: game.user });
     if (selectable.length === 0) return null;

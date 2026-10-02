@@ -13,8 +13,9 @@ const DEPRECATED_ALIAS = 'src';
 const ART_RESOLVER = 'resolveCraftingArt(';
 
 /** EVERY MEDALLION RENDER SITE IN `src/`, PINNED, so no clause below can pass over nothing. */
-// #1648: RunDetail -1, StepDetails -2, ChoiceOptionList +1.
-const MEDALLION_SITES = 84;
+// #1648: RunDetail -1, StepDetails -2, ChoiceOptionList +1. #2080: the simulator's number tile and
+// its result-card icon +2. #2006: the count face tile -1, now the shared DiceTiles' own tile.
+const MEDALLION_SITES = 85;
 
 /** How many of them bind artwork at all. The rest are glyph-only and `alt` is moot for them. */
 const ART_BEARING_SITES = 66;

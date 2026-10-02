@@ -1,8 +1,7 @@
 /**
- * The `1.34.0` pass giving the world one record per essence behaviour, repairing the duplication
- * `1.30.0` left (issue 1654; spec § Equivalent World Essence Merge owns every requirement). THE MAP
- * IS REUSED from `fabricate.worldEssenceMergeMap` whenever it carries entries, so a torn run
- * re-applies the ids it was written against (requirement 10).
+ * The `1.34.0` pass giving the world one record per essence behaviour (issue 1654); spec
+ * § Equivalent World Essence Merge owns every requirement. A non-empty persisted
+ * `fabricate.worldEssenceMergeMap` is reused, so a torn run re-applies its ids (requirement 10).
  */
 
 import { ESSENCE_SECTIONS, resolveEssence } from '../systems/essenceScope.js';
@@ -25,21 +24,17 @@ import { readScopePayload } from './migrateWorldScopeEntities.js';
 import { clone, isPlainObject, forEachSystem } from './migrationHelpers.js';
 import { buildWorldEssenceEquivalence } from './worldEssenceEquivalence.js';
 
-/** The `craftingSystem` array essences are stored under, read from the one list that names it. */
 const ESSENCE_DEFINITIONS_FIELD = ENTITY_TYPE_FIELDS.essences;
 
-/** The entity-type leg the per-system map is written under. */
 const ESSENCES = 'essences';
 
 /** The canonical empty a frozen section takes when the world had no opinion (requirement 8). */
 const EMPTY_SECTION_OVERRIDE = Object.freeze({ macro: null, effectSource: Object.freeze({}) });
 
 /**
- * How a frozen section is written onto the in-system row, on the SHIPPED field names the read union
- * consumes (requirement 8). A deliberate mirror of the module-private
- * `INHERITED_SECTION_WRITERS.essences`, which cannot be imported, checked BEHAVIOURALLY because a
- * key-set check cannot see a writer projecting onto the wrong field name. `effectSource` writes
- * `?? null` per field: the unset state of all three is `null`, not absence.
+ * On the shipped field names the read union consumes (requirement 8): a mirror of the private
+ * `INHERITED_SECTION_WRITERS.essences`, checked behaviourally. `effectSource` writes `?? null` per
+ * field, since null, not absence, is the unset state.
  */
 const IN_SYSTEM_SECTION_WRITERS = Object.freeze({
   macro(record, value) {
@@ -59,10 +54,7 @@ function trimmedString(value) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
-/**
- * Normalize the persisted merge map to its two named legs, totally. The `retired` leg is normalized
- * BY KEY ONLY and its snapshots pass through verbatim, so none is ever discarded.
- */
+/** Total. `retired` is normalized by key only; its snapshots pass through verbatim. */
 export function normalizeEssenceMergeMap(raw) {
   const source = isPlainObject(raw) ? raw : {};
   const systems = {};
@@ -88,9 +80,8 @@ export function normalizeEssenceMergeMap(raw) {
 }
 
 /**
- * The world-wide lookup for WORLD-SCOPE positions only — a world entity row, a default key and a
- * default's quantity map belong to no system. The reference rewrite uses the PER-SYSTEM legs, so a
- * loser id is re-keyed only where it is present (§ Equivalent World Essence Merge).
+ * For world-scope positions only, which belong to no system; the reference rewrite uses the
+ * per-system legs, so a loser id is re-keyed only where present.
  */
 function unionMergeMap(perSystemLegs) {
   const union = {};
@@ -102,15 +93,13 @@ function unionMergeMap(perSystemLegs) {
   return union;
 }
 
-/** Whether a per-system map carries any pair at all. */
 function mapHasEntries(map) {
   return Object.keys(map).length > 0;
 }
 
 /**
- * Re-key one system's own essence rows: the definition ids and the derived `essences` alias beside
- * them, which is READ long before the next save re-mints it. Neither position is on the shared
- * walk's lists, correctly: that walk rewrites REFERENCES.
+ * The definition ids and the derived `essences` alias, read long before a save re-mints it. The
+ * shared walk rewrites references, so neither position is on it.
  */
 function rekeySystemEssenceIds(system, remapEssence) {
   for (const record of arrayOf(system[ESSENCE_DEFINITIONS_FIELD])) {
@@ -124,9 +113,8 @@ function rekeySystemEssenceIds(system, remapEssence) {
 }
 
 /**
- * Freeze every section a re-pointed membership record was inheriting, at BOTH scopes, resolving
- * against the loser's default rather than the survivor's, with the in-system write CONDITIONAL on a
- * world value existing and the membership write unconditional (requirement 8 owns all three).
+ * At both scopes, against the loser's default; the in-system write only where a world value exists,
+ * the membership write always (requirement 8).
  */
 function freezeInheritedSections(record, loserDefault, inSystemRows) {
   const resolved = resolveEssence(loserDefault, record);
@@ -144,10 +132,7 @@ function freezeInheritedSections(record, loserDefault, inSystemRows) {
   return written;
 }
 
-/**
- * Index the already-re-keyed in-system rows by system and id, EVERY row per id rather than the
- * first: `unionScopedDefinitions` preserves a duplicate id, reachable from a hand-edited map.
- */
+/** Every row per id: `unionScopedDefinitions` keeps a hand-edited map's duplicate ids. */
 function indexInSystemEssences(systems) {
   const bySystem = new Map();
   forEachSystem(systems, (system) => {
@@ -167,10 +152,8 @@ function indexInSystemEssences(systems) {
 }
 
 /**
- * Re-point one membership record at its survivor, freezing first: the freeze resolves through the
- * parent it is LEAVING, so it runs while `entityId` still names the loser, while the in-system rows
- * are looked up under the SURVIVOR id. `null` for a record naming no system, which resolves for
- * nobody.
+ * Freeze first, while `entityId` still names the parent it is leaving; in-system rows are looked
+ * up under the survivor id. `null` for a record naming no system.
  */
 function repointMembershipRecord({ record, loserId, survivorId }, defaults, inSystemEssences) {
   const systemId = trimmedString(record.systemId);
@@ -186,9 +169,8 @@ function repointMembershipRecord({ record, loserId, survivorId }, defaults, inSy
 }
 
 /**
- * Rebuild `essenceScope.membership` with every loser re-pointed, in two passes: the first copies
- * every record NOT re-pointed under its original key, which is what keeps a no-op run
- * byte-identical. A collision keeps the SURVIVOR's record, an arm a hand-edited map alone reaches.
+ * Two passes; the first copies unmoved records under their keys, so a no-op run is byte-identical.
+ * A collision, reachable only from a hand-edited map, keeps the survivor's record.
  */
 function rebuildMembership(membership, defaults, remap, inSystemEssences) {
   const rebuilt = {};
@@ -209,17 +191,13 @@ function rebuildMembership(membership, defaults, remap, inSystemEssences) {
     inSystemFreezes.push(repoint.freeze);
     if (!(repoint.key in rebuilt)) rebuilt[repoint.key] = entry.record;
   }
-  // Filtered rather than branched at the push: a record that froze nothing has nothing to disclose.
   return {
     membership: rebuilt,
     inSystemFreezes: inSystemFreezes.filter((freeze) => freeze.sections.length > 0),
   };
 }
 
-/**
- * Run the whole `1.34.0` merge, answering the keys it changed plus the transient
- * `_worldEssenceMergeReport`. Every unchanged key answers its original object.
- */
+/** The changed keys plus the transient `_worldEssenceMergeReport`. */
 export function mergeEquivalentWorldEssences(data) {
   if (!isPlainObject(data)) return data;
 
@@ -232,8 +210,7 @@ export function mergeEquivalentWorldEssences(data) {
 
   const persisted = normalizeEssenceMergeMap(data.worldEssenceMergeMap);
   const reusingPersistedMap = mapHasEntries(persisted.systems);
-  // Derived on every pass because it supplies the report, and read BEFORE the rewrite half so it
-  // sees the ids the persisted map was written against; only its map is discarded on a re-run.
+  // Before the rewrite, so it sees the persisted map's ids; a re-run discards only its map.
   const equivalence = buildWorldEssenceEquivalence({
     systems,
     essenceScope: data.essenceScope,
@@ -243,7 +220,7 @@ export function mergeEquivalentWorldEssences(data) {
   const remap = unionMergeMap(perSystemLegs);
   const globalRemapper = keyedRemapper(remap);
 
-  // 1. The rewrite half — unconditional, driven by the map alone.
+  // 1. The rewrite, unconditional and driven by the map alone.
   const recipesBySystem = new Map();
   for (const recipe of recipes) {
     const systemId = trimmedString(recipe?.craftingSystemId);
@@ -273,8 +250,7 @@ export function mergeEquivalentWorldEssences(data) {
       if (!isPlainObject(record) || trimmedString(record.systemId) !== systemId) continue;
       rewriteMembershipReferences(record, 'components', remappers);
     }
-    // `resolveTool` reads `repairRequirements` from the membership record ALONE, never falling back
-    // to the world default, so a missed id here is the only copy the repair check reads.
+    // `resolveTool` reads `repairRequirements` from the membership record alone.
     for (const record of Object.values(toolScope.membership)) {
       if (!isPlainObject(record) || trimmedString(record.systemId) !== systemId) continue;
       rewriteMembershipReferences(record, 'tools', remappers);
@@ -285,14 +261,14 @@ export function mergeEquivalentWorldEssences(data) {
   for (const record of Object.values(componentScope.defaults)) {
     rewriteEssenceQuantityMap(record, { remapEssence: globalRemapper });
   }
-  // The sharpest of the three tool positions: `seedToolRepairRequirements` copies this array into
-  // every membership record minted later, so a retired id left here PROPAGATES (requirement 5).
+  // `seedToolRepairRequirements` copies this into every later record, so a retired id spreads
+  // (requirement 5).
   for (const record of Object.values(toolScope.defaults)) {
     rewriteToolReferences(record, { remapEssence: globalRemapper });
   }
 
-  // 2. The retirement itself, BEFORE the loser keys are deleted (the freeze reads them) and AFTER
-  // the rewrite half (its in-system write lands on rows that half has already re-keyed).
+  // 2. The retirement: after the rewrite, whose re-keyed rows its write lands on, and before the
+  // loser keys the freeze reads are deleted.
   const rebuilt = rebuildMembership(
     essenceScope.membership,
     essenceScope.defaults,
@@ -320,11 +296,9 @@ export function mergeEquivalentWorldEssences(data) {
     inSystemFreezes: rebuilt.inSystemFreezes,
   };
 
-  // 5. Return the original object for any key this pass did not change, compared against the
-  // NORMALIZED read: seeding an empty `entities` would licence a prune.
+  // 5. Unchanged keys answer the original: seeding an empty `entities` would license a prune.
   const unchanged = (next, original) =>
     JSON.stringify(next) === JSON.stringify(original) ? original : next;
-  // The scope legs compare against the normalized read, so an equal rebuild answers the original.
   const unchangedScope = (next, original) =>
     JSON.stringify(next) === JSON.stringify(readScopePayload(original)) ? original : next;
   const mergeMapSetting = { systems: perSystemLegs, retired };

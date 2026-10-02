@@ -27,20 +27,33 @@
   import {
     CHECK_SECTION_IDS,
     evaluateCheckReadiness,
+    issueControl,
     readinessModeForSlot,
     sectionForIssue,
   } from './checksReadiness.js';
+  import { convertCountingFormula } from './countFormulaConversion.js';
   import Callout from '../../../components/Callout.svelte';
+  import Notice from '../../../components/Notice.svelte';
   import CheckModeCallout from './CheckModeCallout.svelte';
   import { focusValidationTarget } from '../validationFocus.js';
   import { announceValidationOutcome } from '../validationAnnouncement.js';
   import InspectorCard from '../../../components/InspectorCard.svelte';
-  import { checkIssueCopy, interpolate } from './checksCopy.js';
+  import { checkIssueText, convertActionCopy } from './checksCopy.js';
+  import {
+    activityWordFor,
+    failurePolicyInertNote as inertNoteFor,
+    recordNounFor,
+    recordNounPluralFor,
+    subsystemModeLabel as modeLabelFor,
+  } from './checksActivityCopy.js';
+  import { allChecksDetail, issueRowStatus } from './checksValidationRows.js';
   import {
     buildCheckModifierContext,
     resolveActiveCraftingCheckFormula,
     resolveActiveGatheringCheckFormula,
     resolveActiveSalvageCheckFormula,
+    makeRollDataExpressionResolver,
+    resolveCheckModifierContribution,
     resolveEligibleModifierIds,
     resolveModifierPolicy,
   } from '../../../../../systems/checkModifierResolver.js';
@@ -50,21 +63,26 @@
     buildPreviewCheckArgs,
     buildPreviewRecords,
     listPreviewActors,
+    previewCharacter as characterOf,
     resolvePreviewActor,
     runCheckPreview,
-    terseBreakdown,
   } from './checkPreview.js';
   import {
-    describeFormulaEnumerability,
-    enumeratePassFailOdds,
-    enumerateProgressiveOdds,
-    enumerateRoutedOdds,
-    SANDBOX_ABSENT,
-  } from './checkOdds.js';
+    buildOddsModel,
+    buildReadoutModel,
+    countPreviewPlacement,
+    labelPreviewRecords,
+    previewAbstention,
+    previewActorNote,
+    previewEnumeration,
+    previewSignature,
+    previewTrack,
+  } from './checkPreviewModel.js';
   import {
     formatPreviewDifficulties,
     parsePreviewDifficulties,
   } from '../../../../../systems/progressiveCheckSandbox.js';
+  import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
 
   // `resolutionMode` picks the crafting editor; the three `craftingCheck*` props are its drafts.
   let {
@@ -114,6 +132,10 @@
     gatheringResolutionMode = 'd100',
     gatheringCheckProgressive = null,
     gatheringCheckRouted = null,
+    // The raw records overrides live on, outside any check draft (issue 2078): every managed
+    // component (read for salvage) and every gathering task (read for gathering).
+    components = [],
+    gatheringTasks = [],
     // Tool-breakage authority: `checkDriven` adds the per-trigger break-tools toggle.
     breakageAuthority = 'toolSpecific',
     // Feature flags: salvage is always on, gathering only when `features.gathering === true`.
@@ -159,11 +181,6 @@
   }
 
   /** The Validation route's own sentence for a readiness issue — the same one, not a copy. */
-  function issueSentence(id, data) {
-    const copy = checkIssueCopy(id);
-    return interpolate(text(copy.key, copy.fallback, data), data);
-  }
-
   // The alchemy check-mode selector, at the TOP of the crafting route's roll section, STAGING
   // the mode on the root's draft and swapping the editor below. "NO CHECK" IS NOT A MODE
   // HERE: the persisted enum still carries `none`, but a third radio made the on/off decision
@@ -348,46 +365,8 @@
     },
   };
 
-  // The AUTHORED mode, for the "does not apply in {mode} mode" copy and the Validation rail's
-  // rows — deliberately NOT the readiness mode, which collapses every no-check mode to `none`
-  // and would name a mode no economy editor offers. IT IS LOCALIZED through the SAME strings
-  // the rest of the manager uses: the authored token is an internal identifier and the three
-  // subsystems spell one concept three ways.
-  const SUBSYSTEM_MODE_LABELS = {
-    crafting: {
-      simple: ['FABRICATE.Admin.SystemSettings.ResolutionSimple', 'Simple'],
-      routedByIngredients: [
-        'FABRICATE.Admin.Manager.ResolutionRoutedByIngredients',
-        'Routed by ingredients',
-      ],
-      routedByCheck: ['FABRICATE.Admin.Manager.ResolutionRoutedByCheck', 'Routed by check'],
-      progressive: ['FABRICATE.Admin.SystemSettings.ResolutionProgressive', 'Progressive'],
-      alchemy: ['FABRICATE.Admin.SystemSettings.ResolutionAlchemy', 'Alchemy'],
-    },
-    // Alchemy's row names the ALCHEMY CHECK MODE, the choice deciding what alchemy rolls.
-    alchemy: {
-      none: ['FABRICATE.Admin.SystemSettings.Alchemy.CheckModeNone', 'No check'],
-      simple: ['FABRICATE.Admin.SystemSettings.Alchemy.CheckModeSimple', 'Simple check'],
-      tiered: ['FABRICATE.Admin.SystemSettings.Alchemy.CheckModeTiered', 'Tiered check'],
-    },
-    salvage: {
-      simple: ['FABRICATE.Admin.SystemSettings.SalvageResolutionSimple', 'Simple'],
-      progressive: ['FABRICATE.Admin.SystemSettings.SalvageResolutionProgressive', 'Progressive'],
-      routed: ['FABRICATE.Admin.SystemSettings.SalvageResolutionRouted', 'Routed by check'],
-    },
-    gathering: {
-      d100: ['FABRICATE.Admin.Manager.Economy.Resolution.D100', 'd100 roll'],
-      progressive: ['FABRICATE.Admin.Manager.Economy.Resolution.Progressive', 'Progressive'],
-      routed: ['FABRICATE.Admin.Manager.Economy.Resolution.Routed', 'Routed by check'],
-    },
-  };
-
-  /** The GM-facing name of an authored mode; an unmapped token falls back to itself, so a
-   *  mode added to a picker without a row here reads as unfinished, not as another. */
-  function subsystemModeLabel(vocabulary, mode) {
-    const entry = SUBSYSTEM_MODE_LABELS[vocabulary]?.[mode];
-    return entry ? text(entry[0], entry[1]) : String(mode || '');
-  }
+  // The AUTHORED mode's own name, from `checksActivityCopy.js`.
+  const subsystemModeLabel = (vocabulary, mode) => modeLabelFor(vocabulary, mode, text);
 
   // One group per in-play subsystem, against its own draft and mode. Salvage is omitted when
   // its feature is off; GATHERING IS NOT OMITTED UNDER d100, validating a selection that
@@ -422,6 +401,7 @@
             ? salvageCheckProgressive
             : salvageCheckSimple,
         modifierContext: buildCheckModifierContext(draftSystem, 'salvage', null),
+        components,
       });
     }
     if (gatheringEnabled) {
@@ -431,6 +411,7 @@
         authoredMode: subsystemModeLabel('gathering', gatheringResolutionMode),
         check: gatheringProgressive ? gatheringCheckProgressive : gatheringCheckRouted,
         modifierContext: buildCheckModifierContext(draftSystem, 'gathering', null),
+        gatheringTasks,
       });
     }
     return list;
@@ -452,6 +433,20 @@
   const activeActivity = $derived(validationSections.find((row) => row.subsystem === activity));
   const activeCheck = $derived(activeActivity?.check || null);
   const activeMode = $derived(activeActivity?.mode || '');
+  // The evaluation the active editor stack authors, stated on the stack for its captures.
+  const activeEvaluation = $derived(normalizeCheckEvaluation(activeCheck?.evaluation));
+  const evaluationAttrs = $derived({
+    'data-checks-evaluation-product': activeEvaluation.product,
+    'data-checks-evaluation-direction': activeEvaluation.direction,
+    'data-checks-target-source': activeEvaluation.target.source,
+    'data-checks-adjustment-kind': activeEvaluation.target.adjustmentKind,
+  });
+
+  // The Preview-as actor, route-independent so the Validation route names it too.
+  let previewActorId = $state(NO_ACTOR_ID);
+  const previewActor = $derived(resolvePreviewActor(previewActorId));
+  // The Preview-as actor as the editors' character-value fields and strips read it: a copy.
+  const previewCharacter = $derived(characterOf(previewActor));
 
   const activeReadiness = $derived(
     activeActivity
@@ -459,8 +454,11 @@
           mode: activeMode,
           modifierContext: activeActivity.modifierContext,
           activity: activeActivity.subsystem,
+          previewActor: previewCharacter,
+          components: activeActivity.components,
+          gatheringTasks: activeActivity.gatheringTasks,
         })
-      : { checks: [], issues: [] }
+      : { checks: [], issues: [], transient: [] }
   );
 
   const issuesBySection = $derived.by(() => {
@@ -562,6 +560,8 @@
         mode: row.mode,
         modifierContext: row.modifierContext,
         activity: row.subsystem,
+        components: row.components,
+        gatheringTasks: row.gatheringTasks,
       });
       const label = text(
         `FABRICATE.Admin.Manager.Checks.Tabs.${row.subsystem[0].toUpperCase()}${row.subsystem.slice(1)}`,
@@ -578,7 +578,7 @@
         id: row.subsystem,
         icon: SUBSYSTEM_ICONS[row.subsystem] || 'fas fa-dice-d20',
         label: `${label} · ${state}`,
-        detail: [row.authoredMode, row.check?.rollFormula || ''].filter(Boolean).join(' · '),
+        detail: allChecksDetail(row, text),
       };
     })
   );
@@ -617,8 +617,9 @@
    *
    * @param {{activity?: string, section?: string}} target the ROUTE the row carries.
    * @param {string} [focusTarget] the CONTROL's `data-validation-target` value, if it named one.
+   * @param {string} [status] A sentence announced ahead of the destination, as Convert's is.
    */
-  function selectIssue(target, focusTarget) {
+  function selectIssue(target, focusTarget, status = '') {
     if (!target?.activity) return;
     const section = target.section || 'roll';
     onOpenActivity(target.activity, section);
@@ -630,7 +631,7 @@
       focus: () => focusValidationTarget(checksRoot, focusTarget),
       fallbackPanel: sectionPanel,
       announce: (sentence) => {
-        issueAnnouncement = sentence;
+        issueAnnouncement = sentence && status ? `${status} ${sentence}` : sentence;
       },
     });
   }
@@ -647,8 +648,8 @@
   });
   const modeLabel = $derived(routeModeLabel || subsystemModeLabel('crafting', resolutionMode));
 
-  // THE SECTION-LEVEL CALLOUT and THE PANE HEADING, both required by
-  // `openspec/specs/ui-system-studio/spec.md` → "GM Checks Studio". The callout reads the SAME
+  // THE SECTION NOTICES and THE PANE HEADING, both required by
+  // `openspec/specs/ui-system-studio/spec.md` → "GM Checks Studio". The notices read the SAME
   // `activeReadiness` pass the strip's dot is counted from and renders the SAME exported copy
   // the Validation route does; the heading is keyed on the SECTION, the activity being named
   // by the rail, the breadcrumb and the route title.
@@ -728,56 +729,37 @@
     activeActivity ? resolveModifierPolicy(activeActivity.modifierContext) : 'addAll'
   );
 
-  // THE RECORD NOUN, in the activity's own word and localized, because a noun is copy.
-  const RECORD_NOUNS = {
-    crafting: ['FABRICATE.Admin.Manager.Checks.RecordNoun.Crafting', 'recipe'],
-    salvage: ['FABRICATE.Admin.Manager.Checks.RecordNoun.Salvage', 'salvageable item'],
-    gathering: ['FABRICATE.Admin.Manager.Checks.RecordNoun.Gathering', 'gathering task'],
-  };
-  const recordNoun = $derived.by(() => {
-    const entry = RECORD_NOUNS[activity] || RECORD_NOUNS.crafting;
-    return text(entry[0], entry[1]);
+  // The activity's own words, from `checksActivityCopy.js`.
+  const recordNoun = $derived(recordNounFor(activity, text));
+  const activityWord = $derived(activityWordFor(activity, text));
+  const recordNounPlural = $derived(recordNounPluralFor(activity, text));
+
+  // The failure-result policy of the activity on screen, read by its card and the readout alike.
+  const activeFailureResultPolicy = $derived(
+    activity === 'salvage'
+      ? salvageFailureResultPolicy
+      : activity === 'gathering'
+        ? gatheringFailureResultPolicy
+        : craftingFailureResultPolicy
+  );
+
+  // The readout's consumption rows read the ACTIVITY'S OWN failure policy: salvage its item pair
+  // and alchemy's simple check its own flag; gathering's rows ignore it (checkReadoutModel.js).
+  const previewConsumption = $derived.by(() => {
+    if (activity === 'salvage') {
+      return { consumeOnFail: consumeComponentOnFail, breakToolsOnFail: salvageBreakToolsOnFail };
+    }
+    const alchemySimple = craftingAlchemy && alchemyCheckMode === 'simple';
+    const consumeOnFail = alchemySimple ? alchemyConsumeOnFail !== false : consumeIngredientsOnFail;
+    return { consumeOnFail, breakToolsOnFail };
   });
 
-  // The PLURAL of the same noun, sentence-initial, and the three do not pluralize alike.
-  const RECORD_NOUNS_PLURAL = {
-    crafting: ['FABRICATE.Admin.Manager.Checks.RecordNoun.CraftingPlural', 'Recipes'],
-    salvage: ['FABRICATE.Admin.Manager.Checks.RecordNoun.SalvagePlural', 'Salvageable items'],
-    gathering: ['FABRICATE.Admin.Manager.Checks.RecordNoun.GatheringPlural', 'Gathering tasks'],
-  };
-  const recordNounPlural = $derived.by(() => {
-    const entry = RECORD_NOUNS_PLURAL[activity] || RECORD_NOUNS_PLURAL.crafting;
-    return text(entry[0], entry[1]);
-  });
-
-  // WHERE THE POLICY HAS NO REACH, and why: neither `routedByIngredients` nor `progressive`
-  // has an outcome tier or reserved failure group to mark, so a stated reason renders rather
-  // than a control that silently does nothing.
-  const failurePolicyInertNote = $derived.by(() => {
-    if (activity === 'gathering') {
-      return gatheringD100
-        ? text(
-            'FABRICATE.Admin.Manager.Checks.FailureResults.InertGatheringD100',
-            'The d100 gathering roll has no failure outcome to produce — and routed and progressive gathering are not available yet. This setting is kept and takes effect when they are.'
-          )
-        : '';
-    }
-    if (activity === 'crafting' && resolutionMode === 'routedByIngredients') {
-      return text(
-        'FABRICATE.Admin.Manager.Checks.FailureResults.InertRoutedByIngredients',
-        'In routed-by-ingredients mode the check has no outcome tiers to mark as failures, so nothing here can be produced on a failed check. This setting is kept, and applies again if you switch to a mode that has them.'
-      );
-    }
-    const progressive =
-      (activity === 'crafting' && craftingProgressive) ||
-      (activity === 'salvage' && salvageProgressive);
-    return progressive
-      ? text(
-          'FABRICATE.Admin.Manager.Checks.FailureResults.InertProgressive',
-          'A progressive check spends its rolled value down one ordered list of results, so it has no failure outcome to produce. This setting is kept, and applies again if you switch to a mode that has one.'
-        )
-      : '';
-  });
+  const failurePolicyInertNote = $derived(
+    inertNoteFor(
+      { activity, gatheringD100, resolutionMode, craftingProgressive, salvageProgressive },
+      text
+    )
+  );
 
   // THE ROLL SECTION'S MODE CALLOUT, in the activity's own vocabulary and on `roll` alone.
   const calloutMode = $derived.by(() => {
@@ -786,28 +768,78 @@
     return resolutionMode;
   });
 
-  const activeSectionIssues = $derived(
-    activeReadiness.issues
+  // Transient warnings explain themselves here but never feed a dot, badge or tally. Every notice
+  // is amber, so blocking issues sort first, as the Validation tab orders its rows (issue 2082).
+  const sectionNotices = $derived(
+    [...activeReadiness.issues, ...activeReadiness.transient]
       .filter((issue) => sectionForIssue(issue.id) === activeSection)
+      .sort((a, b) => blockingRank(a) - blockingRank(b))
       .map((issue) => ({
         id: issue.id,
-        tone: issue.severity === 'critical' ? 'warning' : 'info',
-        text: issueSentence(issue.id, issue.data),
+        // `countFaceMissing` is raised once per face kind, so the kind keeps each notice distinct.
+        key: issue.data?.kind ? `${issue.id}:${issue.data.kind}` : issue.id,
+        ...checkIssueText(issue.id, issue.data, text),
+        action: noticeAction(issue),
       }))
   );
+  function blockingRank(issue) {
+    return issueRowStatus(issue) === 'block' ? 0 : 1;
+  }
+  const reviewLabel = text('FABRICATE.Admin.Manager.Checks.Validation.Review', 'Review');
+
+  /** A notice's Review: the control its issue names, else its section, as a Validation row's View. */
+  function reviewIssue(issue) {
+    selectIssue({ activity, section: activeSection }, issueControl(issue));
+  }
+
+  /** The draft writer of the check an activity rolls, chosen as `validationSections` chooses it. */
+  function checkWriterFor(subsystem) {
+    if (subsystem === 'salvage') {
+      if (salvageRouted) return onUpdateSalvageCheckRouted;
+      return salvageProgressive ? onUpdateSalvageCheckProgressive : onUpdateSalvageCheckSimple;
+    }
+    if (subsystem === 'gathering') {
+      return gatheringProgressive
+        ? onUpdateGatheringCheckProgressive
+        : onUpdateGatheringCheckRouted;
+    }
+    if (craftingRouted) return onUpdateCraftingCheck;
+    return craftingProgressive ? onUpdateCraftingCheckProgressive : onUpdateCraftingCheckSimple;
+  }
+
+  /**
+   * Convert a summing counting formula (issue 2006): staged into the draft, so Save applies it and
+   * Discard restores the summing check, then the roll section opens on `Count successes`.
+   */
+  function convertCheck(subsystem) {
+    const section = validationSections.find((row) => row.subsystem === subsystem);
+    if (!section?.check) return;
+    checkWriterFor(subsystem)(convertCountingFormula(section.check));
+    const status = text(
+      'FABRICATE.Admin.Manager.Checks.Count.Convert.Status',
+      'Converted to count successes. The original formula and DCs are kept.'
+    );
+    selectIssue({ activity: subsystem, section: 'roll' }, 'checks-product', status);
+  }
+
+  /** A notice's one action: Convert where its issue converts, else Review. */
+  function noticeAction(issue) {
+    const copy = convertActionCopy(issue);
+    if (!copy) return { label: reviewLabel, onClick: () => reviewIssue(issue) };
+    return {
+      label: text(...copy.label),
+      description: text(...copy.description),
+      onClick: () => convertCheck(activity),
+    };
+  }
 
   // ONE previewed record, three readers, so it lives HERE; two copies is how two surfaces
   // disagree about which record is previewed.
-  let previewActorId = $state(NO_ACTOR_ID);
   let previewRecordId = $state(DEFAULT_RECORD_ID);
   let previewResult = $state(null);
   let previewRolling = $state(false);
 
-  const dcWord = text('FABRICATE.Admin.Manager.Checks.Crafting.TierDc', 'DC');
-  const unroutedLabel = text('FABRICATE.Admin.Manager.Checks.Odds.Unrouted', 'No outcome');
-
   const previewActors = $derived(activity === 'validation' ? [] : listPreviewActors());
-  const previewActor = $derived(resolvePreviewActor(previewActorId));
 
   // THE PROGRESSIVE PREVIEW SANDBOX: a progressive histogram needs an ORDERED list of result
   // difficulties, and that list is SANDBOX STATE ON THE CHECK rather than a record's. Read
@@ -834,18 +866,15 @@
     update({ ...activeCheck, preview: { difficulties: parsePreviewDifficulties(raw) } });
   }
 
-  // A progressive check has no DC, so labelling its records with one would invent a number.
-  const recordsCarryDc = $derived(!isProgressive);
   const previewRecords = $derived(
-    buildPreviewRecords({
-      check: activeCheck,
-      defaultLabel: text('FABRICATE.Admin.Manager.Checks.PreviewAs.DefaultRecord', 'Default'),
-    }).map((record) => ({
-      ...record,
-      label: [record.name, recordsCarryDc ? `${dcWord} ${record.dc}` : '']
-        .filter(Boolean)
-        .join(' · '),
-    }))
+    labelPreviewRecords(
+      buildPreviewRecords({
+        check: activeCheck,
+        defaultLabel: text('FABRICATE.Admin.Manager.Checks.PreviewAs.DefaultRecord', 'Default'),
+      }),
+      { evaluation: activeEvaluation, progressive: isProgressive },
+      text
+    )
   );
   const previewRecord = $derived(
     previewRecords.find((record) => record.id === previewRecordId) ?? previewRecords[0] ?? null
@@ -862,258 +891,74 @@
       record: previewRecord,
     })
   );
-  const previewFormula = $derived(String(previewPlan.formula ?? '').trim());
-  // THE SAME CONTEXT THE RUNNER IS HANDED: it appends the scalar, so a histogram computed
+  const previewAbstaining = $derived(previewAbstention(previewPlan, previewCharacter));
+  // The same context the runner is handed: it places the modifiers, so a histogram computed
   // without this describes a formula nothing rolls.
   const previewModifier = $derived(previewPlan.args?.craftingModifier ?? null);
+  // The previewed actor's flat check-modifier total, which a roll-under strip adds to its target.
+  const previewModifierTotal = $derived.by(() => {
+    if (!previewActor || !previewModifier) return 0;
+    const { scalar } = resolveCheckModifierContribution(
+      previewModifier,
+      makeRollDataExpressionResolver(previewActor)
+    );
+    return Number.isFinite(scalar) ? scalar : 0;
+  });
 
-  const enumeration = $derived(
-    previewFormula === ''
-      ? { enumerable: false, reason: 'no-dice' }
-      : describeFormulaEnumerability(previewFormula, previewActor, {
-          craftingModifier: previewModifier,
-        })
-  );
+  const enumeration = $derived(previewEnumeration(previewPlan, previewAbstaining));
   // `resolved === false` is EXACTLY the unresolved-roll-data refusal, from one signal.
   const previewResolved = $derived(enumeration.reason !== 'unresolved-roll-data');
-
   // The reachable total range the two-band strip is drawn across; null when the formula is not
   // enumerable, the editor falling back to a window around the DC.
-  const previewTrack = $derived.by(() => {
-    if (!enumeration.enumerable) return { min: null, max: null };
-    // THE REACHABLE TOTALS, off the enumeration: a bounded rolling modifier clamps its die.
-    const totals = enumeration.outcomes.map((outcome) => outcome.total);
-    return { min: Math.min(...totals), max: Math.max(...totals) };
+  const previewTrackRange = $derived(previewTrack(enumeration));
+
+  const previewSandbox = $derived({
+    difficulties: previewDifficulties,
+    awardMode: activeCheck?.awardMode || 'equal',
   });
 
-  /** The odds view-model, every branch either enumerating or stating why it did not.
-   *  @returns {object} The model `CheckOddsPanel` renders. */
-  function buildOddsModel() {
-    const kind = previewPlan.kind;
-    if (!kind) return { kind: null };
-    if (enumeration.enumerable !== true) {
-      return { kind, enumerable: false, reason: enumeration.reason };
-    }
-    const { faces, combinations, outcomes } = enumeration;
-    if (kind === 'routed') {
-      const rows = enumerateRoutedOdds({ outcomes, args: previewPlan.args }).map((row) => ({
-        id: row.id || 'unrouted',
-        label: row.name || unroutedLabel,
-        percent: row.percent,
-        success: row.success,
-      }));
-      return { kind, enumerable: true, faces, combinations, rows };
-    }
-    if (kind === 'progressive') return buildProgressiveOdds(outcomes, faces, combinations);
-    const rows = enumeratePassFailOdds({
-      outcomes,
-      args: {
-        dc: previewPlan.dc,
-        comparison: previewPlan.args.thresholdMode === 'exceed' ? 'exceed' : 'meet',
-        triggers: previewPlan.args.triggers,
+  const oddsModel = $derived(
+    buildOddsModel(
+      { plan: previewPlan, enumeration, abstention: previewAbstaining, sandbox: previewSandbox },
+      text
+    )
+  );
+
+  const previewModel = $derived(
+    buildReadoutModel(
+      {
+        plan: previewPlan,
+        result: previewResult,
+        rolling: previewRolling,
+        resolved: previewResolved,
+        abstention: previewAbstaining,
+        character: previewCharacter,
+        activity,
+        activityLabel: activityWord,
+        recordNoun,
+        failureResultPolicy: activeFailureResultPolicy,
+        consumption: previewConsumption,
+        sandbox: previewSandbox,
       },
-    }).map((row) => ({
-      id: row.id,
-      label: row.success
-        ? text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccess', 'Success')
-        : text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeFailure', 'Failure'),
-      percent: row.percent,
-      success: row.success,
-    }));
-    return { kind, enumerable: true, faces, combinations, rows };
-  }
+      text
+    )
+  );
 
-  /**
-   * Progressive bucketing, by AWARD COUNT rather than by tier. An empty sandbox is a stated
-   * absence with the control named, never an invented sample.
-   * @param {Array<object>} outcomes The enumerated outcome space.
-   * @param {?number} faces The die's face count, for a single-die formula.
-   * @param {number} combinations How many assignments the space holds.
-   * @returns {object} The model.
-   */
-  function buildProgressiveOdds(outcomes, faces, combinations) {
-    if (previewDifficulties.length === 0) {
-      return { kind: 'progressive', enumerable: false, reason: SANDBOX_ABSENT };
-    }
-    const rows = enumerateProgressiveOdds({
-      outcomes,
-      difficulties: previewDifficulties,
-      awardMode: activeCheck?.awardMode || 'equal',
-    }).map((row) => ({
-      id: row.id,
-      label: text('FABRICATE.Admin.Manager.Checks.Odds.AwardCount', '{awarded} of {of}')
-        .replace('{awarded}', String(row.awarded))
-        .replace('{of}', String(row.of)),
-      percent: row.percent,
-      success: row.awarded > 0,
-    }));
-    return { kind: 'progressive', enumerable: true, faces, combinations, rows };
-  }
-
-  const oddsModel = $derived(buildOddsModel());
-
-  /** The matched band card: the tier the result object actually names. */
-  function buildBandCard(result) {
-    if (!result) return { name: '', detail: '', success: false };
-    const success = result.success === true;
-    if (previewPlan.kind === 'routed') {
-      return {
-        name:
-          result.outcome ||
-          text('FABRICATE.Admin.Manager.Checks.Simulator.NoOutcome', 'No outcome tier'),
-        detail: success
-          ? text(
-              'FABRICATE.Admin.Manager.Checks.Simulator.BandSuccess',
-              'Counts as a success · the result group bound to this tier is produced.'
-            )
-          : text(
-              'FABRICATE.Admin.Manager.Checks.Simulator.BandFailure',
-              'Counts as a failure · nothing is produced.'
-            ),
-        success,
-      };
-    }
-    if (previewPlan.kind === 'progressive') {
-      return {
-        name: text('FABRICATE.Admin.Manager.Checks.Simulator.AwardValue', 'Awards {value}').replace(
-          '{value}',
-          String(result.value ?? 0)
-        ),
-        detail: text(
-          'FABRICATE.Admin.Manager.Checks.Simulator.AwardDetail',
-          'The value is spent down the recipe’s ordered results, each costing its own difficulty.'
-        ),
-        success: true,
-      };
-    }
-    return {
-      name: success
-        ? text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccess', 'Success')
-        : text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeFailure', 'Failure'),
-      detail: success
-        ? text(
-            'FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccessDesc',
-            'The roll reaches the DC, and the recipe’s result group is produced in full.'
-          )
-        : text(
-            'FABRICATE.Admin.Manager.Checks.Crafting.OutcomeFailureDesc',
-            'The roll misses the DC; nothing is produced, and the failure policy decides the cost.'
-          ),
-      success,
-    };
-  }
-
-  /** The "What happens" rows, each read off the SAME result object the engine would act on.
-   *  @param {object|null} result The runner result.
-   *  @returns {Array<object>} `IconFactRow` inputs. */
-  function buildPreviewFacts(result) {
-    if (!result) return [];
-    const facts = [];
-    const success = result.success === true;
-    facts.push({
-      id: 'result-group',
-      icon: 'fas fa-box-open',
-      title: text('FABRICATE.Admin.Manager.Checks.Simulator.FactResults', 'Result group produced'),
-      subtitle: success
-        ? buildBandCard(result).name
-        : text('FABRICATE.Admin.Manager.Checks.Simulator.FactResultsNone', 'None'),
-    });
-    if (activity !== 'gathering') {
-      const consumes = success || consumeIngredientsOnFail;
-      facts.push({
-        id: 'ingredients',
-        icon: 'fas fa-fire-flame-curved',
-        title: text(
-          'FABRICATE.Admin.Manager.Checks.Simulator.FactIngredients',
-          'Ingredients consumed'
-        ),
-        subtitle: consumes
-          ? text('FABRICATE.Admin.Manager.Checks.Simulator.FactAsListed', 'as listed')
-          : text('FABRICATE.Admin.Manager.Checks.Simulator.FactNotConsumed', 'kept'),
-      });
-    }
-    if (result.data?.breakTools === true || (!success && breakToolsOnFail)) {
-      facts.push({
-        id: 'tools',
-        icon: 'fas fa-hammer',
-        title: text('FABRICATE.Admin.Manager.Checks.Simulator.FactTools', 'Required tools break'),
-        subtitle: '',
-      });
-    }
-    if (result.data?.tierStepApplied) {
-      const step = result.data.tierStepApplied;
-      facts.push({
-        id: 'tier-step',
-        icon: 'fas fa-arrow-up-right-dots',
-        title: text(
-          'FABRICATE.Admin.Manager.Checks.Simulator.FactTierStep',
-          'A trigger moved the tier by {steps}'
-        ).replace('{steps}', String(step.steps)),
-        subtitle: step.stepClamped
-          ? text(
-              'FABRICATE.Admin.Manager.Checks.Simulator.FactTierStepClamped',
-              'clamped at the end of the tier list'
-            )
-          : '',
-      });
-    }
-    if (result.data?.minTierFailed) {
-      facts.push({
-        id: 'min-tier',
-        icon: 'fas fa-ban',
-        title: text(
-          'FABRICATE.Admin.Manager.Checks.Simulator.FactMinTier',
-          'Blocked by the recipe’s minimum success tier'
-        ),
-        subtitle: '',
-      });
-    }
-    return facts;
-  }
-
-  const previewModel = $derived.by(() => {
-    const total = Number(previewResult?.data?.total);
-    const band = buildBandCard(previewResult);
-    return {
-      kind: previewPlan.kind,
-      hasFormula: previewFormula !== '',
-      dynamicDc: previewPlan.dynamicDc === true,
-      resolved: previewResolved,
-      rolling: previewRolling,
-      result: previewResult,
-      total: Number.isFinite(total) ? total : null,
-      dc: previewPlan.dc,
-      margin:
-        previewPlan.kind === 'progressive' || !Number.isFinite(total)
-          ? null
-          : total - previewPlan.dc,
-      breakdown: terseBreakdown(previewResult, previewActor?.name ?? ''),
-      // The die the medallion is captioned with, off the result's own dice bag.
-      dieLabel: previewResult?.data?.diceGroups?.[0]?.group
-        ? `d${String(previewResult.data.diceGroups[0].group).split('d')[1]}`
-        : '',
-      bandName: band.name,
-      bandDetail: band.detail,
-      bandSuccess: band.success,
-      facts: buildPreviewFacts(previewResult),
-    };
-  });
-
-  // A rolled result describes ONE (formula, actor, record) tuple, so any move drops it.
-  const previewSignature = $derived(
-    [
+  // A rolled result describes ONE (formula, actor, record, target) tuple, so any move drops it.
+  const previewSignatureNow = $derived(
+    previewSignature({
       activity,
-      activeMode,
-      previewFormula,
-      previewActorId,
-      previewRecord?.id ?? '',
-      previewPlan.dc,
-    ].join('\0')
+      mode: activeMode,
+      plan: previewPlan,
+      actorId: previewActorId,
+      record: previewRecord,
+      tier: activeCheck?.tiers?.find((tier) => tier.id === previewRecord?.id),
+    })
   );
   let adoptedPreviewSignature = $state('');
   $effect(() => {
-    if (previewSignature === adoptedPreviewSignature) return;
-    adoptedPreviewSignature = previewSignature;
+    if (previewSignatureNow === adoptedPreviewSignature) return;
+    adoptedPreviewSignature = previewSignatureNow;
     previewResult = null;
   });
   // A record the check no longer offers must not stay selected.
@@ -1123,11 +968,14 @@
     previewRecordId = previewRecords[0].id;
   });
 
-  async function rollPreview() {
-    if (previewRolling) return;
+  async function rollPreview(additionalDice = 0) {
+    if (previewRolling || previewAbstaining) return;
+    const rolledFor = previewSignatureNow;
     previewRolling = true;
     try {
-      previewResult = await runCheckPreview(previewPlan);
+      const result = await runCheckPreview(previewPlan, additionalDice);
+      // A result from inputs that have since changed never publishes.
+      if (previewSignatureNow === rolledFor) previewResult = result;
     } finally {
       previewRolling = false;
     }
@@ -1137,29 +985,35 @@
     previewRecordId = id;
   }
 
+  // A counting Formula card's inset and reading: this preview's placement and its own odds model.
+  const countPreview = $derived({ placement: countPreviewPlacement(previewPlan), odds: oddsModel });
+
   // Spread rather than restated at ten call sites: the prop list IS the contract.
   const routedPreviewProps = $derived({
     previewRecords,
     previewRecordId: previewRecord?.id ?? '',
     previewDcOverride: previewRecord?.dc ?? null,
     previewLabel: previewRecord?.name ?? '',
+    previewCharacter,
+    previewModifierTotal,
+    trackMin: previewTrackRange.min,
+    trackMax: previewTrackRange.max,
+    countPreview,
     onSelectPreviewRecord: selectPreviewRecord,
   });
   const simplePreviewProps = $derived({
     previewRecords,
     previewRecordId: previewRecord?.id ?? '',
     previewLabel: previewRecord?.name ?? '',
-    trackMin: previewTrack.min,
-    trackMax: previewTrack.max,
+    trackMin: previewTrackRange.min,
+    trackMax: previewTrackRange.max,
+    previewCharacter,
+    previewModifierTotal,
+    countPreview,
     onSelectPreviewRecord: selectPreviewRecord,
   });
   const previewActorSummary = $derived(
-    previewActor
-      ? ''
-      : text(
-          'FABRICATE.Admin.Manager.Checks.PreviewAs.NoActorHint',
-          'With no actor selected every roll-data key reads as 0.'
-        )
+    previewActorNote({ plan: previewPlan, actor: previewActor }, text)
   );
 </script>
 
@@ -1216,11 +1070,7 @@
     {recordNoun}
     {recordNounPlural}
     inertNote={failurePolicyInertNote}
-    value={activity === 'salvage'
-      ? salvageFailureResultPolicy
-      : activity === 'gathering'
-        ? gatheringFailureResultPolicy
-        : craftingFailureResultPolicy}
+    value={activeFailureResultPolicy}
     onChange={(next) => {
       if (activity === 'salvage') return onUpdateSalvageFailureResultPolicy(next);
       if (activity === 'gathering') return onUpdateGatheringFailureResultPolicy(next);
@@ -1344,6 +1194,23 @@
       data-keyboard-focus="true"
       bind:this={sectionPanel}
     >
+      <!-- The section's warning dot, explained IN the panel and first in it, as the prototype
+           draws it: amber, title over detail, with a Review action. -->
+      {#if activity !== 'validation' && !routeIsOff && sectionNotices.length > 0}
+        <div class="manager-checks-section-notices" data-checks-section-notices={activeSection}>
+          {#each sectionNotices as issue (issue.key)}
+            <Notice
+              tone="warning"
+              title={issue.title}
+              detail={issue.detail}
+              action={issue.action}
+              dataAttr="data-checks-section-notice"
+              dataValue={issue.id}
+            />
+          {/each}
+        </div>
+      {/if}
+
       {#if paneHead && !routeIsOff}
         <header class="manager-checks-pane-head" data-checks-pane-head={activeSection}>
           <h2 class="manager-checks-pane-title">{paneHead.title}</h2>
@@ -1351,10 +1218,8 @@
         </header>
       {/if}
 
-      <!-- The section's warning dot, explained IN the panel, above the section content rather
-           than inside each branch, so every route reaches one insertion point. -->
-      <!-- WHAT THIS MODE DOES reads first: it is a standing statement about the mode, where an
-           issue callout is about THIS check. -->
+      <!-- WHAT THIS MODE DOES stays a callout: it documents the mode, where a notice reports
+           THIS check's state. -->
       {#if activity !== 'validation' && !routeIsOff && activeSection === 'roll'}
         <CheckModeCallout
           {activity}
@@ -1364,27 +1229,14 @@
         />
       {/if}
 
-      {#if activity !== 'validation' && !routeIsOff && activeSectionIssues.length > 0}
-        <div class="manager-checks-section-callouts" data-checks-section-callouts={activeSection}>
-          <!-- The tone is DERIVED and both values stand: a readiness issue is a statement about the
-                         live record, which is what `info` is for, and a critical one is the hazard. -->
-          {#each activeSectionIssues as issue (issue.id)}
-            <Callout
-              tone={issue.tone}
-              text={issue.text}
-              dataAttr="data-checks-section-callout"
-              dataValue={issue.id}
-            />
-          {/each}
-        </div>
-      {/if}
-
       {#if activity === 'validation'}
         <ChecksValidationTab
           sections={validationSections}
+          previewActor={previewCharacter}
           {dirty}
           {dirtyActivities}
           onSelectIssue={selectIssue}
+          onConvert={convertCheck}
         />
       {:else if routeIsOff}
         <!-- The check is optional and the GM turned it off, so the way back on is IN the panel. -->
@@ -1409,7 +1261,7 @@
           </EmptyState>
         </div>
       {:else if activity === 'crafting' && craftingAlchemy}
-        <div class="manager-checks-editor-stack" data-checks-panel="crafting">
+        <div class="manager-checks-editor-stack" data-checks-panel="crafting" {...evaluationAttrs}>
           {#if activeSection === 'roll'}
             <InspectorCard>
               <h3 class="manager-checks-card-title">
@@ -1496,6 +1348,26 @@
                 />
                 <ToggleCard
                   variant="is-info"
+                  icon="fas fa-hammer"
+                  section="alchemy-break-tools-on-fail"
+                  field="breakToolsOnFail"
+                  title={text(
+                    'FABRICATE.Admin.SystemSettings.Alchemy.BreakToolsOnFail',
+                    'Break tools on a failed brew'
+                  )}
+                  sub={text(
+                    'FABRICATE.Admin.SystemSettings.Alchemy.BreakToolsOnFailDesc',
+                    'A matched brew that fails its check breaks the tools it uses, the same as a failed crafting check. Off by default.'
+                  )}
+                  toggleLabel={text(
+                    'FABRICATE.Admin.SystemSettings.Alchemy.BreakToolsOnFail',
+                    'Break tools on a failed brew'
+                  )}
+                  on={breakToolsOnFail}
+                  onToggle={(next) => onUpdateCraftingConsumption({ breakToolsOnFail: next })}
+                />
+                <ToggleCard
+                  variant="is-info"
                   icon="fas fa-clock-rotate-left"
                   section="alchemy-show-attempt-history"
                   field="showAttemptHistoryToPlayers"
@@ -1525,6 +1397,7 @@
               {appliedModifiers}
               modifierPolicy={appliedModifierPolicy}
               {recordNoun}
+              {recordNounPlural}
               value={craftingCheck}
               {resolutionMode}
               section={activeSection}
@@ -1555,12 +1428,13 @@
         <!-- Non-alchemy crafting: the per-mode editor plus the system-level failure consumption
                      policy. The wrapper keeps `data-checks-panel="crafting"` but deliberately NOT the
                      `manager-checks-page` class, which a test asserts is absent here. -->
-        <div class="manager-checks-editor-stack" data-checks-panel="crafting">
+        <div class="manager-checks-editor-stack" data-checks-panel="crafting" {...evaluationAttrs}>
           {#if craftingRouted}
             <CraftingCheckEditor
               {appliedModifiers}
               modifierPolicy={appliedModifierPolicy}
               {recordNoun}
+              {recordNounPlural}
               value={craftingCheck}
               {resolutionMode}
               section={activeSection}
@@ -1583,6 +1457,8 @@
             />
           {:else}
             <ProgressiveCraftingCheckEditor
+              {previewCharacter}
+              {countPreview}
               {recordNoun}
               {appliedModifiers}
               modifierPolicy={appliedModifierPolicy}
@@ -1659,12 +1535,13 @@
           {/if}
         </div>
       {:else if activity === 'salvage'}
-        <div class="manager-checks-editor-stack" data-checks-panel="salvage">
+        <div class="manager-checks-editor-stack" data-checks-panel="salvage" {...evaluationAttrs}>
           {#if salvageRouted}
             <CraftingCheckEditor
               {appliedModifiers}
               modifierPolicy={appliedModifierPolicy}
               {recordNoun}
+              {recordNounPlural}
               value={salvageCheckRouted}
               showTiers={false}
               section={activeSection}
@@ -1675,6 +1552,8 @@
             />
           {:else if salvageProgressive}
             <ProgressiveCraftingCheckEditor
+              {previewCharacter}
+              {countPreview}
               {recordNoun}
               {appliedModifiers}
               modifierPolicy={appliedModifierPolicy}
@@ -1790,9 +1669,11 @@
           {/if}
         </div>
       {:else if activity === 'gathering'}
-        <div class="manager-checks-editor-stack" data-checks-panel="gathering">
+        <div class="manager-checks-editor-stack" data-checks-panel="gathering" {...evaluationAttrs}>
           {#if gatheringProgressive}
             <ProgressiveCraftingCheckEditor
+              {previewCharacter}
+              {countPreview}
               {recordNoun}
               {appliedModifiers}
               modifierPolicy={appliedModifierPolicy}
@@ -1807,6 +1688,7 @@
               {appliedModifiers}
               modifierPolicy={appliedModifierPolicy}
               {recordNoun}
+              {recordNounPlural}
               value={gatheringCheckRouted}
               showTiers={false}
               section={activeSection}
@@ -1868,8 +1750,8 @@
 </div>
 
 <style>
-  /* Layout only: the strip is the shared `Callout` primitive and states its own appearance. */
-  .manager-checks-section-callouts {
+  /* Layout only: each notice is the shared `Notice` primitive and states its own appearance. */
+  .manager-checks-section-notices {
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-2);

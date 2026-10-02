@@ -1,11 +1,10 @@
 /** Issue 1286 — the PLAYER complication seam, end to end through the two player stores. */
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 
 import { createSvelteModuleCompiler } from '../helpers/compile-svelte-module.js';
+import { bulkFacade } from '../../src/bootstrap/bulkFacade.js';
 import {
   authoredComplication,
   visibleComplicationPair,
@@ -16,7 +15,6 @@ import { ResolutionModeService } from '../../src/systems/ResolutionModeService.j
 
 const GM = { isGM: true };
 const ORDER_KEY = 'salvage:sys:ingot';
-const repoRoot = resolve(import.meta.dirname, '../..');
 
 let compiler;
 let createInventoryStore;
@@ -702,18 +700,20 @@ describe('the player complication seam', () => {
   });
 
   describe("the bulk forecast's stored-order seam", () => {
-    it('is wired in main.js, under the same edge the engine reads', () => {
-      // The bulk slice cannot be imported under `node --test` (it reaches Foundry globals), so the
-      // composition is pinned against its source, as the complication socket suite pins its apply.
-      const source = readFileSync(resolve(repoRoot, 'src/bootstrap/bulkFacade.js'), 'utf8');
-      const start = source.indexOf('_getBulkSalvageService() {');
-      assert.ok(start !== -1, 'src/bootstrap/bulkFacade.js should declare _getBulkSalvageService');
-      const body = source.slice(start, source.indexOf('\n  }', start));
+    it('is wired in the bulk facade, under the same edge the engine reads', () => {
+      // The facade slice is driven with a stub `this`, so the seam the service holds is the one
+      // the composition built: BulkSalvageService must be given the same result-order edge
+      // CraftingEngine has.
+      const asked = [];
+      const facade = {
+        _readPlayerResultOrder: (entry) => asked.push(entry) && ['r-b', 'r-a'],
+      };
+      const service = bulkFacade._getBulkSalvageService.call(facade);
+      const entry = { actor: { id: 'a1' }, systemId: 'sys', componentId: 'comp' };
 
-      assert.ok(
-        /getPlayerResultOrder:\s*\(?entry\)?\s*=>\s*this\._readPlayerResultOrder\(entry\)/.test(body),
-        'BulkSalvageService must be given the same result-order edge CraftingEngine has'
-      );
+      assert.deepEqual(service.getPlayerResultOrder(entry), ['r-b', 'r-a']);
+      assert.equal(asked.length, 1);
+      assert.equal(asked[0], entry, 'the very entry reaches the facade reader');
     });
   });
 });

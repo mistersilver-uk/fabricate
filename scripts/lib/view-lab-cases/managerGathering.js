@@ -5,8 +5,49 @@
 import {
   ANCHORED_POPOVER_SOURCES,
   ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB,
+  GATHERING_ROUTE_MODEL_PATTERN,
 } from './caseConstants.js';
-import { chooseSelectOption, managerCase } from './caseFactories.js';
+import { chooseSelectOption, managerCase, previewAsActor } from './caseFactories.js';
+
+/**
+ * The gathering task check override (issue 2005, R3), one per state of the approved prototype's
+ * frames 23 and 24, on Smithing's Prospect task under `checkOverride`. `sees` is the Player sees
+ * state; a `resolved` case chooses a character in the task's own Preview-as picker, and `claim`
+ * adds the field's own state. `count` is issue 2006's: one successes needed Stepper, no presets.
+ */
+const OPEN_PROSPECT_TASK = Object.freeze([
+  { selector: '#manager-gathering-nav-tasks' },
+  {
+    selector:
+      '[data-gathering-task-id="sm-task-prospect"] .manager-icon-button[aria-label^="Edit"]',
+  },
+]);
+const TASK_PREVIEW = '[data-gathering-task-dc] [data-override-preview-actor]';
+const taskOverrideCase = ({ id, label, field, frame, sees, claim = '' }) =>
+  managerCase({
+    id,
+    label: `Manager — Gathering task check override, ${label} (prototype state ${frame})`,
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: {
+      system: 'lab-smithing',
+      checkOverride: id.slice('manager-gathering-task-editor-check-'.length),
+    },
+    steps: [
+      'Gathering',
+      ...OPEN_PROSPECT_TASK,
+      { selector: '[data-gathering-task-dc]', scroll: true },
+      ...(sees === 'resolved' ? previewAsActor('lab-actor-idrin', TASK_PREVIEW) : []),
+    ],
+    expectView: 'gathering-task-edit',
+    expectSelector: `.fabricate-manager [data-gathering-task-dc][data-gathering-task-override-field="${field}"]${claim} [data-override-player-sees="${sees}"]`,
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/component\/(OverridePlayerSees\.svelte|overridePlayerSees\.js)$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/PreviewAsPicker\.svelte$/,
+    ],
+  });
 
 export const CASES = Object.freeze([
   // The state it would show is reached by flipping an inherit switch, and in the View Lab that write never reaches the screen.
@@ -20,6 +61,7 @@ export const CASES = Object.freeze([
     expectView: 'environments',
     kinds: ['manager', 'environments'],
     sourceMatches: [
+      GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView)/,
       ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB,
@@ -36,6 +78,7 @@ export const CASES = Object.freeze([
     position: { width: 1000, height: 700 },
     kinds: ['manager', 'environments', 'responsive'],
     sourceMatches: [
+      GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView)/,
       // This case stacks the browse column above the rail, so it is the frame that proves the
@@ -58,6 +101,7 @@ export const CASES = Object.freeze([
     expectSelector: '.fabricate-manager [data-gathering-task-fact="environments"]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
+      GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringTasksBrowserView)\.svelte$/,
       // This frame's `expectSelector` is a fact of the task inspector, which issue 1707 phase 2
       // moved out of the root: without this the leaf publishes environment-editor frames instead.
@@ -112,9 +156,12 @@ export const CASES = Object.freeze([
           '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
       },
     ],
+    // Hearth & Herb, the palette where the control outline is weakest (issue 2151).
+    themeVariants: ['hearth-herb'],
     expectView: 'gathering-task-edit',
     kinds: ['manager', 'environments'],
     sourceMatches: [
+      GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView)/,
     ],
@@ -157,7 +204,10 @@ export const CASES = Object.freeze([
         '[data-gathering-task-node-interval-unit]',
       ].map((target) => ({ container: '[data-gathering-task-nodes]', target })),
       kinds: ['manager', 'environments', 'responsive'],
-      sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/],
+      sourceMatches: [
+        GATHERING_ROUTE_MODEL_PATTERN,
+        /^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/,
+      ],
     })
   ),
   // The gathering studio's first open-panel frame (issue 1510), and the only way to photograph a
@@ -226,6 +276,7 @@ export const CASES = Object.freeze([
     expectContained: [{ container: '.fabricate-manager', target: '.fabricate-select-popover' }],
     kinds: ['manager', 'environments'],
     sourceMatches: [
+      GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/,
       ...ANCHORED_POPOVER_SOURCES,
     ],
@@ -291,6 +342,9 @@ export const CASES = Object.freeze([
         ),
         kinds: ['manager', 'environments', 'responsive'],
         sourceMatches: [
+          // One dirty-draft frame per editor stands for the route model, and the Required Tools
+          // frame for the task's tool-reference handlers (issue 1721).
+          ...(suffix === 'normal' ? [GATHERING_ROUTE_MODEL_PATTERN] : []),
           /^src\/ui\/svelte\/apps\/manager\/Gathering(TaskEditView|EventEditView)\.svelte$/,
         ],
       });
@@ -315,6 +369,7 @@ export const CASES = Object.freeze([
     expectSelector: '[data-gathering-task-results="straight"] [data-recipe-result-item]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
+      GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringTaskEditView)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe\/Recipe(ResultGroupCard|ResultsSection)\.svelte$/,
     ],
@@ -354,6 +409,7 @@ export const CASES = Object.freeze([
       expectScrollable: 'main.manager-gathering-task-edit-view',
       kinds: ['manager', 'environments', 'responsive'],
       sourceMatches: [
+        GATHERING_ROUTE_MODEL_PATTERN,
         /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringTaskEditView)\.svelte$/,
         /^src\/ui\/svelte\/apps\/manager\/recipe\/Recipe(ResultGroupCard|ResultsSection)\.svelte$/,
       ],
@@ -378,6 +434,7 @@ export const CASES = Object.freeze([
     expectSelector: '[data-gathering-routed-tier-status="lab-abundant"][data-match-count="1"]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
+      GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringTaskEditView)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe\/Recipe(ResultGroupCard|ResultsSection)\.svelte$/,
     ],
@@ -401,6 +458,7 @@ export const CASES = Object.freeze([
     expectSelector: '[data-gathering-routed-tier-status="lab-abundant"][data-match-count="0"]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
+      GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringTaskEditView)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe\/Recipe(ResultGroupCard|ResultsSection)\.svelte$/,
     ],
@@ -429,6 +487,8 @@ export const CASES = Object.freeze([
       '.fabricate-manager .manager-travel-popover [data-gathering-task-availability-option="biomes"]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
+      // The biome options are the modifier handlers' vocabulary read (issue 1721).
+      GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(EventEditView|TaskEditView)\.svelte$/,
       ...ANCHORED_POPOVER_SOURCES,
     ],
@@ -454,6 +514,7 @@ export const CASES = Object.freeze([
     position: { width: 1000, height: 720 },
     kinds: ['manager', 'environments', 'responsive'],
     sourceMatches: [
+      GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView)/,
     ],
@@ -474,7 +535,10 @@ export const CASES = Object.freeze([
     ],
     expectView: 'environment-edit',
     kinds: ['manager', 'environments'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/,
+      GATHERING_ROUTE_MODEL_PATTERN,
+    ],
   }),
   ...[
     { suffix: 'normal', width: 1280, height: 820 },
@@ -529,6 +593,7 @@ export const CASES = Object.freeze([
       })),
       kinds: ['manager', 'environments', 'responsive'],
       sourceMatches: [
+        GATHERING_ROUTE_MODEL_PATTERN,
         /^src\/ui\/svelte\/apps\/manager\/environment\/EnvironmentOverviewTab\.svelte$/,
       ],
     });
@@ -560,6 +625,8 @@ export const CASES = Object.freeze([
     expectContained: [{ container: '.fabricate-manager', target: '.fabricate-select-popover' }],
     kinds: ['manager', 'environments'],
     sourceMatches: [
+      // The danger levels are the modifier handlers' vocabulary read (issue 1721).
+      GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/environment\/EnvironmentOverviewTab\.svelte$/,
       ...ANCHORED_POPOVER_SOURCES,
     ],
@@ -587,6 +654,7 @@ export const CASES = Object.freeze([
       ' [data-record-inspector="event"]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
+      GATHERING_ROUTE_MODEL_PATTERN,
       ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB,
       /^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/,
     ],
@@ -605,6 +673,7 @@ export const CASES = Object.freeze([
     expectSelector: '.fabricate-manager [data-gathering-event-fact="environments"]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
+      GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView)/,
       // The facts this case exists to show are computed and rendered here.
@@ -634,6 +703,7 @@ export const CASES = Object.freeze([
     expectView: 'gathering-event-edit',
     kinds: ['manager', 'environments'],
     sourceMatches: [
+      GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView)/,
       // This is the only frame that draws the event half of the shared modifier panel, and neither
@@ -669,11 +739,65 @@ export const CASES = Object.freeze([
       '.fabricate-manager .manager-inspector [data-gathering-drop-condition-modifiers="biome"]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
+      GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringModifierEditor\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringTaskInspector\.svelte$/,
       // And the rail that renders that leaf, since phase 3 moved it out of the root too.
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringInspectorRail\.svelte$/,
     ],
+  }),
+  taskOverrideCase({
+    id: 'manager-gathering-task-editor-check-fixed-over',
+    label: 'higher is better, fixed DC',
+    field: 'dcOverride',
+    frame: 23,
+    sees: 'fixed',
+  }),
+  taskOverrideCase({
+    id: 'manager-gathering-task-editor-check-fixed-under',
+    label: 'lower is better, fixed target',
+    field: 'dcOverride',
+    frame: 23,
+    sees: 'fixed',
+  }),
+  taskOverrideCase({
+    id: 'manager-gathering-task-editor-check-add',
+    label: 'character value, added adjustment, a character chosen',
+    field: 'adjustmentOverride',
+    frame: 24,
+    sees: 'resolved',
+  }),
+  taskOverrideCase({
+    id: 'manager-gathering-task-editor-check-multiply',
+    label: 'character value, multiplied adjustment, a character chosen',
+    field: 'adjustmentOverride',
+    frame: 24,
+    sees: 'resolved',
+  }),
+  taskOverrideCase({
+    id: 'manager-gathering-task-editor-check-default',
+    label: 'character value, system default, no character chosen',
+    field: 'adjustmentOverride',
+    frame: 24,
+    sees: 'no-character',
+  }),
+  // A kind switch left this kept override invalid (issue 2078); the field itself names it.
+  taskOverrideCase({
+    id: 'manager-gathering-task-editor-check-invalid',
+    label: 'character value, a kept override invalid for its kind',
+    field: 'adjustmentOverride',
+    frame: 24,
+    sees: 'adjustment-invalid',
+  }),
+  taskOverrideCase({
+    id: 'manager-gathering-task-editor-check-count',
+    label: 'counting successes, one successes needed stepper',
+    field: 'successesOverride',
+    frame: 25,
+    sees: 'count',
+    claim:
+      ':has([data-gathering-task-successes-override][placeholder="System default"])' +
+      ':has([data-gathering-task-override-kept])',
   }),
 ]);

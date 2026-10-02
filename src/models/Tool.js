@@ -1,10 +1,7 @@
 /**
- * A system-owned library Tool shared by crafting, salvage and gathering. Its field contract — the
- * optional `componentId` link, the tool's own source references as the matching basis, and the
- * `breakage` / `checkBreakable` / `onBreak` / `repairRequirements` shapes — is the data-models
- * "Tool" section, with `flags.fabricate.toolUsage` and `flags.fabricate.toolBroken` as its item-flag
- * conventions. The flagBroken action's " (broken)" name suffix is display-only and idempotent; the
- * flag, never the name, is the authoritative presence-gate disqualifier.
+ * A system library Tool for crafting, salvage and gathering; the field contract is `data-models`
+ * "Tool", with `flags.fabricate.toolUsage` and `toolBroken` on items. The " (broken)" name suffix
+ * is display-only and idempotent; the flag, never the name, disqualifies a tool.
  */
 import { getFabricateFlag, setFabricateFlag } from '../config/flags.js';
 import { stringOnlyIdList as normalizeIdList } from '../utils/scalars.js';
@@ -172,13 +169,10 @@ export class Tool {
     return this.label.trim() || this.name || fallback;
   }
 
-  /** Validate the Tool against the spec contract. */
   validate() {
     const errors = [];
 
-    // A first-class tool is valid with EITHER a managed-component link (`componentId`) OR its own
-    // source references (`registeredItemUuid`/`originItemUuid`); a tool with NEITHER cannot be
-    // matched, so it is invalid (issue 561).
+    // Needs a `componentId` or its own source references, or it cannot be matched (issue 561).
     const hasSourceRefs = !!(this.registeredItemUuid || this.originItemUuid);
     if (!this.componentId && !hasSourceRefs) {
       errors.push('a tool requires either a componentId or its own source references');
@@ -235,8 +229,7 @@ export class Tool {
         this.componentId &&
         target.componentId === this.componentId
       ) {
-        // Only meaningful when the tool HAS a componentId; a null-component (item-sourced) tool can
-        // never collide with its own component id, so the differ-check is skipped.
+        // An item-sourced tool has no component id to collide with.
         errors.push('onBreak.replacementTarget componentId must differ from componentId');
       }
     }
@@ -257,7 +250,7 @@ export class Tool {
     return { valid: errors.length === 0, errors };
   }
 
-  /** Serialize to a plain JSON-safe object containing only spec-defined fields. */
+  /** Only spec-defined fields. */
   toJSON() {
     return {
       ...(this.id && { id: this.id }),
@@ -285,7 +278,6 @@ export class Tool {
     };
   }
 
-  /** Deserialize from a plain object. */
   static fromJSON(data) {
     return new Tool(data);
   }
@@ -295,9 +287,7 @@ export class Tool {
     const mode = this.breakage.mode;
 
     if (mode === 'limitedUses') {
-      // Prefer the authoritative `toolUsage` flag; fall back to the legacy catalyst usage flag
-      // (`catalystItemUsage`) so items already degraded as catalysts keep their used count after
-      // the 0.6.0 Catalyst→Tool migration.
+      // The legacy `catalystItemUsage` flag keeps pre-0.6.0 catalyst wear.
       const usage = getFabricateFlag(item, 'toolUsage', null) ||
         getFabricateFlag(item, 'catalystItemUsage', null) || { timesUsed: 0 };
       const timesUsed = Number(usage?.timesUsed || 0);
@@ -339,19 +329,16 @@ export class Tool {
     return { broken: false, mode, evidence: {} };
   }
 
-  /** Increment the usage counter on an owned tool item. */
   async applyUsage(item) {
     if (this.breakage.mode !== 'limitedUses') return;
 
-    // Seed from `toolUsage`, falling back to the legacy `catalystItemUsage` so the very first
-    // post-migration write continues the catalyst-era count rather than resetting it.
+    // The legacy `catalystItemUsage` seeds the first post-0.6.0 write.
     const current = getFabricateFlag(item, 'toolUsage', null) ||
       getFabricateFlag(item, 'catalystItemUsage', null) || { timesUsed: 0 };
     const timesUsed = Number(current?.timesUsed || 0) + 1;
     await setFabricateFlag(item, 'toolUsage', { timesUsed });
   }
 
-  /** Apply the configured on-break action to an owned tool item. */
   async applyBreakage({ item, actor, createReplacement } = {}) {
     const mode = this.onBreak.mode;
 

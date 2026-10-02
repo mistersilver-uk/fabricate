@@ -1,21 +1,9 @@
 /**
- * GM maintenance action + settings-menu button ("Repair Item Data") that reconciles
- * EVERY PROJECTION of a definition's resolved source document — durable identity and
- * derived display snapshots alike.
- *
- * Identity: it strips a transitive `_stats.duplicateSource` (so future inventory copies
- * link to the source item's own identity, not a template it was copied from), stamps the
- * durable `flags.fabricate.componentId` / `recipeItemDefinitionId`, and re-points owned
- * copies that a duplicate mislabelled.
- *
- * Descriptions (issue 800): each component and recipe-item definition resolves its own
- * source reference — including sources in LOCKED system/module compendiums — and its
- * stored description is refreshed to the enricher-resolved plain text, so a content link
- * reads as the referenced item's name instead of raw `@UUID[…]` directive text.
- *
- * Foundry globals (`foundry.applications.api.*`, `game`, `ui`) are referenced lazily
- * inside functions so importing this module never evaluates a `class extends
- * foundry…` at load time — keeping it safe to import under the test harness.
+ * The GM "Repair Item Data" action, reconciling every projection of a definition's source.
+ * Identity: strip a transitive `_stats.duplicateSource`, stamp the durable flags, re-point
+ * mislabelled owned copies. Descriptions (issue 800): re-resolve each source, locked compendiums
+ * included, to plain text. Foundry globals are read lazily, so importing it evaluates no
+ * `class extends foundry…`.
  */
 
 import { hasUnresolvedDirectives } from '../utils/plainTextDescription.js';
@@ -30,7 +18,6 @@ function localize(key, data = null) {
   return i18n?.localize?.(key) ?? key;
 }
 
-/** Toast the description leg's outcome. */
 function reportDescriptionOutcome(descriptions) {
   if (!descriptions) return;
   const { refreshed = 0, skipped = 0 } = descriptions;
@@ -47,7 +34,7 @@ function reportDescriptionOutcome(descriptions) {
   }
 }
 
-/** Run the repair and toast the result; `null` when the crafting system manager is unavailable. */
+/** `null` when the crafting system manager is unavailable. */
 export async function runItemDataRepair() {
   const manager = globalThis.game?.fabricate?.getCraftingSystemManager?.();
   if (!manager || typeof manager.repairItemData !== 'function') {
@@ -86,7 +73,6 @@ export async function runItemDataRepair() {
   }
 }
 
-/** Confirm with the GM (DialogV2) then run the repair. */
 export async function openRepairItemDataDialog() {
   if (!globalThis.game?.user?.isGM) return;
 
@@ -98,9 +84,7 @@ export async function openRepairItemDataDialog() {
 
   const confirmed = await DialogV2.wait({
     window: { title: localize('FABRICATE.Settings.RepairItemData.Title') },
-    // Two paragraphs, not one: the consent-bearing half ("REPLACES … will be overwritten") is its
-    // own visual unit rather than a clause buried at the end of a ninety-word block the GM has
-    // already stopped reading.
+    // The consent-bearing "REPLACES" half is its own paragraph, not buried in a long block.
     content:
       `<p>${localize('FABRICATE.Settings.RepairItemData.BodyIdentity')}</p>` +
       `<p>${localize('FABRICATE.Settings.RepairItemData.BodyDescriptions')}</p>`,
@@ -123,10 +107,7 @@ export async function openRepairItemDataDialog() {
   if (confirmed === true) await runItemDataRepair();
 }
 
-/**
- * How many stored component / recipe-item descriptions still carry an unresolved enricher
- * directive.
- */
+/** Stored descriptions still carrying an unresolved enricher directive. */
 export function countUnresolvedDirectiveDescriptions(systems = []) {
   let count = 0;
   for (const system of systems) {
@@ -153,10 +134,6 @@ export function notifyUnresolvedItemDescriptions() {
   return count;
 }
 
-/**
- * Register the "Repair Item Data" button into Fabricate's module settings (the same panel as the
- * theme selector).
- */
 export function registerRepairItemDataMenu() {
   return registerDialogSettingsMenu({
     key: REPAIR_MENU_KEY,

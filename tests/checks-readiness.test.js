@@ -10,6 +10,7 @@ import {
   CHECK_READINESS_MODES,
   CHECK_SECTION_IDS,
   evaluateCheckReadiness,
+  issueControl,
   readinessModeForSlot,
   sectionForIssue,
 } from '../src/ui/svelte/apps/manager/checks/checksReadiness.js';
@@ -19,6 +20,7 @@ import {
 } from '../src/systems/checkModifierResolver.js';
 import {
   CHECK_ISSUE_LABELS,
+  CHECK_ISSUE_TITLES,
   CHECK_TICK_LABELS,
   checkIssueCopy,
   interpolate,
@@ -147,6 +149,198 @@ describe('evaluateCheckReadiness', () => {
   });
 });
 
+// The advantage rule's own readiness (issue 2007): `keep` against `findKeepGroup`'s proof and
+// `bonus` against the Studio's grammar, gated to sum and never firing under `off` or count.
+describe('evaluateCheckReadiness: advantage (issue 2007)', () => {
+  const issue = (issues, id) => issues.find((entry) => entry.id === id);
+
+  it('flags a keep-mode check whose first dice group findKeepGroup refuses', () => {
+    for (const rollFormula of [
+      '(1d20+2)*2',
+      'max(1d20, 10)',
+      'floor(1d20/2)',
+      '{1d20,1d20}kh',
+      '2d20kh1 + 1d6',
+      '1d6x + 1d20',
+      '(@skills.x.rank)d20',
+      '10 - 1d20',
+      '0d20 + 5',
+    ]) {
+      const { issues } = evaluateCheckReadiness(
+        { rollFormula, advantage: { mode: 'keep' } },
+        { mode: 'simple' }
+      );
+      const found = issue(issues, 'advantageKeepNoDie');
+      assert.ok(found, `${rollFormula} must raise advantageKeepNoDie`);
+      assert.equal(found.severity, 'warning');
+      assert.equal(sectionForIssue('advantageKeepNoDie'), 'roll');
+      assert.equal(issueControl(found), 'checks-advantage-mode');
+    }
+  });
+
+  it('raises nothing for a dice-free formula, even in keep mode', () => {
+    const { issues } = evaluateCheckReadiness(
+      { rollFormula: '@skill + 5', advantage: { mode: 'keep' } },
+      { mode: 'simple' }
+    );
+    assert.equal(issue(issues, 'advantageKeepNoDie'), undefined);
+    assert.equal(issue(issues, 'advantageKeepAfterReference'), undefined);
+  });
+
+  it('raises nothing for a qualifying first group with no preceding reference', () => {
+    const { issues } = evaluateCheckReadiness(
+      { rollFormula: '1d20 + 3', advantage: { mode: 'keep' } },
+      { mode: 'simple' }
+    );
+    assert.equal(issues.length, 0);
+  });
+
+  it('flags a keep-mode check whose qualifying group follows a character value', () => {
+    const { issues } = evaluateCheckReadiness(
+      { rollFormula: '@prof + 1d20', advantage: { mode: 'keep' } },
+      { mode: 'simple' }
+    );
+    const found = issue(issues, 'advantageKeepAfterReference');
+    assert.ok(found);
+    assert.equal(found.severity, 'warning');
+    assert.deepEqual(found.data, { n: 1, dN: 'd20' });
+    assert.equal(issueControl(found), 'checks-advantage-mode');
+    assert.equal(
+      interpolate(checkIssueCopy('advantageKeepAfterReference').fallback, found.data),
+      "A character value comes before the formula's first dice group. If that value rolls dice, advantage still applies only to 1d20."
+    );
+  });
+
+  it('reads the formula after the retirement shim, as the engine rolls it', () => {
+    for (const rollFormula of ['@craftingmod + 1d20', '2 + @craftingmod + 1d20']) {
+      const { issues } = evaluateCheckReadiness(
+        { rollFormula, advantage: { mode: 'keep' } },
+        { mode: 'simple' }
+      );
+      assert.equal(issue(issues, 'advantageKeepAfterReference'), undefined, rollFormula);
+      assert.equal(issue(issues, 'advantageKeepNoDie'), undefined, rollFormula);
+    }
+  });
+
+  it('flags a bonus expression the grammar refuses, including empty', () => {
+    for (const bonusExpression of ['', '1d6x', '@prof', '1d6*2', '(1d6)', '1d6kh1', '1d6 − 1']) {
+      const { issues } = evaluateCheckReadiness(
+        { rollFormula: '1d20', advantage: { mode: 'bonus', bonusExpression } },
+        { mode: 'simple' }
+      );
+      const found = issue(issues, 'advantageBonusInvalid');
+      assert.ok(found, `${JSON.stringify(bonusExpression)} must raise advantageBonusInvalid`);
+      assert.equal(found.severity, 'critical');
+      assert.equal(issueControl(found), 'checks-advantage-bonus');
+    }
+  });
+
+  it('titles advantageBonusInvalid without repeating its sentence (UX-L2)', () => {
+    const [, title] = CHECK_ISSUE_TITLES.advantageBonusInvalid;
+    assert.equal(title, 'The advantage bonus cannot be rolled');
+    assert.equal(
+      checkIssueCopy('advantageBonusInvalid').fallback,
+      'The advantage bonus is not a dice expression. Use dice and numbers joined by + or −, such as 1d8 + 1.',
+      'the body sentence is unchanged'
+    );
+    assert.ok(
+      !checkIssueCopy('advantageBonusInvalid').fallback.startsWith(title),
+      'the title no longer repeats the body’s opening sentence'
+    );
+  });
+
+  it('raises nothing for a valid bonus expression', () => {
+    for (const bonusExpression of ['1d6', '2d4', '1d8 + 1', '+1d6', '3']) {
+      const { issues } = evaluateCheckReadiness(
+        { rollFormula: '1d20', advantage: { mode: 'bonus', bonusExpression } },
+        { mode: 'simple' }
+      );
+      assert.equal(issue(issues, 'advantageBonusInvalid'), undefined);
+    }
+  });
+
+  it('is silent under off, whatever the formula or stored bonus expression', () => {
+    const { issues } = evaluateCheckReadiness(
+      { rollFormula: '(1d20+2)*2', advantage: { mode: 'off', bonusExpression: '' } },
+      { mode: 'simple' }
+    );
+    assert.equal(issues.length, 0);
+  });
+
+  it('is silent for a counting check, whatever the stored summing advantage fields', () => {
+    const { issues } = evaluateCheckReadiness(
+      {
+        rollFormula: '(1d20+2)*2',
+        advantage: { mode: 'keep', bonusExpression: '' },
+        evaluation: { product: 'count', direction: 'over', pool: { base: '2', die: 10 } },
+      },
+      { mode: 'simple' }
+    );
+    assert.equal(issue(issues, 'advantageKeepNoDie'), undefined);
+    assert.equal(issue(issues, 'advantageBonusInvalid'), undefined);
+  });
+
+  // MA22: `advantageKeepNoDie` must never fire outside sum/keep. Deleting either gate makes it
+  // fire under `off`, `bonus` or count for the very same non-qualifying formula.
+  describe('MA22: advantageKeepNoDie stays gated to sum/keep', () => {
+    const readinessPath = resolve(
+      repoRoot,
+      'src/ui/svelte/apps/manager/checks/checksReadiness.js'
+    );
+    // ratchet-exempt(source-pin): read for MA22's in-memory mutation below, never for its shape
+    const source = readFileSync(readinessPath, 'utf8');
+    const nonQualifying = '(1d20+2)*2';
+
+    it('passes today: off, bonus and count all raise nothing for the non-qualifying formula', () => {
+      for (const advantage of [
+        { mode: 'off' },
+        { mode: 'bonus', bonusExpression: '1d6' },
+      ]) {
+        const { issues } = evaluateCheckReadiness(
+          { rollFormula: nonQualifying, advantage },
+          { mode: 'simple' }
+        );
+        assert.equal(issue(issues, 'advantageKeepNoDie'), undefined);
+      }
+      const { issues } = evaluateCheckReadiness(
+        {
+          rollFormula: nonQualifying,
+          advantage: { mode: 'keep' },
+          evaluation: { product: 'count', direction: 'over', pool: { base: '2', die: 10 } },
+        },
+        { mode: 'simple' }
+      );
+      assert.equal(issue(issues, 'advantageKeepNoDie'), undefined);
+    });
+
+    it('goes red without the mode/product gate: the mutated module fires under off', async () => {
+      const mutated = source
+        // ratchet-exempt(source-pin): mutates the real guard to prove MA22's negative control by
+        // BEHAVIOUR below, not by asserting the source text's shape
+        .replace("if (evaluation.product === 'count') return [];", 'if (false) return [];')
+        // ratchet-exempt(source-pin): mutates the real guard to prove MA22's negative control by
+        // BEHAVIOUR below, not by asserting the source text's shape
+        .replace("if (rule.mode === 'keep') {", "if (rule.mode !== '__never__') {");
+      // A silent no-op substitution is caught below: if neither gate is actually removed, the
+      // mutated module behaves exactly like the real one, and the assertion that
+      // `advantageKeepNoDie` now fires under `off` fails loudly instead of passing by accident.
+      // ratchet-exempt(source-pin): proves the two substitutions above changed the module at all;
+      // asserts a difference happened, never the module's literal shape
+      assert.notEqual(mutated, source, 'the mutation must actually change the module');
+      const module = await import(mutatedModuleUrl(mutated));
+      const { issues } = module.evaluateCheckReadiness(
+        { rollFormula: nonQualifying, advantage: { mode: 'off' } },
+        { mode: 'simple' }
+      );
+      assert.ok(
+        issue(issues, 'advantageKeepNoDie'),
+        'without the mode gate, advantageKeepNoDie wrongly fires under off — the negative ' +
+          'control the mutation exposes'
+      );
+    });
+  });
+});
+
 describe('evaluateCheckReadiness: tier-step targets (issue 975)', () => {
   it('says nothing at all when no trigger sets a target', () => {
     const { checks, issues } = evaluateCheckReadiness(
@@ -233,10 +427,13 @@ describe('evaluateCheckReadiness: tier-step targets (issue 975)', () => {
 // nothing else gates them: an id with no entry renders its own raw id to the GM, and an entry whose
 // lang key is missing renders the fallback forever.
 describe('checks readiness label maps do not drift', () => {
-  const readinessSource = readFileSync(
-    resolve(repoRoot, 'src/ui/svelte/apps/manager/checks/checksReadiness.js'),
-    'utf8'
-  );
+  // The count rules live in their own module since issue 2006, raising through this registry.
+  const readinessSource = [
+    'src/ui/svelte/apps/manager/checks/checksReadiness.js',
+    'src/ui/svelte/apps/manager/checks/countReadiness.js',
+  ]
+    .map((path) => readFileSync(resolve(repoRoot, path), 'utf8'))
+    .join('\n');
   const en = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
 
   // A check literal is `{ id, satisfied }` — the discriminator is the SECOND key, so this finds
@@ -247,16 +444,21 @@ describe('checks readiness label maps do not drift', () => {
     return [...readinessSource.matchAll(pattern)].map((match) => match[1]).sort();
   }
 
-  // The two copy maps are a real MODULE now (issue 1096), shared by the Validation route and by the
-  // section-level Callout, so this reads the exported objects rather than scanning one component's
-  // source for a literal.
+  // The copy maps are a real MODULE now (issue 1096), shared by the Validation route and by the
+  // section notices, so this reads the exported objects rather than scanning one component's
+  // source for a literal. Every issue has a title too (issue 2082), so that map mirrors the ids.
   const LABEL_MAPS = {
     CHECK_LABELS: CHECK_TICK_LABELS,
     ISSUE_LABELS: CHECK_ISSUE_LABELS,
+    ISSUE_TITLES: CHECK_ISSUE_TITLES,
   };
 
   function mapEntries(name) {
-    return Object.entries(LABEL_MAPS[name]).map(([id, meta]) => ({ id, key: meta[0] }));
+    return Object.entries(LABEL_MAPS[name]).map(([id, meta]) => ({
+      id,
+      key: meta[0],
+      fallback: meta[1],
+    }));
   }
 
   function langLeaf(key) {
@@ -266,7 +468,7 @@ describe('checks readiness label maps do not drift', () => {
   }
 
   it('resolves an issue id to the SAME namespaced key both surfaces localize against', () => {
-    // The Validation route and the section Callout each hold their own `text()` bridge, so
+    // The Validation route and the section notice each hold their own `text()` bridge, so
     // the thing that keeps them describing one issue identically is this one resolver.
     const copy = checkIssueCopy('noRollFormula');
     assert.equal(copy.key, 'FABRICATE.Admin.Manager.Checks.Validation.IssueNoRollFormula');
@@ -287,6 +489,7 @@ describe('checks readiness label maps do not drift', () => {
   for (const [kind, secondKey, mapName] of [
     ['check', 'satisfied', 'CHECK_LABELS'],
     ['issue', 'severity', 'ISSUE_LABELS'],
+    ['issue', 'severity', 'ISSUE_TITLES'],
   ]) {
     it(`every ${kind} id has a ${mapName} entry, and vice versa`, () => {
       const entries = mapEntries(mapName);
@@ -304,6 +507,13 @@ describe('checks readiness label maps do not drift', () => {
           'string',
           `${entry.id} maps to ${entry.key}, which must be a string leaf in en.json`
         );
+      }
+    });
+
+    // A fallback that drifts from en.json is the copy a world with no `lang/` entry reads.
+    it(`every ${mapName} fallback reads exactly as its en.json string`, () => {
+      for (const entry of mapEntries(mapName)) {
+        assert.equal(langLeaf(entry.key), entry.fallback, `${entry.id}: ${entry.key}`);
       }
     });
   }
@@ -459,7 +669,7 @@ describe('CHECK_READINESS_ISSUE_IDS is the source of truth for every issue id', 
     // COPY of the module with one id removed from the registry.
     const mutated = source.replace("  'noRollFormula',\n", '');
     assert.notEqual(mutated, source, 'the mutation must actually change the module');
-    return import(`data:text/javascript;base64,${Buffer.from(rewriteImports(mutated)).toString('base64')}`).then(
+    return import(mutatedModuleUrl(mutated)).then(
       (module) => {
         assert.throws(
           () => module.evaluateCheckReadiness({ rollFormula: '' }),
@@ -473,7 +683,11 @@ describe('CHECK_READINESS_ISSUE_IDS is the source of truth for every issue id', 
   // The other half: nothing may build an issue by direct `push`, bypassing the funnel.
   // A source scan is what catches an id on a branch no fixture reaches.
   it('builds no issue literal outside the registry declaration', () => {
-    const body = source.slice(source.indexOf('const REGISTERED_ISSUE_IDS'));
+    const countSource = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/apps/manager/checks/countReadiness.js'),
+      'utf8'
+    );
+    const body = source.slice(source.indexOf('const REGISTERED_ISSUE_IDS')) + countSource;
     const literals = [...body.matchAll(/\{\s*id:\s*'([^']+)',\s*severity:/g)].map((m) => m[1]);
     assert.deepEqual(
       literals,
@@ -483,12 +697,20 @@ describe('CHECK_READINESS_ISSUE_IDS is the source of truth for every issue id', 
     );
   });
 
-  it('carries every id the evaluator actually emits across its branches', () => {
+  it('carries every id the evaluator actually emits across its branches', (t) => {
+    const previous = Object.getOwnPropertyDescriptor(globalThis, 'fromUuidSync');
+    const missing = { value: () => null, configurable: true, writable: true };
+    Object.defineProperty(globalThis, 'fromUuidSync', missing);
+    t.after(() => {
+      if (previous) Object.defineProperty(globalThis, 'fromUuidSync', previous);
+      else delete globalThis.fromUuidSync;
+    });
     // A behavioural sweep, deliberately kept ALONGSIDE the mechanical guards rather than
     // instead of them: it proves the registry is not merely consistent with itself.
     const emitted = new Set();
     const collect = (check, options) => {
-      for (const issue of evaluateCheckReadiness(check, options).issues) emitted.add(issue.id);
+      const { issues, transient } = evaluateCheckReadiness(check, options);
+      for (const issue of [...issues, ...transient]) emitted.add(issue.id);
     };
     const catalogue = [
       { id: 'ok', label: 'Ok', expression: '@a' },
@@ -500,6 +722,7 @@ describe('CHECK_READINESS_ISSUE_IDS is the source of truth for every issue id', 
       // A ROLL-shaped expression, kept in the sweep as a NEGATIVE control (issue 1118): a check
       // appends it as dice now, so it must raise NOTHING.
       { id: 'rolls', label: 'Rolls', expression: '1d4' },
+      { id: 'transformed', label: 'Transformed', expression: '1d20cs>15' },
     ];
     const context = (ids) => ({ catalogue, systemPolicy: 'addAll', defaultModifierIds: ids });
     collect({ rollFormula: '' }, { mode: 'simple' });
@@ -553,7 +776,126 @@ describe('CHECK_READINESS_ISSUE_IDS is the source of truth for every issue id', 
     // rolls, so it reports the missing modifier seam rather than a missing check.
     collect({}, { mode: 'none', modifierContext: context(['ok']), activity: 'gathering' });
     collect({ rollFormula: '1d20' }, { mode: 'simple', modifierContext: context(['rolls']) });
+    collect(
+      { rollFormula: '1d20' },
+      {
+        mode: 'simple',
+        modifierContext: {
+          ...context(['rolls', 'transformed']),
+          systemPolicy: 'highest',
+        },
+      }
+    );
     collect({ rollFormula: '1d20' }, { mode: 'simple', modifierContext: context(['broken']) });
+    // Targets and adjustments (issue 2003), the two transient warnings naming the Preview-as actor.
+    const attribute = (expression, extra = {}) => ({
+      product: 'sum',
+      direction: 'under',
+      target: { source: 'attribute', expression, adjustmentKind: 'multiply', ...extra },
+    });
+    const actor = { name: 'Vosk', rollData: { skills: { craft: { value: 'high' } } } };
+    collect({ rollFormula: '1d100', evaluation: attribute('') }, { mode: 'simple' });
+    collect(
+      {
+        rollFormula: '1d100',
+        evaluation: attribute('1d6', { baseAdjustment: 0 }),
+        tiers: [{ id: 't', name: 'Hard', adjustment: null }],
+      },
+      { mode: 'simple', activity: 'crafting' }
+    );
+    collect(
+      {
+        rollFormula: '1d100',
+        evaluation: attribute('@skills.craft.value'),
+        type: 'relative',
+        relativeOutcomes: [{ id: 'a', name: 'Regular', adjustment: 1, success: true }],
+      },
+      { mode: 'routed', previewActor: { name: 'Idrin', rollData: {} } }
+    );
+    collect(
+      {
+        rollFormula: '1d100',
+        evaluation: attribute('@skills.craft.value'),
+        type: 'relative',
+        relativeOutcomes: [
+          { id: 'a', name: 'Failure', adjustment: null, success: false },
+          { id: 'b', name: 'Botch', adjustment: null, success: false },
+        ],
+      },
+      { mode: 'routed', previewActor: actor }
+    );
+    collect({ rollFormula: '1d20', evaluation: attribute('@x') }, { mode: 'progressive' });
+    // Success-counting pools (issue 2004), one fault each, then the Preview-as actor's two.
+    const count = (pool, extra = {}) => ({
+      rollFormula: '',
+      evaluation: { product: 'count', direction: 'over', pool: { die: 10, ...pool } },
+      ...extra,
+    });
+    collect(count({ base: '2d4', threshold: '' }), { mode: 'simple' });
+    collect(count({ explode: { enabled: true, faces: { kind: 'from', value: 12 } } }), {
+      mode: 'simple',
+    });
+    collect(count({ explode: { enabled: true, faces: { kind: 'from', value: 1 } } }), {
+      mode: 'simple',
+    });
+    collect(
+      count({ base: '2', required: 1 }, { tiers: [{ id: 't', name: 'Hard', successes: null }] }),
+      { mode: 'simple', activity: 'crafting' }
+    );
+    collect(count({ base: '2', required: 3 }), { mode: 'simple' });
+    collect(count({ base: '1000', required: 1 }), { mode: 'simple' });
+    // Issue 2006: a summing formula that counts, a from face with none, a dead dice trigger.
+    collect({ rollFormula: '6d10cs>=8', dc: 2 }, { mode: 'simple' });
+    collect(count({ cancel: { enabled: true, faces: { kind: 'from', value: null } } }), {
+      mode: 'simple',
+    });
+    collect(
+      count(
+        {},
+        {
+          checkBreakage: {
+            triggers: [{ condition: { type: 'diceGroup', groupId: 1, aggregate: 'anyDie' } }],
+          },
+        }
+      ),
+      { mode: 'simple' }
+    );
+    collect(count({ base: '@skills.smith.rank' }), {
+      mode: 'simple',
+      previewActor: { name: 'Vosk', rollData: {} },
+    });
+    collect(count({ base: '@skills.smith.rank' }), {
+      mode: 'simple',
+      previewActor: { name: 'Vosk', rollData: { skills: { smith: { rank: 'high' } } } },
+    });
+    // The advantage rule's own readiness (issue 2007): keep against a non-qualifying formula,
+    // keep after a reference, and an invalid bonus expression.
+    collect(
+      { rollFormula: '(1d20+2)*2', advantage: { mode: 'keep' } },
+      { mode: 'simple' }
+    );
+    collect(
+      { rollFormula: '@prof + 1d20', advantage: { mode: 'keep' } },
+      { mode: 'simple' }
+    );
+    collect(
+      { rollFormula: '1d20', advantage: { mode: 'bonus', bonusExpression: '' } },
+      { mode: 'simple' }
+    );
+    // Additional dice (issue 2008): the base-pool ceiling they raise, a missing source, a path
+    // that is not stored, a macro that is not a script, and the Preview-as actor's stored value.
+    const extra = (additionalDice) =>
+      count({ base: '2', required: 3, additionalDice: { enabled: true, max: 1, ...additionalDice } });
+    collect(extra({ source: 'path', path: 'system.resources.momentum.value' }), { mode: 'simple' });
+    collect(extra({ source: 'path', path: '' }), { mode: 'simple' });
+    collect(extra({ source: 'path', path: '@resources.momentum.value' }), { mode: 'simple' });
+    collect(extra({ source: 'macro', readMacroUuid: 'Macro.gone', spendMacroUuid: 'Macro.gone' }), {
+      mode: 'simple',
+    });
+    collect(extra({ source: 'path', path: 'system.resources.momentum.value' }), {
+      mode: 'simple',
+      previewActor: { name: 'Vosk', rollData: {}, readStored: () => ({ value: undefined }) },
+    });
     for (const id of emitted) {
       assert.ok(
         CHECK_READINESS_ISSUE_IDS.includes(id),
@@ -578,6 +920,11 @@ function rewriteImports(text) {
     resolve(repoRoot, 'src/ui/svelte/apps/manager/checks/checksReadiness.js')
   ).href;
   return text.replaceAll(/from '(\.[^']+)'/g, (_match, specifier) => `from '${new URL(specifier, base).href}'`);
+}
+
+/** A `data:` URL for one rewritten copy of the module, importable as a live COPY. */
+function mutatedModuleUrl(mutated) {
+  return `data:text/javascript;base64,${Buffer.from(rewriteImports(mutated)).toString('base64')}`;
 }
 
 // ── rangeGap: the third range rule, which nothing reported before (issue 1095, DN6) ──
@@ -663,6 +1010,11 @@ describe('rangeGap', () => {
 describe('check-modifier readiness', () => {
   const catalogue = [
     { id: 'ok', label: 'Ok', expression: '@a' },
+    {
+      id: 'transformed',
+      label: 'A transformed modifier name long enough to wrap without clipping',
+      expression: '1d20cs>15',
+    },
     { id: 'inverted', label: 'Inverted', expression: '@b', min: 5, max: -1 },
     { id: 'huge', label: 'Huge', expression: '@c', min: 1e21 },
     // An expression the reducer refuses outright, so it is detectable with no dice engine.
@@ -737,6 +1089,72 @@ describe('check-modifier readiness', () => {
       !Object.hasOwn(CHECK_ISSUE_SECTIONS, 'modifierRollExpression'),
       'and from the section map, so no bucket names an id nothing can raise'
     );
+  });
+
+  it('warns once about eligible transformed entries only when the rule ranks averages', () => {
+    for (const systemPolicy of ['highest', 'playerPicks']) {
+      const { checks, issues } = evaluateCheckReadiness(
+        { rollFormula: '1d20' },
+        {
+          mode: 'simple',
+          modifierContext: {
+            catalogue,
+            systemPolicy,
+            defaultModifierIds: ['ok', 'transformed'],
+            maxModifierPicks: 1,
+          },
+        }
+      );
+      const warning = issues.filter((entry) => entry.id === 'modifierAverageUnavailable');
+      assert.equal(warning.length, 1, `${systemPolicy}: one warning for the eligible set`);
+      assert.equal(warning[0].severity, 'warning', `${systemPolicy}: non-blocking severity`);
+      assert.deepEqual(warning[0].data, {
+        names: 'A transformed modifier name long enough to wrap without clipping',
+      });
+      assert.equal(
+        checks.find((check) => check.id === 'modifierExpressionsResolve')?.satisfied,
+        true,
+        'the transformed formula remains usable'
+      );
+      assert.ok(!issues.some((entry) => entry.id === 'modifierExpressionInvalid'));
+    }
+
+    for (const systemPolicy of ['addAll', 'bySubject']) {
+      const { issues } = evaluateCheckReadiness(
+        { rollFormula: '1d20' },
+        {
+          mode: 'simple',
+          modifierContext: {
+            catalogue,
+            systemPolicy,
+            defaultModifierIds: ['ok', 'transformed'],
+            subjectModifierIds: ['transformed'],
+          },
+        }
+      );
+      assert.ok(
+        !issues.some((entry) => entry.id === 'modifierAverageUnavailable'),
+        `${systemPolicy}: no average-based ranking`
+      );
+    }
+  });
+
+  it('does not warn about transformed entries when ranking leaves nothing out', () => {
+    for (const [label, modifierContext] of [
+      ['playerPicks, no cap', { systemPolicy: 'playerPicks', ids: ['ok', 'transformed'] }],
+      [
+        'playerPicks, cap 2 over two entries',
+        { systemPolicy: 'playerPicks', ids: ['ok', 'transformed'], maxModifierPicks: 2 },
+      ],
+      ['highest over one transformed entry', { systemPolicy: 'highest', ids: ['transformed'] }],
+    ]) {
+      const { ids, ...rest } = modifierContext;
+      const { issues } = evaluateCheckReadiness(
+        { rollFormula: '1d20' },
+        { mode: 'simple', modifierContext: { catalogue, defaultModifierIds: ids, ...rest } }
+      );
+      assert.ok(!issues.some((entry) => entry.id === 'modifierAverageUnavailable'), label);
+    }
   });
 
   // Both bounds faults NAME the offending entries. A shared library can be long, and the
@@ -989,9 +1407,7 @@ describe('the issue-to-section map is exhaustive against the frozen registry', (
   // guard that only proves one of them is half a guard.
   async function loadMutated(mutated) {
     assert.notEqual(mutated, mapSource, 'the mutation must actually change the module');
-    return import(
-      `data:text/javascript;base64,${Buffer.from(rewriteImports(mutated)).toString('base64')}`
-    );
+    return import(mutatedModuleUrl(mutated));
   }
 
   it('FAILS when an id is added to the registry with no bucket', async () => {

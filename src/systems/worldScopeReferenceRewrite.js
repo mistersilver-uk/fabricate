@@ -406,14 +406,17 @@ export function rewriteSystemReferences(
   { remapComponent = identity, remapTool = identity, remapEssence = identity } = {}
 ) {
   if (!isPlainObject(system)) return;
+  // ratchet-exempt(world-scope): rewrite-walk
   for (const component of arrayOf(system.components)) {
     rewriteComponentReferences(component, { remapComponent, remapTool, remapEssence });
   }
   // The essence definition's own id is not touched, for the reason the component's is not: re-keying
   // a definition is the caller's decision.
+  // ratchet-exempt(world-scope): rewrite-walk
   for (const definition of arrayOf(system.essenceDefinitions)) {
     rewriteEssenceReferences(definition, { remapComponent });
   }
+  // ratchet-exempt(world-scope): rewrite-walk
   for (const tool of arrayOf(system.tools)) {
     rewriteToolReferences(tool, { remapComponent, remapEssence });
   }
@@ -431,6 +434,7 @@ export function rewriteGatheringSliceReferences(
   for (const record of [...arrayOf(slice.tasks), ...arrayOf(slice.events)]) {
     rewriteGatheringRecordReferences(record, { remapComponent, remapTool });
   }
+  // ratchet-exempt(world-scope): rewrite-walk
   for (const tool of arrayOf(slice.tools)) {
     rewriteToolReferences(tool, { remapComponent, remapEssence });
   }

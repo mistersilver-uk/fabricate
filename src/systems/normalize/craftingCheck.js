@@ -9,6 +9,13 @@ import { normalizeFailureResultPolicy } from '../../utils/failureResultPolicy.js
 import { normalizeModifierPolicy, resolveMaxModifierPicks } from '../checkModifierResolver.js';
 import { normalizePreviewSandbox } from '../progressiveCheckSandbox.js';
 
+import { normalizeCheckAdvantage } from './checkAdvantage.js';
+import {
+  normalizeCheckEvaluation,
+  normalizeNullableAdjustment,
+  normalizeNullableSuccesses,
+} from './checkEvaluation.js';
+
 export function normalizeCraftingCheck(check = {}, validCatalogueIds = null) {
   const outcomes = Array.isArray(check?.outcomes) ? check.outcomes : [];
   const normalizedOutcomes = outcomes
@@ -88,6 +95,9 @@ export function normalizeSimpleCraftingCheck(simple = {}) {
   const rollFormula = typeof source.rollFormula === 'string' ? source.rollFormula : '';
   return {
     rollFormula,
+    evaluation: normalizeCheckEvaluation(source.evaluation),
+    offerSituationalBonus: normalizeSituationalBonusOffer(source.offerSituationalBonus),
+    advantage: normalizeCheckAdvantage(source.advantage),
     dc: Number.isFinite(dc) ? Math.trunc(dc) : 15,
     thresholdMode: source.thresholdMode === 'exceed' ? 'exceed' : 'meet',
     dcMode: source.dcMode === 'dynamic' ? 'dynamic' : 'static',
@@ -98,9 +108,9 @@ export function normalizeSimpleCraftingCheck(simple = {}) {
 }
 
 // Progressive crafting check: a roll formula whose total is the value progressive awarding
-// spends against result difficulties — no DC, no comparison, no recipe tiers. This allowlist
-// literal is SHARED by the crafting, salvage and gathering checks, so a key omitted here is
-// dropped from all three on every normalize.
+// spends against result difficulties — no DC and no recipe tiers; `thresholdMode` is read only as
+// a counting check's per-die test (issue 2067). This allowlist literal is SHARED by the crafting,
+// salvage and gathering checks, so a key omitted here is dropped from all three on every normalize.
 export function normalizeProgressiveCraftingCheck(progressive = {}) {
   const source = !progressive || typeof progressive !== 'object' ? {} : progressive;
   const rollFormula = typeof source.rollFormula === 'string' ? source.rollFormula : '';
@@ -113,13 +123,23 @@ export function normalizeProgressiveCraftingCheck(progressive = {}) {
     awardMode: ['partial', 'equal', 'exceed'].includes(source.awardMode)
       ? source.awardMode
       : 'equal',
+    thresholdMode: source.thresholdMode === 'exceed' ? 'exceed' : 'meet',
     rollFormula,
+    evaluation: normalizeCheckEvaluation(source.evaluation),
+    offerSituationalBonus: normalizeSituationalBonusOffer(source.offerSituationalBonus),
+    advantage: normalizeCheckAdvantage(source.advantage),
     checkBreakage: normalizeUnifiedTriggers(rollFormula, source.diceCrits, source.checkBreakage),
   };
   // Attached rather than spread, the same way `_normalizeCheckModifierCatalogue` attaches
   // its optional bounds: the key is ABSENT when no experiment has been run.
   if (preview) normalized.preview = preview;
   return normalized;
+}
+
+/** Whether the roll prompt shows the situational-bonus field: true unless explicitly false. A
+ * display flag only; `allowsSituationalModifier` stays the authority gate (issue 2005). */
+function normalizeSituationalBonusOffer(offer) {
+  return offer !== false;
 }
 
 export function normalizeSimpleTier(tier) {
@@ -129,6 +149,8 @@ export function normalizeSimpleTier(tier) {
     id: tier.id || foundry.utils.randomID(),
     name: String(tier.name || '').trim(),
     dc: Number.isFinite(dc) ? Math.trunc(dc) : 0,
+    adjustment: normalizeNullableAdjustment(tier.adjustment),
+    successes: normalizeNullableSuccesses(tier.successes),
   };
 }
 
@@ -219,6 +241,9 @@ export function normalizeRoutedCraftingCheck(routed = {}) {
   return {
     type,
     rollFormula,
+    evaluation: normalizeCheckEvaluation(source.evaluation),
+    offerSituationalBonus: normalizeSituationalBonusOffer(source.offerSituationalBonus),
+    advantage: normalizeCheckAdvantage(source.advantage),
     dc: Number.isFinite(dc) ? Math.trunc(dc) : 15,
     thresholdMode: source.thresholdMode === 'exceed' ? 'exceed' : 'meet',
     // WHERE THE DC COMES FROM, on the routed slot too (issue 1096): a routed RELATIVE check is
@@ -259,7 +284,11 @@ export function normalizeRoutedOutcome(outcome, kind) {
     };
   }
   const dc = Number(outcome.dc);
-  return { ...base, dc: Number.isFinite(dc) ? Math.trunc(dc) : 0 };
+  return {
+    ...base,
+    dc: Number.isFinite(dc) ? Math.trunc(dc) : 0,
+    adjustment: normalizeNullableAdjustment(outcome.adjustment),
+  };
 }
 
 /** Normalize the unified per-check trigger list (issue 419), migrating legacy data on read:

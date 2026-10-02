@@ -10,7 +10,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 
-import { byCodePoint } from './ratchetBaseline.js';
+import { byCodePoint } from './codePointOrder.js';
 
 // Built from a token so a suite's own marks are not themselves a match: the writer rewrites the
 // first region it finds, and a literal sentinel in the suite's source would be that region.

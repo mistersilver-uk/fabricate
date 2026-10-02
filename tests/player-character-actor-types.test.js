@@ -27,6 +27,7 @@ import {
 } from '../src/config/playerCharacterTypesMenu.js';
 import { handleFabricateSettingChange } from '../src/config/settingChangeBridge.js';
 import { SETTING_KEYS, WORLD_SCOPED_SETTING_KEYS } from '../src/config/settings.js';
+import { withProductionApplication } from './helpers/extension-composition-harness.js';
 import { setupDOM, teardownDOM } from './helpers/svelte-dom.js';
 import { makeSettingsSeam } from './helpers/settings.js';
 
@@ -875,43 +876,40 @@ describe('empty-state copy', () => {
   });
 });
 
-// live propagation wiring (source pins). The GM ticks the box; four surfaces must re-project
-// WITHOUT a reload.
+// live propagation wiring. The GM ticks the box; every consuming surface must re-project WITHOUT a
+// reload. The shared `createSetting`/`updateSetting` listener is driven after a real boot by
+// `tests/setting-change-bridge.test.js`, and the manager's roster republish by
+// `tests/ui/manager-services-equivalence.test.js`; the player app is driven here.
 
-describe('the player-character-types hook is wired at every consuming edge', () => {
-  const read = (relativePath) =>
-    readFileSync(resolve(import.meta.dirname, '..', relativePath), 'utf8');
-
-  it('main.js registers the shared setting handler on BOTH createSetting and updateSetting', () => {
-    // The FIRST EVER write to a world setting is a create, not an update, so a GM ticking `robot`
-    // for the first time — the exact reported journey — would otherwise propagate to nobody.
-    const main = read('src/bootstrap/hooks.js');
-    assert.match(main, /Hooks\.on\('updateSetting', handleFabricateSettingDocumentChange\);/);
-    assert.match(main, /Hooks\.on\('createSetting', handleFabricateSettingDocumentChange\);/);
-    // One shared handler, taking the Setting DOCUMENT only: the two hooks do not share
-    // a signature (`createSetting` emits `(doc, options, userId)`), so a second
-    // positional parameter would receive `options` on the create leg.
-    assert.match(main, /const handleFabricateSettingDocumentChange = \(setting\) => \{/);
-  });
-
-  it('the player app refreshes the actor bar on the hook, and unregisters it on close', () => {
-    const app = read('src/ui/SvelteFabricateApp.svelte.js');
-    assert.match(app, /Hooks\.on\('fabricate\.playerCharacterTypesChanged'/);
-    assert.match(app, /Hooks\.off\('fabricate\.playerCharacterTypesChanged'/);
-    assert.match(app, /actorBar\?\.refreshSelectableActors\?\.\(\)/);
-  });
-
-  it('the manager republishes its rosters through the existing data-changed seam', () => {
-    // The GM who ticks the box is the one GUARANTEED to be looking at stale data: the
-    // settings sidebar sits over an open manager.
-    const app = read('src/ui/managerServices.js');
-    assert.match(
-      app,
-      /hooks\.on\('fabricate\.playerCharacterTypesChanged', playerCharacterTypeListener\);/
-    );
-    assert.match(
-      app,
-      /hooks\?\.off\?\.\('fabricate\.playerCharacterTypesChanged', playerCharacterTypeListener\);/
-    );
-  });
+test('the player app refreshes its actor bar on the hook, and releases it on close', { timeout: 300000 }, async () => {
+  const registered = [];
+  const released = [];
+  const hooks = {
+    on: (hook, handler) => registered.push([hook, handler]),
+    off: (hook, id) => released.push([hook, id]),
+    once: () => 0,
+  };
+  await withProductionApplication(
+    {
+      modulePath: '/src/ui/SvelteFabricateApp.svelte.js',
+      exportName: 'SvelteFabricateApp',
+      ApplicationV2: class {},
+      hooks,
+    },
+    (app) => {
+      const refreshed = [];
+      app._services = { actorBar: { refreshSelectableActors: () => refreshed.push('refresh') } };
+      app._refreshExtensionSurfaces = () => {};
+      app._registerHooks();
+      const id = registered.findIndex(([hook]) => hook === 'fabricate.playerCharacterTypesChanged');
+      assert.ok(id >= 0, 'the app subscribes to the player-character-types hook');
+      registered[id][1]();
+      assert.deepEqual(refreshed, ['refresh'], 'and re-seeds the actor bar when it fires');
+      app._removeHooks();
+      assert.ok(
+        released.some(([hook, handle]) => hook === 'fabricate.playerCharacterTypesChanged' && handle === id + 1),
+        'closing releases the SAME subscription'
+      );
+    }
+  );
 });

@@ -2,12 +2,7 @@
 <script>
   import { onDestroy, untrack } from 'svelte';
   import GatheringInspectorRail from './environment/GatheringInspectorRail.svelte';
-  import Chip from '../../components/Chip.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
-  import {
-    DEFAULT_GATHERING_ENVIRONMENT_IMG,
-    DEFAULT_GATHERING_TASK_IMG,
-  } from '../../../../gatheringImageDefaults.js';
   import { isGameMaster, localize, notifyInfo, notifyWarn } from '../../util/foundryBridge.js';
   import { announceAfterFocusMove } from '../../util/announceAfterFocus.js';
   import { resolveDropUuid } from '../../util/dropUtils.js';
@@ -38,10 +33,13 @@
   import { parseDiceGroups } from '../../../../utils/craftingCheckExpression.js';
   import { interpolate } from './checks/checksCopy.js';
   import { summariseCondition } from './checks/checkTriggerSummary.js';
-  import { normalizePreviewSandbox } from '../../../../systems/progressiveCheckSandbox.js';
-  import { activeEnvironmentsForRecord } from '../../../../systems/gatheringComposition.js';
+  import { listPreviewActors, resolvePreviewCharacter } from './checks/checkPreview.js';
+  import { salvagePresetTiers } from './component/salvageDcPresets.js';
   import { buildVocabularyUsage, dedupeVocabularyEntries } from '../../../model/vocabularyUsage.js';
-  import { createRecipeBrowserState } from '../../../model/recipeBrowserModel.js';
+  import {
+    createRecipeBrowserState,
+    recipeCheckSubtitleSuffix,
+  } from '../../../model/recipeBrowserModel.js';
   import {
     componentCategoryOptions,
     createComponentBrowserState,
@@ -108,6 +106,7 @@
   import ComponentAddFromCatalogueDialog from './scoped/ComponentAddFromCatalogueDialog.svelte';
   import ImportFolderMappingModal from './ImportFolderMappingModal.svelte';
   import ImportReportModal from './ImportReportModal.svelte';
+  import { createImportFlowModel } from './importFlowModel.svelte.js';
   import ManagerNavRail from './ManagerNavRail.svelte';
   import ManagerPageHeader from './ManagerPageHeader.svelte';
   import {
@@ -119,21 +118,29 @@
   } from './crafting/craftingNav.js';
   import {
     CHECKS_VIEWS,
-    activeChecksTab as resolveActiveChecksTab,
-    buildChecksNavItems,
-    checksNavIssueTotal,
     isChecksRoute as isChecksView,
     resolveChecksRedirect,
   } from './checks/checksNav.js';
-  import { evaluateCheckReadiness, readinessModeForSlot } from './checks/checksReadiness.js';
+  import { createChecksRouteModel } from './checks/checksRouteModel.svelte.js';
+  import { createGatheringRouteModel } from './gatheringRouteModel.svelte.js';
+  import { createGatheringDraftHandlers } from './gatheringDraftHandlers.svelte.js';
+  import { createGatheringModifierHandlers } from './gatheringModifierHandlers.svelte.js';
   import {
-    buildCheckModifierContext,
-    resolveActiveCraftingCheckFormula,
-    resolveActiveGatheringCheckFormula,
-    resolveActiveSalvageCheckFormula,
-  } from '../../../../systems/checkModifierResolver.js';
+    gatheringDropCountValue,
+    gatheringDropRateTierClass,
+    gatheringDropRateTierColor,
+    gatheringDropRateValue,
+    gatheringModifierDisplayValue,
+    gatheringModifierValueClass,
+    gatheringTaskDropRows,
+    gatheringTaskImage,
+    signedToOperatorValue,
+    sortedDangerTags,
+    truncateDescription,
+  } from './gatheringDisplay.js';
   import RecipeEditView from './RecipeEditView.svelte';
   import { craftingEffect } from './crafting/craftingVisibility.js';
+  import SystemBrowserInspector from './SystemBrowserInspector.svelte';
   import SystemEditView from './SystemEditView.svelte';
   import SystemsBrowserView from './SystemsBrowserView.svelte';
   import TagsCategoriesView from './TagsCategoriesView.svelte';
@@ -306,7 +313,6 @@
   let selectedEssenceId = $state('');
   let lastComponentSystemId = $state('');
   let lastEssenceSystemId = $state('');
-  let lastGatheringSystemId = $state('');
   let essenceEditDirty = $state(false);
   let essenceEditSaving = $state(false);
   let essenceEditDraft = $state(null);
@@ -363,7 +369,6 @@
   let essenceBulkDeleting = $state(false);
   // The bulk delete's ARMED latch (the maintainer's binding decision for this action).
   let essenceBulkDeleteArmed = $state(false);
-  let activeGatheringTab = $state('environments');
   // `activeTravelTab` serves World > Parties ALONE now (issue 1282).
   let activeTravelTab = $state('parties');
   // World > Travel's destination: `realms` or `map`. Realms is the landing tab.
@@ -386,234 +391,76 @@
   let recipeItemActiveTab = $state('overview');
   // World-item options fed to the recipe-item editor's Overview link picker.
   let worldItemOptions = $state([]);
-  // Folder-aware import mapping modal (issue 771): opened before a folder / whole-pack
-  // component drop commits, seeded with the per-folder groups the drop resolved to.
-  let importMappingOpen = $state(false);
-  let importMappingFolders = $state([]);
-  // Post-import reference report (issue 877): the store resolves the assembled
-  // `buildImportReportContent` output once a system import completes.
-  let importReportContent = $state(null);
   // `Add from catalogue to {system}` (issue 1371, M9): the system Component Rules list's header
   // action opens an IN-PLACE picker over the world catalogue rather than navigating anywhere.
   let componentAddFromCatalogueOpen = $state(false);
-  let selectedGatheringTaskId = $state('');
-  let selectedGatheringEventId = $state('');
-  let selectedGatheringDropId = $state('');
-  let gatheringTaskDraft = $state(null);
-  let gatheringTaskDraftBaseline = $state(null);
-  let gatheringTaskSaving = $state(false);
-  // User-facing failure text for the gathering-task editor, rendered by the header toolbar
-  // beside Save (issue 919).
-  let gatheringTaskSaveError = $state('');
-  let gatheringEventDraft = $state(null);
-  let gatheringEventDraftBaseline = $state(null);
-  let gatheringEventSaving = $state(false);
-  // User-facing failure text for the gathering-event editor, rendered by the header toolbar
-  // beside Save (issue 919).
-  let gatheringEventSaveError = $state('');
   // `breakage`, because the system Tool rules editor has no Overview tab: identity is world
   // scope's, and `ToolEditorTabs` records why (issue 1373).
   let toolEditorActiveTab = $state('breakage');
   let toolValidationFocusNonce = $state(0);
 
-  // Per-check unified trigger block (issue 419), carried on every check draft so authoring it
-  // persists.
-  function cloneCheckBreakage(checkBreakage) {
-    const source = checkBreakage && typeof checkBreakage === 'object' ? checkBreakage : {};
-    return {
-      triggers: Array.isArray(source.triggers)
-        ? source.triggers.map((trigger) => ({
-            id: trigger?.id,
-            condition:
-              trigger?.condition && typeof trigger.condition === 'object'
-                ? { ...trigger.condition }
-                : null,
-            outcome: ['success', 'failure', 'none'].includes(trigger?.outcome)
-              ? trigger.outcome
-              : 'none',
-            breakTools: trigger?.breakTools === true,
-            // The third effect (issue 975). Copied, not normalized: the draft holds
-            // what the GM authored and `_normalizeTierStep` clamps it on save.
-            tierStep:
-              trigger?.tierStep && typeof trigger.tierStep === 'object'
-                ? { ...trigger.tierStep }
-                : { mode: 'none', steps: 1, tierId: null },
-          }))
-        : [],
-    };
-  }
-
-  // Routed crafting check editor: a staged draft is seeded from the selected system's
-  // craftingCheck.routed and committed only via the top-right Save button (the same staged pattern
-  // the other editors use), so persistence is explicit and never raced by navigation.
-  function cloneRoutedCheck(routed) {
-    const source = routed && typeof routed === 'object' ? routed : {};
-    const dc = Number(source.dc);
-    const rollFormula =
-      typeof source.rollFormula === 'string'
-        ? source.rollFormula
-        : typeof source.rollExpression === 'string'
-          ? source.rollExpression
-          : '';
-    return {
-      type: source.type === 'fixed' ? 'fixed' : 'relative',
-      rollFormula,
-      dc: Number.isFinite(dc) ? Math.trunc(dc) : 15,
-      thresholdMode: source.thresholdMode === 'exceed' ? 'exceed' : 'meet',
-      tiers: Array.isArray(source.tiers) ? source.tiers.map((tier) => ({ ...tier })) : [],
-      relativeOutcomes: Array.isArray(source.relativeOutcomes)
-        ? source.relativeOutcomes.map((outcome) => ({ ...outcome }))
-        : [],
-      fixedOutcomes: Array.isArray(source.fixedOutcomes)
-        ? source.fixedOutcomes.map((outcome) => ({ ...outcome }))
-        : [],
-      checkBreakage: cloneCheckBreakage(source.checkBreakage),
-    };
-  }
-  let checkRoutedDraft = $state(cloneRoutedCheck($viewState.selectedSystem?.craftingCheck?.routed));
-  let checkRoutedBaseline = $state(
-    cloneRoutedCheck($viewState.selectedSystem?.craftingCheck?.routed)
-  );
-  let lastChecksSystemId = $viewState.selectedSystem?.id || '';
-  let lastChecksResolutionMode = $viewState.selectedSystem?.resolutionMode || 'simple';
-  let checkRoutedSaving = $state(false);
-  const checkRoutedDirty = $derived(
-    JSON.stringify(checkRoutedDraft) !== JSON.stringify(checkRoutedBaseline)
-  );
-
-  // Simple (pass/fail) crafting check draft — same staged pattern, used for simple
-  // and alchemy resolution modes.
-  function cloneSimpleCheck(simple) {
-    const source = simple && typeof simple === 'object' ? simple : {};
-    const dc = Number(source.dc);
-    return {
-      rollFormula: typeof source.rollFormula === 'string' ? source.rollFormula : '',
-      dc: Number.isFinite(dc) ? Math.trunc(dc) : 15,
-      thresholdMode: source.thresholdMode === 'exceed' ? 'exceed' : 'meet',
-      dcMode: source.dcMode === 'dynamic' ? 'dynamic' : 'static',
-      tiers: Array.isArray(source.tiers) ? source.tiers.map((tier) => ({ ...tier })) : [],
-      macroUuid: source.macroUuid || null,
-      checkBreakage: cloneCheckBreakage(source.checkBreakage),
-    };
-  }
-  let checkSimpleDraft = $state(cloneSimpleCheck($viewState.selectedSystem?.craftingCheck?.simple));
-  let checkSimpleBaseline = $state(
-    cloneSimpleCheck($viewState.selectedSystem?.craftingCheck?.simple)
-  );
-  let checkSimpleSaving = $state(false);
-  const checkSimpleDirty = $derived(
-    JSON.stringify(checkSimpleDraft) !== JSON.stringify(checkSimpleBaseline)
-  );
-
-  // THE ALCHEMY CHECK MODE IS A STAGED DRAFT, not a live write.
-  let alchemyCheckModeDraft = $state($viewState.selectedSystem?.alchemy?.checkMode || 'none');
-  let alchemyCheckModeBaseline = $state($viewState.selectedSystem?.alchemy?.checkMode || 'none');
-  let alchemyCheckModeSaving = $state(false);
-  const alchemyCheckModeDirty = $derived(alchemyCheckModeDraft !== alchemyCheckModeBaseline);
-
-  // THE OTHER THREE ACTIVE SWITCHES STAGE TOO — the `enabled` flag of each activity's check.
-  function readCheckActive(config) {
-    return config?.enabled === true;
-  }
-  let craftingCheckActiveDraft = $state(readCheckActive($viewState.selectedSystem?.craftingCheck));
-  let craftingCheckActiveBaseline = $state(
-    readCheckActive($viewState.selectedSystem?.craftingCheck)
-  );
-  let craftingCheckActiveSaving = $state(false);
-  const craftingCheckActiveDirty = $derived(
-    craftingCheckActiveDraft !== craftingCheckActiveBaseline
-  );
-  let salvageCheckActiveDraft = $state(
-    readCheckActive($viewState.selectedSystem?.salvageCraftingCheck)
-  );
-  let salvageCheckActiveBaseline = $state(
-    readCheckActive($viewState.selectedSystem?.salvageCraftingCheck)
-  );
-  let salvageCheckActiveSaving = $state(false);
-  const salvageCheckActiveDirty = $derived(salvageCheckActiveDraft !== salvageCheckActiveBaseline);
-  let gatheringCheckActiveDraft = $state(
-    readCheckActive($viewState.selectedSystem?.gatheringCraftingCheck)
-  );
-  let gatheringCheckActiveBaseline = $state(
-    readCheckActive($viewState.selectedSystem?.gatheringCraftingCheck)
-  );
-  let gatheringCheckActiveSaving = $state(false);
-  const gatheringCheckActiveDirty = $derived(
-    gatheringCheckActiveDraft !== gatheringCheckActiveBaseline
-  );
-
-  // Progressive crafting check draft — same staged pattern, used for progressive resolution mode.
-  function cloneProgressiveCheck(progressive) {
-    const source = progressive && typeof progressive === 'object' ? progressive : {};
-    // The Checks Studio's PREVIEW SANDBOX (issue 1097).
-    const preview = normalizePreviewSandbox(source.preview);
-    const draft = {
-      awardMode: ['partial', 'equal', 'exceed'].includes(source.awardMode)
-        ? source.awardMode
-        : 'equal',
-      rollFormula: typeof source.rollFormula === 'string' ? source.rollFormula : '',
-      checkBreakage: cloneCheckBreakage(source.checkBreakage),
-    };
-    // Attached rather than spread, so an absent experiment stays absent — and so the baseline and
-    // the draft, both built here.
-    if (preview) draft.preview = preview;
-    return draft;
-  }
-  let checkProgressiveDraft = $state(
-    cloneProgressiveCheck($viewState.selectedSystem?.craftingCheck?.progressive)
-  );
-  let checkProgressiveBaseline = $state(
-    cloneProgressiveCheck($viewState.selectedSystem?.craftingCheck?.progressive)
-  );
-  let checkProgressiveSaving = $state(false);
-  const checkProgressiveDirty = $derived(
-    JSON.stringify(checkProgressiveDraft) !== JSON.stringify(checkProgressiveBaseline)
-  );
-
-  // Salvage check drafts — the salvage check now mirrors the crafting check shapes
-  // (simple/routed/progressive), so the crafting clone helpers are reused.
-  const sysSalvage = $viewState.selectedSystem?.salvageCraftingCheck;
-  let salvageSimpleDraft = $state(cloneSimpleCheck(sysSalvage?.simple));
-  let salvageSimpleBaseline = $state(cloneSimpleCheck(sysSalvage?.simple));
-  let salvageRoutedDraft = $state(cloneRoutedCheck(sysSalvage?.routed));
-  let salvageRoutedBaseline = $state(cloneRoutedCheck(sysSalvage?.routed));
-  let salvageProgressiveDraft = $state(cloneProgressiveCheck(sysSalvage?.progressive));
-  let salvageProgressiveBaseline = $state(cloneProgressiveCheck(sysSalvage?.progressive));
-  let salvageSimpleSaving = $state(false);
-  let salvageRoutedSaving = $state(false);
-  let salvageProgressiveSaving = $state(false);
-  const salvageSimpleDirty = $derived(
-    JSON.stringify(salvageSimpleDraft) !== JSON.stringify(salvageSimpleBaseline)
-  );
-  const salvageRoutedDirty = $derived(
-    JSON.stringify(salvageRoutedDraft) !== JSON.stringify(salvageRoutedBaseline)
-  );
-  const salvageProgressiveDirty = $derived(
-    JSON.stringify(salvageProgressiveDraft) !== JSON.stringify(salvageProgressiveBaseline)
-  );
-
-  // Gathering check drafts — the system-level gathering check mirrors the crafting/salvage
-  // progressive + routed shapes (d100 has no editable config).
-  const sysGathering = $viewState.selectedSystem?.gatheringCraftingCheck;
-  let gatheringProgressiveDraft = $state(cloneProgressiveCheck(sysGathering?.progressive));
-  let gatheringProgressiveBaseline = $state(cloneProgressiveCheck(sysGathering?.progressive));
-  let gatheringRoutedDraft = $state(cloneRoutedCheck(sysGathering?.routed));
-  let gatheringRoutedBaseline = $state(cloneRoutedCheck(sysGathering?.routed));
-  let gatheringProgressiveSaving = $state(false);
-  let gatheringRoutedSaving = $state(false);
-  const gatheringProgressiveDirty = $derived(
-    JSON.stringify(gatheringProgressiveDraft) !== JSON.stringify(gatheringProgressiveBaseline)
-  );
-  const gatheringRoutedDirty = $derived(
-    JSON.stringify(gatheringRoutedDraft) !== JSON.stringify(gatheringRoutedBaseline)
-  );
-  // Which Checks child route is open (crafting | salvage | gathering | validation).
-  let checksActiveSection = $state('');
-  // The REQUEST's identity, bumped on every deep link.
-  let checksSectionRequestNonce = $state(0);
   const selectedSystem = $derived($viewState.selectedSystem);
   const selectedSystemId = $derived(selectedSystem?.id || '');
   const systemsLoading = $derived($viewState.systemsLoading === true);
+  // The system import report and the folder-aware component drop (issue 1721).
+  const importFlow = createImportFlowModel({
+    store: () => store,
+    services: () => services,
+    selectedSystemId: () => selectedSystemId,
+  });
+  // The Checks Studio's staged drafts and rail group (issue 1721).
+  const checks = createChecksRouteModel({
+    store: () => store,
+    selectedSystem: () => selectedSystem,
+    selectedSystemId: () => selectedSystemId,
+    salvageResolutionMode: () => salvageResolutionMode,
+    gatheringResolutionMode: () => gathering.gatheringResolutionMode,
+    selectedSystemModifiers: () => selectedSystemModifiers,
+    currentView: () => currentView,
+    // Readiness needs the raw records overrides live on, outside any check draft (issue 2078):
+    // every component (its persisted `salvage`, not the search-filtered `itemCards` projection)
+    // and every gathering task of the selected system. Both feed the rail's always-visible nav
+    // badge too, not only an open Checks route, so BOTH thunks stay behind `$derived` in
+    // `checksRouteModel.svelte.js`: recomputed only when a tracked dependency changes, never once
+    // per render.
+    components: () => store?.componentsForSystem?.(selectedSystemId) ?? [],
+    gatheringTasks: () => $viewState.gatheringConfig?.systems?.[selectedSystemId]?.tasks ?? [],
+  });
+  // The gathering workspace's tab, selections, drafts and library (issue 1721).
+  const gathering = createGatheringRouteModel({
+    store: () => store,
+    viewState: () => $viewState,
+    view: () => currentView,
+    selectedSystem: () => selectedSystem,
+    selectedSystemId: () => selectedSystemId,
+    canShowEnvironments: () => canShowEnvironments,
+    isGatheringRoute: () => isGatheringRoute,
+    navRail: () => navRail,
+    text,
+  });
+  // The gathering workspace's library, draft and drop writes (issue 1721).
+  const drafts = createGatheringDraftHandlers({
+    store: () => store,
+    services: () => services,
+    gathering,
+    navRail: () => navRail,
+    selectedSystemId: () => selectedSystemId,
+    canShowEnvironments: () => canShowEnvironments,
+    isPromise,
+    afterTruthyResult,
+    confirmRouteExit,
+    setActiveView: (view) => {
+      activeView = view;
+    },
+    text,
+  });
+  // The Modifier Library references and condition modifiers a drop or an event carries.
+  const modifiers = createGatheringModifierHandlers({
+    gathering,
+    drafts,
+    selectedSystemModifiers: () => selectedSystemModifiers,
+    text,
+  });
   const canShowEnvironments = $derived(selectedSystem?.features?.gathering === true);
   const recipeMultiStepEnabled = $derived(selectedSystem?.features?.multiStepRecipes === true);
   // Complex recipes need a resolution mode that allows multiple ingredient/result
@@ -682,102 +529,17 @@
     (systemValidationReport.counts?.critical || 0) + (systemValidationReport.counts?.warning || 0)
   );
 
-  // Per-check activation state for the right-menu "Active" card.
-  const checkActivation = $derived({
-    crafting: {
-      mode: selectedSystem?.resolutionMode || 'simple',
-      // The crafting check is optional in simple and routedByIngredients (it runs only when a roll
-      // formula is authored and checks are enabled); routedByCheck and progressive REQUIRE it.
-      optional:
-        (selectedSystem?.resolutionMode || 'simple') === 'alchemy'
-          ? alchemyCheckModeDraft !== 'tiered'
-          : ['simple', 'routedByIngredients'].includes(selectedSystem?.resolutionMode || 'simple'),
-      enabled:
-        selectedSystem?.resolutionMode === 'alchemy'
-          ? alchemyCheckModeDraft !== 'none'
-          : craftingCheckActiveDraft,
-    },
-    salvage: {
-      mode: selectedSystem?.salvageResolutionMode || 'simple',
-      optional: (selectedSystem?.salvageResolutionMode || 'simple') === 'simple',
-      enabled: salvageCheckActiveDraft,
-    },
-    // The system-level gathering check's shape is the gathering economy's resolution mode.
-    gathering: {
-      mode: gatheringResolutionMode,
-      optional: gatheringResolutionMode === 'd100',
-      enabled: gatheringCheckActiveDraft,
-    },
-  });
-
-  // WHICH `craftingCheck` sub-config this system actually rolls — the SLOT — and therefore which
-  // draft is edited, tracked dirty, saved by the top-right Save button.
-  const craftingCheckMode = $derived(
-    resolveActiveCraftingCheckFormula(
-      selectedSystem?.resolutionMode === 'alchemy'
-        ? {
-            ...selectedSystem,
-            alchemy: { ...(selectedSystem?.alchemy || {}), checkMode: alchemyCheckModeDraft },
-          }
-        : selectedSystem
-    ).slot
-  );
-  const craftingCheckDirty = $derived(
-    alchemyCheckModeDirty ||
-      craftingCheckActiveDirty ||
-      (craftingCheckMode === 'routed' && checkRoutedDirty) ||
-      (craftingCheckMode === 'simple' && checkSimpleDirty) ||
-      (craftingCheckMode === 'progressive' && checkProgressiveDirty)
-  );
-  const craftingCheckSaving = $derived(
-    checkRoutedSaving ||
-      checkSimpleSaving ||
-      checkProgressiveSaving ||
-      alchemyCheckModeSaving ||
-      craftingCheckActiveSaving
-  );
-
   // The salvage check editor shown is selected by the salvage resolution mode.
   const salvageResolutionMode = $derived(selectedSystem?.salvageResolutionMode || 'simple');
-  const salvageCheckDirty = $derived(
-    salvageCheckActiveDirty ||
-      (salvageResolutionMode === 'routed' && salvageRoutedDirty) ||
-      (salvageResolutionMode === 'progressive' && salvageProgressiveDirty) ||
-      (salvageResolutionMode === 'simple' && salvageSimpleDirty)
-  );
-  const salvageCheckSaving = $derived(
-    salvageSimpleSaving ||
-      salvageRoutedSaving ||
-      salvageProgressiveSaving ||
-      salvageCheckActiveSaving
-  );
-
-  // The gathering check editor shown is selected by the gathering economy's
-  // resolution mode; d100 has no editable draft, so it is never dirty/saving.
-  const gatheringCheckDirty = $derived(
-    gatheringCheckActiveDirty ||
-      (gatheringResolutionMode === 'routed' && gatheringRoutedDirty) ||
-      (gatheringResolutionMode === 'progressive' && gatheringProgressiveDirty)
-  );
-  const gatheringCheckSaving = $derived(
-    gatheringProgressiveSaving || gatheringRoutedSaving || gatheringCheckActiveSaving
-  );
-
-  // THE DRAFT MODEL LIVES ABOVE THE ROUTE (issue 1096).
-  const checksDirtyActivities = $derived(
-    [
-      craftingCheckDirty ? 'crafting' : '',
-      salvageCheckDirty ? 'salvage' : '',
-      gatheringCheckDirty ? 'gathering' : '',
-    ].filter(Boolean)
-  );
-  const checksDirty = $derived(checksDirtyActivities.length > 0);
-  const checksSaving = $derived(craftingCheckSaving || salvageCheckSaving || gatheringCheckSaving);
 
   // Recipe tiers offered to the recipe editor's "Check tier" dropdown, resolved from the active
   // crafting-check mode.
   const recipeCheckTierOptions = $derived(
-    resolveRecipeCheckTierOptions(selectedSystem?.craftingCheck, craftingCheckMode)
+    resolveRecipeCheckTierOptions(selectedSystem?.craftingCheck, checks.craftingCheckMode)
+  );
+  // The same mode's evaluation, which names each tier's DC, Target or adjustment (issue 2005).
+  const recipeCheckTierEvaluation = $derived(
+    selectedSystem?.craftingCheck?.[checks.craftingCheckMode]?.evaluation ?? null
   );
   // Fixed-type routed success tiers offered to the recipe's "Minimum success tier" override; empty
   // (control hidden) unless the system's real resolution mode is `routedByCheck` + fixed.
@@ -856,11 +618,21 @@
   const salvageCheckEnabled = $derived(selectedSystem?.salvageCraftingCheck?.enabled === true);
   // DC presets come from `salvageCraftingCheck.simple.tiers` in EVERY resolution mode,
   // routed included (decision 7, case 5) — there is no `.routed.tiers` sibling.
-  const salvageCheckTiers = $derived(selectedSystem?.salvageCraftingCheck?.simple?.tiers || []);
-  const salvageCheckDcMode = $derived(
-    selectedSystem?.salvageCraftingCheck?.simple?.dcMode || 'static'
+  const salvageCheckTiers = $derived(salvagePresetTiers(selectedSystem?.salvageCraftingCheck));
+  // The sub-object the salvage mode rolls, whose evaluation picks the override field and whose DC
+  // is the system default (issue 2005).
+  const salvageCheckConfig = $derived(
+    selectedSystem?.salvageCraftingCheck?.[
+      salvageResolutionMode === 'routed' ? 'routed' : 'simple'
+    ] ?? null
   );
-  const salvageCheckDc = $derived(selectedSystem?.salvageCraftingCheck?.simple?.dc ?? 0);
+  const salvageCheckDc = $derived(salvageCheckConfig?.dc ?? 0);
+  // The Preview-as roster the salvage and task check overrides offer, and its roll-data lookup.
+  const overridePreviewActors = $derived(
+    currentView === 'component-edit' || currentView === 'gathering-task-edit'
+      ? listPreviewActors()
+      : []
+  );
   // System components offered to the salvage yield picker.
   const salvageComponentOptions = $derived(selectedSystem?.managedItemOptions || []);
 
@@ -910,313 +682,8 @@
   // The macro picker's options.
   const complicationMacroOptions = $derived(selectedSystem?.availableScriptMacros || []);
 
-  // Reseed the routed + simple check drafts and baselines when the selected system changes (not on
-  // every refresh of the same system, so a save never clobbers an open draft) OR when the SAME
-  // system's resolution mode changes.
-  $effect(() => {
-    const resolutionMode = selectedSystem?.resolutionMode || 'simple';
-    const systemChanged = selectedSystemId !== lastChecksSystemId;
-    const resolutionModeChanged = !systemChanged && resolutionMode !== lastChecksResolutionMode;
-    if (!systemChanged && !resolutionModeChanged) return;
-    lastChecksSystemId = selectedSystemId;
-    lastChecksResolutionMode = resolutionMode;
-    checkRoutedDraft = cloneRoutedCheck(selectedSystem?.craftingCheck?.routed);
-    checkRoutedBaseline = cloneRoutedCheck(selectedSystem?.craftingCheck?.routed);
-    checkSimpleDraft = cloneSimpleCheck(selectedSystem?.craftingCheck?.simple);
-    checkSimpleBaseline = cloneSimpleCheck(selectedSystem?.craftingCheck?.simple);
-    checkProgressiveDraft = cloneProgressiveCheck(selectedSystem?.craftingCheck?.progressive);
-    checkProgressiveBaseline = cloneProgressiveCheck(selectedSystem?.craftingCheck?.progressive);
-    // Reseeded on a system switch alongside the three slot drafts.
-    alchemyCheckModeDraft = selectedSystem?.alchemy?.checkMode || 'none';
-    alchemyCheckModeBaseline = selectedSystem?.alchemy?.checkMode || 'none';
-    craftingCheckActiveDraft = readCheckActive(selectedSystem?.craftingCheck);
-    craftingCheckActiveBaseline = readCheckActive(selectedSystem?.craftingCheck);
-    // A same-system resolution-mode change never touches the salvage/gathering checks.
-    if (!systemChanged) return;
-    const nextSalvage = selectedSystem?.salvageCraftingCheck;
-    salvageCheckActiveDraft = readCheckActive(nextSalvage);
-    salvageCheckActiveBaseline = readCheckActive(nextSalvage);
-    salvageSimpleDraft = cloneSimpleCheck(nextSalvage?.simple);
-    salvageSimpleBaseline = cloneSimpleCheck(nextSalvage?.simple);
-    salvageRoutedDraft = cloneRoutedCheck(nextSalvage?.routed);
-    salvageRoutedBaseline = cloneRoutedCheck(nextSalvage?.routed);
-    salvageProgressiveDraft = cloneProgressiveCheck(nextSalvage?.progressive);
-    salvageProgressiveBaseline = cloneProgressiveCheck(nextSalvage?.progressive);
-    const nextGathering = selectedSystem?.gatheringCraftingCheck;
-    gatheringCheckActiveDraft = readCheckActive(nextGathering);
-    gatheringCheckActiveBaseline = readCheckActive(nextGathering);
-    gatheringProgressiveDraft = cloneProgressiveCheck(nextGathering?.progressive);
-    gatheringProgressiveBaseline = cloneProgressiveCheck(nextGathering?.progressive);
-    gatheringRoutedDraft = cloneRoutedCheck(nextGathering?.routed);
-    gatheringRoutedBaseline = cloneRoutedCheck(nextGathering?.routed);
-  });
+  $effect(() => checks.reseed());
 
-  function onUpdateCraftingCheck(next) {
-    checkRoutedDraft = next;
-  }
-
-  function onUpdateCraftingCheckSimple(next) {
-    checkSimpleDraft = next;
-  }
-
-  function onUpdateCraftingCheckProgressive(next) {
-    checkProgressiveDraft = next;
-  }
-
-  function onUpdateSalvageCheckSimple(next) {
-    salvageSimpleDraft = next;
-  }
-
-  function onUpdateSalvageCheckRouted(next) {
-    salvageRoutedDraft = next;
-  }
-
-  function onUpdateSalvageCheckProgressive(next) {
-    salvageProgressiveDraft = next;
-  }
-
-  function onUpdateGatheringCheckProgressive(next) {
-    gatheringProgressiveDraft = next;
-  }
-
-  function onUpdateGatheringCheckRouted(next) {
-    gatheringRoutedDraft = next;
-  }
-
-  // Live-persist an alchemy behaviour-flag patch (issue 713).
-  function onUpdateAlchemyFlags(patch) {
-    const current = selectedSystem?.alchemy || {};
-    store?.saveAlchemyConfig?.({
-      checkMode: current.checkMode,
-      learnOnCraft: current.learnOnCraft === true,
-      consumeOnFail: current.consumeOnFail !== false,
-      showAttemptHistoryToPlayers: current.showAttemptHistoryToPlayers !== false,
-      ...patch,
-    });
-  }
-
-  /** Run ONE check save and ANSWER WHETHER IT LANDED (issue 1096). */
-  async function persistCheckDraft({ save, rebaseline, setSaving }) {
-    setSaving(true);
-    try {
-      if ((await save()) === false) return false;
-      rebaseline();
-      return true;
-    } catch (error) {
-      console.error('Failed to save check draft', error);
-      return false;
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  /** Persist the staged alchemy check mode, if it moved. */
-  async function saveAlchemyCheckMode() {
-    if (!alchemyCheckModeDirty) return true;
-    return persistCheckDraft({
-      save: () => store?.setAlchemyCheckMode?.(alchemyCheckModeDraft),
-      rebaseline: () => {
-        alchemyCheckModeBaseline = alchemyCheckModeDraft;
-      },
-      setSaving: (on) => {
-        alchemyCheckModeSaving = on;
-      },
-    });
-  }
-
-  /** Persist one activity's staged Active flag. */
-  async function persistCheckActive({ save, rebaseline, setSaving }) {
-    return persistCheckDraft({ save, rebaseline, setSaving });
-  }
-
-  async function saveCraftingCheckActive() {
-    return persistCheckActive({
-      save: () => store?.saveCraftingCheckActive?.(craftingCheckActiveDraft),
-      rebaseline: () => {
-        craftingCheckActiveBaseline = craftingCheckActiveDraft;
-      },
-      setSaving: (on) => {
-        craftingCheckActiveSaving = on;
-      },
-    });
-  }
-
-  async function saveCraftingCheck() {
-    if (!selectedSystemId || craftingCheckSaving || !craftingCheckDirty) return true;
-    // The mode and its slot draft are one save.
-    let modeSaved = true;
-    if (alchemyCheckModeDirty) modeSaved = await saveAlchemyCheckMode();
-    if (craftingCheckActiveDirty) modeSaved = (await saveCraftingCheckActive()) && modeSaved;
-    // EACH SLOT IS GUARDED ON ITS OWN DIRTY FLAG.
-    if (craftingCheckMode === 'routed' && checkRoutedDirty) {
-      return (
-        (await persistCheckDraft({
-          save: () => store?.saveCraftingCheckRouted?.(checkRoutedDraft),
-          rebaseline: () => {
-            checkRoutedBaseline = cloneRoutedCheck(checkRoutedDraft);
-          },
-          setSaving: (on) => {
-            checkRoutedSaving = on;
-          },
-        })) && modeSaved
-      );
-    }
-    if (craftingCheckMode === 'simple' && checkSimpleDirty) {
-      return (
-        (await persistCheckDraft({
-          save: () => store?.saveCraftingCheckSimple?.(checkSimpleDraft),
-          rebaseline: () => {
-            checkSimpleBaseline = cloneSimpleCheck(checkSimpleDraft);
-          },
-          setSaving: (on) => {
-            checkSimpleSaving = on;
-          },
-        })) && modeSaved
-      );
-    }
-    if (craftingCheckMode === 'progressive' && checkProgressiveDirty) {
-      return (
-        (await persistCheckDraft({
-          save: () => store?.saveCraftingCheckProgressive?.(checkProgressiveDraft),
-          rebaseline: () => {
-            checkProgressiveBaseline = cloneProgressiveCheck(checkProgressiveDraft);
-          },
-          setSaving: (on) => {
-            checkProgressiveSaving = on;
-          },
-        })) && modeSaved
-      );
-    }
-    // No dirty slot draft: either this resolution mode rolls no crafting check, or the only
-    // thing that moved was the alchemy check mode, which `saveAlchemyCheckMode` has answered.
-    return modeSaved;
-  }
-
-  async function saveSalvageCheck() {
-    if (!selectedSystemId || salvageCheckSaving || !salvageCheckDirty) return true;
-    // The Active flag first, then the slot draft — and each slot guarded on its OWN dirty flag,
-    // because `salvageCheckDirty` now also reports a moved switch.
-    let activeSaved = true;
-    if (salvageCheckActiveDirty) {
-      activeSaved = await persistCheckActive({
-        save: () => store?.saveSalvageCheckActive?.(salvageCheckActiveDraft),
-        rebaseline: () => {
-          salvageCheckActiveBaseline = salvageCheckActiveDraft;
-        },
-        setSaving: (on) => {
-          salvageCheckActiveSaving = on;
-        },
-      });
-    }
-    if (salvageResolutionMode === 'routed' && salvageRoutedDirty) {
-      return (
-        (await persistCheckDraft({
-          save: () => store?.saveSalvageCheckRouted?.(salvageRoutedDraft),
-          rebaseline: () => {
-            salvageRoutedBaseline = cloneRoutedCheck(salvageRoutedDraft);
-          },
-          setSaving: (on) => {
-            salvageRoutedSaving = on;
-          },
-        })) && activeSaved
-      );
-    }
-    if (salvageResolutionMode === 'progressive' && salvageProgressiveDirty) {
-      return (
-        (await persistCheckDraft({
-          save: () => store?.saveSalvageCheckProgressive?.(salvageProgressiveDraft),
-          rebaseline: () => {
-            salvageProgressiveBaseline = cloneProgressiveCheck(salvageProgressiveDraft);
-          },
-          setSaving: (on) => {
-            salvageProgressiveSaving = on;
-          },
-        })) && activeSaved
-      );
-    }
-    if (salvageResolutionMode === 'simple' && salvageSimpleDirty) {
-      return (
-        (await persistCheckDraft({
-          save: () => store?.saveSalvageCheckSimple?.(salvageSimpleDraft),
-          rebaseline: () => {
-            salvageSimpleBaseline = cloneSimpleCheck(salvageSimpleDraft);
-          },
-          setSaving: (on) => {
-            salvageSimpleSaving = on;
-          },
-        })) && activeSaved
-      );
-    }
-    return activeSaved;
-  }
-
-  async function saveGatheringCheck() {
-    if (!selectedSystemId || gatheringCheckSaving || !gatheringCheckDirty) return true;
-    let activeSaved = true;
-    if (gatheringCheckActiveDirty) {
-      activeSaved = await persistCheckActive({
-        save: () => store?.saveGatheringCheckActive?.(gatheringCheckActiveDraft),
-        rebaseline: () => {
-          gatheringCheckActiveBaseline = gatheringCheckActiveDraft;
-        },
-        setSaving: (on) => {
-          gatheringCheckActiveSaving = on;
-        },
-      });
-    }
-    if (gatheringResolutionMode === 'routed' && gatheringRoutedDirty) {
-      return (
-        (await persistCheckDraft({
-          save: () => store?.saveGatheringCheckRouted?.(gatheringRoutedDraft),
-          rebaseline: () => {
-            gatheringRoutedBaseline = cloneRoutedCheck(gatheringRoutedDraft);
-          },
-          setSaving: (on) => {
-            gatheringRoutedSaving = on;
-          },
-        })) && activeSaved
-      );
-    }
-    if (gatheringResolutionMode === 'progressive' && gatheringProgressiveDirty) {
-      return (
-        (await persistCheckDraft({
-          save: () => store?.saveGatheringCheckProgressive?.(gatheringProgressiveDraft),
-          rebaseline: () => {
-            gatheringProgressiveBaseline = cloneProgressiveCheck(gatheringProgressiveDraft);
-          },
-          setSaving: (on) => {
-            gatheringProgressiveSaving = on;
-          },
-        })) && activeSaved
-      );
-    }
-    // d100 has no editable slot draft — its Active flag above is the only thing to persist.
-    return activeSaved;
-  }
-
-  // The shared Checks header Save persists EVERY dirty activity (issue 1096), not just the route in
-  // view.
-  async function saveChecks() {
-    let saved = true;
-    if (craftingCheckDirty) saved = (await saveCraftingCheck()) && saved;
-    if (salvageCheckDirty) saved = (await saveSalvageCheck()) && saved;
-    if (gatheringCheckDirty) saved = (await saveGatheringCheck()) && saved;
-    return saved;
-  }
-
-  /** The rail's Active switch, for all four activities. */
-  function onToggleCheckActive(kind, enabled) {
-    const on = enabled === true;
-    if (kind === 'crafting' && selectedSystem?.resolutionMode === 'alchemy') {
-      // `simple` is the only mode "on" can mean here. Tiered reports `optional: false`, so it
-      // renders the locked indicator and never reaches this handler.
-      alchemyCheckModeDraft = on ? 'simple' : 'none';
-      return;
-    }
-    if (kind === 'crafting') craftingCheckActiveDraft = on;
-    else if (kind === 'salvage') salvageCheckActiveDraft = on;
-    else if (kind === 'gathering') gatheringCheckActiveDraft = on;
-  }
   const selectedCounts = $derived({
     components: selectedSystem?.managedItemOptions?.length || 0,
     recipes: $viewState.recipes?.length || 0,
@@ -1256,11 +723,6 @@
     componentCategories: componentCategoryRows.length,
     itemTags: tagRows.length,
   });
-  const selectedCountFacts = $derived(buildSelectedCountFacts(selectedCounts));
-  const enabledFeatureLabels = $derived(featureLabels(selectedSystem));
-  const selectedGatheringConditionShortcuts = $derived(
-    buildSelectedGatheringConditionShortcuts(selectedSystem, $viewState.gatheringConfig)
-  );
   // The ONE authored modifier library (issue 1117).
   const selectedSystemModifiers = $derived(
     Array.isArray($viewState.worldModifiers) ? $viewState.worldModifiers : []
@@ -1408,285 +870,10 @@
     await store.clearCurrencyMacro(key);
   }
 
-  function characterModifierLibraryEntry(modifierId) {
-    if (!modifierId) return null;
-    return selectedSystemModifiers.find((entry) => entry.id === modifierId) || null;
-  }
-
-  function characterModifierLabelForRef(ref) {
-    const entry = characterModifierLibraryEntry(ref?.modifierId);
-    if (entry) return entry.label || entry.id;
-    return text(
-      'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.UnknownModifier',
-      'Unknown modifier ({id})'
-    ).replace('{id}', ref?.modifierId || '');
-  }
-
-  function characterModifierIconForRef(ref) {
-    return characterModifierLibraryEntry(ref?.modifierId)?.icon || 'fa-solid fa-user';
-  }
-
-  function characterModifierIsCustomized(ref) {
-    if (!ref) return false;
-    return Boolean(ref.expressionOverride);
-  }
-
-  function rowCharacterModifiers(row) {
-    return Array.isArray(row?.characterModifiers) ? row.characterModifiers : [];
-  }
-
-  async function onAddDropCharacterModifier(rowId, modifierId = null) {
-    if (!editingGatheringTask?.id || !rowId) return;
-    const id = modifierId ?? selectedSystemModifiers[0]?.id ?? '';
-    if (!id) return;
-    const rows = gatheringTaskDropRows(editingGatheringTask);
-    const row = rows.find((entry) => entry.id === rowId);
-    if (!row) return;
-    const refs = Array.isArray(row.characterModifiers) ? row.characterModifiers : [];
-    const newRef = {
-      id: `char-mod-${id}-${refs.length + 1}-${Math.random().toString(36).slice(2, 6)}`,
-      modifierId: id,
-      operator: '+',
-      min: null,
-      max: null,
-      expressionOverride: '',
-    };
-    updateGatheringTaskDrop(rowId, { characterModifiers: [...refs, newRef] });
-  }
-
-  let characterModifierSearchTerm = $state('');
-  const characterModifierSearchSuggestions = $derived.by(() => {
-    const term = characterModifierSearchTerm.trim().toLowerCase();
-    if (!term) return [];
-    const attached = new Set(
-      (selectedGatheringDrop?.characterModifiers || []).map((ref) => ref.modifierId).filter(Boolean)
-    );
-    return selectedSystemModifiers.filter((entry) => {
-      if (attached.has(entry.id)) return false;
-      const label = String(entry.label || '').toLowerCase();
-      const id = String(entry.id || '').toLowerCase();
-      return label.includes(term) || id.includes(term);
-    });
-  });
-  $effect(() => {
-    if (selectedGatheringDrop?.id) {
-      characterModifierSearchTerm = '';
-    }
-  });
-
-  const eventCharacterModifierSearchSuggestions = $derived.by(() => {
-    const term = characterModifierSearchTerm.trim().toLowerCase();
-    if (!term) return [];
-    const attached = new Set(
-      (editingGatheringEvent?.characterModifiers || []).map((ref) => ref.modifierId).filter(Boolean)
-    );
-    return selectedSystemModifiers.filter((entry) => {
-      if (attached.has(entry.id)) return false;
-      const label = String(entry.label || '').toLowerCase();
-      const id = String(entry.id || '').toLowerCase();
-      return label.includes(term) || id.includes(term);
-    });
-  });
-  $effect(() => {
-    if (editingGatheringEvent?.id) {
-      characterModifierSearchTerm = '';
-    }
-  });
-
-  let characterModifierSearchAnchor = $state(null);
-  let characterModifierSearchOpenUp = $state(false);
-
-  function characterModifierSearchClippingBounds(node) {
-    const documentRef = globalThis.document;
-    const windowRef = globalThis.window || globalThis;
-    const viewportTop = 0;
-    const viewportBottom =
-      Number(globalThis.innerHeight || windowRef.innerHeight) ||
-      documentRef?.documentElement?.clientHeight ||
-      0;
-    let parent = node?.parentElement;
-    while (parent && parent !== documentRef?.documentElement) {
-      const style = globalThis.getComputedStyle?.(parent);
-      const overflow = `${style?.overflow || ''} ${style?.overflowY || ''} ${style?.overflowX || ''}`;
-      if (/(auto|scroll|hidden|clip)/.test(overflow)) {
-        const rect = parent.getBoundingClientRect?.();
-        if (rect) {
-          return {
-            top: Math.max(viewportTop, rect.top),
-            bottom: Math.min(viewportBottom || rect.bottom, rect.bottom),
-          };
-        }
-      }
-      parent = parent.parentElement;
-    }
-    return { top: viewportTop, bottom: viewportBottom };
-  }
-
-  function updateCharacterModifierSearchDirection() {
-    const node = characterModifierSearchAnchor;
-    const rect = node?.getBoundingClientRect?.();
-    if (!rect) {
-      characterModifierSearchOpenUp = false;
-      return;
-    }
-    const bounds = characterModifierSearchClippingBounds(node);
-    const spaceBelow = bounds.bottom - rect.bottom;
-    const spaceAbove = rect.top - bounds.top;
-    const openUpThreshold = 160;
-    characterModifierSearchOpenUp = spaceBelow < openUpThreshold && spaceAbove > spaceBelow;
-  }
-
-  $effect(() => {
-    if (characterModifierSearchSuggestions.length === 0) {
-      characterModifierSearchOpenUp = false;
-      return;
-    }
-    updateCharacterModifierSearchDirection();
-  });
-
-  async function pickCharacterModifierForRow(rowId, modifierId) {
-    characterModifierSearchTerm = '';
-    await onAddDropCharacterModifier(rowId, modifierId);
-  }
-
-  function characterModifierOperatorClass(operator) {
-    return operator === '-' ? 'is-negative' : 'is-positive';
-  }
-
-  let gatheringTimeOfDayPickerSelection = $state('');
-  let gatheringWeatherPickerSelection = $state('');
-  let gatheringBiomePickerSelection = $state('');
-  $effect(() => {
-    const biomeAvailable = gatheringConditionAvailableOptions(selectedGatheringDrop, 'biome');
-    if (!biomeAvailable.some((option) => option.id === gatheringBiomePickerSelection)) {
-      gatheringBiomePickerSelection = biomeAvailable[0]?.id || '';
-    }
-    const timeAvailable = gatheringConditionAvailableOptions(selectedGatheringDrop, 'timeOfDay');
-    if (!timeAvailable.some((option) => option.id === gatheringTimeOfDayPickerSelection)) {
-      gatheringTimeOfDayPickerSelection = timeAvailable[0]?.id || '';
-    }
-    const weatherAvailable = gatheringConditionAvailableOptions(selectedGatheringDrop, 'weather');
-    if (!weatherAvailable.some((option) => option.id === gatheringWeatherPickerSelection)) {
-      gatheringWeatherPickerSelection = weatherAvailable[0]?.id || '';
-    }
-  });
-
-  let gatheringEventTimeOfDayPickerSelection = $state('');
-  let gatheringEventWeatherPickerSelection = $state('');
-  let gatheringEventBiomePickerSelection = $state('');
-  $effect(() => {
-    const biomeAvailable = gatheringConditionAvailableOptions(editingGatheringEvent, 'biome');
-    if (!biomeAvailable.some((option) => option.id === gatheringEventBiomePickerSelection)) {
-      gatheringEventBiomePickerSelection = biomeAvailable[0]?.id || '';
-    }
-    const timeAvailable = gatheringConditionAvailableOptions(editingGatheringEvent, 'timeOfDay');
-    if (!timeAvailable.some((option) => option.id === gatheringEventTimeOfDayPickerSelection)) {
-      gatheringEventTimeOfDayPickerSelection = timeAvailable[0]?.id || '';
-    }
-    const weatherAvailable = gatheringConditionAvailableOptions(editingGatheringEvent, 'weather');
-    if (!weatherAvailable.some((option) => option.id === gatheringEventWeatherPickerSelection)) {
-      gatheringEventWeatherPickerSelection = weatherAvailable[0]?.id || '';
-    }
-  });
-
-  function gatheringEventModifierPickerSelection(kind) {
-    if (kind === 'biome') return gatheringEventBiomePickerSelection;
-    return kind === 'weather'
-      ? gatheringEventWeatherPickerSelection
-      : gatheringEventTimeOfDayPickerSelection;
-  }
-
-  function setGatheringEventModifierPickerSelection(kind, value) {
-    if (kind === 'biome') gatheringEventBiomePickerSelection = value;
-    else if (kind === 'weather') gatheringEventWeatherPickerSelection = value;
-    else gatheringEventTimeOfDayPickerSelection = value;
-  }
-
-  function gatheringDropModifierPickerSelection(kind) {
-    if (kind === 'biome') return gatheringBiomePickerSelection;
-    return kind === 'weather' ? gatheringWeatherPickerSelection : gatheringTimeOfDayPickerSelection;
-  }
-
-  function setGatheringDropModifierPickerSelection(kind, value) {
-    if (kind === 'biome') gatheringBiomePickerSelection = value;
-    else if (kind === 'weather') gatheringWeatherPickerSelection = value;
-    else gatheringTimeOfDayPickerSelection = value;
-  }
-
-  function gatheringModifierSignedValue(modifier) {
-    return (
-      (modifier?.operator === '-' ? -1 : 1) * Math.abs(Math.trunc(Number(modifier?.value || 0)))
-    );
-  }
-
-  function gatheringModifierValueClass(modifier) {
-    const signed = gatheringModifierSignedValue(modifier);
-    if (signed > 0) return 'is-positive';
-    if (signed < 0) return 'is-negative';
-    return 'is-zero';
-  }
-
-  function gatheringModifierDisplayValue(modifier) {
-    const value = Math.abs(Math.trunc(Number(modifier?.value || 0)));
-    if (modifier?.operator === '-') return value > 0 ? `-${value}` : '-';
-    return value > 0 ? `+${value}` : '0';
-  }
-
-  function signedToOperatorValue(raw) {
-    const text = String(raw ?? '');
-    const negative = text.trim().startsWith('-');
-    const digits = text.replace(/[^0-9]/g, '');
-    const value = digits === '' ? 0 : Math.abs(Math.trunc(Number(digits)));
-    return { operator: negative ? '-' : '+', value };
-  }
-
-  function onGatheringDropModifierKeydown(rowId, kind, modifier, event) {
-    event.stopPropagation();
-    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
-    event.preventDefault();
-    const next = signedToOperatorValue(
-      String(gatheringModifierSignedValue(modifier) + (event.key === 'ArrowUp' ? 1 : -1))
-    );
-    event.currentTarget.value = gatheringModifierDisplayValue(next);
-    updateGatheringDropModifier(rowId, kind, modifier.id, next);
-  }
-
-  function onGatheringEventModifierKeydown(kind, modifier, event) {
-    event.stopPropagation();
-    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
-    event.preventDefault();
-    const next = signedToOperatorValue(
-      String(gatheringModifierSignedValue(modifier) + (event.key === 'ArrowUp' ? 1 : -1))
-    );
-    event.currentTarget.value = gatheringModifierDisplayValue(next);
-    updateGatheringEventConditionModifier(kind, modifier.id, next);
-  }
-
-  async function setCharacterModifierOverrideEnabled(rowId, ref, enabled, libraryEntry) {
-    const expressionOverride = enabled ? libraryEntry?.expression || '' : '';
-    await onUpdateDropCharacterModifier(rowId, ref.id, { expressionOverride });
-  }
-
-  async function onUpdateDropCharacterModifier(rowId, refId, patch) {
-    if (!editingGatheringTask?.id || !rowId || !refId) return;
-    const rows = gatheringTaskDropRows(editingGatheringTask);
-    const row = rows.find((entry) => entry.id === rowId);
-    if (!row) return;
-    const refs = Array.isArray(row.characterModifiers) ? row.characterModifiers : [];
-    const nextRefs = refs.map((ref) => (ref.id === refId ? { ...ref, ...patch } : ref));
-    updateGatheringTaskDrop(rowId, { characterModifiers: nextRefs });
-  }
-
-  async function onDeleteDropCharacterModifier(rowId, refId) {
-    if (!editingGatheringTask?.id || !rowId || !refId) return;
-    const rows = gatheringTaskDropRows(editingGatheringTask);
-    const row = rows.find((entry) => entry.id === rowId);
-    if (!row) return;
-    const refs = Array.isArray(row.characterModifiers) ? row.characterModifiers : [];
-    const nextRefs = refs.filter((ref) => ref.id !== refId);
-    if (nextRefs.length === refs.length) return;
-    updateGatheringTaskDrop(rowId, { characterModifiers: nextRefs });
-  }
+  $effect(() => modifiers.resetSearchOnDrop());
+  $effect(() => modifiers.resetSearchOnEvent());
+  $effect(() => modifiers.reconcileDropPickers());
+  $effect(() => modifiers.reconcileEventPickers());
 
   const showRecipeCategories = $derived(!!selectedSystem);
   const selectedRecipe = $derived(
@@ -1897,7 +1084,7 @@
   const recipeBulkCheckTierAxis = $derived(
     describeRecipeCheckTierAxis({
       craftingCheck: selectedSystem?.craftingCheck,
-      craftingCheckMode,
+      craftingCheckMode: checks.craftingCheckMode,
       tierOptions: recipeCheckTierOptions,
     })
   );
@@ -1930,100 +1117,6 @@
     void recipeBulk.ids;
     recipeBulkDeleteArmed = false;
   });
-  const environmentList = $derived($viewState.environments || []);
-  const environmentValidationCount = $derived(
-    Array.isArray($viewState.environmentValidationState?.errors)
-      ? $viewState.environmentValidationState.errors.length
-      : 0
-  );
-  const selectedEnvironmentId = $derived(
-    $viewState.selectedEnvironmentId || $viewState.environmentDraft?.id || ''
-  );
-  const environmentDraftForDisplay = $derived($viewState.environmentDraft || null);
-  const shouldUseEnvironmentDraftForDisplay = $derived(
-    Boolean(environmentDraftForDisplay) &&
-      (currentView === 'environment-edit' ||
-        $viewState.environmentDraftDirty === true ||
-        $viewState.environmentDraftIsNew === true ||
-        environmentDraftForDisplay.id === selectedEnvironmentId)
-  );
-  const selectedEnvironment = $derived(
-    shouldUseEnvironmentDraftForDisplay
-      ? environmentDraftForDisplay
-      : environmentList.find((environment) => environment.id === selectedEnvironmentId) ||
-          environmentList.find(
-            (environment) => environment.id === environmentDraftForDisplay?.id
-          ) ||
-          environmentList[0] ||
-          null
-  );
-  const selectedEnvironmentFacts = $derived(environmentFacts(selectedEnvironment));
-  const selectedEnvironmentSceneState = $derived(environmentSceneState(selectedEnvironment));
-  const gatheringNavItems = [
-    {
-      id: 'environments',
-      icon: 'fas fa-seedling',
-      labelKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.Environments',
-      labelFallback: 'Environments',
-    },
-    {
-      id: 'tasks',
-      icon: 'fas fa-list-check',
-      labelKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.Tasks',
-      labelFallback: 'Tasks',
-      titleKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksTitle',
-      titleFallback: 'Gathering Tasks',
-      hintKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksHint',
-      hintFallback: 'Browse gathering tasks before attaching them to environments.',
-    },
-    {
-      id: 'encounters',
-      icon: 'fas fa-masks-theater',
-      labelKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.Encounters',
-      labelFallback: 'Events',
-      titleKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.EncountersTitle',
-      titleFallback: 'Gathering events',
-      hintKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.EncountersHint',
-      hintFallback: 'Browse reusable events before attaching them to environments.',
-    },
-    {
-      id: 'settings',
-      icon: 'fas fa-sliders',
-      labelKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.Settings',
-      labelFallback: 'Settings',
-      titleKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.SettingsPlaceholderTitle',
-      titleFallback: 'Gathering settings',
-      hintKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.SettingsPlaceholderHint',
-      hintFallback: 'Set system-level rules for gathering.',
-    },
-  ];
-  // The SELECTED SYSTEM's participation in Travel & Realms (issue 1282).
-  const gatheringRealmsEnabled = $derived($viewState.gatheringRealmSettings?.enabled === true);
-  // A party's current-realm override is per-selected-system, so it needs that system to take part:
-  // the gathering feature AND its Travel & Realms toggle.
-  const partyRealmOverridesAvailable = $derived(
-    canShowEnvironments &&
-      gatheringRealmsEnabled &&
-      $viewState.partyRealmOverridesAvailable === true
-  );
-  const partyRealmOverridesUnavailableHint = $derived(
-    !selectedSystem || selectedSystem?.features?.gathering !== true
-      ? text(
-          'FABRICATE.Admin.Manager.World.PartyOverrideGatheringRequired',
-          'Select a crafting system with Gathering enabled to set a current-realm override.'
-        )
-      : !gatheringRealmsEnabled
-        ? text(
-            'FABRICATE.Admin.Manager.World.PartyOverrideTravelRequired',
-            'Enable Travel & Realms in this system\u2019s settings to set a current-realm override.'
-          )
-        : ''
-  );
-  const displayedGatheringTab = $derived(activeGatheringTab);
-  const visibleGatheringNavItems = gatheringNavItems;
-  const gatheringInspectorTabs = $derived(
-    visibleGatheringNavItems.filter((tab) => tab.id !== 'environments')
-  );
   const isWorldRoute = $derived(currentView === 'world');
   const isWorldDowntimeRoute = $derived(currentView === 'world-downtime');
   // World > Currency (issue 1278).
@@ -2406,19 +1499,32 @@
     });
   }
 
-  /** Create a world essence from the page header and open its entry editor. */
   /**
-   * Open ONE crafting system's essence rules for a world essence, from the catalogue inspector.
-   *
-   * @param {string} _entityId the essence the row belongs to; see above.
-   * @param {string} systemId the crafting system whose rules to open.
-   * @returns {unknown} whatever `selectSystem` answered, so a refused exit stays refused.
+   * Guard the world draft before changing systems, then seed the same essence into its rules list.
    */
-  function openSystemEssenceRules(_entityId, systemId) {
+  function openSystemEssenceRules(entityId, systemId) {
     if (!systemId) return false;
-    return afterTruthyResult(selectSystem(systemId, 'essences'), () => {
+
+    const land = () => {
+      resetEssenceSelectionFor(systemId, String(entityId ?? ''));
       activeView = 'essences';
-    });
+    };
+    const selectTargetSystem = () => {
+      const selected = store.selectSystem?.(systemId);
+      if (isPromise(selected)) {
+        return selected.then((value) => {
+          if (value !== false) land();
+          return value;
+        });
+      }
+      if (selected !== false) land();
+      return selected;
+    };
+    const confirmed = confirmRouteExit('essences');
+    if (isPromise(confirmed)) {
+      return confirmed.then((value) => (value === false ? false : selectTargetSystem()));
+    }
+    return confirmed === false ? false : selectTargetSystem();
   }
 
   /**
@@ -2753,19 +1859,7 @@
       currentView === 'gathering-task-edit' ||
       currentView === 'gathering-event-edit'
   );
-  const isActiveGatheringChildRoute = $derived(
-    isGatheringRoute && visibleGatheringNavItems.some((tab) => tab.id === displayedGatheringTab)
-  );
-  const activeGatheringInspectorTab = $derived(
-    gatheringInspectorTabs.find((tab) => tab.id === displayedGatheringTab) || null
-  );
-  // Gathering's tab set is fixed, but a restored token can still name a section that no
-  // longer exists — including the retired `travel` one, which is now the World > Travel route.
-  $effect(() => {
-    if (!visibleGatheringNavItems.some((tab) => tab.id === activeGatheringTab)) {
-      activeGatheringTab = 'environments';
-    }
-  });
+  $effect(() => gathering.normalizeTab());
 
   // Crafting nav group (issue 511, PR-B redesign).
   const craftingVisibilityMode = $derived(selectedSystem?.visibilityMode || 'knowledge');
@@ -2775,7 +1869,7 @@
   const recipeCount = $derived($viewState.recipes?.length || 0);
   const recipeItemCount = $derived(recipeItemDefinitions.length);
   // ONE argument bag, read by the rail AND by route reconciliation in `normalizedActiveView` (issue
-  // 1151), mirroring `checksNavArgs`/`checksNavItems` below.
+  // 1151), mirroring the checks route model's `checksNavArgs`/`checksNavItems`.
   const craftingNavArgs = $derived({
     visibilityMode: craftingVisibilityMode,
     resolutionMode: craftingResolutionMode,
@@ -2790,92 +1884,7 @@
   );
   const isCraftingRoute = $derived(isCraftingView(currentView));
   const activeCraftingTab = $derived(resolveActiveCraftingTab(currentView));
-
-  // ── The Checks rail GROUP (issue 1096) ───────────────────────────────────────────────
-  const checksDraftSystem = $derived({
-    modifiers: selectedSystemModifiers,
-    craftingCheck: selectedSystem?.craftingCheck || {},
-    salvageCraftingCheck: selectedSystem?.salvageCraftingCheck || {},
-    gatheringCraftingCheck: selectedSystem?.gatheringCraftingCheck || {},
-  });
-  // ONE slot per activity decides BOTH halves of every badge: which draft is evaluated, and which
-  // rules it is evaluated under.
-  const salvageCheckSlot = $derived(
-    resolveActiveSalvageCheckFormula({
-      salvageResolutionMode,
-      salvageCraftingCheck: {
-        simple: salvageSimpleDraft,
-        routed: salvageRoutedDraft,
-        progressive: salvageProgressiveDraft,
-      },
-    }).slot
-  );
-  const gatheringCheckSlot = $derived(
-    resolveActiveGatheringCheckFormula(
-      {
-        gatheringCraftingCheck: {
-          progressive: gatheringProgressiveDraft,
-          routed: gatheringRoutedDraft,
-        },
-      },
-      gatheringResolutionMode
-    ).slot
-  );
-  function draftForSlot(slot, drafts) {
-    return slot ? (drafts[slot] ?? null) : null;
-  }
-  /**
-   * A SWITCHED-OFF check reports NO issues, and this is the same predicate the route renders by
-   * (`ChecksView`'s `routeIsOff`).
-   */
-  function checksActivityIsOff(activity) {
-    const state = checkActivation?.[activity];
-    if (!state || state.enabled === true) return false;
-    if (activity === 'gathering') return state.mode !== 'd100';
-    return state.optional === true;
-  }
-  function checksIssueCount(activity, slot, drafts) {
-    if (checksActivityIsOff(activity)) return 0;
-    return evaluateCheckReadiness(draftForSlot(slot, drafts) || {}, {
-      mode: readinessModeForSlot(slot),
-      modifierContext: buildCheckModifierContext(checksDraftSystem, activity, null),
-      activity,
-    }).issues.length;
-  }
-  const checksIssueCounts = $derived({
-    crafting: checksIssueCount('crafting', craftingCheckMode, {
-      simple: checkSimpleDraft,
-      routed: checkRoutedDraft,
-      progressive: checkProgressiveDraft,
-    }),
-    salvage: checksIssueCount('salvage', salvageCheckSlot, {
-      simple: salvageSimpleDraft,
-      routed: salvageRoutedDraft,
-      progressive: salvageProgressiveDraft,
-    }),
-    gathering: checksIssueCount('gathering', gatheringCheckSlot, {
-      progressive: gatheringProgressiveDraft,
-      routed: gatheringRoutedDraft,
-    }),
-  });
-  const checksNavArgs = $derived({
-    features: selectedSystem?.features || {},
-    resolutionMode: selectedSystem?.resolutionMode || 'simple',
-    salvageResolutionMode,
-    gatheringResolutionMode,
-    issueCounts: checksIssueCounts,
-    dirtyActivities: {
-      crafting: craftingCheckDirty,
-      salvage: salvageCheckDirty,
-      gathering: gatheringCheckDirty,
-    },
-  });
-  const checksNavItems = $derived(buildChecksNavItems(checksNavArgs));
-  // The PARENT badge sums the three ACTIVITY children only. Validation's badge is that
-  // same total restated, so adding it in would report every issue twice.
-  const checksNavCount = $derived(checksNavIssueTotal(checksNavItems));
   const isChecksRoute = $derived(isChecksView(currentView));
-  const checksActiveTab = $derived(resolveActiveChecksTab(currentView) || 'crafting');
 
   // ── Rail group expansion, and the collapse seam (issue 1185, extracted by issue 1717) ───
   // Both inputs are thunks: the model reads them inside its own `$derived.by` to subscribe to
@@ -2885,7 +1894,7 @@
     groupLocks: () => ({
       crafting: isCraftingRoute,
       checks: isChecksRoute,
-      gathering: isActiveGatheringChildRoute,
+      gathering: gathering.isActiveGatheringChildRoute,
       worldTravel: isWorldTravelRoute,
       worldRules: isWorldRulesRoute,
       worldDowntime: isWorldDowntimeRoute,
@@ -2961,38 +1970,6 @@
         )
       : []
   );
-  const selectedGatheringRules = $derived(
-    $viewState.gatheringConfig?.systems?.[selectedSystemId]?.rules || {
-      rewardSelectionMode: 'highestRankedDrop',
-      rewardLimit: 1,
-      eventSelectionMode: 'allDrops',
-      eventLimit: 1,
-      eventPolicy: 'successWithEvent',
-      toolBreakagePolicy: 'failureOnBreak',
-      biomeModifierAggregation: 'strongestOfEach',
-      eventVisibility: 'encounterChance',
-    }
-  );
-  const selectedGatheringSystemConfig = $derived(
-    $viewState.gatheringConfig?.systems?.[selectedSystemId] || {}
-  );
-  // Two independent limitation flags.
-  const selectedGatheringEconomy = $derived(selectedGatheringSystemConfig.economy || {});
-  // The gathering check editor shown is selected by the gathering economy's
-  // resolution mode (d100 → fixed, not editable; progressive/routed → editable).
-  const gatheringResolutionMode = $derived(selectedGatheringEconomy.resolutionMode || 'd100');
-  const selectedGatheringTaskStaminaEnabled = $derived(
-    selectedGatheringEconomy.stamina != null &&
-      Object.prototype.hasOwnProperty.call(selectedGatheringEconomy.stamina, 'enabled')
-      ? selectedGatheringEconomy.stamina.enabled === true
-      : selectedGatheringEconomy.mode === 'stamina'
-  );
-  const selectedGatheringTaskNodesEnabled = $derived(
-    selectedGatheringEconomy.nodes != null &&
-      Object.prototype.hasOwnProperty.call(selectedGatheringEconomy.nodes, 'enabled')
-      ? selectedGatheringEconomy.nodes.enabled === true
-      : selectedGatheringEconomy.mode === 'nodes'
-  );
   // ─────────────────────────────────────────────────────────────────────────────────────────
   // BREADCRUMB LEAVES: the SUBJECT of an editor, not the act of editing it (issue 1328).
   const crumbSubject = (name, key, fallback) => {
@@ -3001,21 +1978,21 @@
   };
   const environmentCrumb = $derived(
     crumbSubject(
-      environmentDraftForDisplay?.name,
+      gathering.environmentDraftForDisplay?.name,
       'FABRICATE.Admin.Manager.Environment.EditBreadcrumb',
       'Edit environment'
     )
   );
   const gatheringTaskCrumb = $derived(
     crumbSubject(
-      gatheringTaskDraft?.name,
+      gathering.gatheringTaskDraft?.name,
       'FABRICATE.Admin.Manager.Environment.Tasks.EditBreadcrumb',
       'Edit gathering task'
     )
   );
   const gatheringEventCrumb = $derived(
     crumbSubject(
-      gatheringEventDraft?.name,
+      gathering.gatheringEventDraft?.name,
       'FABRICATE.Admin.Manager.Environment.Events.EditBreadcrumb',
       'Edit gathering event'
     )
@@ -3030,33 +2007,6 @@
     )
   );
 
-  // WHICH GATHERING SUB-TAB IS ON SCREEN, in the label the rail gives it.
-  const gatheringTabLabel = $derived.by(() => {
-    const item = gatheringNavItems.find((entry) => entry.id === activeGatheringTab);
-    return item ? text(item.labelKey, item.labelFallback) : '';
-  });
-
-  // THE GATHERING FAMILY'S PER-TAB PAGE COPY, RESOLVED HERE RATHER THAN IN THE VIEW (issue 1515).
-  const activeGatheringNavItem = $derived(
-    gatheringNavItems.find((entry) => entry.id === displayedGatheringTab) || null
-  );
-  const gatheringTabPageTitle = $derived(
-    activeGatheringNavItem?.titleKey
-      ? text(activeGatheringNavItem.titleKey, activeGatheringNavItem.titleFallback)
-      : ''
-  );
-  const gatheringTabPageHint = $derived(
-    activeGatheringNavItem?.hintKey
-      ? text(activeGatheringNavItem.hintKey, activeGatheringNavItem.hintFallback)
-      : ''
-  );
-
-  const gatheringTaskDefinitions = $derived(
-    Array.isArray(selectedGatheringSystemConfig.tasks) ? selectedGatheringSystemConfig.tasks : []
-  );
-  const gatheringEventDefinitions = $derived(
-    Array.isArray(selectedGatheringSystemConfig.events) ? selectedGatheringSystemConfig.events : []
-  );
   // Tools are system-owned: read the canonical library from the selected crafting system (surfaced
   // on $viewState.selectedSystem.tools by the store) rather than the gathering-config copy.
   const selectedGatheringSystemTools = $derived(
@@ -3074,19 +2024,6 @@
       );
       return { ...tool, componentName: component?.name || '', componentImg: component?.img || '' };
     })
-  );
-  // Environments of the selected system, as { id, name } rows for the task editor's optional
-  // default-environment select (the on-drop precedence middle tier).
-  const selectedSystemEnvironmentOptions = $derived(
-    environmentList
-      .filter(
-        (environment) =>
-          String(environment?.craftingSystemId || '') === String(selectedSystemId || '')
-      )
-      .map((environment) => ({
-        id: String(environment.id),
-        name: String(environment.name || environment.id),
-      }))
   );
   const travelParties = $derived($viewState.travelParties || []);
 
@@ -3117,7 +2054,7 @@
   const worldRealms = $derived($viewState.worldRealms || []);
   // Rows for the Realms tab's per-realm environment editor.
   const worldTravelEnvironmentOptions = $derived(
-    environmentList.map((environment) => ({
+    gathering.environmentList.map((environment) => ({
       id: environment.id,
       name: environment.name,
       img: environment.img || '',
@@ -3157,25 +2094,6 @@
       selectedMapRegionUuid = mapCurrentSceneRegions[0].sceneRegionUuid;
     }
   });
-  const gatheringNavCounts = $derived({
-    environments: environmentList.length,
-    tasks: gatheringTaskDefinitions.length,
-    encounters: gatheringEventDefinitions.length,
-    total:
-      environmentList.length + gatheringTaskDefinitions.length + gatheringEventDefinitions.length,
-  });
-  const selectedGatheringTask = $derived(
-    gatheringTaskDefinitions.find((task) => task.id === selectedGatheringTaskId) ||
-      gatheringTaskDefinitions[0] ||
-      null
-  );
-  const selectedGatheringEvent = $derived(
-    gatheringEventDefinitions.find((event) => event.id === selectedGatheringEventId) ||
-      gatheringEventDefinitions[0] ||
-      null
-  );
-  const editingGatheringTask = $derived(gatheringTaskDraft || selectedGatheringTask);
-  const gatheringTaskResolutionMode = $derived(editingGatheringTask?.resolutionMode || 'd100');
   function isGatheringResultGroupMode(mode) {
     return ['straight', 'routed'].includes(mode);
   }
@@ -3186,63 +2104,10 @@
     FULL_WIDTH_VIEWS.find((entry) =>
       entry.predicate(currentView, {
         travelTab: activeTravelTab,
-        resultGroupTaskMode: isGatheringResultGroupMode(gatheringTaskResolutionMode),
+        resultGroupTaskMode: isGatheringResultGroupMode(gathering.gatheringTaskResolutionMode),
       })
     ) ?? null
   );
-  const gatheringTaskRoutedOutcomeTiers = $derived.by(() =>
-    routedTierOptionsForPolicy(
-      selectedSystem?.gatheringCraftingCheck?.routed,
-      selectedSystem?.gatheringCraftingCheck?.failureResultPolicy
-    )
-  );
-  const selectedGatheringDrop = $derived(
-    gatheringTaskDropRows(editingGatheringTask).find((row) => row.id === selectedGatheringDropId) ||
-      gatheringTaskDropRows(editingGatheringTask)[0] ||
-      null
-  );
-  const gatheringTaskDraftDirty = $derived(
-    !!(
-      gatheringTaskDraft &&
-      gatheringTaskDraftBaseline &&
-      JSON.stringify(gatheringTaskDraft) !== JSON.stringify(gatheringTaskDraftBaseline)
-    )
-  );
-  const gatheringTaskValidation = $derived(
-    gatheringTaskDraft
-      ? store.validateGatheringLibraryTask?.(gatheringTaskDraft) || { valid: true, errors: [] }
-      : { valid: true, errors: [] }
-  );
-
-  const editingGatheringEvent = $derived(gatheringEventDraft || selectedGatheringEvent);
-  const gatheringEventDraftDirty = $derived(
-    !!(
-      gatheringEventDraft &&
-      gatheringEventDraftBaseline &&
-      JSON.stringify(gatheringEventDraft) !== JSON.stringify(gatheringEventDraftBaseline)
-    )
-  );
-  const gatheringEventValidation = $derived(validateGatheringEventDraft(gatheringEventDraft));
-
-  function validateGatheringEventDraft(draft) {
-    if (!draft) return { valid: true, errors: [] };
-    const errors = [];
-    if (!String(draft?.name || '').trim()) {
-      errors.push(
-        text('FABRICATE.Admin.Manager.Environment.Events.NameRequired', 'Name is required.')
-      );
-    }
-    const rate = Number(draft?.dropRate);
-    if (!Number.isFinite(rate) || rate < 1 || rate > 100) {
-      errors.push(
-        text(
-          'FABRICATE.Admin.Manager.Environment.Events.DropRateInvalid',
-          'Drop rate must be between 1 and 100.'
-        )
-      );
-    }
-    return { valid: errors.length === 0, errors };
-  }
 
   const libraryToolsList = $derived(
     Array.isArray(selectedSystem?.tools) ? selectedSystem.tools : []
@@ -3294,6 +2159,15 @@
     lastComponentSystemId = systemId;
   }
 
+  /** Seed one system's essence selection before the system-change effect can clear it. */
+  function resetEssenceSelectionFor(systemId, essenceId = '') {
+    selectedEssenceId = essenceId;
+    essenceEditDirty = false;
+    essenceEditSaving = false;
+    essenceEditDraft = null;
+    lastEssenceSystemId = systemId;
+  }
+
   $effect(() => {
     if (selectedSystemId === lastComponentSystemId) return;
     resetComponentSelectionFor(selectedSystemId);
@@ -3301,74 +2175,14 @@
 
   $effect(() => {
     if (selectedSystemId === lastEssenceSystemId) return;
-    selectedEssenceId = '';
-    essenceEditDirty = false;
-    essenceEditSaving = false;
-    essenceEditDraft = null;
-    lastEssenceSystemId = selectedSystemId;
+    resetEssenceSelectionFor(selectedSystemId);
   });
 
-  $effect(() => {
-    if (selectedSystemId === lastGatheringSystemId) return;
-    activeGatheringTab = 'environments';
-    selectedGatheringTaskId = '';
-    selectedGatheringEventId = '';
-    gatheringTaskDraft = null;
-    gatheringTaskDraftBaseline = null;
-    gatheringTaskSaving = false;
-    gatheringTaskSaveError = '';
-    gatheringEventDraft = null;
-    gatheringEventDraftBaseline = null;
-    gatheringEventSaving = false;
-    gatheringEventSaveError = '';
-    navRail.setGroupExpanded('gathering', isGatheringRoute);
-    lastGatheringSystemId = selectedSystemId;
-  });
-
-  $effect(() => {
-    if (activeGatheringTab === 'environments') return;
-    if (currentView === 'environments' && canShowEnvironments) return;
-    if (currentView === 'gathering-task-edit' && canShowEnvironments) return;
-    if (currentView === 'gathering-event-edit' && canShowEnvironments) return;
-    activeGatheringTab = 'environments';
-  });
-
-  $effect(() => {
-    if (!canShowEnvironments) {
-      selectedGatheringTaskId = '';
-      selectedGatheringDropId = '';
-      return;
-    }
-    if (
-      selectedGatheringTaskId &&
-      gatheringTaskDefinitions.some((task) => task.id === selectedGatheringTaskId)
-    )
-      return;
-    selectedGatheringTaskId = gatheringTaskDefinitions[0]?.id || '';
-  });
-
-  $effect(() => {
-    if (!canShowEnvironments) {
-      selectedGatheringEventId = '';
-      return;
-    }
-    if (
-      selectedGatheringEventId &&
-      gatheringEventDefinitions.some((event) => event.id === selectedGatheringEventId)
-    )
-      return;
-    selectedGatheringEventId = gatheringEventDefinitions[0]?.id || '';
-  });
-
-  $effect(() => {
-    if (!editingGatheringTask) {
-      selectedGatheringDropId = '';
-      return;
-    }
-    const rows = gatheringTaskDropRows(editingGatheringTask);
-    if (selectedGatheringDropId && rows.some((row) => row.id === selectedGatheringDropId)) return;
-    selectedGatheringDropId = rows[0]?.id || '';
-  });
+  $effect(() => gathering.resetOnSystemSwitch());
+  $effect(() => gathering.resetTabOffRoute());
+  $effect(() => gathering.reselectTask());
+  $effect(() => gathering.reselectEvent());
+  $effect(() => gathering.reselectDrop());
 
   $effect(() => {
     services?.registerEssenceDirtyGuard?.(() =>
@@ -3406,16 +2220,6 @@
     return result;
   }
 
-  function updateSelectedGatheringRules(updates) {
-    if (!selectedSystemId) return;
-    store.updateGatheringRules?.(selectedSystemId, updates);
-  }
-
-  function updateSelectedGatheringCondition(kind, value) {
-    if (!selectedSystemId || !kind) return;
-    store.updateGatheringConditions?.({ [kind]: value, systemId: selectedSystemId });
-  }
-
   function formatCount(keySingular, fallbackSingular, keyPlural, fallbackPlural, count) {
     const key = count === 1 ? keySingular : keyPlural;
     const fallback = count === 1 ? fallbackSingular : fallbackPlural;
@@ -3429,16 +2233,10 @@
       localize
     );
     const mode = resolutionModeLabel(selectedSystem?.resolutionMode);
-    // "⟨category⟩ · ⟨mode⟩ · DC ⟨n⟩" (§F4): resolve the check DC from the same projected
-    // `checkSummary` the browser row's check pill reads.
-    const summary = selectedRecipe?.checkSummary || null;
-    let dcSuffix = '';
-    if (summary?.kind === 'dc' && Number.isFinite(Number(summary.dc))) {
-      dcSuffix = ` · ${text('FABRICATE.Admin.Manager.Recipe.CheckDcShort', 'DC')} ${summary.dc}`;
-    } else if (summary?.kind === 'none') {
-      dcSuffix = ` · ${text('FABRICATE.Admin.Manager.Recipe.CheckDcShort', 'DC')} —`;
-    }
-    return `${category} · ${mode}${dcSuffix}`;
+    // "⟨category⟩ · ⟨mode⟩ · DC ⟨n⟩" (§F4): resolve the check from the same projected
+    // `checkSummary` the browser row's check pill reads, naming a Target as the pill does.
+    const suffix = recipeCheckSubtitleSuffix(selectedRecipe?.checkSummary || null, text);
+    return `${category} · ${mode}${suffix}`;
   }
 
   // The component editor's header subline: "<category> · Linked <source>" (issue 676, decision 4).
@@ -3493,121 +2291,18 @@
     return `${mode} · ${tiers}`;
   }
 
-  function featureLabels(system) {
-    if (!system?.features) return [];
-    const featureMap = [
-      ['gathering', 'FABRICATE.Admin.Manager.Feature.Gathering', 'Gathering'],
-      ['essences', 'FABRICATE.Admin.Manager.Feature.Essences', 'Essences'],
-      [
-        'multiStepRecipes',
-        'FABRICATE.Admin.Manager.Feature.MultiStepRecipes',
-        'Multi-step recipes',
-      ],
-      ['craftingChecks', 'FABRICATE.Admin.Manager.Feature.CraftingChecks', 'Crafting checks'],
-      ['outcomeRouting', 'FABRICATE.Admin.Manager.Feature.OutcomeRouting', 'Outcome routing'],
-      ['effectTransfer', 'FABRICATE.Admin.Manager.Feature.EffectTransfer', 'Effect transfer'],
-      ['propertyMacros', 'FABRICATE.Admin.Manager.Feature.PropertyMacros', 'Property macros'],
-    ];
-    return featureMap
-      .filter(([key]) => system.features[key] === true)
-      .map(([, key, fallback]) => text(key, fallback));
-  }
-
-  function buildSelectedCountFacts(counts) {
-    const offLabel = text('FABRICATE.Admin.Manager.Off', 'Off');
-    return [
-      {
-        id: 'components',
-        label: text('FABRICATE.Admin.Manager.Column.Components', 'Components'),
-        value: counts.components,
-      },
-      {
-        id: 'recipes',
-        label: text('FABRICATE.Admin.Manager.Column.Recipes', 'Recipes'),
-        value: counts.recipes,
-      },
-      counts.environments == null
-        ? {
-            id: 'environments',
-            label: text('FABRICATE.Admin.Manager.GatheringEnvironments', 'Gathering environments'),
-            value: offLabel,
-            isOff: true,
-          }
-        : {
-            id: 'environments',
-            label: text('FABRICATE.Admin.Manager.GatheringEnvironments', 'Gathering environments'),
-            value: counts.environments,
-          },
-      {
-        id: 'essences',
-        label: text('FABRICATE.Admin.Manager.Nav.Essences', 'Essences'),
-        value: counts.essences,
-      },
-      {
-        id: 'item-tags',
-        label: text('FABRICATE.Admin.Manager.Feature.ItemTags', 'Item tags'),
-        value: counts.itemTags,
-      },
-      {
-        id: 'recipe-categories',
-        label: text('FABRICATE.Admin.Manager.Feature.RecipeCategories', 'Recipe categories'),
-        value: counts.recipeCategories,
-      },
-    ];
-  }
-
-  function buildSelectedGatheringConditionShortcuts(system, gatheringConfig) {
-    if (system?.features?.gathering !== true) return [];
-    const systemConditions = gatheringConfig?.systems?.[system.id]?.conditions || {};
-    return [
-      {
-        kind: 'timeOfDay',
-        icon: 'fas fa-clock',
-        label: text('FABRICATE.Admin.Manager.CurrentTimeOfDay', 'Current time of day'),
-        setting: systemConditions.timeOfDay || {
-          enabled: true,
-          current: gatheringConfig?.conditions?.timeOfDay || 'day',
-          values: gatheringConfig?.vocabularies?.timeOfDay || [],
-        },
-      },
-      {
-        kind: 'weather',
-        icon: 'fas fa-cloud-sun',
-        label: text('FABRICATE.Admin.Manager.CurrentWeather', 'Current weather'),
-        setting: systemConditions.weather || {
-          enabled: true,
-          current: gatheringConfig?.conditions?.weather || 'clear',
-          values: gatheringConfig?.vocabularies?.weather || [],
-        },
-      },
-    ].filter(
-      (condition) =>
-        condition.setting?.enabled !== false && conditionValues(condition.setting).length > 0
-    );
-  }
-
-  function conditionId(option) {
-    if (option && typeof option === 'object') return String(option.id || '').trim();
-    return String(option || '').trim();
-  }
-
-  function conditionLabel(option) {
-    if (option && typeof option === 'object') return String(option.label || option.id || '').trim();
-    return String(option || '').trim();
-  }
-
-  function conditionValues(setting) {
-    return Array.isArray(setting?.values) ? setting.values : [];
-  }
-
   function normalizedActiveView(view, system, environmentsAvailable, essencesAvailable) {
     // `checks` is RETAINED as a redirect to the first available child (issue 1096), so existing
     // deep links.
-    if (system && view === 'checks') return resolveChecksRedirect(checksNavArgs);
+    if (system && view === 'checks') return resolveChecksRedirect(checks.checksNavArgs);
     // A child whose feature was switched off while it was open falls back to the same
     // redirect rather than rendering a route the rail no longer offers.
-    if (system && CHECKS_VIEWS.includes(view) && !checksNavItems.some((item) => item.view === view))
-      return resolveChecksRedirect(checksNavArgs);
+    if (
+      system &&
+      CHECKS_VIEWS.includes(view) &&
+      !checks.checksNavItems.some((item) => item.view === view)
+    )
+      return resolveChecksRedirect(checks.checksNavArgs);
     // The same reconciliation for the Crafting group (issue 1151).
     if (system && isCraftingView(view) && !isCraftingViewAvailable(view, craftingNavArgs))
       return resolveCraftingRedirect(craftingNavArgs);
@@ -3665,9 +2360,9 @@
   // they held when it was built.
   const header = createHeaderModel({
     route: {
-      checksActiveTab: () => checksActiveTab,
+      checksActiveTab: () => checks.checksActiveTab,
       currentView: () => currentView,
-      displayedGatheringTab: () => displayedGatheringTab,
+      displayedGatheringTab: () => gathering.displayedGatheringTab,
       isChecksRoute: () => isChecksRoute,
       isWorldDowntimeRoute: () => isWorldDowntimeRoute,
       isWorldRulesRoute: () => isWorldRulesRoute,
@@ -3686,8 +2381,8 @@
       enabledPartyCount: () => enabledPartyCount,
       essenceRulesMode: () => essenceRulesMode,
       format: () => format,
-      gatheringTabPageHint: () => gatheringTabPageHint,
-      gatheringTabPageTitle: () => gatheringTabPageTitle,
+      gatheringTabPageHint: () => gathering.gatheringTabPageHint,
+      gatheringTabPageTitle: () => gathering.gatheringTabPageTitle,
       playerCharacterUuids: () => playerCharacterUuids,
       recipeDraft: () => recipeDraft,
       recipeEditSubtitle: () => recipeEditSubtitle,
@@ -3738,7 +2433,7 @@
       return text('FABRICATE.Admin.Manager.Component.Inspector', 'Selected component inspector');
     if (currentView === 'essences' || currentView === 'essence-edit')
       return text('FABRICATE.Admin.Manager.Essence.Inspector', 'Selected essence inspector');
-    if (currentView === 'environments' && displayedGatheringTab === 'tasks')
+    if (currentView === 'environments' && gathering.displayedGatheringTab === 'tasks')
       return text(
         'FABRICATE.Admin.Manager.Environment.Tasks.Inspector',
         'Selected gathering task inspector'
@@ -3763,10 +2458,10 @@
   const finishGatheringTaskExit = async (action, nextView) => {
     if (action === 'cancel' || action === false) return false;
     if (action === 'save') {
-      const saved = await saveGatheringTaskDraft();
+      const saved = await drafts.saveGatheringTaskDraft();
       if (saved === false) return false;
     }
-    clearGatheringTaskDraft();
+    drafts.clearGatheringTaskDraft();
     if (nextView) activeView = nextView;
     return true;
   };
@@ -3774,10 +2469,10 @@
   const finishGatheringEventExit = async (action, nextView) => {
     if (action === 'cancel' || action === false) return false;
     if (action === 'save') {
-      const saved = await saveGatheringEventDraft();
+      const saved = await drafts.saveGatheringEventDraft();
       if (saved === false) return false;
     }
-    clearGatheringEventDraft();
+    drafts.clearGatheringEventDraft();
     if (nextView) activeView = nextView;
     return true;
   };
@@ -3894,14 +2589,14 @@
     },
     'gathering-task-edit': {
       active: () => activeView === 'gathering-task-edit',
-      isDirty: () => gatheringTaskDraftDirty,
+      isDirty: () => gathering.gatheringTaskDraftDirty,
       whenClean: (nextView) => finishGatheringTaskExit(true, nextView),
       confirm: () => store.confirmDiscardDirtyGatheringTaskDraft?.(),
       finish: finishGatheringTaskExit,
     },
     'gathering-event-edit': {
       active: () => activeView === 'gathering-event-edit',
-      isDirty: () => gatheringEventDraftDirty,
+      isDirty: () => gathering.gatheringEventDraftDirty,
       whenClean: (nextView) => finishGatheringEventExit(true, nextView),
       confirm: () => store.confirmDiscardDirtyGatheringEventDraft?.(),
       finish: finishGatheringEventExit,
@@ -3940,10 +2635,10 @@
     checks: {
       active: () => isChecksRoute,
       family: (nextView) => isChecksView(nextView),
-      isDirty: () => checksDirty,
+      isDirty: () => checks.checksDirty,
       confirm: () =>
         store?.confirmDiscardDirtyChecksDraft?.(
-          checksDirtyActivities.map((activity) =>
+          checks.checksDirtyActivities.map((activity) =>
             text(
               `FABRICATE.Admin.Manager.Checks.Tabs.${activity[0].toUpperCase()}${activity.slice(1)}`,
               activity
@@ -3952,9 +2647,9 @@
         ),
       finish: async (action) => {
         // Navigation is gated on the save, as the essence and system-details guards gate theirs.
-        if (action === 'save') return await saveChecks();
+        if (action === 'save') return await checks.saveChecks();
         if (action === 'discard' || action === true) {
-          discardChecksDrafts();
+          checks.discardChecksDrafts();
           return true;
         }
         return false;
@@ -4037,22 +2732,6 @@
         allowed === false ? false : finishRouteExit(nextView, nextRouteId)
       );
     return companion === false ? false : finishRouteExit(nextView, nextRouteId);
-  }
-
-  /** Reset every check draft to its last saved baseline. */
-  function discardChecksDrafts() {
-    alchemyCheckModeDraft = alchemyCheckModeBaseline;
-    craftingCheckActiveDraft = craftingCheckActiveBaseline;
-    salvageCheckActiveDraft = salvageCheckActiveBaseline;
-    gatheringCheckActiveDraft = gatheringCheckActiveBaseline;
-    checkRoutedDraft = cloneRoutedCheck(checkRoutedBaseline);
-    checkSimpleDraft = cloneSimpleCheck(checkSimpleBaseline);
-    checkProgressiveDraft = cloneProgressiveCheck(checkProgressiveBaseline);
-    salvageSimpleDraft = cloneSimpleCheck(salvageSimpleBaseline);
-    salvageRoutedDraft = cloneRoutedCheck(salvageRoutedBaseline);
-    salvageProgressiveDraft = cloneProgressiveCheck(salvageProgressiveBaseline);
-    gatheringProgressiveDraft = cloneProgressiveCheck(gatheringProgressiveBaseline);
-    gatheringRoutedDraft = cloneRoutedCheck(gatheringRoutedBaseline);
   }
 
   function surfaceToolsSaveValidationError() {
@@ -4204,17 +2883,17 @@
     environment: {
       view: 'environment-edit',
       targetId: (issue) => issue.environmentId,
-      open: (id) => editEnvironment(id),
+      open: (id) => drafts.editEnvironment(id),
     },
     task: {
       view: 'environment-edit',
       targetId: (issue) => issue.environmentId,
-      open: (id) => editEnvironment(id),
+      open: (id) => drafts.editEnvironment(id),
     },
     event: {
       view: 'environment-edit',
       targetId: (issue) => issue.environmentId,
-      open: (id) => editEnvironment(id),
+      open: (id) => drafts.editEnvironment(id),
     },
     salvage: {
       view: 'component-edit',
@@ -4236,7 +2915,7 @@
   // what makes the retained `checks` id a redirect rather than a dead route.
   function activateChecksParent() {
     navRail.expandGroup('checks');
-    setView(resolveChecksRedirect(checksNavArgs));
+    setView(resolveChecksRedirect(checks.checksNavArgs));
   }
 
   function backToSystemsBrowser() {
@@ -4556,12 +3235,6 @@
     });
   }
 
-  // The store resolves the post-import report content (or null when the import was cancelled,
-  // failed, or skipped an existing system).
-  async function importSystem() {
-    importReportContent = (await store.importSystem?.()) ?? null;
-  }
-
   function exportSystem(systemId = selectedSystemId) {
     if (!systemId) return;
     store.exportSystem?.(systemId);
@@ -4585,27 +3258,6 @@
   // Enabling is GATED: an incomplete recipe (or one with a conflicting signature) is refused.
   function toggleRecipeEnabled(recipeId, enabled, options) {
     store.toggleRecipeEnabled?.(recipeId, enabled, options);
-  }
-
-  // A folder / whole-pack drop opens the mapping modal BEFORE importing so the GM can categorize +
-  // tag per folder.
-  async function dropComponent(data) {
-    const plan = (await services?.collectImportFolderGroups?.(data)) || null;
-    if (plan?.groups?.length) {
-      importMappingFolders = plan.groups;
-      importMappingOpen = true;
-      return;
-    }
-    // `handled` means the collector already notified (e.g. a compendium-directory folder groups
-    // packs, not items) and there is nothing to import — do NOT fall through to onDropItem.
-    if (plan?.handled) return;
-    services?.onDropItem?.(data);
-  }
-
-  async function commitImportFolderMapping(decisions) {
-    importMappingOpen = false;
-    if (!Array.isArray(decisions) || decisions.length === 0) return;
-    await services?.commitImportFolderMapping?.(selectedSystemId, decisions);
   }
 
   function editComponent(itemId = selectedComponent?.id) {
@@ -5311,443 +3963,6 @@
       .replace('{disabled}', disabled);
   }
 
-  function selectEnvironment(environmentId = selectedEnvironment?.id) {
-    if (!environmentId) return;
-    store.selectEnvironment?.(environmentId);
-  }
-
-  function editEnvironment(environmentId = selectedEnvironment?.id) {
-    if (!environmentId || !canShowEnvironments) return;
-    afterTruthyResult(store.selectEnvironment?.(environmentId), () => {
-      activeView = 'environment-edit';
-    });
-  }
-
-  function createEnvironment() {
-    if (!canShowEnvironments) return;
-    const created = store.createEnvironmentDraft?.();
-    if (isPromise(created)) {
-      created.then((value) => {
-        if (value !== false && value !== null) activeView = 'environment-edit';
-      });
-      return;
-    }
-    if (created !== false && created !== null) activeView = 'environment-edit';
-  }
-
-  function toggleEnvironmentEnabled(environmentId, enabled) {
-    if (!environmentId) return;
-    store.toggleEnvironmentEnabled?.(environmentId, enabled);
-  }
-
-  function duplicateEnvironment(environmentId = selectedEnvironment?.id) {
-    if (!environmentId) return;
-    store.duplicateEnvironmentDraft?.(environmentId);
-  }
-
-  function deleteEnvironment(environmentId = selectedEnvironment?.id) {
-    if (!environmentId) return;
-    store.deleteEnvironmentDraft?.(environmentId);
-  }
-
-  function selectGatheringTask(taskId = selectedGatheringTask?.id) {
-    selectedGatheringTaskId = taskId || '';
-  }
-
-  function createGatheringTask(systemId = selectedSystemId) {
-    if (!systemId) return;
-    const created = store.addGatheringLibraryTask?.(systemId);
-    if (isPromise(created)) {
-      created.then((task) => {
-        if (task?.id) selectedGatheringTaskId = task.id;
-      });
-      return;
-    }
-    if (created?.id) selectedGatheringTaskId = created.id;
-  }
-
-  function editGatheringTask(taskId = selectedGatheringTask?.id) {
-    if (!taskId || !canShowEnvironments) return;
-    selectedGatheringTaskId = taskId;
-    const source = gatheringTaskDefinitions.find((task) => task.id === taskId) || null;
-    const snapshot = source ? JSON.parse(JSON.stringify(source)) : null;
-    gatheringTaskDraft = snapshot;
-    gatheringTaskDraftBaseline = snapshot ? JSON.parse(JSON.stringify(snapshot)) : null;
-    gatheringTaskSaveError = '';
-    activeGatheringTab = 'tasks';
-    navRail.expandGroup('gathering');
-    activeView = 'gathering-task-edit';
-  }
-
-  function clearGatheringTaskDraft() {
-    gatheringTaskDraft = null;
-    gatheringTaskDraftBaseline = null;
-    gatheringTaskSaveError = '';
-  }
-
-  function backToGatheringTaskLibrary() {
-    afterTruthyResult(confirmRouteExit('environments'), () => {
-      activeGatheringTab = 'tasks';
-      navRail.expandGroup('gathering');
-      activeView = 'environments';
-    });
-  }
-
-  async function saveGatheringTaskDraft() {
-    if (!gatheringTaskDraft || !selectedSystemId || !selectedGatheringTaskId) return false;
-    const { valid, errors } = gatheringTaskValidation;
-    if (!valid) {
-      gatheringTaskSaveError = errors[0] || '';
-      return false;
-    }
-    const proceed =
-      (await store.confirmGatheringLibraryTaskCompositionLoss?.(
-        selectedSystemId,
-        selectedGatheringTaskId,
-        gatheringTaskDraft
-      )) ?? true;
-    if (!proceed) return false; // GM cancelled the match-loss warning — keep editing, no save error
-    // Cleared here — once an attempt is actually committed to, and before the awaited store call
-    // (mirrors saveRecipeItemDraft).
-    gatheringTaskSaveError = '';
-    gatheringTaskSaving = true;
-    try {
-      const ok = await store.updateGatheringLibraryTask?.(
-        selectedSystemId,
-        selectedGatheringTaskId,
-        gatheringTaskDraft
-      );
-      if (ok) {
-        gatheringTaskDraftBaseline = JSON.parse(JSON.stringify(gatheringTaskDraft));
-        gatheringTaskSaveError = '';
-        return true;
-      }
-      gatheringTaskSaveError = text(
-        'FABRICATE.Admin.Manager.Environment.Tasks.SaveFailed',
-        'Save failed. Try again.'
-      );
-      return false;
-    } catch (error) {
-      console.error('Failed to save gathering task draft', error);
-      gatheringTaskSaveError = text(
-        'FABRICATE.Admin.Manager.Environment.Tasks.SaveFailed',
-        'Save failed. Try again.'
-      );
-      return false;
-    } finally {
-      gatheringTaskSaving = false;
-    }
-  }
-
-  async function deleteGatheringTaskDraft() {
-    if (!selectedSystemId || !selectedGatheringTaskId) return;
-    const deletedTaskId = selectedGatheringTaskId;
-    const result = await store.deleteGatheringLibraryTask?.(selectedSystemId, deletedTaskId);
-    if (result === false) return;
-    if (selectedGatheringTaskId === deletedTaskId) selectedGatheringTaskId = '';
-    gatheringTaskDraft = null;
-    gatheringTaskDraftBaseline = null;
-    gatheringTaskSaveError = '';
-    activeGatheringTab = 'tasks';
-    navRail.expandGroup('gathering');
-    activeView = 'environments';
-  }
-
-  function duplicateGatheringTask(systemId = selectedSystemId, taskId = selectedGatheringTask?.id) {
-    if (!systemId || !taskId) return;
-    const duplicated = store.duplicateGatheringLibraryTask?.(systemId, taskId);
-    if (isPromise(duplicated)) {
-      duplicated.then((task) => {
-        if (task?.id) selectedGatheringTaskId = task.id;
-      });
-      return;
-    }
-    if (duplicated?.id) selectedGatheringTaskId = duplicated.id;
-  }
-
-  function deleteGatheringTask(systemId = selectedSystemId, taskId = selectedGatheringTask?.id) {
-    if (!systemId || !taskId) return;
-    const deleted = store.deleteGatheringLibraryTask?.(systemId, taskId);
-    if (isPromise(deleted)) {
-      deleted.then((value) => {
-        if (value !== false && selectedGatheringTaskId === taskId) selectedGatheringTaskId = '';
-      });
-      return;
-    }
-    if (deleted !== false && selectedGatheringTaskId === taskId) selectedGatheringTaskId = '';
-  }
-
-  function toggleGatheringTaskEnabled(
-    systemId = selectedSystemId,
-    taskId = selectedGatheringTask?.id,
-    enabled = true
-  ) {
-    if (!systemId || !taskId) return;
-    store.updateGatheringLibraryTask?.(systemId, taskId, { enabled });
-  }
-
-  function selectGatheringEvent(eventId = selectedGatheringEvent?.id) {
-    selectedGatheringEventId = eventId || '';
-  }
-
-  function createGatheringEvent(systemId = selectedSystemId) {
-    if (!systemId) return;
-    const created = store.addGatheringLibraryEvent?.(systemId);
-    if (isPromise(created)) {
-      created.then((event) => {
-        if (event?.id) selectedGatheringEventId = event.id;
-      });
-      return;
-    }
-    if (created?.id) selectedGatheringEventId = created.id;
-  }
-
-  function editGatheringEvent(eventId = selectedGatheringEvent?.id) {
-    if (!eventId || !canShowEnvironments) return;
-    selectedGatheringEventId = eventId;
-    const source = gatheringEventDefinitions.find((event) => event.id === eventId) || null;
-    const snapshot = source ? JSON.parse(JSON.stringify(source)) : null;
-    gatheringEventDraft = snapshot;
-    gatheringEventDraftBaseline = snapshot ? JSON.parse(JSON.stringify(snapshot)) : null;
-    gatheringEventSaveError = '';
-    activeGatheringTab = 'encounters';
-    navRail.expandGroup('gathering');
-    activeView = 'gathering-event-edit';
-  }
-
-  function clearGatheringEventDraft() {
-    gatheringEventDraft = null;
-    gatheringEventDraftBaseline = null;
-    gatheringEventSaveError = '';
-    gatheringEventSaving = false;
-  }
-
-  function backToGatheringEventLibrary() {
-    afterTruthyResult(confirmRouteExit('environments'), () => {
-      activeGatheringTab = 'encounters';
-      navRail.expandGroup('gathering');
-      activeView = 'environments';
-    });
-  }
-
-  async function saveGatheringEventDraft() {
-    if (!gatheringEventDraft || !selectedSystemId || !selectedGatheringEventId) return false;
-    const { valid, errors } = gatheringEventValidation;
-    if (!valid) {
-      gatheringEventSaveError = errors[0] || '';
-      return false;
-    }
-    const proceed =
-      (await store.confirmGatheringLibraryEventCompositionLoss?.(
-        selectedSystemId,
-        selectedGatheringEventId,
-        gatheringEventDraft
-      )) ?? true;
-    if (!proceed) return false; // GM cancelled the match-loss warning — keep editing, no save error
-    // Cleared at the same point, and for the same reason, as in saveGatheringTaskDraft: an
-    // unchanged error string is not a DOM mutation.
-    gatheringEventSaveError = '';
-    gatheringEventSaving = true;
-    try {
-      const ok = await store.updateGatheringLibraryEvent?.(
-        selectedSystemId,
-        selectedGatheringEventId,
-        gatheringEventDraft
-      );
-      if (ok !== false) {
-        gatheringEventDraftBaseline = JSON.parse(JSON.stringify(gatheringEventDraft));
-        gatheringEventSaveError = '';
-        return true;
-      }
-      gatheringEventSaveError = text(
-        'FABRICATE.Admin.Manager.Environment.Events.SaveFailed',
-        'Save failed. Try again.'
-      );
-      return false;
-    } catch (error) {
-      // Until issue 919 this `try` had no `catch` at all, so a rejected store call escaped
-      // as an unhandled rejection and the GM saw nothing. Mirrors saveGatheringTaskDraft.
-      console.error('Failed to save gathering event draft', error);
-      gatheringEventSaveError = text(
-        'FABRICATE.Admin.Manager.Environment.Events.SaveFailed',
-        'Save failed. Try again.'
-      );
-      return false;
-    } finally {
-      gatheringEventSaving = false;
-    }
-  }
-
-  async function deleteGatheringEventDraft() {
-    if (!selectedGatheringEventId || !selectedSystemId) return;
-    const message = text(
-      'FABRICATE.Admin.Manager.Environment.Events.DeleteConfirm',
-      'Delete this event? This cannot be undone.'
-    );
-    const confirmed = typeof globalThis.confirm === 'function' ? globalThis.confirm(message) : true;
-    if (confirmed === false) return;
-    const deletedId = selectedGatheringEventId;
-    await store.deleteGatheringLibraryEvent?.(selectedSystemId, deletedId);
-    if (selectedGatheringEventId === deletedId) selectedGatheringEventId = '';
-    clearGatheringEventDraft();
-    activeGatheringTab = 'encounters';
-    navRail.expandGroup('gathering');
-    activeView = 'environments';
-  }
-
-  function duplicateGatheringEvent(
-    systemId = selectedSystemId,
-    eventId = selectedGatheringEvent?.id
-  ) {
-    if (!systemId || !eventId) return;
-    const duplicated = store.duplicateGatheringLibraryEvent?.(systemId, eventId);
-    if (isPromise(duplicated)) {
-      duplicated.then((event) => {
-        if (event?.id) selectedGatheringEventId = event.id;
-      });
-      return;
-    }
-    if (duplicated?.id) selectedGatheringEventId = duplicated.id;
-  }
-
-  function deleteGatheringEvent(systemId = selectedSystemId, eventId = selectedGatheringEvent?.id) {
-    if (!systemId || !eventId) return;
-    const deleted = store.deleteGatheringLibraryEvent?.(systemId, eventId);
-    if (isPromise(deleted)) {
-      deleted.then((value) => {
-        if (value !== false && selectedGatheringEventId === eventId) selectedGatheringEventId = '';
-      });
-      return;
-    }
-    if (deleted !== false && selectedGatheringEventId === eventId) selectedGatheringEventId = '';
-  }
-
-  function toggleGatheringEventEnabled(
-    systemId = selectedSystemId,
-    eventId = selectedGatheringEvent?.id,
-    enabled = true
-  ) {
-    if (!systemId || !eventId) return;
-    store.updateGatheringLibraryEvent?.(systemId, eventId, { enabled });
-  }
-
-  function updateSelectedGatheringEvent(updates = {}) {
-    if (gatheringEventDraft) {
-      gatheringEventDraft = { ...gatheringEventDraft, ...updates };
-      return true;
-    }
-    if (!selectedSystemId || !selectedGatheringEvent?.id) return false;
-    return store.updateGatheringLibraryEvent?.(
-      selectedSystemId,
-      selectedGatheringEvent.id,
-      updates
-    );
-  }
-
-  function updateSelectedGatheringTask(updates = {}) {
-    if (gatheringTaskDraft) {
-      gatheringTaskDraft = { ...gatheringTaskDraft, ...updates };
-      return true;
-    }
-    if (!selectedSystemId || !selectedGatheringTask?.id) return false;
-    return store.updateGatheringLibraryTask?.(selectedSystemId, selectedGatheringTask.id, updates);
-  }
-
-  function addToolReferenceToSelectedTask(toolId) {
-    if (!editingGatheringTask || !toolId) return;
-    const existing = Array.isArray(editingGatheringTask.toolIds)
-      ? editingGatheringTask.toolIds
-      : [];
-    if (existing.includes(toolId)) return;
-    updateSelectedGatheringTask({ toolIds: [...existing, toolId] });
-  }
-
-  function removeToolReferenceFromSelectedTask(toolId) {
-    if (!editingGatheringTask || !toolId) return;
-    const existing = Array.isArray(editingGatheringTask.toolIds)
-      ? editingGatheringTask.toolIds
-      : [];
-    updateSelectedGatheringTask({ toolIds: existing.filter((id) => id !== toolId) });
-  }
-
-  function gatheringDropRowId() {
-    return `drop-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-  }
-
-  function addGatheringTaskDrop() {
-    if (!editingGatheringTask) return;
-    const row = {
-      id: gatheringDropRowId(),
-      name: '',
-      componentId: '',
-      itemUuid: '',
-      quantity: 1,
-      dropRate: 25,
-      conditionModifiers: { biome: [], timeOfDay: [], weather: [] },
-      enabled: false,
-    };
-    selectedGatheringDropId = row.id;
-    updateSelectedGatheringTask({
-      dropRows: [...gatheringTaskDropRows(editingGatheringTask), row],
-    });
-  }
-
-  function updateGatheringTaskDrop(rowId, updates = {}) {
-    if (!editingGatheringTask || !rowId) return;
-    const rows = gatheringTaskDropRows(editingGatheringTask).map((row) =>
-      row.id === rowId ? { ...row, ...updates } : row
-    );
-    const patch =
-      store.gatheringTaskAutopopulateFromComponent?.(
-        selectedSystemId,
-        editingGatheringTask,
-        rows
-      ) || {};
-    updateSelectedGatheringTask({ dropRows: rows, ...patch });
-  }
-
-  function duplicateGatheringTaskDrop(rowId = selectedGatheringDrop?.id) {
-    if (!editingGatheringTask || !rowId) return;
-    const rows = gatheringTaskDropRows(editingGatheringTask);
-    const index = rows.findIndex((row) => row.id === rowId);
-    if (index < 0) return;
-    const duplicate = { ...JSON.parse(JSON.stringify(rows[index])), id: gatheringDropRowId() };
-    selectedGatheringDropId = duplicate.id;
-    updateSelectedGatheringTask({
-      dropRows: [...rows.slice(0, index + 1), duplicate, ...rows.slice(index + 1)],
-    });
-  }
-
-  function deleteGatheringTaskDrop(rowId = selectedGatheringDrop?.id) {
-    if (!editingGatheringTask || !rowId) return;
-    const rows = gatheringTaskDropRows(editingGatheringTask);
-    const index = rows.findIndex((row) => row.id === rowId);
-    const nextRows = rows.filter((row) => row.id !== rowId);
-    selectedGatheringDropId = nextRows[Math.min(index, nextRows.length - 1)]?.id || '';
-    updateSelectedGatheringTask({ dropRows: nextRows });
-  }
-
-  function moveGatheringTaskDrop(rowId, direction) {
-    if (!editingGatheringTask || !rowId) return;
-    const rows = gatheringTaskDropRows(editingGatheringTask);
-    const index = rows.findIndex((row) => row.id === rowId);
-    if (index < 0) return;
-    const target = direction === 'up' ? index - 1 : index + 1;
-    if (target < 0 || target >= rows.length) return;
-    const next = [...rows];
-    [next[index], next[target]] = [next[target], next[index]];
-    updateSelectedGatheringTask({ dropRows: next });
-  }
-
-  async function importGatheringTaskDrop(rowId, data) {
-    if (!rowId) return false;
-    const item = await services?.importSingleManagedItemFromDrop?.(data);
-    if (!item?.id) return false;
-    updateGatheringTaskDrop(rowId, { componentId: item.id, itemUuid: '', name: '', enabled: true });
-    selectedGatheringDropId = rowId;
-    return true;
-  }
-
   /**
    * The world Tool that ALREADY names `uuid` as its source Item, or `null`.
    *
@@ -5975,150 +4190,6 @@
     return store.toggleToolEnabled?.(focusedToolDraft.id, enabled, selectedSystemId);
   }
 
-  function gatheringConditionOptions(kind) {
-    const setting = selectedGatheringSystemConfig.conditions?.[kind] || {};
-    return Array.isArray(setting.values) ? setting.values : [];
-  }
-
-  function gatheringVocabularyOptions(kind) {
-    const vocabulary = selectedGatheringSystemConfig.vocabularies?.[kind] || {};
-    return Array.isArray(vocabulary.values) ? vocabulary.values : [];
-  }
-
-  function gatheringConditionModifierRows(row, kind) {
-    const values = row?.conditionModifiers?.[kind];
-    return Array.isArray(values) ? values : [];
-  }
-
-  function gatheringConditionAvailableOptions(row, kind) {
-    const options =
-      kind === 'biome' ? gatheringVocabularyOptions('biomes') : gatheringConditionOptions(kind);
-    if (!row) return options;
-    const attached = new Set(
-      gatheringConditionModifierRows(row, kind).map((modifier) => modifier.conditionId)
-    );
-    return options.filter((option) => !attached.has(option.id));
-  }
-
-  function gatheringConditionModifierGroups(row) {
-    return {
-      timeOfDay: gatheringConditionModifierRows(row, 'timeOfDay'),
-      weather: gatheringConditionModifierRows(row, 'weather'),
-      biome: gatheringConditionModifierRows(row, 'biome'),
-    };
-  }
-
-  function updateGatheringDropModifier(rowId, kind, modifierId, updates = {}) {
-    if (!editingGatheringTask || !rowId || !kind || !modifierId) return;
-    const row = gatheringTaskDropRows(editingGatheringTask).find((entry) => entry.id === rowId);
-    if (!row) return;
-    const conditionModifiers = gatheringConditionModifierGroups(row);
-    conditionModifiers[kind] = conditionModifiers[kind].map((modifier) =>
-      modifier.id === modifierId ? { ...modifier, ...updates } : modifier
-    );
-    updateGatheringTaskDrop(rowId, { conditionModifiers });
-  }
-
-  function addGatheringDropModifier(rowId, kind, conditionId) {
-    if (!editingGatheringTask || !rowId || !kind || !conditionId) return;
-    const row = gatheringTaskDropRows(editingGatheringTask).find((entry) => entry.id === rowId);
-    if (!row) return;
-    const conditionModifiers = gatheringConditionModifierGroups(row);
-    if (conditionModifiers[kind].some((modifier) => modifier.conditionId === conditionId)) return;
-    conditionModifiers[kind] = [
-      ...conditionModifiers[kind],
-      { id: `${kind}-${gatheringDropRowId()}`, conditionId, operator: '+', value: 0 },
-    ];
-    updateGatheringTaskDrop(rowId, { conditionModifiers });
-  }
-
-  function deleteGatheringDropModifier(rowId, kind, modifierId) {
-    if (!editingGatheringTask || !rowId || !kind || !modifierId) return;
-    const row = gatheringTaskDropRows(editingGatheringTask).find((entry) => entry.id === rowId);
-    if (!row) return;
-    const conditionModifiers = gatheringConditionModifierGroups(row);
-    conditionModifiers[kind] = conditionModifiers[kind].filter(
-      (modifier) => modifier.id !== modifierId
-    );
-    updateGatheringTaskDrop(rowId, { conditionModifiers });
-  }
-
-  function addGatheringEventConditionModifier(kind, conditionId) {
-    if (!editingGatheringEvent?.id || !kind || !conditionId) return;
-    const conditionModifiers = gatheringConditionModifierGroups(editingGatheringEvent);
-    if (conditionModifiers[kind].some((modifier) => modifier.conditionId === conditionId)) return;
-    conditionModifiers[kind] = [
-      ...conditionModifiers[kind],
-      { id: `${kind}-${gatheringDropRowId()}`, conditionId, operator: '+', value: 0 },
-    ];
-    updateSelectedGatheringEvent({ conditionModifiers });
-  }
-
-  function updateGatheringEventConditionModifier(kind, modifierId, updates = {}) {
-    if (!editingGatheringEvent?.id || !kind || !modifierId) return;
-    const conditionModifiers = gatheringConditionModifierGroups(editingGatheringEvent);
-    conditionModifiers[kind] = conditionModifiers[kind].map((modifier) =>
-      modifier.id === modifierId ? { ...modifier, ...updates } : modifier
-    );
-    updateSelectedGatheringEvent({ conditionModifiers });
-  }
-
-  function deleteGatheringEventConditionModifier(kind, modifierId) {
-    if (!editingGatheringEvent?.id || !kind || !modifierId) return;
-    const conditionModifiers = gatheringConditionModifierGroups(editingGatheringEvent);
-    conditionModifiers[kind] = conditionModifiers[kind].filter(
-      (modifier) => modifier.id !== modifierId
-    );
-    updateSelectedGatheringEvent({ conditionModifiers });
-  }
-
-  function pickCharacterModifierForEvent(modifierId) {
-    if (!editingGatheringEvent?.id || !modifierId) return;
-    const refs = Array.isArray(editingGatheringEvent.characterModifiers)
-      ? editingGatheringEvent.characterModifiers
-      : [];
-    if (refs.some((ref) => ref.modifierId === modifierId)) return;
-    characterModifierSearchTerm = '';
-    const newRef = {
-      id: `char-mod-${modifierId}-${refs.length + 1}-${Math.random().toString(36).slice(2, 6)}`,
-      modifierId,
-      operator: '+',
-      min: null,
-      max: null,
-      expressionOverride: '',
-    };
-    updateSelectedGatheringEvent({ characterModifiers: [...refs, newRef] });
-  }
-
-  function onUpdateEventCharacterModifier(refId, patch) {
-    if (!editingGatheringEvent?.id || !refId) return;
-    const refs = Array.isArray(editingGatheringEvent.characterModifiers)
-      ? editingGatheringEvent.characterModifiers
-      : [];
-    const next = refs.map((ref) => (ref.id === refId ? { ...ref, ...patch } : ref));
-    updateSelectedGatheringEvent({ characterModifiers: next });
-  }
-
-  function onDeleteEventCharacterModifier(refId) {
-    if (!editingGatheringEvent?.id || !refId) return;
-    const refs = Array.isArray(editingGatheringEvent.characterModifiers)
-      ? editingGatheringEvent.characterModifiers
-      : [];
-    updateSelectedGatheringEvent({ characterModifiers: refs.filter((ref) => ref.id !== refId) });
-  }
-
-  function setEventCharacterModifierOverrideEnabled(ref, enabled, libraryEntry) {
-    const expressionOverride = enabled ? libraryEntry?.expression || '' : '';
-    onUpdateEventCharacterModifier(ref.id, { expressionOverride });
-  }
-
-  function selectGatheringTab(tabId) {
-    activeGatheringTab = visibleGatheringNavItems.some((tab) => tab.id === tabId)
-      ? tabId
-      : 'environments';
-    navRail.expandGroup('gathering');
-  }
-
   function openWorldParties() {
     return afterTruthyResult(confirmRouteExit('world'), () => {
       activeTravelTab = 'parties';
@@ -6247,18 +4318,6 @@
     openWorldTravelDestination('realms');
   }
 
-  function openGatheringSection(tabId = 'environments') {
-    if (!canShowEnvironments) return;
-    const nextTab = visibleGatheringNavItems.some((tab) => tab.id === tabId)
-      ? tabId
-      : 'environments';
-    afterTruthyResult(confirmRouteExit('environments'), () => {
-      activeGatheringTab = nextTab;
-      navRail.expandGroup('gathering');
-      activeView = 'environments';
-    });
-  }
-
   function enterToolEditor() {
     toolEditorActiveTab = 'breakage';
     activeView = 'tool-edit';
@@ -6325,14 +4384,6 @@
       inherit,
       selectedSystemId
     );
-  }
-
-  function activateGatheringParent() {
-    if (isActiveGatheringChildRoute) {
-      navRail.expandGroup('gathering');
-      return;
-    }
-    openGatheringSection('environments');
   }
 
   // Crafting nav group handlers (issue 511), mirroring the gathering group.
@@ -6537,429 +4588,6 @@
     services?.onCopySourceUuid?.(uuid);
   }
 
-  const INSPECTOR_DESCRIPTION_LIMIT = 160;
-
-  function truncateDescription(description) {
-    if (typeof description !== 'string') return '';
-    const trimmed = description.trim();
-    if (trimmed.length <= INSPECTOR_DESCRIPTION_LIMIT) return trimmed;
-    return `${trimmed.slice(0, INSPECTOR_DESCRIPTION_LIMIT).trimEnd()}…`;
-  }
-
-  function environmentName(environment) {
-    const explicitName = typeof environment?.name === 'string' ? environment.name.trim() : '';
-    if (explicitName) return explicitName;
-    return text('FABRICATE.Admin.Environments.NewDraftTitle', 'New Gathering Environment');
-  }
-
-  function environmentSceneImage(environment) {
-    const linkedScene = linkedSceneForEnvironment(environment);
-    return linkedScene?.img || linkedScene?.thumbnail || linkedScene?.thumb || '';
-  }
-
-  function environmentImage(environment) {
-    // A linked scene's thumbnail takes the place of the environment's own image; the stored
-    // `img` is kept as a fallback for when the scene is unlinked.
-    const sceneImage = environmentSceneImage(environment);
-    if (sceneImage) return sceneImage;
-    return String(environment?.img || '').trim() || DEFAULT_GATHERING_ENVIRONMENT_IMG;
-  }
-
-  function hasEnvironmentImage(environment) {
-    return Boolean(environmentSceneImage(environment) || String(environment?.img || '').trim());
-  }
-
-  function linkedSceneForEnvironment(environment) {
-    const sceneUuid = environment?.sceneUuid || '';
-    if (!sceneUuid) return null;
-    return (selectedSystem?.sceneOptions || []).find((scene) => scene.uuid === sceneUuid) || null;
-  }
-
-  function environmentSelectionModeLabel(environment) {
-    return environment?.selectionMode === 'blind'
-      ? text('FABRICATE.Admin.Environments.SelectionBlind', 'Blind')
-      : text('FABRICATE.Admin.Environments.SelectionTargeted', 'Targeted');
-  }
-
-  function environmentStatusLabel(environment) {
-    return environment?.enabled === false
-      ? text('FABRICATE.Admin.Manager.StatusDisabled', 'Disabled')
-      : text('FABRICATE.Admin.Manager.StatusActive', 'Active');
-  }
-
-  function environmentSceneState(environment) {
-    if (!environment?.sceneUuid) {
-      return {
-        id: 'none',
-        label: text('FABRICATE.Admin.Manager.Environment.SceneNone', 'No scene'),
-        tone: 'disabled',
-      };
-    }
-    const scene = linkedSceneForEnvironment(environment);
-    if (!scene) {
-      return {
-        id: 'missing',
-        label: text('FABRICATE.Admin.Manager.Environment.SceneMissing', 'Scene unresolved'),
-        tone: 'warning',
-      };
-    }
-    return {
-      id: 'linked',
-      label: text('FABRICATE.Admin.Manager.Environment.SceneLinked', 'Linked scene'),
-      name: scene.name || environment.sceneUuid,
-      tone: 'active',
-    };
-  }
-
-  /** One of the three environment inspector counts, as the store computed it. */
-  function environmentStoredCount(environment, key) {
-    const stored = $viewState.environmentTaskCounts?.[String(environment?.id || '')]?.[key];
-    return Number.isFinite(stored) ? stored : 0;
-  }
-
-  function environmentComposedTaskCount(environment) {
-    return environmentStoredCount(environment, 'availableTaskCount');
-  }
-
-  function environmentComposedEventCount(environment) {
-    return environmentStoredCount(environment, 'availableEventCount');
-  }
-
-  function environmentRequiredToolCount(environment) {
-    return environmentStoredCount(environment, 'requiredToolCount');
-  }
-
-  function gatheringTaskName(task) {
-    return String(
-      task?.name ||
-        text('FABRICATE.Admin.Manager.Environment.Tasks.UnnamedTask', 'Unnamed gathering task')
-    ).trim();
-  }
-
-  function gatheringTaskImage(task) {
-    return task?.img || DEFAULT_GATHERING_TASK_IMG;
-  }
-
-  function gatheringTaskDropRows(task) {
-    return Array.isArray(task?.dropRows) ? task.dropRows : [];
-  }
-
-  function gatheringManagedItemLabel(componentId) {
-    const item = (selectedSystem?.managedItemOptions || []).find(
-      (option) => String(option.id || '') === String(componentId || '')
-    );
-    return item?.name || componentId || '';
-  }
-
-  function gatheringManagedItemImage(componentId) {
-    const item = (selectedSystem?.managedItemOptions || []).find(
-      (option) => String(option.id || '') === String(componentId || '')
-    );
-    return item?.img || 'icons/svg/item-bag.svg';
-  }
-
-  function gatheringDropName(row) {
-    return (
-      row?.name ||
-      gatheringManagedItemLabel(row?.componentId) ||
-      row?.itemUuid ||
-      text('FABRICATE.Admin.Manager.Environment.Tasks.UnresolvedDrop', 'Unresolved drop')
-    );
-  }
-
-  function gatheringDropImage(row) {
-    return row?.img || gatheringManagedItemImage(row?.componentId) || 'icons/svg/item-bag.svg';
-  }
-
-  function gatheringOptionLabel(kind, id) {
-    const options = selectedGatheringSystemConfig.vocabularies?.biomes?.values;
-    const option = (Array.isArray(options) ? options : []).find(
-      (value) => String(value?.id || value) === String(id || '')
-    );
-    return String(option?.label || option?.id || id || '').trim();
-  }
-
-  function gatheringConditionLabel(kind, id) {
-    if (kind === 'biome') return gatheringOptionLabel('biome', id) || String(id || '');
-    const setting = selectedGatheringSystemConfig.conditions?.[kind] || {};
-    const option = (Array.isArray(setting.values) ? setting.values : []).find(
-      (value) => String(value?.id || value) === String(id || '')
-    );
-    return String(option?.label || option?.id || id || '').trim();
-  }
-
-  function gatheringModifierKindIcon(kind, conditionId = '') {
-    if (kind === 'weather') return 'fas fa-cloud-sun';
-    if (kind === 'timeOfDay') return 'fas fa-clock';
-    const option = gatheringVocabularyOptions('biomes').find(
-      (value) => String(value?.id || value) === String(conditionId || '')
-    );
-    return String(option?.icon || '').trim() || 'fas fa-mountain-sun';
-  }
-
-  function gatheringModifierCardTitle(kind, scope = 'task') {
-    if (kind === 'biome') {
-      return scope === 'event'
-        ? text('FABRICATE.Admin.Manager.Environment.Events.BiomeModifiers', 'Biome modifiers')
-        : text('FABRICATE.Admin.Manager.Environment.Tasks.BiomeModifiers', 'Biome modifiers');
-    }
-    if (kind === 'weather')
-      return text(
-        'FABRICATE.Admin.Manager.Environment.Tasks.WeatherModifiers',
-        'Weather modifiers'
-      );
-    return text('FABRICATE.Admin.Manager.Environment.Tasks.TimeModifiers', 'Time modifiers');
-  }
-
-  function gatheringModifierCardHint(kind, scope = 'task') {
-    if (scope === 'event') {
-      if (kind === 'biome')
-        return text(
-          'FABRICATE.Admin.Manager.Environment.Events.BiomeModifiersHint',
-          "Adjust this event's chance based on the gathering environment's biomes."
-        );
-      if (kind === 'weather')
-        return text(
-          'FABRICATE.Admin.Manager.Environment.Events.WeatherModifiersHint',
-          "Adjust this event's chance based on the active weather condition."
-        );
-      return text(
-        'FABRICATE.Admin.Manager.Environment.Events.TimeModifiersHint',
-        "Adjust this event's chance based on the active time of day."
-      );
-    }
-    if (kind === 'biome')
-      return text(
-        'FABRICATE.Admin.Manager.Environment.Tasks.BiomeModifiersHint',
-        "Adjust this drop's chance based on the gathering environment's biomes."
-      );
-    if (kind === 'weather')
-      return text(
-        'FABRICATE.Admin.Manager.Environment.Tasks.WeatherModifiersHint',
-        "Adjust this drop's chance based on the active weather condition."
-      );
-    return text(
-      'FABRICATE.Admin.Manager.Environment.Tasks.TimeModifiersHint',
-      "Adjust this drop's chance based on the active time of day."
-    );
-  }
-
-  function gatheringDropRateValue(row) {
-    const number = Math.trunc(Number(row?.dropRate ?? 1));
-    if (!Number.isFinite(number)) return 1;
-    return Math.min(100, Math.max(0, number));
-  }
-
-  function gatheringDropCountValue(row) {
-    const number = Math.trunc(Number(row?.quantity ?? 1));
-    if (!Number.isFinite(number)) return 1;
-    return Math.min(999, Math.max(1, number));
-  }
-
-  function gatheringDropRateTierClass(value) {
-    const rate = gatheringDropRateValue({ dropRate: value });
-    if (rate === 0) return 'is-none';
-    if (rate >= 100) return 'is-guaranteed';
-    if (rate >= 70) return 'is-common';
-    if (rate >= 35) return 'is-uncommon';
-    if (rate >= 15) return 'is-rare';
-    if (rate >= 5) return 'is-very-rare';
-    return 'is-legendary';
-  }
-
-  function gatheringDropRateTierColor(value) {
-    const rate = gatheringDropRateValue({ dropRate: value });
-    if (rate === 0) return 'var(--fab-drop-rate-none)';
-    if (rate >= 100) return 'var(--fab-drop-rate-guaranteed)';
-    if (rate >= 70) return 'var(--fab-drop-rate-common)';
-    if (rate >= 35) return 'var(--fab-drop-rate-uncommon)';
-    if (rate >= 15) return 'var(--fab-drop-rate-rare)';
-    if (rate >= 5) return 'var(--fab-drop-rate-very-rare)';
-    return 'var(--fab-drop-rate-legendary)';
-  }
-
-  // The drop-rate input/blur/keydown trio that used to live here is gone with the hand-rolled
-  // slider it drove (issue 883).
-  function onGatheringDropCountInput(rowId, event) {
-    const input = event.currentTarget;
-    const normalized = String(input.value || '')
-      .replace(/\D+/g, '')
-      .replace(/^0+/, '');
-    input.value = normalized;
-    const quantity = Number(normalized);
-    if (Number.isInteger(quantity) && quantity >= 1 && quantity <= 999)
-      updateGatheringTaskDrop(rowId, { quantity });
-  }
-
-  function onGatheringDropCountBlur(row, event) {
-    const input = event.currentTarget;
-    const normalized = String(input.value || '')
-      .replace(/\D+/g, '')
-      .replace(/^0+/, '');
-    const quantity = Number(normalized);
-    if (normalized !== '' && Number.isInteger(quantity) && quantity >= 1 && quantity <= 999) {
-      input.value = String(quantity);
-      updateGatheringTaskDrop(row.id, { quantity });
-      return;
-    }
-    input.value = String(gatheringDropCountValue(row));
-  }
-
-  function onGatheringDropCountKeydown(row, event) {
-    event.stopPropagation();
-    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
-    event.preventDefault();
-    const currentValue =
-      event.currentTarget.value === ''
-        ? gatheringDropCountValue(row)
-        : Number(event.currentTarget.value);
-    const quantity = gatheringDropCountValue({
-      quantity:
-        (Number.isFinite(currentValue) ? currentValue : gatheringDropCountValue(row)) +
-        (event.key === 'ArrowUp' ? 1 : -1),
-    });
-    event.currentTarget.value = String(quantity);
-    updateGatheringTaskDrop(row.id, { quantity });
-  }
-
-  function gatheringTaskAvailability(task) {
-    const timeValues = Array.isArray(task?.timeOfDay) ? task.timeOfDay : [];
-    const weatherValues = Array.isArray(task?.weather) ? task.weather : [];
-    const times =
-      timeValues.length > 0
-        ? timeValues
-            .map((id) => gatheringConditionLabel('timeOfDay', id))
-            .filter(Boolean)
-            .join(', ')
-        : text('FABRICATE.Admin.Manager.Environment.Tasks.AnyTime', 'Any time');
-    const weather =
-      weatherValues.length > 0
-        ? weatherValues
-            .map((id) => gatheringConditionLabel('weather', id))
-            .filter(Boolean)
-            .join(', ')
-        : text('FABRICATE.Admin.Manager.Environment.Tasks.AnyWeather', 'Any weather');
-    return `${times}, ${weather}`;
-  }
-
-  const DANGER_LEVEL_ORDER = ['safe', 'unsafe', 'hazardous', 'dangerous', 'deadly', 'extreme'];
-
-  function sortedDangerTags(tags) {
-    if (!Array.isArray(tags)) return [];
-    return [...tags].sort((a, b) => {
-      const ai = DANGER_LEVEL_ORDER.indexOf(a);
-      const bi = DANGER_LEVEL_ORDER.indexOf(b);
-      const aRank = ai === -1 ? DANGER_LEVEL_ORDER.length : ai;
-      const bRank = bi === -1 ? DANGER_LEVEL_ORDER.length : bi;
-      if (aRank !== bRank) return aRank - bRank;
-      return String(a).localeCompare(String(b));
-    });
-  }
-
-  function gatheringTaskReferencingEnvironments(task) {
-    if (!task?.id) return [];
-    const taskId = String(task.id);
-    return environmentList.filter((environment) => {
-      if (String(environment?.craftingSystemId || '') !== String(selectedSystemId || ''))
-        return false;
-      const enabledIds = Array.isArray(environment?.enabledTaskIds)
-        ? environment.enabledTaskIds.map(String)
-        : [];
-      return enabledIds.includes(taskId);
-    });
-  }
-
-  function gatheringEventReferencingEnvironments(event) {
-    if (!event?.id) return [];
-    const eventId = String(event.id);
-    return environmentList.filter((environment) => {
-      if (String(environment?.craftingSystemId || '') !== String(selectedSystemId || ''))
-        return false;
-      const enabledIds = Array.isArray(environment?.enabledEventIds)
-        ? environment.enabledEventIds.map(String)
-        : [];
-      return enabledIds.includes(eventId);
-    });
-  }
-
-  /** The environments a library gathering record is active in right now. */
-  function activeEnvironmentsForGatheringRecord(record, kind, scopedEnvironments) {
-    return activeEnvironmentsForRecord(record, scopedEnvironments, kind, {
-      conditionSettings: selectedGatheringSystemConfig.conditions,
-    });
-  }
-
-  // The `task.enabled === false` early return this used to open with is gone rather than kept as a
-  // second gate.
-  function activeGatheringTaskEnvironmentCount(task) {
-    return activeEnvironmentsForGatheringRecord(
-      task,
-      'task',
-      environmentList.filter(
-        (environment) =>
-          environment?.enabled !== false &&
-          String(environment?.craftingSystemId || selectedSystemId) ===
-            String(selectedSystemId || '')
-      )
-    ).length;
-  }
-
-  // Site 10's fact. Extracted from an inline IIFE in the markup so it sits beside the task fact
-  // it now shares a definition with, and so the two are read together when either changes.
-  function activeGatheringEventEnvironmentCount(event) {
-    return activeEnvironmentsForGatheringRecord(
-      event,
-      'event',
-      environmentList.filter(
-        (environment) =>
-          environment?.enabled !== false &&
-          String(environment?.craftingSystemId || '') === String(selectedSystemId || '')
-      )
-    ).length;
-  }
-
-  function environmentFacts(environment) {
-    if (!environment) return [];
-    return [
-      {
-        id: 'tasks',
-        label: text('FABRICATE.Admin.Environments.Tasks', 'Tasks'),
-        value: environmentComposedTaskCount(environment),
-      },
-      {
-        id: 'events',
-        label: text('FABRICATE.Admin.Environments.Events', 'Events'),
-        value: environmentComposedEventCount(environment),
-      },
-      {
-        id: 'required-tools',
-        label: text('FABRICATE.Admin.Environments.RequiredTools', 'Required tools'),
-        value: environmentRequiredToolCount(environment),
-      },
-      {
-        id: 'mode',
-        label: text('FABRICATE.Admin.Environments.SelectionMode', 'Selection mode'),
-        value: environmentSelectionModeLabel(environment),
-      },
-    ];
-  }
-
-  function environmentDirtyFor(environment) {
-    return (
-      environment?.id &&
-      $viewState.environmentDraft?.id === environment.id &&
-      $viewState.environmentDraftDirty === true
-    );
-  }
-
-  function environmentInvalidFor(environment) {
-    return (
-      environment?.id &&
-      $viewState.environmentDraft?.id === environment.id &&
-      environmentValidationCount > 0
-    );
-  }
-
   // `componentSourceState` lived here to tone the inline components inspector's source chip.
 
   // No caller left. Deleting this and its two helpers (usageEvidenceItems,
@@ -7127,18 +4755,6 @@
     });
   }
 
-  function countLabelParts(label) {
-    const normalized = String(label ?? '')
-      .trim()
-      .replace(/\s+/g, ' ');
-    const firstSpace = normalized.indexOf(' ');
-    if (firstSpace === -1) return { lead: normalized, rest: '' };
-    return {
-      lead: normalized.slice(0, firstSpace),
-      rest: normalized.slice(firstSpace + 1),
-    };
-  }
-
   // The page header's action ladder is a child component now, so every control it presses is a
   // named function here rather than a closure written at the call site.
   const backToWorldEssences = () => setView('world-essences');
@@ -7147,8 +4763,8 @@
   const createParty = () => store.createParty?.();
   const deleteEnvironmentDraft = () => store.deleteEnvironmentDraft?.();
   const exportSelectedSystem = () => exportSystem();
-  const createGatheringTaskForSystem = () => createGatheringTask(selectedSystemId);
-  const createGatheringEventForSystem = () => createGatheringEvent(selectedSystemId);
+  const createGatheringTaskForSystem = () => drafts.createGatheringTask(selectedSystemId);
+  const createGatheringEventForSystem = () => drafts.createGatheringEvent(selectedSystemId);
 
   function openComponentAddFromCatalogue() {
     componentAddFromCatalogueOpen = true;
@@ -7239,14 +4855,14 @@
     {worldToolEntryRecord}
     {worldToolEntryName}
     {worldToolEntrySubtitle}
-    {environmentDraftForDisplay}
+    environmentDraftForDisplay={gathering.environmentDraftForDisplay}
     {isWorldRoute}
     {isWorldDowntimeRoute}
     {isWorldRulesRoute}
     {isWorldTravelRoute}
     {isWorldScopedRoute}
     {isChecksRoute}
-    {checksActiveTab}
+    checksActiveTab={checks.checksActiveTab}
     {worldScopedEntryRoute}
     {worldScopedEntryCrumb}
     {worldRulesTab}
@@ -7257,8 +4873,8 @@
     {downtimeTabCrumbNavigable}
     {downtimeLeafCrumb}
     {downtimeChromeChannel}
-    {activeGatheringTab}
-    {gatheringTabLabel}
+    activeGatheringTab={gathering.activeGatheringTab}
+    gatheringTabLabel={gathering.gatheringTabLabel}
     {recipeItemCrumb}
     {environmentCrumb}
     {gatheringTaskCrumb}
@@ -7271,8 +4887,8 @@
     {backToRecipesBrowse}
     {backToComponentsBrowse}
     {backToEnvironmentsBrowse}
-    {backToGatheringTaskLibrary}
-    {backToGatheringEventLibrary}
+    backToGatheringTaskLibrary={drafts.backToGatheringTaskLibrary}
+    backToGatheringEventLibrary={drafts.backToGatheringEventLibrary}
     {selectedSystemId}
     {worldEssenceEntryDirty}
     {worldEssenceEntrySaving}
@@ -7297,7 +4913,7 @@
     {createParty}
     {createTravelRealm}
     {backToSystemsBrowser}
-    {importSystem}
+    importSystem={importFlow.importSystem}
     {exportSelectedSystem}
     {createSystem}
     {createRecipe}
@@ -7320,38 +4936,38 @@
     {componentEditSaving}
     {componentEditSaveLabel}
     {canSaveComponentEdit}
-    {checksDirty}
-    {checksSaving}
-    {saveChecks}
+    checksDirty={checks.checksDirty}
+    checksSaving={checks.checksSaving}
+    saveChecks={checks.saveChecks}
     {essenceEditDirty}
     {essenceEditSaving}
     {essenceEditSaveLabel}
     {canSaveEssenceEdit}
     {cancelEssenceEdit}
-    {displayedGatheringTab}
+    displayedGatheringTab={gathering.displayedGatheringTab}
     {canShowEnvironments}
     {createGatheringTaskForSystem}
     {createGatheringEventForSystem}
-    {createEnvironment}
+    createEnvironment={drafts.createEnvironment}
     environmentDraftDirty={$viewState.environmentDraftDirty}
     environmentDraftIsNew={$viewState.environmentDraftIsNew}
     environmentSaving={$viewState.environmentSaving}
     {deleteEnvironmentDraft}
     {saveEnvironmentEdit}
-    {gatheringTaskDraftDirty}
-    {gatheringTaskSaving}
-    {gatheringTaskValidation}
-    {gatheringTaskSaveError}
-    {selectedGatheringTaskId}
-    {deleteGatheringTaskDraft}
-    {saveGatheringTaskDraft}
-    {gatheringEventDraftDirty}
-    {gatheringEventSaving}
-    {gatheringEventValidation}
-    {gatheringEventSaveError}
-    {selectedGatheringEventId}
-    {deleteGatheringEventDraft}
-    {saveGatheringEventDraft}
+    gatheringTaskDraftDirty={gathering.gatheringTaskDraftDirty}
+    gatheringTaskSaving={gathering.gatheringTaskSaving}
+    gatheringTaskValidation={gathering.gatheringTaskValidation}
+    gatheringTaskSaveError={gathering.gatheringTaskSaveError}
+    selectedGatheringTaskId={gathering.selectedGatheringTaskId}
+    deleteGatheringTaskDraft={drafts.deleteGatheringTaskDraft}
+    saveGatheringTaskDraft={drafts.saveGatheringTaskDraft}
+    gatheringEventDraftDirty={gathering.gatheringEventDraftDirty}
+    gatheringEventSaving={gathering.gatheringEventSaving}
+    gatheringEventValidation={gathering.gatheringEventValidation}
+    gatheringEventSaveError={gathering.gatheringEventSaveError}
+    selectedGatheringEventId={gathering.selectedGatheringEventId}
+    deleteGatheringEventDraft={drafts.deleteGatheringEventDraft}
+    saveGatheringEventDraft={drafts.saveGatheringEventDraft}
   />
 
   <div class={`manager-body ${navRail.collapsedDisplay ? 'is-rail-collapsed' : ''}`}>
@@ -7377,15 +4993,15 @@
       {toolsNavCount}
       {isChecksRoute}
       {activateChecksParent}
-      {checksNavCount}
-      {checksNavItems}
+      checksNavCount={checks.checksNavCount}
+      checksNavItems={checks.checksNavItems}
       {canShowEnvironments}
       {isGatheringRoute}
-      {activateGatheringParent}
-      {gatheringNavCounts}
-      {visibleGatheringNavItems}
-      {displayedGatheringTab}
-      {openGatheringSection}
+      activateGatheringParent={drafts.activateGatheringParent}
+      gatheringNavCounts={gathering.gatheringNavCounts}
+      visibleGatheringNavItems={gathering.visibleGatheringNavItems}
+      displayedGatheringTab={gathering.displayedGatheringTab}
+      openGatheringSection={drafts.openGatheringSection}
       {experimentalFeaturesEnabled}
       {worldScopedCounts}
       {isWorldRoute}
@@ -7460,6 +5076,7 @@
         {...essenceScopeProps}
         entityId={worldScopedEntryId}
         onBackToCatalogue={() => setView('world-essences')}
+        onOpenSystemRules={(entityId, systemId) => openSystemEssenceRules(entityId, systemId)}
         onDraftChange={handleWorldEssenceEntryDraft}
         onDirtyChange={handleWorldEssenceEntryDirty}
         onDraftIdentityChange={handleScopedEntryDraftIdentity}
@@ -7625,43 +5242,43 @@
       </main>
     {:else if currentView === 'environments' || currentView === 'world'}
       <EnvironmentsBrowserView
-        environments={environmentList}
+        environments={gathering.environmentList}
         environmentsLoading={$viewState.environmentsLoading}
         environmentsError={$viewState.environmentsError}
-        environmentDraft={environmentDraftForDisplay}
+        environmentDraft={gathering.environmentDraftForDisplay}
         environmentDraftDirty={$viewState.environmentDraftDirty}
-        {environmentValidationCount}
-        {selectedEnvironmentId}
+        environmentValidationCount={gathering.environmentValidationCount}
+        selectedEnvironmentId={gathering.selectedEnvironmentId}
         {selectedSystemId}
         gatheringConfig={$viewState.gatheringConfig}
         sceneOptions={selectedSystem?.sceneOptions || []}
         environmentTaskCounts={$viewState.environmentTaskCounts || {}}
-        {shouldUseEnvironmentDraftForDisplay}
-        activeGatheringTab={isWorldRoute ? 'travel' : displayedGatheringTab}
+        shouldUseEnvironmentDraftForDisplay={gathering.shouldUseEnvironmentDraftForDisplay}
+        activeGatheringTab={isWorldRoute ? 'travel' : gathering.displayedGatheringTab}
         activeTravelTab={isWorldRoute ? 'parties' : activeTravelTab}
-        selectedTaskId={selectedGatheringTask?.id || selectedGatheringTaskId}
-        selectedEventId={selectedGatheringEvent?.id || selectedGatheringEventId}
+        selectedTaskId={gathering.selectedGatheringTask?.id || gathering.selectedGatheringTaskId}
+        selectedEventId={gathering.selectedGatheringEvent?.id || gathering.selectedGatheringEventId}
         managedItemOptions={selectedSystem?.managedItemOptions || []}
         {services}
-        onSelectGatheringTab={selectGatheringTab}
-        onSelectGatheringTask={selectGatheringTask}
-        onCreateGatheringTask={createGatheringTask}
-        onEditGatheringTask={editGatheringTask}
-        onDuplicateGatheringTask={duplicateGatheringTask}
-        onDeleteGatheringTask={deleteGatheringTask}
-        onToggleGatheringTaskEnabled={toggleGatheringTaskEnabled}
-        onSelectGatheringEvent={selectGatheringEvent}
-        onCreateGatheringEvent={createGatheringEvent}
-        onEditGatheringEvent={editGatheringEvent}
-        onDuplicateGatheringEvent={duplicateGatheringEvent}
-        onDeleteGatheringEvent={deleteGatheringEvent}
-        onToggleGatheringEventEnabled={toggleGatheringEventEnabled}
-        onSelectEnvironment={(id) => selectEnvironment(id)}
-        onEditEnvironment={(id) => editEnvironment(id)}
-        onCreateEnvironment={createEnvironment}
-        onDuplicateEnvironment={(id) => duplicateEnvironment(id)}
-        onDeleteEnvironment={(id) => deleteEnvironment(id)}
-        onToggleEnvironmentEnabled={(id, enabled) => toggleEnvironmentEnabled(id, enabled)}
+        onSelectGatheringTab={drafts.selectGatheringTab}
+        onSelectGatheringTask={drafts.selectGatheringTask}
+        onCreateGatheringTask={drafts.createGatheringTask}
+        onEditGatheringTask={drafts.editGatheringTask}
+        onDuplicateGatheringTask={drafts.duplicateGatheringTask}
+        onDeleteGatheringTask={drafts.deleteGatheringTask}
+        onToggleGatheringTaskEnabled={drafts.toggleGatheringTaskEnabled}
+        onSelectGatheringEvent={drafts.selectGatheringEvent}
+        onCreateGatheringEvent={drafts.createGatheringEvent}
+        onEditGatheringEvent={drafts.editGatheringEvent}
+        onDuplicateGatheringEvent={drafts.duplicateGatheringEvent}
+        onDeleteGatheringEvent={drafts.deleteGatheringEvent}
+        onToggleGatheringEventEnabled={drafts.toggleGatheringEventEnabled}
+        onSelectEnvironment={(id) => drafts.selectEnvironment(id)}
+        onEditEnvironment={(id) => drafts.editEnvironment(id)}
+        onCreateEnvironment={drafts.createEnvironment}
+        onDuplicateEnvironment={(id) => drafts.duplicateEnvironment(id)}
+        onDeleteEnvironment={(id) => drafts.deleteEnvironment(id)}
+        onToggleEnvironmentEnabled={(id, enabled) => drafts.toggleEnvironmentEnabled(id, enabled)}
         onUpdateGatheringConditions={store.updateGatheringConditions}
         onToggleGatheringConditionEnabled={store.toggleGatheringConditionEnabled}
         onAddGatheringConditionValue={store.addGatheringConditionValue}
@@ -7677,8 +5294,8 @@
         travelFieldErrors={$viewState.travelFieldErrors || {}}
         travelActorOptions={$viewState.actorOptions || []}
         {worldRealms}
-        {partyRealmOverridesAvailable}
-        {partyRealmOverridesUnavailableHint}
+        partyRealmOverridesAvailable={gathering.partyRealmOverridesAvailable}
+        partyRealmOverridesUnavailableHint={gathering.partyRealmOverridesUnavailableHint}
         onCreateParty={() => store.createParty?.()}
         onRenameParty={(id, name) => store.renameParty?.(id, name)}
         onSetPartyEnabled={(id, enabled) => store.setPartyEnabled?.(id, enabled)}
@@ -7707,13 +5324,13 @@
           <EnvironmentEditView
             environmentDraft={$viewState.environmentDraft}
             composition={$viewState.environmentComposition}
-            eventSelectionMode={selectedGatheringRules.eventSelectionMode}
+            eventSelectionMode={gathering.selectedGatheringRules.eventSelectionMode}
             isNew={$viewState.environmentDraftIsNew}
-            linkedSceneImage={environmentSceneImage($viewState.environmentDraft)}
+            linkedSceneImage={gathering.environmentSceneImage($viewState.environmentDraft)}
             realmRecords={worldRealms}
-            realmsEnabled={gatheringRealmsEnabled}
-            biomeOptions={gatheringVocabularyOptions('biomes')}
-            dangerOptions={gatheringVocabularyOptions('danger')}
+            realmsEnabled={gathering.gatheringRealmsEnabled}
+            biomeOptions={modifiers.gatheringVocabularyOptions('biomes')}
+            dangerOptions={modifiers.gatheringVocabularyOptions('danger')}
             onPickImagePath={services?.pickImagePath}
             onUpdateEnvironment={store.updateEnvironmentDraft}
             onSetCompositionMode={store.setEnvironmentCompositionMode}
@@ -7722,8 +5339,8 @@
             onExcludeRecord={store.excludeEnvironmentRecord}
             onRestoreRecord={store.restoreEnvironmentRecord}
             onReorderRecord={store.reorderEnvironmentRecord}
-            onOpenSourceTask={(id) => editGatheringTask(id)}
-            onOpenSourceEvent={(id) => editGatheringEvent(id)}
+            onOpenSourceTask={(id) => drafts.editGatheringTask(id)}
+            onOpenSourceEvent={(id) => drafts.editGatheringEvent(id)}
           />
         </section>
       </main>
@@ -7742,10 +5359,10 @@
           <ChecksView
             {foundrySystemId}
             resolutionMode={selectedSystem?.resolutionMode || 'simple'}
-            alchemyCheckMode={alchemyCheckModeDraft}
-            craftingCheck={checkRoutedDraft}
-            craftingCheckSimple={checkSimpleDraft}
-            craftingCheckProgressive={checkProgressiveDraft}
+            alchemyCheckMode={checks.alchemyCheckModeDraft}
+            craftingCheck={checks.checkRoutedDraft}
+            craftingCheckSimple={checks.checkSimpleDraft}
+            craftingCheckProgressive={checks.checkProgressiveDraft}
             craftingConsumption={selectedSystem?.craftingCheck?.consumption || null}
             salvageConsumption={selectedSystem?.salvageCraftingCheck?.consumption || null}
             craftingFailureResultPolicy={selectedSystem?.craftingCheck?.failureResultPolicy ||
@@ -7775,30 +5392,32 @@
             alchemyShowAttemptHistory={selectedSystem?.alchemy?.showAttemptHistoryToPlayers !==
               false}
             {salvageResolutionMode}
-            salvageCheckSimple={salvageSimpleDraft}
-            salvageCheckRouted={salvageRoutedDraft}
-            salvageCheckProgressive={salvageProgressiveDraft}
-            {gatheringResolutionMode}
-            gatheringCheckProgressive={gatheringProgressiveDraft}
-            gatheringCheckRouted={gatheringRoutedDraft}
+            salvageCheckSimple={checks.salvageSimpleDraft}
+            salvageCheckRouted={checks.salvageRoutedDraft}
+            salvageCheckProgressive={checks.salvageProgressiveDraft}
+            gatheringResolutionMode={gathering.gatheringResolutionMode}
+            gatheringCheckProgressive={checks.gatheringProgressiveDraft}
+            gatheringCheckRouted={checks.gatheringRoutedDraft}
+            components={checks.checksComponents}
+            gatheringTasks={checks.checksGatheringTasks}
             breakageAuthority={selectedSystem?.toolBreakage?.authority || 'toolSpecific'}
             features={selectedSystem?.features || {}}
-            activation={checkActivation}
-            activity={checksActiveTab}
-            requestedSection={checksActiveSection}
-            requestedSectionNonce={checksSectionRequestNonce}
-            dirty={checksDirty}
-            dirtyActivities={checksDirtyActivities}
-            {onUpdateCraftingCheck}
-            {onUpdateCraftingCheckSimple}
-            {onUpdateCraftingCheckProgressive}
-            {onUpdateSalvageCheckSimple}
-            {onUpdateSalvageCheckRouted}
-            {onUpdateSalvageCheckProgressive}
-            {onUpdateGatheringCheckProgressive}
-            {onUpdateGatheringCheckRouted}
+            activation={checks.checkActivation}
+            activity={checks.checksActiveTab}
+            requestedSection={checks.checksActiveSection}
+            requestedSectionNonce={checks.checksSectionRequestNonce}
+            dirty={checks.checksDirty}
+            dirtyActivities={checks.checksDirtyActivities}
+            onUpdateCraftingCheck={checks.onUpdateCraftingCheck}
+            onUpdateCraftingCheckSimple={checks.onUpdateCraftingCheckSimple}
+            onUpdateCraftingCheckProgressive={checks.onUpdateCraftingCheckProgressive}
+            onUpdateSalvageCheckSimple={checks.onUpdateSalvageCheckSimple}
+            onUpdateSalvageCheckRouted={checks.onUpdateSalvageCheckRouted}
+            onUpdateSalvageCheckProgressive={checks.onUpdateSalvageCheckProgressive}
+            onUpdateGatheringCheckProgressive={checks.onUpdateGatheringCheckProgressive}
+            onUpdateGatheringCheckRouted={checks.onUpdateGatheringCheckRouted}
             onSetAlchemyCheckMode={(m) => {
-              alchemyCheckModeDraft = m;
+              checks.alchemyCheckModeDraft = m;
             }}
             onUpdateCraftingConsumption={(patch) => store.saveCraftingCheckConsumption?.(patch)}
             onUpdateSalvageConsumption={(patch) => store.saveSalvageCheckConsumption?.(patch)}
@@ -7811,32 +5430,34 @@
             onUpdateCraftingCheckModifiers={(patch) => store.saveCraftingCheckModifiers?.(patch)}
             onUpdateSalvageCheckModifiers={(patch) => store.saveSalvageCheckModifiers?.(patch)}
             onUpdateGatheringCheckModifiers={(patch) => store.saveGatheringCheckModifiers?.(patch)}
-            {onUpdateAlchemyFlags}
+            onUpdateAlchemyFlags={checks.onUpdateAlchemyFlags}
             onOpenActivity={(activity, section) => {
-              checksActiveSection = section || 'roll';
-              checksSectionRequestNonce += 1;
+              checks.requestSection(section);
               setView(`checks-${activity}`);
             }}
             onOpenModifierLibrary={showSystemModifiers}
-            {onToggleCheckActive}
+            onToggleCheckActive={checks.onToggleCheckActive}
           />
         </section>
       </main>
     {:else if currentView === 'gathering-task-edit' && selectedSystem}
       <GatheringTaskEditView
-        task={editingGatheringTask}
-        staminaEnabled={selectedGatheringTaskStaminaEnabled}
-        nodesEnabled={selectedGatheringTaskNodesEnabled}
-        resolutionMode={gatheringTaskResolutionMode}
-        routedOutcomeTiers={gatheringTaskRoutedOutcomeTiers}
-        resultValidationErrors={gatheringTaskValidation.resultErrors || []}
+        task={gathering.editingGatheringTask}
+        staminaEnabled={gathering.selectedGatheringTaskStaminaEnabled}
+        nodesEnabled={gathering.selectedGatheringTaskNodesEnabled}
+        resolutionMode={gathering.gatheringTaskResolutionMode}
+        routedOutcomeTiers={gathering.gatheringTaskRoutedOutcomeTiers}
+        checkConfig={selectedSystem?.gatheringCraftingCheck?.routed ?? null}
+        previewActors={overridePreviewActors}
+        {resolvePreviewCharacter}
+        resultValidationErrors={gathering.gatheringTaskValidation.resultErrors || []}
         {itemCards}
         managedItemOptions={selectedSystem.managedItemOptions || []}
-        weatherOptions={gatheringConditionOptions('weather')}
-        timeOfDayOptions={gatheringConditionOptions('timeOfDay')}
-        biomeOptions={gatheringVocabularyOptions('biomes')}
-        selectedDropId={selectedGatheringDrop?.id || selectedGatheringDropId}
-        rewardRules={selectedGatheringRules}
+        weatherOptions={modifiers.gatheringConditionOptions('weather')}
+        timeOfDayOptions={modifiers.gatheringConditionOptions('timeOfDay')}
+        biomeOptions={modifiers.gatheringVocabularyOptions('biomes')}
+        selectedDropId={gathering.selectedGatheringDrop?.id || gathering.selectedGatheringDropId}
+        rewardRules={gathering.selectedGatheringRules}
         characterModifierLibrary={selectedSystemModifiers}
         checkModifierOptions={selectedSystemModifiers}
         gatheringModifierPolicy={selectedSystem?.gatheringCraftingCheck?.defaultModifierPolicy ||
@@ -7845,30 +5466,30 @@
         gatheringModifierDefaultIds={selectedSystem?.gatheringCraftingCheck?.defaultModifierIds ||
           []}
         libraryTools={selectedGatheringSystemTools}
-        environmentOptions={selectedSystemEnvironmentOptions}
+        environmentOptions={gathering.selectedSystemEnvironmentOptions}
         onPickImagePath={services?.pickImagePath}
-        onUpdateTask={updateSelectedGatheringTask}
+        onUpdateTask={drafts.updateSelectedGatheringTask}
         onSelectDrop={(rowId) => {
-          selectedGatheringDropId = rowId;
+          gathering.selectedGatheringDropId = rowId;
         }}
-        onAddDrop={addGatheringTaskDrop}
-        onUpdateDrop={updateGatheringTaskDrop}
-        onMoveDrop={moveGatheringTaskDrop}
-        onImportDrop={importGatheringTaskDrop}
-        onAddModifier={addGatheringDropModifier}
-        onUpdateModifier={updateGatheringDropModifier}
-        onDeleteModifier={deleteGatheringDropModifier}
-        onAddToolReference={addToolReferenceToSelectedTask}
-        onRemoveToolReference={removeToolReferenceFromSelectedTask}
+        onAddDrop={drafts.addGatheringTaskDrop}
+        onUpdateDrop={drafts.updateGatheringTaskDrop}
+        onMoveDrop={drafts.moveGatheringTaskDrop}
+        onImportDrop={drafts.importGatheringTaskDrop}
+        onAddModifier={modifiers.addGatheringDropModifier}
+        onUpdateModifier={modifiers.updateGatheringDropModifier}
+        onDeleteModifier={modifiers.deleteGatheringDropModifier}
+        onAddToolReference={drafts.addToolReferenceToSelectedTask}
+        onRemoveToolReference={drafts.removeToolReferenceFromSelectedTask}
       />
     {:else if currentView === 'gathering-event-edit' && selectedSystem}
       <GatheringEventEditView
-        event={editingGatheringEvent}
-        weatherOptions={gatheringConditionOptions('weather')}
-        timeOfDayOptions={gatheringConditionOptions('timeOfDay')}
-        biomeOptions={gatheringVocabularyOptions('biomes')}
+        event={gathering.editingGatheringEvent}
+        weatherOptions={modifiers.gatheringConditionOptions('weather')}
+        timeOfDayOptions={modifiers.gatheringConditionOptions('timeOfDay')}
+        biomeOptions={modifiers.gatheringVocabularyOptions('biomes')}
         onPickImagePath={services?.pickImagePath}
-        onUpdateEvent={updateSelectedGatheringEvent}
+        onUpdateEvent={drafts.updateSelectedGatheringEvent}
       />
     {:else if currentView === 'tools' && selectedSystem}
       <ToolsBrowserView
@@ -7933,7 +5554,7 @@
         {essenceCards}
         showSourceUi={showEssenceSourceUi}
         showPropertyMacroUi={showEssencePropertyMacroUi}
-        selectedEssenceId={selectedEssence?.id || selectedEssenceId}
+        {selectedEssenceId}
         {selectedSystemId}
         onSelectEssence={selectEssence}
         onEditEssence={editEssence}
@@ -7995,8 +5616,10 @@
             'addAll'}
           salvageModifierMaxPicks={selectedSystem?.salvageCraftingCheck?.maxModifierPicks ?? null}
           salvageModifierDefaultIds={selectedSystem?.salvageCraftingCheck?.defaultModifierIds || []}
-          {salvageCheckDcMode}
           {salvageCheckDc}
+          {salvageCheckConfig}
+          previewActors={overridePreviewActors}
+          {resolvePreviewCharacter}
           componentOptions={salvageComponentOptions}
           {complicationActivities}
           {complicationTriggerOptions}
@@ -8047,9 +5670,8 @@
         dropEnabled={!!selectedSystemId && !!services?.onDropItem}
         onSearchChange={(term) => store.setItemSearch?.(term)}
         onSelectComponent={(id) => selectComponent(id)}
-        onDropComponent={(data) => dropComponent(data)}
+        onDropComponent={(data) => importFlow.dropComponent(data)}
         onEditComponent={(id) => editComponent(id)}
-        onOpenWorldEntry={(route, entityId) => openWorldScopedEntry(route, entityId)}
         onSelectionCleared={() => componentBulk.announceCleared()}
       />
     {:else if currentView === 'recipe-edit' && selectedSystem}
@@ -8073,6 +5695,7 @@
           : []}
         itemTags={selectedSystem?.itemTags || []}
         checkTierOptions={recipeCheckTierOptions}
+        checkEvaluation={recipeCheckTierEvaluation}
         minSuccessTierOptions={recipeMinSuccessTierOptions}
         craftingModifierOptions={selectedSystemModifiers}
         craftingModifierPolicy={selectedSystem?.craftingCheck?.defaultModifierPolicy || 'addAll'}
@@ -8175,6 +5798,7 @@
         {selectedSystemId}
         {showRecipeCategories}
         resolutionMode={selectedSystem?.resolutionMode || 'simple'}
+        checkEvaluation={recipeCheckTierEvaluation}
         bind:browserState={recipeBrowserState}
         onSearchChange={(term) => store.setRecipeSearch?.(term)}
         onSelectRecipe={(id) => selectRecipe(id)}
@@ -8270,97 +5894,95 @@
         {#if currentView === 'world' || currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' || currentView === 'gathering-event-edit' || isWorldTravelRoute}
           <GatheringInspectorRail
             {currentView}
-            {displayedGatheringTab}
+            displayedGatheringTab={gathering.displayedGatheringTab}
             {isWorldTravelRoute}
-            {activeGatheringInspectorTab}
-            {selectedGatheringTask}
-            {editingGatheringTask}
-            {selectedGatheringDrop}
-            {activeGatheringTaskEnvironmentCount}
-            {gatheringTaskAvailability}
+            activeGatheringInspectorTab={gathering.activeGatheringInspectorTab}
+            selectedGatheringTask={gathering.selectedGatheringTask}
+            editingGatheringTask={gathering.editingGatheringTask}
+            selectedGatheringDrop={gathering.selectedGatheringDrop}
+            activeGatheringTaskEnvironmentCount={gathering.activeGatheringTaskEnvironmentCount}
+            gatheringTaskAvailability={gathering.gatheringTaskAvailability}
             {gatheringTaskDropRows}
             {gatheringTaskImage}
-            {gatheringTaskName}
-            {gatheringTaskReferencingEnvironments}
+            gatheringTaskName={gathering.gatheringTaskName}
+            gatheringTaskReferencingEnvironments={gathering.gatheringTaskReferencingEnvironments}
             {gatheringDropCountValue}
-            {gatheringDropImage}
-            {gatheringDropName}
+            gatheringDropImage={gathering.gatheringDropImage}
+            gatheringDropName={gathering.gatheringDropName}
             {gatheringDropRateTierClass}
             {gatheringDropRateTierColor}
             {gatheringDropRateValue}
-            {gatheringDropModifierPickerSelection}
-            {characterModifierSearchSuggestions}
-            {selectedGatheringEvent}
-            {editingGatheringEvent}
-            {activeGatheringEventEnvironmentCount}
-            {gatheringEventReferencingEnvironments}
-            {gatheringEventModifierPickerSelection}
-            {eventCharacterModifierSearchSuggestions}
+            gatheringDropModifierPickerSelection={modifiers.gatheringDropModifierPickerSelection}
+            characterModifierSearchSuggestions={modifiers.characterModifierSearchSuggestions}
+            selectedGatheringEvent={gathering.selectedGatheringEvent}
+            editingGatheringEvent={gathering.editingGatheringEvent}
+            activeGatheringEventEnvironmentCount={gathering.activeGatheringEventEnvironmentCount}
+            gatheringEventReferencingEnvironments={gathering.gatheringEventReferencingEnvironments}
+            gatheringEventModifierPickerSelection={modifiers.gatheringEventModifierPickerSelection}
+            eventCharacterModifierSearchSuggestions={modifiers.eventCharacterModifierSearchSuggestions}
             {sortedDangerTags}
             {selectedSystemModifiers}
-            {characterModifierSearchOpenUp}
-            {gatheringConditionAvailableOptions}
-            {gatheringConditionLabel}
-            {gatheringConditionModifierRows}
-            {gatheringModifierCardHint}
-            {gatheringModifierCardTitle}
+            gatheringConditionAvailableOptions={modifiers.gatheringConditionAvailableOptions}
+            gatheringConditionLabel={gathering.gatheringConditionLabel}
+            gatheringConditionModifierRows={modifiers.gatheringConditionModifierRows}
+            gatheringModifierCardHint={gathering.gatheringModifierCardHint}
+            gatheringModifierCardTitle={gathering.gatheringModifierCardTitle}
             {gatheringModifierDisplayValue}
-            {gatheringModifierKindIcon}
+            gatheringModifierKindIcon={gathering.gatheringModifierKindIcon}
             {gatheringModifierValueClass}
             {signedToOperatorValue}
-            {rowCharacterModifiers}
-            {characterModifierIconForRef}
-            {characterModifierIsCustomized}
-            {characterModifierLabelForRef}
-            {characterModifierLibraryEntry}
-            {characterModifierOperatorClass}
-            {selectedGatheringRules}
+            rowCharacterModifiers={modifiers.rowCharacterModifiers}
+            characterModifierIconForRef={modifiers.characterModifierIconForRef}
+            characterModifierIsCustomized={modifiers.characterModifierIsCustomized}
+            characterModifierLabelForRef={modifiers.characterModifierLabelForRef}
+            characterModifierLibraryEntry={modifiers.characterModifierLibraryEntry}
+            characterModifierOperatorClass={modifiers.characterModifierOperatorClass}
+            selectedGatheringRules={gathering.selectedGatheringRules}
             {worldTravelTab}
             {selectedTravelRealm}
             {selectedMapRegion}
             {worldRealms}
-            {selectedEnvironment}
-            {selectedEnvironmentFacts}
-            {selectedEnvironmentSceneState}
-            {environmentList}
-            {environmentValidationCount}
-            {environmentDirtyFor}
-            {environmentInvalidFor}
-            {environmentImage}
-            {environmentName}
-            {environmentSelectionModeLabel}
-            {environmentStatusLabel}
-            {hasEnvironmentImage}
+            selectedEnvironment={gathering.selectedEnvironment}
+            selectedEnvironmentFacts={gathering.selectedEnvironmentFacts}
+            selectedEnvironmentSceneState={gathering.selectedEnvironmentSceneState}
+            environmentList={gathering.environmentList}
+            environmentValidationCount={gathering.environmentValidationCount}
+            environmentDirtyFor={gathering.environmentDirtyFor}
+            environmentInvalidFor={gathering.environmentInvalidFor}
+            environmentImage={gathering.environmentImage}
+            environmentName={gathering.environmentName}
+            environmentSelectionModeLabel={gathering.environmentSelectionModeLabel}
+            environmentStatusLabel={gathering.environmentStatusLabel}
+            hasEnvironmentImage={gathering.hasEnvironmentImage}
             {truncateDescription}
             travelSaving={$viewState.travelSaving === true}
             environmentSaveError={$viewState.environmentSaveError}
-            bind:characterModifierSearchAnchor
-            bind:characterModifierSearchTerm
-            onDuplicateDrop={duplicateGatheringTaskDrop}
-            onDeleteDrop={deleteGatheringTaskDrop}
-            onUpdateDrop={updateGatheringTaskDrop}
-            onDropCountInput={onGatheringDropCountInput}
-            onDropCountBlur={onGatheringDropCountBlur}
-            onDropCountKeydown={onGatheringDropCountKeydown}
-            onSelectDropModifierPickerOption={setGatheringDropModifierPickerSelection}
-            onAddDropConditionModifier={addGatheringDropModifier}
-            onUpdateDropConditionModifier={updateGatheringDropModifier}
-            onDropConditionModifierKeydown={onGatheringDropModifierKeydown}
-            onDeleteDropConditionModifier={deleteGatheringDropModifier}
-            onPickDropCharacterModifier={pickCharacterModifierForRow}
-            {onUpdateDropCharacterModifier}
-            {onDeleteDropCharacterModifier}
-            onSetDropCharacterModifierOverride={setCharacterModifierOverrideEnabled}
-            onSelectEventModifierPickerOption={setGatheringEventModifierPickerSelection}
-            onAddEventConditionModifier={addGatheringEventConditionModifier}
-            onUpdateEventConditionModifier={updateGatheringEventConditionModifier}
-            onEventConditionModifierKeydown={onGatheringEventModifierKeydown}
-            onDeleteEventConditionModifier={deleteGatheringEventConditionModifier}
-            onPickEventCharacterModifier={pickCharacterModifierForEvent}
-            {onUpdateEventCharacterModifier}
-            {onDeleteEventCharacterModifier}
-            onSetEventCharacterModifierOverride={setEventCharacterModifierOverrideEnabled}
-            onUpdateRules={updateSelectedGatheringRules}
+            bind:characterModifierSearchTerm={modifiers.characterModifierSearchTerm}
+            onDuplicateDrop={drafts.duplicateGatheringTaskDrop}
+            onDeleteDrop={drafts.deleteGatheringTaskDrop}
+            onUpdateDrop={drafts.updateGatheringTaskDrop}
+            onDropCountInput={drafts.onGatheringDropCountInput}
+            onDropCountBlur={drafts.onGatheringDropCountBlur}
+            onDropCountKeydown={drafts.onGatheringDropCountKeydown}
+            onSelectDropModifierPickerOption={modifiers.setGatheringDropModifierPickerSelection}
+            onAddDropConditionModifier={modifiers.addGatheringDropModifier}
+            onUpdateDropConditionModifier={modifiers.updateGatheringDropModifier}
+            onDropConditionModifierKeydown={modifiers.onGatheringDropModifierKeydown}
+            onDeleteDropConditionModifier={modifiers.deleteGatheringDropModifier}
+            onPickDropCharacterModifier={modifiers.pickCharacterModifierForRow}
+            onUpdateDropCharacterModifier={modifiers.onUpdateDropCharacterModifier}
+            onDeleteDropCharacterModifier={modifiers.onDeleteDropCharacterModifier}
+            onSetDropCharacterModifierOverride={modifiers.setCharacterModifierOverrideEnabled}
+            onSelectEventModifierPickerOption={modifiers.setGatheringEventModifierPickerSelection}
+            onAddEventConditionModifier={modifiers.addGatheringEventConditionModifier}
+            onUpdateEventConditionModifier={modifiers.updateGatheringEventConditionModifier}
+            onEventConditionModifierKeydown={modifiers.onGatheringEventModifierKeydown}
+            onDeleteEventConditionModifier={modifiers.deleteGatheringEventConditionModifier}
+            onPickEventCharacterModifier={modifiers.pickCharacterModifierForEvent}
+            onUpdateEventCharacterModifier={modifiers.onUpdateEventCharacterModifier}
+            onDeleteEventCharacterModifier={modifiers.onDeleteEventCharacterModifier}
+            onSetEventCharacterModifierOverride={modifiers.setEventCharacterModifierOverrideEnabled}
+            onUpdateRules={drafts.updateSelectedGatheringRules}
             onDeleteRealm={(realmId) => store.deleteRealm?.(realmId)}
             onRenameRealm={(realmId, name) => store.renameRealm?.(realmId, name)}
           />
@@ -8377,7 +5999,7 @@
               macroName={essenceEditDraft.macroName ||
                 essenceShortValueName(essenceEditDraft.propertyMacroUuid)}
               inherited={inspectedEssenceInherited}
-              sampleComponentName={essenceEditDraft.componentUsageItems?.[0]?.name || ''}
+              previewCarrier={inspectedEssenceWorldEntry?.previewCarrier ?? null}
             />
           {:else if currentView === 'essences' && essenceBulk.count > 0}
             <EssenceBulkEditPanel
@@ -8407,7 +6029,6 @@
               systemRows={inspectedEssenceSystemRows}
               memberCount={Number(inspectedEssenceWorldEntry?.membershipCount) || 0}
               rosterSize={allSystems.length}
-              membershipActions={store?.worldScope?.essence ?? null}
               onOpenSystemRules={(entityId, systemId) => openSystemEssenceRules(entityId, systemId)}
               onEdit={(id) => editEssence(id)}
               onOpenWorldDefinition={(id) => openWorldScopedEntry('world-essence-entry', id)}
@@ -8502,6 +6123,7 @@
             </section>
           {:else}
             <EmptyState
+              fill
               icon="fas fa-mortar-pestle"
               title={currentView === 'essence-edit'
                 ? text('FABRICATE.Admin.Manager.Essence.CreateInspectorTitle', 'New essence draft')
@@ -8656,6 +6278,7 @@
             </section>
           {:else}
             <EmptyState
+              fill
               icon="fas fa-boxes"
               title={text(
                 'FABRICATE.Admin.Manager.Component.SelectComponent',
@@ -8678,6 +6301,7 @@
               categoryOptions={recipeBulkCategoryOptions}
               checkTierAxis={recipeBulkCheckTierAxis}
               checkTierOptions={recipeCheckTierOptions}
+              checkEvaluation={recipeCheckTierEvaluation}
               books={recipeItemDefinitions}
               bookMembership={recipeBulkBookMembership}
               blockedCount={recipeBulkBlockedCount}
@@ -8747,229 +6371,16 @@
             onToggleEnabled={(id, enabled) => store.setRecipeItemEnabled?.(id, enabled)}
             onToggleQuickLimit={(id, limited) => toggleRecipeItemQuickLimit(id, limited)}
           />
-        {:else if selectedSystem}
-          <section class="fabricate-card manager-inspector-card">
-            <div class="manager-inspector-title-row is-hero-large">
-              <span class="manager-inspector-icon is-hero-large" aria-hidden="true">
-                <i class="fas fa-layer-group"></i>
-              </span>
-              <div class="manager-inspector-copy">
-                <p class="manager-kicker">
-                  {text('FABRICATE.Admin.Manager.Column.System', 'System')}
-                </p>
-                <h2 class="manager-inspector-name" title={selectedSystem.name}>
-                  {selectedSystem.name}
-                </h2>
-                <div class="manager-chip-row">
-                  <Chip tone="active">{resolutionModeLabel(selectedSystem.resolutionMode)}</Chip>
-                  <Chip tone={selectedSystem.enabled === false ? 'disabled' : 'active'}>
-                    {selectedSystem.enabled === false
-                      ? text('FABRICATE.Admin.Manager.StatusDisabled', 'Disabled')
-                      : text('FABRICATE.Admin.Manager.StatusActive', 'Active')}
-                  </Chip>
-                </div>
-              </div>
-            </div>
-
-            <p class="manager-muted">
-              {selectedSystem.description ||
-                text(
-                  'FABRICATE.Admin.Manager.NoDescriptionAdded',
-                  'No description has been added.'
-                )}
-            </p>
-          </section>
-
-          <section class="fabricate-card manager-inspector-card">
-            <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Counts', 'Counts')}</h3>
-            <div class="manager-fact-grid">
-              {#each selectedCountFacts as fact (fact.id)}
-                {@const labelParts = countLabelParts(fact.label)}
-                <div class="manager-fact" class:is-off={fact.isOff} data-count-id={fact.id}>
-                  {#if fact.isOff}
-                    <span class="manager-fact-line">
-                      <span class="manager-fact-label">{fact.label}</span>
-                      <strong class="is-disabled">{fact.value}</strong>
-                    </span>
-                  {:else}
-                    <!-- prettier-ignore -->
-                    <span class="manager-fact-line">
-                      <!-- `{' '}` is the separator between the leading span and the trailing label: -->
-                      <!-- a literal space is the first token inside the `{#if}` and Svelte trims -->
-                      <!-- block-leading whitespace, so the two would run together. -->
-                      <!-- The fence above preserves the LINE ANCHOR of the directive below, not -->
-                      <!-- the render (issue 923): Prettier splits the line below across three, -->
-                      <!-- which moves the mustache off the line the directive is anchored to, -->
-                      <!-- and the suppression stops applying. The durable guard for this whole -->
-                      <!-- class is `reportUnusedDisableDirectives: 'error'` in eslint.config.js. -->
-                      <!-- eslint-disable-next-line svelte/no-useless-mustaches -->
-                      <span class="manager-fact-leading"><strong>{fact.value}</strong> {labelParts.lead}</span>{#if labelParts.rest}{' '}<span class="manager-fact-label">{labelParts.rest}</span>{/if}
-                    </span>
-                  {/if}
-                </div>
-              {/each}
-            </div>
-          </section>
-
-          <section
-            class="fabricate-card manager-inspector-card"
-            aria-label={text('FABRICATE.Admin.Manager.EnabledFeatures', 'Enabled features')}
-          >
-            <h3 class="manager-card-title">
-              {text('FABRICATE.Admin.Manager.EnabledFeatures', 'Enabled features')}
-            </h3>
-            {#if enabledFeatureLabels.length > 0}
-              <div class="manager-feature-list">
-                {#each enabledFeatureLabels as feature (feature)}
-                  <Chip tone="active">{feature}</Chip>
-                {/each}
-              </div>
-            {:else}
-              <p class="manager-muted">
-                {text(
-                  'FABRICATE.Admin.Manager.NoOptionalFeatures',
-                  'No optional features enabled.'
-                )}
-              </p>
-            {/if}
-          </section>
-
-          {#if selectedGatheringConditionShortcuts.length > 0}
-            <section
-              class="fabricate-card manager-inspector-card manager-condition-shortcut-card"
-              data-systems-gathering-conditions
-              aria-label={text('FABRICATE.Admin.Manager.GlobalConditions', 'Global conditions')}
-            >
-              <h3 class="manager-card-title">
-                {text('FABRICATE.Admin.Manager.GlobalConditions', 'Global conditions')}
-              </h3>
-              <div class="manager-condition-shortcut-list">
-                {#each selectedGatheringConditionShortcuts as condition (condition.kind)}
-                  <label
-                    class="fabricate-field manager-field manager-condition-shortcut"
-                    data-systems-gathering-condition={condition.kind}
-                  >
-                    <span class="manager-condition-shortcut-label">
-                      <i class={condition.icon} aria-hidden="true"></i>
-                      <span>{condition.label}</span>
-                    </span>
-                    <select
-                      value={condition.setting.current}
-                      onchange={(event) =>
-                        updateSelectedGatheringCondition(condition.kind, event.currentTarget.value)}
-                    >
-                      {#each conditionValues(condition.setting) as option (conditionId(option))}
-                        <option value={conditionId(option)}>{conditionLabel(option)}</option>
-                      {/each}
-                    </select>
-                  </label>
-                {/each}
-              </div>
-            </section>
-          {/if}
-        {:else if systemsLoading}
-          <section
-            class="manager-setup-card"
-            aria-label={text(
-              'FABRICATE.Admin.Manager.LoadingSystems',
-              'Loading crafting systems...'
-            )}
-          >
-            <div class="manager-setup-card-header">
-              <i class="fas fa-spinner" aria-hidden="true"></i>
-              <div>
-                <p class="manager-kicker">
-                  {text('FABRICATE.Admin.Manager.LoadingSystemsKicker', 'Startup')}
-                </p>
-                <h3>
-                  {text('FABRICATE.Admin.Manager.LoadingSystems', 'Loading crafting systems...')}
-                </h3>
-              </div>
-            </div>
-            <p class="manager-muted">
-              {text(
-                'FABRICATE.Admin.Manager.LoadingSystemsHint',
-                'Fabricate is finishing startup before the system library is shown.'
-              )}
-            </p>
-          </section>
-        {:else if ($viewState.systems || []).length === 0}
-          <section
-            class="manager-setup-card"
-            aria-label={text(
-              'FABRICATE.Admin.Manager.EmptySetup.Title',
-              'Set up your first system'
-            )}
-          >
-            <div class="manager-setup-card-header">
-              <i class="fas fa-compass" aria-hidden="true"></i>
-              <div>
-                <p class="manager-kicker">
-                  {text('FABRICATE.Admin.Manager.EmptySetup.Kicker', 'First run')}
-                </p>
-                <h3>
-                  {text('FABRICATE.Admin.Manager.EmptySetup.Title', 'Set up your first system')}
-                </h3>
-              </div>
-            </div>
-            <p class="manager-muted">
-              {text(
-                'FABRICATE.Admin.Manager.EmptySetup.Hint',
-                'Create a crafting system, add item-backed components, then build recipes from those components.'
-              )}
-            </p>
-            <ol class="manager-setup-list">
-              <li>
-                {text(
-                  'FABRICATE.Admin.Manager.EmptySetup.StepSystem',
-                  'Create a system for one crafting discipline or ruleset.'
-                )}
-              </li>
-              <li>
-                {text(
-                  'FABRICATE.Admin.Manager.EmptySetup.StepComponents',
-                  'Import world or compendium items as reusable components.'
-                )}
-              </li>
-              <li>
-                {text(
-                  'FABRICATE.Admin.Manager.EmptySetup.StepRecipes',
-                  'Add recipes that consume components and award results.'
-                )}
-              </li>
-            </ol>
-            <div
-              class="manager-setup-links"
-              aria-label={text('FABRICATE.Admin.Manager.EmptySetup.Resources', 'Resources')}
-            >
-              <ManagerButton
-                tag="a"
-                href="https://mistersilver-uk.github.io/fabricate/help/quickstart"
-                target="_blank"
-                rel="noreferrer"
-              >
-                <i class="fas fa-book-open" aria-hidden="true"></i>
-                <span>{text('FABRICATE.Admin.Manager.EmptySetup.Quickstart', 'Quickstart')}</span>
-              </ManagerButton>
-              <ManagerButton
-                tag="a"
-                href="https://mistersilver-uk.github.io/fabricate"
-                target="_blank"
-                rel="noreferrer"
-              >
-                <i class="fas fa-circle-question" aria-hidden="true"></i>
-                <span>{text('FABRICATE.Admin.Manager.EmptySetup.Docs', 'Docs')}</span>
-              </ManagerButton>
-            </div>
-          </section>
         {:else}
-          <EmptyState
-            icon="fas fa-arrow-pointer"
-            title={text('FABRICATE.Admin.Manager.SelectSystem', 'Select a system')}
-            hint={text(
-              'FABRICATE.Admin.Manager.InspectorHint',
-              'The inspector shows counts, resolution mode, and enabled features for the selected system.'
-            )}
+          <SystemBrowserInspector
+            {store}
+            {selectedSystem}
+            {selectedSystemId}
+            {selectedCounts}
+            {systemsLoading}
+            systems={$viewState.systems}
+            gatheringConfig={$viewState.gatheringConfig}
+            {resolutionModeLabel}
           />
         {/if}
       </aside>
@@ -8977,19 +6388,19 @@
   </div>
 
   <ImportFolderMappingModal
-    open={importMappingOpen}
-    folders={importMappingFolders}
+    open={importFlow.importMappingOpen}
+    folders={importFlow.importMappingFolders}
     componentCategories={selectedSystem?.componentCategories || []}
     itemTags={selectedSystem?.itemTags || []}
     onAddCategory={addComponentCategory}
-    onCommit={commitImportFolderMapping}
-    onClose={() => (importMappingOpen = false)}
+    onCommit={importFlow.commitImportFolderMapping}
+    onClose={() => (importFlow.importMappingOpen = false)}
   />
 
   <ImportReportModal
-    open={importReportContent !== null}
-    content={importReportContent}
-    onClose={() => (importReportContent = null)}
+    open={importFlow.importReportContent !== null}
+    content={importFlow.importReportContent}
+    onClose={() => (importFlow.importReportContent = null)}
   />
 
   <!--

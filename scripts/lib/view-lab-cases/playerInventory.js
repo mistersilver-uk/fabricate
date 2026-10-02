@@ -17,6 +17,89 @@ import {
   responsiveLayout,
 } from './caseFactories.js';
 
+/** The bulk roll prompt: Fabricate's own modal over the player window. */
+const BULK_PROMPT = '.fabricate-app .manager-modal[data-roll-prompt="bulk"]';
+/** The help line under the bonus field, then the batch list holding each `[name, need]` row. */
+const BULK_PROMPT_ROWS = (help, rows) =>
+  `${BULK_PROMPT}:has(.bonus-group > .help:text-is("${help}")) .bulk-list` +
+  rows
+    .map(
+      ([name, need]) =>
+        `:has(> .bulk-row > .bulk-name:text-is("${name}") + .bulk-need:text-is("${need}"))`
+    )
+    .join('');
+const UNDER_BONUS_HELP =
+  'A bonus raises the target. A rolled bonus such as 1d4 is rolled first, and its result is applied.';
+const COUNT_BONUS_HELP =
+  'A bonus adds that many dice. A rolled bonus such as 1d4 is rolled first, and its result is applied.';
+const BULK_PROMPT_SOURCES = [
+  ...BULK_DEFAULTS.sourceMatches,
+  /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Footer)?\.svelte$/,
+  /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/,
+];
+
+/**
+ * Issue 2008's bulk additional dice (frame 36): Air Shard and the Longsword on Smithing's simple
+ * salvage, with Runework's routed Ruined Slag where a batch names it, every row paid from Sera
+ * Vane's Momentum and seeded with no salvage tool, so each row's own reach is judged.
+ */
+const BULK_ADDITIONAL_SOURCES = [
+  ...BULK_PROMPT_SOURCES,
+  /^src\/ui\/svelte\/apps\/crafting\/RollPromptAdditionalDice\.svelte$/,
+  /^src\/ui\/presenters\/additionalDicePrompt\.js$/,
+];
+const bulkAdditionalSteps = (keys) => [
+  ...chooseSelectOption('.inventory-grid-pagination [data-pagination-size]', '75'),
+  ...keys.map((key) => SHIFT_CLICK(key)),
+  { selector: '[data-inventory-bulk-salvage]' },
+];
+const SMITHING_ROWS = ['lab-smithing:sm-air-shard', 'lab-smithing:sm-longsword'];
+const THREE_ROWS = [...SMITHING_ROWS, 'lab-runework:rw-slag'];
+const BULK_BLOCKED = (action) =>
+  `:has(.manager-modal-footer button[data-action="${action}"][aria-disabled="true"])`;
+const BULK_ENABLED = (action) =>
+  `:has(.manager-modal-footer button[data-action="${action}"]:not([aria-disabled]))`;
+const BULK_NOTE = (text) => `:has([data-roll-prompt-block-note]:text-is("${text}"))`;
+const UNREACHABLE_ROWS = (count) =>
+  `:has(.bulk-row:nth-child(${count}) [data-roll-prompt-bulk-unreachable])` +
+  `:not(:has(.bulk-row:nth-child(${count + 1})))`;
+/** Buy one die on the standing prompt, then roll (issue 2008). */
+const buyOneAndRoll = (prompt) => [
+  { selector: `${prompt} [data-roll-prompt-additional-dice-stepper] [data-stepper-increment]` },
+  { selector: `${prompt} button[type="submit"]` },
+];
+const SINGLE_SALVAGE_PROMPT = '.fabricate-app .manager-modal[data-roll-prompt="single"]';
+/** The Longsword's single salvage, its one bought die rolled at or under 20 (frame 39). */
+const SALVAGE_LONGSWORD_BOUGHT = Object.freeze([
+  { selector: '.inventory-filters input', fill: 'Longsword' },
+  { selector: CARD_BUTTON('lab-smithing:sm-longsword') },
+  { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+  { selector: '[data-inventory-salvage-action]' },
+  ...buyOneAndRoll(SINGLE_SALVAGE_PROMPT),
+]);
+const LAST_TILE_BOUGHT = '.fabricate-dice-tiles__tile:last-child[data-dice-tile-marks~="bought"]';
+const BOUGHT_SALVAGE_SOURCES = [
+  /^src\/ui\/presenters\/(?:SalvageChatCard|BulkSalvageChatCard|countDiceTiles|countEvidenceRows)\.js$/,
+];
+function bulkAdditionalCase({ id, label, state, keys = SMITHING_ROWS, expectSelector }) {
+  return playerCase({
+    ...BULK_DEFAULTS,
+    id,
+    label: `Player app — Inventory bulk roll prompt, additional dice ${label}`,
+    query: { tab: 'inventory', dialog: 'open', rollPromptState: state },
+    steps: bulkAdditionalSteps(keys),
+    expectSelector: BULK_PROMPT + expectSelector,
+    sourceMatches: BULK_ADDITIONAL_SOURCES,
+  });
+}
+
+/** The Salvage tab's roll-under target line (issue 2005): its presenter and the bodies drawing it. */
+const SALVAGE_TARGET_SOURCES = Object.freeze([
+  /^src\/ui\/svelte\/apps\/inventory\/detail\/salvage\/Salvage(?:Simple|Routed)Body\.svelte$/,
+  /^src\/ui\/svelte\/apps\/inventory\/detail\/InventorySalvagePanel\.svelte$/,
+  /^src\/ui\/presenters\/(?:salvageCheckNeed|checkDescriptor)\.js$/,
+]);
+
 export const CASES = Object.freeze([
   playerCase({
     id: 'player-gathering-environments',
@@ -199,6 +282,76 @@ export const CASES = Object.freeze([
       /^src\/utils\/progressiveResultOrder\.js$/,
     ],
   }),
+  // Issue 2005: a salvage rolled under a fixed target states its evidence rows in the summary.
+  playerCase({
+    id: 'player-salvage-under-result',
+    label: 'Player app — Salvage summary after a roll-under salvage, with its evidence rows',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'inventory', dialog: 'open', rollPromptState: 'salvage-under-evidence' },
+    steps: [
+      { selector: '.inventory-filters input', fill: 'Longsword' },
+      {
+        selector:
+          '.inventory-card[data-inventory-card="lab-smithing:sm-longsword"] .inventory-card-button',
+      },
+      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+      { selector: '[data-inventory-salvage-action]' },
+      {
+        selector: '.fabricate-app .manager-modal[data-roll-prompt="single"] button[type="submit"]',
+      },
+      {
+        selector: '[data-inventory-salvage-summary="success"] [data-check-evidence-rows]',
+        scroll: true,
+      },
+    ],
+    expectSelector:
+      '[data-inventory-salvage-summary="success"] [data-check-evidence-rows]' +
+      ':has([data-check-evidence="target"]):has([data-check-evidence="margin"])',
+    kinds: ['player', 'inventory'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/inventory\/detail\/salvage\/SalvageRollSummary\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/detail\/CheckEvidenceRows\.svelte$/,
+      /^src\/ui\/presenters\/check(?:Display|EvidenceRows)\.js$/,
+      /^src\/ui\/svelte\/stores\/inventorySalvageExecution/,
+    ],
+  }),
+  // Issue 2092: a failed single salvage states the same Target/Margin rows, in a failure box.
+  playerCase({
+    id: 'player-salvage-under-result-fail',
+    label: 'Player app — Salvage summary after a failed roll-under salvage, with its evidence rows',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'inventory', dialog: 'open', rollPromptState: 'salvage-under-evidence-fail' },
+    // The failure toast the player is shown, which the lab reports as a console warning.
+    allowedConsoleErrors: [/Salvage check failed/],
+    steps: [
+      { selector: '.inventory-filters input', fill: 'Longsword' },
+      {
+        selector:
+          '.inventory-card[data-inventory-card="lab-smithing:sm-longsword"] .inventory-card-button',
+      },
+      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+      { selector: '[data-inventory-salvage-action]' },
+      {
+        selector: '.fabricate-app .manager-modal[data-roll-prompt="single"] button[type="submit"]',
+      },
+      {
+        selector: '[data-inventory-salvage-summary="failure"] [data-check-evidence-rows]',
+        scroll: true,
+      },
+    ],
+    expectSelector:
+      '[data-inventory-salvage-summary="failure"] [data-check-evidence-rows]' +
+      ':has([data-check-evidence="target"]):has([data-check-evidence="margin"])',
+    kinds: ['player', 'inventory'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/inventory\/detail\/salvage\/SalvageRollSummary\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/detail\/CheckEvidenceRows\.svelte$/,
+      /^src\/ui\/presenters\/check(?:Display|EvidenceRows)\.js$/,
+      /^src\/ui\/svelte\/stores\/inventorySalvageExecution/,
+    ],
+  }),
   playerCase({
     id: 'player-inventory-multi-system',
     label: 'Player app — Inventory multi system',
@@ -215,6 +368,147 @@ export const CASES = Object.freeze([
     ],
     kinds: ['player', 'inventory'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/inventory\//, /^src\/ui\/svelte\/stores\/inventory/],
+  }),
+  // Issue 2005: a roll-under salvage names its target and source in place of a DC, and its banner
+  // says the total must stay at or under the target.
+  playerCase({
+    id: 'player-salvage-under-simple',
+    label: 'Player app — Salvage roll-under against a character value',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'inventory', rollPromptState: 'salvage-under-skill' },
+    steps: [
+      { selector: '.inventory-filters input', fill: 'Air Shard' },
+      {
+        selector:
+          '.inventory-card[data-inventory-card="lab-smithing:sm-air-shard"] .inventory-card-button',
+      },
+      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+    ],
+    expectSelector:
+      '[data-inventory-salvage-panel="simple"]' +
+      ':has([data-inventory-salvage-banner]:has-text("stay at or under the target"))' +
+      ':has([data-inventory-salvage-target="under"]):has([data-inventory-salvage-target-source])',
+    kinds: ['player', 'inventory'],
+    sourceMatches: SALVAGE_TARGET_SOURCES,
+  }),
+  playerCase({
+    id: 'player-salvage-under-routed',
+    label: 'Player app — Routed salvage roll-under, its base target in place of a DC',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'inventory', rollPromptState: 'salvage-under' },
+    steps: [
+      { selector: '.inventory-filters input', fill: 'Ruined Slag' },
+      {
+        selector:
+          '.inventory-card[data-inventory-card="lab-runework:rw-slag"] .inventory-card-button',
+      },
+      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+    ],
+    expectSelector:
+      '[data-inventory-salvage-body="routed"]:has([data-inventory-salvage-target="under"])' +
+      ':not(:has([data-inventory-salvage-dc]))',
+    kinds: ['player', 'inventory'],
+    sourceMatches: SALVAGE_TARGET_SOURCES,
+  }),
+  // Issue 2137: the control, a routed salvage summing against the slag's DC 11, its kicker and its
+  // Reached-at thresholds.
+  playerCase({
+    id: 'player-salvage-routed-dc',
+    label: 'Player app — Routed salvage against a DC, its kicker and thresholds',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'inventory' },
+    steps: [
+      { selector: '.inventory-filters input', fill: 'Ruined Slag' },
+      { selector: CARD_BUTTON('lab-runework:rw-slag') },
+      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+    ],
+    expectSelector:
+      '[data-inventory-salvage-body="routed"]' +
+      ':has(.salvage-dc[data-inventory-salvage-dc="11"]:text-is("DC 11"))' +
+      ':has([data-inventory-salvage-outcome="rw-salv-masterwork"] [data-inventory-outcome-threshold="16"] .manager-chip)' +
+      ':not(:has([data-inventory-outcome-band]))',
+    kinds: ['player', 'inventory'],
+    sourceMatches: [
+      ...SALVAGE_TARGET_SOURCES,
+      /^src\/ui\/presenters\/InventoryListingBuilder\.js$/,
+    ],
+  }),
+  // Issue 2137: a routed salvage counting one success needed states each tier's band in net
+  // successes, as the Journal does, in place of a Reached-at threshold.
+  playerCase({
+    id: 'player-salvage-count-routed',
+    label: 'Player app — Routed salvage that counts successes, its tiers in net successes',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'inventory', rollPromptState: 'salvage-count' },
+    steps: [
+      { selector: '.inventory-filters input', fill: 'Ruined Slag' },
+      { selector: CARD_BUTTON('lab-runework:rw-slag') },
+      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+    ],
+    expectSelector:
+      '[data-inventory-salvage-body="routed"]:not(:has([data-inventory-salvage-dc]))' +
+      ':has([data-inventory-salvage-outcome="rw-salv-masterwork"] [data-inventory-outcome-band="6+"])' +
+      ':has([data-inventory-salvage-outcome="rw-salv-standard"] [data-inventory-outcome-band="1–5"])' +
+      ':has([data-inventory-salvage-outcome="rw-salv-ruined"] [data-inventory-outcome-band="0"] .manager-chip.is-danger)',
+    kinds: ['player', 'inventory'],
+    sourceMatches: [
+      ...SALVAGE_TARGET_SOURCES,
+      /^src\/ui\/presenters\/InventoryListingBuilder\.js$/,
+      /^src\/systems\/runJournalOutcomeBands\.js$/,
+    ],
+  }),
+  // With cancelling on, the same salvage closes on the Journal's Botch row beside Ruined: Ruined
+  // (−5 from one needed) is met from a net of −4, so only a lower net is a Botch.
+  playerCase({
+    id: 'player-salvage-count-routed-botch',
+    label: 'Player app — Routed counting salvage with cancelling, its Botch row beside Ruined',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'inventory', rollPromptState: 'salvage-count-cancel' },
+    steps: [
+      { selector: '.inventory-filters input', fill: 'Ruined Slag' },
+      { selector: CARD_BUTTON('lab-runework:rw-slag') },
+      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+    ],
+    expectSelector:
+      '[data-inventory-salvage-body="routed"]' +
+      ':has([data-inventory-salvage-outcome="rw-salv-ruined"] [data-inventory-outcome-band="−4 – 0"])' +
+      ':has([data-inventory-salvage-outcome="rw-salv-ruined"] + [data-inventory-salvage-outcome="count-botch"]' +
+      ' [data-inventory-outcome-band="<−4"] .manager-chip)',
+    kinds: ['player', 'inventory'],
+    sourceMatches: [
+      ...SALVAGE_TARGET_SOURCES,
+      /^src\/ui\/presenters\/InventoryListingBuilder\.js$/,
+      /^src\/systems\/runJournalOutcomeBands\.js$/,
+    ],
+  }),
+  // Issue 2152: a routed fixed salvage states its authored segments and no DC, a negative-ended
+  // tier with the true minus spaced from the dash.
+  playerCase({
+    id: 'player-salvage-fixed-routed',
+    label: 'Player app — Routed salvage on fixed ranges, a negative-ended tier and no DC',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'inventory', rollPromptState: 'salvage-fixed-routed' },
+    steps: [
+      { selector: '.inventory-filters input', fill: 'Ruined Slag' },
+      { selector: CARD_BUTTON('lab-runework:rw-slag') },
+      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+    ],
+    expectSelector:
+      '[data-inventory-salvage-body="routed"][data-inventory-routed-type="fixed"]' +
+      ':not(:has([data-inventory-salvage-dc])):has([data-inventory-outcome-band="−2 – −1"])',
+    kinds: ['player', 'inventory'],
+    sourceMatches: [
+      ...SALVAGE_TARGET_SOURCES,
+      /^src\/ui\/presenters\/InventoryListingBuilder\.js$/,
+      // `netRange` spaces the negative-ended tier's dash.
+      /^src\/systems\/runJournalOutcomeBands\.js$/,
+    ],
   }),
   playerCase({
     id: 'player-salvage-misconfigured',
@@ -412,9 +706,179 @@ export const CASES = Object.freeze([
       SHIFT_CLICK('lab-smithing:sm-air-shard'),
       { selector: '[data-inventory-bulk-salvage]' },
     ],
-    // Held to the prompt's own element, never to the tab.
-    expectSelector: '.application.dialog .fabricate-roll-prompt__subjects',
-    // It keeps the shared inventory `sourceMatches` and does not add `apps/crafting/rollPrompt.js`.
+    // Held to the prompt's own element, never to the tab. The one row that rolls offers keep, so
+    // the batch does; the row with no check never joins the offer (issue 2007).
+    expectSelector:
+      '.fabricate-app .manager-modal[data-roll-prompt="bulk"]' +
+      ':has(.manager-modal-title:has-text("Salvage checks"))' +
+      ':has(.bulk-need:text-is("No check"))' +
+      ':has(.manager-modal-footer button[data-action="advantage"] .action-note:text-is("keep the better"))' +
+      ':has(.bulk-list + .bulk-note) .bulk-row',
+    sourceMatches: [
+      ...BULK_DEFAULTS.sourceMatches,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Footer)?\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/,
+      /^src\/ui\/svelte\/apps\/crafting\/rollPromptHost\.js$/,
+    ],
+  }),
+  // A roll-under batch names each row's target, and the bonus help says a bonus raises it.
+  playerCase({
+    ...BULK_DEFAULTS,
+    id: 'player-inventory-bulk-roll-prompt-under',
+    label: 'Player app — Inventory bulk roll prompt, roll-under targets',
+    query: { tab: 'inventory', dialog: 'open', rollPromptState: 'salvage-under' },
+    steps: [
+      ...chooseSelectOption('.inventory-grid-pagination [data-pagination-size]', '75'),
+      SHIFT_CLICK('lab-smithing:sm-air-shard'),
+      SHIFT_CLICK('lab-runework:rw-slag'),
+      { selector: '[data-inventory-bulk-salvage]' },
+    ],
+    expectSelector: BULK_PROMPT_ROWS(UNDER_BONUS_HELP, [
+      ['Air Shard', 'Target 12'],
+      ['Ruined Slag', 'Target 11'],
+    ]),
+    sourceMatches: BULK_PROMPT_SOURCES,
+  }),
+  // A character-value row has no single target, so the mixed batch keeps the roll-over help.
+  playerCase({
+    ...BULK_DEFAULTS,
+    id: 'player-inventory-bulk-roll-prompt-under-attribute',
+    label: 'Player app — Inventory bulk roll prompt, a roll-under row with no single target',
+    query: { tab: 'inventory', dialog: 'open', rollPromptState: 'salvage-under-attribute' },
+    steps: [
+      ...chooseSelectOption('.inventory-grid-pagination [data-pagination-size]', '75'),
+      SHIFT_CLICK('lab-smithing:sm-air-shard'),
+      SHIFT_CLICK('lab-runework:rw-slag'),
+      { selector: '[data-inventory-bulk-salvage]' },
+    ],
+    expectSelector: BULK_PROMPT_ROWS(UNDER_BONUS_HELP, [
+      ['Air Shard', 'Target 12'],
+      ['Ruined Slag', 'No single target'],
+    ]),
+    sourceMatches: BULK_PROMPT_SOURCES,
+  }),
+  // A count batch names each row's successes needed, and the help says a bonus adds dice.
+  playerCase({
+    ...BULK_DEFAULTS,
+    id: 'player-inventory-bulk-roll-prompt-count',
+    label: 'Player app — Inventory bulk roll prompt, success-counting rows',
+    query: { tab: 'inventory', dialog: 'open', rollPromptState: 'salvage-count' },
+    steps: [
+      ...chooseSelectOption('.inventory-grid-pagination [data-pagination-size]', '75'),
+      SHIFT_CLICK('lab-smithing:sm-air-shard'),
+      SHIFT_CLICK('lab-runework:rw-slag'),
+      { selector: '[data-inventory-bulk-salvage]' },
+    ],
+    expectSelector: BULK_PROMPT_ROWS(COUNT_BONUS_HELP, [
+      ['Air Shard', '2 needed'],
+      ['Ruined Slag', '1 needed'],
+    ]),
+    sourceMatches: BULK_PROMPT_SOURCES,
+  }),
+  // Issue 2007: two bonus dice of different sizes, so the batch offers both buttons and no note.
+  playerCase({
+    ...BULK_DEFAULTS,
+    id: 'player-inventory-bulk-roll-prompt-advantage',
+    label: 'Player app — Inventory bulk roll prompt, rolls whose advantage notes differ',
+    query: { tab: 'inventory', dialog: 'open', rollPromptState: 'salvage-advantage-mixed' },
+    steps: [
+      ...chooseSelectOption('.inventory-grid-pagination [data-pagination-size]', '75'),
+      SHIFT_CLICK('lab-smithing:sm-air-shard'),
+      SHIFT_CLICK('lab-runework:rw-slag'),
+      { selector: '[data-inventory-bulk-salvage]' },
+    ],
+    expectSelector:
+      BULK_PROMPT +
+      ':has(.manager-modal-footer button[data-action="disadvantage"])' +
+      ':has(.manager-modal-footer button[data-action="normal"][type="submit"])' +
+      ':has(.manager-modal-footer button[data-action="advantage"])' +
+      ':not(:has(.action-note))' +
+      ' .bulk-list:has(> .bulk-row > .bulk-name:text-is("Ruined Slag") + .bulk-need:text-is("Target 11"))',
+    sourceMatches: BULK_PROMPT_SOURCES,
+  }),
+  // Issue 2007 (frame 36, `pBulk`): both bonus dice are the same `1d6`, so the batch's offer agrees
+  // on `kind` and `detail`, and the sub-label shows once for the whole footer.
+  playerCase({
+    ...BULK_DEFAULTS,
+    id: 'player-inventory-bulk-roll-prompt-advantage-shared',
+    label: 'Player app — Inventory bulk roll prompt, rolls that share an advantage note',
+    query: { tab: 'inventory', dialog: 'open', rollPromptState: 'salvage-advantage-shared' },
+    steps: [
+      ...chooseSelectOption('.inventory-grid-pagination [data-pagination-size]', '75'),
+      SHIFT_CLICK('lab-smithing:sm-air-shard'),
+      SHIFT_CLICK('lab-runework:rw-slag'),
+      { selector: '[data-inventory-bulk-salvage]' },
+    ],
+    expectSelector:
+      BULK_PROMPT +
+      ':has(.manager-modal-footer button[data-action="advantage"] .action-note:text-is("+1d6 to the target"))' +
+      ':has(.manager-modal-footer button[data-action="disadvantage"] .action-note:text-is("−1d6 to the target"))' +
+      ' .bulk-list:has(> .bulk-row > .bulk-name:text-is("Ruined Slag") + .bulk-need:text-is("Target 11"))',
+    sourceMatches: BULK_PROMPT_SOURCES,
+  }),
+  // Frame 36 (`pBulk`): three rolls share Sera Vane's 2 Momentum, too few for a die each.
+  bulkAdditionalCase({
+    id: 'player-inventory-bulk-roll-prompt-count-additional',
+    label: 'too few for a die each (prototype frame 36)',
+    state: 'salvage-count-additional',
+    keys: THREE_ROWS,
+    expectSelector:
+      ':has([data-roll-prompt-additional-dice-resource]:text-is("Momentum 2 available"))' +
+      ':has([data-roll-prompt-additional-dice-spend]:text-is("Spends 0 Momentum across 3 rolls (0 each)"))' +
+      ':has([data-roll-prompt-additional-dice-message].is-info:has-text("Not enough Momentum to buy a die for every roll."))' +
+      ':has(input[data-roll-prompt-additional-dice]:disabled)' +
+      ':not(:has([data-roll-prompt-bulk-unreachable]))' +
+      BULK_ENABLED('normal'),
+  }),
+  // R1 across the batch: no row reaches three successes without Advantage's extra die.
+  bulkAdditionalCase({
+    id: 'player-inventory-bulk-roll-prompt-count-additional-blocked',
+    label: 'every row reaching only with Advantage (ruling R1)',
+    state: 'salvage-count-additional-blocked',
+    expectSelector:
+      BULK_BLOCKED('disadvantage') +
+      BULK_BLOCKED('normal') +
+      BULK_ENABLED('advantage') +
+      BULK_NOTE('Only Advantage can reach the successes needed.') +
+      ':not(:has([data-roll-prompt-bulk-unreachable]))',
+  }),
+  bulkAdditionalCase({
+    id: 'player-inventory-bulk-roll-prompt-count-additional-blocked-all',
+    label: 'no row able to reach under any action (ruling R1)',
+    state: 'salvage-count-additional-blocked-all',
+    expectSelector:
+      BULK_BLOCKED('disadvantage') +
+      BULK_BLOCKED('normal') +
+      BULK_BLOCKED('advantage') +
+      BULK_NOTE('Rolling is disabled: none of these rolls can reach the successes they need.') +
+      UNREACHABLE_ROWS(2),
+  }),
+  // One row cannot reach, the other can, so the batch keeps every action and marks the one row.
+  bulkAdditionalCase({
+    id: 'player-inventory-bulk-roll-prompt-count-additional-partial',
+    label: 'one row unable to reach (ruling R1)',
+    state: 'salvage-count-additional-partial',
+    expectSelector:
+      BULK_ENABLED('disadvantage') +
+      BULK_ENABLED('normal') +
+      BULK_ENABLED('advantage') +
+      ':not(:has([data-roll-prompt-block-note]))' +
+      ':has(.bulk-row:nth-child(1) > .bulk-name:text-is("Air Shard"))' +
+      ':has(.bulk-row:nth-child(1) [data-roll-prompt-bulk-unreachable])' +
+      ':has(.bulk-row:nth-child(2) > .bulk-need:text-is("1 needed"))' +
+      ':not(:has(.bulk-row:nth-child(2) [data-roll-prompt-bulk-unreachable]))',
+  }),
+  // Two resources in one batch: the titled well with no stepper, and its note says why.
+  bulkAdditionalCase({
+    id: 'player-inventory-bulk-roll-prompt-count-additional-mixed',
+    label: 'paid from two different resources',
+    state: 'salvage-count-additional-mixed',
+    keys: THREE_ROWS,
+    expectSelector:
+      ' .fab-well[data-roll-prompt-additional-dice-group]' +
+      ':not(:has(input[data-roll-prompt-additional-dice]))' +
+      ':has([data-roll-prompt-additional-dice-title]:text-is("Additional dice"))' +
+      ' [data-roll-prompt-additional-dice-message].is-info:has-text("Rolls in this batch use different resources, so no dice can be added.")',
   }),
   playerCase({
     ...BULK_DEFAULTS,
@@ -461,5 +925,124 @@ export const CASES = Object.freeze([
     // The panel state plus the report's own subject list.
     expectSelector:
       '[data-inventory-bulk-panel="report"] [data-inventory-bulk-subjects] [data-inventory-bulk-subject]',
+  }),
+  // Issue 2006: a counting salvage names its successes needed and per-die test in place of a DC.
+  playerCase({
+    id: 'player-salvage-count-simple',
+    label: 'Player app — Salvage that counts successes, its need and per-die test',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'inventory', rollPromptState: 'salvage-count' },
+    steps: [
+      { selector: '.inventory-filters input', fill: 'Air Shard' },
+      { selector: CARD_BUTTON('lab-smithing:sm-air-shard') },
+      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+    ],
+    expectSelector:
+      '[data-inventory-salvage-panel="simple"]:not(:has([data-inventory-salvage-dc]))' +
+      ':has([data-inventory-salvage-banner]:has-text("The count must reach the successes needed"))' +
+      ' [data-inventory-salvage-target="over"]' +
+      ':text-is("Salvage check · 2 successes needed · d10s, success on ≥ 8")',
+    kinds: ['player', 'inventory'],
+    sourceMatches: SALVAGE_TARGET_SOURCES,
+  }),
+  // Its executed dice: two d6s meeting 1 and exploding once, netting four against two needed.
+  playerCase({
+    id: 'player-salvage-count-result',
+    label: 'Player app — Salvage summary after a counting salvage, with its tiles and rows',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'inventory', dialog: 'open', rollPromptState: 'salvage-count-result' },
+    steps: [
+      { selector: '.inventory-filters input', fill: 'Longsword' },
+      { selector: CARD_BUTTON('lab-smithing:sm-longsword') },
+      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+      { selector: '[data-inventory-salvage-action]' },
+      {
+        selector: '.fabricate-app .manager-modal[data-roll-prompt="single"] button[type="submit"]',
+      },
+      {
+        selector: '[data-inventory-salvage-summary="success"] [data-check-count-tiles]',
+        scroll: true,
+      },
+    ],
+    expectSelector:
+      '[data-inventory-salvage-summary="success"]' +
+      ':has([data-check-count-tiles] [data-dice-tile-generated][data-dice-tile-marks="qualified"])' +
+      ':has([data-check-evidence="count"]:has-text("4 qualified − 0 cancelled = 4 net"))' +
+      ' [data-check-evidence="needed"]:has-text("2 · margin +2")',
+    kinds: ['player', 'inventory'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/inventory\/detail\/salvage\/SalvageRollSummary\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/detail\/CheckEvidenceRows\.svelte$/,
+      /^src\/ui\/presenters\/(?:checkDisplay|countDiceTiles|countEvidenceRows)\.js$/,
+      /^src\/ui\/svelte\/stores\/inventorySalvageExecution/,
+    ],
+  }),
+  // Issue 2008 (frame 39 on salvage): the summary marks the bought die and states its row.
+  playerCase({
+    id: 'player-salvage-count-result-bought',
+    label: 'Player app — Salvage summary after a counting salvage with one bought die',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'inventory', dialog: 'open', rollPromptState: 'salvage-count-result-bought' },
+    steps: [
+      ...SALVAGE_LONGSWORD_BOUGHT,
+      {
+        selector: '[data-inventory-salvage-summary="success"] [data-check-count-tiles]',
+        scroll: true,
+      },
+    ],
+    expectSelector:
+      '[data-inventory-salvage-summary="success"]' +
+      ':has([data-check-evidence="additionalDice"]:has-text("1 bought · spent 1 Momentum"))' +
+      ':has([data-dice-tiles-legend]:has-text("dashed = bought"))' +
+      ` [data-check-count-tiles] ${LAST_TILE_BOUGHT}`,
+    kinds: ['player', 'inventory'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/inventory\/detail\/salvage\/SalvageRollSummary\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/detail\/CheckEvidenceRows\.svelte$/,
+      /^src\/ui\/presenters\/(?:checkDisplay|countDiceTiles|countEvidenceRows)\.js$/,
+    ],
+  }),
+  // The single salvage's posted card: its summary, the dashed tile and the Additional dice row.
+  playerCase({
+    id: 'player-salvage-count-result-bought-chat',
+    label: 'Player app — salvage result card with one bought die',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: {
+      tab: 'inventory',
+      dialog: 'open',
+      rollPromptState: 'salvage-count-result-bought',
+      chatLog: '1',
+    },
+    steps: SALVAGE_LONGSWORD_BOUGHT,
+    expectSelector:
+      '.fabricate-craft-chat:has-text("Source: Longsword")' +
+      ':has([data-check-count-summary]:has-text("3d20 (2 + 1 bought), each ≤ 20"))' +
+      ':has([data-check-evidence="additionalDice"]:has-text("1 bought · spent 1 Momentum"))' +
+      ` ${LAST_TILE_BOUGHT}`,
+    kinds: ['player', 'inventory'],
+    sourceMatches: BOUGHT_SALVAGE_SOURCES,
+  }),
+  // A bulk batch buying one die for each of its two rolls: each subject marks its own bought die.
+  playerCase({
+    ...BULK_DEFAULTS,
+    id: 'player-inventory-bulk-salvage-bought-chat',
+    label: 'Player app — bulk salvage result card, one bought die on each roll',
+    query: {
+      tab: 'inventory',
+      dialog: 'open',
+      rollPromptState: 'salvage-count-result-bought',
+      chatLog: '1',
+    },
+    steps: [...bulkAdditionalSteps(SMITHING_ROWS), ...buyOneAndRoll(BULK_PROMPT)],
+    expectSelector:
+      '.fabricate-craft-chat' +
+      ':has(.fabricate-craft-chat__item--evidence:nth-child(2) [data-check-evidence="additionalDice"])' +
+      ' .fabricate-craft-chat__item--evidence [data-check-evidence="additionalDice"]' +
+      ':has-text("1 bought · spent 1 Momentum")',
+    sourceMatches: BOUGHT_SALVAGE_SOURCES,
   }),
 ]);

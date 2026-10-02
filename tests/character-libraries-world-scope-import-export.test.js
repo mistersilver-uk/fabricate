@@ -3,13 +3,10 @@
 // shipped with no test.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
+import { CompendiumImporter } from '../src/systems/CompendiumImporter.js';
 import { importerOverSettings } from './helpers/worldConfigImporterHarness.js';
 
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const KEY = 'characterLibraries';
 
 const SMITH = { id: 'smithsTools', name: "Smith's Tools", path: 'tools.smith.value', op: 'gte', value: 1 };
@@ -96,39 +93,67 @@ test('ignores a malformed or absent payload rather than throwing', async () => {
   assert.equal(settings[KEY], undefined, 'and never writes for one');
 });
 
-// THE ORDERING, pinned on the SOURCE because no behavioural fixture can reach it: every importer
-// test stands over a mock system manager that does not normalize, so moving the call below
-// `createSystem` leaves the whole suite green while breaking copy-mode import in production.
-test('the merge is ordered BEFORE the system create/update, unlike currency and travel', () => {
-  const source = readFileSync(
-    resolve(repoRoot, 'src/systems/CompendiumImporter.js'),
-    'utf8'
+// THE ORDERING: `_normalizeSystem` derives its Valid Id Basis from the world libraries, so a system
+// created while the incoming entries are still only in the payload is pruned against a basis that
+// cannot see them. A manager double that records what the world held at `createSystem` time sees
+// the order no non-normalizing fake could.
+test('the merge is ordered BEFORE the system create, unlike the currency merge', async () => {
+  const settings = {};
+  const atCreate = [];
+  const manager = {
+    getSystems: () => [],
+    getSystem: () => null,
+    getItems: () => [],
+    createSystem: async (data) => {
+      atCreate.push({
+        libraries: structuredClone(settings[KEY]),
+        currency: structuredClone(settings.currencyConfig),
+      });
+      return { ...data, id: 'sys-imported' };
+    },
+  };
+  const recipeManager = { getRecipes: () => [], notifyRecipesChanged: () => {} };
+  const importer = new CompendiumImporter(manager, recipeManager, {
+    getSetting: (key) => settings[key],
+    setSetting: async (key, value) => {
+      settings[key] = value;
+    },
+    isGM: () => true,
+    reportProgress: () => {},
+  });
+  await importer.importFromPackData({
+    system: { id: 'sys-imported', name: 'Imported' },
+    characterLibraries: { characterPrerequisites: [SMITH], modifiers: [MED] },
+    currencyConfig: { units: [{ id: 'gp', label: 'Gold', value: 1 }] },
+  });
+  assert.equal(atCreate.length, 1, 'the system was created exactly once');
+  assert.deepEqual(
+    atCreate[0].libraries,
+    { characterPrerequisites: [SMITH], modifiers: [MED] },
+    'the character-libraries merge must land BEFORE the system is created'
   );
-  const merge = source.indexOf('await this._persistCharacterLibraries(');
-  const create = source.indexOf('await this._craftingSystemManager.createSystem(');
-  const currency = source.indexOf('await this._persistCurrencyConfig(');
-  assert.ok(merge > 0 && create > 0 && currency > 0, 'located all three call sites');
-  assert.ok(
-    merge < create,
-    'the character-libraries merge must run BEFORE the system is created, or the normalizer ' +
-      'prunes every incoming reference against a basis that cannot see the new entries'
-  );
-  assert.ok(
-    currency > create,
-    'and the currency merge still runs after it — the contrast is the point: nothing reads the ' +
-      'coin ladder during normalization, and these two libraries are read during it'
+  assert.equal(atCreate[0].currency, undefined, 'while the currency merge still runs after it');
+  assert.deepEqual(
+    settings.currencyConfig.units.map(({ id }) => id),
+    ['gp'],
+    'and it does land'
   );
 });
 
-// The store caches what it read.
-test('republishes the store after writing, so the manager’s basis is not stale', () => {
-  const source = readFileSync(
-    resolve(repoRoot, 'src/systems/CompendiumImporter.js'),
-    'utf8'
-  );
-  const body = source.slice(
-    source.indexOf('async _persistCharacterLibraries('),
-    source.indexOf('async _persistCurrencyConfig(')
-  );
-  assert.match(body, /getCharacterLibrariesStore\?\.\(\)\?\.load\?\.\(\)/);
+// The store caches what it read, and `_setSetting` writes the setting directly.
+test('republishes the store after writing, so the manager’s basis is not stale', async () => {
+  const loads = [];
+  const previous = globalThis.game;
+  globalThis.game = {
+    fabricate: { getCharacterLibrariesStore: () => ({ load: () => loads.push('load') }) },
+  };
+  try {
+    const { importer } = importerOverSettings();
+    await importer._persistCharacterLibraries({ characterPrerequisites: [SMITH] });
+    assert.deepEqual(loads, ['load'], 'a landed merge reloads the store');
+    await importer._persistCharacterLibraries({ characterPrerequisites: [SMITH] });
+    assert.deepEqual(loads, ['load'], 'and a merge that adds nothing has nothing to republish');
+  } finally {
+    globalThis.game = previous;
+  }
 });

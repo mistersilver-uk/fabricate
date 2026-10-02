@@ -7,17 +7,13 @@ import { clampAllocation, deliveredEssences, greedyAllocate } from '../utils/ess
 
 import { itemKeyOf, seedRemaining as seedRemainingDefault } from './ingredientLedger.js';
 
-/**
- * The essence resolver the selection paths use: the caller-supplied probe, or the flag-only default
- * that keeps the no-probe craftability and display path byte-for-byte.
- */
+/** The caller's probe, else the flag-only default the no-probe paths have always used. */
 export function essenceResolverFor(resolveItemEssences) {
   return typeof resolveItemEssences === 'function'
     ? resolveItemEssences
     : (item) => getFabricateFlag(item, 'essences', {});
 }
 
-/** One essence requirement's membership of the set's essence block. */
 export function essenceBlockMember(group, option) {
   return {
     group,
@@ -51,10 +47,7 @@ function neededPerUnit(essences, neededIds) {
   return Object.keys(perUnit).length > 0 ? perUnit : null;
 }
 
-/**
- * The essence half of the pass index: the stacks that could ever fund this set's essence block, and
- * the ceiling each essence id can deliver from them.
- */
+/** The stacks that could ever fund the block, and each essence id's ceiling from them. */
 export function buildEssenceIndex(
   availableItems,
   essenceOptions,
@@ -108,10 +101,7 @@ function contendedCarrierKeys(carriers, essenceOptions, ceiling) {
   );
 }
 
-/**
- * Resolve the set's essence block: the requirements this branch took, funded jointly from what the
- * component/tag groups left in `remaining`.
- */
+/** This branch's requirements, funded jointly from what the other groups left. */
 export function resolveEssenceBlock(members, availableItems, remaining, ctx) {
   if (!Array.isArray(members) || members.length === 0) {
     return {
@@ -136,8 +126,7 @@ export function resolveEssenceBlock(members, availableItems, remaining, ctx) {
   const availableUnits = Object.fromEntries(
     carriers.map((carrier) => [carrier.itemKey, carrier.ownedUnits])
   );
-  // A ctx that arrives without a strategy still allocates: the default is applied here as well as
-  // at the public entry point.
+  // A ctx without a strategy still allocates with the default.
   const allocate = typeof ctx.allocate === 'function' ? ctx.allocate : greedyAllocate;
   const suggested = allocate(members, carriers, availableUnits);
   const allocation = ctx.essenceAllocation
@@ -158,10 +147,7 @@ export function resolveEssenceBlock(members, availableItems, remaining, ctx) {
   };
 }
 
-/**
- * The stacks that can fund the block: every item `remaining` still holds units of that carries at
- * least one essence the block needs, deduped by item key.
- */
+/** Held stacks carrying a needed essence, deduped by item key. */
 function essenceCarriers(members, availableItems, remaining, resolveEssences, index = null) {
   const neededIds = new Set(members.map((member) => member.essenceId).filter(Boolean));
   return index?.essence
@@ -203,10 +189,7 @@ function scannedEssenceCarriers(availableItems, remaining, resolveEssences, need
   return carriers;
 }
 
-/**
- * Attribute what the block delivered across its requirements, per essence id: the requirements
- * naming an id settle in author order, each taking `min(need, remaining delivered of that id)`.
- */
+/** Per essence id, in author order, each requirement takes `min(need, remaining delivered)`. */
 function partitionBlock(members, carriers, delivered) {
   const unassigned = new Map(Object.entries(delivered));
   const owned = new Map();
@@ -218,8 +201,7 @@ function partitionBlock(members, carriers, delivered) {
 
   return members.map((member) => {
     const { essenceId, need } = member;
-    // A blank essence id or a non-positive amount is a runtime no-op, satisfied with nothing
-    // consumed, exactly as the pre-block per-option builder treated it.
+    // A blank id or non-positive amount is satisfied with nothing consumed.
     const degenerate = !essenceId || need <= 0;
     const pool = unassigned.get(essenceId) ?? 0;
     const take = degenerate ? 0 : Math.min(need, pool);
@@ -235,10 +217,7 @@ function partitionBlock(members, carriers, delivered) {
   });
 }
 
-/**
- * The block's consumption plan: at most one entry per item key, whose `quantity` is the units the
- * allocation draws from that stack.
- */
+/** At most one entry per item key; `quantity` is the units drawn from that stack. */
 function essenceBlockPlan(members, carriers, allocation) {
   const plan = [];
   for (const carrier of carriers) {
@@ -249,8 +228,7 @@ function essenceBlockPlan(members, carriers, allocation) {
     plan.push({
       item: carrier.item,
       quantity: units,
-      // The first funded option, retained for the back-compat readers that key off
-      // `entry.ingredient`.
+      // For readers that still key off `entry.ingredient`.
       ingredient: funded[0].option,
       essenceGroupIds: funded.map((member) => member.groupId).filter(Boolean),
     });
@@ -258,10 +236,7 @@ function essenceBlockPlan(members, carriers, allocation) {
   return plan;
 }
 
-/**
- * Project a resolved block into the read-side pool model the crafting surfaces render: what each
- * requirement needed and got, what each carrier holds and contributes, and the allocation tying them.
- */
+/** The read-side pool model the crafting surfaces render. */
 export function essencePoolFrom(block) {
   if (!block || block.members.length === 0) return null;
   return {

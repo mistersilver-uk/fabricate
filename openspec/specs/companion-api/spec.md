@@ -28,8 +28,9 @@ The pooled members split the same way: the pooled base-value read, the base-unit
 
 ## The Published Contract
 
-Fabricate publishes exactly one named, versioned contract for outbound behavioural consumption: `game.fabricate.api.companion`, a frozen `{ schemaVersion, members, outcomes, callSites }` descriptor.
-This publication rename leaves schema version 1, those four fields and their order, every member row and order, the outcome and call-site vocabularies, signatures, result shapes, and readiness semantics unchanged.
+Fabricate publishes exactly one named, versioned contract for outbound behavioural consumption: `game.fabricate.api.companion`, a frozen `{ schemaVersion, members, outcomes, callSites, features }` descriptor.
+The earlier publication rename preserved schema version 1, the original four fields and their order, every member row and order, and readiness semantics.
+The additive `features` field, optional `evaluation` request, execution fields and refusal outcomes described below extend that version without changing the meaning of an existing request or answer field.
 `game.fabricate.api.COMPANION` remains an enumerable deprecated accessor to that identical descriptor until an explicitly released breaking major version.
 Reading the alias emits at most one warning per client page session, including across the `init`/`ready` rebind, and names both the lowercase replacement and the migration documentation.
 Reading the lowercase publication emits no alias warning, and warning machinery never changes or throws instead of the descriptor result.
@@ -145,6 +146,7 @@ N unelected clients running the pooled holdings consume delete N times the compo
 There is no absorbing repeat and no natural key: a second take is indistinguishable from a first, so nothing in the answer or the world tells a GM which one was intended.
 Reversing a duplicated award means finding value that arrived; reversing a duplicated take means reconstructing inventory that left, from a ledger of whichever call happened to be looked at.
 That is why the member requires a `callSite` and refuses `notElected`, and why the declaration being **truthful** is a contract obligation on the caller rather than a hint.
+A Standalone Check Roll that buys additional dice **removes value** from the actor in the same way: it is not idempotent, and this value-removing case applies to it in full.
 
 ## The Standalone Check Roll
 
@@ -156,12 +158,13 @@ Stating this positively is required rather than optional: a companion author who
 
 A Standalone Check Roll is therefore **not "a Fabricate check"**.
 A Fabricate check is always taken on a subject inside a crafting system, and carries that system's modifier catalogue, combination rule, tool bonuses, authored triggers, tier stepping and failure-result policy.
-A Standalone Check Roll is `@`-placeholder resolution against the actor's roll data, the retired-placeholder shim, the Advantage/Disadvantage rewrite, the free-text situational bonus with its `Roll.validate` net, the roll mode and the chat post, and the pass/fail or raw-total answer — **without the system-derived terms**, because there is no crafting system and no subject to derive them from.
+A Standalone Check Roll is `@`-placeholder resolution against the actor's roll data, the retired-placeholder shim, the default advantage rule (issue 2007; R2) applied to the formula's authored first dice group — keep, one extra die, disadvantage offered, kept by direction — the free-text situational bonus with its `Roll.validate` net, the roll mode and the chat post, and the pass/fail or raw-total answer — **without the system-derived terms**, because there is no crafting system and no subject to derive them from.
+A count row's forwarded Advantage answers ±1 die on the pool, the same default the record's `countDice` default states.
 
 Two members publish it.
 
-`rollActorCheck` rolls one formula for one actor and answers `{ success, passed, total, diceGroups, resolvedFormula, outcome, message }`.
-Its request key set is **closed**: exactly `{ actorId, callSite, formula, dc, compare, label, interactive, rollDecision }`, and nothing else is read.
+`rollActorCheck` rolls one formula for one actor and answers `{ success, passed, total, diceGroups, resolvedFormula, outcome, message }`, with executed evaluation fields on rolled outcomes.
+Its request key set is **closed**: exactly `{ actorId, callSite, formula, dc, compare, label, interactive, rollDecision, evaluation, additionalDice }`, and nothing else is read.
 No caller-supplied bag is spread into the options builder, the runner, or the nested roll options: a spread would let a companion inject its own prompt and bypass the dialog, or a speaker impersonating another actor in chat, while satisfying every behavioural assertion.
 `img`, `subjects` and `speaker` are deliberately absent from the first version — `speaker` is derived from the resolved actor and is never caller-supplied — because a member MAY gain an optional argument without a version bump but may not lose one.
 There is no bare top-level `rollMode` key: the roll uses the client's own default unless the caller supplies a `rollDecision`, in which case `rollDecision.rollMode` overrides the default exactly as `rollDecision.bonus` and `rollDecision.advantage` do.
@@ -175,9 +178,48 @@ Answering before anything starts is what makes zero mutation on a dismissal stru
 **Derived answer fields are computed from the outcome and from the member's own internal record, never from a caller-supplied bag.**
 `passed` is `true` for `checkPassed`, `false` for `checkFailed`, and `null` for everything else including the ungraded `rolled`, which is not graded and so has no pass.
 `total` is **always the raw roll total** and is `null` for every refusal, `engineUnavailable` and `noFormula` included; a legitimate rolled `0` answers `0` and never `null`.
+An executed answer additionally carries `product`, `direction`, `comparison`, `target`, `margin`, `successes`, `cancelled` and `boughtDice`, projected from the shared runner's `data` without changing the raw total or outcome; `boughtDice` is the dice bought for the roll, `0` when none.
+For sum checks, `successes` and `cancelled` are `null`; for an ungraded sum, `comparison`, `target`, and `margin` are `null`.
+The public `cancelled` field counts cancelled successes in future count checks and is distinct from the runner's top-level `cancelled: true` dismissal sentinel, which answers a refusal and has no execution fields.
+Every refusal omits the eight executed fields rather than supplying synthetic values.
 The member never forces an outcome — it passes an empty trigger list explicitly — so the runner's forced-award divergence between the awarding value and the raw total is unreachable, and a later change that admits triggers cannot silently redefine a published field.
 `diceGroups` and `covered` are **lists**, so their absence is `[]`; a `null` would force every caller to guard a length read.
 The scalars are `null` for the opposite reason: their absence is meaningful, and `0` or `false` would be a confident wrong answer.
+
+**An optional evaluation is validated before either pre-dispatch gate.**
+After authorization, readiness, call-site, election and forwarded roll-decision gates, the member validates an optional `evaluation` before formula, dice-engine, prompt or runner work.
+Absent or `undefined` evaluation receives complete shared defaults; a supplied evaluation, `null` included, must be a plain data record whose every level contains only the normalizer's declared keys, as data properties rather than accessors.
+An `evaluation` inherited from the request's prototype chain below `Object.prototype` refuses `evaluationInvalid` without invoking an accessor, while a key present only on `Object.prototype` is ignored as absent.
+A nested key whose own value is `undefined` is treated as omitted, so its default applies exactly as it does for a top-level `evaluation: undefined`.
+Validation checks even inactive fields without coercing types, clamping numbers or replacing invalid enum values, then applies the shared normalizer only to valid partial records.
+Expressions accept strings or finite numbers; the pool die is an integer at least 2, required is an integer from 0 through 20, additional-dice max is an integer from 1 through 20 and its `label` a string, and face values are `null` or integers from 1 through the effective die.
+The standalone `compare` key remains the sole inclusive versus strict comparison choice: `exceed` is strict and every other legacy value meets the target.
+For schemaVersion 1, `features.checkEvaluation` is a recursively frozen `{ version, modes, additionalDice }`, where each `modes` row is `{ product, direction, targetSources, interactive }`; a normalized evaluation is supported when a row matches its `product` and `direction`, lists its `target.source` in `targetSources`, and allows `interactive` when the request is interactive.
+`version` versions that shape; activating a mode appends a row without changing it.
+At version 1 the descriptor publishes five rows: `{ version: 1, modes: [{ product: 'sum', direction: 'over', targetSources: ['fixed'], interactive: true }, { product: 'sum', direction: 'over', targetSources: ['attribute'], interactive: true }, { product: 'sum', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: true }, { product: 'count', direction: 'over', targetSources: ['fixed', 'attribute'], interactive: true }, { product: 'count', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: true }], additionalDice: true }`, where `additionalDice: true` publishes that a count request may buy additional dice (issue 2008).
+Malformed evaluation refuses `evaluationInvalid`; a valid combination absent from the capability rows refuses `evaluationUnsupported`, both before any rolling or prompting.
+Sum-under and attribute-target requests are active on the rows above interactively too, through the shared roll prompt and a forwarded decision (issue 2005), and so are count requests (issue 2006).
+An interactive count request opens the shared roll prompt through its ManagerModal host, on the standalone overlay when no Fabricate window started it, showing the settled pool line and the successes needed; it posts the count Roll and grades against `pool.required`.
+Every interactive request's prompt is subtitled with the resolved actor's name alone, because a request carries no recipe or tier for the `{actor} · {subject}` form a crafting prompt shows (issue 2134).
+A forwarded count decision opens no prompt, and its bonus adds dice or moves the threshold as the pool's `modifierDestination` says, graded the same way.
+An interactive or forwarded count request that carries Advantage or Disadvantage moves `poolDelta` by the check's `countDice` (issue 2007), the same rule a crafting or salvage count check honours, rather than refusing, and a non-interactive count request naming neither and buying no additional dice rolls its authored pool alone.
+`additionalDice`, when present, is a non-negative integer honoured on a non-interactive request with a count evaluation whose additional dice are enabled; a non-zero value on any other evaluation refuses `notOffered`.
+It buys that many dice under `resolution-modes/spec.md` § Additional Dice and spends them on the executing GM client, with the calling GM as the user, before the main roll.
+Buying requires `callSite: 'gmAction'`: a non-zero value on a `broadcast` request refuses `additionalDiceRefused` with reason `broadcastCallSite` before any read, and a `broadcast` interactive request shows the prompt's additional-dice control as unavailable for that reason.
+A non-zero value on an interactive request refuses `invalidRollDecision`; an interactive request buys through the prompt or a forwarded `rollDecision.additionalDice`, which is validated the same way and is the only additional-dice key the forwarded decision carries.
+Macro payloads carry `null` for the crafting system, activity and subject.
+A post-spend roll refusal answers `evaluationInvalid` with `messageData.boughtDice`, because the spend stands.
+An interactive request for any non-interactive row, a forwarded decision included, refuses `evaluationUnsupported` before any prompt or roll.
+A count request ignores `formula` (`noFormula` applies to sum only, through the shared active-check predicate) and grades exclusively against `pool.required`, ignoring any `dc` or target.
+An unresolved or non-numeric pool `base` or `threshold` refuses `poolUnresolved` before any roll, and every other pool refusal — an invalid `die`, `explode`, `cancel`, or the settled pool itself — refuses `evaluationInvalid` before any Roll is constructed.
+A rolled answer uses the `PassedCount`/`FailedCount` message keys with `{ label, total, required }`, and a zero pool answers `checkFailed` with `FailedZeroPool` and `{ label }` alone, with no Roll constructed.
+On an attribute row the member ignores `dc`, always grades, and resolves the target against the resolved actor's `getRollData()` with the Foundry path mode and the evaluation's `baseAdjustment` (`resolution-modes/spec.md` § Check Target Resolution).
+An unresolved or non-numeric target refuses `targetUnresolved`, and a multiplier at or below zero refuses `evaluationInvalid`, both after the formula and dice-engine gates and before any roll.
+A `sum/under` fixed request without a finite `dc` also refuses `evaluationInvalid` rather than rolling ungraded.
+On the advertised `sum/over/fixed` row the validated evaluation selects the mode and nothing more: the member still rolls `formula`, grades it against `dc` as the fixed target when `dc` is finite and otherwise answers ungraded, and compares through `compare`, so the executed `target` is that `dc`.
+There `target.expression`, `target.adjustmentKind` and `target.baseAdjustment` are validated and then ignored: an evaluation whose `target.expression` differs from `dc` rolls against `dc`, and one sent without a finite `dc` rolls ungraded.
+On an attribute row those same fields drive target resolution instead, and a `sum/under` fixed row grades `formula` under `dc`.
+Every `pool` field stays validated and ignored on every sum row, inactive count-pool data included.
 
 **Two pre-dispatch gates are required, not one.**
 First a **post-shim usability test**, defined identically to `resolveActiveCraftingCheckFormula`'s — the retirement shim, then a trim, then an emptiness test — refusing `noFormula`.
@@ -187,13 +229,15 @@ Without the first gate, a formula such as `@craftingmod` reaches the pass/fail r
 That free pass remains reachable from a direct runner caller and is tracked as `fabricate#1296`; this contract closes it at the published member by refusing in front of it.
 `noFormula` is tested first because "you gave me nothing to roll" is the better answer than "this client cannot roll" when both are true; the order is safe in either direction, because with no dice engine the shim fails **open** and keeps the residue rather than emptying it.
 
-**The runner's answer is discriminated by a three-step ladder, and the ladder is normative.**
-First `cancelled === true`, tested first because it is the one fact true on both arms and at every `interactive` setting.
+**The runner's answer is discriminated by a four-step ladder, and the ladder is normative.**
+First an additional-dice refusal (`additionalDiceRefused`), tested ahead of the dismissal because a refused choice or spend shares the dismissal's `cancelled: true` shape.
+Then `cancelled === true`, the one fact true on both arms and at every `interactive` setting.
 Then **strictly `value === null`**, never a falsy test, because a legitimate rolled `0` is falsy and a falsy test reports it as a failed roll.
 Otherwise grade on the runner's own `outcome`.
 The naive discriminator — a false `success` with a null value — is true of a throw, a dismissal and a cancel alike; derived, it reports a broken formula as "the GM declined", and the companion silently does nothing forever with nothing in the console.
 
-`allowAdvantage` is computed over the **usable subset** of the supplied formulas and is all-or-nothing across it: offering Advantage only some rolls could honour would be a lie about the rest of the batch, and denying it because of a formula that can never roll would be a lie about the ones that can.
+`allowAdvantage` is computed over the **usable subset** of the supplied formulas, with the same first-group proof the crafting and salvage producers use, and is all-or-nothing across it: offering Advantage only some rolls could honour would be a lie about the rest of the batch, and denying it because of a formula that can never roll would be a lie about the ones that can.
+It stays a boolean, as every other published shape does, and the schema version and authorization order are unchanged.
 A batch with **no** usable formula answers `nothingToDecide` with `success: true`, a null decision and an empty `covered`, and opens no dialog — "there is nothing to prompt about" is a correct answer, not a failure.
 The bulk prompt's item count is the caller's **whole batch**, not the usable subset, matching the shipped bulk-salvage prompt.
 
@@ -226,7 +270,12 @@ The shipped internal `caller` discriminator is required of an internal call site
 
 ## The Outcome Vocabulary Added By The Standalone Check Roll
 
-The Standalone Check Roll adds exactly these outcomes: `checkPassed`, `checkFailed`, `rolled`, `rollFailed`, `cancelled`, `engineUnavailable`, `noFormula`, `invalidCallSite`, `notElected`, `invalidRollDecision`, `decided`, and `nothingToDecide`.
+The Standalone Check Roll adds exactly these outcomes: `checkPassed`, `checkFailed`, `rolled`, `rollFailed`, `cancelled`, `engineUnavailable`, `noFormula`, `invalidCallSite`, `notElected`, `invalidRollDecision`, `evaluationInvalid`, `evaluationUnsupported`, `poolUnresolved`, `targetUnresolved`, `additionalDiceRefused`, `decided`, and `nothingToDecide`.
+`additionalDiceRefused` (issue 2008) is a `success: false` refusal answered before any main roll with no executed fields; its `messageData` is `{ label, reason, actor, resource, n, limit, available }`, `reason` one of `ADDITIONAL_DICE_REFUSALS`, and its message is that reason's own sentence for the authored resource name and source.
+`targetUnresolved` answers an attribute target Fabricate could not read as a number from the actor, with the message "{label} check could not read a number for its target from this character."
+`poolUnresolved` answers a count's `pool.base` or `pool.threshold` Fabricate could not read as a number from the actor, with the message "{label} check could not read a number for its dice pool from this character."
+A graded sum answer against a resolved target — `sum/over/attribute`, or `sum/under` with either source — keeps the `checkPassed`/`checkFailed` outcome but reports through the auxiliary `FABRICATE.Check.Roll.PassedTarget`/`FailedTarget` message keys with `{ label, total, target }`, where `target` is the runner's executed `data.target` and never the request `dc`; only `sum/over/fixed` keeps `Passed`/`Failed` with `{ dc }`.
+Those two keys sit on `CHECK_ROLL_MESSAGE_KEYS` as auxiliary message keys selected by the graded result, and are not outcomes.
 Of these, `checkPassed`, `checkFailed`, `rolled`, `decided` and `nothingToDecide` answer `success: true`: a check that **rolled** answered the question whichever way it landed, and the caller reads `outcome` to learn what happened rather than the boolean.
 
 `checkPassed` and `checkFailed` carry their prefix deliberately.
@@ -234,6 +283,7 @@ A bare `failed` answering `success: true` is a trap, because `success: false` al
 
 `invalidRollDecision` exists because a pre-resolved roll decision supplied alongside a non-interactive roll is **silently discarded** by the shared evaluator, which consults one only on its interactive path.
 The caller's bonus, Advantage and roll mode would otherwise all vanish with no error while the base formula rolled, so the decision is **refused** rather than dropped.
+A non-zero top-level `additionalDice` on an interactive request is refused the same way, because there the prompt or the forwarded decision chooses and the top-level count would be discarded.
 
 ## The Award Members
 
@@ -268,6 +318,10 @@ Both members therefore derive every reported amount from what the write itself r
 An award has no natural key: awarding 3 hides twice is legitimately 6 hides, and crediting 50 gp twice is legitimately 100 gp.
 `grantRecipeKnowledge` is idempotent only because the learned map is its own key, and no equivalent state exists here.
 Fabricate will not add an idempotency key: a per-actor ledger of caller-supplied award ids is a new persisted shape with unbounded growth and no restore semantics, and a partial guarantee is more dangerous than a published non-guarantee because it invites a caller to stop defending itself.
+The companion effect marker is operation evidence, not an award idempotency key: it is one Fabricate-owned slot per document, keyed by operation, effect and subwrite id rather than a caller-supplied award id.
+It is overwritten, never accumulated, and `awardComponents` and `creditCurrency` never read it.
+Neither member gains an idempotency guarantee.
+Knowledge grants carry no marker; their learned map remains their own key.
 The recommended caller discipline is a **claim recorded in front of the irreversible act**, not a guard inside it, and Fabricate cannot supply that claim because it does not own the activity the award settles.
 
 The election gate is a mitigation rather than a lock, and its strength is stated exactly.
@@ -553,7 +607,83 @@ An equal retry observes the existing record unchanged, while a different plan fo
 The operation id is reused across users, clients, delivery attempts, reloads and restarts; transport request identity is separate.
 
 This submission and its persistence adapter remain internal in this increment.
-They publish no operation method on `game.fabricate.api.companion`, execute no effect and do not alter the compatibility contract below.
+They publish no operation method on `game.fabricate.api.companion` and do not alter the compatibility contract below.
+Core ships an internal effect executor that no ingress invokes; no effect runs in this increment.
+
+## Companion Operation Authority
+
+Any authenticated GM can submit an operation, and every local or relayed submission enters the same durable claim the Journal run authority takes on its private ledger.
+Foundry's elected GM User decides routing; one exclusive claim page on that ledger then selects the single browser session that accepts, because one elected User can have several browsers open.
+The elected GM's browser enters the claim directly, without waiting for its own broadcast; a non-elected GM relays to the elected GM User and does not accept locally; a non-GM caller, or a relayed request whose server-attested sender is not a GM, is refused before acceptance whatever identity its payload names.
+
+The logical operation id stays distinct from the transport request id and the requesting browser session id, so a retry may change both while naming the same accepted record.
+A legacy Journal run request that names no operation id records its request id as its operation id, and keeps its signature, results, replay, prepare tokens and reconciliation.
+The claim page's fixed id `FabRunAuthority1` is itself a well-formed operation id and is refused as one before acceptance; every other id is used exactly as submitted.
+
+A handler under the claim receives a held-claim context binding the exact live ledger the claim was taken on, an authoritative reader of that ledger's server copy, and an exact claim verifier.
+The operation store is bound to that live ledger and that reader alone, never to a cached collection.
+The verifier answers held only when the server copy shows the same claim page with the same claim id and request id and this browser's User is still the elected GM; a missing, unreadable, replaced or mismatched claim, or a lost election, fails closed.
+The claim id names the attempt; no timestamp establishes ownership, and no compare-and-set or fencing primitive is claimed.
+
+Acceptance itself is first-wins by the operation id, so it can finish while a claim is lost.
+After the awaited acceptance Core verifies the exact claim, rereads the stored record from the server copy and verifies the claim again before it invokes the injected executor, passing that stored record and the held-claim context rather than anything derived from the request.
+Only an accepted or pending stored record with no mutation in flight may continue; a conflict, invalid input, invalid stored evidence, unavailable storage, a terminal record, and a failed, review-required or awaiting-decision record are observation-only, as is any record with a subwrite `applying` or an `applying` effect with null evidence.
+Otherwise an `applying` effect whose subwrites are all settled or pending may continue, and a run resumes only its pending subwrites.
+An equal eligible retry may invoke the executor again serially; this is not an exactly-once callback promise for the world's lifetime.
+A claim check cannot preempt a mutation already in flight, so an executor checks before each next step, and an executor that throws leaves its claim retained for reconciliation rather than released on a timeout.
+An executor that has durably recorded an applying, uncertain or failed subwrite returns normally and its claim is released; the stored evidence, not the claim, keeps the record observation-only.
+Only an executor that throws, having recorded nothing about a mutation it may have begun, leaves its claim retained.
+An executor whose claim is lost after it recorded an intent writes nothing further and reports recovery required, so that run is kept for reconciliation as a throw is.
+
+Evidence is never discarded to settle duplicate ledgers: any embedded page, including a valid or malformed operation record or a page nothing recognises, makes a ledger non-pristine, an inspection that did not answer authorizes no deletion, and two evidence-bearing ledgers remain ambiguous for explicit reconciliation.
+
+Requests and replies use their own socket kinds on the module channel.
+A request targets the elected GM User; a reply targets only the attested sender and settles only the pending request whose recipient, operation id, request id and session id all match, sent by the elected GM.
+A second browser of the elected User that loses the claim sends no contention reply, so it cannot settle the request before the winner answers.
+The socket acknowledgement confirms relay only.
+A relay that times out reports the same operation id as pending and indeterminate, never as a rejection, a replacement identity or a reason to retire a claim.
+
+This increment publishes no operation method on `game.fabricate.api.companion`, ships an internal effect executor that no ingress invokes (no effect runs in this increment), and performs no automatic startup or handoff recovery.
+
+## Companion Reward Effects
+
+The internal executor runs one stored record's effects in plan order under the held run claim, and is not wired into bootstrap.
+It stops at the first effect whose declared decision is still pending, leaving that effect and every later one untouched.
+It validates an effect only when the walk reaches it: an unknown kind, an invalid payload, an empty recipient list, a recipient with an empty award or recipe list, or an actor that does not resolve to a world actor fails that effect whole before any write, and the walk stops.
+A knowledge grant also refuses, in the legacy grant's order, a recipe that does not resolve (`recipeNotFound`), a recipe whose crafting system does not resolve (`systemNotFound`), and a system whose learned knowledge is not observable (`knowledgeNotObservable`).
+A world seam that throws while an effect is planned never throws out of the executor: a pending effect fails whole as `planThrew`, and a resumed effect stops with nothing written, leaving its pending subwrites pending.
+A resumed effect is planned afresh and compared with its evidence; when the replay class, the subwrite ids or any subwrite target (the resolved actor, and the recipe of a knowledge grant) differ, its pending subwrites become known failures `planChanged` and nothing is written for them.
+
+Three kinds exist, and each names its subwrites by plan position:
+
+- `componentAward` `{ systemId, recipients: [{ actorId, awards: [{ componentId, quantity }] }] }`, one subwrite `r<i>.a<j>` per award, replay class `structuredMarker`;
+- `currencyCredit` `{ unitId, recipients: [{ actorId, amount }] }`, one subwrite `r<i>` per recipient, whose replay class follows the world spend strategy: `structuredMarker` for `actorProperty`, `structuredObserved` for `actorInventory` and `opaqueMacro` for `macro`;
+- `recipeKnowledgeGrant` `{ grantedBy, recipients: [{ actorId, recipeIds }] }`, one subwrite `r<i>.k<j>` per recipe, replay class `idempotentKey`.
+
+A subwrite target records the resolved world actor's uuid.
+For each subwrite the executor verifies the claim, persists `applying` with its intent and requires the store to answer `updated`, verifies the claim again, writes once, and persists `applied`, `knownFailure` or `uncertain`.
+An already-known recipe goes from pending to `applied` with no write, under the claim.
+Within one effect it continues past a known failure, as the legacy award does; it stops on an uncertain subwrite, on any store answer other than `updated`, on a lost claim, and at an effect that did not end applied.
+When every effect is applied it completes the record.
+A resumed run skips settled subwrites, runs only pending ones, and stacks a later award onto the item an applied receipt names.
+
+A component or `actorProperty` subwrite is applied only when the returned document's `_source` carries the marker and the intended post-value; a create answering no document or an update answering nothing is a known failure, and a throw or a mismatch is uncertain.
+A created item whose source item carries no stack-quantity field holds one unit, so it proves a quantity of 1; a stacked item must carry its count.
+An `actorProperty` credit whose value path is missing from the actor's `_source` is a known failure before any write.
+An `actorInventory` credit is applied only when the balance measured around the write moved by exactly the credited base amount; a spender that provably wrote nothing is a known failure, and any other delta, zero included, is uncertain.
+A `macro` credit runs once under intent then receipt, and a throw or anything but a clean success is uncertain.
+A knowledge grant is applied only when the learned entry is in the returned `_source`, and a learned-map read that throws before the write is a known failure.
+Each kind also exposes a probe for later recovery, answering `applied` or `uncertain` and never unapplied; nothing calls it in this increment, and an `actorInventory` or `macro` probe is always `uncertain`.
+
+These proofs have stated limits:
+
+- the store's revision check is read-then-write rather than compare-and-set, and the held claim is what serializes Fabricate's writers;
+- an actor-property credit and a stack award are read-modify-write, so a concurrent non-Fabricate writer between the read and the write can lose an update;
+- a post-value check assumes Fabricate is the sole writer between its pre-read and its write, and a concurrent writer makes the subwrite uncertain or, coincidentally, falsely applied;
+- an actor-property credit adds to the prepared balance, which an Active Effect can inflate;
+- an `actorInventory` delta that coincidentally equals the credited amount reads as applied;
+- a knowledge probe reads the learned entry with `granted: true` and the intended `grantedBy`, which is not unique to one operation, so a later matching grant also reads as applied;
+- only world actors are supported, and an unlinked token's synthetic actor is refused.
 
 ## The Compatibility Promise
 

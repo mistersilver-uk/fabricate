@@ -4,6 +4,7 @@
   import { formatAuthoredDuration, formatDurationHMS } from '../../util/formatDuration.js';
   import { statusChipTone } from '../../util/statusChipTone.js';
   import { worldTimeLabel } from '../../util/worldTimeLabel.js';
+  import { withRollPromptOrigin } from '../../util/rollPromptOrigin.js';
   import Callout from '../../components/Callout.svelte';
   import Chip from '../../components/Chip.svelte';
   import InspectorCard from '../../components/InspectorCard.svelte';
@@ -23,6 +24,7 @@
     applyPersonalizedDrops,
     effectPhaseText,
     formatRoll,
+    ladderRuleKey,
     numberOrNaN,
     previewName,
     previewTiers,
@@ -464,7 +466,7 @@
       detail={localize('FABRICATE.App.Journal.CommandError.Detail')}
       action={{
         label: localize('FABRICATE.App.Journal.Retry'),
-        onClick: () => journal?.retryCommandError?.(),
+        onClick: (event) => withRollPromptOrigin(event, () => journal?.retryCommandError?.()),
       }}
       dataAttr="data-journal-command-error"
       dataValue="true"
@@ -567,7 +569,7 @@
         tiers={outcomeTiers}
         emptyTierText={localize('FABRICATE.App.Journal.Yields.None')}
         label={localize('FABRICATE.App.Journal.Yields.PreviewTitle')}
-        hint={localize('FABRICATE.App.Journal.Yields.RoutedRule')}
+        hint={localize(ladderRuleKey(gatheringYield.ladderRule))}
       />
     {:else if gatheringYield && displayedYieldEntries.length > 0}
       {#if yieldPreviewLoading}

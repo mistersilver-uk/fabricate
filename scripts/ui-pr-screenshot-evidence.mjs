@@ -177,7 +177,7 @@ export const VIEW_RECIPES = Object.freeze([
     id: 'manager-systems',
     label: 'Manager systems browser',
     smokeLabels: ['manager-default-selection', 'manager-selected-normal', 'manager-selected-stacked'],
-    matches: [...PAGE_HEADER_MATCHES, /^src\/ui\/svelte\/apps\/manager\/SystemsBrowserView\.svelte$/, /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/],
+    matches: [...PAGE_HEADER_MATCHES, /^src\/ui\/svelte\/apps\/manager\/SystemsBrowserView\.svelte$/, /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/, /^src\/ui\/svelte\/apps\/manager\/SystemBrowserInspector\.svelte$/],
   },
   {
     id: 'manager-rail-expanded',
@@ -612,7 +612,9 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/ui\/managerServices\.js$/,
       /^src\/ui\/presenters\/importReportContent\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/ImportReportModal\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/ManagerModal\.svelte$/,
+      /^src\/ui\/svelte\/components\/ManagerModal\.svelte$/,
+      // The model that opens both import-flow modals (issue 1721).
+      /^src\/ui\/svelte\/apps\/manager\/importFlowModel\.svelte\.js$/,
     ],
   },
   // Issue 771: folder-aware categorization mapping modal, shown before a folder / whole-pack
@@ -624,9 +626,10 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-import-folder-mapping'],
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/ImportFolderMappingModal\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/ManagerModal\.svelte$/,
+      /^src\/ui\/svelte\/components\/ManagerModal\.svelte$/,
       /^src\/ui\/SvelteCraftingSystemManagerApp\.svelte\.js$/,
       /^src\/ui\/managerServices\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/importFlowModel\.svelte\.js$/,
     ],
   },
   // The gated Crafting nav group (issue 511) publishes three distinct frames — the expanded group
@@ -785,10 +788,12 @@ export const VIEW_RECIPES = Object.freeze([
   {
     id: 'player-crafting-roll-prompt',
     label: 'Player crafting — interactive check roll prompt',
-    // Issue 855: `rollPrompt.js` renders the whole dialog, so a change to it is only evidenced by
-    // the dialog frame itself.
     smokeLabels: ['player-crafting-roll-prompt'],
-    matches: [/^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/],
+    matches: [
+      /^src\/ui\/svelte\/apps\/crafting\/(?:rollPrompt\.js|rollPromptHost\.js|RollPrompt(?:Footer|AdditionalDice)?\.svelte)$/,
+      // Issue 2008: the additional-dice control's presenter.
+      /^src\/ui\/presenters\/additionalDicePrompt\.js$/,
+    ],
   },
   {
     id: 'player-crafting-essence-legacy',
@@ -991,6 +996,45 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [
       /^src\/ui\/presenters\/CraftingChatCard\.js$/,
       /^src\/ui\/presenters\/SalvageChatCard\.js$/,
+    ],
+  },
+  // Issue 2006: the success-counting result cards, rolled deterministically in real Foundry.
+  {
+    id: 'chat-craft-card-count',
+    label: 'Chat — success-counting crafting result cards and their summed control',
+    smokeLabels: [
+      'chat-craft-card-count-pass',
+      'chat-craft-card-count-fail',
+      'chat-craft-card-count-botch',
+      'chat-craft-card-count-zero',
+      'chat-craft-card-count-bought',
+      'chat-craft-card-over-control',
+      // Issue 2007: the same count presenters also render the counting advantage case.
+      'chat-craft-card-advantage-count',
+    ],
+    matches: [
+      /^src\/ui\/presenters\/(?:countDiceTiles|countEvidenceRows)\.js$/,
+      /^src\/systems\/countDisplayEvidence\.js$/,
+    ],
+  },
+  // Issue 2005: the roll-under result cards and the refusal, against the summed roll-over control.
+  {
+    id: 'chat-craft-card-under',
+    label: 'Chat — roll-under crafting result cards, their refusal and the roll-over control',
+    // Issue 2007: the same sum-check presenters also render its keep, bonus-die and off cases.
+    smokeLabels: [
+      'chat-craft-card-under-pass',
+      'chat-craft-card-under-fail',
+      'chat-craft-card-under-otherwise',
+      'chat-craft-card-under-misconfigured',
+      'chat-craft-card-over-control',
+      'chat-craft-card-advantage-keep',
+      'chat-craft-card-advantage-keep-under',
+      'chat-craft-card-advantage-bonus',
+      'chat-craft-card-advantage-off',
+    ],
+    matches: [
+      /^src\/ui\/presenters\/(?:checkDiceLine|checkEvidenceRows|checkDisplay|CraftingChatCard)\.js$/,
     ],
   },
   {
@@ -1710,8 +1754,9 @@ function parseCaptureEligible(value) {
   throw new Error(`--capture-eligible must be the literal 'true' or 'false', not '${value}'`);
 }
 
-// `--capture-timeout-minutes` pins the gate's capture deadline to `capture`'s real
-// `timeout-minutes` in `pr-screenshots.yml`.
+// `--capture-timeout-minutes` pins the gate's capture deadline to the summed stage
+// `timeout-minutes` of `pr-screenshots.yml` — select, warm-foundry, the longer of render and
+// verify-chrome, then capture.
 function parseCaptureTimeoutMs(value) {
   if (value === undefined || value === '') return undefined;
   const minutes = Number(value);

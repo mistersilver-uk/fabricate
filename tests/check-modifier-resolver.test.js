@@ -26,10 +26,23 @@ const {
   isRollExpression,
 } = await import(RESOLVER_MODULE);
 const { appendCheckModifierTerm } = await import('../src/systems/toolCheckBonus.js');
+const { evaluateCheckRoll, resolveRolledFormula } = await import('../src/systems/checkRoll.js');
+const { installTermBearingRoll } = await import('./helpers/termBearingRoll.js');
 
 // The FLAT half of a resolved contribution (issue 1118).
 function scalarOf(context, resolveExpression) {
   return resolveCheckModifierContribution(context, resolveExpression).scalar;
+}
+
+class PermissiveRoll {
+  constructor(formula) {
+    this.formula = formula;
+  }
+
+  evaluateSync() {
+    this.total = 1;
+    return this;
+  }
 }
 
 const CATALOGUE = [
@@ -581,6 +594,115 @@ test('the flat contribution playerPicks picks the best N even when they are nega
   );
 });
 
+test('ranking treats finite magnitudes as one category ahead of transformed quantities', () => {
+  const catalogue = [
+    { id: 'count-a', label: 'Count A', expression: '1d20cs>15' },
+    { id: 'negative', label: 'Negative', expression: '-4' },
+    { id: 'count-b', label: 'Count B', expression: '1d20odd' },
+    { id: 'positive', label: 'Positive', expression: '8' },
+  ];
+  const resolve = (expression) => expression;
+  const selected = resolveSelectedCheckModifiers(
+    {
+      catalogue,
+      systemPolicy: 'playerPicks',
+      defaultModifierIds: catalogue.map(({ id }) => id),
+      maxModifierPicks: 3,
+    },
+    resolve,
+    PermissiveRoll
+  );
+
+  assert.deepEqual(
+    selected.map(({ id }) => id),
+    ['count-a', 'negative', 'positive'],
+    'both finite magnitudes rank first, then the first transformed entry fills the spare place; output stays eligible-order'
+  );
+  assert.deepEqual(
+    selected.map(({ id, average }) => ({ id, average })),
+    [
+      { id: 'count-a', average: null },
+      { id: 'negative', average: -4 },
+      { id: 'positive', average: 8 },
+    ],
+    'a transformed quantity carries no numeric average or sentinel'
+  );
+});
+
+test('ranking leaves blocked modifiers behind finite and transformed contributions', () => {
+  const catalogue = [
+    { id: 'blocked', label: 'Blocked', expression: '' },
+    { id: 'transformed', label: 'Transformed', expression: '1d20cs>15' },
+    { id: 'negative', label: 'Negative', expression: '-4' },
+  ];
+  const resolve = (expression) => expression;
+  const contributionFor = (systemPolicy, maxModifierPicks) =>
+    resolveCheckModifierContribution(
+      {
+        catalogue,
+        systemPolicy,
+        defaultModifierIds: catalogue.map(({ id }) => id),
+        maxModifierPicks,
+      },
+      resolve,
+      PermissiveRoll
+    );
+
+  const highest = contributionFor('highest');
+  assert.equal(highest.selected.length, 1, 'highest keeps its one-entry capacity');
+  assert.equal(highest.scalar, -4, 'the finite contribution remains the highest category');
+  assert.deepEqual(highest.rollTerms, [], 'the one finite contribution emits no roll formula');
+
+  const cappedPicks = contributionFor('playerPicks', 2);
+  assert.equal(cappedPicks.selected.length, 2, 'the cap admits two rollable contributions');
+  assert.equal(cappedPicks.scalar, -4, 'the negative finite contribution survives selection');
+  assert.deepEqual(
+    cappedPicks.rollTerms,
+    ['(1d20cs>15)'],
+    'the transformed contribution fills the remaining capacity before the blocked entry'
+  );
+});
+
+test('addAll appends bare-target, counting and unclassified dice exactly as authored', () => {
+  const expressions = ['1d20cs20', '3d6ms10', '1d20df1', '1d20unknown2'];
+  const catalogue = expressions.map((expression, index) => ({
+    id: `entry-${index}`,
+    label: `Entry ${index}`,
+    expression,
+  }));
+  for (const { id, expression } of catalogue) {
+    const { rollTerms, selected } = resolveCheckModifierContribution(
+      { catalogue, systemPolicy: 'addAll', defaultModifierIds: [id] },
+      (text) => text,
+      PermissiveRoll
+    );
+    assert.deepEqual(rollTerms, [`(${expression})`], expression);
+    assert.equal(selected[0].blocked, false, `${expression}: not blocked`);
+  }
+});
+
+test('all-transformed ranking retains authored order for highest and player picks', () => {
+  const catalogue = [
+    { id: 'first', label: 'First', expression: '1d20cs>15' },
+    { id: 'second', label: 'Second', expression: '1d20odd' },
+  ];
+  const resolve = (expression) => expression;
+  const selectedIds = (systemPolicy, maxModifierPicks) =>
+    resolveSelectedCheckModifiers(
+      {
+        catalogue,
+        systemPolicy,
+        defaultModifierIds: ['first', 'second'],
+        maxModifierPicks,
+      },
+      resolve,
+      PermissiveRoll
+    ).map(({ id }) => id);
+
+  assert.deepEqual(selectedIds('highest'), ['first']);
+  assert.deepEqual(selectedIds('playerPicks', 2), ['first', 'second']);
+});
+
 // `bySubject` needs no special case in the reduction: `resolveEligibleModifierIds` has
 // already narrowed the list to the recipe's selection and truncated it to the cap, so
 // SUMMING that list is the whole rule.
@@ -958,7 +1080,7 @@ test('makeRollDataExpressionResolver resolves @-paths to the substituted TEXT', 
   );
 });
 
-// ── appendResolvedCheckModifier (the seam checkRoll uses) ──────────────────────────
+// ── appendResolvedCheckModifier (the formula-only form of the seam checkRoll uses) ──
 
 test('appendResolvedCheckModifier APPENDS the resolved scalar before Foundry sees it', () => {
   const Roll = stubReplaceRoll();
@@ -1550,4 +1672,25 @@ test('isRollExpression answers the same question the resolver does', () => {
   for (const junk of [null, undefined, 7, {}, []]) {
     assert.equal(isRollExpression(junk), false, `${String(junk)} is not an expression`);
   }
+});
+
+test('a padded authored formula rolls trimmed once a modifier context applies', async () => {
+  const context = { catalogue: [], systemPolicy: 'addAll', defaultModifierIds: [] };
+  assert.equal(resolveRolledFormula('1d20 ', null, context, PermissiveRoll), '1d20');
+  // The shared term-bearing double (issue 2007): the EVALUATED roll's `_formula` is read, because
+  // the keep transform will act on the constructed Roll's terms rather than on the string.
+  let rolled = null;
+  const { restore } = installTermBearingRoll({ onConstruct: (roll) => (rolled = roll) });
+  try {
+    await evaluateCheckRoll(' 1d20 ', null, {
+      craftingModifier: context,
+      interactive: true,
+      rollDecision: { advantage: 'advantage' },
+      post: false,
+    });
+  } finally {
+    restore();
+  }
+  assert.equal(rolled._evaluated, true);
+  assert.equal(rolled._formula, '2d20kh1');
 });

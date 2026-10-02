@@ -734,6 +734,60 @@ describe('journalStore', () => {
     }
   });
 
+  // Issue 2008: the authority refused the bought dice, so nothing was spent or rolled.
+  it('words an additional-dice refusal by its reason, never the generic error', async () => {
+    const current = run({ ...ACTIVE[0], lifecycleContract: 'current', lifecycleVersion: 1 });
+    const setup = makeServices({
+      listing: baseListing({ activeRuns: [current], history: [] }),
+      commandResult: {
+        success: false,
+        reason: 'additional-dice-refused',
+        additionalDiceRefusal: 'spendRefused',
+        additionalDiceNotice: { dice: 1, limit: 3, available: 3, label: 'Focus', source: 'path', actorName: 'Hero' },
+      },
+    });
+    const store = await loadedStore(setup);
+    store.select(current);
+
+    await store.execute(current);
+    flushSync();
+
+    const expected = 'Fabricate could not spend Hero\'s Focus, so the check was not rolled.';
+    assert.deepEqual(setup.calls.notify, [expected], 'one warning, worded by its reason');
+    assert.equal(store.commandError.message, expected);
+  });
+
+  // Issue 2008: dice spent before the stage refused are never refunded, so the player is told.
+  it('warns of bought dice a roll spent before its stage could not complete', async () => {
+    const current = run({ ...ACTIVE[0], lifecycleContract: 'current', lifecycleVersion: 1 });
+    const setup = makeServices({
+      listing: baseListing({ activeRuns: [current], history: [] }),
+      commandResult: {
+        success: false,
+        reason: null,
+        message: 'The crafting stage inputs are stale',
+        boughtDice: 2,
+        additionalDiceNotice: { dice: 2, label: 'Focus', source: 'path', actorName: 'Hero' },
+      },
+    });
+    const store = await loadedStore(setup);
+    store.select(current);
+
+    await store.execute(current);
+    flushSync();
+
+    assert.deepEqual(setup.calls.notify, [
+      'The crafting stage inputs are stale',
+      '2 Focus spent; the roll could not be completed.',
+    ]);
+    const unlabelled = makeServices({
+      listing: baseListing({ activeRuns: [current], history: [] }),
+      commandResult: { success: false, reason: 'operation-failed', secret: true, boughtDice: 1 },
+    });
+    await (await loadedStore(unlabelled)).execute(current);
+    assert.equal(unlabelled.calls.notify.at(-1), '1 spent; the roll could not be completed.');
+  });
+
   // A failed check is an outcome the run's own history records, not a command error.
   it('reports a resolved failed check as an outcome, not as a command error', async () => {
     const current = run({ ...ACTIVE[0], lifecycleContract: 'current', lifecycleVersion: 1 });

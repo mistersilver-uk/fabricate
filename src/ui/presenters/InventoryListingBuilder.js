@@ -74,6 +74,7 @@ import {
   resolvedComponentsFor,
   resolvedEssencesFor,
   resolvedToolsFor,
+  salvageToolsFor,
 } from '../../systems/scopedEntityReads.js';
 import { computeSystemVisibility } from '../../systems/systemValidation.js';
 import { effectiveToolBreakageAuthority } from '../../systems/toolBreakageAuthority.js';
@@ -95,6 +96,8 @@ import { matchRecipeItemDefinition, resolveToolForItem } from '../../utils/sourc
 // Single-sourced with the GM UI so the builder and the recipe-item editor share one
 // item-bag literal (the "treat as no image" sentinel).
 import { GENERIC_ITEM_IMAGE } from '../svelte/util/craftingImageDefaults.js';
+
+import { salvageCheckTarget, salvageDisplayDc, withSalvageBands } from './salvageCheckNeed.js';
 
 // A shared empty set for the GM path, where no entity is visibility-hidden — avoids
 // allocating a throwaway Set per system on every listing build.
@@ -1555,12 +1558,19 @@ export class InventoryListingBuilder {
       // re-deriving tool matching (issue 777).
       toolStates,
       toolsAvailable,
-      // simple / routed+relative: the base DC, per-component override applied.
-      // routed+FIXED and progressive: null — there is no DC to show. A fixed outcome
-      // matches on an absolute [start, end] segment of the roll range and `checkRoll`
-      // never reads a DC for it (the GM editor hides the field outright); progressive
-      // has no DC at all.
-      dc: this._salvageDc({ mode, routedType, config, component }),
+      // simple / routed+relative sum/over/fixed: the base DC, per-component override applied.
+      // A fixed range matches on its [start, end] segment and progressive has stages, so
+      // neither has a DC; a roll-under or character-value check states `target` instead.
+      dc: salvageDisplayDc({ mode, routedType, config, component }),
+      target: salvageCheckTarget({
+        mode,
+        config,
+        component,
+        system,
+        recipeManager: this.recipeManager,
+        actor: targetActor,
+        localize: this.localize,
+      }),
       // Default TRUE: an absent key reads as permitted; only an explicit false pins the
       // GM's authored order.
       allowPlayerResultReorder: salvage.allowPlayerResultReorder !== false,
@@ -1627,18 +1637,7 @@ export class InventoryListingBuilder {
    * @private
    */
   _salvageToolStates({ system, salvage, componentById, targetActor }) {
-    const ids = Array.isArray(salvage?.toolIds) ? salvage.toolIds : [];
-    if (ids.length === 0) return [];
-    const library = resolvedToolsFor(system);
-    const seen = new Set();
-    const tools = [];
-    for (const rawId of ids) {
-      const id = String(rawId ?? '').trim();
-      if (!id || seen.has(id)) continue;
-      seen.add(id);
-      const tool = library.find((entry) => entry?.id === id);
-      if (tool) tools.push(tool);
-    }
+    const tools = salvageToolsFor(system, salvage);
     if (tools.length === 0) return [];
 
     const systemId = stringOrNull(system?.id);
@@ -1673,25 +1672,6 @@ export class InventoryListingBuilder {
       if (entry?.virtual === true) state.virtual = true;
       return state;
     });
-  }
-
-  /**
-   * The salvage DC to DISPLAY, mirroring `CraftingEngine._resolveSalvageDc` — the
-   * per-component override when set, else the check sub-object's default (fallback 15).
-   *
-   * Null for `routed + fixed` and for `progressive`: neither has a DC. This is the
-   * highest-risk line in the projection, because the smoke fixture's routed salvage is
-   * `relative`, so an override-shift applied to everything passes every gate while a
-   * fixed-authored world is shown a routing table the engine will not honour.
-   * @private
-   */
-  _salvageDc({ mode, routedType, config, component }) {
-    if (mode === 'progressive') return null;
-    if (mode === 'routed' && routedType === 'fixed') return null;
-    const override = component?.salvage?.dcOverride;
-    if (Number.isFinite(override)) return Math.trunc(override);
-    const dc = Number(config?.dc);
-    return Number.isFinite(dc) ? Math.trunc(dc) : 15;
   }
 
   /**
@@ -1742,15 +1722,9 @@ export class InventoryListingBuilder {
    * @private
    */
   _salvageRoutedOutcomes({ salvage, config, routedType, component, componentById }) {
-    const authored =
-      routedType === 'fixed'
-        ? Array.isArray(config?.fixedOutcomes)
-          ? config.fixedOutcomes
-          : []
-        : Array.isArray(config?.relativeOutcomes)
-          ? config.relativeOutcomes
-          : [];
-    const baseDc = this._salvageDc({ mode: 'routed', routedType: 'relative', config, component });
+    const outcomes = routedType === 'fixed' ? config?.fixedOutcomes : config?.relativeOutcomes;
+    const authored = Array.isArray(outcomes) ? outcomes : [];
+    const baseDc = salvageDisplayDc({ mode: 'routed', routedType: 'relative', config, component });
     const routing = salvage?.outcomeRouting || {};
     const groupById = new Map(
       (Array.isArray(salvage?.resultGroups) ? salvage.resultGroups : [])
@@ -1758,7 +1732,7 @@ export class InventoryListingBuilder {
         .map((group) => [group.id, group])
     );
 
-    return authored.map((outcome) => {
+    const rows = authored.map((outcome) => {
       const name = stringOrEmpty(outcome?.name);
       const routedGroupId = name ? routing[name] : null;
       const delta = Number(outcome?.dc);
@@ -1779,6 +1753,7 @@ export class InventoryListingBuilder {
           : [],
       };
     });
+    return withSalvageBands(rows, { config, component, localize: this.localize });
   }
 
   /**

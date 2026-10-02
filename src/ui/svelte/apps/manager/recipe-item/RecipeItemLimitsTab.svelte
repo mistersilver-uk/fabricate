@@ -7,15 +7,12 @@
                  "Uses per copy" stepper (caps.item.maxUses, min 1) and a "When the
                  last use is spent" SegmentedControl (caps.item.whenSpent).
    - knowledge → Learning card. A "Limited learning" toggle (caps.learn.limitLearning);
-                 when on, a detail block with "Limit applies" (caps.learn.learnScope:
-                 perInstance = per copy / total = across all copies) + "Recipes allowed"
-                 stepper (caps.learn.learnsAllowed, min 1) on one line, then two columns:
-                 "Required Knowledge" (caps.learn.prerequisiteIds — recipes the reader
-                 must already know, AND) and "Learning prerequisites"
-                 (caps.learn.characterPrerequisiteIds — character prerequisites the reader
-                 must pass, AND), each a searchable typeahead + removable pills, then a
-                 live plain-English explanation. When the toggle is off, none of this
-                 shows and neither gate is enforced at runtime.
+                 when on, "Limit applies" (caps.learn.learnScope) and "Recipes allowed"
+                 (caps.learn.learnsAllowed, min 1) on one line, then two AND-gated columns:
+                 "Required Knowledge" (caps.learn.prerequisiteIds) and "Learning
+                 prerequisites" (caps.learn.characterPrerequisiteIds), each a typeahead
+                 combobox over removable pills, then a live plain-English explanation.
+                 With the toggle off none of this shows and neither gate is enforced.
 
   CONTROLLED: every change emits a nested partial patch via `onPatch`; the router
   deep-merges it into the draft.
@@ -32,6 +29,8 @@
   import { localize } from '../../../util/foundryBridge.js';
   import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
+  import { typeaheadPanel } from '../../../actions/typeaheadPanel.js';
+  import { createTypeaheadCombobox } from '../../../util/typeaheadCombobox.svelte.js';
 
   import { prerequisitePreview } from '../../../../../systems/characterPrerequisites.js';
 
@@ -177,10 +176,8 @@
     if (next !== learnsAllowed) patchLearn({ learnsAllowed: next });
   }
 
-  // Required Knowledge (issue 544): the recipe ids a reader must ALREADY have
-  // learned (AND semantics — must know ALL of them) before learning from this book
-  // or scroll. Authored as a searchable typeahead + removable pills (mirrors the
-  // tag picker in ComponentsBrowserView). Folds the legacy single `prerequisite`
+  // Required Knowledge (issue 544): the recipe ids a reader must already have learned, all of
+  // them, before learning from this book or scroll. Folds the legacy single `prerequisite`
   // string into the array so un-normalized drafts still read correctly.
   const prerequisiteIds = $derived(
     Array.isArray(learnCaps.prerequisiteIds)
@@ -198,7 +195,6 @@
   const normalizedRequiredKnowledgeSearch = $derived(
     (requiredKnowledgeSearch || '').trim().toLowerCase()
   );
-  // Options not already selected whose name matches the (non-empty) search term.
   const requiredKnowledgeSuggestions = $derived(
     normalizedRequiredKnowledgeSearch
       ? prerequisiteOptions.filter(
@@ -218,10 +214,9 @@
     patchLearn({ prerequisiteIds: prerequisiteIds.filter((value) => value !== id) });
   }
 
-  // Learning prerequisites (issue 544): the system-owned character-prerequisite ids
-  // a reader must ALL pass (AND) to learn from this book, gating on actor roll data
-  // — distinct from Required Knowledge above, which gates on prior recipe knowledge.
-  // Authored with the same searchable typeahead + removable pills.
+  // Learning prerequisites (issue 544): the system-owned character-prerequisite ids a reader
+  // must all pass to learn from this book, gating on actor roll data rather than on prior
+  // recipe knowledge.
   const characterPrerequisiteIds = $derived(
     Array.isArray(learnCaps.characterPrerequisiteIds) ? learnCaps.characterPrerequisiteIds : []
   );
@@ -230,7 +225,6 @@
     const byId = new Map((characterPrerequisites || []).map((p) => [String(p.id), p]));
     return characterPrerequisiteIds.map((id) => byId.get(String(id))).filter(Boolean);
   });
-  // The prerequisites still available to add (not already selected).
   const availableCharacterPrerequisites = $derived(
     (characterPrerequisites || []).filter((p) => !characterPrerequisiteIds.includes(p.id))
   );
@@ -258,6 +252,28 @@
       characterPrerequisiteIds: characterPrerequisiteIds.filter((value) => value !== id),
     });
   }
+
+  // Both lists float through the shared seam; the figures are `.manager-tag-suggestions`' own.
+  const TAG_LIST = {
+    component: 'RecipeItemLimitsTab',
+    anchor: '.manager-tag-search',
+    maxHeightCap: 148,
+    rows: { pitch: 30, gap: 2, chrome: 10 },
+  };
+  const knowledgeSearch = createTypeaheadCombobox({
+    ...TAG_LIST,
+    query: () => requiredKnowledgeSearch,
+    setQuery: (value) => (requiredKnowledgeSearch = value),
+    count: () => requiredKnowledgeSuggestions.length,
+    onChoose: (index) => addRequiredKnowledge(requiredKnowledgeSuggestions[index].id),
+  });
+  const prereqSearch = createTypeaheadCombobox({
+    ...TAG_LIST,
+    query: () => characterPrereqSearch,
+    setQuery: (value) => (characterPrereqSearch = value),
+    count: () => characterPrereqSuggestions.length,
+    onChoose: (index) => addCharacterPrerequisite(characterPrereqSuggestions[index].id),
+  });
 </script>
 
 <section
@@ -543,35 +559,30 @@
                       type="search"
                       class="manager-recipe-item-prereq-search"
                       data-recipe-item-required-knowledge-search
-                      role="combobox"
-                      aria-expanded={requiredKnowledgeSuggestions.length > 0}
-                      aria-controls="recipe-item-required-knowledge-suggestions"
                       value={requiredKnowledgeSearch}
                       placeholder={text(
                         'FABRICATE.Admin.Manager.RecipeItem.Limits.RequiredKnowledgeSearch',
                         'Search recipes…'
                       )}
                       aria-labelledby="recipe-item-required-knowledge-label"
-                      oninput={(event) => (requiredKnowledgeSearch = event.currentTarget.value)}
+                      {...knowledgeSearch.field}
                     />
-                    {#if requiredKnowledgeSuggestions.length > 0}
+                    {#if knowledgeSearch.listed}
                       <div
-                        id="recipe-item-required-knowledge-suggestions"
                         class="manager-tag-suggestions"
-                        role="listbox"
                         aria-label={text(
                           'FABRICATE.Admin.Manager.RecipeItem.Limits.RequiredKnowledge',
                           'Required Knowledge'
                         )}
+                        {...knowledgeSearch.list}
+                        use:typeaheadPanel={knowledgeSearch.panel}
                       >
-                        {#each requiredKnowledgeSuggestions as option (option.id)}
+                        {#each requiredKnowledgeSuggestions as option, index (option.id)}
                           <button
                             type="button"
-                            role="option"
-                            aria-selected="false"
                             class="manager-tag-suggestion"
                             data-recipe-item-required-knowledge-option={option.id}
-                            onclick={() => addRequiredKnowledge(option.id)}
+                            {...knowledgeSearch.option(index)}
                           >
                             <i class="fas fa-scroll" aria-hidden="true"></i>
                             <span>{option.name}</span>
@@ -643,35 +654,30 @@
                       type="search"
                       class="manager-recipe-item-prereq-search"
                       data-recipe-item-character-prereq-search
-                      role="combobox"
-                      aria-expanded={characterPrereqSuggestions.length > 0}
-                      aria-controls="recipe-item-character-prereq-suggestions"
                       value={characterPrereqSearch}
                       placeholder={text(
                         'FABRICATE.Admin.Manager.RecipeItem.Limits.LearningPrerequisitesSearch',
                         'Search prerequisites…'
                       )}
                       aria-labelledby="recipe-item-character-prereqs-label"
-                      oninput={(event) => (characterPrereqSearch = event.currentTarget.value)}
+                      {...prereqSearch.field}
                     />
-                    {#if characterPrereqSuggestions.length > 0}
+                    {#if prereqSearch.listed}
                       <div
-                        id="recipe-item-character-prereq-suggestions"
                         class="manager-tag-suggestions"
-                        role="listbox"
                         aria-label={text(
                           'FABRICATE.Admin.Manager.RecipeItem.Limits.LearningPrerequisites',
                           'Learning prerequisites'
                         )}
+                        {...prereqSearch.list}
+                        use:typeaheadPanel={prereqSearch.panel}
                       >
-                        {#each characterPrereqSuggestions as prereq (prereq.id)}
+                        {#each characterPrereqSuggestions as prereq, index (prereq.id)}
                           <button
                             type="button"
-                            role="option"
-                            aria-selected="false"
                             class="manager-tag-suggestion"
                             data-recipe-item-character-prereq-option={prereq.id}
-                            onclick={() => addCharacterPrerequisite(prereq.id)}
+                            {...prereqSearch.option(index)}
                           >
                             <i class={prereq.icon || 'fas fa-user-check'} aria-hidden="true"></i>
                             <span>{prereq.name}</span>
@@ -758,15 +764,9 @@
     line-height: 1.4;
   }
 
-  /* The inline empty state shown instead of the search input when a column has no
-     options is the shared `EmptyState` primitive at the compact scale; its own dashed
-     panel used to be re-derived here. */
-
-  /* The typeahead search stretches to fill its column width (overrides the global
-     toolbar-oriented max-width/min-width so a narrow column can't overflow), but
-     `flex: 0 0 auto` stops the global `flex: 1 1 210px` from growing the search box
-     vertically inside the column — otherwise it would push the pill row to the
-     bottom instead of sitting directly under the input. */
+  /* The search fills its column, overriding the global toolbar-oriented width band, and
+     `flex: 0 0 auto` stops the global `flex: 1 1 210px` growing it vertically inside the
+     column, which would push the pill row to the bottom. */
   .manager-recipe-item-prereq-column :global(.manager-tag-search) {
     flex: 0 0 auto;
     max-width: none;

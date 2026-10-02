@@ -1,15 +1,9 @@
 /**
- * Document-coherent reconciliation for actor-scoped run containers
- * (crafting / salvage / gathering).
- *
- * Each run manager holds a per-actor in-memory container that can predate writes
- * made by another client/session or by the primary-GM world-time resume. Blindly
- * persisting that container overwrites the actor document, so a stale view silently
- * CLOBBERS terminal runs written out-of-band (issue 733) and drops other writers'
- * active runs (issue 739). Reconciling the about-to-persist container against the
- * CURRENT persisted document keeps every terminal run (history union by id) and
- * every active run another writer added (active merge against the fresh document,
- * removing only what THIS writer intentionally dropped).
+ * Document-coherent reconciliation for actor-scoped run containers (crafting, salvage,
+ * gathering). A manager's in-memory container can predate another client's write or the
+ * primary-GM world-time resume, so persisting it blindly clobbers out-of-band terminal runs (issue
+ * 733) and drops other writers' active runs (issue 739). Each persist therefore reconciles against
+ * the CURRENT document, removing only what this writer intentionally dropped since its baseline.
  */
 
 function isRunMap(value) {
@@ -17,19 +11,9 @@ function isRunMap(value) {
 }
 
 /**
- * Merge two history lists newest-first, union by run `id`, capped at `historyLimit`.
- *
- * The writer's entries are pushed first so they win for shared ids; document-only
- * entries the writer never saw (a run another client archived) are appended and thus
- * preserved. The final ordering is a STABLE sort by `compareHistory`, so entries with
- * an equal sort key keep their pre-sort order — a single writer whose `next` history
- * is already newest-first is left byte-for-byte unchanged.
- *
- * @param {Array} currentHistory the persisted document's history
- * @param {Array} nextHistory the writer's about-to-persist history
- * @param {(a: object, b: object) => number} [compareHistory] newest-first comparator
- * @param {number} [historyLimit] retention cap (<= 0 means uncapped)
- * @returns {Array} the reconciled history
+ * Newest-first union of two histories by run `id`, capped at `historyLimit` (`<= 0` uncaps). The
+ * writer's entries win shared ids and document-only ones are kept; the sort is stable, so an
+ * already-ordered single writer's history is unchanged.
  */
 export function unionRunHistory(currentHistory, nextHistory, compareHistory, historyLimit = 0) {
   const merged = [];
@@ -49,20 +33,8 @@ export function unionRunHistory(currentHistory, nextHistory, compareHistory, his
 }
 
 /**
- * Reconcile history against the current document.
- *
- * Drops the document entries this writer intentionally removed (present in its
- * baseline history but no longer in its `next` history — e.g. a system/component
- * cleanup sweep), then unions the remaining document entries with the writer's own,
- * newest-first, capped. Terminal entries another client archived that this writer
- * never saw survive.
- *
- * @param {Array} currentHistory the persisted document's history
- * @param {Array} nextHistory the writer's about-to-persist history
- * @param {(a: object, b: object) => number} [compareHistory] newest-first comparator
- * @param {Iterable<string>} [previousHistoryIds] the history ids the writer last observed
- * @param {number} [historyLimit] retention cap
- * @returns {Array} the reconciled history
+ * Drop the document entries this writer removed (in its baseline, gone from `next`, as a cleanup
+ * sweep does), then union the rest with its own; entries another client archived survive.
  */
 export function reconcileRunHistory(
   currentHistory,
@@ -83,17 +55,8 @@ export function reconcileRunHistory(
 }
 
 /**
- * Reconcile the active run map against the current document.
- *
- * Starts from the fresh document's active runs, drops the keys this writer
- * intentionally removed (present in its baseline but no longer in its `next` view),
- * then overlays the writer's own active runs. Active runs another client added that
- * this writer never observed are neither in the baseline nor removed, so they survive.
- *
- * @param {object} currentActive the persisted document's active map
- * @param {object} nextActive the writer's about-to-persist active map
- * @param {Iterable<string>} previousActiveKeys the active keys the writer last observed
- * @returns {object} the reconciled active map
+ * The fresh document's active runs minus the keys this writer removed since its baseline, overlaid
+ * with its own; runs another client added are in neither set, so they survive.
  */
 export function reconcileActiveRuns(currentActive, nextActive, previousActiveKeys = []) {
   const next = isRunMap(nextActive) ? nextActive : {};
@@ -108,18 +71,6 @@ export function reconcileActiveRuns(currentActive, nextActive, previousActiveKey
   return active;
 }
 
-/**
- * Reconcile a whole run container ({ active, history }) against the current document.
- *
- * @param {object} args
- * @param {{active?: object, history?: Array}} args.current the persisted document container
- * @param {{active?: object, history?: Array}} args.next the writer's about-to-persist container
- * @param {Iterable<string>} [args.previousActiveKeys] active keys the writer last observed
- * @param {Iterable<string>} [args.previousHistoryIds] history ids the writer last observed
- * @param {(a: object, b: object) => number} [args.compareHistory] newest-first comparator
- * @param {number} [args.historyLimit] retention cap
- * @returns {{active: object, history: Array}} the reconciled container
- */
 export function reconcileRunContainer({
   current,
   next,
@@ -140,14 +91,7 @@ export function reconcileRunContainer({
   };
 }
 
-/**
- * Build the baseline snapshot (active keys + history ids) a run manager records so a
- * later `_persist` can distinguish an intentional removal from another writer's
- * concurrently-added run. Shared by every actor-scoped run manager's `_recordBaseline`.
- *
- * @param {{active?: object, history?: Array}} container
- * @returns {{activeKeys: string[], historyIds: Array}}
- */
+/** The active keys and history ids a manager records, to tell a removal from another's addition. */
 export function runContainerBaseline(container) {
   return {
     activeKeys: Object.keys(container?.active || {}),
@@ -155,20 +99,7 @@ export function runContainerBaseline(container) {
   };
 }
 
-/**
- * Reconcile the about-to-persist `next` container against the freshly-read `current`
- * document, using the writer's last-observed `baseline` (falling back to the current
- * document when the writer has no baseline yet). Wraps {@link reconcileRunContainer}
- * with the baseline-fallback logic every run manager repeats.
- *
- * @param {object} args
- * @param {{active?: object, history?: Array}} args.current freshly-read document container
- * @param {{active?: object, history?: Array}} args.next the writer's about-to-persist container
- * @param {{activeKeys?: string[], historyIds?: Array}|null} [args.baseline] last-observed snapshot
- * @param {(a: object, b: object) => number} [args.compareHistory] newest-first comparator
- * @param {number} [args.historyLimit] retention cap
- * @returns {{active: object, history: Array}} the reconciled container
- */
+/** `reconcileRunContainer` against the writer's baseline, or the current document without one. */
 export function reconcileAgainstDocument({
   current,
   next,
@@ -195,10 +126,7 @@ export function historyIdsOf(history) {
   return ids;
 }
 
-/**
- * Newest-first comparator keyed on `finishedAt` (the crafting/salvage terminal field).
- * Returns 0 for equal timestamps so a stable sort preserves insertion order.
- */
+/** Newest-first by `finishedAt`; a tie compares `0`, so a stable sort keeps insertion order. */
 export function compareFinishedAtNewestFirst(a, b) {
   return Number(b?.finishedAt || 0) - Number(a?.finishedAt || 0);
 }

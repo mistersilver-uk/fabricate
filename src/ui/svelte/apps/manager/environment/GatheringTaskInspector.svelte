@@ -48,8 +48,6 @@
        drop-scoped writers are bound to the row below rather than forwarded as they arrive. */
     suggestions,
     characterModifierLibrary,
-    characterModifierSearchOpenUp,
-    characterModifierSearchAnchor = $bindable(),
     characterModifierSearchTerm = $bindable(),
     gatheringConditionAvailableOptions,
     gatheringConditionLabel,
@@ -333,8 +331,6 @@
             idPrefix={`drop-${selectedDrop.id}`}
             {suggestions}
             {characterModifierLibrary}
-            {characterModifierSearchOpenUp}
-            bind:characterModifierSearchAnchor
             bind:characterModifierSearchTerm
             {gatheringConditionAvailableOptions}
             {gatheringConditionLabel}
@@ -385,6 +381,7 @@
   {/if}
 {:else}
   <EmptyState
+    fill
     icon="fas fa-list-check"
     title={text('FABRICATE.Admin.Manager.Environment.Tasks.SelectTask', 'Select a gathering task')}
     hint={text(

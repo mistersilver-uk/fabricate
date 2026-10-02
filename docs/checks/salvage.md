@@ -24,6 +24,14 @@ See [The Checks screen]({% link checks/index.md %}#the-checks-screen) for the ed
 
 A salvaged component has a single ingredient, so ingredient-set routing does not apply here.
 
+Set the salvage check to **Which way is better** → **Lower is better**, or its **What the roll is measured against** to **Character value**, to grade the roll under a target or against the salvager's own character value instead of a fixed DC.
+See [Roll-under and character-value checks]({% link checks/crafting.md %}#roll-under-and-character-value-checks) for the full guide, including the component's own **Target override** or **Difficulty adjustment override**.
+
+Set the salvage check to **Count successes** to roll a dice pool and count qualifying dice instead of adding them into one total.
+See [Success-counting checks]({% link checks/crafting.md %}#success-counting-checks) for the full guide, including the component's own **Successes needed override**.
+A counting salvage check can also let a player buy additional dice, single rolls and a batch alike, with the spend always happening on the salvager's own computer.
+See [Additional dice]({% link checks/crafting.md %}#additional-dice).
+
 ## What players see
 
 Everything a player is shown when they salvage comes from the salvage check, never from the recipe crafting check.

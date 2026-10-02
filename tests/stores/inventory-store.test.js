@@ -1369,22 +1369,22 @@ describe('inventoryStore', () => {
       assert.equal(store.bulkSelectedKeys.length, 24);
     });
 
-    it('the store literal MATCHES the shared BULK_MAX_ITEMS it duplicates', async () => {
+    it('the store cap MATCHES the shared BULK_MAX_ITEMS it duplicates', async () => {
       // The bulk sub-store declares its own `BULK_MAX_ITEMS` rather than importing the service's:
       // importing pulls the bulk chat-card builder, `componentStacking.js` and
-      // `itemStackQuantity.js` into this harness's module graph for the sake of one integer. The
-      // pin MOVED with the constant at issue 1695; it was re-anchored, never duplicated.
-      const { readFileSync } = await import('node:fs');
-      const { resolve } = await import('node:path');
+      // `itemStackQuantity.js` into this harness's module graph for the sake of one integer. So
+      // the store's cap is measured against the service's constant, not against a literal.
       const { BULK_MAX_ITEMS } = await import('../../src/systems/BulkSalvageService.js');
-      const storeSource = readFileSync(
-        resolve(import.meta.dirname, '../../src/ui/svelte/stores/inventoryBulkActions.svelte.js'),
-        'utf8'
+      const rows = Array.from({ length: BULK_MAX_ITEMS + 1 }, (unused, index) =>
+        bulkRow(`c${index}`, `Item ${index}`)
       );
-      assert.ok(
-        storeSource.includes(`const BULK_MAX_ITEMS = ${BULK_MAX_ITEMS};`),
-        `the bulk sub-store must declare ${BULK_MAX_ITEMS}, matching BulkSalvageService`
-      );
+      const { store } = await loadedBulkStore(rows);
+      const answers = rows.map((row, index) => store.toggleBulkSelection(`sys:c${index}`));
+      flushSync();
+
+      assert.deepEqual(answers.at(-2), { refused: false }, `selection ${BULK_MAX_ITEMS} fits`);
+      assert.deepEqual(answers.at(-1), { refused: true, reason: 'bulkLimit' }, 'the next is not');
+      assert.equal(store.bulkSelectedKeys.length, BULK_MAX_ITEMS);
     });
   });
 

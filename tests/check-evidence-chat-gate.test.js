@@ -1,0 +1,309 @@
+/**
+ * Issue 2005 — a result card posted by a real salvage or craft states the executed check's evidence
+ * rows only for a public, non-secret roll, on a V13 (`applyRollMode`) and a V14 (`applyMode`) build,
+ * and a hostile modifier label posts with no enrichment pattern left in the card.
+ */
+import test from 'node:test';
+import assert from 'node:assert/strict';
+
+import { openCardRollsCount } from '../src/systems/checkCardRolls.js';
+
+import { shippedLocalize } from './helpers/checkEvidenceFixtures.js';
+import { craftProbe, probeResolutionService, salvageProbe } from './helpers/craftPipelineProbe.js';
+import { stubPromptSurface } from './helpers/rollPromptDialogStub.js';
+import { stubRoll } from './helpers/routedCheckEngine.js';
+import { salvageRunProbe } from './helpers/salvagePipelineProbe.js';
+
+const ROLL_MODES = ['publicroll', 'gmroll', 'blindroll', 'selfroll'];
+const HOSTILE_LABEL = '[[1d20]] @abilities.str.value';
+
+/** A `1d4` (or `(1d4)`) totals 3 and any other formula 9 as 2, 4 and 3; every posted roll message
+ * is recorded. */
+function installRoll(rollMessages) {
+  globalThis.Roll = class EvidenceRoll {
+    constructor(formula) {
+      this.formula = String(formula);
+      const constant = Number(this.formula);
+      if (Number.isFinite(constant)) this.total = constant;
+      else this.total = this.formula.replaceAll(/[()\s]/g, '') === '1d4' ? 3 : 9;
+      const faces = [2, 4, 3].map((result) => ({ result }));
+      this.dice = Number.isFinite(constant)
+        ? []
+        : [{ number: 3, faces: 6, total: this.total, results: faces }];
+    }
+    async evaluate() {
+      return this;
+    }
+    evaluateSync() {
+      return this;
+    }
+    toJSON() {
+      return { formula: this.formula, total: this.total };
+    }
+    async toMessage(data, options) {
+      rollMessages.push(options);
+    }
+    static replaceFormulaData(formula) {
+      return formula;
+    }
+    static validate() {
+      return true;
+    }
+  };
+}
+
+/** A V13 or V14 `ChatMessage` whose created messages are recorded whole, each beside its options. */
+function installChatMessage(version, created, createOptions = []) {
+  const applier =
+    version === 13
+      ? { applyRollMode: (data, mode) => Object.assign(data, { rollMode: mode }) }
+      : { applyMode: (data, mode) => Object.assign(data, { messageMode: mode }) };
+  globalThis.ChatMessage = {
+    create: async (data, options) => {
+      created.push(data);
+      createOptions.push(options);
+      return { id: `msg-${created.length}` };
+    },
+    getSpeaker: () => ({ alias: 'Salvager' }),
+    ...applier,
+  };
+}
+
+const isCard = (data) => String(data.content).includes('fabricate-craft-chat');
+
+/**
+ * A real sum/under salvage against character value 12 with −2 and a rolled 1d4 library bonus.
+ * `arrange(world)` runs once the chat and roll doubles are installed, and a salvage that throws
+ * answers `{ threw }`.
+ */
+async function salvageAs(version, rollMode, arrange = () => {}) {
+  const world = salvageProbe({
+    salvageCraftingCheck: {
+      simple: {
+        rollFormula: '3d6',
+        evaluation: {
+          product: 'sum',
+          direction: 'under',
+          target: { source: 'attribute', expression: '@skills.craft.value' },
+        },
+      },
+      consumption: { consumeComponentOnFail: true },
+      defaultModifierIds: ['steady'],
+    },
+  });
+  const system = globalThis.game.fabricate.getCraftingSystemManager().getSystem('sys-salvage');
+  system.modifiers = [{ id: 'steady', label: HOSTILE_LABEL, expression: '1d4' }];
+  system.components[0].salvage.adjustmentOverride = -2;
+  world.actor.system.skills = { craft: { value: 12 } };
+  globalThis.game.i18n.localize = shippedLocalize;
+  const created = [];
+  const createOptions = [];
+  const rollMessages = [];
+  installRoll(rollMessages);
+  installChatMessage(version, created, createOptions);
+  arrange(world);
+  const result = await world
+    .salvage({ interactive: true, rollDecision: { rollMode } })
+    .catch((error) => ({ threw: error }));
+  delete globalThis.Roll;
+  const cards = created.filter(isCard);
+  const cardOptions = createOptions[created.findIndex(isCard)];
+  // The check roll and its rolled 1d4 leave as one bundled message when no card carries them.
+  const bundles = created.filter((data) => !isCard(data));
+  return { result, cards, cardOptions, bundles, rollMessages };
+}
+
+for (const version of [13, 14]) {
+  for (const rollMode of ROLL_MODES) {
+    test(`V${version} ${rollMode}: the card states evidence only for a public roll`, async () => {
+      const { result, cards, cardOptions, bundles, rollMessages } = await salvageAs(
+        version,
+        rollMode
+      );
+      assert.equal(result.success, true, 'the 3d6 of 9 stays at or under 13');
+      assert.equal(cards.length, 1);
+      const [card] = cards;
+      assert.ok(!('whisper' in card) && !('blind' in card), 'a result card is never whispered');
+      assert.ok(!card.flags?.fabricate, 'and carries no evidence flags');
+      assert.deepEqual(rollMessages, [], 'a roll with a pre-roll never posts through toMessage');
+      const content = String(card.content);
+      if (rollMode === 'publicroll') {
+        assert.deepEqual(
+          card.rolls.map((roll) => roll.formula),
+          ['3d6', '(1d4)'],
+          'the public card carries the check roll, then its pre-roll'
+        );
+        assert.deepEqual(
+          cardOptions,
+          version === 13 ? { rollMode: 'publicroll' } : { messageMode: 'public' },
+          'and states the public mode itself, the only mode a created message is given'
+        );
+        assert.equal(bundles.length, 0, 'so no separate roll message is posted');
+      } else {
+        assert.equal(card.rolls, undefined, 'a private card carries no check or pre-roll Roll');
+        assert.equal(cardOptions, undefined);
+        assert.equal(bundles.length, 1, 'and the roll keeps its own message');
+        assert.equal(bundles[0].rolls.length, 2);
+      }
+      if (rollMode === 'publicroll') {
+        assert.match(content, /data-check-evidence="target"/);
+        assert.match(content, /data-check-evidence="preRolled"/);
+        assert.match(content, /data-check-evidence="margin"/);
+        // 12 − 2, raised by the rolled 1d4 of 3, against the 3d6 of 9.
+        assert.ok(
+          content
+            .replaceAll(/[\u2060\u200B]/g, '')
+            .includes('13 · Salvager @skills.craft.value 12, difficulty −2, modifiers +3')
+        );
+        assert.ok(content.includes('+4 under the target'));
+      } else {
+        assert.doesNotMatch(content, /evidence|character value|under the target|__roll-value/);
+      }
+    });
+  }
+}
+
+const refuse = (message) => async () => {
+  throw new Error(message);
+};
+
+/** Each way a public salvage roll loses its card, and whether `salvage()` itself then throws. */
+const LOST_CARDS = [
+  [
+    'the card cannot be created',
+    () => {
+      const { create } = globalThis.ChatMessage;
+      globalThis.ChatMessage.create = (data, options) =>
+        isCard(data) ? refuse('create refused')() : create(data, options);
+    },
+    false,
+  ],
+  [
+    'the commit throws',
+    (world) => Object.assign(world.engine, { _consumeComponentItems: refuse('consume refused') }),
+    true,
+  ],
+  [
+    'the check throws after its roll',
+    (world) =>
+      Object.assign(world.engine, {
+        _markEngineEvaluated: () => {
+          throw new Error('grading failed');
+        },
+      }),
+    true,
+  ],
+];
+
+for (const [exit, arrange, throws] of LOST_CARDS) {
+  test(`a public salvage roll posts its own message once when ${exit}`, async (t) => {
+    t.mock.method(console, 'error', () => {});
+    const { result, cards, bundles, rollMessages } = await salvageAs(14, 'publicroll', arrange);
+    assert.equal(Boolean(result.threw), throws, String(result.threw?.message));
+    assert.equal(cards.length, 0, 'no card reached chat');
+    assert.equal(bundles.length + rollMessages.length, 1, 'the roll reached chat exactly once');
+    assert.equal(bundles[0].rolls.length, 2, 'with its pre-roll');
+    assert.equal(openCardRollsCount(), 0, 'and no offer is left open');
+  });
+}
+
+test('a hostile label posts with no inline-roll opener and no @ reference left to enrich', async () => {
+  const { cards } = await salvageAs(14, 'publicroll');
+  const content = String(cards[0].content);
+  assert.ok(
+    content.replaceAll('\u200B', '').includes('abilities.str.value'),
+    'positive control: the label was posted'
+  );
+  assert.doesNotMatch(content, /\[\[/);
+  assert.doesNotMatch(content, /@\w/);
+});
+
+/** A real sum/under craft against Hard Work's −2 on character value 12, with a rolled 1d4 bonus. */
+async function craftAs(version, rollMode) {
+  const world = craftProbe({
+    features: { craftingChecks: true },
+    craftingCheck: {
+      enabled: true,
+      consumption: {},
+      defaultModifierIds: ['steady'],
+      simple: {
+        rollFormula: '3d6',
+        dc: 10,
+        evaluation: {
+          product: 'sum',
+          direction: 'under',
+          target: { source: 'attribute', expression: '@skills.craft.value', adjustmentKind: 'add' },
+        },
+        tiers: [{ id: 'hard', name: 'Hard Work', adjustment: -2 }],
+      },
+    },
+    resolutionService: probeResolutionService({ mode: 'simple' }),
+  });
+  world.system.modifiers = [{ id: 'steady', label: 'Steady hands', expression: '1d4' }];
+  world.recipe.checkTierId = 'hard';
+  world.craftingActor.system.skills = { craft: { value: 12 } };
+  globalThis.game.i18n.localize = shippedLocalize;
+  const created = [];
+  installRoll([]);
+  installChatMessage(version, created);
+  const prompt = stubPromptSurface(() => ({ confirmed: true, rollMode }));
+  const result = await world.craft(null, { interactive: true }).finally(prompt.restore);
+  delete globalThis.Roll;
+  const cards = created.filter((data) => String(data.content).includes('fabricate-craft-chat'));
+  return { result, cards };
+}
+
+/** The card with its invisible enrichment joiners removed. */
+const readable = (card) => String(card.content).replaceAll(/[\u2060\u200B]/g, '');
+
+for (const version of [13, 14]) {
+  test(`V${version}: a public craft card states the pill, dice line and ruled rows (QE3)`, async () => {
+    const { result, cards } = await craftAs(version, 'publicroll');
+    assert.equal(result.success, true, 'the 3d6 of 9 stays at or under 13');
+    assert.equal(cards.length, 1);
+    const content = readable(cards[0]);
+    assert.ok(content.includes('fa-circle-check" aria-hidden="true"></i>Success</div>'));
+    assert.ok(content.includes('3d6 (2 + 4 + 3) = 9, compared as rolled'));
+    assert.ok(content.includes('13 · Crafter @skills.craft.value 12, Hard Work −2, modifiers +3'));
+    assert.ok(content.includes('Steady hands 1d4 rolled 3, raising the target'));
+    assert.ok(content.includes('+4 under the target'));
+  });
+
+  for (const rollMode of ROLL_MODES.slice(1)) {
+    test(`V${version} ${rollMode}: a private craft card states no total, dice line or rows`, async () => {
+      const { cards } = await craftAs(version, rollMode);
+      const content = readable(cards[0]);
+      assert.doesNotMatch(content, /evidence|__dice|under the target|Crafter @|__roll-value/);
+      assert.match(content, /fa-circle-check/, 'it keeps its pill (issue 2054)');
+    });
+  }
+}
+
+test('a failed bulk subject states its own evidence rows on the aggregate card (QE8 G8)', async () => {
+  const world = salvageRunProbe({
+    salvageCraftingCheck: {
+      simple: {
+        rollFormula: '1d20',
+        dc: 10,
+        thresholdMode: 'meet',
+        evaluation: { product: 'sum', direction: 'under' },
+      },
+    },
+    targets: [
+      {
+        id: 'ore',
+        name: 'Iron Ore',
+        quantity: 3,
+        ingredientQuantity: 1,
+        resultGroups: [{ id: 'sg-1', results: [{ id: 'sr-1', componentId: 'shard', quantity: 2 }] }],
+      },
+    ],
+    awards: [{ id: 'shard', name: 'Shard' }],
+  });
+  stubRoll(17, [{ number: 1, faces: 20, total: 17 }]);
+  await world.bulkSalvage(['ore']);
+  delete globalThis.Roll;
+  const [, { text }] = world.journal.entries.find(([name]) => name === 'chat.bulk');
+  assert.match(text, /BulkSalvageOutcomeFailed/, 'positive control: the 17 fails a target of 10');
+  assert.match(text, /Evidence\.Target .*Evidence\.Margin/, 'the failure publishes its check');
+});

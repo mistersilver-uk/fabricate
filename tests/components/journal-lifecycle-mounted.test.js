@@ -45,6 +45,7 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-journal-lifecycle-',
   rawModules: [
+    'src/ui/svelte/util/rollPromptOrigin.js',
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...STATUS_TONE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
@@ -57,8 +58,21 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/journal/historyPresentation.js',
     'src/ui/svelte/apps/journal/runStateNotice.js',
     'src/ui/svelte/apps/journal/runDetailPresentation.js',
+    // The roll line signs an executed margin with the shared formatter (issue 2005).
+    'src/utils/checkAdjustmentFormat.js',
+    'src/utils/scalars.js',
     'src/ui/svelte/apps/journal/stageHeading.js',
     'src/ui/svelte/apps/journal/runRecovery.js',
+    // The store words an additional-dice refusal with the roll prompt's notice (issue 2008).
+    'src/ui/presenters/additionalDicePrompt.js',
+    'src/systems/additionalDiceReach.js',
+    'src/utils/fillPlaceholders.js',
+    'src/utils/localizeWithFallback.js',
+    'src/systems/countEvaluation.js',
+    'src/systems/countTriggerReach.js',
+    'src/systems/normalize/checkEvaluation.js',
+    'src/systems/checkEvaluation.js',
+    'src/systems/checkTarget.js',
   ],
   runeModules: [
     'src/ui/svelte/stores/browseListing.svelte.js',

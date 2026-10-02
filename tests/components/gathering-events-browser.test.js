@@ -4,11 +4,12 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { defineStructureContract } from '../helpers/structureContract.js';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
 const browserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/GatheringEventsBrowserView.svelte');
 const environmentsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte');
-const rootPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');
 // Issue 1707 phase 2 moved the event inspector branch out of the root into this leaf.
 const eventInspectorPath = resolve(
   repoRoot,
@@ -19,12 +20,19 @@ const cssPath = resolve(repoRoot, 'styles/fabricate.css');
 
 const browserSource = readFileSync(browserPath, 'utf8');
 const environmentsBrowserSource = readFileSync(environmentsBrowserPath, 'utf8');
-const rootSource = readFileSync(rootPath, 'utf8');
 const eventInspectorSource = readFileSync(eventInspectorPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 const css = readFileSync(cssPath, 'utf8');
 
 describe('GatheringEventsBrowserView source contract', () => {
+  // The filter's own body; its forward to the leaf is asserted by DOM in
+  // `manager-gathering-mounted.js`, and its result by `tests/gathering-display.test.js`.
+  defineStructureContract(
+    'derives event usage from enabledEventIds',
+    'src/ui/svelte/apps/manager/gatheringDisplay.js',
+    { spellsExactly: ['enabledEventIds'] }
+  );
+
   it('renders an event library tabpanel with the expected toolbar filters', () => {
     assert.ok(browserSource.includes("class=\"manager-gathering-panel manager-gathering-panel-events\""), 'browser should use the event panel class');
     assert.ok(browserSource.includes('data-gathering-events-browser'), 'browser should expose a data attribute hook for tests');
@@ -147,16 +155,26 @@ describe('GatheringEventsBrowserView source contract', () => {
     );
   });
 
-  it('wires event CRUD and selection state through the manager root', () => {
-    assert.ok(rootSource.includes('selectedGatheringEventId'), 'manager root should track the selected event id');
-    assert.ok(rootSource.includes('function selectGatheringEvent'), 'manager root should expose selectGatheringEvent');
-    assert.ok(rootSource.includes('function createGatheringEvent'), 'manager root should expose createGatheringEvent');
-    assert.ok(rootSource.includes('function duplicateGatheringEvent'), 'manager root should expose duplicateGatheringEvent');
-    assert.ok(rootSource.includes('function deleteGatheringEvent'), 'manager root should expose deleteGatheringEvent');
-    assert.ok(rootSource.includes('function toggleGatheringEventEnabled'), 'manager root should expose toggleGatheringEventEnabled');
-    assert.ok(rootSource.includes('function updateSelectedGatheringEvent'), 'manager root should expose updateSelectedGatheringEvent');
-    assert.ok(rootSource.includes('store.duplicateGatheringLibraryEvent'), 'manager root should call the new store duplicate action');
-  });
+  // The shell tracks the selected event and the draft handlers own its CRUD (issue 1721).
+  defineStructureContract(
+    'wires event CRUD and selection state through the gathering units',
+    [
+      'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
+      'src/ui/svelte/apps/manager/gatheringDraftHandlers.svelte.js',
+    ],
+    {
+      names: [
+        'selectedGatheringEventId',
+        'selectGatheringEvent',
+        'createGatheringEvent',
+        'duplicateGatheringEvent',
+        'deleteGatheringEvent',
+        'toggleGatheringEventEnabled',
+        'updateSelectedGatheringEvent',
+      ],
+      reads: ['store.duplicateGatheringLibraryEvent'],
+    }
+  );
 
   it('localizes the event library labels', () => {
     const eventsNamespace = lang.FABRICATE.Admin.Manager.Environment.Events;
@@ -176,9 +194,6 @@ describe('GatheringEventsBrowserView source contract', () => {
     assert.ok(eventInspectorSource.includes('manager-event-environment-usage-grid'), 'event usage tiles should sit in a grid container');
     assert.ok(eventInspectorSource.includes('manager-event-environment-usage-card'), 'event usage should render tiled cards');
     assert.ok(eventInspectorSource.includes('manager-event-environment-usage-thumb'), 'event usage tile should include a thumbnail image');
-    // `enabledEventIds` is the filter's own body, not proof it reaches the leaf: that forward is
-    // asserted by DOM in `manager-gathering-mounted.js` (issue 1707 phase 2 review).
-    assert.ok(rootSource.includes('enabledEventIds'), 'usage should be derived from enabledEventIds');
     const events = lang.FABRICATE.Admin.Manager.Environment.Events;
     assert.equal(events.UsedInEnvironmentsCard, 'Used in environments');
     assert.equal(events.NotUsedInEnvironments, 'Not used in any environments yet.');

@@ -4,6 +4,8 @@
  */
 
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
+import { publicAdditionalDiceOffer } from '../systems/additionalDiceReach.js';
+import { publicAdvantageOffer } from '../systems/checkAdvantage.js';
 import { evaluatePreparedCraftingCheck, postCheckRollHandoff } from '../systems/checkRoll.js';
 import { EVENT_SCENE_SOCKET } from '../systems/eventSceneCoordinator.js';
 import { createFoundryJournalRunAuthority } from '../systems/journalRunAuthority.js';
@@ -17,8 +19,126 @@ import {
 import { resolvedComponentsFor } from '../systems/scopedEntityReads.js';
 import { promptCheckRoll } from '../ui/svelte/apps/crafting/rollPrompt.js';
 import { resolveAlchemySubmissions } from '../utils/alchemySubmissions.js';
+import { localizeWith } from '../utils/localizeWithFallback.js';
 
 import { getGatheringEngine } from './gatheringRuntime.js';
+
+/** What a player reads when a re-prepared check differs from the one they answered. */
+function checkChangedNotice() {
+  return localizeWith(
+    (key) => globalThis.game?.i18n?.localize?.(key),
+    'FABRICATE.App.Journal.CheckChanged',
+    undefined,
+    "This roll's details changed while you were deciding. Check them and roll again."
+  );
+}
+
+/** Formula flavour such as `[Modifiers]` labels a term for the chat card, not for the prompt. */
+function displayFormula(formula) {
+  if (typeof formula !== 'string') return formula;
+  return formula
+    .replaceAll(/\[[^\]]*\]/g, '')
+    .replaceAll(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * The entitled Journal descriptor's named display fields are the prompt's only input. A prompt
+ * reopened because its check `changed` states that in a notice.
+ */
+export function promptJournalStageCheck(descriptor, prompt = promptCheckRoll, { changed } = {}) {
+  return prompt({
+    ...(changed === true && { notice: checkChangedNotice() }),
+    name: descriptor?.subject ?? descriptor?.label,
+    actorName: descriptor?.actorName,
+    activity: descriptor?.activity,
+    img: descriptor?.img,
+    formula: displayFormula(descriptor?.formula),
+    resolvedFormula: displayFormula(descriptor?.resolvedFormula),
+    displayFormula: displayFormula(descriptor?.displayFormula),
+    dc: descriptor?.target,
+    direction: descriptor?.direction,
+    ...(descriptor?.targetSource === 'attribute' && { targetSource: 'attribute' }),
+    targetBasis: descriptor?.targetBasis,
+    toolBonus: descriptor?.toolBonus,
+    comparison: descriptor?.comparison,
+    thresholdMode: descriptor?.comparison === 'exceed' ? 'exceed' : null,
+    selectedModifiers: descriptor?.selectedModifiers,
+    allowAdvantage: descriptor?.allowAdvantage === true,
+    advantageOffer: publicAdvantageOffer(descriptor?.advantageOffer),
+    offerSituationalBonus: descriptor?.offerSituationalBonus !== false,
+    modifierChoice: descriptor?.modifierChoice ?? null,
+    ...(descriptor?.product === 'count' && {
+      product: 'count',
+      pool: descriptor.pool,
+      threshold: descriptor.threshold,
+      thresholdAnchor: descriptor.thresholdAnchor,
+      thresholdSource: descriptor.thresholdSource,
+      die: descriptor.die,
+      explode: descriptor.explode,
+      cancel: descriptor.cancel,
+      zeroPoolFails: descriptor.zeroPoolFails,
+      required: descriptor.required,
+      modifierDestination: descriptor.modifierDestination,
+      pendingTools: descriptor.pendingTools,
+    }),
+    ...(descriptor?.additionalDiceOffer && {
+      additionalDiceOffer: publicAdditionalDiceOffer(descriptor.additionalDiceOffer),
+    }),
+  });
+}
+
+/**
+ * The requesting client's check seams: the prompt, which states a changed check in a notice, the
+ * entitled roll post, and the toast that says the same as a secondary cue.
+ */
+export function journalCheckSeams() {
+  return {
+    promptCheck: (descriptor, options) =>
+      promptJournalStageCheck(descriptor, promptCheckRoll, options),
+    postRollHandoff: (handoff) => postCheckRollHandoff(handoff),
+    onCheckChanged: () => globalThis.ui?.notifications?.warn?.(checkChangedNotice()),
+  };
+}
+
+/**
+ * A named gathering prompt carries its activity, as a crafting one already does; a descriptor
+ * without a `label` is a hidden check and keeps the prompt's generic title.
+ */
+export function withPromptActivity(operations, activity) {
+  const describeCheck = operations.describeCheck;
+  if (typeof describeCheck !== 'function') return operations;
+  return {
+    ...operations,
+    describeCheck: async (request) => {
+      const descriptor = await describeCheck(request);
+      const prompt = descriptor?.publicPrompt;
+      if (!prompt?.label || prompt.activity) return descriptor;
+      return { ...descriptor, publicPrompt: { ...prompt, activity: activity() } };
+    },
+  };
+}
+
+/**
+ * A check that cannot roll refuses at describe as it does at evaluate, `roll-unavailable` with its
+ * sentence (issue 2139), so the client clears a stale result as for any misconfigured check. Any
+ * other describe failure still throws.
+ */
+export function withUnrollableCheckRefusal(operations) {
+  const describeCheck = operations.describeCheck;
+  if (typeof describeCheck !== 'function') return operations;
+  return {
+    ...operations,
+    describeCheck: async (request) => {
+      try {
+        return await describeCheck(request);
+      } catch (error) {
+        if (error?.code !== 'CHECK_TARGET_INVALID') throw error;
+        return { required: false, blocked: 'roll-unavailable', detail: { message: error.message } };
+      }
+    },
+  };
+}
 
 async function resolveJournalSourceActors(run, payload = {}, fallbackActor = null) {
   const supplied = Array.isArray(payload.sourceActorUuids) ? payload.sourceActorUuids : null;
@@ -186,6 +306,20 @@ function buildRunStartOperations(fabricate) {
   };
 }
 
+/**
+ * A count check's wording keys, which choose the bonus help and modifier note; its pool,
+ * threshold, die, face rules and required count stay out of a redacted prompt.
+ */
+function countPromptWording(prompt) {
+  if (prompt?.product !== 'count') return {};
+  return {
+    product: 'count',
+    direction: prompt.direction === 'under' ? 'under' : 'over',
+    comparison: prompt.comparison === 'exceed' ? 'exceed' : 'meet',
+    modifierDestination: prompt.modifierDestination === 'threshold' ? 'threshold' : 'pool',
+  };
+}
+
 /** The check legs: what the GM describes to the initiator, and how a decision is graded. */
 function buildCheckOperations(fabricate, authorizeRollHandoff) {
   return {
@@ -221,6 +355,9 @@ function buildCheckOperations(fabricate, authorizeRollHandoff) {
         publicPrompt: {
           allowsSituationalModifier: descriptor.publicPrompt?.allowsSituationalModifier === true,
           allowAdvantage: descriptor.publicPrompt?.allowAdvantage === true,
+          advantageOffer: publicAdvantageOffer(descriptor.publicPrompt?.advantageOffer),
+          offerSituationalBonus: descriptor.publicPrompt?.offerSituationalBonus !== false,
+          ...countPromptWording(descriptor.publicPrompt),
         },
       };
     },
@@ -249,6 +386,7 @@ function buildCheckOperations(fabricate, authorizeRollHandoff) {
         );
       return evaluatePreparedCraftingCheck(privateEvaluation, actor, decision, {
         secret: !visible,
+        user: sender,
       });
     },
     authorizeRollHandoff,
@@ -407,8 +545,56 @@ function createCraftingJournalOperations(fabricate, getService) {
   };
 }
 
-export function createJournalCommandsForFabricate(fabricate) {
-  const authority = createFoundryJournalRunAuthority({
+export function createJournalCommandsForFabricate(
+  fabricate,
+  authority = createJournalAuthorityForFabricate(fabricate)
+) {
+  let service = null;
+  service = createJournalRunCommandService({
+    authority,
+    operations: {
+      crafting: withUnrollableCheckRefusal(
+        createCraftingJournalOperations(fabricate, () => service)
+      ),
+      gathering: withPromptActivity(
+        withUnrollableCheckRefusal(
+          createGatheringJournalRunOperations({
+            getEngine: () => getGatheringEngine(),
+            runManager: fabricate.gatheringRunManager,
+            getService: () => service,
+            getUser: (userId) => game.users?.get(userId) ?? null,
+          })
+        ),
+        () =>
+          localizeWith(
+            (key) => globalThis.game?.i18n?.localize?.(key),
+            'FABRICATE.App.Nav.Gathering',
+            undefined,
+            'Gathering'
+          )
+      ),
+    },
+    currentUser: () => game.user,
+    activeGM: () => game.users?.activeGM ?? null,
+    getUser: (userId) => game.users?.get(userId) ?? null,
+    resolveUuid: (uuid) => globalThis.fromUuid?.(uuid),
+    emit: (message, options) => game.socket?.emit(EVENT_SCENE_SOCKET, message, options ?? {}),
+    randomId: () => foundry.utils.randomID(),
+    ...journalCheckSeams(),
+    getDismissals: () => getSetting(SETTING_KEYS.JOURNAL_RUN_DISMISSALS),
+    setDismissals: (value) => setSetting(SETTING_KEYS.JOURNAL_RUN_DISMISSALS, value),
+    onDismissalsChanged: (payload) => Hooks.callAll('fabricate.journalDismissalsChanged', payload),
+  });
+  installCraftingJournalRunAuthority({ engine: fabricate.craftingEngine, service });
+  return service;
+}
+
+/**
+ * The world's one Journal run authority. The run commands and the companion operations share this
+ * instance, so both queue on one local chain and contend on one claim page.
+ */
+export function createJournalAuthorityForFabricate(fabricate) {
+  return createFoundryJournalRunAuthority({
     reconstructExecutions: createJournalExecutionReconstructor({
       getCraftingRunManager: () => fabricate.craftingRunManager,
       getGatheringRunManager: () => fabricate.gatheringRunManager,
@@ -418,36 +604,4 @@ export function createJournalCommandsForFabricate(fabricate) {
     // refusal: a refusal is true while it holds, and announcing it repaints mid-command.
     onAvailabilityRestored: () => Hooks.callAll('fabricate.journalRunAuthorityRestored'),
   });
-  let service = null;
-  service = createJournalRunCommandService({
-    authority,
-    operations: {
-      crafting: createCraftingJournalOperations(fabricate, () => service),
-      gathering: createGatheringJournalRunOperations({
-        getEngine: () => getGatheringEngine(),
-        runManager: fabricate.gatheringRunManager,
-        getService: () => service,
-        getUser: (userId) => game.users?.get(userId) ?? null,
-      }),
-    },
-    currentUser: () => game.user,
-    activeGM: () => game.users?.activeGM ?? null,
-    getUser: (userId) => game.users?.get(userId) ?? null,
-    resolveUuid: (uuid) => globalThis.fromUuid?.(uuid),
-    emit: (message, options) => game.socket?.emit(EVENT_SCENE_SOCKET, message, options ?? {}),
-    randomId: () => foundry.utils.randomID(),
-    promptCheck: (descriptor) =>
-      promptCheckRoll({
-        name: descriptor?.label,
-        activity: descriptor?.label,
-        allowAdvantage: descriptor?.allowAdvantage === true,
-        modifierChoice: descriptor?.modifierChoice ?? null,
-      }),
-    postRollHandoff: (handoff) => postCheckRollHandoff(handoff),
-    getDismissals: () => getSetting(SETTING_KEYS.JOURNAL_RUN_DISMISSALS),
-    setDismissals: (value) => setSetting(SETTING_KEYS.JOURNAL_RUN_DISMISSALS, value),
-    onDismissalsChanged: (payload) => Hooks.callAll('fabricate.journalDismissalsChanged', payload),
-  });
-  installCraftingJournalRunAuthority({ engine: fabricate.craftingEngine, service });
-  return service;
 }

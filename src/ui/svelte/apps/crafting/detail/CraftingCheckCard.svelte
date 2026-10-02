@@ -1,7 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  CraftingCheckCard surfaces the recipe's crafting check (DC, roll formula, skill)
-  with an optional-vs-mandatory pill. The pill reads "Required" when the engine will
+  CraftingCheckCard surfaces the recipe's crafting check (DC, or a roll-under or character-value
+  target and its source, or a count's successes needed, roll formula, skill) with an optional-vs-mandatory pill. The pill reads "Required" when the engine will
   actually roll the check and a failure fails the craft (routed-by-check / progressive;
   routed-by-ingredients whenever a formula is authored; simple and alchemy when a
   formula is authored AND checks are enabled) — otherwise "Optional". `usable` is true
@@ -15,7 +15,11 @@
 
   const mandatory = $derived(check?.mandatory === true);
   const hasDc = $derived(check?.dc !== null && check?.dc !== undefined);
+  // A count check's successes needed, beside its pool line and never a DC (issue 2006).
+  const needed = $derived(Number.isInteger(check?.successesNeeded) ? check.successesNeeded : null);
   const hasFormula = $derived(typeof check?.rollFormula === 'string' && check.rollFormula !== '');
+  // A summed target other than a fixed DC to meet or beat (issue 2005), or why it cannot be read.
+  const target = $derived(check?.target ?? null);
   const hasSkill = $derived(typeof check?.skill === 'string' && check.skill !== '');
   // The formula couldn't be reduced to a number for the selected actor.
   const formulaError = $derived(check?.formulaResolved === false);
@@ -57,6 +61,25 @@
           {localize('FABRICATE.App.Crafting.Check.DcLabel', { dc: check.dc })}
         </span>
       {/if}
+      {#if needed !== null}
+        <span class="crafting-check-fact" data-check-successes-needed={needed}>
+          <i class="fas fa-bullseye" aria-hidden="true"></i>
+          {needed === 1
+            ? localize('FABRICATE.App.RollPrompt.CountNeededOne')
+            : localize('FABRICATE.App.RollPrompt.CountNeeded', { count: needed })}
+        </span>
+      {/if}
+      {#if target?.text}
+        <span class="crafting-check-fact" data-check-target={target.direction}>
+          <i class="fas fa-bullseye" aria-hidden="true"></i>
+          {target.text}
+        </span>
+        {#if target.source}
+          <span class="crafting-check-fact crafting-check-target-source" data-check-target-source
+            >{target.source}</span
+          >
+        {/if}
+      {/if}
       {#if hasSkill}
         <span class="crafting-check-fact" data-check-skill>
           <i class="fas fa-graduation-cap" aria-hidden="true"></i>
@@ -78,6 +101,12 @@
         </span>
       {/if}
     </div>
+    {#if target?.unresolved}
+      <p class="crafting-check-note crafting-check-error" data-check-target-unresolved>
+        <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+        {target.unresolved}
+      </p>
+    {/if}
     {#if check.usable !== true}
       <p class="crafting-check-note">{localize('FABRICATE.App.Crafting.Check.NoFormula')}</p>
     {:else if formulaError}
@@ -144,6 +173,10 @@
 
   .crafting-check-fact i {
     font-size: 11px;
+    color: var(--fab-text-muted);
+  }
+
+  .crafting-check-target-source {
     color: var(--fab-text-muted);
   }
 

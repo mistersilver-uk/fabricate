@@ -8,121 +8,31 @@ import {
 } from './worldScopeEntityGrouping.js';
 
 /**
- * The persistence shell behind the three world-scope entity settings (issue 1359, part of epic
- * 1357): `fabricate.componentScope`, `fabricate.essenceScope` and `fabricate.toolScope`.
+ * The persistence shell behind `fabricate.componentScope`, `fabricate.essenceScope` and
+ * `fabricate.toolScope` (issue 1359). One factory, three keys, so each entity type's `isSeeded()`
+ * stays honest: a shared key would persist its siblings as empty, and so prunable, on the first
+ * write. The persisted shape is `{ entities: [], defaults: {id: record},
+ * membership: {"entityId|systemId": record} }`; map keys are re-derived from the record on every
+ * normalize, and `entities` enforces identity only.
  *
- * ONE PARAMETERIZED FACTORY, THREE KEYS — and the decisive reason is SEEDEDNESS INDEPENDENCE
- * rather than write amplification. `isSeeded()` is the predicate that makes a destructive prune
- * decidable, and on a SHARED key it cannot be honest per entity type: a store writes the whole
- * object, so one entity type's first write persists the others as empty and converts UNKNOWN bases
- * into real, empty, PRUNABLE ones in a single keystroke. `CharacterLibrariesStore._persist` does
- * exactly that today, and it survives only because the legacy in-system half of the union still
- * vouches for the ids. Across three entity types whose references reach recipe ingredients,
- * results, salvage, gathering drop rows, tool links and essence source components, it would not.
- *
- * Three keys REDUCE but do not REMOVE the clobber window, and this says so rather than
- * overclaiming. Separate keys are separate `Setting` documents and cannot lose each other's
- * update. They do not reduce the INTRA-key window: a whole scope value is read-modify-written per
- * edit, Foundry offers no per-key merge and no compare-and-set, so two GMs editing two different
- * components still race. That window is mitigated only by publish-before-await, within one client,
- * and is unchanged from today's `craftingSystems` write.
- *
- * ## The persisted shape
- *
- * ```text
- * { entities: [ {id, ...} ], defaults: { [entityId]: {id, ...} },
- *   membership: { [entityId|systemId]: {entityId, systemId, ...} } }
- * ```
- *
- * Three sub-keys for the three layers `## Scoped Entity Definitions` names: the World Component /
- * World Essence / World Tool identity roster, the world defaults that carry behaviour, and the
- * per-`(entity, system)` membership record. `defaults` and `membership` are MAPS because that is
- * how they are addressed — `membershipKey(entityId, systemId)` exists for exactly this — and the
- * map key is DERIVED FROM THE RECORD on every normalize rather than trusted, so a hand-edited or
- * imported payload whose key and record disagree cannot produce a lookup that finds the wrong
- * record.
- *
- * `entities` IS NOT GIVEN A SCHEMA HERE, and that is deliberate. This change is additive: nothing
- * is migrated, so no writer exists yet, and inventing an identity schema now would pre-empt the
- * migration issue that has to agree with the shipped `## Component` / `## EssenceDefinition` /
- * `## Tool` shapes. So the entity normalizer enforces IDENTITY ONLY — a non-object entry is
- * dropped, an id-less entry is dropped, ids are trimmed and de-duplicated first-wins — and every
- * other authored field is preserved verbatim.
- *
- * ## Every property of `CharacterLibrariesStore` this copies is load-bearing
- *
- * - RAW READ, THEN KEY PRESENCE, THEN NORMALIZE. `game.settings.get` on a world setting that was
- *   never written returns the REGISTERED DEFAULT, so an unmigrated world reads `{}` and normalizes
- *   to three empty collections — byte-identical, at this API, to a GM who deliberately emptied
- *   them. Those two states must not be treated alike, because `CraftingSystemManager` prunes
- *   reference ids against this corpus, so the distinction is captured from the RAW payload first.
- * - `isSeeded(subKey)` OVER THE NAMED RAW SUB-KEYS, because Foundry synthesizes a document for an
- *   unwritten key and offers no value-level presence answer.
- * - PUBLISH THE CACHE BEFORE AWAITING THE WRITE. A GM authoring incrementally fires one write per
- *   keystroke, so a second edit routinely starts while the first is in flight; publishing after
- *   the await would have that second edit read the pre-first-edit corpus and clobber it.
- * - `load()` IS GUARDED AND NEVER THROWS. A throw propagates through `_normalizeSystem` into
- *   `hydrate` and out of `initialize()` — the issue-970 failure mode where the manager never
- *   initializes at all. An unreadable setting must degrade to an UNKNOWN basis, not take the
- *   module down.
- * - PERSISTENCE IS NEVER GATED ON VALIDITY, exactly as `CurrencyConfigStore` is not: a GM authors
- *   incrementally, so rejecting a transiently incomplete write would make the editor unusable.
- *
- * ## One stable corpus per store, replaced wholesale
- *
- * The resolved-union memo (`src/utils/definitionIndex.js`) keys on the corpus OBJECT, so this
- * store publishes exactly one and replaces it wholesale in `load()` and `_persist()`. Nothing
- * mutates it in place, which is what makes replication invalidate the memo by identity and is why
- * no revision counter is minted for world scope. Keying on the corpus object rather than on any
- * one of its three arrays is deliberate: a store publishes THREE arrays — `entities`, `defaults`
- * and `membership` — and {@link unionScopedDefinitions} reads all three, so keying on one alone
- * would be a PARTIAL identity, missing an invalidation that changed only `defaults` or
- * `membership` while `entities` stayed the same reference.
- *
- * ## The seams are injected, not imported
- *
- * `getSetting` / `setSetting` are constructor parameters with no module-level default, unlike
- * `CharacterLibrariesStore`, so this module does not import `src/config/settings.js` — which
- * transitively pulls in `src/ui/theme.js`. That matters because the three per-entity scope modules
- * import {@link unionScopedDefinitions} from here, and #1358 built them as pure leaves with no
- * Foundry and no UI in their closure. `src/systems/worldScopeStores.js` is the composition root
- * that supplies the real seams.
+ * A load reads raw, records key presence, then normalizes, and never throws; the cache is published
+ * before the write is awaited; persistence is never gated on validity. Each store publishes one
+ * corpus and replaces it wholesale, because the union memo keys on the corpus object. The setting
+ * seams are injected so the three scope modules stay Foundry- and UI-free leaves;
+ * `worldScopeStores.js` supplies them. Contract: `data-models/spec.md` § Scoped Entity Definitions
+ * requirements 13 to 16.
  */
 
-/**
- * The three sub-keys a scope setting carries, in layer order.
- *
- * @type {readonly string[]}
- */
+/** The three sub-keys a scope setting carries, in layer order. */
 export const SCOPE_SUB_KEYS = Object.freeze(['entities', 'defaults', 'membership']);
 
-/**
- * A plain object, or `{}` for anything that cannot be one.
- *
- * @param {unknown} value
- * @returns {object}
- */
 function plainObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 }
 
 /**
- * The entries of a raw sub-key, whether it arrived as a map or as an array.
- *
- * TOLERANT OF BOTH, because the persisted shape is a map while every normalizer #1358 ships takes
- * an array, and an import or a hand edit may legitimately deliver either.
- *
- * EXPORTED since issue 1364, because the export assembler and the world identity drift detector
- * both need exactly this tolerance and a third copy of it is how the persisted shape and its
- * readers drift apart. The drift detector's own copy tested `isPlainObject(raw)` where this one
- * tests truthiness-and-object; both lines are reached only AFTER the array branch returns, so
- * `isPlainObject` there reduced to `raw != null && typeof raw === 'object'` and the only value the
- * truthiness test rejects that it accepted is `null`, which `raw != null` rejects too. The two
- * were behaviourally identical, so folding them changes no caller's read tolerance
- * (`## Scoped Entity Definitions` requirement 13).
- *
- * @param {unknown} raw
- * @returns {unknown[]}
+ * The entries of a raw sub-key, delivered as either a map or an array. The one shared reader of
+ * that tolerance for the store, the export assembler and the drift detector (issue 1364).
  */
 export function subKeyEntries(raw) {
   if (Array.isArray(raw)) return raw;
@@ -131,16 +41,9 @@ export function subKeyEntries(raw) {
 }
 
 /**
- * Normalize the world entity roster: IDENTITY ONLY.
- *
- * A non-object or id-less entry is DROPPED rather than repaired, ids are trimmed and de-duplicated
- * first-wins, and every other authored field is preserved VERBATIM. See the module note for why
- * this deliberately enforces no schema beyond identity.
- *
- * Total, non-throwing and idempotent, on the `normalizeModifierLibrary` contract.
- *
- * @param {unknown} raw
- * @returns {Array<object>}
+ * The world entity roster, identity only: a non-object or id-less entry is dropped, ids are trimmed
+ * and de-duplicated first-wins, and every other field is kept verbatim. Total, non-throwing and
+ * idempotent.
  */
 export function normalizeWorldEntities(raw) {
   const seen = new Set();
@@ -155,29 +58,13 @@ export function normalizeWorldEntities(raw) {
   return normalized;
 }
 
-/**
- * Key a normalized list back into the persisted map shape.
- *
- * The key is DERIVED FROM THE RECORD, never carried over from the raw payload, so a payload whose
- * map key and record disagree cannot survive a round trip in that state.
- *
- * @param {Array<object>} records
- * @param {(record: object) => string} keyOf
- * @returns {Record<string, object>}
- */
+/** Key records back into the persisted map, with each key derived from its record. */
 function keyedByRecord(records, keyOf) {
   const map = {};
   for (const record of records) map[keyOf(record)] = record;
   return map;
 }
 
-/**
- * The membership records for one system, keyed by entity id.
- *
- * @param {Array<object>} memberships
- * @param {string} systemId
- * @returns {Map<string, object>}
- */
 function membershipsForSystem(memberships, systemId) {
   const bySystem = new Map();
   for (const record of memberships) {
@@ -187,159 +74,18 @@ function membershipsForSystem(memberships, systemId) {
 }
 
 /**
- * THE READ UNION for one entity type and one crafting system.
+ * The read union for one entity type and one system; not the basis union
+ * (`CraftingSystemManager#_scopeBasis`), which is not membership-filtered because an absent
+ * membership is a refusal, never a prune. Rows, their order and duplicate ids come from the
+ * in-system array walked once; a row with a present membership and world entity merges
+ * `{ ...entry, ...entity, ...resolved, ...entry }`, deletes every lifted identity field the
+ * in-system record does not carry, then answers each inheriting section from the world default
+ * (issues 1363, 1370, 1372). `enabled`, component `tags` and tool `repairRequirements` are not
+ * sections, so they answer from the in-system record.
  *
- * IT IS NOT THE BASIS UNION, and conflating the two is the single most consequential mistake
- * available in this change. This one answers what a system's entity list IS: that system's
- * surviving in-system array, merged with the world entities whose membership record for that
- * system is PRESENT, each resolved through #1358's three-layer resolver. It is
- * MEMBERSHIP-FILTERED and returns RESOLVED values, never raw world entities — an unfiltered
- * union would give every system every world entity and delete the membership model #1358
- * built, and a raw-entity union would hand back world defaults in place of a system's own
- * overrides, bypassing the inherit map.
- *
- * **THE INHERIT SWITCH DECIDES WHICH LAYER ANSWERS A SECTION** (issue 1372, retiring
- * `## CraftingSystem` requirement 36's blanket claim). An OVERRIDING section is answered by the
- * system's own value, which is the in-system record while the lifted fields have not been shed;
- * an INHERITING section is answered by the WORLD DEFAULT, applied onto the shipped field names
- * the section is spelled over. Everything else — the row ORDER, the row SET, and the lifted
- * IDENTITY fields — is still re-derived from the in-system record on every read.
- * The three sections below are kept in order — the `1363` correction, the `1370` inversion, then
- * the `1372` retirement — because each is the reason the next was needed, and a reader who meets
- * only an earlier one must not read it as the current rule.
- *
- * ## "WORLD WINS" IS PER FIELD, AND WAS PER RECORD (issue 1363)
- *
- * The collision branch used to push the world-resolved entry, mark the id claimed, and then SKIP
- * the legacy entry entirely. That was harmless only while nothing wrote the world corpus. After
- * the `1.30.0` migration the in-system record and the world entity share an id BY CONSTRUCTION,
- * so that skip would drop `salvage`, `essences`, `difficulty` and `complications` from EVERY
- * component the union returns. The merge is `{ ...legacyEntry, ...entity, ...resolved }`: the
- * in-system record supplies fields no world layer owns, and the world layer still wins every
- * field it authors. Nothing about world precedence is weakened — it is corrected only in that a
- * world record no longer ERASES disjoint in-system fields.
- *
- * ## THE IN-SYSTEM RECORD DECIDED EVERY KEY (issue 1370), AND NOW DECIDES ONLY ITS OWN
- *
- * The two spread hazards this note used to record as INTENDED are now INVERTED, for the duration
- * of `## CraftingSystem` requirement 36, and both are restated here rather than deleted so a
- * reader meeting the old reasoning elsewhere can see exactly what replaced it and why.
- *
- * - RETIRED: "a world entity carrying an EMPTY-STRING `description` or `img` overwrites a
- *   populated legacy one, and that is world precedence working as specified". The whole in-system
- *   record is RE-SPREAD last, so an authored empty string on the world entity no longer erases a
- *   populated in-system value. It was never a durable rule: every shipped identity writer writes
- *   the IN-SYSTEM copy, `refreshComponentMetadataForUpdatedItem` rewrites `name`, `img` and
- *   `description` in place on the `updateItem` hook, and no shipped writer writes the world
- *   entity — so world-wins precedence on an identity field reverts the GM's own edit on the very
- *   next read.
- * - RETIRED: "after the migration the membership record is the only correct source of `enabled`
- *   for a world-claimed essence or tool". That held while NOTHING read this union and no editor
- *   wrote either copy. It stops holding under requirement 36: no shipped editor writes a world or
- *   membership `enabled`, `buildMembershipRecord` froze the membership copy at migration time,
- *   and `CraftingSystemManager` is a live writer of the in-system essence `enabled`. Because
- *   `resolveScopedDefinition` emits `enabled` UNCONDITIONALLY for an enableable scope — and
- *   `resolveComponent` emits `tags` unconditionally — those two keys were overwritten even when
- *   no scope had authored anything, so a GM-disabled tool read back as usable.
- *
- * `member` and `inherited` survive the re-spread untouched, because no shipped in-system record
- * carries either key.
- *
- * ## AN INHERITING SYSTEM FOLLOWS ITS WORLD DEFAULT (issue 1372)
- *
- * **THE DEFECT THIS RETIRES.** The re-spread above made the in-system record win EVERY key, so a
- * membership record's `inherit` map decided nothing at read time: a GM who flipped a section to
- * `Inherited` and then edited that world default changed nothing in the system, while the system
- * rules editor rendered `Inheriting` with a `World default: …` line and the rules list rendered an
- * `Inherits world defaults` pill. The claim was true at the instant the switch was flipped and
- * false the moment the world default moved. `## CraftingSystem` requirement 36 is retired to the
- * extent that produced it, and no further: an in-system record still decides its own identity and
- * its own non-section fields.
- *
- * **THE RULE IS PER SECTION, AND THE SWITCH IS THE SELECTOR.** For every section the scope
- * declares:
- *
- * - `inherit` is `false` — the system's OWN value answers, and while the lifted fields have not
- *   been shed that value lives on the in-system record. The membership record's stored block is
- *   the RETAINED dormant override `setSectionInheritance` keeps; it does not win, because no
- *   shipped editor writes it and the migration froze it at `1.30.0`, so letting it win would
- *   revert every post-migration edit — the same failure the identity clause exists to prevent.
- * - `inherit` is `true` (or the map omits the section) — the WORLD DEFAULT answers, applied onto
- *   the shipped field names through {@link inheritedSectionWriters}. An UNAUTHORED world default
- *   applies nothing, so an inheriting system with no world value to take keeps reading what it
- *   read before, which is exactly what the screen's `The world default is unset` note says.
- *
- * **WHY THIS DOES NOT MOVE A SINGLE EXISTING WORLD.** `buildMembershipRecord` writes
- * `OVERRIDING_INHERIT` — every section `false` — for every `(entity, system)` pair the `1.30.0`
- * migration creates, so on a migrated world every section is OVERRIDING and every row still
- * answers from the in-system record, byte for byte. A world that predates the membership record
- * has no membership half at all and takes the `!membership || !entity` branch, which answers the
- * in-system row BY REFERENCE. The only rows whose resolution changes are the ones a GM has
- * explicitly switched to inheriting, which is the opt-in.
- *
- * **WHAT IS DELIBERATELY NOT SWITCHED.** `enabled`, component `tags` and tool
- * `repairRequirements` are NOT sections and carry no inherit switch, so nothing about them is
- * decidable from the map this rule reads. They keep answering from the in-system record. Naming
- * them here matters because all three are emitted by a resolver — `enabled` and `tags`
- * unconditionally — so a future change that deleted the trailing re-spread instead of adding this
- * per-section pass would silently hand every one of them to a frozen migration-time copy.
- *
- * ABSENCE IS A VALUE, so the re-spread alone is not enough: a spread cannot DELETE. Every field in
- * `WORLD_IDENTITY_FIELDS` the in-system record does not carry is deleted from the merged row, with
- * {@link identityOf} as the oracle for "which identity keys does this record carry" — it skips
- * exactly the `undefined` ones. Without that half, a world entity's stale `description` survives on
- * a record the GM has since cleared.
- *
- * THE MEMO'S SYSTEM-HALF GUARD IS `(revision, length)`, AND THIS CHANGE IS THE FIRST FOR WHICH
- * THAT DECIDES REAL ANSWERS. All thirteen `advanceDefinitionRevision` call sites advance
- * `components` or `recipeItemDefinitions`; none advances `tools` or `essenceDefinitions`. No
- * writer needs one today, because every shipped tool and essence edit REPLACES the array. A
- * future IN-PLACE edit preserving both identity and length would serve a stale union to every
- * repointed reader, silently - so a writer added there must advance the revision, exactly as the
- * component writers do.
- *
- * ROW ORDER and ROW SET are NOT dated to requirement 36 and did not move with it, which is why
- * this still walks `legacy` ONCE. The union emits the in-system array's rows, in the in-system
- * array's order, and the world layer contributes NO row of its own. Three resolution tiers are
- * FIRST-WINS
- * over array order (`buildIndex` keeps the first record per id, the first per name, and the
- * earliest position per source reference), so a world-roster-ordered union would silently
- * re-rank them. The row-set rule is what stops a GM's deleted component — whose world entity and
- * membership record `_deleteComponentSet` leaves behind — from being RESURRECTED by a repointed
- * reader beside the recipes that same delete disabled; a keep-mode import can create the same
- * membered-but-recordless pair with no deletion involved.
- *
- * A DUPLICATE ID IS PRESERVED, NOT COLLAPSED, and the retired shape got its own reason wrong. The
- * two-pass build keyed the in-system records into a LAST-WINS map on the claim that "both shipped
- * index builders are — the definition index and `CraftingSystemManager`'s own `itemById`".
- * `itemById` is last-wins; `buildIndex` is FIRST-wins. So that map would have made a repointed
- * `findById` answer the LAST record where the pre-repoint reader answered the FIRST, and a
- * repointed listing builder emit ONE row where it emitted TWO. Walking `legacy` once keeps both
- * rows in in-system order and leaves first-wins resolution exactly as it was.
- *
- * The BASIS union (`CraftingSystemManager#_scopeBasis`) is deliberately NOT membership-filtered,
- * because #1358's membership requirement is that an absent record is a REFUSAL, never a PRUNE: a
- * reference to a world entity this system is not a member of must survive normalization and be
- * refused at use.
- *
- * BOUNDED, NOT A READ-ALIAS. It exists because migrations run on the ACTIVE GM alone: every player
- * and assistant GM spends at least one session reading settings that have not been written, and
- * before the migration the in-system arrays ARE the corpus. It is bounded by that migration —
- * deliberately not the permanent read-alias the `1.22.0` and `1.23.0` relocations refused.
- *
- * @param {object} options
- * @param {{entities: Array<object>, defaults: Array<object>, membership: Array<object>}|null}
- *   options.corpus The store's published world corpus.
- * @param {string} options.systemId
- * @param {unknown} options.systemDefinitions The system's surviving in-system array.
- * @param {(worldDefault: object|null, membership: object|null) => object} options.resolve The
- *   per-entity resolver from `componentScope.js` / `essenceScope.js` / `toolScope.js`.
- * @param {'components'|'essences'|'tools'} options.entityType Selects the lifted identity field
- *   list the DELETE half re-derives against. REQUIRED: an omitted or unrecognised value THROWS,
- *   because defaulting it would silently disable a correctness rule — see
- *   {@link liftedIdentityFields}. `resolveComponentScope` / `resolveEssenceScope` /
- *   `resolveToolScope` are the only production callers, and each passes a literal.
- * @returns {Array<object>}
+ * The memo guards the system half by `(revision, length)`, so a writer that edits `tools` or
+ * `essenceDefinitions` in place must advance the revision. `entityType` is required and an unknown
+ * one throws. Contract: `data-models/spec.md` § Scoped Entity Definitions requirement 15.
  */
 export function unionScopedDefinitions({
   corpus,
@@ -355,9 +101,8 @@ export function unionScopedDefinitions({
   const system = typeof systemId === 'string' ? systemId.trim() : '';
   if (!system) return [...legacy];
 
-  // One pass to bucket the memberships and one to key the world roster, rather than a
-  // `findMembership` scan per row: the union is memoized, but a memo over an O(entities x
-  // memberships) build is still an O(entities x memberships) build on every world edit.
+  // Bucket once rather than scan per row: a memo over an O(entities x memberships) build still
+  // rebuilds on every world edit.
   const bySystem = membershipsForSystem(memberships, system);
   const byId = worldEntitiesById(entities);
   const identityFields = liftedIdentityFields(entityType);
@@ -369,25 +114,19 @@ export function unionScopedDefinitions({
     const membership = id === undefined || id === null ? undefined : bySystem.get(id);
     const entity = id === undefined || id === null ? undefined : byId.get(id);
     if (!membership || !entity) {
-      // No world half for this row, so the row IS the in-system record, untouched and
-      // un-reallocated.
+      // No world half, so the row is the in-system record itself, unreallocated.
       union.push(entry);
       continue;
     }
     const worldDefault = findWorldDefault(defaults, id);
     const resolved = resolve(worldDefault, membership);
-    // FIELD BY FIELD, NOT RECORD BY RECORD (issue 1363), and then RE-DERIVED FROM THE IN-SYSTEM
-    // RECORD (issue 1370). The in-system record still supplies its own identity and every
-    // non-section key it carries; the world layer supplies the keys it does not.
     const merged = { ...entry, ...entity, ...resolved, ...entry };
     const carried = identityOf(entry, entityType);
     for (const field of identityFields) {
       if (!(field in carried)) delete merged[field];
     }
-    // AND THEN THE INHERIT SWITCH DECIDES (issue 1372). It runs AFTER the re-spread and after the
-    // identity delete, because it is the one thing the in-system record does NOT get to answer:
-    // a section the membership record marks inheriting resolves to the world default, on the
-    // shipped field names, and an overriding one is left exactly as the two passes above left it.
+    // Last, after the re-spread and the identity delete: an inheriting section is the one thing
+    // the in-system record does not answer.
     applyInheritedSections(merged, worldDefault, resolved.inherited, sectionWriters);
     union.push(merged);
   }
@@ -395,20 +134,9 @@ export function unionScopedDefinitions({
 }
 
 /**
- * Apply the WORLD DEFAULT for every section this system inherits, onto the shipped field names.
- *
- * TWO GUARDS, AND NEITHER IS DEFENSIVE STYLE. The section must be marked inheriting - an absent
- * `inherit` key reads as inheriting, matching `isSectionInherited`, because that is the state
- * `addToSystem` creates a record in. And the world default must have AUTHORED the section:
- * `undefined` means the world says nothing, so there is nothing to follow and the row keeps what
- * the in-system record gave it. `null` is NOT absence - an authored `macro: null` means "no
- * macro", and an inheriting system must take that answer rather than keep its own.
- *
- * @param {object} row The merged row, mutated in place. It is a fresh object per read.
- * @param {object|null} worldDefault
- * @param {{[section: string]: boolean}} inherited The resolver's per-section switch report.
- * @param {Readonly<Record<string, (row: object, value: unknown) => void>>} writers
- * @returns {void}
+ * Apply the world default for each inheriting section onto the fresh merged row. A missing
+ * `inherit` key reads as inheriting, as in `isSectionInherited`; an `undefined` world value applies
+ * nothing, while `null` is authored and applies.
  */
 function applyInheritedSections(row, worldDefault, inherited, writers) {
   if (!worldDefault || typeof worldDefault !== 'object') return;
@@ -421,17 +149,8 @@ function applyInheritedSections(row, worldDefault, inherited, writers) {
 }
 
 /**
- * The three shipped `EssenceDefinition` source fields an inherited `effectSource` block is
- * spelled over, in the shape `_sourceFieldsForEssenceSelection` emits.
- *
- * `?? null` rather than a conditional write, because the UNSET state of all three is `null` and
- * not absence on this record: an inheriting system whose world default authored `effectSource: {}`
- * has NO effect source, and leaving its own stale `sourceComponentId` standing would be the
- * per-field fallback `## Scoped Entity Definitions` forbids by name.
- *
- * @param {object} row
- * @param {unknown} value
- * @returns {void}
+ * Spread an inherited `effectSource` block over the three shipped source fields. Unset is `null`
+ * on this record, so an authored `effectSource: {}` clears all three.
  */
 function writeInheritedEffectSource(row, value) {
   const block = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
@@ -439,39 +158,18 @@ function writeInheritedEffectSource(row, value) {
 }
 
 /**
- * How each entity type's world-default SECTIONS are written onto a merged row, per entity type.
- *
- * THE SECTION NAME AND THE SHIPPED FIELD NAME ARE NOT ALWAYS THE SAME, which is the whole reason
- * this table exists rather than a spread. A component's `category` and `essences` and a tool's
- * `breakage` and `onBreak` are spelled identically at both scopes, so their writers are assignments. An essence's
- * two sections are NEW names that collide with nothing on the in-system record - `effectSource` is
- * a block over three fields and `macro` is `propertyMacroUuid` - so without a projection the
- * resolved value would sit on the row under a key no consumer reads, and "an inheriting system
- * follows its world default" would be true of the union's shape and false of every craft.
- *
- * The KEY SET is the scope's section list and must stay equal to it: a section with no writer here
- * silently stops inheriting, which is the defect this change removes.
- * `tests/world-scope-inherited-section-resolution.test.js` drives every section each scope
- * DECLARES and asserts the merged row changed, which is a stronger guard than comparing key sets:
- * a key added here with a projection that writes the wrong field name would pass the comparison.
- *
- * `repairRequirements` is deliberately absent. It is a SEED and not a resolver section
- * (`### Tool scope` requirement 2): `resolveTool` answers it from the membership record alone and
- * never reads it back out of the world defaults, so there is no inherit switch to read.
- *
- * @type {Readonly<Record<string, Readonly<Record<string, (row: object, value: unknown) => void>>>>}
+ * How each section is written onto a merged row, since a section name is not always its shipped
+ * field name (an essence's `effectSource` and `macro`). Every section a scope declares needs a
+ * writer here, which `inheritedSectionWriters` checks; the field names are driven per section by
+ * `tests/world-scope-inherited-section-resolution.test.js`. `repairRequirements` is a seed, not a
+ * section.
  */
 const INHERITED_SECTION_WRITERS = Object.freeze({
   components: Object.freeze({
     category(row, value) {
       row.category = value;
     },
-    // `essences` joined `COMPONENT_SECTIONS` at issue 1371 r18-store (M31), and it is an
-    // assignment because the section is spelled over the shipped `Component.essences` map. A
-    // COPY of the world map rather than the corpus object itself: the row is handed to
-    // consumers that read it as their own, and a normalized section value aliases the corpus
-    // by contract, so an assignment by reference would let a consumer edit the world default
-    // through the row.
+    // A copy, so a consumer cannot edit the world default through the row (issue 1371).
     essences(row, value) {
       row.essences = value && typeof value === 'object' ? { ...value } : value;
     },
@@ -489,14 +187,7 @@ const INHERITED_SECTION_WRITERS = Object.freeze({
     onBreak(row, value) {
       row.onBreak = value;
     },
-    // `prerequisites` and `bonus` joined `TOOL_SECTIONS` at `1.31.0` (issue 1373), and BOTH ARE
-    // ASSIGNMENTS because the section name and the shipped field name coincide: a normalized
-    // `Tool` carries `prerequisites: {enabled, ids, gateMode}` and `bonus: {enabled, expression}`
-    // under exactly those keys (`Tool.js`, and `toolCheckBonus.js` reads `tool.prerequisites`
-    // and `tool.bonus`), unlike the essence's two, whose section names name nothing on the
-    // record. Verified against the field, not against the section name: a writer guessed from
-    // the section name is right here and wrong two lines above, which is why the check is per
-    // entry rather than per table.
+    // Section and `Tool` field names coincide here (issue 1373).
     prerequisites(row, value) {
       row.prerequisites = value;
     },
@@ -507,21 +198,8 @@ const INHERITED_SECTION_WRITERS = Object.freeze({
 });
 
 /**
- * The sections a scope DECLARES, asked of the resolver this union was handed.
- *
- * NOT AN IMPORT OF THE THREE SECTION LISTS, because `componentScope.js`, `essenceScope.js` and
- * `toolScope.js` all import THIS module for {@link unionScopedDefinitions}, so reading
- * `TOOL_SECTIONS` from here would close an import cycle around the very function the cycle's other
- * half calls.
- *
- * The probe is the resolver's own documented non-member branch: `resolveScopedDefinition` fills
- * `inherited` for every section the scope declares BEFORE it consults either record, and answers
- * a null world default and a null membership without raising - which is the state the world-scope
- * preview already resolves in. So the key set of `resolve(null, null).inherited` is exactly the
- * scope's section list, obtained once per union rather than per row.
- *
- * @param {(worldDefault: object|null, membership: object|null) => object} resolve
- * @returns {string[]}
+ * The sections a scope declares, probed as the key set of `resolve(null, null).inherited`. Not
+ * imported, because the three scope modules import this one and that would close a cycle.
  */
 function declaredSections(resolve) {
   if (typeof resolve !== 'function') return [];
@@ -529,32 +207,9 @@ function declaredSections(resolve) {
 }
 
 /**
- * The inherited-section writers for one entity type, REFUSING an unrecognised entity type AND a
- * DECLARED SECTION THIS TABLE DOES NOT WRITE.
- *
- * It throws for the same reason {@link liftedIdentityFields} does, and the failure it catches is
- * the same shape: a typo would leave every section of that entity type reading the in-system
- * record whatever its switch said, with every suite green, because the union's other two passes
- * still produce a complete-looking row.
- *
- * THE SECOND REFUSAL IS THE SAME FAILURE ONE LEVEL DOWN, and it is here because it has already
- * happened. Issue 1373 added `prerequisites` and `bonus` to `TOOL_SECTIONS` while this table
- * still wrote `breakage` and `onBreak` alone, and the result was not a red line anywhere near
- * the table: the two new sections simply kept answering from the in-system record whatever their
- * switch said, exactly as an entity-type typo would have. Only a suite that happens to drive
- * every DECLARED section caught it, and a lane that adds a section without touching that suite
- * would not have been caught at all. A section list and a writer table that must stay equal, and
- * that live in two modules, is a mirror; the mirror is now checked where it is READ.
- *
- * The check is on the KEY SET only - it cannot see a writer that projects onto the wrong field
- * name, which is what `tests/world-scope-inherited-section-resolution.test.js` drives
- * behaviourally, per section, for exactly that reason.
- *
- * @param {'components'|'essences'|'tools'} entityType
- * @param {readonly string[]} [declared] The sections the scope declares, from
- *   {@link declaredSections}. An empty list checks nothing, which is the honest answer for a
- *   caller that supplied no resolver.
- * @returns {Readonly<Record<string, (row: object, value: unknown) => void>>}
+ * The section writers for one entity type. Throws on an unknown type and on a declared section the
+ * table does not write, which would otherwise answer from the in-system record with every suite
+ * green (issue 1373). An empty `declared` checks nothing.
  */
 function inheritedSectionWriters(entityType, declared = []) {
   const writers = INHERITED_SECTION_WRITERS[entityType];
@@ -582,20 +237,8 @@ function inheritedSectionWriters(entityType, declared = []) {
 }
 
 /**
- * The lifted identity field list for one entity type, REFUSING an unrecognised one.
- *
- * IT THROWS RATHER THAN DEFAULTING TO AN EMPTY LIST, and that is the whole point of the
- * function. The DELETE half of the key rule is a CORRECTNESS rule, so defaulting an unknown key
- * to "delete nothing" fails OPEN: a typo in one of the three call sites would leave a stale
- * world name, icon or image on a record the GM has since cleared, on every read, with every
- * suite in the repository still green. Measured: two such typos kept 943 tests across 23 files
- * passing. A key that silently disables a correctness rule should be loud.
- *
- * The three production callers are `resolveComponentScope`, `resolveEssenceScope` and
- * `resolveToolScope`, and each passes a literal.
- *
- * @param {'components'|'essences'|'tools'} entityType
- * @returns {readonly string[]}
+ * The lifted identity fields for one entity type. Throws rather than defaulting to none, which
+ * would fail open and leave a cleared identity field stale on every read.
  */
 function liftedIdentityFields(entityType) {
   const fields = WORLD_IDENTITY_FIELDS[entityType];
@@ -611,17 +254,7 @@ function liftedIdentityFields(entityType) {
   return fields;
 }
 
-/**
- * The world entity roster keyed by id.
- *
- * FIRST-WINS, matching {@link normalizeWorldEntities}, which already de-duplicates the roster
- * first-wins before it is published. A store's corpus therefore cannot exercise the branch at
- * all; a hand-built fixture corpus can, and it must answer the same record the roster's own
- * normalizer would have kept.
- *
- * @param {Array<object>} entities
- * @returns {Map<unknown, object>}
- */
+/** The world roster keyed by id, first-wins like {@link normalizeWorldEntities}. */
 function worldEntitiesById(entities) {
   const byId = new Map();
   for (const entity of entities) {
@@ -633,20 +266,9 @@ function worldEntitiesById(entities) {
 }
 
 /**
- * Build one world-scope entity store.
- *
- * @param {object} options
- * @param {string} options.settingKey The world setting key this store owns.
- * @param {(key: string) => unknown} options.getSetting
- * @param {(key: string, value: unknown) => Promise<unknown>} options.setSetting
- * @param {(raw: unknown) => Array<object>} options.normalizeDefaults The per-entity world-defaults
- *   normalizer from `componentScope.js` / `essenceScope.js` / `toolScope.js`.
- * @param {(raw: unknown) => Array<object>} options.normalizeMemberships The per-entity membership
- *   normalizer from the same module.
- * @param {(raw: object) => object} [options.normalizeExtras] Per-key fields beside the three
- *   sub-keys — the WORLD tool-breakage authority is the only one, and it belongs to `toolScope`
- *   alone.
- * @returns {object} The store.
+ * Build one world-scope entity store. `normalizeDefaults` and `normalizeMemberships` come from the
+ * entity's scope module; `normalizeExtras` supplies per-key fields beside the three sub-keys, used
+ * only by `toolScope` for the world tool-breakage authority.
  */
 export function createScopedDefinitionStore({
   settingKey,
@@ -682,7 +304,6 @@ class ScopedDefinitionStore {
     this._normalizeDefaults = normalizeDefaults;
     this._normalizeMemberships = normalizeMemberships;
     this._normalizeExtras = normalizeExtras;
-    /** @type {{entities: Array<object>, defaults: Array<object>, membership: Array<object>}|null} */
     this._corpus = null;
     this._entityIds = null;
     this.loaded = false;
@@ -690,13 +311,8 @@ class ScopedDefinitionStore {
   }
 
   /**
-   * Read, record raw key presence, then normalize — and the ORDER is the whole point. See the
-   * module note.
-   *
-   * GUARDED. An unreadable or malformed setting degrades to an UNKNOWN basis rather than taking
-   * the module down.
-   *
-   * @returns {object} The published corpus.
+   * Read raw, record key presence, then normalize, in that order. Never throws: an unreadable
+   * setting degrades to an unknown basis.
    */
   load() {
     let raw;
@@ -710,16 +326,7 @@ class ScopedDefinitionStore {
     return this._corpus;
   }
 
-  /**
-   * Replace the published corpus wholesale.
-   *
-   * WHOLESALE IS THE CONTRACT, not an implementation detail: the resolved-union memo keys on this
-   * object's identity, so an in-place edit would serve a stale union forever.
-   *
-   * @param {object} corpus
-   * @returns {void}
-   * @private
-   */
+  /** Replace the corpus wholesale; the union memo keys on its identity, so never edit in place. */
   _publish(corpus) {
     this._corpus = corpus;
     this._entityIds = null;
@@ -730,11 +337,6 @@ class ScopedDefinitionStore {
     if (!this.loaded) this.load();
   }
 
-  /**
-   * @param {unknown} raw
-   * @returns {object}
-   * @private
-   */
   _normalize(raw) {
     const source = plainObject(raw);
     return {
@@ -746,43 +348,30 @@ class ScopedDefinitionStore {
   }
 
   /**
-   * The published world corpus, BY REFERENCE.
-   *
-   * Deliberately not a clone: {@link unionScopedDefinitions} is memoized on this object's
-   * identity, and a fresh clone per call would miss the memo on every read. Callers that intend to
-   * mutate use {@link ScopedDefinitionStore#get}.
-   *
-   * @returns {{entities: Array<object>, defaults: Array<object>, membership: Array<object>}}
+   * The published corpus by reference, since the union memo keys on its identity; a caller that
+   * edits uses {@link ScopedDefinitionStore#get}.
    */
   corpus() {
     this._ensureLoaded();
     return this._corpus;
   }
 
-  /** The world entity roster, by reference. @returns {Array<object>} */
+  /** The world entity roster, by reference. */
   listEntities() {
     return this.corpus().entities;
   }
 
-  /** The world defaults, by reference. @returns {Array<object>} */
+  /** The world defaults, by reference. */
   listDefaults() {
     return this.corpus().defaults;
   }
 
-  /** The system membership records, by reference. @returns {Array<object>} */
+  /** The system membership records, by reference. */
   listMemberships() {
     return this.corpus().membership;
   }
 
-  /**
-   * The world entity ids, cached against the published corpus.
-   *
-   * Cached because `CraftingSystemManager#_scopeBasis` asks for it on EVERY normalize, and the
-   * roster is world-wide rather than per system. The cache is dropped by `_publish`, so it cannot
-   * outlive the corpus it was derived from.
-   *
-   * @returns {ReadonlySet<string>}
-   */
+  /** The world entity ids, cached until `_publish`; `_scopeBasis` asks on every normalize. */
   entityIds() {
     this._ensureLoaded();
     if (!this._entityIds) {
@@ -792,16 +381,9 @@ class ScopedDefinitionStore {
   }
 
   /**
-   * Whether the setting has ever actually been WRITTEN, as against reading back the registered
-   * default. This is the predicate that makes a destructive prune decidable.
-   *
-   * PER SUB-KEY when given one. `CraftingSystemManager#_scopeBasis` asks `isSeeded('entities')`
-   * and never the aggregate form, because the aggregate ORs across sub-keys and would report
-   * seeded on the strength of a sibling — handing the basis a real, empty, PRUNABLE id set derived
-   * from a sub-key that is simply absent.
-   *
-   * @param {'entities'|'defaults'|'membership'|null} [subKey]
-   * @returns {boolean}
+   * Whether the setting was ever written rather than read back as the registered default; the
+   * predicate that makes a destructive prune decidable. `_scopeBasis` asks per sub-key, because
+   * the no-argument form ORs across sub-keys and would vouch on a sibling's strength.
    */
   isSeeded(subKey = null) {
     this._ensureLoaded();
@@ -809,23 +391,12 @@ class ScopedDefinitionStore {
     return this.seeded[subKey] === true;
   }
 
-  /**
-   * A deep copy of the persisted shape — arrays back to maps — for a caller that intends to edit.
-   *
-   * @returns {object}
-   */
+  /** A deep copy of the persisted shape, arrays back to maps, for a caller that edits. */
   get() {
     this._ensureLoaded();
     return cloneJson(this._persistedShape(this._corpus));
   }
 
-  /**
-   * The persisted projection of a normalized corpus.
-   *
-   * @param {object} corpus
-   * @returns {object}
-   * @private
-   */
   _persistedShape(corpus) {
     const { entities, defaults, membership, ...extras } = corpus;
     return {
@@ -838,32 +409,16 @@ class ScopedDefinitionStore {
     };
   }
 
-  /**
-   * PUBLISH THE CACHE BEFORE AWAITING THE WRITE — see the module note.
-   *
-   * @param {object} next A normalized corpus.
-   * @returns {Promise<object>}
-   * @private
-   */
+  /** Publish the cache before awaiting the write, so an overlapping edit reads this one. */
   async _persist(next) {
     this._publish(next);
-    // A write is by definition a real payload, so every sub-key is seeded from here on. Without
-    // this the store would keep reporting UNKNOWN until the next reload and go on refusing to
-    // prune ids the GM has just deliberately removed.
+    // A write is a real payload, so every sub-key is seeded from here on and a removed id prunes.
     this.seeded = { entities: true, defaults: true, membership: true };
     await this.setSetting(this.settingKey, cloneJson(this._persistedShape(next)));
     return this._corpus;
   }
 
-  /**
-   * Replace the whole scope wholesale.
-   *
-   * NOT GATED ON VALIDITY, deliberately: a GM authors incrementally, so the moment they add an
-   * entity and before they name it the payload is transiently incomplete.
-   *
-   * @param {unknown} raw
-   * @returns {Promise<object>}
-   */
+  /** Replace the whole scope; not gated on validity, since a GM authors incrementally. */
   async save(raw) {
     this._ensureLoaded();
     return this._persist(this._normalize(raw));
@@ -871,12 +426,8 @@ class ScopedDefinitionStore {
 }
 
 /**
- * Which of the three sub-keys the RAW payload actually carries — i.e. which have been WRITTEN, as
- * against synthesized from the registered default. An array or a scalar is not a payload this
- * store ever wrote, so every sub-key reads as unseeded.
- *
- * @param {unknown} raw
- * @returns {{entities: boolean, defaults: boolean, membership: boolean}}
+ * Which sub-keys the raw payload carries, as against the synthesized default. An array or a scalar
+ * is not a payload this store wrote, so every sub-key reads unseeded.
  */
 function carriedSubKeys(raw) {
   const source = plainObject(raw);

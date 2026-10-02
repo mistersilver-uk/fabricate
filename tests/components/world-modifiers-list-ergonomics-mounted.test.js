@@ -35,6 +35,7 @@ const harness = createMountedComponentHarness({
     // The unified modifier library's bounds pair and roll classification (issue 1117).
     'src/systems/characterLibraries.js',
     'src/systems/checkModifierResolver.js',
+    'src/systems/checkModifierRouter.js',
     'src/systems/salvageCheckUsability.js',
     'src/systems/toolCheckBonus.js',
     'src/utils/checkModifierPicks.js',
@@ -331,6 +332,38 @@ describe('world modifiers list ergonomics (mounted, issue 768)', () => {
       Boolean(rolled.querySelector('[data-world-modifier-roll-note="mod-roll"]')),
       'a roll-shaped expression says so where it is authored, not only in Validation'
     );
+  });
+
+  it('tells a transformed roll it has no average to rank by, and a plain roll that it has', async () => {
+    const root = await harness.mount({
+      library: [
+        { id: 'mod-roll', label: 'Rolled', icon: 'fa-solid fa-b', expression: '1d6' },
+        { id: 'mod-count', label: 'Counted', icon: 'fa-solid fa-c', expression: '1d20cs>15' },
+      ],
+    });
+    const noteOf = async (id) => {
+      const row = root.querySelector(`[data-world-modifier="${id}"]`);
+      row.querySelector('[data-toggle-modifier]').dispatchEvent(clickEvent());
+      await flushRender();
+      return row.querySelector(`[data-world-modifier-roll-note="${id}"]`).textContent;
+    };
+    const plain = await noteOf('mod-roll');
+    assert.ok(plain.includes('ranked by its average'), 'a plain roll is ranked by its average');
+    const counted = await noteOf('mod-count');
+    assert.ok(counted.includes('no comparable average'), 'a transformed roll has no average');
+    assert.ok(!counted.includes('ranked by its average'), 'and is not said to be ranked by one');
+  });
+
+  it('states where a rolled modifier lands as a benefit, in both directions (issue 2005)', async () => {
+    const root = await harness.mount({
+      library: [{ id: 'mod-roll', label: 'Rolled', icon: 'fa-solid fa-b', expression: '1d6' }],
+    });
+    const row = root.querySelector('[data-world-modifier="mod-roll"]');
+    row.querySelector('[data-toggle-modifier]').dispatchEvent(clickEvent());
+    await flushRender();
+    const note = row.querySelector('[data-world-modifier-roll-note="mod-roll"]').textContent;
+    assert.ok(note.includes('a check that adds to its total appends the dice'), note);
+    assert.ok(note.includes('a roll-under check rolls them first and raises its target'), note);
   });
 
   // An inverted or unrollable pair makes the entry contribute nothing.

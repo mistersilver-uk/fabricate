@@ -1,8 +1,7 @@
 /**
- * `1.23.0` — merge a crafting system's two modifier libraries into ONE `system.modifiers` (issue
- * 1117; spec § Unified Modifier Library Migration owns the rules, the lossy downgrade and why THE
- * RUNNER'S ORDERING IS LOAD-BEARING). THE CHECK-CATALOGUE ENTRY KEEPS THE ID, being the only side
- * whose references this pass can rewrite EXHAUSTIVELY.
+ * `1.23.0`: one `system.modifiers` from the two libraries (issue 1117); spec § Unified Modifier
+ * Library Migration. The check entry keeps the id, the only side whose references this pass can
+ * rewrite exhaustively.
  */
 
 import { isPlainObject, forEachSystem } from './migrationHelpers.js';
@@ -10,13 +9,10 @@ import { isPlainObject, forEachSystem } from './migrationHelpers.js';
 /** Where the check-modifier catalogue lived between `1.22.0` and `1.23.0`. */
 const LEGACY_CHECK_LIBRARY_KEY = 'checkModifiers';
 
-/** Where the gathering character-modifier library lived, inside the gathering config. */
 const LEGACY_GATHERING_LIBRARY_KEY = 'characterModifiers';
 
-/** The one merged library, on the crafting system. */
 const UNIFIED_LIBRARY_KEY = 'modifiers';
 
-/** The suffix a re-keyed gathering entry takes when its id collides. */
 const COLLISION_SUFFIX = 'gathering';
 
 function _entryId(entry) {
@@ -35,10 +31,7 @@ function _resolveCollision(id, taken) {
   return candidate;
 }
 
-/**
- * Rewrite every `modifierId` in one reference list through the rename map, in place. A reference
- * naming an id that did not collide is left as authored, and a malformed one is skipped.
- */
+/** In place; unrenamed and malformed references are left as they are. */
 function _rewriteReferences(references, renames) {
   if (!Array.isArray(references) || renames.size === 0) return;
   for (const reference of references) {
@@ -48,11 +41,7 @@ function _rewriteReferences(references, renames) {
   }
 }
 
-/**
- * Apply the renames across every gathering reference site in ONE system's block. The three sites are
- * exactly the ones `migrateRemoveSystemProvider` scrubs, which is the enumeration the determinism
- * argument rests on: if a fourth existed, renaming the gathering side would not be a closed rewrite.
- */
+/** Exactly the three sites `migrateRemoveSystemProvider` scrubs; a fourth would break closure. */
 function _rewriteGatheringReferences(systemConfig, renames) {
   if (!isPlainObject(systemConfig) || renames.size === 0) return;
   if (Array.isArray(systemConfig.tasks)) {
@@ -73,11 +62,7 @@ function _rewriteGatheringReferences(systemConfig, renames) {
   }
 }
 
-/**
- * Apply the whole `1.23.0` transform to ONE system and its gathering block, both mutated in place,
- * answering how many entries were re-keyed. Split out so the world migration and the export upcast
- * share ONE derivation.
- */
+/** In place, answering the re-key count; shared with the export upcast. */
 export function applyUnifiedModifierLibrary(system, systemConfig = null) {
   if (!isPlainObject(system)) return 0;
 
@@ -89,15 +74,11 @@ export function applyUnifiedModifierLibrary(system, systemConfig = null) {
       ? systemConfig[LEGACY_GATHERING_LIBRARY_KEY]
       : null;
 
-  // A MALFORMED LEGACY VALUE IS SKIPPED, NOT DELETED — the same call `1.22.0` makes: deleting a
-  // non-array library is a repair, and this migration would be destroying data it has decided it
-  // cannot read, on the one path where the GM has no copy left.
+  // A malformed legacy value is skipped, not deleted, as in `1.22.0`: the GM has no other copy.
   if (checkEntries === null && gatheringEntries === null) return 0;
 
-  // GUARDED, so the transform is idempotent without relying on the version gate: an authored
-  // unified library is the newer location and is never clobbered, while the legacy keys are still
-  // retired so a half-migrated system converges. The View Lab depends on this directly — it boots
-  // the real runner over fixtures seeding no `migrationVersion`.
+  // Idempotent without the version gate, which the View Lab relies on: an authored unified
+  // library is never clobbered, and the legacy keys still retire.
   const alreadyUnified = Array.isArray(system[UNIFIED_LIBRARY_KEY]);
   const merged = alreadyUnified ? system[UNIFIED_LIBRARY_KEY] : [];
   const taken = new Set(merged.map((entry) => _entryId(entry)).filter(Boolean));
@@ -105,8 +86,7 @@ export function applyUnifiedModifierLibrary(system, systemConfig = null) {
   if (!alreadyUnified && checkEntries) {
     for (const entry of checkEntries) {
       const id = _entryId(entry);
-      // A check entry with no usable id cannot collide and cannot be referenced; it is carried
-      // through verbatim and the normalizer drops it.
+      // No usable id: carried verbatim for the normalizer to drop.
       if (id) {
         if (taken.has(id)) continue;
         taken.add(id);
@@ -145,7 +125,6 @@ export function applyUnifiedModifierLibrary(system, systemConfig = null) {
   return renames.size;
 }
 
-/** Runner entry point. */
 export function migrateUnifyModifierLibraries(data = {}) {
   const systems = structuredClone(data.systems ?? null);
   if (!Array.isArray(systems)) {

@@ -271,13 +271,13 @@
        exists to hold. `contextClass` keeps only the container concern. -->
   <EmptyState
     compact
+    fill
     icon="fas fa-screwdriver-wrench"
     title={text('FABRICATE.Admin.Manager.Tools.SelectTitle', 'Select a Tool')}
     hint={text(
       'FABRICATE.Admin.Manager.Tools.SelectHint',
       'Choose a Tool to inspect its behaviour.'
     )}
-    contextClass="manager-tool-browser-inspector-empty"
     dataAttr="data-tool-browser-inspector-empty"
   />
 {/if}

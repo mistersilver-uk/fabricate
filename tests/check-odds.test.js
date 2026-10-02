@@ -9,7 +9,7 @@ import {
   enumerateProgressiveOdds,
   enumerateRoutedOdds,
 } from '../src/ui/svelte/apps/manager/checks/checkOdds.js';
-import { buildPreviewCheckArgs } from '../src/ui/svelte/apps/manager/checks/checkPreview.js';
+import { buildPreviewCheckArgs, runCheckPreview } from '../src/ui/svelte/apps/manager/checks/checkPreview.js';
 import { resolveForcedOutcome } from '../src/systems/checkRoll.js';
 import {
   RECORDED_ROLL_DATA,
@@ -18,6 +18,7 @@ import {
   recordedRollDouble,
 } from './helpers/recordedRollParse.js';
 import { createLabRoll } from './view-lab/foundry/labRoll.js';
+import { installCountDice } from './helpers/countEngineDice.js';
 
 /** The previewed actor the recording was made against. */
 const ACTOR = { getRollData: () => RECORDED_ROLL_DATA };
@@ -163,6 +164,16 @@ describe('checkOdds: every refusal carries its OWN reason code', () => {
     assert.deepEqual(domainOf(two), { min: 2, max: 26 });
     const pool = describe14365('{1d20,1d12}kh');
     assert.deepEqual(domainOf(pool), { min: 1, max: 20 }, 'keep-highest of the two members');
+  });
+
+  it('retains the die-modifier refusal for free-text transformed quantities', () => {
+    for (const formula of ['1d20cs>15', '2d6cs>5', '1d20odd']) {
+      assert.deepEqual(
+        describeFormulaEnumerability(formula, ACTOR, { Roll: LAB_ROLL }),
+        { enumerable: false, reason: ODDS_REASONS.dieModifiers },
+        formula
+      );
+    }
   });
 
   it('refuses a space too large to walk, rather than sampling one', () => {
@@ -378,11 +389,39 @@ describe('checkOdds: the per-face dice bag comes from the production code path',
 });
 
 describe('checkOdds: pass/fail and progressive bucketing', () => {
+  it('previews a count check through its count runner, its retained formula inert (issue 2004)', async () => {
+    const dice = installCountDice({ faces: [6, 1], chat: false });
+    try {
+      const plan = buildPreviewCheckArgs({
+        activity: 'crafting', mode: 'simple', actor: ACTOR,
+        draft: {
+          rollFormula: '1d20', dc: 10,
+          evaluation: {
+            product: 'count', direction: 'under',
+            pool: { die: 6, base: '2', threshold: '3', required: 1 },
+          },
+        },
+      });
+      assert.equal(plan.formula, '', 'the retained 1d20 never reaches the preview');
+      const result = await runCheckPreview(plan);
+      assert.deepEqual(dice.formulas(), ['2d6'], 'the pool rolls, once');
+      assert.equal(result.data.product, 'count');
+      assert.equal(result.data.direction, 'under');
+      assert.equal(result.data.total, 1, 'the 1 qualifies at or under 3 and the 6 does not');
+      assert.equal(result.success, true);
+    } finally {
+      dice.restore();
+    }
+  });
+
   it('splits a pass/fail check on the comparison', () => {
     assert.deepEqual(
       enumeratePassFailOdds({
         outcomes: spaceOf('1d20').outcomes,
-        args: { dc: 15, comparison: 'meet', triggers: [] },
+        args: {
+          dc: 15, comparison: 'meet', triggers: [],
+          evaluation: { product: 'count', direction: 'under' },
+        },
       }).map((row) => [row.id, row.count]),
       [
         ['failure', 14],

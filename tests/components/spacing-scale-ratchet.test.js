@@ -16,11 +16,18 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { assertRatchet, tallyByKey } from '../helpers/ratchetBaseline.js';
+import {
+  STYLE_CORPUS,
+  assertGateCases,
+  checkGate,
+  emptyMarkerFailure,
+  gateOver,
+  styleCorpusOf,
+  workingTree,
+} from '../helpers/designSystemRatchet.js';
 import { repoRoot } from '../helpers/sourceScan.js';
 import {
   MAX_VAR_CHAIN_DEPTH,
-  collectStyleCorpus,
   pixelValuesIn,
   scanPixelDeclarations,
   varReferencesIn,
@@ -32,8 +39,6 @@ import {
   FLOOR_REFERENCE_STYLESHEET_SPACING_DECLARATIONS,
   FLOOR_REFERENCE_SVELTE_SPACING_DECLARATIONS,
   HAIRLINE_MAGNITUDE,
-  KNOWN_RAW_SPACING,
-  KNOWN_RAW_SPACING_TOTAL,
   SCANNED_SPACING_PROPERTIES,
   SPACING_SCALE_PREFIX,
   isExemptSpacingPixels,
@@ -44,40 +49,45 @@ import {
 const STYLESHEET_SPACING_DECLARATION_FLOOR = 1289;
 const SVELTE_SPACING_DECLARATION_FLOOR = 1450;
 
-/** The corpus is walked once. Lazily, so a walk failure is reported as a test rather than as an
- * unattributed module-load throw that escapes the `# fail` count entirely. */
+/** The spacing declarations of one side's style corpus, with the published scale held opaque. */
+const scanSpacing = (corpus, accept, opaqueProperty = isSpacingScaleToken) =>
+  scanPixelDeclarations({ corpus, properties: SCANNED_SPACING_PROPERTIES, accept, opaqueProperty });
+
+/** Every literal the spec does not exempt, as the debt. */
+const rawSpacing = (corpus) => scanSpacing(corpus, (pixels) => !isExemptSpacingPixels(pixels));
+
+/** The corpus is walked once, lazily, so a walk failure is reported as a test. */
 let cached = null;
 function scan() {
   if (cached === null) {
-    const corpus = collectStyleCorpus();
-    const opaqueProperty = isSpacingScaleToken;
+    const { readFile, listFiles } = workingTree(STYLE_CORPUS);
+    const corpus = styleCorpusOf(readFile, listFiles()).styles;
     cached = {
       corpus,
-      // The debt: every literal the spec does not exempt.
-      raw: scanPixelDeclarations({
-        corpus,
-        properties: SCANNED_SPACING_PROPERTIES,
-        accept: (pixels) => !isExemptSpacingPixels(pixels),
-        opaqueProperty,
-      }),
+      raw: rawSpacing(corpus),
       // The complement, over the same corpus and the same definitions.
-      exempt: scanPixelDeclarations({
+      exempt: scanSpacing(corpus, isExemptSpacingPixels),
+      // Control 3's other half: nothing held opaque, so every scale token resolves to its own
+      // pixel value and this must find strictly more.
+      resolved: scanSpacing(
         corpus,
-        properties: SCANNED_SPACING_PROPERTIES,
-        accept: isExemptSpacingPixels,
-        opaqueProperty,
-      }),
-      // Control 3's other half: the same scan with NOTHING held opaque. Every scale token then
-      // resolves to its own pixel value, so this must find strictly more.
-      resolved: scanPixelDeclarations({
-        corpus,
-        properties: SCANNED_SPACING_PROPERTIES,
-        accept: () => true,
-      }),
+        () => true,
+        () => false
+      ),
     };
   }
   return cached;
 }
+
+/** One side's raw spacing literals, one site per occurrence, netting a move within a file. */
+const SPACING_GATE = gateOver([STYLE_CORPUS], (readFile, files) =>
+  rawSpacing(styleCorpusOf(readFile, files).styles).occurrences.map((record) => ({
+    file: record.file,
+    line: record.line,
+    id: `${record.property} ${record.value}px`,
+    value: `${record.value}px`,
+  }))
+);
 
 /** `styles/**` on one side, Svelte scoped blocks on the other. */
 const isStylesheet = (record) => record.file.startsWith('styles/');
@@ -144,7 +154,7 @@ test('every spacing property spelling is scanned, including the logical longhand
   const scanned = new Set(SCANNED_SPACING_PROPERTIES);
 
   // The logical longhands contribute ZERO occurrences today.
-  // structural guard: nothing in the baseline would notice them being dropped from the list, and
+  // structural guard: no base comparison would notice them being dropped from the list, and
   // a rewrite that switched `padding-left` for `padding-inline-start` would then walk straight
   // around the gate carrying its literals with it.
   const missing = [];
@@ -165,7 +175,8 @@ test('every spacing property spelling is scanned, including the logical longhand
     [],
     'a spacing property spelling has been dropped from SCANNED_SPACING_PROPERTIES. Each one is a ' +
       'way to write the same declaration, so an unscanned spelling is a rename away from being a ' +
-      'bypass:\n  ' + missing.join('\n  ')
+      'bypass:\n  ' +
+      missing.join('\n  ')
   );
 });
 
@@ -285,7 +296,7 @@ test('both documented exemptions are live, and nothing else is exempt', () => {
   );
 
   // The two bands are the WHOLE exemption. A predicate widened to swallow a third band would
-  // otherwise show up only as a heap of vanished baseline rows, which reads like debt paid down.
+  // otherwise show up only as a heap of shrunk entries, which reads like debt paid down.
   const stray = exempt.occurrences.filter(
     (record) => !hairlines.includes(record) && !clearances.includes(record)
   );
@@ -311,29 +322,20 @@ test('both documented exemptions are live, and nothing else is exempt', () => {
  * from this one. So "no new raw spacing literal has been introduced" is a claim about what the
  * two stylesheet corpora DECLARE, not about what the product renders.
  */
-test('no new raw spacing literal has been introduced', () => {
-  const { raw } = scan();
-  const observed = tallyByKey(
-    raw.occurrences,
-    (record) => `${record.file} ${record.property} ${record.value}`
-  );
-
-  assertRatchet({
-    label: 'raw spacing literals',
-    baseline: KNOWN_RAW_SPACING,
-    pinnedTotal: KNOWN_RAW_SPACING_TOTAL,
-    observed,
-    scanned: raw.declarations.length,
-    floor: STYLESHEET_SPACING_DECLARATION_FLOOR + SVELTE_SPACING_DECLARATION_FLOOR,
-    guidance:
-      'Padding, margin and gap MUST derive from the published spacing scale — see the "Spacing ' +
+test('no new raw spacing literal has been introduced', (t) => {
+  checkGate(
+    t,
+    SPACING_GATE,
+    'Padding, margin and gap MUST derive from the published spacing scale — see the "Spacing ' +
       'scale" section of `openspec/specs/ui-visual-style/spec.md`. Use the numeric tokens ' +
       `(\`${SPACING_SCALE_PREFIX}-1\` through \`${SPACING_SCALE_PREFIX}-6\`, plus ` +
-      `\`${SPACING_SCALE_PREFIX}-2xs\` and \`${SPACING_SCALE_PREFIX}-chip\`); this baseline is ` +
-      'the debt already owed, not a permission to add to it. The nearest step is almost always ' +
-      'right. The spec exempts exactly two things and this gate already applies both, so a value ' +
-      'outside them needs a token rather than a row.',
-  });
+      `\`${SPACING_SCALE_PREFIX}-2xs\` and \`${SPACING_SCALE_PREFIX}-chip\`); the literals the ` +
+      'base commit already carries are debt owed, not a permission to add to it. The nearest ' +
+      'step is almost always right. The spec exempts exactly two things and this gate already ' +
+      'applies both, so a value outside them needs a token; a ' +
+      '`ratchet-exempt(design-system): <reason>` marker is for a value that genuinely is not ' +
+      'spacing.'
+  );
 });
 
 test('no raw spacing literal has been laundered into a private token', () => {
@@ -358,6 +360,94 @@ test('no raw spacing literal has been laundered into a private token', () => {
       'been paid — the gap is still that many pixels wide — and the count above did not move ' +
       `because the scan resolves \`var()\`. Use a published \`${SPACING_SCALE_PREFIX}\` token, ` +
       'which this scan holds opaque precisely because deriving from the scale is what the spec ' +
-      'asks for:\n  ' + laundered.join('\n  ')
+      'asks for:\n  ' +
+      laundered.join('\n  ')
   );
+});
+
+/* ───────────────────────── proofs against throwaway repositories ───────────────────────── */
+
+const SHEET = 'styles/fabricate.css';
+const PROBE = 'src/ui/svelte/Probe.svelte';
+const REASON = 'ratchet-exempt(design-system): the probe needs it';
+
+const sheetWith = (...lines) =>
+  [
+    `:root { ${SPACING_SCALE_PREFIX}-2: 8px; }`,
+    '.fabricate .a { padding: 12px; gap: var(--fab-space-2); }',
+    ...lines,
+    '',
+  ].join('\n');
+
+const probeWith = (...rules) =>
+  [
+    '<div class="probe"></div>',
+    '<style>',
+    '  .probe { margin: 6px; }',
+    ...rules,
+    '</style>',
+    '',
+  ].join('\n');
+
+const WIRING_BASE = Object.freeze({
+  [SHEET]: sheetWith(),
+  [PROBE]: probeWith(),
+  'README.md': 'unrelated\n',
+});
+
+const spacing = (file, id) => `${file}: ${id}`;
+
+test('the spacing gate fails a new literal and a grown one, and nothing the spec allows', (t) => {
+  assertGateCases(t, SPACING_GATE, WIRING_BASE, [
+    {
+      head: { [SHEET]: sheetWith('.fabricate .b { padding: 13px; }') },
+      failures: [`${spacing(SHEET, 'padding 13px')} is new (1)`],
+    },
+    {
+      head: { [PROBE]: probeWith('  .probe-b { margin: 6px; }') },
+      failures: [`${spacing(PROBE, 'margin 6px')} rose from 1 to 2`],
+    },
+    {
+      head: {
+        [SHEET]: sheetWith(
+          '.fabricate .c { margin: -1px; padding: 36px; gap: var(--fab-space-2); }'
+        ),
+      },
+      failures: [],
+    },
+    {
+      head: { [SHEET]: sheetWith().replace('padding: 12px', 'padding-block: 12px') },
+      failures: [],
+    },
+    { head: { 'README.md': 'changed\n' }, skipped: 'corpus-unchanged' },
+  ]);
+});
+
+test('a literal moved into a private token is still counted, at its resolved value', (t) => {
+  assertGateCases(t, SPACING_GATE, WIRING_BASE, [
+    {
+      head: {
+        [SHEET]: sheetWith(':root { --inset: 13px; }', '.fabricate .b { padding: var(--inset); }'),
+      },
+      failures: [`${spacing(SHEET, 'padding 13px')} is new (1)`],
+    },
+  ]);
+});
+
+test('a reasoned marker at the declaration exempts it, and an empty one fails', (t) => {
+  const offender = '.fabricate .b { padding: 13px; }';
+  assertGateCases(t, SPACING_GATE, WIRING_BASE, [
+    { head: { [SHEET]: sheetWith(`/* ${REASON} */`, offender) }, failures: [] },
+    {
+      head: { [PROBE]: probeWith(`  /* ${REASON} */`, '  .probe-b { margin: 6px; }') },
+      failures: [],
+    },
+    {
+      head: { [SHEET]: sheetWith('/* ratchet-exempt(design-system): */', offender) },
+      failures: [
+        `${spacing(SHEET, 'padding 13px')} is new (1); its ratchet-exempt marker gives no reason`,
+        emptyMarkerFailure(SHEET, 3),
+      ],
+    },
+  ]);
 });

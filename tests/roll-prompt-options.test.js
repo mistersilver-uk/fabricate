@@ -1,483 +1,635 @@
-import { strict as assert } from 'node:assert';
+import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-
 import {
   buildInteractiveRollOptions,
+  buildSinglePromptData,
+  normalizeSituationalBonus,
+  promptBulkCheckRoll,
   promptCheckRoll,
+  translatePromptAnswer,
 } from '../src/ui/svelte/apps/crafting/rollPrompt.js';
+import { resolveCheckDecision } from '../src/systems/checkRollDecision.js';
+import { rollPromptTarget } from '../src/ui/svelte/apps/crafting/rollPromptTarget.js';
+import { normalizeCheckEvaluation } from '../src/systems/normalize/checkEvaluation.js';
+import { stubI18n, stubPromptSurface } from './helpers/rollPromptDialogStub.js';
 
-// The DialogV2 / i18n stubs are SHARED with `tests/roll-prompt-bulk.test.js` (issue 859): the two
-// prompts share `renderDieRow`, `renderBonusInput`, `renderRollModePicker`, `readSharedRollChoice`
-// and `buildRollButtons`, so a second copy of the harness would be new test code duplicating new
-// test code against SonarCloud's new-code duplication gate.
-import { checkboxGroupField, stubDialogCapture, stubI18n } from './helpers/rollPromptDialogStub.js';
-
-const PICK_DESCRIPTOR = {
-  modifiers: [
-    { id: 'med', label: 'Medicine', icon: 'fa-solid fa-med', value: 3 },
-    { id: 'herb', label: 'Herbalism', icon: 'fa-solid fa-herb', value: 5 },
-  ],
-  defaultSelectedId: 'herb',
-};
-
-// The same options under a cap of 2 — the shape `buildCheckModifierChoice` produces
-// for an unbounded or multi-pick system (issue 1055).
-const MULTI_PICK_DESCRIPTOR = {
-  ...PICK_DESCRIPTOR,
+const choice = {
+  modifiers: [{ id: 'a', label: 'A', display: '+1' }, { id: 'b', label: 'B', display: '+1d4' }],
   maxPicks: 2,
-  defaultSelectedIds: ['med', 'herb'],
-  defaultSelectedId: 'med',
+  defaultSelectedIds: ['a', 'b'],
 };
 
-// The catalogue editor creates a row with `label: ''` and never forces a value, and the
-// icon is only defaulted in the editor's own control — so a saved entry can reach the
-// prompt with BOTH empty. This descriptor is that entry, alongside a normal sibling.
-const BARE_DESCRIPTOR = {
-  modifiers: [
-    { id: 'bare', label: '', icon: '', value: 3 },
-    { id: 'herb', label: 'Herbalism', icon: 'fa-solid fa-herb', value: 5 },
-  ],
-  defaultSelectedId: 'herb',
-};
+async function open(args, answer) {
+  const surface = stubPromptSurface(() => answer);
+  try {
+    return { view: null, result: await promptCheckRoll(args), ...surface, surface };
+  } finally {
+    surface.restore();
+  }
+}
 
-/**
- * `buildInteractiveRollOptions` threads the subject `name`/`activity`/`img` into the options bag so
- * the prompt can render its icon-first header.
- */
-describe('buildInteractiveRollOptions', () => {
-  it('threads name, activity, and img into the options bag', () => {
+describe('roll prompt adapter', () => {
+  it('builds the automated-caller bag with a strict interactive flag and no stray keys', () => {
+    for (const interactive of [false, undefined, 'true']) {
+      assert.equal(buildInteractiveRollOptions({ interactive }).interactive, false);
+    }
     const options = buildInteractiveRollOptions({
-      interactive: true,
-      actor: { id: 'a1' },
-      name: 'Forge Iron Rivets',
-      activity: 'Crafting',
-      img: 'icons/tools/smithing/anvil.webp',
-      dc: 12,
+      interactive: true, actor: { name: 'Brenna' }, activity: 'Crafting', name: 'Iron', dc: 12, img: 'icons/iron.webp',
     });
     assert.equal(options.interactive, true);
-    assert.equal(options.name, 'Forge Iron Rivets');
-    assert.equal(options.activity, 'Crafting');
-    assert.equal(options.img, 'icons/tools/smithing/anvil.webp');
-    assert.equal(options.dc, 12);
-    assert.equal(typeof options.prompt, 'function');
+    assert.equal(options.img, 'icons/iron.webp');
+    assert.deepEqual(Object.keys(options).sort(), [
+      'activity', 'dc', 'flavor', 'img', 'interactive', 'name', 'prompt', 'rollMode', 'speaker',
+    ]);
   });
 
-  it('carries a false interactive flag through for automated callers', () => {
-    const options = buildInteractiveRollOptions({
-      interactive: false,
-      actor: null,
-      name: 'Extract Iron Ore',
-      activity: 'Gathering',
-    });
-    assert.equal(options.interactive, false);
-    assert.equal(options.name, 'Extract Iron Ore');
-    assert.equal(options.activity, 'Gathering');
-  });
-
-  it('forwards a modifierChoice descriptor into the bag when present', () => {
-    const options = buildInteractiveRollOptions({
-      interactive: true,
-      actor: null,
-      name: 'Healing Salve',
-      activity: 'Crafting',
-      modifierChoice: PICK_DESCRIPTOR,
-    });
-    assert.equal(options.modifierChoice, PICK_DESCRIPTOR);
-  });
-
-  it('omits the modifierChoice key entirely when absent (byte-identical bag)', () => {
-    const options = buildInteractiveRollOptions({
-      interactive: true,
-      actor: null,
-      name: 'Iron Rivets',
-      activity: 'Crafting',
-    });
-    assert.equal('modifierChoice' in options, false, 'no stray key on non-playerPicks paths');
-  });
-
-  // The engine NEVER omits the key: `_buildInteractiveModifierChoice` returns `null` on every
-  // deterministic / non-interactive path, so `null` — not `undefined` — is the production shape the
-  // byte-identical-bag guard has to survive.
-  it('omits the modifierChoice key when the engine passes an explicit null', () => {
-    const options = buildInteractiveRollOptions({
-      interactive: true,
-      actor: null,
-      name: 'Iron Rivets',
-      activity: 'Crafting',
-      modifierChoice: null,
-    });
-    assert.equal(
-      'modifierChoice' in options,
-      false,
-      'a null descriptor (the engine default) must not add the key'
-    );
-  });
-
-  // Acceptance 11 — "the single-item salvage path is unchanged: no `rollOptions` key added
-  // (asserted)".
-  it('adds no rollDecision key on any non-bulk path', () => {
-    for (const args of [
-      { interactive: true, actor: { id: 'a1' }, name: 'Iron Rivets', activity: 'Crafting', dc: 12 },
-      { interactive: false, actor: null, name: 'Extract Iron Ore', activity: 'Gathering' },
-      {
-        interactive: true,
-        actor: null,
-        name: 'Iron Ore',
-        activity: 'Salvage',
-        modifierChoice: PICK_DESCRIPTOR,
-      },
+  it('names only a summed roll-over fixed DC in the options flavor; a Target waits for its benefits (Q20)', () => {
+    const flavor = (evaluation, dc = 14) => buildInteractiveRollOptions(
+      { interactive: true, actor: null, name: 'Rope', activity: 'Crafting', dc, evaluation },
+      () => null
+    ).flavor;
+    const skill = { product: 'sum', direction: 'over', target: { source: 'attribute', expression: '@skill' } };
+    assert.equal(flavor(undefined), 'Rope — Crafting check (DC 14)');
+    for (const evaluation of [
+      { product: 'sum', direction: 'under', target: { source: 'fixed' } },
+      skill,
+      { ...skill, direction: 'under' },
+      { product: 'count', direction: 'under' },
     ]) {
-      const options = buildInteractiveRollOptions(args);
-      assert.equal('rollDecision' in options, false, `${args.activity}: byte-identical bag`);
+      assert.equal(flavor(evaluation), 'Rope — Crafting check', JSON.stringify(evaluation));
     }
+    assert.equal(flavor(undefined, null), 'Rope — Crafting check', 'an unresolved DC names no number');
   });
-});
 
-describe('promptCheckRoll: playerPicks radio fieldset', () => {
-  it('renders a radio option per modifier with the default pre-checked, and returns the chosen id', async () => {
-    const captured = stubDialogCapture({
-      situationalBonus: { value: '' },
-      rollMode: { value: 'publicroll' },
-      craftingModifier: { value: 'med' },
+  it('builds localized activity and actor-subject labels without inventing a missing subject', () => {
+    const named = buildSinglePromptData({ activity: 'Crafting', actorName: 'Brenna', name: 'Iron', dc: 12, thresholdMode: 'exceed' });
+    assert.equal(named.title, 'Crafting check');
+    assert.equal(named.subtitle, 'Brenna · Iron');
+    assert.equal(named.comparison, 'exceed');
+    assert.equal(buildSinglePromptData({ activity: 'Salvage', actorName: 'Brenna' }).subtitle, 'Brenna');
+    assert.equal(buildSinglePromptData({ thresholdMode: 'exceed', comparison: null }).comparison, null);
+    assert.equal(buildSinglePromptData({ thresholdMode: 'exceed', comparison: 'meet' }).comparison, 'meet');
+  });
+
+  it('inserts user-authored names literally, never as replacement patterns', () => {
+    const data = buildSinglePromptData({ activity: "$'Forge", actorName: 'A$&B', name: '$1 Blade' });
+    assert.equal(data.title, "$'Forge check");
+    assert.equal(data.subtitle, 'A$&B · $1 Blade');
+  });
+
+  it('binds the actor name while preserving the runner prompt payload', async () => {
+    let captured;
+    const options = buildInteractiveRollOptions({ actor: { name: 'Brenna' }, activity: 'Crafting' }, async (payload) => {
+      captured = payload;
+      return { confirmed: true };
     });
+    assert.deepEqual(await options.prompt({ resolvedFormula: '1d20 + 2', thresholdMode: 'exceed' }), { confirmed: true });
+    assert.deepEqual(captured, { resolvedFormula: '1d20 + 2', thresholdMode: 'exceed', actorName: 'Brenna' });
+  });
+
+  it('offers Advantage only for a strictly true allowAdvantage', async () => {
+    for (const allowAdvantage of [undefined, null, 'true', 1]) {
+      const { view } = await open({ activity: 'Crafting', allowAdvantage }, null);
+      assert.equal(view.allowAdvantage, false, `${String(allowAdvantage)} is not true`);
+    }
+    const { view } = await open({ activity: 'Crafting', allowAdvantage: true }, null);
+    assert.equal(view.allowAdvantage, true);
+  });
+
+  it('offers exactly the four legacy roll-mode tokens under Fabricate labels', async () => {
+    const restore = stubI18n({ 'FABRICATE.App.RollPrompt.RollModePrivate': 'Private GM roll (lang)' });
+    const previousConfig = globalThis.CONFIG;
+    globalThis.CONFIG = { get Dice() { throw new Error('CONFIG.Dice must not be read'); } };
     try {
-      const choice = await promptCheckRoll({
-        formula: '1d20 + (5)',
-        resolvedFormula: '1d20 + (5)',
-        activity: 'Crafting',
-        modifierChoice: PICK_DESCRIPTOR,
-      });
-      assert.match(captured.content, /name="craftingModifier"/, 'radio group rendered');
-      assert.match(captured.content, /value="med"/);
-      assert.match(captured.content, /value="herb"\s+checked/, 'the default (herb) is pre-checked');
-      assert.match(captured.content, /Medicine/);
-      assert.match(captured.content, /Herbalism/);
-      assert.match(captured.content, /\+3/, 'signed value chip');
-      assert.match(captured.content, /\+5/);
-      assert.match(captured.content, /fabricate-roll-prompt__modifiers/);
-      assert.equal(choice.chosenModifierId, 'med', 'the checked radio value is returned');
+      const { view } = await open({ activity: 'Crafting' }, null);
+      assert.deepEqual(view.rollModes.map((mode) => mode.value), ['publicroll', 'gmroll', 'blindroll', 'selfroll']);
+      assert.deepEqual(view.rollModes.map((mode) => mode.label), ['Public roll', 'Private GM roll (lang)', 'Blind GM roll', 'Self roll']);
     } finally {
-      captured.restore();
+      globalThis.CONFIG = previousConfig;
+      restore();
     }
   });
 
-  it('falls back to the default selection when the radio field is absent (headless form)', async () => {
-    const captured = stubDialogCapture({
-      situationalBonus: { value: '' },
-      rollMode: { value: 'publicroll' },
-      // no craftingModifier field
-    });
-    try {
-      const choice = await promptCheckRoll({
-        formula: '1d20 + (5)',
-        activity: 'Crafting',
-        modifierChoice: PICK_DESCRIPTOR,
-      });
-      assert.equal(choice.chosenModifierId, 'herb');
-    } finally {
-      captured.restore();
-    }
-  });
-
-  // The control TYPE follows the cap, because the two say different things to the player
-  // and a checkbox that behaves like a radio is a lie about the control (issue 1055).
-  it('renders a CHECKBOX group with a stated bound above a cap of one', async () => {
-    const captured = stubDialogCapture({
-      situationalBonus: { value: '' },
-      rollMode: { value: 'publicroll' },
-      craftingModifier: checkboxGroupField(MULTI_PICK_DESCRIPTOR.modifiers, ['med', 'herb']),
-    });
-    const restoreI18n = stubI18n({ 'FABRICATE.App.RollPrompt.PickUpTo': 'Pick up to {count}' });
-    try {
-      const choice = await promptCheckRoll({
-        formula: '1d20 + (modifier)',
-        activity: 'Crafting',
-        modifierChoice: MULTI_PICK_DESCRIPTOR,
-      });
-      assert.match(captured.content, /type="checkbox" name="craftingModifier"/, 'checkbox group');
-      assert.doesNotMatch(captured.content, /type="radio"/, 'not a radio group');
-      assert.match(captured.content, /Pick up to 2/, 'the legend states the bound in words');
-      assert.match(captured.content, /value="med"\s+checked/, 'both pre-selected ids are checked');
-      assert.match(captured.content, /value="herb"\s+checked/);
-      assert.deepEqual(choice.chosenModifierIds, ['med', 'herb'], 'both ticked boxes returned');
-      assert.equal(
-        choice.chosenModifierId,
-        'med',
-        'the legacy singular field is the first of them'
-      );
-    } finally {
-      restoreI18n();
-      captured.restore();
-    }
-  });
-
-  // The reader walks the group's `checked` flags rather than reading `RadioNodeList#value`, which
-  // is specified to inspect RADIO inputs only and returns `''` for a checkbox group however many
-  // boxes are ticked.
-  it('reports a PARTIAL checkbox selection, and an empty one as an empty array', async () => {
-    for (const [checkedIds, expected] of [
-      [['herb'], ['herb']],
-      [[], []],
-    ]) {
-      const captured = stubDialogCapture({
-        situationalBonus: { value: '' },
-        rollMode: { value: 'publicroll' },
-        craftingModifier: checkboxGroupField(MULTI_PICK_DESCRIPTOR.modifiers, checkedIds),
-      });
+  it('carries the client default roll mode into the view and the automated bag', async () => {
+    for (const [setting, expected] of [[undefined, 'publicroll'], ['unknown', 'publicroll'], ['blindroll', 'blindroll']]) {
+      const restore = stubI18n({}, { rollMode: setting });
       try {
-        const choice = await promptCheckRoll({
-          formula: '1d20 + (modifier)',
-          activity: 'Crafting',
-          modifierChoice: MULTI_PICK_DESCRIPTOR,
-        });
-        assert.deepEqual(choice.chosenModifierIds, expected);
+        assert.equal(buildInteractiveRollOptions({ activity: 'Crafting' }).rollMode, expected);
+        const { view, result } = await open({ activity: 'Crafting' }, { confirmed: true, rollMode: 'unknown' });
+        assert.equal(view.defaultRollMode, expected);
+        assert.equal(result.rollMode, expected, 'an unsupported submitted mode falls back to the default');
       } finally {
-        captured.restore();
+        restore();
       }
     }
   });
 
-  it('omits the legacy singular field entirely for an empty selection', async () => {
-    const captured = stubDialogCapture({
-      situationalBonus: { value: '' },
-      rollMode: { value: 'publicroll' },
-      craftingModifier: checkboxGroupField(MULTI_PICK_DESCRIPTOR.modifiers, []),
-    });
-    try {
-      const choice = await promptCheckRoll({
-        formula: '1d20 + (modifier)',
-        activity: 'Crafting',
-        modifierChoice: MULTI_PICK_DESCRIPTOR,
-      });
-      assert.equal(
-        'chosenModifierId' in choice,
-        false,
-        'never present-but-undefined — an unticked group has no first id'
-      );
-    } finally {
-      captured.restore();
+  it('normalizes the situational bonus', () => {
+    for (const [raw, expected] of [['', null], [null, null], ['   ', null], ['2', '2'], ['  +2  ', '2'], ['-1', '-1'], ['1d4 + 1', '1d4 + 1'], ['++2', '+2']]) {
+      assert.equal(normalizeSituationalBonus(raw), expected, JSON.stringify(raw));
     }
   });
 
-  // The live cap binding is a UI affordance, not the invariant, and a submit that
-  // bypassed it must not over-report. `evaluateCheckRoll` re-imposes the cap too.
-  it('re-applies the cap to an over-large submitted selection', async () => {
-    const captured = stubDialogCapture({
-      situationalBonus: { value: '' },
-      rollMode: { value: 'publicroll' },
-      craftingModifier: checkboxGroupField(MULTI_PICK_DESCRIPTOR.modifiers, ['med', 'herb']),
+  it('re-imposes the pick cap on an over-large submitted selection', async () => {
+    const { result } = await open({ modifierChoice: choice }, { confirmed: true, chosenModifierIds: ['b', 'a', 'x'] });
+    assert.deepEqual(result.chosenModifierIds, ['b', 'a']);
+    assert.equal(result.chosenModifierId, 'b');
+  });
+
+  it('preserves an explicit empty selection and the headless defaults', async () => {
+    const { result } = await open({ modifierChoice: choice }, { confirmed: true, chosenModifierIds: [] });
+    assert.deepEqual(result.chosenModifierIds, []);
+    assert.ok(!Object.hasOwn(result, 'chosenModifierId'));
+    const defaulted = await open({ modifierChoice: choice }, { confirmed: true });
+    assert.deepEqual(defaulted.result.chosenModifierIds, ['a', 'b']);
+    const headless = await promptCheckRoll({ modifierChoice: choice });
+    assert.deepEqual(headless, { confirmed: true, chosenModifierIds: ['a', 'b'], chosenModifierId: 'a' });
+    assert.deepEqual(await promptCheckRoll(), { confirmed: true });
+  });
+
+  it('maps every non-confirmation and a failed open to the unchanged false shape', async () => {
+    for (const answer of [undefined, null, false, {}, { confirmed: 'yes' }]) {
+      assert.deepEqual((await open({}, answer)).result, { confirmed: false }, JSON.stringify(answer));
+    }
+    const previousError = console.error;
+    console.error = () => {};
+    const surface = stubPromptSurface(() => {
+      throw new Error('host refused');
     });
     try {
-      const choice = await promptCheckRoll({
-        formula: '1d20 + (modifier)',
-        activity: 'Crafting',
-        // The SAME two boxes ticked, but the descriptor only permits one.
-        modifierChoice: { ...MULTI_PICK_DESCRIPTOR, maxPicks: 1, defaultSelectedIds: ['herb'] },
-      });
-      assert.deepEqual(choice.chosenModifierIds, ['med'], 'truncated to the cap, in group order');
+      assert.deepEqual(await promptCheckRoll({ activity: 'Crafting' }), { confirmed: false });
     } finally {
-      captured.restore();
+      surface.restore();
+      console.error = previousError;
     }
   });
 
-  it('renders no fieldset and adds no chosenModifierId when modifierChoice is absent', async () => {
-    const captured = stubDialogCapture({
-      situationalBonus: { value: '' },
-      rollMode: { value: 'publicroll' },
-    });
-    try {
-      const choice = await promptCheckRoll({
-        formula: '1d20 + 3',
-        activity: 'Crafting',
+  it('hands the prompt the pre-modifier target and a summed check direction', async () => {
+    const received = async (evaluation, dc = 15) => {
+      let input;
+      await resolveCheckDecision({
+        authoredFormula: '1d20', actor: null, deferred: false, Roll: null,
+        evaluation: normalizeCheckEvaluation(evaluation),
+        resolvedCheck: { formula: '1d20', selected: [] },
+        displayFormula: (formula) => ({ display: formula }),
+        options: { interactive: true, dc, prompt: async (payload) => { input = payload; return null; } },
       });
-      assert.doesNotMatch(captured.content, /craftingModifier/, 'no modifier fieldset');
-      assert.equal('chosenModifierId' in choice, false, 'byte-identical choice object');
-    } finally {
-      captured.restore();
-    }
+      return { target: input.target, direction: input.direction, dc: input.dc };
+    };
+    assert.deepEqual(await received({ direction: 'under' }), { target: 15, direction: 'under', dc: 15 });
+    assert.deepEqual(await received({}), { target: 15, direction: 'over', dc: 15 });
+    assert.deepEqual(await received({ product: 'count', direction: 'under' }, null), {
+      target: null, direction: 'under', dc: null,
+    }, 'a count prompt names its per-die direction and no target');
   });
 
-  // A row can reach the prompt with an empty label AND an empty icon.
-  it('names an unlabelled modifier and still emits its icon and value chip', async () => {
-    const captured = stubDialogCapture({
-      situationalBonus: { value: '' },
-      rollMode: { value: 'publicroll' },
-      craftingModifier: { value: 'bare' },
-    });
-    try {
-      await promptCheckRoll({
-        formula: '1d20 + (modifier)',
-        activity: 'Crafting',
-        modifierChoice: BARE_DESCRIPTOR,
-      });
-      assert.match(
-        captured.content,
-        /<span class="fabricate-roll-prompt__modifier-label">Unnamed modifier<\/span>/,
-        'an empty label falls back to a readable name, not a bare value chip'
-      );
-      assert.match(
-        captured.content,
-        /<i class="fabricate-roll-prompt__modifier-icon fa-solid fa-dice-d20"/,
-        'an icon-less option keeps its gutter via the catalogue default icon'
-      );
-      // Both options emit an icon, so the icon/label/chip columns line up.
-      assert.equal(
-        captured.content.match(/fabricate-roll-prompt__modifier-icon/g).length,
-        2,
-        'every option emits an icon slot'
-      );
-      assert.equal(
-        captured.content.match(/fabricate-roll-prompt__modifier-value/g).length,
-        2,
-        'every option emits a value chip'
-      );
-    } finally {
-      captured.restore();
-    }
-  });
-
-  // A non-finite value is the one case with two possible answers; the chip must still
-  // render (row alignment) and `formatSigned` owns the single fallback.
-  it('renders a chip for a non-finite modifier value rather than dropping it', async () => {
-    const captured = stubDialogCapture({
-      situationalBonus: { value: '' },
-      rollMode: { value: 'publicroll' },
-      craftingModifier: { value: 'broken' },
-    });
-    try {
-      await promptCheckRoll({
-        formula: '1d20 + (modifier)',
-        activity: 'Crafting',
-        modifierChoice: {
-          modifiers: [
-            { id: 'broken', label: 'Broken', icon: 'fa-solid fa-x', value: undefined },
-            { id: 'herb', label: 'Herbalism', icon: 'fa-solid fa-herb', value: 5 },
-          ],
-          defaultSelectedId: 'herb',
+  it('hands a count prompt its pre-modifier pool, threshold and required count (issue 2004)', async () => {
+    const received = async (evaluation, { required = 3, countPolicy, thresholdMode } = {}) => {
+      let input;
+      await resolveCheckDecision({
+        authoredFormula: '', actor: null, deferred: false, Roll: null,
+        evaluation: normalizeCheckEvaluation({ product: 'count', ...evaluation }),
+        resolvedCheck: { formula: '', selected: [] },
+        displayFormula: () => null,
+        countPolicy,
+        options: {
+          interactive: true, dc: null, required, thresholdMode,
+          prompt: async (payload) => { input = payload; return null; },
         },
       });
-      assert.match(
-        captured.content,
-        /<span class="fabricate-roll-prompt__modifier-value">0<\/span>/,
-        'a non-finite value renders an unsigned 0 chip'
-      );
-      assert.equal(
-        captured.content.match(/fabricate-roll-prompt__modifier-value/g).length,
-        2,
-        'the chip is never omitted'
-      );
-    } finally {
-      captured.restore();
-    }
+      return input;
+    };
+    const policy = {
+      dice: 4, die: 6, threshold: 5, comparison: 'exceed', direction: 'under', resolved: { base: 4.9, threshold: 5 },
+    };
+    const input = await received(
+      { direction: 'under', pool: { modifierDestination: 'threshold' } },
+      { countPolicy: policy, thresholdMode: 'exceed' }
+    );
+    const { product, direction, comparison, pool, threshold, die, required, modifierDestination } = input;
+    assert.deepEqual(
+      { product, direction, comparison, pool, threshold, die, required, modifierDestination },
+      {
+        product: 'count', direction: 'under', comparison: 'exceed', pool: 4.9, threshold: 5, die: 6,
+        required: 3, modifierDestination: 'threshold',
+      },
+      'the resolved base unfloored, so the prompt floors it once after every benefit (issue 2006)'
+    );
+    // The count rule offers by default (issue 2007), whatever the retained formula.
+    assert.deepEqual([input.dc, input.target, input.formula, input.allowAdvantage], [null, null, '', true]);
+    assert.equal(input.thresholdMode, 'exceed');
+    const bare = await received({}, { required: null });
+    assert.deepEqual(
+      [bare.direction, bare.pool, bare.threshold, bare.die, bare.required, bare.modifierDestination],
+      ['over', null, null, null, null, 'pool'],
+      'no policy and a progressive check name no pool or required count'
+    );
+    const summed = await received({ product: 'sum' });
+    assert.ok(!Object.hasOwn(summed, 'product') && !Object.hasOwn(summed, 'pool'), 'sum adds no count field');
   });
 
-  // Issue 1118: a ROLLING modifier's chip shows what it will roll.
-  it('shows a rolling modifier’s DICE on its chip, not a fractional average', async () => {
-    const captured = stubDialogCapture({
-      situationalBonus: { value: '' },
-      rollMode: { value: 'publicroll' },
-      craftingModifier: { value: 'luck' },
+  it('shows a count prompt its pool line and successes chip, never a formula or DC', async () => {
+    const count = (fields) => open({
+      product: 'count', pool: 6, die: 10, threshold: 8, required: 2, comparison: 'meet',
+      modifierDestination: 'pool', dc: 12, target: 12, formula: '1d20', displayFormula: '1d20', ...fields,
+    }, null);
+    const { view } = await count({ direction: 'over' });
+    assert.equal(view.formula, '6d10 · each ≥ 8');
+    assert.deepEqual([view.dc, view.dcText, view.neededText, view.chipText], [null, '', '2 successes needed', '2 successes needed']);
+    assert.deepEqual(view.count, {
+      pool: 6, die: 10, threshold: 8, thresholdAnchor: null, thresholdSource: null, explode: null, cancel: null,
+      zeroPoolFails: true, required: 2, destination: 'pool',
     });
-    try {
-      await promptCheckRoll({
-        formula: '1d20 + (modifier)',
-        activity: 'Crafting',
-        modifierChoice: {
-          modifiers: [
-            { id: 'med', label: 'Medicine', icon: 'fa-solid fa-m', value: 3, display: '+3' },
-            {
-              id: 'luck',
-              label: 'Luck',
-              icon: 'fa-solid fa-d',
-              value: null,
-              average: 2.5,
-              formula: '(1d4)',
-              display: '+1d4',
-            },
-          ],
-          defaultSelectedId: 'luck',
+    assert.equal(view.labels.formulaNote, 'Success on ≥ 8');
+    assert.equal(view.labels.eachAdds, 'Each adds dice.');
+    assert.equal(
+      view.labels.bonusHelp,
+      'A bonus adds that many dice. A rolled bonus such as 1d4 is rolled first, and its result is applied.'
+    );
+    const signs = [];
+    for (const direction of ['over', 'under']) {
+      for (const comparison of ['meet', 'exceed']) {
+        signs.push((await count({ direction, comparison, threshold: 7.456 })).view.formula);
+      }
+    }
+    assert.deepEqual(signs, [
+      '6d10 · each ≥ 7.46', '6d10 · each > 7.46', '6d10 · each ≤ 7.46', '6d10 · each < 7.46',
+    ]);
+    const under = (await count({ direction: 'under', modifierDestination: 'threshold', required: 1 })).view;
+    assert.equal(under.direction, 'under');
+    assert.equal(under.neededText, '1 success needed');
+    assert.equal(under.labels.eachAdds, 'Each moves the threshold.');
+    assert.equal(
+      under.labels.bonusHelp,
+      'A bonus moves the threshold by that much. A rolled bonus such as 1d4 is rolled first, and its result is applied.'
+    );
+    assert.equal((await count({ required: 0 })).view.neededText, '0 successes needed');
+    const progressive = (await count({ required: null })).view;
+    assert.deepEqual([progressive.count.required, progressive.neededText], [null, '']);
+    assert.equal((await count({ comparison: undefined, thresholdMode: 'exceed' })).view.comparison, 'exceed');
+  });
+
+  it('states a count prompt\'s qualifying rule with its actual faces (N30, frames 30 and 35)', async () => {
+    const note = async (fields) => (await open({
+      product: 'count', pool: 6, die: 10, threshold: 8, thresholdAnchor: 8, thresholdSource: 'fixed', required: 2,
+      comparison: 'meet', direction: 'over', formula: '1d20 + 4', displayFormula: '1d20 + 4', dc: 15, ...fields,
+    }, null)).view.labels.formulaNote;
+    const best = { kind: 'best', face: 10, once: false };
+    const worst = { kind: 'worst', face: 1 };
+    assert.equal(
+      await note({ explode: best, cancel: worst }),
+      'Success on ≥ 8 · explodes on 10 · 1 cancels a success',
+      'frame 35, naming the faces rather than best and worst'
+    );
+    assert.equal(
+      await note({
+        pool: 2, die: 20, threshold: 14, thresholdAnchor: 14, direction: 'under', thresholdSource: 'character',
+      }),
+      'Success on ≤ 14 (character value 14)',
+      'frame 30: the threshold and the character value it was read from, never the expression'
+    );
+    assert.equal(
+      await note({ comparison: 'exceed', explode: { ...best, once: true } }),
+      'Success on > 8 · explodes on 10 once'
+    );
+    assert.equal(
+      await note({ explode: { kind: 'from', face: 9 }, cancel: { kind: 'from', face: 2 } }),
+      'Success on ≥ 8 · explodes on 9 or above · 2 or under cancels a success',
+      'an authored from-face, never the default best or worst face'
+    );
+    assert.equal(
+      await note({
+        die: 20, direction: 'under', explode: { kind: 'from', face: 2, once: true }, cancel: { kind: 'from', face: 19 },
+      }),
+      'Success on ≤ 8 · explodes on 2 or under once · 19 or above cancels a success'
+    );
+    assert.equal(
+      await note({ threshold: 6.5, thresholdAnchor: 8 }),
+      'Success on ≥ 6.5, moved +1.5 by modifiers',
+      'a Tool benefit settled before the prompt moved the fixed threshold'
+    );
+    assert.equal(await note({ pool: null, threshold: null, die: null, explode: best }), undefined,
+      'a hidden or redacted pool states no rule');
+    const { view } = await open({
+      product: 'count', pool: 6, die: 10, threshold: 8, thresholdAnchor: 8, thresholdSource: 'character',
+      required: 2, direction: 'over', explode: best, cancel: worst, formula: '1d20 + 4', displayFormula: '1d20 + 4',
+      dc: 15,
+    }, null);
+    const shown = JSON.stringify([view.formula, view.labels.formulaNote, view.neededText, view.dcText]);
+    assert.ok(!shown.includes('1d20') && !shown.includes('DC') && !shown.includes('15') && !shown.includes('@'),
+      'never the retained roll formula, a DC, an expression or a path');
+  });
+
+  it('hands the prompt the threshold source, anchor and actual faces, never an expression (issue 2006)', async () => {
+    const received = async (pool, countPolicy, toolContributions) => {
+      let input;
+      await resolveCheckDecision({
+        authoredFormula: '', actor: null, deferred: false, Roll: null,
+        evaluation: normalizeCheckEvaluation({ product: 'count', pool }),
+        resolvedCheck: { formula: '', selected: [] },
+        displayFormula: () => null,
+        countPolicy,
+        options: {
+          interactive: true, dc: null, required: 2, toolContributions,
+          prompt: async (payload) => { input = payload; return null; },
         },
       });
-      assert.match(
-        captured.content,
-        /<span class="fabricate-roll-prompt__modifier-value">\+1d4<\/span>/,
-        'the rolling option chips its dice'
+      return input;
+    };
+    const policy = {
+      dice: 6, die: 10, threshold: 14, comparison: 'meet', direction: 'over', resolved: { base: 6, threshold: 14 },
+      explode: { kind: 'best', value: null, once: false }, cancel: { kind: 'from', value: 2 },
+    };
+    const fields = (input) => [
+      input.thresholdSource, input.thresholdAnchor, input.explode, input.cancel, input.zeroPoolFails,
+    ];
+    const character = await received({ threshold: ' @abilities.int.mod + 11 ', zeroPoolFails: false }, policy);
+    assert.deepEqual(fields(character), [
+      'character', 14, { kind: 'best', face: 10, once: false }, { kind: 'from', face: 2 }, false,
+    ]);
+    assert.ok(!JSON.stringify(character).includes('@'), 'no expression or path reaches the prompt');
+    const fixed = await received({ threshold: '8' }, { ...policy, explode: null, cancel: null });
+    assert.deepEqual(fields(fixed), ['fixed', 14, null, null, true], 'a plain number is a fixed threshold');
+    const under = await received(
+      { threshold: '8' },
+      { ...policy, direction: 'under', explode: { kind: 'best', value: null, once: true }, cancel: { kind: 'worst', value: null } }
+    );
+    assert.deepEqual([under.explode, under.cancel], [{ kind: 'best', face: 1, once: true }, { kind: 'worst', face: 10 }],
+      'the faces a roll-under pool explodes and cancels on');
+    assert.deepEqual(fields(await received({ threshold: '@abilities.int.mod' }, null)), [null, null, null, null, null],
+      'no resolved pool, no source, anchor or rules');
+  });
+
+  it('settles the Tool benefits rolled before the prompt onto its pool or threshold (issue 2006)', async () => {
+    let input;
+    const received = async (modifierDestination, direction = 'over') => {
+      await resolveCheckDecision({
+        authoredFormula: '', actor: null, deferred: false, Roll: null,
+        evaluation: normalizeCheckEvaluation({ product: 'count', direction, pool: { modifierDestination } }),
+        resolvedCheck: { formula: '', selected: [] },
+        displayFormula: () => null,
+        countPolicy: { dice: 2, die: 6, threshold: 5, comparison: 'meet', direction, resolved: { base: 2.5, threshold: 5 } },
+        options: {
+          interactive: true, dc: null, required: 1,
+          toolContributions: [
+            { source: 'tool', label: 'Hammer', form: 'scalar', value: 1.5, preRoll: { expression: '1d2', total: 1.5 } },
+            { source: 'tool', label: 'Rasp', form: 'expression', expression: '1d4' },
+          ],
+          prompt: async (payload) => { input = payload; return null; },
+        },
+      });
+      return [input.pool, input.threshold, input.thresholdAnchor];
+    };
+    assert.deepEqual(await received('pool'), [4, 5, 5], 'the pool grows by the settled Tool benefit');
+    assert.deepEqual(await received('threshold'), [2.5, 3.5, 5], 'an over threshold falls by it');
+    assert.deepEqual(await received('threshold', 'under'), [2.5, 6.5, 5], 'an under threshold rises by it');
+  });
+
+  it('settles a count prompt\'s picks and typed bonus onto its line without rolling (issue 2006)', async () => {
+    const picks = {
+      modifiers: [
+        { id: 'a', label: 'Steady', value: 1, display: '+1' },
+        { id: 'b', label: 'Luck', value: null, display: '+1d4' },
+        { id: 'c', label: 'Half', value: 0.5, display: '+0.5' },
+      ],
+      maxPicks: 3,
+      defaultSelectedIds: ['a'],
+    };
+    const promptFor = async (fields) => (await open({
+      product: 'count', pool: 6, die: 10, threshold: 8, thresholdAnchor: 8, thresholdSource: 'fixed', required: 2,
+      comparison: 'meet', direction: 'over', modifierDestination: 'pool', modifierChoice: picks, ...fields,
+    }, null)).view;
+    const line = (view, ids, bonus) => {
+      const settled = rollPromptTarget(view, ids, bonus);
+      return [settled.formula, settled.note, settled.zeroPool];
+    };
+    const pool = await promptFor({});
+    assert.equal(pool.formula, '7d10 · each ≥ 8', 'it opens settled on the default pick');
+    assert.deepEqual(line(pool, ['a'], '2'), ['9d10 · each ≥ 8', 'Success on ≥ 8', '']);
+    assert.deepEqual(line(pool, ['a', 'b'], ''), ['7d10 + 1d4 dice · each ≥ 8', 'Success on ≥ 8', ''],
+      'a rolled pick is named as pending dice, never averaged in');
+    assert.deepEqual(line(pool, [], '1d6'), ['6d10 + 1d6 dice · each ≥ 8', 'Success on ≥ 8', '']);
+    assert.equal(line({ ...pool, count: { ...pool.count, pool: 2.5 } }, ['c'], '')[0], '3d10 · each ≥ 8',
+      'the pool floors once, after every benefit');
+
+    const threshold = await promptFor({ modifierDestination: 'threshold' });
+    assert.equal(threshold.labels.formulaNote, 'Success on ≥ 7, moved +1 by modifiers',
+      'a +1 benefit reads moved +1, signed by the benefit, never by the arithmetic');
+    assert.deepEqual(line(threshold, ['a'], '+2'), ['6d10 · each ≥ 5', 'Success on ≥ 5, moved +3 by modifiers', '']);
+    assert.deepEqual(line(threshold, [], '1d4'), ['6d10 · each ≥ 8 + 1d4', 'Success on ≥ 8', '']);
+    const under = await promptFor({
+      direction: 'under', modifierDestination: 'threshold', thresholdSource: 'character', thresholdAnchor: 8,
+    });
+    assert.deepEqual(line(under, ['a'], '-3'), [
+      '6d10 · each ≤ 6', 'Success on ≤ 6 (character value 8), moved −2 by modifiers', '',
+    ]);
+    assert.equal(line(under, ['a'], '')[1], 'Success on ≤ 9 (character value 8), moved +1 by modifiers',
+      'a +1 benefit reads moved +1 under too');
+
+    const zero = await promptFor({ pool: 1, die: 6, modifierChoice: null });
+    const notice = 'This roll fails automatically: the pool is reduced to zero.';
+    assert.deepEqual(line(zero, [], '-1'), ['0d6 · each ≥ 8', 'Success on ≥ 8', notice]);
+    assert.deepEqual(line(zero, [], '-1.5'), ['0d6 · each ≥ 8', 'Success on ≥ 8', notice]);
+    assert.equal(line(zero, [], '')[2], '', 'no notice while the pool holds a die');
+    assert.equal(line({ ...zero, count: { ...zero.count, zeroPoolFails: false } }, [], '-3')[0], '1d6 · each ≥ 8',
+      'a pool that does not fail at zero still rolls one die');
+    assert.equal(line({ ...zero, count: { ...zero.count, pool: 0 } }, [], '1d4')[2], '',
+      'pending dice may lift a pool above zero, so no automatic failure is claimed');
+    assert.equal(line({ ...zero, count: { ...zero.count, pool: 0, destination: 'threshold' } }, [], '1d4')[2], notice,
+      'a rolled bonus that moves the threshold cannot add dice, so the zero pool still fails');
+  });
+
+  it('names a summed roll-under target to stay under, and leaves roll-over copy unchanged', async () => {
+    const under = (thresholdMode) => open({ dc: 15, target: 15, direction: 'under', thresholdMode }, null);
+    const meet = (await under('meet')).view;
+    assert.equal(meet.direction, 'under');
+    assert.equal(`${meet.dcText} · ${meet.labels.meet}`, 'Target 15 · stay at or under');
+    assert.equal(`${meet.dcText} · ${(await under('exceed')).view.labels.exceed}`, 'Target 15 · stay under');
+    assert.deepEqual(
+      [meet.chipText, (await under('exceed')).view.chipText, (await open({ dc: 12, thresholdMode: 'exceed' }, null)).view.chipText],
+      ['Target 15 · stay at or under', 'Target 15 · stay under', 'DC 12 · beat'],
+      'the one target chip reads the number and its comparison'
+    );
+    assert.equal((await open({ name: 'Vein' }, null)).view.chipText, '', 'no number, no chip');
+    assert.equal(meet.labels.eachAdds, 'Each raises the target.');
+    assert.equal(meet.labels.formulaNote, 'The dice are compared as rolled.');
+    assert.equal(
+      meet.labels.bonusHelp,
+      'A bonus raises the target. A rolled bonus such as 1d4 is rolled first, and its result is applied.'
+    );
+    for (const args of [{ dc: 12 }, { dc: 12, target: 12, direction: 'over' }]) {
+      const { view } = await open(args, null);
+      assert.equal(view.direction, 'over');
+      assert.deepEqual(
+        [view.dcText, view.labels.meet, view.labels.exceed, view.labels.eachAdds, view.labels.bonusHelp],
+        ['DC 12', 'meet or beat', 'beat', 'Each adds to the total.',
+          'A bonus adds to the total. A rolled bonus such as 1d4 is rolled with the check.'],
+        'a roll-over prompt keeps its DC copy byte for byte'
       );
-      assert.ok(
-        !captured.content.includes('2.5'),
-        'and never the average it is merely RANKED by'
-      );
-      assert.match(
-        captured.content,
-        /<span class="fabricate-roll-prompt__modifier-value">\+3<\/span>/,
-        'a flat option is unchanged'
-      );
-    } finally {
-      captured.restore();
+      assert.equal(view.labels.formulaNote, undefined, 'a roll-over formula carries no note');
     }
   });
 
-  it('localizes the fieldset legend and the unnamed-modifier fallback', async () => {
-    const restoreI18n = stubI18n({
-      'FABRICATE.App.RollPrompt.CheckModifier': 'Modificateur',
-      'FABRICATE.App.RollPrompt.UnnamedModifier': 'Modificateur sans nom',
-    });
-    const captured = stubDialogCapture({
-      situationalBonus: { value: '' },
-      rollMode: { value: 'publicroll' },
-      craftingModifier: { value: 'bare' },
-    });
+  it('names a count row\'s required successes in a bulk batch', async () => {
+    const surface = stubPromptSurface(() => null);
     try {
-      await promptCheckRoll({
-        formula: '1d20 + (modifier)',
-        activity: 'Crafting',
-        modifierChoice: BARE_DESCRIPTOR,
-      });
-      assert.match(
-        captured.content,
-        /<legend class="fabricate-roll-prompt__modifiers-legend">Modificateur<\/legend>/,
-        'the legend reads through game.i18n'
-      );
-      assert.match(captured.content, /Modificateur sans nom/, 'the fallback name is localized too');
-      assert.doesNotMatch(captured.content, /Check modifier/, 'no hard-coded English legend');
+      await promptBulkCheckRoll({ subjects: [
+        { name: 'Ore', need: { kind: 'successes', count: 3 } },
+        { name: 'Scrap', need: { kind: 'dc', dc: 12 } },
+      ] });
+      assert.deepEqual(surface.view.subjects.map((row) => row.needText), ['3 needed', 'DC 12']);
     } finally {
-      captured.restore();
-      restoreI18n();
+      surface.restore();
     }
   });
 
-  it('falls back to English copy when the key does not resolve', async () => {
-    const captured = stubDialogCapture({
-      situationalBonus: { value: '' },
-      rollMode: { value: 'publicroll' },
-      craftingModifier: { value: 'bare' },
-    });
-    try {
-      await promptCheckRoll({
-        formula: '1d20 + (modifier)',
-        activity: 'Crafting',
-        modifierChoice: BARE_DESCRIPTOR,
+  it('gives an all-count batch with one destination that count\'s help, and a mix the summed help', async () => {
+    const help = async (subjects) => {
+      const surface = stubPromptSurface(() => null);
+      try {
+        await promptBulkCheckRoll({ subjects });
+        return surface.view.labels.bonusHelp;
+      } finally {
+        surface.restore();
+      }
+    };
+    const row = (destination, kind = 'successes') => ({ name: 'Ore', need: { kind, count: 2, destination } });
+    assert.equal(
+      await help([row('pool'), row('pool')]),
+      'A bonus adds that many dice. A rolled bonus such as 1d4 is rolled first, and its result is applied.'
+    );
+    assert.equal(
+      await help([row('threshold'), row('threshold')]),
+      'A bonus moves the threshold by that much. A rolled bonus such as 1d4 is rolled first, and its result is applied.'
+    );
+    const summed = 'A bonus adds to the total. A rolled bonus such as 1d4 is rolled with the check.';
+    assert.equal(await help([row('pool'), row('threshold')]), summed, 'two destinations have no one answer');
+    assert.equal(await help([row('pool'), { name: 'Scrap', need: { kind: 'dc', dc: 12 } }]), summed);
+    assert.equal(await help([row(undefined)]), summed, 'a row naming no destination keeps the summed help');
+    assert.equal(await help([row('pool'), row('pool', 'dc')]), summed, 'only count rows answer by destination');
+  });
+
+  it('reads the target before the legacy dc, and names no direction without a number', () => {
+    assert.equal(buildSinglePromptData({ dc: 12, target: 9, direction: 'under' }).dc, 9);
+    assert.equal(buildSinglePromptData({ dc: 12 }).dc, 12);
+    const blank = buildSinglePromptData({ dc: null, direction: 'under' });
+    assert.deepEqual([blank.dc, blank.direction], [null, 'over']);
+  });
+
+  it('hands a roll-under prompt its target basis and the Tool bonus, and nothing to any other', async () => {
+    const basis = { expression: '@skills.smith.level', value: 12, adjustment: null };
+    const received = async (evaluation) => {
+      let input;
+      await resolveCheckDecision({
+        authoredFormula: '1d20', actor: null, deferred: false, Roll: null,
+        evaluation: normalizeCheckEvaluation(evaluation),
+        resolvedCheck: { formula: '1d20', selected: [] },
+        displayFormula: (formula) => ({ display: formula }),
+        options: {
+          interactive: true, dc: 12, targetBasis: basis,
+          toolContributions: [{ value: 2 }, { value: -1 }, null, { value: Number.NaN }],
+          prompt: async (payload) => { input = payload; return null; },
+        },
       });
-      assert.match(captured.content, /<legend[^>]*>Check modifier<\/legend>/);
-      assert.match(captured.content, /Unnamed modifier/);
+      return [input.targetBasis, input.toolBonus];
+    };
+    assert.deepEqual(await received({ direction: 'under' }), [basis, 1]);
+    for (const evaluation of [{}, { product: 'count', direction: 'under' }]) {
+      assert.deepEqual(await received(evaluation), [undefined, undefined], JSON.stringify(evaluation));
+    }
+    const options = buildInteractiveRollOptions({ interactive: true, dc: 10, targetBasis: basis }, () => null);
+    assert.equal(options.targetBasis, basis);
+    assert.equal(Object.hasOwn(buildInteractiveRollOptions({ interactive: true, dc: 10 }), 'targetBasis'), false);
+  });
+
+  it('names a roll-under target after its flat modifiers and Tool bonus, and explains it', async () => {
+    const target = async (args, selectedIds = []) => {
+      const { view } = await open({ dc: 10, target: 10, direction: 'under', ...args }, null);
+      return rollPromptTarget(view, selectedIds);
+    };
+    const hardWork = { expression: '@skills.smith.level', value: 12, adjustment: { kind: 'add', value: -2, label: 'Hard Work' } };
+    assert.deepEqual(await target({ targetBasis: hardWork, selectedModifiers: [{ label: 'Steady hands', value: 1 }] }), {
+      chipText: 'Target 11 · stay at or under', source: '@skills.smith.level 12 · Hard Work −2 · modifiers +1',
+    }, 'frame 29, with the true minus sign');
+    assert.deepEqual(await target({ targetBasis: hardWork, thresholdMode: 'exceed' }), {
+      chipText: 'Target 10 · stay under', source: '@skills.smith.level 12 · Hard Work −2',
+    }, 'a character-value target explains itself with no modifier applied');
+    const halved = { ...hardWork, adjustment: { kind: 'multiply', value: 0.5, label: '' } };
+    assert.equal((await target({ targetBasis: halved, dc: 6, target: 6 })).source, '@skills.smith.level 12 · difficulty ×½');
+    const floored = { expression: '@skills.lore.level', value: 9, adjustment: { kind: 'multiply', value: 0.5, label: '' } };
+    assert.deepEqual(await target({ targetBasis: floored, dc: 4, target: 4 }), {
+      chipText: 'Target 4 · stay at or under', source: '@skills.lore.level 9 · difficulty ×½',
+    }, 'the line names the value and multiplier before the floor; the chip names the floored target');
+    const bare = { expression: '@skills.smith.level', value: 12, adjustment: null };
+    assert.deepEqual(await target({ targetBasis: bare, dc: 12, target: 12 }), {
+      chipText: 'Target 12 · stay at or under', source: '@skills.smith.level 12',
+    }, 'an unadjusted character value still names itself, with no difficulty part');
+    assert.deepEqual(await target({ dc: 15, target: 15, toolBonus: 2, selectedModifiers: [{ value: 1 }, { value: -4 }] }), {
+      chipText: 'Target 14 · stay at or under', source: 'Base 15 · tools +2 · modifiers −3',
+    }, 'a fixed target names its base once something raised it');
+    assert.deepEqual(await target({ dc: 15, target: 15, selectedModifiers: [{ label: 'Die', display: '+1d4', value: null }] }), {
+      chipText: 'Target 15 + 1d4 · stay at or under', source: '',
+    }, 'a rolled modifier is named as pending, never averaged in, and shows no line (issue 2005)');
+    const choicePlan = { options: [{ id: 'a', value: 1 }, { id: 'b', value: null }, { id: 'c', value: 3 }] };
+    const { view } = await open({ dc: 10, target: 10, direction: 'under', targetBasis: hardWork }, null);
+    const live = (ids) => rollPromptTarget({ ...view, choicePlan }, ids).chipText;
+    assert.deepEqual([live(['a']), live(['c']), live(['b']), live(['a', 'c'])], [
+      'Target 11 · stay at or under', 'Target 13 · stay at or under',
+      'Target 10 · stay at or under', 'Target 14 · stay at or under',
+    ], 'the picked choices, not the offered ones, raise the target');
+  });
+
+  it('names only a typed bonus the dice engine accepts as pending (R9)', async () => {
+    const { view } = await open({ dc: 12, target: 12, direction: 'under' }, null);
+    const original = globalThis.Roll;
+    globalThis.Roll = { validate: (formula) => /^\d*d\d+$/.test(formula) };
+    try {
+      assert.equal(rollPromptTarget(view, [], 'abc').chipText, 'Target 12 · stay at or under');
+      assert.equal(rollPromptTarget(view, [], '1d4').chipText, 'Target 12 + 1d4 · stay at or under');
     } finally {
-      captured.restore();
+      if (original === undefined) delete globalThis.Roll;
+      else globalThis.Roll = original;
     }
   });
 
-  it('returns the pre-selected default in the headless (no DialogV2) path', async () => {
-    const original = globalThis.foundry;
-    if (original !== undefined) delete globalThis.foundry;
+  it('keeps the roll-over chip text and gives it no explanation', async () => {
+    const { view } = await open({ dc: 12, target: 12, direction: 'over', toolBonus: 2, selectedModifiers: [{ value: 1 }] }, null);
+    assert.deepEqual(rollPromptTarget(view, []), { chipText: 'DC 12 · meet or beat', source: '' });
+    assert.equal(Object.hasOwn(view, 'targetBasis'), false);
+  });
+
+  it('formats the pick cap and the DC before the component sees them', async () => {
+    const { view } = await open({ modifierChoice: choice, dc: 12 }, null);
+    assert.equal(view.labels.pickUpTo, 'Pick up to 2');
+    assert.equal(view.dcText, 'DC 12');
+    assert.equal((await open({}, null)).view.dcText, '', 'no DC, no DC copy');
+  });
+
+  it('opens the modal whenever the page has a body, rather than confirming headlessly', async () => {
+    const previousDocument = globalThis.document;
+    const previousError = console.error;
+    const errors = [];
+    console.error = (...args) => errors.push(String(args[0]));
+    globalThis.document = { body: {} };
     try {
-      const choice = await promptCheckRoll({
-        formula: '1d20 + (5)',
-        activity: 'Crafting',
-        modifierChoice: PICK_DESCRIPTOR,
-      });
-      assert.equal(choice.confirmed, true);
-      assert.equal(choice.chosenModifierId, 'herb');
+      // Node cannot load the `.svelte` module, so the attempted open fails and reads as a dismissal.
+      assert.deepEqual(await promptCheckRoll({ activity: 'Crafting' }), { confirmed: false });
+      assert.ok(errors.some((line) => line.includes('Roll prompt failed to load')), errors.join('\n'));
     } finally {
-      if (original !== undefined) globalThis.foundry = original;
+      globalThis.document = previousDocument;
+      console.error = previousError;
     }
+  });
+
+  it('translates a confirmed answer into the unchanged caller keys', () => {
+    const plan = { options: [], maxPicks: 1, defaultSelectedIds: [] };
+    assert.deepEqual(
+      translatePromptAnswer({ confirmed: true, bonus: ' +1d4 ', rollMode: 'gmroll', advantage: 'advantage' }, { defaultRollMode: 'publicroll', choicePlan: plan }),
+      { confirmed: true, bonus: '1d4', rollMode: 'gmroll', advantage: 'advantage' }
+    );
+    assert.equal(
+      translatePromptAnswer({ confirmed: true, advantage: 'sideways' }, { defaultRollMode: 'publicroll', choicePlan: plan }).advantage,
+      'normal'
+    );
   });
 });

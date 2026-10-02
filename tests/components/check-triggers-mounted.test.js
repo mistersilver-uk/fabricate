@@ -39,6 +39,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/checks/checksCopy.js',
     'src/ui/svelte/apps/manager/checks/checkTriggerSummary.js',
     'src/ui/svelte/apps/manager/checks/checkTriggerPresets.js',
+    // A counting check's pool group reads the normalized pool (issue 2006).
+    'src/systems/normalize/checkEvaluation.js',
     // The studio's converted option vocabularies (issue 1510).
     'src/ui/svelte/apps/manager/checks/checksSelectOptions.js'
   ],
@@ -935,5 +937,212 @@ describe('the common-trigger presets author a trigger when CLICKED', () => {
       showBreakTools: false
     });
     assert.equal(root.querySelector('[data-check-trigger-presets]'), null);
+  });
+});
+
+// ── Preset polarity through the rendered control (issue 2005, Q15) ──────────────────────
+describe('the common-trigger presets follow the check direction', () => {
+  const UNDER = { product: 'sum', direction: 'under' };
+  const OVER = { product: 'sum', direction: 'over' };
+  const naturalOne = {
+    id: 'n1',
+    condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 20 },
+    outcome: 'none',
+    breakTools: false,
+    tierStep: { mode: 'up', steps: 1, tierId: null }
+  };
+
+  it('a roll-under check labels and authors its best preset on face 1', async () => {
+    const emitted = [];
+    const root = await harness.mount({
+      value: triggerBlock([]),
+      rollFormula: '1d20',
+      kind: 'routed',
+      outcomeOptions: ROUTED_TIERS,
+      evaluation: UNDER,
+      onChange: (next) => emitted.push(next)
+    });
+    const labels = [...root.querySelectorAll('[data-add-trigger-preset]')].map((button) =>
+      button.textContent.trim()
+    );
+    assert.deepEqual(labels, [
+      'Natural 1 on 1d20 → step up a tier',
+      'Natural 20 on 1d20 → step down a tier'
+    ]);
+    root.querySelector('[data-add-trigger-preset="high"]').click();
+    const best = emitted.at(-1).triggers.at(-1);
+    assert.equal(best.condition.value, 1, 'the best face under is 1');
+    assert.deepEqual(best.tierStep, { mode: 'up', steps: 1, tierId: null });
+    root.querySelector('[data-add-trigger-preset="low"]').click();
+    assert.equal(emitted.at(-1).triggers.at(-1).condition.value, 20, 'the worst face is 20');
+  });
+
+  it('a roll-high check keeps the legacy labels', async () => {
+    const root = await harness.mount({
+      value: triggerBlock([]),
+      rollFormula: '1d20',
+      kind: 'simple',
+      evaluation: OVER
+    });
+    const labels = [...root.querySelectorAll('[data-add-trigger-preset]')].map((button) =>
+      button.textContent.trim()
+    );
+    assert.deepEqual(labels, [
+      'Natural 20 on 1d20 → automatic success',
+      'Natural 1 on 1d20 → automatic failure'
+    ]);
+  });
+
+  it('switching the direction rewrites no existing trigger and relabels only the presets', async () => {
+    const emitted = [];
+    const root = await harness.mount({
+      value: triggerBlock([naturalOne]),
+      rollFormula: '1d20',
+      kind: 'routed',
+      outcomeOptions: ROUTED_TIERS,
+      evaluation: OVER,
+      onChange: (next) => emitted.push(next)
+    });
+    await harness.setProps({ evaluation: UNDER });
+    assert.equal(emitted.length, 0, 'an evaluation change emits nothing');
+    assert.equal(naturalOne.condition.value, 20, 'the authored face is untouched');
+    assert.match(
+      root.querySelector('[data-add-trigger-preset="high"]').textContent,
+      /Natural 1 on 1d20/,
+      'only the offered preset changes'
+    );
+    root.querySelector('[data-add-trigger-preset="high"]').click();
+    assert.deepEqual(
+      emitted.at(-1).triggers.map((trigger) => trigger.condition.value),
+      [20, 1],
+      'a new preset appends after the kept trigger'
+    );
+  });
+});
+
+// ── A counting check's triggers (issue 2006, N13 and N16) ──────────────────────────────────────
+describe('a counting check triggers on its pool and its net successes', () => {
+  const cancelling = (enabled) => ({
+    product: 'count',
+    direction: 'over',
+    pool: { die: 10, cancel: { enabled, faces: { kind: 'worst', value: null } } }
+  });
+  const COUNT = cancelling(true);
+  const presetLabels = (root) =>
+    [...root.querySelectorAll('[data-add-trigger-preset]')].map((button) => button.textContent.trim());
+  const ROUTED_COUNT_LABELS = [
+    'Any die shows its best face (10) → step up a tier',
+    'Every die shows its worst face (1) → step down a tier',
+    'Botch (net below zero) → lowest tier'
+  ];
+
+  async function mountCount({ rollFormula = '', kind = 'routed', evaluation = COUNT, ...props } = {}) {
+    const emitted = [];
+    const root = await harness.mount({
+      value: triggerBlock([]),
+      rollFormula,
+      kind,
+      outcomeOptions: ROUTED_TIERS,
+      lowestTierId: 'tier-a',
+      evaluation,
+      onChange: (next) => emitted.push(next),
+      ...props
+    });
+    const click = async (presetId) => {
+      root.querySelector(`[data-add-trigger-preset="${presetId}"]`).click();
+      await harness.setProps({ value: emitted.at(-1) });
+      return emitted.at(-1).triggers.at(-1);
+    };
+    return { root, emitted, click };
+  }
+
+  it('offers the pool presets with no formula at all', async () => {
+    const { root } = await mountCount({ rollFormula: '' });
+    assert.deepEqual(presetLabels(root), ROUTED_COUNT_LABELS);
+  });
+
+  it('never offers a preset on the retained formula, whose d20 the pool does not roll', async () => {
+    const { root, click } = await mountCount({ rollFormula: '1d20 + 5' });
+    assert.deepEqual(presetLabels(root), ROUTED_COUNT_LABELS);
+    const best = await click('high');
+    assert.deepEqual(best.condition, {
+      type: 'diceGroup',
+      groupId: 0,
+      aggregate: 'anyDie',
+      operator: '==',
+      value: 10
+    });
+    assert.deepEqual(
+      selectOptionLabels(root, `[data-trigger="${best.id}"] ${DICE_GROUP}`),
+      ['d10'],
+      'the Dice group subject offers the pool alone'
+    );
+    assert.equal(
+      root.querySelector(`[data-trigger-summary="${best.id}"]`).textContent.trim(),
+      'Any die of d10 is exactly 10'
+    );
+  });
+
+  it('adds the Botch preset, which reads as net successes and sends the roll to the lowest tier', async () => {
+    const { root, emitted, click } = await mountCount({ rollFormula: '1d20 + 5' });
+    const botch = await click('botch');
+    assert.deepEqual(botch.condition, { type: 'rollTotal', operator: '<', value: 0 });
+    assert.deepEqual(botch.tierStep, { mode: 'target', steps: 1, tierId: 'tier-a' });
+    const when = `[data-trigger="${botch.id}"] ${CONDITION_TYPE}`;
+    assert.equal(selectTriggerText(root, when), 'Net successes');
+    assert.deepEqual(selectOptionLabels(root, when), ['Net successes', 'Dice group', 'Outcome tier']);
+    assert.equal(
+      root.querySelector(`[data-trigger-summary="${botch.id}"]`).textContent.trim(),
+      'Net successes is under 0'
+    );
+    assert.equal(
+      root.querySelector(`[data-trigger-quote="${botch.id}"] span`).textContent.trim(),
+      'When net successes is under 0, the result becomes Ruined.'
+    );
+    chooseSelectOption(root, when, 'diceGroup');
+    assert.equal(emitted.at(-1).triggers.at(-1).condition.groupId, 0, 'the pool is group 0');
+  });
+
+  it('a simple count check fails on its worst face, with Botch only while cancelling', async () => {
+    const { root, click } = await mountCount({ kind: 'simple', evaluation: cancelling(false) });
+    assert.deepEqual(presetLabels(root), ['Every die shows its worst face (1) → automatic failure']);
+    const worst = await click('low');
+    assert.deepEqual(worst.condition, {
+      type: 'diceGroup',
+      groupId: 0,
+      aggregate: 'allDice',
+      operator: '==',
+      value: 1
+    });
+    assert.equal(worst.outcome, 'failure');
+    await harness.setProps({ evaluation: COUNT });
+    assert.deepEqual(presetLabels(root), [
+      'Every die shows its worst face (1) → automatic failure',
+      'Botch (net below zero) → automatic failure'
+    ]);
+    const botch = await click('botch');
+    assert.equal(botch.outcome, 'failure');
+    assert.equal(
+      root.querySelector(`[data-trigger-summary="${botch.id}"]`).textContent.trim(),
+      'Net successes is under 0'
+    );
+  });
+
+  it('a summing check keeps its roll total and formula presets', async () => {
+    const { root } = await mountCount({
+      rollFormula: '1d20 + 5',
+      evaluation: { product: 'sum', direction: 'over', pool: COUNT.pool },
+      value: triggerBlock([rollTotalTrigger])
+    });
+    assert.deepEqual(presetLabels(root), [
+      'Natural 20 on 1d20 → step up a tier',
+      'Natural 1 on 1d20 → step down a tier'
+    ]);
+    expandTrigger(root, 't1');
+    assert.equal(selectTriggerText(root, `[data-trigger="t1"] ${CONDITION_TYPE}`), 'Roll total');
+    assert.equal(
+      root.querySelector('[data-trigger-summary="t1"]').textContent.trim(),
+      'Roll total is at most 3'
+    );
   });
 });

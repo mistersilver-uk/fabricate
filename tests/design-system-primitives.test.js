@@ -8,7 +8,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { measureImporters } from '../scripts/lib/componentImporters.js';
+import { importGraph, measureImporters } from '../scripts/lib/componentImporters.js';
 import {
   DESIGN_SYSTEM_PRIMITIVES,
   NOT_A_PRIMITIVE,
@@ -22,11 +22,14 @@ import {
   mapChangedFilesToCases,
 } from '../scripts/lib/viewLabCases.js';
 import { VIEW_RECIPES } from '../scripts/ui-pr-screenshot-evidence.mjs';
+
 import {
-  KNOWN_UNREGISTERED_SHARED_COMPONENTS,
-  KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL,
-} from './components/design-system-known-debt.js';
-import { assertRatchet, tallyByKey } from './helpers/ratchetBaseline.js';
+  MANIFEST_CORPUS,
+  MANIFEST_PATH,
+  assertGateCases,
+  checkGate,
+  manifestRows,
+} from './helpers/designSystemRatchet.js';
 
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -70,7 +73,7 @@ const PUBLISHING_CASE_IDS = new Set(
 );
 
 /** The V8-escaped source of `BROAD_SIGNAL_PATTERN`, verbatim. */
-const EXPECTED_BROAD_SIGNAL_SOURCE = String.raw`^styles\/|^src\/ui\/svelte\/components\/|^src\/ui\/theme\.js$|^src\/ui\/svelte\/apps\/manager\/(ExplainerCard|IconFactRow|ManagerModal)\.svelte$`;
+const EXPECTED_BROAD_SIGNAL_SOURCE = String.raw`^styles\/|^src\/ui\/svelte\/components\/|^src\/ui\/theme\.js$|^src\/ui\/svelte\/apps\/manager\/(ExplainerCard|IconFactRow)\.svelte$`;
 
 /**
  * The keys `BROAD_SIGNAL_CASE_OVERRIDES` carries — the DOMAIN, pinned separately from the entries.
@@ -90,6 +93,8 @@ const EXPECTED_OVERRIDE_KEYS = [
   // Issue 1509: the editor tab strip, and the third key gained by neither of the two routes above —
   // the component did not acquire a state and it did not arrive.
   'src/ui/svelte/components/ChoiceOptionList.svelte',
+  // Issue 2006: the die tiles, a primitive ARRIVING, on the simulator's two rolled count frames.
+  'src/ui/svelte/components/DiceTiles.svelte',
   'src/ui/svelte/components/EditorTabs.svelte',
   'src/ui/svelte/components/EditorValidationSurface.svelte',
   'src/ui/svelte/components/EmptyState.svelte',
@@ -104,6 +109,8 @@ const EXPECTED_OVERRIDE_KEYS = [
   // Issue 1505: the uppercase micro-label, on sixteen converted eyebrow sites.
   'src/ui/svelte/components/Kicker.svelte',
   'src/ui/svelte/components/ListRow.svelte',
+  // Issue 2021: the modal chrome's banded frame, which every dialog draws since epic 1997.
+  'src/ui/svelte/components/ManagerModal.svelte',
   'src/ui/svelte/components/ManagerSearchField.svelte',
   'src/ui/svelte/components/ManagerToolbar.svelte',
   // Issue 1506: the app's ONE art tile, after it absorbed both crafting thumbnails. ONE frame,
@@ -153,6 +160,8 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/Stepper.svelte',
   'src/ui/svelte/components/ThresholdBandStrip.svelte',
   'src/ui/svelte/components/ToggleCard.svelte',
+  // Issue 2008: the well below a card, a primitive ARRIVING, on the Formula card's option groups.
+  'src/ui/svelte/components/Well.svelte',
   // Issue 1515: THE SHEET, and the first key here that is not a component path. It sorts last
   // because this list is compared against `Object.keys(...).sort()` and `'src/'` < `'styles/'`.
   'src/ui/svelte/components/WorldClockChip.svelte',
@@ -193,7 +202,6 @@ const BROAD_SHADOWED_SOURCE_MATCHES = [
 const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/apps/manager/ExplainerCard.svelte',
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
-  'src/ui/svelte/apps/manager/ManagerModal.svelte',
   'src/ui/svelte/components/ArmedDangerButton.svelte',
   'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
@@ -219,8 +227,12 @@ test('the inputs every property below quantifies over are alive', () => {
   // 48 as of issue 1392, which promoted `apps/manager/VocabularyPanel.svelte`: the World Vocabulary
   // screen is its second independent caller, and property (e) below reported it as a component that
   // had crossed the membership bar with nobody adjudicating it.
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 63, 'the shipped primitive set changed size');
-  assert.equal(NOT_A_PRIMITIVE.length, 17, 'the recorded non-member set changed size');
+  // 68 as of issue 2005, which promoted the shared Preview-as picker, the Player sees block and the
+  // executed check evidence rows; 70 as of issue 2006, whose result boxes promoted the die tiles;
+  // 72 as of issue 2008: the Formula card's option well, and the `<Well>` on its second caller.
+  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 72, 'the shipped primitive set changed size');
+  // 16 as of issue 2006's die tiles, and again once issue 2008 promoted the `<Well>` it built.
+  assert.equal(NOT_A_PRIMITIVE.length, 16, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(
     PUBLISHING_CASE_IDS.size > 0,
@@ -236,7 +248,7 @@ test('BROAD_SIGNAL_PATTERN emits exactly the pinned source', () => {
       "frames away from the cases that claim a file, narrowing it hands a primitive's evidence " +
       'to whichever cases happen to name its path. Accept it by updating this pin deliberately.'
   );
-  assert.equal(BROAD_SIGNAL_PATTERN.source.length, 144);
+  assert.equal(BROAD_SIGNAL_PATTERN.source.length, 131);
 });
 
 test('(a) every override key is a broad-signal file that exists on disk', () => {
@@ -715,22 +727,40 @@ const PRIMITIVE_DIRECTORY = 'src/ui/svelte/components/';
 const MEMBERSHIP_BAR = 2;
 
 /**
- * Every `.svelte` outside `components/` that clears the membership bar and has no manifest row. The
- * register below is therefore the EXCLUSION MECHANISM rather than a list of offenders (issue 1481).
+ * Every `.svelte` outside `components/` that clears the membership bar and has no manifest row, on
+ * the side `readFile` reads. That is the register's EXCLUSION MECHANISM rather than a list of
+ * offenders (issue 1481).
  */
-function unregisteredSharedComponents() {
-  const registered = new Set(MANIFEST_ROWS.map((row) => row.path));
-  return RENDER_FILES.filter(
+function unregisteredSharedComponents(readFile, files) {
+  const sources = files.filter((file) => file.startsWith('src/'));
+  const graph = importGraph(sources, (file) => readFile(file) ?? '');
+  const registered = new Set(manifestRows(readFile).map((row) => row.path));
+  return sources.filter(
     (file) =>
       file.startsWith(UI_ROOT) &&
       file.endsWith('.svelte') &&
       !file.startsWith(PRIMITIVE_DIRECTORY) &&
       !registered.has(file) &&
-      IMPORTERS.importersOf(file).length >= MEMBERSHIP_BAR
+      graph.importersOf(file).length >= MEMBERSHIP_BAR
   );
 }
 
-test('(e) the register of unadjudicated shared components is exactly what is recorded', () => {
+/**
+ * Its trigger set is the whole import graph under `src/` and the manifest. A marker at a file's
+ * head excuses the file only when it newly crosses the bar.
+ */
+const UNREGISTERED_GATE = Object.freeze({
+  include: (file) => file.startsWith('src/') || MANIFEST_CORPUS.include(file),
+  measure: (readFile, listFiles) =>
+    unregisteredSharedComponents(readFile, listFiles()).map((file) => ({
+      file,
+      id: 'unregistered shared component',
+    })),
+  siteMarkers: false,
+  headMarkers: true,
+});
+
+test('(e) no shared component crosses the membership bar without a manifest row', (t) => {
   const domain = RENDER_FILES.filter(
     (file) =>
       file.startsWith(UI_ROOT) &&
@@ -752,62 +782,54 @@ test('(e) the register of unadjudicated shared components is exactly what is rec
       'mechanism this register relies on is not being exercised by the tree at all'
   );
 
-  assertRatchet({
-    label: 'shared components outside components/ with no manifest row',
-    baseline: KNOWN_UNREGISTERED_SHARED_COMPONENTS,
-    pinnedTotal: KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL,
-    observed: tallyByKey(unregisteredSharedComponents(), (file) => file),
-    scanned: IMPORTERS.fileCount,
-    floor: 500,
-    guidance:
-      'A component with two or more independent callers is a candidate for the shared vocabulary, ' +
+  checkGate(
+    t,
+    UNREGISTERED_GATE,
+    'A component with two or more independent callers is a candidate for the shared vocabulary, ' +
       'wherever it lives — see the "primitive set is a closed, versioned vocabulary" requirement ' +
       'in `openspec/specs/design-system/spec.md`, which sets the bar by CALLER COUNT and not by ' +
-      'directory. A name arriving here means one more component crossed the bar without anyone ' +
-      'deciding: either promote it, with its `library` adjudication and its `evidence` ' +
-      'derivation, or record it on `notAPrimitive` with the measurement that put it there. A name ' +
-      'LEAVING here without a manifest row means it dropped below the bar, which is worth a ' +
-      'sentence of its own.',
-  });
-});
-
-test('(e) every registered path is a real, unadjudicated component', () => {
-  // THE MIRROR GUARD. A register keyed on a path rots the moment a file is renamed, and
-  // `assertRatchet` would report that as VANISHED — correct, but in the language of counts rather
-  // than of the mistake.
-  const onDisk = new Set(RENDER_FILES);
-  const registered = new Set(MANIFEST_ROWS.map((row) => row.path));
-  const paths = KNOWN_UNREGISTERED_SHARED_COMPONENTS.map((row) => row.key);
-
-  assert.deepEqual(
-    paths.filter((file) => !onDisk.has(file)),
-    [],
-    'a register row names a file that is not on disk. A renamed component leaves a row that can ' +
-      'never match anything, and the next author reads it as a component nobody has adjudicated ' +
-      'when in fact nobody can find it.'
-  );
-  assert.deepEqual(
-    paths.filter((file) => registered.has(file)),
-    [],
-    'a register row names a component that now HAS a manifest row. That is the register working ' +
-      '— the component was adjudicated — and the row should have been deleted by the change that ' +
-      'adjudicated it, with the pinned total lowered to match.'
-  );
-  assert.deepEqual(
-    paths.filter((file) => file.startsWith(PRIMITIVE_DIRECTORY)),
-    [],
-    `a register row names a file under ${PRIMITIVE_DIRECTORY}, which is outside this property's ` +
-      'domain entirely — those are covered by the manifest clauses above, and a row here would be ' +
-      'checked by nothing while looking checked'
+      'directory. A component arriving here crossed the bar without anyone deciding: promote it, ' +
+      'with its `library` adjudication and its `evidence` derivation; record it on ' +
+      '`notAPrimitive` with the measurement that put it there; or, for a composition of existing ' +
+      'members, write `<!-- ratchet-exempt(design-system): <reason> -->` at the head of its file.'
   );
 });
 
-test('(e) exactly one shared member row still lives outside the primitive directory', () => {
+test('(e) the register gate reads the import graph and the manifest on each side', (t) => {
+  const SHARED = `${UI_ROOT}apps/Shared.svelte`;
+  const importer = (name) => `<script>import Shared from './${name}.svelte';</script>\n`;
+  const manifest = (...paths) =>
+    `${JSON.stringify({ designSystemPrimitives: paths.map((file) => ({ path: file })), notAPrimitive: [] })}\n`;
+  const base = {
+    [SHARED]: '<div></div>\n',
+    [`${UI_ROOT}apps/One.svelte`]: importer('Shared'),
+    [MANIFEST_PATH]: manifest(),
+    'README.md': 'x\n',
+  };
+  const second = { [`${UI_ROOT}apps/Two.svelte`]: importer('Shared') };
+  assertGateCases(t, UNREGISTERED_GATE, base, [
+    { head: second, failures: [`${SHARED}: unregistered shared component is new (1)`] },
+    { head: { ...second, [MANIFEST_PATH]: manifest(SHARED) }, failures: [] },
+    {
+      head: {
+        ...second,
+        [SHARED]: '<!-- ratchet-exempt(design-system): a composition -->\n<div></div>\n',
+      },
+      failures: [],
+    },
+    { head: { 'README.md': 'y\n' }, skipped: 'corpus-unchanged' },
+  ]);
+});
+
+test('(e) exactly two shared member rows live outside the primitive directory', () => {
   assert.deepEqual(
     MANIFEST_ROWS.filter(
       (row) => row.scope === 'shared' && !row.path.startsWith(PRIMITIVE_DIRECTORY)
     ).map((row) => row.path),
-    ['src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte'],
+    [
+      'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
+      'src/ui/svelte/apps/crafting/detail/CheckEvidenceRows.svelte',
+    ],
     'the design-system spec names this set; a promotion or a new shared row outside ' +
       `${PRIMITIVE_DIRECTORY} must update that sentence with it`
   );
@@ -817,7 +839,7 @@ const APP_DIRECTORY = 'src/ui/svelte/apps/';
 
 test('(f) no file under components/ imports from the application tree', () => {
   // The dependency graph inverted rather than a source pin: `importersOf` is measured, so this adds
-  // no `tests/source-pin-ledger.txt` row and no specifier's spelling can satisfy it.
+  // no pin to `tests/source-pin-ratchet.test.js` and no specifier's spelling can satisfy it.
   const appRenderFiles = RENDER_FILES.filter((file) => file.startsWith(APP_DIRECTORY));
   assert.ok(
     appRenderFiles.length >= 200,

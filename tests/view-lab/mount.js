@@ -11,8 +11,11 @@ import {
   findLabInjectedContentWidthLosses,
   measureWithoutLabStyles,
 } from './labInjectedLayoutGuard.js';
+import { installLabTheme, readLabTheme } from './labTheme.js';
 import { LAB_INTERACTABLE_REFS } from './world/labInteractables.js';
 import { buildLabWorld } from './world/labWorld.js';
+import { installLabChatLog } from './labChatLog.js';
+import { seedRollPromptFixture } from './rollPromptFixtures.js';
 
 const READY_ATTRIBUTE = 'data-view-lab-ready';
 const ERROR_ATTRIBUTE = 'data-view-lab-error';
@@ -106,9 +109,17 @@ function readParams() {
     // DARK by default, because that is what the smoke renders and the smoke is the fidelity
     // authority.
     colorScheme: params.get('colorScheme') === 'light' ? 'light' : 'dark',
+    // The Fabricate palette, which an unknown id refuses rather than letting it fall back (issue 2151).
+    theme: readLabTheme(params),
     // Which crafting system the manager opens on.
     system: params.get('system') ?? null,
     gatheringTaskMode: params.get('gatheringTaskMode') ?? null,
+    // Ashfall Runework's routed crafting check graded roll-under (issue 2005).
+    runeworkCheckMode: params.get('runeworkCheckMode') ?? null,
+    checkOverride: params.get('checkOverride') ?? null,
+    rollPromptState: params.get('rollPromptState') ?? null,
+    // A success-counting Checks Studio state seeded onto Karrun Forgecraft (issue 2004).
+    checkPreviewState: params.get('checkPreviewState') ?? null,
     journalCaseState: params.get('journalCaseState') ?? null,
     // TWO things, and the name says only the second: a world seeded with NO crafting systems, and
     // the persisted selection cleared through the real admin store after construction.
@@ -143,7 +154,7 @@ function readParams() {
     // selection top bar (issue 1198). Nothing shipped changes: the provider lives in this file
     // and registers with the production page-session registry the player app itself reads.
     //
-    // These three params are their own attributed REGION. Only the player window can render what
+    // These params are their own attributed REGION. Only the player window can render what
     // they produce, and `scripts/lib/viewLabCases.js` keys `ATTRIBUTED_LAB_INPUTS` on that fact —
     // so a hunk confined to this block selects the player frames instead of the whole corpus.
     playerProvider: params.get('playerProvider') === '1',
@@ -151,6 +162,11 @@ function readParams() {
     playerProviderFault: params.get('playerProviderFault') === '1',
     // Evidence-only label stress for the rail's truncation rule.
     longPlayerLabels: params.get('longPlayerLabels') === '1',
+    // A stand-in companion's interactive count roll, prompting on the standalone overlay; the
+    // `count-additional` request also offers additional dice (issue 2008).
+    companionRoll: ['count', 'count-additional'].includes(params.get('companionRoll'))
+      ? params.get('companionRoll')
+      : null,
     // view-lab-region:end
     // view-lab-region:canvas-mount-params
     // The two params only the three CANVAS windows read (issue 1520).
@@ -187,6 +203,9 @@ function readParams() {
     // `enter` (the default) to press whichever button Foundry marks default, or a button action by
     // name.
     dialog: params.get('dialog') ?? DEFAULT_LAB_DIALOG_ANSWER,
+    // Dock a chat log in the window, so a case can photograph the result card it posts: `1` on
+    // the right, `left` over the recipe list when the right column is what the case names.
+    chatLog: ['1', 'left'].includes(params.get('chatLog')) ? params.get('chatLog') : null,
   };
 }
 
@@ -321,6 +340,10 @@ async function mountPlayerApp(content, params) {
     playerExtensions,
   };
   const instance = mount(FabricateAppRoot, { target: content, props });
+  if (params.companionRoll) {
+    const { installLabCompanionRoll } = await import('./labCompanionRoll.js');
+    installLabCompanionRoll(content.ownerDocument, params.companionRoll);
+  }
   return { instance, services, props };
 }
 
@@ -449,7 +472,7 @@ function labDowntimeProvider() {
           // An asset the LAB serves. A Foundry core path resolves in a real world and 404s
           // here, and the harness treats a console error during render as a failure -- so a
           // core icon would fail the capture rather than merely render a broken medallion.
-          image: 'assets/img/fabricate-logo.jpg',
+          image: 'docs/img/fabricate-logo.jpg',
           status: { label: 'Unsaved' },
           actions: [
             {
@@ -888,11 +911,17 @@ async function boot() {
         noInteractables: params.noInteractables,
         noSceneRegions: params.noSceneRegions,
         gatheringTaskMode: params.gatheringTaskMode,
+        runeworkCheckMode: params.runeworkCheckMode,
+        checkOverride: params.checkOverride,
         journalCaseState: params.journalCaseState,
+        checkPreviewState: params.checkPreviewState,
       });
+  await seedRollPromptFixture(world, params.rollPromptState);
   if (params.longDowntimeLabels) applyLongDowntimeLocalization(world);
   const localize = world ? world.localize : (key) => key;
   configureLabPage({ colorScheme: params.colorScheme });
+  // After the world build, whose startup applies the stored theme setting to the document.
+  installLabTheme(params.theme);
 
   const built = buildAppWindow({
     appId: params.appId,
@@ -919,6 +948,11 @@ async function boot() {
     if (params.manyPlayers) world.shim.seedPlayerRoster();
     // Before any step can click something that confirms.
     world.shim.setDialogAnswer(params.dialog);
+    if (params.chatLog) {
+      installLabChatLog(built.frame, undefined, {
+        side: params.chatLog === '1' ? 'right' : 'left',
+      });
+    }
     mounted = await mountAppFor(built.content, params);
     await settle([built.frame], mounted?.services ?? null);
     // After settle, because the check needs the populated tree — an empty window has nothing

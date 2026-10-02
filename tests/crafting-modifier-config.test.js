@@ -2,9 +2,13 @@
 // selection triple over it, and the per-subject picks — issues 770, 1055, 1095.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+
+import { createLangBackedI18n } from './helpers/langBackedI18n.js';
+import { walkNodes } from './helpers/moduleAst.js';
+import { componentAstOf } from './helpers/parsedSource.js';
+import { repoRoot } from './helpers/sourceScan.js';
+import { staticTextCalls } from './helpers/structureContract.js';
+import { keyName } from './helpers/structureShapes.js';
 
 globalThis.foundry = {
   utils: { randomID: () => Math.random().toString(36).slice(2) },
@@ -184,59 +188,70 @@ test('_normalizeCraftingCheck accepts every one of the four combination rules', 
 
 // policy copy: the card's English fallbacks mirror lang/en.json.
 // `CraftingModifierCatalogueCard.svelte` hard-codes an English `fallback`/`descFallback` beside
-// every `labelKey`/`descKey`, so the same sentence lives in two files (issue 1055).
-test('the modifier card fallbacks match lang/en.json exactly', () => {
-  const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-  const source = readFileSync(
-    join(root, 'src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte'),
-    'utf8'
-  );
-  const lang = JSON.parse(readFileSync(join(root, 'lang/en.json'), 'utf8'));
-  const resolve = (key) =>
-    key.split('.').reduce((node, segment) => (node == null ? undefined : node[segment]), lang);
-  const assertMirrored = (pairs, expectedCount, what) => {
-    assert.equal(pairs.length, expectedCount, `expected ${expectedCount} ${what}`);
-    for (const [, key, fallback] of pairs) {
-      assert.equal(resolve(key), fallback.replaceAll("\\'", "'"), `${key} drifted`);
-    }
-  };
+// every `labelKey`/`descKey`, so the same sentence lives in two files (issue 1055). The pairs are
+// read off the parsed component: adjacent string-valued keys of one object literal, and every
+// `text(key, fallback)` call.
+const langText = createLangBackedI18n(repoRoot).lookup;
 
+/** Every adjacent `{ <key>: '…', <next>: '…' }` literal pair whose two key names `admits`. */
+function copyPairs(component, admits) {
+  const pairs = [];
+  const literal = (entry) =>
+    typeof entry?.value?.value === 'string' && entry.value.type === 'Literal'
+      ? entry.value.value
+      : undefined;
+  for (const node of walkNodes(component)) {
+    if (node.type !== 'ObjectExpression') continue;
+    node.properties.forEach((entry, index) => {
+      const next = node.properties[index + 1];
+      const [key, fallback] = [literal(entry), literal(next)];
+      // An empty key is a placeholder row with nothing to localize.
+      if (!key || fallback === undefined) return;
+      if (admits(keyName(entry), keyName(next))) pairs.push({ key, fallback });
+    });
+  }
+  return pairs;
+}
+
+function assertMirrored(pairs, expectedCount, what) {
+  assert.equal(pairs.length, expectedCount, `expected ${expectedCount} ${what}`);
+  for (const { key, fallback } of pairs) assert.equal(langText(key), fallback, `${key} drifted`);
+}
+
+/** The `text('FABRICATE…', '…')` calls a component localizes inline, both arguments literal. */
+const inlineCopy = (component) =>
+  staticTextCalls(component).filter(({ key }) => key.startsWith('FABRICATE.'));
+
+test('the modifier card fallbacks match lang/en.json exactly', () => {
+  const card = componentAstOf(
+    'src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte'
+  );
   // The INLINE option table: three rules whose copy is activity-independent.
+  const optionRow = (key, next) =>
+    ['labelKey', 'descKey'].includes(key) && ['fallback', 'descFallback'].includes(next);
   assertMirrored(
-    [
-      ...source.matchAll(
-        /(?:labelKey|descKey):\s*'([^']+)',\s*\w*[Ff]allback:\s*'((?:[^'\\]|\\.)*)'/g
-      ),
-    ],
+    copyPairs(card, optionRow),
     6,
     'label + description pairs across the three activity-independent combination rules'
   );
   // SUBJECT_COPY: FOUR key/literal pairs per activity, on THREE activities (issue 1095) — the
   // per-activity `bySubject` label, its description, its pick-cap hint and the card DESCRIPTION it
   // shows under that rule.
-  for (const [keyProp, valueProp, expected] of [
-    ['labelKey', 'label', 3],
-    ['descKey', 'desc', 3],
-    ['capKey', 'cap', 3],
-    ['leadKey', 'lead', 6],
+  for (const [stem, expected] of [
+    ['label', 3],
+    ['desc', 3],
+    ['cap', 3],
+    ['lead', 6],
   ]) {
     assertMirrored(
-      [
-        ...source.matchAll(
-          new RegExp(
-            String.raw`\b${keyProp}:\s*'([^']+)',\s*${valueProp}:\s*\n?\s*'((?:[^'\\]|\\.)*)'`,
-            'g'
-          )
-        ),
-      ],
+      copyPairs(card, (key, next) => key === `${stem}Key` && next === stem),
       expected,
-      `${keyProp}/${valueProp} pairs`
+      `${stem}Key/${stem} pairs`
     );
   }
-  // `\bkey:` cannot match `labelKey:`/`descKey:` (no word boundary after `l`/`c`), so this picks up
-  // only the MAX_PICKS_COPY, DEFAULTS_INTRO_COPY, INERT_COPY and NOT_ELIGIBLE_COPY tables.
+  // The MAX_PICKS_COPY, DEFAULTS_INTRO_COPY, INERT_COPY and NOT_ELIGIBLE_COPY tables.
   assertMirrored(
-    [...source.matchAll(/\bkey:\s*'([^']+)',\s*(?:label|fallback):\s*'((?:[^'\\]|\\.)*)'/g)],
+    copyPairs(card, (key, next) => key === 'key' && ['label', 'fallback'].includes(next)),
     12,
     'the playerPicks cap hint, the three inert-cause sentences, the four ON ' +
       'eligibility words, and the four OFF ones — one ENTRY per rule, because "Not applied" ' +
@@ -245,69 +260,38 @@ test('the modifier card fallbacks match lang/en.json exactly', () => {
       'the rule cards beside them say "the modifiers you mark selectable" in the prototype’s ' +
       'own words'
   );
-  // Everything else the card localizes INLINE, through `text(key, fallback)` — the empty state's
-  // two branches, the two bounds faults, the read-only link, the field captions.
-  const inline = [
-    ...source.matchAll(/text\(\s*'(FABRICATE\.[^']+)',\s*\n?\s*'((?:[^'\\]|\\.)*)'\s*\)/g),
-  ];
+  // Everything else the card localizes INLINE — the empty state's two branches, the two bounds
+  // faults, the read-only link, the field captions.
+  const inline = inlineCopy(card);
   assert.ok(inline.length >= 15, `expected the card's inline fallbacks, got ${inline.length}`);
-  for (const [, key, fallback] of inline) {
-    assert.equal(resolve(key), fallback.replaceAll("\\'", "'"), `${key} drifted`);
-  }
+  assertMirrored(inline, inline.length, 'inline fallbacks');
 });
 
 // The shared subject picker is a THIRD surface restating the same vocabulary, one noun per
 // subject (issue 1095). Same mirror, same failure mode, so the same guard.
 test('the subject modifier picker fallbacks match lang/en.json exactly', () => {
-  const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-  const source = readFileSync(
-    join(root, 'src/ui/svelte/apps/manager/SubjectModifierPicker.svelte'),
-    'utf8'
+  const picker = componentAstOf('src/ui/svelte/apps/manager/SubjectModifierPicker.svelte');
+  // The per-subject SUBJECT_COPY table: `<name>Key` immediately followed by `<name>`.
+  assertMirrored(
+    copyPairs(picker, (key, next) => key === `${next}Key`),
+    14,
+    'seven sentences per subject, on two subjects'
   );
-  const lang = JSON.parse(readFileSync(join(root, 'lang/en.json'), 'utf8'));
-  const resolve = (key) =>
-    key.split('.').reduce((node, segment) => (node == null ? undefined : node[segment]), lang);
-
-  // The per-subject SUBJECT_COPY table: `<name>Key: '...'` immediately followed by
-  // `<name>: '...'`, on both subjects.
-  const pairs = [
-    ...source.matchAll(/\b(\w+)Key:\s*\n?\s*'([^']+)',\s*\1:\s*\n?\s*'((?:[^'\\]|\\.)*)'/g),
-  ];
-  assert.equal(pairs.length, 14, 'seven sentences per subject, on two subjects');
-  for (const [, , key, fallback] of pairs) {
-    assert.equal(resolve(key), fallback.replaceAll("\\'", "'"), `${key} drifted`);
-  }
-  // …plus the activity-independent ones it localizes inline.
-  const inline = [
-    ...source.matchAll(/text\(\s*'(FABRICATE\.[^']+)',\s*\n?\s*'((?:[^'\\]|\\.)*)'\s*\)/g),
-  ];
+  const inline = inlineCopy(picker);
   assert.ok(inline.length >= 4, `expected the picker's inline fallbacks, got ${inline.length}`);
-  for (const [, key, fallback] of inline) {
-    assert.equal(resolve(key), fallback.replaceAll("\\'", "'"), `${key} drifted`);
-  }
+  assertMirrored(inline, inline.length, 'inline fallbacks');
 });
 
 // The Overview tab restates the pick-source labels for its own tri-state select, the pick-cap
-// sentences, and the inert cause from the recipe's point of view (issue 1055).
+// sentences, and the inert cause from the recipe's point of view (issue 1055). Scoped to the
+// check-modifier keys this change owns: the tab carries other pairs whose drift predates it.
 test('the recipe Overview tab modifier fallbacks match lang/en.json exactly', () => {
-  const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-  const source = readFileSync(
-    join(root, 'src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte'),
-    'utf8'
+  const tab = componentAstOf('src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte');
+  const pairs = inlineCopy(tab).filter(({ key }) =>
+    ['CraftingModifier', 'ModifierPolicy', 'ModifierUnnamed'].some((part) => key.includes(part))
   );
-  const lang = JSON.parse(readFileSync(join(root, 'lang/en.json'), 'utf8'));
-  const resolve = (key) =>
-    key.split('.').reduce((node, segment) => (node == null ? undefined : node[segment]), lang);
-
-  // Scoped to the check-modifier keys this change owns. The tab carries other
-  // key/fallback pairs whose drift predates issue 1055 and is not this guard's business.
-  const pairs = [
-    ...source.matchAll(/text\(\s*'(FABRICATE\.[^']+)',\s*\n?\s*'((?:[^'\\]|\\.)*)'\s*\)/g),
-  ].filter(([, key]) => /(?:CraftingModifier|ModifierPolicy|ModifierUnnamed)/.test(key));
   assert.ok(pairs.length >= 10, `expected the tab's modifier fallbacks, got ${pairs.length}`);
-  for (const [, key, fallback] of pairs) {
-    assert.equal(resolve(key), fallback.replaceAll("\\'", "'"), `${key} drifted`);
-  }
+  assertMirrored(pairs, pairs.length, 'modifier fallbacks');
 });
 
 test('_normalizeCraftingCheck coerces a genuinely unknown policy to addAll', () => {

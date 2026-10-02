@@ -145,6 +145,20 @@ Actual receipts not uniquely attributed to a selected row MUST appear once below
 Unknown per-row award attribution MUST NOT erase known check evidence: retain those outcomes with Not recorded amounts and show the unattributed actual award once with an explanation.
 Routed gathering success shows Final check, Brought back and How the check landed; routed failure shows its verdict and actual outcome log without repeating the log's roll in the verdict.
 The full OutcomeLadder remains an active preview; its native selection bands and highest-matching/lowest-relative-fallback rule MUST be stated truthfully rather than adopting prototype low-roll semantics.
+A roll-under ladder MUST rank its tiers through the check's own direction and state its bands with `≤` and `>` (or `<` and `≥` when strict), and its hint MUST state the roll-under selection rule: the tier with the lowest threshold the roll stays at or under (or under), else the tier with the highest threshold.
+A character-value ladder MUST state each tier's adjustment labelled with its name — `Failed · −15`, or `Ruined · Otherwise` for a multiplied tier with none — and the rule that each tier adjusts the character's value before the roll, never a number derived from `dcOverride ?? dc ?? 15`; a fixed-range ladder keeps the roll-high rule.
+Outside a roll-high check against a fixed DC a crafting step's check label never says DC: a fixed target reads `{formula} · Target {n} · {comparison}` (`1d20 · Target 12 · stay at or under`), and a character value or a fixed-range routed check names only its formula.
+A step's recorded roll line then reads `{formula} = {total} · target {target} · margin {margin}` from the executed target and benefit-positive margin, and a record without either reads its formula and total alone, never `vs DC n`.
+A counting check's ladder MUST be stated in net successes and ranked by net whatever the per-die direction, never by the summed comparison.
+While cancelling is enabled a `Botch` row carrying the least demanding tier's outcome covers only the nets no tier meets: `<0`, or below that tier's threshold when it needs zero or fewer successes, whose own band then starts at its threshold, so no band repeats.
+The row sits beside that tier wherever the ladder authors it, after it on a ladder whose first tier needs more successes than its last and before it otherwise.
+With cancelling off the least demanding tier's band starts at 0, unless every net of 0 or more meets a higher tier, when it states its own threshold.
+A band or fixed range whose ends include a negative number separates them with a spaced en dash (`−2 – −1`, `−2 – 1`), and keeps the tight dash otherwise.
+A counting step's check label reads `{n} successes needed · d{die}s` (`1 success needed`), or `Successes counted on d{die}s` where no required count applies, never the retained formula or a DC.
+Its recorded roll line reads `{net} successes, {required} needed` (`1 success, {required} needed`), a net below zero reads `Botch: {net} net successes` with no required count, `{net} net successes` when no required count applies, and a pool that rolled nothing reads the zero-pool sentence — never `vs DC n`.
+A pass/fail record's `required` is its recorded total less its margin; a routed record's margin is taken from its matched tier, so its `required` is the check's own successes needed, as the step label states it, and never the total less that margin.
+A routed record states that count only while it agrees with the current check, its total less its margin being that count plus its matched tier's current offset; a record that no longer agrees, a fixed range, or one whose tier is gone reads its net alone, so history is never restated by a later-edited configuration.
+A secret check's rows stay withheld.
 
 A matching just-resolved notice may temporarily own a single-record summary and receipts; reselecting clears it and restores ordinary history.
 Its evidence band MUST be withheld entirely when it owns no rows — a multi-stage run's rows belong to its stage cards — rather than rendered empty, because an empty band still occupies its own line and unbalances the notice it sits in.
@@ -242,5 +256,15 @@ Alchemy makes that the DEFAULT case: brewing is never gated by visibility, and d
 - Because a redacted model carries no `recipeId`, `Fabricate#advanceCraftingRun` resolves the recipe from the PERSISTED RUN rather than from its caller.
 The client-supplied `recipeId` is ignored; trusting it also allowed advancing one run while naming another run's recipe.
 - The initial versioned secret-check prompt MUST remain generic, omitting protected subject names, artwork, formula, DC and modifier details before any reply leaves the GM.
+An entitled visible versioned check prompt MUST receive a Crafting activity label, actor and recipe or step subject, the tool-appended formula, a finite simple-check target with its meet-or-exceed comparison, and the display entries resolved from the same prepared modifier snapshot that evaluation uses.
+Its offered player choices MUST remain deferred rather than appear as already-applied modifiers; routed and progressive checks MUST expose no single public target or comparison.
+An entitled prepared check that counts successes MUST open the same count prompt as the crafting path: the settled pool and threshold, the actual explode and cancel faces and the successes needed, forwarded as numbers and enums only, never the retained formula, an expression or a path.
+The prompt projection MUST omit private configuration, outcome tiers, source actors, speaker and execution results.
+The complete prepared evaluation MUST stay in the issuing GM authority instance rather than replicated JournalEntry flags.
+If that instance loses its snapshot or another GM takes over, the pending token MUST fail without evaluation or effects and the viewer may prepare a fresh check.
+Taking longer than the token's lifetime over the roll prompt MUST NOT cost the viewer their roll: the client prepares again and settles the answer already given when nothing the prompt showed has changed, and otherwise reopens the prompt on the fresh check with a notice (`data-models/spec.md`, the authority ledger's prepare tokens).
+The reopened prompt MUST state that the roll's details changed in a warning notice above the check, and a warning notification repeats the sentence as a secondary cue.
+Changing the modifier library or actor roll data after preparation MUST NOT change the prepared modifier contribution or its displayed value.
 Secret evaluation uses GM private posting and a sanitized response without player roll-data handoff.
 A non-secret evaluated-roll handoff MUST separately recheck the initiating viewer's entitlement after commit; this cannot substitute for initial-prompt redaction.
+A public crafting check's evaluated roll that the stage's result card carried MUST NOT be handed back, so the viewer posts no second message for it (`ui-crafting-app/spec.md`, Result Chat Cards).

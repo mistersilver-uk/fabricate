@@ -1,50 +1,17 @@
 /**
- * `game.fabricate.grantRecipeKnowledge` — the companion contract's GM knowledge grant
- * (issue 1289).
- *
- * A downtime activity's reward is "you learned this by doing the work": no book is involved,
- * no copy is consumed, and no learn budget is spent. Every write path Fabricate already has
- * onto `learnedRecipes` is anchored on a real owned recipe item — a matched copy, a learn
- * budget, a prerequisite, or craft-time auto-learn. This one is UNBOUNDED by design, and
- * that is exactly why it lives here.
- *
- * ## Why a free function, and not a method on `RecipeVisibilityService`
- *
- * `game.fabricate.getRecipeVisibilityService()` hands back the LIVE service through a
- * published accessor with NO GATE OF ANY KIND, and a companion already calls it. An
- * unbounded write placed on that object would make `grantRecipeKnowledge({ recipe, actor:
- * myOwnCharacter })` a fully authorised, self-benefiting write any PLAYER could make from
- * the console. `resetActorKnowledge` is self-harm; a grant is self-benefit, and the
- * asymmetry is the whole point. The rejected alternative — an explicit `authorized: true`
- * argument the facade supplies — is security by convention: a player passes the same
- * argument. So nothing writable is added to the handed-out service, and this module reaches
- * no `_`-prefixed member of it; it takes the four seams below instead.
- *
- * ## The gate order, and the three gates that are NOT here
- *
- * The facade owns the first three preconditions — caller is a GM, the actor resolves and the
- * caller may act as it, and the module is ready — in that order, because the readiness check
- * throws and must therefore run AFTER the never-throwing refusals rather than before them.
- * This function owns the remaining five, in the order they appear below: the recipe
- * resolves, its system resolves, a learned entry on that system is OBSERVABLE, `grantedBy`
- * normalizes, and the recipe is not already known.
- *
- * Four gates the book learn paths enforce are deliberately NOT enforced: book membership, a
- * matched non-exhausted owned copy, Required Knowledge, and the per-book character gate.
- * The first two are the "no owned book required" relaxation this member exists for; the
- * latter two are inert for a recipe with no member book, and where they do bite the skip is
- * the intended GM override — those gates exist for a reader EARNING knowledge from a book,
- * and a GM who wants them can decline to grant.
- *
- * ## Never throws
- *
- * A `stable` contract member is called inside a GM's automation tick, after other side
- * effects have committed, where a throw aborts work mid-flight and surfaces as an unhandled
- * rejection nothing attributes to a caller. Every path here answers a result, including a
- * write the persistence layer rejects (`grantFailed`).
+ * `game.fabricate.grantRecipeKnowledge`: the companion GM knowledge grant (issue 1289), an
+ * unbounded write with no owned book, copy or learn budget.
+ * A free function, not a `RecipeVisibilityService` method: that live service is handed out
+ * ungated, so any player could grant themselves recipes. It reaches no `_` member of it.
+ * The facade gates GM, actor and readiness first; this owns recipe, system, observability,
+ * `grantedBy` and already-known, in that order. Book membership, owned copy, Required Knowledge
+ * and the per-book character gate are deliberately not enforced (a GM override).
+ * Never throws: a `stable` member answers a result, including `grantFailed`.
+ * `grantRecipeKnowledgeEntry` is the effect-path primitive (issue 1954); it carries no marker.
  */
 
-import { LEARNED_RECIPES_FLAG_KEY } from '../config/flags.js';
+import { FABRICATE_FLAG_NAMESPACE, LEARNED_RECIPES_FLAG_KEY } from '../config/flags.js';
+import { getByPath } from '../utils/objectPath.js';
 
 import {
   COMPANION_OUTCOMES,
@@ -54,13 +21,34 @@ import {
 } from './companionContract.js';
 import { readLearnedRecipeEntries } from './recipeKeyedFlagEntries.js';
 
-/**
- * The learned map exactly as `RecipeVisibilityService._getLearnedMap` reads it, through the
- * injected flag seam and the shared key rather than that private member.
- */
+/** The learned map as `RecipeVisibilityService._getLearnedMap` reads it, via the flag seam. */
 function readLearnedMap(actor, readFlag) {
   const learned = readFlag(actor, LEARNED_RECIPES_FLAG_KEY, {});
   return learned && typeof learned === 'object' ? learned : {};
+}
+
+/** Where the learned map lives in a document's `_source`. */
+const LEARNED_SOURCE_PATH = `flags.${FABRICATE_FLAG_NAMESPACE}.fabricate.${LEARNED_RECIPES_FLAG_KEY}`;
+
+/** Idempotency by entry, never `learnedMap[id]`: a dotted id is dot-expanded (issue 1143). */
+function knownIn(learnedMap, recipeId) {
+  return readLearnedRecipeEntries(learnedMap).has(String(recipeId));
+}
+
+/** Whether `actor` already knows `recipeId`, through the flag seam. */
+export function isRecipeKnown(actor, recipeId, readFlag) {
+  return knownIn(readLearnedMap(actor, readFlag), recipeId);
+}
+
+function sourceLearnedEntry(document, recipeId) {
+  const learned = getByPath(document?._source, LEARNED_SOURCE_PATH);
+  if (!learned || typeof learned !== 'object') return null;
+  return readLearnedRecipeEntries(learned).get(String(recipeId)) ?? null;
+}
+
+/** The granted entry; `granted` is only ever `true` (absent means not granted). */
+function grantedEntry(grantedBy) {
+  return { learnedAt: Date.now(), sourceItemUuid: null, granted: true, grantedBy };
 }
 
 function documentLabel(document) {
@@ -68,53 +56,12 @@ function documentLabel(document) {
 }
 
 /**
- * Grant a recipe's knowledge to one actor, with no owned book required.
- *
- * ### The write
- *
- * `{ learnedAt, sourceItemUuid: null, granted: true, grantedBy }` — four scalars, spread over
- * the RAW persisted map exactly as `learnRecipeOnCraft` spreads it, so this introduces no
- * second write shape. `granted` is written `true` and NEVER `false`: absence means not
- * granted, so no migration touches the existing corpus. It is the display discriminant, and
- * it exists as a field of its own because "was this granted?" and "what did the caller want
- * recorded about why?" are two questions — keying the display on the presence of a LABEL
- * would leave a label-less grant (the likely common case: a macro with nothing meaningful to
- * say) indistinguishable from a craft-time auto-learn entry, and rendering as "Learned by
- * crafting" is precisely the false provenance this member exists to remove.
- *
- * `granted` COLLIDES BY NAME with `evaluateKnowledgeAccess`'s own `granted`, and the two are
- * unrelated. That one is an access DECISION computed per viewer per evaluation — "may this
- * reader craft this recipe right now" — and is never persisted; this one is a PERSISTED fact
- * about how an entry came to exist, read only by the GM Knowledge surface's source ladder.
- * They meet in no expression, but they do appear in adjacent code, so a reader who assumes
- * `knowledge.granted` and `entry.granted` are the same field is reading two different
- * questions as one.
- *
- * ### Idempotency
- *
- * Decided through {@link readLearnedRecipeEntries}, NEVER a bare `learnedMap[recipe.id]`
- * index. `Document#update` dot-expands a recipe id containing a `.` into a subtree, so a
- * bare index misses it and a legacy dotted id would be re-granted — and re-written — on
- * every call (issue 1143). An already-known recipe performs NO WRITE and answers
- * `success: true` with `alreadyKnown`, because the caller is an automation tick that may
- * legitimately re-run and `success: false` would make a correct re-run read as a failure;
- * the caller distinguishes GRANTED NOW from ALREADY KNEW by the outcome, never by the
- * boolean.
- *
- * @param {object} request
- * @param {object} request.actor the RESOLVED actor — the facade's ownership gate ran already
- * @param {string} request.recipeId the recipe to grant, by id (never a uuid)
- * @param {*} [request.grantedBy] an optional caller-supplied provenance label; refused,
- *   never coerced or truncated (see `normalizeGrantedBy`)
- * @param {object} seams the four injected seams, supplied by the facade
- * @param {(recipeId: string) => object|null} seams.resolveRecipe
- * @param {(recipe: object) => object|null} seams.resolveSystem
- * @param {(system: object) => boolean} seams.isObservable
- *   `RecipeVisibilityService.isLearnedKnowledgeObservable`
- * @param {(actor: object, key: string, fallback: *) => *} seams.readFlag
- * @param {(actor: object, key: string, value: *) => Promise<*>} seams.writeFlag
- * @returns {Promise<Readonly<{success: boolean, outcome: string, message: string,
- *   messageData?: object}>>}
+ * Grant a recipe's knowledge to one actor. Writes `{ learnedAt, sourceItemUuid: null, granted:
+ * true, grantedBy }` over the raw map as `learnRecipeOnCraft` does; `granted` is only ever
+ * `true` (absent means not granted) and is the display discriminant, so a label-less grant is
+ * never shown as learned by crafting. It is unrelated to `evaluateKnowledgeAccess`'s `granted`.
+ * An already-known recipe writes nothing and answers success with `alreadyKnown`.
+ * `seams.isObservable` is `RecipeVisibilityService.isLearnedKnowledgeObservable`.
  */
 export async function grantRecipeKnowledge(
   { actor, recipeId, grantedBy = null } = {},
@@ -129,9 +76,7 @@ export async function grantRecipeKnowledge(
   if (!system) return knowledgeGrantResult(COMPANION_OUTCOMES.systemNotFound, messageData);
 
   if (isObservable(system) !== true) {
-    // The modes are reported AS AUTHORED on the system — the words a GM recognises from the
-    // system editor — rather than as the predicate's internally resolved enum, which is that
-    // method's own business and is deliberately not re-derived here.
+    // Modes are reported as authored on the system, not as the predicate's resolved enum.
     return knowledgeGrantResult(COMPANION_OUTCOMES.knowledgeNotObservable, {
       ...messageData,
       visibilityMode: system?.visibilityMode ?? null,
@@ -141,35 +86,87 @@ export async function grantRecipeKnowledge(
 
   const label = normalizeGrantedBy(grantedBy);
   if (!label.ok) {
-    // The too-long refusal interpolates the limit rather than restating the number, so the
-    // string and the validator cannot drift apart.
+    // Interpolate the limit so the string and the validator cannot drift apart.
     const refusalData =
       label.outcome === COMPANION_OUTCOMES.grantedByTooLong ? { max: GRANTED_BY_MAX_LENGTH } : null;
     return knowledgeGrantResult(label.outcome, refusalData);
   }
 
   const learnedMap = readLearnedMap(actor, readFlag);
-  if (readLearnedRecipeEntries(learnedMap).has(String(recipe.id))) {
+  if (knownIn(learnedMap, recipe.id)) {
     return knowledgeGrantResult(COMPANION_OUTCOMES.alreadyKnown, messageData);
   }
 
-  const next = {
-    ...learnedMap,
-    [recipe.id]: {
-      learnedAt: Date.now(),
-      sourceItemUuid: null,
-      granted: true,
-      grantedBy: label.value,
-    },
-  };
+  const next = { ...learnedMap, [recipe.id]: grantedEntry(label.value) };
 
   try {
     await writeFlag(actor, LEARNED_RECIPES_FLAG_KEY, next);
   } catch {
-    // `setFabricateFlag` REJECTS when Foundry refuses the update, so that a caller is never
-    // told a flag persisted when it did not. A `stable` member may not rethrow it.
+    // `setFabricateFlag` rejects on a refused update; a `stable` member may not rethrow.
     return knowledgeGrantResult(COMPANION_OUTCOMES.grantFailed);
   }
 
   return knowledgeGrantResult(COMPANION_OUTCOMES.granted, messageData);
+}
+
+const settled = (status, intent, receipt, failure) => ({ status, intent, receipt, failure });
+
+/**
+ * Grant one validated recipe on the effect path (issue 1954), answering `{ status, intent,
+ * receipt, failure }`. Already known is `applied` with no write and a null intent; otherwise
+ * `applied` only when the learned entry is in the returned `_source`. `null` or `undefined` wrote
+ * nothing; a learned-map read that throws is `knownFailure`, a write throw or a missing entry is
+ * `uncertain`; `beforeWrite(intent)` gates the write as in `placeComponentAward` (`notAttempted`
+ * unless it answers `true`; its throw propagates).
+ */
+export async function grantRecipeKnowledgeEntry(
+  { actor, recipeId, grantedBy = null, beforeWrite = null },
+  { readFlag, writeFlag }
+) {
+  const id = String(recipeId);
+  let learnedMap;
+  try {
+    learnedMap = readLearnedMap(actor, readFlag);
+  } catch (error) {
+    const detail = error?.message ?? String(error);
+    return settled('knownFailure', null, null, { reason: 'preflightThrew', detail });
+  }
+  if (knownIn(learnedMap, id)) return settled('applied', null, { result: 'alreadyKnown' }, null);
+
+  const intent = { recipeId: id, grantedBy };
+  if (beforeWrite && (await beforeWrite(intent)) !== true) {
+    return settled('notAttempted', intent, null, null);
+  }
+  let written;
+  try {
+    written = await writeFlag(actor, LEARNED_RECIPES_FLAG_KEY, {
+      ...learnedMap,
+      [id]: grantedEntry(grantedBy),
+    });
+  } catch (error) {
+    return settled('uncertain', intent, null, {
+      reason: 'writeThrew',
+      detail: error?.message ?? String(error),
+    });
+  }
+  if (written == null) {
+    return settled('knownFailure', intent, null, { reason: 'writeRefused', detail: null });
+  }
+  if (!sourceLearnedEntry(written, id)) {
+    return settled('uncertain', intent, null, { reason: 'receiptMismatch', detail: null });
+  }
+  return settled('applied', intent, { result: 'granted' }, null);
+}
+
+/**
+ * Recovery probe: `applied` only when the actor's `_source` entry carries `granted: true` and the
+ * intended `grantedBy`, else `uncertain`. A learned map is its own key, so a GM's later matching
+ * grant also reads as applied.
+ */
+export function probeRecipeKnowledgeGrant(actor, { recipeId, grantedBy = null }) {
+  const entry = sourceLearnedEntry(actor, recipeId);
+  const applied = entry?.granted === true && entry.grantedBy === grantedBy;
+  return applied
+    ? { status: 'applied', receipt: { result: 'granted' } }
+    : { status: 'uncertain', receipt: null };
 }

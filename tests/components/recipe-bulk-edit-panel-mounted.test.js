@@ -33,7 +33,14 @@ const panel = createMountedComponentHarness({
     // component under test, and the shared harness's closure validator throws loudly on an
     // omission — the hand-rolled suites are the ones that hang instead.
     'src/ui/model/recipeBulkEditModel.js',
-    'src/utils/bulkSelectionModel.js'
+    'src/utils/bulkSelectionModel.js',
+    // The tier labels the single-recipe editor shares, which name a DC, a Target or an adjustment.
+    'src/ui/svelte/apps/manager/recipe/recipeOverviewSelectOptions.js',
+    'src/utils/checkAdjustmentFormat.js',
+    // …and a count tier by its successes needed, the default's from the pool (issue 2006).
+    'src/systems/normalize/checkEvaluation.js',
+    'src/utils/fillPlaceholders.js',
+    'src/utils/scalars.js'
   ],
   compiledModules: [
     'src/ui/svelte/components/Callout.svelte',
@@ -757,6 +764,93 @@ describe('RecipeBulkEditPanel check-tier axis (issue 1010)', () => {
     assert.deepEqual(
       selectOptionLabels(root, TIER_HOOK).map((text) => text.replace(HINT_JOIN, '')),
       ['Leave unchanged', 'Default DC', 'Easy (DC 8)', 'Unnamed tier (DC 18)']
+    );
+  });
+
+  it('names a roll-under Target and a character-value adjustment instead of a DC (issue 2005)', async () => {
+    const HINT_JOIN = / (?:Every|Clears) .*$/;
+    const evaluation = (direction, source = 'fixed', adjustmentKind = 'add') => ({
+      product: 'sum',
+      direction,
+      target: { source, expression: '@skills.smith.value', adjustmentKind },
+    });
+    const tiers = [
+      { id: 'tier-easy', name: 'Easy', dc: 8, adjustment: 1 },
+      { id: 'tier-hard', name: 'Hard', dc: 18, adjustment: 0.5 }
+    ];
+    const cases = [
+      [evaluation('under'), ['Default target', 'Easy (Target 8)', 'Hard (Target 18)'], /default target\.$/, /^The target/],
+      [
+        evaluation('under', 'attribute', 'multiply'),
+        ['Default · base adjustment', 'Easy (×1)', 'Hard (×½)'],
+        /base adjustment\.$/,
+        /^The adjustment/
+      ]
+    ];
+    for (const [checkEvaluation, labels, defaultHint, subhint] of cases) {
+      panel.remount();
+      const { root } = await mountPanel({ checkEvaluation, checkTierOptions: tiers });
+      const rows = selectOptionLabels(root, TIER_HOOK);
+      assert.deepEqual(rows.slice(1).map((text) => text.replace(HINT_JOIN, '')), labels);
+      assert.match(rows[1], defaultHint, 'the Default row hint names what it clears to');
+      assert.ok(rows.every((text) => !/\bDC\b/.test(text)), 'no row says DC');
+      const hints = [...root.querySelectorAll('.fab-bulk-edit-subhint')].map((node) => node.textContent);
+      assert.ok(hints.some((text) => subhint.test(text)), 'the section hint names the same unit');
+    }
+  });
+
+  it('words the dynamic and no-tier callouts for a Target or an adjustment, keeping DC roll-high (T6)', async () => {
+    const evaluation = (direction, source = 'fixed') => ({
+      product: 'sum',
+      direction,
+      target: { source, expression: '@skills.smith.value', adjustmentKind: 'add' },
+    });
+    const callout = async (reason, checkEvaluation) => {
+      panel.remount();
+      const { root } = await mountPanel({
+        checkEvaluation,
+        checkTierAxis: { available: false, reason },
+      });
+      return root.querySelector('[data-recipe-bulk-check-tier-unavailable]').textContent.trim();
+    };
+    assert.match(await callout('dynamic', null), /resolves its DC dynamically/);
+    assert.match(await callout('noTiers', null), /its default DC\./);
+    for (const checkEvaluation of [evaluation('under'), evaluation('over', 'attribute')]) {
+      assert.match(await callout('dynamic', checkEvaluation), /resolves its target dynamically/);
+    }
+    assert.match(await callout('noTiers', evaluation('under')), /its default target\./);
+    assert.match(await callout('noTiers', evaluation('under', 'attribute')), /its base adjustment\./);
+    for (const reason of ['dynamic', 'noTiers']) {
+      assert.doesNotMatch(await callout(reason, evaluation('under')), /\bDC\b/, reason);
+    }
+  });
+
+  it('names a count tier by its successes needed, and stages it when chosen (issue 2006)', async () => {
+    const HINT_JOIN = / (?:Every|Clears) .*$/;
+    const checkEvaluation = { product: 'count', direction: 'under', pool: { required: 2 } };
+    const tiers = [
+      { id: 'tier-easy', name: 'Easy', dc: 8, successes: 1 },
+      { id: 'tier-hard', name: 'Hard', dc: 18, successes: null },
+    ];
+    const { root, state } = await mountPanel({ checkEvaluation, checkTierOptions: tiers });
+    const rows = selectOptionLabels(root, TIER_HOOK);
+    assert.deepEqual(rows.slice(1).map((text) => text.replace(HINT_JOIN, '')), [
+      'Default · 2 successes',
+      'Easy · 1 success',
+      'Hard · — successes',
+    ]);
+    assert.match(rows[1], /default successes needed\.$/, 'the Default row clears to the count');
+    assert.ok(rows.every((text) => !/\bDC\b/.test(text)), 'no row says DC');
+    const hints = [...root.querySelectorAll('.fab-bulk-edit-subhint')].map((node) => node.textContent);
+    assert.ok(hints.some((text) => text.startsWith('The successes needed these recipes')));
+    chooseOption(root, TIER_HOOK, 'tier-easy');
+    assert.equal(state.draft.checkTierId, 'tier-easy');
+    assert.equal(tierLabel(root), 'Easy · 1 success');
+    panel.remount();
+    const unavailable = await mountPanel({ checkEvaluation, checkTierAxis: { available: false, reason: 'dynamic' } });
+    assert.match(
+      unavailable.root.querySelector('[data-recipe-bulk-check-tier-unavailable]').textContent,
+      /takes its successes needed from a macro/
     );
   });
 

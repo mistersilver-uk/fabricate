@@ -1,0 +1,87 @@
+<!-- Svelte 5 runes mode -->
+<!-- ratchet-exempt(design-system): the die tiles are promoted to a shared primitive at target, because the player result box and the salvage roll summary now import them beside the Checks Studio simulator (issue 2006) -->
+<!--
+  The die tiles of a success-counting roll (issue 2006): one tile per active die in roll order,
+  each explosion's die straight after the die that produced it, every mark on one tile.
+  `countDiceTiles.js` builds the model and every string; its chat renderer emits this markup.
+
+  Props:
+  | prop | values | default | contract |
+  | --- | --- | --- | --- |
+  | `model` | `{ tiles: [{ face, marks, generated, bought? }], more, bought? }` | `null` | `tileModel(...)`'s output. Nothing renders without a tile. |
+  | `legend` | boolean | `false` | Adds the key under the tiles, each mark's own glyph beside its word; the result boxes and the simulator draw it, chat does not. |
+  | `faceDataAttr` / `marksDataAttr` / `legendDataAttr` | `data-*` names | `DICE_TILE_HOOKS` | A host's own hook names; a tile's marks are space-separated. |
+
+  Invariants:
+  - Every glyph is `aria-hidden`; each tile's `aria-label` names its face and marks, so colour is
+    never the only signal. A bought die dashes its border and its label says so (issue 2008).
+  - The tiles wrap inside the host and never scroll sideways.
+  - The `fabricate-dice-tiles` family is styled once in `styles/fabricate.css`, because a chat card
+    sits outside every Fabricate window and draws the same markup.
+-->
+<script>
+  import {
+    DICE_TILE_GLYPHS,
+    DICE_TILE_HOOKS,
+    legendKeys,
+    legendSeparator,
+    moreText,
+    tileLabel,
+    tileMarkTokens,
+    tileTone,
+  } from '../../presenters/countDiceTiles.js';
+  import { localize } from '../util/foundryBridge.js';
+
+  let {
+    model = null,
+    legend = false,
+    faceDataAttr = DICE_TILE_HOOKS.face,
+    marksDataAttr = DICE_TILE_HOOKS.marks,
+    legendDataAttr = DICE_TILE_HOOKS.legend,
+  } = $props();
+
+  const tiles = $derived(Array.isArray(model?.tiles) ? model.tiles : []);
+  const more = $derived(Number(model?.more) > 0 ? Number(model.more) : 0);
+  const keys = $derived(legendKeys(localize, model?.bought));
+</script>
+
+{#if tiles.length > 0 || more > 0}
+  <div class="fabricate-dice-tiles">
+    <ul class="fabricate-dice-tiles__list">
+      {#each tiles as tile, position (position)}
+        {@const tone = tileTone(tile.marks)}
+        <li
+          class="fabricate-dice-tiles__tile"
+          class:fabricate-dice-tiles__tile--success={tone === 'success'}
+          class:fabricate-dice-tiles__tile--danger={tone === 'danger'}
+          class:fabricate-dice-tiles__tile--bought={tile.bought === true}
+          {...{ [faceDataAttr]: tile.face, [marksDataAttr]: tileMarkTokens(tile) }}
+          data-dice-tile-generated={tile.generated ? '' : undefined}
+          aria-label={tileLabel(tile, localize)}
+        >
+          <span class="fabricate-dice-tiles__face" aria-hidden="true">{tile.face}</span>
+          {#if tile.marks.length > 0}
+            <span class="fabricate-dice-tiles__marks" aria-hidden="true">
+              {#each tile.marks as mark (mark)}
+                <i class={DICE_TILE_GLYPHS[mark]} aria-hidden="true"></i>
+              {/each}
+            </span>
+          {/if}
+        </li>
+      {/each}
+      {#if more > 0}
+        <li class="fabricate-dice-tiles__more" data-dice-tiles-more={more}>
+          {moreText(more, localize)}
+        </li>
+      {/if}
+    </ul>
+    {#if legend}
+      <p class="fabricate-dice-tiles__legend" {...{ [legendDataAttr]: '' }}>
+        {#each keys as key, index (index)}{#if index > 0}{legendSeparator(localize)}{/if}<span
+            class="fabricate-dice-tiles__key"
+            >{#if key.glyph}<i class={key.glyph} aria-hidden="true"></i>{/if}{key.text}</span
+          >{/each}
+      </p>
+    {/if}
+  </div>
+{/if}

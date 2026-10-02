@@ -4,18 +4,87 @@
  * never a hard-coded list, which would misreport the world's real DCs; storage is `null` for the
  * system default, else an integer. The five cases, each referenced by number below:
  *
- *  1. `dcMode === 'dynamic'` — the DC is macro-computed, so the system-default label carries no DC
- *     suffix, while presets and Custom… stay available.
+ *  1. Salvage never runs a DC macro (it grades the override, else the slot's DC, else 15), so the
+ *     system-default label names that static DC whatever the crafting check's `dcMode`
+ *     (issue 2081).
  *  2. Zero authored tiers, the COMMON case: System default + Custom… only, plus "Manage presets".
  *  3. `_normalizeSimpleTier` permits `name: ''` and coerces a non-finite `dc` to `0`, which would
  *     render an unlabelled "— DC 0". Such tiers are not authored presets, so they are skipped.
  *  4. Duplicate-DC tiers make "match by DC" ambiguous; the FIRST match wins, and the ambiguity is
- *     immaterial because the stored value is the DC rather than the tier id.
+ *     immaterial because the stored value is the DC rather than the tier id. The option list
+ *     keeps only that first tier, so every option value is unique.
  *  5. Tiers hang off `salvageCraftingCheck.simple.tiers` in EVERY resolution mode, routed included.
+ *
+ * Under a character-value target the same tiers supply ADJUSTMENTS instead: the control edits
+ * `adjustmentOverride`, lists only named tiers whose adjustment is valid for the kind, and matches
+ * by adjustment (`adj:<n>`). Under a count check they supply SUCCESSES NEEDED: the control edits
+ * `successesOverride` and lists named tiers whose `successes` is set (`req:<n>`). Every function
+ * below takes that `evaluation` and defaults to fixed.
  */
+
+import { isValidTargetAdjustment } from '../../../../../systems/checkTarget.js';
+import { numberOrNull } from '../../../../../utils/scalars.js';
+
+import { checkOverrideField } from './overridePlayerSees.js';
+
+/** The override field the active check reads: successes, adjustment or DC. */
+export { checkOverrideField as salvageOverrideField } from './overridePlayerSees.js';
 
 export const SALVAGE_DC_SYSTEM_DEFAULT = 'system';
 export const SALVAGE_DC_CUSTOM = 'custom';
+
+const EPSILON = 1e-9;
+
+/** Whether `evaluation` grades against a character value, which the adjustment override adjusts. */
+function readsAdjustment(evaluation) {
+  return checkOverrideField(evaluation) === 'adjustmentOverride';
+}
+
+function readsSuccesses(evaluation) {
+  return checkOverrideField(evaluation) === 'successesOverride';
+}
+
+function adjustmentKind(evaluation) {
+  return evaluation?.target?.adjustmentKind === 'multiply' ? 'multiply' : 'add';
+}
+
+/** An added adjustment is any finite number; a multiplier must also be above zero. */
+function usableAdjustment(kind, value) {
+  const number = numberOrNull(value);
+  return number !== null && isValidTargetAdjustment(kind, number);
+}
+
+/** Case 4: the first option per value, as {@link resolveSalvageDcSelection} matches the first. */
+function firstPerValue(options) {
+  const seen = new Set();
+  return options.filter(({ value }) => {
+    if (seen.has(value)) return false;
+    seen.add(value);
+    return true;
+  });
+}
+
+/** Named tiers whose `adjustment` is valid for `kind`; the attribute counterpart of case 3. */
+export function usableSalvageAdjustmentTiers(tiers, kind = 'add') {
+  if (!Array.isArray(tiers)) return [];
+  return tiers.filter(
+    (tier) => Boolean(String(tier?.name ?? '').trim()) && usableAdjustment(kind, tier?.adjustment)
+  );
+}
+
+/** Named tiers whose successes needed is set, 0 included; the count counterpart of case 3. */
+export function usableSalvageSuccessesTiers(tiers) {
+  if (!Array.isArray(tiers)) return [];
+  return tiers.filter(
+    (tier) => Boolean(String(tier?.name ?? '').trim()) && Number.isInteger(tier?.successes)
+  );
+}
+
+/** Case 5: the preset tiers of a `salvageCraftingCheck`, which are `simple.tiers` in every mode. */
+export function salvagePresetTiers(salvageCheck) {
+  const tiers = salvageCheck?.simple?.tiers;
+  return Array.isArray(tiers) ? tiers : [];
+}
 
 /** Case 3: an authored preset needs a name AND a usable DC; `_normalizeSimpleTier` lets both lapse. */
 export function usableSalvageDcTiers(tiers) {
@@ -37,12 +106,22 @@ export function usableSalvageDcTiers(tiers) {
  * cleared reading. The parameter is typed wide deliberately: the narrow type made the `=== ''`
  * check provably-false to static analysis (sonar `javascript:S3403`) rather than merely unreachable.
  */
-export function resolveSalvageDcSelection(dcOverride, tiers) {
+export function resolveSalvageDcSelection(dcOverride, tiers, evaluation = null) {
   if (dcOverride === null || dcOverride === undefined || dcOverride === '') {
     return SALVAGE_DC_SYSTEM_DEFAULT;
   }
   const numeric = Number(dcOverride);
   if (!Number.isFinite(numeric)) return SALVAGE_DC_CUSTOM;
+  if (readsSuccesses(evaluation)) {
+    const match = usableSalvageSuccessesTiers(tiers).some((tier) => tier.successes === numeric);
+    return match ? `req:${numeric}` : SALVAGE_DC_CUSTOM;
+  }
+  if (readsAdjustment(evaluation)) {
+    const tier = usableSalvageAdjustmentTiers(tiers, adjustmentKind(evaluation)).find(
+      (entry) => Math.abs(Number(entry.adjustment) - numeric) < EPSILON
+    );
+    return tier ? `adj:${Number(tier.adjustment)}` : SALVAGE_DC_CUSTOM;
+  }
   // Case 4: FIRST match wins.
   const match = usableSalvageDcTiers(tiers).find((tier) => Number(tier.dc) === numeric);
   return match ? `dc:${Math.trunc(numeric)}` : SALVAGE_DC_CUSTOM;
@@ -50,24 +129,49 @@ export function resolveSalvageDcSelection(dcOverride, tiers) {
 
 /**
  * The option list in render order: system default, each usable tier, then Custom…. Labels are
- * injected pre-localized by the caller, keeping this a pure leaf with no `localize` import.
+ * injected pre-localized by the caller, keeping this a pure leaf with no `localize` import. Under
+ * a character-value `evaluation`, `adjustmentDefaultLabel` and `adjustmentTierLabel(name, value)`
+ * label the adjustment presets instead, and under a count `successesDefaultLabel(required)` and
+ * `successesTierLabel(name, n)` the successes presets.
  */
 export function buildSalvageDcOptions({
   tiers = [],
-  dcMode = 'static',
   systemDc = 0,
+  evaluation = null,
   systemDefaultLabel = (dc) => `System default — DC ${dc}`,
-  systemDefaultDynamicLabel = () => 'System default — set by macro',
   tierLabel = (name, dc) => `${name} — DC ${dc}`,
+  adjustmentDefaultLabel = () => 'System default — base adjustment',
+  adjustmentTierLabel = (name, value) => `${name} — ${value}`,
+  successesDefaultLabel = (required) => `System default — ${required} successes needed`,
+  successesTierLabel = (name, count) => `${name} — ${count} successes needed`,
   customLabel = () => 'Custom…',
 } = {}) {
-  const options = [
-    {
-      value: SALVAGE_DC_SYSTEM_DEFAULT,
-      // Case 1: no static number exists in dynamic mode, so no DC suffix.
-      label: dcMode === 'dynamic' ? systemDefaultDynamicLabel() : systemDefaultLabel(systemDc),
-    },
-  ];
+  if (readsSuccesses(evaluation)) {
+    return [
+      { value: SALVAGE_DC_SYSTEM_DEFAULT, label: successesDefaultLabel(evaluation.pool.required) },
+      ...firstPerValue(
+        usableSalvageSuccessesTiers(tiers).map((tier) => ({
+          value: `req:${tier.successes}`,
+          label: successesTierLabel(String(tier.name).trim(), tier.successes),
+        }))
+      ),
+      { value: SALVAGE_DC_CUSTOM, label: customLabel() },
+    ];
+  }
+  if (readsAdjustment(evaluation)) {
+    return [
+      { value: SALVAGE_DC_SYSTEM_DEFAULT, label: adjustmentDefaultLabel() },
+      ...firstPerValue(
+        usableSalvageAdjustmentTiers(tiers, adjustmentKind(evaluation)).map((tier) => ({
+          value: `adj:${Number(tier.adjustment)}`,
+          label: adjustmentTierLabel(String(tier.name).trim(), Number(tier.adjustment)),
+        }))
+      ),
+      { value: SALVAGE_DC_CUSTOM, label: customLabel() },
+    ];
+  }
+  // Case 1: the static DC salvage grades, whatever the crafting check's DC mode.
+  const options = [{ value: SALVAGE_DC_SYSTEM_DEFAULT, label: systemDefaultLabel(systemDc) }];
 
   // Case 2: with no usable tiers this contributes nothing, which is why "Manage presets" exists.
   for (const tier of usableSalvageDcTiers(tiers)) {
@@ -76,22 +180,27 @@ export function buildSalvageDcOptions({
   }
 
   options.push({ value: SALVAGE_DC_CUSTOM, label: customLabel() });
-  return options;
+  return firstPerValue(options);
 }
 
 /**
- * The `dcOverride` a chosen option persists: `null` for the system default, a tier's DC rather than
- * its id, and Custom… keeps the current value so switching to it never rewrites an off-tier override.
+ * The value a chosen option persists into the active field: `null` for the system default, a
+ * tier's DC (or, under a character value, its exact adjustment) rather than its id, and Custom…
+ * keeps the current value so switching to it never rewrites an off-tier override. A DC and a
+ * successes count are integers; an adjustment is never truncated, because ×0.7 is exact.
  */
-export function salvageDcOverrideForSelection(selection, currentDcOverride) {
+export function salvageDcOverrideForSelection(selection, currentDcOverride, evaluation = null) {
   if (selection === SALVAGE_DC_SYSTEM_DEFAULT) return null;
+  const exact = readsAdjustment(evaluation);
+  const settle = (numeric) => {
+    if (!Number.isFinite(numeric)) return null;
+    return exact ? numeric : Math.trunc(numeric);
+  };
   if (selection === SALVAGE_DC_CUSTOM) {
     // Guard null/''/undefined EXPLICITLY: `Number(null)` is 0, which would turn "switch to Custom…
     // from the system default" into a spurious DC-0 override.
     if ([null, undefined, ''].includes(currentDcOverride)) return null;
-    const numeric = Number(currentDcOverride);
-    return Number.isFinite(numeric) ? Math.trunc(numeric) : null;
+    return settle(Number(currentDcOverride));
   }
-  const numeric = Number(String(selection).replace(/^dc:/, ''));
-  return Number.isFinite(numeric) ? Math.trunc(numeric) : null;
+  return settle(Number(String(selection).replace(/^(?:dc|adj|req):/, '')));
 }

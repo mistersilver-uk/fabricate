@@ -134,7 +134,6 @@ const APPROVED_RECIPE_FIELD_DOMAINS = {
   checkTierId: ['resolution-config'],
   minSuccessOutcomeId: ['resolution-config'],
   craftingModifier: ['resolution-config'],
-  currencyCost: ['resolution-config'],
   allowPlayerResultReorder: ['resolution-config'],
   locked: ['access-and-knowledge'],
   visibility: ['access-and-knowledge'],

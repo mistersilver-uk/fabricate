@@ -1,4 +1,7 @@
 manager-recipe-edit-normal
+manager-recipe-edit-check-tier-under
+manager-recipe-edit-check-tier-under-attribute
+manager-recipe-edit-check-tier-count
 manager-recipe-edit-crafting-modifier-inherit
 manager-recipe-edit-crafting-modifier-custom-set
 manager-recipe-edit-crafting-modifier-suppressed
@@ -11,6 +14,7 @@ manager-recipe-edit-books-scrolls
 manager-recipe-edit-tools
 manager-recipe-edit-ingredients
 manager-recipe-edit-ingredients-kind-list
+manager-recipe-edit-ingredients-suggestions
 manager-recipe-edit-ingredients-cost
 manager-recipe-edit-tag-picker
 manager-recipe-edit-ingredients-or-menu

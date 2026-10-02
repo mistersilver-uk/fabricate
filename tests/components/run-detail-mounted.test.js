@@ -24,6 +24,7 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-run-detail-',
   rawModules: [
+    'src/ui/svelte/util/rollPromptOrigin.js',
     // Issue 1504/1506: the raw closure the shared `<Select>` reaches through
     // `SearchablePopover`, which the compiled `<Chip>` closure below arrives with.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
@@ -38,6 +39,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/journal/historyPresentation.js',
     'src/ui/svelte/apps/journal/runStateNotice.js',
     'src/ui/svelte/apps/journal/runDetailPresentation.js',
+    // The roll line signs an executed margin with the shared formatter (issue 2005).
+    'src/utils/checkAdjustmentFormat.js',
+    'src/utils/scalars.js',
     'src/ui/svelte/apps/journal/stageHeading.js',
     'src/ui/svelte/apps/journal/runRecovery.js',
     // Issue 1506: the run's status is a `<Chip>` now.

@@ -12,8 +12,8 @@ import test from 'node:test';
 
 import { SETTING_KEYS } from '../src/config/settings.js';
 import { MIGRATION_DEFERRAL_REASONS, MigrationRunner } from '../src/migration/MigrationRunner.js';
-import { entryModuleSource } from './helpers/bootstrapEntrySource.js';
-
+import { composeMigrationNotice } from '../src/migration/migrationNoticeDetail.js';
+import { dispatchMigrationSummary } from './helpers/migrationPassDriver.js';
 
 /** A recipe the 0.6.0 catalyst-to-tool migration transforms. */
 function catalystRecipe(id, systemId = 'sys-1') {
@@ -183,24 +183,28 @@ test('only the write-failure notice instructs a reload', () => {
   assert.equal(/reload/i.test(strings.CorpusUnreadable), false);
 });
 
-test('main.js reports a deferred pass before it reports an aborted one', () => {
-  // A source scan, and deliberately so: `main.js` cannot be imported under `node --test`, and
-  // a unit test that hand-injects the collaborator cannot observe the wiring at all.
-  const source = entryModuleSource('src/bootstrap/migrations.js');
-
-  assert.match(
-    source,
-    /if \(summary\?\.deferred === true\) \{/,
-    'the deferral branch exists and sits above the abort branch'
-  );
-  assert.ok(
-    source.indexOf('summary?.deferred === true') < source.indexOf('summary?.aborted === true'),
-    'the deferral branch is checked BEFORE the abort branch, because a deferral reports aborted:false'
-  );
-  // The GM-facing notice: a deferred pass must reach `ui.notifications.error`, or a world
-  // whose migrations silently did not run says nothing at all.
-  assert.match(source, /MIGRATION_DEFERRAL_NOTICES\[summary\.deferredReason\]/);
-  assert.match(source, /Migration\.Deferred\.WritebackFailed/);
+test('the startup pass posts a deferral on its reason\'s notice, and asks before the abort', async () => {
+  const { CORPUS_READ_FAILED, WRITEBACK_FAILED } = MIGRATION_DEFERRAL_REASONS;
+  const unreadable = 'FABRICATE.Migration.Deferred.CorpusUnreadable';
+  const english = (key) => composeMigrationNotice(key, undefined, () => undefined).message;
+  assert.notEqual(english(unreadable), english('FABRICATE.Migration.Deferred.WritebackFailed'));
+  for (const [reason, key] of [
+    [WRITEBACK_FAILED, 'FABRICATE.Migration.Deferred.WritebackFailed'],
+    [CORPUS_READ_FAILED, unreadable],
+    ['unrecognised', unreadable],
+  ]) {
+    // No runner reports both; `aborted: true` is what makes the order of the two branches visible.
+    const { posted, logged } = await dispatchMigrationSummary({
+      deferred: true,
+      deferredReason: reason,
+      aborted: true,
+    });
+    assert.deepEqual(posted, [['error', english(key), { permanent: true }]], reason);
+    assert.deepEqual(
+      logged.map(([level, line]) => [level, line.startsWith(`Fabricate | migration pass deferred (${reason})`)]),
+      [['error', true]]
+    );
+  }
 });
 
 // 4. Corpus order does not change any decision

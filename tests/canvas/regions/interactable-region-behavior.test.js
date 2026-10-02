@@ -202,6 +202,33 @@ test('static events delegate to the manager seam when present', async () => {
   }
 });
 
+// Issue 2153: the macro global carries no manager, so the handlers read `game.fabricate` alone.
+test('static events never reach a manager on the globalThis.fabricate macro global', async () => {
+  const saved = { game: globalThis.game, fabricate: globalThis.fabricate };
+  const calls = [];
+  Reflect.deleteProperty(globalThis, 'game');
+  Reflect.set(globalThis, 'fabricate', {
+    interactableManager: {
+      onRegionEnter: async () => { calls.push('enter'); },
+      onRegionExit: async () => { calls.push('exit'); }
+    }
+  });
+  try {
+    const Class = createInteractableRegionBehaviorClass({
+      RegionBehaviorType: FakeRegionBehaviorType,
+      fields: makeFakeFields()
+    });
+    await Class.events.tokenEnter.call({ id: 'b1' }, { user: 'u' });
+    await Class.events.tokenExit.call({ id: 'b1' }, { user: 'u' });
+    assert.deepEqual(calls, []);
+  } finally {
+    for (const [name, value] of Object.entries(saved)) {
+      if (value === undefined) Reflect.deleteProperty(globalThis, name);
+      else Reflect.set(globalThis, name, value);
+    }
+  }
+});
+
 test('static events pass the RegionBehavior DOCUMENT (this.behavior), not the data model', async () => {
   // In V13 a `RegionBehaviorType` `static events` handler runs with `this` bound to the DATA MODEL
   // (the `system`), whose `type`/`system`/`parent` are NOT the document's.

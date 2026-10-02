@@ -1,90 +1,18 @@
 /**
- * THE WORLD IDENTITY SNAPSHOT DRIFT DETECTOR (issue 1363, epic 1357, PR 3).
+ * The world identity snapshot drift detector (issue 1363). The `1.30.0` migration leaves every
+ * identity in two copies, equal at migration time, and either side can move since issue 1371; it
+ * reports a divergence, never a direction. The active GM runs it once per session after the scope
+ * stores load and before any manager exists, as an informational notice: a disclosure, since the
+ * read union already resolves every divergence safely. It repairs and writes nothing, and the
+ * migration's own output must report zero entries. Not named after a mirror: a copy kept in sync
+ * is unimplementable, as the writer set cannot be enumerated.
  *
- * The `1.30.0` migration makes two copies of every entity's identity: the in-system record,
- * which stays **LIVE AND AUTHORITATIVE** while `## CraftingSystem` requirement 36 holds, and the WORLD IDENTITY
- * SNAPSHOT held on `fabricate.componentScope` / `essenceScope` / `toolScope`. The two are EQUAL
- * AT MIGRATION TIME BY CONSTRUCTION — the migration writes the merged identity back onto every
- * in-system record — and the snapshot goes stale on the GM's first post-migration identity edit.
- *
- * **DIVERGENCE IS NOW REACHABLE FROM BOTH DIRECTIONS (issue 1371).** Until the world Component
- * catalogue and entry shipped, every identity writer wrote the IN-SYSTEM copy and nothing wrote
- * the snapshot, so the snapshot could only ever fall behind. The world Component entry editor
- * writes the SNAPSHOT — `name`, `img` and `description` on the world component record — so a GM
- * can now move either copy without touching the other, and the two can meet a reader carrying
- * different values in either order. The detector's behaviour is unchanged: it reports a
- * divergence and never a direction, which was already the right answer and is now the only one.
- *
- * **THIS MODULE IS PURE, AND SINCE ISSUE 1370 IT HAS A PRODUCTION CONSUMER.** `initialize()`
- * calls it once per session on the ACTIVE GM alone, after the three scope stores load and
- * before either manager is constructed, and composes the report into an INFORMATIONAL notice.
- * The report is a DISCLOSURE obligation and not a correctness one: the read union already
- * resolves every divergence in the safe direction, and this tells the GM where their own two
- * copies of one identity no longer agree — an in-system edit the snapshot has not seen, or a
- * world-catalogue edit no crafting system reads. It repairs nothing and writes nothing.
- * The claim it makes executable — "the two copies are equal at migration time" — is the whole
- * reason the deferred shed is reconcilable, and an unchecked claim of that kind is exactly the
- * acceptance criterion this programme has already shipped twice unable to fail. The migration's
- * own output must produce ZERO entries, over every corpus in the acceptance set.
- *
- * ## IT IS DELIBERATELY NOT NAMED `reportScopeMirrorDrift`
- *
- * In `openspec/specs/data-models/spec.md` a MIRROR is a copy KEPT IN SYNC, which is precisely the
- * mechanism `#### D11` shows to be unimplementable: the identity-writer set cannot be enumerated,
- * because `SettingsCraftingDefinitionRepository.save()` flushes "every in-memory mutation,
- * including ones made in place by code paths that never called `save()` themselves", and a set
- * defined as *paths that never call save* cannot be found by grepping save sites. Naming the
- * detector after the mirror would re-import the claim this module exists because we cannot make.
- *
- * ## THE IDENTITY-WRITER SET, ENUMERATED BY NAME — IN-SYSTEM SIDE
- *
- * Issue 1370 repointed the readers and wired this detector into `initialize()`, where it REPORTS
- * every divergence rather than silently resolving it. These are the writers that make divergence
- * reachable, and the list is kept because they are what keeps it reachable SESSION AFTER SESSION.
- *
- * IT IS ONE HALF OF THE SET, and it is labelled so because a list presented as complete while a
- * whole direction of divergence is missing is worse than no list. The SNAPSHOT side follows it:
- *
- *   - `CraftingSystemManager#createItem`
- *   - `CraftingSystemManager#addItemFromUuid`
- *   - `CraftingSystemManager#replaceItemSource`
- *   - `CraftingSystemManager#updateItem`
- *   - `CraftingSystemManager#applyBulkEditToComponents`
- *   - `CraftingSystemManager#refreshComponentMetadataForUpdatedItem` — bound UNCONDITIONALLY to
- *     the `updateItem` hook in `src/main.js`, mutating `name`, `img` and `description` IN PLACE
- *   - `CraftingSystemManager#addRecipeItemFromUuid`
- *
- * ## THE IDENTITY-WRITER SET, ENUMERATED BY NAME — SNAPSHOT SIDE
- *
- * Issue 1371 shipped the first surface in this repository that writes the WORLD half of an
- * identity, so the enumeration above stopped being the whole set:
- *
- *   - `WorldComponentEntryPage` — the world Component entry editor, whose buffered Save writes
- *     `name`, `img` and `description` onto the world component record through
- *     `worldScopeActions.updateEntity`
- *
- * The essence and tool entry editors write the same half for their own corpora; they are named
- * here as the shape rather than repeated per type, because what makes a writer belong to this
- * list is that it addresses the world record and not the in-system one.
- *
- * **THE IN-SYSTEM LIST IS NOT PR 2's "five mutation-time bypass sites".** That list was built for the
- * Valid Id BASIS concern and is about which mutations bypass a normalize; this one is about which
- * code paths write a LIFTED IDENTITY FIELD. Reusing that list as the writer set is the easiest
- * way for PR 8 to inherit a wrong enumeration, and it would miss
- * `refreshComponentMetadataForUpdatedItem` outright.
- *
- * ## RESOLUTION DIRECTION, as issue 1370 settled it
- *
- * The read union used to resolve `{ ...legacyEntry, ...entity, ...resolved }`, which made the
- * STALE snapshot identity beat the FRESH in-system one. It now RE-APPLIES the whole in-system
- * record last and DELETES every lifted identity field that record does not carry, re-derived AT
- * READ TIME rather than by a one-shot pass — which could not hold anyway, because the component
- * metadata refresh rewrites `name`, `img` and `description` in place at any point in a session.
- *
- * **NOT "the same transform the migration uses".** That spelling names an IDENTITY projection,
- * which re-applies none of the behaviour keys and would leave a GM-disabled tool reading back
- * usable. The identity projection supplies the DELETE key-set ONLY; the re-application is a
- * re-spread of the whole record.
+ * In-system writers: `CraftingSystemManager`'s `createItem`, `addItemFromUuid`,
+ * `replaceItemSource`, `updateItem`, `applyBulkEditToComponents`, `addRecipeItemFromUuid` and
+ * `refreshComponentMetadataForUpdatedItem`, bound unconditionally to the `updateItem` hook.
+ * Snapshot writers: the world entry editors, through `worldScopeActions.updateEntity`. The
+ * in-system list is NOT PR 2's "five mutation-time bypass sites", which answers the basis concern.
+ * Contract: `data-models/spec.md` § Scoped Entity Definitions requirement 15.
  */
 
 import { isPlainObject } from '../utils/scalars.js';
@@ -106,23 +34,9 @@ function arrayOf(value) {
 }
 
 /**
- * Every `(systemId, entityType, entityId, field)` where the in-system copy and the world
- * identity snapshot disagree on a LIFTED field.
- *
- * Only pairs the system is a MEMBER of are compared: an entity a system has no membership record
- * for does not exist in that system, so there is no in-system copy to disagree with.
- *
- * ABSENCE IS A VALUE. A field present on one side and absent on the other is a divergence, because
- * the migration's write-back deletes an identity field the world entity does not carry — so equal
- * means "agrees, including on absence".
- *
- * TOTAL AND NON-THROWING: a malformed corpus answers an empty list.
- *
- * @param {unknown} craftingSystems The raw `craftingSystems` setting.
- * @param {unknown} scopeCorpus `{ components, essences, tools }`, each either the persisted scope
- *   payload or a store's published corpus.
- * @returns {Array<{systemId: string, entityType: string, entityId: string, field: string,
- *   systemValue: unknown, worldValue: unknown}>}
+ * Every member `(systemId, entityType, entityId, field)` whose lifted identity field differs,
+ * absence included, with both values. `scopeCorpus` holds persisted payloads or published
+ * corpora; a malformed input answers `[]`.
  */
 export function reportWorldIdentityDrift(craftingSystems, scopeCorpus) {
   const drift = [];

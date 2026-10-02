@@ -133,8 +133,9 @@ A client installed from one channel MUST NOT be able to move to another channel 
 A private channel's targets MUST be reachable only with credentials, in the case of its sources target, or through an unguessable URL derived from a per-group secret, in the case of a tester target.
 A derivable path is not a private one: a private channel's sources target MUST NOT be anonymously readable, because that path is computable from published configuration.
 Each tester group MUST derive its tester URLs from its own secret.
+A channel MAY declare more than one tester group, and a publish to that channel MUST write every declared group's tester target, each at the path derived from that group's own secret.
 A publish MUST NOT write any target belonging to a channel it was not asked to publish.
-A channel that declares a tester group whose secret is not configured MUST fail the publish rather than write a guessable path.
+A channel that declares a tester group whose secret is not configured MUST refuse the publish before building or writing anything, naming that group's secret, rather than write a guessable path.
 A cohort's URL is immutable once distributed: rotating a group's secret is a cohort migration, never hygiene.
 Publishing MUST NOT remove a target it has already published for a tester group.
 A target superseded by rotation keeps serving its last pre-rotation manifest, so no update is ever offered to its cohort and no error is surfaced — the cohort silently stops receiving updates rather than failing.
@@ -167,6 +168,7 @@ A tester group's identity is deployment configuration: its name and the environm
 A publish MUST resolve that identity from the configuration current at publish time, never from the configuration recorded in the source of the version being published.
 Otherwise a rotation can never take effect for an already-minted version, the new prefix can never be populated, and the cohort stays split across two prefixes.
 A publish that cannot apply the configuration current at publish time MUST refuse and name that as the reason, rather than fall back to the configuration recorded in the version's source.
+The tooling that reads that configuration and writes the targets is part of the publish, not of the version being published: a publish MUST take only the built artefact from the version's source and MUST run the publishing tooling current at publish time, because tooling recorded in an older version cannot read a configuration shape introduced after it.
 A verification that evaluates a tester group's identity from configuration other than the configuration the channel is published under MUST report a difference between the two as configuration drift, naming both declarations.
 A publisher-side declaration it cannot read MUST be treated as a difference rather than as agreement, because a verification that cannot see what the channel was published under has established nothing.
 Drift is a diagnosis and MUST NOT be an independent refusal, but it MUST be named in a refusal it explains, because an absent head under a newly declared identity is a configuration fault rather than a cohort risk.
@@ -182,6 +184,12 @@ Drift is a diagnosis and MUST NOT be an independent refusal, but it MUST be name
 - **WHEN** an already-minted version is republished after its tester group's identity has changed
 - **THEN** it is published under the group identity the publish is configured with now, not the one recorded in that version's source
 - **AND** the prefix that identity resolves to carries that version, rather than returning 404 while the superseded prefix serves its last pre-rotation manifest
+
+#### Scenario: adding a tester group to a channel that already carries a version
+
+- **WHEN** an already-published version is republished to its channel after a tester group was added to that channel
+- **THEN** the added group's target is written with that version
+- **AND** the targets already carrying that version from the same build are not rewritten
 
 #### Scenario: a promotion evaluated under a tester identity the channel was not published under
 

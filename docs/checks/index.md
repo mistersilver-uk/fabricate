@@ -8,7 +8,7 @@ has_children: true
 # Checks
 
 **Checks** in the Crafting Admin panel's left rail is where you author the rolls that gate what an activity produces.
-Each activity has its own page, and this page covers what they all share: the shape of the editor, and the named-modifier library every one of them selects from.
+Each activity has its own page, and this page covers what they all share: the shape of the editor, which way a roll is measured, and the named-modifier library every one of them selects from.
 
 For an activity's own rules, see [Crafting]({% link checks/crafting.md %}), [Salvage]({% link checks/salvage.md %}), or [Gathering]({% link checks/gathering.md %}).
 
@@ -41,7 +41,10 @@ When an optional check is switched off, the page collapses to a single section o
 
 Fabricate checks each activity page as you edit it.
 A section with something to fix carries a dot on the strip, and the same issue is counted on that activity's entry in the rail.
-Open that section and it states each of its own issues in full, in the same words the **Validation** page uses, so a dot never leaves you to go looking for what it meant.
+Open that section and it opens with an amber notice for each of its own issues, blocking issues listed above warnings.
+Each notice shows a short title and, beneath it, the same sentence the **Validation** page states for that issue, so a dot never leaves you to go looking for what it meant.
+A notice's **Review** button takes you to the field it names, or to the section itself when no single field is at fault.
+The one exception is the mode description that opens **The roll**: that stays a plain note about how the mode works, because it is not reporting a problem.
 The **Checks** entry itself totals the counts of the activity pages it is showing you, so a hidden feature's stale issues never badge a page you cannot open to clear them.
 **Validation** restates that same total, so it is never added on top of it.
 
@@ -56,6 +59,7 @@ Leaving Checks for another screen with unsaved edits asks first, names which act
 ### The Validation page
 
 **Validation** gathers every issue across the crafting, salvage, and gathering checks into one list, grouped by activity and rated **Pass**, **Warning**, or **Blocks enable**.
+Each issue shows a short title over the sentence explaining it, the same title and sentence its section's own notice shows.
 Selecting an issue takes you to the page and section that raised it, and highlights the specific field when the issue is about one.
 A blocking issue never stops you saving, only enabling the system.
 
@@ -65,7 +69,31 @@ A blocking issue never stops you saving, only enabling the system.
 
 The panel to the right of each activity page carries links to this documentation and to the quickstart, the check's on or off switch, and a **This check** summary of its formula, outcome tiers, triggers, and applied modifiers.
 It also carries **Preview as**, **Outcome preview**, and **Chance per outcome**.
-Those three are planned and not yet available, so each states what it will do and offers no controls yet.
+**Preview as** picks a character, and, where the check has one, a difficulty record, to try the check against.
+**Outcome preview** then rolls a test check against that choice and announces the whole result together, never posting to chat and never costing the character anything.
+A rolled number sits in a medallion, captioned with what it is, such as the die that decided a difficulty check or the total or net successes otherwise.
+Under it, a breakdown line states the dice and modifiers behind that number and the character it was rolled for, and beside the number sits a line stating what it was measured against, such as a difficulty, a target and margin, or how many successes were needed.
+A card below states the outcome and what it does, tinted for success or failure, and often carries a note explaining the margin or a trigger that changed the result.
+A **What happens** list closes the readout, naming exactly what the outcome produces, consumes, and whether it breaks the required Tools.
+**Chance per outcome** works out the exact odds for the chosen character rather than estimating them, and shows each outcome's percentage.
+When a formula cannot be charted exactly, it explains why in place of a chart.
+See [What the previews will tell you]({% link checks/crafting.md %}#what-the-previews-will-tell-you) for a worked example.
+
+## What the roll produces
+
+Every check's **The roll** section opens with a **What the roll produces** setting, choosing between **Add the dice**, the classic check every other section on this page describes, and **Count successes**, where the check rolls a pool of dice and counts how many of them individually clear a threshold instead of adding them into one total.
+It appears on every check that rolls, except gathering's immediate d100 mode and an Alchemy check switched off, neither of which rolls a check at all.
+Switching between the two keeps everything you authored on both sides, so trying **Count successes** and switching back costs you nothing.
+See [Success-counting checks]({% link checks/crafting.md %}#success-counting-checks) for the full guide to authoring one, and [Additional dice]({% link checks/crafting.md %}#additional-dice) for letting a player spend a resource to roll more dice than a counting check's pool alone would give them.
+
+## Which way is better
+
+A pass-or-fail or routed check's **The roll** section carries a **Which way is better** setting, next to **What the roll produces**.
+**Higher is better** is the classic roll-over-a-difficulty check, and **Lower is better** instead requires the roll to stay at or under the difficulty.
+A progressive check shows the setting too, but only **Higher is better** can drive it, because it spends its roll as a budget; **Lower is better** raises a blocking issue on **Validation**.
+Below it, **What the roll is measured against** picks a **Fixed difficulty**, the same number for every character, or a **Character value** read from the crafting, salvage, or gathering character, which a **Difficulty adjustment** adjusts rather than replaces.
+Switching between **Higher is better** and **Lower is better**, or between the two target sources, keeps everything you authored on every side, so trying one and switching back costs you nothing.
+See [Roll-under and character-value checks]({% link checks/crafting.md %}#roll-under-and-character-value-checks) for the full guide, including a character-value target's adjustment, the salvage and gathering task overrides, and what a player's roll prompt, chat card, and result box show.
 
 ## Check modifiers
 
@@ -74,7 +102,7 @@ Fabricate adds the eligible modifiers to the roll itself, each labelled so the c
 The ones that work out to a plain number are summed into one term, so a roll of `1d20 + 2` with a `+3` modifier is rolled and reported as `1d20 + 2 + 3[Modifiers]`.
 Each modifier that rolls dice is added as its own term beside it, so its dice stay attributable to it.
 A `+3` modifier and a `1d4` one together give `1d20 + 2 + 3[Modifiers] + (1d4)[Modifiers]`.
-The modifiers themselves live in **one library per crafting system**, on the **Modifiers** card of the system's **System settings** page.
+The modifiers themselves live in one world library, at **World > Rules & Resources > Modifiers**.
 The **Modifiers** section of each Checks page then decides which of them that activity applies and how they combine.
 Its **Named modifiers** card lists the library and carries the switch that marks an entry eligible.
 Its **How they combine** card carries the combination rule and the pick limit.
@@ -92,12 +120,22 @@ Each shows the library read-only and links to World › Rules & Resources › Mo
 Because an eligible modifier never appears in the formula you type, **The roll** section restates it for you.
 Under the formula field, **What actually gets rolled** shows the same formula with each applied modifier beside it and names the rule that combines them.
 
+### What a check rolls today
+
+For an active check, Fabricate builds the roll in this order: your authored formula, with Advantage or Disadvantage already rolled into its first dice group where that mode is chosen, then eligible Tool bonuses, the selected named modifiers, a valid situational bonus, and finally an Advantage or Disadvantage bonus die where that mode is chosen instead.
+See [Advantage and disadvantage]({% link checks/crafting.md %}#advantage-and-disadvantage) for the three modes a check can offer.
+Under **Lower is better**, the Tool bonus and the named modifiers raise the target instead of joining the roll, as [Which way is better](#which-way-is-better) describes.
+Flat named modifiers share one labelled term, while each named modifier that rolls dice keeps its own labelled term.
+
+A Tool bonus that rolls dice is rolled once before the main check, and its total joins the check as a labelled number.
+Fabricate does not roll that Tool bonus again when it posts the check.
+
 ### Defining modifiers
 
 A modifier's expression is an ordinary roll expression.
 See [Expressions]({% link expressions.md %}) for the syntax, the per-game-system data paths, and how bounds clamp what an entry contributes.
 
-Open **System settings** for the crafting system and find the **Modifiers** card, then choose **Add modifier**.
+Open **World > Rules & Resources > Modifiers**, then choose **Add modifier**.
 Each entry has an **Icon**, a **Label** such as Medicine or Herbalism, and an **Expression**.
 Write a character-data path with its leading `@` — for example `@abilities.med.mod` — because the field supplies nothing for you.
 A number or a dice expression takes no `@` at all: write `2` or `1d4` as they stand, and `@abilities.med.mod + 1d4` mixes the two.
@@ -107,7 +145,9 @@ This is the same library gathering drop rows and events reference for their d100
 
 {% include screenshot.html case="manager-checks-crafting-modifiers" %}
 
-The two READ it differently — a drop row works the expression out and shifts the chance by the result, while a check adds it to the roll — but **an expression that rolls dice is welcome in both**.
+The two read it differently.
+A drop row works the expression out and shifts the chance by the result, while an active check adds it to the roll.
+An expression that rolls dice is welcome in both.
 A check appends the dice to its own roll formula, so a `1d4` modifier is rolled once together with the check, animates like any other die, and shows on the chat card.
 
 Two consequences are worth knowing.
@@ -115,7 +155,10 @@ Two consequences are worth knowing.
 - **A modifier's minimum and maximum clamp the RESULT of its roll, not the formula.**
 A `1d8` capped at `+6` contributes 6 on a roll of 7 and 3 on a roll of 3, and the die still shows.
 - **Where modifiers compete, they are ranked by their AVERAGE.**
-Under **Highest**, and under **Player picks** when nothing prompts, `1d4` is worth 2.5 and beats a flat `+2` — the same winner every time, with no hidden roll to decide it — and the winner is then added as dice.
+Under **Highest**, and under **Player picks** when nothing prompts, `1d4` is worth 2.5 and beats a flat `+2`.
+The same winner is chosen every time, with no hidden roll to decide it, and the winner is then added as dice.
+A modifier whose dice total is transformed rather than summed, such as one written with a counting suffix like `cs` or `cf`, or with `even` or `odd`, has no average to rank by.
+It ranks after every modifier that does have one, keeping the order you listed it in among other such modifiers, and it still rolls exactly as written whenever a competing rule has a place left over for it.
 
 ### Upgrading from a version before 1.21.0
 
@@ -182,8 +225,8 @@ It also decides **who chooses them, and when**.
 
 | Combination rule | Who chooses | What it does | When you would want it |
 |:-----------------|:------------|:-------------|:------------------------|
-| **Add all** | Nobody. The system's default set applies as it stands. | Sums every modifier in the default set. | The recipe rewards stacking every relevant skill or tool bonus at once. |
-| **Highest** | Nobody. The system's default set applies as it stands. | Adds only the single best modifier in the default set. Best means highest on average, so a `1d4` beats a flat `+2`, and a winner that rolls dice is added as dice. It is not a keep-highest dice roll across the set. | Several skills can substitute for each other, and only the best should count. |
+| **Apply all** | Nobody. The system's default set applies as it stands. | Sums every modifier in the default set. | The recipe rewards stacking every relevant skill or tool bonus at once. |
+| **Highest** | Nobody. The system's default set applies as it stands. | Adds only the single best modifier in the default set. Best means highest on average, so a `1d4` beats a flat `+2`, and a winner that rolls dice is added as dice. A modifier with no average, because its dice total is transformed rather than summed, is added only when nothing else in the set has an average. It is not a keep-highest dice roll across the set. | Several skills can substitute for each other, and only the best should count. |
 | **By recipe** / **By component** / **By gathering task** | You do, per record, on that record's own editor. | Sums the modifiers that record picked. | Different recipes (or components, or gathering tasks) in one system draw on different skills, and you want to decide that once, while authoring the record. |
 | **Player picks** | The player does, at roll time. | Sums the modifiers the player picked. | You want the player to decide, in the moment, which of their skills they are relying on for that attempt. |
 
@@ -203,7 +246,7 @@ The by-record rule is one rule with three labels: it reads **By recipe** on Craf
 There is no separate "Default modifiers" picker: each library entry carries its own switch, on its own row, and the entries you switch on ARE the activity's default set.
 The switch's word changes with the combination rule, because the rule is what "on" means, and its off word answers it:
 
-- Under **Add all** an entry reads **Applied** or **Not applied** — the set that applies, to every attempt in the system.
+- Under **Apply all** an entry reads **Applied** or **Not applied** — the set that applies, to every attempt in the system.
 - Under **Highest** it reads **Considered** or **Not considered** — the entries compared, of which only the largest is added.
 - Under **Player picks** it reads **Selectable** or **Not selectable** — the menu the player chooses from at roll time.
 - Under the by-record rule it reads **Selectable** or **Not selectable** as well, because both rules mark the entries someone else may choose from.
@@ -278,7 +321,7 @@ The picks are summed at roll time, and nothing is asked of the player.
 **If a recipe's Eligible modifiers control is not on its Overview tab**, this section is almost always why.
 The control appears only when the system's combination rule is **By recipe** and the system has at least one entry in its Modifiers library.
 Salvage and Gathering have the same control on the component editor's Salvage section and in the gathering task editor, under their own activity's rule.
-Under **Add all**, **Highest**, or **Player picks** the recipe has nothing to choose, so the tab shows nothing at all rather than a control the system would ignore.
+Under **Apply all**, **Highest**, or **Player picks** the recipe has nothing to choose, so the tab shows nothing at all rather than a control the system would ignore.
 Open **Checks › Crafting** for that recipe's system and look at the **Combination rule** on the **Modifiers** section.
 If the rule is already **By recipe** and the control is still missing, the recipe's Overview tab shows a banner in its place naming which of the causes in [When check modifiers do nothing](#when-check-modifiers-do-nothing) applies.
 
@@ -298,9 +341,28 @@ A gathering check under **Player picks** still applies the best selection the pl
 
 When the player is prompted, the roll dialog adds a **Check modifier** choice below the formula, listing each eligible modifier by icon and label.
 A modifier that works out to a plain number shows that number.
-A modifier that rolls dice shows the dice it will roll instead, bounds included, because the average it was ranked by is not a number the roll can produce.
+A modifier that rolls dice shows the dice it will roll instead, bounds included, because that is not a number the roll can produce, whether or not the modifier has an average to rank by.
 With a **Maximum picks** of 1 it is a one-of list.
 Above 1 it is a tick list whose heading says how many may be ticked, and further ticks are refused once the cap is reached.
-The best allowed selection is pre-chosen — the highest-averaging modifiers the cap permits — so a player who just clicks **Roll** without changing anything gets the same result an unprompted craft would have produced.
-Because the chosen value is not known until the player picks it, the formula preview ends in a neutral `+ (modifier)[Modifiers]` term instead of a number, until the player confirms.
+The best allowed selection is pre-chosen.
+Modifiers with an ordinary average fill the cap first, best average first, and a modifier whose dice total is transformed and has no average fills whatever places are left over, in the order you listed it.
+A player who just clicks **Roll** without changing anything gets the same result an unprompted craft would have produced.
+The prompt shows the prepared formula, and lists every contribution that is already resolved as a chip beneath it rather than as a term in it.
+Rolled from the crafting or inventory screen, the formula ends in a placeholder `+ (modifier)[Modifiers]` term where the picked modifiers will go; a Journal check shows its prepared formula and offers the choice beneath it.
+A deferred **Player picks** contribution and a **Situational bonus** join the roll only after the player confirms.
 The chat card names the modifiers that were picked.
+
+{: .note }
+> If a transformed modifier, one with no average, is eligible alongside others under **Highest**, or under **Player picks** with a **Maximum picks** below how many are eligible, the **Validation** page raises a warning naming it.
+> That warning does not block saving or enabling the system.
+> The modifier stays eligible and selectable, and it still rolls exactly as written whenever a pick is free for it.
+
+A visible interactive check prompt names the activity and, when available, the character and its subject; a hidden Journal check keeps generic copy and omits protected identity and formula.
+The prompt opens over the Fabricate window you rolled from, or over the page when a macro or another module opens it, and closing that window cancels the roll.
+Clicking outside it does not cancel the roll; **Escape** pressed inside the prompt or its close button does, and pressing **Enter** rolls normally.
+Outside the prompt, **Escape** keeps its usual Foundry meaning.
+It offers **Situational bonus** and **Roll mode**, plus **Advantage** and **Disadvantage** when the check's own advantage rule offers them.
+See [Advantage and disadvantage]({% link checks/crafting.md %}#advantage-and-disadvantage).
+It shows a **DC** or **Target** chip only when the check has one target to show.
+For an entitled visible Journal check, the prepared modifier contributions stay fixed while the prompt is open.
+Changing character data or the modifier library after preparation cannot change those captured modifier terms; other actor-dependent formula terms are resolved when the authority evaluates the roll.

@@ -18,7 +18,13 @@ import {
 import { readStackQuantity } from '../../systems/itemStackQuantity.js';
 import { buildPassInventorySnapshot } from '../../systems/passInventorySnapshot.js';
 import { historyEvidenceFields } from '../../systems/runHistoryEvidence.js';
-import { craftingOutcomeBand, routedOutcomeBand } from '../../systems/runJournalOutcomeBands.js';
+import {
+  craftingOutcomeBand,
+  ladderRule,
+  routedOutcomeBand,
+  taskCountRequired,
+  withCountBotch,
+} from '../../systems/runJournalOutcomeBands.js';
 import { getRunLifecycleContract } from '../../systems/runLifecycleState.js';
 import { resolvedComponentsFor, resolvedEssencesFor } from '../../systems/scopedEntityReads.js';
 import {
@@ -37,17 +43,25 @@ import { activityPermitsFailureResults } from '../../utils/failureResultPolicy.j
 import { cloneJson } from '../../utils/scalars.js';
 import { resolveRecipeImage } from '../svelte/util/craftingImageDefaults.js';
 
+import {
+  activeModeLabelKey,
+  executedTargetFields,
+  historicalModeLabelKey,
+  journalActiveCheck,
+  journalCheckAnchor,
+  journalCheckLabel,
+  journalCountNeeded,
+  journalModeLabelKey,
+  recordedNumber,
+  taskCountNeed,
+} from './journalCheckText.js';
+
 const DEFAULT_RUN_IMAGE = 'icons/svg/item-bag.svg';
 const DEFAULT_GATHERING_IMAGE = 'icons/containers/bags/pouch-leather-brown-green.webp';
 // Generic player-facing label for a blind gathering run, shared with the
 // gathering listing so both surfaces say the same thing.
 const BLIND_TASK_LABEL_KEY = 'FABRICATE.Gathering.BlindTaskLabel';
 const DAY_SECONDS = 24 * 60 * 60;
-
-function recordedNumber(value) {
-  if (typeof value !== 'number' && typeof value !== 'string') return null;
-  return typeof value === 'string' && value.trim() === '' ? null : numberOrNull(value);
-}
 
 /** What a surface states about a ROLLED amount, or null for a fixed one (issue 1645): an award's
  *  recorded roll BESIDE the real quantity it produced, an authored expression INSTEAD of a number no
@@ -102,18 +116,6 @@ function historicalStepAttempted(step, run, index) {
   );
 }
 
-// Localized player-facing resolution-mode label keys. The crafting
-// `resolutionMode` token is system-internal, so the projection maps it to a
-// localized enum (never emitting the raw token). There is no canonical
-// "Standard" mode — `simple` (a DC pass/fail check) renders as "Standard (DC)".
-const MODE_LABEL_KEYS = Object.freeze({
-  simple: 'FABRICATE.App.Journal.Mode.Standard',
-  routedByIngredients: 'FABRICATE.App.Journal.Mode.RoutedByIngredients',
-  routedByCheck: 'FABRICATE.App.Journal.Mode.RoutedByCheck',
-  progressive: 'FABRICATE.App.Journal.Mode.Progressive',
-  alchemy: 'FABRICATE.App.Journal.Mode.Alchemy',
-});
-
 const TERMINAL_STATUSES = new Set(['succeeded', 'failed', 'cancelled']);
 const EXECUTION_JOURNAL_STATUSES = new Set(['planned', 'committed', 'recoveryRequired']);
 const EXECUTION_EFFECT_PHASES = new Set(['planned', 'applying', 'applied']);
@@ -125,7 +127,6 @@ const SAFE_EXECUTION_EFFECT_KINDS = new Set([
   'consumeAlchemyExtras',
   'spendCurrency',
   'applyToolUsage',
-  'spendItemPilesCurrency',
   'awardResults',
   'finalizeCraftingStage',
   'recordRecipeUse',
@@ -790,7 +791,7 @@ export class RunJournalBuilder {
       updatedAt: numberOrNull(run.updatedAt),
       finishedAt: numberOrNull(run.finishedAt),
       structureLabel: '',
-      resolutionModeLabel: this.localize(MODE_LABEL_KEYS.alchemy),
+      resolutionModeLabel: this.localize(journalModeLabelKey('alchemy')),
       recipeId: null,
       taskId: null,
       flavor: '',
@@ -913,7 +914,7 @@ export class RunJournalBuilder {
         historyEntitled,
         toolStates,
       }),
-      lastCheckResult: this._checkResultModel(runStep?.lastCheckResult),
+      lastCheckResult: this._stepCheckResult(runStep, system, recipe),
       // Requirements retain their authored identity; consumption retains physical receipts.
       // Only entitled consumption receives the separate historical metadata enrichment.
       requirements: normalizeList(runStep?.requirements).map((entry) =>
@@ -1222,9 +1223,10 @@ export class RunJournalBuilder {
         : normalizeList(routed.relativeOutcomes);
     const permitsFailure = activityPermitsFailureResults(system, 'crafting');
     const systemId = stringOrNull(recipe.craftingSystemId);
-    const dc = this._resolveCheckDc({ config: routed, recipe, mode });
+    const dc = journalCheckAnchor({ config: routed, recipe, mode });
+    const botch = this.localize('FABRICATE.Check.CountEvidence.Botch');
     try {
-      return outcomes.map((outcome, index) => {
+      const tiers = outcomes.map((outcome, index) => {
         const fail = outcome?.success !== true;
         const resolved =
           fail && !permitsFailure
@@ -1240,13 +1242,14 @@ export class RunJournalBuilder {
         return {
           id: stringOrNull(outcome?.id) || `tier-${index + 1}`,
           name: stringOrEmpty(outcome?.name).trim(),
-          band: craftingOutcomeBand(outcome, routed, dc),
+          band: craftingOutcomeBand(outcome, routed, dc, this._bandLabels()),
           fail,
           yields: results.map((result, resultIndex) =>
             this._tierYield(result, systemId, resultIndex)
           ),
         };
       });
+      return withCountBotch(tiers, routed, botch, dc);
     } catch {
       return null;
     }
@@ -1784,13 +1787,19 @@ export class RunJournalBuilder {
     };
   }
 
-  _checkResultModel(lastCheckResult) {
+  _stepCheckResult(runStep, system, recipe) {
+    const need = system && journalCountNeeded(this._activeCheck(system, recipe));
+    return this._checkResultModel(runStep?.lastCheckResult, need);
+  }
+
+  _checkResultModel(lastCheckResult, need = null) {
     if (!lastCheckResult || typeof lastCheckResult !== 'object') return null;
     // The roll detail lives on `data` (dc, resolved formula, raw total) — surface it
     // so the run journal can show the ACTUAL roll (e.g. "1d20 + 3 = 11 vs DC 16"),
     // not just the authored requirement.
     const data =
       lastCheckResult.data && typeof lastCheckResult.data === 'object' ? lastCheckResult.data : {};
+    const executed = executedTargetFields(data, need);
     return {
       success: lastCheckResult.success === true,
       outcome: stringOrNull(lastCheckResult.outcome),
@@ -1798,32 +1807,33 @@ export class RunJournalBuilder {
       reason: stringOrNull(lastCheckResult.reason),
       formula: stringOrNull(data.resolvedFormula) || stringOrNull(data.formula),
       total: recordedNumber(data.total) ?? recordedNumber(lastCheckResult.value),
-      dc: recordedNumber(data.dc),
+      dc: executed ? null : recordedNumber(data.dc),
+      ...executed,
     };
   }
 
-  /**
-   * Compose the step's crafting-check label as `rollFormula` + resolved DC ONLY
-   * (no skill name — none is stored). The active mode selects the check config
-   * (`simple`/`progressive`/`routed`); the DC resolves from the recipe's selected
-   * tier, else the config's static DC. A dynamic-DC macro and progressive
-   * (value-budget) checks have no statically resolvable DC, so the formula is
-   * surfaced without a number rather than a hardcoded default.
-   * @private
-   */
+  /** The ladder's localized words: a multiply ladder's tier with no adjustment is Otherwise. */
+  _bandLabels() {
+    return {
+      otherwise: this.localize('FABRICATE.App.Journal.StepDetails.BandOtherwise'),
+      needed: this.localize('FABRICATE.App.Journal.StepDetails.BandNeeded'),
+      named: (tier, adjustment) =>
+        this.localize('FABRICATE.App.Journal.StepDetails.BandAdjustment', { tier, adjustment }),
+    };
+  }
+
+  _ladderRuleField(routed) {
+    const rule = ladderRule(routed);
+    return rule ? { ladderRule: rule } : null;
+  }
+
+  /** The step's check label through {@link journalCheckLabel}, for the recipe's active check. */
   _checkLabel({ system, recipe }) {
-    if (!system) return null;
-    const mode = this._resolveMode(recipe, system);
-    const { config, rollFormula } = resolveActiveCraftingCheckFormula({
-      ...system,
-      resolutionMode: mode,
-    });
-    const formula = stringOrNull(rollFormula);
-    if (!formula) return null;
-    const dc = this._resolveCheckDc({ config, recipe, mode });
-    return dc === null
-      ? formula
-      : this.localize('FABRICATE.App.Journal.StepDetails.CheckWithDc', { formula, dc });
+    return system ? journalCheckLabel(this._activeCheck(system, recipe), this.localize) : null;
+  }
+
+  _activeCheck(system, recipe) {
+    return journalActiveCheck({ system, recipe, mode: this._resolveMode(recipe, system) });
   }
 
   _activeCheckKind({ system, recipe }) {
@@ -1834,19 +1844,6 @@ export class RunJournalBuilder {
     });
     if (check.checkUsable) return 'check';
     return check.requiresCheck ? 'unknown' : 'none';
-  }
-
-  _resolveCheckDc({ config, recipe, mode }) {
-    if (mode === 'progressive') return null;
-    if (config?.dcMode === 'dynamic') return null;
-    const tierId = stringOrNull(recipe?.checkTierId);
-    if (tierId) {
-      const tier = normalizeList(config?.tiers).find((entry) => entry?.id === tierId);
-      const tierDc = Number(tier?.dc);
-      if (Number.isFinite(tierDc)) return Math.trunc(tierDc);
-    }
-    const dc = Number(config?.dc);
-    return Number.isFinite(dc) ? Math.trunc(dc) : null;
   }
 
   _craftingFailureReason(runSteps) {
@@ -1947,14 +1944,12 @@ export class RunJournalBuilder {
   }
 
   _resolutionModeLabel(recipe, system) {
-    const mode = this._resolveMode(recipe, system);
-    return this.localize(MODE_LABEL_KEYS[mode] || MODE_LABEL_KEYS.simple);
+    return this.localize(activeModeLabelKey(this._activeCheck(system, recipe)));
   }
 
   _historicalModeLabel(steps) {
-    const mode = steps.find((step) => step.attempted && step.resolutionSnapshot)?.resolutionSnapshot
-      .mode;
-    return MODE_LABEL_KEYS[mode] ? this.localize(MODE_LABEL_KEYS[mode]) : '';
+    const key = historicalModeLabelKey(steps.find((s) => s.attempted && s.resolutionSnapshot));
+    return key ? this.localize(key) : '';
   }
 
   /**
@@ -2228,6 +2223,8 @@ export class RunJournalBuilder {
         mode === 'routed'
           ? this._routedYieldTiers(context.task, system, stringOrNull(run.craftingSystemId))
           : [],
+      // A roll-under or character-value ladder states its own selection rule (issue 2005).
+      ...(mode === 'routed' && this._ladderRuleField(system?.gatheringCraftingCheck?.routed)),
     };
   }
 
@@ -2257,7 +2254,12 @@ export class RunJournalBuilder {
       roll: evidence.roll,
       rollModel: evidence.rollModel,
       unattributedAwardIndexes: evidence.unattributedAwardIndexes,
-      check: ['routed', 'progressive'].includes(mode) ? this._checkResultModel(result) : null,
+      check: ['routed', 'progressive'].includes(mode)
+        ? this._checkResultModel(
+            result,
+            taskCountNeed(system?.gatheringCraftingCheck?.routed, task)
+          )
+        : null,
       tiers: [],
     };
   }
@@ -2346,7 +2348,7 @@ export class RunJournalBuilder {
       groupsByName.set(name, [...(groupsByName.get(name) ?? []), group]);
     }
     const permitFailure = activityPermitsFailureResults(system, 'gathering');
-    return outcomes.map((outcome, index) => {
+    const tiers = outcomes.map((outcome, index) => {
       const fail = outcome?.success !== true;
       const groups = groupsByName.get(normalizeName(outcome?.name)) ?? [];
       const results =
@@ -2354,13 +2356,15 @@ export class RunJournalBuilder {
       return {
         id: stringOrNull(outcome?.id) || `tier-${index + 1}`,
         name: stringOrEmpty(outcome?.name).trim(),
-        band: routedOutcomeBand(outcome, routed, task),
+        band: routedOutcomeBand(outcome, routed, task, this._bandLabels()),
         fail,
         yields: results.map((result, resultIndex) =>
           this._tierYield(result, systemId, resultIndex)
         ),
       };
     });
+    const botch = this.localize('FABRICATE.Check.CountEvidence.Botch');
+    return withCountBotch(tiers, routed, botch, taskCountRequired(routed, task));
   }
 
   _tierYield(result, systemId, index) {

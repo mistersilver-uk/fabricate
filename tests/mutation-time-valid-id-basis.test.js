@@ -651,6 +651,7 @@ test('that scan is not vacuous — it sees the calls it exempts', () => {
       'src/systems/RecipeManager.js',
       'src/systems/RecipeVisibilityService.js',
       'src/systems/SalvageRunManager.js',
+      'src/systems/manager/deleteCascades.js',
       // `mutationCleanupComposition.js` is deliberately absent: it names these collaborators only
       // in prose, and `stripComments` blanks prose.
       'src/systems/startupPassComposition.js',
@@ -690,8 +691,8 @@ test('no caller anywhere under src invokes the orphan sweep without naming its i
     [...callers].sort(),
     [
       'src/systems/CompendiumImporter.js',
-      'src/systems/CraftingSystemManager.js',
       'src/systems/RecipeManager.js',
+      'src/systems/manager/deleteCascades.js',
     ],
     'the walk must actually reach every file naming the public orphan sweep'
   );
@@ -701,7 +702,7 @@ test('no caller anywhere under src invokes the orphan sweep without naming its i
     'the compendium importer must name its pruned recipe ids'
   );
   assert.match(
-    readSource('src/systems/CraftingSystemManager.js'),
+    readSource('src/systems/manager/deleteCascades.js'),
     /cleanupOrphanedRecipeFlags\?\.\(\{\s*removedRecipeIds/,
     'the recipe-set delete must name its removed recipe ids'
   );

@@ -73,7 +73,6 @@
   --fab-surface-active: rgb(241 209 181 / 12%);
   --fab-border: rgb(217 184 156 / 18%);
   --fab-border-strong: rgb(217 184 156 / 32%);
-  --fab-border-soft: #2C3B49;
   --fab-text: #F1D1B5;
   --fab-text-secondary: #D9B89C;
   --fab-text-muted: rgb(217 184 156 / 74%);
@@ -160,7 +159,6 @@
   --fab-overlay-light-14: rgb(241 209 181 / 14%);
   --fab-overlay-light-28: rgb(241 209 181 / 28%);
   --fab-overlay-light-96: rgb(241 209 181 / 96%);
-  --fab-danger-surface-strong: rgb(185 124 120 / 36%);
   --fab-warning-focus: rgb(231 219 177 / 78%);
   --fab-shadow-sm: 0 8px 18px rgb(17 26 35 / 20%);
   --fab-shadow-md: 0 10px 24px rgb(17 26 35 / 28%);
@@ -181,7 +179,6 @@
   --fab-surface-active: rgb(255 255 255 / 10%);
   --fab-border: rgb(153 191 204 / 16%);
   --fab-border-strong: rgb(153 191 204 / 28%);
-  --fab-border-soft: rgb(153 191 204 / 12%);
   --fab-text: #F2F7F5;
   --fab-text-secondary: #DFF6DF;
   --fab-text-muted: #A9B8BD;
@@ -262,7 +259,6 @@
   --fab-overlay-light-14: rgb(255 255 255 / 14%);
   --fab-overlay-light-28: rgb(255 255 255 / 28%);
   --fab-overlay-light-96: rgb(255 255 255 / 96%);
-  --fab-danger-surface-strong: rgb(120 20 20 / 20%);
   --fab-warning-focus: rgb(246 176 72 / 78%);
   --fab-shadow-sm: 0 8px 18px rgb(0 0 0 / 18%);
   --fab-shadow-md: 0 10px 24px rgb(0 0 0 / 28%);
@@ -283,7 +279,6 @@
   --fab-surface-active: rgb(240 226 212 / 12%);
   --fab-border: rgb(200 177 163 / 18%);
   --fab-border-strong: rgb(200 177 163 / 32%);
-  --fab-border-soft: #5A4A50;
   --fab-text: #F0E2D4;
   --fab-text-secondary: #C8B1A3;
   --fab-text-muted: rgb(200 177 163 / 74%);
@@ -364,7 +359,6 @@
   --fab-overlay-light-14: rgb(240 226 212 / 14%);
   --fab-overlay-light-28: rgb(240 226 212 / 28%);
   --fab-overlay-light-96: rgb(240 226 212 / 96%);
-  --fab-danger-surface-strong: rgb(168 109 102 / 36%);
   --fab-warning-focus: rgb(214 192 142 / 78%);
   --fab-shadow-sm: 0 8px 18px rgb(20 18 20 / 20%);
   --fab-shadow-md: 0 10px 24px rgb(20 18 20 / 28%);
@@ -385,7 +379,6 @@
   --fab-surface-active: rgb(241 233 216 / 12%);
   --fab-border: rgb(213 198 168 / 18%);
   --fab-border-strong: rgb(213 198 168 / 32%);
-  --fab-border-soft: #53695E;
   --fab-text: #F1E9D8;
   --fab-text-secondary: #D5C6A8;
   --fab-text-muted: rgb(213 198 168 / 74%);
@@ -466,7 +459,6 @@
   --fab-overlay-light-14: rgb(241 233 216 / 14%);
   --fab-overlay-light-28: rgb(241 233 216 / 28%);
   --fab-overlay-light-96: rgb(241 233 216 / 96%);
-  --fab-danger-surface-strong: rgb(185 131 120 / 36%);
   --fab-warning-focus: rgb(231 216 162 / 78%);
   --fab-shadow-sm: 0 8px 18px rgb(22 28 25 / 20%);
   --fab-shadow-md: 0 10px 24px rgb(22 28 25 / 28%);
@@ -487,7 +479,6 @@
   --fab-surface-active: rgb(242 236 255 / 12%);
   --fab-border: rgb(203 191 236 / 18%);
   --fab-border-strong: rgb(203 191 236 / 32%);
-  --fab-border-soft: #40506B;
   --fab-text: #F2ECFF;
   --fab-text-secondary: #CBBFEC;
   --fab-text-muted: rgb(203 191 236 / 74%);
@@ -568,7 +559,6 @@
   --fab-overlay-light-14: rgb(242 236 255 / 14%);
   --fab-overlay-light-28: rgb(242 236 255 / 28%);
   --fab-overlay-light-96: rgb(242 236 255 / 96%);
-  --fab-danger-surface-strong: rgb(199 138 150 / 36%);
   --fab-warning-focus: rgb(230 224 200 / 78%);
   --fab-shadow-sm: 0 8px 18px rgb(18 24 36 / 20%);
   --fab-shadow-md: 0 10px 24px rgb(18 24 36 / 28%);
@@ -589,7 +579,6 @@
   --fab-surface-active: rgb(243 243 245 / 10%);
   --fab-border: rgb(188 137 99 / 18%);
   --fab-border-strong: rgb(188 137 99 / 32%);
-  --fab-border-soft: #2E2833;
   --fab-text: #F3F3F5;
   --fab-text-secondary: #B6B4B2;
   --fab-text-muted: rgb(182 180 178 / 78%);
@@ -672,7 +661,6 @@
   --fab-overlay-light-14: rgb(243 243 245 / 14%);
   --fab-overlay-light-28: rgb(243 243 245 / 28%);
   --fab-overlay-light-96: rgb(243 243 245 / 96%);
-  --fab-danger-surface-strong: rgb(161 108 96 / 36%);
   --fab-warning-focus: rgb(193 150 110 / 72%);
   --fab-shadow-sm: 0 8px 18px rgb(0 0 0 / 20%);
   --fab-shadow-md: 0 10px 24px rgb(0 0 0 / 28%);
@@ -693,7 +681,6 @@
   --fab-surface-active: rgb(228 192 102 / 12%);
   --fab-border: rgb(214 203 168 / 16%);
   --fab-border-strong: rgb(214 203 168 / 28%);
-  --fab-border-soft: #2A3550;
   --fab-text: #F2EAD6;
   --fab-text-secondary: #CFC198;
   --fab-text-muted: rgb(207 193 152 / 74%);
@@ -774,13 +761,18 @@
   --fab-overlay-light-14: rgb(228 192 102 / 14%);
   --fab-overlay-light-28: rgb(228 192 102 / 28%);
   --fab-overlay-light-96: rgb(228 192 102 / 96%);
-  --fab-danger-surface-strong: rgb(201 110 102 / 36%);
   --fab-warning-focus: rgb(230 208 138 / 78%);
   --fab-shadow-sm: 0 8px 18px rgb(10 14 26 / 24%);
   --fab-shadow-md: 0 10px 24px rgb(10 14 26 / 32%);
   --fab-shadow-lg: 0 14px 38px rgb(10 14 26 / 40%);
   --fab-badge-gold: #CBA75F;
   --fab-on-badge-gold: #171208;
+}
+
+/* ratchet-exempt(design-system): a derived token is declared once on every root a palette is, :root included, so each resolves against its own palette. --fab-control-outline outlines an unchecked selection control at 3:1 on its surface in every palette (issue 2047). */
+:root,
+.fabricate[data-fabricate-theme] {
+  --fab-control-outline: var(--fab-text-subtle);
 }
 
 /* ========================================== Every Fabricate window ========================================== */
@@ -848,6 +840,18 @@
   outline-offset: 2px;
 }
 
+/* A TEXT FIELD's ring is drawn inside its own box: an outset ring on a field flush with a scrolling ancestor loses its left and right arms to that ancestor's clip. `:where()` keeps the module ring's (0,2,1), so a component's own ring still wins. */
+.fabricate :is(input, textarea):where(:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file'], [type='button'], [type='submit'], [type='reset'], [type='image'])):focus-visible {
+  outline: 1px solid var(--fab-accent);
+  outline-offset: -1px;
+}
+
+/* A focused, empty field shows its caret alone: the caret is drawn at the text origin, on top of the placeholder's first glyph, so the hint yields while the field holds focus and returns on blur. */
+.fabricate input:focus-visible::placeholder,
+.fabricate textarea:focus-visible::placeholder {
+  color: transparent;
+}
+
 /* THE THIRD HALF OF THE PAIR ABOVE, because a programmatic `.focus()` following a pointer activation matches `:focus` and NOT `:focus-visible` — the reset strips the ring and the repaint never supplies one. `validationFocus.js` stamps `data-validation-focused` and this block paints it, written FLAT over the reset's own element list because a single `.fabricate [data-validation-focused]` rule is (0,2,0) and loses to the reset outright (issues 1517, 1509). */
 .fabricate a[data-validation-focused],
 .fabricate button[data-validation-focused],
@@ -856,6 +860,11 @@
 .fabricate textarea[data-validation-focused] {
   outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
+}
+
+/* A text field's validation ring is inset for the reason its keyboard ring is: a field flush with a scrolling ancestor loses an outset ring's side arms to that ancestor's clip. */
+.fabricate :is(input, textarea):where(:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file'], [type='button'], [type='submit'], [type='reset'], [type='image']))[data-validation-focused] {
+  outline-offset: -2px;
 }
 
 /* THE `[tabindex]` HALF, SPLIT OFF FOR ONE DECLARATION: the ring is INSET, because a `[tabindex]` carrier is flush with `.manager-editor-tab-panel`'s padding box and a scroll container clips an outward offset off its left arm — measured in Chromium by `tests/components/validation-focus.test.js`. */
@@ -1667,6 +1676,11 @@
   padding: 14px;
 }
 
+/* The Formula card's head keeps the prototype's tighter lead-to-control gap. */
+.fabricate-manager .manager-checks-card[data-roll-formula-card] > .manager-checks-card-body {
+  padding-top: var(--fab-space-3);
+}
+
 .fabricate-manager .manager-checks-card-body.is-roomy {
   padding: 14px 16px;
 }
@@ -1687,6 +1701,7 @@
   font-family: var(--fab-font-serif);
   font-size: 13px;
   font-weight: 600;
+  line-height: normal;
   letter-spacing: 0;
   text-transform: none;
 }
@@ -1934,8 +1949,10 @@
 .fabricate-manager .manager-checks-difficulty-field.is-dc {
   flex: 0 0 auto;
 
-  /* The shared `Stepper` takes its HEIGHT from the layout context; its border, radius, background and type stay the primitive's own. */
-  width: 118px;
+  /* The shared `Stepper` takes its height from the layout context: the 30px field rung, at the width of two 26px adjuncts round a 42px value. */
+  --fab-stepper-fill-height: 30px;
+
+  width: 96px;
 }
 
 .fabricate-manager .manager-checks-difficulty-field.is-comparison {
@@ -1949,15 +1966,14 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  line-height: normal;
 }
 
-/* The check-type chooser still renders through the shared `RadioCardGroup`; only the checks studio's own scale is restated, at (0,4,0) so it lands without touching the primitive every other screen uses. */
+/* The check-type chooser still renders through the shared `RadioCardGroup`; only the checks studio's own scale is restated, at (0,4,0). Padding, radius, radio and legend are the primitive's. */
 .fabricate-manager .manager-checks-card .manager-resolution-mode-card.is-config-cards .manager-resolution-option {
   gap: 11px;
-  padding: 12px 13px;
   border: 1px solid var(--fab-border);
-  border-radius: 10px;
-  background: var(--fab-bg-0);
+  background: var(--fab-bg-1);
 }
 
 .fabricate-manager
@@ -1965,7 +1981,7 @@
   .manager-resolution-mode-card.is-config-cards
   .manager-resolution-option.is-active {
   border-color: var(--fab-accent-border);
-  background: var(--fab-accent-soft);
+  background: var(--fab-surface-soft);
 }
 
 .fabricate-manager
@@ -1977,8 +1993,8 @@
   height: 28px;
   border-radius: 8px;
   color: var(--fab-text-subtle);
-  background: var(--fab-bg-2);
-  font-size: 12px;
+  background: var(--fab-surface-active);
+  font-size: 11px;
 }
 
 .fabricate-manager
@@ -1987,7 +2003,7 @@
   .manager-resolution-option.is-active
   .manager-resolution-option-icon {
   color: var(--fab-accent);
-  background: var(--fab-bg-1);
+  background: var(--fab-accent-soft);
 }
 
 .fabricate-manager .manager-checks-card .manager-resolution-option-name {
@@ -2005,7 +2021,7 @@
 
 .fabricate-manager .manager-checks-card .manager-resolution-option-desc {
   color: var(--fab-text-muted);
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 400;
   line-height: 1.5;
 }
@@ -2050,7 +2066,7 @@
   min-width: 0;
 }
 
-/* The outcome row's own box: swatch, name, stepper, toggle and remove on ONE line inside one bordered card. Issue 1512 deleted this rule with the tier list it converted onto `SortableList`, but the outcome list in `CraftingCheckEditor.svelte` never converted and still draws these rows itself, so without it every child stacked unboxed at content width. The gap and padding sit on the scale (the deleted rule said 10px and 8px 11px). Scoped to the list's own children: the recipe tier rows in `CheckRecipeTiers.svelte` carry this class on a `.fabricate-sortable-list-row`, whose line already owns the box and the padding. */
+/* The outcome row's own box: swatch, name, stepper, toggle and remove on ONE line inside one bordered card. Issue 1512 deleted this rule with the tier list it converted onto `SortableList`, but the outcome list in `CraftingCheckEditor.svelte` never converted and still draws these rows itself, so without it every child stacked unboxed at content width. The gap and padding sit on the scale (the deleted rule said 10px and 8px 11px). Scoped to the list's own children: the recipe tier rows in `CheckRecipeTiers.svelte` carry this class on a `.fabricate-sortable-list-row`, whose line already owns the box and the padding. skin census (issue 1523): a pinned carrier — `tests/components/manager-checks-mounted.js` reads `.manager-checks-tier-row` by name. */
 .fabricate-manager .manager-checks-tier-list > .manager-checks-tier-row {
   display: flex;
   align-items: center;
@@ -2059,11 +2075,59 @@
   padding: var(--fab-space-2) var(--fab-space-3);
   border: 1px solid var(--fab-border);
   border-radius: 9px;
-  background: var(--fab-bg-0);
+  background: var(--fab-bg-1);
 }
 
-/* The outcome list's own append action, which lives OUTSIDE that list so it is reachable from the zero state too (issue 1097 follow-up). */
+/* The outcome list's column captions, for the eye alone, aligned over the row's own tracks. */
+.fabricate-manager .manager-checks-tier-head {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-3);
+  margin: var(--fab-space-4) 0 var(--fab-space-chip);
+  padding: 0 var(--fab-space-3);
+  color: var(--fab-text-subtle);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.fabricate-manager .manager-checks-tier-head > .is-swatch {
+  flex: 0 0 9px;
+}
+
+.fabricate-manager .manager-checks-tier-head > .is-name {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-checks-tier-head > .is-threshold {
+  flex: 0 0 118px;
+  text-align: center;
+}
+
+.fabricate-manager .manager-checks-tier-head > .is-range {
+  flex: 0 0 84px;
+  text-align: center;
+}
+
+.fabricate-manager .manager-checks-tier-head > .is-success {
+  flex: 0 0 158px;
+  text-align: center;
+}
+
+.fabricate-manager .manager-checks-tier-head > .is-break {
+  flex: 0 0 76px;
+  text-align: center;
+}
+
+.fabricate-manager .manager-checks-tier-head > .is-remove {
+  flex: 0 0 26px;
+}
+
+/* The outcome list's own append action, which lives outside that list so it is reachable from the zero state too (issue 1097 follow-up); full width, as the tier list's footer adder is. */
 .fabricate-button.manager-button.manager-checks-outcome-add {
+  width: 100%;
   margin-top: 6px;
 }
 
@@ -2109,13 +2173,13 @@
   font-size: 9px;
 }
 
-/* A 12px ROUNDED SQUARE, which is what the prototype draws. The 50% dot this replaces was the same 12px key in a different shape. */
+/* A 9px circle, the prototype's tier key. */
 .fabricate-manager .manager-checks-tier-swatch {
   display: block;
   flex: 0 0 auto;
-  width: 12px;
-  height: 12px;
-  border-radius: 4px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
   background: var(--fab-outcome-swatch, var(--fab-surface-active));
 }
 
@@ -2125,12 +2189,13 @@
   width: auto;
   min-width: 0;
   height: 28px;
-  padding: 0 9px;
-  border: 1px solid var(--fab-border);
+  min-height: 0;
+  padding: 0 var(--fab-space-2xs);
+  border: 1px solid transparent;
   border-radius: 7px;
   color: var(--fab-text);
-  background: var(--fab-bg-2);
-  font-size: 12.5px;
+  background: transparent;
+  font-size: 12px;
   font-weight: 500;
 }
 
@@ -2163,7 +2228,7 @@
   width: 158px;
 }
 
-/* The studio's remove action: a subtle danger icon button, 28px square, not the manager's 34px `.manager-icon-button`. The converted tier list's delete is `SortableList`'s own since issue 1512; the outcome list in `CraftingCheckEditor.svelte` still draws this one. */
+/* The studio's remove action: a subtle danger icon button, 26px square, not the manager's 34px `.manager-icon-button`. The converted tier list's delete is `SortableList`'s own since issue 1512; the outcome list in `CraftingCheckEditor.svelte` still draws this one. */
 .fabricate-manager .manager-checks-tier-row .manager-checks-tier-remove,
 .fabricate-manager .manager-checks-trigger-head .manager-checks-trigger-remove {
   appearance: none;
@@ -2172,8 +2237,8 @@
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   min-height: 0;
   padding: 0;
   border: 1px solid var(--fab-danger-border);
@@ -2329,17 +2394,19 @@
   font-weight: 600;
 }
 
-/* The rail's PANEL COPY. Two scales, and they are the prototype's own: a panel with nothing in it yet states its subject at 11px in the subtle ink, and the activation card's hint — which qualifies a control right above it — is one step up in the muted ink. */
+/* The rail's PANEL COPY. Two treatments: a panel's hint is the library's `k-hint` (10.5px at 1.5, subtle ink), and the activation card's hint — which qualifies a control right above it — keeps its tighter leading in the muted ink. */
 .fabricate-manager .manager-checks-rail .manager-muted {
   margin: 0;
   color: var(--fab-text-subtle);
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 400;
+  line-height: 1.5;
 }
 
 .fabricate-manager .manager-checks-active-card .manager-muted {
   color: var(--fab-text-muted);
   font-size: 10.5px;
+  line-height: 1.35;
 }
 
 /* ── The rail's LISTS ── `THIS CHECK` and `ALL CHECKS` are ONE card of compact rows each, not a stack of bordered cards. */
@@ -2513,18 +2580,22 @@
 .fabricate-manager .manager-checks-card .manager-modifier-readonly-label,
 .fabricate-manager .manager-tool-prerequisite-list .manager-modifier-readonly-label,
 .fabricate-manager .manager-tool-bonus-list .manager-modifier-readonly-label {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
   color: var(--fab-text);
   font-size: 12.5px;
   font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
-/* THE ONE ELASTIC CELL. The expression takes the row's slack, which is what puts the bounds chip and the eligibility control against the row's right edge with no auto margin anywhere — exactly how the prototype lays the row out. */
+/* THE ONE ELASTIC CELL. The expression takes the row's slack, which is what puts the bounds chip and the eligibility control against the row's right edge with no auto margin anywhere — exactly how the prototype lays the row out. It gives way only past twelve characters, sharing the shrink with the name, so a counting die stays whole and neither cell can push the control out (issue 2044). */
 .fabricate-manager .manager-checks-card .manager-modifier-readonly-expression,
 .fabricate-manager .manager-tool-prerequisite-list .manager-modifier-readonly-expression,
 .fabricate-manager .manager-tool-bonus-list .manager-modifier-readonly-expression {
-  flex: 1 1 0;
-  min-width: 0;
+  flex: 1 1 auto;
+  min-width: 12ch;
   overflow: hidden;
   color: var(--fab-text-secondary);
   background: none;
@@ -2554,7 +2625,7 @@
   min-width: 0;
 }
 
-/* The expression cell is `flex: 1 1 0` in the inline row, which is what puts a trailing control against the row's right edge with no auto margin anywhere. */
+/* The expression cell is `flex: 1 1 auto` in the inline row, which is what puts a trailing control against the row's right edge with no auto margin anywhere. */
 .fabricate-manager .manager-modifier-readonly-row.is-text-stacked .manager-modifier-readonly-expression {
   flex: 0 0 auto;
   margin-top: var(--fab-space-2xs);
@@ -3075,11 +3146,20 @@
   align-items: center;
   gap: 9px;
   min-width: 0;
-  height: 40px;
+  height: 38px;
   padding: 0 12px;
   border: 1px solid var(--fab-border);
   border-radius: 9px;
   background: var(--fab-surface-soft);
+}
+
+/* A wrapper-drawn field lights the wrapper: the borderless input inside draws no ring of its own. */
+.fabricate-manager :is(.manager-checks-formula-input, .manager-prerequisite-path-input, .manager-component-entry-alias-field):focus-within {
+  border-color: var(--fab-accent);
+}
+
+.fabricate-manager :is(.manager-checks-formula-input, .manager-prerequisite-path-input, .manager-component-entry-alias-field) input:focus-visible {
+  outline: none;
 }
 
 .fabricate-manager .manager-checks-formula-input > i {
@@ -3090,6 +3170,7 @@
 
 .fabricate-manager .manager-checks-formula-input input {
   flex: 1 1 auto;
+  align-self: stretch;
   width: auto;
   min-width: 0;
   height: auto;
@@ -3098,7 +3179,7 @@
   color: var(--fab-text);
   background: transparent;
   font-family: var(--fab-font-mono);
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 500;
 }
 
@@ -3109,6 +3190,10 @@
   font-size: 10px;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
+}
+
+.fabricate-manager .manager-checks-formula-average-value {
+  font-family: var(--fab-font-mono);
 }
 
 /* WHAT ACTUALLY GETS ROLLED. The INFO family, because it is a standing explanation of how the surface behaves rather than a hazard — the same reason the mode callout above the cards is info. */
@@ -3132,6 +3217,7 @@
 }
 
 .fabricate-manager .manager-checks-formula-resolved-body {
+  flex: 1 1 auto;
   min-width: 0;
 }
 
@@ -3156,7 +3242,7 @@
 .fabricate-manager .manager-checks-formula-base {
   color: var(--fab-text);
   font-family: var(--fab-font-mono);
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 500;
 }
 
@@ -3178,14 +3264,19 @@
 .fabricate-manager .manager-checks-formula-chip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
+  gap: var(--fab-space-chip);
+  padding: var(--fab-space-1) var(--fab-space-2);
   border: 1px solid var(--fab-accent-border);
-  border-radius: 7px;
+  border-radius: 999px;
   color: var(--fab-accent);
   background: var(--fab-accent-soft);
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 600;
+  line-height: normal;
+}
+
+.fabricate-manager .manager-checks-formula-chip > i {
+  font-size: 9px;
 }
 
 .fabricate-manager .manager-checks-formula-rule {
@@ -3864,11 +3955,6 @@
   text-align: center;
 }
 
-.fabricate-manager .manager-character-modifier-add-suggestions.is-above {
-  top: auto;
-  bottom: calc(100% + 4px);
-}
-
 .fabricate-manager .manager-character-modifier-row-list,
 .fabricate-manager .manager-condition-modifier-row-list {
   display: flex;
@@ -4122,10 +4208,10 @@
   box-shadow: none;
 }
 
-/* THE SEARCH FAMILY'S OWN KEYBOARD RING. Declarations copied verbatim from the module ring (`.fabricate <element>:focus-visible`), which is (0,2,1) too and sits earlier, so this changes nothing wherever a Fabricate root is an ancestor; what it is FOR is the bare host, where a primitive leaning on the module ring would render none (issue 1508). */
+/* THE SEARCH FAMILY'S OWN KEYBOARD RING. Declarations copied verbatim from the module's text-field ring (`.fabricate :is(input, textarea):where(…):focus-visible`), which is (0,2,1) too and sits earlier, so this changes nothing wherever a Fabricate root is an ancestor; what it is FOR is the bare host, where a primitive leaning on the module ring would render none (issue 1508). */
 .fabricate-search input:focus-visible {
-  outline: 2px solid var(--fab-accent);
-  outline-offset: 2px;
+  outline: 1px solid var(--fab-accent);
+  outline-offset: -1px;
 }
 
 /* THE FILTERS' FLOOR (issue 1510). The trigger is sized to its VALUE, so without a floor each
@@ -4159,12 +4245,10 @@
   background: var(--fab-bg-1);
 }
 
+/* No offsets here: `typeaheadPanel` portals the list to the application root and writes its placement inline, at the popover family's stacking level. */
 .fabricate-manager .manager-tag-suggestions {
   position: absolute;
-  z-index: 12;
-  top: 38px;
-  right: 0;
-  left: 0;
+  z-index: 4000;
   display: grid;
   gap: var(--fab-space-2xs);
   max-height: 148px;
@@ -4195,6 +4279,12 @@
 .fabricate-manager .manager-tag-suggestion:focus-visible {
   color: var(--fab-success-text);
   background: var(--fab-success-soft);
+}
+
+/* The keyboard cursor: the field keeps DOM focus, so the active option is drawn from its state. */
+.fabricate-manager .manager-tag-suggestion[aria-selected='true'] {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: -2px;
 }
 
 .fabricate-manager .manager-selected-tag-row {
@@ -4706,7 +4796,12 @@
 }
 
 .fabricate-manager .manager-recipe-check.is-dc,
-.fabricate-manager .manager-recipe-check.is-dynamic {
+.fabricate-manager .manager-recipe-check.is-dynamic,
+.fabricate-manager .manager-recipe-check.is-target,
+.fabricate-manager .manager-recipe-check.is-attribute,
+.fabricate-manager .manager-recipe-check.is-dynamicTarget,
+.fabricate-manager .manager-recipe-check.is-successes,
+.fabricate-manager .manager-recipe-check.is-dynamicSuccesses {
   border-color: var(--fab-info-border);
   color: var(--fab-info-text);
   background: var(--fab-info-soft);
@@ -6355,6 +6450,10 @@
   word-break: normal;
 }
 
+.fabricate-manager .manager-muted.is-danger {
+  color: var(--fab-danger-text);
+}
+
 .fabricate-manager .manager-system-copy,
 .fabricate-manager .manager-inspector-copy {
   min-width: 0;
@@ -6715,6 +6814,7 @@
 
 .fabricate-manager .manager-essence-edit-view {
   display: grid;
+  grid-template-rows: max-content;
   align-content: start;
   gap: var(--fab-space-2);
   min-width: 0;
@@ -7737,7 +7837,7 @@
   margin: 0;
   margin-top: 0.15rem;
   padding: 0;
-  border: 1.5px solid var(--fab-border);
+  border: 1.5px solid var(--fab-control-outline);
   border-radius: 50%;
   appearance: none;
   -webkit-appearance: none;
@@ -7754,7 +7854,7 @@
   margin: 0;
   margin-top: 0.15rem;
   padding: 0;
-  border: 1.5px solid var(--fab-border);
+  border: 1.5px solid var(--fab-control-outline);
   border-radius: 50%;
   appearance: none;
   -webkit-appearance: none;
@@ -7878,14 +7978,14 @@
   border: 0;
 }
 
-/* `legendVisible` PUTS THE GROUP'S OWN NAME BACK ON SCREEN (issue 1373). */
+/* `legendVisible` puts the group's own name back on screen (issue 1373), a chip gap above its cards as the Checks Studio prototype draws it. */
 .fabricate-option-cards.manager-resolution-mode-card.is-config-cards.is-legend-visible
   .manager-resolution-mode-legend {
   position: static;
   width: auto;
   height: auto;
   padding: 0;
-  margin: 0;
+  margin: 0 0 var(--fab-space-chip);
   overflow: visible;
   clip-path: none;
   white-space: normal;
@@ -7898,12 +7998,13 @@
   gap: var(--fab-space-3);
 }
 
+/* The library's `<OptionCards>` padding and radius. */
 .fabricate-option-cards.manager-resolution-mode-card.is-config-cards .manager-resolution-option {
   align-items: flex-start;
   gap: var(--fab-space-3);
   padding: var(--fab-space-3);
   border: 1px solid var(--fab-border);
-  border-radius: 10px;
+  border-radius: 11px;
   background: var(--fab-overlay-light-04);
 }
 
@@ -7913,9 +8014,7 @@
   box-shadow: none;
 }
 
-/* THE TILE IS A RUNG ABOVE THE CARD, NOT THE RAMP'S TOP. `proto:2637` fills this glyph `--bg2` — our `--fab-bg-1` — inside a card the same screen draws over a `--bg1` pane (issue 1373). */
-
-/* skin census (issue 1523): not an adopter — this tile's fill and border were taken TOGETHER from the prototype under issue 1373 as a component treatment, not a shared field/well rung; its tuple joins the card-skin census as a deferral. */
+/* The tile is a rung above the card, not the ramp's top. `proto:2637` fills this glyph `--bg2` — our `--fab-bg-1` — inside a card the same screen draws over a `--bg1` pane (issue 1373). The library's icon chip is a fill with no edge, so the border is transparent. */
 .fabricate-option-cards.manager-resolution-mode-card.is-config-cards .manager-resolution-option-icon {
   order: 1;
   flex: 0 0 40px;
@@ -7924,7 +8023,7 @@
   justify-content: center;
   width: 40px;
   height: 40px;
-  border: 1px solid var(--fab-border);
+  border: 1px solid transparent;
   border-radius: 9px;
   background: var(--fab-bg-1);
   color: var(--fab-accent);
@@ -7937,10 +8036,19 @@
   gap: var(--fab-space-1);
 }
 
+/* The Checks Studio prototype's radio, where the library's `<OptionCards>` draws none: a quiet ring at rest, a thick accent ring when chosen, centred on the card. */
 .fabricate-option-cards.manager-resolution-mode-card.is-config-cards .manager-resolution-option input[type='radio'] {
   order: 3;
-  align-self: flex-start;
-  margin-top: 0.1rem;
+  align-self: center;
+  margin-top: 0;
+  border: 1px solid var(--fab-control-outline);
+  background: var(--fab-bg-1);
+  background-clip: padding-box;
+}
+
+.fabricate-option-cards.manager-resolution-mode-card.is-config-cards .manager-resolution-option input[type='radio']:checked {
+  border: 4px solid var(--fab-accent);
+  box-shadow: none;
 }
 
 @container (max-width: 620px) {
@@ -8014,7 +8122,7 @@
 }
 
 /* `:not(.fab-stepper-input)` — the shared `Stepper` supplies its OWN borderless chrome (48px wide, 22px tall, transparent) from its component-scoped \3c style> (issue 883). */
-.fabricate-field.manager-field input:not(.fab-stepper-input):not([type='radio']):not([type='range']),
+.fabricate-field.manager-field input:not(.fab-stepper-input):not([type='radio'], [type='checkbox']):not([type='range']),
 .fabricate-field.manager-field select,
 .fabricate-field.manager-field textarea {
   width: 100%;
@@ -8026,7 +8134,7 @@
 }
 
 /* Same exclusion, same reason, and this half is why the event editor's slider also stood 36px tall with 8px of side padding instead of the 28px/0 the control asks for (issue 1523). */
-.fabricate-field.manager-field input:not(.fab-stepper-input):not([type='radio']):not([type='range']),
+.fabricate-field.manager-field input:not(.fab-stepper-input):not([type='radio'], [type='checkbox']):not([type='range']),
 .fabricate-field.manager-field select {
   height: 36px;
   padding: 0 var(--fab-space-2);
@@ -8045,11 +8153,16 @@
   box-shadow: none;
 }
 
-/* THE FIELD FAMILY'S OWN KEYBOARD RING. Declarations copied verbatim from the module ring, which is (0,2,1) too and sits earlier, so nothing moves where that ring already reaches; what this is FOR is the bare host (issues 1508, 1511, 1510, 1357). */
+/* THE FIELD FAMILY'S OWN KEYBOARD RING. Both blocks are copied verbatim from the module's pair — the element ring, then its text-field variant with the same exclusion — which is (0,2,1) too and sits earlier, so nothing moves where that ring already reaches; what this is FOR is the bare host (issues 1508, 1511, 1510, 1357). */
 .fabricate-field input:focus-visible,
 .fabricate-field textarea:focus-visible {
   outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
+}
+
+.fabricate-field :is(input, textarea):where(:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file'], [type='button'], [type='submit'], [type='reset'], [type='image'])):focus-visible {
+  outline: 1px solid var(--fab-accent);
+  outline-offset: -1px;
 }
 
 .fabricate-manager .manager-recipe-steps-requirements {
@@ -9291,6 +9404,10 @@
   border-color: var(--fab-accent-border);
 }
 
+.fabricate-manager .manager-recipe-option-search:focus-within {
+  border-color: var(--fab-accent);
+}
+
 .fabricate-manager .manager-recipe-option-search > i {
   flex: 0 0 auto;
   color: var(--fab-text-subtle);
@@ -9300,6 +9417,7 @@
 /* The input paints NOTHING: `.manager-recipe-option-search` draws the box, so the field inside it must not draw a second one. */
 .fabricate-manager .manager-recipe-option-search input[type='text'] {
   flex: 1;
+  align-self: stretch;
   min-width: 0;
   height: auto;
   min-height: 0;
@@ -9312,17 +9430,14 @@
   outline: none;
 }
 
-/* THE SUGGESTIONS, BENEATH THE FIELD (`proto:2279`) rather than in a portaled popover. */
+/* The suggestions, beneath the field (`proto:2279`). No offsets here: `typeaheadPanel` portals the list to the application root and writes its placement inline, at the popover family's stacking level. */
 .fabricate-manager .manager-recipe-option-suggestions {
   position: absolute;
-  top: 33px;
-  right: 0;
-  left: 0;
-  z-index: 30;
+  z-index: 4000;
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2xs);
-  max-height: 190px;
+  max-height: 232px;
   padding: var(--fab-space-1);
   border: 1px solid var(--fab-border-strong);
   border-radius: 9px;
@@ -9358,6 +9473,12 @@
 
 .fabricate-manager .manager-recipe-option-suggestion:hover {
   background: var(--fab-surface-soft);
+}
+
+/* The keyboard cursor: the field keeps DOM focus, so the active option is drawn from its state. */
+.fabricate-manager .manager-recipe-option-suggestion[aria-selected='true'] {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: -2px;
 }
 
 .fabricate-manager .manager-recipe-option-suggestion > i {
@@ -10179,7 +10300,7 @@
   flex-wrap: wrap;
   gap: var(--fab-space-chip);
   min-width: 0;
-  margin-top: var(--fab-space-chip);
+  margin-top: var(--fab-space-2);
 }
 
 .fabricate-manager .manager-checks-formula-token {
@@ -10188,17 +10309,29 @@
   align-items: center;
   gap: var(--fab-space-chip);
   width: auto;
-  height: auto;
-  min-height: 22px;
+  height: 26px;
+  min-height: 26px;
   padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 6px;
+  border: 1px dashed var(--fab-border-strong);
+  border-radius: 7px;
   color: var(--fab-text-muted);
-  background: transparent;
+  background: var(--fab-bg-1);
   font-family: var(--fab-font-mono);
-  font-size: 0.66rem;
-  line-height: 1;
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: normal;
   cursor: pointer;
+}
+
+.fabricate-manager .manager-checks-formula-token > i {
+  font-size: 8px;
+  opacity: 0.6;
+}
+
+/* The token's kind glyph (a die, an ability…) at full ink, beside the quieter `+` verb. */
+.fabricate-manager .manager-checks-formula-token > i.is-kind {
+  font-size: 9px;
+  opacity: 1;
 }
 
 .fabricate-manager .manager-checks-formula-token:hover {
@@ -10455,6 +10588,17 @@
   min-height: 24px;
   padding: 0;
   flex: 0 0 24px;
+}
+
+/* The banded Modal's close (maintainer ruling 2026-09-28); its paint is `ManagerModal`'s. */
+.fabricate-icon-button.manager-icon-button.is-size-26 {
+  box-sizing: border-box;
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  min-height: 26px;
+  padding: 0;
+  flex: 0 0 26px;
 }
 
 /* The strip half, for the reason spelled out on `.fabricate-button:focus` above: core's orange
@@ -11474,12 +11618,8 @@
   padding-left: 36px;
 }
 
-.fabricate-manager .manager-task-component-tag-search .manager-tag-suggestions {
-  position: absolute;
-  z-index: 5;
-  inset: calc(100% + 4px) 0 auto;
+.fabricate-manager .manager-task-component-tag-suggestions {
   max-height: 132px;
-  overflow-y: auto;
 }
 
 .fabricate-manager .manager-task-component-pills {
@@ -12148,10 +12288,16 @@
   box-shadow: none;
 }
 
-/* THE SLIDER FAMILY'S OWN KEYBOARD RING. Declarations copied verbatim from the module ring (`.fabricate <element>:focus-visible`), which is (0,2,1) too and sits earlier, so this changes nothing wherever a Fabricate root is an ancestor; what it is FOR is the bare host, where a primitive leaning on the module ring would render none (issue 1508). */
-.fabricate-slider input:focus-visible {
+/* THE SLIDER FAMILY'S OWN KEYBOARD RING, on the range half alone. Declarations copied verbatim from the module ring (`.fabricate <element>:focus-visible`), so this changes nothing wherever a Fabricate root is an ancestor; what it is FOR is the bare host, where a primitive leaning on the module ring would render none (issue 1508). */
+.fabricate-slider input[type='range']:focus-visible {
   outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
+}
+
+/* The percent half is a text field, so it takes the module's text-field ring, copied for the bare host. */
+.fabricate-slider .manager-drop-rate-percent input:focus-visible {
+  outline: 1px solid var(--fab-accent);
+  outline-offset: -1px;
 }
 
 .fabricate-manager .manager-tool-breakage-chance-control {
@@ -16077,6 +16223,85 @@
   font-weight: 700;
 }
 
+/* A crafting check's Success or Failure pill and its dice line (issue 2005, frames 37 and 38). The tone is mixed into the chat's own ink, so the pill reads on parchment and on a dark chat theme alike. Its geometry is the design system's tag-run chip (`library.html:977`): a 6px by 12px pad at line-height 1, 600 weight and a 9px glyph, which sets frame 38's 26px pill. */
+.fabricate-craft-chat__result {
+  --fabricate-craft-chat-tone: var(--fab-success);
+
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: var(--fab-space-chip);
+  padding: var(--fab-space-chip) var(--fab-space-3);
+  border: 1px solid currentcolor;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--fabricate-craft-chat-tone) 18%, transparent);
+  color: color-mix(in srgb, var(--fabricate-craft-chat-tone) 45%, currentcolor);
+  font-size: 0.85em;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.fabricate-craft-chat__result > i {
+  font-size: 9px;
+}
+
+.fabricate-craft-chat__result--failure {
+  --fabricate-craft-chat-tone: var(--fab-danger);
+}
+
+.fabricate-craft-chat__dice {
+  font-family: var(--fab-font-mono);
+  font-size: 0.85em;
+  font-weight: 500;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+/* The executed check's Target, Pre-rolled and Margin rows (issue 2005): a key column beside wrapping text, as the prototype's chat card sets them. */
+.fabricate-craft-chat__evidence {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+  margin: 0;
+}
+
+.fabricate-craft-chat__evidence-row {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: var(--fab-space-chip);
+  font-size: 0.85em;
+}
+
+/* Core styles every `dl dt` and `dl dd` (a shadowed emphatic ink and an indent), so each resets to the card's own chat ink. */
+.fabricate-craft-chat__evidence-label {
+  margin: 0;
+  padding: 0;
+  color: inherit;
+  font-weight: 600;
+  text-shadow: none;
+  opacity: 0.58;
+}
+
+.fabricate-craft-chat__evidence-value {
+  margin: 0;
+  padding: 0;
+  color: inherit;
+  font-weight: 500;
+  line-height: 1.45;
+  text-shadow: none;
+  overflow-wrap: anywhere;
+}
+
+/* A bulk subject row that states its evidence spans the card and wraps its rows beneath its name. */
+.fabricate-craft-chat__item--evidence {
+  flex-wrap: wrap;
+  grid-column: 1 / -1;
+}
+
+.fabricate-craft-chat__item--evidence .fabricate-craft-chat__evidence {
+  flex: 1 0 100%;
+}
+
 .fabricate-gather-chat__section,
 .fabricate-craft-chat__section {
   display: flex;
@@ -16096,7 +16321,7 @@
 }
 
 .fabricate-gather-chat__section--event .fabricate-gather-chat__heading {
-  color: var(--fab-danger);
+  color: color-mix(in srgb, var(--fab-danger) 45%, currentcolor);
   opacity: 0.95;
 }
 
@@ -16106,8 +16331,9 @@
   opacity: 0.8;
 }
 
+/* The danger tone mixed into the chat's own ink, as the result pill is, so it reads on parchment. */
 .fabricate-craft-chat--failure .fabricate-craft-chat__notice {
-  color: var(--fab-danger);
+  color: color-mix(in srgb, var(--fab-danger) 45%, currentcolor);
   opacity: 0.95;
 }
 
@@ -16233,9 +16459,9 @@
   opacity: 0.58;
 }
 
-/* A macro only the GM can repair is not narration, so it reads in the danger ramp the failure notice above already uses rather than in the neutral one its neighbours use. */
+/* A macro only the GM can repair is not narration, so it reads in the danger tone mixed into the chat's own ink, as the failure notice and the result pill do, rather than in the neutral one its neighbours use. */
 .fabricate-craft-chat--gm .fabricate-craft-chat__complication-fault {
-  color: var(--fab-danger);
+  color: color-mix(in srgb, var(--fab-danger) 45%, currentcolor);
 }
 
 /* Its heading keeps the eyebrow's SHAPE and drops the eyebrow's fade. 0.58 of the danger ramp on a parchment chat background is the lowest-contrast run on the card, and this is the one run that has to be read: everything else here is narration a GM can skim, and this is a broken link only they can repair. */
@@ -16272,6 +16498,125 @@
 
 .fabricate-gather-chat__stat-value {
   font-weight: 700;
+}
+
+/* The die tiles of a success-counting roll (issue 2006), one family for the Studio simulator, the result boxes and the chat cards: a chat card sits outside every Fabricate window, so the rules are rooted at the family rather than at an app, and read only the :root tokens. */
+.fabricate-dice-tiles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+}
+
+.fabricate-dice-tiles__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Frames 39 and 40: a 38 by 44 tile at radius 9, the face over its marks, toned by what it did. */
+.fabricate-dice-tiles__tile {
+  display: inline-flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 38px;
+  height: 44px;
+  margin: 0;
+  padding: 0 var(--fab-space-1);
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  background: var(--fab-surface-soft);
+  color: var(--fab-text-muted);
+  font-family: var(--fab-font-mono);
+  line-height: 1;
+}
+
+.fabricate-dice-tiles__tile--success {
+  border-color: var(--fab-success-border);
+  background: var(--fab-success-soft);
+  color: var(--fab-success-text);
+}
+
+.fabricate-dice-tiles__tile--danger {
+  border-color: var(--fab-danger-border);
+  background: var(--fab-danger-soft);
+  color: var(--fab-danger-text);
+}
+
+/* A bought die (issue 2008) dashes the border it already has, so its tone's colour stands. */
+.fabricate-dice-tiles__tile--bought {
+  border-style: dashed;
+}
+
+/* An untoned tile's resting border is too faint to read as dashed (WCAG 1.4.11), so it inks. */
+.fabricate-dice-tiles__tile--bought:not(
+    .fabricate-dice-tiles__tile--success,
+    .fabricate-dice-tiles__tile--danger
+  ) {
+  border-color: var(--fab-text-muted);
+}
+
+/* On a chat card a tile mixes its tone into the chat's own ink, as the result pill does, so it reads on parchment and on a dark chat theme alike. */
+.fabricate-craft-chat .fabricate-dice-tiles__tile {
+  --fabricate-dice-tile-tone: currentcolor;
+
+  border-color: color-mix(in srgb, var(--fabricate-dice-tile-tone) 45%, transparent);
+  background: color-mix(in srgb, var(--fabricate-dice-tile-tone) 12%, transparent);
+  color: color-mix(in srgb, var(--fabricate-dice-tile-tone) 45%, currentcolor);
+}
+
+.fabricate-craft-chat .fabricate-dice-tiles__tile--success {
+  --fabricate-dice-tile-tone: var(--fab-success);
+}
+
+.fabricate-craft-chat .fabricate-dice-tiles__tile--danger {
+  --fabricate-dice-tile-tone: var(--fab-danger);
+}
+
+.fabricate-dice-tiles__face {
+  font-size: 14px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.fabricate-dice-tiles__marks {
+  display: flex;
+  gap: var(--fab-space-2xs);
+  font-size: 9px;
+}
+
+.fabricate-dice-tiles__more {
+  align-self: center;
+  color: var(--fab-text-muted);
+  font-family: var(--fab-font-mono);
+  font-size: 11px;
+}
+
+.fabricate-dice-tiles__legend {
+  margin: 0;
+  color: var(--fab-text-muted);
+  font-size: 10px;
+}
+
+/* A legend key draws its mark's own tile glyph before the word (issue 2134). */
+.fabricate-dice-tiles__key {
+  display: inline-flex;
+  gap: var(--fab-space-2xs);
+  align-items: baseline;
+}
+
+/* On a chat card the overflow count and legend read in the chat's own ink, at the subtitle's 72%, as the tiles do. */
+.fabricate-craft-chat .fabricate-dice-tiles__more,
+.fabricate-craft-chat .fabricate-dice-tiles__legend {
+  color: color-mix(in srgb, currentcolor 72%, transparent);
 }
 
 /* Region-first player interaction prompt (InteractionPromptApp) — a small, non-modal toast. */
@@ -17114,7 +17459,6 @@
 .fabricate-picker-popover .manager-travel-popover-search input:focus-visible {
   outline: none;
   border-color: var(--fab-accent);
-  box-shadow: 0 0 0 1px var(--fab-accent);
 }
 
 /* `proto:2260`: `max-height:180px; overflow:auto; display:flex; flex-direction:column; gap:2px`, and no inset of its own - the panel's 7px is what every left edge in the popover sits on (issue 1035). */
@@ -17313,10 +17657,11 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* The leading glyph and the chevron are both quiet, as the specimen draws them. */
+/* The leading glyph and the chevron are both quiet, as the specimen draws them, and at its 12px (`.k-field .i`) on every rung rather than at the rung's type (ruling 2026-09-28). */
 .fabricate-select-trigger > i {
   flex: none;
   color: var(--fab-text-subtle);
+  font-size: 12px;
 }
 
 .fabricate-select-trigger > i:last-child {
@@ -17442,407 +17787,14 @@
   line-height: 1.5;
 }
 
-/* ========================================== Interactive roll prompt (DialogV2) ========================================== The check roll-config dialog (`promptCheckRoll`, rollPrompt.js) carries the `.fabricate-roll-prompt-dialog` root class (+ `.fabricate-dialog`) so its body and footer buttons are themeable, styled to resemble the dnd5e roll dialog: a centered header (icon + activity title / subject subtitle), a die glyph, the formula with a right-aligned "Formula" label, a DC chip, a situational-bonus input, and a Configuration section with a Roll Mode picker. */
-.fabricate-roll-prompt {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-3);
-  padding: var(--fab-space-2) 0;
+/* The standalone roll-prompt host (`overlayHost.js`): a companion or macro prompt opened while no Fabricate window is open. A zero-size fixed layer, so it lifts the modal it hosts above Foundry's windows without blocking the page around it. */
+.fabricate.fabricate-standalone-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: calc(var(--z-index-tooltip, 9999) - 1);
   color: var(--fab-text);
-}
-
-.fabricate-roll-prompt__header {
-  display: flex;
-  gap: var(--fab-space-3);
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-}
-
-.fabricate-roll-prompt__icon {
-  flex: 0 0 auto;
-  width: 40px;
-  height: 40px;
-  border: 1px solid var(--fab-border);
-  border-radius: 6px;
-  object-fit: cover;
-  background: var(--fab-bg-1);
-}
-
-.fabricate-roll-prompt__title {
-  margin: 0;
-  border: none;
-  font-size: 1.15rem;
-  font-weight: 700;
-  line-height: 1.2;
-  color: var(--fab-text);
-}
-
-.fabricate-roll-prompt__die {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 2.4rem;
-  line-height: 1;
-  color: var(--fab-accent);
-}
-
-.fabricate-roll-prompt__formula {
-  display: flex;
-  gap: var(--fab-space-2);
-  align-items: baseline;
-  justify-content: space-between;
-  padding: var(--fab-space-2) var(--fab-space-3);
-  border: 1px solid var(--fab-border);
-  border-radius: 6px;
-  background: var(--fab-overlay-light-04);
-}
-
-.fabricate-roll-prompt__formula code {
-  min-width: 0;
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--fab-text);
-  background: none;
-  overflow-wrap: anywhere;
-}
-
-.fabricate-roll-prompt__formula-meta {
-  display: flex;
-  flex: 0 0 auto;
-  gap: var(--fab-space-2);
-  align-items: center;
-}
-
-.fabricate-roll-prompt__formula--dc-only {
-  justify-content: center;
-}
-
-.fabricate-roll-prompt__formula-label {
-  flex: 0 0 auto;
-  font-size: 0.72rem;
-  font-weight: 600;
-  text-align: right;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--fab-text-muted);
-}
-
-.fabricate-roll-prompt__dc,
-.fabricate-roll-prompt__modifier-value {
-  padding: var(--fab-space-2xs) var(--fab-space-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 999px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: var(--fab-text-muted);
-  background: var(--fab-overlay-light-06);
-}
-
-.fabricate-roll-prompt__modifier-value {
-  flex: 0 0 auto;
-  margin-left: auto;
-  font-variant-numeric: tabular-nums;
-}
-
-.fabricate-roll-prompt__bonus {
-  width: 100%;
-  height: 36px;
-  padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 6px;
-  color: var(--fab-text);
-  background: var(--fab-bg-1);
-}
-
-.fabricate-roll-prompt__config {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-  padding-top: var(--fab-space-2);
-  border-top: 1px solid var(--fab-border-soft);
-}
-
-.fabricate-roll-prompt__config-heading {
-  margin: 0;
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--fab-text-muted);
-}
-
-.fabricate-roll-prompt__config label {
-  display: flex;
-  gap: var(--fab-space-2);
-  align-items: center;
-  justify-content: space-between;
-  font-size: 0.9rem;
-  color: var(--fab-text);
-}
-
-.fabricate-roll-prompt select {
-  flex: 0 1 60%;
-  min-width: 0;
-  height: 36px;
-  padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 6px;
-  color: var(--fab-text);
-  background: var(--fab-bg-1);
-}
-
-.fabricate-roll-prompt select option {
-  color: var(--fab-text);
-  background: var(--fab-bg-1);
-}
-
-/* Interactive `playerPicks` modifier choice (issue 770 Phase 2). A PICK-ONE radio group rendered between the formula and the situational-bonus input when `promptCheckRoll` receives a `modifierChoice` descriptor. */
-.fabricate-roll-prompt__modifiers {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-1);
-  min-width: 0;
-  margin: 0;
-  padding: var(--fab-space-2);
-  border: 1px solid var(--fab-border-soft);
-  border-radius: 6px;
-  background: var(--fab-overlay-light-04);
-}
-
-.fabricate-roll-prompt__modifiers-legend {
-  margin: 0;
-  padding: 0;
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--fab-text-muted);
-}
-
-/* `flex: 0 0 auto` is defensive: Foundry's form CSS gives `label` a flex ratio, which would otherwise stretch these rows unevenly inside the column flex container. */
-.fabricate-roll-prompt__modifier-option {
-  display: flex;
-  flex: 0 0 auto;
-  gap: var(--fab-space-2);
-  align-items: center;
-  min-width: 0;
-  padding: var(--fab-space-2);
-  border: 1px solid transparent;
-  border-radius: 6px;
-  font-size: 0.9rem;
-  color: var(--fab-text);
-  cursor: pointer;
-}
-
-.fabricate-roll-prompt__modifier-option:hover {
-  background: var(--fab-overlay-light-06);
-}
-
-.fabricate-roll-prompt__modifier-option:has(input[type='radio']:checked) {
-  border-color: var(--fab-accent);
-  background: var(--fab-accent-soft);
-}
-
-/* Custom radio: strip the native control and draw a themed ring; the checked state paints an accent ring plus a filled centre dot via an inset box-shadow. */
-.fabricate-roll-prompt__modifier-option input[type='radio'] {
-  flex: 0 0 auto;
-  width: 16px;
-  height: 16px;
-  min-width: 0;
-  margin: 0;
-  padding: 0;
-  border: 1.5px solid var(--fab-border-strong);
-  border-radius: 50%;
-  appearance: none;
-  -webkit-appearance: none;
-  background: transparent;
-  cursor: pointer;
-}
-
-/* Foundry core draws the native radio's inner chrome via ::before/::after, which `appearance: none` does NOT remove — it bleeds through over the themed control. */
-.fabricate-roll-prompt__modifier-option input[type='radio']::before,
-.fabricate-roll-prompt__modifier-option input[type='radio']::after {
-  display: none;
-}
-
-.fabricate-roll-prompt__modifier-option input[type='radio']:checked {
-  border-color: var(--fab-accent);
-  box-shadow: inset 0 0 0 3px var(--fab-bg-1), inset 0 0 0 16px var(--fab-accent);
-}
-
-/* A `:focus` suppression zeroes `box-shadow`, which is also what paints the checked centre dot, so a radio can lose its dot the instant it is clicked (issue 1520). */
-.fabricate-roll-prompt__modifier-option input[type='radio']:checked:focus {
-  box-shadow: inset 0 0 0 3px var(--fab-bg-1), inset 0 0 0 16px var(--fab-accent);
-}
-
-/* Multi-pick variant. `playerPicks` lets the player take up to `craftingCheck.maxModifierPicks` modifiers, which sum, so above a cap of 1 the group renders as checkboxes (issue 1055). */
-.fabricate-roll-prompt__modifier-option:has(input[type='checkbox']:checked) {
-  border-color: var(--fab-accent);
-  background: var(--fab-accent-soft);
-}
-
-.fabricate-roll-prompt__modifier-option input[type='checkbox'] {
-  flex: 0 0 auto;
-  width: 16px;
-  height: 16px;
-  min-width: 0;
-  margin: 0;
-  padding: 0;
-  border: 1.5px solid var(--fab-border-strong);
-  border-radius: 3px;
-  appearance: none;
-  -webkit-appearance: none;
-  background: transparent;
-  cursor: pointer;
-}
-
-/* Same load-bearing reset as the radio: Foundry core draws the native control's inner chrome via ::before/::after, which `appearance: none` does NOT remove. */
-.fabricate-roll-prompt__modifier-option input[type='checkbox']::before,
-.fabricate-roll-prompt__modifier-option input[type='checkbox']::after {
-  display: none;
-}
-
-.fabricate-roll-prompt__modifier-option input[type='checkbox']:checked {
-  border-color: var(--fab-accent);
-  background-color: var(--fab-accent);
-  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23fff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' d='m3.5 8.5 3 3 6-7'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: 100%;
-}
-
-/* At the cap the unchecked boxes are disabled (`bindModifierPickCap`) rather than silently ignoring clicks; dim the whole row so the state is visible, not just unresponsive. */
-.fabricate-roll-prompt__modifier-option:has(input:disabled) {
-  cursor: default;
-  opacity: 0.45;
-}
-
-.fabricate-roll-prompt__modifier-option:has(input:disabled):hover {
-  background: transparent;
-}
-
-/* The cap, stated in the legend beside "Check modifier". Lower-case and un-tracked against the legend's uppercase kicker so it reads as a note on the group rather than a second heading. */
-.fabricate-roll-prompt__modifiers-hint {
-  margin-left: var(--fab-space-2);
-  font-weight: 600;
-  text-transform: none;
-  letter-spacing: normal;
-  color: var(--fab-text-muted);
-}
-
-.fabricate-roll-prompt__modifier-icon {
-  flex: 0 0 1.1rem;
-  text-align: center;
-  color: var(--fab-accent);
-}
-
-.fabricate-roll-prompt__modifier-label {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-/* Bulk check prompt (`promptBulkCheckRoll`, issue 859). One answer for a whole batch, so the body drops the formula and the DC — a batch has no single subject — and replaces them with a subject strip and a note saying the answer lands on every roll. */
-.fabricate-roll-prompt__subjects {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--fab-space-2);
-  align-items: center;
-  justify-content: center;
-}
-
-/* Fixed 30px squares, matching the row-thumb size the bulk panel uses, so the dialog and the panel behind it show the queue at one scale. */
-.fabricate-roll-prompt__subject {
-  flex: 0 0 auto;
-  width: 30px;
-  height: 30px;
-  border: 1px solid var(--fab-border);
-  border-radius: 4px;
-  object-fit: cover;
-  background: var(--fab-bg-1);
-}
-
-/* The "+K more" overflow chip. Same pill treatment as the DC / modifier-value chips (comma-joined there rather than duplicated here only because those two share a background this one deliberately does not — it sits ON the strip, not in a panel). */
-.fabricate-roll-prompt__subjects-more {
-  flex: 0 0 auto;
-  padding: var(--fab-space-2xs) var(--fab-space-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 999px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  color: var(--fab-text-muted);
-  background: var(--fab-overlay-light-06);
-}
-
-/* The note sits BELOW the picker, because it describes what the two controls above it will do — the player reads it after seeing the fields it is about, not before. */
-.fabricate-roll-prompt__bulk-note {
-  margin: 0;
-  font-size: 0.8rem;
-  font-style: italic;
-  line-height: 1.35;
-  text-align: center;
-  color: var(--fab-text-muted);
-}
-
-/* Footer buttons: three equal Advantage/Normal/Disadvantage (or a single Roll), mirroring the .fabricate-dialog flex template + .manager-button fill/weight. */
-.fabricate-roll-prompt-dialog .form-footer button,
-.fabricate-roll-prompt-dialog .dialog-buttons button {
-  appearance: none;
-  -webkit-appearance: none;
-  box-sizing: border-box;
-  flex: 1 1 0;
-  min-height: 36px;
-  padding: var(--fab-space-2) var(--fab-space-3);
-  border: 1px solid var(--fab-border);
-  border-radius: 6px;
-  font-weight: 700;
-  line-height: 1.2;
-  color: var(--fab-text);
-  background: var(--fab-overlay-light-06);
-  cursor: pointer;
-}
-
-.fabricate-roll-prompt-dialog .form-footer button:hover,
-.fabricate-roll-prompt-dialog .dialog-buttons button:hover {
-  border-color: var(--fab-border-strong);
-  background: var(--fab-overlay-light-10);
-}
-
-.fabricate-roll-prompt-dialog .form-footer button[data-action='advantage'],
-.fabricate-roll-prompt-dialog .dialog-buttons button[data-action='advantage'] {
-  border-color: var(--fab-success-border);
-  color: var(--fab-success-text);
-  background: var(--fab-success-soft);
-}
-
-.fabricate-roll-prompt-dialog .form-footer button[data-action='disadvantage'],
-.fabricate-roll-prompt-dialog .dialog-buttons button[data-action='disadvantage'] {
-  border-color: var(--fab-danger-border);
-  color: var(--fab-danger-text);
-  background: var(--fab-danger-soft);
-}
-
-/* Tinted buttons need their own hover (the neutral hover rule above has the same specificity but is overridden by the later data-action fills, so without these Advantage/Disadvantage would not react to hover). */
-.fabricate-roll-prompt-dialog .form-footer button[data-action='advantage']:hover,
-.fabricate-roll-prompt-dialog .dialog-buttons button[data-action='advantage']:hover {
-  border-color: var(--fab-success-strong);
-  color: var(--fab-on-success);
-  background: var(--fab-success-strong);
-}
-
-.fabricate-roll-prompt-dialog .form-footer button[data-action='disadvantage']:hover,
-.fabricate-roll-prompt-dialog .dialog-buttons button[data-action='disadvantage']:hover {
-  border-color: var(--fab-danger-border);
-  color: var(--fab-danger-text);
-  background: var(--fab-danger-surface-strong);
-}
-
-/* ONE RULE SURVIVES HERE AND IT IS NOT A COPY. Issue 1520 deleted this block's Foundry-core `:focus` reset and its `button, input` `:focus-visible` ring: the dialog root emits `fabricate`, so the module-rooted focus pair at the top of this sheet reaches this DialogV2 body at the same (0,2,1) rank and with a wider element list, and both halves were byte-for-byte what the module already writes (issue 1501). */
-.fabricate-roll-prompt-dialog select:focus-visible {
-  outline: none;
-  box-shadow: inset 0 0 0 2px var(--fab-accent);
+  color-scheme: dark;
 }
 
 /* The recipe row's collapse ladder (issue 643 §8). Drop order is fixed: (1) description, (2) I/O + steps readout, (3) check pill — and NEVER the lock, enable or edit controls (issue 1010). */
@@ -18321,12 +18273,6 @@
   border-color: var(--fab-success);
   color: var(--fab-success);
   background: var(--fab-success-soft);
-}
-
-/* LAYOUT CONTEXT ONLY for the shared `EmptyState` primitive. The appearance (dashed panel, tile, type scale) belongs to `EmptyState.svelte`'s scoped block, and the per-screen 2rem glyph / 1.2rem title exception that used to live here is gone — a primitive with a per-screen size override is a second empty-state design (issue 1373). */
-.fabricate-manager .manager-tool-browser-inspector-empty {
-  flex: 0 0 auto;
-  min-height: 0;
 }
 
 .fabricate-manager .manager-tool-inspector-hero {
@@ -19414,6 +19360,7 @@
 
 /* ── A6. SYSTEMS USING THIS COMPONENT ── `proto:920-953`. */
 .fabricate-manager .manager-component-entry-systems-card {
+  flex: 0 0 auto;
   gap: 0;
   padding: 0;
   overflow: hidden;
@@ -19894,11 +19841,23 @@
   background: var(--fab-surface-active);
 }
 
-/* ── C6. THE GHOST ROW ── `proto:5001`: the SAME row on `--fab-surface-soft` at `opacity: .72`. */
+/* An absent component follows the Essence Rules row: full contrast, normal row geometry and no
+   resting fill. */
 .fabricate-manager .manager-components-list .manager-component-row.is-ghost {
+  min-height: 76px;
   border-color: var(--fab-border);
-  background: var(--fab-surface-soft);
-  opacity: 0.72;
+  background: transparent;
+  opacity: 1;
+}
+
+.fabricate-manager .manager-components-list .manager-component-row.is-ghost:hover {
+  border-color: var(--fab-border-strong);
+  background: var(--fab-bg-1);
+}
+
+.fabricate-manager .manager-components-list .manager-component-row.is-ghost.is-selected {
+  border-color: var(--fab-accent-border);
+  background: var(--fab-bg-1);
 }
 
 .fabricate-manager .manager-components-list .manager-component-row .manager-component-identity {
@@ -19975,7 +19934,8 @@
   text-transform: uppercase;
 }
 
-/* `proto:1090` and `proto:5580`: the row's ONE control, LABELLED. 30 is a live rung, so it does not move; the radius snaps to 7 for a control in the 26-32 band. */
+/* Member rows keep the compact 30px Edit control. The absent row's primary Add uses the primitive's
+   canonical 34px geometry. */
 .fabricate-manager .manager-components-list .manager-component-row .manager-component-row-open {
   flex: 0 0 auto;
   gap: var(--fab-space-chip);
@@ -20501,7 +20461,7 @@
 
 /* `proto:1417`: `Outcome routing` is a `--fab-bg-1` well behind a hairline at radius 9, headed by a micro-label. */
 
-/* skin census (issue 1523): two unpinned carrier classes in one carrier block — no hit for either under tests/ or scripts/ except this branch's own repetition baseline, which pins `.manager-salvage-dc-card` at two appearances (`tests/components/selector-repetition- baseline.json`), so an adoption that deletes this rule must re-derive that table; both are emitted by `ComponentEditView.svelte`. */
+/* skin census (issue 1523): two unpinned carrier classes in one carrier block — no hit for either under tests/ or scripts/; both are emitted by `ComponentEditView.svelte`. */
 .fabricate-manager .manager-salvage-routing-card,
 .fabricate-manager .manager-salvage-dc-card {
   padding: var(--fab-space-3);
@@ -20510,33 +20470,31 @@
   background: var(--fab-bg-1);
 }
 
-/* `proto:1429`: `Salvage check DC` is a title over a note, radius 9, `surface-soft` behind a `border-strong` hairline. Its 34px snapped the reference's 32, and it now uses the shared control's `toolbar` rung (issue 1510), which matches without an override. */
+/* Checks Studio frames 23-24 (issue 2005): a kicker over the controls, the hint beneath, then the kept-value callout and the Player sees block, stacked. The library's `.k-lbl` stacks its kicker, field and `.k-hint` the same way. */
 .fabricate-manager .manager-salvage-dc-card {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: var(--fab-space-3);
-  align-items: center;
+  align-items: stretch;
 }
 
 .fabricate-manager .manager-salvage-dc-copy {
   display: flex;
-  flex: 1 1 220px;
   flex-direction: column;
-  gap: var(--fab-space-2xs);
+  gap: var(--fab-space-chip);
   min-width: 0;
 }
 
 .fabricate-manager .manager-salvage-dc-title {
-  color: var(--fab-text);
-  font-weight: 600;
-  font-size: 0.72rem;
+  display: flex;
 }
 
+/* `library.html` `.k-hint`: 10.5px / 1.5 in `--fab-text-subtle`. */
 .fabricate-manager .manager-salvage-dc-note {
   color: var(--fab-text-subtle);
   font-weight: 400;
-  font-size: 0.63rem;
-  line-height: 1.45;
+  font-size: 0.66rem;
+  line-height: 1.5;
 }
 
 /* The preset control's box comes from the shared `<Select>`'s `toolbar` rung (issue 1510): 34px, radius 9, `0.72rem`, `--fab-bg-1`. `surface-soft` is licensed per-site skin on the trigger below; the `border-strong` hairline is this rule's own. */
@@ -20544,7 +20502,6 @@
   flex: 0 0 auto;
   width: auto;
   min-width: 0;
-  margin-left: auto;
 }
 
 .fabricate-manager .manager-salvage-dc-select .fabricate-select-trigger {

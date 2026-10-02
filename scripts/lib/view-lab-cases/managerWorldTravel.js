@@ -5,6 +5,7 @@
 import {
   ANCHORED_POPOVER_SOURCES,
   ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB,
+  GATHERING_ROUTE_MODEL_PATTERN,
 } from './caseConstants.js';
 import { chooseSelectOption, managerCase } from './caseFactories.js';
 
@@ -101,6 +102,7 @@ export const CASES = Object.freeze([
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'environments', 'world'],
     sourceMatches: [
+      GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringRealmsTab)\.svelte$/,
     ],
   }),
@@ -263,6 +265,7 @@ export const CASES = Object.freeze([
     expectSelector: '.fabricate-manager [data-economy-mode-card] [data-economy-mode-option]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
+      GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/GatheringEconomyView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/EnvironmentsBrowserView\.svelte$/,
       // The only frame that draws the Gathering Rules rail, which issue 1707 moved out of the

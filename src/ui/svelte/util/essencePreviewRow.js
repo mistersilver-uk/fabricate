@@ -1,8 +1,5 @@
-// The two synthetic rows the essence editor's "How it appears" preview mounts on the REAL player
-// `InventoryItemCard`: the per-essence aggregate `InventoryListingBuilder._buildEssenceRows` emits,
-// and a fake carrying component holding this essence as a pip. Feeding the real component a
-// synthetic row is what stops the preview drifting from what players see, as `recipeItemPreviewRow`
-// does. It imports NOTHING, so the mounted-test allowlist stays small.
+// Shape the preview as the two `InventoryItemCard` rows players see: the essence aggregate and a
+// carrying component with its essence pip.
 
 // A core Foundry pack icon under Foundry's own `public/` root, so it resolves in every install
 // whatever the game system. Deliberately NOT `GENERIC_ITEM_IMAGE`, which is a load-bearing "no
@@ -18,7 +15,7 @@ function str(value) {
 // produce is invented.
 export function buildEssencePreviewRow(
   essence,
-  { sampleComponentName = '', totalQuantity = 1 } = {}
+  { previewCarrier = null, fallbackComponentName = '', totalQuantity = 1 } = {}
 ) {
   const id = str(essence?.id) || null;
   const name = str(essence?.name);
@@ -56,14 +53,16 @@ export function buildEssencePreviewRow(
     contributors: [],
   };
 
+  const hasCarrier = previewCarrier !== null && typeof previewCarrier === 'object';
+
   // `isEssenceSource: false` routes the card to its artwork branch instead.
   const componentRow = {
     key: `essence:preview:component:${id ?? 'draft'}`,
-    componentId: null,
+    componentId: hasCarrier ? str(previewCarrier.id) || null : null,
     systemId: null,
     systemName: '',
-    name: str(sampleComponentName),
-    img: SAMPLE_COMPONENT_IMAGE,
+    name: hasCarrier ? str(previewCarrier.name) : str(fallbackComponentName),
+    img: hasCarrier ? str(previewCarrier.img) : SAMPLE_COMPONENT_IMAGE,
     icon: null,
     // Null rather than absent, purely so both preview rows keep the one builder-row shape.
     colorToken: null,

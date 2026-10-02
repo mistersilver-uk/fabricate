@@ -11,6 +11,9 @@ aux_links:
 
 nav_sort: order
 
+# The DOMAIN.md glossary notes carry no front matter, so Jekyll would publish them raw.
+exclude: [domain]
+
 # The theme's footer is otherwise an <hr> with nothing under it on desktop -- the credit block
 # below it is mobile-only. These two fill it.
 back_to_top: true

@@ -444,9 +444,6 @@ test('manager empty states use refined heading and setup-panel styling', () => {
     '.fabricate-manager .manager-task-required-tools-scroll > .manager-empty': blockFor(
       '.fabricate-manager .manager-task-required-tools-scroll > .manager-empty'
     ),
-    '.fabricate-manager .manager-tool-browser-inspector-empty': blockFor(
-      '.fabricate-manager .manager-tool-browser-inspector-empty'
-    ),
     '.fabricate-manager .manager-recipe-tab-empty': blockFor(
       '.fabricate-manager .manager-recipe-tab-empty'
     ),

@@ -9,13 +9,28 @@
 
 const RESOLUTION_PASSES = 3;
 
-/** A ledger no session has committed anything to may be discarded without losing evidence. */
-async function isPristine(ledger, { readState, readClaim }) {
+/**
+ * A ledger no session committed anything to may be discarded. Any embedded page is evidence,
+ * valid or malformed; `null` means the inspection did not answer and authorises no deletion.
+ */
+async function isPristine(ledger, { readState, readClaim, hasLedgerEvidence }) {
   if (await readClaim(ledger)) return false;
   const state = await readState(ledger);
-  if (!state || typeof state !== 'object') return true;
-  if (Object.keys(state.requests ?? {}).length > 0) return false;
-  return Object.values(state.prepareTokens ?? {}).every((token) => token?.status !== 'active');
+  if (state && typeof state === 'object') {
+    if (Object.keys(state.requests ?? {}).length > 0) return false;
+    if (Object.values(state.prepareTokens ?? {}).some((token) => token?.status === 'active')) {
+      return false;
+    }
+  }
+  if (typeof hasLedgerEvidence !== 'function') return true;
+  let evidence;
+  try {
+    evidence = await hasLedgerEvidence(ledger);
+  } catch {
+    return null;
+  }
+  if (evidence === null || evidence === undefined) return null;
+  return evidence !== true;
 }
 
 /**
@@ -104,6 +119,8 @@ export function createLedgerRetry({ listLedgers, writeState }) {
  * @param {Function} deps.readState `async (ledger) => state`.
  * @param {Function} deps.readClaim `async (ledger) => claim|null`.
  * @param {Function} deps.ledgerSource `() => source` for a newly provisioned ledger.
+ * @param {Function} [deps.hasLedgerEvidence] `async (ledger) => boolean|null`, whether the ledger
+ *   holds any embedded page on the live or authoritative copy; `null` when unanswered.
  * @param {Function} [deps.canCreateLedger] `() => boolean`; `JOURNAL_CREATE` is revocable.
  * @returns {{ensureSingleLedger: Function}}
  */
@@ -115,6 +132,7 @@ export function createJournalRunLedgerProvisioner({
   readState,
   readClaim,
   ledgerSource,
+  hasLedgerEvidence = null,
   canCreateLedger = () => true,
 }) {
   const liveLedgers = async () => ((await listLedgers()) ?? []).filter((entry) => entry?.id);
@@ -162,11 +180,9 @@ export function createJournalRunLedgerProvisioner({
     for (const record of observed) {
       const ledger = byId.get(record.id);
       if (!ledger) return unsettled();
-      candidates.push({
-        ...record,
-        ledger,
-        pristine: await isPristine(ledger, { readState, readClaim }),
-      });
+      const pristine = await isPristine(ledger, { readState, readClaim, hasLedgerEvidence });
+      if (pristine === null) return unsettled();
+      candidates.push({ ...record, ledger, pristine });
     }
     return arbitrate(candidates);
   }

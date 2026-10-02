@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import {
+  CHECK_TARGET_RAW_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
   STATUS_TONE_RAW_MODULES,
@@ -45,6 +46,8 @@ const RECIPE_RAW_MODULES = [
   // The lifted browse state's default page size, which the browse-list composable reads.
   'src/ui/model/managerBrowserViewState.js',
   'src/ui/model/recipeBrowserModel.js',
+  // ... which names its check sort key from the system's evaluation (issue 2005) ...
+  ...CHECK_TARGET_RAW_MODULES,
   // ... which since issue 1688 runs on the shared adapter-driven pipeline.
   'src/ui/model/entityBrowserModel.js',
   // entityBrowserModel imports the shared category totals (issue 676).
@@ -528,6 +531,71 @@ describe('RecipesBrowserView row readout (issue 643 §9)', () => {
     );
   });
 
+  it('names a counting pill by its successes needed in the mono face, and sorts by the count (issue 2006)', async () => {
+    const root = await browser.mount({
+      recipes: [
+        makeRecipe({ id: 'r-three', name: 'Three', checkSummary: { kind: 'successes', dc: 3 } }),
+        makeRecipe({ id: 'r-one', name: 'One', checkSummary: { kind: 'successes', dc: 1 } }),
+      ]
+    });
+    const pill = (id) => root.querySelector(`[data-recipe-id="${id}"] [data-recipe-check]`);
+    assert.equal(pill('r-three').dataset.recipeCheck, 'successes');
+    assert.equal(pill('r-three').textContent.trim(), '3 successes');
+    assert.equal(pill('r-one').textContent.trim(), '1 success');
+    assert.ok(pill('r-three').classList.contains('is-mono'), 'a count is a numeric like a DC');
+    assert.ok(selectOptionLabels(root, '[data-recipe-sort]').includes('Successes needed'));
+    chooseSelectOption(root, '[data-recipe-sort]', 'dc');
+    flushSync();
+    const order = [...root.querySelectorAll('[data-recipe-id]')].map((row) => row.dataset.recipeId);
+    assert.deepEqual(order.filter((id) => id.startsWith('r-')), ['r-one', 'r-three']);
+    browser.remount();
+
+    const macro = await browser.mount({
+      recipes: [makeRecipe({ checkSummary: { kind: 'dynamicSuccesses', dc: null } })]
+    });
+    assert.equal(macro.querySelector('[data-recipe-check]').textContent.trim(), 'Dynamic successes');
+    browser.remount();
+  });
+
+  it('names a roll-under Target in the mono face, and a character value by its source (issue 2005)', async () => {
+    const target = await browser.mount({
+      recipes: [makeRecipe({ checkSummary: { kind: 'target', dc: 12 } })]
+    });
+    const targetPill = target.querySelector('[data-recipe-check]');
+    assert.equal(targetPill.dataset.recipeCheck, 'target');
+    assert.equal(targetPill.textContent.trim(), 'Target 12');
+    assert.ok(targetPill.classList.contains('is-mono'), 'a target is a numeric like a DC');
+    browser.remount();
+
+    const attribute = await browser.mount({
+      recipes: [makeRecipe({ checkSummary: { kind: 'attribute', dc: null } })]
+    });
+    const attributePill = attribute.querySelector('[data-recipe-check]');
+    assert.equal(attributePill.dataset.recipeCheck, 'attribute');
+    assert.equal(attributePill.textContent.trim(), 'Character value');
+    assert.ok(attributePill.querySelector('i.fa-user'), 'the Target source card glyph');
+    assert.equal(attributePill.classList.contains('is-mono'), false, 'a phrase is not a number');
+    assert.ok(selectOptionLabels(attribute, '[data-recipe-sort]').includes('Check target'));
+    browser.remount();
+
+    const macro = await browser.mount({
+      recipes: [makeRecipe({ checkSummary: { kind: 'dynamicTarget', dc: null } })]
+    });
+    assert.equal(macro.querySelector('[data-recipe-check]').textContent.trim(), 'Dynamic target');
+    browser.remount();
+
+    const empty = await browser.mount({
+      recipes: [],
+      checkEvaluation: { product: 'sum', direction: 'under', target: { source: 'fixed' } }
+    });
+    assert.ok(selectOptionLabels(empty, '[data-recipe-sort]').includes('Check target'), 'no rows (QE Q7)');
+    browser.remount();
+
+    const roll = await browser.mount({ recipes: [makeRecipe({ checkSummary: { kind: 'dc', dc: 12 } })] });
+    const sortLabels = selectOptionLabels(roll, '[data-recipe-sort]');
+    assert.ok(sortLabels.includes('Check DC') && !sortLabels.includes('Check target'), 'roll-high keeps DC');
+  });
+
   // The two check-LESS states are not the same fact.
   it('warns when the system cannot roll for a recipe, and stays neutral when it need not', async () => {
     const noCheck = await browser.mount({
@@ -1004,6 +1072,16 @@ describe('RecipeBrowserInspector (mounted)', () => {
     assert.equal(stat('results').textContent, '3');
     assert.equal(stat('steps').textContent, '2');
     assert.equal(stat('check').textContent, 'DC 17', 'the store already projects the resolved DC');
+    for (const [checkSummary, text] of [
+      [{ kind: 'target', dc: 12 }, 'Target 12'],
+      [{ kind: 'attribute', dc: null }, 'Character value'],
+      [{ kind: 'dynamicTarget', dc: null }, 'Dynamic'],
+      [{ kind: 'successes', dc: 2 }, '2 successes'],
+      [{ kind: 'dynamicSuccesses', dc: null }, 'Dynamic'],
+    ]) {
+      await inspector.setProps({ selectedRecipe: makeRecipe({ id: 'r1', checkSummary }) });
+      assert.equal(stat('check').textContent, text, 'issue 2005: no DC outside roll-high fixed');
+    }
     assert.equal(
       root.querySelector('[data-recipe-fact="structure"]'),
       null,

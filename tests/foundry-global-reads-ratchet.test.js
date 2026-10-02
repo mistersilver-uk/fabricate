@@ -1,34 +1,26 @@
 /**
- * Bare `game`/`ui`/`Hooks`/`CONFIG` reads in the domain layer, bounded per file (issue 1677).
- *
- * `eslint.config.js` arms `no-restricted-globals` on these roots; `eslint-debt.txt` switches it off
- * for the files not yet clean, and that disable is all-or-nothing — hence the ledger. The rule
- * sees BARE references alone, so the `globalThis.game?.…` reads here are out of scope.
+ * Bare `game`/`ui`/`Hooks`/`CONFIG` reads in the domain layer (issue 1677). `eslint.config.js` arms
+ * `no-restricted-globals` on these roots and `npm run lint` holds each file's count at its base
+ * value. The rule sees BARE references alone, so `globalThis.game?.…` reads are out of scope.
  */
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import path from 'node:path';
 import test from 'node:test';
 
 import { ESLint, Linter } from 'eslint';
 
-import { DOMAIN_LAYER_ROOTS, DOMAIN_RESTRICTED_GLOBALS } from '../eslint.config.js';
-import { ESLINT_DEBT } from '../eslint.debt.js';
+import config, { DOMAIN_LAYER_ROOTS, DOMAIN_RESTRICTED_GLOBALS } from '../eslint.config.js';
+import { lintAgainstBase } from '../scripts/lib/newViolations.js';
 
-import { byCodePoint, ceilingLedgerGate } from './helpers/ratchetBaseline.js';
+import { byCodePoint } from './helpers/codePointOrder.js';
 import { collectWorkingTreeSources, repoRoot } from './helpers/sourceScan.js';
+import { createTempGitRepo } from './helpers/temp-git-repo.js';
 
 const RULE = 'no-restricted-globals';
 
-const LEDGER_PATH = resolve(import.meta.dirname, 'foundry-global-reads-ledger.txt');
-
-const RUN = 'node --conditions=browser --test tests/foundry-global-reads-ratchet.test.js';
-
-/** Below this the scan is truncated rather than clean; the domain layer holds ~268 modules. */
+/** Below this the scan is truncated rather than whole; the domain layer holds ~268 modules. */
 const SCAN_FLOOR = 201;
-
-/** Enough rows that a truncated scan cannot regenerate the ledger down to a handful. */
-const ROW_FLOOR = 8;
 
 /** The gate's own rule options, imported rather than restated so the two cannot disagree. */
 const LINT_CONFIG = Object.freeze({
@@ -36,98 +28,49 @@ const LINT_CONFIG = Object.freeze({
   rules: { [RULE]: ['error', ...DOMAIN_RESTRICTED_GLOBALS] },
 });
 
-/** Reports in one source, with a parse failure raised rather than counted as a clean zero. */
-function readsIn(linter, file, text) {
-  const messages = linter.verify(text, LINT_CONFIG, file);
-  const fatal = messages.find((message) => message.fatal);
-  if (fatal !== undefined) {
-    throw new Error(`${file} failed to parse at line ${fatal.line}: ${fatal.message}`);
-  }
-  return messages.filter((message) => message.ruleId === RULE).length;
+async function isArmed(eslint, file) {
+  const entry = (await eslint.calculateConfigForFile(file)).rules[RULE];
+  return Array.isArray(entry) && entry[0] !== 0 && entry[0] !== 'off';
 }
 
-function buildLedger() {
-  const linter = new Linter();
-  const corpus = collectWorkingTreeSources(DOMAIN_LAYER_ROOTS, ['.js']);
-  const entries = [];
-  for (const [file, text] of Object.entries(corpus)) {
-    const count = readsIn(linter, file, text);
-    if (count > 0) entries.push([file, count]);
-  }
-  return {
-    observed: Object.fromEntries(entries.sort(([left], [right]) => byCodePoint(left, right))),
-    scanned: Object.keys(corpus).length,
-  };
-}
-
-const gate = ceilingLedgerGate({
-  test,
-  assert,
-  title: 'no domain file makes more bare Foundry-global reads than its ledger ceiling',
-  ledgerPath: LEDGER_PATH,
-  updateEnv: 'UPDATE_FOUNDRY_GLOBAL_READS_LEDGER',
-  tightenEnv: 'TIGHTEN_FOUNDRY_GLOBAL_READS_LEDGER',
-  build: buildLedger,
-  // No headroom: the disable is all-or-nothing, so one more read is one more unbounded coupling.
-  ceiling: (_key, reads) => reads,
-  shrink: 'fail',
-  floor: SCAN_FLOOR,
-  wording: {
-    subject: 'bare Foundry-global reads in the domain layer',
-    update: `UPDATE_FOUNDRY_GLOBAL_READS_LEDGER=1 ${RUN}`,
-    tighten: `TIGHTEN_FOUNDRY_GLOBAL_READS_LEDGER=1 ${RUN}`,
-    addedHint:
-      'A file cannot appear without also being added to `eslint-debt.txt`, since the rule is ' +
-      'armed on these roots; that pair of edits is what needs justifying.',
-    staleHint:
-      'A file vanishes when its last read moves to an edge: drop its `no-restricted-globals` ' +
-      'line from `eslint-debt.txt` and lower the srcRoot counts in `tests/lint-coverage.test.js` ' +
-      'in the same change.',
-  },
-});
-
-test('the ledger reports the figures issue 1677 measured', (t) => {
-  // Floored rather than pinned: the exact targets live on #1656, and pinning them here makes
-  // every banked read a second conflict site on top of the ledger row itself.
-  if (gate.regenerated()) return t.skip('this run rewrote the ledger');
-  // Read off the SCAN, not the committed file: a scan that stopped matching leaves the ledger
-  // byte-identical, so a floor read off the file clears while nothing at all was measured.
-  const { observed } = gate.current();
-  const total = Object.values(observed).reduce((sum, count) => sum + count, 0);
-  t.diagnostic(`${Object.keys(observed).length} debted domain files, ${total} bare reads`);
-  assert.ok(
-    Object.keys(observed).length > ROW_FLOOR,
-    `only ${Object.keys(observed).length} debted files measured, below the floor of ${ROW_FLOOR}`
-  );
-});
-
-test('the scan looked at the whole domain layer, not a truncated corpus', () => {
-  // A ceiling bounds only what it observes, so an empty corpus meets every ceiling it was given.
-  const corpus = collectWorkingTreeSources(DOMAIN_LAYER_ROOTS, ['.js']);
-  assert.ok(
-    Object.keys(corpus).length > 200,
-    `only ${Object.keys(corpus).length} domain modules were read, against the ~268 here`
-  );
-  const roots = new Set(Object.keys(corpus).map((file) => file.split('/').slice(0, 2).join('/')));
+test('the rule is armed on every module of the whole domain layer', async () => {
+  // A scope bounds only what it covers, so an empty corpus would pass every assertion below.
+  const corpus = Object.keys(collectWorkingTreeSources(DOMAIN_LAYER_ROOTS, ['.js']));
+  assert.ok(corpus.length >= SCAN_FLOOR, `only ${corpus.length} domain modules, against ~268`);
+  const roots = new Set(corpus.map((file) => file.split('/').slice(0, 2).join('/')));
   assert.deepEqual(
     [...roots].sort(byCodePoint),
     [...DOMAIN_LAYER_ROOTS].sort(byCodePoint),
     'every configured root still contributes a file'
   );
+  const eslint = new ESLint();
+  const unarmed = [];
+  for (const file of corpus) if (!(await isArmed(eslint, file))) unarmed.push(file);
+  assert.deepEqual(unarmed, [], 'a domain file with the rule off is a read nothing counts');
 });
 
-test('the ledger names exactly the files `eslint-debt.txt` exempts from the rule', () => {
-  // A debt entry with no row is an unbounded exemption; a row with no entry fails `npm run lint`.
-  const debted = Object.values(ESLINT_DEBT)
-    .flatMap((group) => Object.entries(group))
-    .filter(([, rules]) => rules.includes(RULE))
-    .map(([file]) => file)
-    .sort(byCodePoint);
-  assert.deepEqual(
-    Object.keys(gate.current().observed).sort(byCodePoint),
-    debted,
-    'the debted files and the counted files have diverged; both move together, both ways'
-  );
+test('npm run lint fails one more bare read in a file that already has some', async () => {
+  const repo = createTempGitRepo('fab-foundry-reads-');
+  try {
+    const file = 'src/systems/Debted.js';
+    const read = (name) => `export function ${name}() {\n  return game.user;\n}\n`;
+    repo.write({ [file]: read('first') });
+    const base = repo.commitAll('base');
+    repo.write({ [file]: `${read('first')}${read('second')}` });
+    const domainBlocks = config.filter((block) => block.rules?.[RULE]);
+    assert.ok(domainBlocks.length > 0, 'the real config still arms the rule somewhere');
+    const outcome = await lintAgainstBase({
+      cwd: repo.dir,
+      env: { RATCHET_BASE: base },
+      eslintOptions: {
+        overrideConfigFile: true,
+        overrideConfig: [{ languageOptions: LINT_CONFIG.languageOptions }, ...domainBlocks],
+      },
+    });
+    assert.deepEqual(outcome.failures, [`${file}: ${RULE} rose from 1 to 2 (line 2, 5)`]);
+  } finally {
+    repo.dispose();
+  }
 });
 
 test('the rule reports each restricted name, and resolves scope rather than text', () => {
@@ -160,25 +103,21 @@ test('the rule is armed on the domain layer and absent from the sanctioned edges
   // The scope IS the allow-list: every edge already lies outside these roots, so nothing in them
   // is exempt on purpose. An edge moved in, or a root dropped from the glob, reds here.
   const eslint = new ESLint();
-  const armed = async (file) => {
-    const config = await eslint.calculateConfigForFile(file);
-    const entry = config.rules[RULE];
-    return Array.isArray(entry) && entry[0] !== 0 && entry[0] !== 'off';
-  };
+  const armed = (file) => isArmed(eslint, file);
 
   assert.equal(await armed('src/systems/GatheringEngine.js'), true, 'armed on a clean domain file');
   assert.equal(await armed('src/migration/MigrationRunner.js'), true, 'armed on a clean migration');
   assert.equal(
     await armed('src/systems/CraftingEngine.js'),
-    false,
-    'a debted file has the rule off; its count is held by the ledger instead'
+    true,
+    'armed on a file with bare reads too; `npm run lint` holds its count at base'
   );
   assert.equal(await armed('src/main.js'), false, 'the module entry shell is an edge, not debt');
   // The entry's Foundry edge moved to `src/bootstrap/` (issue 1715) and is an edge there too, so
   // the directory is deliberately outside DOMAIN_LAYER_ROOTS. Paired with an existence check, so
   // this cannot answer `false` for a file that was never created.
   assert.equal(
-    existsSync(resolve(repoRoot, 'src/bootstrap/hooks.js')),
+    existsSync(path.resolve(repoRoot, 'src/bootstrap/hooks.js')),
     true,
     'the hooks edge exists, so the assertion below is about a real file'
   );
@@ -191,10 +130,5 @@ test('the rule is armed on the domain layer and absent from the sanctioned edges
     await armed('src/ui/svelte/util/foundryHooks.js'),
     false,
     'the bridge exists to make these globals reachable'
-  );
-  assert.equal(
-    await armed('src/integrations/ItemPilesIntegration.js'),
-    false,
-    'the third-party integration layer is an edge'
   );
 });

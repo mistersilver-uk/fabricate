@@ -1,32 +1,13 @@
 /**
- * Resolves the current realms for a party (or a selected actor) within one
- * crafting system. Manual GM override takes precedence; absent a manual override
- * the current realm is derived LIVE from where the party's `travelActor` marker
- * token currently sits (token-in-scene-region → realm `sceneMappings` → Fabricate
- * realm), via the injected `senseSceneRegions` collaborator. No state is stored
- * for the auto case — it always reflects the marker's live position.
- *
- * Canonical source tokens: `manualOverride`, `travelActor`, `unresolved`.
- *
- * Resolution detail (per the Current Realm Resolution spec):
- * - A manual override that includes a DISABLED realm id still resolves it (GM
- *   diagnostic/preview inclusion); the UI marks it disabled.
- * - Realm ids referencing MISSING realms are stale repair evidence
- *   (`staleRealmIds`) and do not resolve.
- * - `mode: 'none'` / absent override ⇒ auto (travel-actor) sensing; a
- *   travel-actor-less party, or a marker in no linked Scene Region, resolves to
- *   `unresolved`.
+ * Resolves a party's current realms (Current Realm Resolution). A manual GM override wins,
+ * resolving even a disabled realm for diagnosis, while a missing realm id becomes
+ * `staleRealmIds` repair evidence. Otherwise the realms are sensed live, never stored, from the
+ * Scene Regions holding the party's travel-actor marker, matched through realm `sceneMappings`.
+ * Sources are `manualOverride`, `travelActor` and `unresolved`.
  */
 
 export class GatheringLocationService {
-  /**
-   * @param {object} collaborators
-   * @param {object} collaborators.partyStore
-   * @param {object} collaborators.systemManager
-   * @param {(travelActorUuid: string) => Iterable<string>} [collaborators.senseSceneRegions]
-   *   Returns the Scene Region UUIDs the marker token currently sits inside.
-   *   Foundry-backed at runtime; defaults to none so the service stays pure in tests.
-   */
+  /** `senseSceneRegions(travelActorUuid)` yields the marker's region UUIDs, none by default. */
   constructor({ partyStore, travelStore, senseSceneRegions = () => [] } = {}) {
     this.partyStore = partyStore;
     this.travelStore = travelStore;
@@ -39,18 +20,9 @@ export class GatheringLocationService {
   }
 
   /**
-   * WHERE A PARTY IS DOES NOT DEPEND ON A CRAFTING SYSTEM (issue 1282).
-   *
-   * This resolver used to take a `systemId`, gate on that system's travel toggle, and read
-   * that system's realms. All three dissolved when realms became world scope: a party is one
-   * set of tokens standing in one place, and that fact is not a property of a crafting system.
-   *
-   * The per-system toggle moved entirely to the CONSUMPTION side — it decides whether a
-   * system's environments are gated by the resolved location, never whether the location
-   * resolves. `GatheringEngine._locationBlockedReasons` still holds that gate, unchanged.
-   *
-   * @param {{ partyId: string }} args
-   * @returns {{ resolved: boolean, source: 'manualOverride'|'travelActor'|'unresolved', realms: object[], realmIds: string[], staleRealmIds: string[], partyId: string|null }}
+   * `{ resolved, source, realms, realmIds, staleRealmIds, partyId }` for one party, independent
+   * of any crafting system (issue 1282); the per-system gate is in
+   * `GatheringEngine._locationBlockedReasons`.
    */
   resolveCurrentRealms({ partyId } = {}) {
     const empty = {
@@ -80,11 +52,9 @@ export class GatheringLocationService {
       for (const realmId of overrideRealmIds) {
         const realm = realmsById.get(realmId);
         if (!realm) {
-          // Missing realm ⇒ stale repair evidence; does not resolve.
           staleRealmIds.push(realmId);
           continue;
         }
-        // Disabled realms in a manual override STILL resolve (GM diagnostic).
         realms.push(realm);
         realmIds.push(realmId);
       }
@@ -98,10 +68,7 @@ export class GatheringLocationService {
       };
     }
 
-    // Auto (travel-actor) sensing: derive the current realms LIVE from the Scene
-    // Regions the party's marker token sits inside, mapped to Fabricate realms by
-    // their sceneMappings. A travel-actor-less party, or a marker in no linked
-    // realm, resolves to unresolved.
+    // No travel actor, or a marker in no linked region, is unresolved.
     const travelActorUuid = party.travelActorUuid ? String(party.travelActorUuid) : '';
     if (!travelActorUuid) return { ...empty, partyId };
 
@@ -129,16 +96,7 @@ export class GatheringLocationService {
     };
   }
 
-  /**
-   * Resolve current realms for the enabled party that contains the actor.
-   *
-   * No `systemId`, and no travel gate: where an actor's party is standing is the same answer
-   * whichever crafting system is asking. The gate lives at the consumption side, in
-   * `GatheringEngine._locationBlockedReasons`.
-   *
-   * @param {{ actor: object }} args
-   * @returns {object} Same shape as resolveCurrentRealms.
-   */
+  /** The current realms of the actor's enabled party, in `resolveCurrentRealms`'s shape. */
   resolveForActor({ actor } = {}) {
     const unresolved = {
       resolved: false,
@@ -154,12 +112,7 @@ export class GatheringLocationService {
     return this.resolveCurrentRealms({ partyId: party.id });
   }
 
-  /**
-   * Build the current-realm context consumed by `evaluateLocationAvailability`.
-   *
-   * @param {{ actor: object }} args
-   * @returns {{ resolved: boolean, source: string, realms: object[], realmIds: string[], staleRealmIds: string[], partyId: string|null }}
-   */
+  /** The current-realm context `evaluateLocationAvailability` reads. */
   buildCurrentRealmContext({ actor } = {}) {
     return this.resolveForActor({ actor });
   }

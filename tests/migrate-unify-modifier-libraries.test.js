@@ -232,17 +232,19 @@ test('the runner applies 1.23.0, reports the collisions and never persists the t
 
   const summary = await runner.run();
 
-  // EIGHT, not one: issue 1096's 1.24.0 entry is a deliberate no-op that exists to mark
+  // THIRTEEN, not one: issue 1096's 1.24.0 entry is a deliberate no-op that exists to mark
   // the routed DC-source downgrade boundary, issue 1098's 1.25.0 seeds the failure-result
   // policy, issue 1278's 1.26.0 lifts currency to world scope, issue 1282's 1.27.0 lifts travel,
   // issue 1308's 1.28.0 lifts both character libraries, and issue 1315's 1.29.0 folds manual
   // force lists into their picked lists, issue 1363's 1.30.0 lifts components, essences and
   // tools to world scope, and issue 1373's 1.31.0 backfills each system's own tool prerequisites
   // and check bonus as its own override, issue 1371's 1.32.0 elects each component's world
-  // essence map, and issue 1608's 1.33.0 records the mark that keeps every existing subject
-  // modifier pick rolling; the runner counts every entry it applies.
-  assert.equal(summary.ran, 12);
-  assert.equal(store.get('migrationVersion'), '1.34.0');
+  // essence map, issue 1608's 1.33.0 records the mark that keeps every existing subject
+  // modifier pick rolling, issue 1654's 1.34.0 merges equivalent world essences, and issue
+  // 2100's 1.35.0 stamps the old always-break alchemy default; the runner counts every entry
+  // it applies.
+  assert.equal(summary.ran, 13);
+  assert.equal(store.get('migrationVersion'), '1.35.0');
   assert.deepEqual(summary.unifiedModifierCollisions, [{ system: 'Herbalism', collisions: 1 }]);
   for (const key of ['craftingSystems', 'gatheringConfig']) {
     assert.ok(

@@ -3,6 +3,7 @@
  */
 
 import {
+  CHECKS_ROUTE_MODEL_PATTERN,
   CRAFTING_ROUTED_CHECK,
   CRAFTING_ROUTED_INGREDIENTS,
   CRAFTING_SHARED,
@@ -78,7 +79,7 @@ export const CASES = Object.freeze([
     smokeLabels: [],
     reaches: 'beyond',
     query: { system: 'lab-runework' },
-    // The frame that shows the whole ramp (issue 1096).
+    // The frame that shows the whole ramp (issue 1096). A signed offset commits on Enter or blur.
     steps: [
       'Checks',
       { selector: '#manager-checks-nav-crafting' },
@@ -87,9 +88,11 @@ export const CASES = Object.freeze([
       { selector: '[data-add-outcome-tier]' },
       { selector: ':nth-match([data-outcome-name], 4)', fill: 'Flawless' },
       { selector: ':nth-match([data-outcome-dc], 4)', fill: '10' },
+      { selector: ':nth-match([data-outcome-dc], 4)', press: 'Enter' },
       { selector: ':nth-match([data-outcome-success], 4)' },
       { selector: ':nth-match([data-outcome-name], 5)', fill: 'Slag' },
       { selector: ':nth-match([data-outcome-dc], 5)', fill: '-10' },
+      { selector: ':nth-match([data-outcome-dc], 5)', press: 'Enter' },
       { selector: '[data-outcome-band-strip-hint]', scroll: true },
     ],
     expectView: 'checks-crafting',
@@ -117,6 +120,7 @@ export const CASES = Object.freeze([
       // `ItemDropZone` is deliberately not claimed here (issue 1509): it is a broad signal, so it was never read.
       /^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/,
       /^src\/ui\/model\/macroReference\.js$/,
+      CHECKS_ROUTE_MODEL_PATTERN,
     ],
   }),
   managerCase({
@@ -143,6 +147,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/CheckRecipeTiers\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/,
+      CHECKS_ROUTE_MODEL_PATTERN,
     ],
   }),
   managerCase({
@@ -170,6 +175,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/CheckRecipeTiers\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/,
+      CHECKS_ROUTE_MODEL_PATTERN,
     ],
   }),
   managerCase({
@@ -193,7 +199,10 @@ export const CASES = Object.freeze([
     // The route alone is not enough: a click that no-oped leaves the right screen showing the wrong state.
     expectSelector: '[data-trigger="rw-trig-step-up"] [data-trigger-tier-step]',
     kinds: ['manager', 'checks'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/CheckTriggers\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/CheckTriggers\.svelte$/,
+      CHECKS_ROUTE_MODEL_PATTERN,
+    ],
   }),
   managerCase({
     id: 'manager-checks-crafting-trigger-break-tools',
@@ -216,7 +225,10 @@ export const CASES = Object.freeze([
     // The subject itself, not the route: both the authority click and the disclosure click have to have landed.
     expectSelector: '[data-trigger="rw-trig-step-up"] [data-trigger-break]',
     kinds: ['manager', 'checks'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/CheckTriggers\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/CheckTriggers\.svelte$/,
+      CHECKS_ROUTE_MODEL_PATTERN,
+    ],
   }),
   // All four cases select an actor first, and that is not decoration.
   managerCase({
@@ -241,7 +253,9 @@ export const CASES = Object.freeze([
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/checkPreview\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/checkReadoutModel\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/checks\/CheckOutcomePreview\.svelte$/,
+      CHECKS_ROUTE_MODEL_PATTERN,
     ],
   }),
   managerCase({
@@ -263,6 +277,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/checkOdds\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/checks\/CheckOddsPanel\.svelte$/,
+      CHECKS_ROUTE_MODEL_PATTERN,
     ],
   }),
   managerCase({
@@ -286,6 +301,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/checkOdds\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/checks\/CheckOddsPanel\.svelte$/,
+      CHECKS_ROUTE_MODEL_PATTERN,
     ],
   }),
   managerCase({
@@ -305,10 +321,12 @@ export const CASES = Object.freeze([
     // A bucket that must exist, not merely a bar.
     expectSelector: '.fabricate-manager [data-checks-odds-row="award-0"]',
     kinds: ['manager', 'checks'],
-    // No entry for `src/systems/progressiveCheckSandbox.js`: `isUiFile` admits no such path, so a pattern would be dead.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/checkOdds\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/checks\/CheckOddsPanel\.svelte$/,
+      CHECKS_ROUTE_MODEL_PATTERN,
+      // The preview sandbox the award-count histogram is bucketed from.
+      /^src\/systems\/progressiveCheckSandbox\.js$/,
     ],
   }),
   managerCase({
@@ -329,7 +347,10 @@ export const CASES = Object.freeze([
     expectSelector: '.fabricate-manager [data-simple-band-strip] [data-band-strip-handle]',
     kinds: ['manager', 'checks'],
     // The strip's simple mode, one of the two frames `BROAD_SIGNAL_CASE_OVERRIDES` names for it (issue 1378).
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/,
+      CHECKS_ROUTE_MODEL_PATTERN,
+    ],
   }),
   managerCase({
     id: 'manager-checks-crafting-outcomes-empty',
@@ -351,7 +372,10 @@ export const CASES = Object.freeze([
     // The fix as a selector: the add control has to be a sibling of the empty sentence, outside the list's `{#if}`.
     expectSelector: '.fabricate-manager [data-outcomes-empty] ~ [data-add-outcome-tier]',
     kinds: ['manager', 'checks'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/CraftingCheckEditor\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/CraftingCheckEditor\.svelte$/,
+      CHECKS_ROUTE_MODEL_PATTERN,
+    ],
   }),
   managerCase({
     id: 'manager-checks-crafting-alchemy-off',
@@ -367,7 +391,10 @@ export const CASES = Object.freeze([
     expectSelector:
       '.fabricate-manager [data-checks-panel="crafting"][data-checks-off] [data-checks-turn-on]',
     kinds: ['manager', 'checks'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/ChecksView\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/ChecksView\.svelte$/,
+      CHECKS_ROUTE_MODEL_PATTERN,
+    ],
   }),
   managerCase({
     id: 'manager-checks-crafting-alchemy-behaviour',
@@ -387,7 +414,10 @@ export const CASES = Object.freeze([
     // The card, which is the subject and exists in no other state — not one of its toggles.
     expectSelector: '.fabricate-manager [data-alchemy-behaviour]',
     kinds: ['manager', 'checks'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/ChecksView\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/ChecksView\.svelte$/,
+      CHECKS_ROUTE_MODEL_PATTERN,
+    ],
   }),
   // Player recipe detail, one per resolution mode.
   playerCase({
@@ -584,5 +614,37 @@ export const CASES = Object.freeze([
     expectNoHorizontalOverflow: ['.fabricate-app-content', '.fabricate-app-nav'],
     kinds: ['player', 'extension'],
     sourceMatches: PLAYER_EXTENSION_SOURCES,
+  }),
+  // Issue 2008: the Preview stepper adds one bought die to the simulated roll only, marked on the
+  // last original tile, while the odds and the inset reading stay at the base pool.
+  managerCase({
+    id: 'manager-checks-count-simulator-bought',
+    label: 'Manager — Checks count preview, a simulated roll with one bought die (frame 07 rail)',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', checkPreviewState: 'dice-pool-faults' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      ...previewAsActor('lab-actor-idrin'),
+      {
+        selector:
+          '[data-checks-preview-additional-dice-field] .fab-stepper [data-stepper-increment]',
+      },
+      { selector: '[data-checks-simulator-roll]' },
+      { selector: '[data-checks-simulator-panel]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    expectSelector:
+      '.fabricate-manager:has([data-check-count-expected="1.30"])' +
+      ':has([data-checks-odds-expected="1.30"])' +
+      ' [data-checks-simulator-readout][data-checks-simulator-product="count"]' +
+      ':has([data-checks-simulator-legend]:has-text("dashed = bought"))' +
+      ':not(:has([data-checks-simulator-face-marks~="bought"] ~ li))' +
+      ' [data-checks-simulator-face-marks~="bought"]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/(?:CheckOutcomePreview\.svelte|checkPreview\.js|checkReadoutModel\.js)$/,
+    ],
   }),
 ]);

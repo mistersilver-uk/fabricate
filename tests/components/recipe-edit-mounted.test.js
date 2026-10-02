@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import {
   createMountedComponentHarness,
   SEARCHABLE_POPOVER_RAW_MODULES,
+  TYPEAHEAD_RUNE_MODULES,
 } from '../helpers/svelte-component-harness.js';
 import { Recipe } from '../../src/models/Recipe.js';
 import { ANNOUNCE_AFTER_FOCUS_MS } from '../../src/ui/svelte/util/announceAfterFocus.js';
@@ -102,6 +103,7 @@ const RAW_MODULES = [
   // harness, whose inline list has no validator.
   'src/systems/characterLibraries.js',
   'src/systems/checkModifierResolver.js',
+  'src/systems/checkModifierRouter.js',
   // …and issue 1094 gave that resolver its first two imports.
   'src/systems/toolCheckBonus.js',
   'src/utils/craftingCheckExpression.js',
@@ -116,6 +118,11 @@ const RAW_MODULES = [
   // The Overview tab resolves the recipe's category label for its Category select, and maps its
   // four converted cells' option lists beside itself (issue 1510).
   'src/ui/svelte/apps/manager/recipe/recipeOverviewSelectOptions.js',
+  // …which names a character-value tier by its adjustment through the shared formatter.
+  'src/utils/checkAdjustmentFormat.js',
+  // …and a count tier by its successes needed, the default's from the pool (issue 2006).
+  'src/systems/normalize/checkEvaluation.js',
+  'src/utils/fillPlaceholders.js',
   ...SEARCHABLE_POPOVER_RAW_MODULES,
   // A progressive stage row draws its component's complications read-only (issue 1286).
   'src/ui/model/complicationSummary.js',
@@ -200,6 +207,7 @@ const editHarness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-recipe-edit-',
   rawModules: RAW_MODULES,
+  runeModules: TYPEAHEAD_RUNE_MODULES,
   compiledModules: RECIPE_COMPILED,
   componentPath: 'src/ui/svelte/apps/manager/RecipeEditView.svelte',
 });
@@ -384,6 +392,36 @@ async function mountIngredientGroups(groups, { props = {}, set = {} } = {}) {
 function mountSingleGroup(options, opts = {}) {
   return mountIngredientGroups([{ id: 'grp-1', options }], opts);
 }
+
+/** The suggestion list a name field controls. It is portalled out of the row, so it is reached
+ *  through the field's own `aria-controls` rather than by a row-scoped query. */
+function suggestionListOf(field) {
+  const id = field.getAttribute('aria-controls');
+  return id ? field.ownerDocument.querySelector(`[id="${id}"]`) : null;
+}
+
+async function typeInto(field, value) {
+  field.value = value;
+  field.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
+  await flushRender();
+}
+
+async function pressKey(field, key, init = {}) {
+  const event = new globalThis.window.KeyboardEvent('keydown', {
+    key,
+    bubbles: true,
+    cancelable: true,
+    ...init,
+  });
+  field.dispatchEvent(event);
+  await flushRender();
+  return event;
+}
+
+const UNNAMED_COMPONENT_ROW = Object.freeze({
+  quantity: 1,
+  match: Object.freeze({ type: 'component', componentId: null }),
+});
 
 // Mount the editor on a recipe carrying the given result groups, wired to a fresh
 // patch collector, then switch to the Results tab and flush the first render.
@@ -572,6 +610,56 @@ describe('RecipeEditView (mounted)', () => {
       { checkTierId: 'tier-hard' },
       'selecting a tier stages checkTierId'
     );
+    editHarness.remount();
+  });
+
+  it('names a roll-under Target and a character-value adjustment in the Check tier options (issue 2005)', async () => {
+    const tiers = [
+      { id: 'tier-easy', name: 'Easy', dc: 12, adjustment: -2 },
+      { id: 'tier-hard', name: 'Hard', dc: 8, adjustment: 0.5 },
+    ];
+    const evaluation = (direction, source, adjustmentKind = 'add') => ({
+      product: 'sum',
+      direction,
+      target: { source, expression: '@skills.smith.value', adjustmentKind },
+    });
+    const cases = [
+      [evaluation('under', 'fixed'), ['Default target', 'Easy (Target 12)', 'Hard (Target 8)']],
+      [evaluation('over', 'attribute'), ['Default · base adjustment', 'Easy (−2)', 'Hard (+0.5)']],
+      [evaluation('under', 'attribute', 'multiply'), ['Default · base adjustment', 'Easy (×−2)', 'Hard (×½)']],
+    ];
+    for (const [checkEvaluation, labels] of cases) {
+      const target = await editHarness.mount(
+        identityProps({ checkTierOptions: tiers, checkEvaluation })
+      );
+      assert.deepEqual(selectOptionLabels(target, TIER_TRIGGER), labels);
+      closeSelectPanel(target, TIER_TRIGGER);
+      editHarness.remount();
+    }
+  });
+
+  it('names each count tier by its successes needed, never its DC, and stages the pick (issue 2006)', async () => {
+    const patches = [];
+    const target = await editHarness.mount(
+      identityProps({
+        onUpdateRecipe: (patch) => {
+          patches.push(patch);
+        },
+        checkTierOptions: [
+          { id: 'tier-easy', name: 'Easy', dc: 12, successes: 3 },
+          { id: 'tier-unset', name: 'Unset', dc: 8, successes: null },
+        ],
+        checkEvaluation: { product: 'count', direction: 'under', pool: { required: 1 } },
+      })
+    );
+    assert.deepEqual(selectOptionLabels(target, TIER_TRIGGER), [
+      'Default · 1 success',
+      'Easy · 3 successes',
+      'Unset · — successes',
+    ]);
+    chooseSelectOption(target, TIER_TRIGGER, 'tier-easy');
+    await flushRender();
+    assert.deepEqual(patches.at(-1), { checkTierId: 'tier-easy' });
     editHarness.remount();
   });
 
@@ -4175,6 +4263,26 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  it('takes its portalled suggestion list down when the editor leaves the tab', async () => {
+    const { target } = await mountSingleGroup([UNNAMED_COMPONENT_ROW], {
+      props: { componentOptions: COMPONENT_OPTIONS },
+    });
+    const page = target.ownerDocument;
+    const field = target.querySelector('[data-recipe-option-search]');
+    await typeInto(field, 'Water');
+    const list = suggestionListOf(field);
+    assert.ok(Boolean(list), 'the list opened');
+    assert.ok(!field.closest('[data-recipe-option]').contains(list), 'and left its own row');
+
+    await openTab(target, 'results');
+    assert.equal(
+      page.querySelectorAll('.manager-recipe-option-suggestions').length,
+      0,
+      'a list outside the tab panel must not outlive the row that opened it'
+    );
+    editHarness.remount();
+  });
+
   it('patches the option quantity when the quantity input changes', async () => {
     const { target, patches } = await mountSingleGroup(
       [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
@@ -4604,18 +4712,25 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('renders the suggestions BENEATH the field, and picking one names the row', async () => {
-    const { target, patches } = await mountSingleGroup(
-      [{ quantity: 1, match: { type: 'component', componentId: null } }],
-      { props: { componentOptions: COMPONENT_OPTIONS } }
-    );
+  it('floats the suggestions in the application root, and picking one names the row', async () => {
+    const { target, patches } = await mountSingleGroup([UNNAMED_COMPONENT_ROW], {
+      props: { componentOptions: COMPONENT_OPTIONS },
+    });
     const row = target.querySelector('[data-recipe-option]');
     const field = row.querySelector('input[data-recipe-option-search]');
-    field.value = 'Pure';
-    field.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
-    await flushRender();
-    const suggestions = [...row.querySelectorAll('[data-recipe-option-suggestion]')];
-    assert.equal(suggestions.length, 1, 'the list narrows to the query, in the row itself');
+    await typeInto(field, 'Pure');
+    assert.ok(
+      !row.querySelector('[data-recipe-option-suggestion]'),
+      'no suggestion is positioned inside the row, where its scrolling ancestor would clip it'
+    );
+    const list = suggestionListOf(field);
+    assert.ok(list.parentElement === target, 'the list is a child of the application root');
+    const suggestions = [...list.querySelectorAll('[data-recipe-option-suggestion]')];
+    assert.equal(suggestions.length, 1, 'the list narrows to the query');
+
+    const press = new globalThis.window.MouseEvent('mousedown', { bubbles: true, cancelable: true });
+    suggestions[0].dispatchEvent(press);
+    assert.equal(press.defaultPrevented, true, 'a press on the list never blurs the field');
     suggestions[0].click();
     await flushRender();
     assert.equal(
@@ -4623,6 +4738,178 @@ describe('RecipeEditView (mounted)', () => {
       'cmp-water',
       'clicking a suggestion names the row'
     );
+    assert.ok(
+      !target.querySelector('.manager-recipe-option-suggestions'),
+      'choosing leaves no panel behind in the root'
+    );
+    editHarness.remount();
+  });
+
+  it('drives the list from the field: the holder key map, and Enter on the active option', async () => {
+    const { target, patches } = await mountSingleGroup([UNNAMED_COMPONENT_ROW], {
+      props: { componentOptions: COMPONENT_OPTIONS },
+    });
+    const field = target.querySelector('input[data-recipe-option-search]');
+    assert.equal(field.getAttribute('role'), 'combobox');
+    assert.equal(field.getAttribute('aria-autocomplete'), 'list');
+    assert.equal(field.getAttribute('aria-expanded'), 'false');
+    assert.equal(field.hasAttribute('aria-controls'), false, 'nothing is controlled while closed');
+
+    await typeInto(field, 'e');
+    const options = [...suggestionListOf(field).querySelectorAll('[role="option"]')];
+    assert.equal(options.length, 2, 'both catalogue entries match');
+    assert.equal(field.getAttribute('aria-expanded'), 'true');
+    assert.equal(suggestionListOf(field).getAttribute('role'), 'listbox');
+    assert.equal(
+      field.hasAttribute('aria-activedescendant'),
+      false,
+      'a new query starts with no active option'
+    );
+    for (const option of options) {
+      assert.equal(option.getAttribute('tabindex'), '-1', 'no suggestion is a tab stop');
+      assert.equal(option.getAttribute('data-keyboard-focus'), 'true');
+      assert.equal(option.getAttribute('aria-selected'), 'false');
+    }
+
+    const held = await pressKey(field, 'ArrowDown', { shiftKey: true });
+    assert.equal(held.defaultPrevented, false, 'a key with a modifier held is not the list\'s');
+    assert.equal(field.hasAttribute('aria-activedescendant'), false);
+    await pressKey(field, 'ArrowDown', { isComposing: true });
+    assert.equal(field.hasAttribute('aria-activedescendant'), false, 'nothing moves mid-composition');
+
+    const down = await pressKey(field, 'ArrowDown');
+    assert.equal(down.defaultPrevented, true);
+    assert.equal(field.getAttribute('aria-activedescendant'), options[0].id);
+    assert.equal(options[0].getAttribute('aria-selected'), 'true');
+    await pressKey(field, 'ArrowDown');
+    assert.equal(field.getAttribute('aria-activedescendant'), options[1].id);
+    await pressKey(field, 'ArrowDown');
+    assert.equal(field.getAttribute('aria-activedescendant'), options[0].id, 'the cursor wraps');
+    await pressKey(field, 'ArrowUp');
+    assert.equal(field.getAttribute('aria-activedescendant'), options[1].id);
+
+    const enter = await pressKey(field, 'Enter');
+    assert.equal(enter.defaultPrevented, true, 'Enter is consumed while the list is open');
+    assert.equal(
+      patches.at(-1).ingredientSets[0].ingredientGroups[0].options[0].match.componentId,
+      'cmp-water',
+      'Enter commits the active option rather than the top suggestion'
+    );
+    editHarness.remount();
+  });
+
+  it('starts each new query with no active option', async () => {
+    const { target } = await mountSingleGroup([UNNAMED_COMPONENT_ROW], {
+      props: { componentOptions: COMPONENT_OPTIONS },
+    });
+    const field = target.querySelector('input[data-recipe-option-search]');
+    await typeInto(field, 'e');
+    await pressKey(field, 'ArrowDown');
+    assert.equal(field.hasAttribute('aria-activedescendant'), true);
+    await typeInto(field, 'er');
+    assert.equal(field.hasAttribute('aria-activedescendant'), false);
+    editHarness.remount();
+  });
+
+  it('clears the query on Escape and consumes the key', async () => {
+    const { target, patches } = await mountSingleGroup([UNNAMED_COMPONENT_ROW], {
+      props: { componentOptions: COMPONENT_OPTIONS },
+    });
+    const field = target.querySelector('input[data-recipe-option-search]');
+    let reachedDocument = 0;
+    const count = () => (reachedDocument += 1);
+    globalThis.document.addEventListener('keydown', count);
+    try {
+      await typeInto(field, 'Pure');
+      const escape = await pressKey(field, 'Escape');
+      assert.equal(escape.defaultPrevented, true);
+      assert.equal(reachedDocument, 0, 'the key never reaches a dismiss handler above the field');
+      assert.equal(field.value, '', 'the query is emptied');
+      assert.ok(
+        !target.querySelector('.manager-recipe-option-suggestions'),
+        'an empty query is the closed state'
+      );
+      const idle = await pressKey(field, 'Escape');
+      assert.equal(idle.defaultPrevented, false, 'with nothing typed the key is not the field\'s');
+      assert.equal(reachedDocument, 1);
+      assert.equal(patches.length, 0, 'and neither press commits anything');
+    } finally {
+      globalThis.document.removeEventListener('keydown', count);
+    }
+    editHarness.remount();
+  });
+
+  it('closes on blur keeping the query, and reopens on focus', async () => {
+    const { target } = await mountSingleGroup([UNNAMED_COMPONENT_ROW], {
+      props: { componentOptions: COMPONENT_OPTIONS },
+    });
+    const field = target.querySelector('input[data-recipe-option-search]');
+    await typeInto(field, 'Pure');
+    assert.ok(Boolean(suggestionListOf(field)), 'typing opens the list');
+    field.dispatchEvent(new globalThis.window.Event('blur'));
+    await flushRender();
+    assert.ok(!target.querySelector('.manager-recipe-option-suggestions'), 'blur closes it');
+    assert.equal(field.value, 'Pure', 'and keeps the query');
+    field.dispatchEvent(new globalThis.window.Event('focus'));
+    await flushRender();
+    assert.ok(Boolean(suggestionListOf(field)), 'refocusing reopens it');
+
+    globalThis.document.body.dispatchEvent(
+      new globalThis.window.MouseEvent('mousedown', { bubbles: true })
+    );
+    await flushRender();
+    assert.ok(
+      !target.querySelector('.manager-recipe-option-suggestions'),
+      'a press outside both field and panel closes it'
+    );
+    await typeInto(field, 'Pur');
+    assert.ok(Boolean(suggestionListOf(field)), 'and typing reopens it');
+    editHarness.remount();
+  });
+
+  it('gives two open rows their own option ids', async () => {
+    const { target } = await mountSingleGroup([UNNAMED_COMPONENT_ROW, UNNAMED_COMPONENT_ROW], {
+      props: { componentOptions: COMPONENT_OPTIONS },
+    });
+    const fields = [...target.querySelectorAll('input[data-recipe-option-search]')];
+    assert.equal(fields.length, 2);
+    for (const field of fields) {
+      await typeInto(field, 'e');
+      await pressKey(field, 'ArrowDown');
+    }
+    const lists = fields.map(suggestionListOf);
+    assert.ok(lists[0] !== lists[1], 'each field controls its own list');
+    const ids = lists.flatMap((list) =>
+      [...list.querySelectorAll('[role="option"]')].map((option) => option.id)
+    );
+    assert.equal(new Set(ids).size, 4, `the four option ids are distinct: ${ids}`);
+    for (const [index, field] of fields.entries()) {
+      const active = lists[index].querySelector(
+        `[id="${field.getAttribute('aria-activedescendant')}"]`
+      );
+      assert.ok(Boolean(active), 'the active descendant resolves inside its own panel');
+    }
+    editHarness.remount();
+  });
+
+  it('states No matches as a status note in place of the listbox', async () => {
+    const { target, patches } = await mountSingleGroup([UNNAMED_COMPONENT_ROW], {
+      props: { componentOptions: COMPONENT_OPTIONS },
+    });
+    const row = target.querySelector('[data-recipe-option]');
+    const field = row.querySelector('input[data-recipe-option-search]');
+    await typeInto(field, 'zzz');
+    const note = target.querySelector('[data-recipe-option-no-matches]');
+    assert.ok(Boolean(note), 'the note renders');
+    assert.ok(!row.contains(note), 'outside the row');
+    assert.equal(note.parentElement.getAttribute('role'), 'status');
+    assert.ok(note.parentElement.parentElement === target, 'in the application root');
+    assert.ok(!target.querySelector('[role="listbox"]'), 'and no listbox is rendered');
+    assert.equal(field.getAttribute('aria-expanded'), 'false');
+    assert.equal(field.hasAttribute('aria-controls'), false);
+    const enter = await pressKey(field, 'Enter');
+    assert.equal(enter.defaultPrevented, true);
+    assert.equal(patches.length, 0, 'Enter on a query that matches nothing commits nothing');
     editHarness.remount();
   });
 
@@ -4738,11 +5025,10 @@ describe('RecipeEditView (mounted)', () => {
   // assertion below reads it here. `e` is the query because it is in both `Life` and `Water`:
   async function offeredIn(row, query = 'e') {
     const field = row.querySelector('[data-recipe-option-search]');
-    field.value = query;
-    field.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
-    await flushRender();
-    return [...row.querySelectorAll('[data-recipe-option-suggestion]')].map((suggestion) =>
-      suggestion.textContent.trim()
+    await typeInto(field, query);
+    const list = suggestionListOf(field);
+    return [...(list?.querySelectorAll('[data-recipe-option-suggestion]') ?? [])].map(
+      (suggestion) => suggestion.textContent.trim()
     );
   }
 

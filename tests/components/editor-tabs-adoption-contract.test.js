@@ -1,15 +1,16 @@
 /** The END STATE of the manager tab-strip conversion (issue 1429, epic 1357). */
-import test from 'node:test';
 import assert from 'node:assert/strict';
 import { join, resolve } from 'node:path';
+import test from 'node:test';
+
 import { parse } from 'svelte/compiler';
 
+import { byCodePoint } from '../helpers/codePointOrder.js';
 import {
   SOURCES,
   definePrimitiveAdoptionContract,
   walkTemplate,
 } from '../helpers/primitiveAdoptionContract.js';
-import { byCodePoint } from '../helpers/ratchetBaseline.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const PRIMITIVE = 'src/ui/svelte/components/EditorTabs.svelte';

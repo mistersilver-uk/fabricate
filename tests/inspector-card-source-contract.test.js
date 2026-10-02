@@ -26,18 +26,14 @@ const CLASS_EXCEPTIONS = Object.freeze([
       'survives — so the count is now exactly the one place that writes it',
   }),
   Object.freeze({
-    file: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
+    file: 'src/ui/svelte/apps/manager/SystemBrowserInspector.svelte',
     count: 4,
     why:
-      'deferred: root convergence pending. Four hand-rolled cards remain — the systems feature ' +
-      'panels — and they are held out of the sweep because the converging root is the wrong ' +
-      'place to land its tail. The fifth was the Tags & Categories at-a-glance card, and issue ' +
-      '1915 retired that inspector rail rather than converting it. The count was 32 until 1707 ' +
-      'wrote the twice-authored modifier panel once (two cards de-duplicated, not converted), 28 ' +
-      'until its phase 2 moved nineteen into the leaf rows below, and 9 until its phase 3 moved ' +
-      'the four the chain drew around those branches into the rail row below. Pinned by count so ' +
-      'a later root pass that converts some of the four fails here instead of leaving a fraction ' +
-      'of a deferral nobody is tracking.',
+      'deferred with a named reason: the systems feature panels, the last four of the manager ' +
+      "root's hand-rolled cards. Issue 1721 relocated them with the systems inspector chain " +
+      'without converting one, so the deferral is unchanged in substance and this screen is now ' +
+      'small enough for a conversion lane to take on its own. Pinned by count so a later partial ' +
+      'pass fails here rather than silently reducing a deferral nobody is tracking.',
   }),
   Object.freeze({
     file: 'src/ui/svelte/apps/manager/environment/GatheringEventInspector.svelte',

@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { defineStructureContract } from '../helpers/structureContract.js';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
 
@@ -146,8 +148,14 @@ describe('World and Travel navigation', () => {
       ),
       'entering Parties no longer reaches into the gathering tab state'
     );
-    assert.equal(managerRootSource.includes("activeGatheringTab = 'travel'; activeView"), false);
   });
+
+  // Read off the whole entry, so a write through the gathering route model's setter is caught too.
+  defineStructureContract(
+    'entering Parties leaves the gathering tab alone',
+    { file: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte', fn: 'openWorldParties' },
+    { namesNo: ['activeGatheringTab'] }
+  );
 
   it('renders the World > Travel route from the root, keeping its inspector', () => {
     assert.ok(

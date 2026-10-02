@@ -6,13 +6,8 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
-import { entrySources } from './helpers/bootstrapEntrySource.js';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
+import { withFabricateLifecycleReplay } from './helpers/extension-composition-harness.js';
 
 globalThis.foundry = { utils: { getProperty: () => undefined } };
 
@@ -200,37 +195,60 @@ test('never rewrites the descriptions it inspects', () => {
 
 // Production wiring. Both seams default to PASS-THROUGHS, so deleting the wiring reverts the entire
 // feature in production while every unit test — which constructs its own manager with its own fakes
-// — stays green. The entry composes the manager and `src/bootstrap/hooks.js` runs the detector, so
-// both are read here through ONE call (issue 1715).
-const mainSource = [
-  entrySources['src/bootstrap/composeServices.js'],
-  entrySources['src/bootstrap/hooks.js'],
-].join('\n');
+// — stays green. So the composed manager is asked, and the `ready` sequence is run, in a real boot.
 
-test('src/main.js wires the REAL enricher seams into CraftingSystemManager', () => {
-  assert.match(
-    mainSource,
-    /new CraftingSystemManager\(\s*fabricate\.recipeManager\s*,\s*\{/,
-    'the manager must be constructed WITH seams — the bare one-argument form silently ' +
-      'reverts issue 800 in production, because both seams default to pass-throughs'
-  );
-  assert.match(mainSource, /enrichToHtml:\s*\(raw, options\) => enrichToHtml\(raw, options\)/);
-  assert.match(mainSource, /primeEnricherCache:\s*\(rawTexts\) => primeEnricherCache\(rawTexts\)/);
-  assert.match(
-    mainSource,
-    /import \{[^}]*\benrichToHtml\b[^}]*\bprimeEnricherCache\b[^}]*\} from '\.\.?\/ui\/svelte\/util\/foundryBridge\.js'/,
-    'both seams must be imported from the Foundry bridge'
-  );
-});
+test('the composed manager enriches through Foundry, and ready tells the GM once', { timeout: 300000 }, async () => {
+  await withFabricateLifecycleReplay(async ({ ready, loadModule }) => {
+    const { default: facade } = await loadModule('/src/main.js');
+    const { countUnresolvedDirectiveDescriptions } = await loadModule('/src/config/repairItemData.js');
+    const { foundry } = globalThis;
+    const editor = foundry.applications.ux.TextEditor.implementation;
+    const { enrichHTML } = editor;
+    const { parseUuid } = foundry.utils;
+    const enriched = [];
+    const fetched = [];
+    const pack = { get: () => null, getDocuments: async (query) => fetched.push(query) };
+    const source = { uuid: 'Item.source' };
+    editor.enrichHTML = async (text, options) => {
+      enriched.push([text, options.secrets, options.rolls, options.relativeTo === source]);
+      return '<p>enriched</p>';
+    };
+    foundry.utils.parseUuid = () => ({ collection: pack, primaryId: 'probe-id' });
+    try {
+      const manager = facade.craftingSystemManager;
+      const html = await manager._enrichToHtml('@UUID[Item.x]', { relativeTo: source });
+      assert.equal(html, '<p>enriched</p>');
+      assert.deepEqual(
+        enriched,
+        [['@UUID[Item.x]', false, false, true]],
+        'as GM, stored for players, relative links resolved against the source document'
+      );
+      await manager._primeEnricherCache(['@UUID[Compendium.probe.items.Item.probe-id]']);
+      assert.deepEqual(fetched, [{ _id__in: ['probe-id'] }], 'one fetch primes the pack');
+    } finally {
+      editor.enrichHTML = enrichHTML;
+      foundry.utils.parseUuid = parseUuid;
+    }
 
-test('src/main.js invokes the startup detector', () => {
-  assert.match(
-    mainSource,
-    /^\s*notifyUnresolvedItemDescriptions\(\);/m,
-    'nothing else gates this call site — without it an un-repaired world gets no cue at all'
-  );
-  assert.match(
-    mainSource,
-    /import \{ notifyUnresolvedItemDescriptions \} from '\.\.?\/config\/repairItemData\.js'/
-  );
+    const count = countUnresolvedDirectiveDescriptions(facade.craftingSystemManager.getSystems());
+    assert.ok(count > 0, 'the premise: the lab world holds a label-less content link');
+    const expected = globalThis.game.i18n.format(
+      'FABRICATE.Settings.RepairItemData.UnresolvedDetected',
+      { count }
+    );
+    assert.notEqual(expected, 'FABRICATE.Settings.RepairItemData.UnresolvedDetected');
+    const infos = [];
+    const { info } = globalThis.ui.notifications;
+    globalThis.ui.notifications.info = (message) => infos.push(message);
+    try {
+      await ready();
+    } finally {
+      globalThis.ui.notifications.info = info;
+    }
+    assert.deepEqual(
+      infos.filter((message) => message === expected),
+      [expected],
+      'nothing else gates this call site: without it an un-repaired world gets no cue at all'
+    );
+  });
 });

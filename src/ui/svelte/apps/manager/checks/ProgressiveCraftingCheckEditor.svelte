@@ -2,12 +2,19 @@
 <!--
   Progressive crafting check editor. A progressive check rolls a FORMULA for a numeric value and
   spends it against each result's difficulty in order, the award mode deciding how the spend
-  stops. There is no DC, comparison or recipe tier — just the formula, the award mode and the
-  unified `CheckTriggers` editor, whose outcome select is relabelled for this numeric context.
+  stops. There is no DC or recipe tier — just the formula, the award mode and the unified
+  `CheckTriggers` editor, whose outcome select is relabelled for this numeric context. A counting
+  check also edits `thresholdMode`, its per-die test (issue 2067), in the Formula card's pool.
   Controlled: renders `value` (`{ awardMode, rollFormula, checkBreakage }`) and emits the next.
+  The runtime refuses a summed roll-under progressive check, so that state carries a warning.
 -->
 <script>
+  import { progressiveTargetRefusal } from '../../../../../systems/checkTarget.js';
+  import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
+  import Notice from '../../../components/Notice.svelte';
   import { localize } from '../../../util/foundryBridge.js';
+  import { targetRefusalSentence } from './checkTargetStatus.js';
+  import { formulaCardLead } from './checksCopy.js';
   import CheckFormulaFields from './CheckFormulaFields.svelte';
   import CheckAwardMode from './CheckAwardMode.svelte';
   import CheckTriggers from './CheckTriggers.svelte';
@@ -24,6 +31,9 @@
     appliedModifiers = [],
     modifierPolicy = 'addAll',
     recordNoun = 'recipe',
+    // The Preview-as actor and the preview's `{ placement, odds }` a counting Formula card reads.
+    previewCharacter = null,
+    countPreview = null,
     onChange = () => {},
   } = $props();
 
@@ -34,6 +44,13 @@
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
   }
+
+  const evaluation = $derived(normalizeCheckEvaluation(value?.evaluation));
+  const refusal = $derived(progressiveTargetRefusal(evaluation));
+  // Null for a summed check, which has no comparison; a counting check tests each die by it.
+  const perDieTest = $derived(
+    evaluation.product === 'count' ? (value?.thresholdMode === 'exceed' ? 'exceed' : 'meet') : null
+  );
 
   function emit(patch) {
     onChange({ ...value, ...patch });
@@ -49,9 +66,11 @@
             {text('FABRICATE.Admin.Manager.Checks.Crafting.FormulaTitle', 'Formula')}
           </h3>
           <p class="manager-checks-card-description">
-            {text(
+            {formulaCardLead(
+              value?.evaluation,
+              text,
               'FABRICATE.Admin.Manager.Checks.Crafting.ProgressiveLead',
-              'Roll a formula for a numeric value. Results are awarded in order, each spending its difficulty from the value, until the value can no longer cover the next. Per-die crits force award-all or award-none.'
+              'Resolves to a numeric value, not a pass or fail. Modifiers from the Modifiers tab are applied by the check; they never appear in the formula.'
             )}
           </p>
         </div>
@@ -63,10 +82,24 @@
           {modifierPolicy}
           {recordNoun}
           {foundrySystemId}
+          evaluation={value?.evaluation ?? null}
+          thresholdMode={perDieTest}
+          underNote={!refusal}
+          offerSituationalBonus={value?.offerSituationalBonus !== false}
+          advantage={value?.advantage ?? null}
+          character={previewCharacter}
+          {countPreview}
           onChange={emit}
         />
       </div>
     </InspectorCard>
+    {#if refusal}
+      <Notice
+        tone="warning"
+        title={targetRefusalSentence(refusal, text)}
+        dataAttr="data-check-progressive-refusal"
+      />
+    {/if}
   {/if}
 
   {#if shows('triggers')}
@@ -75,6 +108,7 @@
       rollFormula={value?.rollFormula || ''}
       kind="progressive"
       showBreakTools={checkDriven}
+      evaluation={value?.evaluation ?? null}
       onChange={(checkBreakage) => emit({ checkBreakage })}
     />
   {/if}

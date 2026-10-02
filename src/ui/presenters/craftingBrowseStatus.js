@@ -32,13 +32,25 @@ export const CRAFTING_BROWSE_STATUS = Object.freeze({
   EXHAUSTED: 'exhausted',
   MISSING_MATERIALS: 'missingMaterials',
   DISCOVERY: 'discovery',
+  CHECK_UNROLLABLE: 'checkUnrollable',
+});
+
+/** Localization keys for a recipe's primary blocking reason; `available` has none. */
+export const BROWSE_BLOCKING_REASON_KEYS = Object.freeze({
+  [CRAFTING_BROWSE_STATUS.LOCKED]: 'FABRICATE.App.Crafting.Blocking.Locked',
+  [CRAFTING_BROWSE_STATUS.UNKNOWN]: 'FABRICATE.App.Crafting.Blocking.Unknown',
+  [CRAFTING_BROWSE_STATUS.EXHAUSTED]: 'FABRICATE.App.Crafting.Blocking.Exhausted',
+  [CRAFTING_BROWSE_STATUS.DISCOVERY]: 'FABRICATE.App.Crafting.Blocking.Discovery',
+  [CRAFTING_BROWSE_STATUS.MISSING_MATERIALS]: 'FABRICATE.App.Crafting.Blocking.MissingMaterials',
+  [CRAFTING_BROWSE_STATUS.CHECK_UNROLLABLE]: 'FABRICATE.App.Crafting.Blocking.CheckUnrollable',
 });
 
 /**
  * Browse-status precedence, highest first:
  *
  *   teaser → discovery, locked → locked, knowledge → unknown,
- *   recipe-item exhausted → exhausted, materials missing → missingMaterials,
+ *   recipe-item exhausted → exhausted, a check that refuses this character → checkUnrollable
+ *   (issue 2139, which gathering cannot clear), materials missing → missingMaterials,
  *   otherwise available.
  *
  * `materialsAvailable` is deliberately a TRISTATE read: `false` means a material check ran
@@ -59,17 +71,20 @@ export const CRAFTING_BROWSE_STATUS = Object.freeze({
  *   reached its cap. This rule takes no audience and never branches on one: a GM row reads
  *   `exhausted` as `false` because the knowledge gate that produces exhaustion is bypassed
  *   for a GM upstream, not because this function treats a GM caller differently.
+ * @param {boolean} [input.checkRefused] Whether the recipe's check refuses the character.
  * @returns {string} A {@link CRAFTING_BROWSE_STATUS} value.
  */
 export function deriveBrowseStatus({
   reason = '',
   materialsAvailable = null,
   exhausted = false,
+  checkRefused = false,
 } = {}) {
   if (reason === 'teaser') return CRAFTING_BROWSE_STATUS.DISCOVERY;
   if (reason === 'locked') return CRAFTING_BROWSE_STATUS.LOCKED;
   if (reason === 'knowledge') return CRAFTING_BROWSE_STATUS.UNKNOWN;
   if (exhausted === true) return CRAFTING_BROWSE_STATUS.EXHAUSTED;
+  if (checkRefused === true) return CRAFTING_BROWSE_STATUS.CHECK_UNROLLABLE;
   if (materialsAvailable === false) return CRAFTING_BROWSE_STATUS.MISSING_MATERIALS;
   return CRAFTING_BROWSE_STATUS.AVAILABLE;
 }

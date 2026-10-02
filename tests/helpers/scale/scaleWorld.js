@@ -261,7 +261,7 @@ export function useHydratedRecipes(world, recipes) {
  * `Recipe.fromJSON` mints ids for sub-records through `foundry.utils.randomID()`, which
  * `tests/helpers/foundryEnv.js` implements as a process-lifetime counter that is never reset.
  * Ids therefore get WIDER as a process runs, so a byte count taken after other hydrations is
- * larger than the same byte count taken first — which makes any committed byte count a function
+ * larger than the same byte count taken first — which makes any compared byte count a function
  * of how many earlier cases hydrated, not of `{profile, seed}` alone.
  *
  * That is not hypothetical and it is not small enough to ignore. Measured on this checkout, the

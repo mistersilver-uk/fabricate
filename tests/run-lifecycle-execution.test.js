@@ -7,15 +7,115 @@ import {
 } from '../src/systems/CraftingLifecycleExecutor.js';
 import { CraftingFizzleExecutor } from '../src/systems/CraftingFizzleExecutor.js';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
+import { GatheringEngine } from '../src/systems/GatheringEngine.js';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
+import { craftingStepHistoryEvidence } from '../src/systems/CraftingRunManager.js';
+import { historyEvidenceFields } from '../src/systems/runHistoryEvidence.js';
 import { IngredientSet } from '../src/models/IngredientSet.js';
 import { Recipe } from '../src/models/Recipe.js';
 import {
+  evaluatePreparedCheck,
   evaluatePreparedRunCheck,
   postCheckRollHandoff,
 } from '../src/systems/checkRoll.js';
 import { transitionExecutionJournal } from '../src/systems/runExecutionJournal.js';
+import { promptJournalStageCheck } from '../src/bootstrap/journalOperations.js';
+import { buildSinglePromptData } from '../src/ui/svelte/apps/crafting/rollPrompt.js';
+import { rollPromptTarget } from '../src/ui/svelte/apps/crafting/rollPromptTarget.js';
+import { installCountDice } from './helpers/countEngineDice.js';
+import { countEvaluation } from './helpers/countFixtures.js';
+import { stubPromptSurface } from './helpers/rollPromptDialogStub.js';
+import { installCoreDie } from './helpers/termBearingRoll.js';
 import { createPersistedCraftingHistory, mergeHistoryFlag } from './helpers/journal-fixtures.js';
+import { gatheringFixture } from './helpers/real-gathering-attempt.js';
+
+test('both history allowlists retain only executed check evaluation metadata', () => {
+  const executed = {
+    resolutionSnapshot: { kind: 'check', mode: 'simple', product: 'sum', direction: 'over' },
+    lastCheckResult: { data: { total: 17, product: 'sum', direction: 'over' } },
+  };
+  for (const allow of [craftingStepHistoryEvidence, historyEvidenceFields]) {
+    assert.deepEqual(allow(executed, { executed: true }).resolutionSnapshot, executed.resolutionSnapshot);
+    assert.deepEqual(allow(executed).resolutionSnapshot, { kind: 'check', mode: 'simple' });
+    for (const invalid of [
+      { ...executed, lastCheckResult: undefined },
+      { ...executed, lastCheckResult: { data: { product: 'sum', direction: 'over' } } },
+      { ...executed, resolutionSnapshot: { ...executed.resolutionSnapshot, product: 'count' } },
+      { ...executed, resolutionSnapshot: { ...executed.resolutionSnapshot, kind: 'ingredients' } },
+    ]) {
+      assert.deepEqual(allow(invalid, { executed: true }).resolutionSnapshot, {
+        kind: invalid.resolutionSnapshot.kind, mode: 'simple',
+      });
+    }
+  }
+});
+
+test('the history allowlists keep count evaluation only where snapshot and result agree', () => {
+  const snapshot = { kind: 'check', mode: 'simple', product: 'count', direction: 'under' };
+  const agreeing = [
+    { total: -1, product: 'count', direction: 'under' },
+    { total: null, zeroPool: true, product: 'count', direction: 'under' },
+  ];
+  const disagreeing = [
+    { total: null, product: 'count', direction: 'under' },
+    { total: 2, product: 'count', direction: 'over' },
+    { total: 2, product: 'sum', direction: 'under' },
+    { total: null, zeroPool: true, product: 'sum', direction: 'under' },
+  ];
+  for (const allow of [craftingStepHistoryEvidence, historyEvidenceFields]) {
+    for (const data of agreeing) {
+      const source = { resolutionSnapshot: snapshot, lastCheckResult: { data } };
+      assert.deepEqual(allow(source, { executed: true }).resolutionSnapshot, snapshot);
+    }
+    for (const data of disagreeing) {
+      const source = { resolutionSnapshot: snapshot, lastCheckResult: { data } };
+      assert.deepEqual(allow(source, { executed: true }).resolutionSnapshot, {
+        kind: 'check',
+        mode: 'simple',
+      });
+    }
+  }
+});
+
+/** Completes a one-stage versioned check with `data` as the validated result and reloads it. */
+function completeVersionedCheck(data) {
+  return createPersistedCraftingHistory({
+    stageCount: 1,
+    drive: async ({ engine, actor, sources, gm, runId, manager }) => {
+      engine.installVersionedRunAuthority({
+        consumeExecutionGrant: async (_grant, context) => ({
+          operationId: `evaluation-${context.requestId}`,
+          resolvedCheckResult: { success: true, outcome: 'pass', value: 17, data },
+        }),
+      });
+      game.time.worldTime += 60;
+      const result = await engine.executeVersionedStage({
+        viewer: gm, actor, componentSourceActors: sources, runId,
+        expectedRevision: manager().getRun(actor, runId).runRevision,
+        requestId: 'check-evaluation', executionGrant: 'grant',
+      });
+      assert.equal(result.success, true);
+      return { reloaded: new CraftingRunManager().getRunHistory(actor)[0] };
+    },
+  });
+}
+
+test('a completed versioned check retains executed evaluation after actor-flag reload', async () => {
+  const fixture = await completeVersionedCheck({ dc: 12, total: 17, product: 'sum',
+    direction: 'over', comparison: 'meet', target: 12, margin: 5, successes: null, cancelled: null });
+  assert.deepEqual(fixture.record.steps[0].resolutionSnapshot, {
+    kind: 'check', mode: 'simple', product: 'sum', direction: 'over',
+  });
+  assert.deepEqual(fixture.reloaded.steps[0].resolutionSnapshot, fixture.record.steps[0].resolutionSnapshot);
+  assert.equal(fixture.reloaded.steps[0].lastCheckResult.data.margin, 5);
+});
+
+test('a versioned check result without evaluation metadata records none in its snapshot', async () => {
+  const fixture = await completeVersionedCheck({ dc: 12, total: 17 });
+  for (const record of [fixture.record, fixture.reloaded]) {
+    assert.deepEqual(record.steps[0].resolutionSnapshot, { kind: 'check', mode: 'simple' });
+  }
+});
 
 for (const failLast of [false, true]) {
   test(`writer/reload/projection retains distinct stage awards, source-qualified essence and settled currency (failure=${failLast})`, async () => {
@@ -728,23 +828,6 @@ test('CraftingEngine never leaves an uncommitted active run for an unresolved st
         ingredientSet.ingredientGroups = [
           { id: 'solar-carrier', options: [{ match: { type: 'essence', essenceId: 'solar' } }] },
         ];
-      },
-    },
-    {
-      name: 'currency',
-      refuses: true,
-      configure({ engine, recipe }) {
-        recipe.currencyCost = { currencies: [{ name: 'gp', cost: 5 }] };
-        engine.itemPilesIntegration = {
-          isEnabled: () => true,
-          canAfford: async () => false,
-          deductCurrency: async () => {
-            throw new Error('readiness must not spend currency');
-          },
-        };
-        game.fabricate.getCraftingSystemManager = () => ({
-          getSystem: () => ({ resolutionMode: 'simple' }),
-        });
       },
     },
     {
@@ -1843,6 +1926,7 @@ test('CraftingEngine records a non-consuming fizzle without touching submitted s
 
 test('CraftingEngine check preflight is read-only and a missing trusted result writes no journal', async () => {
   const { engine, runManager } = setupEngineFixture();
+  const restoreDie = installCoreDie();
   const actor = new FakeActor('crafter');
   actor.name = 'Tinker';
   const source = new FakeActor('source');
@@ -1861,13 +1945,17 @@ test('CraftingEngine check preflight is read-only and a missing trusted result w
       alias: speakerActor.name,
     }),
   };
-  game.fabricate.getCraftingSystemManager = () => ({
-    getSystem: () => ({
-      resolutionMode: 'simple',
-      features: { craftingChecks: true },
-      craftingCheck: { simple: { rollFormula: '1d20 + 3', dc: 12 } },
-    }),
-  });
+  const system = {
+    resolutionMode: 'simple',
+    features: { craftingChecks: true },
+    craftingCheck: {
+      simple: {
+        rollFormula: '1d20 + 3', dc: 12,
+        evaluation: { product: 'sum', direction: 'over', pool: { required: 3 } },
+      },
+    },
+  };
+  game.fabricate.getCraftingSystemManager = () => ({ getSystem: () => system });
   engine.installVersionedRunAuthority({
     consumeExecutionGrant: async (_grant, context) => ({
       operationId: `${context.operation}-operation`,
@@ -1884,6 +1972,10 @@ test('CraftingEngine check preflight is read-only and a missing trusted result w
   // A check is describable only once every other stage requirement is met, elapsed time
   // included, so the preflight runs against a matured gate.
   game.time.worldTime = 1120;
+  const originalI18n = game.i18n;
+  game.i18n = {
+    localize: (key) => key === 'FABRICATE.App.Nav.Crafting' ? 'Artesanía' : key,
+  };
 
   try {
     const descriptor = await engine.describeVersionedStageCheck({
@@ -1894,9 +1986,22 @@ test('CraftingEngine check preflight is read-only and a missing trusted result w
     });
     assert.deepEqual(descriptor.publicPrompt, {
       label: 'Sun Tea',
+      activity: 'Artesanía',
+      subject: 'Sun Tea',
+      actorName: 'Tinker',
+      img: 'icons/sundries/documents/blueprint-recipe-alchemical.webp',
+      formula: '1d20 + 3',
+      resolvedFormula: null,
+      displayFormula: '1d20 + 3',
+      target: 12,
+      direction: 'over',
+      comparison: 'meet',
+      selectedModifiers: [],
       mode: 'simple',
       allowsSituationalModifier: true,
+      offerSituationalBonus: true,
       allowAdvantage: true,
+      advantageOffer: { advantage: true, disadvantage: true, kind: 'keep', detail: null },
       modifierChoice: null,
     });
     assert.equal(descriptor.privateEvaluation.rollFormula, '1d20 + 3');
@@ -1904,6 +2009,11 @@ test('CraftingEngine check preflight is read-only and a missing trusted result w
     assert.equal(descriptor.privateEvaluation.decisionPolicy.dc, 12);
     assert.deepEqual(descriptor.privateEvaluation.speaker, expectedSpeaker);
     assert.equal(descriptor.privateEvaluation.flavor, 'Sun Tea — Crafting check (DC 12)');
+    assert.deepEqual(descriptor.privateEvaluation.checkConfig.evaluation, {
+      product: 'sum', direction: 'over', pool: { required: 3 },
+    });
+    system.craftingCheck.simple.evaluation.pool.required = 12;
+    assert.equal(descriptor.privateEvaluation.checkConfig.evaluation.pool.required, 3);
 
     const originalRoll = globalThis.Roll;
     const posts = [];
@@ -1933,6 +2043,12 @@ test('CraftingEngine check preflight is read-only and a missing trusted result w
     try {
       const privateEvaluation = JSON.parse(JSON.stringify(descriptor.privateEvaluation));
       const evaluated = await evaluatePreparedRunCheck(privateEvaluation, actor);
+      assert.deepEqual(
+        Object.fromEntries(['product', 'direction', 'comparison', 'target', 'margin', 'successes', 'cancelled']
+          .map((key) => [key, evaluated.data[key]])),
+        { product: 'sum', direction: 'over', comparison: 'meet', target: 12, margin: 3,
+          successes: null, cancelled: null }
+      );
       const handoff = JSON.parse(JSON.stringify(evaluated.rollHandoff));
       const posted = await postCheckRollHandoff(handoff, { Roll: ReconstructedRoll });
       assert.equal(posted.success, true);
@@ -1943,6 +2059,8 @@ test('CraftingEngine check preflight is read-only and a missing trusted result w
       else globalThis.Roll = originalRoll;
     }
   } finally {
+    game.i18n = originalI18n;
+    restoreDie();
     if (originalChatMessage === undefined) delete globalThis.ChatMessage;
     else globalThis.ChatMessage = originalChatMessage;
   }
@@ -1965,6 +2083,614 @@ test('CraftingEngine check preflight is read-only and a missing trusted result w
   // The start committed its own journal; the refused execute neither planned nor changed one.
   assert.equal(unchanged.executionJournal.status, 'committed');
   assert.equal(unchanged.executionJournal.intent.trigger, 'start');
+});
+
+/** A prepared check's decision as the Journal command binds it: the bonus rides the authority
+ * gate the public prompt published, never the display offer. */
+function boundDecision(publicPrompt, bonus) {
+  return { bonus, allowsSituationalModifier: publicPrompt.allowsSituationalModifier === true };
+}
+
+test('a prepared offer-false check still applies a decision bonus of 2 (issue 2005)', async () => {
+  const rolled = [];
+  const originalRoll = globalThis.Roll;
+  globalThis.Roll = class OfferRoll {
+    constructor(formula) {
+      this.formula = formula;
+      this.total = formula.endsWith('+ (2)') ? 12 : 10;
+      this.dice = [];
+    }
+    static validate() { return true; }
+    async evaluate() {
+      rolled.push(this.formula);
+      return this;
+    }
+    toJSON() { return { formula: this.formula, total: this.total, terms: [] }; }
+  };
+  try {
+    const { engine, recipe } = setupEngineFixture();
+    const actor = new FakeActor('offer-off');
+    const source = new FakeActor('offer-source');
+    const system = {
+      resolutionMode: 'simple',
+      features: { craftingChecks: true },
+      craftingCheck: { simple: { rollFormula: '1d20', dc: 12, offerSituationalBonus: false } },
+    };
+    game.fabricate.getCraftingSystemManager = () => ({ getSystem: () => system });
+    const started = await startReadyVersionedRun({ engine, recipe, actor, source });
+    game.time.worldTime = 1120;
+    const crafting = await engine.describeVersionedStageCheck({
+      actor, componentSourceActors: [source], runId: started.runId,
+      preparationGrant: 'prepare-grant',
+    });
+    assert.equal(crafting.publicPrompt.offerSituationalBonus, false, 'the prompt hides the field');
+    assert.equal(crafting.publicPrompt.allowsSituationalModifier, true, 'the gate stays open');
+    const crafted = await evaluatePreparedRunCheck(
+      JSON.parse(JSON.stringify(crafting.privateEvaluation)), actor,
+      boundDecision(crafting.publicPrompt, '2')
+    );
+    assert.equal(rolled.at(-1), '1d20 + (2)', 'the bonus still reaches the roll');
+    assert.equal(crafted.success, true, '10 + 2 meets 12');
+
+    const gathering = gatheringFixture({ mode: 'routed' });
+    gathering.system.gatheringCraftingCheck.routed.offerSituationalBonus = false;
+    const described = new GatheringEngine({ localize: (key) => key })._versionedCheckDescriptor({
+      actor: { uuid: 'Actor.g', system: {} },
+      run: { taskId: gathering.task.id },
+      ...gathering,
+    });
+    assert.equal(described.publicPrompt.offerSituationalBonus, false);
+    assert.equal(described.publicPrompt.allowsSituationalModifier, true);
+    await evaluatePreparedRunCheck(
+      JSON.parse(JSON.stringify(described.privateEvaluation)), actor,
+      boundDecision(described.publicPrompt, '2')
+    );
+    assert.equal(rolled.at(-1), '1d20 + (2)');
+  } finally {
+    if (originalRoll === undefined) delete globalThis.Roll;
+    else globalThis.Roll = originalRoll;
+  }
+});
+
+/** Starts a ready versioned run whose one Tool is supplied by a second actor's item. */
+async function startToolSuppliedRun(
+  tool,
+  { resolutionMode = 'simple', slot = 'simple', check = { rollFormula: '1d20', dc: 12 } } = {}
+) {
+  const { engine, recipe, recipeManager, runManager } = setupEngineFixture();
+  const actor = new FakeActor('tool-crafter');
+  const source = new FakeActor('tool-owner');
+  actor.getRollData = () => ({ bonus: 99 });
+  source.getRollData = () => ({ bonus: 2 });
+  const system = {
+    resolutionMode,
+    features: { craftingChecks: true },
+    craftingCheck: { [slot]: check },
+  };
+  game.fabricate.getCraftingSystemManager = () => ({ getSystem: () => system });
+  const started = await startReadyVersionedRun({ engine, recipe, actor, source });
+  game.time.worldTime = 1120;
+  recipeManager.getToolsForSet = () => [tool];
+  recipeManager.resolveToolStates = () => [{ available: true, contributionInput: {
+    tool, matchedItem: { parent: source }, primaryActor: actor,
+  } }];
+  const describe = () => engine.describeVersionedStageCheck({
+    actor, componentSourceActors: [source], runId: started.runId,
+    preparationGrant: 'prepare-grant',
+  });
+  const revision = () => {
+    runManager.invalidateCache();
+    return runManager.getActiveRun(actor, started.runId).runRevision;
+  };
+  return { actor, source, describe, revision };
+}
+
+function installPreparedRolls(evaluations, posted) {
+  const previousRoll = globalThis.Roll;
+  const previousChat = globalThis.ChatMessage;
+  class PreparedRoll {
+    constructor(formula, data) {
+      this.formula = formula;
+      this.data = data;
+      this.total = formula === '1d4+@bonus' ? 3 : Number(formula) || 16;
+      this.dice = formula === '1d4+@bonus' ? [{}] : [];
+    }
+    async evaluate() { evaluations.push({ formula: this.formula, data: this.data }); return this; }
+    toJSON() { return { formula: this.formula, total: this.total }; }
+    async toMessage() { posted.push({ rolls: [this] }); }
+    static fromData(data) { return new PreparedRoll(data.formula); }
+    static validate() { return true; }
+    static replaceFormulaData(formula) { return formula; }
+  }
+  globalThis.Roll = PreparedRoll;
+  globalThis.ChatMessage = { getSpeaker: () => ({ alias: 'Tinker' }),
+    create: async (data) => posted.push(data) };
+  return {
+    PreparedRoll,
+    restore() {
+      if (previousRoll === undefined) delete globalThis.Roll;
+      else globalThis.Roll = previousRoll;
+      if (previousChat === undefined) delete globalThis.ChatMessage;
+      else globalThis.ChatMessage = previousChat;
+    },
+  };
+}
+
+test('a versioned Journal check applies a flat Tool bonus from its supplying actor', async () => {
+  const tool = { id: 'hammer', label: 'Hammer', bonus: { enabled: true, expression: '2' } };
+  const { actor, describe } = await startToolSuppliedRun(tool);
+  const evaluations = [];
+  const { restore } = installPreparedRolls(evaluations, []);
+  try {
+    const snapshot = JSON.parse(JSON.stringify((await describe()).privateEvaluation));
+    assert.equal(snapshot.rollFormula, '1d20 + 2[Hammer]');
+    await evaluatePreparedRunCheck(snapshot, actor);
+    assert.deepEqual(evaluations.map(({ formula }) => formula), ['2', '1d20 + 2[Hammer]']);
+  } finally {
+    restore();
+  }
+});
+
+test('the versioned crafting descriptor refuses its target before the Tool roll and captures it', async () => {
+  const tool = { id: 'hammer', label: 'Hammer', bonus: { enabled: true, expression: '1d4+@bonus' } };
+  const skill = { product: 'sum', direction: 'over', target: { source: 'attribute', expression: '@skill' } };
+  const evaluations = [];
+  const { restore } = installPreparedRolls(evaluations, []);
+  try {
+    for (const [options, reason] of [
+      [{ check: { rollFormula: '1d20', dc: 12, evaluation: skill } },
+        'the character value its target reads was not found'],
+      [{
+        resolutionMode: 'progressive',
+        slot: 'progressive',
+        check: { rollFormula: '1d20', evaluation: { product: 'sum', direction: 'under' } },
+      }, 'a progressive check cannot roll under a target'],
+    ]) {
+      const { describe, revision } = await startToolSuppliedRun(tool, options);
+      const before = revision();
+      await assert.rejects(describe, {
+        code: 'CHECK_TARGET_INVALID',
+        message: `Crafting check cannot roll: ${reason}.`,
+      });
+      assert.equal(revision(), before, `${reason}: the run is untouched`);
+    }
+    assert.deepEqual(evaluations, [], 'no Tool die rolls before a refusal');
+
+    const { actor, describe } = await startToolSuppliedRun(tool, {
+      check: { rollFormula: '1d20', dc: 12, evaluation: skill },
+    });
+    actor.getRollData = () => ({ bonus: 99, skill: 16 });
+    const { publicPrompt, privateEvaluation } = await describe();
+    assert.deepEqual(evaluations.map(({ formula }) => formula), ['1d4+@bonus']);
+    const { dc, target, targetSource } = privateEvaluation.decisionPolicy;
+    assert.deepEqual({ dc, target, targetSource }, { dc: null, target: 16, targetSource: 'attribute' });
+    assert.equal(privateEvaluation.flavor, 'Sun Tea — Crafting check', 'the Target is named at roll time');
+    assert.deepEqual([publicPrompt.target, publicPrompt.direction], [16, 'over']);
+    assert.equal(publicPrompt.targetSource, 'attribute', 'the prompt names a target, not a DC (QE4)');
+    const surface = stubPromptSurface(() => null);
+    try {
+      await promptJournalStageCheck(publicPrompt);
+    } finally {
+      surface.restore();
+    }
+    assert.equal(surface.view.chipText, 'Target 16 · meet or beat');
+    assert.equal(JSON.stringify(publicPrompt).includes('@skill'), false, 'the expression stays private');
+  } finally {
+    restore();
+  }
+});
+
+test('a fixed-range roll-under Journal descriptor names no Target in its flavor', async () => {
+  const tool = { id: 'hammer', label: 'Hammer', bonus: { enabled: true, expression: '2' } };
+  const under = { product: 'sum', direction: 'under', target: { source: 'fixed' } };
+  const { describe } = await startToolSuppliedRun(tool, {
+    resolutionMode: 'routedByCheck',
+    slot: 'routed',
+    check: {
+      rollFormula: '1d20',
+      dc: 12,
+      type: 'fixed',
+      fixedOutcomes: [{ id: 'all', name: 'All', success: true, start: 1, end: 20 }],
+      evaluation: under,
+    },
+  });
+  const { restore } = installPreparedRolls([], []);
+  try {
+    const { publicPrompt, privateEvaluation } = await describe();
+    assert.equal(publicPrompt.target, null, 'a fixed range grades no target');
+    assert.doesNotMatch(privateEvaluation.flavor, /Target/);
+  } finally {
+    restore();
+  }
+});
+
+test('a roll-under versioned prompt names its pre-modifier target through the Journal adapter', async () => {
+  const tool = { id: 'hammer', label: 'Hammer', bonus: { enabled: true, expression: '2' } };
+  const under = { product: 'sum', direction: 'under' };
+  const { describe } = await startToolSuppliedRun(tool, {
+    check: { rollFormula: '1d20', dc: 12, thresholdMode: 'exceed', evaluation: under },
+  });
+  const { restore } = installPreparedRolls([], []);
+  try {
+    const { publicPrompt } = await describe();
+    assert.deepEqual([publicPrompt.target, publicPrompt.direction, publicPrompt.comparison], [12, 'under', 'exceed']);
+    assert.equal(publicPrompt.displayFormula, '1d20', 'the Tool scalar raises the target, not the roll');
+    let received;
+    await promptJournalStageCheck(publicPrompt, async (options) => {
+      received = options;
+    });
+    const view = buildSinglePromptData(received);
+    assert.deepEqual([view.dc, view.direction, view.comparison], [12, 'under', 'exceed']);
+    assert.deepEqual([publicPrompt.targetBasis, publicPrompt.toolBonus], [null, 2]);
+    const surface = stubPromptSurface(() => null);
+    try {
+      await promptJournalStageCheck(publicPrompt);
+    } finally {
+      surface.restore();
+    }
+    assert.deepEqual(rollPromptTarget(surface.view, []), {
+      chipText: 'Target 14 · stay under', source: 'Base 12 · tools +2',
+    }, 'the chip names the target the rolled Tool bonus already raised');
+  } finally {
+    restore();
+  }
+});
+
+test('a roll-under versioned prompt explains a character-value target through the Journal adapter', async () => {
+  const tool = { id: 'hammer', label: 'Hammer', bonus: { enabled: true, expression: '2' } };
+  const target = { source: 'attribute', expression: '@bonus', baseAdjustment: -90 };
+  const { describe } = await startToolSuppliedRun(tool, {
+    check: { rollFormula: '1d20', dc: 12, evaluation: { product: 'sum', direction: 'under', target } },
+  });
+  const { restore } = installPreparedRolls([], []);
+  const surface = stubPromptSurface(() => null);
+  try {
+    const { publicPrompt } = await describe();
+    assert.equal(publicPrompt.target, 9);
+    assert.deepEqual(publicPrompt.targetBasis, {
+      expression: '@bonus', value: 99, adjustment: { kind: 'add', value: -90, label: '' },
+    });
+    await promptJournalStageCheck(publicPrompt);
+    assert.deepEqual(rollPromptTarget(surface.view, []), {
+      chipText: 'Target 11 · stay at or under', source: '@bonus 99 · difficulty −90 · tools +2',
+    });
+  } finally {
+    surface.restore();
+    restore();
+  }
+});
+
+test('a count versioned prompt shows its Tool-settled pool line and successes through the Journal adapter', async () => {
+  const tool = { id: 'hammer', label: 'Hammer', bonus: { enabled: true, expression: '1d4' } };
+  const evaluation = countEvaluation({
+    direction: 'under', die: 20, base: '@skill', threshold: '13', required: 2, modifierDestination: 'threshold',
+  });
+  const { actor, describe } = await startToolSuppliedRun(tool, {
+    check: { rollFormula: '1d20', dc: 12, thresholdMode: 'exceed', evaluation },
+  });
+  actor.getRollData = () => ({ skill: 3.7 });
+  const dice = installCountDice({ faces: [4] });
+  const surface = stubPromptSurface(() => null);
+  try {
+    const { publicPrompt } = await describe();
+    await promptJournalStageCheck(publicPrompt);
+    const { view } = surface;
+    assert.equal(
+      view.formula,
+      '3d20 · each < 17',
+      'the pool 3.7 rounded down, and the threshold moved by the Tool die rolled before the prompt'
+    );
+    assert.equal(view.labels.formulaNote, 'Success on < 17, moved +4 by modifiers');
+    assert.deepEqual([publicPrompt.threshold, publicPrompt.thresholdAnchor], [17, 13]);
+    assert.equal(view.neededText, '2 successes needed');
+    assert.deepEqual([view.dc, view.dcText, view.allowAdvantage], [null, '', true]);
+    assert.equal(view.labels.eachAdds, 'Each moves the threshold.');
+  } finally {
+    surface.restore();
+    dice.restore();
+  }
+});
+
+test('a fixed-range routed count versioned prompt names no required count', async () => {
+  const tool = { id: 'hammer', label: 'Hammer', bonus: { enabled: true, expression: '1' } };
+  const ranges = [{ id: 'plain', name: 'Plain', success: true, start: 0, end: 9 }];
+  const described = async (type) => {
+    const check = {
+      rollFormula: '', dc: 12, type, thresholdMode: 'meet', fixedOutcomes: ranges,
+      relativeOutcomes: [{ id: 'fine', name: 'Fine', success: true, dc: 0 }],
+      evaluation: countEvaluation({ base: '2', required: 3 }),
+    };
+    const { describe } = await startToolSuppliedRun(tool, {
+      resolutionMode: 'routedByCheck', slot: 'routed', check,
+    });
+    return (await describe()).publicPrompt;
+  };
+  const dice = installCountDice({ faces: [] });
+  try {
+    const fixed = await described('fixed');
+    assert.deepEqual([fixed.product, fixed.pool, fixed.required], ['count', 3, null], 'the Tool +1 settled on the pool');
+    assert.equal((await described('relative')).required, 3);
+  } finally {
+    dice.restore();
+  }
+});
+
+test('the versioned count descriptor refuses before the Tool roll and captures its policy privately', async () => {
+  const tool = { id: 'hammer', label: 'Hammer', bonus: { enabled: true, expression: '1d4' } };
+  const check = (pool) => ({
+    rollFormula: '1d20',
+    dc: 12,
+    evaluation: countEvaluation({ base: '@skill', ...pool }),
+  });
+  const dice = installCountDice({ faces: [2, 9, 3, 8, 7] });
+  try {
+    const refused = await startToolSuppliedRun(tool, { check: check({}) });
+    const before = refused.revision();
+    await assert.rejects(refused.describe, {
+      code: 'CHECK_TARGET_INVALID',
+      message: 'Crafting check cannot roll: its dice pool reads @skill, which this character does not have.',
+    });
+    assert.equal(refused.revision(), before, 'the run is untouched');
+    assert.deepEqual(dice.constructed, [], 'no Tool die rolls before the refusal');
+
+    const { actor, describe } = await startToolSuppliedRun(tool, { check: check({}) });
+    actor.getRollData = () => ({ bonus: 99, skill: 2 });
+    const { publicPrompt, privateEvaluation } = await describe();
+    assert.deepEqual(dice.formulas(), ['1d4'], 'the Tool rolls once, after validation');
+    const { dc, target, targetSource, count } = privateEvaluation.decisionPolicy;
+    assert.deepEqual([dc, target, targetSource], [null, null, null]);
+    assert.deepEqual([count.base, count.threshold, count.required, count.die], [2, 8, 1, 10]);
+    assert.equal(privateEvaluation.flavor, 'Sun Tea — Crafting check', 'no DC suffix');
+    assert.deepEqual(
+      [publicPrompt.target, publicPrompt.allowAdvantage, publicPrompt.allowsSituationalModifier],
+      [null, true, true],
+      'the count rule offers advantage, never the retained 1d20, and names no target'
+    );
+    assert.deepEqual(
+      [publicPrompt.formula, publicPrompt.displayFormula, publicPrompt.resolvedFormula],
+      ['', '', null],
+      'the inert retained formula never reaches the prompt'
+    );
+    assert.equal(JSON.stringify(publicPrompt).includes('@skill'), false);
+
+    const snapshot = JSON.parse(JSON.stringify(privateEvaluation));
+    actor.getRollData = () => ({ bonus: 99, skill: 6 });
+    const result = await evaluatePreparedRunCheck(snapshot, actor);
+    assert.deepEqual(
+      dice.formulas(),
+      ['1d4', '4d10'],
+      'the captured base 2 plus the Tool 2, never the live 6, and the Tool never rerolls'
+    );
+    assert.deepEqual([result.data.total, result.success], [2, true], '9 and 8 qualify');
+  } finally {
+    dice.restore();
+  }
+});
+
+test('an unusable optional check describes as not required, whatever its target', async () => {
+  const tool = { id: 'hammer', label: 'Hammer', bonus: { enabled: true, expression: '1d4+@bonus' } };
+  const skill = { product: 'sum', direction: 'over', target: { source: 'attribute', expression: '@skill' } };
+  const describeUnusable = async (evaluation) => {
+    const evaluations = [];
+    const { restore } = installPreparedRolls(evaluations, []);
+    try {
+      const { actor, describe } = await startToolSuppliedRun(tool, {
+        check: { rollFormula: '', dc: 12, evaluation },
+      });
+      actor.getRollData = () => ({});
+      return { required: (await describe()).required, rolled: evaluations.map((e) => e.formula) };
+    } finally {
+      restore();
+    }
+  };
+  const attribute = await describeUnusable(skill);
+  assert.equal(attribute.required, false, 'no check rolls, so its missing target never refuses');
+  // The descriptor prepares its Tools for an unusable check at base too; the target adds no roll.
+  assert.deepEqual(attribute, await describeUnusable(undefined));
+});
+
+test('the versioned prompt derives its formula with the evaluation, so sum/under appends nothing', async () => {
+  const tool = { id: 'hammer', label: 'Hammer', bonus: { enabled: true, expression: '2' } };
+  const { restore } = installPreparedRolls([], []);
+  try {
+    const promptFormula = async (evaluation) => {
+      const { describe } = await startToolSuppliedRun(tool, {
+        check: { rollFormula: '1d20', dc: 12, evaluation },
+      });
+      const system = game.fabricate.getCraftingSystemManager().getSystem();
+      system.modifiers = [{ id: 'knack', label: 'Knack', expression: '2' }];
+      Object.assign(system.craftingCheck, {
+        defaultModifierPolicy: 'addAll',
+        defaultModifierIds: ['knack'],
+      });
+      return (await describe()).publicPrompt.formula;
+    };
+    assert.equal(await promptFormula({ product: 'sum', direction: 'under' }), '1d20');
+    assert.match(await promptFormula(undefined), /^1d20 \+ 2\[Hammer\] \+ .*2/);
+  } finally {
+    restore();
+  }
+});
+
+test('real prepared Tool collection snapshots one roll and reuses it for every evaluation', async () => {
+  const tool = { id: 'hammer', label: 'Hammer', bonus: { enabled: true, expression: '1d4+@bonus' } };
+  const { actor, source, describe } = await startToolSuppliedRun(tool);
+  const evaluations = [];
+  const posted = [];
+  const { PreparedRoll, restore } = installPreparedRolls(evaluations, posted);
+  try {
+    const snapshot = JSON.parse(JSON.stringify((await describe()).privateEvaluation));
+    const toolContributions = snapshot.checkConfig.toolContributions;
+    assert.equal(toolContributions[0].value, 3);
+    assert.equal(toolContributions[0].preRoll.expression, '1d4+@bonus');
+    source.getRollData = () => ({ bonus: 100 });
+
+    const appended = await evaluatePreparedRunCheck(snapshot, actor);
+    assert.deepEqual(evaluations.map(({ formula }) => formula),
+      ['1d4+@bonus', '1d20 + 3[Hammer]']);
+    assert.deepEqual(evaluations[0].data, { bonus: 2 });
+    assert.equal(Object.hasOwn(appended.data, 'preRolls'), false, 'sum/over adds no roll evidence');
+    const single = JSON.parse(JSON.stringify(appended.rollHandoff));
+    assert.equal(Object.hasOwn(single, 'serializedPreRolls'), false);
+    assert.equal((await postCheckRollHandoff(single, { Roll: PreparedRoll })).success, true);
+    assert.deepEqual(posted[0].rolls.map(({ formula }) => formula), ['1d20 + 3[Hammer]']);
+
+    const routed = await evaluatePreparedCheck({
+      formula: '1d20',
+      options: {
+        toolContributions, rollMode: 'selfroll', evaluation: { product: 'sum', direction: 'under' },
+      },
+    }, actor);
+    assert.deepEqual(routed.modifierPlacement.preRolls.map(({ expression, total }) =>
+      ({ expression, total })), [{ expression: '1d4+@bonus', total: 3 }]);
+    const handoff = JSON.parse(JSON.stringify(routed.rollHandoff));
+    assert.equal(handoff.serializedPreRolls.length, 1);
+    assert.equal((await postCheckRollHandoff(handoff, { Roll: PreparedRoll })).success, true);
+    assert.deepEqual(posted[1].rolls.map(({ formula }) => formula), ['1d20', '1d4+@bonus']);
+    assert.equal(evaluations.length, 3, 'the Tool is never rolled again');
+  } finally {
+    restore();
+  }
+});
+
+test('versioned Journal preparation freezes modifier contributions across actor and library edits', async () => {
+  const originalRoll = globalThis.Roll;
+  const rolledFormulas = [];
+  class PreparedModifierRoll {
+    constructor(formula) {
+      this.formula = formula;
+      this.total = 17;
+      this.dice = [];
+    }
+    static replaceFormulaData(formula, data, { missing = '0' } = {}) {
+      return formula.replace(/@([\w.]+)/g, (_match, path) => {
+        const value = path.split('.').reduce((entry, key) => entry?.[key], data);
+        return value === undefined ? missing : String(value);
+      });
+    }
+    static validate() { return true; }
+    evaluateSync() { return this; }
+    async evaluate() {
+      rolledFormulas.push(this.formula);
+      return this;
+    }
+    toJSON() { return { formula: this.formula, total: this.total, terms: [] }; }
+  }
+  globalThis.Roll = PreparedModifierRoll;
+  try {
+    for (const policy of ['addAll', 'playerPicks']) {
+      const { engine, recipe } = setupEngineFixture();
+      let toolAppendCalls = 0;
+      engine._prepareToolCheckBonuses = async (formula, _tools, evaluation) => {
+        toolAppendCalls += 1;
+        return { formula: `${formula} + 2[Tool]`, contributions: [], evaluation };
+      };
+      const actor = new FakeActor(`journal-${policy}`);
+      actor.name = 'Tinker';
+      actor.system = { focus: 3, spark: 1 };
+      actor.getRollData = () => actor.system;
+      const system = {
+        resolutionMode: 'simple',
+        craftingCheck: {
+          simple: { rollFormula: '1d20', dc: 12 },
+          defaultModifierPolicy: policy,
+          defaultModifierIds: ['focus', 'spark'],
+          maxModifierPicks: 2,
+        },
+        modifiers: [
+          { id: 'focus', label: 'Focus', expression: '@focus' },
+          { id: 'spark', label: 'Spark', expression: '1d4+@spark' },
+        ],
+      };
+      game.fabricate.getCraftingSystemManager = () => ({ getSystem: () => system });
+      const source = new FakeActor('source');
+      const started = await startReadyVersionedRun({
+        engine, recipe, actor, source,
+      });
+      game.time.worldTime = 1120;
+      const descriptor = await engine.describeVersionedStageCheck({
+        actor, componentSourceActors: [source], runId: started.runId,
+        preparationGrant: 'prepare-grant',
+      });
+      assert.equal(descriptor.publicPrompt.actorName, 'Tinker');
+      assert.equal(descriptor.publicPrompt.subject, 'Sun Tea');
+      assert.equal(descriptor.publicPrompt.target, 12);
+      assert.equal(descriptor.publicPrompt.comparison, 'meet');
+      assert.equal(toolAppendCalls, 1);
+      assert.equal(rolledFormulas.length, policy === 'addAll' ? 0 : 1);
+      assert.equal(descriptor.privateEvaluation.rollFormula, '1d20 + 2[Tool]');
+      assert.ok(!Object.hasOwn(descriptor.publicPrompt, 'checkConfig'));
+      if (policy === 'playerPicks') {
+        assert.deepEqual(descriptor.publicPrompt.selectedModifiers, []);
+        assert.deepEqual(descriptor.publicPrompt.modifierChoice.modifiers.map(({ id }) => id), ['focus', 'spark']);
+        assert.ok(!Object.hasOwn(descriptor.publicPrompt.modifierChoice.modifiers[1], 'formula'));
+        assert.deepEqual(descriptor.publicPrompt.modifierChoice.modifiers.map(({ value }) => value), [3, null],
+          'a flat pick carries the number a roll-under prompt adds to its target; a rolled one none');
+      } else {
+        assert.equal(descriptor.publicPrompt.formula, '1d20 + 2[Tool] + 3[Modifiers] + (1d4+1)[Modifiers]');
+        assert.equal(descriptor.publicPrompt.displayFormula, '1d20 + 2[Tool]', 'Tool terms stay, chips do not');
+        assert.deepEqual(descriptor.publicPrompt.selectedModifiers.map(({ label, display }) => ({ label, display })), [
+          { label: 'Focus', display: '+3' },
+          { label: 'Spark', display: '+1d4+1' },
+        ]);
+        assert.deepEqual(descriptor.publicPrompt.selectedModifiers.map(({ value }) => value), [3, null]);
+      }
+      actor.system.focus = 9;
+      actor.system.spark = 8;
+      system.modifiers[0].expression = '77';
+      system.modifiers[1].expression = '8d8';
+      const decision = policy === 'playerPicks' ? { modifierIds: ['focus', 'spark'] } : {};
+      const evaluated = await evaluatePreparedRunCheck(
+        JSON.parse(JSON.stringify(descriptor.privateEvaluation)), actor, decision
+      );
+      assert.equal(evaluated.success, true);
+      assert.equal(rolledFormulas.at(-1), '1d20 + 2[Tool] + 3[Modifiers] + (1d4+1)[Modifiers]');
+      assert.equal(rolledFormulas.length, policy === 'addAll' ? 1 : 2);
+      if (policy !== 'playerPicks') continue;
+      // A prompt that offered no choice sends no ids: absent rolls the defaults, empty rolls none.
+      for (const [unanswered, expected] of [
+        [{}, '1d20 + 2[Tool] + 3[Modifiers] + (1d4+1)[Modifiers]'],
+        [{ modifierIds: null }, '1d20 + 2[Tool] + 3[Modifiers] + (1d4+1)[Modifiers]'],
+        [{ modifierIds: [] }, '1d20 + 2[Tool]'],
+      ]) {
+        await evaluatePreparedRunCheck(
+          JSON.parse(JSON.stringify(descriptor.privateEvaluation)), actor, unanswered
+        );
+        assert.equal(rolledFormulas.at(-1), expected, JSON.stringify(unanswered));
+      }
+    }
+  } finally {
+    if (originalRoll === undefined) delete globalThis.Roll;
+    else globalThis.Roll = originalRoll;
+  }
+});
+
+test('versioned Journal prompts keep routed and progressive targets private', async () => {
+  for (const mode of ['routedByCheck', 'progressive']) {
+    const { engine, recipe } = setupEngineFixture();
+    const actor = new FakeActor(`journal-${mode}`);
+    const system = {
+      resolutionMode: mode,
+      craftingCheck: {
+        routed: { rollFormula: '1d20', type: 'relative', dc: 12,
+          relativeOutcomes: [{ id: 'pass', name: 'Pass', dc: 0 }] },
+        progressive: { rollFormula: '1d20' },
+      },
+    };
+    game.fabricate.getCraftingSystemManager = () => ({ getSystem: () => system });
+    const source = new FakeActor('source');
+    const started = await startReadyVersionedRun({
+      engine, recipe, actor, source,
+    });
+    game.time.worldTime = 1120;
+    const descriptor = await engine.describeVersionedStageCheck({
+      actor, componentSourceActors: [source], runId: started.runId,
+      preparationGrant: 'prepare-grant',
+    });
+    assert.equal(descriptor.publicPrompt.target, null);
+    assert.equal(descriptor.publicPrompt.comparison, null);
+    if (mode === 'routedByCheck') assert.equal(descriptor.privateEvaluation.decisionPolicy.dc, 12);
+  }
 });
 
 test('CraftingEngine world-time execution keeps an input stage blocked with zero journal effects', async () => {

@@ -23,6 +23,7 @@ const SCOPED_RAW_MODULES = [
   ...FOUNDRY_BRIDGE_RAW_MODULES,
   'src/ui/svelte/apps/manager/scoped/scopedStudio.js',
   'src/ui/svelte/apps/manager/scoped/essenceScoped.js',
+  'src/ui/svelte/apps/manager/scoped/componentScoped.js',
   'src/ui/svelte/stores/worldScopeProjection.js',
   // Issue 1392 (epic 1357, PR 7a): `worldScopeProjection.js` counts the World Vocabulary's
   // per-entry references now, so its own static closure reaches the vocabulary core and the
@@ -125,6 +126,7 @@ const entryHarness = createMountedComponentHarness({
     ...SHELL_MODULES,
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/EditorTabs.svelte',
+    'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/apps/manager/IconFactRow.svelte',
     'src/ui/svelte/components/EditorValidationSurface.svelte',
@@ -133,6 +135,7 @@ const entryHarness = createMountedComponentHarness({
     'src/ui/svelte/components/IconPicker.svelte',
     'src/ui/svelte/components/ManagerColorPopover.svelte',
     'src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte',
+    'src/ui/svelte/apps/manager/scoped/ScopedEntrySystemsCard.svelte',
     'src/ui/svelte/apps/manager/scoped/WorldEssenceEntryPage.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/scoped/WorldEssenceEntryPage.svelte',
@@ -173,6 +176,16 @@ function essenceScope() {
       ],
     },
     systems: ROSTER,
+    usage: {
+      ash: {
+        componentCount: 1,
+        previewCarrier: {
+          id: 'ash-carrier',
+          name: 'Ashen Thread',
+          img: 'icons/commodities/materials/thread-plain-grey.webp',
+        },
+      },
+    },
   });
 }
 
@@ -215,6 +228,50 @@ after(() => {
   pageHarness.teardown();
   shellHarness.teardown();
   entryHarness.teardown();
+});
+
+describe('the essence catalogue opens with its first shown row inspected', () => {
+  function selectedIds(root) {
+    return [...root.querySelectorAll('[data-scoped-list-row].is-selected')].map((row) =>
+      row.getAttribute('data-scoped-list-row')
+    );
+  }
+
+  function search(root, value) {
+    const input = root.querySelector('[data-scoped-list-search]');
+    input.value = value;
+    input.dispatchEvent(new root.ownerDocument.defaultView.Event('input', { bubbles: true }));
+    flushSync();
+  }
+
+  it('inspects the first row without moving the choice when a filter hides it', async () => {
+    const root = await pageHarness.mount(pageProps());
+    assert.deepEqual(selectedIds(root), ['ash']);
+    assert.equal(root.querySelector('[data-scoped-list-inspector-name]').textContent.trim(), 'Ash');
+
+    search(root, 'no matching essence');
+    assert.deepEqual(selectedIds(root), [], 'the selected id remains valid while no row is shown');
+    assert.ok(root.querySelector('[data-scoped-list-inspector-state="resting"]'));
+
+    search(root, '');
+    assert.deepEqual(selectedIds(root), ['ash'], 'clearing the filter restores the same choice');
+  });
+
+  it('waits for late data and does not replace an id whose record was deleted', async () => {
+    const empty = essenceScope();
+    empty.entries = [];
+    const root = await pageHarness.mount(pageProps({ scope: empty }));
+    assert.deepEqual(selectedIds(root), []);
+
+    await pageHarness.setProps({ scope: essenceScope() });
+    assert.deepEqual(selectedIds(root), ['ash'], 'the first late-loaded row is selected');
+
+    const withoutAsh = essenceScope();
+    withoutAsh.entries = withoutAsh.entries.filter((entry) => entry.id !== 'ash');
+    await pageHarness.setProps({ scope: withoutAsh });
+    assert.deepEqual(selectedIds(root), [], 'a stale catalogue id leaves the inspector resting');
+    assert.ok(root.querySelector('[data-scoped-list-inspector-state="resting"]'));
+  });
 });
 
 describe('criterion 4 — the essence catalogue renders NO source-item affordance', () => {
@@ -439,6 +496,16 @@ describe('the world essence entry editor buffers its edit until Save', () => {
     assert.equal(reported.dirty.at(-1), true, 'the header button was never told to enable');
   });
 
+  it('pairs the projected carrier name and artwork in the preview', async () => {
+    const { root } = await mountEntry();
+    const component = root.querySelector('[data-essence-preview-component]');
+    assert.equal(component.querySelector('.inventory-card-name').textContent.trim(), 'Ashen Thread');
+    assert.equal(
+      component.querySelector('.inventory-card-art img').getAttribute('src'),
+      'icons/commodities/materials/thread-plain-grey.webp'
+    );
+  });
+
   it('SAVE flushes exactly the difference, and nothing else on the record', async () => {
     const { root, actions, reported } = await mountEntry();
     root.querySelector('[data-scoped-world-default-clear]').click();
@@ -577,5 +644,51 @@ describe('the essence entry row states what an essence removal actually does', (
       false,
       'an essence removal repairs no recipe, so no essence control may say it does'
     );
+  });
+
+  it('shares the component table controls while treating disabled rules as membership', async () => {
+    const calls = [];
+    const root = await entryHarness.mount({
+      scope: essenceScope(),
+      actions: {
+        addToSystem: (...args) => calls.push(['add', ...args]),
+        removeFromSystem: (...args) => calls.push(['remove', ...args]),
+      },
+      entityId: 'ash',
+      onBackToCatalogue: () => {},
+      onOpenSystemRules: (...args) => calls.push(['rules', ...args]),
+    });
+
+    assert.match(root.querySelector('[data-scoped-entry-systems-card]').textContent, /Systems using this essence/);
+    root.querySelector('[data-scoped-entry-system-filter="with"] input').click();
+    await entryHarness.setProps({});
+    assert.deepEqual(
+      [...root.querySelectorAll('[data-scoped-entry-system]')].map((row) => row.dataset.scopedEntrySystem),
+      ['sys-a', 'sys-b'],
+      'disabled rules remain in With rules because membership is independent of enabled state'
+    );
+    assert.match(root.querySelector('[data-scoped-entry-system="sys-b"]').textContent, /Disabled here/);
+
+    root.querySelector('[data-scoped-entry-system-rules="sys-b"]').click();
+    assert.deepEqual(calls, [['rules', 'ash', 'sys-b']]);
+
+    const remove = root.querySelector(
+      '[data-scoped-entry-system="sys-a"] [data-arm-token="scoped-membership-remove:ash|sys-a"]'
+    );
+    remove.click();
+    await entryHarness.setProps({});
+    root
+      .querySelector(
+        '[data-scoped-entry-system="sys-a"] [data-arm-token="scoped-membership-remove:ash|sys-a"]'
+      )
+      .click();
+    assert.deepEqual(calls.at(-1), ['remove', 'ash', 'sys-a']);
+
+    root.querySelector('[data-scoped-entry-system-filter="without"] input').click();
+    await entryHarness.setProps({});
+    const outsider = root.querySelector('[data-scoped-entry-system="sys-c"]');
+    assert.ok(Boolean(outsider.querySelector('[data-scoped-membership-add]')));
+    outsider.querySelector('[data-scoped-membership-add]').click();
+    assert.deepEqual(calls.at(-1), ['add', 'ash', 'sys-c']);
   });
 });

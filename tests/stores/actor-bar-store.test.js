@@ -1,26 +1,10 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { compileModule } from 'svelte/compiler';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
-import { rewriteClientImports } from '../helpers/rewriteClientImports.js';
+import { createSvelteModuleCompiler } from '../helpers/compile-svelte-module.js';
 
-const repoRoot = resolve(import.meta.dirname, '../..');
-
-let tempRoot;
+let compiler;
 let createActorBarStore;
-
-
-function writeCompiledModule(sourcePath) {
-  const source = readFileSync(resolve(repoRoot, sourcePath), 'utf8');
-  const compiled = compileModule(source, { filename: sourcePath, generate: 'client', dev: true });
-  const destination = join(tempRoot, `${sourcePath}.js`);
-  mkdirSync(dirname(destination), { recursive: true });
-  writeFileSync(destination, rewriteClientImports(compiled.js.code));
-}
 
 function makeServices(overrides = {}) {
   const calls = { setSelectedActorId: [] };
@@ -42,17 +26,14 @@ const ACTORS = [
 
 describe('actorBarStore', () => {
   before(async () => {
-    tempRoot = mkdtempSync(join(tmpdir(), 'fabricate-actorbar-'));
-    symlinkSync(resolve(repoRoot, 'node_modules'), join(tempRoot, 'node_modules'), 'junction');
-    writeCompiledModule('src/ui/svelte/stores/actorBarStore.svelte.js');
-    createActorBarStore = (await import(pathToFileURL(join(
-      tempRoot,
-      'src/ui/svelte/stores/actorBarStore.svelte.js.js'
-    )))).createActorBarStore;
+    compiler = createSvelteModuleCompiler('fabricate-actorbar-');
+    ({ createActorBarStore } = await compiler.loadWithClosure(
+      'src/ui/svelte/stores/actorBarStore.svelte.js'
+    ));
   });
 
   after(() => {
-    rmSync(tempRoot, { recursive: true, force: true });
+    compiler.cleanup();
   });
 
   it('populates the selectable list and seeds the selection from the persisted id', () => {

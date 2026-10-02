@@ -5,10 +5,12 @@
   projection (issue 881); the geometry kept is the behaviour preview's.
 
   `icon` / `title` / `subtitle` are the row (omit `icon` to release the glyph column); `titleAttr`,
-  `dataAttr`, `dataValue` are hooks; `badge` / `badgeTone` draw a trailing chip. `tile` and
-  `density="rule"` are OPT-IN, because the design distinguishes them and the nine call sites were
-  not all in the parity pass. `tone="info"` marks a value that came from SOMEWHERE ELSE, on the
-  theme's own `--fab-info` and never a literal. The row owns only its own well; how a container
+  `dataAttr`, `dataValue`, `metaAttr`, `metaValue` are hooks; `badge` / `badgeTone` draw a trailing
+  chip. `tile`, `density="rule"` and `density="line"` (one line, the subtitle trailing as mono
+  meta) are OPT-IN, because the design distinguishes them and the call sites were not all in the
+  parity pass. `tone="info"` marks a value that came from SOMEWHERE ELSE, on the theme's own
+  `--fab-info`; `success|danger|warning|neutral|muted` ink the glyph by what the row states, each
+  from its token and never a literal. The row owns only its own well; how a container
   STACKS rows stays with the container, and a caller override is not available either —
   `manager-layout.test.js` fails on this row's class token appearing in any other manager `.svelte`.
 -->
@@ -19,6 +21,8 @@
     title = '',
     subtitle = '',
     titleAttr = '',
+    metaAttr = '',
+    metaValue = '',
     dataAttr = '',
     dataValue = '',
     tile = false,
@@ -33,6 +37,7 @@
   // Spread, so an unset hook is absent rather than an empty attribute a selector would match.
   const hookAttributes = $derived(dataAttr ? { [dataAttr]: dataValue || true } : {});
   const titleAttributes = $derived(titleAttr ? { [titleAttr]: true } : {});
+  const metaAttributes = $derived(metaAttr ? { [metaAttr]: metaValue || true } : {});
 </script>
 
 <div
@@ -41,7 +46,13 @@
   class:is-glyphless={!icon}
   class:is-tiled={tile}
   class:is-rule={density === 'rule'}
+  class:is-line={density === 'line'}
   class:is-info={tone === 'info'}
+  class:is-tone-success={tone === 'success'}
+  class:is-tone-danger={tone === 'danger'}
+  class:is-tone-warning={tone === 'warning'}
+  class:is-tone-neutral={tone === 'neutral'}
+  class:is-tone-muted={tone === 'muted'}
   {...hookAttributes}
 >
   {#if icon}
@@ -50,7 +61,7 @@
   <span>
     <strong {...titleAttributes}>{title}</strong>
     {#if subtitle}
-      <small>{subtitle}</small>
+      <small {...metaAttributes}>{subtitle}</small>
     {/if}
   </span>
   {#if badge}
@@ -110,6 +121,27 @@
     color: var(--fab-info);
   }
 
+  /* A small mark inks with its family's `-text` token, per the design system's token rule. */
+  .manager-icon-fact-row.is-tone-success > i {
+    color: var(--fab-success-text);
+  }
+
+  .manager-icon-fact-row.is-tone-danger > i {
+    color: var(--fab-danger-text);
+  }
+
+  .manager-icon-fact-row.is-tone-warning > i {
+    color: var(--fab-warning-text);
+  }
+
+  .manager-icon-fact-row.is-tone-neutral > i {
+    color: var(--fab-text-muted);
+  }
+
+  .manager-icon-fact-row.is-tone-muted > i {
+    color: var(--fab-text-disabled);
+  }
+
   .manager-icon-fact-row > span {
     display: grid;
     gap: var(--fab-space-2xs);
@@ -147,5 +179,45 @@
   .manager-icon-fact-row.is-rule small {
     color: var(--fab-text-subtle);
     font-size: 9.5px;
+  }
+
+  /* THE `line` DENSITY (issue 2080): the Checks simulator's "What happens" row, one line with the
+     subtitle trailing as mono meta. Snapped to the spacing scale; its `--bg1` is `--fab-bg-0`. */
+  .manager-icon-fact-row.is-line {
+    grid-template-columns: 13px minmax(0, 1fr);
+    gap: var(--fab-space-2);
+    padding: var(--fab-space-2);
+    border-radius: 9px;
+    background: var(--fab-bg-0);
+  }
+
+  .manager-icon-fact-row.is-line.is-glyphless {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .manager-icon-fact-row.is-line > i {
+    font-size: 10.5px;
+  }
+
+  .manager-icon-fact-row.is-line > span {
+    display: flex;
+    align-items: baseline;
+    gap: var(--fab-space-2);
+  }
+
+  .manager-icon-fact-row.is-line strong {
+    flex: 1;
+    min-width: 0;
+    color: var(--fab-text-secondary);
+    font-size: 10.5px;
+    font-weight: 500;
+  }
+
+  .manager-icon-fact-row.is-line small {
+    color: var(--fab-text-subtle);
+    font-family: var(--fab-font-mono);
+    font-size: 10px;
+    font-weight: 500;
+    white-space: nowrap;
   }
 </style>

@@ -188,7 +188,14 @@ export const SEARCHABLE_POPOVER_RAW_MODULES = Object.freeze([
   'src/ui/svelte/actions/dismissOnOutsideClick.js',
   'src/ui/svelte/actions/portal.js',
   'src/ui/svelte/actions/anchoredPopover.js',
+  // The typeahead combobox's portalled suggestion list, a wrapper over the action above.
+  'src/ui/svelte/actions/typeaheadPanel.js',
   'src/ui/svelte/util/overlayBounds.js'
+]);
+
+/** The typeahead combobox's controller, compiled into every tree that renders a typeahead field. */
+export const TYPEAHEAD_RUNE_MODULES = Object.freeze([
+  'src/ui/svelte/util/typeaheadCombobox.svelte.js'
 ]);
 
 // The compiled `.svelte` modules `SearchablePopover` ITSELF needs when it is the component under
@@ -242,6 +249,44 @@ export const PLAYER_APP_COMPILED_MODULES = Object.freeze([
 ]);
 
 // The raw `.js` modules the player Crafting tab tree needs in a mounted test.
+/** `src/systems/checkTarget.js` and its import closure. */
+export const CHECK_TARGET_RAW_MODULES = Object.freeze([
+  'src/systems/checkTarget.js',
+  'src/systems/checkEvaluation.js',
+  'src/systems/normalize/checkEvaluation.js',
+  'src/utils/localizeWithFallback.js',
+]);
+
+/** The result boxes' executed check evidence rows (issue 2005) and their import closure. */
+export const CHECK_EVIDENCE_RAW_MODULES = Object.freeze([
+  'src/ui/presenters/checkEvidenceRows.js',
+  // A count check's rows and its die tiles (issue 2006).
+  'src/ui/presenters/countEvidenceRows.js',
+  'src/ui/presenters/countDiceTiles.js',
+  'src/ui/presenters/htmlEscape.js',
+  'src/ui/svelte/apps/crafting/rollPromptTarget.js',
+  // The count line the prompt target settles through the router and the pool floor (issue 2006).
+  'src/systems/checkModifierRouter.js',
+  'src/systems/countEvaluation.js',
+  ...CHECK_TARGET_RAW_MODULES,
+  'src/utils/fillPlaceholders.js',
+  'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
+  'src/utils/checkAdjustmentFormat.js',
+  'src/utils/scalars.js',
+]);
+
+/**
+ * The additional-dice notice the player stores and views raise (issue 2008): the prompt presenter
+ * and the prompt-safe reach leaf it words refusals through. Their remaining closure is
+ * `CHECK_EVIDENCE_RAW_MODULES`, which every list spreading this one also carries.
+ */
+export const ADDITIONAL_DICE_NOTICE_RAW_MODULES = Object.freeze([
+  'src/ui/presenters/additionalDicePrompt.js',
+  'src/ui/svelte/util/journalRunReasons.js',
+  'src/systems/additionalDiceReach.js',
+  'src/systems/countTriggerReach.js',
+]);
+
 export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`, spread
   // from the roster above rather than copied so the two cannot drift.
@@ -270,6 +315,13 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/recipeDuration.js',
   'src/systems/characterLibraries.js',
   'src/ui/presenters/CraftingListingBuilder.js',
+  // Issue 2005: the check card's roll-under or character-value target line.
+  'src/ui/presenters/checkDescriptor.js',
+  // Issue 2006: a count card's successes needed, read as the engine reads it.
+  'src/systems/countCheck.js',
+  // Issue 2139: whether the check refuses the character, which the browse status reads.
+  'src/systems/craftingCheckRefusal.js',
+  'src/ui/presenters/heldToolBonus.js',
   // Same rule, issue 1091: the browse-status vocabulary and its precedence rule moved out of the
   // builder into an import-free leaf so #1091's summary projection can share them without pulling
   // the builder in.
@@ -277,6 +329,11 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   // Same rule, issue 1055: the builder resolves the displayed check formula through the
   // SAME check-modifier context the engine rolls, so it imports the resolver.
   'src/systems/checkModifierResolver.js',
+  'src/systems/checkModifierRouter.js',
+  // Issue 2003: the builder reads the check evaluation to hide the DC chip off sum/over/fixed.
+  ...CHECK_TARGET_RAW_MODULES,
+  // Issue 2004: it resolves a count check's pool for the formula line it shows.
+  'src/systems/countEvaluation.js',
   // …and issue 1094 gave that resolver its first two imports, so one entry no longer suffices.
   'src/systems/toolCheckBonus.js',
   'src/utils/craftingCheckExpression.js',
@@ -333,7 +390,12 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/utils/scalars.js',
   'src/systems/scopedDefinitions.js',
   'src/systems/worldScopeEntityGrouping.js',
-  'src/ui/svelte/actions/dismissOnOutsideClick.js'
+  'src/ui/svelte/actions/dismissOnOutsideClick.js',
+  // Issue 2053: the Craft button records the window a roll prompt opens in.
+  'src/ui/svelte/util/rollPromptOrigin.js',
+  // Issue 2008: `craftingStore` words a refused additional-dice choice through the prompt presenter.
+  ...ADDITIONAL_DICE_NOTICE_RAW_MODULES,
+  ...CHECK_EVIDENCE_RAW_MODULES
 ]);
 
 // Every transitive `.svelte` module in the player Crafting tab tree (plus the shared Pagination
@@ -375,6 +437,9 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/crafting/detail/EssenceContribution.svelte',
   'src/ui/svelte/apps/crafting/detail/OutcomeTierTable.svelte',
   'src/ui/svelte/apps/crafting/detail/RollResultBox.svelte',
+  'src/ui/svelte/apps/crafting/detail/CheckEvidenceRows.svelte',
+  'src/ui/svelte/components/DiceTiles.svelte',
+  'src/ui/svelte/apps/journal/JournalFactRow.svelte',
   'src/ui/svelte/apps/crafting/detail/RecipeBodyShell.svelte',
   'src/ui/svelte/apps/crafting/detail/SimpleRecipeBody.svelte',
   // SimpleRecipeBody renders this for an explicit multi-step recipe (issue 765).
@@ -441,6 +506,8 @@ export function createMountedComponentHarness({ repoRoot, tmpPrefix, rawModules 
     async loadRuneModule(modulePath) {
       return import(pathToFileURL(join(tempRoot, `${modulePath}.js`)).href);
     },
+    // The same for a declared raw module, so a test reads the module state the mounted tree writes.
+    loadRawModule: (modulePath) => import(pathToFileURL(join(tempRoot, modulePath)).href),
     teardown() {
       if (mounted) { mounted.$destroy(); mounted = null; }
       if (target) { target.remove(); target = null; }

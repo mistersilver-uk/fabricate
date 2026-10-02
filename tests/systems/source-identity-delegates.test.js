@@ -126,7 +126,7 @@ function repairWorld() {
 }
 
 /** A tool carrying only an ALIAS reference, no `originItemUuid`/`registeredItemUuid` — the
- * tools-kind filter at `SourceIdentityService.js:489-491` exists so a ref-less tool never reaches
+ * tools-kind filter in `buildRepairKinds` exists so a ref-less tool never reaches
  * the repair walk from either the world-source or the owned-copy resolver, even though both
  * resolvers would otherwise match it through the shared `aliasItemUuids` union. */
 function aliasOnlyToolWorld() {
@@ -153,8 +153,8 @@ function aliasOnlyToolWorld() {
   };
 }
 
-/** A flagged, resolvable source living in a compendium pack — the guard at
- * `SourceIdentityService.js:83` exists so `_clearSourceFlag` never issues `unsetFlag` against it. */
+/** A flagged, resolvable source living in a compendium pack — the pack guard in `clearSourceFlag`
+ * (`SourceIdentityService.js`) exists so it never issues `unsetFlag` against it. */
 function flaggedPackSourceWorld() {
   const source = makeDocument({
     uuid: PACK_UUID,
@@ -165,7 +165,7 @@ function flaggedPackSourceWorld() {
 }
 
 /** An owned copy whose name matches a recipe-item definition only after case folding —
- * `normalizeMatchName` (`SourceIdentityService.js:209-213`) lowercases before comparing. */
+ * `normalizeMatchName` (`SourceIdentityService.js`) lowercases before comparing. */
 function caseFoldedRepointWorld() {
   const copy = makeDocument({
     uuid: 'Actor.hero.Item.scroll',
@@ -199,7 +199,7 @@ function caseFoldedRepointWorld() {
 
 /** A token-flagged actor owning one matchable copy — the repair walk's actor loop names no
  * discriminator on `actor?.isToken`, so a synthetic/unlinked token actor is scanned exactly like
- * any other (`SourceIdentityService.js:550-551`, `:594`). */
+ * any other (`repairItemData`, `SourceIdentityService.js`). */
 function tokenActorWorld() {
   const owned = makeDocument({
     uuid: 'Actor.token-hero.Item.ore',
@@ -639,7 +639,7 @@ describe('the guards close before a write', () => {
     assert.equal(
       summary.tools.stamped,
       0,
-      'the tools-kind filter (SourceIdentityService.js:489-491) keeps a ref-less tool unreachable'
+      'the tools-kind filter (buildRepairKinds) keeps a ref-less tool unreachable'
     );
     const journals = harness.journals();
     assert.deepStrictEqual(journals['Item.hammer-src'], [], 'no setFlag write on the world source');
@@ -656,7 +656,7 @@ describe('the guards close before a write', () => {
     assert.deepStrictEqual(
       harness.journals()[PACK_UUID],
       [],
-      'the compendium guard (SourceIdentityService.js:83) must refuse an unsetFlag write'
+      'the compendium guard (clearSourceFlag) must refuse an unsetFlag write'
     );
   });
 });
@@ -668,7 +668,7 @@ describe('two more surviving mutants, killed without a src/ change', () => {
     assert.equal(
       summary.repointed,
       1,
-      'normalizeMatchName lowercases before comparing (SourceIdentityService.js:209-213)'
+      'normalizeMatchName lowercases before comparing (SourceIdentityService.js)'
     );
     assert.equal(
       harness.fixtures.copy.flags.fabricate.fabricate.roles.sys1.recipeItemDefinitionId,

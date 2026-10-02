@@ -51,11 +51,7 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   // ADDED BY ISSUE 1373, and deliberately: the world Tool entry's `Preview as` region resolves its
   // Tool's world-default prerequisites against ONE actor, and the roster it offers is the shared,
   // GM-configurable player-character predicate rather than a second `type === 'character'` test.
-  '../../../../gatheringImageDefaults.js',
   '../../../../systems/characterModifierPrerequisiteCopy.js',
-  '../../../../systems/checkModifierResolver.js',
-  '../../../../systems/gatheringComposition.js',
-  '../../../../systems/progressiveCheckSandbox.js',
   '../../../../utils/categoryIcons.js',
   '../../../../utils/componentCategories.js',
   '../../../../utils/craftingCheckExpression.js',
@@ -78,8 +74,6 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   // THE SHIPPED TWO-STEP DESTRUCTIVE CONTROL, for the world Tool entry's HEADER `Delete` (issue
   // 1373's parity round).
   '../../components/ArmedDangerButton.svelte',
-  // MOVED BY ISSUE 1506, not added.
-  '../../components/Chip.svelte',
   // Moved by issue 1710, not added.
   '../../components/EmptyState.svelte',
   '../../components/ManagerButton.svelte',
@@ -116,6 +110,9 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   './RecipeEditView.svelte',
   './RecipeItemEditor.svelte',
   './RecipesBrowserView.svelte',
+  // Added by issue 1721: the systems library inspector is its own unit, which took the only
+  // `Chip` the root rendered, so `../../components/Chip.svelte` left this list.
+  './SystemBrowserInspector.svelte',
   './SystemEditView.svelte',
   './SystemsBrowserView.svelte',
   './TagsCategoriesView.svelte',
@@ -124,10 +121,16 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   // ADDED BY ISSUE 1706's SHARED BULK-SELECTION COMPOSABLE.
   './bulkSelection.svelte.js',
   './checks/ChecksView.svelte',
+  // ADDED BY ISSUE 2005, with `./component/salvageDcPresets.js` below: the salvage and task
+  // overrides' Preview-as roster and roll-data lookup, and the salvage preset tiers.
+  './checks/checkPreview.js',
   './checks/checkTriggerSummary.js',
   './checks/checksCopy.js',
   './checks/checksNav.js',
-  './checks/checksReadiness.js',
+  // Added by issue 1721: the Checks Studio's drafts and rail group are their own unit, which took
+  // `checkModifierResolver.js`, `progressiveCheckSandbox.js` and `checksReadiness.js` with them.
+  './checks/checksRouteModel.svelte.js',
+  './component/salvageDcPresets.js',
   './components/ComponentBrowserInspector.svelte',
   './components/ComponentBulkEditPanel.svelte',
   './crafting/craftingNav.js',
@@ -143,9 +146,19 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   './essences/EssenceBehaviorPreview.svelte',
   './essences/EssenceBrowserInspector.svelte',
   './essences/EssenceBulkEditPanel.svelte',
+  // Added by issue 1721: the gathering workspace's read side and its pure presenters are their own
+  // units, which took `gatheringImageDefaults.js` and `gatheringComposition.js` with them.
+  './gatheringDisplay.js',
+  // Added by issue 1721: the gathering workspace's write side, and the modifiers a drop or an event
+  // carries, are their own units.
+  './gatheringDraftHandlers.svelte.js',
+  './gatheringModifierHandlers.svelte.js',
+  './gatheringRouteModel.svelte.js',
   // Added by issue 1720: the page header's six answers are their own unit, and the root no longer
   // resolves the eyebrow, title, lede or action-group name itself.
   './headerModel.svelte.js',
+  // Added by issue 1721: the import report and the folder-aware component drop are their own unit.
+  './importFlowModel.svelte.js',
   './navRailModel.svelte.js',
   './recipes/RecipeBrowserInspector.svelte',
   './recipes/RecipeBulkEditPanel.svelte',

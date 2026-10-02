@@ -186,7 +186,7 @@ Eight bullets follow: the `CollapsibleGroupHeader` one states which primitive ow
   All six dead rules are repaired as `:global(...)` chained so their specificity is unchanged, and `tests/components/manager-button-scoped-class-reach.test.js` covers this primitive as the mechanical guard.
   No `.svelte` under `src/` renders a raw `class="manager-inspector-card"` any longer, with eight stated exceptions.
   `InspectorCard.svelte`'s own two occurrences are the emission itself and one line of prose on the `class` prop.
-  `CraftingSystemManagerRoot.svelte`'s four — the systems feature panels — and the gathering inspector rail's twenty-five are deferred with a named reason: issue 1707 relocated them without converting one, so where the root alone was 40% of the 80-site census these twenty-nine are 36%, the two the de-duplication removed being gone rather than converted and the tags at-a-glance card having left with the inspector rail issue 1915 retired.
+  `SystemBrowserInspector.svelte`'s four — the systems feature panels — and the gathering inspector rail's twenty-five are deferred with a named reason: issues 1707 and 1721 relocated them without converting one, so where the root alone was 40% of the 80-site census these twenty-nine are 36%, the two the de-duplication removed being gone rather than converted and the tags at-a-glance card having left with the inspector rail issue 1915 retired.
   The twenty-five are `environment/GatheringTaskInspector.svelte`'s seven, `world/TravelInspector.svelte`'s eight, `environment/GatheringInspectorRail.svelte`'s four, `environment/GatheringEventInspector.svelte`'s three, `environment/GatheringModifierEditor.svelte`'s two and `environment/GatheringRulesInspector.svelte`'s one, and each file is now small enough that a conversion lane can take one screen at a time.
   They stay pinned by count so a later partial pass fails rather than silently reducing a deferral nobody is tracking.
 - THE manager's labelled form field exists at `src/ui/svelte/components/Field.svelte`, taking its HOST element from a CLOSED `as` set of three: `label`, `div` and `fieldset`.
@@ -198,8 +198,8 @@ Eight bullets follow: the `CollapsibleGroupHeader` one states which primitive ow
   Like `ManagerButton` it deliberately has NO scoped `<style>` and claims the section's layout-context exception to say so: `styles/fabricate.css` owns `.manager-field` and roughly thirty rules that reach through it to the controls inside, and a scoped block here would be a second source of truth for the same box.
   `class` is APPENDED to `manager-field` and never replaces it, and every other attribute — `data-*`, `id`, `for`, `aria-*`, `disabled` — passes through, so a call site keeps its own selectors.
   A VALUELESS attribute must be written `data-x=""` at a call site rather than as a bare `data-x`: a raw element renders the bare form as `data-x=""` while the same token on a component arrives through the rest spread as boolean `true` and renders `data-x="true"`, and that divergence is invisible in a source diff.
-  81 of the 88 sites converted, across 23 components; the remaining seven were `CraftingSystemManagerRoot.svelte`'s, and issue 1707 relocated four of them — two into `environment/GatheringModifierEditor.svelte` and two into `environment/GatheringTaskInspector.svelte` — while the de-duplication removed two that were never converted, leaving one in the root, so the deferral is now five sites across three files rather than seven in one.
-  It stays deferred per file with a new reason — each file's fields are one screen's form, and a screen-at-a-time conversion is separately reviewable — and pinned by exact count in that source-contract test so the debt cannot sit still and cannot grow; the 11,777-line root every manager lane touches keeps its one.
+  81 of the 88 sites converted, across 23 components; the remaining seven were `CraftingSystemManagerRoot.svelte`'s, and issue 1707 relocated four of them — two into `environment/GatheringModifierEditor.svelte` and two into `environment/GatheringTaskInspector.svelte` — while the de-duplication removed two that were never converted, leaving one in the root, which issue 1721 relocated into `SystemBrowserInspector.svelte`, so the deferral is now five sites across three files rather than seven in one.
+  It stays deferred per file with a new reason — each file's fields are one screen's form, and a screen-at-a-time conversion is separately reviewable — and pinned by exact count in that source-contract test so the debt cannot sit still and cannot grow; `SystemBrowserInspector.svelte` keeps its one.
   Six scoped rules across three components — `GatheringTaskEditView.svelte`, `ImportFolderMappingModal.svelte` and `checks/CraftingModifierCatalogueCard.svelte` — were disconnected by the conversion and repaired as `:global(.manager-field.the-other-class …)`, chained with `.manager-field` so each keeps the specificity its scoped form had rather than dropping a compound.
   Not one of them was pruned, so the compiler warned about none of them and every converted file's emitted CSS was byte-identical to its pre-change output; `tests/components/manager-button-scoped-class-reach.test.js` is the guard that reports the class rather than the gate that missed it, and `<Field>` is a row on that guard’s primitive registry rather than a second copy of its scan.
 - THE manager's FILTER BAR exists at `src/ui/svelte/components/ManagerToolbar.svelte` and its SEARCH FIELD at `src/ui/svelte/components/ManagerSearchField.svelte`, and they are TWO components where `design-system/library.html:1370` specifies one.
@@ -214,9 +214,9 @@ Eight bullets follow: the `CollapsibleGroupHeader` one states which primitive ow
   Like `ManagerButton`, `IconButton`, `InspectorCard` and `Field`, both deliberately have NO scoped `<style>` and claim this section's exception: `styles/fabricate.css` owns `.manager-toolbar` and `.manager-search`, and emitting exactly the class the sheet already paints is what makes converting a correct call site provably a no-op on screen.
   Neither takes a variant prop.
   The sheet declares four further bar treatments anchored four different ways, and one of them — `.manager-toolbar:not(:has(.manager-toolbar-primary))` — is a branch ALWAYS taken, because no component under `src/` writes `.manager-toolbar-primary` at all, so the grid form it guards is declared and never rendered.
-  20 of the 23 fields converted; the remaining THREE are ADJUDICATED OPT-OUTS rather than deferred work, and the distinction matters because a deferral implies the sites are the same and these are not.
-  Each renders a `.manager-tag-suggestions` typeahead list as a sibling of the input inside the label, which makes it a combobox belonging to `SearchablePopover.svelte`, and the manager root's two additionally take `bind:this` on the label for popover positioning — which on a COMPONENT tag binds the component instance rather than its host element, so converting either needs an element-ref seam the primitive does not have.
-  The root's two are near-identical duplicates of one another, so a later root de-duplication that merged them would legitimately take that pin from 2 to 1 rather than reading as a regression.
+  26 fields in 23 components render through the primitive as of issue 2157, counted from each component's Svelte AST; the remaining TWO are ADJUDICATED OPT-OUTS rather than deferred work, and the distinction matters because a deferral implies the sites are the same and these are not.
+  Each writes a `.manager-tag-suggestions` typeahead list as a sibling of the input inside the label, which makes it a typeahead combobox under `design-system` rather than a search field, and the open list is portalled out of the label to the nearest application root (issue 2157), so "inside the label" describes the source and never the rendered tree.
+  The two were three until issue 1707 wrote the manager root's near-identical pair once, in `environment/GatheringModifierEditor.svelte`, which took that pin from 2 to 1.
   FOUR scoped rules were disconnected by the conversion, and three of the four are the SILENT kind: `scoped/EntityListInspectorFrame.svelte`'s `flex: 0 0 auto` pair, its `.manager-scoped-list-toolbar select` sizing and its `:global(.manager-scoped-list-filter-row.is-selection)` flattening were all emitted with the hash attached, raised no `css_unused_selector`, and left that file's compiled `css.code` BYTE-IDENTICAL — because that component also writes `<div class={TOOLBAR_ROW_CLASS}>`, a regular element with an expression-valued `class`, which makes every class selector in its block possibly-matching.
   The fourth, `scoped/SystemRulesRoster.svelte`'s `.manager-scoped-roster-search`, was PRUNED instead and would have been named by `lint:svelte:warnings`; that file writes no such element, which is the measured difference between the two modes.
   Each is repaired as a `:global(...)` chained onto the class the primitive emits, and each keeps the specificity its scoped form compiled to — (0,2,0), (0,2,1), (0,4,0) and (0,2,0) respectively.
@@ -228,6 +228,13 @@ Eight bullets follow: the `CollapsibleGroupHeader` one states which primitive ow
 
 A shared primitive rendering N ordered, named bands over a value track with draggable boundaries, at `src/ui/svelte/components/ThresholdBandStrip.svelte`.
 The numeric steppers in the tier rows remain AUTHORITATIVE; the strip is a visualisation bound to the same state.
+
+Handles, `role="slider"` and the "DC" `aria-valuetext` remain only on the strip of a summed check graded over a fixed target.
+Every other strip — roll under, a character-value target, or a count — is a READ-ONLY derived picture drawn through the primitive's `readonly` mode: it renders no handle, so no slider role, tabindex or drag cursor, and its group's `aria-describedby` names a visually hidden list stating each band and its range.
+The caller derives those bands and formats each range; the strip derives nothing, and the tier steppers are its only editor.
+A count strip is built by `checkBandModel.js` in net successes: each band starts at the required count plus the band's extra successes, the best band met wins, and a first `Botch` band below zero is drawn only while cancelling is enabled, with a `<0` tick under the track's start (the strip's `leadingTick`).
+Its scale reads `Measured in successes. The count must reach {T}`, then `; this pool is reduced to zero, so the check fails automatically.` for a pool that is reduced to zero and fails, or a full stop otherwise, then `A net below zero is a botch.` as its own sentence while cancelling is enabled.
+Band tones follow net successes and are never reversed for a roll-under per-die test.
 
 It uses NO gradient.
 Each band is a solid fill from that band's own runtime colour applied inline via `style=` (authored data, never a source literal), and it claims NO §Product UI Visual Style exemption — the exemption's own rule (a gradient across the complete track, fill kept full-width) conflicts with per-band identity, which is the whole point of the control.
@@ -299,8 +306,9 @@ A single per-screen size override of the shared panel is a second empty-state de
 #### Modal dialogs
 
 Every centred manager modal renders through one shared modal-chrome primitive.
-The chrome is the dialog surface itself, portaled into the manager area with Escape and outside-click dismissal, and it owns exactly four things: the panel, a compact heading of a title over an optional muted subtitle, a round close control aligned with the title, and a right-aligned footer rail for the dialog's actions.
+The chrome is the dialog surface itself, portaled into the manager area with Escape and outside-click dismissal, and it owns exactly four things: the panel, a compact heading of a title over an optional muted subtitle, a close control aligned with the title, and a right-aligned footer rail for the dialog's actions.
 Everything between the heading and the footer belongs to the feature and carries that feature's own scoped styling.
+Every Fabricate dialog draws that chrome in the design system's banded Modal frame (maintainer ruling 2026-09-28).
 
 A manager modal MUST NOT be assembled from a raw HTML string handed to a Foundry dialog.
 Such a dialog inherits Foundry's page-title headings, unstyled list markup, and full-width footer button, which is a second modal design standing beside the shared one; it also cannot use any shared primitive, since a string is not a component.
@@ -486,6 +494,7 @@ Both published calls answer from the catalogue and cannot make that mistake.
 #### Numeric entry
 
 Every editable numeric field in the manager and in the interactable and component editors renders through one shared stepper primitive — a typeable `type="number"` input with `−`/`+` adjuncts, a clamp, and no native spinner — EXCEPT the documented non-conformances recorded below.
+A value whose reading is not a plain number, such as a tier multiplier read as `×½`, renders through the same primitive's opt-in formatted mode rather than a second control.
 The exception clause is not optional decoration: two such fields exist today, so a rule stated absolutely would be falsified the moment it was written.
 The Recipe Studio duration-unit requirement is an INSTANCE of this rule rather than a local exception of its own.
 A bare `type="number"` with no adjuncts is a second numeric-entry design and is not an acceptable rendering: it inherits Foundry's host chrome, offers the browser's drawn arrows as its only pointer affordance, and shares neither the clamp nor the commit path.
@@ -498,6 +507,13 @@ A numeric field whose domain admits "unset" — a DC override that inherits the 
 Neither adjunct is disabled while the field is unset, because nothing is at a bound when there is no value.
 A field whose blank rendering is merely cosmetic for zero is NOT such a field: `0` is its real persisted value, so it shows `0`.
 The distinction is a domain fact and is decided per field from what the model stores, never from how the old control happened to look.
+
+**Formatted numeric values.**
+A formatted stepper is a `role="spinbutton"` text input with decimal inputmode that commits a valid finite value on Enter or blur, and nothing while the GM types.
+Enter never submits an enclosing form, invalid or partial text restores the committed display, and Escape during an edit restores it without blurring and without reaching Foundry's bindings.
+Stepping moves to the nearest strictly greater or smaller stop, so an off-list value stays exact until it is stepped, and Home and End select the lowest and highest numeric stops.
+A caller-named null endpoint (Otherwise) is distinct from an unset value: the endpoint sits one step below the lowest stop, renders its label and states it in `aria-valuetext` with no `aria-valuenow`, while an unset value renders the placeholder and persists null.
+An empty edit never manufactures the endpoint.
 
 **Native spinner suppression.**
 A numeric field's native spinner is suppressed IF AND ONLY IF the field carries another pointer-driven stepping affordance — the stepper's `−`/`+` adjuncts, or a sibling range track in the same control bound to the same value.

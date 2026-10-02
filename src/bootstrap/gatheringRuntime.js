@@ -11,11 +11,7 @@ import { matchGatheringTools } from '../gatheringToolRuntime.js';
 import { createToolBreakageRuntime } from '../toolBreakageRuntime.js';
 import { MacroExecutor } from '../utils/MacroExecutor.js';
 
-/**
- * The single `GatheringEngine`. Held behind a setter because an ES module cannot assign to an
- * imported binding, and the composition root writes what four other modules read. ESM gives one
- * module instance per specifier, so this is one holder however many modules import it.
- */
+// Behind a setter: an ES module cannot assign an imported binding, and the root writes it.
 let gatheringEngine = null;
 
 export function setGatheringEngine(engine) {
@@ -27,12 +23,10 @@ export function getGatheringEngine() {
   return gatheringEngine;
 }
 
-/** Resolve a stored gathering actor preference against Foundry's actor collection. */
 export function resolveGatheringActor(actorId) {
   return game.actors?.get?.(actorId) ?? null;
 }
 
-/** Whether the current user may select an actor for gathering. */
 export function isSelectableGatheringActor(actor) {
   return isGatheringActorSelectableByUser(actor, game.user);
 }
@@ -43,10 +37,7 @@ export const getGatheringSelectableActors = createGatheringSelectableActorsGette
   isSelectable: isGatheringActorSelectableByUser,
 });
 
-/**
- * The actor-selection top bar's predicate: attempt authorization's ownership rule plus the
- * player-character concept. It NARROWS the bar, never attempt authorization.
- */
+/** Attempt authorization's ownership rule plus player characters; it narrows only the bar. */
 export function isSelectableBarActor({ actor, viewer } = {}) {
   return isGatheringActorSelectableByUser(actor, viewer) && isPlayerCharacterActor(actor);
 }
@@ -66,7 +57,6 @@ export function isCurrentWorldPaused() {
   return game.paused === true;
 }
 
-/** Execute a gathering macro through the shared macro runner. */
 export async function runGatheringMacro(macroUuid, context = {}) {
   return MacroExecutor.run(macroUuid, context);
 }
@@ -130,16 +120,10 @@ export function localizeGathering(key, data = {}) {
   return game.i18n?.format?.(key, data) ?? game.i18n?.localize?.(key) ?? key;
 }
 
-/**
- * The one-shot deprecation notice for a renamed public name, and the set that makes it fire once
- * per name. Declared in exactly one module — the leaf the class shell, the gathering slice and the
- * published namespace each import without a cycle — and held there by
- * `tests/scalar-helper-duplicates.test.js`. A second set would warn twice for any name reachable
- * through both the facade and the published namespace; today none is.
- */
+// One set, held here by `tests/scalar-helper-duplicates.test.js`, so each name warns once.
 const _deprecationWarned = new Set();
 
-/** One-time console deprecation notice for a renamed public API name. Never throws. */
+/** A once-per-name console notice for a renamed public API name. Never throws. */
 export function deprecate(oldName, newName, documentation = null) {
   if (_deprecationWarned.has(oldName)) return;
   _deprecationWarned.add(oldName);
@@ -147,6 +131,6 @@ export function deprecate(oldName, newName, documentation = null) {
   try {
     console.warn(`Fabricate: ${oldName} is deprecated; use ${newName} instead.${hint}`);
   } catch {
-    // A broken console shim must not replace the deprecated API's result with a throw.
+    // A broken console shim must not turn the deprecated call into a throw.
   }
 }

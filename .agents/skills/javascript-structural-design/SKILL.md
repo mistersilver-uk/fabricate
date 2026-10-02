@@ -69,7 +69,7 @@ Flag or refactor these patterns when they create real risk:
 - classes or modules with mixed responsibilities
 - job-title names like `ThingManager`, `ParserService`, or `ContextHolder`
 - getter-heavy APIs that expose internal state instead of owning behavior
-- a unit past the size gate in `tests/file-size-ledger.txt`: a function over 100 lines, a `.js` module over 800 lines, a `.svelte` component over 500
+- a unit past the size gate in `tests/file-size-ratchet.test.js`: a function over 100 lines, a `.js` module over 800 lines, a `.svelte` component over 500
 - a helper redeclared locally when a shared implementation exists (`tests/scalar-helper-duplicates.test.js`)
 
 ## JavaScript Adaptation
@@ -83,6 +83,11 @@ Apply the direction, not dogma:
 Functions and closures are fine if dependencies stay explicit and the seam stays testable.
 - Foundry globals are unavoidable at runtime edges.
 Wrap or localize them instead of letting them leak through the whole call chain.
+- Keep modules and objects small and cohesive; if a unit naturally does X and Y, split it.
+- Keep constructors and factories boring; avoid hidden I/O, service lookup, and object graph assembly inside them.
+- Inject specific collaborators instead of passing context or container grab bags and digging through them later.
+- Prefer behavior-first APIs over getter or setter-heavy data bags.
+- Isolate global mutable state and runtime lookups at thin edges that are easy to test.
 
 ## Expected Output
 

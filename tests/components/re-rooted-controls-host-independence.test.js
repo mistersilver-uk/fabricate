@@ -1906,6 +1906,8 @@ test('the caller-override measurement reds when the baseline is written at the f
   }
 });
 
+const TEXT_FIELD_RINGS = new Set(['.fabricate-search input:focus-visible']);
+
 test('each re-rooted family declares its own focus ring, and none of them reaches a select', async () => {
   const tab = await browser.newPage();
   try {
@@ -1924,7 +1926,7 @@ test('each re-rooted family declares its own focus ring, and none of them reache
         '.fabricate-field input:focus-visible, .fabricate-field textarea:focus-visible',
       ],
       ['.fabricate-search input:focus', '.fabricate-search input:focus-visible'],
-      ['.fabricate-slider input:focus', '.fabricate-slider input:focus-visible'],
+      ['.fabricate-slider input:focus', '.fabricate-slider input[type="range"]:focus-visible'],
       // THE TAB STRIP'S PAIR (issue 1509).
       ['.fabricate-tabs button:focus', '.fabricate-tabs button:focus-visible'],
       // THE TOGGLE'S TWO PAIRS. The first is the one this change CONVERTED rather than added.
@@ -1939,14 +1941,19 @@ test('each re-rooted family declares its own focus ring, and none of them reache
     ]) {
       const ring = rules.filter((rule) => rule.selectorText === repaint);
       assert.equal(ring.length, 1, `${repaint} must be declared exactly once`);
+      // A text-field family copies the module's inset text-field ring, every other family its
+      // outset one.
+      const textField = TEXT_FIELD_RINGS.has(repaint);
       assert.match(
         ring[0].cssText,
-        /outline:\s*2px solid var\(--fab-accent\)/,
+        textField
+          ? /outline:\s*1px solid var\(--fab-accent\)/
+          : /outline:\s*2px solid var\(--fab-accent\)/,
         `${repaint} must carry the same outline the module ring declares`
       );
       assert.match(
         ring[0].cssText,
-        /outline-offset:\s*2px/,
+        textField ? /outline-offset:\s*-1px/ : /outline-offset:\s*2px/,
         `${repaint} must carry the module ring's outline offset`
       );
 
@@ -1975,6 +1982,31 @@ test('each re-rooted family declares its own focus ring, and none of them reache
           'repaint or source order deletes the accent ring it exists to supply'
       );
     }
+
+    // The field family copies the module's text-field variant too, with the module's exclusion,
+    // below its element ring so the variant wins the tie for a text field and no other input.
+    const variantOf = (root) =>
+      rules.findIndex(
+        (rule) =>
+          rule.selectorText.startsWith(`${root} :is(input, textarea):where(:not(`) &&
+          rule.selectorText.endsWith(':focus-visible')
+      );
+    const exclusionOf = (index) => /:where\(:not\((.*?)\)\)/.exec(rules[index].selectorText)[1];
+    const moduleVariant = variantOf('.fabricate');
+    const fieldVariant = variantOf('.fabricate-field');
+    assert.ok(moduleVariant >= 0 && fieldVariant >= 0, 'both text-field variants are declared');
+    assert.equal(exclusionOf(fieldVariant), exclusionOf(moduleVariant));
+    assert.match(exclusionOf(moduleVariant), /checkbox.*radio.*range.*color.*file.*button/);
+    assert.match(rules[fieldVariant].cssText, /outline:\s*1px solid var\(--fab-accent\)/);
+    assert.match(rules[fieldVariant].cssText, /outline-offset:\s*-1px/);
+    assert.ok(
+      fieldVariant >
+        rules.findIndex(
+          (rule) =>
+            rule.selectorText ===
+            '.fabricate-field input:focus-visible, .fabricate-field textarea:focus-visible'
+        )
+    );
 
     // NO RE-ROOTED FAMILY REACHES A FOCUSED `select`, and this is now the whole of that claim.
     const roots = [

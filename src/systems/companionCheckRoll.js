@@ -1,113 +1,41 @@
 /**
- * The **Standalone Check Roll** — Fabricate's check-roll mechanics, published to a companion
- * module that owns no crafting system (issue 1293).
- *
- * ## What "standalone" claims, and what it does not
- *
- * "Standalone" is a claim about the **crafting-system** axis: this roll stands outside any
- * `CraftingSystem`. It is NOT a claim about the **game-system** axis, where Fabricate is
- * agnostic on every path including this one — a Standalone Check Roll is exactly as
- * game-system agnostic as every other Fabricate check, which is to say completely.
- *
- * What this publishes is therefore NOT "a Fabricate check". A Fabricate check is always taken
- * on a subject inside a crafting system, and it carries that system's modifier catalogue, its
- * combination rule, tool bonuses, authored triggers, tier stepping and failure-result policy.
- * A Standalone Check Roll is the check-roll MECHANICS — `@`-placeholder resolution against the
- * actor's roll data, the retired-placeholder shim, the Advantage/Disadvantage rewrite, the
- * free-text situational bonus with its `Roll.validate` net, the roll mode and the chat post,
- * and the pass/fail or raw-total answer — WITHOUT the system-derived terms, because there is
- * no crafting system and no subject to derive them from.
- *
- * ## What it does NOT restore
- *
- * `evaluateCheckRoll` evaluates with `allowInteractive: false` UNCONDITIONALLY, so this member
- * inherits that and suppresses **Foundry's own `RollResolver`**. A GM configured for manual or
- * physical-dice fulfilment still does not type their die result here. What the seam restores
- * is a DIFFERENT dialog: Fabricate's own `promptCheckRoll`, which confirms the roll, offers
- * Advantage and a situational bonus, and — crucially — REPORTS ITS OWN DISMISSAL, so a caller
- * can abort with zero mutation. Foundry's dice resolver cannot: closing it fulfils the roll
- * with `term.randomFace()`, a real number indistinguishable from a typed one.
- *
- * ## This module has no crafting system, structurally rather than by discipline
- *
- * `buildCheckModifierContext(system, activity, subject)` needs a crafting system and a subject
- * that is a recipe, a component or a gathering task. A downtime activity is none of the three.
- * So this module passes `craftingModifier: null` and builds no `modifierChoice`: no
- * `+ N[Modifiers]` term appends, and the `playerPicks` fieldset never renders.
- *
- * That is INHERITING the derivation, not opting out of it. The roll still routes through
- * `evaluateCheckRoll`, whose base formula is the one implementation of shim-plus-append; with
- * no context the append is a documented no-op, and if the append ever changes, this member
- * changes with it. It mirrors `checkWorldCurrencyAffordability`'s own structural argument: the
- * answer must be UNABLE to consult a system rather than merely disciplined about not doing so.
- *
- * ## A Foundry-free leaf
- *
- * It reads NO global and imports only `./companionContract.js` and
- * `../utils/craftingCheckExpression.js`. Every runner, prompt, builder, election test, dice-
- * engine test and localizer arrives as a SEAM, and the resolved actor arrives as an argument —
- * the facade resolves it through the shared ownership-gated resolver, so this module resolves
- * nothing and reads no collection. There is therefore no second resolver to disagree with the
- * first, and no `globalThis.Roll` reference anywhere in this file.
+ * Standalone check rolls use shared mechanics without a crafting system.
+ * The resolved actor, prompt, runners and dice-engine check enter through named seams.
  */
 
-import { hasPlainD20, stripRetiredModifierPlaceholder } from '../utils/craftingCheckExpression.js';
+import { stripRetiredModifierPlaceholder } from '../utils/craftingCheckExpression.js';
 
+import { additionalDiceRefusalKey } from './additionalDiceReach.js';
+import { intersectAdvantageOffers, resolveAdvantageOffer } from './checkAdvantage.js';
+import { isFixedSumOver, resolveCheckTarget, selectTargetAdjustment } from './checkTarget.js';
+import {
+  resolveCompanionCheckEvaluation,
+  supportsCompanionCheckEvaluation,
+} from './companionCheckEvaluation.js';
 import {
   CHECK_ROLL_DEFAULT_LABEL,
   COMPANION_OUTCOMES,
+  additionalDiceCallSiteRefusal,
   bulkCheckDecisionResult,
   checkRollResult,
   gateCompanionCallSite,
 } from './companionContract.js';
+import { normalizeCheckAdvantage } from './normalize/checkAdvantage.js';
+import { hasActiveCheck } from './salvageCheckUsability.js';
+
+/** A standalone roll authors no advantage rule, so it rolls under the default one (ruling R2). */
+const COMPANION_ADVANTAGE = Object.freeze(normalizeCheckAdvantage());
 
 /**
- * The POST-SHIM formula, or `''` when there is nothing left to roll.
- *
- * This is exactly `resolveActiveCraftingCheckFormula`'s shipped derivation — the retirement
- * shim, then a trim, then an emptiness test — under the reason written down beside it: THE
- * RETIREMENT SHIM RUNS BEFORE THE EMPTINESS TEST (issue 1094), so readiness and the roll path
- * can never disagree. It is re-derived here rather than imported because that reader takes a
- * CRAFTING SYSTEM, which this module does not have; `craftingCheckExpression.js` is the shared
- * leaf both derivations rest on.
- *
- * The shim empties far more than a bare token: it returns `''` both for a formula that reduces
- * to nothing (`'@craftingmod'`) and for one it REFUSES as non-additive or structurally unwhole
- * (`'max(@craftingmod, 2)'`, `'1d20 * @craftingmod'`). `'1d20+3'` survives untouched.
- *
- * @param {*} formula
- * @returns {string}
+ * The post-shim formula, or `''` when nothing is left to roll. Re-derives
+ * `resolveActiveCraftingCheckFormula` (shim before the emptiness test, issue 1094) without a
+ * crafting system; the shim also empties a formula it refuses as non-additive.
  */
 function resolveUsableCheckFormula(formula) {
   return stripRetiredModifierPlaceholder(String(formula ?? '')).trim();
 }
 
-/**
- * Whether a formula can actually roll a check.
- *
- * INTERNAL, and deliberately not a seam. Making it injectable would let `rollActorCheck`'s
- * `noFormula` gate and `resolveBulkCheckDecision`'s usable filter disagree, which is the one
- * failure it exists to prevent. It takes no `Roll` argument either, so it and
- * `evaluateCheckRoll` read the dice engine through the same default binding and cannot diverge
- * on the shim's fail-open path.
- *
- * @param {*} formula
- * @returns {boolean}
- */
-const isUsableCheckFormula = (formula) => resolveUsableCheckFormula(formula) !== '';
-
-/**
- * The display label the roll goes to chat and to the dialog under.
- *
- * Defaulted to a localized ACTIVITY NOUN, because `buildInteractiveRollOptions` composes its
- * flavor as `` `${activity} check${dcLabel}` `` with NO guard: an omitted label would post
- * "undefined check (DC 15)" to a GM's chat log. Fixed here rather than in the prompt module,
- * which this change does not touch.
- *
- * @param {*} label the caller's label
- * @param {{localize: (key: string, fallback: string) => string}} seams
- * @returns {string}
- */
+/** Defaulted to a localized noun: an unguarded flavor would read "undefined check (DC 15)". */
 function resolveCheckLabel(label, seams) {
   const supplied = typeof label === 'string' ? label.trim() : '';
   if (supplied !== '') return supplied;
@@ -115,33 +43,29 @@ function resolveCheckLabel(label, seams) {
 }
 
 /**
- * The three-step discriminator ladder, applied to whichever runner answered.
- *
- * ONE ladder for both arms, and its steps are ordered rather than merely listed:
- *
- * 1. `cancelled === true` — the dismissal, tested FIRST because it is the one fact that is
- *    true on both arms and at every `interactive` setting.
- * 2. `value === null` — the runner's throw branch. **Strictly `=== null`, never `!value`**: a
- *    legitimate rolled `0` is falsy, and `!value` would report it as a failed roll.
- * 3. otherwise grade on `outcome` — `'pass'`/`'fail'` on the graded arm, and the ungraded
- *    arm's `null` outcome answers `rolled`.
- *
- * Step 2 is sound only because BOTH pre-dispatch gates ran: the runners' third `value: null`
- * producer is `evaluateCheckRoll`'s non-blocking `engine: false` branch, and that branch has
- * TWO sites — no `globalThis.Roll`, and a POST-SHIM-EMPTY formula with `Roll` fully present.
- * The dice-engine gate closes only the first. With the usability gate missing, a formula the
- * shim empties would reach the runner and answer `checkPassed` with the DC IGNORED.
- *
- * The naive discriminator — `success === false && value === null` — is true of a throw, a
- * dismissal and the graded cancel alike; derived, it reports a broken formula as "the GM
- * declined", and the companion silently does nothing forever with nothing in the console.
- *
- * @param {object} result the runner's answer
- * @param {boolean} graded whether the pass/fail runner answered
- * @returns {string} the outcome token
+ * A count refusal (issue 2004) names its input as `data.refusedInput`: an unresolved or
+ * non-numeric base or threshold is `poolUnresolved`, and every other named input (die, explode,
+ * cancel, the settled pool) is `evaluationInvalid`.
  */
-function discriminateCheckOutcome(result, graded) {
+function countRefusalOutcome(result) {
+  const refusedInput = result?.data?.refusedInput;
+  return refusedInput === 'base' || refusedInput === 'threshold'
+    ? COMPANION_OUTCOMES.poolUnresolved
+    : COMPANION_OUTCOMES.evaluationInvalid;
+}
+
+/**
+ * The ordered outcome ladder for both runners: an additional-dice refusal (issue 2008) before the
+ * `cancelled === true` shape it shares, then that dismissal, then (for a count request only) a
+ * `misconfigured` pool refusal, then `value === null` (strictly: a rolled `0` is falsy) as
+ * `rollFailed`, then `outcome`, ungraded answering `rolled`. The null step is sound only because
+ * both pre-dispatch gates ran: `evaluateCheckRoll` also answers `value: null` with no
+ * `globalThis.Roll` and for a post-shim-empty formula.
+ */
+function discriminateCheckOutcome(result, graded, counted = false) {
+  if (result?.additionalDiceRefusal) return COMPANION_OUTCOMES.additionalDiceRefused;
   if (result?.cancelled === true) return COMPANION_OUTCOMES.cancelled;
+  if (counted && result?.misconfigured === true) return countRefusalOutcome(result);
   if (result?.value === null) return COMPANION_OUTCOMES.rollFailed;
   if (!graded) return COMPANION_OUTCOMES.rolled;
   return result?.outcome === 'pass'
@@ -149,108 +73,42 @@ function discriminateCheckOutcome(result, graded) {
     : COMPANION_OUTCOMES.checkFailed;
 }
 
-/**
- * Roll ONE formula for ONE actor, graded against a DC or ungraded, and answer the result.
- *
- * The request key set is CLOSED: exactly `{ actor, callSite, formula, dc, compare, label,
- * interactive, rollDecision }`, and nothing else is read. **No `...request` spread reaches the
- * options builder, the runner seam or the nested `rollOptions`.** That is not defensive style:
- * a spread would let a companion inject its own `prompt` and bypass the dialog entirely, or a
- * `speaker` impersonating another actor in chat, while passing every behavioural assertion.
- *
- * Three keys are deliberately absent from v1 as bare top-level fields — `img` (dialog header
- * art), `subjects` (the bulk thumbnail strip) and `speaker` (never caller-supplied; derived
- * from the resolved actor). `rollMode` is not a fourth: the roll uses the client's own default
- * unless a supplied `rollDecision.rollMode` overrides it, exactly as `bonus` and `advantage`
- * do (see `@param request.rollDecision` below). The compatibility promise is asymmetric: a
- * member MAY gain an optional argument without a version bump but may not lose one, so this
- * starts narrow.
- *
- * @param {object} request
- * @param {object|null} request.actor the RESOLVED actor, passed by the facade's gate
- * @param {string} request.callSite one of {@link COMPANION_CALL_SITES}; required, no default
- * @param {string} request.formula the authored roll formula
- * @param {number} [request.dc] a finite DC selects the GRADED arm; omit for the ungraded one
- * @param {'meet'|'exceed'} [request.compare] threshold mode, default `'meet'`
- * @param {string} [request.label] display label; defaults to a localized activity noun
- * @param {boolean} [request.interactive] open the roll prompt, default `false`
- * @param {{bonus?: string|null, rollMode?: string, advantage?: string}|null}
- *   [request.rollDecision] a PRE-RESOLVED decision; refused unless `interactive` is true
- * @param {object} seams the collaborators, injected from the facade
- * @returns {Promise<Readonly<object>>} a companion-contract answer; NEVER throws
- */
-export async function rollActorCheck(request, seams) {
-  const refusal = gateCompanionCallSite(request, seams);
-  if (refusal) return checkRollResult(refusal);
-
-  const label = resolveCheckLabel(request?.label, seams);
-  const interactive = request?.interactive === true;
-  const rollDecision = request?.rollDecision ?? null;
-  // A decision supplied with `interactive: false` is REFUSED rather than silently discarded.
-  // `evaluateCheckRoll` consults a pre-resolved decision only inside its interactive branch,
-  // so the caller's bonus, advantage and roll mode would otherwise all vanish with no error
-  // and the BASE formula would roll — the identical failure the shipped code calls out as
-  // load-bearing at the seam it guards.
-  if (rollDecision && !interactive) {
-    return checkRollResult(COMPANION_OUTCOMES.invalidRollDecision, { label });
-  }
-  // A decision that says the GM DECLINED is a decline, and it is honoured before anything is
-  // gated or dispatched. The documented decision shape carries no `confirmed` key — it is the
-  // prompt's answer MINUS that flag, and stripping it is what keeps the evaluator from reading
-  // a bulk decision as a cancellation — so a caller that forwarded a whole prompt answer has
-  // handed over a refusal. Reading it as a fourth NAMED key rather than spreading the object
-  // is what keeps that from also widening what a caller can inject: `confirmed` is honoured,
-  // and nothing else the caller attached is.
-  if (rollDecision?.confirmed === false) {
-    return checkRollResult(COMPANION_OUTCOMES.cancelled, { label });
-  }
-
-  // Two pre-dispatch gates, in this order. `noFormula` first because "you gave me nothing to
-  // roll" is the better answer than "this client cannot roll" when both are true; the order is
-  // safe in either direction, because with `Roll` absent the shim FAILS OPEN and keeps the
-  // residue rather than emptying it, so a missing engine can never manufacture a spurious
-  // `noFormula`.
-  const formula = String(request?.formula ?? '');
-  if (!isUsableCheckFormula(formula)) {
-    return checkRollResult(COMPANION_OUTCOMES.noFormula, { label });
-  }
-  if (seams.hasDiceEngine() !== true) {
-    return checkRollResult(COMPANION_OUTCOMES.engineUnavailable, { label });
-  }
-
-  const dc = request?.dc;
+async function runStandaloneCheck(
+  { formula, dc, compare, actor, label, interactive, rollDecision, evaluation, purchase },
+  seams
+) {
   const graded = Number.isFinite(dc);
-  const actor = request?.actor ?? null;
-  // Composed from NAMED KEYS ONLY, then `prompt` is overridden on the returned bag. Overriding
-  // afterwards is what keeps this change out of `rollPrompt.js` entirely: the builder hard-wires
-  // `prompt: promptCheckRoll`, and that function auto-confirms where there is no `DialogV2`, so
-  // without the seam the dismissal case — the one property this member exists to preserve —
-  // would be unreachable under test.
   const rollOptions = seams.buildRollOptions({
     interactive,
     actor,
     activity: label,
     dc: graded ? dc : undefined,
+    // The flavor names a DC only for sum/over/fixed; a roll-under target is named once it settles.
+    evaluation,
   });
+  // Fabricate's own prompt owns dismissal, since Foundry's RollResolver fulfils rather than aborts on close; set after the builder so a test seam can inject a dismissing prompt.
   rollOptions.prompt = seams.prompt;
+  rollOptions.advantage = COMPANION_ADVANTAGE;
+  Object.assign(rollOptions, purchase);
   if (rollDecision) {
     rollOptions.rollDecision = {
       bonus: rollDecision.bonus,
       rollMode: rollDecision.rollMode,
       advantage: rollDecision.advantage,
+      additionalDice: rollDecision.additionalDice,
     };
   }
-
   const result = graded
     ? await seams.runPassFail({
         formula,
         dc,
-        thresholdMode: request?.compare === 'exceed' ? 'exceed' : 'meet',
+        thresholdMode: compare === 'exceed' ? 'exceed' : 'meet',
         triggers: [],
         actor,
         label,
         rollOptions,
         craftingModifier: null,
+        evaluation,
       })
     : await seams.runProgressive({
         formula,
@@ -259,9 +117,133 @@ export async function rollActorCheck(request, seams) {
         label,
         rollOptions,
         craftingModifier: null,
+        evaluation,
       });
+  return { result, graded };
+}
 
-  const outcome = discriminateCheckOutcome(result, graded);
+/**
+ * The `dc` `runStandaloneCheck` grades against, resolved before any roll (issue 2003). A fixed
+ * sum/under request needs its own finite `dc` (D10, preferred over an ungraded roll); an attribute
+ * request ignores `dc` and reads the resolved actor instead, and any resolution failure other than
+ * an invalid multiplier answers `targetUnresolved` rather than a reason code no caller expects.
+ */
+function resolveCompanionCheckTarget(evaluation, requestDc, actor) {
+  if (evaluation.target.source !== 'attribute') {
+    if (evaluation.direction === 'under' && !Number.isFinite(requestDc)) {
+      return { refusal: COMPANION_OUTCOMES.evaluationInvalid };
+    }
+    return { dc: requestDc };
+  }
+  const rollData = typeof actor?.getRollData === 'function' ? actor.getRollData() : {};
+  const resolved = resolveCheckTarget({
+    evaluation,
+    rollData,
+    anchor: requestDc,
+    adjustment: selectTargetAdjustment(evaluation, null),
+  });
+  if (resolved.ok) return { dc: resolved.target };
+  return {
+    refusal:
+      resolved.reason === 'adjustment-invalid'
+        ? COMPANION_OUTCOMES.evaluationInvalid
+        : COMPANION_OUTCOMES.targetUnresolved,
+  };
+}
+
+/**
+ * The `dc` a request grades against: a count request ignores its own `dc` and target, always
+ * grading against `pool.required` (issue 2004); any other request resolves its sum target.
+ */
+function resolveCompanionDc(evaluation, counted, requestDc, actor) {
+  if (counted) return { dc: evaluation.pool.required };
+  return resolveCompanionCheckTarget(evaluation, requestDc, actor);
+}
+
+/**
+ * `rollActorCheck`'s `messageData` once graded: a caller-`dc` grade (sum/over/fixed) names it, a
+ * count grade names its required count (a zero pool needs neither), and any other grade names its
+ * resolved target from the runner's own executed evidence, never the request `dc`.
+ */
+function companionCheckMessageData({
+  label,
+  total,
+  dc,
+  graded,
+  counted,
+  fixedOver,
+  zeroPool,
+  target,
+  required,
+}) {
+  if (!graded) return { label, total };
+  if (counted) return zeroPool ? { label } : { label, total, required };
+  return fixedOver ? { label, total, dc } : { label, total, target };
+}
+
+/** Whether a request names bought dice at all: any value but absent, `null` or `0`. */
+function namesAdditionalDice(value) {
+  return value !== undefined && value !== null && value !== 0;
+}
+
+/**
+ * The additional-dice refusal a request earns before any budget read (issue 2008), or null: a
+ * count its evaluation does not offer, one that is not a whole number of 0 or more, or any
+ * purchase on a `broadcast` call site. The limit, availability and the spend are the engine's.
+ */
+function additionalDiceRequestRefusal({ requested, request }, evaluation) {
+  if (!namesAdditionalDice(requested)) return null;
+  if (evaluation.product !== 'count' || evaluation.pool.additionalDice.enabled !== true) {
+    return 'notOffered';
+  }
+  if (!Number.isInteger(requested) || requested < 0) return 'choiceInvalid';
+  return additionalDiceCallSiteRefusal(request);
+}
+
+/**
+ * The roll options a purchase adds: a non-interactive request's count, and the unavailable reason
+ * a call site that may not spend shows on the prompt.
+ */
+function additionalDiceOptions({ interactive, requested, request }) {
+  const forcedUnavailable = additionalDiceCallSiteRefusal(request);
+  return {
+    ...(!interactive && namesAdditionalDice(requested) && { additionalDice: requested }),
+    ...(forcedUnavailable && { forcedUnavailable }),
+  };
+}
+
+/**
+ * An `additionalDiceRefused` answer: its reason, the reason's key for the authored Resource name
+ * and source, and every fact that key names, from the engine's notice once it read a budget.
+ */
+function additionalDiceRefusedAnswer({ reason, label, evaluation, actor, notice = {} }) {
+  const { label: resource, source } = evaluation.pool.additionalDice;
+  return checkRollResult(
+    COMPANION_OUTCOMES.additionalDiceRefused,
+    {
+      label,
+      reason,
+      actor: actor?.name ?? '',
+      resource,
+      n: Number.isInteger(notice.dice) ? notice.dice : null,
+      limit: notice.limit ?? 0,
+      available: notice.available ?? 0,
+    },
+    { refusalKey: additionalDiceRefusalKey(reason, { label: resource, source }) }
+  );
+}
+
+/**
+ * Discriminate a settled runner result into `rollActorCheck`'s answer: an additional-dice refusal,
+ * a dismissal, a count pool refusal (before any executed evidence, naming any dice a refused Roll
+ * already spent), a generic roll failure, or the executed evidence.
+ */
+function buildCheckRollAnswer({ result, graded, counted, evaluation, label, dc, actor }) {
+  const outcome = discriminateCheckOutcome(result, graded, counted);
+  if (outcome === COMPANION_OUTCOMES.additionalDiceRefused) {
+    const { additionalDiceRefusal: reason, additionalDiceNotice: notice } = result;
+    return additionalDiceRefusedAnswer({ reason, label, evaluation, actor, notice });
+  }
   if (outcome === COMPANION_OUTCOMES.cancelled) {
     return checkRollResult(COMPANION_OUTCOMES.cancelled, { label });
   }
@@ -271,51 +253,161 @@ export async function rollActorCheck(request, seams) {
       detail: typeof result?.message === 'string' ? result.message : '',
     });
   }
-  // `data.total` and never `value`: `value` is the AWARDING value on the ungraded arm, which a
-  // forced outcome can overwrite. `triggers: []` makes that unreachable today, and reading the
-  // raw total anyway is what stops a later change that admits triggers from silently
-  // redefining a published field.
+  if (
+    outcome === COMPANION_OUTCOMES.poolUnresolved ||
+    outcome === COMPANION_OUTCOMES.evaluationInvalid
+  ) {
+    const bought = result.data?.boughtDice?.count;
+    return checkRollResult(outcome, bought ? { label, boughtDice: bought } : { label });
+  }
+  // `data.total`, never `value`: on the ungraded arm `value` is the awarding value a forced
+  // outcome can overwrite.
   const total = result.data.total;
-  // The graded strings name the DC they were measured against; the ungraded one cannot, so
-  // the bag is built per arm rather than uniformly. `assertMessageDataCovers` derives the
-  // requirement from the STRING, so a placeholder added to either without an author here
-  // fails at the answers that already carry the key.
-  return checkRollResult(outcome, graded ? { label, total, dc } : { label, total }, {
+  const zeroPool = result.data.zeroPool === true;
+  const fixedOver = !counted && isFixedSumOver(evaluation);
+  const messageData = companionCheckMessageData({
+    label,
+    total,
+    dc,
+    graded,
+    counted,
+    fixedOver,
+    zeroPool,
+    target: result.data.target,
+    required: evaluation.pool.required,
+  });
+  return checkRollResult(outcome, messageData, {
     total,
     diceGroups: result.data.diceGroups,
     resolvedFormula: result.data.resolvedFormula ?? null,
+    product: result.data.product,
+    direction: result.data.direction,
+    comparison: result.data.comparison,
+    target: result.data.target,
+    margin: result.data.margin,
+    successes: result.data.successes,
+    cancelled: result.data.cancelled,
+    targetGraded: graded && !counted && !fixedOver,
+    zeroPool,
+    boughtDice: result.data.boughtDice?.count ?? 0,
   });
 }
 
 /**
- * Answer ONE roll decision — situational bonus, roll mode, Advantage disposition — to be
- * applied to N rolls the CALLER will make. **It rolls nothing.**
- *
- * This reproduces `BulkSalvageService._resolveRollDecision` for a caller with no crafting
- * system. It answers BEFORE anything starts, which is what makes zero mutation on a dismissal
- * structural rather than compensating: there is nothing to roll back because nothing began.
- *
- * It takes **no `actorId`**. It reads no actor, rolls nothing and touches no document; an
- * ownership gate on an argument the member never reads is ceremony a later reader deletes, and
- * a caller passing one would infer a gate that is not there. It remains GM-gated — inline, in
- * the facade, because the shared preamble is scoped to actor-targeted members — `callSite`-
- * gated, elected, and `notReady`-refusing.
- *
- * It takes no `interactive` either: prompting IS the member.
- *
- * @param {object} request
- * @param {string} request.callSite one of {@link COMPANION_CALL_SITES}; required, no default
- * @param {Array<string>} request.formulas the batch's authored formulas, in the caller's order
- * @param {object} seams the collaborators, injected from the facade
- * @returns {Promise<Readonly<object>>} a companion-contract answer; NEVER throws
+ * Roll one formula for one actor, graded against a finite `dc` or ungraded, without throwing.
+ * The request is closed and does not spread caller properties into the runner or roll options.
+ * A supplied evaluation is strictly validated after call-site and roll-decision gates, then matched to a published mode.
+ */
+export async function rollActorCheck(request, seams) {
+  try {
+    const refusal = gateCompanionCallSite(request, seams);
+    if (refusal) return checkRollResult(refusal);
+    return await settleRollActorCheck(request, seams);
+  } catch (error) {
+    return checkRollResult(COMPANION_OUTCOMES.rollFailed, {
+      label: CHECK_ROLL_DEFAULT_LABEL.fallback,
+      detail: typeof error?.message === 'string' ? error.message : '',
+    });
+  }
+}
+
+/**
+ * Whether a request carries a choice the evaluator would silently discard: a `rollDecision` with
+ * `interactive: false`, which `evaluateCheckRoll` reads only in its interactive branch, or an
+ * interactive request's top-level `additionalDice`, where the prompt or decision chooses instead.
+ */
+function discardsDecision(request, interactive) {
+  return interactive
+    ? namesAdditionalDice(request?.additionalDice)
+    : Boolean(request?.rollDecision);
+}
+
+async function settleRollActorCheck(request, seams) {
+  const label = resolveCheckLabel(request?.label, seams);
+  const interactive = request?.interactive === true;
+  const rollDecision = request?.rollDecision ?? null;
+  if (discardsDecision(request, interactive)) {
+    return checkRollResult(COMPANION_OUTCOMES.invalidRollDecision, { label });
+  }
+  // A forwarded prompt answer with `confirmed: false` is a decline; `confirmed` is read as a named
+  // key, never spread, so nothing else the caller attached is honoured.
+  if (rollDecision?.confirmed === false) {
+    return checkRollResult(COMPANION_OUTCOMES.cancelled, { label });
+  }
+
+  const resolved = resolveCompanionCheckEvaluation(request?.evaluation);
+  if (!resolved.ok) return checkRollResult(COMPANION_OUTCOMES.evaluationInvalid, { label });
+  const evaluation = resolved.evaluation;
+  if (!supportsCompanionCheckEvaluation(evaluation, interactive)) {
+    return checkRollResult(COMPANION_OUTCOMES.evaluationUnsupported, { label });
+  }
+  const counted = evaluation.product === 'count';
+  const actor = request?.actor ?? null;
+  const purchase = {
+    interactive,
+    requested: interactive ? rollDecision?.additionalDice : request?.additionalDice,
+    request,
+  };
+  const reason = additionalDiceRequestRefusal(purchase, evaluation);
+  if (reason) {
+    const notice = { dice: purchase.requested };
+    return additionalDiceRefusedAnswer({ reason, label, evaluation, actor, notice });
+  }
+
+  // `noFormula` applies to sum only (issue 2004): `hasActiveCheck` reads a count evaluation as
+  // active regardless of `formula`. Checked before `engineUnavailable`; safe either way, as the
+  // shim fails open without `Roll` and so never manufactures a spurious `noFormula`.
+  const formula = String(request?.formula ?? '');
+  if (!hasActiveCheck({ evaluation }, resolveUsableCheckFormula(formula))) {
+    return checkRollResult(COMPANION_OUTCOMES.noFormula, { label });
+  }
+  if (seams.hasDiceEngine() !== true) {
+    return checkRollResult(COMPANION_OUTCOMES.engineUnavailable, { label });
+  }
+
+  const targeting = resolveCompanionDc(evaluation, counted, request?.dc, actor);
+  if (targeting.refusal) return checkRollResult(targeting.refusal, { label });
+  const dc = targeting.dc;
+
+  let result;
+  let graded;
+  try {
+    ({ result, graded } = await runStandaloneCheck(
+      {
+        formula,
+        dc,
+        compare: request?.compare,
+        actor,
+        label,
+        interactive,
+        rollDecision,
+        evaluation,
+        purchase: additionalDiceOptions(purchase),
+      },
+      seams
+    ));
+  } catch (error) {
+    return checkRollResult(COMPANION_OUTCOMES.rollFailed, {
+      label,
+      detail: typeof error?.message === 'string' ? error.message : '',
+    });
+  }
+
+  return buildCheckRollAnswer({ result, graded, counted, evaluation, label, dc, actor });
+}
+
+/**
+ * Answer one roll decision (bonus, roll mode, Advantage) for N rolls the caller makes; it rolls
+ * nothing, so a dismissal mutates nothing. Mirrors `BulkSalvageService._resolveRollDecision`.
+ * No `actorId` (it reads no actor) and no `interactive` (prompting is the member); still GM-gated
+ * inline in the facade, `callSite`-gated, elected and `notReady`-refusing. Never throws.
  */
 export async function resolveBulkCheckDecision(request, seams) {
   const refusal = gateCompanionCallSite(request, seams);
   if (refusal) return bulkCheckDecisionResult(refusal);
 
   const formulas = Array.isArray(request?.formulas) ? request.formulas : [];
-  // "Usable" is the SAME post-shim predicate `rollActorCheck`'s `noFormula` gate applies, so
-  // `'@craftingmod'` can neither be counted as covered nor deny Advantage to the whole batch.
+  // The same post-shim predicate as the `noFormula` gate.
   const usable = [];
   for (const [index, formula] of formulas.entries()) {
     const resolved = resolveUsableCheckFormula(formula);
@@ -323,9 +415,7 @@ export async function resolveBulkCheckDecision(request, seams) {
   }
   const covered = usable.map((entry) => entry.index);
   if (usable.length === 0) {
-    // Not a failure: "there is nothing to prompt about" is a correct answer, and asking a GM
-    // for a situational bonus for a batch in which nothing rolls is a dialog with no
-    // consequence. The direct analogue of the salvage service's own `none`.
+    // Not a failure: a batch in which nothing rolls has nothing to prompt about.
     return bulkCheckDecisionResult(COMPANION_OUTCOMES.nothingToDecide, null, {
       choice: null,
       allowAdvantage: false,
@@ -333,19 +423,19 @@ export async function resolveBulkCheckDecision(request, seams) {
     });
   }
 
-  // Computed over the USABLE SUBSET, all-or-nothing: offering Advantage that only some rolls
-  // could honour would be a lie about the rest of the batch, and denying it because of a
-  // formula that can never roll would be a lie about the ones that can.
-  const allowAdvantage = usable.every((entry) => hasPlainD20(entry.formula));
-  // `count` is the WHOLE BATCH, matching the salvage service's own `count: runnable.length`
-  // rather than its usable subset. The member supplies no `subjects`, so an unspecified count
-  // would make the dialog render "One roll setting for 0 items".
-  const choice = await seams.promptBulk({ allowAdvantage, count: formulas.length });
+  // All-or-nothing over the usable subset only, each formula under the default advantage rule.
+  const advantageOffer = intersectAdvantageOffers(
+    usable.map((entry) =>
+      resolveAdvantageOffer({ advantage: COMPANION_ADVANTAGE, authoredFormula: entry.formula })
+    )
+  );
+  const allowAdvantage = advantageOffer.advantage;
+  // The whole batch, as the salvage service counts; with no `subjects` the dialog reads "0 items".
+  const choice = await seams.promptBulk({ allowAdvantage, advantageOffer, count: formulas.length });
   if (!choice || choice.confirmed === false) {
     return bulkCheckDecisionResult(COMPANION_OUTCOMES.cancelled);
   }
-  // `promptCheckRoll`'s shape MINUS `confirmed`, which is what makes the evaluator treat it as
-  // a pre-resolved choice rather than as a cancellation.
+  // The prompt's shape minus `confirmed`, so the evaluator reads a choice, not a cancellation.
   return bulkCheckDecisionResult(
     COMPANION_OUTCOMES.decided,
     { count: covered.length, total: formulas.length },

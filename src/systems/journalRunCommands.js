@@ -1,3 +1,12 @@
+import { settleCardRolls } from './checkCardRolls.js';
+import { settlePromptedCheck } from './journalCheckPrompt.js';
+import {
+  evaluatePreparedJournalCheck,
+  withPreparedAdditionalDiceOffer,
+  withSpentAdditionalDice,
+} from './journalPreparedCheck.js';
+import { cardOffer, executedCheckFor, withEntitledFacts } from './journalRollFacts.js';
+import { decisionAdditionalDice, preparedDecisionPolicy } from './preparedDecisionPolicy.js';
 import { applyGuardedRunMutation } from './runLifecycleState.js';
 
 /** Request/reply discriminators multiplexed on the existing module socket. */
@@ -54,32 +63,17 @@ function replyMatches(pending, payload) {
   );
 }
 
-function safeRollDecision(value) {
-  const decision = value && typeof value === 'object' ? value : {};
-  const modifierIds = decision.modifierIds ?? decision.chosenModifierIds;
-  return {
-    bonus: typeof decision.bonus === 'string' ? decision.bonus : null,
-    rollMode: typeof decision.rollMode === 'string' ? decision.rollMode : null,
-    advantage: typeof decision.advantage === 'string' ? decision.advantage : null,
-    modifierIds: Array.isArray(modifierIds)
-      ? modifierIds.filter((id) => typeof id === 'string')
-      : [],
-  };
-}
-
 /**
- * Encode native identity for per-user, per-world terminal hiding, without deleting actor history.
- * @param {{actorUuid: string, runType: string, runId: string}} identity
- * @returns {string} JSON tuple key. Alchemy uses its native `crafting` run type.
+ * The JSON tuple key hiding one native run per user and world, never deleting actor history;
+ * alchemy uses its native `crafting` run type.
  */
 export function journalRunDismissalKey({ actorUuid, runType, runId }) {
   return JSON.stringify([String(actorUuid ?? ''), String(runType ?? ''), String(runId ?? '')]);
 }
 
 /**
- * Keep valid identity/timestamp entries, bounded to the 500 most recently hidden runs.
- * @param {object} value User-scoped dismissal map.
- * @returns {object} A new map suitable for the replacing user-setting write.
+ * Keep valid identity/timestamp entries, bounded to the 500 most recently hidden runs, as a new
+ * map for the replacing user-setting write.
  */
 export function normalizeJournalRunDismissals(value) {
   const entries = Object.entries(value && typeof value === 'object' ? value : {})
@@ -108,19 +102,14 @@ function operationUnavailable() {
 }
 
 /**
- * The refusal every Fabricate edge answers when the journal-run command service is absent.
- * It lives HERE so the reason-drift guard can see it: minted at an edge instead, the literal sat
- * outside every source that guard scanned and reached a player unworded.
- * @returns {{success: false, reason: string}}
+ * The refusal every Fabricate edge answers when the journal-run command service is absent, minted
+ * here so the reason-drift guard can see it.
  */
 export function authorityUnavailableRefusal() {
   return failure('authority-unavailable');
 }
 
-/**
- * The same absence in the shape `getJournalRunAuthorityAvailability` answers.
- * @returns {{available: false, reason: string}}
- */
+/** The same absence in the shape `getJournalRunAuthorityAvailability` answers. */
 export function authorityUnavailableAvailability() {
   return { available: false, reason: 'authority-unavailable' };
 }
@@ -165,23 +154,13 @@ function installEngineAuthority(engine, authority) {
 }
 
 /**
- * Preserve one-call execution when the stage is ready and all choices are supplied.
- * New starts select version 1 and use the installed active-GM boundary for start and execution.
- * Waiting stages or incomplete choices return their run for later Journal execution without
- * editable-material spending. Existing unstamped runs retain legacy behavior.
- * @param {object} options
- * @param {object} options.engine Crafting engine with its authority adapter installed.
- * @param {object} options.runManager Native crafting-run lookup.
- * @param {object} options.actor Resolved Actor document, not an actor ID or UUID string.
- * @param {object[]} options.sourceActors Resolved material-source Actor documents.
- * @param {object} options.recipe Resolved Recipe.
- * @param {string|null} [options.ingredientSetId]
- * @param {object} [options.options] Run ID, explicit ingredient/essence choices, and the
- *   `interactive` flag: `true` from the crafting UI opens the roll dialog for a required check,
- *   absent or `false` (the public API's default) settles it on the engine's own defaults.
- * @param {Function} [options.executeCommand] Authoritative command client.
- * @param {Function} [options.resolveUuid] Optional created-result document resolver.
- * @returns {Promise<object>} Start/wait, execution or refusal result, with resolved results when available.
+ * Preserve one-call execution when the stage is ready and all choices are supplied. New starts
+ * select version 1 and use the installed active-GM boundary for start and execution; a waiting
+ * stage or incomplete choices return the run for later Journal execution without spending
+ * editable materials, and existing unstamped runs keep legacy behaviour. `actor` and
+ * `sourceActors` are resolved documents, never ids. `options.interactive` is `true` from the
+ * crafting UI, which opens the roll dialog for a required check, and absent or `false` (the public
+ * API's default) settles it on the engine's own defaults.
  */
 export async function executePublicCraft({
   engine,
@@ -239,12 +218,10 @@ export async function executePublicCraft({
         sourceActorUuids: actorUuidList(sourceActors),
       },
     },
-    // The caller's flag, not a constant (issue 1780). The crafting UI passes `interactive: true`
-    // and expects the roll dialog; a macro omits it and `craftRecipe` defaults it to false, which
-    // is the non-interactive route issue 1683 added so the API never waits on a prompt nobody
-    // answers. Hard-coding `false` here silenced the player app's prompt the moment `main.js`
-    // started forwarding these options.
-    { interactive: options?.interactive === true }
+    // The caller's flag, never a constant (issue 1780): the crafting UI passes `true` and expects
+    // the roll dialog, while a macro omits it and `craftRecipe` defaults it to the non-interactive
+    // route issue 1683 added, so the API never waits on a prompt nobody answers.
+    { interactive: options?.interactive === true, ...decisionAdditionalDice(options) }
   );
   if (!Array.isArray(settled?.createdResultUuids) || typeof resolveUuid !== 'function') {
     return settled;
@@ -262,41 +239,21 @@ export async function executePublicCraft({
 }
 
 /**
- * Preserve one-call completion for the public gathering API.
- *
- * The gathering counterpart of {@link executePublicCraft}, and it exists for the same reason.
- * Issue 1648 gave gathering a versioned lifecycle, and `startGatheringAttempt` began selecting it
- * unconditionally. That routes a ready attempt away from the engine's immediate resolution and
- * into a started run awaiting execution -- so every macro and script calling
- * `game.fabricate.startGatheringAttempt()` went on reporting `accepted: true` and silently
- * awarded nothing. Crafting was given this boundary in the same work; gathering was not, and the
- * Foundry smoke's guaranteed-success forage caught it the moment the Phase E hang stopped
- * masking the rest of the run.
- *
- * Keyed on `canExecuteImmediately`, the same field {@link executePublicCraft} uses, because it is
- * the one the journal command layer's result normaliser forwards. The gathering engine's native
- * word is `state: 'ready'` and the normaliser drops it, so keying on that completed nothing at
- * all -- every public caller reads a normalised result. A waiting or timed attempt answers
- * `canExecuteImmediately: false` and is left exactly as it was: those mature at GM-gated world
- * time, and finishing one here would spend the wait the task declares.
- *
- * The start result is kept under the settled one rather than replaced. An attempt that was
- * accepted and then failed to execute is both of those things, and a caller reading `accepted`
- * must not be told the attempt never happened.
- * @param {object} options
- * @param {Function} options.requestStart Bound versioned start, already viewer-scoped.
- * @param {object} options.actor Resolved Actor document, not an id or UUID string.
- * @param {Function} [options.executeCommand] Authoritative command client.
- * @param {boolean} [options.interactive] The caller's flag: `true` from the gathering screen
- *   opens the roll dialog for a required check, `false` (the public API's default) settles it.
- * @returns {Promise<object>} The start result for a waiting or refused attempt, else the start
- *   result with its execution outcome applied over it.
+ * Preserve one-call completion for the public gathering API, as `executePublicCraft` does for
+ * crafting: since issue 1648 `startGatheringAttempt` selects the versioned lifecycle, so without
+ * this a ready public attempt reported `accepted: true` and awarded nothing. Keyed on
+ * `canExecuteImmediately`, the field the command layer's normaliser forwards (it drops the
+ * engine's `state: 'ready'`); a waiting or timed attempt is left as it was, since it matures at
+ * GM-gated world time. The execution outcome is applied OVER the start result, so an accepted
+ * attempt that failed to execute still reads `accepted`. `interactive` is the caller's flag, as
+ * in `executePublicCraft`.
  */
 export async function executePublicGather({
   requestStart,
   actor,
   executeCommand = null,
   interactive = false,
+  additionalDice = 0,
 } = {}) {
   if (typeof requestStart !== 'function') return operationUnavailable();
   const started = await requestStart();
@@ -317,18 +274,16 @@ export async function executePublicGather({
       actorUuid: actor?.uuid,
       runType: 'gathering',
       runId,
-      // `runRevision`, not `run.runRevision`: the start this reads is already NORMALISED, and
-      // the normaliser lifts the revision to the top level and drops the run document. Reading
-      // the nested one sent `expectedRevision: undefined` and the execute answered
-      // `invalid-command`, which is a refusal the player would have seen as a gather that
-      // started and awarded nothing.
+      // `runRevision`, not `run.runRevision`: the normalised start lifts the revision to the top
+      // level and drops the run document, and an undefined `expectedRevision` is refused as
+      // `invalid-command`.
       expectedRevision: started.runRevision,
       action: 'execute',
       payload: { trigger: 'manual' },
     },
     // The caller's flag, for the reason `executePublicCraft` gives (issue 1780): the gathering
     // screen passes `interactive: true` and expects its roll dialog.
-    { interactive: interactive === true }
+    { interactive: interactive === true, ...decisionAdditionalDice({ additionalDice }) }
   );
   return { ...started, ...settled };
 }
@@ -337,10 +292,6 @@ export async function executePublicGather({
  * Compose both persisted run managers into the authority's exclusive reconstruction boundary.
  * The returned function requires exactly one scope: a nonempty `operationId` or `orphaned: true`.
  * It reconstructs evidence and never performs spending, awards or rollback.
- * @param {object} [options]
- * @param {Function} options.getCraftingRunManager
- * @param {Function} options.getGatheringRunManager
- * @returns {Function} Async scoped reconstruction returning `{success, results?}` or a reason.
  */
 export function createJournalExecutionReconstructor({
   getCraftingRunManager,
@@ -572,12 +523,12 @@ export function createGatheringJournalRunOperations({
         requestId,
       });
     },
-    evaluateCheck: ({ actor, privateEvaluation, decision }) => {
+    evaluateCheck: ({ actor, privateEvaluation, decision, sender }) => {
       const runtime = currentEngine();
       if (typeof runtime?.evaluatePreparedVersionedCheck !== 'function') {
         return operationUnavailable();
       }
-      return runtime.evaluatePreparedVersionedCheck({ actor, privateEvaluation, decision });
+      return runtime.evaluatePreparedVersionedCheck({ actor, privateEvaluation, decision, sender });
     },
     execute: ({ actor, run, payload, executionGrant, requestId, expectedRevision }) => {
       const runtime = currentEngine();
@@ -650,11 +601,8 @@ function serializedOperationResult(result, { secret = false, runId = '' } = {}) 
     ...(Object.hasOwn(source, 'canExecuteImmediately') && {
       canExecuteImmediately: source.canExecuteImmediately === true,
     }),
-    // Gathering says WHY it refused in its own vocabulary -- `state` names the condition and
-    // `blockedReasons` carries the coded detail -- where crafting uses `reason` and `message`.
-    // This list was written for crafting's words, so it dropped gathering's on the floor and a
-    // blocked attempt reached its caller as `{success: false, reason: null, message: null}`:
-    // a refusal with nothing in it, which no surface can word and no player can act on
+    // Gathering refuses in its own vocabulary (`state` and the coded `blockedReasons`), where
+    // crafting uses `reason` and `message`; dropping them left a refusal no surface could word
     // (issue 1759).
     ...(Object.hasOwn(source, 'state') && { state: source.state ?? null }),
     ...(Object.hasOwn(source, 'blockedReasons') && {
@@ -680,6 +628,7 @@ function serializedOperationResult(result, { secret = false, runId = '' } = {}) 
  * @param {number} [deps.timeoutMs=15000] Remote-reply timeout, not cancellation of server work.
  * @param {Function|null} [deps.promptCheck] Local safe-descriptor prompt returning a roll decision.
  * @param {Function|null} [deps.postRollHandoff] Post an already evaluated, entitled roll without rerolling.
+ * @param {Function|null} [deps.onCheckChanged] Tell the player a re-prepared check differs from the one answered.
  * @param {Function} [deps.getDismissals] Read this user's dismissal map.
  * @param {Function} [deps.setDismissals] Awaited replacing write of this user's dismissal map.
  * @param {Function} [deps.now] Wall-clock milliseconds for tokens and dismissal timestamps.
@@ -698,6 +647,7 @@ export function createJournalRunCommandService({
   timeoutMs = JOURNAL_RUN_COMMAND_TIMEOUT_MS,
   promptCheck = null,
   postRollHandoff = null,
+  onCheckChanged = null,
   getDismissals = () => ({}),
   setDismissals = async () => {},
   now = () => Date.now(),
@@ -753,7 +703,7 @@ export function createJournalRunCommandService({
     return { success: true, sender, actor, operation, run, revision };
   }
 
-  async function executeOperation(request, context, helpers) {
+  async function executeOperation(request, context, helpers, spent) {
     const { actor, operation, run } = context;
     const binding = {
       operation: request.action === 'releaseCheck' ? 'execute' : request.action,
@@ -794,23 +744,19 @@ export function createJournalRunCommandService({
       preparedPayload = prepared?.payload ?? preparedPayload;
       executionOperation = prepared?.executionOperation ?? executionOperation;
     }
-    const prepareToken = request.payload?.prepareToken;
-    if (request.action === 'execute' && prepareToken) {
-      const token = helpers.consumePrepareToken(prepareToken, binding);
-      if (!token) return failure('prepare-token-invalid');
-      privateEvaluation = token.binding?.privateEvaluation;
+    if (request.action === 'execute' && request.payload?.prepareToken) {
       const evaluate = operation.evaluateCheck;
       if (typeof evaluate !== 'function') return failure('check-evaluator-unavailable');
-      const resolvedCheckResult = await evaluate({
-        actor,
-        run,
-        sender: context.sender,
-        privateEvaluation,
-        decision: {
-          ...safeRollDecision(request.payload?.rollDecision),
-          ...token.binding?.decisionPolicy,
-        },
-      });
+      const { consumePrepareToken } = helpers;
+      const seams = { evaluate, consumePrepareToken, currentRealmIsActiveGm, spent };
+      const prepared = await evaluatePreparedJournalCheck({ request, context, binding, ...seams });
+      if (prepared.response) return prepared.response;
+      const resolvedCheckResult = prepared.checkResult;
+      privateEvaluation = prepared.privateEvaluation;
+      // A check that cannot roll carries its refusal sentence, which the player sees.
+      if (resolvedCheckResult?.misconfigured === true) {
+        return failure('roll-unavailable', { message: resolvedCheckResult.message ?? null });
+      }
       if (resolvedCheckResult?.engineEvaluated !== true || resolvedCheckResult.cancelled) {
         return failure(resolvedCheckResult?.cancelled ? 'roll-cancelled' : 'roll-unavailable');
       }
@@ -821,10 +767,12 @@ export function createJournalRunCommandService({
       } = resolvedCheckResult;
       responseRollHandoff = rollHandoff;
       secretCheck = secret === true;
-      trustedContext = {
-        operationId: request.requestId,
-        resolvedCheckResult: trustedResolvedCheckResult,
-      };
+      const entitlement = { operation, request, resolveUuid, getUser, privateEvaluation };
+      const offered = await cardOffer(trustedResolvedCheckResult, rollHandoff, {
+        ...entitlement,
+        payload: request.payload ?? {},
+      });
+      trustedContext = { operationId: request.requestId, resolvedCheckResult: offered };
     } else if (request.action === 'execute' && typeof operation.describeCheck === 'function') {
       const preparationGrant = helpers.createExecutionGrant({
         ...binding,
@@ -839,24 +787,21 @@ export function createJournalRunCommandService({
         preparationGrant,
         requestId: request.requestId,
       });
-      if (descriptor?.blocked) return failure(descriptor.blocked);
+      if (descriptor?.blocked) return failure(descriptor.blocked, descriptor.detail);
       if (descriptor?.required) {
+        const publicPrompt = await withPreparedAdditionalDiceOffer(descriptor, context);
         const token = helpers.issuePrepareToken(
           {
             ...binding,
             privateEvaluation: descriptor.privateEvaluation,
-            decisionPolicy: {
-              allowsSituationalModifier:
-                descriptor.publicPrompt?.allowsSituationalModifier === true,
-              allowAdvantage: descriptor.publicPrompt?.allowAdvantage === true,
-            },
+            decisionPolicy: preparedDecisionPolicy(publicPrompt),
           },
           { expiresAt: now() + 60_000 }
         );
         return {
           success: true,
           checkRequired: true,
-          promptDescriptor: descriptor.publicPrompt ?? {},
+          promptDescriptor: publicPrompt ?? {},
           prepareToken: token,
         };
       }
@@ -869,6 +814,21 @@ export function createJournalRunCommandService({
       };
     }
 
+    const facts = { trustedContext, responseRollHandoff, secretCheck, privateEvaluation };
+    const plan = { binding, preparedPayload, executionOperation };
+    try {
+      return await commitOperation(request, context, helpers, { ...facts, ...plan });
+    } finally {
+      // Every way out closes the card offer; one the reply already settled is gone by now.
+      await settleCardRolls(trustedContext.resolvedCheckResult?.cardRolls);
+    }
+  }
+
+  /** Runs the operation under its execution grant and answers the reply an entitled sender reads. */
+  async function commitOperation(request, context, helpers, prepared) {
+    const { actor, operation, run } = context;
+    const { binding, preparedPayload, executionOperation, trustedContext } = prepared;
+    const { responseRollHandoff, secretCheck, privateEvaluation } = prepared;
     const method = operation[executionOperation];
     if (typeof method !== 'function') return failure('unsupported-operation');
     if (!currentRealmIsActiveGm()) return failure('active-gm-required');
@@ -898,39 +858,14 @@ export function createJournalRunCommandService({
       secret: secretCheck,
       runId: request.runId,
     });
-    if (response.success && responseRollHandoff && !secretCheck) {
-      let rollEntitled = true;
-      if (typeof operation.authorizeRollHandoff === 'function') {
-        try {
-          const freshActor = await resolveUuid(request.actorUuid);
-          const freshSender = getUser?.(request.senderId) ?? null;
-          const freshRun =
-            freshActor && validText(request.runId)
-              ? await operation.getRun?.({
-                  actor: freshActor,
-                  runId: request.runId,
-                  includeHistory: true,
-                })
-              : null;
-          rollEntitled = Boolean(
-            freshActor &&
-            freshSender &&
-            (await operation.authorizeRollHandoff({
-              actor: freshActor,
-              run: freshRun,
-              payload,
-              sender: freshSender,
-              privateEvaluation,
-              result,
-            }))
-          );
-        } catch {
-          rollEntitled = false;
-        }
-      }
-      if (rollEntitled) return { ...response, rollHandoff: responseRollHandoff };
-    }
-    return response;
+    const check = secretCheck
+      ? null
+      : executedCheckFor(request.runType, trustedContext.resolvedCheckResult);
+    // A handoff the result card carried is not posted again by the requester.
+    const carried = await settleCardRolls(trustedContext.resolvedCheckResult?.cardRolls);
+    const handoff = secretCheck || carried ? null : responseRollHandoff;
+    const entitlement = { operation, request, resolveUuid, getUser, payload, privateEvaluation };
+    return withEntitledFacts(response, { check, handoff }, { ...entitlement, result });
   }
 
   async function handleRequest(request, senderId) {
@@ -938,12 +873,16 @@ export function createJournalRunCommandService({
     if (!currentRealmIsActiveGm()) {
       return failure('active-gm-required');
     }
-    return authority.run({ ...request, senderId }, async (helpers) => {
+    const spent = {};
+    // A run command's logical identity is its request, whatever the payload names.
+    const claimed = { ...request, operationId: undefined, senderId };
+    const response = await authority.run(claimed, async (helpers) => {
       // Every lookup occurs after the server-arbitrated claim has been acquired.
       const context = await resolveCommandContext(request, senderId);
       if (!context.success) return context;
-      return executeOperation({ ...request, senderId }, context, helpers);
+      return executeOperation({ ...request, senderId }, context, helpers, spent);
     });
+    return withSpentAdditionalDice(response, spent, request.expectedRevision);
   }
 
   function buildReply(request, recipientId, response) {
@@ -966,6 +905,11 @@ export function createJournalRunCommandService({
     }
     if (payload?.kind !== JOURNAL_RUN_SOCKET_KIND.REQUEST) return null;
     if (!currentRealmIsActiveGm()) return null;
+    if (
+      typeof authority.shouldHandleRequest === 'function' &&
+      !(await authority.shouldHandleRequest(payload))
+    )
+      return null;
     const response = await handleRequest(payload, senderId);
     // A second tab for the same elected GM has the same attested sender id. A tab that lost
     // either boot recovery or this command's claim must stay silent or it can beat the winning
@@ -1014,46 +958,25 @@ export function createJournalRunCommandService({
   }
 
   /**
-   * Run one Journal command, resolving a required check on the way.
-   *
-   * `interactive` is the CALLER'S. The Journal and the crafting and gathering screens pass
-   * `true`; the public API defaults it to `false` because a macro or a script has no one to
-   * answer a dialog, and `promptCheck` awaits a human with no timeout of its own -- `sendCommand`
-   * has one, the prompt does not. A non-interactive caller therefore settles the check with the
-   * engine's own defaults instead of opening it, which is the same route a player takes after
-   * answering (issue 1683).
+   * Run one Journal command, resolving a required check on the way. `interactive` is the CALLER'S:
+   * the public API defaults it to `false`, because `promptCheck` awaits a human with no timeout of
+   * its own, so a non-interactive caller settles the check on the engine's defaults, the route a
+   * player takes after answering (issue 1683), buying only the `additionalDice` it names.
    */
-  async function executeJournalRunCommand(command, { interactive = true } = {}) {
+  async function executeJournalRunCommand(command, options = {}) {
+    const { interactive = true } = options;
     const first = await sendCommand(command);
     if (!first?.checkRequired) return first;
     if (!interactive) {
+      const rollDecision = decisionAdditionalDice(options);
       return sendCommand({
         ...command,
-        payload: { ...command.payload, prepareToken: first.prepareToken, rollDecision: {} },
+        payload: { ...command.payload, prepareToken: first.prepareToken, rollDecision },
       });
     }
     if (typeof promptCheck !== 'function') return failure('check-prompt-unavailable');
-    const decision = await promptCheck(first.promptDescriptor);
-    if (!decision || decision.confirmed === false) {
-      await sendCommand({
-        ...command,
-        action: 'releaseCheck',
-        payload: { prepareToken: first.prepareToken },
-      });
-      return { success: false, cancelled: true, reason: 'roll-cancelled' };
-    }
-    const settled = await sendCommand({
-      ...command,
-      payload: {
-        ...command.payload,
-        prepareToken: first.prepareToken,
-        rollDecision: safeRollDecision(decision),
-      },
-    });
-    if (settled?.rollHandoff && typeof postRollHandoff === 'function') {
-      await postRollHandoff(settled.rollHandoff);
-    }
-    return settled;
+    const seams = { sendCommand, promptCheck, postRollHandoff, onCheckChanged };
+    return settlePromptedCheck(command, first, seams);
   }
 
   function getDismissedJournalRunKeys({ actorUuid, viewerId } = {}) {

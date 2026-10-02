@@ -1,39 +1,46 @@
 /**
- * The DETERMINISTIC reduction of a roll expression to one number, and whether it rolls dice at all
- * (issue 1118). The average RANKS `highest` and `playerPicks`' non-interactive fallback and never
- * pays, so an approximation costs a mis-ranked entry, never a wrong payout. Keep/drop is exact via
- * {@link keptDiceAverage}; every other die modifier falls back to the plain average, which is wrong
- * by ~10 for the counting family (`cs`/`cf`). Anything unreducible is `NaN`, which every caller
- * reads as "contributes nothing". Import-free and Foundry-free.
+ * Deterministic reduction and quantity classification for roll expressions. Reduction preserves
+ * the face-sum approximation; classification prevents transformed totals from being read as it.
  */
 
-/** Foundry's configured single-letter denominations (`CONFIG.Dice.terms`). */
+/** `CONFIG.Dice.terms`' single-letter denominations. */
 const DENOMINATION_AVERAGES = new Map([
   ['f', 0],
   ['c', 0.5],
 ]);
 
-/**
- * A die at the current offset: an optional integer count, `d`, and faces that are either a run of
- * digits or one of Foundry's configured denominations.
- */
 const DIE_AT = /^(\d+)?[dD](\d+|[fFcC])((?:[a-zA-Z]+|[0-9<>=]+)*)/;
 
-/** A keep/drop modifier at the head of a modifier run, e.g. */
+/** A keep/drop modifier (`kh`, `kl`, `dh`, `dl`, `k`, `d`) heading a modifier run. */
 const KEEP_AT = /^(kh|kl|dh|dl|k|d(?![fF]))(\d+)?/i;
 
-/** The remainder of a modifier run, consumed and ignored once a keep/drop is read. */
+/** Consumed and ignored once a keep/drop is read. */
 const MODIFIER_RUN_AT = /^(?:[a-zA-Z]+|[0-9<>=]+)*/;
 
-/** Reduce a roll expression to its deterministic average, and report whether it rolls. */
+/** Foundry's `Die` modifier grammar: the counting family takes an optional comparator or bare
+ *  target, and `r`/`x` an optional iteration bound ahead of one. */
+const TRANSFORMED_MODIFIER_AT = /^(?:cs|cf|df|sf|ms)(?:[<>=]*\d+)?|^(?:even|odd)/i;
+const MAGNITUDE_MODIFIER_AT =
+  /^(?:kh|kl|dh|dl|k|d)\d*|^(?:rr|r|xo|x)\d*(?:[<>=]+\d+)?|^(?:min|max)\d+/i;
+
+/** Whether an expression represents a magnitude, a transformed total, or no readable quantity. */
+export function classifyRollQuantity(input) {
+  const source = String(input ?? '').trim();
+  if (source === '') return 'irreducible';
+  const reader = createReader(source);
+  const value = reader.parseExpression();
+  reader.skipWhitespace();
+  if (!reader.atEnd() || !Number.isFinite(value) || !reader.syntaxValid()) return 'irreducible';
+  return reader.transformed() ? 'transformed' : 'magnitude';
+}
+
 export function reduceRollExpression(input, { dieValue = null } = {}) {
   const source = String(input ?? '').trim();
   if (source === '') return { value: NaN, rollsDice: false };
   const reader = createReader(source, dieValue);
   const value = reader.parseExpression();
   reader.skipWhitespace();
-  // Trailing text the walk could not consume means the expression is not this grammar's, so the
-  // reduction is refused rather than reported from a prefix of it.
+  // Unconsumed trailing text refuses the whole reduction rather than reporting a prefix.
   const complete = reader.atEnd();
   return {
     value: complete && Number.isFinite(value) ? value : NaN,
@@ -41,10 +48,11 @@ export function reduceRollExpression(input, { dieValue = null } = {}) {
   };
 }
 
-/** The recursive-descent reader. */
 function createReader(source, dieValue = null) {
   let index = 0;
   let sawDice = false;
+  let sawTransformed = false;
+  let validSyntax = true;
   let dieOrdinal = 0;
 
   const skipWhitespace = () => {
@@ -55,7 +63,14 @@ function createReader(source, dieValue = null) {
   const skipFlavor = () => {
     if (source[index] !== '[') return;
     const close = source.indexOf(']', index);
+    if (close === -1) validSyntax = false;
     index = close === -1 ? source.length : close + 1;
+  };
+
+  const noteModifierQuantity = (modifiers) => {
+    const quantity = classifyDieModifiers(modifiers);
+    if (quantity === 'irreducible') validSyntax = false;
+    if (quantity === 'transformed') sawTransformed = true;
   };
 
   const matchAt = (pattern) => {
@@ -105,8 +120,7 @@ function createReader(source, dieValue = null) {
 
   function parsePrimary() {
     skipWhitespace();
-    // A die is tried FIRST, so `1d6` is not read as the number 1 and `d20` is not read as a call to
-    // a function named `d`.
+    // A die first, so `1d6` is not the number 1 and `d20` not a call to a function `d`.
     const die = matchAt(DIE_AT);
     if (die) return dieAverage(Number(die[1] ?? 1), die[2], die[3]);
     const character = source[index];
@@ -141,10 +155,10 @@ function createReader(source, dieValue = null) {
 
   function dieAverage(count, faces, modifiers) {
     sawDice = true;
+    noteModifierQuantity(modifiers);
     skipFlavor();
     if (dieValue) {
-      // BEFORE the shape checks below, deliberately: a substituting caller is answering for this
-      // die itself, and it is the one that gets to decide which shapes it can answer for.
+      // Before the shape checks: a substituting caller decides which shapes it answers for.
       const substituted = dieValue({
         ordinal: dieOrdinal++,
         count,
@@ -170,7 +184,6 @@ function createReader(source, dieValue = null) {
     return resolveKeptCount(count, keep[1].toLowerCase(), keep[2]);
   }
 
-  /** A dice POOL. */
   function parsePool() {
     sawDice = true;
     index += 1;
@@ -183,8 +196,9 @@ function createReader(source, dieValue = null) {
     }
     if (source[index] !== '}') return NaN;
     index += 1;
-    const keep = matchAt(KEEP_AT);
-    matchAt(MODIFIER_RUN_AT);
+    const run = matchAt(MODIFIER_RUN_AT)[0];
+    noteModifierQuantity(run);
+    const keep = KEEP_AT.exec(run);
     skipFlavor();
     if (members.some((member) => !Number.isFinite(member))) return NaN;
     return sumOf(keep ? keptMembers(members, keep[1].toLowerCase(), keep[2]) : members);
@@ -193,8 +207,7 @@ function createReader(source, dieValue = null) {
   function parseFunction() {
     const start = index;
     while (index < source.length && /[a-zA-Z_]/.test(source[index])) index += 1;
-    // NOT lowercased: `FunctionTerm#function` resolves `Math[fn]` case-sensitively, so `MAX(1d4,
-    // 2)` is a function Foundry cannot call and this walk must not pretend it can.
+    // Not lowercased: `FunctionTerm#function` resolves `Math[fn]` case-sensitively.
     const name = source.slice(start, index);
     skipWhitespace();
     const args = [];
@@ -221,10 +234,28 @@ function createReader(source, dieValue = null) {
     skipWhitespace,
     atEnd: () => index >= source.length,
     rollsDice: () => sawDice,
+    syntaxValid: () => validSyntax,
+    transformed: () => sawTransformed,
   };
 }
 
-/** Whether a keep/drop mode retains the HIGHEST results. */
+function classifyDieModifiers(modifiers) {
+  let remaining = String(modifiers ?? '');
+  let transformed = false;
+  while (remaining !== '') {
+    const quantity = TRANSFORMED_MODIFIER_AT.exec(remaining);
+    if (quantity) {
+      transformed = true;
+      remaining = remaining.slice(quantity[0].length);
+      continue;
+    }
+    const magnitude = MAGNITUDE_MODIFIER_AT.exec(remaining);
+    if (!magnitude) return 'irreducible';
+    remaining = remaining.slice(magnitude[0].length);
+  }
+  return transformed ? 'transformed' : 'magnitude';
+}
+
 function keepsHighest(mode) {
   return ['k', 'kh', 'd', 'dl'].includes(mode);
 }
@@ -245,15 +276,10 @@ function keptMembers(members, mode, rawCount) {
   return ordered.slice(0, kept);
 }
 
-/**
- * Above this the order-statistics walk stops being worth its cost; fall back to the plain average.
- */
+/** Above this the order-statistics walk falls back to the plain average. */
 const KEPT_DICE_LIMITS = Object.freeze({ count: 200, sides: 1000 });
 
-/**
- * The EXACT expected sum of the kept dice of `count` identical `sides`-sided dice under a keep/drop
- * modifier.
- */
+/** The exact expected sum of the kept dice. */
 function keptDiceAverage(count, sides, mode, rawCount) {
   const plain = (count * (sides + 1)) / 2;
   if (count > KEPT_DICE_LIMITS.count || sides > KEPT_DICE_LIMITS.sides) return plain;
@@ -288,10 +314,7 @@ function sumOf(values) {
   return values.reduce((total, value) => total + value, 0);
 }
 
-/**
- * Foundry's own Math extensions (`common/primitives/math.mjs`), which a formula may call and a bare
- * `Math` in Node does not carry.
- */
+/** Foundry's Math extensions (`common/primitives/math.mjs`), absent from Node's `Math`. */
 const FOUNDRY_MATH_EXTENSIONS = Object.freeze({
   clamp: (value, min, max) => Math.min(Math.max(value, min), max),
   mix: (a, b, weight) => a * weight + b * (1 - weight),
@@ -299,13 +322,12 @@ const FOUNDRY_MATH_EXTENSIONS = Object.freeze({
   toRadians: (degrees) => (degrees * Math.PI) / 180,
 });
 
-/** Apply a function term, MIRRORING Foundry's own resolution rather than curating a list. */
+/** Mirrors Foundry's own resolution rather than curating a list. */
 function applyMathFunction(name, args) {
   if (name === 'random') return NaN;
   const fn = FOUNDRY_MATH_EXTENSIONS[name] ?? Math[name];
   if (typeof fn !== 'function') return NaN;
-  // `Math.min()` / `Math.max()` with no arguments answer ±Infinity, which is not a contribution any
-  // formula could produce; the finite test at the top of the walk refuses it.
+  // Argument-less `Math.min()` and `Math.max()` answer ±Infinity, which the finite test refuses.
   const value = fn(...args);
   return typeof value === 'number' ? value : NaN;
 }

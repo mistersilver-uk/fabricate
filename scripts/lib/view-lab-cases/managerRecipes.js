@@ -5,6 +5,7 @@
 import {
   ANCHORED_POPOVER_SOURCES,
   BULK_DELETE_CARD_PATTERN,
+  CHECKS_ROUTE_MODEL_PATTERN,
   RECIPE_BULK_EDIT_MATCHES,
 } from './caseConstants.js';
 import { chooseSelectOption, managerCase } from './caseFactories.js';
@@ -154,7 +155,24 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Recipe/,
       /^src\/ui\/svelte\/apps\/manager\/recipes?\//,
+      CHECKS_ROUTE_MODEL_PATTERN,
     ],
+  }),
+  // The inspector names a switched-off check as the row pill does, never "No check" (issue 2136).
+  managerCase({
+    id: 'manager-recipes-inspector-check-off',
+    label: 'Manager — Recipes inspector, check switched off',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-tidewrack' },
+    steps: [
+      'Crafting',
+      { selector: '.manager-recipe-row[data-recipe-id="tw-r-tidewater"] .manager-recipe-identity' },
+    ],
+    expectView: 'recipes',
+    expectSelector: '.fabricate-manager [data-recipe-fact="check"]:has-text("Check off")',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [/^src\/ui\/model\/recipeBrowserModel\.js$/],
   }),
   managerCase({
     id: 'manager-recipes-grouped-continuation',
@@ -206,7 +224,7 @@ export const CASES = Object.freeze([
       '.fabricate-manager [data-bulk-book-state="add"] ~ [data-bulk-book-state="remove"], ' +
       '.fabricate-manager [data-bulk-book-state="remove"] ~ [data-bulk-book-state="add"]',
     kinds: ['manager', 'recipes'],
-    sourceMatches: RECIPE_BULK_EDIT_MATCHES,
+    sourceMatches: [...RECIPE_BULK_EDIT_MATCHES, CHECKS_ROUTE_MODEL_PATTERN],
   }),
   managerCase({
     id: 'manager-recipes-bulk-edit-unstaged',
@@ -318,7 +336,137 @@ export const CASES = Object.freeze([
     ],
     kinds: ['manager', 'recipes'],
     // Spread rather than the shared array: this and the picker frame are the two bulk-edit frames resting on an open panel.
-    sourceMatches: [...RECIPE_BULK_EDIT_MATCHES, ...ANCHORED_POPOVER_SOURCES],
+    sourceMatches: [
+      ...RECIPE_BULK_EDIT_MATCHES,
+      ...ANCHORED_POPOVER_SOURCES,
+      CHECKS_ROUTE_MODEL_PATTERN,
+    ],
+  }),
+  // Issue 2005 (T6): a roll-under check's pill names a Target, and a character value its source.
+  ...[
+    ['manager-recipes-check-pill-under', 'roll-under-fixed', 'target', 'Target 12'],
+    [
+      'manager-recipes-check-pill-under-attribute',
+      'roll-under-add',
+      'attribute',
+      'Character value',
+    ],
+    [
+      'manager-recipes-check-pill-under-dynamic',
+      'roll-under-dynamic',
+      'dynamicTarget',
+      'Dynamic target',
+    ],
+  ].map(([id, state, kind, text]) =>
+    managerCase({
+      id,
+      label: `Manager — Recipes check pill, ${state.replaceAll('-', ' ')}`,
+      smokeLabels: [],
+      reaches: 'beyond',
+      query: { system: 'lab-smithing', checkPreviewState: state },
+      steps: ['Crafting'],
+      expectView: 'recipes',
+      expectSelector: `.fabricate-manager .manager-recipe-row [data-recipe-check="${kind}"]:has-text("${text}")`,
+      kinds: ['manager', 'recipes'],
+      sourceMatches: [
+        /^src\/ui\/svelte\/apps\/manager\/RecipesBrowserView\.svelte$/,
+        /^src\/ui\/svelte\/stores\/adminRecipeRowProjection\.js$/,
+      ],
+    })
+  ),
+  // Issue 2006: a counting check's pill names each recipe's successes needed in the mono face, and
+  // the DC sort key reads and sorts by that count.
+  managerCase({
+    id: 'manager-recipes-check-pill-count',
+    label: 'Manager — Recipes check pill and sort, success-counting check',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', checkPreviewState: 'dice-pool-recipes' },
+    // Ungrouped, so the sort reads across the whole library: one success first, five last.
+    steps: [
+      'Crafting',
+      ...chooseSelectOption('[data-recipe-sort]', 'dc'),
+      { selector: '[aria-labelledby="manager-recipe-group-label"]' },
+    ],
+    expectView: 'recipes',
+    expectSelector:
+      '.fabricate-manager:has([data-recipe-sort]:has-text("Successes needed"))' +
+      ':has(.manager-recipe-row [data-recipe-check="successes"]:has-text("1 success"))' +
+      ':has(.manager-recipe-row [data-recipe-check="successes"]:has-text("5 successes"))' +
+      ' .manager-recipe-row [data-recipe-check="successes"].is-mono:has-text("3 successes")',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipesBrowserView\.svelte$/,
+      /^src\/ui\/svelte\/stores\/(?:adminRecipeRowProjection|recipeCheckSummaryProjection)\.js$/,
+      /^src\/ui\/model\/recipeBrowserModel\.js$/,
+    ],
+  }),
+  // The bulk axis under a multiplied character value: each tier names its multiplier, never a DC.
+  managerCase({
+    id: 'manager-recipes-bulk-edit-check-tier-under',
+    label: 'Manager — Recipes bulk edit check tier list, character value multiplied',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', checkPreviewState: 'roll-under-multiply' },
+    steps: [
+      'Crafting',
+      { selector: 'label:has(input[data-recipe-select="sm-r-longsword"])' },
+      { selector: 'label:has(input[data-recipe-select="sm-r-greatsword"])' },
+      { selector: '[data-recipe-bulk-check-tier]' },
+      // The list is longer than the panel's room, so the authored tiers sit below its fold.
+      { selector: '[data-popover-option="sm-tier-masterwork"]', scroll: true },
+    ],
+    expectView: 'recipes',
+    expectSelector:
+      '.fabricate-manager .fabricate-select-popover' +
+      ':has([data-popover-option="sm-tier-masterwork"]:has-text("Masterwork (×½)"))' +
+      ':has-text("Default · base adjustment")',
+    expectContained: [
+      { container: '.fabricate-manager', target: '.fabricate-select-popover' },
+      {
+        container: '.fabricate-select-popover',
+        target: '[data-popover-option="sm-tier-masterwork"]',
+      },
+    ],
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      ...RECIPE_BULK_EDIT_MATCHES,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/recipeOverviewSelectOptions\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
+    ],
+  }),
+  // Issue 2006: under a counting check each tier names its successes needed, and the axis says so.
+  managerCase({
+    id: 'manager-recipes-bulk-edit-check-tier-count',
+    label: 'Manager — Recipes bulk edit check tier list, success-counting check',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', checkPreviewState: 'dice-pool-recipes' },
+    steps: [
+      'Crafting',
+      { selector: 'label:has(input[data-recipe-select="sm-r-longsword"])' },
+      { selector: 'label:has(input[data-recipe-select="sm-r-greatsword"])' },
+      { selector: '[data-recipe-bulk-check-tier]' },
+      { selector: '[data-popover-option="sm-tier-masterwork"]', scroll: true },
+    ],
+    expectView: 'recipes',
+    expectSelector:
+      '.fabricate-manager:has(.fab-bulk-edit-subhint:has-text("The successes needed these recipes"))' +
+      ' > .fabricate-select-popover' +
+      ':has([data-popover-option="sm-tier-masterwork"]:has-text("Masterwork · 5 successes"))' +
+      ':has-text("Default · 3 successes")',
+    expectContained: [
+      { container: '.fabricate-manager', target: '.fabricate-select-popover' },
+      {
+        container: '.fabricate-select-popover',
+        target: '[data-popover-option="sm-tier-masterwork"]',
+      },
+    ],
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      ...RECIPE_BULK_EDIT_MATCHES,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/recipeOverviewSelectOptions\.js$/,
+    ],
   }),
   // Both frames run on herbalism rather than the flagship smithing library, which is why they say anything.
   managerCase({

@@ -32,6 +32,8 @@
   import { createBrowserListState } from './browserListState.svelte.js';
   import {
     RECIPE_SORT_KEYS,
+    recipeCheckPill,
+    recipeCheckSortLabel,
     buildRecipeBrowserModel,
     createRecipeBrowserState,
     deriveRecipeIo,
@@ -51,6 +53,8 @@
     selectedSystemId = '',
     showRecipeCategories = false,
     resolutionMode = 'simple',
+    // The system's crafting-check evaluation, which names the check sort key with no rows.
+    checkEvaluation = null,
     onSearchChange = () => {},
     onSelectRecipe = () => {},
     onEditRecipe = () => {},
@@ -198,7 +202,6 @@
   const SORT_LABELS = {
     name: ['FABRICATE.Admin.Manager.Recipe.SortName', 'Name'],
     attention: ['FABRICATE.Admin.Manager.Recipe.SortAttention', 'Needs attention'],
-    dc: ['FABRICATE.Admin.Manager.Recipe.SortDc', 'Check DC'],
     ingredients: ['FABRICATE.Admin.Manager.Recipe.SortIngredients', 'Ingredients'],
     results: ['FABRICATE.Admin.Manager.Recipe.SortResults', 'Results'],
   };
@@ -211,6 +214,8 @@
   };
 
   function sortLabel(key) {
+    // A roll-under or character-value check sorts by its Target, never a DC (issue 2005).
+    if (key === 'dc') return recipeCheckSortLabel(recipes, text, checkEvaluation);
     const [labelKey, fallback] = SORT_LABELS[key] || SORT_LABELS.name;
     return text(labelKey, fallback);
   }
@@ -336,57 +341,9 @@
       : text('FABRICATE.Admin.Manager.Recipe.SingleStep', 'Single step');
   }
 
-  // The five check states. `none` is the one WARNING: a system that cannot roll for this recipe
-  // is a thing the GM must be able to scan a library for. `ingredients` is its neutral sibling —
-  // a routedByIngredients system resolves off the ingredient set that was used, so no check is a
-  // working configuration, not a gap.
-  const CHECK_PILLS = {
-    dc: ['FABRICATE.Admin.Manager.Recipe.CheckDc', 'DC {dc}', 'fas fa-dice-d20'],
-    dynamic: ['FABRICATE.Admin.Manager.Recipe.CheckDynamic', 'Dynamic DC', 'fas fa-dice-d20'],
-    progressive: [
-      'FABRICATE.Admin.Manager.Recipe.CheckProgressive',
-      'Progressive',
-      'fas fa-list-ol',
-    ],
-    ingredients: [
-      'FABRICATE.Admin.Manager.Recipe.CheckByIngredients',
-      'By ingredients',
-      'fas fa-code-branch',
-    ],
-    // A check the GM SWITCHED OFF, distinct from one the system cannot roll. Same neutral
-    // treatment as `progressive` and `ingredients`: a working configuration, not a fault.
-    checkOff: ['FABRICATE.Admin.Manager.Recipe.CheckOff', 'Check off', 'fas fa-power-off'],
-    none: ['FABRICATE.Admin.Manager.Recipe.CheckNone', 'No check', 'fas fa-triangle-exclamation'],
-  };
-
-  const CHECK_TOOLTIPS = {
-    ingredients: [
-      'FABRICATE.Admin.Manager.Recipe.CheckByIngredientsTooltip',
-      'This system routes results by the ingredient set used, with no crafting check.',
-    ],
-    checkOff: [
-      'FABRICATE.Admin.Manager.Recipe.CheckOffTooltip',
-      'This system’s crafting check is switched off, so every matched attempt resolves as a success.',
-    ],
-    none: [
-      'FABRICATE.Admin.Manager.Recipe.CheckNoneTooltip',
-      'This system has no usable crafting check.',
-    ],
-  };
-
   // The check pill is projected by the store (`recipe.checkSummary`) — the row cannot resolve
   // `checkTierId` to a tier DC, nor the system's mode, on its own.
-  function checkPill(recipe) {
-    const summary = recipe?.checkSummary || { kind: 'none', dc: null };
-    const [labelKey, fallback, icon] = CHECK_PILLS[summary.kind] || CHECK_PILLS.none;
-    const tooltip = CHECK_TOOLTIPS[summary.kind];
-    return {
-      kind: summary.kind,
-      icon,
-      label: format(labelKey, fallback, { dc: summary.dc ?? '' }),
-      title: tooltip ? text(tooltip[0], tooltip[1]) : '',
-    };
-  }
+  const checkPill = (recipe) => recipeCheckPill(recipe?.checkSummary, format);
 
   function isSelectedRecipe(recipe) {
     return !!selectedRecipeId && recipe.id === selectedRecipeId;
@@ -737,7 +694,7 @@
                            kinds stay in the UI face. -->
                       <Chip
                         class={`manager-recipe-check is-${check.kind}`}
-                        mono={check.kind === 'dc'}
+                        mono={check.mono}
                         icon={check.icon}
                         data-recipe-check={check.kind}
                         title={check.title || undefined}

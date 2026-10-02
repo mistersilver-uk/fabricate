@@ -11,15 +11,10 @@ import { corpusDelta, REVISION_SCOPES, RevisionRegistry } from './revisionTokens
 
 export class RevisionBookkeeping {
   /**
-   * @param {object} seams The per-manager differences, injected as one scope and four functions so
-   *   the bookkeeping can never reach back through its owner.
-   * @param {string} seams.entityScope The scope every mutation advances.
-   * @param {(systemId: string) => string} seams.systemScopeOf One system's narrow entity scope.
-   * @param {(fields: readonly string[]) => readonly string[]} seams.domainsForFields
-   * @param {(recordId: string, entry: object) => Iterable<string|null>} seams.ownersOf The systems
-   *   one delta entry belongs to: the record id itself for a crafting system, the before/after
-   *   pair for a recipe.
-   * @param {(record: *) => *} [seams.project] The comparison projection {@link corpusDelta} reads.
+   * The per-manager differences arrive as one scope and four functions, so the bookkeeping never
+   * reaches back through its owner. `ownersOf(recordId, entry)` yields the systems one delta entry
+   * belongs to: the record id for a crafting system, the before/after pair for a recipe. `project`
+   * is the comparison projection `corpusDelta` reads.
    */
   constructor({
     entityScope,

@@ -7,7 +7,18 @@
 
 export const OVERLAY_HOST_ROOT_CLASSES = Object.freeze(['fabricate-manager', 'fabricate-app']);
 
-export const OVERLAY_HOST_SELECTOR = OVERLAY_HOST_ROOT_CLASSES.map((cls) => `.${cls}`).join(', ');
+/**
+ * The explicit host for an overlay opened while no Fabricate application is open (a companion or
+ * macro roll prompt): a fixed layer on `<body>` carrying the Fabricate theme scope. It is not an
+ * application root, so it is resolved beside those roots rather than listed among them.
+ */
+export const STANDALONE_OVERLAY_HOST_CLASS = 'fabricate-standalone-overlay';
+
+export const APPLICATION_HOST_SELECTOR = OVERLAY_HOST_ROOT_CLASSES.map((cls) => `.${cls}`).join(
+  ', '
+);
+
+export const OVERLAY_HOST_SELECTOR = `${APPLICATION_HOST_SELECTOR}, .${STANDALONE_OVERLAY_HOST_CLASS}`;
 
 // Module-level: "warn once" must outlive the instance that warned, which is recreated per render.
 const reported = new Set();

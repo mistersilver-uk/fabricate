@@ -1,11 +1,7 @@
 /**
- * The single derivation of a Tool's displayed name, image and description (data-models "Tool"
- * requirement 13). Since issue 561 a first-class item-sourced Tool carries `componentId: null` and
- * holds its identity in its own display snapshot, so a resolver consulting only the linked
- * component renders a placeholder or a plausible-but-wrong identity — the rule had recurred in
- * seven surfaces (issues 976, 1119) because the reference implementation lived in the manager UI.
- * This is the layering-neutral home, and the CALLER resolves the linked component, so no lookup
- * convention lands here.
+ * The one derivation of a Tool's displayed name, image and description (`data-models` "Tool"
+ * requirement 13). An item-sourced Tool has `componentId: null` and its own snapshot, so reading
+ * only the linked component shows a wrong identity. The caller resolves the linked component.
  */
 
 /** The sentinel used when neither a Tool nor its linked component carries artwork. */
@@ -26,7 +22,7 @@ export function resolveToolDescription(tool, linkedComponent = null) {
   return String(tool?.description || linkedComponent?.description || '').trim();
 }
 
-/** Resolve the managed component a Tool links to, from an array of managed items. */
+/** From an array of managed items. */
 export function linkedComponentFor(tool, managedItems = []) {
   if (!tool?.componentId) return null;
   const items = Array.isArray(managedItems) ? managedItems : [];

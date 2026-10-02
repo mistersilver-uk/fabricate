@@ -4,6 +4,9 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { tick } from '../../node_modules/svelte/src/index-client.js';
 import {
+  ADDITIONAL_DICE_NOTICE_RAW_MODULES,
+  CHECK_EVIDENCE_RAW_MODULES,
+  CHECK_TARGET_RAW_MODULES,
   MARKS_AND_NOTICES_COMPILED_MODULES,
   PLAYER_APP_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
@@ -31,6 +34,7 @@ const harness = createMountedComponentHarness({
   // message, never by guessing: `validateMountedComponentDependencies` walks the whole static
   // import closure and names the importer chain, the specifier and the target list.
   rawModules: [
+    'src/ui/svelte/util/rollPromptOrigin.js',
     // Issue 1506: the one tone map the converted status pills read at a dynamic site.
     ...STATUS_TONE_RAW_MODULES,
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
@@ -40,11 +44,22 @@ const harness = createMountedComponentHarness({
     'src/config/stackQuantityPathPresets.js',
     'src/gatheringImageDefaults.js',
     'src/ui/presenters/CraftingListingBuilder.js',
+    // Issue 2005: the check card's roll-under or character-value target line.
+    'src/ui/presenters/checkDescriptor.js',
+    // Issue 2006: a count card's successes needed, read as the engine reads it.
+    'src/systems/countCheck.js',
+    'src/systems/craftingCheckRefusal.js',
+    'src/ui/presenters/heldToolBonus.js',
+    ...CHECK_TARGET_RAW_MODULES,
+    'src/systems/countEvaluation.js',
     'src/systems/characterLibraries.js',
     'src/systems/checkModifierResolver.js',
+    'src/systems/checkModifierRouter.js',
     'src/ui/presenters/craftingBrowseStatus.js',
     'src/systems/foundryCalendar.js',
     'src/systems/inventorySnapshot.js',
+    // The shared salvage-failure fallback literal (issue 2092), read by SalvageRollSummary.
+    'src/systems/salvageMessages.js',
     // Issue 1370 (epic 1357, PR 8a): the listing builder and the inventory snapshot enter
     // through the SHARED READ SEAM rather than reading `system.components` directly, and
     // these seven are that seam's whole closure. Same mechanical rule as everything else in
@@ -95,6 +110,9 @@ const harness = createMountedComponentHarness({
   'src/ui/svelte/util/foundryIconCatalogue.json',
     'src/ui/svelte/util/formatDuration.js',
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...CHECK_EVIDENCE_RAW_MODULES,
+    // Issue 2008: the player stores and GatheringView word additional-dice notices through it.
+    ...ADDITIONAL_DICE_NOTICE_RAW_MODULES,
     // Issue 1648: the shared authority-refusal wording the Journal panels and stores read.
     'src/ui/svelte/util/journalRunReasons.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
@@ -203,6 +221,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageMisconfiguredBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageProgressiveBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageRollSummary.svelte',
+    'src/ui/svelte/apps/crafting/detail/CheckEvidenceRows.svelte',
+    'src/ui/svelte/components/DiceTiles.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageRoutedBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageSimpleBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageToolRequirements.svelte',

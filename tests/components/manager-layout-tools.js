@@ -9,6 +9,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
+import { BAND_TONES } from '../../src/ui/svelte/apps/manager/checks/checkBandModel.js';
 import { openLayoutContext, renderWithCascade } from '../helpers/layout-harness.js';
 
 import {
@@ -208,19 +209,21 @@ test('manager character modifier search suggestions render with availability-sty
               <section>
                 <label class="fabricate-search manager-search is-compact manager-character-modifier-add-search">
                   <i class="fa-solid fa-search" aria-hidden="true"></i>
-                  <input type="search" value="wis" aria-label="Search character modifiers">
-                  <div class="manager-tag-suggestions manager-character-modifier-add-suggestions" role="listbox" aria-label="Character modifiers">
-                    <button type="button" class="manager-tag-suggestion manager-character-modifier-add-suggestion" role="option">
-                      <i class="fa-solid fa-user" aria-hidden="true"></i>
-                      <span>Wisdom modifier</span>
-                    </button>
-                    <button type="button" class="manager-tag-suggestion manager-character-modifier-add-suggestion" role="option">
-                      <i class="fa-solid fa-hand-fist" aria-hidden="true"></i>
-                      <span>Strength modifier</span>
-                    </button>
-                  </div>
+                  <input type="search" value="wis" role="combobox" aria-label="Search character modifiers">
                 </label>
               </section>
+            </div>
+            <!-- The list as it renders: portalled out of its label to the application root, with
+                 the placement the typeahead panel action writes inline. -->
+            <div class="manager-tag-suggestions manager-character-modifier-add-suggestions" role="listbox" aria-label="Character modifiers" style="left: 376px; right: auto; width: 320px; min-width: 320px; max-width: 320px; max-height: 144px; top: 62px; bottom: auto;">
+              <button type="button" class="manager-tag-suggestion manager-character-modifier-add-suggestion" role="option" tabindex="-1" aria-selected="false">
+                <i class="fa-solid fa-user" aria-hidden="true"></i>
+                <span>Wisdom modifier</span>
+              </button>
+              <button type="button" class="manager-tag-suggestion manager-character-modifier-add-suggestion" role="option" tabindex="-1" aria-selected="false">
+                <i class="fa-solid fa-hand-fist" aria-hidden="true"></i>
+                <span>Strength modifier</span>
+              </button>
             </div>
           </main>
         </body>
@@ -603,17 +606,10 @@ test('the modifiers card and its combination-rule cards take the studio scale, a
       'fabricate-card manager-inspector-card manager-checks-card'
     );
     assert.equal(fixed.cardRadius, 11, "the studio card contract's own radius is 11px");
-    assert.equal(
-      fixed.optionPaddingLeft,
-      13,
-      "the combination-rule card's studio padding is 13px left/right"
-    );
-    assert.equal(
-      fixed.optionPaddingTop,
-      12,
-      "the combination-rule card's studio padding is 12px top/bottom"
-    );
-    assert.equal(fixed.optionRadius, 10, "the combination-rule card's studio radius is 10px");
+    // The library's `<OptionCards>` states padding 12px and radius 11px, so the primitive owns them.
+    assert.equal(fixed.optionPaddingLeft, 12, "the combination-rule card's padding is 12px");
+    assert.equal(fixed.optionPaddingTop, 12, "the combination-rule card's padding is 12px");
+    assert.equal(fixed.optionRadius, 11, "the combination-rule card's radius is 11px");
 
     // MUTATION PROOF, same page: reintroducing the defect.
     const broken = await modifiersCombinationRuleMetrics(
@@ -629,12 +625,6 @@ test('the modifiers card and its combination-rule cards take the studio scale, a
       broken.cardBackground,
       fixed.cardBackground,
       'expected the bare card shell to fall back to the generic translucent fill'
-    );
-    assert.notEqual(
-      broken.optionPaddingLeft,
-      fixed.optionPaddingLeft,
-      `expected the bare shell to drop the combination-rule cards off 13px padding ` +
-        `(bare: ${broken.optionPaddingLeft}px)`
     );
     assert.notEqual(
       broken.optionGap,
@@ -771,7 +761,7 @@ test('the stacked-text variant is the row own, not the Tool tab', () => {
   assert.match(stackDeclarations, /flex-direction: column/, '`proto:2333` sets name over value');
   assert.match(stackDeclarations, /min-width: 0/, 'so a long expression ellipses inside the row');
 
-  // The expression cell is `flex: 1 1 0` in the INLINE row.
+  // The expression cell is `flex: 1 1 auto` in the INLINE row.
   const expression =
     '.fabricate-manager .manager-modifier-readonly-row.is-text-stacked ' +
     '.manager-modifier-readonly-expression {';
@@ -1267,11 +1257,8 @@ test('a squeezed breadcrumb crumb ellipsises from its left edge under the core b
 });
 
 test('every outcome band name clears WCAG AA in every shipped theme', async () => {
-  // The ramp is READ OUT OF the editor rather than restated.
-  const toneNames = /const BAND_TONES = \[([^\]]+)\];/
-    .exec(checkEditorSource)?.[1]
-    .split(',')
-    .map((name) => name.trim().replace(/^'|'$/g, ''));
+  // The ramp is the shared band model's, which the editor and the odds bars both read.
+  const toneNames = [...BAND_TONES];
   const toneMix = Number(/const BAND_TONE_MIX = (\d+);/.exec(checkEditorSource)?.[1]);
   const toneBase = /const BAND_TONE_BASE = '([^']+)';/.exec(checkEditorSource)?.[1];
   assert.ok(toneNames?.length >= 2, 'the ramp tones are readable');
@@ -1860,41 +1847,29 @@ test('the modifier row gives every field room for its longest content at every m
   }
 });
 
-test('the simulator face tile layers the rolled digit ON the medallion, not beside it', async () => {
-  // Svelte scopes DESCENDANTS with `:where(.svelte-<hash>)`.
+test('the rolled readout layers its number and caption INSIDE the 38px medallion', async () => {
   const hash = previewScoped.hashClass;
   const view = await renderWithCascade(
-    `<div class="fabricate-manager"><div class="manager-checks-simulator-readout ${hash}">` +
-      `<span class="manager-checks-simulator-face ${hash}" id="tile">` +
-      `<span style="display:block;width:44px;height:44px"></span>` +
-      `<small id="value" class="${hash}"><strong class="${hash}">20</strong>` +
-      `<span class="${hash}">d20</span></small>` +
+    `<div class="fabricate-manager"><div class="manager-checks-simulator-head ${hash}">` +
+      `<span class="manager-checks-simulator-medallion ${hash}" id="tile">` +
+      `<span style="display:block;width:38px;height:38px"></span>` +
+      `<span class="manager-checks-simulator-medallion-value ${hash}" id="value">` +
+      `<strong class="${hash}">−13</strong><small class="${hash}">total</small></span>` +
       `</span></div></div>`,
     [css, previewScoped.css],
     { viewport: { width: 900, height: 400 } }
   );
   try {
     const tile = (await view.measure('#tile')).box;
-    const digit = await view.measure('#value');
-    const value = digit.box;
-    const geometry = {
-      position: digit.style.position,
-      overlaps:
-        value.left >= tile.left - 0.5 &&
+    const value = (await view.measure('#value')).box;
+    assert.equal(Math.round(tile.width), 38, 'the tile is the medallion’s own 38px square');
+    assert.ok(
+      value.left >= tile.left - 0.5 &&
         value.right <= tile.right + 0.5 &&
         value.top >= tile.top - 0.5 &&
         value.bottom <= tile.bottom + 0.5,
-      width: Math.round(value.width),
-      tileWidth: Math.round(tile.width),
-    };
-    assert.equal(geometry.position, 'absolute', 'the rule that positions it still matches');
-    assert.equal(geometry.tileWidth, 44, 'the tile is the medallion’s own 44px square');
-    assert.equal(
-      geometry.width,
-      geometry.tileWidth,
-      '`inset: 0` makes the digit span the tile; without it the box collapses to its content'
+      'the number and its caption sit inside the tile rather than beside it'
     );
-    assert.ok(geometry.overlaps, 'the digit sits INSIDE the tile rather than beside it');
   } finally {
     await view.close();
   }
@@ -1929,8 +1904,8 @@ test('an odds row keeps its bar between a bounded label and a pinned percentage'
     assert.equal(geometry.display, 'grid', 'the grid rule still matches this row');
     assert.equal(geometry.overflow, 'hidden', 'and the label truncates rather than wrapping');
     assert.ok(
-      geometry.label <= 90,
-      `a long tier name is bounded at the 5.5rem track (got ${geometry.label}px)`
+      geometry.label <= 80,
+      `a long tier name is bounded at the 80px track (got ${geometry.label}px)`
     );
     assert.ok(geometry.bar > 40, `the bar keeps real width beside it (got ${geometry.bar}px)`);
   } finally {

@@ -90,12 +90,19 @@
     setBulkRecipeLock,
     setBulkRecipeStatus,
   } from '../../../../model/recipeBulkEditModel.js';
+  import {
+    bulkCheckTierCopy,
+    checkTierDefaultLabel,
+    checkTierLabel,
+  } from '../recipe/recipeOverviewSelectOptions.js';
 
   let {
     count = 0,
     categoryOptions = [],
     checkTierAxis = { available: false, reason: 'noTiers' },
     checkTierOptions = [],
+    // The active crafting check's evaluation, which names each tier's DC, Target or adjustment.
+    checkEvaluation = null,
     books = [],
     bookMembership = new Map(),
     blockedCount = 0,
@@ -321,19 +328,19 @@
     },
     {
       value: RECIPE_CHECK_TIER_DEFAULT,
-      label: text('FABRICATE.Admin.Manager.Recipe.CheckTierDefault', 'Default DC'),
-      hint: text(
-        'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierDefaultHint',
-        "Clears every selected recipe to the system's default DC."
-      ),
+      label: checkTierDefaultLabel(checkEvaluation, text),
+      hint: checkTierCopy.defaultHint(),
       group: checkTierInstructionsGroup,
     },
     ...checkTierOptions.map((tier) => ({
       value: tier.id,
-      label: `${tier.name || text('FABRICATE.Admin.Manager.Recipe.CheckTierUnnamed', 'Unnamed tier')} (DC ${tier.dc})`,
+      label: checkTierLabel(tier, checkEvaluation, text),
       group: checkTierTiersGroup,
     })),
   ]);
+
+  // What the axis sets, by what a tier names: a DC, a Target, an adjustment or a count.
+  const checkTierCopy = $derived(bulkCheckTierCopy(checkEvaluation, text));
 
   // The section heading and the staged list's accessible name, so both read as one string.
   // `recipe item` remains the canonical spec noun; this is the display name the rail already uses.
@@ -402,6 +409,9 @@
   const checkTierAvailable = $derived(checkTierAxis?.available === true);
   const checkTierReason = $derived(String(checkTierAxis?.reason || ''));
   const checkTierMessage = $derived.by(() => {
+    // A Target, adjustment or count check words its own dynamic and no-tier reasons.
+    const worded = checkTierCopy[checkTierReason];
+    if (worded) return worded();
     const message = CHECK_TIER_REASON_MESSAGES[checkTierReason];
     return message ? text(message[0], message[1]) : '';
   });
@@ -831,12 +841,7 @@
        saying there is no recipe-level check tier at all. -->
   <BulkEditSection
     label={text('FABRICATE.Admin.Manager.Recipe.CheckTier', 'Check tier')}
-    subhint={checkTierAvailable
-      ? text(
-          'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierHint',
-          "The DC these recipes roll against — not the check's outcome tiers."
-        )
-      : ''}
+    subhint={checkTierAvailable ? checkTierCopy.hint() : ''}
   />
   {#if checkTierAvailable}
     <!-- GROUPED, HINTED AND TICKED: two rows are INSTRUCTIONS and the rest are authored tiers.

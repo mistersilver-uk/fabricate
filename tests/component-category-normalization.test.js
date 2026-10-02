@@ -3,8 +3,9 @@
  * decision-8(a) salvage-enable clamp that enforces Component Requirement 5.
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import test from 'node:test';
+
+import { defineStructureContract } from './helpers/structureContract.js';
 
 // Minimal stubs so the module can load without a Foundry runtime
 let idCounter = 0;
@@ -578,46 +579,44 @@ test('1371 r20: a value write that THROWS puts the switch it flipped back', asyn
 // with it: a top-level read of a deleted file throws at MODULE LOAD and fails this whole suite, not
 // one test.
 
-// The editor ROOT's own branch, pinned as source because it is a `.svelte` module: the alternative
-// is a hand-written mirror of `handleSave` that keeps passing however the real one is written.
-const EDITOR_ROOT_SOURCE = readFileSync(
-  new URL('../src/ui/svelte/apps/ComponentEditorRoot.svelte', import.meta.url),
-  'utf8'
+// The MANAGER root's hop is one forwarded argument no mounted case can see — `ComponentEditView`
+// states the baseline and the store consumes it, and both halves are driven behaviourally, but the
+// verb BETWEEN them is structure (issue 1371). Foundry integrator round 8, finding 1(b).
+const MANAGER_ROOT = 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte';
+
+defineStructureContract(
+  '1371 r22: the manager root hands the editor save to the baseline-accepting seam',
+  MANAGER_ROOT,
+  { gives: [{ at: 'ComponentEditView', attribute: 'onSave', is: 'saveComponentEdit' }] }
 );
 
-// The MANAGER root's own hop, pinned as source for the same reason as the two above: it is a
-// 16,000-line `.svelte` module, and the one branch that matters here is a single forwarded argument
-// no mounted case can see — `ComponentEditView` states the baseline and the store consumes it, and
-// both halves are driven behaviourally, but the verb BETWEEN them is a mirror (issue 1371).
-const MANAGER_ROOT_SOURCE = readFileSync(
-  new URL('../src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte', import.meta.url),
-  'utf8'
+defineStructureContract(
+  '1371 r22: which forwards the editor’s stated baseline to the override-aware store verb',
+  { file: MANAGER_ROOT, fn: 'saveComponentEdit' },
+  {
+    takes: ['itemId, updates, { baseline } = {}'],
+    contains: ['const result = await store.updateComponent?.(itemId, merged, { baseline });'],
+  }
 );
 
-test('1371 r22: the manager root forwards the editor’s stated baseline to the store verb', () => {
-  // Foundry integrator round 8, finding 1(b).
-  assert.ok(
-    MANAGER_ROOT_SOURCE.includes('async function saveComponentEdit(itemId, updates, { baseline } = {})'),
-    'the save seam accepts the editor’s third argument'
-  );
-  assert.ok(
-    MANAGER_ROOT_SOURCE.includes('store.updateComponent?.(itemId, merged, { baseline })'),
-    'and hands it to the override-aware store verb rather than dropping it'
-  );
-});
-
-test('1371 r21: the editor root emits the seed’s two facts WITH the rows it drew', () => {
-  // Foundry integrator round 7, finding 2. Both are facts about the RENDER, and the window
-  // registers no hooks — so anything re-derived at save time is a different world's answer.
-  assert.ok(
-    EDITOR_ROOT_SOURCE.includes('carriedEssences: editorState.carriedEssences'),
-    'the carried entries travel with the draft'
-  );
-  assert.ok(
-    EDITOR_ROOT_SOURCE.includes('baselineEssences: editorState.baselineEssences'),
-    'and so does the baseline an untouched save of THESE rows would produce'
-  );
-});
+// Foundry integrator round 7, finding 2. Both are facts about the RENDER, and the window registers
+// no hooks — so anything re-derived at save time is a different world's answer.
+defineStructureContract(
+  '1371 r21: the editor root emits the seed’s two facts WITH the rows it drew',
+  { file: 'src/ui/svelte/apps/ComponentEditorRoot.svelte', fn: 'handleSave' },
+  {
+    contains: [
+      `onSave?.({
+        showTags: editorState.showTags,
+        showEssences: editorState.showEssences,
+        tagOptions: tagDraft,
+        essenceOptions: essenceDraft,
+        carriedEssences: editorState.carriedEssences,
+        baselineEssences: editorState.baselineEssences,
+      })`,
+    ],
+  }
+);
 
 // The BASELINE is a fact about the RENDER (issue 1371 r21-store4). Round 6 gave the rule a stated
 // baseline; round 7 found that both hops carrying it were unproven (quality N1 — every fixture's

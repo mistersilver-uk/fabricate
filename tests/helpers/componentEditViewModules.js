@@ -2,6 +2,7 @@
 
 import { COMPONENT_SCOPE_LEAF_MODULES } from './componentScopeMountModules.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from './foundryBridgeModules.js';
+import { CHECK_TARGET_RAW_MODULES } from './svelte-component-harness.js';
 
 /** Raw (uncompiled) modules the harness copies into the temp tree verbatim. */
 export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
@@ -12,6 +13,7 @@ export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
   // ABSENT `maxModifierPicks` means rather than coercing it. These four close its graph.
   'src/systems/characterLibraries.js',
   'src/systems/checkModifierResolver.js',
+  'src/systems/checkModifierRouter.js',
   'src/systems/salvageCheckUsability.js',
   'src/utils/checkModifierPicks.js',
   'src/systems/toolCheckBonus.js',
@@ -21,7 +23,7 @@ export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
   ...FOUNDRY_BRIDGE_RAW_MODULES,
   'src/ui/svelte/util/listReorderAnnouncement.js',
   // The ONE derivation of a `<Stepper>`'s three accessible names from its field label
-  // (issue 1050); `ComponentEditView` reaches it through the salvage quantity and DC fields.
+  // (issue 1050); the tree reaches it through the salvage check override's custom field.
   'src/ui/svelte/components/stepperLabels.js',
   'src/ui/svelte/util/componentEditor.js',
   // The add-new essence offer projection (issue 1036); ComponentEditView imports it to
@@ -32,6 +34,18 @@ export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
   // `worldVocabulary.js` asks it whether a name is the general bucket and every tree spreading that
   // tier now needs it.
   'src/ui/svelte/apps/manager/component/salvageDcPresets.js',
+  // The salvage check override (issue 2005): the target resolver for its Player sees line, the
+  // adjustment labels its formatted Stepper reads, and the comparison word.
+  ...CHECK_TARGET_RAW_MODULES,
+  'src/utils/scalars.js',
+  'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
+  'src/utils/checkAdjustmentFormat.js',
+  'src/ui/svelte/apps/manager/checks/checksCopy.js',
+  'src/ui/svelte/apps/manager/checks/previewActorId.js',
+  'src/ui/svelte/apps/manager/component/overridePlayerSees.js',
+  // A count check's override line reads the required count and the pool description (issue 2006).
+  'src/systems/countCheck.js',
+  'src/systems/countEvaluation.js',
   // The three converted selects' option vocabularies (issue 1510), mapped beside the view.
   'src/ui/svelte/apps/manager/component/componentEditSelectOptions.js',
   // The salvage mode pill's label source (issue 676) — it already carries 'Routed by
@@ -131,5 +145,12 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   // THE RAIL'S ESSENCE RUN (issue 1371 r18-entry, maintainer ruling M31) is the shared essence chip
   // (M29), a static import of the rail and so two rungs down from this tree's root.
   'src/ui/svelte/apps/manager/components/EssenceChip.svelte',
+  // The salvage check override (issue 2005) and the notice it names a kept override with.
+  'src/ui/svelte/components/Notice.svelte',
+  // Its Player sees block and the Checks Studio's own Preview-as picker it reuses.
+  'src/ui/svelte/apps/manager/checks/PreviewAsPicker.svelte',
+  'src/ui/svelte/components/Kicker.svelte',
+  'src/ui/svelte/apps/manager/component/OverridePlayerSees.svelte',
+  'src/ui/svelte/apps/manager/component/CheckOverrideField.svelte',
   'src/ui/svelte/apps/manager/ComponentEditView.svelte',
 ]);

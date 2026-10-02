@@ -257,6 +257,17 @@ describe('Stepper fill variant (issue 1050)', () => {
   });
 });
 
+describe('Stepper group corner (epic 1997)', () => {
+  it('draws the library specimen’s radius 7 on every group, the 26-32px ladder rung', async () => {
+    // Maintainer ruling 2026-09-28: the authority wins where it specifies; the group drew 8px.
+    for (const props of [{ value: 2 }, { value: 2, fill: true }, { value: 2, density: 'comfortable' }]) {
+      const { input } = await mountStepper(props);
+      assert.equal(getComputedStyle(input.closest('.fab-stepper')).borderRadius, '7px');
+      harness.remount();
+    }
+  });
+});
+
 describe('Stepper inputProps contract (issue 1050)', () => {
   // Everything above `<script>`: the component's own doc header.
   const header = stepperSource.slice(0, stepperSource.indexOf('<script>'));

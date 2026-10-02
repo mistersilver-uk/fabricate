@@ -74,6 +74,10 @@ Use **`activeGM`** for BROADCAST-driven work that runs on every connected client
 Use **`isGM`** for a SINGLE-CLIENT, user-initiated GM action — a click in a GM-only application — because there is no duplicate-execution risk to prevent, and `activeGM` would instead lock out the assistant GMs the application already admits.
 `game.fabricate.resetActorKnowledge` is the canonical `isGM` example: one GM invokes it, from a macro/console or the GM Knowledge surface, and Foundry authorises the document writes for an assistant too (`testUserPermission` short-circuits any `isGM` to `OWNER`).
 Getting this backwards is silent in both directions — an `isGM` broadcast gate duplicates writes only when a second GM is logged in, and an `activeGM` click gate refuses only assistant GMs.
+- **An elected User is not one browser.** `game.users.activeGM` elects a USER, and every browser that User has open passes the `activeGM` gate: a targeted socket message reaches all of them, and two of them can each believe they are the executor.
+An `activeGM` gate is therefore enough only where a duplicate is harmless; work that must happen once needs a durable claim as well.
+The Journal run authority's fixed claim page (`src/systems/journalRunAuthority.js`) is that claim, and the companion operation authority (`src/systems/companionOperationAuthority.js`) enters the same one rather than a second: the elected User routes, the claim selects the browser, and a browser that loses the claim stays silent.
+A claim check verifies against the server copy and cannot stop work already in flight, so no timestamp or check here is a fence.
 - **Embedded documents created or destroyed WITH their parent emit no `create<Embedded>` / `delete<Embedded>` hook.** Hook dispatch is per-operation-type, and embedded collections are materialised through `EmbeddedCollection#_initialize`, a path with no lifecycle hook dispatch at all.
 So an `Actor.create` carrying `items[]` — from an import, a duplicate, or a compendium drop — fires `createActor` and **zero** `createItem`, and `deleteActor` is symmetric.
 Any projection over `actor.items` must therefore hook the PARENT's CRUD (`createActor` / `deleteActor`) as well as the child's (`createItem` / `updateItem` / `deleteItem`); the parent hooks are load-bearing, not belt-and-braces.
@@ -103,12 +107,65 @@ For BOTH compendium cases, read folder membership from `pack.index[].folder` —
 Do **NOT** use `Folder#getSubfolders` for a packed folder: it filters `game.folders` (world-only) and returns `[]` for an in-pack folder, silently dropping nested items; derive the in-pack subtree from the `pack.folders` parent links instead (`descendantFolderIdSet` in `src/ui/svelte/util/importFolderGroups.js`).
 A compendium-**directory** world folder (resolved `folder.documentType === 'Compendium'`) groups packs, not items, and has no item-level grouping — skip it with a notice.
 - Foundry `DiceTerm#total` is the post-modifier, active-only sum; `DiceTerm#number`/`#faces` may be undefined until evaluated — read `results[].result` for raw per-die logic.
+`DiceTerm#total` sums `result.count` when present (`DiceTerm#total` in `client/dice/terms/dice.mjs`, V13.351 and V14.367), so writing `count` makes the tooltip part total and `Roll#result` report that value; a defined `success` or `failure` on a result suppresses the `min`/`max` CSS classes (`DiceTerm#getResultCSS`).
+- **Foundry's explosion limit is a cap on total checked results, recursive `x` only; `xo` never trips it.**
+Core throws the fixed English string "Maximum recursion depth for exploding dice roll exceeded" once more than 1000 results are checked across all faces (`Die#explode` in `client/dice/terms/die.mjs`); `checked` counts the initial dice and every explosion together (V13.351 and V14.367).
+One-use `xo` exits at `checked === initial` and cannot hit the limit for 999 dice or fewer (the same method, identical in both versions).
+- **`Roll.replaceFormulaData` converts value types differently on V13.351 and V14.367.**
+Booleans write as `String(value)` (`"true"`/`"false"`) on V13 and `String(Number(value))` (`"1"`/`"0"`) on V14 (`Roll.replaceFormulaData` in `client/dice/roll.mjs`); both read as non-numeric and refuse as `invalid` when Fabricate's local reader encounters them.
+Arrays, Sets, Maps and plain objects write as `ᚖjsonᚖ` on both, accepted only as function-term arguments, never as numbers.
+V14 honours an overridden `toString()` on plain or null-prototype objects; V13 writes them as JSON regardless.
+Braces in `@{path}` form are V14-only — V13.351's pattern `/@([a-z.0-9_-]+)/gi` leaves them as literal text.
+- **A bare roll-data path greedily swallows a die term written directly after it, on both builds.**
+`Roll.replaceFormulaData`'s path pattern is `@{[-.\w]+}|@[-.\w]+` on V14.367 and `@([a-z.0-9_-]+)` on V13.351 (`client/dice/roll.mjs`), and `\w`/`a-z0-9_-` both include digits and the bare letter `d`, so `@pooldN` reads as the single path `pooldN` rather than the path `pool` followed by a die term — Fabricate's own count-formula conversion neutralises this the same way, stopping its path match before a trailing `d\d` (`ROLL_DATA_PATH` in `src/ui/svelte/apps/manager/checks/countFormulaConversion.js`).
+The two rollable forms that avoid it are `(@path)dN`, where the closing paren stops the greedy match on both builds, and V14's `@{path}dN`, where the closing brace does.
+- **V13.351's compound modifier token (e.g. `xcs>=8`) drops its comparison and target; V14.367 splits it correctly.**
+V13's `DiceTerm.MODIFIER_REGEXP` (`/([A-z]+)([^A-z\s()+\-*/]+)?/g`, `client/dice/terms/dice.mjs`) captures a maximal run of letters as ONE token, so adjacent letter-modifiers with no separating digits — `x` immediately followed by `cs>=8` — parse as the single unrecognized command `xcs`; `_evaluateModifiers`'s "unmatched compound command" fallback then re-invokes each matched prefix (`x`, then `cs`) with the BARE prefix as its own `modifier` argument, discarding the trailing `>=8` entirely, so both apply with no comparison or target at all, on every die.
+V14.367 rebuilds its modifier pattern from the union of every registered modifier keyword and matches each occurrence's own trailing argument directly (`(${modifierUnion})${MODIFIER_ARG_REGEXP_STRING}`, same file), so `xcs>=8` splits into `x` and `cs>=8` correctly.
+Fabricate's count-formula conversion grammar targets the V14.367 reading, which is a real behaviour change for anyone rolling the converted formula on V13.351 (see Deviations, issue 2006).
+- **`cf` counts failures as a positive addition to the total; `df` deducts a failure as −1 even where it also qualified as a success.**
+`Die.countFailures` (`cf`, `client/dice/terms/die.mjs`) recasts each matching result to `count: 1`, which `DiceTerm#total` then SUMS in as an ordinary positive contribution — `cf` is never a cancellation, and Fabricate's count-formula conversion never maps it to its own cancel rule for that reason.
+`Die.deductFailures` (`df`, same file) calls the shared `DiceTerm._applyDeduct` (`dice.mjs`), which reassigns `r.failure = true` (deleting any `r.success` a prior `cs` had set) whenever ITS OWN comparison matches a face, then scores that die `count: -1` — so a face that both a `cs` and a `df` would match on the same roll is scored −1 on Foundry's own dice, where Fabricate's own cancel rule scores the same overlap 0; the conversion grammar refuses to convert a `df` whose face range overlaps the qualifying range for exactly this reason.
+- **Every die-term modifier keyword is matched case-insensitively on both builds.**
+V13.351 lowercases the extracted command before matching (`dice.mjs`) and every specific modifier's own argument regex carries the `i` flag (`die.mjs`); V14.367 lowercases the whole modifier sequence up front and matches with a `gi` pattern (`dice.mjs`).
+`2D20CS<=10` and `2d20cs<=10` roll identically on both, and Fabricate's own count-formula conversion grammar carries the same `i` flag for that reason.
+- **Fabricate's `resolveDeterministicExpression` refuses an unresolved path instead of reading it as zero.**
+`Roll.parse` replaces unresolved references with `"0"` (`missing: "0"`, V13.351 and V14.367), so target and threshold resolution use Fabricate's own reader, which witnesses only the paths the code passes to it, never Foundry's silent substitution.
+- **`getProperty` tries the whole key first, then walks with property-in tests, stopping at falsy values and primitives.**
+The walk is identical in V13.351 and V14.367 (`getProperty` in `common/utils/helpers.mjs`): the whole key is tried first (`'skills.sur'` wins over the nested value `skills['sur']`); prototype getters resolve (a `DataModel`-like class with a getter works); inherited values resolve; array index and `.length` resolve; the walk stops at a falsy value (`0` is terminal, `@a.0` unresolved) and at a string (`@a.length` on a string unresolved); a trailing dot is unresolved; and hyphenated keys like `@x-1` read as-is, matching Foundry's own token pattern.
+- **`tooltip.hbs` renders `result` as raw HTML but escapes `classes`.**
+The template writes `{{{this.result}}}` (triple braces, unescaped) and `class="{{this.classes}}"` (double braces, escaped), so a span's role and aria-label survive unmodified, but CSS class names are safe from injection.
+An empty `data-tooltip` attribute falls back to `aria-label` in both versions (`TooltipManager` in `client/helpers/interaction/tooltip-manager.mjs`).
 - **A hand-rolled `@path` reference pattern narrower than core's own silently misses references core recognises, and a maximised-total helper does not need to neutralise paths itself before rolling.**
 `Roll.parse` already substitutes every roll-data reference it recognises with `0` (`missing: "0"`) before evaluating, and V14 recognises a braced `@{…}` form that a bare `@[-.\w]+` pattern misses.
 `ROLL_DATA_PATH` in `src/utils/rollFormulaRollability.js` matches core's own wider pattern (`/@\{[-.\w]+\}|@[-.\w]+/g`) for exactly this reason, and `maximisedTotal` rolls the formula verbatim rather than hand-neutralising it first (issue 1645).
 - **`evaluateSync({ maximize: true })` is deterministic for every dice term but SKIPS dice modifiers entirely, so its maximised total is not a formula's true ceiling.**
 A keep-highest or keep-lowest modifier is never applied under maximise, so `4d6kh3` maximises to 24 (every die counted) rather than 18 (the kept three).
 A rollability floor built on this call is a `total > 0` proof only, never a stated maximum, and must not be read as one: see `maximisedTotal` in `src/utils/rollFormulaRollability.js` (issue 1645).
+- **A constructed `Roll`'s cached `_formula` goes stale the moment a term is mutated directly, and only `resetFormula()` refreshes it.**
+`_formula` is set once in the constructor and thereafter reassigned only by `resetFormula()` (`return this._formula = this.constructor.getFormula(this.terms)`, `client/dice/roll.mjs`, V13.351 and V14.367); the live `get formula()` getter recomputes from `terms` on every read, but `toJSON()`, `clone()` (`new this.constructor(this._formula, this.data, this.options)`) and `Roll.fromData` all read the cached field instead, so a caller that pushes a keep modifier or edits `term.number` in place and skips `resetFormula()` ships a chat message, a serialized roll, or a clone that still names the unmutated formula (issue 2007's keep transform in `src/systems/checkKeepTransform.js` calls it for exactly this reason).
+- **`Roll#alter` mutates every `DiceTerm` on the roll, never a chosen one.**
+`alter(multiply, add)` maps `this.terms` and calls `term.alter(multiply, add)` on each term `instanceof DiceTerm`, then calls `resetFormula()` itself (`client/dice/roll.mjs`, both builds); the keep transform therefore mutates its target `Die` term's `number` and `modifiers` directly and calls `resetFormula()` itself, because `Roll#alter` would also multiply or add into every OTHER die term the formula carries.
+- **No `RollTerm` subclass defines its own `toString()`.**
+`DiceTerm`, `OperatorTerm`, `NumericTerm` and `ParentheticalTerm` all fall through to `Object.prototype.toString` (only `Roll` itself overrides `toString()`, `client/dice/roll.mjs`, both builds), so interpolating a term object directly reads `"[object Object]"`.
+Read a term's `.formula`, `.total` or `.expression` explicitly instead.
+- **Foundry's Roll grammar wraps only a LEADING minus as a term's own sign.**
+`grammar.pegjs`'s `Expression` rule captures a leading sign only as `leading:(_ @Additive)*` before the very first `Term` (identical on 13.351 and 14.367 bar V14's added `range()` capture); a `-` anywhere else, after `*`/`/` or between two terms as in `10 - 1d20`, is matched by `Additive`/`Operators` instead, a BINARY operator joining two terms, never a per-term unary sign.
+`findKeepGroup` (`src/utils/craftingCheckExpression.js`) relies on this: `10 - 1d20` and `1d20 * -1` refuse as a `position` fault rather than being read as a negated dice group, because Foundry itself has no such per-term negation to invert.
+- **Modifiers apply in the order they were AUTHORED on the die term, and `keep`/`drop` rank by raw face, never by success or count.**
+`DiceTerm#_evaluateModifiers` (`client/dice/terms/dice.mjs`, both builds) walks the term's own modifier string in order and applies each modifier in turn, so `kh1cs>=6` keeps by face and then counts successes among the survivors, while `cs>=6kh1` counts first and keeps whichever face survives that count; `_keepOrDrop` (`die.mjs`) sorts strictly by `r.result`, the raw rolled face, never by a prior modifier's `r.success`/`r.count`.
+This is why the keep transform (issue 2007) refuses a formula whose first dice group already carries a modifier of its own: appending a keep after an existing `cs`/`cf`/`x` would rank the kept dice by face, not by the check's own success rule.
+- **`cs` with no comparison and no target counts nothing, contrary to its own docstring.**
+`Die#countSuccess` (`client/dice/terms/die.mjs`, both builds) resolves `target = parseInt(target) ?? this.faces`; `parseInt(undefined)` is `NaN`, and `??` only falls through on `null`/`undefined`, never `NaN`, so a bare `cs` with no explicit target compares every result against `NaN` and marks none of them a success, though the method's own comment claims it counts "relative to the maximum possible value if no target is given."
+- **A parsed term's `offset` (its position in the formula string) is V14-only.**
+14.367's grammar rule threads `range()` into every `_on*Term` parser callback as an `offset` field (`client/dice/parser.mjs`); 13.351's parser callbacks take no such argument, so a parsed term there carries no `offset` at all, rather than an `undefined` one on a present key.
+- **The game system can register its own plain die class, so gate on `instanceof Die`, never a class-identity check.**
+The split comes from the dnd5e system, not from core Foundry: dnd5e 5.2.x registers core's `Die` for a plain die, while dnd5e 5.3.x registers its own `BasicDie extends Die`.
+The recorded corpus shows every plain die term's `constructor.name` as `BasicDie`, with an ancestry of `BasicDie`, `Die`, `DiceTerm`, `RollTerm`, on 14.365 with dnd5e 5.3.3 (`tests/fixtures/recorded-roll-terms/foundry-14.365.json`), against a bare `Die` on 13.351 with dnd5e 5.2.5 (`foundry-13.351.json`).
+`checkKeepTransform.js`'s `locateKeepTerm` takes the running build's own `Die` class as an injected parameter and tests `instanceof` for exactly this reason.
+- **`1d4 [Tool]` (a space before the flavour bracket) throws a `peg$SyntaxError` on both builds.**
+The grammar's `Flavor` rule (`"[" @$[^[\]]+ "]"`) attaches directly onto its owning term with no whitespace rule between them, so a space before `[` leaves the bracket unattached to any term and the whole formula fails to parse (recorded as `threw: true` for `"1d20 + 3 + 1d4 [Tool]"` in both `tests/fixtures/recorded-roll-terms/foundry-13.351.json` and `foundry-14.365.json`).
+Fabricate emits every flavour-bracketed term with no leading space for this reason.
 - `game.documentTypes.Item` is a plain **array**, not a `Set` — `Game#setupPackages` builds it with `Object.keys(types)` (verified against V13.351 `client/game.mjs`).
   A defensive `Array.from()` is harmless and still appears in the harness, but code may index and `.includes()` it directly.
   This note previously claimed `Set`; a `.has()` written against it would have failed at runtime while passing every fake that copied the note.
@@ -136,10 +193,16 @@ Fabricate evaluates the configured command directly so player-initiated crafting
 The generated `AsyncFunction` receives `(context, args, scope)`, with all three names referencing the identical Fabricate payload object.
 This is identifier-level compatibility, not full native execution semantics: Foundry constructs its native `scope` as a rest copy and also provides `actor` / `token` / `speaker` / `character` locals, while Fabricate provides neither the copy nor those additional locals.
 Foundry V13.351 `client/client.mjs` publishes `game`, `foundry`, `ui`, and `fromUuid` on `globalThis`, so Fabricate macros consume those runtime globals directly instead of receiving redundant function parameters.
+Both V13.351 and V14.365 `client/client.mjs` install `game` (the `{view}` stub that `Game.create` later replaces) and `ui` with `Object.assign(globalThis, …)` at module load, so the `globalThis.game?.…` / `globalThis.ui?.…` spelling that `no-restricted-globals` requires in the domain layer reads exactly the binding a bare read would, and the two differ only under Node, where an unset bare global throws a `ReferenceError` and the qualified read answers `undefined`.
 A thrown error propagates to the caller (no Foundry notification-swallow), which is why a currency payment-gate macro that throws aborts the craft loudly instead of silently passing.
 - `CraftingSystemManager` uses `getSystems()` and `getItems(systemId)`.
 - V13 `CalendarData#timeToComponents().day` is the day-*of-year* (0-based, and it resets every year), NOT a cumulative campaign day.
 Compose an absolute/monotonic day from `year` + `day` (plus a days-per-year seam) before showing it — see `daysPerYearFromCalendar` (`src/systems/foundryCalendar.js`) and `worldTimeLabel` (`src/ui/svelte/util/worldTimeLabel.js`).
+- **`src/systems/foundryCalendar.js` derives interval lengths from the world calendar, `game.time.calendar`, an instance of `CONFIG.time.worldCalendarClass` (core default `foundry.data.CalendarData`, the same schema on V13.351 and V14.365), through these fields.**
+A day is `days.hoursPerDay * days.minutesPerHour * days.secondsPerMinute`, else the measured difference `componentsToTime({ day: 1 }) - componentsToTime({ day: 0 })`, else the Earth day of 86,400 seconds.
+A week is the weekday count `days.values.length` times the day length, else seven days, and the Earth week of 604,800 seconds when there is no calendar at all.
+A year is `days.daysPerYear`, else the sum of `months.values[].days`, else unresolved, so the caller falls back to a within-year day.
+Fabricate fixes minutes and hours at 60 and 3,600 seconds and never reads them from the calendar, although `CalendarData` makes `days.secondsPerMinute` and `days.minutesPerHour` configurable, so under a custom calendar only Fabricate's day and week lengths follow it.
 - A run's persisted `componentSourceActorUuids` are UUIDs (not ids) — resolve them with `fromUuid`/`fromUuidSync`, never `game.actors.get`.
 See `resolveAdvanceSources` (`src/systems/advanceCraftingSources.js`).
 - **The player-path ownership gate lives in the `src/bootstrap/craftingFacade.js` facade, not in `CraftingEngine`.** `CraftingEngine.craft` / `salvage` contain **no ownership check at all** — they resolve the actor uuid they are handed and mutate that actor's Items directly.
@@ -242,7 +305,7 @@ An operator crosses the socket as a `__$OPERATOR$__` marker the receiver revives
 Both helpers return `null` for `__proto__`, `constructor` and `prototype` on both builds, so the caller skips that key or reroutes it to a rebuild: a dotted V14 deletion there silently no-ops because core `setProperty` skips those segments while expanding, and assigning `__proto__` on a value-tree node would rewrite its prototype; any other key that is not one flag-key segment throws a `TypeError`.
 - **`_stats.compendiumSource` and `_stats.duplicateSource` are cleared with `null`, never deleted.** Both are required nullable `DocumentUUIDField`s, so a forced deletion in either form fails validation ("may not be undefined") on V13.351 and V14.365.
 The client then drops the whole patch, sibling sets included, and swallows the rejection with a notification while `update()` still resolves, so nothing fails loudly.
-`_restoreSourceProvenance` in `src/systems/CraftingSystemManager.js` writes `_stats.<key>: null`, the field's own absent value, on both builds.
+`restoreSourceProvenance` in `src/systems/manager/toolSources.js` (issue #1923) writes `_stats.<key>: null`, the field's own absent value, on both builds.
 - **`Document#unsetFlag` changed its WRITE SHAPE at V14, not its outcome.** V13's `unsetFlag` splits the flag key on `.` and issues the dotted deletion path `flags.<scope>.<head>.-=<tail>: null`; V14's `unsetFlag` instead issues `update({flags: {[scope]: {[key]: <the global ForcedDeletion operator>}}})`.
 A DOTTED key still reaches the correct nested leaf on V14, because `flags` is a `DocumentFlagsField extends TypedObjectField` whose `ObjectField` element expands a dotted key at every nesting level while cleaning, so `SourceIdentityService.js`'s `flags.fabricate.<flagKey>` writes delete the same leaf on both builds.
 What IS deprecated-with-warning on V14 is HAND-BUILDING the `{'…-=key': null}` form yourself rather than calling `Document#unsetFlag` or the shared forced-deletion helper above, which Fabricate no longer does anywhere.
@@ -284,6 +347,11 @@ Fabricate's `visibility: 'gmOnly'` is therefore a **disclosure** guarantee (no F
 - **`ChatMessage#rolls` accepts live `Roll` instances directly, and a non-empty array is what plays the dice sound and animates a dice-animation module like Dice So Nice for that message.**
 A message's own custom `content` survives alongside a non-empty `rolls` array, because the card renders its own child elements rather than relying on core's rolled-message template.
 `CHAT_MESSAGE_STYLES.ROLL` is retired by V14.367, so do not gate a "this message is a roll" check on it: a non-empty `rolls` array is the live signal (reported by Foundry review; core source for the style removal is not in this tree, so confirm against your pinned build before relying on the specific version).
+- **`ChatMessage#renderHTML` runs `TextEditor.implementation.enrichHTML` on every message's content, with custom enrichers on and no per-caller opt-out, so any text a module posts to chat is subject to every game system's registered enrichers.**
+`TextEditor.enrichHTML` parses the content with `innerHTML` and walks the resulting text nodes, so core and custom enrichers match against decoded `Text.textContent`, never the escaped HTML source (`client/applications/ux/text-editor.mjs`, identical in V13.351 and V14.367).
+An HTML-escaped `&amp;` therefore still reaches an enricher as `&`, which is why `inertText` (`src/ui/presenters/CraftingChatCard.js`) inserts a literal U+2060 word joiner after it, as it does after `@` and inside `[[`, to break the `&Word[`, `@Word[` and `[[…]]` shapes (issue 2093).
+A system whose enricher uses no sigil at all, such as StarWarsFFG's `:ability:` or `[AB]` dice tokens, is not covered, since breaking every bare bracket would mangle ordinary text.
+The text-node walker has no skip list, and enrichment re-fetches the text nodes after every pass, so a later, sigil-less system enricher can also match inside text Foundry's own earlier passes inserted (issue 2109).
 - **A test double for a Foundry util must match the REAL helper's edge semantics, not just its happy path.** A stub LOOSER than core produces false passes, which is the direction nobody notices under `npm test`: the essence-macro test fixtures' hand-rolled `setProperty` stub vivified on `== null` (replacing a `null` intermediate with `{}`, where real Foundry throws) and omitted core's `__proto__`/`constructor`/`prototype` refusal, so no test built on that stub could ever fail on the `setProperty` defect above while the real code aborted crafts in production.
 See `tests/helpers/essenceFixtures.js`.
 - **Foundry's LIGHT application theme changes almost nothing about a Fabricate window, so a light-theme screenshot that looks dark is correct rather than broken.**
@@ -314,9 +382,55 @@ Every collaborator in `InteractableManager` (`src/canvas/InteractableManager.js`
 - **V14 retired the `rollMode` chat vocabulary in favour of `messageMode`.**
 On 14.365 `core.rollMode` survives only as a deprecated shim setting, registered in `client/game.mjs`, that maps `core.messageMode` back to a legacy string, so any read of it returns a truthy value and trips `Roll#toMessage`'s own deprecation warning in `client/dice/roll.mjs` — which carries **no `once`**, so it fires once per roll rather than once per session, unlike the setting-read warning itself, which **is** `{once: true}`.
 Do not conflate the two: reading the setting warns once per session; the truthy value it hands to `Roll#toMessage` then warns again on every single roll, which is the one that matters for a bulk resolve.
-An unrecognised mode also changes failure shape across the boundary: on 13.351 `ChatMessage.applyRollMode` falls back to a GM whisper, while on 14.365 `applyMode` throws on `CONFIG.ChatMessage.modes[mode]` being undefined.
+An unrecognised mode also changes failure shape across the boundary: on 13.351 `ChatMessage.applyRollMode` treats every mode other than `publicroll` and `selfroll` as a GM whisper (keeping an already non-empty `whisper`) and sets `blind` only for `blindroll`, so a V14 key never posts publicly there but `blind` loses its blindness, while on 14.365 `applyMode` throws reading `handler` of an undefined `CONFIG.ChatMessage.modes[mode]`.
 Both fail safe on Fabricate's own check-roll path regardless, because the chat post is wrapped in a swallowed-error guard (`checkRoll.js`), so the roll still returns a valid total and only the chat message is lost.
 This narrows any future fix to threading `messageMode` instead of `rollMode`, not merely silencing the warning (issue 1293; reported by Foundry review, core source not in this tree).
+- **On V14 the chat-mode labels are `CHAT.MODES.public`, `.gm`, `.blind` and `.self`; the `CHAT.Roll*` keys are absent from 14.365, and `CONFIG.Dice.rollModes` is a deprecation proxy (since 14, until 16).**
+A `CHAT.Roll*` label therefore localizes to the key itself on V14, and any read of `CONFIG.Dice.rollModes` warns, so a V14 roll-mode label reads its `CHAT.MODES.*` key (issue 2021).
+- **A roll-free chat card's visibility is applied to its data, with the applier and its vocabulary chosen together.**
+`ChatMessage#_preCreate` maps the legacy `rollMode` create option only inside `if ( this.isRoll )`, and `isRoll` is `rolls.length > 0` (`client/documents/chat-message.mjs`, V13.351 and V14.365), so `ChatMessage.create(data, {rollMode: 'blindroll'})` for a card carrying no rolls maps nothing and posts it publicly.
+V14.365 applies a `messageMode` create option outside that guard, but V13.351 has no such option.
+V13's `ChatMessage.applyRollMode` takes the legacy tokens (`publicroll`, `gmroll`, `blindroll`, `selfroll`) and V14's `ChatMessage.applyMode` takes `CONFIG.ChatMessage.modes` keys (`public`, `gm`, `blind`, `self`, `ic`), and neither applier accepts the other's vocabulary (the `rollMode` bullet above gives each build's failure shape), though V14.365 keeps `applyRollMode` as a deprecated static until V16 that maps legacy tokens through `Roll._mapLegacyRollMode`, so only an `applyMode` probe tells the builds apart.
+`Roll#toMessage` translates only its legacy `rollMode` option through `Roll._mapLegacyRollMode`, so a token passed as `messageMode` reaches `applyMode` untranslated (`client/dice/roll.mjs`, V14.365).
+`src/systems/bulkChatVisibility.js` therefore probes `typeof ChatMessage.applyMode === 'function'`, a static that a subclassed `CONFIG.ChatMessage.documentClass` inherits, and picks the applier and the vocabulary in that one step, translating through a copy of core's `_mapLegacyRollMode` table.
+An unmapped token passes through rather than defaulting to `public`, because V14.365's deprecated `core.rollMode` shim answers `ic` verbatim for an In-Character user, and a `?? 'public'` default would also downgrade a blind client default to public.
+`applyMode`'s `ic` branch reads `chatData.speaker.actor` unguarded, so every caller sets `speaker` before the visibility pass, and a build exposing neither applier makes `applyBulkChatVisibility` throw into the caller's `catch` rather than post with core's public default.
+- **DialogV2's `default` button option only sets `autofocus`; Enter submits through the FIRST `type="submit"` button in document order.**
+So every non-default action MUST declare `type: "button"`, or Enter fires whichever submit button renders first, whatever `default` names (issue 2021).
+- **DialogV2 has no subtitle slot, and `window.frame: false` removes the close control and dragging along with the header.**
+A secondary heading belongs in the dialog's own content, and a frameless dialog needs its own dismiss action (issue 2021).
+- **`KeyboardManager` listens on `window` in the bubble phase, and `hasFocus` reads only `document.activeElement`; while it is false, `core.dismiss` (Escape) closes every framed window.**
+`hasFocus` is true for an `input`, `select` or `textarea`, a content-editable node, a `button` inside a `form`, or any element whose `data-keyboard-focus` is `""` or `"true"` (`"false"` opts out), so a modal that must keep Escape, Tab or Space from Foundry stops the key before it bubbles to `window` (`client/helpers/interaction/keyboard-manager.mjs`, V13.351 and V14.367; issue 2021).
+Every keybinding is skipped while such an element holds focus, so Escape in a typeahead field cannot close the Manager; `DialogV2` listens for Escape on its own element instead, which is why a field inside one still stops the key (issue 2157).
+- **An ApplicationV2 is an event target that emits `close`, and `foundry.applications.instances.get(frame.id)` maps a window frame to its application.**
+`app.addEventListener('close', fn, { once: true })` is how an overlay mounted into a window learns that window is closing; `emittedEvents` is `prerender`, `render`, `close` and `position` on V13.351 (issue 2021).
+- **The `.application` frame is a stacking context, and it becomes the containing block for its fixed descendants only when its position `scale` is not 1, because `setPosition` then writes `transform: scale(…)`.**
+`.fabricate-manager`'s `container-type` does not make it one either (measured in Chromium), so a fixed overlay's `%` sizes resolve against the viewport at scale 1 and against the scaled window otherwise, which is why the roll prompt caps its height with `%` rather than `vh` (`client/applications/api/application.mjs`, V13.351; issue 2021).
+- **ApplicationV2's `[data-action]` click delegation on the frame reaches every descendant, portaled overlays included, and `close`, `tab` and `toggleControls` are reserved there.**
+An overlay button portaled into a window whose `data-action` is `close` closes the window, and any other unregistered action falls through to the no-op `_onClickAction` (`client/applications/api/application.mjs`, V13.351; issue 2021).
+- **A check with modifier pre-rolls posts one message carrying multiple live rolls.**
+`Roll#toMessage` replaces the message's `rolls` with its own roll, so `postBundledCheckRoll` uses `ChatMessage.create` with `[mainRoll, ...preRolls]` and the main total as content, as `Roll#toMessage` sets it; the pre-rolls are actual evaluated rolls, not another animation of their numeric totals.
+With no explicit roll mode, the bundled post reads the posting client's current `core.rollMode` on V13 or `core.messageMode` on V14 through `chatModeOption`; passing an explicit mode keeps its precedence and the same speaker and flavor apply to the bundle.
+The prepared handoff retains `serializedRoll` and separately ordered `serializedPreRolls`; an entitled client reconstructs each with `Roll.fromData` and posts the bundle without reevaluation, while an old single-roll handoff still uses `Roll#toMessage`.
+Secret execution excludes formula-bearing handoff and pre-roll evidence from the requester; a GM-visible message may still reveal that a roll happened while hiding its content.
+A public crafting or salvage check posts no roll message of its own when its result card is posted: the roll is offered to the card (`src/systems/checkCardRolls.js`), `postResultCard` (`src/systems/resultCardPost.js`) carries it in the card's `rolls` under an explicit public mode, and an offer no card claimed falls back to the bundled post or the handoff.
+- **`ChatMessage.create` applies a visibility mode only when one is passed, and never reads the client's chat-mode selector.**
+The option is `rollMode` on V13.351 and `messageMode` on V14.365; the selector default belongs to `Roll#toMessage`, the chat input, RollTable, Cards and Combat.
+A mode-less message carrying rolls is therefore public whatever the creating GM's selector says, and `postResultCard` (`src/systems/resultCardPost.js`) passes the public mode to state that, not to override a default (issue 2157).
+- **A GM, assistant included, may create a `ChatMessage` whose `author` is another user, and the server keeps it; a non-GM's `author` is forced to their own id.**
+The author holds OWNER on the message.
+`postResultCard` authors a card carrying a check roll as the user the check was rolled for, read from the offer the authority opened with its server-attested sender id (`cardOffer` in `src/systems/journalRollFacts.js`), never from a payload field.
+- **Dice So Nice animates from `createChatMessage` on every client, and reads only the first roll to decide whether a message has dice.**
+It rebuilds `message.rolls` with `Roll.fromData`, hides the message until the animation ends, and returns early when `rolls[0].dice.length === 0` even if a later roll has dice (5.2.5 on V13, 6.4.2 on V14), so `postResultCard` leads with a dice-bearing roll.
+Dice appearance follows the message author on 5.2.5; on 6.4.x the default setting swaps in the speaker actor's unambiguous player owner, else the author.
+- **A Svelte component's styles are injected unlayered, so a scoped rule beats `styles/fabricate.css` whatever its specificity.**
+Module stylesheets load in `layer(modules)` and `svelte.config.js` compiles with `css: 'injected'`, so a scoped declaration can only be stood down by its own selector, never by a more specific module rule; the roll prompt's placeholder colour excludes `:focus-visible` in its own selector for this reason (issue 2157).
+- **`Roll#toJSON` is shallow.**
+A `ParentheticalTerm` serializes its inner Roll as the live object, whose `_root` links back to the outer roll and its actor roll data.
+Serialize roll evidence with a JSON round trip (`cloneJson`), never `structuredClone`, which copies that live graph or throws on it.
+- **`Roll.fromData` and `RollTerm._fromData` mutate their input**, so a caller that keeps the serialized data passes a clone.
+- **`ChatMessage#renderRollContent` renders `message.rolls` only when `content` has no child elements.**
+A bundled post therefore carries the bare total as its content, and a viewer who cannot see that content still gets every roll drawn privately.
 - **`Localization#format` is a real, separately-declared method on V13 and a bare alias of `localize` on V14, with no deprecation warning either way.**
 On V13.351, `client/helpers/localization.mjs` declares `format(stringId, data={})` as its own method, calling `this.localize(stringId)` internally, and its `localize(stringId)` takes no `data` argument at all.
 On V14.365 the class declares only `localize(stringId, data)` — which now accepts `data` itself — and `format` is not declared as a method anywhere in the class body; it survives solely because the module ends with `Object.defineProperties(Localization.prototype, {format: {value: Localization.prototype.localize}})`, a non-enumerable alias pointing at the same function as `localize`.
@@ -335,6 +449,17 @@ The consequence for any caller reporting an amount: derive it from what the writ
 `Document#delete` also resolves `undefined` when a pre-delete veto drops the document on both V13.351 and V14.365; a successful deletion resolves the deleted document.
 Versioned consumption in `_consumeItemQuantity` in `src/systems/CraftingEngine.js` requires a document return before recording spending or allowing subsequent awards.
 A partially applied ingredient batch remains uncertain in the execution journal and requires reconciliation without replay or automatic rollback.
+- **An embedded Item re-created with `{keepId: true, keepEmbeddedIds: true}` from its pre-delete `toObject()` is exact except for `_stats` and, on an unlinked token, delta promotion.**
+On V13.351 and V14.365 the server backend assigns a new id only when `!(operation.keepId && data._id)`, so the `_id` and UUID survive, and `_generateEmbeddedDocumentIds(keepEmbeddedIds)` skips embedded documents that already carry an `_id`, so active effects keep theirs.
+`createdTime`, `modifiedTime` and `lastModifiedBy` are refreshed on both builds: creation data is stripped of `DocumentStatsField.managedFields` (V14.365 `_sanitizeType`, V13.351 `ServerDocumentMixin._deleteStats`) and every creation is re-stamped (V14.365 `ServerDocumentMixin#_tagStats`, V13.351 `tagModelStats` from `ServerDocumentMixin#_preCreate`).
+On an unlinked token the restore promotes an inherited item to a delta-managed record, so it stops tracking later base-actor edits; only core's `EmbeddedCollectionDelta#restoreDocuments` re-links one.
+The server rejects a `keepId` create onto an id the collection still holds, so a restore covers only the ids the delete answered.
+A restore fires `createItem` per document (`noHook` gates only the pre-hook) and yields a new JS object, so a held `Item` reference goes stale.
+`consumePooledHoldings` in `src/systems/companionPooledConsumption.js` relies on all of this (issue 1342).
+- **Batching embedded writes saves round trips, not hooks.**
+`deleteEmbeddedDocuments('Item', ids)` fires one `deleteItem` hook per document on V13 and V14, and `foundry.documents.modifyBatch`, the multi-parent transaction, is V14-only while `module.json` declares `minimum: "13"`.
+A batch answers short rather than rejecting: `deleteEmbeddedDocuments` omits a document a `preDelete` hook refused, and `updateEmbeddedDocuments` omits one for a `_preUpdate` refusal, a `preUpdate<Type>` hook refusal, a throwing `updateSource` or the empty-diff drop.
+`collection.get(id, {strict: true})` throws for an id that vanished between plan and write, which rejects the whole batch.
 - **A `Macro`'s `command` is a `StringField({ required: true, blank: true })` on EVERY macro type, so `typeof command === 'string'` does not mean "this is a script macro".**
 A `chat`-type macro passes that guard and has its chat text compiled as JavaScript by `MacroExecutor.run` (`src/utils/MacroExecutor.js`), so it throws for any body that is not also valid JS.
 Discriminating script from chat is therefore a **call-site** job, and deliberately not centralised: `MacroExecutor`'s own module docblock (`src/utils/MacroExecutor.js`) records that centralising it would turn a chat-type essence property macro from a silent `console.warn` into a per-essence-per-result error notification, and `tests/macro-executor.test.js` pins that decision as the ABSENCE of `/\.type\b/` and `/script/i` from the module's comment-stripped source.
@@ -354,6 +479,30 @@ The CSS counter-example makes the same point one layer over — the `font` / `--
 `InteractableManager.registerKeybinding` (`src/canvas/InteractableManager.js`) is therefore called from the `init` hook in `src/bootstrap/hooks.js`, and a registration that still throws is logged with `console.warn` rather than swallowed (issues #1835, #1881).
 - **A client keybinding's `onDown` returns truthy only when it actually acted.**
 The dispatch loop stops at the first truthy `onDown` in `(precedence, order)` sequence, so an unconditional `true` silently eats a later action on the same key, including a core default such as `ascend` on `KeyE`.
+- **`Document#update` resolves to `undefined` exactly when nothing was written, never when something was** (issue 2008).
+A `preUpdateActor`/`_preUpdate` veto, a validation failure, and an empty diff all resolve `undefined`, and a successful write resolves the updated document itself.
+The additional-dice stored-path spend (`spendAdditionalDice` in `src/systems/additionalDice.js`) checks the return value rather than assuming success, through `requireDocumentAcknowledgment` (`src/systems/runHistoryEvidence.js`), which also rejects a resolved value that is not the SAME document instance passed in.
+- **A synthetic (unlinked-token) actor's `update` resolves to the same `token.actor` instance, not a new object.**
+So the identity check above still passes for a token actor exactly as it does for a world actor, and one acknowledgment helper covers both without special-casing either.
+- **A resource Fabricate intends to WRITE must be read from `_source`, never from prepared data, and a path present in `actor.overrides` must be treated as not writable even though it still reads a number** (issue 2008).
+`readStoredResource` (`src/systems/additionalDiceReach.js`) reads `foundry.utils.getProperty(actor._source, path)` for exactly this reason: prepared data can show a value an Active Effect is holding in place, and writing underneath that effect would not change what anyone sees.
+`foundry.utils.hasProperty(actor.overrides, path)` is the standing check for "an Active Effect currently overrides this path", and additional dice refuse to spend from an overridden path (`resourceOverridden`) rather than writing a value the effect would immediately mask again.
+- **`fromUuidSync` answers a compendium INDEX entry for an unloaded compendium document, and an index entry carries no `documentName` and no `type`.**
+Core's compendium index is deliberately thin (`compendiumIndexFields` on `CompendiumCollection`, `client/documents/collections/compendium-collection.mjs`), and a Macro's index entry in particular carries no `type` at all (`common/documents/macro.mjs`).
+Code that resolves a macro reference synchronously — the additional-dice readiness row in `src/ui/svelte/apps/manager/checks/countReadiness.js` is one — must tell apart three answers: `null` (missing), a loaded Document (test `documentName`, then `type`), and an unloaded index entry with no `documentName` at all (unresolved rather than invalid, because its type cannot be known without loading it).
+- **Foundry has no atomic increment or compare-and-set on a Document field.**
+Every write is read-then-`update`, so two clients writing the same path at nearly the same moment can both read the pre-write value, and one decrement is lost.
+The additional-dice spend queue (`additionalDice.js`, keyed by actor UUID plus path, or by the spend-macro UUID alone) only serializes spends issued from ONE client.
+It cannot, and does not claim to, serialize across clients, which is a documented and accepted limitation rather than a defect (issue 2008).
+- **`ManagerModal`'s `initialFocus` is a single selector LIST resolved with one `querySelector` call, which returns the first match in DOCUMENT order, not the order the selectors are listed in** (`src/ui/svelte/components/ManagerModal.svelte`).
+A selector meant as a fallback must already sit later in the markup than the control it falls back from, or it wins first regardless of where it sits in the comma-separated selector list.
+- **Core `Macro#execute` binds `speaker`, `actor`, `token` and `character` locals in addition to `scope`; Fabricate's shared `MacroExecutor` (`src/utils/MacroExecutor.js`) binds only `scope`, `context` and `args`, all identical by reference.**
+A macro ported from ordinary Foundry use that reads a bare `actor` or `token` is `undefined` on every Fabricate-run path, the Additional Dice Macro Contract (`data-models/spec.md` § Additional Dice Macro Contract) included, so such a macro must read everything from its payload argument instead.
+- **A module flag SCOPE is a package id, which core allows to contain hyphens and to start with a digit; a stored document PATH's own segments do not allow either, because a bare dot-path cannot otherwise tell a hyphen from a minus sign or a leading digit from a list index.**
+Core validates a package id against `/^[A-Za-z0-9-_]+$/` (`common/packages/base-package.mjs`), so `flags.my-module.momentum` and `flags.5e-helper.points` are both valid stored paths whose first SEGMENT is a flag scope, not a plain identifier.
+Additional dice's path validation (`countAdditionalDicePathInvalid` in `src/ui/svelte/apps/manager/checks/countReadiness.js`) special-cases exactly that first segment rather than banning a hyphen or a leading digit everywhere in the path.
+- **Foundry's own `Die#explode` throws "Maximum recursion depth" once a recursive explosion has checked more than 1000 results, and that limit is Foundry's, not Fabricate's.**
+`FabricateCountRoll` (`src/systems/countRoll.js`) catches exactly that message and maps it to its own `explode-unbounded` refusal, while any other error during evaluation is rethrown rather than swallowed.
 - Update compatibility metadata if new Foundry API requirements are introduced.
 
 ## Architecture Pointers
@@ -365,25 +514,62 @@ Cite code by symbol name and file path only — for example `_playerListingField
 Some contributor-workflow deep-dives moved into `CONTRIBUTING.md`: the Foundry smoke harness (`npm run test:foundry` phases, outputs, Phase D0 selector drift) is the "Foundry integration (smoke) tests" section; UI PR screenshot evidence is the "UI PR screenshot evidence" section; the Foundry-vs-Fabricate CSS override map (button layout, focus rings, specificity ladder) is the "Foundry vs Fabricate CSS overrides" section.
 Interrupted or stale per-worktree smoke recovery is defined in `.agents/skills/fabricate-orchestrator/references/foundry-smoke-lifecycle.md`.
 
+- UI shells live in `src/ui/*.js` and `src/ui/*.svelte.js`.
+- `src/ui/model/` holds the Foundry-free view models the UI owns — pure filtering, sorting, pagination, selection and validation logic with no Foundry global and no importer outside `src/ui/`.
+- Svelte UI components live in `src/ui/svelte/apps/` and `src/ui/svelte/components/`.
+- Svelte stores live in `src/ui/svelte/stores/`.
+- Domain and runtime logic lives under `src/models/`, `src/systems/`, `src/utils/`, `src/config/`, and related `src/` modules.
+- Tests live under `tests/`.
+- Styles live in `styles/`, primarily `styles/fabricate.css`.
+- When a Svelte component is shared between task and event (or similar `kind`-driven) contexts, split shared i18n keys into kind-specific siblings (`…Task` / `…Event`) and select with a ternary on `kind`.
+Reserve combined "tasks and events" / "task or event" wording for surfaces that genuinely mix kinds (overview hints, mixed validation issues, error messages).
+- Generic "record" / "records" wording in user-facing strings under `FABRICATE.Admin.Manager.EnvironmentEditor.*` is a known anti-pattern; environments don't have catalysts, they have tasks, events, and required tools.
+Use accurate domain terms when adding new strings.
+- Test files under `tests/components/` pin code shapes with `inspectorSource.includes(...)` / `listSource.includes(...)` string assertions.
+When renaming variables, refactoring markup, or removing i18n keys, grep these assertions and update them in lockstep — they fail at test time, not compile time.
+
 ### Extracted normalizer clusters under `src/systems/`
 
 `src/systems/normalize/` is the first subdirectory `src/systems/` has had, and it holds normalizer logic extracted out of `CraftingSystemManager` as free functions, starting with `src/systems/normalize/craftingCheck.js` and joined by six more clusters (issue #1713): `tools.js`, `systemFields.js`, `essences.js`, `recipeItems.js`, `salvage.js`, and `components.js`.
+An eighth cluster, `system.js` (issue #1923), holds the whole-system normalizer behind `_normalizeSystem`, which passes both Valid Id Bases as thunks the normalizer calls at their original positions; an omitted basis reads every half as unknown (`null`), never as an empty Set or array.
 Each cluster stays private to the `CraftingSystemManager` aggregate: nothing outside `CraftingSystemManager.js` and the two paired equivalence/delegate test suites per cluster imports it, and callers still reach it only through the manager's own delegate methods.
 The same shape also covers two flat `src/systems/` modules that sit beside `normalize/` rather than inside it: `SourceIdentityService.js` (durable-flag stamping, the three one-shot auto-stamps, and the GM "Repair Item Data" pass) and `sourceIdentitySnapshots.js` (the enricher-backed description resolver and the three per-kind source snapshots), both extracted out of `CraftingSystemManager` (issue #1699).
 Only `CraftingSystemManager.js` imports either module, and every collaborator arrives through an `io` bag the manager's delegate rebuilds on each call rather than a bag captured once, so a suite that patches a manager member after construction still observes it through the delegate.
+`src/systems/manager/` (issue #1923) holds the manager's write clusters in the same shape: `itemSources.js` (the item-source operations and the legacy recipe-item migration), `toolSources.js` (the tool-source transaction behind `upsertTool` and `deleteTool`), `bulkEdits.js` (the three `applyBulkEditTo*` edits), and `deleteCascades.js` (the system, recipe-set, component-set and essence delete cascades).
+`collaborators.js` beside them holds the five save attributions and the base `io` bag every module's bag spreads, and each bag entry is a thunk that reads its manager member when called.
+Each module exports its own bag builder rather than the manager owning one, so `tests/stores/admin-store-component-scope.test.js` can still borrow a delegate onto a hand-built object, and a moved function reaches a sibling through the bag whenever the manager keeps a member of that name, so a stub of that member still takes effect.
+No module under `manager/` imports `normalize/` or `CraftingSystemManager.js`, so a normalizer or a Valid Id Basis arrives through the bag.
+
+A disabled or absent control only refuses to *enter* a forbidden state through one surface.
+It cannot stop a record *becoming* forbidden by a removal path, and it is not on the path of the writers that have no UI at all — import (`CraftingSystemExporter.prepareForImport`), copy-mode, and migration.
+Enforce the rule where every writer passes instead: `_normalizeSystem` / `_normalizeComponent` / `_normalizeSalvage` in `src/systems/CraftingSystemManager.js` are that single chokepoint.
+Issue 676 is the worked example, and the claim "constraining the control makes the forbidden state unreachable by construction" was false in **both** directions: the sanctioned flow's exact reverse (enable at one result group, delete that group, save) persisted the forbidden state anyway, and then disabled the control that would have undone it.
+Keep the control constraint as UX, and **test the requirement** (normalizer input → output), never the control's `disabled` attribute — a control-shaped test reads green through every gap the control cannot close.
 
 ### Versioned Journal authority and recovery
 
 `journalRunCommands.js` and `journalRunAuthority.js` in `src/systems/` own version-1 arbitration; an absent lifecycle version alone selects legacy behavior.
 `executePublicCraft` preserves ready, fully supplied one-call crafting through the same active-GM boundary, while `CraftingRunManager.pruneInstantaneousActiveRuns` excludes versioned records that may legitimately wait for manual execution.
-The explicit Journal setup action provisions one private ledger only after single-GM-session confirmation; active-GM identity alone cannot distinguish two tabs for the same user.
+The explicit Journal setup action provisions one GM-owned world ledger only after single-GM-session confirmation; active-GM identity alone cannot distinguish two tabs for the same user.
 `reconcileJournalRunAuthority({ claimId, disposition })` records `reconciled` or `abandoned` and releases the matching retained claim only after reconstructing its run evidence; it never retries uncertain effects or promises transactional rollback.
 Initial crafting check descriptors are redacted in `createCraftingJournalOperations` in `src/bootstrap/journalOperations.js` before transport, independently of the post-commit roll-handoff entitlement check.
 
 The authority ledger MUST stay a world `JournalEntry`, and that is a correctness dependency rather than a placement preference.
 `JournalEntry.dump()` takes no user and applies no ownership filter, so the `ownership: {default: 0}` ledger is present in every player's `game.journal` from the connect payload alone.
+Its flags therefore hold only safe request outcomes and prepare-token bindings, status, expiry and issuer identities; the full prepared evaluation and cached recipient-specific prompt or roll handoff stay in the issuing GM authority instance until an entitled reply is sent.
+The issuer instance alone consumes an active token or replays a private preparation reply; another tab of the same GM stays silent, and a lost snapshot or new GM requires fresh preparation without rolling or spending.
+Committed requests may replay only their safe durable outcome without repeating effects or disclosing a roll handoff.
+Boot recovery scrubs legacy private fields from the replicated flag under the active-GM claim; because the state write deep-merges, the adapter deletes each one through `forcedDeletionEntry` in an update awaited before that write, since normalizing a field away alone leaves it persisted.
 Every player-side read in `createFoundryJournalRunAuthority` in `src/systems/journalRunAuthority.js` relies on that: move the ledger into a compendium, or assume its absence, and each player client resolves `ledger-missing` and refuses every Journal run control permanently.
 The restored-availability announcement is local in the same way — `Hooks.callAll` never crosses the socket, so a remote client re-derives only because the core `deleteJournalEntryPage` hook fires its own refresh, which holds because the collection delete precedes the `callAll`.
+
+### What the boot contract's lab shim cannot show
+
+`tests/bootstrap/fabricate-boot-contract.test.js` boots the real entry inside the View Lab's Foundry shim, `installFoundryShim` in `tests/view-lab/foundry/installFoundryShim.js`, and four of that shim's limits bound what a boot claim can prove.
+The default lab user is both `game.user` and `game.users.activeGM`, so an `isGM`, active-GM or primary-GM gate cannot be told apart on it; `probeGmGates` in `tests/helpers/bootContractProbes.js` asks each wired gate again as an assistant GM and as a player.
+The lab world binds `game.fabricate` before the lifecycle replay and keeps `game.ready` true throughout, so an init-timing claim reads a member only `bindFabricateGlobal` installs rather than the global's identity or `game.ready`.
+The shim's `game.settings.register` keeps only a setting's default and its `set` never calls `onChange`, so a setting's `onChange` is asserted through a recorder on `register`, never through `game.settings.settings`.
+Its `Hooks.call` and `Hooks.callAll` run no listener and its `once` is `on`, so a hook claim asserts the recorded `callAll` name and arguments or calls the registered handler directly, never an effect further down.
 
 ### Manager confirm-discard guard
 
@@ -430,6 +616,18 @@ Two corrections to the paragraph above, against the table as it ships: the map a
 The same-view rows are `environment-edit`, `recipe-edit`, `recipe-item-edit` and `system-edit`, and of those only `environment-edit` pairs a same-view skip with no `SCOPE_BROWSER_BY_VIEW` entry.
 
 **Anti-patterns:** adding `globalThis.confirm(message)` as a fallback (DialogV2 is always present in Foundry; missing-DialogV2 means a test environment that should stub the store helper); adding a `services?.confirmDiscard{Kind}Draft?.()` seam that nothing wires up in production; skipping the dirty check at the Svelte layer and relying solely on the store helper (the Svelte layer is the source of truth for which view is active and whether its draft is dirty; the store helper just asks the user).
+
+- **Carve-out: high-frequency destructive ROW actions.** A per-row destructive action a GM performs repeatedly down a list (deleting one owned copy, erasing one learned recipe) uses the inline two-step arm — `src/ui/svelte/components/ArmedDangerButton.svelte` — instead of a modal: the first click arms the control, the second executes.
+A modal per row is the wrong ergonomics at that frequency, and the arm still requires a deliberate second act.
+`confirmDialog` is RETAINED for the heavyweight cases: deleting a stacked (`quantity > 1`) document, and a reset action.
+The armed token MUST be keyed on the target document id, never a row index, because a projection can re-publish asynchronously between the two clicks.
+This carve-out does NOT retrofit `VocabularyPanel`'s expanding below-row confirm strip, which is a different idiom by design — it carries a reference-count consequence sentence no two-word button label can hold.
+- **Carve-out: a bulk action that states its own impact.** A bulk destructive action ALSO uses the inline two-step arm, in place of `confirmDialog`, when the panel states the impact of the pending action — what it affects and how much — in view BEFORE the control is armed.
+The stated impact is what a modal would otherwise exist to warn about, so the modal adds no safety once the panel already says it, and the arm still requires the same deliberate second act a row action does.
+A bulk action that does NOT state its impact in-panel still goes through `confirmDialog`; this does not relax the rule for a bulk action that stays silent about its consequences until the modal names them.
+The essence library's bulk delete (`EssenceBulkEditPanel.svelte`) is the worked example: it states how many essences, carrying components, and rewritten recipes are affected, then arms the same `ArmedDangerButton`, on an explicit maintainer decision (issue 1036).
+The Component Studio's bulk delete (`ComponentBulkEditPanel.svelte`) is the second (issue 1129) and shows the carve-out generalizing rather than staying a one-off: it states how many components, rewritten recipes, and newly disabled recipes are affected, then arms.
+Its impact is computed in the store and passed in as a prop rather than derived from the selected rows, because one of its numbers — how many recipes the delete leaves uncraftable — depends on the whole selection against real recipe bodies and cannot be answered per row.
 
 ### Root-hosted manager dialogs keep their state between opens
 
@@ -549,6 +747,7 @@ Before comparing two selectors' specificity, establish the layer each sits in; a
 - **Add.** Only when neither holds, and only with two or more independent callers, does a new primitive enter the set.
 That change adds its specimen to `openspec/specs/design-system/library.html` AND, once it ships, its row to `scripts/lib/designSystemPrimitives.json`, in the same change.
 A component under `src/ui/svelte/components/` with no specimen is an undocumented primitive, a specimen with no row for a shipped primitive is a name no diff can be attributed to, and `tests/design-system-coverage.test.js` is the gate that fails on either: it requires every file in that directory to carry a manifest row, and requires no library entry recorded as unbuilt to ship as a component.
+`tests/design-system-coverage.test.js` enforces this: it fails when a file in that directory carries no manifest row, and when the library and the manifest describe different vocabularies.
 
 A candidate that decomposes entirely into existing members is a composition and does not enter the set; it goes to the capability's ruled-out register with the composition that replaces it, so it is not re-proposed.
 Where a proposal conflicts with a shipped component, the shipped props are the specification — adopt them, or state in the same change why they are being replaced.

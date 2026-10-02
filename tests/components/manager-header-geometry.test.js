@@ -1,8 +1,9 @@
 /*
- * THE MANAGER PAGE HEADER'S TWO GEOMETRY CONTRACTS, measured in a real engine.
- *  1. The `Unsaved` chip renders SHORTER than the Back / Delete / Save buttons it sits
- *     beside. The header cluster is a `space-between` flex row that centres its children, so
- *     a 20px chip beside 34px buttons reads as a label that fell out of the group.
+ * The Manager page header's two geometry contracts, measured in a real engine.
+ *  1. The `Unsaved` chip takes the geometry of the buttons it sits beside in full: height,
+ *     corner, type size and inline padding. A chip matching only one of the four reads as a
+ *     further control drawn wrong.
+ *  2. A long identity subtitle or title truncates on one line, so the action cluster never wraps.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -93,12 +94,20 @@ function header(subtitle, title = 'Nimithernian Institute for the Arcane') {
  * @returns {string}
  */
 function pageFor(subtitle, title) {
+  return pageAround(header(subtitle, title));
+}
+
+/**
+ * @param {string} markup the Manager's content, composed inside its real shell
+ * @returns {string}
+ */
+function pageAround(markup) {
   const fixture = SCOPED_COMPONENTS.reduce(
     stampScopedClasses,
     `<div class="application theme-dark">
       <section class="window-content">
         <div class="fabricate fabricate-manager" data-fabricate-theme="dark" style="width:1040px">
-          ${header(subtitle, title)}
+          ${markup}
         </div>
       </section>
     </div>`
@@ -130,8 +139,6 @@ async function measure(subtitle, title) {
       const subline = document.querySelector('.manager-subtitle');
       const style = getComputedStyle(subline);
       return {
-        chipHeight: round(chip),
-        buttonHeights: buttons.map(round),
         // THE TOPS ARE WHAT SAY WHETHER THE CLUSTER WRAPPED. Every action on one line shares
         // a top; a wrapped `Save` sits below its siblings, which is the defect exactly.
         actionTops: [chip, ...buttons].map((element) =>
@@ -166,18 +173,95 @@ async function measure(subtitle, title) {
   }
 }
 
-test('the header status chip is the same height as the buttons it sits beside', async () => {
-  // 20px BESIDE 34px was what shipped. The cluster centres its children.
-  const measured = await measure('Training · 8 days total');
+/**
+ * The two shipped clusters that stand a state chip beside 34px buttons. `is-primary` widens its
+ * own inline padding, so only the ghost composition compares that figure.
+ */
+const CHIP_CLUSTERS = [
+  {
+    name: 'the page header beside a ghost button',
+    compared: ['height', 'radius', 'fontSize', 'paddingLeft', 'paddingRight'],
+    markup: (chipClass) => `
+<header class="manager-header">
+  <div class="manager-header-actions" aria-label="Actions">
+    <span class="${chipClass}" title="Unsaved">Unsaved</span>
+    <button type="button" class="fabricate-button manager-button fab-manager-button is-ghost">
+      <i class="fas fa-arrow-left"></i><span>Back</span>
+    </button>
+  </div>
+</header>`,
+  },
+  {
+    name: 'an edit card heading beside a primary button',
+    compared: ['height', 'radius', 'fontSize'],
+    markup: (chipClass) => `
+<section class="manager-edit-card">
+  <div class="manager-edit-card-heading">
+    <h3 class="manager-card-title">Identity</h3>
+    <div class="manager-action-group">
+      <span class="${chipClass}" title="Unsaved">Unsaved</span>
+      <button type="submit" class="fabricate-button manager-button fab-manager-button is-primary">
+        <i class="fas fa-save"></i><span>Save details</span>
+      </button>
+    </div>
+  </div>
+</section>`,
+  },
+];
 
-  const heights = new Set(measured.buttonHeights);
-  assert.equal(heights.size, 1, `the buttons are not one height: ${measured.buttonHeights}`);
-  assert.equal(
-    measured.chipHeight,
-    measured.buttonHeights[0],
-    `the chip is ${measured.chipHeight}px beside ${measured.buttonHeights[0]}px buttons`
-  );
-});
+const CHIP_FACES = [
+  { name: 'plain', chipClass: 'manager-chip is-warning is-action' },
+  { name: 'truncated', chipClass: 'manager-chip is-warning is-truncated is-action' },
+];
+
+/**
+ * @param {string} markup one composed cluster
+ * @returns {Promise<{chip: object, button: object}>} the computed geometry of the chip and button
+ */
+async function measureCluster(markup) {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    await page.setContent(pageAround(markup), { waitUntil: 'load' });
+    return await page.evaluate(() => {
+      const geometry = (element) => {
+        const style = getComputedStyle(element);
+        return {
+          height: Math.round(element.getBoundingClientRect().height),
+          radius: Number.parseFloat(style.borderTopLeftRadius) || 0,
+          fontSize: Number.parseFloat(style.fontSize) || 0,
+          paddingLeft: Number.parseFloat(style.paddingLeft) || 0,
+          paddingRight: Number.parseFloat(style.paddingRight) || 0,
+        };
+      };
+      return {
+        chip: geometry(document.querySelector('.manager-chip')),
+        button: geometry(document.querySelector('.manager-button')),
+      };
+    });
+  } finally {
+    await browser.close();
+  }
+}
+
+for (const cluster of CHIP_CLUSTERS) {
+  for (const face of CHIP_FACES) {
+    test(`a ${face.name} action chip takes the button's geometry in ${cluster.name}`, async () => {
+      const { chip, button } = await measureCluster(cluster.markup(face.chipClass));
+
+      // A button the sheet failed to style would compare equal to a chip that also lost its rule.
+      assert.ok(button.radius > 0, 'the button computed no corner radius to compare against');
+      assert.ok(button.fontSize > 0, 'the button computed no font size to compare against');
+      for (const property of cluster.compared) {
+        assert.equal(
+          chip[property],
+          button[property],
+          `the chip's ${property} is ${chip[property]} beside a button at ${button[property]}`
+        );
+      }
+    });
+  }
+}
 
 test('a long identity subtitle truncates rather than wrapping the action cluster', async () => {
   // THE DEFECT, IN THE ORDER IT HAPPENS. The subtitle wraps.

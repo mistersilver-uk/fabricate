@@ -120,6 +120,8 @@ The control gains no new state.
 
 The per-recipe select-row grid's worst case is **three** cells — Category, the picker cell, and _at most one_ of Check tier / Minimum success tier — because the picker cell hosts its own tri-state select (**Inherit system default** / **Custom set** / **No modifiers**) rather than adding a further grid cell.
 Check tier and Minimum success tier are mutually exclusive by construction and never render together: `resolveRecipeFixedOutcomeTierOptions` offers a minimum tier only for `routedByCheck` + `fixed`, while `resolveRecipeCheckTierOptions` under that same mode offers tiers only when the routed type is **not** `fixed`.
+Under a fixed roll-under target the Check tier options read `{name} (Target {dc})` and `Default target`, and under a character value `{name} (−2)` or `{name} (×½)` and `Default · base adjustment`, never a DC.
+Under a counting check the Check tier options read `{name} · {n} successes` (`{name} · 1 success`, or `{name} · — successes` when a tier sets none) and `Default · {required} successes`, and the editor header's check fact names the same count, never a DC.
 Selecting **Custom set** seeds the pill row from the recipe's own eligible ids (falling back to the system default set, so "customize" starts from what the recipe was inheriting), TRUNCATED to `craftingCheck.maxModifierPicks` so the seed never shows picks the engine would not roll; selecting **No modifiers** writes an authored empty `modifierIds` array (nothing is appended to that recipe's check roll); selecting **Inherit system default** drops the `modifierIds` key.
 Clearing the LAST selected pill under **Custom set** posts an authored empty array (`{ modifierIds: [] }`), never `null` — posting `null` would silently become _Inherit_, which is the pre-1055 defect this control replaces (a GM could not express "this recipe gets no check modifiers" at all).
 Under **Inherit system default** the pill row is replaced by a read-only line naming the inherited set through the active language's list formatting (or stating that the system default set is empty, so no check modifier applies to this recipe).
@@ -161,7 +163,7 @@ The two issues are about the placeholder; the tick is about the formula, and the
 The critical case is asserted over the shared refusal corpus rather than a sampled list, because a hand-picked list of non-additive shapes is exactly what let a classifier-driven split ship.
 
 Both predicates also inspect the legacy `routed.rollExpression` alias, and that branch is DEFENSIVE, not load-bearing — it is described that way because describing it as load-bearing was wrong.
-`rollExpression` is a READ alias that both `CraftingSystemManager._normalizeRoutedCraftingCheck` and the manager root's `cloneRoutedCheck` fold into `rollFormula`, and neither emits the key, so no draft this tab is ever handed carries a live one; the `1.21.0` migration sweeps the alias because it reads the raw SETTING, which is a different input.
+`rollExpression` is a READ alias that both `CraftingSystemManager._normalizeRoutedCraftingCheck` and `checks/checkDraftClone.js`'s `cloneRoutedCheck` fold into `rollFormula`, and neither emits the key, so no draft this tab is ever handed carries a live one; the `1.21.0` migration sweeps the alias because it reads the raw SETTING, which is a different input.
 It is kept here because `evaluateCheckReadiness` is a pure evaluator over a plain check object with no normalizer of its own, and a placeholder reaching it through the alias must not be the one thing the tab stays silent about.
 Both strings NAME `@craftingmod` explicitly rather than saying "a retired placeholder", which is unidentifiable in a formula carrying several `@` tokens.
 That is not in tension with the inert-cause copy: those two strings must not name a placeholder because they would be telling a GM to ADD one, and there is none to add.
@@ -170,7 +172,7 @@ The catalogue card renders in **every** crafting activity route, including alche
 That historical triple is not the live one: `noPlaceholder` retired with the placeholder at issue 1094 and `noModifierSupport` was added at issue 1096, so the live set is again THREE and is stated below.
 
 **Checks studio — combination rule and pick cap.** `CraftingModifierCatalogueCard.svelte` authors everything the SYSTEM owns here, and the system owns all of it: there is no authority axis and no per-recipe rule override.
-It renders the **Combination rule** as one `RadioCardGroup` of four options in `MODIFIER_POLICIES` order — **Add all**, **Highest**, **By recipe / By component / By gathering task** (`bySubject`, labelled from the activity), **Player picks** — so the two selecting rules sit adjacent and the 2x2 grid reads them as a pair.
+It renders the **Combination rule** as one `RadioCardGroup` of four options in `MODIFIER_POLICIES` order — **Apply all**, **Highest**, **By recipe / By component / By gathering task** (`bySubject`, labelled from the activity), **Player picks** — so the two selecting rules sit adjacent and the 2x2 grid reads them as a pair.
 `MODIFIER_POLICIES` remains the source of that list and its order, and `normalizeModifierPolicy` validates the selection; neither is re-declared as a local literal, and the latter is what makes a world still carrying the pre-1095 `byRecipe` select the right card.
 The 2x2 grid MUST reflow to 1x4 under the container query rather than overflow the real ~700–760px pane: the card declares itself a container (`container-type: inline-size`), so the shipped `@container (max-width: 620px)` rule for `.is-config-cards` measures the CARD rather than the whole manager shell.
 
@@ -227,9 +229,12 @@ It keeps every convention the settings-list cards already have and the Checks ca
   No stored value changes — the affix only ever supplied the sigil on write, so a persisted path already carries it.
   The summary row reads the stored expression back verbatim for the same reason;
 - the two BLOCKING bounds faults, reported on the COLLAPSED row and named by cause (`inverted` / `unsafe`), because an entry that contributes nothing is a fault a GM scanning the list must be able to see;
-- a **roll-shaped expression** note on the open editor, stating that EVERY activity may use it: a gathering drop row applies its rolled result, and a check appends the dice to its roll formula so the roll is made once and shows on the card, and that where modifiers compete — `highest`, or `playerPicks` — such an entry is ranked by its average.
-  It is a NOTE, not a warning, and it raises no readiness issue: the blocking `modifierRollExpression` is RETIRED, because there is nothing left to report about an entry that rolls.
+- a **roll-shaped expression** note on the open editor, stating that EVERY activity may use it: a gathering drop row applies its rolled result, a check that adds to its total appends the dice to its roll formula so the roll is made once and shows on the card, and a roll-under check rolls them first and raises its target by the result, and that where modifiers compete — `highest`, or `playerPicks` — such an entry is ranked by its average.
+  An entry whose expression transforms its dice total (`cs`, `cf`, `even`, `odd`, `df`, `sf` or `ms`, judged by `classifyModifierExpression` with character paths taken as zero) carries the transformed variant of the note instead: where modifiers compete it has no comparable average, so entries with an ordinary average are chosen ahead of it.
+  It is a NOTE, not a warning, and it raises no readiness issue of its own: the blocking `modifierRollExpression` is RETIRED, because there is nothing left to report about an entry that rolls.
+  A transformed entry that a check ranks is reported on that check's Modifiers readiness instead, as the non-blocking `modifierAverageUnavailable` (`ui-system-studio`).
 
+The section hint describes a modifier as a benefit a check applies the way it applies bonuses — added to the total, raising a roll-under target, or moving a success count's threshold or dice — never as something always added to the roll.
 The summary row keeps its `@`-stripped inline expression and its `Roll` chip, and gains the signed bounds chip.
 The Checks screens' read-only modifier cards deep-link here, expanding the section and scrolling it into view; the link goes through the same route-exit guard every other manager navigation does, so leaving a dirty Checks draft still prompts.
 
@@ -289,15 +294,23 @@ A choice group states OR in its own `ANY ONE OF` pill, so every row OUTSIDE a gr
 Changing it CLEARS the row's value, because an id belonging to the old kind means nothing to the new one and the new kind's own editor could neither see nor clear it.
 - **The name field has two faces.**
 Named, it is a pill carrying the subject's image or icon, its name and a real clear BUTTON.
-Unnamed, it is an inline search field with its suggestions rendered BENEATH it, in the row — never a popover opened over it.
+Unnamed, it is an inline search field — a typeahead combobox, never a trigger that opens a picker — and its suggestion list opens directly BENEATH it, sharing its left edge and at least as wide as the field.
+The list's POSITION is the requirement and its DOM parent is not: it is a floating surface under `design-system`, portalled to the nearest application root, because a list positioned inside the row is clipped by the row's scrolling ancestor.
+It flips ABOVE the field only where that root has no room below, and in neither placement does it cover the field it completes.
 - **A suggestion starts where the query starts.**
-The panel sits directly under the field it completes, so each suggestion's glyph and label are left-aligned against the typed text above them; a suggestion centred in its panel is not continuing what the GM typed.
+The panel shares the left edge of the field it completes, beneath it or flipped above it, so each suggestion's glyph and label are left-aligned against the typed text; a suggestion centred in its panel is not continuing what the GM typed.
 This is a declaration the row has to make rather than a default it can rely on: Foundry styles every `button` on the page as a centred flex box, so a suggestion row that names no justification of its own inherits that centring, and `text-align` cannot undo it because the row is a flex container rather than a text one.
 - **Losing focus commits NOTHING; Enter commits.**
 The DOM fires `change` on a text input on blur as well as on Enter, so a field that committed on `change` committed the raw query the moment a GM clicked a suggestion — and unmounted that suggestion before its own click could run, so the click did nothing and the pill showed the blur handler's value.
-Tabbing to a suggestion fails identically, which is why suppressing the pointer path alone is half a fix.
-- **What Enter commits is the top suggestion, not the typed string.**
+Tabbing to a suggestion failed identically while the list sat in the row's tab order, which is why suppressing the pointer path alone was half a fix.
+The list is no longer in that order, so a suggestion is reached from the field's own keys and never by Tab.
+- **What Enter commits is a suggestion, not the typed string.**
+`Enter` commits the active option, and with none active the TOP suggestion.
 A requirement names a catalogue ENTRY by id rather than carrying a free name, so a query matching nothing commits nothing rather than authoring an unresolvable id.
+- **The field drives its list, and focus never leaves it.**
+The input is the holder of `design-system`'s listbox contract: `ArrowDown` and `ArrowUp` move the active option, which the field names through `aria-activedescendant`, and a new query starts with none active.
+The list is open only while the field holds focus and the query is non-empty, so a blur or a press elsewhere closes it and keeps the query.
+`Escape` clears the query, which closes the list.
 - **An empty catalogue DEGRADES the field rather than blocking it.**
 The input still renders and is still typeable, and its own placeholder says there is nothing to name yet.
 A world with no components and no essences is the state every world starts in, so it is a first-class face of this control rather than an error.
@@ -386,6 +399,15 @@ The GM component surfaces: the component browser and the component editor.
 6. The salvage check DC control offers the system's authored check tiers, a system-default option storing `null`, and a `Custom…` option exposing an arbitrary integer.
    A persisted override matching no tier selects `Custom…` and is displayed and round-tripped unchanged.
    A "Manage presets" link routes to the system's Checks screen.
+   The control (`component/CheckOverrideField.svelte`, on the component editor only) edits the one field the active check reads.
+   Under a roll-under fixed target it edits `component.salvage.dcOverride` as `Target override` (`Replaces the system target for this component. The total must stay {cmp} it.`), its presets reading `{name} — Target n` beside `System default — Target n`.
+   Under a character value it edits `component.salvage.adjustmentOverride` as `Difficulty adjustment override`, hinted as added to or multiplied into the character value and rounded down; its presets are the named `salvageCraftingCheck.simple.tiers` whose `adjustment` is valid for the kind, each reading `{name} — {adjustment}` beside `System default — base adjustment`, and a custom multiplier is kept exactly (`×0.7`).
+   A roll-high fixed check keeps `Salvage DC override` and its `System default — DC n` wording unchanged.
+   System default nulls only the active field, a dormant DC or adjustment override survives with its own notice (`A DC override of {dc} is kept on this component. This system does not read it, so it is not shown for editing.`), and changing the source never rewrites either.
+   Player sees reads `Salvage check · stay {cmp} {dc}` for a fixed roll-under target, and `Salvage check · stay {cmp} {target} ({source})` or `Salvage check · reach {target} ({source})` for a character value, naming the Preview-as character's value and the adjustment.
+   Under a counting check the control is labelled `Successes needed override` and edits `component.salvage.successesOverride` (0–20); its presets are the named `salvageCraftingCheck.simple.tiers` with non-null `successes`, each reading `{name} — {n} successes needed`, and System default clears only `successesOverride`.
+   A kept DC or adjustment override is never rewritten, and each is named in its own dormant notice.
+   Player sees reads `Salvage check · {n} successes needed · d{die}s, success on {sym} {threshold}`.
 7. The component browser's category group headers obey the shared GM-library group-header rule specified under Recipe Studio: the header pairs what the group renders with the category's total across the filtered rows (`25 of 282 components`) whenever the two differ, reports one number for a wholly-shown group, and localizes both singulars.
 8. The component browser preserves the identical view-state across an editor round-trip specified under Recipe Studio, including its **essence** filter alongside category, page, sort, group-by-category, page size, and per-category collapse state; opening a component editor and returning restores exactly what the GM left.
    A genuine crafting-system switch resets category + essence + page + collapse, while keeping sort, group-by-category, and page size as cross-system preferences.

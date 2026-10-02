@@ -11,7 +11,9 @@ import { ResolutionModeService } from '../../src/systems/ResolutionModeService.j
 import { RunJournalBuilder } from '../../src/ui/presenters/RunJournalBuilder.js';
 import {
   craftingOutcomeBand,
+  ladderRule,
   routedOutcomeBand,
+  withCountBotch,
 } from '../../src/systems/runJournalOutcomeBands.js';
 import { IngredientSet } from '../../src/models/IngredientSet.js';
 import {
@@ -19,6 +21,7 @@ import {
   runStatusPresentation,
 } from '../../src/ui/svelte/apps/journal/journalRunStatus.js';
 import { runStateNotice } from '../../src/ui/svelte/apps/journal/runStateNotice.js';
+import { formatRoll } from '../../src/ui/svelte/apps/journal/runDetailPresentation.js';
 
 const ACTOR = { id: 'actor-1', uuid: 'Actor.actor-1', name: 'Akra', img: 'icons/a.webp' };
 const PLAYER = { id: 'user-1', isGM: false };
@@ -3436,4 +3439,547 @@ test('the lowest crafting tier reads as an upper bound, exactly as its gathering
   const only = { type: 'relative', relativeOutcomes: [{ id: 'only', dc: 0 }] };
   assert.equal(craftingOutcomeBand(only.relativeOutcomes[0], only, 10), '−∞–∞');
   assert.equal(routedOutcomeBand(only.relativeOutcomes[0], only, null), '−∞–∞');
+});
+
+// ── Issue 2005: the ladder, the step label and the roll line follow the evaluation ─────────
+const UNDER_FIXED = { product: 'sum', direction: 'under', target: { source: 'fixed' } };
+const attributeEvaluation = (direction, adjustmentKind) => ({
+  product: 'sum',
+  direction,
+  target: { source: 'attribute', expression: '@skills.smith.value', adjustmentKind },
+});
+const LADDER = [
+  { id: 'setback', dc: -15 },
+  { id: 'fine', dc: 0 },
+  { id: 'masterwork', dc: 4 },
+];
+const bands = (band, routed, context) => routed.relativeOutcomes.map((tier) => band(tier, routed, context));
+
+test('a roll-under ladder ranks its thresholds by better(), with ≤ and < bands in ladder order', () => {
+  // Under, each threshold is the target minus the tier's step: Setback 25, Fine 10, Masterwork 6.
+  const meet = { type: 'relative', thresholdMode: 'meet', relativeOutcomes: LADDER, evaluation: UNDER_FIXED };
+  const exceed = { ...meet, thresholdMode: 'exceed' };
+  assert.deepEqual(bands(craftingOutcomeBand, meet, 10), ['>10', '≤10', '≤6']);
+  assert.deepEqual(bands(craftingOutcomeBand, exceed, 10), ['≥10', '<10', '<6']);
+  assert.deepEqual(bands(craftingOutcomeBand, meet, null), ['>Target', '≤Target', '≤Target−4']);
+  // Gathering reads the task's fixed override before the slot's DC, as the runtime does.
+  const task = { dcOverride: 10 };
+  assert.deepEqual(bands(routedOutcomeBand, { ...meet, dc: 99 }, task), ['>10', '≤10, >6', '≤6']);
+  assert.deepEqual(bands(routedOutcomeBand, { ...exceed, dc: 99 }, task), ['≥10', '<10, ≥6', '<6']);
+  // Roll-high keeps its bands exactly.
+  const over = { ...meet, evaluation: { product: 'sum', direction: 'over' } };
+  assert.deepEqual(bands(craftingOutcomeBand, over, 10), ['<10', '10+', '14+']);
+  assert.deepEqual(bands(routedOutcomeBand, over, task), ['<10', '≥10, <14', '≥14']);
+});
+
+test('an attribute ladder states each tier adjustment and Otherwise, never an invented number (Q20)', () => {
+  const task = { dcOverride: 12, adjustmentOverride: -2 };
+  for (const direction of ['under', 'over']) {
+    const add = {
+      type: 'relative',
+      thresholdMode: 'meet',
+      dc: 15,
+      relativeOutcomes: LADDER,
+      evaluation: attributeEvaluation(direction, 'add'),
+    };
+    assert.deepEqual(bands(routedOutcomeBand, add, task), ['−15', '0', '+4'], direction);
+    assert.equal(
+      routedOutcomeBand({ name: ' Failed ', dc: -15 }, add, task),
+      'Failed · −15',
+      'maintainer ruling M3: a named tier labels its adjustment'
+    );
+    assert.deepEqual(bands(craftingOutcomeBand, add, 12), ['−15', '0', '+4'], direction);
+    const multiply = {
+      ...add,
+      evaluation: attributeEvaluation(direction, 'multiply'),
+      relativeOutcomes: [
+        { id: 'failure', adjustment: null },
+        { id: 'regular', adjustment: 1 },
+        { id: 'hard', adjustment: 0.5 },
+        { id: 'extreme', adjustment: 0.2 },
+      ],
+    };
+    const labels = { otherwise: 'Otherwise' };
+    assert.deepEqual(
+      multiply.relativeOutcomes.map((tier) => routedOutcomeBand(tier, multiply, task, labels)),
+      ['Otherwise', '×1', '×½', '×⅕']
+    );
+    assert.deepEqual(
+      multiply.relativeOutcomes.map((tier) => craftingOutcomeBand(tier, multiply, 12, labels)),
+      ['Otherwise', '×1', '×½', '×⅕']
+    );
+  }
+});
+
+test('the gathering ladder names an attribute adjustment through the builder, localizing Otherwise', () => {
+  const system = {
+    ...SYSTEM,
+    gatheringCraftingCheck: {
+      routed: {
+        type: 'relative',
+        dc: 12,
+        thresholdMode: 'meet',
+        evaluation: attributeEvaluation('under', 'multiply'),
+        relativeOutcomes: [
+          { id: 'fail', name: 'Failure', success: false, adjustment: null },
+          { id: 'pass', name: 'Hard', success: true, adjustment: 0.5 },
+        ],
+      },
+    },
+  };
+  const task = { id: 'routed-task', name: 'Hunt', resolutionMode: 'routed', dcOverride: 14, resultGroups: [] };
+  const run = makeBuilder({
+    system,
+    gatheringActive: [
+      { id: 'routed', craftingSystemId: system.id, environmentId: 'env-1', taskId: task.id, status: 'inProgress' },
+    ],
+    getGatheringTask: () => task,
+  }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0];
+  const band = (tier, adjustment) =>
+    `FABRICATE.App.Journal.StepDetails.BandAdjustment|${JSON.stringify({ tier, adjustment })}`;
+  assert.deepEqual(
+    run.gatheringYield.tiers.map((tier) => tier.band),
+    [band('Failure', 'FABRICATE.App.Journal.StepDetails.BandOtherwise'), band('Hard', '×½')]
+  );
+  assert.equal(run.gatheringYield.ladderRule, 'adjustment', 'the ladder states its adjustment rule');
+});
+
+test('the crafting ladder localizes a multiply tier with no adjustment as Otherwise', () => {
+  const system = {
+    ...SYSTEM,
+    resolutionMode: 'routedByCheck',
+    craftingCheck: {
+      routed: {
+        type: 'relative',
+        dc: 12,
+        thresholdMode: 'meet',
+        evaluation: attributeEvaluation('under', 'multiply'),
+        relativeOutcomes: [
+          { id: 'failed', name: 'Failed', success: false, adjustment: null },
+          { id: 'hard', name: 'Hard', success: true, adjustment: 0.5 },
+        ],
+      },
+    },
+  };
+  const recipe = { ...SINGLE_STEP_RECIPE, getExecutionSteps: () => [{ id: 's0', resultGroups: [] }] };
+  const preview = makeBuilder({
+    active: [activeSingleStepRun({ steps: [{ stepId: 's0', status: 'inProgress' }] })],
+    recipe,
+    system,
+    resolutionModeService: new ResolutionModeService({ getSystem: () => system }),
+  }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0].craftingYield;
+  const band = (tier, adjustment) =>
+    `FABRICATE.App.Journal.StepDetails.BandAdjustment|${JSON.stringify({ tier, adjustment })}`;
+  assert.deepEqual(
+    preview.tiers.map((tier) => tier.band),
+    [band('Failed', 'FABRICATE.App.Journal.StepDetails.BandOtherwise'), band('Hard', '×½')]
+  );
+});
+
+test('a routed relative ladder names its selection rule by direction, comparison and source', () => {
+  const routed = (evaluation, thresholdMode = 'meet', type = 'relative') => ({
+    type, thresholdMode, evaluation, relativeOutcomes: LADDER,
+  });
+  assert.equal(ladderRule(routed(UNDER_FIXED)), 'under');
+  assert.equal(ladderRule(routed(UNDER_FIXED, 'exceed')), 'underStrict');
+  assert.equal(ladderRule(routed(attributeEvaluation('over', 'add'))), 'adjustment');
+  assert.equal(ladderRule(routed({ product: 'sum', direction: 'over' })), null, 'roll-high unchanged');
+  assert.equal(ladderRule(routed(UNDER_FIXED, 'meet', 'fixed')), null, 'fixed ranges keep their rule');
+});
+
+test('the step label names a roll-under Target, and a character value no number', () => {
+  const label = (simple) =>
+    makeBuilder({ active: [activeCraftingRun()], system: { ...SYSTEM, craftingCheck: { simple } } })
+      .buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0].steps[1].detail.checkLabel;
+  assert.equal(
+    label({ rollFormula: '1d20', dc: 15, tiers: [], evaluation: UNDER_FIXED }),
+    'FABRICATE.App.Journal.StepDetails.CheckWithTarget|' +
+      '{"formula":"1d20","target":15,"comparison":"FABRICATE.App.Crafting.Check.StayAtOrUnder"}'
+  );
+  for (const direction of ['over', 'under']) {
+    const evaluation = attributeEvaluation(direction, 'add');
+    assert.equal(label({ rollFormula: '1d20', dc: 15, tiers: [], evaluation }), '1d20', direction);
+  }
+  assert.equal(
+    label({ rollFormula: '1d20', dc: 15, tiers: [] }),
+    'FABRICATE.App.Journal.StepDetails.CheckWithDc|{"formula":"1d20","dc":15}'
+  );
+  // A count names its successes needed and die, never its retained formula or DC (issue 2006).
+  for (const direction of ['over', 'under']) {
+    const evaluation = { product: 'count', direction, pool: { die: 6, required: 3 } };
+    assert.equal(
+      label({ rollFormula: '1d20', dc: 12, tiers: [], evaluation }),
+      'FABRICATE.App.Journal.StepDetails.Count.Check|{"count":3,"die":6}',
+      direction
+    );
+  }
+});
+
+test('the step label names no Target for a fixed-range routed check, which grades no target', () => {
+  const routed = { rollFormula: '1d20', dc: 12, type: 'fixed', tiers: [], evaluation: UNDER_FIXED };
+  const detail = makeBuilder({
+    active: [activeCraftingRun()],
+    system: { ...SYSTEM, resolutionMode: 'routedByCheck', craftingCheck: { routed } },
+    resolutionModeService: { getMode: () => 'routedByCheck' },
+  }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0].steps[1].detail;
+  assert.equal(detail.checkLabel, '1d20');
+});
+
+test('the roll line reads the executed target and margin outside sum/over/fixed', () => {
+  const recorded = (data) => {
+    const run = terminalCraftingRun({
+      status: 'failed',
+      steps: [{ stepId: 's0', index: 0, status: 'failed', createdResults: [],
+        lastCheckResult: { success: false, value: 11, data: { resolvedFormula: '1d20', total: 11, ...data } } }],
+    });
+    return makeBuilder({ history: [run] }).buildListing({ actor: ACTOR, viewer: PLAYER }).history[0]
+      .steps[0].lastCheckResult;
+  };
+  const under = recorded({ direction: 'under', dc: 12, target: 14, margin: 3 });
+  assert.deepEqual([under.dc, under.target, under.margin], [null, 14, 3]);
+  const attribute = recorded({ direction: 'over', targetSource: 'attribute', dc: null, target: 16, margin: -5 });
+  assert.deepEqual([attribute.dc, attribute.target, attribute.margin], [null, 16, -5]);
+  // A count's target is a per-die face, not a total's: it names its net and required count.
+  const count = recorded({ product: 'count', direction: 'under', dc: null, target: 4, total: 3, margin: 1 });
+  assert.deepEqual([count.target, count.margin, count.count], [null, null, { net: 3, required: 2, zeroPool: false }]);
+  const legacy = recorded({ dc: 16 });
+  assert.equal(legacy.dc, 16);
+  assert.ok(!Object.hasOwn(legacy, 'target') && !Object.hasOwn(legacy, 'margin'), 'roll-high adds no keys');
+
+  const english = (key, data) =>
+    ({
+      'FABRICATE.App.Journal.StepDetails.RollResultWithTarget': '{formula} = {total} · target {target} · margin {margin}',
+      'FABRICATE.App.Journal.StepDetails.RollResultValueWithTarget': 'Rolled {value} · target {target} · margin {margin}',
+      'FABRICATE.App.Journal.StepDetails.RollResultWithDc': '{formula} = {total} vs DC {dc}',
+      'FABRICATE.App.Journal.StepDetails.RollResultValue': 'Rolled {value}',
+    })[key].replaceAll(/\{(\w+)\}/g, (_whole, token) => String(data[token]));
+  assert.equal(formatRoll({ ...under, formula: '1d20' }, english), '1d20 = 11 · target 14 · margin +3');
+  assert.equal(formatRoll({ ...attribute, formula: '' }, english), 'Rolled 11 · target 16 · margin −5');
+  assert.equal(formatRoll({ ...legacy, formula: '1d20' }, english), '1d20 = 11 vs DC 16');
+  assert.doesNotMatch(formatRoll({ ...under, formula: '1d20' }, english), /DC/);
+  assert.equal(formatRoll({ ...count, formula: '' }, localize), 'FABRICATE.App.Journal.StepDetails.Count.RollResult|{"net":"3","required":2}');
+});
+
+// ── Issue 2006: a counting check's ladder, step label and roll line read in net successes ─────
+const COUNT_LADDER = [
+  { id: 'ruined', name: 'Ruined', success: false, dc: -2 },
+  { id: 'success', name: 'Success', success: true, dc: 0 },
+  { id: 'fine', name: 'Fine', success: true, dc: 1 },
+  { id: 'masterwork', name: 'Masterwork', success: true, dc: 3 },
+];
+const countRouted = (direction, cancel = false) => ({
+  type: 'relative',
+  thresholdMode: 'meet',
+  dc: 15,
+  relativeOutcomes: COUNT_LADDER,
+  evaluation: { product: 'count', direction, pool: { die: 6, required: 2, cancel: { enabled: cancel } } },
+});
+
+test('a count ladder states net successes ranked by net whatever the per-die direction (N37)', () => {
+  for (const direction of ['over', 'under']) {
+    const routed = countRouted(direction);
+    // Required 2: thresholds 0, 2, 3 and 5, the best met winning, never the tier DC read as a total.
+    const expected = ['0–1', '2', '3–4', '5+'];
+    assert.deepEqual(bands(craftingOutcomeBand, routed, 2), expected, direction);
+    // Gathering reads the task's successes override before the pool's, as the runtime does.
+    assert.deepEqual(bands(routedOutcomeBand, routed, { successesOverride: 2, dcOverride: 9 }), expected);
+    assert.deepEqual(bands(routedOutcomeBand, routed, {}), expected, 'the pool requires 2');
+    assert.deepEqual(bands(routedOutcomeBand, routed, { successesOverride: 4 }), ['0–3', '4', '5–6', '7+']);
+    assert.equal(ladderRule(routed), null, 'the roll-high selection rule reads net successes');
+  }
+  const fixed = { ...countRouted('under'), type: 'fixed', fixedOutcomes: [{ start: 0, end: 2 }] };
+  assert.equal(craftingOutcomeBand(fixed.fixedOutcomes[0], fixed, 2), '0–2', 'fixed ranges are nets');
+  // Issue 2135: a fixed range with a negative end spaces its dash, as a count band does.
+  const range = (start, end) => routedOutcomeBand({ start, end }, { type: 'fixed' }, null);
+  assert.deepEqual(
+    [range(-2, 1), range(-3, -1), range(-2, -2), range(1, 9), range(4, 4)],
+    ['−2 – 1', '−3 – −1', '−2', '1–9', '4']
+  );
+});
+
+test('a macro-set count ladder states its bands relative to the unknown successes needed', () => {
+  const offsets = [-2, 0, 2].map((dc, index) => ({ id: `t${index}`, name: `T${index}`, success: dc >= 0, dc }));
+  const routed = { ...countRouted('over'), relativeOutcomes: offsets, dcMode: 'dynamic' };
+  routed.evaluation.pool.required = 3;
+  assert.deepEqual(bands(craftingOutcomeBand, routed, 3), ['0–2', '3–4', '5+'], 'a static count');
+  assert.deepEqual(bands(craftingOutcomeBand, routed, null), ['<Needed', 'Needed+', 'Needed+2+']);
+  const labels = { needed: 'Besoin' };
+  assert.equal(craftingOutcomeBand(offsets[2], routed, null, labels), 'Besoin+2+', 'a localized word');
+  const system = { ...SYSTEM, resolutionMode: 'routedByCheck', craftingCheck: { routed } };
+  const tiers = makeBuilder({
+    active: [activeSingleStepRun({ steps: [{ stepId: 's0', status: 'inProgress' }] })],
+    recipe: { ...SINGLE_STEP_RECIPE, getExecutionSteps: () => [{ id: 's0', resultGroups: [] }] },
+    system,
+    resolutionModeService: new ResolutionModeService({ getSystem: () => system }),
+  }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0].craftingYield.tiers;
+  assert.deepEqual(
+    tiers.map((tier) => tier.band),
+    ['<FABRICATE.App.Journal.StepDetails.BandNeeded', 'FABRICATE.App.Journal.StepDetails.BandNeeded+',
+      'FABRICATE.App.Journal.StepDetails.BandNeeded+2+'],
+    'the Journal ladder never states the static pool.required under a macro'
+  );
+});
+
+test('the crafting and gathering count ladders open with a Botch row only while cancelling is on', () => {
+  const recipe = { ...SINGLE_STEP_RECIPE, checkTierId: 'hard', getExecutionSteps: () => [{ id: 's0', resultGroups: [] }] };
+  const craftingTiers = (routed) => {
+    const system = { ...SYSTEM, resolutionMode: 'routedByCheck', craftingCheck: { routed: { ...routed, tiers: [{ id: 'hard', dc: 30, successes: 3 }] } } };
+    return makeBuilder({
+      active: [activeSingleStepRun({ steps: [{ stepId: 's0', status: 'inProgress' }] })],
+      recipe,
+      system,
+      resolutionModeService: new ResolutionModeService({ getSystem: () => system }),
+    }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0].craftingYield.tiers;
+  };
+  const summary = (tiers) => tiers.map((tier) => [tier.id, tier.name, tier.band, tier.fail]);
+  // The recipe's tier needs 3 successes, never its DC of 30.
+  assert.deepEqual(summary(craftingTiers(countRouted('under', true))), [
+    ['count-botch', 'FABRICATE.Check.CountEvidence.Botch', '<0', true],
+    ['ruined', 'Ruined', '0–2', true],
+    ['success', 'Success', '3', false],
+    ['fine', 'Fine', '4–5', false],
+    ['masterwork', 'Masterwork', '6+', false],
+  ]);
+  assert.equal(craftingTiers(countRouted('under')).length, 4, 'no botch without cancelling');
+
+  const gatheringTiers = (routed) => {
+    const task = { id: 'routed-task', name: 'Hunt', resolutionMode: 'routed', successesOverride: 1, resultGroups: [] };
+    return makeBuilder({
+      system: { ...SYSTEM, gatheringCraftingCheck: { routed } },
+      gatheringActive: [{ id: 'routed', craftingSystemId: SYSTEM.id, environmentId: 'env-1', taskId: task.id, status: 'inProgress' }],
+      getGatheringTask: () => task,
+    }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0].gatheringYield.tiers;
+  };
+  // The task needs 1, so Ruined (−2) is met from a net of −1 and only a lower net is a Botch.
+  assert.deepEqual(
+    gatheringTiers(countRouted('over', true)).map((tier) => tier.band),
+    ['<−1', '−1 – 0', '1', '2–3', '4+']
+  );
+  assert.equal(gatheringTiers(countRouted('over')).length, 4);
+});
+
+test('the Botch row sits beside the least demanding tier, whichever way the ladder is authored', () => {
+  const tiers = (outcomes) => outcomes.map(({ id }) => ({ id, name: id, band: '' }));
+  const routed = (outcomes) => ({ ...countRouted('over', true), relativeOutcomes: outcomes });
+  const ids = (outcomes) =>
+    withCountBotch(tiers(outcomes), routed(outcomes), 'Botch').map((tier) => tier.id);
+  assert.deepEqual(ids(COUNT_LADDER), ['count-botch', 'ruined', 'success', 'fine', 'masterwork']);
+  const bestFirst = COUNT_LADDER.toReversed();
+  assert.deepEqual(
+    ids(bestFirst),
+    ['masterwork', 'fine', 'success', 'ruined', 'count-botch'],
+    'a best-first ladder closes on its Botch row rather than opening on it'
+  );
+});
+
+test('a crafting ladder places its Botch floor from the recipe tier successes needed (issue 2135)', () => {
+  const recipe = { ...SINGLE_STEP_RECIPE, checkTierId: 'easy', getExecutionSteps: () => [{ id: 's0', resultGroups: [] }] };
+  const routed = { ...countRouted('over', true), tiers: [{ id: 'easy', dc: 5, successes: 1 }] };
+  const system = { ...SYSTEM, resolutionMode: 'routedByCheck', craftingCheck: { routed } };
+  const tiers = makeBuilder({
+    active: [activeSingleStepRun({ steps: [{ stepId: 's0', status: 'inProgress' }] })],
+    recipe,
+    system,
+    resolutionModeService: new ResolutionModeService({ getSystem: () => system }),
+  }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0].craftingYield.tiers;
+  // The tier needs 1, so Ruined (−2) is met from a net of −1 and the Botch row starts below it.
+  assert.deepEqual(
+    tiers.map((tier) => [tier.id, tier.band]),
+    [['count-botch', '<−1'], ['ruined', '−1 – 0'], ['success', '1'], ['fine', '2–3'], ['masterwork', '4+']]
+  );
+});
+
+// Issue 2135: the Botch row covers only the nets no tier meets, beside the least demanding tier.
+const offsetLadder = (...offsets) =>
+  offsets.map((dc, index) => ({ id: String.fromCodePoint(65 + index), name: '', success: dc >= 0, dc }));
+const countLadder = (required, offsets, cancel = true) => {
+  const routed = { ...countRouted('over', cancel), relativeOutcomes: offsets };
+  const tiers = offsets.map((outcome) => ({ id: outcome.id, band: craftingOutcomeBand(outcome, routed, required) }));
+  return withCountBotch(tiers, routed, 'Botch', required).map((tier) => `${tier.id} ${tier.band}`);
+};
+
+test('a non-positive tier keeps its own band and the Botch row starts below it (issue 2135)', () => {
+  // Required 0 at offsets −2/0/+1: a net of −2 or −1 meets A, so only a net below −2 is a Botch.
+  assert.deepEqual(countLadder(0, offsetLadder(-2, 0, 1)), ['count-botch <−2', 'A −2 – −1', 'B 0', 'C 1+']);
+  // Two negative tiers: a net of −1 meets B, the higher of them, never the least demanding one.
+  assert.deepEqual(
+    countLadder(0, offsetLadder(-3, -1, 2)),
+    ['count-botch <−3', 'A −3 – −2', 'B −1 – 1', 'C 2+']
+  );
+  assert.deepEqual(countLadder(0, offsetLadder(-2)), ['count-botch <−2', 'A −2+']);
+  // Without cancelling no net falls below zero, so the least demanding tier starts at 0.
+  assert.deepEqual(countLadder(1, offsetLadder(-4, 0, 5), false), ['A 0', 'B 1–5', 'C 6+']);
+  assert.deepEqual(countLadder(1, offsetLadder(-4, 0, 5)), ['count-botch <−3', 'A −3 – 0', 'B 1–5', 'C 6+']);
+  for (const [required, offsets] of [[0, [-2, 0, 1]], [0, [-3, -1, 2]], [3, [0, -2, 1]], [2, [-2, 0, 2]]]) {
+    const ladder = countLadder(required, offsetLadder(...offsets)).map((row) => row.slice(row.indexOf(' ') + 1));
+    assert.equal(new Set(ladder).size, ladder.length, `no band repeats at ${offsets}`);
+  }
+});
+
+test('the Botch row sits beside the least demanding tier of an unordered ladder (issue 2135)', () => {
+  // Offsets 0/−2/+1 from 3: A needs 3, B 1 and C 4, so the Botch row precedes B, not A.
+  assert.deepEqual(countLadder(3, offsetLadder(0, -2, 1)), ['A 3', 'count-botch <0', 'B 0–2', 'C 4+']);
+  // Read best-first at its ends, the row follows the least demanding tier instead.
+  assert.deepEqual(countLadder(3, offsetLadder(2, -2, 0, 1)), ['A 5+', 'B 0–2', 'count-botch <0', 'C 3', 'D 4']);
+  // A macro-set count cannot place its Botch row below an unknown count, so it stays below 0.
+  const routed = { ...countRouted('over', true), relativeOutcomes: offsetLadder(-2, 0) };
+  const macro = withCountBotch(routed.relativeOutcomes.map(({ id }) => ({ id })), routed, 'Botch', null);
+  assert.deepEqual(macro.map((tier) => [tier.id, tier.band]), [['count-botch', '<0'], ['A', undefined], ['B', undefined]]);
+});
+
+// Issue 2133: the header's mode pill says DC only for a check graded against one.
+test('the Standard mode label names a DC only for a summed roll-high check against a fixed DC', () => {
+  const label = (simple, run = activeCraftingRun()) =>
+    makeBuilder({ active: [run], system: { ...SYSTEM, craftingCheck: { simple } } })
+      .buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0].resolutionModeLabel;
+  const simple = SYSTEM.craftingCheck.simple;
+  assert.equal(label(simple), 'FABRICATE.App.Journal.Mode.Standard');
+  assert.equal(label({ ...simple, dcMode: 'dynamic' }), 'FABRICATE.App.Journal.Mode.Standard', 'a macro DC');
+  for (const evaluation of [
+    { product: 'count', direction: 'over', pool: { die: 10, required: 2 } },
+    UNDER_FIXED,
+    attributeEvaluation('over', 'add'),
+  ]) {
+    assert.equal(label({ ...simple, evaluation }), 'FABRICATE.App.Journal.Mode.StandardCheck', evaluation.product);
+  }
+  const routed = makeBuilder({ active: [activeCraftingRun()], mode: 'routedByCheck' })
+    .buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0].resolutionModeLabel;
+  assert.equal(routed, 'FABRICATE.App.Journal.Mode.RoutedByCheck');
+});
+
+test('a closed Standard run names a DC only when its recorded check graded against one', () => {
+  const label = (snapshot, data) => {
+    const run = terminalCraftingRun({
+      steps: [{ stepId: 's0', index: 0, status: 'succeeded', createdResults: [],
+        resolutionSnapshot: { kind: 'check', mode: 'simple', ...snapshot },
+        lastCheckResult: { success: true, value: 3, data: { total: 3, ...data } } }],
+    });
+    return makeBuilder({ history: [run] }).buildListing({ actor: ACTOR, viewer: GM }).history[0].resolutionModeLabel;
+  };
+  assert.equal(label({ product: 'sum', direction: 'over' }, { dc: 12 }), 'FABRICATE.App.Journal.Mode.Standard');
+  assert.equal(label({}, { dc: 12 }), 'FABRICATE.App.Journal.Mode.Standard', 'a record before #2005');
+  const count = { product: 'count', direction: 'over' };
+  assert.equal(label(count, { ...count, dc: null, margin: 1 }), 'FABRICATE.App.Journal.Mode.StandardCheck');
+  const under = { product: 'sum', direction: 'under' };
+  assert.equal(label(under, { ...under, target: 14, margin: 3 }), 'FABRICATE.App.Journal.Mode.StandardCheck');
+  assert.equal(
+    label({}, { direction: 'over', targetSource: 'attribute', target: 16, margin: 2 }),
+    'FABRICATE.App.Journal.Mode.StandardCheck',
+    'a character value'
+  );
+});
+
+test('a count step label names the successes needed and the die, never the formula or a DC', () => {
+  const detail = (system, recipe = RECIPE) =>
+    makeBuilder({ active: [activeCraftingRun()], system: { ...SYSTEM, ...system }, recipe })
+      .buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0].steps[1].detail.checkLabel;
+  const evaluation = { product: 'count', direction: 'under', pool: { die: 10, required: 2 } };
+  const simple = { rollFormula: '2d20cs<=10', dc: 15, evaluation, tiers: [{ id: 'hard', dc: 18, successes: 1 }] };
+  assert.equal(detail({ craftingCheck: { simple } }), 'FABRICATE.App.Journal.StepDetails.Count.Check|{"count":2,"die":10}');
+  assert.equal(
+    detail({ craftingCheck: { simple } }, { ...RECIPE, checkTierId: 'hard' }),
+    'FABRICATE.App.Journal.StepDetails.Count.CheckOne|{"die":10}'
+  );
+  assert.equal(
+    detail({ craftingCheck: { simple: { ...simple, rollFormula: '' } } }),
+    'FABRICATE.App.Journal.StepDetails.Count.Check|{"count":2,"die":10}',
+    'a count needs no retained formula to be labelled'
+  );
+  assert.equal(
+    detail({ craftingCheck: { simple: { ...simple, dcMode: 'dynamic' } } }),
+    'FABRICATE.App.Journal.StepDetails.Count.CheckDie|{"die":10}',
+    'a macro-set count names no number'
+  );
+});
+
+const COUNT_LINE_ENGLISH = {
+  'FABRICATE.App.Journal.StepDetails.Count.RollResult': '{net} successes, {required} needed',
+  'FABRICATE.App.Journal.StepDetails.Count.RollResultOne': '1 success, {required} needed',
+  'FABRICATE.App.Journal.StepDetails.Count.RollResultBotch': 'Botch: {net} net successes',
+  'FABRICATE.App.Journal.StepDetails.Count.RollResultNet': '{net} net successes',
+  'FABRICATE.App.Journal.StepDetails.Count.RollResultNetOne': '1 net success',
+  'FABRICATE.Check.CountEvidence.ZeroPoolResult': 'A pool reduced to zero fails automatically. Nothing was rolled.',
+};
+const countLineEnglish = (key, data = {}) =>
+  COUNT_LINE_ENGLISH[key].replaceAll(/\{(\w+)\}/g, (_whole, token) => String(data[token]));
+/** The English roll line of a recorded count, under `system` (the default simple sum check). */
+const countLine = (data, system = SYSTEM) => {
+  const run = terminalCraftingRun({
+    status: 'failed',
+    steps: [{ stepId: 's0', index: 0, status: 'failed', createdResults: [],
+      lastCheckResult: { success: false, value: data.total ?? 0, data: { product: 'count', direction: 'over', dc: null, target: 5, ...data } } }],
+  });
+  const check = makeBuilder({ history: [run], system, resolutionModeService: { getMode: () => system.resolutionMode } })
+    .buildListing({ actor: ACTOR, viewer: PLAYER }).history[0].steps[0].lastCheckResult;
+  return formatRoll({ ...check, formula: '' }, countLineEnglish);
+};
+
+test('a count roll line reads its net against the required count, or its net, never a DC', () => {
+  const line = (data) => countLine(data);
+  assert.equal(line({ total: 4, margin: 2 }), '4 successes, 2 needed');
+  assert.equal(line({ total: 3, margin: 1 }), '3 successes, 2 needed', 'a simple check reads its required');
+  assert.equal(line({ total: 1, margin: -1 }), '1 success, 2 needed');
+  assert.equal(line({ total: -1, margin: -2 }), 'Botch: −1 net successes', 'a botch states no required count');
+  assert.equal(line({ total: 1, margin: 1 }), '1 net success', 'never a required count of 0');
+  // A routed margin is taken from the matched tier, so without the check's own count it reads the net.
+  assert.equal(line({ type: 'relative', total: -2, margin: -1 }), 'Botch: −2 net successes');
+  assert.equal(line({ type: 'relative', total: 4, margin: 1 }), '4 net successes');
+  assert.equal(line({ type: 'relative', total: 1, margin: 0 }), '1 net success');
+  assert.equal(line({ total: 3, margin: null }), '3 net successes');
+  assert.equal(line({ total: 1 }), '1 net success');
+  assert.equal(line({ total: null, margin: null, zeroPool: true }), countLineEnglish('FABRICATE.Check.CountEvidence.ZeroPoolResult'));
+  assert.doesNotMatch(line({ total: 4, margin: 2, dc: 15 }), /DC|target/);
+});
+
+// Issue 2133: a routed count's line states the check's own successes needed, as its step label does.
+test('a routed count roll line states the check own successes needed, never total less margin', () => {
+  const routed = countRouted('over', true);
+  const system = { ...SYSTEM, resolutionMode: 'routedByCheck', craftingCheck: { routed } };
+  const record = (outcomeId, total, margin) => ({ type: 'relative', outcomeId, total, margin });
+  // Masterwork (+3) matched at net 6 records a margin of 1 against its own threshold of 5.
+  assert.equal(countLine(record('masterwork', 6, 1), system), '6 successes, 2 needed');
+  assert.equal(countLine(record('ruined', 1, 1), system), '1 success, 2 needed');
+  assert.equal(countLine(record('ruined', -1, -1), system), 'Botch: −1 net successes');
+  // A macro sets the count at roll time, and a fixed range grades the net itself: neither names one.
+  const macro = { ...system, craftingCheck: { routed: { ...routed, dcMode: 'dynamic' } } };
+  assert.equal(countLine(record('masterwork', 6, 1), macro), '6 net successes');
+  const fixed = { ...system, craftingCheck: { routed: { ...routed, type: 'fixed', fixedOutcomes: [] } } };
+  assert.equal(countLine({ type: 'fixed', total: 6, margin: 1 }, fixed), '6 net successes');
+  // A check no longer counting has no successes needed to state.
+  const summed = { ...system, craftingCheck: { routed: { ...routed, evaluation: undefined } } };
+  assert.equal(countLine(record('masterwork', 6, 1), summed), '6 net successes');
+});
+
+// Issue 2133 review: history is never chosen by a later-edited configuration.
+test('a closed routed count states its needed count only while the record agrees with the check', () => {
+  const routed = countRouted('over', true);
+  const system = (edited) => ({ ...SYSTEM, resolutionMode: 'routedByCheck', craftingCheck: { routed: edited } });
+  const record = (outcomeId, total, margin) => ({ type: 'relative', outcomeId, total, margin });
+  assert.equal(countLine(record('masterwork', 6, 1), system(routed)), '6 successes, 2 needed');
+  // The pool now needs 3, so the recorded margin no longer measures against today's count.
+  const raised = { ...routed, evaluation: { ...routed.evaluation, pool: { ...routed.evaluation.pool, required: 3 } } };
+  assert.equal(countLine(record('masterwork', 6, 1), system(raised)), '6 net successes');
+  // Masterwork's step moved from +3 to +4 after the roll.
+  const moved = { ...routed, relativeOutcomes: COUNT_LADDER.map((tier) => (tier.id === 'masterwork' ? { ...tier, dc: 4 } : tier)) };
+  assert.equal(countLine(record('masterwork', 6, 1), system(moved)), '6 net successes');
+  // A tier step or forced outcome records a margin taken from another tier than the one matched.
+  assert.equal(countLine(record('fine', 6, 1), system(routed)), '6 net successes');
+  assert.equal(countLine(record('deleted-tier', 6, 1), system(routed)), '6 net successes');
+  assert.equal(countLine({ type: 'relative', total: 6, margin: 1 }, system(routed)), '6 net successes');
+  assert.equal(countLine({ ...record('masterwork', 6, null) }, system(routed)), '6 net successes');
+});
+
+test('a routed gathering count roll line states the task successes needed', () => {
+  const task = { id: 'routed-task', name: 'Hunt', resolutionMode: 'routed', successesOverride: 1, resultGroups: [] };
+  const check = (routed) => makeBuilder({
+    system: { ...SYSTEM, gatheringCraftingCheck: { routed } },
+    gatheringHistory: [{
+      id: 'g-done', craftingSystemId: SYSTEM.id, environmentId: 'env-1', taskId: task.id, status: 'succeeded',
+      resolutionSnapshot: { mode: 'routed' },
+      economyEvidence: { runtimeSnapshot: { task } },
+      checkResult: { success: true, outcome: 'Fine', value: 4,
+        data: { product: 'count', direction: 'over', type: 'relative', outcomeId: 'masterwork', total: 4, margin: 0 } },
+    }],
+  }).buildListing({ actor: ACTOR, viewer: GM }).history[0].gatheringYield?.check;
+  assert.equal(formatRoll({ ...check(countRouted('over')), formula: '' }, countLineEnglish), '4 successes, 1 needed');
 });

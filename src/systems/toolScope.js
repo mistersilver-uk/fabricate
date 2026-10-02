@@ -9,148 +9,40 @@ import {
 import { unionScopedDefinitions } from './scopedDefinitionStore.js';
 
 /**
- * The tool half of Scoped Entity Definitions (issue 1358, part of epic 1357).
- *
- * `## Tool` describes the shipped per-system shape and stays authoritative while `## CraftingSystem` requirement 36 holds. Issue 1370
- * repointed every non-UI reader at the read union, and READING IS NOT AUTHORITY: while that
- * requirement holds the in-system record decides every key it carries, the row order and the
- * row set, so the arrays did not lose authority when the readers moved. The `1.30.0` world-scope migration (PR 3) is what
- * makes THIS module live: `resolveToolBreakageAuthority` below is reached by the four non-UI
- * effective-authority readers from that release onward, because the crafting-system normalizer
- * became absence-preserving in the same change.
- *
- * FIVE WORLD-DEFAULT SECTIONS, FOUR OF THEM INHERITED. `breakage`, `onBreak`, `prerequisites` and
- * `bonus` are ordinary sections with their own inherit switches. `repairRequirements` is the
- * fifth, and it is a SEED rather than a live parent: it is copied out of the world defaults when a
- * tool is added to a system and then diverges freely, so `seedToolRepairRequirements` is a
- * function the membership action calls once and NOT a section the resolver reads through.
- * Modelling it as a section with a permanently-false inherit switch would be a lie the UI would
- * then have to hide, and it would be untrue on its own terms: a repair recipe prices a set of
- * referents FOR ONE SYSTEM, and a live world value would change what a repair costs in a system
- * that never authored it.
- *
- * THAT IS ABOUT COST AND MEMBERSHIP, NOT ABOUT NAMING, and this sentence used to say otherwise
- * (issue 1373, maintainer round 2). It read "names ingredient groups over the OWNING SYSTEM's
- * components, which the world scope cannot address" - true before epic 1357 gave the world its
- * own component catalogue, and not true now: a world component id IS the id a membership record
- * carries, so a repair group may name world components, world essences and world tags. What
- * world scope cannot promise is that every system inheriting the Tool has ADOPTED each named
- * Component, which is why the seed is copied on adoption rather than resolved live - and why
- * the world Tool entry that authors it states that reach on the screen.
- *
- * `prerequisites` AND `bonus` JOINED THE LIST AT `1.31.0` (issue 1373), because the design treats
- * a Tool's character gate and its check bonus as world defaults a system INHERITS and may
- * override, not as per-system-only fields. They are the shipped `Tool.prerequisites` and
- * `Tool.bonus` unchanged. Two properties separate them from `breakage` and `onBreak`, and both
- * matter:
- *
- *  - AN EMPTY OVERRIDE IS EXPRESSIBLE for both. `{enabled: false, ids: [], gateMode: 'usability'}`
- *    and `{enabled: false, expression: ''}` are real values every reader treats as "no
- *    prerequisites" and "no bonus", exactly as `### Essence scope`'s `effectSource: {}` means "no
- *    source". So a membership record can say "this system requires nothing", and the every-member
- *    precondition `breakage` and `onBreak` need does not apply to them.
- *  - THE `1.31.0` MIGRATION WRITES NO WORLD DEFAULT FOR EITHER, on the unknowable-PROVENANCE rule
- *    this file already records for the world break mode: `Tool#toJSON` mints both keys on EVERY
- *    save, so a persisted `{enabled: false}` is indistinguishable from a GM's deliberate choice.
- *    An ABSENT world default resolves to the membership record's own value, which the same
- *    migration writes verbatim from that system's in-system Tool - so every existing system reads
- *    exactly what it read before, and a world default exists only once a GM authors one.
- *
- * `enabled` KEEPS ITS SHIPPED MEANING VERBATIM. A reference to a tool that does not resolve, or
- * that resolves to a disabled tool, BLOCKS the attempt with `TOOL_BLOCKED` (`## Tool`
- * requirement 3). That is a hard block, not the essence's soft disable, and the two are
- * deliberately different meanings of one field name.
- *
- * THE WORLD DEFAULTS CARRY A MASTER SWITCH, AND THE TOOL IS THE ONLY SCOPE THAT DECLARES ONE.
- * `TOOL_SCOPE` is `worldEnableable`, so a tool's world defaults may carry `enabled` and the
- * resolver answers `world.enabled && system.enabled`: a world-disabled Tool is off in every
- * system whatever each system says. The per-system flag is unchanged and still means what it
- * meant; it simply cannot re-enable a world-disabled Tool. An ABSENT world flag reads as
- * enabled, so a world that never touches the switch behaves exactly as it did.
- *
- * The read union re-applies that veto — see {@link resolveToolScope} — because requirement 36
- * lets the in-system record decide every key it carries, `enabled` included.
- *
- * THE BREAK MODE IS NOT A NEW FIELD, AND IT IS LIVE FROM `1.30.0`.
- * `resolveToolBreakageAuthority` resolves the SHIPPED
- * `CraftingSystem.toolBreakage.authority` (`## CraftingSystem` requirement 21) over a world value
- * and a per-system override, carrying the same two tokens; the per-tool control under `checkDriven`
- * stays `checkBreakable`. The governing rule is unchanged and gains exactly one clause: SCOPE
- * decides where authority is authored; AUTHORITY still decides WHETHER.
+ * The tool half of Scoped Entity Definitions (issue 1358): four inherited sections, plus
+ * `repairRequirements`, a seed copied on adoption because a repair's cost is per system. `1.31.0`
+ * writes no world `prerequisites` or `bonus`, as `Tool#toJSON` mints both (issue 1373). A disabled
+ * tool is a hard `TOOL_BLOCKED`, unlike the essence soft disable, and only tools carry a world
+ * master switch. Scope decides where the break mode is authored; authority still decides whether.
+ * Contract: `data-models/spec.md` § Scoped Entity Definitions, Tool scope.
  */
 
-/**
- * The tool sections resolution reads through, and the only keys a tool membership record's
- * `inherit` map may carry.
- *
- * @type {readonly string[]}
- */
+/** The tool sections, and the only keys an `inherit` map may carry. */
 export const TOOL_SECTIONS = Object.freeze(['breakage', 'onBreak', 'prerequisites', 'bonus']);
 
-/**
- * The world-default section that is SEEDED onto a membership record rather than inherited.
- *
- * @type {readonly string[]}
- */
+/** The world-default section seeded onto a membership record rather than inherited. */
 export const TOOL_SEEDED_SECTIONS = Object.freeze(['repairRequirements']);
 
-/**
- * The two tool-breakage authority tokens. Already shipped; the prototype's `tool` / `check` are
- * deliberately not introduced, and `immune` is a retired name.
- *
- * @type {readonly string[]}
- */
+/** The two shipped authority tokens; `immune` is a retired name. */
 export const TOOL_BREAKAGE_AUTHORITIES = Object.freeze(['toolSpecific', 'checkDriven']);
 
-/**
- * The authority a system with no authored value, and no world value to inherit, reads as.
- *
- * @type {string}
- */
+/** The authority when neither the system nor the world authored one. */
 export const DEFAULT_TOOL_BREAKAGE_AUTHORITY = 'toolSpecific';
 
 /**
- * The block reason a reference to an absent or disabled tool raises.
- *
- * THIS TOKEN IS ALREADY SHIPPED, as a bare literal, in THREE files this module deliberately does
- * not import: `GatheringEngine.js` (its private `DEFAULT_BLOCKED_REASON_KEYS` map plus four
- * `_blockedReason` call sites), the player app's `gatheringBlockedReasons.js` label and callout
- * maps, and `GatheringTaskRequirements.svelte`, which filters the token out of the requirement
- * callouts. Importing any of them into this module would drag a Foundry consumer, or a UI leaf,
- * into a deliberate leaf that has neither - which is the reason, and it is about what this
- * module may DEPEND ON rather than about what depends on it. Eight modules import it, this
- * file's own header calls it live, and the read seam of issue 1370 is one of them. So the
- * shipped copies are held together by a drift guard in `tests/entity-scope-resolvers.test.js`
- * that fails if the literal stops matching this constant. That guard scrapes the first two
- * files only; the Svelte leaf is named here so the count is honest. Issue 1370’s READ
- * repointing did NOT converge the three onto this export - it repointed readers of the ENTITY
- * ARRAYS, which is a different set - so the convergence is still owed, and the lane that takes
- * it must not work from an undercount.
- *
- * @type {string}
+ * The block reason for an absent or disabled tool. Copies of the literal in `GatheringEngine.js`,
+ * `gatheringBlockedReasons.js` and `GatheringTaskRequirements.svelte` stay unimported to keep this
+ * a leaf; `tests/entity-scope-resolvers.test.js` guards the first two against drift.
  */
 export const TOOL_BLOCKED = 'TOOL_BLOCKED';
 
-/**
- * Attach the seeded `repairRequirements` list only when it was authored.
- *
- * The list itself is OPAQUE - its members are ingredient groups this module has no business
- * inspecting - so it is preserved by reference and never walked.
- *
- * @param {object} entry
- * @returns {object}
- */
+/** The seeded list, by reference and never walked, only when authored. */
 function attachRepairRequirements(entry) {
   return Array.isArray(entry.repairRequirements)
     ? { repairRequirements: entry.repairRequirements }
     : {};
 }
 
-/**
- * The tool scope descriptor.
- *
- * @type {Readonly<object>}
- */
 export const TOOL_SCOPE = defineScope({
   sections: TOOL_SECTIONS,
   enableable: true,
@@ -159,48 +51,22 @@ export const TOOL_SCOPE = defineScope({
   membershipExtras: attachRepairRequirements,
 });
 
-/**
- * Whether a tool's WORLD record leaves it enabled. Re-exported under a tool-shaped name so a
- * caller that holds one tool's world defaults reads the rule rather than the field.
- *
- * @param {object|null|undefined} worldDefault
- * @returns {boolean}
- */
+/** Whether a tool's world record leaves it enabled. */
 export function isToolEnabledInWorld(worldDefault) {
   return isWorldEnabled(worldDefault);
 }
 
-/**
- * Normalize the world tool defaults.
- *
- * @param {unknown} raw
- * @returns {Array<object>}
- */
 export function normalizeToolWorldDefaults(raw) {
   return normalizeWorldDefaults(raw, TOOL_SCOPE);
 }
 
-/**
- * Normalize the tool system membership records.
- *
- * @param {unknown} raw
- * @returns {Array<object>}
- */
 export function normalizeToolMemberships(raw) {
   return normalizeMemberships(raw, TOOL_SCOPE);
 }
 
 /**
- * Seed a new membership record's `repairRequirements` from the world defaults.
- *
- * Called ONCE, when a tool is added to a system. The seed is a COPY rather than the world list
- * itself, so a later world edit cannot reach through into a system that has already diverged, and
- * a later system edit cannot reach back into the world. A value that cannot be cloned is preserved
- * verbatim rather than dropped: a seed that silently lost a repair recipe would be worse than one
- * that shares a reference nobody can mutate structurally.
- *
- * @param {object|null} worldDefault
- * @returns {Array<object>}
+ * Seed a new membership's `repairRequirements` once, on adoption, as a copy so neither side reaches
+ * the other; an uncloneable list is kept shallow rather than dropped.
  */
 export function seedToolRepairRequirements(worldDefault) {
   const world = worldDefault && typeof worldDefault === 'object' ? worldDefault : {};
@@ -212,29 +78,13 @@ export function seedToolRepairRequirements(worldDefault) {
   }
 }
 
-/**
- * Whether a value is one of the two shipped authority tokens.
- *
- * @param {unknown} value
- * @returns {boolean}
- */
 function isAuthorityToken(value) {
   return typeof value === 'string' && TOOL_BREAKAGE_AUTHORITIES.includes(value);
 }
 
 /**
- * Normalize the WORLD tool-breakage authority for persistence (issue 1359).
- *
- * ABSENCE-PRESERVING. An unauthored or unrecognized value answers `{}` — no `toolBreakage` key at
- * all — rather than minting `toolSpecific`, because a minted default at world scope is
- * indistinguishable from a GM's deliberate choice and would silently become the value every
- * absent-preserving system inherits once the normalizer flip lands.
- *
- * Answers a PARTIAL OBJECT rather than the block itself, so `createToolScopeStore` can spread it
- * over the three sub-keys without a presence test of its own.
- *
- * @param {unknown} raw The raw `toolBreakage` block from the persisted scope value.
- * @returns {{toolBreakage?: {authority: string}}}
+ * The world tool-breakage authority as a partial object to spread (issue 1359). An unauthored or
+ * unknown value answers `{}`, never a minted `toolSpecific`.
  */
 export function normalizeWorldToolBreakage(raw) {
   const authority = raw && typeof raw === 'object' ? raw.authority : undefined;
@@ -242,17 +92,8 @@ export function normalizeWorldToolBreakage(raw) {
 }
 
 /**
- * Resolve the effective tool-breakage authority for one crafting system.
- *
- * ABSENT-PRESERVING ON THE SYSTEM SIDE: a system that authored nothing INHERITS the world value
- * rather than re-defaulting to `toolSpecific`, which is the whole point of lifting the switch. An
- * unrecognized system token is treated as absent for the same reason. Only when neither scope
- * authors a recognized token does the answer fall to `toolSpecific`, preserving `## CraftingSystem`
- * requirement 21 for a world that has authored no world value at all.
- *
- * @param {object|null} worldToolBreakage The world `toolBreakage` block.
- * @param {object|null} systemToolBreakage The crafting system's own `toolBreakage` block.
- * @returns {string} `"toolSpecific"` or `"checkDriven"`.
+ * One system's effective authority: its own recognised token, else the world's, else
+ * `toolSpecific` (`## CraftingSystem` requirement 21).
  */
 export function resolveToolBreakageAuthority(worldToolBreakage, systemToolBreakage) {
   const system = systemToolBreakage?.authority;
@@ -263,21 +104,8 @@ export function resolveToolBreakageAuthority(worldToolBreakage, systemToolBreaka
 }
 
 /**
- * Resolve one `(tool, system)` pair.
- *
- * The answer carries `breakage`, `onBreak`, `prerequisites` and `bonus` (each when authored at
- * the winning scope), `repairRequirements` when the membership record authored some, `member`, the
- * per-section `inherited` map, and `enabled`.
- *
- * `repairRequirements` is answered from the MEMBERSHIP RECORD ALONE and is never read back out of
- * the world defaults - a seeded value that a system has since edited is the only truth about that
- * system's repair recipe.
- *
- * @param {object|null} worldDefault
- * @param {object|null} membership
- * @returns {{breakage?: unknown, onBreak?: unknown, prerequisites?: unknown, bonus?: unknown,
- *   repairRequirements?: Array<object>, member: boolean, enabled: boolean,
- *   inherited: {[section: string]: boolean}}}
+ * Resolve one `(tool, system)` pair: the authored sections, `member`, `inherited`, `enabled`, and
+ * `repairRequirements` from the membership record alone, never the world defaults.
  */
 export function resolveTool(worldDefault, membership) {
   const record = membership && typeof membership === 'object' ? membership : null;
@@ -288,61 +116,19 @@ export function resolveTool(worldDefault, membership) {
   return resolved;
 }
 
-/**
- * Why a reference to this tool blocks the attempt, or `null` when it does not.
- *
- * A tool that does not exist in the system and a tool that exists but is disabled block
- * IDENTICALLY, because `## Tool` requirement 3 makes an unresolvable reference and a disabled one
- * the same refusal. This is a HARD block: unlike the essence soft disable, nothing downstream runs.
- *
- * @param {{member?: boolean, enabled?: boolean}|null} resolved
- * @returns {string|null}
- */
+/** A non-member and a disabled tool block identically (`## Tool` requirement 3). */
 export function toolAttemptBlockReason(resolved) {
   if (!resolved?.member || resolved.enabled !== true) return TOOL_BLOCKED;
   return null;
 }
 
 /**
- * THE READ UNION for a tool: what a crafting system's tools list IS (issue 1359).
- *
- * The system's surviving in-system array, merged with the world tools whose membership
- * record for this system is PRESENT, each RESOLVED through the three-layer resolver above.
- *
- * **While `## CraftingSystem` requirement 36 holds, the IN-SYSTEM RECORD DECIDES: the union
- * answers every KEY that record carries, its ROW ORDER and its ROW SET, re-derived from it at
- * read time, and the world layer supplies only the keys it does not carry. The world-wins
- * precedence below is the TARGET contract and is SUSPENDED, not consumed, for the duration; it
- * re-arms when requirement 36 retires.**
- * So the surviving record supplies `componentId`, `label`, `requirement` and `checkBreakable` as
- * it always did - and, while requirement 36 holds, `prerequisites` and `bonus` too, because
- * `Tool#toJSON` emits both keys unconditionally and the in-system record decides every key it
- * carries. Those two are world-default SECTIONS as of `1.31.0` and the membership record is where
- * the per-system override is authored, but their world layer is SUSPENDED on this read path for
- * exactly as long as `breakage` and `onBreak` are - AND every
- * identity and behaviour key it carries; a lifted identity field it does NOT carry is DELETED
- * from the merged row, because absence is a value. A lane adding a world-scope WRITER here
- * must not implement against world-wins precedence: doing so reverts the GM's own edits on
- * the very next read, which is the defect this inversion exists to prevent.
- *
- * IT IS MEMBERSHIP-FILTERED AND RESOLVED, and the BASIS union
- * (`CraftingSystemManager#_scopeBasis`) is neither. That difference is the point: an absent
- * membership record is a REFUSAL, never a PRUNE, so a reference to a world tool this system is
- * not a member of must be ABSENT from this answer and PRESENT in the basis. Filtering the basis by
- * membership would convert that refusal into a silent, persisted deletion on the first normalize.
- *
- * @param {{entities: Array<object>, defaults: Array<object>, membership: Array<object>}|null}
- *   worldCorpus The world scope store's published corpus.
- * @param {string} systemId
- * @param {unknown} systemTools The system's surviving in-system array.
- * @returns {Array<object>}
+ * The read union for tools; see `unionScopedDefinitions`. The in-system record still supplies
+ * `componentId`, `label`, `requirement`, `checkBreakable`, and `prerequisites` and `bonus` unless
+ * inheriting, so a world-scope writer must not assume world-wins.
  */
 export function resolveToolScope(worldCorpus, systemId, systemTools) {
-  // THE VETO IS RE-APPLIED OVER THE MERGED ROWS, and `applyWorldEnabledVeto` says why: the union
-  // re-spreads the in-system record last, so a normalized in-system tool's own `enabled` wins
-  // every key contest — which is correct for a value that system AUTHORED and wrong for a
-  // world-scope veto. It only ever turns a row OFF, so a corpus with no world-disabled tool
-  // answers the identical array this function has always answered.
+  // The in-system re-spread would let a tool's own `enabled` outvote a world-off veto.
   return applyWorldEnabledVeto(
     unionScopedDefinitions({
       corpus: worldCorpus,

@@ -22,6 +22,7 @@
   import { INVALIDATION_STORES, STORE_DOMAINS } from '../../../../systems/invalidationDomains.js';
   import { describeBlockedReasons } from './gatheringBlockedReasons.js';
   import { journalRefusalMessage } from '../../util/journalRunReasons.js';
+  import { notifyAdditionalDice } from '../../../presenters/additionalDicePrompt.js';
   import GatheringEnvironmentList from './GatheringEnvironmentList.svelte';
   import GatheringDetail from './GatheringDetail.svelte';
   import GatheringTaskDetail from './GatheringTaskDetail.svelte';
@@ -259,21 +260,17 @@
         // to chat (Dice So Nice) for the routed/progressive check paths.
         interactive: true,
       });
-      // Never swallow a rejected attempt: surface WHY so a blocked attempt can't be
-      // a silent no-op. A started/accepted attempt reports its outcome via the chat
-      // card, so only an explicit rejection notifies here. A CANCELLED attempt
-      // (player dismissed the roll dialog) is a user choice, not a rejection: it is
-      // also `accepted: false` but carries no blockedReasons, so handle it first and
-      // stay silent.
-      if (result && result.cancelled === true) {
-        return;
-      }
+      // Never swallow a rejected attempt: surface WHY so a blocked attempt can't be a silent
+      // no-op; the chat card reports an accepted one. A CANCELLED attempt (a dismissed roll
+      // dialog, also `accepted: false` with no blockedReasons) returns first, its only notice
+      // a refused additional-dice choice's (issue 2008).
+      notifyAdditionalDice(result, { notify: notifyWarn, localize }, store?.selectedActor?.name);
+      if (result?.cancelled === true) return;
       if (result && result.accepted === false) {
         notifyWarn(describeBlockedReasons(result.blockedReasons, localize));
-      } else if (result && result.success === false) {
-        // A versioned start goes through the run authority, whose refusal shape is
-        // `{success:false, reason}` with NO `accepted` and no `message` — so it
-        // missed the branch above entirely and the attempt was a silent no-op.
+      } else if (result && result.success === false && !result.additionalDiceRefusal) {
+        // A versioned start's refusal is `{success:false, reason}` with NO `accepted` and no
+        // `message`, so it missed the branch above and the attempt was a silent no-op.
         notifyWarn(journalRefusalMessage(result, localize, describeBlockedReasons(null, localize)));
       }
       await load();

@@ -21,7 +21,6 @@ const detailSource = read('../../src/ui/svelte/apps/journal/RunDetail.svelte');
 const statusSource = read('../../src/ui/svelte/apps/journal/journalRunStatus.js');
 const actionsSource = read('../../src/ui/svelte/apps/journal/ActionsPanel.svelte');
 const stepSource = read('../../src/ui/svelte/apps/journal/StepDetails.svelte');
-const builderSource = read('../../src/ui/presenters/RunJournalBuilder.js');
 const historySource = read('../../src/ui/svelte/apps/journal/HistoricalRunDetail.svelte');
 const cssSource = read('../../styles/fabricate.css');
 const enLang = JSON.parse(read('../../lang/en.json'));
@@ -264,10 +263,11 @@ describe('Journal label mirrors resolve in lang/en.json (drift guard)', () => {
   });
 
   it('every resolution-mode label key resolves to a real localized string', () => {
-    const keys = [...builderSource.matchAll(/'(FABRICATE\.App\.Journal\.Mode\.[A-Za-z]+)'/g)].map(
+    const modeSource = read('../../src/ui/presenters/journalCheckText.js');
+    const keys = [...modeSource.matchAll(/'(FABRICATE\.App\.Journal\.Mode\.[A-Za-z]+)'/g)].map(
       (match) => match[1]
     );
-    assert.ok(keys.length >= 5, 'extracted the MODE_LABEL_KEYS values from the builder');
+    assert.ok(keys.length >= 6, 'extracted the mode label keys from journalCheckText');
     for (const key of new Set(keys)) {
       assert.equal(
         typeof resolveLangKey(key),

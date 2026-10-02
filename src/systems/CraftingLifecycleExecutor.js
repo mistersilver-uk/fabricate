@@ -199,8 +199,6 @@ export class CraftingLifecycleExecutor {
    * Settle a failed effect. A DEFINITE refusal that has written nothing at all discards the plan
    * instead of demanding recovery, so a run no effect touched stays ordinary and retryable rather
    * than becoming permanently unclearable (issue 1648, F1).
-   * @private
-   * @returns {Promise<Error>} The error to throw.
    */
   async _effectFailure(actor, run, effectId, error) {
     const applied = observeExecutionJournal(run.executionJournal).effects.some(

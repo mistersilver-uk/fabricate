@@ -31,9 +31,6 @@
     componentMembershipFilters,
   } from './scoped/componentScoped.js';
 
-  /** The world entry route a GHOST ROW opens; the one string deciding whether the link resolves. */
-  const WORLD_ENTRY_ROUTE = 'world-component-entry';
-
   let {
     itemCards = [],
     itemSearchTerm = '',
@@ -61,9 +58,6 @@
     // Told AFTER the toolbar's Clear has emptied the selection (issue 1157): the clear stays this
     // browser's, but emptying the selection unmounts the panel and the button that was pressed.
     onSelectionCleared = null,
-    // The deep link into the world catalogue entry that AUTHORS a record's identity. Called with the
-    // ROUTE TOKEN and the entity id.
-    onOpenWorldEntry = () => {},
     // The filter / sort / group / paginate view-state (issue 676), lifted by the manager root and
     // bound here so it survives the editor round-trip.
     browserState = $bindable(null),
@@ -418,9 +412,6 @@
 
   const recipesLabel = $derived(text('FABRICATE.Admin.Manager.Component.RecipesStat', 'Recipes'));
   const salvageLabel = $derived(text('FABRICATE.Admin.Manager.Component.SalvagePill', 'Salvage'));
-  // The em dash the ghost row draws in the `Recipes` column; a hyphen would read as a minus sign.
-  const NO_VALUE = '—';
-
   /** One MEMBER row's props. */
   function rowProps(item) {
     return {
@@ -452,30 +443,24 @@
     };
   }
 
-  /** One GHOST row's props — the same row, dimmed and stated. Adoption is two writes and this calls
-      ONE key: `actions.addToSystem` writes the membership record AND the in-system record. */
+  /** One absent row's props. Adoption stays on the composed membership action. */
   function ghostRowProps(ghost) {
     return {
       component: ghost,
       member: false,
+      selected: isSelectedComponent(ghost),
       notInSystemLabel: text('FABRICATE.Admin.Manager.Component.GhostPill', 'Not in this system'),
-      recipesValue: NO_VALUE,
-      recipesLabel,
       noDescriptionText: text(
         'FABRICATE.Admin.Manager.Component.GhostNoDescription',
-        'No description yet.'
+        'No description'
       ),
-      addLabel: text('FABRICATE.Admin.Manager.Component.GhostAdd', 'Add to system'),
+      addLabel: text('FABRICATE.Admin.Manager.Component.GhostAdd', 'Add to this system'),
       addNamedLabel: format(
         'FABRICATE.Admin.Manager.Component.GhostAddNamed',
         'Add {name} to this system',
         { name: ghost.name }
       ),
-      // A ghost row's identity opens the world catalogue ENTRY, not the in-system selection:
-      // `onSelectComponent` writes `selectedComponentId`, which the inspector resolves against THIS
-      // system's row set, and a ghost has no row there. (The reference selects a ghost into its own
-      // inspector; Fabricate's cannot. Recorded as a deviation.)
-      onSelect: (id) => onOpenWorldEntry(WORLD_ENTRY_ROUTE, id),
+      onSelect: onSelectComponent,
       onAdd: (id) => actions?.addToSystem?.(id, systemId),
     };
   }
@@ -777,16 +762,8 @@
           </ul>
         {/if}
 
-        <!--
-          THE GHOST COHORT: world components this system has no rules record for, drawn as THE SAME
-          ROW, dimmed and stated — medallion, copy column and `Recipes` column stay, the pill reads
-          `Not in this system`, the second line is the WORLD description and the trailing control is
-          a dashed `+ Add to system`. THEY CARRY NO SELECTION BOX, because the prune effect above
-          drops every selected id the system has no component for; the one knowing divergence from
-          C6's row table. They are their own list AFTER the member one rather than folded into the
-          model, which would put unadoptable rows through a grouping and a sort that mean nothing for
-          them — but they are STILL PAGED through the same window.
-        -->
+        <!-- Absent world components follow the Essence Rules row and remain in the shared cohort
+             window. They are ungrouped because system category and sort facts do not exist yet. -->
         {#if ghostWindow.length > 0}
           <ul
             class="manager-component-group-body manager-component-ghost-body"

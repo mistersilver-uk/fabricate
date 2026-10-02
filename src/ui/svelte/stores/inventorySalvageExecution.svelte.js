@@ -9,6 +9,8 @@
  * injected thunk, so there is no import back to the store and no helper declared twice.
  */
 
+import { notifyAdditionalDice } from '../../presenters/additionalDicePrompt.js';
+
 // The shared "nothing fired" list (issue 1286). Frozen and hoisted so every un-fired
 // state — pre-roll, time-gated, runless, and a resolution that fired nothing — reaches
 // `markFiredStageComplications` as the SAME empty array, which returns the stage list by
@@ -68,6 +70,8 @@ function successSnapshot(result, systemId, componentId) {
       .map((entry) => entry?.componentId)
       .filter(Boolean),
     outcomeId: result?.salvageRun?.checkResult?.data?.outcomeId ?? null,
+    // The executed check's display projection, for the summary's evidence rows (issue 2005).
+    check: result?.check ?? null,
     // What the resolution FIRED, per stage occurrence (issue 1286), published
     // VERBATIM from the run record.
     //
@@ -97,6 +101,34 @@ function successSnapshot(result, systemId, componentId) {
     // the summary omits the roll phrase entirely rather than printing "of 0".
     rollValue: Number.isFinite(result?.value) ? result.value : null,
   };
+}
+
+/**
+ * Project one failed salvage check onto the ribbon's read-only summary (issue 2092), mirroring the
+ * crafting result box: the failure state, the engine's message, the executed check's evidence
+ * rows — `CheckEvidenceRows` itself withholds those rows for a blind or secret roll — and any
+ * reserved failure award (`publishSalvageFailure`'s `results`, issue 1098's `perRecord` policy),
+ * so the box never contradicts the chat card it stands beside.
+ */
+function failureSnapshot(result, systemId, componentId) {
+  return {
+    systemId,
+    componentId,
+    state: 'failure',
+    message: result?.message ?? '',
+    check: result.check,
+    awarded: (Array.isArray(result?.results) ? result.results : []).map((entry) => ({
+      name: String(entry?.name ?? ''),
+      img: typeof entry?.img === 'string' ? entry.img : null,
+    })),
+  };
+}
+
+/** The salvaging actor's name, which an additional-dice notice names (issue 2008). */
+function salvagingActorName(row, participation) {
+  const sources = Array.isArray(row?.sources) ? row.sources : [];
+  const actorId = participation?.salvage?.targetActorId;
+  return sources.find((source) => source?.actorId === actorId)?.actorName;
 }
 
 /**
@@ -242,8 +274,7 @@ export function createSalvageExecution({
     try {
       const flush = await flushOrder?.();
       if (flush?.ok === false) {
-        // The revert and its live-region announcement already happened inside the
-        // flush. Consume nothing.
+        // The flush already reverted and announced it, so consume nothing.
         return { success: false, message: orderAnnouncement?.() ?? '' };
       }
       const result = await services?.salvageComponent?.({
@@ -253,6 +284,7 @@ export function createSalvageExecution({
         componentId,
         interactive: true,
       });
+      notifyAdditionalDice(result, services, salvagingActorName(row, participation));
       return await recordOutcome(result, row, systemId, componentId);
     } catch (error) {
       const message = error?.message ?? String(error);
@@ -282,7 +314,11 @@ export function createSalvageExecution({
       await holdSalvagedRow(result, row, systemId, componentId);
       return result;
     }
-    salvageResult = null;
+    // A rolled failure (issue 2092) carries the executed `check` projection
+    // (`publishSalvageFailure`, issue 2005); a refusal before any roll — missing
+    // materials, missing tools, misconfigured — never sets that key, and stays
+    // toast-only exactly as before.
+    salvageResult = result?.check ? failureSnapshot(result, systemId, componentId) : null;
     if (result?.message) services?.notify?.(result.message);
     return result ?? { success: false };
   }

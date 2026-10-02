@@ -1,4 +1,6 @@
 /** Read-only presentation of the builder's entitled evidence, with no catalogue or runtime reads. */
+import { formatCountRoll, formatGradedRoll } from './runDetailPresentation.js';
+
 const prefix = 'FABRICATE.App.Journal.History.';
 const list = (value) => (Array.isArray(value) ? value : []);
 const finite = (value) => value != null && Number.isFinite(Number(value));
@@ -44,8 +46,21 @@ export function presentCurrencySpends(spends, localize) {
 
 function checkText(check, localize) {
   if (!check) return '';
+  if (check.count) return formatCountRoll(check.count, localize);
   const total = finite(check.total) ? check.total : check.value;
   if (!finite(total)) return '';
+  // Outside sum/over/fixed the executed target and margin, never a DC (issue 2005).
+  const graded = formatGradedRoll(
+    {
+      formula: named(check.formula) ? check.formula : '',
+      total: Number(total),
+      value: Number(total),
+      target: finite(check.target) ? Number(check.target) : NaN,
+      margin: finite(check.margin) ? Number(check.margin) : NaN,
+    },
+    localize
+  );
+  if (graded) return graded;
   const suffix = finite(check.dc) ? 'WithDc' : '';
   const key = named(check.formula) ? 'RollResult' : 'RollResultValue';
   return localize(`FABRICATE.App.Journal.StepDetails.${key}${suffix}`, {

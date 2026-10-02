@@ -276,7 +276,6 @@ function makeEngine(system, { actorInventoryCoinSpender = null, actorPropertyCoi
     null,
     { getMode: () => 'simple', validateRecipe: () => ({ valid: true }), validateCheckResult: () => true },
     null,
-    null,
     actorInventoryCoinSpender,
     actorPropertyCoinSpender
   );
@@ -1060,7 +1059,7 @@ test('engine: a THROWN currency lookup fails closed in both directions', async (
     },
   });
 
-  const engine = new CraftingEngine(null, null, null, null, null, null, new ActorPropertyCoinSpender());
+  const engine = new CraftingEngine(null, null, null, null, null, new ActorPropertyCoinSpender());
   const recipe = { craftingSystemId: system.id };
   const spends = [{ unit: 'gp', amount: 5 }];
   const actor = new CurrencyCraftingActorFake('Spender', { currency: { gp: 47 } });

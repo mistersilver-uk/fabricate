@@ -33,6 +33,7 @@ import {
 import { evaluateEnvironmentReadiness } from '../../src/ui/svelte/apps/manager/environment/environmentReadiness.js';
 import { createAdminStore } from '../../src/ui/svelte/stores/adminStore.js';
 import { createServices, makeSystem } from '../helpers/adminStoreServices.js';
+import { defineStructureContract } from '../helpers/structureContract.js';
 import { buildLabContent } from '../view-lab/world/labContent.js';
 import { resolveDraw } from '../view-lab/world/labRunStates.js';
 
@@ -481,19 +482,18 @@ describe('site 2 — environmentComposition.classifyCompositionRecords, through 
     }
   });
 
+  // Claim two: the store projects the state through the same set this suite does. What this second
+  // claim can and cannot prove, stated honestly (issue 1321): the set it projects through is
+  // structure, and the matrix below is the behaviour of that projection.
+  defineStructureContract(
+    'the store projects `composed` through the COMPOSED set, not the included one',
+    'src/ui/model/environmentComposition.js',
+    {
+      contains: ['const composed = ENVIRONMENT_COMPOSED_COMPOSITION_STATES.has(compositionState);'],
+    }
+  );
+
   it("projects through the store's OWN set, which re-deriving the projection here cannot see", async () => {
-    // Claim two: the store projects the state through the same set this suite does. What this
-    // second claim can and cannot prove, stated honestly (issue 1321).
-    const storeSource = readFileSync(
-      resolve(repoRoot, 'src/ui/model/environmentComposition.js'),
-      'utf8'
-    );
-    assert.ok(
-      storeSource.includes(
-        'const composed = ENVIRONMENT_COMPOSED_COMPOSITION_STATES.has(compositionState);'
-      ),
-      'the store projects `composed` through the COMPOSED set, not the included one'
-    );
     for (const mode of MODES) {
       const rowsById = await classifiedRowsFor(mode);
       const conditionGated = [...rowsById.values()]

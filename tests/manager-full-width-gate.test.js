@@ -179,7 +179,7 @@ test('the gathering task editor releases its inspector track only for result-gro
   );
   assert.match(
     rootSource,
-    /resultGroupTaskMode:\s*isGatheringResultGroupMode\(gatheringTaskResolutionMode\)/,
+    /resultGroupTaskMode:\s*isGatheringResultGroupMode\(gathering\.gatheringTaskResolutionMode\)/,
     'the full-width derivation should receive the selected task mode'
   );
   assert.match(

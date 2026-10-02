@@ -21,28 +21,22 @@ import {
 import { chooseSelectOption } from './selectControl.mjs';
 
 /**
- * A UI-triggered craft / immediate-d100 gather now opens the interactive roll prompt (a Foundry
- * DialogV2 carrying `.fabricate-roll-prompt`). A caller that knows the prompt opens passes a longer
- * `timeout`; the default keeps a prompt-less path cheap.
+ * A UI-triggered craft / immediate-d100 gather now opens the interactive roll prompt (Fabricate's
+ * shared modal, `.manager-modal[data-roll-prompt]`). A caller that knows the prompt opens passes a
+ * longer `timeout`; the default keeps a prompt-less path cheap.
  */
 export async function handleRollPromptIfPresent(ctx, label, { timeout = 2500 } = {}) {
   const { page, screenshot } = ctx;
-  const dialog = page
-    .locator('.application.dialog:has(.fabricate-roll-prompt), .dialog:has(.fabricate-roll-prompt)')
-    .first();
+  const dialog = page.locator('.manager-modal[data-roll-prompt]').first();
   try {
     await dialog.waitFor({ state: 'visible', timeout });
   } catch {
     return false;
   }
   await screenshot(page, label);
-  // The confirm button is "Normal" for a d20 check (Advantage/Normal/Disadvantage) or "Roll" for a
-  // non-d20 / d100 check (single button).
-  const rollBtn = dialog
-    .locator(
-      'button[data-action="normal"], button[data-action="roll"], button:has-text("Normal"), button:has-text("Roll")'
-    )
-    .first();
+  // Roll is the form's only submit button, and it rolls normally. A text match found the roll-mode
+  // Select's "Public roll" trigger first and opened it instead, leaving the prompt standing.
+  const rollBtn = dialog.locator('button[type="submit"]').first();
   await rollBtn.click().catch(() => {});
   await dialog.waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
   return true;

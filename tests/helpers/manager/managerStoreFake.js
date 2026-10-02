@@ -869,6 +869,21 @@ function createStore(calls = [], options = {}) {
     },
     // THE WORLD SCOPE PROJECTION, seeded from the same tool roster (issue 1373).
     worldScope: {
+      ...(options.worldEssencePreviewCarrier && {
+            essence: {
+              available: false,
+              entries: [
+                {
+                  id: 'earth',
+                  previewCarrier: options.worldEssencePreviewCarrier.earth ?? null,
+                },
+                {
+                  id: 'water',
+                  previewCarrier: options.worldEssencePreviewCarrier.water ?? null,
+                },
+              ],
+            },
+          }),
       tool: {
         entities: (options.gatheringLibraryTools || []).map((tool) => ({ id: tool.id })),
         entries: (options.gatheringLibraryTools || []).map((tool) => ({
@@ -1631,6 +1646,8 @@ function createStore(calls = [], options = {}) {
         return Promise.reject(new Error('update gathering task failed'));
       }
       if (options.updateGatheringLibraryTaskResult === false) return false;
+      // A store that answers nothing, which the task and event saves read differently.
+      if (options.updateGatheringLibraryTaskResolvesNothing) return Promise.resolve(undefined);
       viewState.update((state) => {
         const systemConfig = state.gatheringConfig?.systems?.[systemId];
         if (!systemConfig) return state;
@@ -1674,6 +1691,7 @@ function createStore(calls = [], options = {}) {
         return Promise.reject(new Error('update gathering event failed'));
       }
       if (options.updateGatheringLibraryEventResult === false) return false;
+      if (options.updateGatheringLibraryEventResolvesNothing) return Promise.resolve(undefined);
       viewState.update((state) => {
         const systemConfig = state.gatheringConfig?.systems?.[systemId];
         if (!systemConfig) return state;

@@ -89,8 +89,13 @@ The shipped Essences rail item and the `.manager-rail-toggle` collapse control b
 
 Each activity route renders FIVE sections — The roll / Outcomes / Triggers / Modifiers / On failure — each with a count badge and a warning dot fed from the same readiness evaluation that feeds the rail badge and the Validation route, so the three can never disagree.
 The warning dot carries a text accessible name, and a section carrying both a count and an issue renders both; a count of zero renders unbadged, because five sections each wearing a `0` is chrome rather than information.
-The dot is EXPLAINED IN THE PANEL: the open section renders the shared `Callout` for each of its own issues, carrying the same sentence the Validation route renders for that issue id from one exported copy map, toned `warning` for an issue that blocks enabling and `info` for one that does not.
+The dot is EXPLAINED IN THE PANEL: the open section opens, first in the pane and above its heading, with the shared amber `Notice` for each of its own issues, carrying the issue's short title over the same sentence the Validation route renders as that row's detail, both from one exported copy map.
+Every readiness issue has a title, and the title map is proven exhaustive against `CHECK_READINESS_ISSUE_IDS` in both directions.
+A section's notices sort blocking issues first, then warnings, as the Validation route orders its rows; with every notice amber, the order is the pane's only priority cue.
+A notice's Review action focuses the control the issue names, and otherwise focuses the section, as a Validation row's View does.
+No readiness issue renders as a `Callout`; the mode description on The roll stays a `Callout`, because it documents the mode rather than reporting this check's state.
 A dot whose only explanation is on another route is a signal with no legend, and two surfaces describing one issue from two copies of the sentence is how they come to describe it differently.
+When ranking leaves an entry out — `highest` over two or more eligible entries, or `playerPicks` whose pick cap is below the number of eligible entries — Modifiers readiness emits one non-blocking `warning`-severity issue, `modifierAverageUnavailable`, naming every eligible transformed-quantity entry with sound bounds and a resolving expression, whose average cannot be compared; the entry remains selectable and rollable, and the warning never becomes `modifierExpressionInvalid`.
 The section strip is a real ARIA tablist driven by Arrow, Home and End, and only the SELECTED tab carries `aria-controls`, because only the selected section's panel is in the document.
 It renders through the ONE editor tab strip primitive, which draws both of its marks and offers that selected-tab-only mode; this route owns the section-to-tab mapping, its `checks-section-*` and `data-checks-*` hooks and the issue count's localized unit, and nothing about how a mark looks.
 Outcomes renders in EVERY mode and hosts that mode's own outcome model: the two-outcome pass/fail statement on `simple`, the `awardMode` selector on `progressive`, the band strip plus the tier rows on `routed`.
@@ -113,7 +118,7 @@ Crafting (non-alchemy), salvage and gathering stage their check's `enabled` flag
 Each activity's save writes its Active flag before its slot draft and ANDs both answers, and each slot write is guarded on that slot's own dirty flag so a switch-only save does not rewrite an untouched formula block.
 The reading is derived from the MODE rather than from the persisted `enabled` flag, since a mandatory check runs whatever that flag says; it reads on for every locked mode except alchemy `none`, which rolls nothing.
 The Preview-as panel carries an ACTOR selector and a RECORD selector, and both are real controls with a simulator behind them.
-"Preview as" offers UNFILTERED `game.actors` — the Studio is GM-only and a GM's `Document#isOwner` is true for every actor, so the player-side "assigned character OR owner" union would hide actors a GM can legitimately preview against — plus an explicit "No actor" option, under which every `@` key resolves to `0` and the panel renders the unresolved warning rather than a total.
+"Preview as" offers UNFILTERED `game.actors` — the Studio is GM-only and a GM's `Document#isOwner` is true for every actor, so the player-side "assigned character OR owner" union would hide actors a GM can legitimately preview against — plus an explicit "No actor" option, under which every `@` key resolves to `0` and the panel renders the unresolved warning rather than a total, for a summed roll-over against a fixed DC; every other evaluation follows "Roll-under and character-value preview and readiness".
 The RECORD is the same selection the Outcomes section's band strip is drawn against: a check's own default DC first, then every authored recipe tier.
 In PROGRESSIVE mode the record selector is replaced by the progressive preview sandbox's ordered-difficulty field, because a record's whole contribution is a DC and a progressive check has none.
 
@@ -128,10 +133,52 @@ For `dcMode: 'dynamic'` it resolves the STATIC fallback DC and renders a stated 
 The engine reaches a dynamic DC by calling `MacroExecutor.run`, which compiles `macro.command` into an `AsyncFunction` and executes it with the current user's authority, guarded only by `typeof command === 'string'` — which is NOT a script-type check, because Foundry declares `type` with `initial: CONST.MACRO_TYPES.CHAT` and `command` as `required: true, blank: true` on both types, and the shipped `ItemDropZone documentType="Macro"` accepts any Macro.
 A DC macro that creates a `ChatMessage`, updates an Actor or writes a flag must not be able to do so from a preview button.
 
-It renders only values present on the returned result, never a parallel model: the rolled die face on a `Medallion`, the TERSE breakdown line (`d20 9 +10 · Sera Vane` — the full resolved formula is the `THIS CHECK` digest's row), the total against the DC with its margin, the matched band card with its disposition, and a "What happens" list of icon fact rows including tier-step and minimum-tier evidence.
+The readout renders only values present on the returned result and the check's own configuration, in the approved prototype's layout, announced politely.
+It has five parts:
+
+- a medallion
+- a terse breakdown line
+- the total and its target line
+- a result card toned by the graded result, with a serif outcome title, a detail line and, where one applies, a note
+- a "What happens" list of icon fact rows
+
+The medallion carries:
+
+- the first rolled face captioned with its die, for a summed roll-over against a fixed DC
+- the total captioned `total`, for a roll-under or character-value check
+- the signed net captioned `net`, for a count check
+
+The breakdown is terse:
+
+- a summed roll-over against a fixed DC reads `d20 9 +3 · Sera Vane` and always states its signed remainder
+- a roll-under joins its faces with ` + ` and appends `· raw`
+- the previewed actor's name ends the line
+
+Every negative number uses the true minus sign.
+
+A summed roll-over against a fixed DC:
+
+- reads `vs DC {dc}`, `vs DC {dc} · {margin}`, `in the {min}–{max} band` or `value spent`
+- states a note only when a trigger stepped, forced or decided the result, read from `data.tierStepApplied` and `data.forcedOutcome`
+- lists the result, the failure-result policy, ingredient consumption and tool breakage from the activity's own policies
+
+Every other evaluation:
+
+- states the benefit-positive margin note whenever the line shows a margin, unless a trigger-forced outcome takes the note slot
+- lists one row, "Result group produced" or "Failure policy applies", plus a tool-breakage row when the result breaks tools
+
+A progressive check spends its rolled value down the sandbox order through `resolveProgressiveAward` and reads "{awarded} of {of} awarded".
+
 It surfaces `resolved === false` — the signal `resolveCheckFormulaDisplay` already produces by re-resolving with `missing: 'NaN'` — as a stated "does not reduce to a number for this actor" warning, because `Roll.parse`'s own `missing: "0"` silently turns an unresolved `@` key into a plausible WRONG total, and "renders only values present on the result" does not catch that, since the wrong number IS on the result.
 It treats `Actor#getRollData()`'s live `system` object as read-only and clones before any local augmentation.
-A rolled readout describes ONE (formula, actor, record) tuple and is DROPPED when any of the three changes, because a total no current configuration produces must not stay on screen.
+A rolled readout describes ONE (formula, actor, record, evaluation, target) tuple and is dropped when any of them changes, because a total no current configuration produces must not stay on screen.
+
+With additional dice enabled on a counting check, an `Additional dice` stepper above the roll button, its caption visible, adds dice to the simulated roll only (issue 2008).
+It is bounded by `min(max, available)` from the Preview-as actor's stored value for a path source, by `max` for a macro source, because the preview never runs the read macro, and by 0 otherwise, a path an active effect overrides included, and it is clamped to the bounds whenever they change, so a count above a lowered bound is never rolled.
+Its note reads `Up to {limit} for {actor} ({resource} {available}, at most {max} per roll).` (without a resource name `Up to {limit} for {actor} ({available} available, at most {max} per roll).`), `The preview never runs the read macro, so up to {max} can be added here.`, `{actor} has no stored number at {path}, so no dice can be added.`, `An active effect changes {actor}'s {path}, so no dice can be added.`, `Choose a character to see how many they can add.` or `This check has no source to pay for additional dice.`
+It never spends, updates a document or runs a macro: the count reaches the runner as the internal `simulatedAdditionalDice` option, which places the same contribution a real roll places, and no public allowlist forwards it.
+At 0 the stepper adds nothing: the simulated roll and its readout are those of the same check with additional dice off.
+Simulated bought dice render as bought tiles.
 
 #### Per-outcome odds histogram
 
@@ -148,22 +195,26 @@ A string scan admits formulas face enumeration cannot describe — `2d6` is one 
 (3) **Determinism must recurse, and a `StringTerm` lies.** `RollParser.flattenTree` only recurses into `node.class === "Node"`, so a parenthetical, function or pool term is pushed whole and `Roll.parse('1d20 + (2d6)')` yields exactly one top-level die term with hidden randomness inside; a top-level class scan would call it enumerable and draw a histogram that lies.
 Determinism is therefore judged by Foundry's own recursive `term.isDeterministic` — but `StringTerm#isDeterministic` returns `true` for an unresolvable string that then throws at evaluate, so a `StringTerm` is refused explicitly, and it is told apart from a `ParentheticalTerm` (which also carries a string `term`) by the fields only a parenthetical has.
 
-**Every refusal carries a discriminated reason code** — `parse-threw`, `no-dice`, `multiple-die-groups`, `die-modifiers`, `non-unit-count`, `non-integer-faces`, `non-numeric-denomination`, `non-deterministic-remainder`, `string-term`, `unresolved-roll-data` — so a refuse-everything predicate is distinguishable from a correct one and the panel can say WHY rather than only that it abstained.
+**Every refusal carries a discriminated reason code** — `parse-threw`, `no-dice`, `multiple-die-groups`, `die-modifiers`, `non-unit-count`, `non-integer-faces`, `non-numeric-denomination`, `non-deterministic-remainder`, `string-term`, `unresolved-roll-data` — so a refuse-everything predicate is distinguishable from a correct one and the panel can say WHY rather than only that it abstained; the roll-under reasons are listed under "Roll-under and character-value preview and readiness".
 `non-numeric-denomination` is stated separately from `non-integer-faces` because a `FateDie` reports `faces: 3` and a `Coin` reports `faces: 2`: both are integers, and calling either "not an integer" would be a false statement in the panel.
 A formula whose only die sits inside a parenthetical, function or pool term refuses as `non-deterministic-remainder` rather than `no-dice`, which is reserved for a formula that really is all arithmetic.
 Anything outside the shape renders a stated note rather than an approximation: a histogram that lies is worse than one that abstains.
-The caption is COMPUTED from the enumerated space, never hard-coded — a `1d12` check reads "all 12 faces".
+For a summed roll-over against a fixed DC the caption is COMPUTED from the enumerated space, never hard-coded — a `1d12` check reads "all 12 faces"; a roll-under or character-value check names its formula instead, as "Roll-under and character-value preview and readiness" states.
 
-**The histogram, the `avg` annotation and the simulator MUST describe ONE formula, and it is the formula the RUNNER rolls.**
+**The histogram and the simulator MUST describe ONE formula, and it is the formula the RUNNER rolls.**
+The formula field's `avg` annotation is not a third reader of that formula: it reads the authored free-text formula alone, with no modifier contribution appended (below).
 The preview arg-builder hands the runner an AUTHORED formula plus a check-modifier context, and the runner appends the resolved scalar itself — so a derivation that describes the roll without that context describes a formula nothing rolls.
 The append therefore has ONE implementation and ONE composition (`resolveRolledFormula`: the retired-placeholder shim, then the modifier append), which the runner, the display resolver and the enumerator all ASK FOR rather than rebuild.
 A second composition is free to drift, and drift here is a histogram spanning `1..20` beside a readout rolling `5..24`, for the same check, at the same moment.
 It is applied exactly ONCE: the appended formula is then resolved for display with the context omitted, exactly as the runner does, so the scalar cannot land twice.
 
 The TOOL bonus is appended ABOVE the runner — by the engine on a real craft and by the preview arg-builder on a preview — and the runner appends none of its own, so the preview matches the engine's shape and the enumerator layers only the modifier on top.
+Under roll-under the preview arg-builder appends no Tool term; it hands the terms to the runner as contributions placed on the target.
 The SITUATIONAL bonus is unreachable from a preview at all: it lives behind `interactive === true`, and a null roll-options bag spreads to `{}`.
 Because a system with an empty catalogue resolves a ZERO scalar and makes the append a no-op, this rule MUST be exercised with a non-empty catalogue and a non-zero resolved scalar or it is graded vacuously.
 Progressive checks bucket by AWARD COUNT and OMIT a count no face can reach, while an award of nothing is listed wherever it is reachable.
+
+The odds and the Formula card's expected-successes reading ignore the simulator's additional dice and describe the base pool.
 
 ##### The progressive preview sandbox
 
@@ -187,8 +238,12 @@ The View Lab's `Roll` double carries a `parse` static whose term shape is derive
 A capture job that fails whole now surfaces as a FAILED evidence gate rather than as silent stale evidence: the gate reds instead of passing on the previous head's frames, so the bad case is visible as the failure it is.
 The panel additionally guards a missing or throwing `Roll.parse` as a not-enumerable result rather than a throw.
 
-An `avg N` annotation on the formula field renders the expected value of the PREVIEW formula for the previewed actor and is OMITTED whenever that formula does not reduce to a number.
-It is deliberately LOOSER than the histogram's predicate — it answers for multi-group and modified formulas the histogram abstains from — because it is an annotation on a field the GM is typing in rather than a claim about a distribution.
+An `avg N` annotation on the formula field renders the deterministic magnitude average (`reduceRollExpression`) of the free-text formula with character paths taken as zero, its value set in the mono face and the annotation referenced by the formula input's `aria-describedby`.
+When a die or pool carries `cs`, `cf`, `even`, `odd`, `df`, `sf` or `ms`, the annotation renders visible `avg —`, stamps `data-check-formula-average-withheld="die-modifiers"`, and exposes, in visually hidden text that needs no hover, a localized explanation that the average is withheld because the die modifier transforms the total.
+Malformed or irreducible input omits the annotation.
+A counting check's Formula card carries no `avg`: its reading is `expected successes {n}`, the same expected net the odds panel renders on `data-checks-odds-expected`, from the one preview computation, to two decimals, and hidden whenever the count odds abstain rather than shown as zero.
+A summing check's `avg` and `avg —` are unchanged.
+Magnitude expressions remain deliberately LOOSER than the histogram's predicate — the annotation answers for multi-group and magnitude-modified formulas the histogram abstains from — because it is an annotation on a field the GM is typing in rather than a claim about a distribution.
 Its responsive behaviour reuses the SHIPPED `fabricate-manager` container ladder and introduces no new breakpoint: `styles/fabricate.css` already declares that container with blocks at 1320 / 1120 / 960 / 900 / 831 / 680, and `.fabricate-manager .manager-inspector` already carries `overflow-y: auto; max-height: 100%`.
 At the existing 1320 breakpoint and below, the odds histogram and the simulator readout become collapsed disclosures, headers and counts retained.
 At the existing 1120 breakpoint and below, the shipped rule already restacks `.manager-body` to one column with `grid-auto-rows: max-content` and hands scrolling to the body; the rail's own `overflow-y` / `max-height` is LEFT ALONE there, because that block unsets neither and a `max-content` track cannot be squeezed.
@@ -198,6 +253,7 @@ That requires the studio's own workspace to restack there too, and a container q
 The workspace's column track is therefore set through a custom property the base rule reads and never declares, which cannot tie whichever order the two are read in; a source-text assertion cannot tell a dead rule from a live one, so this is pinned by measuring the rendered grid at the floor.
 
 The Validation route renders the documentation pair and the "All checks" summary ONLY — no activation toggle, no Preview-as, no simulator, no histogram, no This-check digest — and renders no section strip.
+The "All checks" summary's second line names the authored mode and what the check rolls — for a counting check its pool, comparison, threshold and face clauses as the Formula card's inset reads them, never its retained formula.
 Validation renders through the shared `EditorValidationSurface`, selecting an issue deep-links to the owning activity AND section, and the issue-id to section map is proven exhaustive against the frozen `CHECK_READINESS_ISSUE_IDS` registry `evaluateCheckReadiness` pushes from — never a hand-copied list.
 A deep link is an EVENT with its own identity, not a standing instruction: the route carries a request nonce the section strip latches on, so the same section requested twice is two requests and the second still lands.
 Latching on the section VALUE strands the repeat — leave the requested section, ask for it again, and the request equals the latch and is swallowed — and not latching at all drags the strip back to the standing request the instant the GM clicks anything else.
@@ -213,10 +269,13 @@ A slot of `null` — a mode that rolls NO check, which is alchemy `none` and gat
 The evaluator REFUSES a mode outside its own vocabulary rather than defaulting to `simple`, since a default is what made the mismatch silent.
 
 A Validation group with no ticks and no issues states "No issues detected." rather than rendering a heading over nothing; the group is never dropped, because absence reads as "this subsystem was not evaluated".
+Each Validation group lists every issue before the passes — blocking, then warning, then pass — through the shared surface's `issuesFirst` order, whose default lifts only blocking rows and leaves every other editor's authored order alone.
+With warnings and no blocking issue on a saved draft, the hero reads "Enabled with warnings" over "Saves and enables — review the warnings when you can.", the shared `FABRICATE.Admin.Manager.Validation.*` verdict the recipe and environment editors also render, and a transient warning never moves it.
+A blocking issue reads "Blocked from enabling", and an unsaved draft with none reads "No blocking issues, but not saved yet" rather than calling warnings clean.
 
 A `Save checks` that does not land BLOCKS the route exit it was raised for, matching the shipped essence and system-details guards: every dirty activity is still attempted, the answer is the conjunction, and a failed activity keeps its draft dirty.
 
-A check is usable iff its mode carries an authored `rollFormula`; the legacy check-source/macro layer (`macroUuid` / `successMacroUuid` / `failureMacroUuid` / `checkSource` / `builtIn`) was removed by migration 1.8.0 and is not authored.
+A check is usable iff its mode carries an authored `rollFormula` or its evaluation is `count`; the legacy check-source/macro layer (`macroUuid` / `successMacroUuid` / `failureMacroUuid` / `checkSource` / `builtIn`) was removed by migration 1.8.0 and is not authored.
 
 - Enable checks (the on/off toggle for the optional simple-mode check)
 - Roll formula, DC, and tier controls per mode (`simple` / `routed` / `progressive`)
@@ -235,6 +294,164 @@ The DC-hiding note applies to `routedByCheck + fixed` in the `CraftingCheckEdito
 
 Mode semantics are defined in `resolution-modes/spec.md`.
 There is no check-wide tier-stepping toggle: stepping is authored per trigger in the `CheckTriggers` editor below, and the retired routed `natStepping` card has been removed from the crafting and salvage editors.
+
+#### Roll-under and character-value preview and readiness
+
+Every check the Studio previews other than a summed roll-over against a fixed DC resolves its target as the runtime does: a character value is read from the Preview-as actor with Foundry path semantics, the record's adjustment applies (a recipe tier with none inherits the base), and no macro runs.
+A dynamic target therefore previews against the adjusted character value, and the simulator states that its macro is never run (`Simulator.DynamicTarget`).
+The odds and the track window use the check's own modifier placement from the shared `deriveCheckRoll` derivation: roll-over appends the modifiers to the roll, and roll-under places their `targetDelta` on the target.
+Each separately rolled modifier is enumerated JOINTLY with the main dice under the same positive whitelist and the shared 50,000-outcome cap; one the whitelist rejects abstains as `modifier-preroll-not-enumerable`, a joint space above the cap as `too-many-outcomes`, and no average is ever substituted.
+The odds heading of a roll-under or character-value check reads "exact · {formula}" with the authored formula, and a joint space also names each separately rolled bonus it crosses in ("exact · 1d20 with 1d4").
+Routed rows list the unrouted bucket first and then the tiers worst to best by the routing's own ranking; summed roll-over against a fixed DC keeps the order totals reach them in.
+Each bar takes its row's hue on the tier strip's five-stop ramp (danger, warning, success, info, accent) by position, worst first, and the unrouted bucket is always danger.
+
+The preview ABSTAINS — no odds, no target, no margin, no bar and Roll disabled — with one reason shared by the odds panel and the simulator.
+With no actor chosen, a check whose target or formula reads the character abstains first as `needs-preview-actor`, with the no-actor note `PreviewAs.NoActorCharacter` and the simulator hint `Simulator.NeedsCharacter`.
+An actorless literal target and formula stay previewable, and summed roll-over against a fixed DC keeps its own no-actor note.
+Otherwise the reasons are `progressive-under-unsupported`, `attribute-path-unresolved` (naming the actor and path), `attribute-value-not-numeric` and `target-invalid`.
+The simulator reads the executed `data.target` and `data.margin` ("target {target} · margin {margin}"), and shows neither for a result with no target (an Otherwise tier or a fixed range); summed roll-over against a fixed DC keeps its total-minus-DC reading.
+It notes "Margin is shown so that higher is always better: how far under the target the total landed." (or "…over the target…" when higher is better).
+A rolled result is dropped when any input it describes changes, and a deferred result publishes only if the inputs it was rolled for still hold.
+
+Readiness validates only what the active mode reads: a progressive or fixed-range target source is inert.
+It raises, as critical issues, `attributeTargetMissing` and `attributeTargetInvalid` (dice or non-arithmetic once every path is neutralized), `attributeTierWithoutAdjustment` (crafting recipe tiers), `adjustmentInvalidForKind` (a multiplier at or below zero), `otherwiseTierMissing` and `multipleOtherwiseTiers` (relative tiers under a multiplied character value) and `progressiveUnderUnsupported` (summed checks only).
+The target, adjustment and progressive-direction issues belong to The roll, the Otherwise issues to Outcomes.
+With a Preview-as actor chosen it raises two TRANSIENT warnings naming that actor, `attributePathUnresolvedForPreview` and `attributeValueNotNumeric`; they are explained by the section notice and listed on the Validation route, and they never feed a rail or nav badge, a section dot, the Validation tally or the enable gate.
+Their notices' Review focuses the character-value field for the target issues and the transient warnings.
+
+#### Roll-under and character-value authoring
+
+The Formula card's "Which way is better" axis (`Higher is better` / `Lower is better`) writes only `evaluation.direction`.
+No direction, target-source or adjustment-kind switch rewrites anything: `dc`, tier `dc`, `adjustment`, `successes`, `target`, inactive outcome rows and dormant overrides all survive, and `dc`, `adjustment` and `successes` stay distinct fields.
+A multiplier kept after switching back to `Add a number` reads as an added adjustment (`+0.5`), which is valid and rounds down at runtime, so no readiness issue is raised for it.
+Under a roll-under check the Formula card notes `The total must stay {cmp} the target. Modifiers raise the target; the dice stay as rolled.`, where `{cmp}` is `at or under` (meet) or `under` (exceed) everywhere in the Studio, and no label names a game system, a die size or a fixed direction phrase.
+Its inset reads the formula, the comparison, the target chip (`Target {dc}` for a fixed target, the authored expression for a character value) and the modifier chips, never joining the chips with `+`, and `avg —` stays visible for a transformed formula under every direction, source and kind.
+Its rule sentence reads `The dice are compared raw. Every modifier that applies raises the target instead of being added to the roll.`, naming the previewed tier's adjustment first when one applies.
+
+Every summed check that grades against a target offers the target source as a `RadioCardGroup`, `What the roll is measured against`: `Fixed difficulty` (`The same number for every character, set here and per recipe tier.`) or `Character value` (`Read from the crafting character. Difficulty adjusts it rather than replacing it.`).
+The Difficulty card's lead names the direction: fixed roll-under "The number the roll must stay {cmp}, and where that number comes from.", character value "The character value the roll must reach, and how difficulty adjusts it." or "…must stay {cmp}, and how difficulty adjusts it."
+A character value is a plain `RollDataExpressionInput` (no sigil affix) whose help shows `@skills.craft.value - 2`, never Foundry's V14-only `@{path}` form; with no Preview-as actor it reads "Choose a character in Preview as to see what this resolves to.", resolved `{actor} → {value}`, and unresolved `{actor} has no value at {path}. The check cannot resolve for them.`
+Its static value is labelled `Base DC`, `Target` or `Base adjustment` by source and direction, its adjustment source group reads "How the adjustment is set" with a static base adjustment or a macro that returns the target to reach or to roll under, and its `Difficulty adjustment` is `Add a number` or `Multiply, rounded down`.
+The Comparison reads `At or under` / `Strictly under` under a roll-under check.
+Numeric and fractional values edit through the formatted `Stepper` (`ui-visual-style/spec.md` § Numeric entry), so a multiplier reads `×½` and stays directly typeable, including an off-list `×0.7`.
+
+The formula card also renders one `In the roll prompt` group ("What the player can change before the dice are rolled.") with an `Offer a situational bonus` toggle writing `offerSituationalBonus`: on, it describes the bonus as adding to the total, raising the target or moving the threshold for the evaluation; off, "The prompt shows no bonus field."
+Below that offer, the same group authors the check's advantage rule (issue 2007; shape in `data-models/spec.md` § Check advantage record), sharing `CheckPromptOptions.svelte` across the simple, routed and progressive editors and never `CraftingCheckEditor.svelte` alone.
+A summing check's block is a `SegmentedControl` reading `advantage.mode` — `Off`, `Roll extra, keep one` or `Bonus die` — under the eyebrow `Advantage and disadvantage`, each choice explained by a note beneath it.
+Off reads `The prompt has a single Roll button.`
+Keep reads `Advantage rolls {total}{dN} and keeps the {n }{highest|lowest}. Applies to the first dice group, {n}{dN}.` from the authored formula's first dice group, `lowest` replacing `highest` under a roll-under check; a keep check whose first dice group `findKeepGroup` refuses instead reads `The formula's first dice group is not a plain die, so the prompt has a single Roll button. Choose Bonus die, or start the formula with a plain die.` and hides the stepper below without discarding `extraDice`.
+Bonus reads `Advantage {adds to the total|raises the target} by {expr}. Use this when the formula has several dice groups or the system grants a fixed bonus.`
+Under keep, a formatted `Stepper` labelled `Dice rolled for {dN}` shows `{n + extraDice}{dN}` and parses a typed `4d6` or a bare `4` back into `extraDice`, clamped to 1–4, keeping the accessible name equal to the visible label.
+Under bonus, a mono `Field` labelled `Bonus expression` (placeholder `1d6`) writes `bonusExpression`, its help reading `Any dice expression: 1d6, 2d4, 1d8 + 1.` when it matches the grammar, `Enter a dice expression, such as 1d6, 2d4 or 1d8 + 1.` in the danger tone when empty, or `Not a dice expression. Use dice and numbers joined by + or −, such as 1d8 + 1.` in the danger tone when it does not match.
+Every mode but off also shows an `Also offer disadvantage` `StatusToggle` writing `offerDisadvantage`, hinting what Disadvantage does in the current mode — `Disadvantage rolls the same dice and keeps the {n }{lowest|highest}.` under keep, `Disadvantage {subtracts from the total|lowers the target} by {expr}.` under bonus — or, off, `The prompt offers advantage only.`
+A counting check's block instead shows an `Offer advantage and disadvantage` `StatusToggle` writing `countEnabled`, hinting `Advantage adds {n} {die|dice} to the pool; disadvantage removes {n}.` when on or the single-Roll note when off, beside a numeric `Stepper` (1–5) labelled `Dice added or removed` writing `countDice`.
+Every control in the block writes the whole normalized `advantage` record back through one change handler, one key changed at a time, so a mode switch never destroys the other mode's operand.
+Recipe tiers name their unit `DC`, `Target` or `Adjustment`; under a character value they lead "A recipe picks one of these; it adjusts the character value before the roll.", and a tier with no adjustment reads `—` beside `Set an adjustment` while keeping the base adjustment at runtime.
+Relative outcome rows edit a fixed or added check's `dc` as `Benefit ±`, and a multiplied character value's `adjustment` as `Adjustment`, where exactly one row with no multiplier is `Otherwise`; a new row never duplicates Otherwise or reads `dc` as a multiplier.
+Every band strip but a roll-high fixed-DC one is a read-only picture built by `checkBandModel.js` (`ui-visual-style/spec.md` § Threshold band strip), scaled `Target {T} ({source}). Success sits at the low end: a total {cmp} {T} succeeds.` under a roll-under check; the tier Steppers stay authoritative.
+A progressive summed check shows its budget, the direction axis and the prompt group but no Difficulty card, keeping its inactive target data, and a progressive roll-under check raises the blocking readiness above.
+
+Readiness adds three advantage issues to The roll (issue 2007), sharing that section's badge, warning dot and Validation row with every other roll issue.
+`advantageKeepNoDie` (warning; sum, `keep`, the authored formula carries at least one dice group but `findKeepGroup` refuses it) names `checks-advantage-mode` and reads `Advantage keeps extra dice from the formula's first dice group, but that group is not a plain die, so players get a single Roll button. Choose Bonus die or turn advantage off.`
+`advantageKeepAfterReference` (warning; sum, `keep`, `findKeepGroup` succeeds with a character-value reference before the kept group) names the same control and reads `A character value comes before the formula's first dice group. If that value rolls dice, advantage still applies only to {n}{dN}.`
+`advantageBonusInvalid` (critical; sum, `bonus`, `bonusExpression` fails the grammar, including empty) names `checks-advantage-bonus` and reads `The advantage bonus is not a dice expression. Use dice and numbers joined by + or −, such as 1d8 + 1.`
+A dice-free authored formula raises none of the three and silently offers the single Roll, none of the three fires under `off` or counting, and the keep note never replaces the formula card's `avg —` reading.
+
+#### Success-counting preview and readiness
+
+While a check's evaluation is `count`, its retained `rollFormula` is inert on every Studio surface: readiness raises no `noRollFormula`, `modifiersInertNoFormula` or retired-placeholder issue and reports no `hasRollFormula` tick, the simulator reads its pool rather than the formula, and the digest's roll row reads `Roll · {base}d{die} · each {comparison} {threshold}` with the authored expressions (`Digest.CountFormula`), a base that is not a whole number bracketed as `(@skills.smith.rank + 2)d10`.
+Preview records are labelled with their required count, `{name} · {count} successes` or `{name} · 1 success`, read from the recipe tier's `successes` or else the pool's `required`; a progressive record carries no suffix.
+The pool resolves through `countEvaluation.js` exactly as the runtime resolves it, before any roll, and no macro runs: a dynamic required count previews against the successes needed set on the check, and the simulator says so (`Simulator.DynamicRequired`).
+
+The odds panel charts OUTCOMES, never a net-count histogram, from `countOdds.js` over the runner's own modifier placement, with every separately rolled benefit mixed in exactly.
+Each outcome is graded by the runtime's count graders, so pass/fail, routed tiers and progressive award counts are the ones a real roll would produce, and rows run worst to best.
+An any-die or all-dice trigger on the pool is enumerated jointly with the net; any other per-die trigger abstains as `count-face-trigger-not-enumerable`, explosions that leave material mass unexpanded abstain as `count-residual-too-large`, and a pool above the 999 dice Foundry rolls at once abstains as `pool-too-large` (`This pool is more dice than Foundry can roll at once, so there is nothing to chart.`).
+With cancelling on, the mass below zero net is split out of the bucket it grades into as a first `Botch` row (danger tone), only when every such outcome grades as a non-success; for a progressive check it comes out of the rows that award nothing.
+The heading adjunct reads `exact · expected {expected}`, or `nearly exact · expected {expected}` when recursion left a residual, with the expected net to two decimals mirrored on `data-checks-odds-expected`; an abstaining panel shows neither.
+The panel root carries `data-checks-odds-product="count"`.
+
+The preview abstains with no actor when the pool reads the character (`needs-preview-actor`), and names the actor for a path they lack (`count-path-unresolved`: `{actor} is missing a value this check reads ({path}), so it cannot resolve for them.`) or a value that is not a number (`count-value-not-numeric`); an actorless literal pool stays previewable, a pool fault of the check's own abstains as `target-invalid`, and Roll is disabled while abstaining.
+The simulator renders its faces through the shared `DiceTiles` primitive (see `design-system`), one tile per active face in roll order with each explosion's die straight after the die that produced it, every mark `qualified`, `cancelled` or `exploded` combined on one tile by a glyph, a `data-checks-simulator-face-marks` value and its accessible name, so colour is never the only signal; the tile takes the success tone for a qualifying or exploding face and the danger tone for a cancelling one.
+The tiles and legend sit directly under the medallion row.
+The breakdown reads `{qualified} qualified − {cancelled} cancelled = {net} net` and then the actor.
+The target line reads `needs {required} · margin {margin}`: `{required}` is the check's own required count, on a routed check too, and the margin is the net minus it, always signed (`+0`).
+A net below zero marks the readout `data-checks-simulator-botch`.
+Only when the graded result is not a success does the readout read `needs {required} · a net below zero is a botch`, title the card `Botch` and read `Net below zero`; a trigger-rescued botch keeps the normal margin line and its success title and sub-line, with `data-checks-simulator-botch` still set.
+A zero pool rolls nothing: it shows `0` captioned `net` and `pool reduced to 0`, and notes "The pool was reduced to zero, so the check fails automatically."
+A progressive count check shows its raw net and awards `max(0, net)`.
+Negative counts use the true minus sign.
+
+Readiness raises, in The roll: `countPoolInvalid` and `countThresholdInvalid` (critical: blank, dice or not arithmetic once every path is neutralized), `countFaceBeyondDie` (warning: an enabled explode or cancel face beyond the die, naming what follows), `countExplodeUnbounded` (critical: a recursive explosion on every face), `countTierWithoutSuccesses` (critical: a crafting recipe tier with no successes needed, raised only while at least one tier exists), and, for a literal base, `countPoolTooLarge` (critical: above the 999 dice Foundry rolls at once, raising no ceiling row), `countRequiredExceedsMaxPool` (critical) and `countRequiredExceedsBasePool` (warning) against the authored ceiling, which is the literal base plus `pool.additionalDice.max` while additional dice (issue 2008) are enabled and the base alone otherwise, a disabled record's retained `max` ignored; the base settles through the runtime's own pool resolver, so it floors float noise, rolls at least one die when a zero pool does not fail, and never reads below zero dice.
+A base reading the character raises no ceiling issue and ticks `countPoolCharacterDependent` on Validation only, never as a Difficulty card callout (frame 06 draws none); fixed ranges and progressive checks grade no required count.
+Frame 08's `Successes needed above the most dice that can be rolled`, frame 07's `Successes needed above the base pool` and frame 19's `A character path does not resolve` are among the count issues' titles.
+Each of these rows names the control that clears it, as "Success-counting authoring" lists, so a notice's Review and a Validation row's View focus that control.
+With a Preview-as actor chosen it raises the TRANSIENT `countPathUnresolvedForPreview` and `countValueNotNumericForPreview`, which follow the same rule as the roll-under transient warnings: a section notice and a Validation row, and never a badge, dot, tally or enable gate.
+While additional dice are enabled on a count check, readiness adds three critical rows to The roll, and none fires while they are off or on a summing check.
+`countAdditionalDiceSourceMissing` fires for a path source with a blank path or a macro source with a blank read or spend UUID, naming the first blank of the path, the read macro and the spend macro, and reads `Additional dice are allowed but have no source` over `Set the value on the crafting character or the macro pair that pays for them, or turn additional dice off.`
+`countAdditionalDicePathInvalid` fires for a non-blank path that is not dot-separated key segments — an `@`, a space, an operator other than a hyphen inside a key, a bracket or an all-digit segment (a list index) — and reads `The value that pays for additional dice must be a path on the character, such as system.resources.momentum.value, not an expression or a list entry.`
+A key may hold letters, digits, `_`, `$` and `-`, so a module flag scope such as `flags.my-module.momentum` is a stored path.
+`countAdditionalDiceMacroInvalid` fires once per linked macro that `fromUuidSync` (non-strict) resolves to nothing, to a loaded Document whose `documentName` is not `Macro`, or to a loaded Macro whose `type` is not `script`, and reads `The {read|spend} macro is missing or is not a script macro, so players cannot buy additional dice. Link a script macro.`; a compendium index entry, which carries no `documentName` and no `type`, and a lookup that throws are unresolved and raise nothing, leaving the type to the drop and the roll.
+Their Validation ticks are `countAdditionalDiceSourceSet`, `countAdditionalDicePathStored` and `countAdditionalDiceMacrosScript`.
+With a Preview-as actor chosen and a valid path, the TRANSIENT `countAdditionalDicePathUnresolvedForPreview` warns `{actor} has no stored number at {path}, so no dice can be added for them.`, or `An active effect changes {actor}'s {path}, so no dice can be added for them.`, under the transient rule above: a section notice and a Validation row, never a badge, dot, tally or enable gate.
+
+#### Success-counting authoring
+
+The Formula card's first axis row pairs "What the roll produces" (`Add the dice` / `Count successes`) with "Which way is better" on every slot that rolls, and is absent for gathering `d100` and alchemy `none`.
+The product control writes only `evaluation.product`: a switch rewrites nothing, so `rollFormula`, `dc`, tier `dc`, adjustments, `target`, `pool`, `thresholdMode`, tier `successes`, overrides and triggers all survive both ways, and a never-counted record shows the normalizer's defaults.
+Each field has one editor: under count, `thresholdMode` is edited only by the per-die test under `Success on`, and the Difficulty card's Comparison does not render.
+A progressive counting check offers the same per-die test and writes the progressive slot's own `thresholdMode`; a summed progressive check shows no comparison control (#2067).
+
+In count mode the Formula card replaces the free-text formula, its `avg` and its token row with the structured pool: `Die`, `Base pool`, `Success on` with its per-die test, `Explode`, `Cancel`, `Modifiers and bonuses` (move the threshold or add dice) and `Zero pool`.
+The base pool and the threshold each offer `Number` or `Character value`; the choice is view state derived from the stored string, switching writes nothing, and the Stepper writes a string.
+Stepper bounds constrain editing only, so an imported or converted value outside them shows as stored and is never clamped on load, convert or save.
+`Off` / `Best face` (or `Worst face`) / `From a face` are three peer choices; choosing `From a face` seeds the current best or worst face, so the Studio never writes a null face, and turning a feature off keeps its face and repeat.
+The face Stepper and `Keeps exploding` / `Once` render only while their feature is on.
+
+The inset under the pool states the composed roll as authored — the pool, the per-die test and its threshold, the modifier chips on the term they move and the explode and cancel faces — and, against the Preview-as actor, the settled pool floored after every benefit and the settled threshold.
+It never shows a Foundry formula, a `cs`/`df` token or the retained `rollFormula`, and it constructs and evaluates no Roll; with no actor and a character-dependent input it asks for one, and a missing path is named rather than read as zero.
+Every surface that describes a count policy formats it from the one Foundry-free `describeCountPolicy`.
+
+A counting Formula card shows the `Allow players to roll additional dice` group (issue 2008) after the composed-roll inset and before `In the roll prompt`, on every count slot that rolls in all three activities.
+Both groups draw one titled option-group frame, the shared `<Well>` (`design-system/spec.md`), and this one carries its `StatusToggle` (`aria-pressed`, `aria-controls` naming the nested region) at the head's end.
+It is off by default, and while off no nested field renders, validates or is read.
+While on, it shows:
+
+- "Paid for by", a `SegmentedControl` of `Value on the crafting character` / `Read and spend macros`;
+- for the path source, "Path on the crafting character", a plain stored-path input with the placeholder `system.resources.momentum.value` and a line read from the Preview-as actor's stored data, never prepared data: resolved `{actor} → {value}`, no actor `Choose a character in Preview as to see what this resolves to.`, blank (danger) `No source set. Players cannot be offered additional dice until one is.`, no number at the path (warning) `{actor} has no stored number at {path}, so they could not buy additional dice.`, and overridden by an active effect (warning) `An active effect changes {actor}'s {path}, so spending it would not lower it. Use a stored value.`;
+- for the macro source, two `ItemDropZone` macro wells, `Read macro` (`Returns what the character can spend`) and `Spend macro` (`Deducts what was spent`), side by side until either would fall under 220px, where a dropped macro that is not a script macro is refused with a notice;
+- "Resource name", a plain text field hinting `What players see this resource called. Leave it blank to show the amount alone.`, for both sources;
+- "Most additional dice per roll", a `Stepper` from 1 to 20, default 1.
+
+"Paid for by" and "Most additional dice per roll" are visible captions naming their control, not only accessible names.
+Switching the source or turning the toggle off rewrites no field, so the path, both macro UUIDs, the resource name and the maximum survive both ways.
+The inset and the expected-successes reading ignore bought dice.
+
+The Difficulty card of a counting check edits `pool.required` as `Successes needed` (0–20) with its static or dynamic source, and states the `countRequiredExceedsMaxPool` and `countRequiredExceedsBasePool` sentences as callouts, never a predicate of its own; a progressive counting check has no Difficulty card.
+Recipe tiers edit `tiers[].successes` in a `Successes` column; a tier with none reads `—` beside `Set successes needed`, and a tier added while counting starts at the check's successes needed.
+Relative outcome rows edit the shared delta as `Extra successes`, and a count band strip is a read-only picture in net successes (see `ui-visual-style`).
+
+Every count readiness id has a clearing control: `countPoolInvalid` and `countPoolTooLarge` the base pool, `countThresholdInvalid` the threshold, `countFaceBeyondDie` the explode or cancel face it names, `countExplodeUnbounded` the explode choice, the two ceiling rows the successes needed, and `countTierWithoutSuccesses` the first tier without successes.
+The additional-dice rows name `checks-additional-dice-path`, `checks-additional-dice-read-macro` or `checks-additional-dice-spend-macro`, whichever the row reports.
+Two issues are added.
+`countFaceMissing` (critical, The roll) blocks an enabled explode or cancel `from` face with no value, which only imported or API data can hold; it is raised once per missing face, under one `countFacesSet` tick, each with its own notice.
+`countTriggerGroupUnreachable` (a warning, Triggers, outside the enable gate) names each kept trigger whose dice condition reads a group or face the pool never rolls, quoted and titled against the formula it was written for — its die, a repeated die by its ordinal, and a group that formula lacks as `dice group {n}` — in a singular sentence for one trigger; the trigger is kept and works again after switching back to adding the dice.
+
+##### Free-text counting formula conversion
+
+A summing check whose formula carries a success-counting die modifier (`cs`, `cf`, `even` or `odd`, with character paths neutralised) raises the `freeTextCountingFormula` warning in The roll; it never feeds the enable gate, is absent while the check counts, and `avg —` stays beside it.
+The row offers `Convert to count successes` only when all of these hold:
+
+- the check is summed, higher is better, against a fixed target rather than a character value;
+- the formula maps exactly: one die term, one directional `cs`, an optional same-side explosion, and an optional worst-side `df` whose faces are disjoint from the qualifying ones;
+- every copied required count fits 0–20.
+
+A dynamic-DC check converts only when it grades `meet`: its macro is kept and its return is then read as the successes needed, and the row says so.
+Otherwise the row stays a warning offering View only.
+The Validation row carries the action in place of View and the roll-section notice carries the same action; both call one handler.
+Convert STAGES into the draft — it marks the activity dirty, `Save checks` applies it and Discard restores the summing check — and writes nothing on the click.
+It sets `product: 'count'`, the pool, the direction and the per-die strictness, and copies the static and tier DCs into the required counts, plus one where the check graded `exceed`; a tier with authored successes keeps them.
+Convert retains `rollFormula` and every DC, never maps `cf` to cancel, and edits no component or task.
+It focuses the product axis's `Count successes` choice and announces the change politely.
 
 #### Check Trigger Controls
 
@@ -255,12 +472,19 @@ Each trigger pairs an expressive dice-matching condition with three effects (iss
 - The row carries a four-segment `SegmentedControl` (No step / Step up / Step down / Target tier) and a **stable operand slot** at one pinned width whose contents swap by mode — a shared stepper clamped at a minimum of 1 for `up`/`down`, the shared `Select` at its `inline` rung for `target`, and an inert disabled placeholder for `none` — so changing mode never moves the control out from under the GM's pointer in a wrapping row.
   The stepper and the `Select` trigger both FILL the pinned slot rather than sizing to their own content, and that direction is the requirement: the 160px pin and the no-movement guarantee are unchanged, so each primitive is made to fill the existing slot rather than the slot being re-measured to the primitive.
   The guarantee that holds across a mode swap is POSITION and WIDTH, not height: each mode renders its box at the same 160px width in the same place, so nothing under the GM's pointer moves horizontally and no row rewraps, but the three rendered boxes are NOT the same height — the stepper's filled height is 36px, the inert placeholder's disabled input is 32px (the studio's own field height), and the `target` select's `inline` rung is 30px — and the row's `align-items: flex-end` keeps their bottom edges level rather than their tops.
-  It is deliberately not a claim about the operand's whole appearance — the stepper keeps its own 8px radius and soft surface fill, the `Select` trigger takes the `inline` rung's 7px radius on `--fab-bg-2`, and the inert placeholder keeps the manager's field background, because a layout-context rule may take a SIZE from its slot but must not restyle the primitive's border, radius or fill (see line 88).
+  It is deliberately not a claim about the operand's whole appearance — the stepper keeps its own 7px radius (the library specimen's, since maintainer ruling 2026-09-28) and soft surface fill, the `Select` trigger takes the `inline` rung's 7px radius on `--fab-bg-2`, and the inert placeholder keeps the manager's field background, because a layout-context rule may take a SIZE from its slot but must not restyle the primitive's border, radius or fill (see line 88).
   An operand sized to its own content would break the size half outright: it stands as a narrower island beside the modes that fill the slot, and a trigger that hugs its VALUE re-measures every time the GM chooses a longer tier name, which is the movement the pin exists to prevent.
   Every rendered `SegmentedControl` takes a radio `name` unique per CONTROL, not per trigger: a trigger card renders two of them, and a shared group name would make choosing a tier-step mode uncheck the outcome radio.
 - **The `target` select never displays a tier it has not persisted.**
   `tierId` defaults to `null`, and a control whose value matches no option must not read as a tier the check has not persisted, so the `Select` takes a `placeholder` ("Choose a tier…") that renders as its trigger's value while `tierId` is `null` — placeholder text on the trigger, with no row for it in the list to choose — and renders a dangling id as an appended disabled "Missing tier" option with the primitive's `invalid` treatment on the trigger, its danger border and soft fill.
   A dangling target is reachable by ordinary authoring, not only by import: the relative↔fixed type switch swaps the whole tier list and dangles every authored `tierId` at once.
+- For a counting check the `rollTotal` subject reads `Net successes` in the editor and the trigger summary, and the presets act on the pool's single die group, never the retained formula.
+  Simple: `Every die shows its worst face ({worst}) → automatic failure`.
+  Routed: `Any die shows its best face ({best}) → step up a tier` and `Every die shows its worst face ({worst}) → step down a tier`.
+  When cancelling is enabled: `Botch (net below zero) → automatic failure` (simple, `rollTotal < 0`) or `Botch (net below zero) → lowest tier` (routed, offered only while a tier exists).
+  Best and worst follow `presetPolarity`, and authored triggers are never rewritten.
+- A summed check's natural-face presets read `Natural {face} on {die} → {effect}` and take their faces from `presetPolarity(evaluation)` (`checkTriggerPresets.js`), which names the best face `low` under a roll-under direction and `high` otherwise: the best-face preset (id `high`) names 1 under a roll-under check and the die's maximum otherwise, and the worst-face preset (id `low`) the opposite.
+  Only a newly authored preset reads the evaluation; changing the direction never rewrites an existing trigger.
 - When the check has no named outcome tiers, the `target` branch shows its own muted guidance cue rather than hiding the control — a GM authoring top-down configures triggers before tiers, and hiding it would make an authored target invisible.
   It carries a hook and a lang key distinct from the `outcomeTier` condition's no-tiers cue, because a trigger that is both `outcomeTier`-conditioned and `target`-stepping on a tier-less check would otherwise render two identically-hooked nodes in one card.
 - Two readiness rules back the control, both `warning` severity and both reported only once at least one trigger sets `target`: `danglingTierStepTarget` (the target names no tier on the active list, including "no tier chosen at all") and `multipleTierStepTargets` (two or more triggers set a target; if more than one matches, the lowest-ranked wins).
@@ -353,7 +577,7 @@ The currency configuration is no longer part of it: only the Currency participat
 It writes through the existing admin-store persistence and confirmation flows.
 Recipe resolution mode, salvage resolution mode, and the Recipe Visibility card moved to the Crafting group's Settings page (`crafting-settings`); the System Overview Settings tab no longer renders them.
 
-The identity card's **Save details** control SHALL be preceded (in DOM order) by an `Unsaved` chip (`.manager-chip.is-warning`, `FABRICATE.Admin.Manager.SystemEdit.Dirty`) shown whenever the Name or Description input differs from the persisted `selectedSystem.name` / `selectedSystem.description`, and cleared when the values match — naturally, after Save persists and the projection re-publishes.
+The identity card's **Save details** control SHALL be preceded (in DOM order) by an `Unsaved` chip (`.manager-chip.is-warning.is-action`, `FABRICATE.Admin.Manager.SystemEdit.Dirty`) shown whenever the Name or Description input differs from the persisted `selectedSystem.name` / `selectedSystem.description`, and cleared when the values match — naturally, after Save persists and the projection re-publishes.
 The Name / Description inputs SHALL seed from the persisted system on system-identity change only, so a two-phase or otherwise unrelated `viewState` re-publish of the same system does not overwrite un-saved edits.
 As a consequence, a concurrent external edit to the same open system is not merged into the open form and is overwritten on Save (last-writer-wins), matching the manager's staged-draft model for recipes, components, and essences.
 The identity sub-form (Name + Description only) SHALL participate in the Manager confirm-discard route-exit chain as a `system-details` kind, evaluated after the tools tail of the cascade: navigating away from, or switching systems on, a dirty details form prompts the standard three-way Save / Discard / Keep-editing dialog — Save persists the pending name and description before navigating, Discard reverts the inputs and proceeds, Keep-editing stays.
@@ -528,6 +752,9 @@ Capabilities:
 - A browser that supports bulk selection states the ticked-row treatment through the one shared rule every such browser joins, so the state looks identical in every studio.
   A studio that writes the ticked class without joining that rule renders a ticked row indistinguishable from an unticked one, which is a defect rather than an omission.
 - The essence library's search, filters, sort, presentation and page position survive a round trip through the essence editor.
+- The essence library initially inspects the first adopted member in the rendered sorted, filtered and paginated list when its selected id is empty or no longer names a current member.
+  A valid adopted-member selection survives sorting, filtering, paging and an editor round trip even while its row is temporarily absent from the rendered page.
+  Empty results select nothing, and rows shown only through `All world essences` are never automatically selected.
 - Manager essence icon editing uses a pop-over icon picker instead of requiring raw icon class entry.
   The editor's icon control is one column: the preview tile fills that column's width and the picker and its reset sit inside the same edge, so no control overhangs the tile it belongs to.
   The tile's glyph is sized for the tile rather than inheriting the shared row-medallion glyph size, which reads as a speck at editor scale.
@@ -605,6 +832,7 @@ The header owns Back to Tool Rules, a World Tool route to the world record, Save
 Both navigations render as the same secondary treatment, because they are the same kind of verb — leaving this screen for another — and `Save rules` is the only primary in the cluster.
 The World Tool route renders only when the world catalogue actually holds a record for the Tool, because a pre-migration in-system Tool has no world half to open.
 The body includes a live behavior preview, while the inspector summarizes identity, effective rules, the player-facing copy, a per-actor preview, and what requires the Tool in this system.
+The behaviour preview states where a Tool's check bonus lands for each evaluation, as a benefit: `Adds the dice` · `{expression} to the total`, `Lower is better` · `{expression} to the target`, and `Counts successes` · `moves the threshold {expression}, or adds {expression} dice, as the check routes it`.
 
 Breakage opens with the two per-system facts that are not rules — `Enabled in {system}` and the per-system display-label OVERRIDE — and closes with `Stop using this Tool here`.
 The label field states that it overrides the world Tool name in this crafting system only and that blank falls back to it.
@@ -707,6 +935,10 @@ The readout is a phrase, not a numeric, and stays in the UI face — the mono fa
 
 The **check pill** resolves the recipe's `checkTierId` against the system check's tiers and shows that tier's DC, falling back to the check's static default DC.
 It shows a dynamic-DC pill when the check resolves its DC through a macro and a progressive pill for a progressive system.
+Only a summed roll-high check against a fixed DC shows a DC: a fixed roll-under target reads `Target {n}`, a character-value target reads `Character value` in either direction, and a macro-resolved target of either reads `Dynamic target`.
+The sort key those pills share with the check DC reads `Check target` whenever any row names a target or character value (with no rows, whenever the system's summed check is not roll-high against a fixed DC), and a character-value row, which has no single number, sorts with the dynamic rows; the editor subline names the same fact.
+A counting check's pill reads `{n} successes` (`1 success`) in the mono face — the recipe tier's successes needed, falling back to the pool's own like the engine — and `Dynamic successes` when a macro sets the count; the sort key it shares with the check DC reads `Successes needed` and sorts by that count.
+Every pill that carries or stands for a check's difficulty (DC, Target, Character value, successes and their dynamic forms) takes the info tone.
 A check is **usable** only when an authored `rollFormula` exists, which is not the same as "checks enabled", and the two check-less states are distinct and must not be conflated:
 
 - **`By ingredients`** (neutral) — a `routedByIngredients` system with no usable check.
@@ -797,6 +1029,7 @@ The neutral tone additionally requires the step to DECLARE a result group: a ste
 
 Each activity route's fifth section renders the `failureResultPolicy` `RadioCardGroup`, whose `perRecord` card copy is **per activity** — "Decided per recipe" / "Decided per salvageable item" / "Decided per gathering task", from the same record-noun vocabulary the Difficulty card reads.
 Crafting adds `consumeIngredientsOnFail` and `breakToolsOnFail`; the alchemy branch renders the policy beside its own behaviour flags, because alchemy `simple` is one of the two crafting modes where the reserved failure group is a live award.
+Since issue 2100, alchemy's own behaviour flags include a fourth `ToggleCard`, "Break tools on a failed brew", wired to the SAME `craftingCheck.consumption.breakToolsOnFail` field the crafting branch's card writes — not a separate alchemy-owned flag — because a failed simple or tiered alchemy check breaks tools under exactly the same policy a failed crafting check does.
 Salvage renders `consumeComponentOnFail` and `breakToolsOnFail`, persisted since 1.7.0 and reachable from no editor before this; **gathering renders NEITHER**, because it has no consumption block, renders the **dormancy notice naming issue 683**, and cross-references `task.failureOutcome` read-only.
 Where the policy is inert — `routedByIngredients`, `progressive`, gathering `d100` — the section renders a **stated inert note naming the reason** rather than a control that does nothing, and the control itself stays selectable, because the policy is persisted per ACTIVITY rather than per mode and switching modes must not reset it.
 The prototype's sentence "Applies to every resolution mode" is therefore **recorded as NON-ADOPTED** and is not rendered: the requirement above makes the policy inert on three of the modes.
@@ -857,6 +1090,8 @@ The held count is resolved on the same basis every other membership reader uses 
 Staging accumulates across recipe items rather than being limited to the one on screen: each staged item appears in a list stating its operation, the number of recipes it affects, and its own control to leave that item unchanged.
 This axis deliberately differs from the Component Studio's tag axis, which is a run of tri-state controls; the divergence is in the staged axis only, and both panels render the same shared bulk-edit chrome.
 The check tier axis carries THREE distinct instructions and never collapses two of them: leave the recipe's tier alone, clear it to the system's default DC, and set a named tier.
+Under a fixed roll-under target each tier reads `{name} (Target {dc})`, the default `Default target`, and the hint, default hint and dynamic and no-tier statements name a target; under a character value each tier reads its adjustment, `{name} (−2)` or `{name} (×½)`, the default `Default · base adjustment`, and those statements name the base adjustment, never a DC.
+Under a counting check each tier reads `{name} · {n} successes` (`{name} · — successes` when it sets none), the default reads `Default · {required} successes`, and the axis hint and the dynamic and no-tier statements name successes needed rather than a DC.
 Where the system's crafting check carries no recipe-level tier — a progressive system, a dynamically resolved DC, a fixed-type routed check whose per-recipe difficulty is its minimum success tier instead, a resolution mode that rolls no crafting check at all, or a check with no tiers authored — the panel states which of those it is in place of the control rather than hiding it.
 A well-formed system whose mode rolls no check is told exactly that, and is never told its resolution mode is unrecognised.
 That is not the same fact as the system having no usable check at all, which the row's own check pill already reports, and the two are never conflated.
@@ -1150,6 +1385,10 @@ Current GM editor behavior:
 - Gathering Task authoring includes identity, image, description, enabled state, task-level time/weather availability gates, search/pagination for ordered d100 drop rows, unresolved drop-zone rows, inline chance/quantity controls, modifier summaries, selected-drop inspector editing, and final chance preview.
   D100 row selection is controlled by selected-system Gathering Rules, not Gathering Task authoring.
 - Gathering Task authoring may also include node count, depletion timing, respawn policy, stamina cost, attempt limits, risk overrides, encounter hooks, natural expression providers, and macro providers where the selected economy/features use them.
+- A routed task's check override is one Stepper with the `System default` placeholder and no presets.
+  Under a fixed target it edits `task.dcOverride`, labelled `Target override` for a roll-under check (hint `Replaces the system target for this task. The total must stay {cmp} it.`); under a character value it edits `task.adjustmentOverride` as `Difficulty adjustment override`, formatted for the adjustment kind and never truncating a multiplier; a roll-high fixed check keeps its DC override unchanged.
+  Clearing it restores the system default by nulling only the active field, and a dormant DC or adjustment override survives with its own notice.
+  Under a counting check it is labelled `Successes needed override` and edits `task.successesOverride` (0–20); a kept DC or adjustment override survives, is never rewritten and is named in its own dormant notice.
 - Reusable event authoring includes name, image, description, enabled state, danger/match tags, d100 drop rate, and modifier provider evidence.
 - The selected-system inspector exposes the WORLD character modifier library for gathering (issue 1308; per-system until then), with add/edit/delete controls, opt-in preset seeding when supported by the active Foundry system, and stale-reference evidence for rows that still point at deleted modifiers.
   The inspector projection is an explicit allowlist, so neither library may be projected off the crafting system any more: a field omitted there is invisible to the UI, and one projected from the system would show a stale copy the corpus no longer carries.

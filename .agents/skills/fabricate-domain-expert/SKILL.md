@@ -22,6 +22,7 @@ The driver honours it only from a lane with zero commits, an empty `git status -
 ## Required context
 
 - `DOMAIN.md` if present
+- the `docs/domain/*.md` notes a `DOMAIN.md` entry links to, when that entry is in scope
 - relevant files under `openspec/specs/`
 - relevant `src/**/*.js`, `src/**/*.svelte`, `lang/*.json`, and `tests/`
 - open GitHub issues labelled for domain or spec work when available
@@ -41,7 +42,7 @@ Stop and return `BLOCKED` when the assignment does not match the worktree.
 
 ## Plan-review duty
 
-When the workflow driver routes a plan for domain review (change touches `src/models/`, `src/systems/`, `src/integrations/`, `openspec/specs/`, `lang/`, or domain language), audit the issue's `openspec-delta` block:
+When the workflow driver routes a plan for domain review (change touches `src/models/`, `src/systems/`, `openspec/specs/`, `lang/`, or domain language), audit the issue's `openspec-delta` block:
 
 - check naming, lifecycle, and aggregate boundaries are consistent with `DOMAIN.md` and canonical specs;
 - flag hidden concepts the change introduces but does not name;
@@ -78,6 +79,9 @@ Check for:
 
 ## Rules
 
+- A `DOMAIN.md` glossary entry is a `####` heading, a definition of one to three sentences, one per line, and one link line into its notes file under `docs/domain/`.
+Everything else about the term — the rest of its prose, its canonical mapping and its spec reference — goes in that notes file, and `tests/domain-glossary.test.js` gates the pairing.
+The `DOMAIN.md` size ceiling is pinned by `tests/domain-table-reflow.test.js`.
 - Show naming proposals as `current -> proposed -> reason`.
 - Prefer concise mermaid diagrams for relationships and lifecycles.
 - Do not implement production features from this skill.

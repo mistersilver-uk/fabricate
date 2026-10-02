@@ -4,16 +4,18 @@
  * plain model in and a string out with no Foundry stubs.
  */
 
-import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 
+import { BulkSalvageService } from '../src/systems/BulkSalvageService.js';
 import {
   BULK_SALVAGE_CHAT_KEYS,
   buildBulkSalvageChatContent,
   sumChatEntriesByName,
 } from '../src/ui/presenters/BulkSalvageChatCard.js';
-import { BulkSalvageService } from '../src/systems/BulkSalvageService.js';
+import { executedCheckDisplay } from '../src/ui/presenters/checkDisplay.js';
 import { SALVAGE_CHAT_KEYS } from '../src/ui/presenters/SalvageChatCard.js';
+
 import {
   bulkComponent,
   bulkSystem,
@@ -22,6 +24,14 @@ import {
   craftingSystemLookup,
   recordedSalvageResults,
 } from './helpers/bulkSalvageFixtures.js';
+import {
+  NOT_PUBLIC,
+  OVER_FIXED_DATA,
+  PUBLIC_BARE,
+  UNDER_DATA,
+  executedCheck,
+  shippedLocalize,
+} from './helpers/checkEvidenceFixtures.js';
 
 /** A localizer that renders each key as a readable, greppable token. */
 const loc = (key) => `[${key.split('.').at(-1)}]`;
@@ -40,12 +50,13 @@ describe('buildBulkSalvageChatContent: N subjects, each with its own roll', () =
     actorNames: ['Akra'],
     counts: { total: 3, succeeded: 1, failed: 1, waiting: 1 },
     subjects: [
-      cardSubject({ name: 'Iron Ore', img: 'icons/ore.webp', rollValue: 17 }),
+      cardSubject({ name: 'Iron Ore', img: 'icons/ore.webp', rollValue: 17, check: PUBLIC_BARE }),
       cardSubject({
         name: 'Boar Hide',
         img: 'icons/hide.webp',
         outcome: 'failed',
         rollValue: 4,
+        check: PUBLIC_BARE,
         message: 'Nothing recovered',
       }),
       cardSubject({
@@ -437,5 +448,140 @@ describe('buildBulkSalvageChatContent: every row’s complications on the ONE ca
   it('a run that fired nothing renders no section at all', () => {
     const html = card({ ...MODEL, complications: [] });
     assert.ok(!html.includes('--complications'), 'no empty heading, no empty grid');
+  });
+});
+
+describe('buildBulkSalvageChatContent: each subject states its own executed evidence (issue 2005)', () => {
+  const model = (subjects) => ({
+    status: 'succeeded',
+    actorNames: ['Akra'],
+    counts: { total: subjects.length, succeeded: subjects.length, failed: 0 },
+    subjects,
+  });
+
+  it('a public roll-under subject carries its rows, and a private one in the same batch none', () => {
+    const html = buildBulkSalvageChatContent(
+      model([
+        cardSubject({ name: 'Iron Ore', rollValue: 9, check: executedCheck() }),
+        cardSubject({
+          name: 'Boar Hide',
+          rollValue: 9,
+          check: executedCheck(UNDER_DATA, NOT_PUBLIC[0]),
+        }),
+      ]),
+      shippedLocalize
+    );
+    const rows = html.split('<li ').slice(1);
+    assert.match(rows[0], /fabricate-craft-chat__item--evidence/);
+    assert.match(rows[0], /data-check-evidence="target"/);
+    assert.ok(rows[0].includes('+5 under the target'));
+    assert.doesNotMatch(rows[1], /evidence|__roll/, 'the gmroll subject states no total (issue 2054)');
+  });
+
+  it('every non-public subject leaves the card byte-identical (Q19)', () => {
+    const bare = buildBulkSalvageChatContent(model([cardSubject({ rollValue: 15 })]), shippedLocalize);
+    for (const visibility of NOT_PUBLIC) {
+      const html = buildBulkSalvageChatContent(
+        model([cardSubject({ rollValue: 15, check: executedCheck(UNDER_DATA, visibility) })]),
+        shippedLocalize
+      );
+      assert.equal(html, bare, JSON.stringify(visibility));
+    }
+  });
+
+  it('a public sum/over fixed subject gains only its Needed and Margin rows (M3)', () => {
+    const html = buildBulkSalvageChatContent(
+      model([cardSubject({ rollValue: 15, check: executedCheck(OVER_FIXED_DATA) })]),
+      shippedLocalize
+    );
+    const [row] = html.split('<li ').slice(1);
+    assert.match(row, /fabricate-craft-chat__item--evidence/);
+    assert.deepEqual(
+      [...row.matchAll(/data-check-evidence="(\w+)"/g)].map(([, id]) => id),
+      ['needed', 'margin']
+    );
+    assert.ok(row.includes('DC 12, meet or beat') && row.includes('>+3<'));
+  });
+
+  it('the service hands each row its own executed projection from the salvage result', async () => {
+    const posted = [];
+    const service = new BulkSalvageService({
+      salvage: async (actorUuid, systemId, componentId) => ({
+        success: true,
+        results: [],
+        check: executedCheck(UNDER_DATA, componentId === 'comp-ore' ? undefined : NOT_PUBLIC[1]),
+      }),
+      getCraftingSystem: craftingSystemLookup([
+        bulkSystem({
+          id: 'sys-a',
+          components: [
+            bulkComponent({ id: 'comp-ore', name: 'Iron Ore' }),
+            bulkComponent({ id: 'comp-hide', name: 'Boar Hide' }),
+          ],
+        }),
+      ]),
+      postChatMessage: async (message) => posted.push(message),
+      localize: shippedLocalize,
+    });
+    await service.run({
+      targets: [
+        bulkTarget({ systemId: 'sys-a', componentId: 'comp-ore' }),
+        bulkTarget({ systemId: 'sys-a', componentId: 'comp-hide' }),
+      ],
+      interactive: false,
+    });
+    assert.equal(occurrences(posted[0].content, 'data-check-evidence="target"'), 1);
+  });
+});
+
+describe('bought dice on a bulk card (issue 2008)', () => {
+  /** A pool of none lifted to one d8 by the die bought from an unnamed resource, under 4. */
+  const boughtSubject = (name, visibility) =>
+    cardSubject({
+      name,
+      rollValue: 1,
+      check: executedCheckDisplay({
+        data: {
+          product: 'count',
+          direction: 'under',
+          comparison: 'meet',
+          total: 1,
+          target: 4,
+          boughtDice: { count: 1, source: 'macro' },
+        },
+        visibility,
+        countDisplay: {
+          die: 8,
+          bought: 1,
+          results: [{ index: 0, face: 3, active: true, qualified: true }],
+          qualified: 1,
+          cancelled: 0,
+          net: 1,
+          required: null,
+          zeroPool: false,
+          pool: { base: 0, terms: [], rolled: 1 },
+          threshold: { anchor: 4, source: 'fixed', terms: [], effective: 4 },
+        },
+      }),
+    });
+
+  it('states each subject’s bought dice under that subject’s own visibility', () => {
+    const html = buildBulkSalvageChatContent(
+      {
+        status: 'succeeded',
+        actorNames: ['Akra'],
+        counts: { total: 2, succeeded: 2, failed: 0 },
+        subjects: [
+          boughtSubject('Iron Ore', { rollMode: 'publicroll', secret: false }),
+          boughtSubject('Boar Hide', NOT_PUBLIC[0]),
+        ],
+      },
+      shippedLocalize
+    );
+    const [ore, hide] = html.split('Boar Hide');
+    assert.equal(occurrences(ore, '1d8 (0 + 1 bought), each ≤ 4'), 1);
+    assert.equal(occurrences(ore, 'data-dice-tile-marks="qualified bought"'), 1);
+    assert.equal(occurrences(ore, '>1 bought · spent 1</dd>'), 1, 'no noun for an unnamed resource');
+    assert.doesNotMatch(hide, /bought|Additional dice/, 'the GM-only subject states none');
   });
 });

@@ -1,13 +1,30 @@
+import { resolveDeterministicExpression } from '../../../../../systems/checkEvaluation.js';
 import {
+  classifyModifierExpression,
   modifierExpressionResolves,
   resolveEligibleModifierIds,
+  resolveMaxModifierPicks,
   resolveModifierBounds,
+  resolveModifierPolicy,
 } from '../../../../../systems/checkModifierResolver.js';
+import { isValidTargetAdjustment } from '../../../../../systems/checkTarget.js';
+import { normalizeCheckAdvantage } from '../../../../../systems/normalize/checkAdvantage.js';
+import {
+  normalizeCheckEvaluation,
+  normalizeNullableAdjustment,
+} from '../../../../../systems/normalize/checkEvaluation.js';
 import {
   findRangeConflicts,
+  keepGroupOf,
   planRetiredPlaceholderStrip,
 } from '../../../../../utils/craftingCheckExpression.js';
 import { trimString as trimmed } from '../../../../../utils/scalars.js';
+
+import { isBonusExpression } from './checkAdvantageCopy.js';
+import { invalidOverrideRecords, overrideEntriesFor } from './checkOverrideReadiness.js';
+import { missingTargetPaths, targetExpressionFault } from './checkTargetStatus.js';
+import { formulaCountsSuccesses, planCountConversion } from './countFormulaConversion.js';
+import { countReadiness, countRequiredReadiness as countRequiredRows } from './countReadiness.js';
 
 /**
  * Pure readiness evaluator for one subsystem check, mirroring `recipeReadiness.js`: it returns
@@ -26,6 +43,11 @@ export const CHECK_READINESS_ISSUE_IDS = Object.freeze([
   'noRollFormula',
   'retiredPlaceholderBreaksFormula',
   'retiredPlaceholderInFormula',
+  'freeTextCountingFormula',
+  // Advantage (issue 2007)
+  'advantageKeepNoDie',
+  'advantageKeepAfterReference',
+  'advantageBonusInvalid',
   // Outcomes
   'unnamedOutcome',
   'noSuccessOutcome',
@@ -39,9 +61,39 @@ export const CHECK_READINESS_ISSUE_IDS = Object.freeze([
   'modifierBoundsInverted',
   'modifierBoundsUnsafe',
   'modifierExpressionInvalid',
+  'modifierAverageUnavailable',
   'modifiersInertNoCheck',
   'modifiersInertNoModifierSupport',
   'modifiersInertNoFormula',
+  // Targets and adjustments
+  'attributeTargetMissing',
+  'attributeTargetInvalid',
+  'attributeTierWithoutAdjustment',
+  'adjustmentInvalidForKind',
+  'otherwiseTierMissing',
+  'multipleOtherwiseTiers',
+  'progressiveUnderUnsupported',
+  // Success-counting pools (issue 2004)
+  'countPoolInvalid',
+  'countThresholdInvalid',
+  'countFaceBeyondDie',
+  'countExplodeUnbounded',
+  'countTierWithoutSuccesses',
+  'countRequiredExceedsMaxPool',
+  'countRequiredExceedsBasePool',
+  'countPoolTooLarge',
+  'countFaceMissing',
+  'countTriggerGroupUnreachable',
+  // Additional dice (issue 2008)
+  'countAdditionalDiceSourceMissing',
+  'countAdditionalDicePathInvalid',
+  'countAdditionalDiceMacroInvalid',
+  // Transient: they name the Preview-as actor and feed no badge, dot, tally or enable gate.
+  'attributePathUnresolvedForPreview',
+  'attributeValueNotNumeric',
+  'countPathUnresolvedForPreview',
+  'countValueNotNumericForPreview',
+  'countAdditionalDicePathUnresolvedForPreview',
 ]);
 
 const REGISTERED_ISSUE_IDS = new Set(CHECK_READINESS_ISSUE_IDS);
@@ -67,6 +119,10 @@ export const CHECK_ISSUE_SECTIONS = Object.freeze({
   noRollFormula: 'roll',
   retiredPlaceholderBreaksFormula: 'roll',
   retiredPlaceholderInFormula: 'roll',
+  freeTextCountingFormula: 'roll',
+  advantageKeepNoDie: 'roll',
+  advantageKeepAfterReference: 'roll',
+  advantageBonusInvalid: 'roll',
   unnamedOutcome: 'outcomes',
   noSuccessOutcome: 'outcomes',
   rangeInvalid: 'outcomes',
@@ -77,10 +133,95 @@ export const CHECK_ISSUE_SECTIONS = Object.freeze({
   modifierBoundsInverted: 'modifiers',
   modifierBoundsUnsafe: 'modifiers',
   modifierExpressionInvalid: 'modifiers',
+  modifierAverageUnavailable: 'modifiers',
   modifiersInertNoCheck: 'modifiers',
   modifiersInertNoModifierSupport: 'modifiers',
   modifiersInertNoFormula: 'modifiers',
+  attributeTargetMissing: 'roll',
+  attributeTargetInvalid: 'roll',
+  attributeTierWithoutAdjustment: 'roll',
+  adjustmentInvalidForKind: 'roll',
+  otherwiseTierMissing: 'outcomes',
+  multipleOtherwiseTiers: 'outcomes',
+  progressiveUnderUnsupported: 'roll',
+  countPoolInvalid: 'roll',
+  countThresholdInvalid: 'roll',
+  countFaceBeyondDie: 'roll',
+  countExplodeUnbounded: 'roll',
+  countTierWithoutSuccesses: 'roll',
+  countRequiredExceedsMaxPool: 'roll',
+  countRequiredExceedsBasePool: 'roll',
+  countPoolTooLarge: 'roll',
+  countFaceMissing: 'roll',
+  countTriggerGroupUnreachable: 'triggers',
+  attributePathUnresolvedForPreview: 'roll',
+  attributeValueNotNumeric: 'roll',
+  countPathUnresolvedForPreview: 'roll',
+  countValueNotNumericForPreview: 'roll',
+  countAdditionalDiceSourceMissing: 'roll',
+  countAdditionalDicePathInvalid: 'roll',
+  countAdditionalDiceMacroInvalid: 'roll',
+  countAdditionalDicePathUnresolvedForPreview: 'roll',
 });
+
+const FACE_CONTROLS = Object.freeze({
+  explode: 'checks-count-explode-face',
+  cancel: 'checks-count-cancel-face',
+});
+const INPUT_CONTROLS = Object.freeze({
+  base: 'checks-count-base',
+  threshold: 'checks-count-threshold',
+});
+const ADDITIONAL_DICE_CONTROLS = Object.freeze({
+  path: 'checks-additional-dice-path',
+  read: 'checks-additional-dice-read-macro',
+  spend: 'checks-additional-dice-spend-macro',
+});
+
+/**
+ * Which control each issue names: the `data-validation-target` a Validation row's View and a
+ * section notice's Review focus. An id with none is route-only and focuses its section: an
+ * Outcomes tier carries no id, and a modifier fault names its own entries. A map instead of an
+ * address picks by the issue's `kind` (explode or cancel) or `input` (base or threshold).
+ * @type {Readonly<Record<string, string | Readonly<Record<string, string>>>>} */
+export const CHECK_ISSUE_CONTROLS = Object.freeze({
+  noRollFormula: 'checks-roll-formula',
+  retiredPlaceholderBreaksFormula: 'checks-roll-formula',
+  retiredPlaceholderInFormula: 'checks-roll-formula',
+  freeTextCountingFormula: 'checks-roll-formula',
+  advantageKeepNoDie: 'checks-advantage-mode',
+  advantageKeepAfterReference: 'checks-advantage-mode',
+  advantageBonusInvalid: 'checks-advantage-bonus',
+  danglingTierStepTarget: 'checks-triggers',
+  multipleTierStepTargets: 'checks-triggers',
+  countTriggerGroupUnreachable: 'checks-triggers',
+  attributeTargetMissing: 'checks-target-expression',
+  attributeTargetInvalid: 'checks-target-expression',
+  attributePathUnresolvedForPreview: 'checks-target-expression',
+  attributeValueNotNumeric: 'checks-target-expression',
+  countPoolInvalid: 'checks-count-base',
+  countPoolTooLarge: 'checks-count-base',
+  countThresholdInvalid: 'checks-count-threshold',
+  countExplodeUnbounded: 'checks-count-explode',
+  countFaceBeyondDie: FACE_CONTROLS,
+  countFaceMissing: FACE_CONTROLS,
+  countTierWithoutSuccesses: 'checks-count-tier-successes',
+  countRequiredExceedsMaxPool: 'checks-count-required',
+  countRequiredExceedsBasePool: 'checks-count-required',
+  countPathUnresolvedForPreview: INPUT_CONTROLS,
+  countValueNotNumericForPreview: INPUT_CONTROLS,
+  countAdditionalDiceSourceMissing: ADDITIONAL_DICE_CONTROLS,
+  countAdditionalDicePathInvalid: 'checks-additional-dice-path',
+  countAdditionalDiceMacroInvalid: ADDITIONAL_DICE_CONTROLS,
+  countAdditionalDicePathUnresolvedForPreview: 'checks-additional-dice-path',
+});
+
+/** The control one raised issue names, or `undefined` for a route-only one. */
+export function issueControl(issue) {
+  const control = CHECK_ISSUE_CONTROLS[issue?.id];
+  if (typeof control !== 'object') return control;
+  return control[issue.data?.kind] ?? control[issue.data?.input];
+}
 
 /**
  * The mode this evaluator answers "this activity rolls no check at all" under. Gathering `d100`
@@ -208,8 +349,11 @@ function fixedRangesHaveGap(outcomes, excluded) {
  * `modifierRollExpression` is RETIRED (`openspec/specs/resolution-modes/spec.md` → "Check
  * Source", whose two bounds faults stay SEPARATE ids because the repairs differ).
  * `modifierExpressionInvalid` is an entry whose EXPRESSION cannot contribute and excludes bounds
- * faults. All three NAME the offending entries and cover only entries this activity selects; the
- * three `modifiersInert*` warnings report a selection reaching no roll, gated on NON-EMPTY.
+ * faults. `modifierAverageUnavailable` is a separate, NON-BLOCKING warning naming an otherwise
+ * usable entry whose dice total is TRANSFORMED (`classifyModifierExpression`), raised only when
+ * `highest` or a capped `playerPicks` would actually rank it out (`modifiersCompete`). All four
+ * NAME the offending entries and cover only entries this activity selects; the three
+ * `modifiersInert*` warnings report a selection reaching no roll, gated on NON-EMPTY.
  * @param {object|null} modifierContext A `buildCheckModifierContext` bag, or null (no-ops).
  * @param {{ rollsNoCheck: boolean, hasRollFormula: boolean }} formulaState
  * @returns {{ checks: CheckReadinessCheck[], issues: CheckReadinessIssue[] }} */
@@ -219,6 +363,14 @@ function fixedRangesHaveGap(outcomes, excluded) {
  * @param {Array<{entry: object}>} faulted @returns {string} */
 function namesOf(faulted) {
   return faulted.map(({ entry }) => entry.label || entry.id).join(', ');
+}
+
+/** Whether ranking leaves an entry out: `highest` over two or more, or a `playerPicks` cap below
+ *  the eligible count (an absent cap is `Infinity`, so it never is). */
+function modifiersCompete(modifierContext, eligibleCount) {
+  const policy = resolveModifierPolicy(modifierContext);
+  const places = policy === 'highest' ? 1 : resolveMaxModifierPicks(modifierContext);
+  return (policy === 'highest' || policy === 'playerPicks') && places < eligibleCount;
 }
 
 function checkModifierReadiness(modifierContext, { rollsNoCheck, hasRollFormula, activity = '' }) {
@@ -240,10 +392,16 @@ function checkModifierReadiness(modifierContext, { rollsNoCheck, hasRollFormula,
   const unsafe = namesOf(faulted.filter(({ bounds }) => bounds.unsafe));
   // An entry whose EXPRESSION cannot contribute, bounds set aside; asked of the resolver, so
   // what readiness calls unusable and what the roll drops are one decision.
-  const unusable = namesOf(
-    faulted.filter(
-      ({ entry, bounds }) =>
-        !bounds.inverted && !bounds.unsafe && !modifierExpressionResolves(entry)
+  const usableCandidates = faulted
+    .filter(({ bounds }) => !bounds.inverted && !bounds.unsafe)
+    .map((candidate) => ({
+      ...candidate,
+      resolves: modifierExpressionResolves(candidate.entry),
+    }));
+  const unusable = namesOf(usableCandidates.filter(({ resolves }) => !resolves));
+  const transformed = namesOf(
+    usableCandidates.filter(
+      ({ entry, resolves }) => resolves && classifyModifierExpression(entry) === 'transformed'
     )
   );
 
@@ -257,6 +415,9 @@ function checkModifierReadiness(modifierContext, { rollsNoCheck, hasRollFormula,
   if (unusable !== '') {
     pushIssue(issues, 'modifierExpressionInvalid', 'critical', { names: unusable });
   }
+  if (transformed !== '' && modifiersCompete(modifierContext, eligible.length)) {
+    pushIssue(issues, 'modifierAverageUnavailable', 'warning', { names: transformed });
+  }
   // The two no-check modes reach no roll for OPPOSITE reasons, so they cannot share a sentence:
   // alchemy `none` rolls nothing, while gathering `d100` rolls and has no seam for modifiers.
   if (rollsNoCheck) {
@@ -264,6 +425,252 @@ function checkModifierReadiness(modifierContext, { rollsNoCheck, hasRollFormula,
       activity === 'gathering' ? 'modifiersInertNoModifierSupport' : 'modifiersInertNoCheck';
     pushIssue(issues, id, 'warning');
   } else if (!hasRollFormula) pushIssue(issues, 'modifiersInertNoFormula', 'warning');
+  return { checks, issues };
+}
+
+/** The two transient warnings: the Preview-as actor's value at the target cannot be read. */
+function previewActorTargetWarnings(transient, expression, previewActor) {
+  const rollData = previewActor.rollData ?? {};
+  const read = resolveDeterministicExpression(expression, rollData, { pathMode: 'foundry' });
+  if (read.ok) return;
+  const actor = previewActor.name ?? '';
+  if (read.reason === 'unresolved-path') {
+    const path = missingTargetPaths(expression, rollData).join(', ');
+    pushIssue(transient, 'attributePathUnresolvedForPreview', 'warning', { actor, path });
+  } else {
+    pushIssue(transient, 'attributeValueNotNumeric', 'warning', { actor });
+  }
+}
+
+/** The character-value expression's own rules, and the Preview-as actor's reading of it. */
+function attributeExpressionReadiness(result, expression, previewActor) {
+  const hasExpression = expression !== '';
+  result.checks.push({ id: 'attributeTargetSet', satisfied: hasExpression });
+  if (!hasExpression) {
+    pushIssue(result.issues, 'attributeTargetMissing', 'critical');
+    return;
+  }
+  const fault = targetExpressionFault(expression);
+  result.checks.push({ id: 'attributeTargetReadable', satisfied: !fault });
+  if (fault) pushIssue(result.issues, 'attributeTargetInvalid', 'critical');
+  else if (previewActor) previewActorTargetWarnings(result.transient, expression, previewActor);
+}
+
+/** Named entries whose adjustment is set, as `{ name, value }`; null adjustments are skipped. */
+function setAdjustments(entries) {
+  return entries
+    .map((entry) => ({
+      name: trimmed(entry?.name) || String(entry?.id ?? ''),
+      value: normalizeNullableAdjustment(entry?.adjustment),
+    }))
+    .filter((entry) => entry.value !== null);
+}
+
+/** Under a character value every crafting recipe tier sets its own adjustment. */
+function recipeTierReadiness(result, tiers) {
+  if (tiers.length === 0) return;
+  const unset = tiers.filter((tier) => normalizeNullableAdjustment(tier?.adjustment) === null);
+  result.checks.push({ id: 'recipeTiersSetAdjustment', satisfied: unset.length === 0 });
+  if (unset.length > 0) {
+    const names = unset.map((tier) => trimmed(tier?.name) || tier?.id).join(', ');
+    pushIssue(result.issues, 'attributeTierWithoutAdjustment', 'critical', { names });
+  }
+}
+
+/**
+ * The base, every set tier adjustment and every named override record suit the target's
+ * adjustment kind. A faulted base is flagged as `baseAdjustment` rather than named, so the copy
+ * layer names it in the reader's language; a faulted override is a component's or a gathering
+ * task's kept value (issue 2078), named beside the tiers in the same sentence.
+ */
+function adjustmentKindReadiness(
+  result,
+  { adjustmentKind: kind, baseAdjustment },
+  set,
+  overrideRecords = []
+) {
+  const suits = (value) => isValidTargetAdjustment(kind, value);
+  const baseInvalid = baseAdjustment !== null && !suits(baseAdjustment);
+  const invalid = [
+    ...set.filter((entry) => !suits(entry.value)),
+    ...invalidOverrideRecords(overrideRecords, kind),
+  ];
+  result.checks.push({
+    id: 'adjustmentsSuitKind',
+    satisfied: !baseInvalid && invalid.length === 0,
+  });
+  if (baseInvalid || invalid.length > 0) {
+    const names = invalid.map((entry) => entry.name).join(', ');
+    const data = baseInvalid ? { names, baseAdjustment: true } : { names };
+    pushIssue(result.issues, 'adjustmentInvalidForKind', 'critical', data);
+  }
+}
+
+/** A multiply check's relative tiers: exactly one leaves its multiplier unset as Otherwise. */
+function otherwiseReadiness(result, outcomes) {
+  if (outcomes.length === 0) return;
+  const otherwise = outcomes.filter(
+    (outcome) => normalizeNullableAdjustment(outcome?.adjustment) === null
+  );
+  result.checks.push({ id: 'singleOtherwiseTier', satisfied: otherwise.length === 1 });
+  if (otherwise.length === 0) pushIssue(result.issues, 'otherwiseTierMissing', 'critical');
+  if (otherwise.length > 1) {
+    const names = otherwise.map((outcome) => trimmed(outcome?.name) || outcome?.id).join(', ');
+    pushIssue(result.issues, 'multipleOtherwiseTiers', 'critical', { names });
+  }
+}
+
+/** This module's funnel, handed to the count rules so the registry refuses their ids too. */
+const raise = (issues, id, severity, data) => pushIssue(issues, id, severity, data);
+
+export { countCeilingIssues, literalBaseDice } from './countReadiness.js';
+
+/** The count required-rows the Difficulty card states (issue 2006), through this registry. */
+export function countRequiredReadiness(result, evaluation, { tiers, literal }) {
+  countRequiredRows(result, evaluation, { tiers, literal, raise });
+}
+
+/**
+ * Readiness of a summed check's target, read only where the active activity and mode read it: a
+ * progressive check's direction, and a character-value target's expression and adjustments. A
+ * progressive or fixed-range target source is inert, so nothing about it is validated.
+ * @returns {{ checks: CheckReadinessCheck[], issues: CheckReadinessIssue[],
+ *   transient: CheckReadinessIssue[] }} */
+function targetReadiness(check, { mode, activity, previewActor, overrideEntries = [] }) {
+  const result = { checks: [], issues: [], transient: [] };
+  const evaluation = normalizeCheckEvaluation(check?.evaluation);
+  if (evaluation.product === 'count') {
+    countReadiness(result, check, evaluation, { mode, activity, previewActor, raise });
+    return result;
+  }
+  if (mode === 'progressive') {
+    if (evaluation.direction === 'under') {
+      result.checks.push({ id: 'progressiveHigherIsBetter', satisfied: false });
+      pushIssue(result.issues, 'progressiveUnderUnsupported', 'critical');
+    }
+    return result;
+  }
+  const { type, outcomes } = routedOutcomes(check);
+  if (evaluation.target.source !== 'attribute' || (mode === 'routed' && type === 'fixed')) {
+    return result;
+  }
+  attributeExpressionReadiness(result, evaluation.target.expression.trim(), previewActor);
+  const tiers = activity === 'crafting' && Array.isArray(check?.tiers) ? check.tiers : [];
+  recipeTierReadiness(result, tiers);
+  const multiplyTiers =
+    mode === 'routed' && evaluation.target.adjustmentKind === 'multiply' ? outcomes : [];
+  adjustmentKindReadiness(
+    result,
+    evaluation.target,
+    [...setAdjustments(tiers), ...setAdjustments(multiplyTiers)],
+    overrideEntries
+  );
+  if (multiplyTiers.length > 0) otherwiseReadiness(result, multiplyTiers);
+  return result;
+}
+
+/**
+ * The roll formula's readiness, read post-shim as `checkUsable` reads it: one strip plan decides
+ * both the formula tick and the retired-placeholder severity (a stripped placement is lossless, a
+ * refused one discards the whole formula), with the legacy `rollExpression` alias planned the same
+ * way. A count check's retained formula is inert, so it raises nothing and counts as a roll.
+ */
+function formulaReadiness(check, evaluation, options) {
+  if (evaluation.product === 'count') return { checks: [], issues: [], hasRollFormula: true };
+  const checks = [];
+  const issues = [];
+  const plan = planRetiredPlaceholderStrip(trimmed(check?.rollFormula));
+  const hasRollFormula = plan.outcome !== 'refused' && trimmed(plan.formula) !== '';
+  checks.push({ id: 'hasRollFormula', satisfied: hasRollFormula });
+  if (!hasRollFormula) pushIssue(issues, 'noRollFormula', 'warning');
+  const legacyPlan = planRetiredPlaceholderStrip(trimmed(check?.rollExpression));
+  if (plan.outcome === 'refused' || legacyPlan.outcome === 'refused') {
+    pushIssue(issues, 'retiredPlaceholderBreaksFormula', 'critical');
+  } else if (plan.outcome === 'stripped' || legacyPlan.outcome === 'stripped') {
+    pushIssue(issues, 'retiredPlaceholderInFormula', 'warning');
+  }
+  countingFormulaReadiness({ checks, issues }, check, options);
+  return { checks, issues, hasRollFormula };
+}
+
+/**
+ * A summing formula whose die counts successes (issue 2006): a warning, never gating, whose data
+ * carries the Convert plan the row and the roll section's notice offer the action from.
+ */
+function countingFormulaReadiness(result, check, { mode, activity, components, gatheringTasks }) {
+  if (!formulaCountsSuccesses(check?.rollFormula)) return;
+  result.checks.push({ id: 'summedFormulaCountsNothing', satisfied: false });
+  const records = { components, gatheringTasks };
+  const plan = planCountConversion(check, { mode, activity, records });
+  const data = { formula: trimmed(check.rollFormula), ...plan };
+  pushIssue(result.issues, 'freeTextCountingFormula', 'warning', data);
+}
+
+/**
+ * The authored advantage rule's own readiness (issue 2007), read the same way the Studio's note
+ * reads it: `keep` against `keepGroupOf`'s proof, `bonus` against the Studio's grammar. Inert
+ * under `off` and for a counting check, whose advantage reads only the count keys.
+ */
+function advantageReadiness(check, evaluation) {
+  if (evaluation.product === 'count') return [];
+  const rule = normalizeCheckAdvantage(check?.advantage);
+  const issues = [];
+  if (rule.mode === 'keep') {
+    const group = keepGroupOf(check?.rollFormula);
+    if (!group.ok && group.reason !== 'none') {
+      pushIssue(issues, 'advantageKeepNoDie', 'warning');
+    } else if (group.ok && group.referenceFirst) {
+      pushIssue(issues, 'advantageKeepAfterReference', 'warning', {
+        n: group.number,
+        dN: `d${group.faces}`,
+      });
+    }
+  } else if (rule.mode === 'bonus' && !isBonusExpression(rule.bonusExpression)) {
+    pushIssue(issues, 'advantageBonusInvalid', 'critical');
+  }
+  return issues;
+}
+
+/**
+ * Routed-only readiness, extracted so `evaluateCheckReadiness` stays under the function-size
+ * ratchet: outcome-tier naming and Success coverage, fixed-range validity, and tier-step targets.
+ * Tier-step targets are read outside the tier-count gate on purpose: a target authored before any
+ * tier exists is exactly the dangling case a GM needs told about.
+ */
+function routedTierReadiness(check) {
+  const checks = [];
+  const issues = [];
+  const { type, outcomes } = routedOutcomes(check);
+  if (outcomes.length > 0) {
+    const allNamed = outcomes.every((outcome) => trimmed(outcome?.name) !== '');
+    checks.push({ id: 'outcomesNamed', satisfied: allNamed });
+    if (!allNamed) pushIssue(issues, 'unnamedOutcome', 'critical');
+
+    const hasSuccess = outcomes.some((outcome) => outcome?.success === true);
+    checks.push({ id: 'hasSuccessOutcome', satisfied: hasSuccess });
+    if (!hasSuccess) pushIssue(issues, 'noSuccessOutcome', 'critical');
+
+    // Fixed tiers own a CONTIGUOUS, non-overlapping segment of the roll value range, and all
+    // three faults are `critical`: no copy or test may describe `rangeInvalid` or
+    // `rangeOverlap` as a warning, each leaving a roll value routed wrongly or not at all.
+    if (type === 'fixed') {
+      const conflicts = findRangeConflicts(outcomes);
+      const rangesValid = conflicts.invalid.size === 0;
+      const rangesNoOverlap = conflicts.overlapping.size === 0;
+      checks.push({ id: 'rangesValid', satisfied: rangesValid });
+      if (!rangesValid) pushIssue(issues, 'rangeInvalid', 'critical');
+      checks.push({ id: 'rangesNoOverlap', satisfied: rangesNoOverlap });
+      if (!rangesNoOverlap) pushIssue(issues, 'rangeOverlap', 'critical');
+      const excluded = new Set([...conflicts.invalid, ...conflicts.overlapping]);
+      const gapped = fixedRangesHaveGap(outcomes, excluded);
+      checks.push({ id: 'rangesContiguous', satisfied: !gapped });
+      if (gapped) pushIssue(issues, 'rangeGap', 'critical');
+    }
+  }
+
+  const tierStep = tierStepTargetReadiness(check, outcomes);
+  checks.push(...tierStep.checks);
+  issues.push(...tierStep.issues);
   return { checks, issues };
 }
 
@@ -276,8 +683,15 @@ function checkModifierReadiness(modifierContext, { rollsNoCheck, hasRollFormula,
  *   than defaulting: a caller handing through a raw resolution mode skipped every rule silently.
  * @param {object|null} [options.modifierContext] A `buildCheckModifierContext` bag, or null.
  * @param {'crafting'|'salvage'|'gathering'} [options.activity] Which activity's check this is;
- *   it changes one answer — WHY a no-check mode's selection reaches no roll.
- * @returns {{ checks: CheckReadinessCheck[], issues: CheckReadinessIssue[] }} */
+ *   it decides WHY a no-check mode's selection reaches no roll, and whether recipe tiers apply.
+ * @param {?{name: string, rollData: object}} [options.previewActor] The Preview-as character,
+ *   whose unreadable target value raises a `transient` warning naming them.
+ * @param {object[]} [options.components] Every component; `activity: 'salvage'` grades each
+ *   salvage-enabled one's kept override (issue 2078).
+ * @param {object[]} [options.gatheringTasks] Every gathering task; `activity: 'gathering'`
+ *   grades each routed one's kept override the same way.
+ * @returns {{ checks: CheckReadinessCheck[], issues: CheckReadinessIssue[],
+ *   transient: CheckReadinessIssue[] }} */
 export function evaluateCheckReadiness(check = {}, options = {}) {
   const mode = options.mode || 'simple';
   if (!SUPPORTED_MODES.has(mode)) {
@@ -301,89 +715,32 @@ export function evaluateCheckReadiness(check = {}, options = {}) {
       hasRollFormula: false,
       activity: options.activity || '',
     });
-    return { checks: modifiers.checks, issues: modifiers.issues };
+    return { checks: modifiers.checks, issues: modifiers.issues, transient: [] };
   }
 
-  // Every authored check needs a roll formula to resolve, READ POST-SHIM, which is the whole
-  // point of this derivation: `checkUsable` is post-shim, so reading the RAW field ticked "Has a
-  // roll formula" green for a check that cannot roll, falsifying the invariant
-  // `resolution-modes/spec.md` asserts. ONE PLAN, not one plan and one classifier: deriving BOTH
-  // the formula tick and the severity split below from this single call makes them incapable of
-  // disagreeing.
-  const authoredFormula = trimmed(check?.rollFormula);
-  const plan = planRetiredPlaceholderStrip(authoredFormula);
-  const hasRollFormula = plan.outcome !== 'refused' && trimmed(plan.formula) !== '';
-  checks.push({ id: 'hasRollFormula', satisfied: hasRollFormula });
-  if (!hasRollFormula) {
-    pushIssue(issues, 'noRollFormula', 'warning');
-  }
-
-  // The retired check-modifier placeholder, typed after its retirement into a free-text field,
-  // which the shim would then remove SILENTLY on the way to the roll.
-  //
-  // THE SEVERITY SPLITS ON THE STRIP OUTCOME, the two cases needing opposite advice. A STRIPPED
-  // placement is ignorable, the removal being lossless, and a placeholder-ONLY formula is reported
-  // by `hasRollFormula` above rather than merged into this one. A REFUSED placement discards the
-  // WHOLE formula, so "just delete the placeholder" is actively wrong: deleting it out of
-  // `1d20 * @craftingmod` leaves `1d20 * `, still broken.
-  //
-  // IT ASKS THE DECIDER, NOT THE CLASSIFIER, which covers only the first half of usability. The
-  // legacy `routed.rollExpression` alias is planned DEFENSIVELY through that same decider, so the
-  // two branches cannot answer differently.
-  const legacyPlan = planRetiredPlaceholderStrip(trimmed(check?.rollExpression));
-  if (plan.outcome === 'refused' || legacyPlan.outcome === 'refused') {
-    pushIssue(issues, 'retiredPlaceholderBreaksFormula', 'critical');
-  } else if (plan.outcome === 'stripped' || legacyPlan.outcome === 'stripped') {
-    pushIssue(issues, 'retiredPlaceholderInFormula', 'warning');
-  }
+  const evaluation = normalizeCheckEvaluation(check?.evaluation);
+  const formula = formulaReadiness(check, evaluation, { ...options, mode });
+  checks.push(...formula.checks);
+  issues.push(...formula.issues, ...advantageReadiness(check, evaluation));
+  const { hasRollFormula } = formula;
 
   // Routed checks route an outcome tier to a result set by tier NAME, and only SUCCESS tiers
   // can be routed, so the rules below wait until at least one tier is authored.
   if (mode === 'routed') {
-    const { type, outcomes } = routedOutcomes(check);
-    if (outcomes.length > 0) {
-      const allNamed = outcomes.every((outcome) => trimmed(outcome?.name) !== '');
-      checks.push({ id: 'outcomesNamed', satisfied: allNamed });
-      if (!allNamed) {
-        pushIssue(issues, 'unnamedOutcome', 'critical');
-      }
-
-      const hasSuccess = outcomes.some((outcome) => outcome?.success === true);
-      checks.push({ id: 'hasSuccessOutcome', satisfied: hasSuccess });
-      if (!hasSuccess) {
-        pushIssue(issues, 'noSuccessOutcome', 'critical');
-      }
-
-      // Fixed tiers own a CONTIGUOUS, non-overlapping segment of the roll value range, and all
-      // three faults are `critical`: no copy or test may describe `rangeInvalid` or
-      // `rangeOverlap` as a warning, each leaving a roll value routed wrongly or not at all.
-      if (type === 'fixed') {
-        const conflicts = findRangeConflicts(outcomes);
-        const rangesValid = conflicts.invalid.size === 0;
-        const rangesNoOverlap = conflicts.overlapping.size === 0;
-        checks.push({ id: 'rangesValid', satisfied: rangesValid });
-        if (!rangesValid) {
-          pushIssue(issues, 'rangeInvalid', 'critical');
-        }
-        checks.push({ id: 'rangesNoOverlap', satisfied: rangesNoOverlap });
-        if (!rangesNoOverlap) {
-          pushIssue(issues, 'rangeOverlap', 'critical');
-        }
-        const excluded = new Set([...conflicts.invalid, ...conflicts.overlapping]);
-        const gapped = fixedRangesHaveGap(outcomes, excluded);
-        checks.push({ id: 'rangesContiguous', satisfied: !gapped });
-        if (gapped) {
-          pushIssue(issues, 'rangeGap', 'critical');
-        }
-      }
-    }
-
-    // Outside the tier-count gate on purpose: a target authored before any tier exists is
-    // exactly the dangling case a GM needs told about.
-    const tierStep = tierStepTargetReadiness(check, outcomes);
-    checks.push(...tierStep.checks);
-    issues.push(...tierStep.issues);
+    const routed = routedTierReadiness(check);
+    checks.push(...routed.checks);
+    issues.push(...routed.issues);
   }
+
+  const overrideEntries = overrideEntriesFor(options.activity, options);
+  const target = targetReadiness(check, {
+    mode,
+    activity: options.activity || '',
+    previewActor: options.previewActor ?? null,
+    overrideEntries,
+  });
+  checks.push(...target.checks);
+  issues.push(...target.issues);
 
   // The check-modifier selection, last: it reads `hasRollFormula` above to decide whether
   // an eligible selection reaches a roll at all.
@@ -394,5 +751,5 @@ export function evaluateCheckReadiness(check = {}, options = {}) {
   checks.push(...modifiers.checks);
   issues.push(...modifiers.issues);
 
-  return { checks, issues };
+  return { checks, issues, transient: target.transient };
 }

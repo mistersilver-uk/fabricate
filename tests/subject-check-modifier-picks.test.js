@@ -83,7 +83,13 @@ test('_normalizeSalvage survives a whole-system normalize, alongside its sibling
       {
         id: 'c1',
         name: 'Ore',
-        salvage: { enabled: true, dcOverride: 17, checkModifierIds: ['med'] },
+        salvage: {
+          enabled: true,
+          dcOverride: 17,
+          adjustmentOverride: 0.5,
+          successesOverride: 2,
+          checkModifierIds: ['med'],
+        },
       },
       { id: 'c2', name: 'Herb', salvage: { enabled: true, checkModifierIds: [] } },
       { id: 'c3', name: 'Coal', salvage: { enabled: true } },
@@ -92,6 +98,8 @@ test('_normalizeSalvage survives a whole-system normalize, alongside its sibling
   const byId = new Map(system.components.map((component) => [component.id, component]));
   assert.deepEqual(byId.get('c1').salvage.checkModifierIds, ['med']);
   assert.equal(byId.get('c1').salvage.dcOverride, 17, 'and its siblings survive alongside it');
+  assert.equal(byId.get('c1').salvage.adjustmentOverride, 0.5);
+  assert.equal(byId.get('c1').salvage.successesOverride, 2);
   assert.deepEqual(byId.get('c2').salvage.checkModifierIds, []);
   assert.equal(Object.hasOwn(byId.get('c3').salvage, 'checkModifierIds'), false);
 });
@@ -130,6 +138,27 @@ test('normalizeLibraryTask preserves authoredness on all five inputs', () => {
   }
 });
 
+test('gathering task overrides survive library and runtime projections', () => {
+  const service = new GatheringRichStateService({
+    getSetting: () => ({ systems: {} }),
+    setSetting: async () => {},
+    settingKey: SETTING_KEYS.GATHERING_CONFIG,
+  });
+  const library = normalizeThroughRichState({
+    id: 't',
+    name: 'T',
+    dcOverride: 14,
+    adjustmentOverride: 0.5,
+    successesOverride: 3,
+  });
+  const runtime = service._libraryTaskToRuntimeTask(library);
+  for (const task of [library, runtime]) {
+    assert.equal(task.dcOverride, 14);
+    assert.equal(task.adjustmentOverride, 0.5);
+    assert.equal(task.successesOverride, 3);
+  }
+});
+
 test('_normalizeGatheringTask — the adminStore MIRROR — answers identically', async () => {
   // The mirror is module-private, so it is driven through the ONE public path that reaches it: the
   // store's `gatheringConfig` projection, which normalizes the whole persisted config through
@@ -141,6 +170,8 @@ test('_normalizeGatheringTask — the adminStore MIRROR — answers identically'
     const task = {
       id: 't',
       name: 'T',
+      adjustmentOverride: 0.5,
+      successesOverride: 3,
       ...(input === undefined ? {} : { checkModifierIds: input }),
     };
     const settings = new Map([
@@ -155,6 +186,8 @@ test('_normalizeGatheringTask — the adminStore MIRROR — answers identically'
     });
     await store.refresh();
     const normalized = get(store.viewState).gatheringConfig.systems['sys-1'].tasks[0];
+    assert.equal(normalized.adjustmentOverride, 0.5);
+    assert.equal(normalized.successesOverride, 3);
     if (expected === undefined) {
       assert.equal(
         Object.hasOwn(normalized, 'checkModifierIds'),
@@ -165,4 +198,34 @@ test('_normalizeGatheringTask — the adminStore MIRROR — answers identically'
       assert.deepEqual(normalized.checkModifierIds, expected, `${label} (mirror)`);
     }
   }
+});
+
+test('an unrelated gathering task save keeps its adjustment and successes overrides', async () => {
+  const { createAdminStore } = await import('../src/ui/svelte/stores/adminStore.js');
+  const settings = new Map([
+    [
+      'gatheringConfig',
+      {
+        systems: {
+          'sys-1': {
+            tasks: [{ id: 't', name: 'T', dcOverride: 14, adjustmentOverride: -1.5, successesOverride: 2 }],
+          },
+        },
+      },
+    ],
+    ['lastManagedCraftingSystem', ''],
+  ]);
+  const store = createAdminStore({
+    getSetting: (key) => settings.get(key),
+    setSetting: async (key, value) => settings.set(key, value),
+    getCraftingSystemManager: () => ({ getSystems: () => [], getSystem: () => null }),
+    getRecipeManager: () => ({ getRecipes: () => [] }),
+  });
+  await store.refresh();
+  assert.equal(await store.updateGatheringLibraryTask('sys-1', 't', { staminaCost: 2 }), true);
+  const [saved] = settings.get('gatheringConfig').systems['sys-1'].tasks;
+  assert.equal(saved.staminaCost, 2);
+  assert.equal(saved.dcOverride, 14);
+  assert.equal(saved.adjustmentOverride, -1.5);
+  assert.equal(saved.successesOverride, 2);
 });

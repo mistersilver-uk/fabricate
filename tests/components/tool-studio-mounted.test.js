@@ -9,6 +9,7 @@ import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
   STATUS_TONE_RAW_MODULES,
+  TYPEAHEAD_RUNE_MODULES,
 } from '../helpers/svelte-component-harness.js';
 import { WORLD_TOOL_SCOPE_RAW_MODULES } from '../helpers/toolMountModules.js';
 import { ANNOUNCE_AFTER_FOCUS_MS } from '../../src/ui/svelte/util/announceAfterFocus.js';
@@ -77,6 +78,7 @@ const harness = createMountedComponentHarness({
     ...WORLD_TOOL_SCOPE_RAW_MODULES,
     ...SEARCHABLE_POPOVER_RAW_MODULES,
   ],
+  runeModules: TYPEAHEAD_RUNE_MODULES,
   compiledModules: [
     // The shared side-panel explainer card and icon fact row (issue 881).
     'src/ui/svelte/apps/manager/ExplainerCard.svelte',
@@ -132,6 +134,7 @@ const harness = createMountedComponentHarness({
     // list and the Checks Studio catalogue render it, so it is static in this tree's graph
     // and an omission HANGS this suite rather than failing it.
     'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte',
+    'src/ui/svelte/components/Kicker.svelte',
     'src/ui/svelte/apps/manager/tools/ToolRequirementsTab.svelte',
     'src/ui/svelte/apps/manager/tools/ToolValidationTab.svelte',
     'src/ui/svelte/apps/manager/ToolEditView.svelte',
@@ -303,6 +306,13 @@ after(() => harness.teardown());
 afterEach(() => harness.remount());
 
 describe('Tool Studio editor (mounted)', () => {
+  it('draws the dirty chip at the action density of the buttons beside it', async () => {
+    const root = await harness.mount(props({ dirty: true }));
+    const chip = root.querySelector('[data-tool-editor-status]');
+    assert.ok(Boolean(chip.closest('.manager-header-actions')), 'the chip is in the cluster');
+    assert.ok(chip.classList.contains('is-action'), 'the chip stands beside 34px buttons');
+  });
+
   it('renders header-only actions, three accessible tabs, and no Kind', async () => {
     const navigation = [];
     const root = await harness.mount(
@@ -1052,7 +1062,7 @@ describe('Tool Studio editor (mounted)', () => {
     );
     assert.match(
       root.querySelector('[data-tool-bonus-off]').textContent,
-      /Adds nothing to the crafting check/
+      /Adds nothing to any check/
     );
     // And no second card head: the body head is a subordinate ROW.
     assert.ok(!root.querySelector('[data-tool-requirements-tab] .manager-tool-editor-card-heading'));
@@ -1588,7 +1598,7 @@ describe('Tool Studio editor (mounted)', () => {
     );
     assert.equal(
       root.querySelector('[data-tool-bonus-note]').textContent.trim(),
-      'Applied to the crafting check as @prof.',
+      'Applies @prof to any check this tool is used for, in the way that check applies bonuses.',
       '`proto:4755`'
     );
   });
@@ -1609,6 +1619,34 @@ describe('Tool Studio editor (mounted)', () => {
       'Nothing is added to the check until you pick a modifier.',
       '`proto:4755`'
     );
+  });
+
+  // ── WHERE THE BONUS LANDS (issue 2005): a benefit, per kind of check ───────────────────────
+  it('previews the bonus as a benefit for each kind of check, and updates with the pick', async () => {
+    const rows = (root) =>
+      [...root.querySelectorAll('[data-tool-bonus-behaviour-row]')].map((row) => [
+        row.dataset.toolBonusBehaviourRow,
+        row.querySelector('dt').textContent.trim(),
+        row.querySelector('dd').textContent.trim(),
+      ]);
+    const root = await harness.mount(
+      props({ activeTab: 'requirements', tool: tool({ bonus: { enabled: true, expression: '2' } }) })
+    );
+    assert.deepEqual(rows(root), [
+      ['sum-over', 'Adds the dice', '+2 to the total'],
+      ['sum-under', 'Lower is better', '+2 to the target'],
+      ['count', 'Counts successes', 'moves the threshold 2, or adds 2 dice, as the check routes it'],
+    ]);
+
+    await harness.setProps({ tool: tool({ bonus: { enabled: true, expression: '@prof' } }) });
+    assert.equal(
+      root.querySelector('[data-tool-bonus-behaviour-row="sum-under"] dd').textContent.trim(),
+      '@prof to the target',
+      'an expression is named as written'
+    );
+
+    await harness.setProps({ tool: tool({ bonus: { enabled: true, expression: '' } }) });
+    assert.ok(!root.querySelector('[data-tool-bonus-behaviour]'), 'no bonus, no preview');
   });
 
   // ── AN EXPRESSION THE LIBRARY DOES NOT CONTAIN IS NOT DISCARDED ──────────────────────────
@@ -2083,7 +2121,7 @@ describe('Tool Studio editor (mounted)', () => {
       root.querySelector('[data-tool-preview-prerequisites]').textContent,
       '1 prerequisite'
     );
-    assert.equal(root.querySelector('[data-tool-preview-bonus]').textContent, 'Adds @prof');
+    assert.equal(root.querySelector('[data-tool-preview-bonus]').textContent, 'Adds @prof to any check');
     // THE IDENTITY CARD CARRIES NEITHER OF THOSE ANSWERS ANY MORE (issue 1373). Its two chips
     // restated the first and fourth effective-rules rows one line below them, and the design
     // draws a thumbnail, a name and a scope sentence.

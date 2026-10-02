@@ -52,7 +52,6 @@ game.fabricate.getGatheringEnvironmentStore() // Gathering environment persisten
 game.fabricate.getGatheringRunManager()     // Gathering run persistence
 game.fabricate.getGatheringGateAndCheckEvaluator() // Gathering gate/check evaluation
 game.fabricate.getGatheringRichStateService() // Gathering rich-state internals
-game.fabricate.getItemPilesIntegration()     // Item Piles integration facade
 game.fabricate.listGatheringForActor({ actor }) // Player-visible gathering listing
 game.fabricate.startGatheringAttempt({ actor, environmentId, taskId }) // Start gathering
 game.fabricate.getGatheringDropBreakdown({ environmentId, taskId }) // Task drop preview data
@@ -122,7 +121,7 @@ const {
   GatheringLocationService,
   GatheringGateAndCheckEvaluator, GatheringEngine,
   RecipeVisibilityService, ResolutionModeService,
-  SignatureValidator, ItemPilesIntegration,
+  SignatureValidator,
   CompendiumImporter, CraftingSystemExporter
 } = game.fabricate.api;
 ```
@@ -397,6 +396,18 @@ Destroy removes the component's WHOLE stack on the target actor, with no quantit
 It is deliberately not gated on the system's Salvage feature or the component's own salvage setup, since deleting an owned item is something a player could already do from the Foundry sheet.
 It posts no chat card, because a result card reports what an activity produced, and destroying produces nothing.
 
+### System-Owned Check Evidence
+
+System-owned check results can also contain `data.preRolls`.
+Each entry records a separately evaluated modifier as `{ source, label, expression, total, destination }` in evaluation order.
+The main `total` and `diceGroups` continue to describe only the authored check roll.
+Fabricate omits `data.preRolls` when no separately evaluated modifier completed, including cancelled, unrolled, and secret executions.
+Under the active roll-total-over-target evaluation, a dice-bearing Tool bonus joins the formula as a number and adds no entry.
+An entitled roll handoff carries serialized pre-rolls with its main serialized roll and reconstructs them for the recipient after GM execution, without rerolling.
+If that handoff cannot reconstruct its rolls, it refuses the chat post without rolling back the executed check.
+If Fabricate cannot serialize a dice-bearing Tool bonus's roll, the check does not run, rather than applying a bonus whose roll was lost.
+A bundled post uses its chosen roll mode, or the posting client's current default when no mode was chosen.
+
 ### Actor Selection
 
 These methods back the unified Fabricate window's actor-selection bar and persist the remembered gathering actor:
@@ -585,7 +596,8 @@ if (!contract) return;                    // Fabricate has not loaded yet — re
 if (contract.schemaVersion !== 1) return; // A version this companion does not understand.
 ```
 
-The descriptor is frozen data with exactly four fields — `schemaVersion`, `members`, `outcomes`, and `callSites` — and it is assigned when Fabricate's own `init` listener runs, before any service exists.
+The frozen descriptor retains the original `schemaVersion`, `members`, `outcomes` and `callSites` fields, with additive `features` for advertised capabilities.
+It is assigned when Fabricate's own `init` listener runs, before any service exists.
 `outcomes` and `callSites` are both published so you can read a **symbol** rather than write a bare string; `callSites` matters most, because `callSite` is the one required input with no default, and `invalidCallSite` is the whole of a typo's punishment.
 
 {: .warning }
@@ -610,7 +622,7 @@ Every member is declared at exactly one promise tier, and nothing outside this s
 | `getActorInventoryCoinSpender` | `handle` | `game.fabricate` | The coin spender for the `actorInventory` strategy, or `null` before readiness. |
 | `getCraftingEngine` | `handle` | `game.fabricate` | The live crafting engine, or `null` before readiness. |
 | `getCraftingEngine().findComponentItems` | `handle` | the crafting engine | `(actor, component, system)` finds an actor's existing stacks of a component, so an award can **stack** rather than duplicate. See its carve-outs below. |
-| `rollActorCheck` | `stable` | `game.fabricate` | `({ actorId, callSite, formula, dc, compare, label, interactive, rollDecision })` rolls one **Standalone Check Roll** for one actor, graded against a `dc` or ungraded, and answers the total, the dice groups and the resolved formula. GM-gated, call-site-gated, and a dismissed prompt is a refusal rather than a rolled failure. |
+| `rollActorCheck` | `stable` | `game.fabricate` | `({ actorId, callSite, formula, dc, compare, label, interactive, rollDecision, evaluation })` rolls one **Standalone Check Roll** for one actor, graded against a `dc` or ungraded. It answers the total, dice groups, resolved formula and runner-produced evaluation metadata on a rolled outcome. GM-gated, call-site-gated, and a dismissed prompt is a refusal rather than a rolled failure. |
 | `resolveBulkCheckDecision` | `stable` | `game.fabricate` | `({ callSite, formulas })` settles **one** roll decision — situational bonus, roll mode, Advantage — for N rolls the caller will make. It rolls nothing, takes no `actorId`, and answers which of the caller's formulas the decision covers. |
 | `awardComponents` | `stable` | `game.fabricate` | `({ actorId, callSite, systemId, awards })` places components on an actor's sheet, stacking onto what they already hold rather than duplicating it. GM-gated, call-site-gated, **not idempotent**, and it answers one `placements` entry per requested award so partial success is legible. |
 | `creditCurrency` | `stable` | `game.fabricate` | `({ actorId, callSite, unitId, amount })` credits one denomination of the **world** coin ladder to an actor. GM-gated, call-site-gated, **not idempotent**, whole amounts only, and `credited` is `null` wherever Fabricate cannot prove what landed. |
@@ -702,6 +714,58 @@ if (result.passed) applyReward(result.total);
 A legitimate rolled `0` answers `0`, never `null`, so you can always tell a real zero from a refusal.
 `passed` is `true`, `false`, or `null` for an ungraded roll, which is not graded and therefore has no pass.
 `diceGroups` is a list, so its absence is `[]` rather than `null`.
+
+`evaluation` is optional.
+When it is absent or `undefined`, Fabricate uses the shared Check Evaluation defaults.
+When supplied, it must be a plain data record with only recognized keys at every nested level.
+`null` is a supplied value and refuses `evaluationInvalid`.
+Unlike `dc`, `label` and `rollDecision`, it does not mean absent.
+A nested key whose value is `undefined` counts as omitted, so its default applies.
+Fabricate validates every supplied field before applying defaults, without coercing invalid types or replacing invalid values.
+
+Read `game.fabricate.api.companion.features.checkEvaluation` before sending an evaluation.
+This additive `features` field leaves `schemaVersion` at `1`.
+Its shape is `{ version, modes, additionalDice }`: each `modes` row is `{ product, direction, targetSources, interactive }`, and an evaluation is executable when one row matches its `product` and `direction`, lists its `target.source` in `targetSources`, and has `interactive: true` when the roll is interactive.
+`version` names this descriptor's shape, not its rows.
+Activating a mode appends a row without changing it, so match rows rather than comparing versions.
+At version 1 the descriptor publishes five rows: `{ product: 'sum', direction: 'over', targetSources: ['fixed'], interactive: true }`, `{ product: 'sum', direction: 'over', targetSources: ['attribute'], interactive: true }`, `{ product: 'sum', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: true }`, `{ product: 'count', direction: 'over', targetSources: ['fixed', 'attribute'], interactive: true }`, and `{ product: 'count', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: true }`.
+`additionalDice` is `true`, so a count evaluation whose pool has additional dice enabled may buy them through this member too, as described below.
+On the fixed sum-over row the evaluation only selects the mode, `target.expression` and the pool settings are validated but never change the roll, and Fabricate still grades `formula` against `dc` through `compare`, so a request without a finite `dc` rolls ungraded.
+On an attribute row Fabricate ignores `dc` entirely and resolves the target from `target.expression` against the actor's roll data instead, using the same lookup Foundry's own `Roll.replaceFormulaData` uses, plus the row's `baseAdjustment`.
+An unresolved or non-numeric target refuses the outcome `targetUnresolved` before any roll, and an invalid multiplier refuses `evaluationInvalid`.
+A sum-under request against a fixed target with no finite `dc` also refuses `evaluationInvalid` rather than rolling ungraded.
+On a count row Fabricate ignores both `formula` and `dc` and grades the rolled dice pool's net successes against `evaluation.pool.required` alone.
+An unresolved or non-numeric `pool.base` or `pool.threshold` refuses the outcome `poolUnresolved` before any roll, and any other invalid pool setting (`die`, `explode`, `cancel`, or the settled pool itself) refuses `evaluationInvalid` before Fabricate constructs a Roll.
+A pool that resolves to zero or fewer dice answers `checkFailed` with no Roll constructed at all.
+An interactive count request opens Fabricate's roll prompt, which shows the dice pool and the successes needed rather than a formula or DC, and a situational bonus there adds dice or moves the threshold, as the pool's `modifierDestination` says.
+A forwarded `rollDecision` applies its bonus the same way without opening the prompt.
+Advantage and Disadvantage move the pool by the default rule's one die: an interactive count request that forwards `advantage: 'advantage'` adds a die, `'disadvantage'` removes one, and the pool floor and `zeroPoolFails` apply after that adjustment.
+A count evaluation whose pool has additional dice enabled may buy them through a top-level `additionalDice` request key: a non-negative integer, honoured only on a **non-interactive** request and only from `callSite: 'gmAction'`.
+A non-zero `additionalDice` on a `broadcast` request refuses `additionalDiceRefused` with reason `broadcastCallSite` before any read, and a `broadcast` interactive request shows the prompt's additional-dice control as unavailable for that same reason.
+A non-zero `additionalDice` on an **interactive** request refuses `invalidRollDecision` instead: there the player buys through Fabricate's own roll prompt, or you forward a pre-resolved `rollDecision.additionalDice`, validated the same way and the only additional-dice key a forwarded decision carries.
+A non-zero `additionalDice` on any evaluation other than an enabled count refuses `notOffered`.
+
+A refused purchase, or a refused spend, answers the outcome `additionalDiceRefused`: a `success: false` refusal with no executed fields, answered before any main roll.
+Its `messageData` is `{ label, reason, actor, resource, n, limit, available }`, with `reason` one of the closed `ADDITIONAL_DICE_REFUSALS` list, and `message` is already that reason's own sentence for the resource name you authored and the source you chose.
+An executed answer additionally carries `boughtDice`, the integer dice bought for that roll, `0` when none were bought.
+A main roll that still fails after a successful spend, for example once Foundry's own dice-explosion limit is hit, answers `evaluationInvalid` with `messageData.boughtDice`, because the spend already stands and nothing is refunded.
+
+A malformed evaluation returns `evaluationInvalid`.
+A valid evaluation whose mode is absent from the advertised rows returns `evaluationUnsupported`.
+Both outcomes are stable refusals before Fabricate prompts or rolls.
+
+Only `checkPassed`, `checkFailed` and `rolled` results carry executed evaluation metadata from the runner: `product`, `direction`, `comparison`, `target`, `margin`, `successes`, `cancelled` and `boughtDice` (`0` when none were bought).
+Every refusal omits those fields, including evaluation refusals, with one exception: a post-spend `evaluationInvalid` still carries `boughtDice` alone, because that spend already happened and stands.
+`additionalDiceRefused` is answered before any spend and carries no executed fields at all.
+
+A graded answer against a resolved target, meaning an attribute row or any sum-under row, reports through `FABRICATE.Check.Roll.PassedTarget` or `FailedTarget` instead of the plain `Passed`/`Failed` keys, with `messageData` `{ label, total, target }` taken from the roll's own executed target, never from the request `dc`.
+Only the fixed sum-over row keeps `Passed`/`Failed` with `{ label, total, dc }`.
+A graded count row reports through `FABRICATE.Check.Roll.PassedCount`/`FailedCount` instead, with `messageData` `{ label, total, required }`, where `total` is the net successes the pool rolled.
+A zero pool reports through `FailedCount`'s sibling `FailedZeroPool` with `messageData` `{ label }` alone, since neither a total nor a required count means anything with no dice rolled.
+An attribute target Fabricate could not read as a number answers the outcome `targetUnresolved`.
+Its message key is `FABRICATE.Check.Roll.TargetUnresolved`, whose English text is "{label} check could not read a number for its target from this character."
+A count's `pool.base` or `pool.threshold` Fabricate could not read as a number answers the outcome `poolUnresolved`.
+Its message key is `FABRICATE.Check.Roll.PoolUnresolved`, whose English text is "{label} check could not read a number for its dice pool from this character."
 
 **`callSite` is required and has no default.**
 Nothing in the request or the environment distinguishes your deliberate click from a synced `updateWorldTime` tick, so Fabricate refuses `invalidCallSite` rather than guessing.

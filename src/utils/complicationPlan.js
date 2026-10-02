@@ -1,10 +1,8 @@
 /**
- * The PURE half of progressive component complications (issue 1286): which complications a
- * committed award fires, and the two player-facing projections of them. Buckets, firing unit and
- * dedupe key are the resolution-modes requirements "The five stage buckets", "The per-entry facts"
- * and "Once per result entry, never once per component". An import-free leaf but for
- * `componentComplications.js`, so a player view-model never pulls `checkRoll.js`'s sixteen-module
- * closure; `tests/component-complications-plan.test.js` pins that allowlist.
+ * The pure half of component complications (issue 1286): what a committed award fires, and its two
+ * player projections, per `resolution-modes` "The five stage buckets", "The per-entry facts" and
+ * "Once per result entry, never once per component". It imports only `componentComplications.js`,
+ * pinned by `tests/component-complications-plan.test.js`, so no view-model pulls `checkRoll.js`.
  */
 
 import {
@@ -58,12 +56,11 @@ function readStage(stage, index) {
     componentId: idOf(stage?.componentId ?? component ?? null),
     component,
     complications: list(stage?.complications ?? component?.complications),
-    // WHERE IN THE RENDERED LIST THIS ENTRY SITS, 1-based, counting EVERY stage (issue 1286).
+    // 1-based position in the rendered list, counting every stage (issue 1286).
     position: index + 1,
   };
 }
 
-/** The bucket one stage lands in. */
 function bucketFor(resultId, award) {
   if (!resultId) return 'skipped';
   if (award.skipped.has(resultId)) return 'skipped';
@@ -73,7 +70,7 @@ function bucketFor(resultId, award) {
   return 'unreached';
 }
 
-/** Classify the ordered stage list against the award loop's own report. */
+/** Against the award loop's own report. */
 function classifyStages(stages, award) {
   const buckets = {
     skipped: idSet(award?.skippedResults),
@@ -87,10 +84,7 @@ function classifyStages(stages, award) {
   });
 }
 
-/**
- * The facts the three stage-outcome clauses read for ONE result entry, from that entry's own bucket
- * and nothing else.
- */
+/** From the entry's own bucket and nothing else. */
 function stageFacts(bucket) {
   const facts = {};
   for (const [condition, buckets] of Object.entries(BUCKETS_BY_STAGE_CONDITION)) {
@@ -100,16 +94,14 @@ function stageFacts(bucket) {
 }
 
 /**
- * `null` is a fail-OPEN sentinel meaning "the caller cannot say which triggers this block owns",
- * and it is LIVE on the runtime path: neither `CraftingEngine` nor `GatheringEngine` passes ids to
- * `planComplications`, so a clause naming an unknown trigger stays evaluable rather than being
- * silently made unsatisfiable.
+ * `null` fails open, "the caller cannot say which triggers it owns", and is live: neither engine
+ * passes ids, so a clause naming an unknown trigger stays evaluable rather than unsatisfiable.
  */
 function isOwnedTrigger(triggerId, ownedTriggerIds) {
   return ownedTriggerIds === null || ownedTriggerIds.has(triggerId);
 }
 
-/** The ENABLED clauses of one complication and whether each matched. */
+/** The enabled clauses and whether each matched. */
 function resolveClauses(complication, ctx) {
   const clauses = [];
   for (const condition of COMPLICATION_STAGE_CONDITIONS) {
@@ -128,10 +120,7 @@ function resolveClauses(complication, ctx) {
   return clauses;
 }
 
-/**
- * Combine the enabled clauses under `match`, deferring to the runtime when — and only when — a live
- * condition roll is what is left to decide.
- */
+/** Under `match`, deferring to the runtime only when a live condition roll remains. */
 function decideFiring(complication, clauses) {
   const needsDice = complication?.rollCondition?.enabled === true;
   if (clauses.length === 0 && !needsDice) return null;
@@ -149,7 +138,7 @@ function appliesToActivity(complication, activity) {
   return complication?.activities?.[activity] === true;
 }
 
-/** Every firing ONE result entry contributes, in authored complication order. */
+/** In authored complication order. */
 function entryFirings(entry, ctx) {
   if (!entry.componentId || entry.bucket === 'skipped') return [];
   const facts = stageFacts(entry.bucket);
@@ -171,8 +160,7 @@ function entryFirings(entry, ctx) {
       complicationId,
       complication,
       resultId: entry.resultId,
-      // The entry's place in the ordered list, carried so a player-facing output can name WHICH
-      // occurrence fired without re-deriving an order it does not hold (issue 1286).
+      // So a player output can name which occurrence fired (issue 1286).
       position: entry.position,
       bucket: entry.bucket,
       buckets: [entry.bucket],
@@ -183,7 +171,6 @@ function entryFirings(entry, ctx) {
   return firings;
 }
 
-/** PLAN the complications a committed progressive award should fire. */
 export function planComplications({
   activity,
   stages,
@@ -207,15 +194,14 @@ export function planComplications({
     matchedTriggerIds: idSet(matchedTriggerIds),
     ownedTriggerIds: checkTriggerIds === null ? null : idSet(checkTriggerIds),
   };
-  // Fire order IS stage order: the player's reordered list for crafting, the order captured onto
-  // the run at start for salvage, the authored order for gathering.
+  // Stage order: the player's for crafting, the run's captured one for salvage, the authored
+  // one for gathering.
   for (const entry of classified) {
     plan.firings.push(...entryFirings(entry, ctx));
   }
   return plan;
 }
 
-/** The player-safe projection of ONE complication record. */
 function projectForPlayer(complication) {
   return {
     id: idOf(complication),
@@ -230,10 +216,7 @@ function visibilityOf(entry) {
   return text(entry?.complication?.visibility ?? entry?.visibility);
 }
 
-/**
- * The RESOLVED-tense player projection: filter a resolution's fired complications to what a player
- * may see.
- */
+/** Resolved tense: the fired complications a player may see. */
 export function publicComplications(fired) {
   return list(fired)
     .filter((entry) => visibilityOf(entry) === 'visible')
@@ -243,9 +226,7 @@ export function publicComplications(fired) {
         resultId: entry?.resultId ?? null,
         componentId: entry?.componentId ?? null,
         complicationId: entry?.complicationId ?? projected.id,
-        // Null rather than absent for a firing minted before this key existed (a run record read
-        // back, a hand-built fixture), so a renderer tests one thing to decide whether it can name
-        // a position at all.
+        // Null, not absent, for an older firing, so a renderer tests one thing.
         position: Number.isFinite(entry?.position) ? entry.position : null,
         buckets: [...list(entry?.buckets)],
         name: projected.name,
@@ -255,10 +236,7 @@ export function publicComplications(fired) {
     });
 }
 
-/**
- * Whether a complication has any clause that could EVER match, so the bulk block's "N complications
- * could fire" is not a lie.
- */
+/** Any clause that could ever match, so "N complications could fire" is true. */
 function canEverFire(complication, ownedTriggerIds) {
   if (complication?.rollCondition?.enabled === true) return true;
   if (COMPLICATION_STAGE_CONDITIONS.some((name) => complication?.when?.[name] === true))
@@ -271,10 +249,7 @@ function canEverFire(complication, ownedTriggerIds) {
   );
 }
 
-/**
- * The FORECAST-tense player projection: the `visible` complications a component COULD fire in an
- * activity, with no roll and no run.
- */
+/** Forecast tense: the `visible` complications a component could fire, with no roll. */
 export function forecastComplications(component, { activity, checkTriggerIds }) {
   const ownedTriggerIds = idSet(checkTriggerIds);
   return list(component?.complications)

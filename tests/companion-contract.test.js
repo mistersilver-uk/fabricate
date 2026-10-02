@@ -29,6 +29,7 @@ import {
   POOLED_HOLDINGS_CONSUME_MESSAGE_KEYS,
   POOLED_HOLDINGS_READ_ENTRY_OUTCOMES,
   POOLED_HOLDINGS_READ_MESSAGE_KEYS,
+  additionalDiceCallSiteRefusal,
   affordabilityResult,
   bulkCheckDecisionResult,
   checkRollResult,
@@ -42,6 +43,7 @@ import {
 import {
   assertContractResult,
   assertLocalizationKey,
+  assertMessageDataCovers,
   assertMessageIsFromTable,
   localizedString,
 } from './helpers/companionContractOutcomes.js';
@@ -99,6 +101,11 @@ const EXPECTED_OUTCOMES = Object.freeze([
   'engineUnavailable',
   'noFormula',
   'invalidRollDecision',
+  'evaluationInvalid',
+  'evaluationUnsupported',
+  'targetUnresolved',
+  'poolUnresolved',
+  'additionalDiceRefused',
   'cancelled',
   'invalidCallSite',
   'notElected',
@@ -273,13 +280,14 @@ function affordabilityAnswer(outcome, affordable, messageData = null) {
   return expected;
 }
 
-test('the descriptor publishes exactly the four contract fields, frozen', () => {
+test('the descriptor publishes versioned evaluation features, frozen', () => {
   assert.ok(Object.isFrozen(COMPANION_CONTRACT), 'the descriptor is frozen');
   assert.deepEqual(Object.keys(COMPANION_CONTRACT), [
     'schemaVersion',
     'members',
     'outcomes',
     'callSites',
+    'features',
   ]);
   assert.equal(COMPANION_CONTRACT.schemaVersion, COMPANION_CONTRACT_SCHEMA_VERSION);
   assert.equal(Number.isInteger(COMPANION_CONTRACT_SCHEMA_VERSION), true);
@@ -292,6 +300,20 @@ test('the descriptor publishes exactly the four contract fields, frozen', () => 
   assert.ok(Object.isFrozen(COMPANION_CONTRACT.members), 'the member table is frozen');
   assert.ok(Object.isFrozen(COMPANION_CONTRACT.outcomes), 'the outcome vocabulary is frozen');
   assert.ok(Object.isFrozen(COMPANION_CONTRACT.callSites), 'the call-site pair is frozen');
+  assert.deepEqual(COMPANION_CONTRACT.features.checkEvaluation, {
+    version: 1,
+    modes: [
+      { product: 'sum', direction: 'over', targetSources: ['fixed'], interactive: true },
+      { product: 'sum', direction: 'over', targetSources: ['attribute'], interactive: true },
+      { product: 'sum', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: true },
+      { product: 'count', direction: 'over', targetSources: ['fixed', 'attribute'], interactive: true },
+      { product: 'count', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: true },
+    ],
+    additionalDice: true,
+  });
+  assert.ok(Object.isFrozen(COMPANION_CONTRACT.features));
+  assert.ok(Object.isFrozen(COMPANION_CONTRACT.features.checkEvaluation));
+  assert.ok(Object.isFrozen(COMPANION_CONTRACT.features.checkEvaluation.modes[0].targetSources));
 });
 
 test('the member table is exactly the declared set at its declared promise tiers', () => {
@@ -406,9 +428,24 @@ test('the outcome vocabulary is complete for this schema version and maps token 
   }
 });
 
+// `rollActorCheck`'s table also carries these, auxiliary to `checkPassed`/`checkFailed`: a
+// target-graded answer (issue 2003) or a count answer (issue 2004) keeps that OUTCOME and picks
+// one of these keys instead of Passed/Failed, so none of them is itself a declared outcome token.
+const CHECK_ROLL_AUXILIARY_MESSAGE_KEYS = Object.freeze([
+  'checkPassedTarget',
+  'checkFailedTarget',
+  'checkPassedCount',
+  'checkFailedCount',
+  'checkFailedZeroPool',
+]);
+
 test('every declared outcome is emittable by a member, and every member outcome is declared', () => {
   const declared = new Set(Object.values(COMPANION_OUTCOMES));
-  const emittable = new Set(MEMBER_KEY_TABLES.flatMap(({ keys }) => Object.keys(keys)));
+  const emittable = new Set(
+    MEMBER_KEY_TABLES.flatMap(({ keys }) =>
+      Object.keys(keys).filter((key) => !CHECK_ROLL_AUXILIARY_MESSAGE_KEYS.includes(key))
+    )
+  );
   assert.deepEqual(
     [...declared].filter((outcome) => !emittable.has(outcome)),
     [],
@@ -505,6 +542,25 @@ test('every outcome message key resolves to a string leaf in lang/en.json', () =
   assert.doesNotMatch(localizedString(CHECK_ROLL_MESSAGE_KEYS.checkPassed), /failed/);
   assert.match(localizedString(CHECK_ROLL_MESSAGE_KEYS.checkFailed), /failed/);
   assert.doesNotMatch(localizedString(CHECK_ROLL_MESSAGE_KEYS.checkFailed), /passed/);
+  // The count-graded pair (issue 2004) is the same swap risk, one word apart, naming the
+  // successes needed rather than a DC.
+  for (const outcome of ['checkPassedCount', 'checkFailedCount']) {
+    assert.match(
+      localizedString(CHECK_ROLL_MESSAGE_KEYS[outcome]),
+      /\{label\}[\s\S]*\{total\}[\s\S]*\{required\}/,
+      `the graded ${outcome} names the successes needed it was measured against`
+    );
+  }
+  assert.match(localizedString(CHECK_ROLL_MESSAGE_KEYS.checkPassedCount), /passed/);
+  assert.doesNotMatch(localizedString(CHECK_ROLL_MESSAGE_KEYS.checkPassedCount), /failed/);
+  assert.match(localizedString(CHECK_ROLL_MESSAGE_KEYS.checkFailedCount), /failed/);
+  assert.doesNotMatch(localizedString(CHECK_ROLL_MESSAGE_KEYS.checkFailedCount), /passed/);
+  assert.match(localizedString(CHECK_ROLL_MESSAGE_KEYS.checkFailedZeroPool), /failed/);
+  assert.doesNotMatch(
+    localizedString(CHECK_ROLL_MESSAGE_KEYS.checkFailedZeroPool),
+    /\{total\}|\{required\}/,
+    'a zero pool never rolled a total or checked a required count'
+  );
   // The three refusals the FACADE DELEGATOR answers with are emitted before any label has
   // been resolved, so a placeholder in one of them would put literal braces in front of a GM
   // with nothing able to supply them. Same for the two the call-site gate answers with.
@@ -717,7 +773,15 @@ test('every rollActorCheck refusal answers the WHOLE refusal shape', () => {
     assert.deepEqual(result.diceGroups, []);
     assert.equal(result.total, null);
   }
-  for (const outcome of ['noFormula', 'engineUnavailable', 'cancelled']) {
+  for (const outcome of [
+    'noFormula',
+    'engineUnavailable',
+    'cancelled',
+    'evaluationInvalid',
+    'evaluationUnsupported',
+    'targetUnresolved',
+    'poolUnresolved',
+  ]) {
     assertContractResult(
       checkRollResult(outcome, { label: 'Fabricate' }),
       checkRollRefusal(outcome, { label: 'Fabricate' })
@@ -763,8 +827,141 @@ test('a legitimate rolled zero answers 0, and never the null a refusal answers',
   assert.equal(zero.success, true, 'the check WAS rolled; it simply did not pass');
   assert.equal(zero.diceGroups.length, 1);
 
+  const executed = checkRollResult('checkFailed', { label: 'Fabricate', total: 0, dc: 15 }, {
+    total: 0,
+    product: 'sum',
+    direction: 'over',
+    comparison: 'meet',
+    target: 15,
+    margin: -15,
+    successes: null,
+    cancelled: null,
+  });
+  assert.deepEqual(
+    [executed.product, executed.direction, executed.comparison, executed.target, executed.margin],
+    ['sum', 'over', 'meet', 15, -15]
+  );
+
   const refusal = checkRollResult('engineUnavailable', { label: 'Fabricate' });
   assert.equal(refusal.total, null, 'and the two are distinguishable, which is the whole point');
+});
+
+test('a target-graded pass or fail picks the target key over Passed/Failed (issue 2003)', () => {
+  const targetEvidence = {
+    total: 8,
+    product: 'sum',
+    direction: 'under',
+    comparison: 'meet',
+    target: 10,
+    margin: 2,
+    successes: null,
+    cancelled: null,
+    targetGraded: true,
+  };
+  const passed = checkRollResult('checkPassed', { label: 'Fabricate', total: 8, target: 10 }, targetEvidence);
+  assert.equal(passed.message, CHECK_ROLL_MESSAGE_KEYS.checkPassedTarget);
+  assert.equal(passed.outcome, 'checkPassed', 'the OUTCOME stays checkPassed; only the key differs');
+  assertMessageDataCovers(passed, 'a target-graded pass');
+
+  const failed = checkRollResult(
+    'checkFailed',
+    { label: 'Fabricate', total: 12, target: 10 },
+    { ...targetEvidence, total: 12, margin: -2 }
+  );
+  assert.equal(failed.message, CHECK_ROLL_MESSAGE_KEYS.checkFailedTarget);
+  assertMessageDataCovers(failed, 'a target-graded failure');
+
+  // Un-targeted (sum/over/fixed): the plain Passed/Failed key, whatever `messageData` carries.
+  const fixed = checkRollResult(
+    'checkPassed',
+    { label: 'Fabricate', total: 20, dc: 15 },
+    { ...targetEvidence, target: 15, targetGraded: false }
+  );
+  assert.equal(fixed.message, CHECK_ROLL_MESSAGE_KEYS.checkPassed);
+
+  // `targetGraded` is read only for a rolled outcome: a refusal never picks the target key.
+  const refused = checkRollResult('rollFailed', { label: 'Fabricate', detail: '' }, {
+    targetGraded: true,
+  });
+  assert.equal(refused.message, CHECK_ROLL_MESSAGE_KEYS.rollFailed);
+});
+
+test('a count pass or fail picks the count key, and a zero pool picks its own (issue 2004)', () => {
+  const countEvidence = {
+    total: 1,
+    product: 'count',
+    direction: 'over',
+    comparison: 'meet',
+    target: 8,
+    margin: 0,
+    successes: 1,
+    cancelled: 0,
+  };
+  const passed = checkRollResult(
+    'checkPassed',
+    { label: 'Fabricate', total: 1, required: 1 },
+    countEvidence
+  );
+  assert.equal(passed.message, CHECK_ROLL_MESSAGE_KEYS.checkPassedCount);
+  assert.equal(passed.outcome, 'checkPassed', 'the OUTCOME stays checkPassed; only the key differs');
+  assertMessageDataCovers(passed, 'a count pass');
+
+  const failed = checkRollResult(
+    'checkFailed',
+    { label: 'Fabricate', total: 0, required: 1 },
+    { ...countEvidence, total: 0, successes: 0, margin: -1 }
+  );
+  assert.equal(failed.message, CHECK_ROLL_MESSAGE_KEYS.checkFailedCount);
+  assertMessageDataCovers(failed, 'a count failure');
+
+  // A zero pool (issue 2004) is a checkFailed answer too, but it never reached the dice, so it
+  // picks its own key and needs no `total`/`required` in its messageData.
+  const zeroPool = checkRollResult(
+    'checkFailed',
+    { label: 'Fabricate' },
+    { ...countEvidence, total: null, successes: null, cancelled: null, margin: null, zeroPool: true }
+  );
+  assert.equal(zeroPool.message, CHECK_ROLL_MESSAGE_KEYS.checkFailedZeroPool);
+  assertMessageDataCovers(zeroPool, 'a zero-pool failure');
+
+  // `product: 'count'` alone, without `zeroPool`, still keeps the plain count key.
+  const nonZero = checkRollResult(
+    'checkFailed',
+    { label: 'Fabricate', total: 0, required: 1 },
+    { ...countEvidence, total: 0, zeroPool: false }
+  );
+  assert.equal(nonZero.message, CHECK_ROLL_MESSAGE_KEYS.checkFailedCount);
+});
+
+test('an additional-dice refusal reports its reason key, and an executed answer its bought dice (issue 2008)', () => {
+  const reasonKey = 'FABRICATE.Check.AdditionalDiceRefusal.SpendRefused';
+  const data = { label: 'Fabricate', reason: 'spendRefused', actor: 'Idrin', resource: 'Momentum' };
+  const refused = checkRollResult('additionalDiceRefused', data, { refusalKey: reasonKey, total: 3 });
+  assertContractResult(refused, {
+    ...checkRollRefusal('additionalDiceRefused', data),
+    message: reasonKey,
+  });
+  // A refusal with no reason key falls back to the outcome's own key.
+  const bare = checkRollResult('additionalDiceRefused', { label: 'Fabricate' });
+  assertContractResult(bare, checkRollRefusal('additionalDiceRefused', { label: 'Fabricate' }));
+  // `refusalKey` re-keys this refusal alone; a dismissal sharing its shape keeps its own words.
+  const cancelled = checkRollResult('cancelled', { label: 'Fabricate' }, { refusalKey: reasonKey });
+  assert.equal(cancelled.message, CHECK_ROLL_MESSAGE_KEYS.cancelled);
+
+  const evidence = { total: 2, product: 'count', successes: 2, cancelled: 0 };
+  const label = { label: 'Fabricate', total: 2, required: 1 };
+  assert.equal(checkRollResult('checkPassed', label, { ...evidence, boughtDice: 1 }).boughtDice, 1);
+  assert.equal(checkRollResult('checkPassed', label, evidence).boughtDice, 0, 'none bought is 0');
+  assert.equal('boughtDice' in checkRollResult('rollFailed', { label: 'x', detail: '' }), false);
+});
+
+test('only a gmAction purchase may spend: a broadcast refuses broadcastCallSite (issue 2008)', () => {
+  assert.equal(additionalDiceCallSiteRefusal({ callSite: COMPANION_CALL_SITES.gmAction }), null);
+  assert.equal(
+    additionalDiceCallSiteRefusal({ callSite: COMPANION_CALL_SITES.broadcast }),
+    'broadcastCallSite'
+  );
+  assert.equal(additionalDiceCallSiteRefusal(null), null, 'the call-site gate owns a missing one');
 });
 
 test('an ungraded roll has no pass, and a bulk answer derives its own three fields', () => {

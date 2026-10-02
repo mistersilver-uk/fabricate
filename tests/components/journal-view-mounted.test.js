@@ -21,6 +21,7 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-journal-view-',
   rawModules: [
+    'src/ui/svelte/util/rollPromptOrigin.js',
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...STATUS_TONE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
@@ -33,6 +34,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/journal/historyPresentation.js',
     'src/ui/svelte/apps/journal/runStateNotice.js',
     'src/ui/svelte/apps/journal/runDetailPresentation.js',
+    // The roll line signs an executed margin with the shared formatter (issue 2005).
+    'src/utils/checkAdjustmentFormat.js',
+    'src/utils/scalars.js',
     'src/ui/svelte/apps/journal/stageHeading.js',
     'src/ui/svelte/apps/journal/runRecovery.js',
   ],
@@ -686,6 +690,20 @@ describe('JournalView mounted behavior', () => {
     assert.equal(routedTarget.querySelectorAll('[data-outcome-tier]').length, 2);
     assert.match(routedTarget.querySelector('.journal-detail-meta').textContent, /Mode\.routed/u);
     assert.doesNotMatch(routedTarget.querySelector('.journal-detail-meta').textContent, /null/u);
+    const ruleHint = (root) => root.querySelector('[data-outcome-ladder] .fab-outcome-hint').textContent;
+    assert.match(ruleHint(routedTarget), /Yields\.RoutedRule$/u);
+
+    // Issue 2005: a roll-under or character-value ladder states its own selection rule.
+    for (const [ladderRule, key] of [
+      ['under', /Yields\.RoutedRuleUnder$/u],
+      ['underStrict', /Yields\.RoutedRuleUnderStrict$/u],
+      ['adjustment', /Yields\.RoutedRuleAdjustment$/u],
+    ]) {
+      harness.remount();
+      const under = makeGatheringRun({ gatheringYield: { ...routed.gatheringYield, ladderRule } });
+      const { store: underStore } = makeJournal({ selectedRun: under, selectedRunKey: under.key });
+      assert.match(ruleHint(await harness.mount({ services: makeServices(underStore) })), key);
+    }
 
     harness.remount();
     const straight = makeGatheringRun({
@@ -896,6 +914,30 @@ describe('JournalView mounted behavior', () => {
     harness.remount();
     const cleared = await harness.mount({ services });
     assert.ok(!cleared.querySelector('[data-journal-command-error]'));
+  });
+
+  it('records the window a retry came from as the host of the roll it starts (issue 2053)', async () => {
+    const { activeRollPromptOrigin } = await harness.loadRawModule(
+      'src/ui/svelte/util/rollPromptOrigin.js'
+    );
+    const run = makeCraftingRun({ lifecycleContract: 'current', lifecycleVersion: 1 });
+    const { store } = makeJournal({
+      selectedRun: run,
+      selectedRunKey: run.key,
+      commandError: { runKey: run.key, actorUuid: run.actorUuid, message: 'The run changed.' },
+    });
+    let origin = 'unread';
+    store.retryCommandError = async () => {
+      origin = activeRollPromptOrigin();
+    };
+    const target = await harness.mount({ services: makeServices(store) });
+    const notice = target.querySelector('[data-journal-command-error]');
+    const retry = notice.querySelector('[data-notice-action]');
+    retry.click();
+    await Promise.resolve();
+    const root = retry.closest('.fabricate-app, .fabricate-manager');
+    assert.ok(root && origin === root, 'the retry runs with its own window recorded as the origin');
+    assert.ok(activeRollPromptOrigin() === null, 'the origin is released once the retry settles');
   });
 
   it('offers the GM the release on the very run whose own evidence is uncertain', async () => {

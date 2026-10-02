@@ -2,18 +2,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { FRAGMENT_VALIDITY_CORPUS } from '../scripts/lib/rollTermsCorpus.js';
+
 import {
   RECORDED_CHECK_FORMULAS,
   RECORDED_FRAGMENT_VALIDITY,
   VALIDATE_ONLY_HOLES,
   recordedModifierRoll,
 } from './helpers/recordedModifierRollShapes.js';
+import { RECORDED_ROLL_TERMS } from './helpers/recordedRollParse.js';
 
 const {
   appendResolvedCheckModifier,
   buildCheckModifierChoice,
   buildCheckModifierContext,
   makeRollDataExpressionResolver,
+  modifierExpressionResolves,
   resolveCheckModifierContribution,
   resolveSelectedCheckModifiers,
 } = await import('../src/systems/checkModifierResolver.js');
@@ -57,6 +61,21 @@ const CATALOGUE = [
 ];
 
 const RECORDED_FORMULAS = new Set(RECORDED_CHECK_FORMULAS.map((row) => row.formula));
+
+class TransformedRoll {
+  static replaceFormulaData(formula) {
+    return String(formula);
+  }
+
+  constructor(formula) {
+    this.formula = formula;
+  }
+
+  evaluateSync() {
+    this.total = 1;
+    return this;
+  }
+}
 
 /** Append the resolved contribution of `ids` under `policy` to `1d20`. */
 function rolled(policy, ids, { maxModifierPicks, subject = {} } = {}) {
@@ -180,6 +199,98 @@ test('playerPicks takes the best N by average, non-interactively', () => {
     '1d20 + (1d4)[Modifiers]',
     'a cap of 1 is `highest`, unchanged'
   );
+});
+
+test('transformed entries stay unblocked and contribute their exact formulas after ranking', () => {
+  const catalogue = [
+    { id: 'count', label: 'Count', expression: '1d20cs>15' },
+    { id: 'negative', label: 'Negative', expression: '-4' },
+    { id: 'odd', label: 'Odd', expression: '1d20odd' },
+    { id: 'positive', label: 'Positive', expression: '8' },
+  ];
+  const context = (systemPolicy, ids, maxModifierPicks) => ({
+    catalogue,
+    systemPolicy,
+    defaultModifierIds: ids,
+    maxModifierPicks,
+  });
+  const resolve = (expression) => expression;
+
+  const highest = resolveCheckModifierContribution(
+    context('highest', ['count', 'odd']),
+    resolve,
+    TransformedRoll
+  );
+  assert.deepEqual(highest.rollTerms, ['(1d20cs>15)']);
+  assert.deepEqual(
+    highest.selected.map(({ id, blocked, formula }) => ({ id, blocked, formula })),
+    [{ id: 'count', blocked: false, formula: '(1d20cs>15)' }]
+  );
+
+  const countOnly = resolveCheckModifierContribution(
+    context('playerPicks', ['count', 'odd'], 2),
+    resolve,
+    TransformedRoll
+  );
+  assert.deepEqual(countOnly.rollTerms, ['(1d20cs>15)', '(1d20odd)']);
+
+  const mixed = resolveCheckModifierContribution(
+    context('playerPicks', ['count', 'negative', 'odd', 'positive'], 3),
+    resolve,
+    TransformedRoll
+  );
+  assert.deepEqual(mixed.selected.map(({ id }) => id), ['count', 'negative', 'positive']);
+  assert.equal(mixed.scalar, 4, 'the positive and negative magnitude entries both contribute');
+  assert.deepEqual(mixed.rollTerms, ['(1d20cs>15)'], 'the spare transformed entry still rolls');
+});
+
+test('an interactive transformed choice retains its formula and has no average', () => {
+  const choice = buildCheckModifierChoice(
+    {
+      catalogue: [
+        { id: 'count', label: 'Count', expression: '1d20cs>15' },
+        { id: 'flat', label: 'Flat', expression: '-2' },
+      ],
+      systemPolicy: 'playerPicks',
+      defaultModifierIds: ['count', 'flat'],
+      maxModifierPicks: 2,
+    },
+    (expression) => expression,
+    TransformedRoll
+  );
+  const transformed = choice.modifiers.find(({ id }) => id === 'count');
+  assert.deepEqual(
+    {
+      average: transformed.average,
+      blocked: transformed.blocked,
+      display: transformed.display,
+      formula: transformed.formula,
+    },
+    { average: null, blocked: false, display: '+1d20cs>15', formula: '(1d20cs>15)' }
+  );
+  assert.deepEqual(choice.defaultSelectedIds, ['count', 'flat']);
+});
+
+test('an interactive pre-selection under a binding cap takes magnitudes ahead of transformed', () => {
+  const catalogue = [
+    { id: 'count', label: 'Count', expression: '1d20cs>15' },
+    { id: 'flat', label: 'Flat', expression: '-2' },
+    { id: 'odd', label: 'Odd', expression: '1d20odd' },
+  ];
+  const preselected = (maxModifierPicks) =>
+    buildCheckModifierChoice(
+      {
+        catalogue,
+        systemPolicy: 'playerPicks',
+        defaultModifierIds: catalogue.map(({ id }) => id),
+        maxModifierPicks,
+      },
+      (expression) => expression,
+      TransformedRoll
+    ).defaultSelectedIds;
+
+  assert.deepEqual(preselected(1), ['flat'], 'the one magnitude outranks both transformed');
+  assert.deepEqual(preselected(2), ['count', 'flat'], 'the first transformed fills the spare pick');
 });
 
 test('bySubject appends what the subject picked, dice included', () => {
@@ -340,6 +451,44 @@ test('the recorded oracle carries fragments Roll.validate accepts and the engine
   for (const [fragment, validates, evaluates] of VALIDATE_ONLY_HOLES) {
     assert.equal(validates, true, `${fragment} parses`);
     assert.notEqual(evaluates, 'rolls', `${fragment} cannot actually be rolled`);
+  }
+});
+
+test('the oracle is the 14.365 recording, row for row (issue 2043)', () => {
+  const { fragments } = RECORDED_ROLL_TERMS['14.365'];
+  assert.deepEqual(
+    RECORDED_FRAGMENT_VALIDITY.map(([fragment]) => fragment),
+    [...FRAGMENT_VALIDITY_CORPUS],
+    'record a new shape with `node scripts/foundry-test.mjs --check=roll-terms`'
+  );
+  for (const [fragment, validates, evaluates] of RECORDED_FRAGMENT_VALIDITY) {
+    assert.deepEqual(
+      [validates, evaluates],
+      [fragments[fragment].validates, fragments[fragment].evaluates],
+      fragment
+    );
+    // The maximized proof applies no dice modifier, so a real roll is recorded beside it.
+    assert.equal(
+      fragments[fragment].completes,
+      evaluates !== 'throws',
+      `${fragment}: a real roll agrees`
+    );
+  }
+});
+
+test('an incomplete comparator is accepted or blocked as its recording says', () => {
+  const Roll = recordedModifierRoll();
+  const counted = ['1d20cs>', '1d20cs<', '1d20cs>=', '1d20cs<=', '1d20cs=', '1d20cs', '2d6cs'];
+  const others = ['1d20cf>', '1d20cf', '2d6cf<', '1d20df<', '1d20df', '2d6x>', '2d6r<', '2d6cs>5>'];
+  const entries = [
+    ...[...counted, ...others].map((expression) => [{ expression }, `(${expression})`]),
+    [{ expression: '1d20cs>', min: -1, max: 6 }, 'min(max((1d20cs>), -1), 6)'],
+  ];
+  const recorded = new Map(RECORDED_FRAGMENT_VALIDITY.map((row) => [row[0], row[2]]));
+  for (const [entry, fragment] of entries) {
+    assert.ok(recorded.has(fragment), `${fragment} is recorded`);
+    const rolls = recorded.get(fragment) === 'rolls';
+    assert.equal(modifierExpressionResolves(entry, Roll), rolls, fragment);
   }
 });
 

@@ -52,16 +52,26 @@ export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({
   'material-shortage': 'lab-v1-material-shortage',
   'ingredient-route': 'lab-v1-ingredient-route',
   'check-route': 'lab-v1-check-route',
+  'journal-check-prompt': 'lab-v1-journal-check-prompt',
   'essence-shared': 'lab-v1-essence-shared',
   paused: 'lab-v1-paused',
   'cancel-confirmation': 'lab-v1-cancel-confirmation',
   'past-stage': 'lab-v1-stage-browser',
+  // Issue 2005: the same browser, its past stage rolled roll-under against an executed target.
+  'past-stage-under': 'lab-v1-stage-browser',
+  // Issue 2006: its past stage counted successes, recording the net and the margin it cleared.
+  'past-stage-count': 'lab-v1-stage-browser',
   'future-stage': 'lab-v1-stage-browser',
+  // Issue 2103: the same browser under a roll-under crafting check, its future step naming a Target.
+  'future-stage-under': 'lab-v1-stage-browser',
   'gathering-straight': 'lab-v1-gathering-straight',
   'gathering-d100': 'lab-v1-gathering-d100',
   'gathering-check': 'lab-v1-gathering-check',
+  'gathering-journal-check-prompt': 'lab-v1-gathering-journal-check-prompt',
   'finished-success': 'lab-v1-finished-success',
   'finished-failure': 'lab-v1-finished-failure',
+  // Issue 2133: a routed count that cleared Masterwork, its line against the check's own count.
+  'finished-routed-count': 'lab-v1-finished-routed-count',
   'finished-cancelled': 'lab-v1-finished-cancelled',
   'active-page-two': 'lab-v1-active-5',
   'finished-page-two': 'lab-v1-finished-5',
@@ -576,6 +586,7 @@ function journalCaseFactories(context) {
         })
       ),
     'check-route': () => active(ready('lab-v1-check-route', checkRoute())),
+    'journal-check-prompt': () => active(ready('lab-v1-journal-check-prompt', checkRoute())),
     'essence-shared': () => active(unbegun('lab-v1-essence-shared', essence())),
     paused: () =>
       active(
@@ -587,15 +598,27 @@ function journalCaseFactories(context) {
       ),
     'cancel-confirmation': readyAlias('lab-v1-cancel-confirmation'),
     'past-stage': () => active(stageBrowserRun(context, multi())),
+    'past-stage-under': () => active(stageBrowserRun(context, multi(), UNDER_STAGE_CHECK)),
+    'past-stage-count': () => active(stageBrowserRun(context, multi(), COUNT_STAGE_CHECK)),
     'future-stage': () => active(stageBrowserRun(context, multi())),
+    'future-stage-under': () => active(stageBrowserRun(context, multi())),
     'gathering-straight': () =>
       emptyRunContainers({ gatheringActive: [gatheringCaseRun(context, 'straight')] }),
     'gathering-d100': () =>
       emptyRunContainers({ gatheringActive: [gatheringCaseRun(context, 'd100')] }),
     'gathering-check': () =>
       emptyRunContainers({ gatheringActive: [gatheringCaseRun(context, 'routed')] }),
+    // Issue 2073: a matured routed gathering run, primed for `execute` to fall through to the
+    // real engine (see the fixture-execute short circuit below) and open the real roll prompt.
+    'gathering-journal-check-prompt': () =>
+      emptyRunContainers({
+        gatheringActive: [
+          { ...gatheringCaseRun(context, 'routed'), id: 'lab-v1-gathering-journal-check-prompt' },
+        ],
+      }),
     'finished-success': () => finished(terminalCraftingCase(context, single(), 'succeeded')),
     'finished-failure': () => finished(terminalCraftingCase(context, checkRoute(), 'failed')),
+    'finished-routed-count': () => finished(routedCountCase(context, checkRoute())),
     'finished-cancelled': () => finished(cancelledCraftingCase(context, multi())),
     'active-page-two': () => pagingContainers(context, single()),
     'finished-page-two': () => pagingContainers(context, single()),
@@ -1329,13 +1352,37 @@ function futureGate() {
   };
 }
 
-function stageBrowserRun(context, recipe) {
+/** An executed roll-under check: 11 against a final target of 14, a margin of +3. */
+const UNDER_STAGE_CHECK = Object.freeze({
+  success: true,
+  value: 11,
+  data: { resolvedFormula: '1d20', total: 11, dc: 12, direction: 'under', target: 14, margin: 3 },
+});
+
+/** An executed count check: a net of 3 against 2 needed, a margin of +1. */
+const COUNT_STAGE_CHECK = Object.freeze({
+  success: true,
+  value: 3,
+  data: {
+    product: 'count',
+    direction: 'over',
+    comparison: 'meet',
+    dc: null,
+    target: 8,
+    total: 3,
+    successes: 3,
+    cancelled: 0,
+    margin: 1,
+  },
+});
+
+function stageBrowserRun(context, recipe, pastCheck = null) {
   const authored = recipeSteps(recipe);
   const steps = authored.map((_entry, index) => {
     if (index === 0) {
       return versionedRecipeStep(recipe, index, 'succeeded', {
         completedAt: NOW - HOUR,
-        lastCheckResult: {
+        lastCheckResult: pastCheck ?? {
           success: true,
           value: 17,
           data: { resolvedFormula: '1d20 + 3', total: 17, dc: 14 },
@@ -1388,6 +1435,36 @@ function terminalCraftingCase(context, recipe, status, id = null) {
       ],
     },
   });
+}
+
+/**
+ * Runework's routed count (`runeworkCheckMode=routed-count`, two needed) netting 6, so it routed
+ * to Masterwork (+2) and recorded a margin of 2 against that tier's 4, never against the 2.
+ */
+function routedCountCase(context, recipe) {
+  const run = terminalCraftingCase(context, recipe, 'succeeded', 'lab-v1-finished-routed-count');
+  run.steps[0].resolutionSnapshot = {
+    kind: 'check',
+    mode: 'routedByCheck',
+    product: 'count',
+    direction: 'over',
+  };
+  run.steps[0].lastCheckResult = {
+    success: true,
+    outcome: 'Masterwork',
+    value: 6,
+    data: {
+      ...COUNT_STAGE_CHECK.data,
+      type: 'relative',
+      target: 7,
+      total: 6,
+      successes: 6,
+      margin: 2,
+      outcomeId: 'rw-masterwork',
+      success: true,
+    },
+  };
+  return run;
 }
 
 function cancelledCraftingCase(context, recipe) {
@@ -1600,6 +1677,12 @@ export function createLabJournalCaseController({
   };
 
   async function execute(command) {
+    if (
+      ['journal-check-prompt', 'gathering-journal-check-prompt'].includes(state) &&
+      command?.action === 'execute'
+    ) {
+      return undefined;
+    }
     const event = { ...cloneFixtureValue(command ?? {}), state };
     events.push(event);
     const located = locateActiveRun(containers, command);

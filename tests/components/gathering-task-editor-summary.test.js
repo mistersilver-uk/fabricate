@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { defineStructureContract } from '../helpers/structureContract.js';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
 const editorPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte');
@@ -29,6 +31,13 @@ const inspectorSource = `${taskInspectorSource}\n${readFileSync(eventInspectorPa
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 
 describe('Selected gathering task — drops summary lives in the inspector', () => {
+  // Its result is driven by `tests/gathering-display.test.js`.
+  defineStructureContract(
+    'derives task usage from enabledTaskIds',
+    'src/ui/svelte/apps/manager/gatheringDisplay.js',
+    { spellsExactly: ['enabledTaskIds'] }
+  );
+
   it('renders the drops summary inside the task inspector card', () => {
     assert.ok(taskInspectorSource.includes('data-task-drops-summary'), 'task inspector should expose the drops summary card');
     assert.ok(taskInspectorSource.includes('data-task-drops-summary-list'), 'drop summary list should expose a data attribute');
@@ -64,10 +73,9 @@ describe('Selected gathering task — drops summary lives in the inspector', () 
     assert.ok(/data-gathering-task-fact="biomes"[\s\S]*?\{#if Array\.isArray\(task\.biomes\) && task\.biomes\.length > 0\}/.test(taskInspectorSource), 'task biome label should be conditional on user-defined biomes');
   });
 
-  it('reads drop labels/images from existing task helpers and environment usage from enabledTaskIds', () => {
+  it('reads drop labels/images and environment names from existing task helpers', () => {
     assert.ok(taskInspectorSource.includes('gatheringDropImage(drop)'), 'inspector should reuse gatheringDropImage for the drop thumb');
     assert.ok(taskInspectorSource.includes('gatheringDropName(drop)'), 'inspector should reuse gatheringDropName for the drop label');
-    assert.ok(rootSource.includes('enabledTaskIds'), 'the shell should filter environments by enabledTaskIds');
     assert.ok(taskInspectorSource.includes('environmentImage(environment)'), 'inspector should reuse environmentImage helper');
     assert.ok(taskInspectorSource.includes('environmentName(environment)'), 'inspector should reuse environmentName helper');
   });
@@ -97,7 +105,7 @@ describe('Selected gathering task — drops summary lives in the inspector', () 
     const editorMountIndex = rootSource.indexOf('<GatheringTaskEditView');
     assert.ok(editorMountIndex >= 0, 'editor mount should be present in the manager root');
     const editorMountSlice = rootSource.slice(editorMountIndex, editorMountIndex + 2000);
-    assert.equal(/\benvironments=\{environmentList\}/.test(editorMountSlice), false, 'editor mount should not pass environments anymore');
+    assert.equal(/\benvironments=\{(?:gathering\.)?environmentList\}/.test(editorMountSlice), false, 'editor mount should not pass environments anymore');
   });
 
   it('owns gathering resolution on the task editor and keeps the economy selector inert', () => {
@@ -127,6 +135,6 @@ describe('Selected gathering task — drops summary lives in the inspector', () 
   it('renders active result validation beside the result editor', () => {
     assert.ok(editorSource.includes('resultValidationErrors = []'));
     assert.ok(editorSource.includes('data-gathering-task-results-validation'));
-    assert.ok(rootSource.includes('resultValidationErrors={gatheringTaskValidation.resultErrors'));
+    assert.ok(rootSource.includes('resultValidationErrors={gathering.gatheringTaskValidation.resultErrors'));
   });
 });

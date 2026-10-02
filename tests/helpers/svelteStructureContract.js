@@ -145,7 +145,7 @@ export function boundDirectives(ast) {
 }
 
 /** The props a component destructures from `$props()`, and those it declares with no default. */
-function declaredProps(ast) {
+export function declaredProps(ast) {
   const declared = new Set();
   const required = new Set();
   for (const node of walkNodes(ast)) {

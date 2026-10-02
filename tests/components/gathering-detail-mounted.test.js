@@ -10,6 +10,8 @@ import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 import { rewriteClientImports } from '../helpers/rewriteClientImports.js';
 // The raw `.js` closure of `SearchablePopover`.
 import {
+  ADDITIONAL_DICE_NOTICE_RAW_MODULES,
+  CHECK_TARGET_RAW_MODULES,
   PLAYER_APP_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
@@ -187,7 +189,14 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     mkdirSync(dirname(reasonsDestination), { recursive: true });
     writeFileSync(reasonsDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/journalRunReasons.js'), 'utf8'));
 
-    for (const modulePath of FOUNDRY_BRIDGE_RAW_MODULES) {
+    // Issue 2008: GatheringView words an additional-dice notice through the prompt presenter.
+    for (const modulePath of [
+      ...FOUNDRY_BRIDGE_RAW_MODULES,
+      ...ADDITIONAL_DICE_NOTICE_RAW_MODULES,
+      ...CHECK_TARGET_RAW_MODULES,
+      'src/systems/countEvaluation.js',
+      'src/utils/fillPlaceholders.js',
+    ]) {
       const utilDestination = join(tempRoot, modulePath);
       mkdirSync(dirname(utilDestination), { recursive: true });
       writeFileSync(utilDestination, readFileSync(resolve(repoRoot, modulePath), 'utf8'));
@@ -250,7 +259,8 @@ describe('GatheringDetail (center column) mounted behavior', () => {
 
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
-    for (const rawModule of SEARCHABLE_POPOVER_RAW_MODULES) {
+    // Issue 2053: the attempt buttons record the window a roll prompt opens in.
+    for (const rawModule of [...SEARCHABLE_POPOVER_RAW_MODULES, 'src/ui/svelte/util/rollPromptOrigin.js']) {
       const rawDestination = join(tempRoot, rawModule);
       mkdirSync(dirname(rawDestination), { recursive: true });
       writeFileSync(rawDestination, readFileSync(resolve(repoRoot, rawModule), 'utf8'));

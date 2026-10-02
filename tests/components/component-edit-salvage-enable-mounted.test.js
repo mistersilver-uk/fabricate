@@ -78,7 +78,6 @@ function props(overrides = {}) {
     salvageResolutionMode: 'simple',
     salvageCheckEnabled: true,
     salvageCheckTiers: TIERS,
-    salvageCheckDcMode: 'static',
     salvageCheckDc: 15,
     ...rest,
   };
@@ -340,7 +339,7 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     assert.equal(chosenPreset(target), 'custom', 'an override matching no tier selects Custom…');
     assert.equal(
       assertSelectHasResolvedName(target, PRESET_TRIGGER),
-      'Salvage check DC',
+      'Salvage DC override',
       'and it still announces the name the native control did'
     );
     assert.equal(

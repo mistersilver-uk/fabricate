@@ -229,7 +229,6 @@ function makeEngine(opts = {}) {
     mockRecipeManager,
     null,
     opts.resolutionModeService || null,
-    null,
     opts.salvageRunManager || new SalvageRunManager()
   );
 }

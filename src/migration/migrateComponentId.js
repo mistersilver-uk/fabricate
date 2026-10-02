@@ -5,12 +5,7 @@
 
 import { mapSystems } from './migrationHelpers.js';
 
-// --- Internal helpers ------------------------------------------------------
-
-/**
- * Rename the key on one object, in place: an existing `componentId` is preserved and the old key
- * deleted. The caller has already deep-cloned.
- */
+/** In place on a clone; an existing `componentId` wins. */
 function _migrateId(obj) {
   if (obj == null || typeof obj !== 'object') return;
   if ('systemItemId' in obj) {
@@ -21,29 +16,22 @@ function _migrateId(obj) {
   }
 }
 
-/** Migrate a catalyst entry. */
 function _migrateCatalyst(cat) {
   _migrateId(cat);
   return cat;
 }
 
-/** Migrate a result entry. */
 function _migrateResult(result) {
   _migrateId(result);
   return result;
 }
 
-/**
- * Migrate an ingredient entry: the top-level id, `match.systemItemId`, the `systemItem` match
- * type, and `alternatives[]` recursively.
- */
+/** The top-level id, `match`, and `alternatives[]` recursively. */
 function _migrateIngredient(ing) {
   if (ing == null || typeof ing !== 'object') return ing;
 
-  // Top-level id rename
   _migrateId(ing);
 
-  // match object
   if (ing.match && typeof ing.match === 'object') {
     if ('systemItemId' in ing.match) {
       if (!('componentId' in ing.match) || ing.match.componentId == null) {
@@ -56,7 +44,6 @@ function _migrateIngredient(ing) {
     }
   }
 
-  // Recurse into alternatives
   if (Array.isArray(ing.alternatives)) {
     ing.alternatives = ing.alternatives.map(_migrateIngredient);
   }
@@ -64,13 +51,11 @@ function _migrateIngredient(ing) {
   return ing;
 }
 
-/** Migrate all catalysts in an array. */
 function _migrateCatalysts(catalysts) {
   if (!Array.isArray(catalysts)) return catalysts;
   return catalysts.map(_migrateCatalyst);
 }
 
-/** Migrate all results in a resultGroups array. */
 function _migrateResultGroups(resultGroups) {
   if (!Array.isArray(resultGroups)) return resultGroups;
   return resultGroups.map((rg) => {
@@ -81,13 +66,11 @@ function _migrateResultGroups(resultGroups) {
   });
 }
 
-/** Migrate a flat top-level results array. */
 function _migrateResults(results) {
   if (!Array.isArray(results)) return results;
   return results.map(_migrateResult);
 }
 
-/** Migrate an ingredient set's `ingredientGroups[].options[]` and `ingredients[]`. */
 function _migrateIngredientSet(set) {
   if (set == null || typeof set !== 'object') return set;
 
@@ -111,7 +94,6 @@ function _migrateIngredientSet(set) {
   return set;
 }
 
-/** Migrate a single step object. */
 function _migrateStep(step) {
   if (step == null || typeof step !== 'object') return step;
 
@@ -130,36 +112,29 @@ function _migrateStep(step) {
   return step;
 }
 
-// --- Public API ------------------------------------------------------------
-
-/** Migrate raw recipe JSON, answering a new deep-cloned array. */
+/** Answers a new deep-cloned array. */
 export function migrateRecipes(recipes) {
   if (!Array.isArray(recipes)) return recipes;
 
   return JSON.parse(JSON.stringify(recipes)).map((recipe) => {
     if (recipe == null || typeof recipe !== 'object') return recipe;
 
-    // Top-level catalysts
     if (Array.isArray(recipe.catalysts)) {
       recipe.catalysts = _migrateCatalysts(recipe.catalysts);
     }
 
-    // Top-level resultGroups
     if (Array.isArray(recipe.resultGroups)) {
       recipe.resultGroups = _migrateResultGroups(recipe.resultGroups);
     }
 
-    // Top-level results (flat array variant)
     if (Array.isArray(recipe.results)) {
       recipe.results = _migrateResults(recipe.results);
     }
 
-    // ingredientSets (and their nested catalysts/ingredients)
     if (Array.isArray(recipe.ingredientSets)) {
       recipe.ingredientSets = recipe.ingredientSets.map(_migrateIngredientSet);
     }
 
-    // steps
     if (Array.isArray(recipe.steps)) {
       recipe.steps = recipe.steps.map(_migrateStep);
     }
@@ -168,12 +143,11 @@ export function migrateRecipes(recipes) {
   });
 }
 
-/** Migrate raw crafting-system JSON, answering a new deep-cloned array. */
+/** Answers a new deep-cloned array. */
 export function migrateCraftingSystems(systems) {
   if (!Array.isArray(systems)) return systems;
 
   return mapSystems(JSON.parse(JSON.stringify(systems)), (system) => {
-    // Rename managedItems -> components
     if ('managedItems' in system) {
       if (!('components' in system) || system.components == null) {
         system.components = system.managedItems;
@@ -181,7 +155,6 @@ export function migrateCraftingSystems(systems) {
       delete system.managedItems;
     }
 
-    // Migrate salvage fields on each component
     const componentList = system.components;
     if (Array.isArray(componentList)) {
       system.components = componentList.map((component) => {
@@ -202,7 +175,6 @@ export function migrateCraftingSystems(systems) {
   });
 }
 
-/** Migrate both recipes and systems. */
 export function runComponentIdMigration(recipes, systems) {
   return {
     recipes: migrateRecipes(recipes),

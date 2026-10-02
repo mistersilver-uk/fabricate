@@ -1,560 +1,272 @@
 /**
- * Activity-agnostic crafting-check roll helpers, shared by the crafting and
- * salvage check runners (and, in a later phase, gathering). Extracting them keeps
- * a single copy of the roll → dice-group → crit → pass/fail (or → numeric value)
- * logic instead of duplicating it per activity.
- *
- * `label` ('Crafting' | 'Salvage' | …) only customises the human-readable failure
- * messages so each activity reads naturally; the result shape is identical.
+ * The activity-agnostic check roll engine shared by crafting, salvage and gathering (DOMAIN.md
+ * "Check"): roll, dice groups, forced outcomes, then pass/fail, a routed tier or a progressive
+ * value. `label` only customises the failure messages; the result shape is identical.
  */
 
-import { evaluateCheckBreakageCondition } from '../toolBreakageRuntime.js';
-import {
-  applyD20Advantage,
-  hasPlainD20,
-  stripRetiredModifierPlaceholder,
-} from '../utils/craftingCheckExpression.js';
+import { stripRetiredModifierPlaceholder } from '../utils/craftingCheckExpression.js';
 
 import { chatModeOption } from './bulkChatVisibility.js';
-import { appendResolvedCheckModifier } from './checkModifierResolver.js';
+import { resolveAdvantageOffer } from './checkAdvantage.js';
+import { compareToTarget, effectiveMargin } from './checkEvaluation.js';
+import { evaluateKeptRoll } from './checkKeepTransform.js';
 import {
-  appendCheckModifierRollTerms,
-  appendCheckModifierTerm,
-  CHECK_MODIFIER_TERM_LABEL,
-} from './toolCheckBonus.js';
+  resolveCheckModifierFormula,
+  resolvedLibraryContributions,
+} from './checkModifierResolver.js';
+import { resolveModifierPreRolls } from './checkModifierRolls.js';
+import { planModifierPlacement, SUM_OVER_EVALUATION } from './checkModifierRouter.js';
+import { defersModifierChoice, resolveCheckDecision } from './checkRollDecision.js';
+import {
+  checkRollHandoff,
+  postCheckRoll,
+  preRollEvidence,
+  reportedVisibility,
+  rolledDiceGroups,
+} from './checkRollOutput.js';
+import {
+  classifyCheckTotal,
+  effectiveTarget,
+  resolveForcedOutcome,
+  sumGrading,
+} from './checkRouting.js';
+import {
+  activeCheckEvaluation,
+  checkTargetRefusal,
+  isFixedSumOver,
+  progressiveTargetRefusal,
+  targetFlavorSuffix,
+} from './checkTarget.js';
+import { preparedCountEvaluation, preparedCountOptions } from './countCheck.js';
+import {
+  carryAdditionalDice,
+  evaluateCountCheckRoll,
+  preparedCountResult,
+  runCountPassFail,
+  runCountProgressive,
+  runCountRouted,
+} from './countCheckRoll.js';
+import { authorizedPreparedDecision, validatedPreparedDecision } from './preparedDecisionPolicy.js';
+
+export { classifyCheckTotal, resolveForcedOutcome } from './checkRouting.js';
+export { postCheckRollHandoff, rolledDiceGroups } from './checkRollOutput.js';
+
+const noRoll = () => ({ engine: false, total: 0, diceGroups: [], resolvedFormula: null });
+const cancelled = (data) => ({ success: false, cancelled: true, outcome: null, value: null, data });
 
 /**
- * The deferred `playerPicks` slot the roll prompt renders in place of a number.
- *
- * It is a TRAILING term (`1d20 + 3 + (modifier)[Modifiers]`) rather than an inline
- * placeholder, matching where the resolved term actually lands (issue 1094). A specific
- * number would misrepresent a non-default pick, and `cleanHTML` strips inline handlers
- * so a live-updating preview is not available; the per-option chips carry each option's
- * value.
+ * `data.targetTerms` outside sum/over/fixed (issue 2005): the resolved target's terms, else its
+ * anchor, then the rolled tier's step, then the settled scalar benefits. Folded in order with
+ * `preRolls` they reproduce `data.target`. A term is `{ kind, value, source?, label? }`, `label`
+ * naming the tier of an adjustment. `data.targetSource` names the anchor's source; a character
+ * value also records its typed formula and the character's name, so results never re-read them.
  */
-const DEFERRED_MODIFIER_SLOT = `(modifier)[${CHECK_MODIFIER_TERM_LABEL}]`;
+function targetTermsEvidence({
+  grading,
+  target,
+  anchor,
+  baseTerms,
+  tierTerm = null,
+  rolled,
+  evaluation,
+  actor,
+}) {
+  if (target === null || (grading.direction === 'over' && grading.source === 'fixed')) return {};
+  const base =
+    Array.isArray(baseTerms) && baseTerms.length > 0
+      ? baseTerms
+      : [{ kind: 'anchor', value: anchor }];
+  const benefits = grading.direction === 'under' ? (rolled?.benefitTerms ?? []) : [];
+  return {
+    targetSource: grading.source,
+    ...attributeTargetFacts(grading, evaluation, actor),
+    targetTerms: [
+      ...base.map(({ kind, value, label }) => ({ kind, value, ...(label && { label }) })),
+      ...(tierTerm ? [tierTerm] : []),
+      ...benefits.map(({ kind, value, source }) => ({ kind, value, source })),
+    ],
+  };
+}
+
+/** A character-value target's typed formula and the name of the character it was read from. */
+function attributeTargetFacts(grading, evaluation, actor) {
+  if (grading.source !== 'attribute') return {};
+  const expression = String(evaluation?.target?.expression ?? '').trim();
+  const name = typeof actor?.name === 'string' ? actor.name.trim() : '';
+  return {
+    ...(expression && { targetExpression: expression }),
+    ...(name && { targetActor: name }),
+  };
+}
+
+/** The relative tier the roll matched, before forcing or steps, as its target term; its
+ * threshold is the executed target, so forced and stepped outcomes keep it. */
+function rolledTierTerm(grading, classifyInput) {
+  const { matched } = classifyCheckTotal({ ...classifyInput, triggers: [], minOutcomeId: null });
+  if (!matched) return null;
+  const label = typeof matched.name === 'string' && matched.name ? { label: matched.name } : {};
+  if (grading.multiply) return { kind: 'multiplier', value: Number(matched.adjustment), ...label };
+  const step = Number(matched.dc);
+  return { kind: 'adjustment', value: grading.direction === 'under' ? 0 - step : step, ...label };
+}
+
+/** A routed result's trigger evidence: a forced disposition (issue 2080) and a real tier step. */
+function routedTriggerEvidence({ forcedDisposition, tierStepApplied }) {
+  return {
+    ...(forcedDisposition && { forcedOutcome: forcedDisposition }),
+    ...(tierStepApplied && { tierStepApplied }),
+  };
+}
 
 /**
- * THE FORMULA THIS MODULE ACTUALLY ROLLS, for an authored formula and a modifier context.
- *
- * Two transforms stand between what a GM typed and what Foundry evaluates, and both are
- * unconditional: the retired-placeholder shim (issue 1094) removes a `@craftingmod` token
- * that survived the `1.21.0` migration, and {@link appendResolvedCheckModifier} resolves
- * the eligible check modifiers to a scalar and appends ONE `+ N[Modifiers]` term.
- *
- * IT IS ONE DERIVATION BECAUSE THREE CALLERS NEED THE SAME ANSWER, and issue 1097 shipped
- * the defect that proves it. {@link evaluateCheckRoll} and {@link resolveCheckFormulaDisplay}
- * each carried their own copy of this pair, and the Checks Studio's odds enumerator carried
- * neither: it charted the AUTHORED formula while the simulator beside it rolled the
- * appended one, so a system with a non-empty check-modifier catalogue drew a histogram
- * spanning `1..20` next to a readout rolling `5..24` — on the same screen, at the same
- * time. Nothing published was wrong only because every View Lab check happened to resolve a
- * zero scalar, which is luck rather than coverage. A preview that disagrees with the engine
- * is worse than no preview, so the append has exactly one implementation and exactly one
- * composition, and this is it.
- *
- * @param {string} formula The AUTHORED formula.
- * @param {object|null} actor The actor whose roll data resolves it.
- * @param {object|null} [craftingModifier] The check-modifier context, or null where no
- *   modifier term should be appended (salvage/gathering, and the deferred `playerPicks`
- *   path, which appends after the prompt returns instead).
- * @param {*} [Roll] The `Roll` class; a parameter so an injected engine drives both the
- *   shim's validity net and the append.
- * @returns {string} The formula that will be rolled, or `''` when the shim emptied it.
+ * The formula this module actually rolls and its modifier placement: the retired-placeholder shim
+ * (issue 1094), then the library append for `evaluation`. One derivation, because the roll, the
+ * display and the Checks Studio's odds enumerator must agree (issue 1097). `craftingModifier` is
+ * `null` where no term appends; `Roll` is a parameter so an injected engine drives both steps.
+ * Tool contributions already sit in a sum/over formula and join the placement only.
  */
+export function deriveCheckRoll(
+  formula,
+  actor,
+  craftingModifier = null,
+  Roll = globalThis.Roll,
+  evaluation = SUM_OVER_EVALUATION,
+  toolContributions = []
+) {
+  const rolled = resolveRolledCheck(formula, actor, craftingModifier, Roll, evaluation);
+  const placement = planModifierPlacement({
+    evaluation,
+    contributions: [
+      ...(Array.isArray(toolContributions) ? toolContributions : []),
+      ...resolvedLibraryContributions(rolled.selected),
+    ],
+  });
+  return { formula: rolled.formula, placement };
+}
+
+/** The formula half of {@link deriveCheckRoll}; `''` when the shim emptied the formula. */
 export function resolveRolledFormula(
   formula,
   actor,
   craftingModifier = null,
-  Roll = globalThis.Roll
+  Roll = globalThis.Roll,
+  evaluation = SUM_OVER_EVALUATION
+) {
+  return resolveRolledCheck(formula, actor, craftingModifier, Roll, evaluation).formula;
+}
+
+function resolveRolledCheck(
+  formula,
+  actor,
+  craftingModifier,
+  Roll = globalThis.Roll,
+  evaluation = SUM_OVER_EVALUATION
 ) {
   const authored = stripRetiredModifierPlaceholder(String(formula ?? ''), Roll);
-  if (authored.trim() === '') return '';
-  return appendResolvedCheckModifier(authored, actor, craftingModifier, Roll);
+  if (authored.trim() === '') return { formula: '', selected: [] };
+  return resolveCheckModifierFormula(authored, actor, craftingModifier, Roll, evaluation);
 }
 
 /**
- * Summarise an evaluated Roll's dice as
- * `{ groupId, group: "NdS", sum, results: number[] }` entries.
- *
- * - `groupId` is the index into the evaluated `roll.dice` term order (NOT re-parsed
- *   from the formula string), so duplicate `NdS` groups (`1d20 + 1d20` → groupId 0
- *   and 1) are disambiguated deterministically. The `checkBreakage` `diceGroup`
- *   trigger DSL targets a group by this index.
- *
- *   SINCE ISSUE 1118 A ROLLING CHECK MODIFIER CONTRIBUTES DICE HERE TOO, and the decision
- *   about that is deliberate rather than overlooked. Modifier terms are APPENDED, so every
- *   die the authored formula declares keeps the index it always had and no working trigger
- *   changes meaning. What DOES change is a trigger whose `groupId` already DANGLED — authored
- *   against a formula that has since lost a die — which used to match nothing and can now
- *   resolve against a modifier's die. It is not guarded here because the only available guard
- *   is a group count re-parsed from the authored formula, and `parseDiceGroups` and
- *   `roll.dice` do not agree term-for-term on every formula (a parenthesised die count, for
- *   one), so a slice would sometimes drop an AUTHORED group from trigger matching — a worse
- *   failure than the one it fixes. `CheckTriggers.svelte` offers only the authored formula's
- *   groups, so a dangling id is reachable only by editing a formula after authoring a trigger
- *   against it, and readiness has no rule for it.
- * - `sum` is the DiceTerm#total — the GROUP TOTAL (POST-MODIFIER, active-only). The
- *   `group` key (`NdS`) carries no modifiers, so a modified pool (keep/drop/explode/
- *   reroll, e.g. `2d20kh1`) reports its modified total under the plain `2d20` key — a
- *   total that need not be in `[N, N*S]`. A `diceGroup` trigger's `total` aggregate
- *   matches this group total; the editor + normalizer make modified pools
- *   crit-ineligible, so a converted legacy crit can never collide with a modified
- *   total. When the die has no finite total (an
- *   unevaluated/headless die) the active-only raw faces are summed as a fallback,
- *   matching Foundry's own modified total.
- * - `results` are the ACTIVE-only raw faces: `die.results[].result` (raw face),
- *   filtering `entry.active !== false` (keeps present-true AND absent — Foundry omits
- *   `active` on a kept result — and excludes only an explicit `false`; per AGENTS.md
- *   `DiceTerm#total` is post-modifier, raw faces come from `results[].result`). The
- *   `anyDie`/`allDice`/`lowestDie`/`highestDie` aggregates derive from this; with no
- *   per-die `results` (headless/stub) those aggregates fail open (no break).
- */
-export function rolledDiceGroups(roll) {
-  const dice = Array.isArray(roll?.dice) ? roll.dice : [];
-  return dice.map((die, groupId) => {
-    const count = Number(die?.number);
-    const faces = Number(die?.faces);
-    const dieTotal = Number(die?.total);
-    // Active-only raw faces (#419): `active !== false` keeps present-true AND absent
-    // (Foundry omits `active` on a kept result) and excludes only an explicit `false`
-    // (a dropped/discarded die), matching Foundry's own modified total.
-    const rawResults = Array.isArray(die?.results) ? die.results : [];
-    const results = rawResults
-      .filter((entry) => entry?.active !== false)
-      .map((entry) => Number(entry?.result))
-      .filter((face) => Number.isFinite(face));
-    // `sum` is the post-modifier die total; fall back to the active-only raw-face sum
-    // for an unevaluated/headless die with no finite total (#443).
-    const sum = Number.isFinite(dieTotal) ? dieTotal : results.reduce((acc, face) => acc + face, 0);
-    return {
-      groupId,
-      group: `${Number.isFinite(count) ? count : 0}d${Number.isFinite(faces) ? faces : 0}`,
-      sum,
-      results,
-    };
-  });
-}
-
-/**
- * Resolve any forced outcome from the unified per-check trigger list (issue 419).
- * Each trigger whose `outcome` is `'success'` or `'failure'` forces that
- * disposition when its condition matches the roll. A matching forced FAILURE takes
- * precedence over a forced success. Returns `{ disposition: 'success' | 'failure' }`
- * for the winning trigger, or null when none force an outcome.
- *
- * Condition matching reuses the shared {@link evaluateCheckBreakageCondition}
- * evaluator with a synthetic checkResult `{ value, data: { total, diceGroups } }`,
- * restricted to the outcome-independent condition types (`rollTotal` /
- * `progressiveValue` / `diceGroup`). `outcomeTier` conditions are ignored here: the
- * routed tier is resolved AFTER the forced outcome, so matching on it would be
- * circular. Such a trigger stays live at the two later seams where a tier IS known —
- * it can drive a tier STEP against the rolled tier (see
- * {@link applyTierStepTriggers}, issue 975) and it still breaks tools at the engine
- * seam — so this is one of three call sites of the shared evaluator, not two.
- *
- * @param {Array<object>} triggers
- * @param {{ total?: number, value?: number, diceGroups?: Array<object> }} roll
- * @returns {{ disposition: 'success' | 'failure' } | null}
- */
-export function resolveForcedOutcome(triggers, { total, value, diceGroups } = {}) {
-  const list = Array.isArray(triggers) ? triggers : [];
-  const checkResult = {
-    value,
-    data: { total, diceGroups: Array.isArray(diceGroups) ? diceGroups : [] },
-  };
-  let forcedSuccess = null;
-  for (const trigger of list) {
-    if (!trigger || typeof trigger !== 'object') continue;
-    const outcome = trigger.outcome;
-    if (outcome !== 'success' && outcome !== 'failure') continue;
-    // outcomeTier conditions are circular here (the tier is forced by this very
-    // resolution), so they can never force an outcome.
-    if (trigger.condition?.type === 'outcomeTier') continue;
-    if (!evaluateCheckBreakageCondition(trigger.condition, checkResult)) continue;
-    if (outcome === 'failure') return { disposition: 'failure' }; // forced failure wins
-    forcedSuccess = { disposition: 'success' };
-  }
-  return forcedSuccess;
-}
-
-/**
- * The ids a returned prompt choice ASKS to spend, before any validation.
- *
- * Three shapes are accepted, in this precedence, and the order matters:
- *
- * 1. `chosenModifierIds` — the multi-pick array the prompt returns today. An EMPTY
- *    array is an answer ("I picked nothing"), not an absence, so it wins over the
- *    descriptor default and appends no modifier term at all.
- * 2. `chosenModifierId` — the historical single-pick field. Still honoured so a caller
- *    or harness that supplies one keeps working rather than silently rolling the
- *    default; `null`/`undefined` falls through, exactly as the `??` it replaces did.
- * 3. The descriptor's own pre-selection — the headless-confirm fallback, where the
- *    prompt confirmed without reporting a selection at all.
- *
- * @param {{defaultSelectedIds?: string[], defaultSelectedId?: string}|null} modifierChoice
- * @param {{chosenModifierIds?: unknown, chosenModifierId?: unknown}|null} choice
- * @returns {unknown[]}
- */
-function requestedModifierIds(modifierChoice, choice) {
-  if (Array.isArray(choice?.chosenModifierIds)) return choice.chosenModifierIds;
-  const single = choice?.chosenModifierId;
-  if (single !== undefined && single !== null) return [single];
-  const defaults = modifierChoice?.defaultSelectedIds;
-  if (Array.isArray(defaults)) return defaults;
-  const fallback = modifierChoice?.defaultSelectedId;
-  return fallback === undefined || fallback === null ? [] : [fallback];
-}
-
-/**
- * Reduce a returned prompt selection to the modifiers that actually count, the scalar the
- * FLAT ones sum to, the roll fragments the ROLLING ones contribute, and their labels.
- *
- * The prompt is a UI control, so its cap is not the invariant — this layer re-derives
- * the legal selection from the descriptor and never trusts what came back:
- *
- * - An id the descriptor never OFFERED is discarded rather than valued (an unknown id
- *   contributed 0 before and contributes nothing now, so a lone unknown id still
- *   reduces to 0).
- * - The survivors are taken in ELIGIBLE-SET order and TRUNCATED to `maxPicks`, matching
- *   how `resolveEligibleModifierIds` bounds a `bySubject` selection. Ordering by the
- *   descriptor rather than by the returned array makes the outcome independent of the
- *   order the prompt happened to report, and truncating (rather than taking the best N)
- *   keeps an over-large selection from paying MORE than a legal one.
- * - `maxPicks` absent, or not a positive integer, means 1 — the historical single-pick
- *   behaviour, so a descriptor built before this field existed cannot silently widen.
- * - An empty selection sums to 0 and contributes no fragments.
- *
- * The fragments are taken VERBATIM from the descriptor (issue 1118). They were built,
- * clamped and validated by `checkModifierResolver` when the choice was described, so this
- * layer neither re-clamps nor re-wraps them — a second spelling of the same fragment is how
- * the offered chip and the rolled term would come to disagree.
- *
- * @param {{modifiers?: Array<{id: string, label?: string, value?: number|null,
- *   formula?: string|null}>, maxPicks?: number, defaultSelectedIds?: string[],
- *   defaultSelectedId?: string}|null} modifierChoice
- * @param {{chosenModifierIds?: unknown, chosenModifierId?: unknown}|null} choice
- * @returns {{value: number, formulas: string[], labels: string[]}}
- */
-function resolveModifierSelection(modifierChoice, choice) {
-  const offered = Array.isArray(modifierChoice?.modifiers) ? modifierChoice.modifiers : [];
-  const requested = new Set(requestedModifierIds(modifierChoice, choice));
-  const rawCap = Number(modifierChoice?.maxPicks);
-  const maxPicks = Number.isInteger(rawCap) && rawCap > 0 ? rawCap : 1;
-  const picked = offered
-    .filter((modifier) => typeof modifier?.id === 'string' && requested.has(modifier.id))
-    .slice(0, maxPicks);
-  const value = picked.reduce((sum, modifier) => {
-    const num = Number(modifier?.value);
-    return sum + (Number.isFinite(num) ? num : 0);
-  }, 0);
-  const formulas = picked
-    .map((modifier) => modifier?.formula)
-    .filter((formula) => typeof formula === 'string' && formula.trim() !== '');
-  const labels = picked
-    .map((modifier) => modifier?.label)
-    .filter((label) => typeof label === 'string' && label !== '');
-  return { value, formulas, labels };
-}
-
-/**
- * Evaluate a check roll formula, returning `{ engine, total, diceGroups }`. Returns
- * `engine: false` when no dice engine is available (headless/non-Foundry). Throws on
- * a bad formula (callers wrap it).
- *
- * All interactive behaviour is opt-in via `options`; with no `options` (or no
- * `prompt`/`ChatMessage`) this behaves exactly as the original automated roll.
- *
- * @param {string} formula The roll formula (may carry `@` placeholders).
- * @param {object|null} actor The actor whose roll data resolves the formula.
- * @param {object} [options]
- * @param {boolean} [options.interactive] When true (and a `prompt` is supplied),
- *   confirm the roll with the player and optionally add a situational modifier;
- *   when true (and `ChatMessage.create` exists) post the evaluated roll to chat so
- *   Dice So Nice animates it.
- * @param {(args: {formula: string, resolvedFormula: string|null, dc: *, label: *})
- *   => Promise<{confirmed?: boolean, bonus?: string|null, rollMode?: string}>}
- *   [options.prompt] The confirm dialog (see `promptCheckRoll`).
- * @param {{bonus?: string|null, rollMode?: string, advantage?: string}|null}
- *   [options.rollDecision] A PRE-RESOLVED roll decision (issue 859 bulk salvage):
- *   `promptCheckRoll`'s return shape MINUS `confirmed`. When present on an interactive
- *   roll it is used as the player's `choice` and NO dialog is shown, so one answer can
- *   drive N rolls. Everything downstream of the choice is identical to a prompted roll
- *   (the check-modifier append, advantage transform, the `Roll.validate` net,
- *   `effectiveRollMode`). Absent on every single-item path.
- * @param {string} [options.rollMode] The effective chat roll mode.
- * @param {string} [options.flavor] Chat message flavor / dialog label.
- * @param {object} [options.speaker] Chat message speaker.
- * @param {*} [options.dc] The DC surfaced to the prompt (display only).
- * @param {object} [options.craftingModifier] The check-modifier context
- *   (issue 770): `{ catalogue, systemPolicy, defaultModifierIds, recipeModifier,
- *   maxModifierPicks }`. Resolved to a scalar and APPENDED as one `+ N[Modifiers]` term
- *   before the formula reaches Foundry's `Roll`.
- * @param {{modifiers: Array<{id,label,icon,value}>, maxPicks: number,
- *   defaultSelectedIds: string[], defaultSelectedId: string}} [options.modifierChoice]
- *   The deferred interactive `playerPicks` descriptor (issues 770, 1055). Present only
- *   on an interactive `playerPicks` craft; when set, NO modifier term is appended until
- *   the prompt returns the chosen ids, and then the SUM of those modifiers' values is.
- *   `playerPicks` is multi-pick: the player selects up to `maxPicks`, so a cap of 1 is
- *   the historical single-pick behaviour and nothing else about this path changes.
- *   Absent on every other path.
- * @returns {Promise<{engine: boolean, total: number, diceGroups: Array<object>,
- *   resolvedFormula: string|null, cancelled?: boolean}>}
+ * Evaluate a check formula to `{ engine, total, diceGroups, resolvedFormula }`: `engine: false`
+ * without a dice engine, and a bad formula throws for the caller to wrap. Interactive behaviour
+ * is opt-in: `interactive` with a `prompt` confirms with the player, and a pre-resolved
+ * `rollDecision` (the prompt's shape minus `confirmed`, issue 859) stands in for the dialog so
+ * one answer drives N rolls. `modifierChoice` defers the `playerPicks` append until the prompt
+ * returns (issues 770, 1055); otherwise `craftingModifier` appends before anything reads the
+ * formula. A cancelled prompt returns `cancelled: true` so the runner aborts with zero mutation.
+ * Separately evaluated modifiers settle before the main roll and return their ordered placement.
+ * `advantage` is the check's normalized advantage rule, the normalizer's default when absent.
  */
 export async function evaluateCheckRoll(formula, actor, options = {}) {
-  if (typeof globalThis.Roll !== 'function')
-    return { engine: false, total: 0, diceGroups: [], resolvedFormula: null };
-  // The retirement shim runs UNCONDITIONALLY at the head (issue 1094), so a token that
-  // survived the `1.21.0` migration — hand-edited, imported, or seeded by a fixture —
-  // can never reach Foundry's `Roll` and can never double-count against the appended
-  // term below. It is TOTAL: what comes back is a formula `Roll.validate` accepts or
-  // `''`, never a dangling operator.
+  // A count check rolls its structured pool, so its retained formula never reaches `Roll`.
+  if (ownEvaluation(options).product === 'count') return evaluateCountCheckRoll(actor, options);
+  if (typeof globalThis.Roll !== 'function') return noRoll();
+  // The retirement shim runs first, unconditionally (issue 1094): a surviving token never
+  // reaches `Roll` or double-counts against the appended term.
   const authoredFormula = stripRetiredModifierPlaceholder(String(formula));
-  // A formula the shim emptied is NOT a check. The usability readers
-  // (`resolveActiveCraftingCheckFormula`, `resolveSalvageCheck`) report it as
-  // "no formula", and `_runCraftingCheck` now gates all five of its runner decisions on
-  // that same POST-SHIM `checkUsable`, so this is a BACKSTOP rather than the only guard:
-  // it keeps `new Roll('')` — which throws, and would surface as a rolled and therefore
-  // CONSUMING failure — unreachable from any caller that reaches this function by another
-  // route (a hand-built config, a runner called directly). Reported as "no engine", the
-  // shape every runner already treats as non-blocking.
-  if (authoredFormula.trim() === '')
-    return { engine: false, total: 0, diceGroups: [], resolvedFormula: null };
+  // A formula the shim emptied is not a check. The usability readers already gate on it; this
+  // backstop keeps `new Roll('')` (a rolled, consuming failure) unreachable by any other route.
+  if (authoredFormula.trim() === '') return noRoll();
   const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
-  // Interactive `playerPicks` (issue 770 Phase 2): the modifier value depends on a
-  // selection made INSIDE the prompt, so it cannot be pre-resolved here. When a deferred
-  // `modifierChoice` descriptor is present AND this is an interactive prompt roll, append
-  // nothing yet and append the chosen value after the prompt returns. Every other path
-  // (all Phase-1 policies, and non-interactive `playerPicks`) appends the deterministic
-  // scalar, exactly as before.
-  const modifierChoice = options?.modifierChoice;
-  const useDeferredChoice =
-    Boolean(modifierChoice) &&
-    options?.interactive === true &&
-    (typeof options.prompt === 'function' || Boolean(options?.rollDecision));
-  // Append the resolved check-modifier scalar (issues 770, 1094) BEFORE anything
-  // downstream reads the formula, so the dialog, roll, and journal all agree
-  // (eval == display). A zero scalar — or no modifier context at all — appends nothing.
-  //
-  // Through {@link resolveRolledFormula} rather than inline (issue 1097): the shim above
-  // has already run, so this composition is a no-op re-strip, and routing it here is what
-  // makes "the formula this module rolls" a thing OTHER modules can ask for instead of
-  // rebuild. The Checks Studio's odds enumerator asks; before it could, it charted the
-  // authored formula while the simulator rolled the appended one.
-  const baseFormula = useDeferredChoice
-    ? authoredFormula
-    : resolveRolledFormula(authoredFormula, actor, options?.craftingModifier);
-  // Capture the @-resolved formula (e.g. "1d20 + 3") so the dialog and run journal
-  // can show the actual modifiers, not the authored `@abilities…` placeholders.
-  // Recomputed from the COMBINED formula below when a valid situational bonus is
-  // applied, so the journal display reconciles with the rolled total (FIX 3).
-  let resolved = resolveCheckFormulaDisplay(baseFormula, actor);
-
-  let effectiveFormula = baseFormula;
-  let effectiveRollMode = options?.rollMode;
-  let effectiveFlavor = options?.flavor;
-  // THE ADVANTAGE QUESTION IS ASKED OF THE AUTHORED CHECK, NEVER OF THE APPENDED MODIFIERS
-  // (issue 1118 review). Once a modifier may roll, `parsePlainDiceGroups` — which splits on
-  // parens AND flavour brackets — reads `(1d20)[Modifiers]` as a plain `1d20`, so a `2d10`
-  // check carrying a `1d20` modifier would offer Advantage it does not have and
-  // `applyD20Advantage` would rewrite the MODIFIER's die into `2d20kh1`. It also made the two
-  // paths disagree with each other: the non-deferred one computed `allowAdvantage` AFTER the
-  // append and the deferred one BEFORE it, on the same system.
-  //
-  // The transform is applied to this prefix and the remainder is re-attached, which is sound
-  // because every appender here only ever APPENDS to the trimmed base — `appendToolBonusTerms`
-  // and `appendCheckModifierRollTerms` both return `base + terms`. The `startsWith` guard
-  // keeps that an invariant rather than an assumption: a caller that ever breaks it falls back
-  // to the whole-string transform instead of splicing at the wrong offset.
-  let advantageBase = authoredFormula.trim();
-
-  // A PRE-RESOLVED decision (issue 859): one prompt answer applied to every roll of a
-  // bulk run. It stands in for the dialog's return value, so the whole block below —
-  // and only that block — has two ways to obtain a `choice`.
-  const preResolved = options?.rollDecision ?? null;
-
-  // Interactive roll (opt-in): confirm with the player (or reuse a pre-resolved
-  // decision) and optionally append a situational modifier before rolling. A cancelled
-  // prompt short-circuits with `cancelled: true` so the runner can abort with zero
-  // mutation.
-  //
-  // The `Boolean(preResolved) ||` half is load-bearing: without it a decision supplied
-  // with no `prompt` is silently discarded and the BASE formula rolls — the bulk run's
-  // situational bonus, advantage and roll mode all vanish with no error.
-  if (
-    options?.interactive === true &&
-    (Boolean(preResolved) || typeof options.prompt === 'function')
-  ) {
-    // Prompt-only work, so it lives in the prompt arm and is never computed for a
-    // pre-resolved roll (which shows no dialog and needs no display formula).
-    const askPlayer = async () => {
-      // For a deferred modifier choice the modifier value is the player's pick, which
-      // isn't known until the dialog resolves. Show the slot as a neutral TRAILING
-      // `+ (modifier)[Modifiers]` term — the same position the resolved term takes —
-      // rather than a static default number a non-default pick would contradict. Other
-      // `@` placeholders still resolve to numbers; the per-option value chips carry each
-      // option's value.
-      const promptFormula = useDeferredChoice
-        ? `${effectiveFormula} + ${DEFERRED_MODIFIER_SLOT}`
-        : effectiveFormula;
-      const promptResolved = useDeferredChoice
-        ? resolveCheckFormulaDisplay(promptFormula, actor)
-        : resolved;
-      return options.prompt({
-        formula: promptFormula,
-        resolvedFormula: promptResolved?.display ?? null,
-        dc: options.dc,
-        label: options.flavor,
-        name: options.name,
-        activity: options.activity,
-        img: options.img,
-        modifierChoice,
-        // Advantage/Disadvantage are offered only for a plain-d20 check — the AUTHORED
-        // check, not whatever the modifiers appended to it.
-        allowAdvantage: hasPlainD20(advantageBase),
-      });
-    };
-    const choice = preResolved ?? (await askPlayer());
-    // LOAD-BEARING `=== false`: a pre-resolved `rollDecision` carries NO `confirmed`
-    // key (it is `promptCheckRoll`'s shape minus that flag), so tightening this to
-    // `!choice.confirmed` would turn every bulk roll into a cancellation.
-    if (!choice || choice.confirmed === false) {
-      return { engine: true, cancelled: true, total: 0, diceGroups: [], resolvedFormula: null };
-    }
-    // Resolve the player's modifier selection FIRST — before the advantage transform and
-    // situational-bonus append — so those compose on top of the chosen modifier and the
-    // same appended formula feeds eval AND display (eval == display).
-    if (useDeferredChoice) {
-      // The player may pick UP TO `maxPicks` modifiers; the flat ones SUM into one term and
-      // each rolling one appends its own (issue 1118). `resolveModifierSelection` owns the
-      // whole reduction, including re-imposing the cap the prompt only *displays* and
-      // falling back to the pre-selection when the prompt confirmed without one (headless).
-      // A zero sum with no fragments appends nothing, which is the same formula an empty
-      // pick would have rolled before.
-      const selection = resolveModifierSelection(modifierChoice, choice);
-      effectiveFormula = appendCheckModifierRollTerms(
-        appendCheckModifierTerm(effectiveFormula, { value: selection.value }),
-        selection.formulas
-      );
-      resolved = resolveCheckFormulaDisplay(effectiveFormula, actor);
-      // Best-effort: append the chosen modifier labels to the chat flavor (e.g.
-      // `… · Herbalism, Alchemist's Kit`), riding the existing flavor thread. One
-      // bullet-joined segment however many were picked, so the flavor does not grow a
-      // separator per modifier.
-      const chosenLabel = selection.labels.join(', ');
-      // Only join with the bullet when there is an existing flavor; an empty base must
-      // not leave an orphan `· ` (production always supplies a flavor, but direct
-      // callers/tests may not).
-      if (chosenLabel) {
-        effectiveFlavor = effectiveFlavor ? `${effectiveFlavor} · ${chosenLabel}` : chosenLabel;
-      }
-    }
-    // Advantage transform first (so the situational bonus appends AFTER the pool),
-    // yielding e.g. `2d20kh1 + 3 + (2)`. Only a plain `1d20` is rewritten; any other
-    // disposition or formula is left unchanged.
-    if (choice.advantage === 'advantage' || choice.advantage === 'disadvantage') {
-      if (effectiveFormula.startsWith(advantageBase)) {
-        const rewritten = applyD20Advantage(advantageBase, choice.advantage);
-        effectiveFormula = rewritten + effectiveFormula.slice(advantageBase.length);
-        advantageBase = rewritten;
-      } else {
-        effectiveFormula = applyD20Advantage(effectiveFormula, choice.advantage);
-      }
-      resolved = resolveCheckFormulaDisplay(effectiveFormula, actor);
-    }
-    const bonus = typeof choice.bonus === 'string' ? choice.bonus.trim() : choice.bonus;
-    if (bonus) {
-      // Guaranteed safety net: a malformed situational bonus must NEVER reach
-      // `new Roll(...).evaluate()` and become a rolled (consuming) check failure.
-      // When `Roll.validate` is available and rejects the combined formula, IGNORE
-      // the bonus and roll the base formula instead. When `Roll.validate` is
-      // unavailable (headless/tests), fall through — the runner's try/catch is the
-      // backstop there.
-      const combined = `${effectiveFormula} + (${bonus})`;
-      // `Roll.validate` is a STATIC that does `new this(formula)` internally, so it MUST
-      // be invoked as a method. Detaching it (`const validate = Roll.validate`) leaves
-      // `this` undefined, `new this(...)` throws inside Foundry's own try/catch, and it
-      // returns false for EVERY formula — which silently dropped the situational bonus
-      // from every roll, whole number and dice expression alike.
-      const RollClass = globalThis.Roll;
-      if (typeof RollClass?.validate === 'function' && RollClass.validate(combined) === false) {
-        console.warn('Fabricate | Ignoring invalid situational bonus', bonus);
-      } else {
-        effectiveFormula = combined;
-        // Reconcile the journal display with the total actually rolled (FIX 3).
-        resolved = resolveCheckFormulaDisplay(effectiveFormula, actor);
-      }
-    }
-    if (choice.rollMode) effectiveRollMode = choice.rollMode;
-  }
-
-  // Automated check roll: never surface a manual roll-fulfilment dialog mid-craft
-  // on a client configured for manual fulfilment (mirrors Roll.simulate's V13
-  // behaviour). `allowInteractive: false` suppresses that resolver.
-  const roll = await new globalThis.Roll(effectiveFormula, rollData).evaluate({
-    allowInteractive: false,
+  const evaluation = ownEvaluation(options);
+  const deferred = defersModifierChoice(options);
+  const resolvedCheck = deferred
+    ? { formula: authoredFormula, selected: [] }
+    : resolveRolledCheck(authoredFormula, actor, options?.craftingModifier, undefined, evaluation);
+  const decision = await resolveCheckDecision({
+    authoredFormula,
+    actor,
+    options,
+    evaluation,
+    deferred,
+    resolvedCheck,
+    displayFormula: resolveCheckFormulaDisplay,
+    Roll: globalThis.Roll,
   });
+  if (decision.cancelled) {
+    return carryAdditionalDice({ ...noRoll(), engine: true, cancelled: true }, decision);
+  }
+  const {
+    formula: effectiveFormula,
+    flavor: effectiveFlavor,
+    rollMode: effectiveRollMode,
+    resolvedFormula,
+    placementPlan,
+    benefitTerms,
+  } = decision;
+  const { placement: modifierPlacement, rolls: preRolls } = await resolveModifierPreRolls(
+    placementPlan,
+    { Roll: globalThis.Roll, rollData }
+  );
+
+  // Construct, keep (issue 2007), then evaluate with no manual-fulfilment dialog mid-craft.
+  const { roll, kept } = await evaluateKeptRoll(effectiveFormula, rollData, decision.keep);
   const rolledTotal = Number(roll?.total);
   const total = Number.isFinite(rolledTotal) ? rolledTotal : 0;
+  const flavor = settledFlavor(options, effectiveFlavor, evaluation, modifierPlacement);
 
-  // Surface the roll to chat so Dice So Nice animates it (interactive only).
-  // `toMessage` is the DSN trigger — no dice3d/game.dice3d code is needed. A chat
-  // failure is logged and swallowed, never thrown (mirrors
-  // `CraftingEngine._postCraftChatMessage`).
-  if (
-    options?.interactive &&
-    options?.post !== false &&
-    typeof globalThis.ChatMessage?.create === 'function'
-  ) {
-    try {
-      await roll.toMessage(
-        { speaker: options.speaker, flavor: effectiveFlavor },
-        { rollMode: effectiveRollMode, create: true }
-      );
-    } catch (error) {
-      console.error('Fabricate | Failed to post check roll to chat:', error);
-    }
-  }
-
+  const posting = { roll, options, flavor, rollMode: effectiveRollMode };
   const result = {
     engine: true,
     total,
     diceGroups: rolledDiceGroups(roll),
-    resolvedFormula: resolved?.display ?? null,
+    resolvedFormula: kept ? roll.formula : resolvedFormula,
+    modifierPlacement,
+    ...(benefitTerms?.length > 0 && { benefitTerms }),
+    ...(options?.reportVisibility === true && { rollMode: effectiveRollMode ?? null }),
+    ...(await postCheckRoll({ ...posting, preRolls })),
   };
-  if (options?.includeRollHandoff === true && typeof roll?.toJSON === 'function') {
-    result.rollHandoff = {
-      serializedRoll: roll.toJSON(),
-      flavor: effectiveFlavor ?? null,
-      speaker: options?.speaker ?? null,
-      rollMode: effectiveRollMode ?? null,
-    };
-  }
+  const rollHandoff = checkRollHandoff({ ...posting, placement: modifierPlacement });
+  if (rollHandoff) result.rollHandoff = rollHandoff;
   return result;
 }
 
-function validatedPreparedDecision(decision, modifierChoice) {
-  const source = decision && typeof decision === 'object' ? decision : {};
-  const offered = new Set(
-    (Array.isArray(modifierChoice?.modifiers) ? modifierChoice.modifiers : [])
-      .map((modifier) => modifier?.id)
-      .filter((id) => typeof id === 'string')
-  );
-  const selected = (Array.isArray(source.modifierIds) ? source.modifierIds : []).filter(
-    (id) => typeof id === 'string' && offered.has(id)
-  );
-  const advantage = ['advantage', 'disadvantage'].includes(source.advantage)
-    ? source.advantage
-    : null;
-  const rollMode = ['publicroll', 'gmroll', 'blindroll', 'selfroll'].includes(source.rollMode)
-    ? source.rollMode
-    : null;
-  return {
-    bonus: typeof source.bonus === 'string' ? source.bonus : null,
-    advantage,
-    rollMode,
-    chosenModifierIds: selected,
-  };
+/**
+ * The flavor a pass/fail roll posts: outside sum/over/fixed it names the FINAL target, the
+ * `flavorTarget` anchor with its settled benefits, as the prompt chip and the result's Target row
+ * do (maintainer ruling M1). The suffix sits before any appended modifier label.
+ */
+function settledFlavor(options, flavor, evaluation, placement) {
+  const anchor = options?.flavorTarget;
+  if (typeof flavor !== 'string' || !Number.isFinite(anchor)) return flavor;
+  if (evaluation?.product !== 'sum' || isFixedSumOver(evaluation)) return flavor;
+  const target = effectiveTarget(anchor, sumGrading(evaluation), placement?.targetDelta);
+  const base = flavor.startsWith(options.flavor ?? '\0') ? options.flavor : flavor;
+  return `${base}${targetFlavorSuffix(target)}${flavor.slice(base.length)}`;
+}
+
+/**
+ * The first own `evaluation` among `sources`, else sum/over. An own key only: an inherited
+ * `evaluation` (prototype pollution) never selects a mode.
+ */
+function ownEvaluation(...sources) {
+  for (const source of sources) {
+    const evaluation =
+      source != null && Object.hasOwn(source, 'evaluation') ? source.evaluation : null;
+    if (evaluation != null) return evaluation;
+  }
+  return SUM_OVER_EVALUATION;
 }
 
 /**
@@ -567,7 +279,14 @@ export async function evaluatePreparedCheck(preparation, actor, decision = {}) {
   const source = preparation && typeof preparation === 'object' ? preparation : {};
   const options = source.options && typeof source.options === 'object' ? source.options : {};
   const secret = source.secret === true;
-  const rollDecision = validatedPreparedDecision(decision, options.modifierChoice);
+  // The prepare-time snapshot's own offer: a button it excludes never reaches the roll.
+  const advantageOffer = resolveAdvantageOffer({
+    advantage: options.advantage,
+    evaluation: ownEvaluation(options),
+    authoredFormula: stripRetiredModifierPlaceholder(String(source.formula ?? '')),
+    Roll: globalThis.Roll,
+  });
+  const rollDecision = validatedPreparedDecision(decision, options.modifierChoice, advantageOffer);
   // Secrecy is authoritative, not a default that the player's roll-mode choice may override.
   if (secret) rollDecision.rollMode = 'gmroll';
   const result = await evaluateCheckRoll(source.formula, actor, {
@@ -579,16 +298,26 @@ export async function evaluatePreparedCheck(preparation, actor, decision = {}) {
     includeRollHandoff: !secret,
   });
   if (!secret) return result;
+  // The settled placement stays inside the authority for classification; the requester's reply never carries it.
   return {
     engine: result.engine,
     total: result.total,
     diceGroups: result.diceGroups,
     resolvedFormula: null,
+    modifierPlacement: result.modifierPlacement,
+    ...(result.refusal && { refusal: result.refusal }),
+    ...(result.bought && { bought: result.bought }),
+    ...(result.cancelled && carryAdditionalDice({ cancelled: true }, result)),
+    ...(result.policy && {
+      policy: result.policy,
+      zeroPool: result.zeroPool === true,
+      countProjection: result.countProjection ?? null,
+    }),
     secret: true,
   };
 }
 
-function preparedCheckKind(preparation) {
+export function preparedCheckKind(preparation) {
   const slot = String(preparation?.slot ?? '').toLowerCase();
   const mode = String(preparation?.mode ?? '').toLowerCase();
   if (slot.includes('progressive') || mode.includes('progressive')) return 'progressive';
@@ -598,15 +327,157 @@ function preparedCheckKind(preparation) {
   return 'simple';
 }
 
+/** The executed evidence of a summed check: `target` is effective and `margin` benefit-positive. */
+function executedSumEvidence(total, target, comparison, direction = 'over') {
+  return {
+    product: 'sum',
+    direction,
+    comparison,
+    target,
+    margin: target === null ? null : effectiveMargin(total, target, direction),
+    successes: null,
+    cancelled: null,
+  };
+}
+
+/** `data.dc` names only a fixed target; an attribute result carries its number in `data.target`. */
+function fixedDc(dc, grading) {
+  return grading.source === 'fixed' ? dc : null;
+}
+
+/** A prepared check refuses progressive sum/under, and a blank sum/under formula, before any roll. */
+function preparedCheckRefusal(kind, evaluation, formula) {
+  if (kind === 'progressive') return progressiveTargetRefusal(evaluation);
+  const blank = String(formula ?? '').trim() === '';
+  return blank && sumGrading(evaluation).direction === 'under' ? 'formula-empty' : null;
+}
+
+/** Grades a prepared total as the matching runner does, against the captured anchor. */
+function gradePreparedTotal(
+  kind,
+  { config, evaluation, anchor, rolled, total, diceGroups, secret, actor }
+) {
+  const grading = sumGrading(evaluation);
+  const targetDelta = rolled.modifierPlacement?.targetDelta;
+  const triggers = config.checkBreakage?.triggers ?? config.triggers ?? [];
+  const comparison = config.thresholdMode === 'exceed' ? 'exceed' : 'meet';
+  const terms = (target, tierTerm) =>
+    secret
+      ? {}
+      : targetTermsEvidence({
+          grading,
+          target,
+          anchor,
+          baseTerms: config.targetTerms,
+          tierTerm,
+          rolled,
+          evaluation,
+          actor,
+        });
+  if (kind === 'routed') {
+    const classifyInput = {
+      type: config.type,
+      total,
+      dc: anchor,
+      comparison,
+      relativeOutcomes: config.relativeOutcomes,
+      fixedOutcomes: config.fixedOutcomes,
+      triggers,
+      diceGroups,
+      clampToNearest: config.clampToNearest !== false,
+      minOutcomeId: config.minOutcomeId ?? null,
+      evaluation,
+      targetDelta,
+    };
+    const classified = classifyCheckTotal(classifyInput);
+    const tierTerm = classified.target === null ? null : rolledTierTerm(grading, classifyInput);
+    return {
+      success: classified.success,
+      outcome: classified.matched?.name ?? null,
+      value: total,
+      data: {
+        type: config.type,
+        ...executedSumEvidence(total, classified.target, classified.comparison, grading.direction),
+        ...terms(classified.target, tierTerm),
+        outcomeId: classified.matched?.id ?? null,
+        success: classified.success,
+        breakTools: classified.breakTools,
+        ...routedTriggerEvidence(classified),
+        ...(classified.minTierFailed && {
+          minTierFailed: true,
+          blockedOutcomeId: classified.blockedOutcomeId,
+        }),
+      },
+    };
+  }
+  const forced = resolveForcedOutcome(triggers, { total, diceGroups });
+  if (kind === 'progressive') {
+    let value = total;
+    if (forced?.disposition === 'success') value = Number.MAX_SAFE_INTEGER;
+    if (forced?.disposition === 'failure') value = 0;
+    return {
+      success: true,
+      outcome: null,
+      value,
+      data: {
+        ...executedSumEvidence(total, null, null),
+        value,
+        ...(forced && { forcedOutcome: forced.disposition }),
+      },
+    };
+  }
+  const target = effectiveTarget(Number(anchor), grading, targetDelta);
+  const success = forced
+    ? forced.disposition === 'success'
+    : compareToTarget(total, target, comparison, grading.direction);
+  return {
+    success,
+    outcome: success ? 'pass' : 'fail',
+    value: total,
+    data: {
+      ...executedSumEvidence(total, target, comparison, grading.direction),
+      ...terms(target, null),
+      ...(forced && { forcedOutcome: forced.disposition }),
+    },
+  };
+}
+
+/**
+ * The options a prepared check rolls with, every one from its prepare-time capture: the advantage
+ * rule is the snapshot's, so a config edit between prepare and execute changes nothing.
+ */
+function preparedRollOptions(
+  preparation,
+  { config, advantage, evaluation, count, kind, secret, anchor, rollMode, user }
+) {
+  return {
+    flavor:
+      preparation?.flavor ?? preparation?.publicPrompt?.label ?? config.label ?? 'Crafting check',
+    rollMode: secret ? 'gmroll' : (rollMode ?? 'selfroll'),
+    craftingModifier: config.craftingModifier ?? null,
+    modifierChoice: config.modifierChoice ?? null,
+    toolContributions: config.toolContributions ?? [],
+    evaluation,
+    advantage,
+    speaker: preparation?.speaker ?? config.speaker ?? null,
+    ...preparedCountOptions(count, { secret, kind, type: config.type }),
+    // A pass/fail roll names its final target; a secret one never carries it.
+    ...(kind === 'simple' && !secret && { flavorTarget: anchor }),
+    reportVisibility: true,
+    user,
+  };
+}
+
 /**
  * Evaluate and classify the private CraftingEngine check descriptor without accepting a client
- * formula or total. This is the authority-side twin of the three existing formula runners.
+ * formula or total. This is the authority-side twin of the three existing formula runners; it
+ * places by the prepared evaluation and grades against the captured `decisionPolicy.target`.
  */
 export async function evaluatePreparedRunCheck(
   preparation,
   actor,
   decision = {},
-  { secret = false, failureMessage = 'Check failed' } = {}
+  { secret = false, failureMessage = 'Check failed', label = 'Crafting', user = null } = {}
 ) {
   const checkConfig =
     preparation?.checkConfig && typeof preparation.checkConfig === 'object'
@@ -617,34 +488,42 @@ export async function evaluatePreparedRunCheck(
       ? preparation.decisionPolicy
       : {};
   const config = { ...checkConfig, ...decisionPolicy };
-  const authoritativeDecision = {
-    ...decision,
-    bonus: decision?.allowsSituationalModifier === true ? decision.bonus : null,
-    advantage: decision?.allowAdvantage === true ? decision.advantage : null,
-  };
+  const kind = preparedCheckKind(preparation);
+  const evaluation = activeCheckEvaluation(checkConfig);
+  const refusal = preparedCheckRefusal(kind, evaluation, preparation?.rollFormula);
+  if (refusal) return checkTargetRefusal(refusal, label);
+  // A count check replays its captured policy and never re-reads the live actor's pool.
+  const count =
+    evaluation.product === 'count' ? preparedCountEvaluation(decisionPolicy.count) : null;
+  if (evaluation.product === 'count' && !count) {
+    return checkTargetRefusal('invalid', label, { refusedInput: 'pool' });
+  }
+  const anchor = decisionPolicy.target ?? config.resolvedDc ?? config.dc;
+  const authoritativeDecision = authorizedPreparedDecision(decision);
+  if (authoritativeDecision.additionalDiceRefusal) {
+    return carryAdditionalDice(cancelled({}), authoritativeDecision);
+  }
+  const options = preparedRollOptions(preparation, {
+    config,
+    advantage: checkConfig.advantage,
+    evaluation,
+    count,
+    kind,
+    secret,
+    anchor,
+    rollMode: authoritativeDecision.rollMode,
+    user,
+  });
   const rolled = await evaluatePreparedCheck(
-    {
-      formula: preparation?.rollFormula,
-      secret,
-      options: {
-        flavor:
-          preparation?.flavor ??
-          preparation?.publicPrompt?.label ??
-          config.label ??
-          'Crafting check',
-        rollMode: secret ? 'gmroll' : (authoritativeDecision.rollMode ?? 'selfroll'),
-        craftingModifier: config.craftingModifier ?? null,
-        modifierChoice: config.modifierChoice ?? null,
-        speaker: preparation?.speaker ?? config.speaker ?? null,
-      },
-    },
+    { formula: preparation?.rollFormula, secret, options },
     actor,
     authoritativeDecision
   );
-  if (rolled.cancelled) {
-    return { success: false, cancelled: true, outcome: null, value: null, data: {} };
+  if (rolled.cancelled) return carryAdditionalDice(cancelled({}), rolled);
+  if (count) {
+    const grading = { config, required: count.required, secret, failureMessage, label };
+    return preparedCountResult(kind, rolled, grading);
   }
-  const kind = preparedCheckKind(preparation);
   if (!rolled.engine) {
     return {
       success: true,
@@ -658,63 +537,36 @@ export async function evaluatePreparedRunCheck(
   }
   const total = Number(rolled.total) || 0;
   const diceGroups = Array.isArray(rolled.diceGroups) ? rolled.diceGroups : [];
-  const triggers = config.checkBreakage?.triggers ?? config.triggers ?? [];
-  const forced = resolveForcedOutcome(triggers, { total, diceGroups });
-  const data = {
-    dc: config.resolvedDc ?? config.dc,
+  const graded = gradePreparedTotal(kind, {
+    config,
+    evaluation,
+    anchor,
+    rolled,
     total,
     diceGroups,
-  };
-  let success = true;
-  let outcome = null;
-  let value = total;
-  if (kind === 'progressive') {
-    if (forced?.disposition === 'success') value = Number.MAX_SAFE_INTEGER;
-    if (forced?.disposition === 'failure') value = 0;
-    data.value = value;
-  } else if (kind === 'routed') {
-    const classified = classifyCheckTotal({
-      type: config.type,
-      total,
-      dc: data.dc,
-      comparison: config.thresholdMode === 'exceed' ? 'exceed' : 'meet',
-      relativeOutcomes: config.relativeOutcomes,
-      fixedOutcomes: config.fixedOutcomes,
-      triggers,
-      diceGroups,
-      clampToNearest: config.clampToNearest !== false,
-      minOutcomeId: config.minOutcomeId ?? null,
-    });
-    success = classified.success;
-    outcome = classified.matched?.name ?? null;
-    data.type = config.type;
-    data.comparison = config.thresholdMode === 'exceed' ? 'exceed' : 'meet';
-    data.outcomeId = classified.matched?.id ?? null;
-    data.success = success;
-    data.breakTools = classified.breakTools;
-    if (classified.tierStepApplied) data.tierStepApplied = classified.tierStepApplied;
-    if (classified.minTierFailed) {
-      data.minTierFailed = true;
-      data.blockedOutcomeId = classified.blockedOutcomeId;
-    }
-  } else {
-    const comparison = config.thresholdMode === 'exceed' ? 'exceed' : 'meet';
-    success = forced
-      ? forced.disposition === 'success'
-      : comparison === 'exceed'
-        ? total > Number(data.dc)
-        : total >= Number(data.dc);
-    outcome = success ? 'pass' : 'fail';
-    data.comparison = comparison;
-  }
+    secret,
+    actor,
+  });
   return {
-    success,
-    outcome,
-    value,
-    data,
-    message: success ? null : failureMessage,
+    success: graded.success,
+    outcome: graded.outcome,
+    value: graded.value,
+    data: {
+      dc: config.resolvedDc ?? config.dc,
+      total,
+      // The formulas the dice line states, typed and resolved; a secret roll hands back neither.
+      ...(rolled.resolvedFormula && {
+        rollFormula: stripRetiredModifierPlaceholder(String(preparation.rollFormula ?? '')).trim(),
+        resolvedFormula: rolled.resolvedFormula,
+      }),
+      diceGroups,
+      ...(!secret && preRollEvidence(rolled)),
+      ...graded.data,
+    },
+    message: graded.success ? null : failureMessage,
     engineEvaluated: true,
     secret,
+    visibility: { rollMode: secret ? 'gmroll' : (rolled.rollMode ?? null), secret },
     ...(rolled.rollHandoff && { rollHandoff: rolled.rollHandoff }),
   };
 }
@@ -727,71 +579,19 @@ export function evaluatePreparedCraftingCheck(preparation, actor, decision = {},
   });
 }
 
-/** Reconstruct and post a GM-evaluated roll in the entitled player's own Foundry session. */
-export async function postCheckRollHandoff(handoff, { Roll = globalThis.Roll } = {}) {
-  if (!handoff?.serializedRoll || typeof Roll?.fromData !== 'function') {
-    return { success: false, reason: 'invalid-roll-handoff' };
-  }
-  try {
-    const roll = Roll.fromData(handoff.serializedRoll);
-    if (!roll || typeof roll.toMessage !== 'function') {
-      return { success: false, reason: 'invalid-roll-handoff' };
-    }
-    await roll.toMessage(
-      { speaker: handoff.speaker ?? undefined, flavor: handoff.flavor ?? undefined },
-      { ...chatModeOption(handoff.rollMode), create: true }
-    );
-    return { success: true };
-  } catch (error) {
-    console.error('Fabricate | Failed to post authoritative check roll to chat:', error);
-    return { success: false, reason: 'chat-post-failed' };
-  }
-}
-
 /**
- * Roll a SIDE expression — one that is not a crafting check — and post it to chat under an
- * EXPLICIT visibility token.
- *
- * ## Why this is not {@link evaluateCheckRoll}
- *
- * Not because of the chat post: that function already posts for Dice So Nice, gated on
- * `options.interactive`. It is because it also applies the retired-modifier shim, the
- * check-modifier append and the advantage transform — three transforms that belong to a
- * crafting CHECK and have no business on a complication's damage roll. A `2d6` shrapnel roll
- * must not silently gain `+ 4[Modifiers]` because the system has a check-modifier catalogue.
- *
- * ## The mode token is always explicit
- *
- * `core.rollMode` / `core.messageMode` are `scope: "client"` settings, so falling back to them
- * reads the WRITING client's own selector: a GM with Private GM Roll selected would silently
- * turn a player-visible complication's roll GM-only. Callers pass `publicroll` or `gmroll` and
- * never rely on the fallback. {@link chatModeOption} then picks the option key and the
- * vocabulary together.
- *
- * This is the ONLY place besides {@link evaluateCheckRoll} that constructs a `Roll`.
- *
- * @param {string} formula The expression to roll, verbatim — no shim, no append, no transform.
- * @param {object|null} actor The actor whose roll data resolves `@` placeholders.
- * @param {object} [options]
- * @param {string} [options.rollMode='publicroll'] The EXPLICIT legacy visibility token.
- * @param {string} [options.flavor] Chat flavor.
- * @param {object} [options.speaker] Chat speaker; omitted from the message data when absent so
- *   core builds its own.
- * @param {boolean} [options.post=true] Post the roll to chat. `false` evaluates only, for a
- *   caller that carries the total somewhere other than a message.
- * @returns {Promise<{engine: boolean, total: number, formula: string|null, posted: boolean,
- *   roll: object|null}>} `engine: false` with no dice engine or an empty formula, the same
- *   non-blocking shape every runner already treats as "no roll". Throws on a bad formula, which
- *   the caller wraps — a complication's effect roll is guarded per effect precisely so a
- *   malformed one still lets its macro run.
+ * Roll a side expression (not a check) verbatim, with no shim, modifier append or advantage, and
+ * post it under an explicit visibility token, never the client-scoped `core.rollMode` or
+ * `core.messageMode` fallback, which follows the writing client's own selector. `post: false`
+ * only evaluates. `engine: false` without a dice engine or with an empty formula; a bad formula
+ * throws for the caller to wrap.
  */
 export async function evaluateSideRoll(formula, actor, options = {}) {
   const expression = String(formula ?? '').trim();
   if (typeof globalThis.Roll !== 'function' || expression === '')
     return { engine: false, total: 0, formula: null, posted: false, roll: null };
   const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
-  // `allowInteractive: false` for the same reason the check path passes it: never surface a
-  // manual roll-fulfilment dialog mid-resolution on a client configured for manual fulfilment.
+  // `allowInteractive: false`, as on the check path.
   const roll = await new globalThis.Roll(expression, rollData).evaluate({
     allowInteractive: false,
   });
@@ -808,8 +608,7 @@ export async function evaluateSideRoll(formula, actor, options = {}) {
       });
       posted = true;
     } catch (error) {
-      // Swallowed and logged, never thrown: a chat failure must not cost the caller the
-      // outcome it already committed (the same containment `evaluateCheckRoll` uses).
+      // Logged, never thrown: a chat failure must not cost the caller its committed outcome.
       console.error('Fabricate | Failed to post side roll to chat:', error);
     }
   }
@@ -817,45 +616,23 @@ export async function evaluateSideRoll(formula, actor, options = {}) {
 }
 
 /**
- * Resolve a check formula's `@` placeholders against an actor's roll data for
- * DISPLAY — substituting each placeholder with its numeric value inline
- * (e.g. `1d20 + @abilities.str.mod + @prof` → `1d20 + 3 + 2`) WITHOUT rolling any
- * dice (no evaluation, so no randomness / side effects).
- *
- * Returns `null` when there is no formula or no dice engine (the caller then shows
- * the raw formula). Otherwise `{ display, resolved }` where `resolved` is false when
- * the formula does not reduce to a number for this actor (unknown/missing `@` keys
- * or a non-numeric substitution) — `missing: 'NaN'` makes those detectable, since
- * Foundry would otherwise silently leave or zero an unmatched key.
- *
- * The optional `craftingModifier` context (issue 770) resolves the eligible check
- * modifiers to a scalar and APPENDS it FIRST — using the SAME pure resolver the eval
- * path uses — so the displayed formula equals what evaluates (eval == display).
- *
- * @param {string} formula
- * @param {object|null} actor
- * @param {object|null} [craftingModifier] The check-modifier context
- *   (`{ catalogue, systemPolicy, defaultModifierIds, recipeModifier }`); omit for
- *   salvage/gathering, or wherever no modifier term should be appended.
- * @param {*} [Roll] The `Roll` class. A PARAMETER rather than a bare `globalThis` read
- *   (issue 1097) so a caller that already injects a `Roll` — the Checks Studio's odds
- *   enumerator does, to grade its predicate against recorded real-Foundry output — drives
- *   ONE dice engine rather than two. Defaulted, so every existing caller is unchanged.
- * @returns {{ display: string, resolved: boolean }|null}
+ * Resolve a check formula's `@` placeholders for display without rolling (`1d20 + @prof` to
+ * `1d20 + 2`), through the same shim and modifier append the roll uses, so display equals eval.
+ * `null` with no formula or no engine; `resolved` is false when the formula does not reduce for
+ * this actor, detected through `missing: 'NaN'`; `modifiers` are the library entries it applied.
+ * `Roll` is a parameter so the Checks Studio's odds enumerator drives one injected engine.
  */
 export function resolveCheckFormulaDisplay(
   formula,
   actor,
   craftingModifier = null,
-  Roll = globalThis.Roll
+  Roll = globalThis.Roll,
+  evaluation = SUM_OVER_EVALUATION
 ) {
   if (typeof formula !== 'string' || formula.trim() === '') return null;
   if (typeof Roll?.replaceFormulaData !== 'function') return null;
-  // The retirement shim and the modifier append are BOTH the roll path's, asked for
-  // rather than restated (issue 1097): a display can never render a token the roll path
-  // strips, nor omit a term the roll path adds, and a formula that strips to empty
-  // reports "no formula" rather than a dangling operator.
-  const substituted = resolveRolledFormula(formula, actor, craftingModifier, Roll);
+  const rolled = resolveRolledCheck(formula, actor, craftingModifier, Roll, evaluation);
+  const substituted = rolled.formula;
   if (substituted.trim() === '') return null;
   const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
   const display = Roll.replaceFormulaData(substituted, rollData, {
@@ -866,32 +643,17 @@ export function resolveCheckFormulaDisplay(
     !/NaN/.test(display) &&
     !/@/.test(display) &&
     (typeof Roll.validate !== 'function' || Roll.validate(display) === true);
-  return { display, resolved };
+  return { display, resolved, modifiers: rolled.selected };
 }
 
 /**
- * Reduce a free-text situational bonus to a NUMBER.
- *
- * The d100 gathering path folds a flat modifier into every percentile throw
- * (`GatheringRichStateService#resolveD100Attempt`), so unlike {@link evaluateCheckRoll} —
- * which appends the raw bonus to the formula and lets Foundry's `Roll` evaluate it — it
- * needs a scalar and cannot take a formula string.
- *
- * The roll prompt's bonus field is deliberately free text, so a player may enter `3`,
- * `1d4`, `2 + 1` or `@prof`. A plain number is used as-is (no dice engine needed, so the
- * headless path is unchanged); anything else is rolled through Foundry. Never returns NaN
- * — a malformed entry degrades to 0 rather than throwing mid-attempt, mirroring the safety
- * net in {@link evaluateCheckRoll}.
- *
- * @param {string|number|null|undefined} bonus The raw situational bonus.
- * @param {object|null} [actor] Actor supplying roll data for `@` placeholders.
- * @returns {Promise<number>} The bonus as a finite number (0 when absent or unusable).
+ * A free-text situational bonus as a number, for the d100 gathering path, which needs a scalar:
+ * a plain number is used as-is with no engine, anything else is rolled, and a malformed entry is
+ * `0`, never `NaN` or a throw.
  */
 export async function evaluateSituationalBonus(bonus, actor = null) {
   const text = typeof bonus === 'string' ? bonus.trim() : bonus;
   if ([null, undefined, ''].includes(text)) return 0;
-  // A plain number needs no dice engine — this keeps the common case (and the headless
-  // path, where `Roll` may be absent or a minimal stub) behaving exactly as before.
   const direct = Number(text);
   if (Number.isFinite(direct)) return direct;
   const RollClass = globalThis.Roll;
@@ -904,8 +666,7 @@ export async function evaluateSituationalBonus(bonus, actor = null) {
   }
   try {
     const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
-    // `allowInteractive: false` keeps a client configured for manual fulfilment from
-    // surfacing a roll resolver mid-attempt (the same footgun the check roll avoids).
+    // `allowInteractive: false`, as on the check path.
     const rolled = await new RollClass(formula, rollData).evaluate({
       allowInteractive: false,
     });
@@ -918,16 +679,37 @@ export async function evaluateSituationalBonus(bonus, actor = null) {
 }
 
 /**
- * Run a pass/fail formula check: roll the formula, compare the total against `dc`
- * (met-or-exceeded or strictly exceeded), honouring the unified per-check trigger
- * list's forced outcomes (issue 419). Returns
- * `{ success, outcome: 'pass'|'fail', value, data, message }`.
- *
- * @param {object} [params.rollOptions] Optional interactive-roll bag threaded to
- *   {@link evaluateCheckRoll} (built by `buildInteractiveRollOptions`). When it
- *   opts into an interactive roll and the player dismisses the prompt, the runner
- *   returns `{ success: false, cancelled: true, outcome: null, value: null }` so
- *   the caller aborts with zero mutation. Omit it (the default) for a silent roll.
+ * Rolls a runner's formula, or answers `{ exit }`: the runner's result for a thrown roll, a
+ * cancelled prompt (zero mutation) or a missing dice engine. A blank formula rolls nothing.
+ */
+async function rollRunnerFormula({ formula, actor, options, label, kind = '', data, headless }) {
+  if (!formula) return { total: 0, diceGroups: [], resolvedFormula: null };
+  let rolled;
+  try {
+    rolled = await evaluateCheckRoll(formula, actor, options);
+  } catch (error) {
+    console.error(`Fabricate | ${label} ${kind}check roll failed (${formula})`, error);
+    return {
+      exit: {
+        success: false,
+        outcome: kind ? null : 'fail',
+        value: null,
+        data,
+        message: `${label} check roll failed: ${error.message}`,
+      },
+    };
+  }
+  if (rolled.cancelled) return { exit: carryAdditionalDice(cancelled(data), rolled) };
+  if (!rolled.engine) return { exit: headless };
+  const { total, diceGroups, resolvedFormula } = rolled;
+  return { rolled, total, diceGroups, resolvedFormula };
+}
+
+/**
+ * A pass/fail check: the total against `dc` (the resolved anchor), met or (`thresholdMode:
+ * 'exceed'`) strictly exceeded in the evaluation's direction, honouring forced outcomes. Under,
+ * the settled `targetDelta` raises the target once. A dismissed prompt returns `cancelled: true`;
+ * with no dice engine it passes rather than block.
  */
 export async function runFormulaPassFail({
   formula: rawFormula,
@@ -938,77 +720,78 @@ export async function runFormulaPassFail({
   label = 'Crafting',
   rollOptions = null,
   craftingModifier = null,
+  targetTerms = null,
+  ...input
 }) {
-  const formula = String(rawFormula || '').trim();
-  let total = 0;
-  let diceGroups = [];
-  let resolvedFormula = null;
-  if (formula) {
-    let rolled;
-    try {
-      rolled = await evaluateCheckRoll(formula, actor, { ...rollOptions, dc, craftingModifier });
-    } catch (error) {
-      console.error(`Fabricate | ${label} check roll failed (${formula})`, error);
-      return {
-        success: false,
-        outcome: 'fail',
-        value: null,
-        data: { dc, formula },
-        message: `${label} check roll failed: ${error.message}`,
-      };
-    }
-    // The player cancelled the interactive roll dialog: abort with zero mutation
-    // (no crit/DC logic, no consumption downstream).
-    if (rolled.cancelled) {
-      return { success: false, cancelled: true, outcome: null, value: null, data: { dc, formula } };
-    }
-    if (!rolled.engine) {
-      // No dice engine: cannot evaluate, so do not block the activity.
-      return { success: true, outcome: 'pass', value: null, data: { dc, formula }, message: null };
-    }
-    total = rolled.total;
-    diceGroups = rolled.diceGroups;
-    resolvedFormula = rolled.resolvedFormula;
+  const evaluation = ownEvaluation(input, rollOptions);
+  if (evaluation.product === 'count') {
+    const count = { rollOptions, evaluation, thresholdMode, craftingModifier };
+    return runCountPassFail({ ...count, dc, triggers, actor, label });
   }
+  const grading = sumGrading(evaluation);
+  const formula = String(rawFormula || '').trim();
+  if (!formula && grading.direction === 'under') return checkTargetRefusal('formula-empty', label);
+  const data = { dc: fixedDc(dc, grading), formula };
+  const roll = await rollRunnerFormula({
+    formula,
+    actor,
+    label,
+    data,
+    options: {
+      ...rollOptions,
+      evaluation,
+      dc,
+      thresholdMode,
+      craftingModifier,
+      flavorTarget: dc,
+    },
+    headless: { success: true, outcome: 'pass', value: null, data, message: null },
+  });
+  if (roll.exit) return roll.exit;
+  const { total, diceGroups, resolvedFormula, rolled } = roll;
 
   const forced = resolveForcedOutcome(triggers, { total, diceGroups });
   const comparison = thresholdMode === 'exceed' ? 'exceed' : 'meet';
-  let success;
-  if (forced) {
-    success = forced.disposition === 'success';
-  } else if (comparison === 'exceed') {
-    success = total > dc;
-  } else {
-    success = total >= dc;
-  }
+  const target = effectiveTarget(dc, grading, rolled?.modifierPlacement?.targetDelta);
+  const success = forced
+    ? forced.disposition === 'success'
+    : compareToTarget(total, target, comparison, grading.direction);
   return {
     success,
     outcome: success ? 'pass' : 'fail',
     value: total,
     data: {
-      dc,
-      formula,
+      dc: data.dc,
+      // Typed, after the retired-placeholder shim, so its operands align with the resolved one.
+      formula: stripRetiredModifierPlaceholder(formula),
       resolvedFormula,
       total,
       comparison,
+      ...(formula && executedSumEvidence(total, target, comparison, grading.direction)),
+      ...(formula &&
+        targetTermsEvidence({
+          grading,
+          target,
+          anchor: dc,
+          baseTerms: targetTerms,
+          rolled,
+          evaluation,
+          actor,
+        })),
       diceGroups,
+      ...preRollEvidence(rolled),
+      ...(forced && { forcedOutcome: forced.disposition }),
     },
     message: success ? null : `${label} check failed`,
+    ...reportedVisibility(rolled),
   };
 }
 
 /**
- * Run a progressive formula check: roll the formula and return its total as the
- * numeric `value` progressive awarding spends against result difficulties. The
- * activity always proceeds. A matched forced SUCCESS awards everything
- * (`MAX_SAFE_INTEGER`), a forced FAILURE awards nothing (`0`). Returns
- * `{ success: true, outcome: null, value, data }`.
- *
- * @param {object} [params.rollOptions] Optional interactive-roll bag threaded to
- *   {@link evaluateCheckRoll} (built by `buildInteractiveRollOptions`). When the
- *   player dismisses the interactive prompt, the runner returns
- *   `{ success: false, cancelled: true, outcome: null, value: null }` so the caller
- *   aborts with zero mutation. Omit it (the default) for a silent roll.
+ * A progressive check: the total becomes the `value` progressive awarding spends, and the
+ * activity always proceeds unless the roll itself throws or the prompt is cancelled. A forced
+ * success awards everything (`MAX_SAFE_INTEGER`), a forced failure nothing. `thresholdMode` is
+ * read only as a counting check's per-die test, else the slot's own from `rollOptions`.
  */
 export async function runFormulaProgressive({
   formula: rawFormula,
@@ -1017,40 +800,31 @@ export async function runFormulaProgressive({
   label = 'Crafting',
   rollOptions = null,
   craftingModifier = null,
+  thresholdMode,
+  ...input
 }) {
-  const formula = String(rawFormula || '').trim();
-  let total = 0;
-  let diceGroups = [];
-  let resolvedFormula = null;
-  if (formula) {
-    let rolled;
-    try {
-      rolled = await evaluateCheckRoll(formula, actor, { ...rollOptions, craftingModifier });
-    } catch (error) {
-      console.error(`Fabricate | ${label} progressive check roll failed (${formula})`, error);
-      return {
-        success: false,
-        outcome: null,
-        value: null,
-        data: { formula },
-        message: `${label} check roll failed: ${error.message}`,
-      };
-    }
-    // The player cancelled the interactive roll dialog: abort with zero mutation.
-    if (rolled.cancelled) {
-      return { success: false, cancelled: true, outcome: null, value: null, data: { formula } };
-    }
-    if (!rolled.engine) {
-      // No dice engine: award nothing (a finite value) rather than block.
-      return { success: true, outcome: null, value: 0, data: { formula, total: 0, value: 0 } };
-    }
-    total = rolled.total;
-    diceGroups = rolled.diceGroups;
-    resolvedFormula = rolled.resolvedFormula;
+  const evaluation = ownEvaluation(input, rollOptions);
+  if (evaluation.product === 'count') {
+    const count = { rollOptions, evaluation, thresholdMode, craftingModifier };
+    return runCountProgressive({ ...count, triggers, actor, label });
   }
+  const refusal = progressiveTargetRefusal(evaluation);
+  if (refusal) return checkTargetRefusal(refusal, label);
+  const formula = String(rawFormula || '').trim();
+  const roll = await rollRunnerFormula({
+    formula,
+    actor,
+    label,
+    kind: 'progressive ',
+    data: { formula },
+    options: { ...rollOptions, evaluation, craftingModifier },
+    // No dice engine: award nothing (a finite value) rather than block.
+    headless: { success: true, outcome: null, value: 0, data: { formula, total: 0, value: 0 } },
+  });
+  if (roll.exit) return roll.exit;
+  const { total, diceGroups, resolvedFormula, rolled } = roll;
 
-  // Forced-outcome resolution sees the RAW total as the awarding value (the
-  // `progressiveValue` condition targets the natural value before any forcing).
+  // Forcing sees the raw total as the value, which `progressiveValue` conditions target.
   const forced = resolveForcedOutcome(triggers, { total, value: total, diceGroups });
   let value;
   if (forced) {
@@ -1061,10 +835,8 @@ export async function runFormulaProgressive({
   return {
     success: true,
     outcome: null,
-    // `value` is the AWARDING value (a forced outcome can overwrite it to
-    // MAX_SAFE_INTEGER/0), while `data.total` keeps the RAW roll total. A
-    // `progressiveValue` trigger targets `value`; a `rollTotal` trigger targets
-    // `data.total` — so the two can resolve differently on the same roll.
+    // `value` awards (forcing may overwrite it) while `data.total` keeps the raw total, so a
+    // `progressiveValue` and a `rollTotal` trigger can resolve differently on one roll.
     value,
     data: {
       formula,
@@ -1072,506 +844,21 @@ export async function runFormulaProgressive({
       total,
       value,
       diceGroups,
+      ...(formula && executedSumEvidence(total, null, null)),
+      ...preRollEvidence(rolled),
+      ...(forced && { forcedOutcome: forced.disposition }),
     },
+    ...reportedVisibility(rolled),
   };
 }
 
 /**
- * Match a rolled total against a routed check's outcome tiers, returning the
- * matched tier (or null). Outcome tiers come from
- * {@link CraftingSystemManager#_normalizeRoutedCraftingCheck}:
- *
- * - `relative` outcomes carry a `dc` DELTA relative to the base DC; the effective
- *   threshold is `dc (base param) + outcome.dc`. The match honours `comparison`
- *   ('exceed' → `total > threshold`, else 'meet' → `total >= threshold`) and,
- *   among all matching tiers, picks the one with the HIGHEST effective threshold
- *   (best tier).
- * - `fixed` outcomes carry a non-overlapping `[start, end]` segment of the roll
- *   range; a tier matches when `start <= total <= end`. Ranges are validated
- *   non-overlapping, but should several match the one with the highest `start`
- *   wins.
- *
- * `clampToNearest` (relative only) closes the below-lowest dead zone: when the total
- * meets NO relative threshold, it routes to the lowest-threshold tier (the closest
- * one) instead of returning null, so a rising base DC never yields a rolled-but-
- * unrouted craft. There is no top-end clamp — the highest tier is meet-or-exceed and
- * unbounded above. The flag is ignored in the fixed branch (authored ranges own their
- * own gaps).
- */
-function matchRoutedOutcome({
-  type,
-  total,
-  dc,
-  comparison,
-  relativeOutcomes,
-  fixedOutcomes,
-  clampToNearest = false,
-}) {
-  if (type === 'fixed') {
-    const outcomes = Array.isArray(fixedOutcomes) ? fixedOutcomes : [];
-    let best = null;
-    for (const outcome of outcomes) {
-      if (!outcome) continue;
-      const start = Number(outcome.start);
-      const end = Number(outcome.end);
-      if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
-      if (total < start || total > end) continue;
-      if (!best || start > Number(best.start)) best = outcome;
-    }
-    return best;
-  }
-  const outcomes = Array.isArray(relativeOutcomes) ? relativeOutcomes : [];
-  let best = null;
-  let bestThreshold = null;
-  let lowest = null;
-  let lowestThreshold = null;
-  for (const outcome of outcomes) {
-    if (!outcome) continue;
-    const delta = Number(outcome.dc);
-    if (!Number.isFinite(delta)) continue;
-    const threshold = dc + delta;
-    // Track the lowest-threshold tier for the clamp fallback; strict `<` keeps the
-    // first tier (author order) among equal-lowest thresholds — deterministic.
-    if (lowest === null || threshold < lowestThreshold) {
-      lowest = outcome;
-      lowestThreshold = threshold;
-    }
-    const matches = comparison === 'exceed' ? total > threshold : total >= threshold;
-    if (!matches) continue;
-    if (best === null || threshold > bestThreshold) {
-      best = outcome;
-      bestThreshold = threshold;
-    }
-  }
-  // Below every threshold: clamp to the closest (lowest) tier when asked, else null.
-  if (best === null && clampToNearest) return lowest;
-  return best;
-}
-
-/** The per-type ranking key: a relative tier ranks by DC delta, a fixed one by
- * range start. */
-function routedRankKey(type) {
-  return type === 'fixed' ? 'start' : 'dc';
-}
-
-/**
- * The SINGLE derivation of routed tier ORDER (issue 975). Ranks a routed check's
- * tiers ascending by `dc` (relative) / `start` (fixed) — worst first, best last — so
- * {@link routeCritOutcome}, the `minOutcomeId` gate and {@link applyTierStepTriggers}
- * all read one ordering instead of deriving three independently.
- *
- * Two properties are load-bearing, and losing either is a silent behaviour flip:
- *
- * - **Non-finite ranks are dropped.** A tier whose `dc`/`start` does not coerce to a
- *   finite number has no place in the order (both pre-975 derivations filtered it).
- * - **Ties keep AUTHOR order.** `routeCritOutcome` compared with strict `>` / `<`, so
- *   among tiers of equal rank it kept the FIRST authored one for BOTH dispositions.
- *   The secondary comparator on the author index reproduces that — and the sort takes
- *   an explicit comparator regardless, since `unicorn/require-array-sort-compare` is
- *   active.
- *
- * Callers locate a tier in the result by ID (`findIndex((o) => o.id === …)`, first
- * match wins), never by object identity: this is a copy, and a step composing on a
- * forced reroute would otherwise search it for an object it never contained.
- *
- * @returns {Array<object>} The rankable tiers, lowest rank first. Never null.
- */
-function rankedRoutedOutcomes({ type, relativeOutcomes, fixedOutcomes }) {
-  const key = routedRankKey(type);
-  const source = type === 'fixed' ? fixedOutcomes : relativeOutcomes;
-  return (Array.isArray(source) ? source : [])
-    .map((outcome, authorIndex) => ({ outcome, authorIndex, rank: Number(outcome?.[key]) }))
-    .filter((entry) => Boolean(entry.outcome) && Number.isFinite(entry.rank))
-    .toSorted((left, right) => left.rank - right.rank || left.authorIndex - right.authorIndex)
-    .map((entry) => entry.outcome);
-}
-
-/**
- * The ranked tiers sharing one success disposition — the subset a forced outcome
- * routes into and, from issue 975, the only subset a step may move within.
- */
-function dispositionSubset(ranked, disposition) {
-  const wantSuccess = disposition === 'success';
-  return ranked.filter((outcome) => (outcome.success === true) === wantSuccess);
-}
-
-/**
- * Route a forced-crit disposition to a tier of the matching success flag. A forced
- * FAILURE (`forcedSuccess === false`) routes to the LOWEST-ranked failing tier
- * (relative: smallest `dc`; fixed: smallest `start`); a forced SUCCESS routes to the
- * HIGHEST-ranked succeeding tier. Among tiers of EQUAL rank the first authored one
- * wins in both directions. Returns the chosen tier, or null when no tier of that
- * disposition exists.
- */
-function routeCritOutcome({ type, forcedSuccess, relativeOutcomes, fixedOutcomes }) {
-  const wantSuccess = forcedSuccess === true;
-  const ranked = dispositionSubset(
-    rankedRoutedOutcomes({ type, relativeOutcomes, fixedOutcomes }),
-    wantSuccess ? 'success' : 'failure'
-  );
-  if (ranked.length === 0) return null;
-  // Ascending order: index 0 already IS the lowest-ranked, author-first tier.
-  if (!wantSuccess) return ranked[0];
-  // The highest rank sits at the end, but equal-rank tiers must resolve to the FIRST
-  // authored one, so seek the START of the top-rank run rather than reading `at(-1)`.
-  const key = routedRankKey(type);
-  const topRank = Number(ranked.at(-1)[key]);
-  return ranked[ranked.findIndex((outcome) => Number(outcome[key]) === topRank)];
-}
-
-/** The `tierStep.mode` values that ask for a real move; `'none'` (and anything
- * unrecognised) is inert. */
-const TIER_STEP_MODES = new Set(['target', 'up', 'down']);
-
-/**
- * The frozen ROLLED-tier snapshot every step condition is evaluated against — once,
- * and never again against the stepped tier.
- *
- * This is what makes an `outcomeTier`-conditioned step non-circular and terminating:
- * the pass is a pure function of `(rolled tier, triggers, roll)` with no feedback
- * edge, so the obvious cycle ("land on Poor, step down" / "land on Terrible, step
- * up") cannot iterate and no iteration order can leak into the result. Stated as a
- * domain rule: a step condition asks about the tier the dice landed on, never about
- * the tier the step produces.
- *
- * `value` is left `undefined` so `progressiveValue` stays invisible here, matching
- * the existing {@link resolveForcedOutcome} call.
- */
-function rolledTierSnapshot(rolled, total, diceGroups) {
-  return Object.freeze({
-    value: undefined,
-    outcome: rolled?.name ?? null,
-    data: Object.freeze({
-      total,
-      diceGroups: Array.isArray(diceGroups) ? diceGroups : [],
-      outcomeId: rolled?.id ?? null,
-    }),
-  });
-}
-
-/** Every trigger whose condition matches the rolled tier AND whose `tierStep` asks
- * for a real move, in author order. */
-function matchedTierStepTriggers(triggers, snapshot) {
-  return (Array.isArray(triggers) ? triggers : []).filter((trigger) => {
-    if (!TIER_STEP_MODES.has(trigger?.tierStep?.mode)) return false;
-    return evaluateCheckBreakageCondition(trigger.condition, snapshot);
-  });
-}
-
-/**
- * A `tierStep.steps` magnitude: an integer `>= 1`, the same clamp
- * `_normalizeTierStep` applies on the way in.
- *
- * Clamped HERE as well so the runtime does not depend on the normalizer having run.
- * A magnitude is a MAGNITUDE — the direction lives in `mode` — so a raw `steps: -2`
- * on an `up` trigger must not silently step DOWN two, inverting the effect the GM
- * authored. Unreachable through the normalizer today; independent of it by
- * construction now.
- */
-function tierStepMagnitude(steps) {
-  const value = Math.trunc(Number(steps));
-  return Number.isFinite(value) && value >= 1 ? value : 1;
-}
-
-/**
- * Resolve the winning `target` trigger against the array in play — FILTER, then
- * CHOOSE.
- *
- * A target is ELIGIBLE only when its `tierId` resolves to a tier present in that
- * array. An ineligible one — a dangling id, or (under a forced outcome) a target
- * naming the opposite disposition — is discarded BEFORE the comparison, so it can
- * never beat a valid competitor and then no-op. Among the eligible ones the
- * LOWEST-RANKED tier wins: order-independent and pessimistic, mirroring
- * {@link resolveForcedOutcome}'s "a matched failure beats a matched success
- * regardless of position".
- *
- * @returns {{ index: number, trigger: object|null }} `index` is -1 when no eligible
- *   target survives, in which case the rolled (or forced) tier is the step base.
- */
-function resolveTierStepTarget(stepping, inPlay) {
-  let index = -1;
-  let trigger = null;
-  for (const candidate of stepping) {
-    if (candidate.tierStep.mode !== 'target') continue;
-    const tierId = candidate.tierStep.tierId;
-    if (typeof tierId !== 'string' || tierId === '') continue;
-    const found = inPlay.findIndex((outcome) => outcome.id === tierId);
-    if (found === -1) continue;
-    if (index === -1 || found < index) {
-      index = found;
-      trigger = candidate;
-    }
-  }
-  return { index, trigger };
-}
-
-/** The signed net of the relative steps: `Σ up.steps − Σ down.steps`. Summation is
- * the only commutative composition, so two `up 1` triggers make `up 2` and
- * `up 1` + `down 1` is a deliberate no-op rather than an order-dependent coin flip. */
-function netTierSteps(stepping) {
-  return stepping.reduce((net, trigger) => {
-    const { mode, steps } = trigger.tierStep;
-    if (mode === 'up') return net + tierStepMagnitude(steps);
-    if (mode === 'down') return net - tierStepMagnitude(steps);
-    return net;
-  }, 0);
-}
-
-/** The ids credited with the applied step: the winning target plus every matched
- * relative trigger, in author order. A losing or ineligible target contributed
- * nothing to the move and is not credited. */
-function appliedTierStepTriggerIds(stepping, winningTarget) {
-  return stepping
-    .filter((trigger) => trigger.tierStep.mode !== 'target' || trigger === winningTarget)
-    .map((trigger) => trigger.id)
-    .filter((id) => typeof id === 'string' && id !== '');
-}
-
-/**
- * Apply the `tierStep` effect of every matching unified trigger to the rolled tier
- * (issue 975), replacing the old `natStepping` boolean's hard-coded d20/±1 rule.
- *
- * **Stepping is disposition-preserving.** The ARRAY IN PLAY is the ranked subset of
- * tiers sharing the forced disposition when a forced outcome is present, and the
- * whole ranked list otherwise. Every index, "lowest-ranked" and the clamp are
- * computed over that array, so a forced outcome can never step across into the
- * opposite disposition and `data.success` can never disagree with the final tier's
- * own `success`.
- *
- * Composition, in order: the winning eligible `target` (if any) sets the base index,
- * the net relative offset applies from there, and the result CLAMPS to
- * `[0, length - 1]` of the array in play. That clamp is unrelated to
- * `clampToNearest`, which decides whether a tier matched at all; this one decides
- * where an out-of-range step lands, and the evidence names it `stepClamped` so the
- * two never read as one concept.
- *
- * @param {object|null} params.rolled The tier `matchRoutedOutcome` produced, after
- *   any forced reroute. `null` steps nothing — `target` included, since a check that
- *   matched no tier is the deliberate "no route" path.
- * @param {'success'|'failure'|null} params.forcedDisposition
- * @returns {{ matched: object|null, tierStepApplied: object|null }} `tierStepApplied`
- *   is present only on a REAL tier change.
- */
-function applyTierStepTriggers({
-  rolled,
-  type,
-  forcedDisposition = null,
-  triggers,
-  relativeOutcomes,
-  fixedOutcomes,
-  total,
-  diceGroups,
-}) {
-  if (!rolled) return { matched: null, tierStepApplied: null };
-
-  const stepping = matchedTierStepTriggers(triggers, rolledTierSnapshot(rolled, total, diceGroups));
-  if (stepping.length === 0) return { matched: rolled, tierStepApplied: null };
-
-  const ranked = rankedRoutedOutcomes({ type, relativeOutcomes, fixedOutcomes });
-  const inPlay = forcedDisposition === null ? ranked : dispositionSubset(ranked, forcedDisposition);
-  const fromIndex = inPlay.findIndex((outcome) => outcome.id === rolled.id);
-  if (fromIndex === -1) return { matched: rolled, tierStepApplied: null };
-
-  const target = resolveTierStepTarget(stepping, inPlay);
-  const base = target.index === -1 ? fromIndex : target.index;
-  const requestedIndex = base + netTierSteps(stepping);
-  const toIndex = Math.min(Math.max(requestedIndex, 0), inPlay.length - 1);
-  // Present only on a real tier change: a fully clamped no-op and a cancelling
-  // `up 1` + `down 1` both leave the rolled tier standing with no evidence.
-  if (toIndex === fromIndex) return { matched: rolled, tierStepApplied: null };
-
-  const stepped = inPlay[toIndex];
-  // `target` whenever a target won, whatever the index delta — "you were placed on
-  // Masterwork" has no direction.
-  let mode = 'target';
-  if (target.index === -1) mode = toIndex > fromIndex ? 'up' : 'down';
-  return {
-    matched: stepped,
-    tierStepApplied: {
-      mode,
-      // The REALIZED magnitude, not the requested one: evidence describes the effect,
-      // and the chat card's step notice renders this count straight to the player.
-      // `stepClamped` carries the fact that the author asked for more.
-      steps: Math.abs(toIndex - fromIndex),
-      fromOutcomeId: rolled.id ?? null,
-      toOutcomeId: stepped.id ?? null,
-      stepClamped: requestedIndex !== toIndex,
-      triggerIds: appliedTierStepTriggerIds(stepping, target.trigger),
-    },
-  };
-}
-
-/**
- * Decide whether the FIXED-type recipe minimum-success-tier gate blocks the final
- * (post-step) tier.
- *
- * It consumes {@link rankedRoutedOutcomes} to LOCATE the required tier but keeps
- * comparing threshold VALUES rather than rank indices, which is load-bearing:
- * `_normalizeRoutedOutcome` stores duplicate and overlapping ranges without
- * complaint (`rangeOverlap` is a `critical` READINESS issue but never an
- * enforcement — `checksReadiness.js` reports it and nothing refuses the roll), so
- * two fixed tiers sharing a `start` compare EQUAL by value and the craft passes,
- * where an index comparison would strictly fail it.
- */
-function minSuccessTierFailed({ type, minOutcomeId, matched, relativeOutcomes, fixedOutcomes }) {
-  if (type !== 'fixed' || !minOutcomeId) return false;
-  const ranked = rankedRoutedOutcomes({ type, relativeOutcomes, fixedOutcomes });
-  const requiredIndex = ranked.findIndex((outcome) => outcome.id === minOutcomeId);
-  const requiredStart = Number(ranked[requiredIndex]?.start);
-  // A stale/unknown `minOutcomeId` no-ops gracefully, like `checkTierId`.
-  if (!Number.isFinite(requiredStart)) return false;
-  const matchedStart = Number(matched?.start);
-  return !Number.isFinite(matchedStart) || matchedStart < requiredStart;
-}
-
-/**
- * Classify ONE total against a routed check's tiers — the whole of
- * {@link runFormulaRouted}'s post-roll resolution, extracted so nothing else has to
- * restate it (issue 1097).
- *
- * The Checks Studio's odds histogram enumerates a die group's faces and buckets each
- * one, and a preview that disagrees with the engine about which tier a total lands on
- * is worse than no preview at all. So this is not a shared helper the runner *may*
- * use: `runFormulaRouted` calls it, which is what makes drift impossible rather than
- * merely unlikely.
- *
- * Composition order is the runner's own and is load-bearing — forced reroute, then
- * tier step, then the recipe minimum gate — and is documented at each step in
- * {@link runFormulaRouted}.
- *
- * `diceGroups` is the bag {@link resolveForcedOutcome} and {@link applyTierStepTriggers}
- * both read. A caller synthesising one per face MUST build it through
- * {@link rolledDiceGroups}: a bag missing `results` makes every per-die trigger silently
- * invisible while still matching a hand-computed distribution for a trigger-free check.
- *
- * @param {object} params
- * @param {'relative'|'fixed'} params.type
- * @param {number} params.total The rolled (or enumerated) total.
- * @param {number} params.dc The base DC relative thresholds are measured against.
- * @param {'meet'|'exceed'} params.comparison Already reduced from `thresholdMode`.
- * @param {Array<object>} [params.relativeOutcomes]
- * @param {Array<object>} [params.fixedOutcomes]
- * @param {Array<object>} [params.triggers]
- * @param {Array<object>} [params.diceGroups]
- * @param {boolean} [params.clampToNearest]
- * @param {?string} [params.minOutcomeId]
- * @returns {{
- *   matched: object|null,
- *   forcedDisposition: 'success'|'failure'|null,
- *   success: boolean,
- *   breakTools: boolean,
- *   tierStepApplied: object|null,
- *   minTierFailed: boolean,
- *   blockedOutcomeId: string|null,
- * }} `matched` is the EFFECTIVE tier (null when the minimum gate blocked it);
- *   `blockedOutcomeId` names the tier the gate blocked and is null on a normal route.
- */
-export function classifyCheckTotal({
-  type,
-  total,
-  dc,
-  comparison,
-  relativeOutcomes,
-  fixedOutcomes,
-  triggers,
-  diceGroups = [],
-  clampToNearest = false,
-  minOutcomeId = null,
-}) {
-  const forced = resolveForcedOutcome(triggers, { total, diceGroups });
-
-  let matched = forced
-    ? routeCritOutcome({
-        type,
-        forcedSuccess: forced.disposition === 'success',
-        relativeOutcomes,
-        fixedOutcomes,
-      })
-    : matchRoutedOutcome({
-        type,
-        total,
-        dc,
-        comparison,
-        relativeOutcomes,
-        fixedOutcomes,
-        clampToNearest,
-      });
-
-  const tierStep = applyTierStepTriggers({
-    rolled: matched,
-    type,
-    forcedDisposition: forced ? forced.disposition : null,
-    triggers,
-    relativeOutcomes,
-    fixedOutcomes,
-    total,
-    diceGroups,
-  });
-  matched = tierStep.matched;
-
-  const minTierFailed =
-    !forced &&
-    minSuccessTierFailed({ type, minOutcomeId, matched, relativeOutcomes, fixedOutcomes });
-  const effectiveMatched = minTierFailed ? null : matched;
-
-  const success = minTierFailed
-    ? false
-    : forced
-      ? forced.disposition === 'success'
-      : effectiveMatched
-        ? effectiveMatched.success === true
-        : false;
-
-  return {
-    matched: effectiveMatched,
-    forcedDisposition: forced ? forced.disposition : null,
-    success,
-    // The matched (or rerouted) tier's `breakTools` is the only `data.breakTools`
-    // source — the routed per-tier legacy bridge the breakage seam reads.
-    breakTools: effectiveMatched ? effectiveMatched.breakTools === true : false,
-    tierStepApplied: tierStep.tierStepApplied,
-    minTierFailed,
-    blockedOutcomeId: minTierFailed ? (matched?.id ?? null) : null,
-  };
-}
-
-/**
- * Run a routed formula check: roll the formula and map the total onto one of the
- * configured outcome tiers (relative DC deltas or fixed value ranges), returning
- * the matched tier's NAME as `outcome` for the activity's outcome→result-group
- * routing. A unified trigger's forced outcome overrides the disposition: a forced
- * SUCCESS routes to the best succeeding tier, a forced FAILURE to the worst failing
- * tier. A unified trigger's `tierStep` effect then moves that ROLLED tier to the
- * FINAL tier (issue 975), within the forced disposition when one is in play. The
- * surfaced `data.breakTools` is the final tier's own flag (the routed per-tier legacy
- * bridge). When no tier matches (and no forced outcome reroutes), `outcome` is null
- * and `success` reflects the forced outcome (when any) or `false`.
- *
- * HEADLESS: with no dice engine the routed check cannot simulate a tier, so it
- * returns a non-blocking `{ success: true, outcome: null, value: null }` rather
- * than fabricating a route.
- *
- * @param {object} [params.rollOptions] Optional interactive-roll bag threaded to
- *   {@link evaluateCheckRoll} (built by `buildInteractiveRollOptions`). When the
- *   player dismisses the interactive prompt, the runner returns
- *   `{ success: false, cancelled: true, outcome: null, value: null }` so the caller
- *   aborts with zero mutation. Omit it (the default) for a silent roll.
- * @param {boolean} [params.clampToNearest] Relative-mode only: when a total meets no
- *   tier threshold, route to the lowest (closest) tier instead of returning a null
- *   outcome. Every routed caller opts in today — crafting, salvage AND gathering
- *   (`GatheringEngine._resolveRoutedFormulaOutcome` passes `clampToNearest: true`) —
- *   so a rolled-but-unrouted check is only reachable by a caller that omits it.
- *   Unrelated to the tier-step clamp: this one decides whether a tier matched at all,
- *   that one decides where an out-of-range step lands (`data.tierStepApplied.stepClamped`).
- * @param {?string} [params.minOutcomeId] FIXED-type only: a recipe's minimum success
- *   tier id. When the FINAL (post-step) tier ranks below it (by `start`) — or the
- *   total lands outside every fixed range, so no tier matched at all — the check
- *   fails outright: `success:false`, no outcome routes, and the matched tier's
- *   `breakTools` is dropped (nothing routes, so the per-tier breakage bridge does
- *   not fire). Optional and no-op by default — only the crafting routedByCheck caller
- *   threads it, so salvage/gathering are unaffected. Ignored for relative type and
- *   bypassed by a forced (crit) outcome.
- * @returns {Promise<{success: boolean, outcome: string|null, value: number|null, data: object, message: string|null}>}
+ * A routed check: roll, then `classifyCheckTotal`, returning the final tier's name as `outcome`
+ * for result-group routing. Headless it returns a non-blocking `success: true, outcome: null`
+ * rather than fabricate a route, and a cancelled prompt returns `cancelled: true`. Every routed
+ * caller passes `clampToNearest: true` today. `minOutcomeId` (fixed type, crafting only) fails a
+ * final tier below it, or a total outside every range, and drops its `breakTools`; a forced
+ * outcome bypasses it.
  */
 export async function runFormulaRouted({
   formula: rawFormula,
@@ -1587,106 +874,99 @@ export async function runFormulaRouted({
   clampToNearest = false,
   minOutcomeId = null,
   craftingModifier = null,
+  targetTerms = null,
+  ...input
 }) {
-  const formula = String(rawFormula || '').trim();
-  let total = 0;
-  let diceGroups = [];
-  let resolvedFormula = null;
-  if (formula) {
-    let rolled;
-    try {
-      // Do NOT re-inject the tier-matching `dc` here: `evaluateCheckRoll` uses its
-      // `dc` for the prompt DISPLAY only, and each caller already threads the correct
-      // prompt-facing DC on `rollOptions` (undefined for a fixed routedByCheck check
-      // so the prompt shows no DC chip; numeric otherwise). Re-adding `dc` would
-      // clobber that and re-surface the meaningless DC on a fixed check (mirrors
-      // `runFormulaProgressive`, which also spreads `rollOptions` with no `dc`).
-      rolled = await evaluateCheckRoll(formula, actor, { ...rollOptions, craftingModifier });
-    } catch (error) {
-      console.error(`Fabricate | ${label} routed check roll failed (${formula})`, error);
-      return {
-        success: false,
-        outcome: null,
-        value: null,
-        data: { dc, formula, type },
-        message: `${label} check roll failed: ${error.message}`,
-      };
-    }
-    // The player cancelled the interactive roll dialog: abort with zero mutation.
-    if (rolled.cancelled) {
-      return {
-        success: false,
-        cancelled: true,
-        outcome: null,
-        value: null,
-        data: { dc, formula, type },
-      };
-    }
-    if (!rolled.engine) {
-      // No dice engine: a routed check cannot simulate a tier, so do not block
-      // and do not fabricate a route.
-      return {
-        success: true,
-        outcome: null,
-        value: null,
-        data: { dc, formula, type },
-        message: null,
-      };
-    }
-    total = rolled.total;
-    diceGroups = rolled.diceGroups;
-    resolvedFormula = rolled.resolvedFormula;
+  const evaluation = ownEvaluation(input, rollOptions);
+  if (evaluation.product === 'count') {
+    return runCountRouted({
+      rollOptions,
+      evaluation,
+      thresholdMode,
+      craftingModifier,
+      dc,
+      actor,
+      label,
+      type,
+      relativeOutcomes,
+      fixedOutcomes,
+      triggers,
+      clampToNearest,
+      minOutcomeId,
+    });
   }
+  const grading = sumGrading(evaluation);
+  const formula = String(rawFormula || '').trim();
+  if (!formula && grading.direction === 'under') return checkTargetRefusal('formula-empty', label);
+  const data = { dc: fixedDc(dc, grading), formula, type };
+  const roll = await rollRunnerFormula({
+    formula,
+    actor,
+    label,
+    kind: 'routed ',
+    data,
+    // No `dc`: callers already put the prompt-facing DC on `rollOptions` (none for fixed).
+    options: { ...rollOptions, evaluation, thresholdMode, craftingModifier },
+    headless: { success: true, outcome: null, value: null, data, message: null },
+  });
+  if (roll.exit) return roll.exit;
+  const { total, diceGroups, resolvedFormula, rolled } = roll;
 
-  const comparison = thresholdMode === 'exceed' ? 'exceed' : 'meet';
-
-  // The WHOLE post-roll resolution — forced reroute, then tier step, then the recipe
-  // minimum gate — lives in the shared classifier so the Checks Studio's odds histogram
-  // buckets each enumerated face through the identical code (issue 1097). The ordering
-  // rationale is documented on {@link classifyCheckTotal}: forcing picks an EXTREME tier
-  // while a step is RELATIVE, so stepping first would be silently discarded, and the gate
-  // asks whether the craft reached the recipe's minimum, so it must judge the FINAL tier.
-  const classified = classifyCheckTotal({
+  // The whole post-roll resolution, shared with the odds histogram (issue 1097).
+  const classifyInput = {
     type,
     total,
     dc,
-    comparison,
+    comparison: thresholdMode,
     relativeOutcomes,
     fixedOutcomes,
     triggers,
     diceGroups,
     clampToNearest,
     minOutcomeId,
-  });
-  const { matched, success } = classified;
+    evaluation,
+    targetDelta: rolled?.modifierPlacement?.targetDelta,
+  };
+  const classified = classifyCheckTotal(classifyInput);
+  const { matched, success, comparison } = classified;
+  const tierTerm = classified.target === null ? null : rolledTierTerm(grading, classifyInput);
 
   return {
     success,
     outcome: matched ? matched.name : null,
     value: total,
     data: {
-      dc,
-      formula,
+      dc: data.dc,
+      formula: stripRetiredModifierPlaceholder(formula),
       resolvedFormula,
       total,
       type,
       comparison,
+      ...(formula && executedSumEvidence(total, classified.target, comparison, grading.direction)),
+      ...(formula &&
+        targetTermsEvidence({
+          grading,
+          target: classified.target,
+          anchor: dc,
+          baseTerms: targetTerms,
+          tierTerm,
+          rolled,
+          evaluation,
+          actor,
+        })),
+      ...preRollEvidence(rolled),
       outcomeId: matched?.id ?? null,
       success,
       breakTools: classified.breakTools,
       diceGroups,
-      // Additive on a real tier change only (issue 975): the resolved NET effect, the
-      // REALIZED magnitude, and the ids that produced it.
-      ...(classified.tierStepApplied && { tierStepApplied: classified.tierStepApplied }),
-      // Additive on a min-tier failure only: the tier the recipe minimum BLOCKED —
-      // post-step, pre-gate — for a richer chat/journal explanation later. Named for
-      // what the gate did to it rather than "rolled", which issue 975 mints as a term
-      // of art for the PRE-step tier. Absent on a normal route.
+      // Only on a real tier change (issue 975), and on a min-tier failure the tier it blocked.
+      ...routedTriggerEvidence(classified),
       ...(classified.minTierFailed && {
         minTierFailed: true,
         blockedOutcomeId: classified.blockedOutcomeId,
       }),
     },
     message: success ? null : `${label} check failed`,
+    ...reportedVisibility(rolled),
   };
 }

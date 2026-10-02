@@ -1,6 +1,6 @@
 /**
- * The owner gate on `Fabricate#salvageComponents` / `#destroyComponents` (issue 859). Why the
- * ownership pin is a SOURCE contract
+ * The owner gate on `Fabricate#salvageComponents` / `#destroyComponents` (issue 859), driven
+ * through the real facade class.
  */
 
 import { describe, it } from 'node:test';
@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 
 import { BulkDestroyService } from '../src/systems/BulkDestroyService.js';
 import { BulkSalvageService } from '../src/systems/BulkSalvageService.js';
+import { readIdentityCounters, resetIdentityCounters } from '../src/utils/definitionIndex.js';
 import {
   bulkComponent,
   bulkSystem,
@@ -15,204 +16,12 @@ import {
   recordingSalvage,
 } from './helpers/bulkSalvageFixtures.js';
 import {
-  HARNESS_SOURCE,
-  MAIN_SOURCE,
   createFabricateFacadeHarness,
-  mainMethodSource,
   makeDeletableFacadeActor,
   makeFacadeActor,
 } from './helpers/fabricateFacadeHarness.js';
 
-// LOCATORS, not assertions: each names the signature `mainMethodSource` slices from, so it has to
-// be the CURRENT one verbatim.
-const GATE = '_gateBulkTargets(targets, actorId) {';
-const SALVAGE = 'async salvageComponents({';
-const DESTROY =
-  'async destroyComponents({ actorId = null, targets = [], onProgress = null } = {}) {';
-
-describe('the bounded slice is genuinely bounded', () => {
-  it('stops at the method it names, and does not run to end of file', () => {
-    const gate = mainMethodSource(GATE);
-    assert.ok(gate.startsWith(GATE), 'starts at the signature');
-    assert.ok(gate.trimEnd().endsWith('}'), 'and ends at its own closing brace');
-    assert.ok(gate.length < 800, `the whole gate is small; got ${gate.length} characters`);
-    assert.equal(
-      gate.includes('salvageComponents'),
-      false,
-      'the very next method is already outside the slice'
-    );
-  });
-
-  it('proves the bound is load-bearing: `_resolveCraftingSources` DOES live elsewhere', () => {
-    // This is the assertion that justifies the whole helper.
-    assert.ok(
-      MAIN_SOURCE.split('_resolveCraftingSources').length - 1 > 5,
-      'the crafting/gathering facades legitimately use it many times over'
-    );
-    assert.ok(
-      MAIN_SOURCE.slice(MAIN_SOURCE.indexOf(GATE)).includes('_resolveCraftingSources'),
-      'so an UNBOUNDED slice from the gate would contain it'
-    );
-    assert.equal(
-      mainMethodSource(GATE).includes('_resolveCraftingSources'),
-      false,
-      'while the bounded one does not'
-    );
-  });
-
-  it('fails loudly rather than asserting on an empty string', () => {
-    // A pin that silently degrades to `''` passes every absence assertion forever.
-    assert.throws(() => mainMethodSource('_noSuchMethodExists(a, b) {'), /declares no/);
-  });
-});
-
-describe('_gateBulkTargets: the exact expression, and nothing else', () => {
-  it('resolves `target.actorId ?? actorId`', () => {
-    assert.ok(
-      mainMethodSource(GATE).includes('this._resolveCraftingActor(target.actorId ?? actorId)'),
-      'the per-target actor id, falling back to the run-level one'
-    );
-  });
-
-  it('has NO persisted-selection fallback', () => {
-    // The whole hazard. A `?? this.getSelectedCraftingActorId()` tail here would silently
-    // RETARGET a row whose own actor did not resolve onto whichever actor the player last
-    // selected — salvaging or destroying the wrong character's items, with no error
-    // anywhere and nothing on screen to distinguish it from a correct run.
-    const gate = mainMethodSource(GATE);
-    assert.equal(gate.includes('getSelectedCraftingActorId'), false);
-    assert.equal(gate.includes('rememberedActorId'), false);
-    assert.equal(gate.includes('_resolveCraftingSources'), false);
-  });
-
-  it('takes an actor ID and never a uuid, at any nesting level', () => {
-    const gate = mainMethodSource(GATE);
-    assert.equal(gate.includes('actorUuid'), false);
-    assert.equal(gate.includes('fromUuid'), false);
-  });
-
-  it('preserves input order and refuses rather than dropping a row', () => {
-    const gate = mainMethodSource(GATE);
-    assert.ok(gate.includes('.map('), 'a map, so every input row yields an output row');
-    assert.equal(gate.includes('.filter((entry) => entry.actor)'), false, 'the gate drops nothing');
-  });
-});
-
-describe('both facades delegate to the one gate', () => {
-  for (const [label, signature] of [
-    ['salvageComponents', SALVAGE],
-    ['destroyComponents', DESTROY],
-  ]) {
-    it(`${label} calls _gateBulkTargets and resolves no actor itself`, () => {
-      const body = mainMethodSource(signature);
-      assert.ok(body.includes('this._gateBulkTargets(targets, actorId)'), 'one gate, not two');
-      assert.equal(
-        body.includes('this._resolveCraftingActor('),
-        false,
-        'resolution happens in exactly one place'
-      );
-      assert.equal(body.includes('_resolveCraftingSources'), false);
-      assert.equal(body.includes('getSelectedCraftingActorId'), false);
-    });
-
-    it(`${label} filters the gated rows rather than the input`, () => {
-      const body = mainMethodSource(signature);
-      assert.ok(body.includes('gated.filter((entry) => entry.actor)'));
-      assert.ok(body.includes('this._mergeBulkRows(gated'), 'and weaves refusals back in order');
-    });
-  }
-
-  it('only salvageComponents derives a uuid, and only from the RESOLVED actor', () => {
-    const salvage = mainMethodSource(SALVAGE);
-    assert.ok(salvage.includes('actorUuid: actor.uuid'), 'derived from the gate, never taken in');
-    assert.equal(
-      mainMethodSource(DESTROY).includes('actorUuid'),
-      false,
-      'destroy hands the service the resolved document itself'
-    );
-  });
-
-  it('names `notPermitted` in the refusal row builder', () => {
-    assert.ok(
-      mainMethodSource('_buildNotPermittedRow(target) {').includes("outcome: 'notPermitted'")
-    );
-  });
-
-  for (const [label, signature] of [
-    ['salvageComponents', SALVAGE],
-    ['destroyComponents', DESTROY],
-  ]) {
-    it(`${label} FORWARDS onProgress into the service call`, () => {
-      // Accepting the option and forwarding it are two different edits, and deleting the forward is
-      // silent: the run still completes, the report is still correct, and the panel's progress bar
-      // simply freezes at `0 of N` for the whole run.
-      const body = mainMethodSource(signature);
-      const call = body.indexOf('.run({');
-      assert.ok(call > 0, 'the facade delegates to the service');
-      assert.ok(
-        body.slice(call).includes('onProgress'),
-        'the listener reaches `run()`, not just the signature'
-      );
-      assert.ok(
-        body.indexOf('onProgress') < call,
-        'and the signature accepts one, so the forward is not reading a global'
-      );
-    });
-  }
-});
-
-describe('_postBulkSalvageChatMessage: speaker → visibility → create, in that order', () => {
-  // NOT mirrored into the harness: a hand-copied poster would be evidence about the copy rather
-  // than about `src/main.js`.
-  const POSTER =
-    'async _postBulkSalvageChatMessage({ content, rollMode, actorUuid, actorNames = [] }) {';
-
-  it('creates with `author`, and never the discarded `user` key', () => {
-    // The V14 schema defines `author` and has NO `user` field and no shim, so a message
-    // created with `user` is silently attributed by defaulting instead — which works
-    // often enough that nothing catches it.
-    const body = mainMethodSource(POSTER);
-    assert.ok(body.includes('author: game.user?.id'));
-    assert.equal(body.includes('user:'), false, 'the discarded key appears nowhere');
-  });
-
-  it('has the speaker ON `chatData` BEFORE visibility is applied', () => {
-    // `ChatMessage.applyMode`'s `ic` branch reads `chatData.speaker.actor` unguarded, so a
-    // visibility pass over speaker-less data THROWS for any player whose client default is
-    // In-Character — and takes the whole card with it.
-    const body = mainMethodSource(POSTER);
-    // Key ORDER inside the literal is free; membership is not.
-    const composed = /const chatData = \{[^}]*\bspeaker\b[^}]*\};/.exec(body);
-    const visibility = body.indexOf('applyBulkChatVisibility');
-    assert.ok(composed, 'the speaker is a member of the `chatData` literal as CONSTRUCTED');
-    assert.ok(visibility !== -1, 'and visibility is applied at all');
-    // Both indices are real, so neither comparison can pass on a `-1` for an absent
-    // token — the vacuity `assert.ok(-1 < N)` would have handed us.
-    assert.ok(
-      composed.index < visibility,
-      'the speaker-bearing construction precedes the visibility pass'
-    );
-    assert.equal(
-      body.includes('chatData.speaker'),
-      false,
-      'and it is never attached post-hoc, which is how it could land after the applier'
-    );
-  });
-
-  it('applies visibility BEFORE create, and never as a create option', () => {
-    // The legacy `rollMode` CREATE OPTION is honoured only for a message carrying rolls, and this
-    // card carries none — so `create(chatData, { rollMode })` would post every blind bulk card
-    // publicly.
-    const body = mainMethodSource(POSTER);
-    const visibility = body.indexOf('applyBulkChatVisibility');
-    const create = body.indexOf('ChatMessage.create');
-    assert.ok(visibility > 0 && create > 0);
-    assert.ok(visibility < create);
-    assert.equal(body.includes('create(chatData, {'), false, 'no create-option smuggling');
-  });
-});
-
-// Behaviour, through the harness copy the assertions above protect.
+// Behaviour, through the REAL facade (issue 1933).
 
 const ORE = bulkComponent({ id: 'comp-ore', name: 'Iron Ore', img: 'icons/ore.webp' });
 const SYSTEM = bulkSystem({ id: 'sys-a', components: [ORE] });
@@ -584,63 +393,117 @@ describe('destroyComponents: the same gate, the same refusal', () => {
   });
 });
 
+describe('_postBulkSalvageChatMessage: speaker -> visibility -> create, observed on the real poster', () => {
+  /** A V13-shaped `ChatMessage` recording each step with what `chatData` held at that moment. */
+  function recordingChatMessage() {
+    const steps = [];
+    globalThis.ChatMessage = {
+      getSpeaker: ({ actor }) => {
+        steps.push(['getSpeaker', actor.id]);
+        return { actor: actor.id, alias: actor.name };
+      },
+      applyRollMode: (chatData, mode) => {
+        steps.push(['visibility', mode, 'speaker' in chatData]);
+        chatData.blind = mode === 'blindroll';
+      },
+      create: async (...args) => {
+        steps.push(['create', args.length, { ...args[0] }]);
+        return { id: 'message' };
+      },
+    };
+    return steps;
+  }
+
+  it('builds the speaker onto chatData before visibility, and creates with author alone', async () => {
+    const actor = makeFacadeActor('a-mine', { ownerUserIds: ['u1'] });
+    const { facade } = createFabricateFacadeHarness({ user: { id: 'u1', isGM: false }, actors: [actor] });
+    const steps = recordingChatMessage();
+
+    await facade._postBulkSalvageChatMessage({
+      content: '<p>card</p>',
+      rollMode: 'blindroll',
+      actorUuid: actor.uuid,
+    });
+
+    assert.deepEqual(
+      steps.map(([step]) => step),
+      ['getSpeaker', 'visibility', 'create']
+    );
+    assert.equal(steps[1][2], true, 'the speaker is on chatData when visibility is applied');
+    const [, argumentCount, created] = steps[2];
+    assert.equal(argumentCount, 1, 'visibility travels on the data, never as a create option');
+    assert.equal(created.author, 'u1');
+    assert.equal('user' in created, false, 'the discarded V14 `user` key is never written');
+    assert.equal(created.blind, true, 'the created data carries the applied visibility');
+  });
+
+  it('builds an alias speaker without inferring one when no actor resolves', async () => {
+    const { facade } = createFabricateFacadeHarness({ user: { id: 'u1', isGM: false } });
+    const steps = recordingChatMessage();
+
+    await facade._postBulkSalvageChatMessage({
+      content: '<p>card</p>',
+      rollMode: 'gmroll',
+      actorNames: ['Ari', 'Bo'],
+    });
+
+    assert.deepEqual(
+      steps.map(([step]) => step),
+      ['visibility', 'create'],
+      'getSpeaker() with no actor falls through to the controlled tokens, so it is never asked'
+    );
+    assert.equal(steps[1][2].speaker.alias, 'Ari, Bo');
+  });
+});
+
 // The indexed component lookup (issue 1202)
 
-/**
- * `src/main.js` methods whose component lookup must stay index-backed, with the exact signature
- * `mainMethodSource` slices from.
- */
+/** Methods whose component lookup runs once per row, with what multiplies it. */
 const INDEXED_LOOKUPS = [
-  ['_buildNotPermittedRow(target) {', 'once per bulk row, before the service is entered'],
   [
-    '_resolveJournalComponent(systemId, componentId) {',
-    "wired as RunJournalBuilder's getComponent, called per result / requirement / " +
-      'consumed ingredient / salvage identity inside a .map() over journal rows',
+    '_buildNotPermittedRow',
+    'once per bulk row, before the service is entered',
+    (facade) => facade._buildNotPermittedRow(target('a-any')),
+  ],
+  [
+    '_resolveJournalComponent',
+    "wired as RunJournalBuilder's getComponent, called per result / requirement / consumed " +
+      'ingredient / salvage identity inside a .map() over journal rows',
+    (facade) => facade._resolveJournalComponent('sys-a', 'comp-ore'),
   ],
 ];
 
 describe('issue 1202 — the multiplied component lookups stay index-backed', () => {
-  for (const [signature, multiplier] of INDEXED_LOOKUPS) {
-    it(`${signature.slice(0, signature.indexOf('('))} resolves through the retained index`, () => {
-      const body = mainMethodSource(signature);
-      assert.ok(
-        /findById\(\s*getDefinitionIndex\(/.test(body),
-        `${signature} must resolve its component id through the retained index — it runs ` +
-          `${multiplier}, so a scan here is an additive rows x components term.`
+  const WIDE_SYSTEM = bulkSystem({
+    id: 'sys-a',
+    components: [
+      ...Array.from({ length: 40 }, (_, index) => bulkComponent({ id: `filler-${index}` })),
+      ORE,
+    ],
+  });
+
+  for (const [name, multiplier, lookup] of INDEXED_LOOKUPS) {
+    it(`${name} examines ONE indexed candidate per lookup, never a scan`, () => {
+      const { facade } = createFabricateFacadeHarness({
+        user: { id: 'gm', isGM: true },
+        systems: [{ system: WIDE_SYSTEM, recipes: [] }],
+      });
+      lookup(facade);
+      resetIdentityCounters();
+
+      const answers = [lookup(facade), lookup(facade), lookup(facade)];
+
+      assert.deepEqual(
+        answers.map((answer) => answer?.name),
+        ['Iron Ore', 'Iron Ore', 'Iron Ore']
       );
+      const { candidatesExamined, indexBuilds } = readIdentityCounters();
       assert.equal(
-        body.includes('.find('),
-        false,
-        `${signature} still contains a raw .find( scan over a definition array. The bounded ` +
-          `slice is this method only, so this cannot be a neighbour's legitimate use.`
+        candidatesExamined,
+        3,
+        `${name} runs ${multiplier}, so a scan here is an additive rows x components term`
       );
+      assert.equal(indexBuilds, 0, 'and the index built by the first lookup is retained');
     });
   }
-
-  it('holds the harness mirror to the same contract as the method it copies', () => {
-    // `_buildNotPermittedRow` is reproduced in `fabricateFacadeHarness.js` under a comment claiming
-    // it is a faithful copy (issue 1202).
-    const production = mainMethodSource('_buildNotPermittedRow(target) {');
-    const mirror = mainMethodSource('_buildNotPermittedRow(target) {', HARNESS_SOURCE);
-
-    assert.ok(mirror.length > 100, `non-vacuity: the mirror sliced to ${mirror.length} characters`);
-    assert.notEqual(
-      mirror,
-      production,
-      'sanity: the two are NOT byte-identical (the copy carries its own comments), so ' +
-        'this guard has to compare the claim rather than the whole text'
-    );
-    for (const [label, body] of [
-      ['production', production],
-      ['the harness mirror', mirror],
-    ]) {
-      assert.ok(
-        /findById\(\s*getDefinitionIndex\(resolvedComponentsFor\(system\)\),\s*target\?\.componentId\s*\)/.test(
-          body
-        ),
-        `${label} must resolve the component through the retained index, or "faithful copy" ` +
-          `is a claim the tree does not support.`
-      );
-    }
-  });
 });

@@ -3,10 +3,12 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import {
+  CHECK_EVIDENCE_RAW_MODULES,
   MARKS_AND_NOTICES_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
   STATUS_TONE_RAW_MODULES,
+  TYPEAHEAD_RUNE_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import { ANNOUNCE_AFTER_FOCUS_MS } from '../../src/ui/svelte/util/announceAfterFocus.js';
@@ -17,12 +19,15 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-recipe-item-editor-',
+  runeModules: TYPEAHEAD_RUNE_MODULES,
   rawModules: [
+    'src/ui/svelte/util/rollPromptOrigin.js',
     // Issue 1506: the one tone map the converted status pills read at a dynamic site.
     ...STATUS_TONE_RAW_MODULES,
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...CHECK_EVIDENCE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     // RecipeItemEditor/ToolEditView/EssenceEditView resolve.
     'src/ui/svelte/apps/manager/validationFocus.js',
@@ -34,6 +39,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/recipeItemAccessBadge.js',
     // The Limits tab's character-prerequisite picker imports the pure engine (issue 544).
     'src/systems/characterPrerequisites.js',
+    // The shared salvage-failure fallback literal (issue 2092), read by SalvageRollSummary.
+    'src/systems/salvageMessages.js',
     'src/ui/svelte/util/dropUtils.js',
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
@@ -78,6 +85,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
     'src/ui/svelte/components/RowDisclosure.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageRollSummary.svelte',
+    'src/ui/svelte/apps/crafting/detail/CheckEvidenceRows.svelte',
+    'src/ui/svelte/components/DiceTiles.svelte',
+    'src/ui/svelte/apps/journal/JournalFactRow.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageSimpleBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageRoutedBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageProgressiveBody.svelte',

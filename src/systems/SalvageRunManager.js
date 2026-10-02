@@ -15,15 +15,10 @@ const HISTORY_LIMIT = 50;
  */
 export class SalvageRunManager extends RunContainerManagerBase {
   /**
-   * @param {object} [deps]
-   * @param {() => boolean} [deps.isPrimaryGM] Primary-GM gate for the timed
-   *   world-time resume path (issue 656). `processWorldTime` runs off the synced
-   *   `updateWorldTime` hook, so without this every connected client resumes a
-   *   maturing run and races the broadcast `setFlag` write. The default `() => true`
-   *   is intentional: unit fixtures build no `activeGM` and must still resume, and
-   *   the immediate `CraftingEngine.salvage()` path never routes through here. Because
-   *   the default fails OPEN, the real `game.users.activeGM?.id === game.user?.id`
-   *   check is WIRED at construction in `main.js` — that wiring is load-bearing.
+   * `isPrimaryGM` gates the timed world-time resume (issue 656), so not every client resumes a
+   * maturing run and races the broadcast `setFlag`. The default `() => true` fails OPEN for
+   * fixtures, and the immediate `CraftingEngine.salvage()` never routes through it, so
+   * `src/bootstrap/composeServices.js` wires the real `activeGM` check (load-bearing).
    */
   constructor({ isPrimaryGM = () => true } = {}) {
     super({ flagKey: 'salvageRuns' });
@@ -54,8 +49,7 @@ export class SalvageRunManager extends RunContainerManagerBase {
     const now = this._nowWorldTime();
     const runId = foundry.utils.randomID();
     const run = nativeHistoryRecord({
-      // Defaults first; `...runData` lets the caller override; then the
-      // authoritative fields below are re-asserted so they cannot be clobbered.
+      // Defaults, then the caller's `...runData`, then the authoritative fields re-asserted below.
       craftingSystemId: null,
       componentId: null,
       status: 'inProgress',
@@ -131,40 +125,14 @@ export class SalvageRunManager extends RunContainerManagerBase {
   }
 
   /**
-   * Archive an active run to history with a terminal status and whatever the caller has
-   * to record about how it ended.
-   *
-   * ## The payload is NOT an allowlist, and one field now depends on that
-   *
-   * `...payload` is spread wholesale between the run and the authoritative status fields,
-   * so any key a caller passes lands on the persisted record and survives the
-   * flag round-trip — `_normalizeContainer` normalizes the CONTAINER, never the individual
-   * run records. That is a deliberate property of this class (the salvage `resultOrder`
-   * capture already relies on it) and it is what lets `salvage()` write
-   * `firedComplications` here rather than amending an archived entry afterwards, which
-   * this class offers no way to do (issue 1286).
-   *
-   * `firedComplications` is `[{resultId, componentId, complicationId, buckets}]` and is
-   * REDACTED BY THE CALLER, at the write, through `publicComplications`. That is not a
-   * caller courtesy this class could take over: the container is an actor flag replicated
-   * to every client with permission on the actor — for a player character, the owning
-   * player — so a `gmOnly` complication reaching this method has already leaked, whatever
-   * this method then does with it. Redacting on the way OUT would be too late and would
-   * also be the wrong shape, because history records are read straight off the flag by
-   * surfaces that never call back through here.
-   *
-   * The list may legitimately hold SEVERAL records differing only in `resultId`: a
-   * complication fires per result entry, so a component staged twice that went wrong twice
-   * wrote two firings. Nothing on the write path may de-duplicate them.
-   *
-   * A run that fired nothing player-visible carries no such key at all, matching the
-   * omitted-when-default doctrine the rest of the persisted shapes follow.
-   *
-   * @param {Actor} actor
-   * @param {object} run The active run being completed.
-   * @param {'succeeded'|'failed'|'cancelled'} [status]
-   * @param {object} [payload] Terminal evidence, spread verbatim onto the record.
-   * @returns {Promise<object>} the archived record.
+   * Archive an active run with a terminal status. `payload` is spread verbatim, NOT allowlisted
+   * (`_normalizeContainer` normalizes the container, never a record), which the salvage
+   * `resultOrder` capture and `firedComplications` rely on (issue 1286). `firedComplications`,
+   * `[{resultId, componentId, complicationId, buckets}]`, is REDACTED BY THE CALLER through
+   * `publicComplications` at the write: the flag replicates to everyone with permission on the
+   * actor, so a `gmOnly` complication reaching here has already leaked. Records differing only in
+   * `resultId` are separate firings and are never de-duplicated; a run that fired nothing
+   * player-visible omits the key. Answers the archived record.
    */
   async completeRun(actor, run, status = 'succeeded', payload = {}) {
     const container = this._getContainer(actor);
@@ -199,15 +167,9 @@ export class SalvageRunManager extends RunContainerManagerBase {
   }
 
   /**
-   * Discard an active salvage run WITHOUT recording it in history — for a run that
-   * was created but never legitimately resolved (e.g. the player dismissed the
-   * interactive roll dialog before the check ran). Unlike {@link cancelRun}, which
-   * archives to history as `cancelled`, this leaves no trace: the attempt never
-   * began. Mirrors `CraftingRunManager#discardRun`.
-   *
-   * @param {Actor} actor
-   * @param {string} runId
-   * @returns {Promise<object|null>} the discarded run, or null if not active
+   * Discard an active salvage run WITHOUT a history entry, for a run that never legitimately
+   * resolved (such as a dismissed roll dialog); `cancelRun` archives instead. `null` when not
+   * active.
    */
   async discardRun(actor, runId) {
     const container = this._getContainer(actor);
@@ -219,13 +181,9 @@ export class SalvageRunManager extends RunContainerManagerBase {
   }
 
   async processWorldTime(worldTime = this._nowWorldTime(), onReadyRun = null) {
-    // Timed resume only (issue 656): this is the exclusively timed path (callers are
-    // CraftingEngine.processPendingSalvageRuns and startup processFabricateWorldTime),
-    // driven from the synced updateWorldTime hook. Gate to the primary GM so exactly
-    // one client resumes maturing runs and persists the broadcast setFlag write.
-    // Immediate CraftingEngine.salvage() never routes here, so it stays on the acting
-    // client. If only players are online the resume defers until the primary GM
-    // connects and its startup pass catches up any matured run.
+    // Timed resume only (issue 656), from the synced `updateWorldTime` hook: only the primary GM
+    // resumes and writes the broadcast `setFlag`. The immediate `salvage()` never routes here;
+    // with only players online the resume waits for the primary GM's startup catch-up.
     if (this._isPrimaryGM() !== true) return;
     for (const actor of game.actors || []) {
       for (const run of this.getActiveRuns(actor)) {

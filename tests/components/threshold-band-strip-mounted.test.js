@@ -4,6 +4,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  buildCountBands,
+  describeCountBandRange,
+} from '../../src/ui/svelte/apps/manager/checks/checkBandModel.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -95,6 +99,21 @@ describe('ThresholdBandStrip: the two number systems', () => {
       handles(root).map((handle) => handle.getAttribute('aria-valuenow')),
       ticks,
       'aria-valuenow carries the number the eye reads, not the offset the stepper shows'
+    );
+  });
+
+  it('draws a caller leading tick at the track start, and none by default', async () => {
+    const plain = await harness.mount({ bands: RELATIVE_BANDS, previewDc: 12 });
+    assert.ok(!plain.querySelector('[data-band-strip-leading-tick]'), 'no leading tick unless asked');
+    harness.remount();
+    const root = await harness.mount({ bands: RELATIVE_BANDS, previewDc: 12, leadingTick: '<0' });
+    const leading = root.querySelector('[data-band-strip-leading-tick]');
+    assert.equal(leading.textContent.trim(), '<0');
+    assert.match(leading.getAttribute('style'), /left: 0%/);
+    assert.ok(leading.closest('.fab-band-strip-ticks'), 'it sits in the tick row, first');
+    assert.deepEqual(
+      [...root.querySelectorAll('.fab-band-strip-tick')].map((tick) => tick.textContent.trim()),
+      ['<0', '7', '12', '17', '22']
     );
   });
 
@@ -589,5 +608,103 @@ describe('ThresholdBandStrip: the drag scale is frozen for the gesture', () => {
 
     // 100/200 of the same 2..27 track lands on 15.
     assert.deepEqual(emitted.at(-1), { binding: 'relative', index: 2, dc: 3 });
+  });
+});
+
+/** ── The read-only band picture (issue 2005, ruling R2) ─────────────────────────────── */
+
+/** A roll-under ×1/×½/×⅕ ladder against 55, with each band's range caller-formatted. */
+const UNDER_BANDS = [
+  { id: 'extreme', name: 'Extreme', from: 1, range: '11 or under' },
+  { id: 'hard', name: 'Hard', from: 12, range: '12–27' },
+  { id: 'regular', name: 'Regular', from: 28, range: '28–55' },
+  { id: 'otherwise', name: 'Otherwise', from: 56, range: '56 or over' },
+];
+
+describe('ThresholdBandStrip: readonly', () => {
+  it('draws the bands with no slider, tab stop or draggable handle', async () => {
+    const writes = [];
+    const root = await harness.mount({
+      bands: UNDER_BANDS,
+      readonly: true,
+      onChange: (patch) => writes.push(patch),
+    });
+    assert.equal(root.querySelectorAll('[data-band-strip-band]').length, 4, 'every band drawn');
+    assert.equal(handles(root).length, 0, 'no handle, so no drag cursor either');
+    assert.ok(!root.querySelector('[role="slider"]'), 'no slider role');
+    assert.ok(!root.querySelector('[tabindex]'), 'nothing joins the tab order');
+    const track = root.querySelector('[data-band-strip-track]');
+    press(track, 'ArrowRight');
+    track.dispatchEvent(pointer('pointerdown', 100));
+    track.dispatchEvent(pointer('pointermove', 200));
+    assert.deepEqual(writes, [], 'and no key or pointer path writes anything');
+  });
+
+  it('describes the group by a visually hidden list naming each band and its range', async () => {
+    const root = await harness.mount({ bands: UNDER_BANDS, readonly: true });
+    const track = root.querySelector('[data-band-strip-track]');
+    assert.equal(track.getAttribute('role'), 'group');
+    const describedBy = track.getAttribute('aria-describedby');
+    assert.ok(describedBy, 'the group names its description');
+    const list = root.querySelector('[data-band-strip-band-list]');
+    assert.equal(list.id, describedBy, 'which is the hidden band list');
+    assert.ok(list.classList.contains('visually-hidden'));
+    assert.deepEqual(
+      [...list.querySelectorAll('li')].map((item) => item.textContent.trim()),
+      ['Extreme: 11 or under', 'Hard: 12–27', 'Regular: 28–55', 'Otherwise: 56 or over']
+    );
+  });
+
+  it('gives two read-only strips on one page distinct descriptions', async () => {
+    const first = await harness.mount({ bands: UNDER_BANDS, readonly: true });
+    const firstId = first.querySelector('[data-band-strip-band-list]').id;
+    const second = await harness.mount({ bands: UNDER_BANDS, readonly: true });
+    assert.notEqual(second.querySelector('[data-band-strip-band-list]').id, firstId);
+    first.remove();
+  });
+
+  it('reuses the fallback note when the picture cannot be drawn', async () => {
+    const root = await harness.mount({ bands: [], readonly: true, fallbackNote: 'Unresolved.' });
+    assert.match(root.querySelector('[data-band-strip-fallback]').textContent, /Unresolved/);
+    assert.ok(!root.querySelector('[data-band-strip-band-list]'));
+  });
+
+  it('leaves the default strip exactly as it was: handles, and no description', async () => {
+    const root = await harness.mount({ bands: RELATIVE_BANDS, previewDc: 12 });
+    const track = root.querySelector('[data-band-strip-track]');
+    assert.ok(!track.hasAttribute('aria-describedby'));
+    assert.ok(!root.querySelector('[data-band-strip-band-list]'));
+    assert.ok(!root.querySelector('.visually-hidden'));
+    assert.equal(handles(root).length, 4);
+    assert.deepEqual(
+      handles(root).map((handle) => [handle.getAttribute('role'), handle.getAttribute('tabindex')]),
+      Array.from({ length: 4 }, () => ['slider', '0'])
+    );
+  });
+
+  it("N11: draws a counting check's ladder in net successes, read-only, Botch first", async () => {
+    const english = (_key, text) => text;
+    const bands = buildCountBands({
+      evaluation: { product: 'count', pool: { cancel: { enabled: true } } },
+      required: 2,
+      outcomes: [
+        { id: 'ruined', name: 'Ruined', success: false, dc: -2 },
+        { id: 'success', name: 'Success', success: true, dc: 0 },
+        { id: 'fine', name: 'Fine', success: true, dc: 1 },
+        { id: 'masterwork', name: 'Masterwork', success: true, dc: 3 },
+      ],
+      names: { botch: 'Botch' },
+    }).map((band) => ({ ...band, range: describeCountBandRange(band, english) }));
+    const root = await harness.mount({ bands, readonly: true });
+    assert.ok(!root.querySelector('[role="slider"]'), 'no slider role on a count strip');
+    assert.deepEqual(
+      [...root.querySelectorAll('[data-band-strip-band-list] li')].map((item) => item.textContent.trim()),
+      ['Botch: below 0', 'Ruined: 0–1', 'Success: 2', 'Fine: 3–4', 'Masterwork: 5 or more']
+    );
+    assert.deepEqual(
+      [...root.querySelectorAll('.fab-band-strip-tick')].map((tick) => tick.textContent),
+      ['0', '2', '3', '5'],
+      'the ticks mark each threshold in successes'
+    );
   });
 });

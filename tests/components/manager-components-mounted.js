@@ -30,6 +30,7 @@ import {
 let Component;
 let mounted;
 let target;
+let mountedStore;
 
 // The locators read `target` through a getter rather than a captured element.
 const queries = createManagerQueries(() => target);
@@ -41,7 +42,9 @@ const { mountManager } = createManagerMounts({
     mounted = nextMounted;
     target = nextTarget;
   },
-  adoptStore: () => {},
+  adoptStore: (store) => {
+    mountedStore = store;
+  },
 });
 
 /** Register this route’s cases in `manager-mounted.test.js`’s one describe. */
@@ -1473,5 +1476,102 @@ export function registerComponentsCases() {
         assert.equal(managerView(), 'components', 'and the GM leaves the editor either way');
       });
     }
+  });
+
+  // The folder-aware drop through the shell's import flow model (issue 1721).
+  describe('folder-aware component drop', () => {
+    const GROUPS = [
+      { folderId: 'f1', folderName: 'Reagent', itemCount: 2, itemUuids: ['Item.a', 'Item.b'] },
+    ];
+    const mappingDialog = () => document.querySelector('[data-import-mapping]');
+    const serviceCalls = (calls, name) => calls.filter(([called]) => called === name);
+
+    /** Mount on Component Rules with a collector answering `plan`, then drop one folder. */
+    async function dropFolder(plan) {
+      const calls = [];
+      mountManager([], {}, {
+        onDropItem: (data) => calls.push(['onDropItem', data]),
+        collectImportFolderGroups: async (data) => {
+          calls.push(['collect', data]);
+          return plan;
+        },
+        commitImportFolderMapping: async (systemId, decisions) =>
+          calls.push(['commit', systemId, decisions]),
+      });
+      navButton('Component Rules').click();
+      await settle();
+      const dropEvent = new Event('drop', { bubbles: true, cancelable: true });
+      Object.defineProperty(dropEvent, 'dataTransfer', {
+        value: { getData: () => JSON.stringify({ type: 'Folder', uuid: 'Folder.f1' }) },
+      });
+      target.querySelector('.manager-component-drop-zone').dispatchEvent(dropEvent);
+      await settle();
+      return calls;
+    }
+
+    it('opens the mapping modal for a grouped drop and commits against the selected system', async () => {
+      const calls = await dropFolder({ groups: GROUPS });
+      assert.ok(Boolean(mappingDialog()), 'the grouped drop opens the mapping modal');
+      assert.equal(serviceCalls(calls, 'onDropItem').length, 0, 'and imports nothing yet');
+
+      document.querySelector('[data-import-mapping-commit]').click();
+      await settle();
+
+      assert.ok(!mappingDialog(), 'the commit closes the modal');
+      const [commit] = serviceCalls(calls, 'commit');
+      assert.equal(commit?.[1], 'alchemy', 'against the system selected when the GM commits');
+      assert.deepEqual(commit?.[2].map((decision) => decision.folderId), ['f1']);
+    });
+
+    it('neither imports nor opens the modal for a drop the collector already handled', async () => {
+      const calls = await dropFolder({ handled: true });
+      assert.ok(!mappingDialog(), 'a handled drop opens nothing');
+      assert.deepEqual(
+        calls,
+        [['collect', { type: 'Folder', uuid: 'Folder.f1' }]],
+        'and never falls through to onDropItem'
+      );
+    });
+
+    it('closes the mapping modal on Cancel without committing', async () => {
+      const calls = await dropFolder({ groups: GROUPS });
+      assert.ok(Boolean(mappingDialog()), 'the grouped drop opens the mapping modal');
+
+      document.querySelector('[data-import-mapping-cancel]').click();
+      await settle();
+
+      assert.ok(!mappingDialog(), 'Cancel closes the modal');
+      assert.equal(serviceCalls(calls, 'commit').length, 0, 'and nothing reaches the service');
+    });
+
+    it('opens the import report from the header Import button and closes it', async () => {
+      mountManager();
+      mountedStore.importSystem = async () => ({
+        handledCount: 0,
+        groups: [{ kind: 'sourceItem', kindLabel: 'Component source items', count: 0, rows: [] }],
+      });
+      target.querySelector('[data-manager-import-system]').click();
+      await settle();
+      assert.ok(Boolean(document.querySelector('[data-import-report]')), 'Import opens the report');
+
+      document.querySelector('[data-import-report-close]').click();
+      await settle();
+      assert.ok(!document.querySelector('[data-import-report]'), 'and its Close dismisses it');
+    });
+
+    it('refuses an empty import in the modal, and the shell drops one that gets past it', async () => {
+      const calls = await dropFolder({ groups: GROUPS });
+      document.querySelector('[data-import-mapping-skip]').click();
+      flushSync();
+      const commit = document.querySelector('[data-import-mapping-commit]');
+      assert.equal(commit.disabled, true, 'the modal itself refuses an empty import');
+      // Lifted so the shell's own guard is what answers the empty set.
+      commit.disabled = false;
+      commit.click();
+      await settle();
+
+      assert.ok(!mappingDialog(), 'the modal closes');
+      assert.equal(serviceCalls(calls, 'commit').length, 0, 'and nothing reaches the service');
+    });
   });
 }

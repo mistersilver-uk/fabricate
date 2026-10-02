@@ -5,7 +5,7 @@ world-prerequisites
 world-modifiers
 world-component-entry-definition
 world-vocabulary
-world-essence-catalogue
+world-essence-catalogue-resting
 world-essence-entry
 world-tool-catalogue-list-head
 world-tool-entry-overview
@@ -23,6 +23,7 @@ manager-checks-validation
 manager-checks-rail-group
 manager-checks-salvage-on-failure
 manager-tags-categories-normal
+manager-checks-v3-count-routed-light
 manager-essences-normal
 manager-essence-edit-first-state
 manager-environments-browse-normal

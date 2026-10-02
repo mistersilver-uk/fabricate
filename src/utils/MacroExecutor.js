@@ -67,10 +67,10 @@ export const MacroExecutor = {
     // Foundry V13.351 client/client.mjs publishes game, foundry, ui, and fromUuid on
     // globalThis, so accepting them again as function parameters is redundant. Macro commands
     // resolve those runtime globals directly. Note this binds only ('context','args','scope'):
-    // core's own #executeScript also binds speaker, actor, token and character, so a macro
-    // reaching for any of those resolves a GLOBAL on the executing client — which, GM-side,
-    // is the GM's assigned character, the GM's viewed canvas and a TRUE game.user.isGM. The
-    // socket supplies speaker, actor and token on the payload scope for that reason.
+    // core's own #executeScript also binds speaker, actor, token and character, which are no
+    // globals, so a macro naming any of them bare throws, and game.user is the executing
+    // client's user — GM-side, a TRUE game.user.isGM. The socket supplies speaker, actor and
+    // token on the payload scope for that reason.
     const fn = new AsyncFunction('context', 'args', 'scope', `"use strict";\n${macro.command}`);
 
     return await fn(payload, payload, payload);

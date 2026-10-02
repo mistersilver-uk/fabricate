@@ -15,19 +15,33 @@ import {
   DocumentShapedDefinitionRepository,
 } from './helpers/definitionRepositoryFakes.js';
 import { installFoundryEnv } from './helpers/foundryEnv.js';
+import { calledName, parseModule, walkNodes } from './helpers/moduleAst.js';
+import { sourceAstEntriesUnder } from './helpers/parsedSource.js';
 import { makeSettingsSeam } from './helpers/settings.js';
-import { collectWorkingTreeSources, stripComments } from './helpers/sourceScan.js';
 
 const env = installFoundryEnv();
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 const { Recipe } = await import('../src/models/Recipe.js');
 
+const DEFINITION_KEYS = new Set(['RECIPES', 'CRAFTING_SYSTEMS']);
+const SETTING_ACCESSORS = new Set(['getSetting', 'setSetting', '_getSetting', '_setSetting']);
+
+/** A read of `SETTING_KEYS.RECIPES` or `.CRAFTING_SYSTEMS`, bracket spelling included. */
+const namesDefinitionKey = (node) =>
+  node?.type === 'MemberExpression' &&
+  node.object?.type === 'Identifier' &&
+  node.object.name === 'SETTING_KEYS' &&
+  DEFINITION_KEYS.has(node.computed ? node.property?.value : node.property?.name);
+
 /**
  * `getSetting(SETTING_KEYS.RECIPES)` and friends — the thing the acceptance criterion actually
  * forbids, as opposed to merely naming a key.
  */
-const KEY_ACCESS = /\b_?(?:get|set)Setting\(\s*SETTING_KEYS\.(?:RECIPES|CRAFTING_SYSTEMS)\b/;
+const accessesDefinitionKey = (node) =>
+  SETTING_ACCESSORS.has(calledName(node)) && namesDefinitionKey(node.arguments[0]);
+
+const firesOn = (code, predicate) => [...walkNodes(parseModule(code).ast)].some(predicate);
 
 /** Modules permitted to READ OR WRITE the two keys directly. */
 const KEY_ACCESS_ALLOWLIST = new Set([
@@ -91,60 +105,54 @@ function countedRecipeManager() {
 }
 
 describe('no production code outside the adapter touches the definition setting keys', () => {
-  /** @returns {Record<string, string>} comment-stripped `src/**` sources by repo-relative path. */
-  function scannedSources() {
-    const sources = collectWorkingTreeSources(['src'], ['.js', '.mjs', '.svelte']);
-    assert.ok(
-      Object.keys(sources).length > 100,
-      'the source scan found suspiciously few files; a vacuous gate proves nothing'
-    );
-    return Object.fromEntries(
-      Object.entries(sources).map(([file, source]) => [file, stripComments(source)])
-    );
+  /** The `src/**` modules outside `allowlist` with a node `predicate` matches. */
+  function offenders(allowlist, predicate) {
+    const trees = sourceAstEntriesUnder('src');
+    assert.ok(trees.length > 100, 'the source scan found suspiciously few files');
+    return trees
+      .filter(([file, ast]) => !allowlist.has(file) && [...walkNodes(ast)].some(predicate))
+      .map(([file]) => file);
   }
 
   it('leaves every read and write of the two keys to the adapter', () => {
-    const offenders = Object.entries(scannedSources())
-      .filter(([file, code]) => !KEY_ACCESS_ALLOWLIST.has(file) && KEY_ACCESS.test(code))
-      .map(([file]) => file);
-
     assert.deepEqual(
-      offenders,
+      offenders(KEY_ACCESS_ALLOWLIST, accessesDefinitionKey),
       [],
       'these modules read or write the recipes/craftingSystems settings directly; go through CraftingDefinitionRepository instead'
     );
   });
 
   it('leaves even naming the two keys to a short, deliberate list', () => {
-    const offenders = Object.entries(scannedSources())
-      .filter(
-        ([file, code]) =>
-          !KEY_MENTION_ALLOWLIST.has(file) && /SETTING_KEYS\.(RECIPES|CRAFTING_SYSTEMS)/.test(code)
-      )
-      .map(([file]) => file);
-
-    assert.deepEqual(offenders, [], 'these modules name a definition setting key directly');
+    assert.deepEqual(
+      offenders(KEY_MENTION_ALLOWLIST, namesDefinitionKey),
+      [],
+      'these modules name a definition setting key directly'
+    );
   });
 
-  it('actually fires on the shape it forbids, in both spellings', () => {
+  it('actually fires on the shape it forbids, in every spelling', () => {
     // A "must print nothing" gate is worthless until you have watched it print something.
-    // Both of these are real pre-seam lines from the two managers and the migration runner.
-    assert.ok(KEY_ACCESS.test(stripComments('const saved = getSetting(SETTING_KEYS.RECIPES) || [];')));
-    assert.ok(
-      KEY_ACCESS.test(stripComments('await setSetting(SETTING_KEYS.CRAFTING_SYSTEMS, payload);'))
-    );
-    assert.ok(
-      KEY_ACCESS.test(stripComments('const raw = this._getSetting(SETTING_KEYS.RECIPES) ?? [];')),
-      'an injected accessor reaching the same key is the same coupling'
-    );
+    // The first three are real pre-seam lines from the two managers and the migration runner.
+    for (const code of [
+      'const saved = getSetting(SETTING_KEYS.RECIPES) || [];',
+      'await setSetting(SETTING_KEYS.CRAFTING_SYSTEMS, payload);',
+      'const raw = this._getSetting(SETTING_KEYS.RECIPES) ?? [];',
+      "const raw = getSetting(SETTING_KEYS['CRAFTING_SYSTEMS']);",
+    ]) {
+      assert.ok(firesOn(code, accessesDefinitionKey), code);
+    }
+    assert.ok(firesOn('const key = SETTING_KEYS.RECIPES;', namesDefinitionKey));
   });
 
   it('does not fire on prose or on an unrelated setting key', () => {
     assert.ok(
-      !KEY_ACCESS.test(stripComments('// getSetting(SETTING_KEYS.RECIPES) used to live here\nconst x = 1;')),
-      'comments are stripped before matching, so documenting the retired shape is safe'
+      !firesOn(
+        '// getSetting(SETTING_KEYS.RECIPES) used to live here\nconst x = 1;',
+        namesDefinitionKey
+      ),
+      'a comment is no node, so documenting the retired shape is safe'
     );
-    assert.ok(!KEY_ACCESS.test(stripComments('getSetting(SETTING_KEYS.THEME);')));
+    assert.ok(!firesOn('getSetting(SETTING_KEYS.THEME);', namesDefinitionKey));
   });
 });
 

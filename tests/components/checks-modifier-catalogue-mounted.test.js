@@ -99,6 +99,11 @@ describe('the check-modifier catalogue card (mounted)', () => {
       assert.equal(rows.length, CATALOGUE.length, 'every entry is read out');
       assert.equal(rows[0].textContent.trim(), 'Medicine');
       assert.equal(
+        rows[0].getAttribute('title'),
+        'Medicine',
+        'the name carries its full text, since a long one ellipsises (issue 2044)'
+      );
+      assert.equal(
         card.querySelector('[data-crafting-modifier-readonly="expression"]').textContent.trim(),
         '@abilities.med.mod'
       );
@@ -364,6 +369,30 @@ describe('the check-modifier catalogue card (mounted)', () => {
       !catalogue.querySelector('[data-crafting-modifier-max-picks]'),
       'and the cap is not left behind in the library card'
     );
+    harness.remount();
+  });
+
+  it('describes each combination rule as reaching the check, never as summed into the roll (issue 2005)', async () => {
+    const patches = [];
+    const target = await mountChecks({
+      onUpdateCraftingCheckModifiers: (patch) => patches.push(patch),
+    });
+    const policyCard = target.querySelector('[data-crafting-modifier-policy-card]');
+    assert.equal(
+      policyCard.querySelector('.manager-checks-card-description').textContent.trim(),
+      'Which of the named modifiers reach the check, and how they combine.'
+    );
+    const option = (value) =>
+      policyCard.querySelector(`[data-crafting-modifier-policy-option="${value}"]`);
+    assert.match(option('addAll').textContent, /Every modifier marked applied reaches the check\./);
+    assert.match(
+      option('highest').textContent,
+      /The modifiers marked considered are compared by value and only the largest applies\./
+    );
+    assert.doesNotMatch(policyCard.textContent, /summed into the roll|largest is added/);
+    option('highest').querySelector('input').click();
+    await new Promise((done) => setTimeout(done, 0));
+    assert.equal(patches.at(-1)?.defaultModifierPolicy, 'highest', 'the rule is still chosen here');
     harness.remount();
   });
 

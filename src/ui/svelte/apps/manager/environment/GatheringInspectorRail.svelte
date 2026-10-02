@@ -6,9 +6,7 @@
   no-selection empty state (issue 1707).
 
   Every reader and writer arrives as a prop from the shell, which still owns the state; the
-  two `bind:` props are the character-modifier search anchor and term, shared by both subjects.
-  `characterModifierSearchOpenUp` is a plain value because only the shell computes it and the
-  drop list reads it.
+  one `bind:` prop is the character-modifier search term, shared by both subjects.
 -->
 <script>
   import Chip from '../../../components/Chip.svelte';
@@ -50,7 +48,6 @@
     eventCharacterModifierSearchSuggestions,
     sortedDangerTags,
     selectedSystemModifiers,
-    characterModifierSearchOpenUp,
     gatheringConditionAvailableOptions,
     gatheringConditionLabel,
     gatheringConditionModifierRows,
@@ -86,7 +83,6 @@
     environmentStatusLabel,
     hasEnvironmentImage,
     truncateDescription = () => '',
-    characterModifierSearchAnchor = $bindable(),
     characterModifierSearchTerm = $bindable(),
     onDuplicateDrop = () => {},
     onDeleteDrop = () => {},
@@ -152,8 +148,6 @@
     {onDropCountKeydown}
     suggestions={characterModifierSearchSuggestions}
     characterModifierLibrary={selectedSystemModifiers}
-    {characterModifierSearchOpenUp}
-    bind:characterModifierSearchAnchor
     bind:characterModifierSearchTerm
     {gatheringConditionAvailableOptions}
     {gatheringConditionLabel}
@@ -194,8 +188,6 @@
     {truncateDescription}
     suggestions={eventCharacterModifierSearchSuggestions}
     characterModifierLibrary={selectedSystemModifiers}
-    {characterModifierSearchOpenUp}
-    bind:characterModifierSearchAnchor
     bind:characterModifierSearchTerm
     {gatheringConditionAvailableOptions}
     {gatheringConditionLabel}
@@ -416,6 +408,7 @@
   </section>
 {:else}
   <EmptyState
+    fill
     icon="fas fa-seedling"
     title={text('FABRICATE.Admin.Manager.Environment.SelectEnvironment', 'Select an environment')}
     hint={text(

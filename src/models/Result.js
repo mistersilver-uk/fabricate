@@ -2,8 +2,7 @@ import { hasRollDataPath, maximisedTotal } from '../utils/rollFormulaRollability
 
 import { isNull, omitReconstructibleDefaults } from './reconstructibleDefaults.js';
 
-/** Serialized result fields the constructor rebuilds to EXACTLY this value from absence, so
- *  emitting them is pure payload weight (issue 1135). */
+/** Fields the constructor rebuilds exactly from absence (issue 1135). */
 export const RESULT_OMITTED_WHEN_DEFAULT = {
   quantityFormula: isNull,
 };
@@ -33,7 +32,6 @@ export class Result {
 
     this.componentId = data.componentId || data.systemItemId || null;
 
-    // Foundry Source UUID (core.sourceId flag) of item to create
     this.itemUuid = data.itemUuid || null;
 
     this.quantity = data.quantity || 1;

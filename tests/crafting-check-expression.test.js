@@ -1,16 +1,12 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { evaluateNumericExpression } from '../src/systems/checkModifierResolver.js';
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import {
   recordedFoundryRoll,
   RETIRED_PLACEMENT_CORPUS,
 } from './helpers/retiredPlaceholderOracle.js';
-
-const repoRootForGuard = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+import { defineStructureContract } from './helpers/structureContract.js';
 import {
   parseDiceGroups,
   isPlainDieTerm,
@@ -481,45 +477,32 @@ describe('stripRetiredModifierPlaceholder', () => {
 // imports FROM `checkModifierResolver.js`, so siting it there closes the cycle `checkRoll.js ->
 // checkModifierResolver.js -> checkRoll.js`.
 describe('the retirement shim module placement (AF1)', () => {
-  const sourceOf = (path) => readFileSync(resolve(repoRootForGuard, path), 'utf8');
-  const importsOf = (source) =>
-    [...source.matchAll(/^\s*import\s[^;]*?from\s+'([^']+)';/gm)].map((match) => match[1]);
+  // Exact sets, so static, re-exported and `import()` specifiers all count.
+  defineStructureContract(
+    'keeps craftingCheckExpression.js a ZERO-import leaf',
+    'src/utils/craftingCheckExpression.js',
+    { importSpecifiers: [['', []]], exports: ['stripRetiredModifierPlaceholder'] }
+  );
 
-  it('keeps craftingCheckExpression.js a ZERO-import leaf', () => {
-    assert.deepEqual(
-      importsOf(sourceOf('src/utils/craftingCheckExpression.js')),
-      [],
-      'the shim module must import nothing, or it can be dragged into a cycle by its own deps'
-    );
-  });
+  // Importing checkRoll.js from either reader closes the cycle AF1 names.
+  const LEAF = '../utils/craftingCheckExpression.js';
+  const readers = ['src/systems/checkModifierResolver.js', 'src/systems/salvageCheckUsability.js'];
+  for (const reader of readers) {
+    const title = `${reader} reads the shim from the leaf, clear of the roll stack`;
+    defineStructureContract(title, reader, {
+      importSpecifiers: [
+        ['checkRoll', []],
+        ['craftingCheckExpression', [LEAF]],
+      ],
+      importsName: [[LEAF, 'stripRetiredModifierPlaceholder']],
+    });
+  }
 
-  it('keeps both usability readers clear of the roll stack', () => {
-    for (const reader of [
-      'src/systems/checkModifierResolver.js',
-      'src/systems/salvageCheckUsability.js',
-    ]) {
-      const imports = importsOf(sourceOf(reader));
-      assert.equal(
-        imports.some((specifier) => specifier.includes('checkRoll')),
-        false,
-        `${reader} must not import checkRoll.js — that is the cycle AF1 names`
-      );
-      assert.ok(
-        imports.some((specifier) => specifier.includes('craftingCheckExpression')),
-        `${reader} reads the shim from the leaf module`
-      );
-    }
-  });
-
-  it('has checkRoll.js importing the shim from the leaf, not re-declaring it', () => {
-    const source = sourceOf('src/systems/checkRoll.js');
-    assert.ok(
-      /stripRetiredModifierPlaceholder,?\n?[^;]*from '\.\.\/utils\/craftingCheckExpression\.js'/s.test(
-        source
-      ),
-      'checkRoll.js consumes the shim rather than owning it'
-    );
-  });
+  defineStructureContract(
+    'has checkRoll.js importing the shim from the leaf, not re-declaring it',
+    'src/systems/checkRoll.js',
+    { importsName: [[LEAF, 'stripRetiredModifierPlaceholder']] }
+  );
 });
 
 // the leading-multiplicative residue guard is BELT AND BRACES, and this proves it.

@@ -31,8 +31,6 @@
        to change when one moves. */
     suggestions,
     characterModifierLibrary,
-    characterModifierSearchOpenUp,
-    characterModifierSearchAnchor = $bindable(),
     characterModifierSearchTerm = $bindable(),
     gatheringConditionAvailableOptions,
     gatheringConditionLabel,
@@ -76,8 +74,6 @@
         idPrefix={`event-${editingEvent.id}`}
         {suggestions}
         {characterModifierLibrary}
-        {characterModifierSearchOpenUp}
-        bind:characterModifierSearchAnchor
         bind:characterModifierSearchTerm
         {gatheringConditionAvailableOptions}
         {gatheringConditionLabel}
@@ -224,6 +220,7 @@
   </section>
 {:else if !editing}
   <EmptyState
+    fill
     icon="fas fa-masks-theater"
     title={text(
       'FABRICATE.Admin.Manager.Environment.Events.SelectEvent',

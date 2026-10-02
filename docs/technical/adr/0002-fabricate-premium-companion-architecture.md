@@ -523,7 +523,7 @@ If an ecosystem is wanted, a perpetual paid-up option alongside the subscription
 The answer belongs in the API documentation as well as here, because a third party reading the API docs will not read this record.
 
 **Precedent is thin in exactly one place, and it is called out as such.**
-Free Foundry libraries with published APIs and third-party ecosystems plainly exist — Sequencer, Item Piles, libWrapper, socketlib.
+Free Foundry libraries with published APIs and third-party ecosystems plainly exist — Sequencer, libWrapper, socketlib.
 **No documented case was found of a Foundry module publishing a plugin API on which a third-party *paid* module builds as an advertised, sanctioned arrangement.**
 That is a "not found", not a proof of absence.
 The nearest analogues are paid modules depending on free *permissively*-licensed libraries, which raises no licence question at all — so Fabricate's noncommercial licence is precisely what makes this new ground.
@@ -1155,7 +1155,7 @@ A third defect is named under the premium signal and is the same shape: `premium
 Four terms in this record collide with the corpus, and a record that introduces vocabulary should say which sense it is using.
 
 **`companion` has two opposite meanings and they are already both in the repository.**
-`openspec/specs/integrations/spec.md` uses it ten times for a module Fabricate *consumes* — Item Piles, Simple Calendar.
+`openspec/specs/integrations/spec.md` uses it for a module Fabricate *consumes*.
 `openspec/specs/ui-extension-points/spec.md`, `DOMAIN.md` and this record use it for a module that consumes *Fabricate*.
 Because `integrations/spec.md` now gains an inbound-only scope statement pointing at the outbound section, both senses would otherwise sit one cross-reference apart.
 **Pick: `integration partner` for the inbound sense, `companion` for the outbound one**, and rename in `integrations/spec.md` when its scope statement is written.

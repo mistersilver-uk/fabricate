@@ -18,7 +18,6 @@
       "gathering": false,
       "salvage": true,
       "chatOutput": true,
-      "itemPiles": false,
       "refundOnPlayerCancel": true
     },
     "itemTags": [
@@ -114,7 +113,59 @@
       "failureResultPolicy": "perRecord",
       "progressive": {
         "awardMode": "equal",
+        "thresholdMode": "meet",
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "checkBreakage": {
           "triggers": []
         }
@@ -126,6 +177,57 @@
       "routed": {
         "type": "relative",
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -139,6 +241,57 @@
       },
       "simple": {
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -166,6 +319,57 @@
       "failureResultPolicy": "perRecord",
       "simple": {
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -178,6 +382,57 @@
       "routed": {
         "type": "relative",
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -191,7 +446,59 @@
       },
       "progressive": {
         "awardMode": "equal",
+        "thresholdMode": "meet",
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "checkBreakage": {
           "triggers": []
         }
@@ -210,7 +517,59 @@
       "failureResultPolicy": "perRecord",
       "progressive": {
         "awardMode": "equal",
+        "thresholdMode": "meet",
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "checkBreakage": {
           "triggers": []
         }
@@ -218,6 +577,57 @@
       "routed": {
         "type": "relative",
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -297,6 +707,8 @@
           "allowPlayerResultReorder": true,
           "ingredientQuantity": 1,
           "dcOverride": null,
+          "adjustmentOverride": null,
+          "successesOverride": null,
           "toolIds": [],
           "resultGroups": []
         }
@@ -323,6 +735,8 @@
           "allowPlayerResultReorder": true,
           "ingredientQuantity": 1,
           "dcOverride": null,
+          "adjustmentOverride": null,
+          "successesOverride": null,
           "toolIds": [],
           "resultGroups": []
         }
@@ -350,6 +764,8 @@
           "allowPlayerResultReorder": true,
           "ingredientQuantity": 1,
           "dcOverride": null,
+          "adjustmentOverride": null,
+          "successesOverride": null,
           "toolIds": [],
           "resultGroups": []
         }
@@ -373,6 +789,8 @@
           "allowPlayerResultReorder": true,
           "ingredientQuantity": 1,
           "dcOverride": null,
+          "adjustmentOverride": null,
+          "successesOverride": null,
           "toolIds": [],
           "resultGroups": []
         }
@@ -396,6 +814,8 @@
           "allowPlayerResultReorder": true,
           "ingredientQuantity": 1,
           "dcOverride": null,
+          "adjustmentOverride": null,
+          "successesOverride": null,
           "toolIds": [],
           "resultGroups": []
         }
@@ -419,6 +839,8 @@
           "allowPlayerResultReorder": true,
           "ingredientQuantity": 1,
           "dcOverride": null,
+          "adjustmentOverride": null,
+          "successesOverride": null,
           "toolIds": [],
           "resultGroups": []
         }
@@ -556,7 +978,6 @@
       "gathering": false,
       "salvage": true,
       "chatOutput": true,
-      "itemPiles": false,
       "refundOnPlayerCancel": true
     },
     "itemTags": [
@@ -652,7 +1073,59 @@
       "failureResultPolicy": "perRecord",
       "progressive": {
         "awardMode": "equal",
+        "thresholdMode": "meet",
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "checkBreakage": {
           "triggers": []
         }
@@ -664,6 +1137,57 @@
       "routed": {
         "type": "relative",
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -677,6 +1201,57 @@
       },
       "simple": {
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -704,6 +1279,57 @@
       "failureResultPolicy": "perRecord",
       "simple": {
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -716,6 +1342,57 @@
       "routed": {
         "type": "relative",
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -729,7 +1406,59 @@
       },
       "progressive": {
         "awardMode": "equal",
+        "thresholdMode": "meet",
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "checkBreakage": {
           "triggers": []
         }
@@ -748,7 +1477,59 @@
       "failureResultPolicy": "perRecord",
       "progressive": {
         "awardMode": "equal",
+        "thresholdMode": "meet",
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "checkBreakage": {
           "triggers": []
         }
@@ -756,6 +1537,57 @@
       "routed": {
         "type": "relative",
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -944,7 +1776,6 @@
       "gathering": false,
       "salvage": true,
       "chatOutput": true,
-      "itemPiles": false,
       "refundOnPlayerCancel": true
     },
     "itemTags": [
@@ -991,7 +1822,59 @@
       "failureResultPolicy": "perRecord",
       "progressive": {
         "awardMode": "equal",
+        "thresholdMode": "meet",
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "checkBreakage": {
           "triggers": []
         }
@@ -1003,6 +1886,57 @@
       "routed": {
         "type": "relative",
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -1016,6 +1950,57 @@
       },
       "simple": {
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -1043,6 +2028,57 @@
       "failureResultPolicy": "perRecord",
       "simple": {
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -1055,6 +2091,57 @@
       "routed": {
         "type": "relative",
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -1068,7 +2155,59 @@
       },
       "progressive": {
         "awardMode": "equal",
+        "thresholdMode": "meet",
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "checkBreakage": {
           "triggers": []
         }
@@ -1087,7 +2226,59 @@
       "failureResultPolicy": "perRecord",
       "progressive": {
         "awardMode": "equal",
+        "thresholdMode": "meet",
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "checkBreakage": {
           "triggers": []
         }
@@ -1095,6 +2286,57 @@
       "routed": {
         "type": "relative",
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -1166,6 +2408,8 @@
           "allowPlayerResultReorder": true,
           "ingredientQuantity": 1,
           "dcOverride": null,
+          "adjustmentOverride": null,
+          "successesOverride": null,
           "toolIds": [],
           "resultGroups": []
         }
@@ -1190,6 +2434,8 @@
           "allowPlayerResultReorder": true,
           "ingredientQuantity": 1,
           "dcOverride": null,
+          "adjustmentOverride": null,
+          "successesOverride": null,
           "toolIds": [],
           "resultGroups": []
         }
@@ -1214,6 +2460,8 @@
           "allowPlayerResultReorder": true,
           "ingredientQuantity": 1,
           "dcOverride": null,
+          "adjustmentOverride": null,
+          "successesOverride": null,
           "toolIds": [],
           "resultGroups": []
         }
@@ -1235,6 +2483,8 @@
           "allowPlayerResultReorder": true,
           "ingredientQuantity": 1,
           "dcOverride": null,
+          "adjustmentOverride": null,
+          "successesOverride": null,
           "toolIds": [],
           "resultGroups": []
         }
@@ -1256,6 +2506,8 @@
           "allowPlayerResultReorder": true,
           "ingredientQuantity": 1,
           "dcOverride": null,
+          "adjustmentOverride": null,
+          "successesOverride": null,
           "toolIds": [],
           "resultGroups": []
         }
@@ -1277,6 +2529,8 @@
           "allowPlayerResultReorder": true,
           "ingredientQuantity": 1,
           "dcOverride": null,
+          "adjustmentOverride": null,
+          "successesOverride": null,
           "toolIds": [],
           "resultGroups": []
         }
@@ -1414,7 +2668,6 @@
       "gathering": false,
       "salvage": true,
       "chatOutput": true,
-      "itemPiles": false,
       "refundOnPlayerCancel": true
     },
     "itemTags": [
@@ -1510,7 +2763,59 @@
       "failureResultPolicy": "perRecord",
       "progressive": {
         "awardMode": "equal",
+        "thresholdMode": "meet",
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "checkBreakage": {
           "triggers": []
         }
@@ -1522,6 +2827,57 @@
       "routed": {
         "type": "relative",
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -1535,6 +2891,57 @@
       },
       "simple": {
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -1562,6 +2969,57 @@
       "failureResultPolicy": "perRecord",
       "simple": {
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -1574,6 +3032,57 @@
       "routed": {
         "type": "relative",
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -1587,7 +3096,59 @@
       },
       "progressive": {
         "awardMode": "equal",
+        "thresholdMode": "meet",
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "checkBreakage": {
           "triggers": []
         }
@@ -1606,7 +3167,59 @@
       "failureResultPolicy": "perRecord",
       "progressive": {
         "awardMode": "equal",
+        "thresholdMode": "meet",
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "checkBreakage": {
           "triggers": []
         }
@@ -1614,6 +3227,57 @@
       "routed": {
         "type": "relative",
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -1685,6 +3349,8 @@
           "allowPlayerResultReorder": true,
           "ingredientQuantity": 1,
           "dcOverride": null,
+          "adjustmentOverride": null,
+          "successesOverride": null,
           "toolIds": [],
           "resultGroups": []
         }
@@ -1711,6 +3377,8 @@
           "allowPlayerResultReorder": true,
           "ingredientQuantity": 1,
           "dcOverride": null,
+          "adjustmentOverride": null,
+          "successesOverride": null,
           "toolIds": [],
           "resultGroups": []
         }
@@ -1738,6 +3406,8 @@
           "allowPlayerResultReorder": true,
           "ingredientQuantity": 1,
           "dcOverride": null,
+          "adjustmentOverride": null,
+          "successesOverride": null,
           "toolIds": [],
           "resultGroups": []
         }
@@ -1761,6 +3431,8 @@
           "allowPlayerResultReorder": true,
           "ingredientQuantity": 1,
           "dcOverride": null,
+          "adjustmentOverride": null,
+          "successesOverride": null,
           "toolIds": [],
           "resultGroups": []
         }
@@ -1784,6 +3456,8 @@
           "allowPlayerResultReorder": true,
           "ingredientQuantity": 1,
           "dcOverride": null,
+          "adjustmentOverride": null,
+          "successesOverride": null,
           "toolIds": [],
           "resultGroups": []
         }
@@ -1807,6 +3481,8 @@
           "allowPlayerResultReorder": true,
           "ingredientQuantity": 1,
           "dcOverride": null,
+          "adjustmentOverride": null,
+          "successesOverride": null,
           "toolIds": [],
           "resultGroups": []
         }
@@ -1944,7 +3620,6 @@
       "gathering": false,
       "salvage": true,
       "chatOutput": true,
-      "itemPiles": false,
       "refundOnPlayerCancel": true
     },
     "itemTags": [
@@ -2040,7 +3715,59 @@
       "failureResultPolicy": "perRecord",
       "progressive": {
         "awardMode": "equal",
+        "thresholdMode": "meet",
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "checkBreakage": {
           "triggers": []
         }
@@ -2052,6 +3779,57 @@
       "routed": {
         "type": "relative",
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -2065,6 +3843,57 @@
       },
       "simple": {
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -2092,6 +3921,57 @@
       "failureResultPolicy": "perRecord",
       "simple": {
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -2104,6 +3984,57 @@
       "routed": {
         "type": "relative",
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -2117,7 +4048,59 @@
       },
       "progressive": {
         "awardMode": "equal",
+        "thresholdMode": "meet",
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "checkBreakage": {
           "triggers": []
         }
@@ -2136,7 +4119,59 @@
       "failureResultPolicy": "perRecord",
       "progressive": {
         "awardMode": "equal",
+        "thresholdMode": "meet",
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "checkBreakage": {
           "triggers": []
         }
@@ -2144,6 +4179,57 @@
       "routed": {
         "type": "relative",
         "rollFormula": "",
+        "evaluation": {
+          "product": "sum",
+          "direction": "over",
+          "target": {
+            "source": "fixed",
+            "expression": "",
+            "adjustmentKind": "add",
+            "baseAdjustment": null
+          },
+          "pool": {
+            "die": 10,
+            "base": "2",
+            "threshold": "8",
+            "required": 1,
+            "modifierDestination": "pool",
+            "zeroPoolFails": true,
+            "explode": {
+              "enabled": false,
+              "faces": {
+                "kind": "best",
+                "value": null
+              },
+              "once": false
+            },
+            "cancel": {
+              "enabled": false,
+              "faces": {
+                "kind": "worst",
+                "value": null
+              }
+            },
+            "additionalDice": {
+              "enabled": false,
+              "source": "path",
+              "path": "",
+              "readMacroUuid": "",
+              "spendMacroUuid": "",
+              "max": 1,
+              "label": ""
+            }
+          }
+        },
+        "offerSituationalBonus": true,
+        "advantage": {
+          "mode": "keep",
+          "extraDice": 1,
+          "bonusExpression": "1d6",
+          "offerDisadvantage": true,
+          "countEnabled": true,
+          "countDice": 1
+        },
         "dc": 15,
         "thresholdMode": "meet",
         "dcMode": "static",
@@ -2217,6 +4303,8 @@
           "allowPlayerResultReorder": true,
           "ingredientQuantity": 1,
           "dcOverride": null,
+          "adjustmentOverride": null,
+          "successesOverride": null,
           "toolIds": [],
           "resultGroups": []
         }
@@ -2243,6 +4331,8 @@
           "allowPlayerResultReorder": true,
           "ingredientQuantity": 1,
           "dcOverride": null,
+          "adjustmentOverride": null,
+          "successesOverride": null,
           "toolIds": [],
           "resultGroups": []
         }
@@ -2270,6 +4360,8 @@
           "allowPlayerResultReorder": true,
           "ingredientQuantity": 1,
           "dcOverride": null,
+          "adjustmentOverride": null,
+          "successesOverride": null,
           "toolIds": [],
           "resultGroups": []
         }
@@ -2293,6 +4385,8 @@
           "allowPlayerResultReorder": true,
           "ingredientQuantity": 1,
           "dcOverride": null,
+          "adjustmentOverride": null,
+          "successesOverride": null,
           "toolIds": [],
           "resultGroups": []
         }
@@ -2316,6 +4410,8 @@
           "allowPlayerResultReorder": true,
           "ingredientQuantity": 1,
           "dcOverride": null,
+          "adjustmentOverride": null,
+          "successesOverride": null,
           "toolIds": [],
           "resultGroups": []
         }
@@ -2339,6 +4435,8 @@
           "allowPlayerResultReorder": true,
           "ingredientQuantity": 1,
           "dcOverride": null,
+          "adjustmentOverride": null,
+          "successesOverride": null,
           "toolIds": [],
           "resultGroups": []
         }

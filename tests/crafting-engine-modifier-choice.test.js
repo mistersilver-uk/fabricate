@@ -2,8 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
-import { CraftingListingBuilder } from '../src/ui/presenters/CraftingListingBuilder.js';
-import { resolveCheckFormulaDisplay } from '../src/systems/checkRoll.js';
+import { craftingFacade } from '../src/bootstrap/craftingFacade.js';
 import { Recipe } from '../src/models/Recipe.js';
 import { stubInteractiveRollEnvironment } from './helpers/rollPromptDialogStub.js';
 
@@ -123,6 +122,14 @@ test('engine gating: an unauthored formula threads no modifierChoice', () => {
     for (const formula of ['', '   ', null, undefined]) {
       assert.equal(build(formula, context(), true), null, String(formula));
     }
+  });
+});
+
+test('engine gating: an empty-formula count check still offers the playerPicks descriptor (issue 2004)', () => {
+  withRoll({ med: 2, herb: 5 }, () => {
+    const count = { product: 'count', direction: 'over', pool: {} };
+    assert.notEqual(engine._buildInteractiveModifierChoice('', context(), ACTOR, true, count), null);
+    assert.equal(build('', context(), true), null, 'an empty sum still offers none');
   });
 });
 
@@ -434,6 +441,11 @@ function modifierRecipe(craftingModifier, id = 'r-mod') {
   return new Recipe({ id, name: 'Healing Salve', craftingSystemId: 'sys-1', craftingModifier });
 }
 
+/** The facade's own builder, so the display wiring under test is the production one. */
+function productionListingBuilder() {
+  return craftingFacade._getCraftingListingBuilder.call({});
+}
+
 /** Roll one interactive pass/fail check and report what actually reached `Roll`. */
 async function rollThrough(system, recipe, stubOptions = {}) {
   const stub = stubInteractiveRollEnvironment(stubOptions);
@@ -657,18 +669,27 @@ test('engine rules: the listing DISPLAYS exactly what the engine rolls (parity)'
 
   const stub = stubInteractiveRollEnvironment();
   try {
-    const builder = new CraftingListingBuilder({
-      // The production wiring from `main.js`, so the display path under test is the
-      // real one rather than a stub that could never disagree.
-      resolveCheckFormula: (formula, actor, craftingModifier) =>
-        resolveCheckFormulaDisplay(formula, actor, craftingModifier),
-    });
-    const check = builder._buildCheck(system, 'simple', recipe, PICK_ACTOR);
+    const check = productionListingBuilder()._buildCheck(system, 'simple', recipe, PICK_ACTOR);
     assert.equal(
       check.resolvedFormula,
       engineRoll.rolled,
       'the listed formula is the string the engine rolled, not a second reading of the context'
     );
+  } finally {
+    stub.restore();
+  }
+});
+
+test('engine rules: a roll-under listing shows the bare roll its modifiers raise the target of', async () => {
+  const system = ruleSystem({ policy: 'addAll' });
+  system.craftingCheck.simple = { ...RULE_SLOT.simple, evaluation: { product: 'sum', direction: 'under' } };
+  const recipe = modifierRecipe({}, 'r-under');
+  const engineRoll = await rollThrough(system, recipe);
+  assert.equal(engineRoll.rolled, '1d20', 'scalar modifiers move the target, not the total');
+  const stub = stubInteractiveRollEnvironment();
+  try {
+    const check = productionListingBuilder()._buildCheck(system, 'simple', recipe, PICK_ACTOR);
+    assert.equal(check.resolvedFormula, engineRoll.rolled);
   } finally {
     stub.restore();
   }

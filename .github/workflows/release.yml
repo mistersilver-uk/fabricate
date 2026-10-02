@@ -70,6 +70,9 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
+    env:
+      # A release run tests a tree CI already compared with its base, so the ratchets opt out.
+      RATCHET_BASE: none
     steps:
       - uses: actions/checkout@v6
       # Shared Node + npm ci preamble (no OIDC — this job touches no bucket).
@@ -225,10 +228,12 @@ jobs:
       dry_run: false
       overwrite: false
     secrets:
-      # Reusable workflows do not inherit repo secrets. early-access derives its tester feed from
-      # S3_GUILD_ARTISAN_PATH_SECRET; S3_TESTER_PATH_SECRET is forwarded because release-s3.yml
-      # declares it. A hotfix channel is undeclared and has no tester group, so it needs neither.
+      # Reusable workflows do not inherit repo secrets. early-access derives its two tester feeds
+      # from S3_APPRENTICE_PATH_SECRET and S3_GUILD_ARTISAN_PATH_SECRET; S3_TESTER_PATH_SECRET is
+      # forwarded because release-s3.yml declares it. A hotfix channel is undeclared and has no
+      # tester group, so it needs none of them.
       S3_TESTER_PATH_SECRET: ${{ secrets.S3_TESTER_PATH_SECRET }}
+      S3_APPRENTICE_PATH_SECRET: ${{ secrets.S3_APPRENTICE_PATH_SECRET }}
       S3_GUILD_ARTISAN_PATH_SECRET: ${{ secrets.S3_GUILD_ARTISAN_PATH_SECRET }}
 
   verify-publish:

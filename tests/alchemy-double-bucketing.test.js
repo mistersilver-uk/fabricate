@@ -4,16 +4,10 @@
  * `flags.fabricate.componentId`.
  */
 
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { roleItem } from './helpers/componentIdentityFixtures.js';
-import { entryModuleSource } from './helpers/bootstrapEntrySource.js';
-
 
 function getProperty(object, path) {
   if (!object || !path) return undefined;
@@ -33,6 +27,7 @@ const { SignatureValidator } = await import('../src/systems/SignatureValidator.j
 const { AlchemyListingBuilder } = await import('../src/ui/presenters/AlchemyListingBuilder.js');
 const { resolveAlchemySubmissions } = await import('../src/utils/alchemySubmissions.js');
 const { getItemSourceReferences } = await import('../src/utils/sourceUuid.js');
+const { FabricateFacadeUnderTest } = await import('./helpers/fabricateFacadeHarness.js');
 
 const SYS = 'alchemy-sys';
 
@@ -166,15 +161,41 @@ test('resolveAlchemySubmissions returns { item, componentId } records bucketed s
   assert.equal(submitted[0].item, item, 'the record carries the REAL owned item');
 });
 
-test('the facade threads craftingSystemId into the collector so the palette and collector agree (main.js seam guard)', () => {
-  // Fabricate#submitAlchemyAttempt is not runtime-importable in the node test env (src/main.js
-  // imports a .css asset), so this asserts the seam on source text — the established pattern for
-  // src/main.js coverage in this repo.
-  const __dirname = dirname(fileURLToPath(import.meta.url));
-  const mainSource = entryModuleSource('src/bootstrap/craftingFacade.js');
-  assert.match(
-    mainSource,
-    /resolveAlchemySubmissions\(\s*sources,\s*components,\s*submittedComponentIds,\s*craftingSystemId\s*\)/,
-    'submitAlchemyAttempt must pass craftingSystemId into resolveAlchemySubmissions'
+test('the real facade threads craftingSystemId into the collector, so the palette and collector agree', async () => {
+  const { components } = world();
+  const item = roleItem({
+    uuid: 'Actor.src.Item.owned-copy-of-A',
+    duplicateSource: 'Item.A',
+    roles: { [SYS]: { componentId: 'cB' } },
+    quantity: 1,
+    name: 'Restamped Draught',
+  });
+  const source = { id: 'src', items: [item] };
+  globalThis.game.actors = { get: (id) => (id === 'src' ? source : null) };
+  const brews = [];
+  const facade = new FabricateFacadeUnderTest({
+    ready: true,
+    craftingSystemManager: { getSystem: (id) => (id === SYS ? { id: SYS, components } : null) },
+    craftingEngine: {
+      craftAlchemy: async (actor, sources, submitted, options) => {
+        brews.push({ submitted, options });
+        return { success: true };
+      },
+    },
+  });
+
+  await facade.submitAlchemyAttempt({
+    actorId: 'src',
+    craftingSystemId: SYS,
+    submittedComponentIds: ['cB'],
+    componentSourceActorIds: [],
+  });
+
+  assert.equal(brews.length, 1, 'the divergent item is dispensed for the B request');
+  assert.deepEqual(
+    brews[0].submitted.map((record) => [record.componentId, record.item]),
+    [['cB', item]]
   );
+  assert.equal(brews[0].options.craftingSystemId, SYS);
+  assert.equal(brews[0].options.lifecycleVersion, 1, 'a new brew starts a versioned run');
 });

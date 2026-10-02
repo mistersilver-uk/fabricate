@@ -10,6 +10,7 @@ import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js'
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
+  TYPEAHEAD_RUNE_MODULES,
   SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
@@ -26,6 +27,7 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-world-tool-entry-',
   componentPath: 'src/ui/svelte/apps/manager/scoped/WorldToolEntryPage.svelte',
+  runeModules: TYPEAHEAD_RUNE_MODULES,
   rawModules: [
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
@@ -84,6 +86,7 @@ const harness = createMountedComponentHarness({
     // list and the Checks Studio catalogue render it, so it is static in this tree's graph
     // and an omission HANGS this suite rather than failing it.
     'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte',
+    'src/ui/svelte/components/Kicker.svelte',
     'src/ui/svelte/apps/manager/tools/ToolRequirementsTab.svelte',
     // `ToolRequirementsTab` draws each of its two sections as a `ToolInheritCard` now (issue
     // 1373), so the card and the shared inherit row it wraps are in this tree's static graph.
@@ -652,6 +655,13 @@ describe('the world Tool entry (issue 1373)', () => {
       const empty = await mountWithDice('');
       assert.ok(!empty.querySelector('[data-world-tool-entry-formula-error]'));
     });
+
+    // The formula error message's DANGER COLOUR is arbitrated in a real browser, against the
+    // actual stylesheet and the actual competing selectors, in
+    // `tests/components/manager-muted-danger-cascade.test.js` (issue 2097). happy-dom mounts this
+    // component with no `styles/fabricate.css` attached at all, so a `getComputedStyle` check here
+    // would resolve against nothing and prove nothing; the class-presence assertion it replaced
+    // was equally vacuous, since both classes were already present before the cascade was fixed.
   });
 
   // THE LINKED-ITEM CARD, RELOCATED FROM THE SYSTEM EDITOR (issue 1373)
@@ -1096,7 +1106,7 @@ describe('the world Tool entry (issue 1373)', () => {
       );
       assert.equal(
         target.querySelector('[data-tool-bonus-note]').textContent.trim(),
-        'Applied to the crafting check as @prof.'
+        'Applies @prof to any check this tool is used for, in the way that check applies bonuses.'
       );
 
       rows[1].querySelector('input[type="radio"]').click();

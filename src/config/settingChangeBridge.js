@@ -16,17 +16,9 @@ const TOOL_SCOPE_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.TOOL_SCOP
 const WORLD_VOCABULARY_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.WORLD_VOCABULARY}`;
 
 /**
- * The invalidation scopes a world travel edit produces (issue 1282).
- *
- * Realms used to live on the crafting system, so editing one wrote `craftingSystems` and the
- * systems branch announced `resolution-config` for that system through
- * `SYSTEM_FIELD_DOMAINS.gatheringRealms`. That row is unreachable for realm DATA now — the key
- * has left the system record — so this leg has to announce it instead.
- *
- * Scoped per PARTICIPATING system rather than as one unattributable world-wide scope, because
- * `craftingDataChange` treats an unattributable leg as poisoning the whole payload into a broad
- * invalidation. A system with travel switched off gates nothing on location, so re-narrowing it
- * could not produce an observable difference.
+ * Realm data left the system record (issue 1282), so this leg announces `resolution-config`. Per
+ * participating system, since `craftingDataChange` turns an unattributable leg into a broad
+ * invalidation; a system with travel off gates nothing on location.
  */
 function travelParticipantScopes(craftingSystemManager) {
   const systems = craftingSystemManager?.getSystems?.() ?? [];
@@ -38,10 +30,7 @@ function travelParticipantScopes(craftingSystemManager) {
     }));
 }
 
-/**
- * The scopes an UNATTRIBUTABLE world edit announces: EVERY crafting system, each carrying the same
- * domain set.
- */
+/** An unattributable world edit announces every system, each with the same domain set. */
 function everySystemScopes(craftingSystemManager, domains) {
   const systems = craftingSystemManager?.getSystems?.() ?? [];
   return (Array.isArray(systems) ? systems : [])
@@ -85,7 +74,6 @@ function replicatedScopes(manager) {
     : [];
 }
 
-/** Emit the scoped change signal for a whole-corpus replicated reload. */
 function announceScopedChange(source, manager, callAll) {
   emitCraftingDataChanged(
     craftingDataChange({ source, scopes: replicatedScopes(manager) }),
@@ -93,10 +81,7 @@ function announceScopedChange(source, manager, callAll) {
   );
 }
 
-/**
- * The WORLD-STORE legs: a replicated world setting whose reaction is always the same three steps —
- * reload the store, republish the manager, then announce the scopes that edit produced.
- */
+/** Each reloads its store, republishes the manager, then announces its scopes. */
 const WORLD_STORE_LEGS = Object.freeze([
   { key: CURRENCY_CONFIG_KEY, store: 'currencyConfigStore', scopes: currencyParticipantScopes },
   { key: TRAVEL_CONFIG_KEY, store: 'travelStore', scopes: travelParticipantScopes },
@@ -121,7 +106,7 @@ const WORLD_STORE_LEGS = Object.freeze([
     store: 'toolScopeStore',
     scopes: (manager) => everySystemScopes(manager, TOOL_SCOPE_DOMAINS),
   },
-  // Issue 1392 (epic 1357, PR 7a).
+  // Issue 1392.
   {
     key: WORLD_VOCABULARY_KEY,
     store: 'worldVocabularyStore',
@@ -129,7 +114,6 @@ const WORLD_STORE_LEGS = Object.freeze([
   },
 ]);
 
-/** Run one world-store leg. */
 function runWorldStoreLeg(leg, targets) {
   const { craftingSystemManager, callAll } = targets;
   targets[leg.store]?.load?.();
@@ -140,10 +124,7 @@ function runWorldStoreLeg(leg, targets) {
   }
 }
 
-/**
- * Bridge a replicated Fabricate world-setting change into the local change hooks the player app
- * listens on.
- */
+/** A replicated world-setting change, into the local hooks the player app listens on. */
 export function handleFabricateSettingChange(settingKey, targets = {}) {
   const { craftingSystemManager, recipeManager, gatheringEnvironmentStore, callAll } = targets;
   if (settingKey === CRAFTING_SYSTEMS_KEY) {
@@ -164,8 +145,7 @@ export function handleFabricateSettingChange(settingKey, targets = {}) {
     return true;
   }
   if (settingKey === GATHERING_ENVIRONMENTS_KEY) {
-    // `load()` re-reads the setting into the store's in-memory list; it only reads, so there is no
-    // write → `updateSetting` → write loop.
+    // `load()` only reads, so there is no `updateSetting` write loop.
     gatheringEnvironmentStore?.load?.();
     callAll?.('fabricate.gatheringEnvironmentsChanged');
     return true;

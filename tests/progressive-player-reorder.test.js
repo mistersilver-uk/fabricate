@@ -239,7 +239,7 @@ test('salvage: allowPlayerResultReorder false pins the authored order', () => {
 
 test('salvage: RUNLESS uses the authored order — there is no settings fallback', () => {
   // The seam would return an order, but no run means no captured order.
-  const engine = new CraftingEngine({}, null, null, null, null, null, null, {
+  const engine = new CraftingEngine({}, null, null, null, null, null, {
     getPlayerResultOrder: () => ['s-c', 's-b', 's-a'],
   });
   const groups = engine._resolveSalvageResultGroups(salvageComponent(), SALVAGE_SYSTEM, {
@@ -370,7 +370,6 @@ test('D2: a world-time resume awards down the order stamped by run.userId, not t
     { canCraft: () => ({ canCraft: true }), getToolsForSet: () => [], toolMatchesItem: () => false },
     null,
     null,
-    null,
     salvageRunManager,
     null,
     null,
@@ -400,7 +399,6 @@ test('D2: a world-time resume awards down the order stamped by run.userId, not t
   // a seam that would return a DIFFERENT order if anything still read settings.
   const resumeEngine = new CraftingEngine(
     { canCraft: () => ({ canCraft: true }), getToolsForSet: () => [], toolMatchesItem: () => false },
-    null,
     null,
     null,
     salvageRunManager,
@@ -448,7 +446,6 @@ test('salvage: the captured order key is scoped per (systemId, componentId), nev
   };
   const engine = new CraftingEngine(
     { canCraft: () => ({ canCraft: true }), getToolsForSet: () => [], toolMatchesItem: () => false },
-    null,
     null,
     null,
     salvageRunManager,

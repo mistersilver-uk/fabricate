@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
 import {
@@ -10,6 +9,34 @@ import {
   createJournalRunAuthority,
 } from '../src/systems/journalRunAuthority.js';
 import { JOURNAL_RUN_COMMAND_TIMEOUT_MS } from '../src/systems/journalRunCommands.js';
+import { evaluatePreparedRunCheck } from '../src/systems/checkRoll.js';
+import { executedCheckDisplay } from '../src/ui/presenters/checkDisplay.js';
+import { defineStructureContract } from './helpers/structureContract.js';
+import { deletedKey, forEachDeletionForm, isForcedDeletion } from './helpers/forcedDeletion.js';
+
+const isMergeable = (value) =>
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value) && !isForcedDeletion(value);
+
+/** `mergeObject` as `Document#update` applies it: a deep merge honouring both deletion forms. */
+function mergeUpdate(target, patch) {
+  for (const [key, value] of Object.entries(patch)) {
+    const deleted = deletedKey(key, value);
+    if (deleted !== null) delete target[deleted];
+    else if (isMergeable(value) && isMergeable(target[key])) mergeUpdate(target[key], value);
+    else target[key] = isMergeable(value) ? mergeUpdate({}, value) : structuredClone(value);
+  }
+  return target;
+}
+
+/** A dotted `Document#update` payload: each key is expanded, then merged, never replaced. */
+function applyDocumentUpdate(document, changes) {
+  for (const [path, value] of Object.entries(changes)) {
+    const segments = path.split('.');
+    const leaf = segments.pop();
+    const parent = segments.reduce((node, segment) => (node[segment] ??= {}), document);
+    mergeUpdate(parent, { [leaf]: value });
+  }
+}
 
 /**
  * Models the V13.351/V14.365 server rules the arbitration rests on: `keepId` is what preserves a
@@ -25,7 +52,8 @@ function foundryAuthorityFixture(crypto, { failServerRead = () => false } = {}) 
   let generatedPageIds = 0;
   let ledgerSeq = 0;
   const makeEntry = (source) => {
-    let state = source.flags.fabricate.journalRunAuthorityState;
+    const document = { flags: structuredClone(source.flags) };
+    const updates = [];
     // The SERVER's pages, and the broadcast-fed LOCAL mirror of them, kept as two collections so
     // a test can drive them apart the way a missed delete broadcast does in a real world.
     const serverPages = new Map();
@@ -38,15 +66,16 @@ function foundryAuthorityFixture(crypto, { failServerRead = () => false } = {}) 
       _stats: { createdTime: 5000 },
       pages,
       serverPages,
-      getFlag: (scope, key) =>
-        scope === 'fabricate' && key === 'journalRunAuthorityState'
-          ? state
-          : source.flags?.[scope]?.[key],
+      flags: document.flags,
+      updates,
+      getFlag: (scope, key) => document.flags?.[scope]?.[key],
+      // A flag write DEEP-MERGES, as core's does: a key omitted from it survives.
       update: async (changes) => {
-        state = changes['flags.fabricate.journalRunAuthorityState'];
+        updates.push(changes);
+        applyDocumentUpdate(document, changes);
       },
       get state() {
-        return state;
+        return document.flags.fabricate.journalRunAuthorityState;
       },
       createEmbeddedDocuments: async (_type, [pageSource], options = {}) => {
         claimCalls.push({ source: pageSource, options });
@@ -205,6 +234,12 @@ function sharedAuthorityWorld() {
       // this is the seam that drives a genuine CHAIN rejection rather than a handled failure.
       beforeList = null,
       queueWaitMs = undefined,
+      // The server copy of one ledger; the fake's single store is already authoritative.
+      readAuthoritativeLedger = async (ledgerId) =>
+        server.has(ledgerId)
+          ? { status: 'available', ledger: server.get(ledgerId) }
+          : { status: 'unavailable' },
+      hasLedgerEvidence = null,
     } = {}
   ) =>
     createJournalRunAuthority({
@@ -220,7 +255,7 @@ function sharedAuthorityWorld() {
         await beforeCreate?.();
         const ledger = addLedger(source.state);
         ledger.source = source;
-        log.push(['create', ledger.id]);
+        log.push(['create', structuredClone(source)]);
         return ledger;
       },
       deleteLedger: async (entry) => {
@@ -250,6 +285,8 @@ function sharedAuthorityWorld() {
       randomId: () => `id-${++nextId}`,
       now: () => currentTime,
       queueWaitMs,
+      readAuthoritativeLedger,
+      hasLedgerEvidence,
       reconstructExecutions,
       onAvailabilityRestored,
     });
@@ -599,15 +636,23 @@ describe('journal run authority ledger', () => {
     assert.ok(calls >= 4, 'boot, claims, and the token use secure random values');
   });
 
-  it('fails closed when Web Crypto is unavailable and has no Math.random fallback', async () => {
+  it('fails closed when Web Crypto is unavailable and has no Math.random fallback', async (t) => {
+    const insecure = [];
+    t.mock.method(Math, 'random', () => insecure.push('Math.random') && 0.5);
     const authority = foundryAuthorityFixture({});
     assert.deepEqual(await authority.setup(), {
       success: false,
       reason: 'secure-random-unavailable',
     });
-    const source = readFileSync(new URL('../src/systems/journalRunAuthority.js', import.meta.url), 'utf8');
-    assert.doesNotMatch(source, /Math\.random/);
+    assert.deepEqual(insecure, [], 'no insecure draw stands in for the missing Web Crypto');
   });
+
+  // Every draw in the module, not only setup's: ids come from Web Crypto and nowhere else.
+  defineStructureContract(
+    'draws its randomness from Web Crypto alone',
+    'src/systems/journalRunAuthority.js',
+    { reads: ['webCrypto.randomUUID', 'webCrypto.getRandomValues'], readsNo: ['Math.random'] }
+  );
 
   it('provisions one private ledger for the active GM and keeps setup an idempotent ensure', async () => {
     const world = sharedAuthorityWorld();
@@ -1482,6 +1527,244 @@ describe('journal run authority ledger', () => {
     assert.deepEqual(wrongSender, { success: false });
   });
 
+  it('keeps prepared evaluation and recipient replies outside every replicated ledger write', async () => {
+    const world = sharedAuthorityWorld();
+    const authority = world.realm();
+    await authority.setup();
+    const binding = {
+      actorUuid: 'Actor.a', runType: 'crafting', runId: 'run-1', expectedRevision: 2,
+      privateEvaluation: { formula: 'SECRET_FORMULA', catalogue: ['SECRET_CHOICE'] },
+      // The persisted whitelist keeps the whole advantage offer (issue 2007).
+      decisionPolicy: {
+        allowsSituationalModifier: true,
+        allowAdvantage: true,
+        advantageOffer: { advantage: true, disadvantage: false, kind: 'keep', detail: null },
+      },
+    };
+    const request = { requestId: 'private-prepare', senderId: 'player', sessionId: 'one' };
+    const prepare = () => authority.run(request, ({ issuePrepareToken }) => ({
+      success: true, checkRequired: true,
+      prepareToken: issuePrepareToken(binding),
+      promptDescriptor: { formula: 'SECRET_PROMPT' },
+    }));
+    const first = await prepare();
+    assert.deepEqual(await prepare(), first);
+    assert.equal(world.ledger.state.requests[request.requestId].response.promptDescriptor, undefined);
+    assert.equal(world.ledger.state.prepareTokens[first.prepareToken].binding.privateEvaluation, undefined);
+    let consumed;
+    await authority.run(
+      { requestId: 'private-consume', senderId: 'player', sessionId: 'one' },
+      ({ consumePrepareToken }) => {
+        consumed = consumePrepareToken(first.prepareToken, binding);
+        return { success: consumed !== null };
+      }
+    );
+    assert.deepEqual(consumed.binding.privateEvaluation, binding.privateEvaluation);
+    assert.deepEqual(world.ledger.state.prepareTokens[first.prepareToken].binding.decisionPolicy,
+      binding.decisionPolicy);
+    assert.deepEqual(await prepare(), { success: false, reason: 'prepare-token-invalid' });
+    const replicated = world.log.filter(([kind]) => ['create', 'write'].includes(kind));
+    assert.ok(replicated.some(([kind]) => kind === 'create'));
+    for (const [, document] of replicated) {
+      assert.doesNotMatch(JSON.stringify(document), /SECRET_FORMULA|SECRET_CHOICE|SECRET_PROMPT/);
+    }
+  });
+
+  it('replies with executed evidence naming the typed formula only in its ruled field (Q5)', async () => {
+    const originalRoll = globalThis.Roll;
+    globalThis.Roll = class EvidenceRoll {
+      constructor(formula) {
+        this.formula = String(formula);
+        this.total = Number.isFinite(Number(this.formula)) ? Number(this.formula) : 9;
+        this.dice = [];
+      }
+      async evaluate() { return this; }
+      evaluateSync() { return this; }
+      toJSON() { return { formula: this.formula, total: this.total }; }
+      static replaceFormulaData(formula) { return formula; }
+      static validate() { return true; }
+    };
+    try {
+      const preparation = () => ({
+        mode: 'simple', slot: 'simple', rollFormula: '3d6',
+        checkConfig: {
+          rollFormula: '3d6', thresholdMode: 'meet',
+          evaluation: {
+            product: 'sum', direction: 'under',
+            target: { source: 'attribute', expression: '@skills.SECRET_PATH.value', adjustmentKind: 'add' },
+          },
+          craftingModifier: {
+            catalogue: [{ id: 'steady', label: 'SECRET_LABEL', expression: '1' }],
+            systemPolicy: 'addAll', defaultModifierPolicy: 'SECRET_POLICY', defaultModifierIds: ['steady'],
+          },
+        },
+        decisionPolicy: {
+          target: 10, targetSource: 'attribute',
+          targetTerms: [
+            { kind: 'anchor', value: 12, path: '@skills.SECRET_PATH.value' },
+            { kind: 'adjustment', value: -2 },
+          ],
+        },
+      });
+      const actor = { getRollData: () => ({}) };
+      const visible = await evaluatePreparedRunCheck(preparation(), actor);
+      assert.deepEqual(visible.data.targetTerms, [
+        { kind: 'anchor', value: 12 },
+        { kind: 'adjustment', value: -2 },
+        { kind: 'benefit', value: 1, source: 'library' },
+      ]);
+      const hidden = await evaluatePreparedRunCheck(preparation(), actor, {}, { secret: true });
+      assert.ok(!Object.hasOwn(hidden.data, 'targetTerms'), 'a secret projection omits them');
+      assert.equal(visible.data.resolvedFormula, '3d6', 'the dice line has its formula (M1)');
+      assert.equal(visible.data.rollFormula, '3d6', 'and its typed formula (G7)');
+      assert.ok(!Object.hasOwn(hidden.data, 'resolvedFormula'), 'a secret roll hands back none');
+      assert.ok(!Object.hasOwn(hidden.data, 'rollFormula'), 'nor its typed formula');
+
+      const world = sharedAuthorityWorld();
+      const authority = world.realm();
+      await authority.setup();
+      const reply = await authority.run(
+        { requestId: 'evidence-reply', senderId: 'player', sessionId: 'one' },
+        () => ({ success: true, check: executedCheckDisplay(visible) })
+      );
+      assert.equal(reply.check.evidence.target, 11, 'anchor 12, adjustment −2, library +1');
+      // The typed formula is the player-visible fact the prompt already states (maintainer ruling).
+      const { targetExpression, ...evidence } = reply.check.evidence;
+      assert.equal(targetExpression, '@skills.SECRET_PATH.value');
+      const sentinels = /SECRET_PATH|SECRET_LABEL|SECRET_POLICY/;
+      assert.doesNotMatch(JSON.stringify({ ...reply, check: { ...reply.check, evidence } }), sentinels);
+      assert.doesNotMatch(JSON.stringify(visible.data.targetTerms), sentinels);
+      const ruledField = '"targetExpression":"@skills.SECRET_PATH.value"';
+      for (const [, document] of world.log.filter(([kind]) => ['create', 'write'].includes(kind))) {
+        assert.doesNotMatch(JSON.stringify(document).replaceAll(ruledField, ''), sentinels);
+      }
+    } finally {
+      if (originalRoll === undefined) delete globalThis.Roll;
+      else globalThis.Roll = originalRoll;
+    }
+  });
+
+  it('scrubs legacy private bindings and caller-only replies during active-GM bootstrap', async () => {
+    const world = sharedAuthorityWorld();
+    world.addLedger({
+      version: 1,
+      requests: {
+        legacy: {
+          kind: 'command', status: 'settled', senderId: 'player', sessionId: 'one',
+          response: { success: true, checkRequired: true, prepareToken: 'old',
+            promptDescriptor: { formula: 'LEGACY_PROMPT' },
+            rollHandoff: { formula: 'LEGACY_HANDOFF' } },
+        },
+      },
+      prepareTokens: {
+        old: { status: 'active', binding: {
+          senderId: 'player', actorUuid: 'Actor.a', runType: 'crafting', runId: 'run-1',
+          expectedRevision: 2, privateEvaluation: { formula: 'LEGACY_FORMULA' },
+        }, expiresAt: 2000 },
+      },
+      reconciliations: [],
+    });
+    const authority = world.realm();
+    assert.equal((await authority.bootstrapRecovery()).success, true);
+    assert.equal(world.ledger.state.prepareTokens.old.status, 'released');
+    assert.equal(world.ledger.state.requests.legacy.response.promptDescriptor, undefined);
+    assert.equal(world.ledger.state.requests.legacy.response.rollHandoff, undefined);
+    assert.deepEqual(
+      await authority.run({ requestId: 'legacy', senderId: 'player', sessionId: 'one' },
+        () => ({ success: true })),
+      { success: false, reason: 'prepare-token-invalid' }
+    );
+    for (const [kind, state] of world.log) {
+      if (kind === 'write') assert.doesNotMatch(JSON.stringify(state), /LEGACY_/);
+    }
+  });
+
+  it('routes an issued token and preparation replay only to its issuing GM tab', async () => {
+    const world = sharedAuthorityWorld();
+    const issuer = world.realm();
+    const otherTab = world.realm();
+    await issuer.setup();
+    const binding = { actorUuid: 'Actor.a', runType: 'crafting', runId: 'run-1', expectedRevision: 2,
+      privateEvaluation: { formula: 'private' } };
+    const prepareRequest = { requestId: 'prepare-tab', senderId: 'player', sessionId: 'one' };
+    const prepared = await issuer.run(prepareRequest, ({ issuePrepareToken }) => ({
+      success: true, checkRequired: true, prepareToken: issuePrepareToken(binding),
+      promptDescriptor: { label: 'visible only to recipient' },
+    }));
+    const tokenRequest = { requestId: 'consume-tab', senderId: 'player', sessionId: 'one',
+      payload: { prepareToken: prepared.prepareToken } };
+    const claims = world.log.filter(([kind]) => kind === 'claim').length;
+    assert.equal(await otherTab.shouldHandleRequest(prepareRequest), false);
+    assert.equal(await otherTab.shouldHandleRequest(tokenRequest), false);
+    assert.equal(world.log.filter(([kind]) => kind === 'claim').length, claims);
+    assert.equal(await issuer.shouldHandleRequest(tokenRequest), true);
+    let calls = 0;
+    await issuer.run(tokenRequest, ({ consumePrepareToken }) => {
+      calls += 1;
+      return { success: consumePrepareToken(prepared.prepareToken, binding) !== null };
+    });
+    assert.equal(calls, 1);
+    assert.equal(await otherTab.shouldHandleRequest(tokenRequest), false);
+  });
+
+  it('rejects cache loss and a newly elected GM without consuming a prepared check', async () => {
+    const world = sharedAuthorityWorld();
+    const issuer = world.realm();
+    await issuer.setup();
+    const binding = { actorUuid: 'Actor.a', runType: 'crafting', runId: 'run-1', expectedRevision: 2,
+      privateEvaluation: { formula: 'private' } };
+    const prepared = await issuer.run(
+      { requestId: 'prepare-lost', senderId: 'player', sessionId: 'one' },
+      ({ issuePrepareToken }) => ({ success: true, prepareToken: issuePrepareToken(binding) })
+    );
+    const replacement = world.realm('gm2', {
+      getCurrentUser: () => ({ id: 'gm2', isGM: true }),
+      getActiveGM: () => ({ id: 'gm2', isGM: true }),
+    });
+    await replacement.bootstrapRecovery();
+    let evaluated = 0;
+    const attempt = await replacement.run(
+      { requestId: 'consume-lost', senderId: 'player', sessionId: 'one',
+        payload: { prepareToken: prepared.prepareToken } },
+      ({ consumePrepareToken }) => {
+        const snapshot = consumePrepareToken(prepared.prepareToken, binding);
+        if (snapshot) evaluated += 1;
+        return { success: snapshot !== null, reason: snapshot ? null : 'prepare-token-invalid' };
+      }
+    );
+    assert.deepEqual(attempt, { success: false, reason: 'prepare-token-invalid' });
+    assert.equal(evaluated, 0);
+    assert.equal(world.ledger.state.prepareTokens[prepared.prepareToken].status, 'active');
+    const fresh = await replacement.run(
+      { requestId: 'prepare-fresh', senderId: 'player', sessionId: 'one' },
+      ({ issuePrepareToken }) => ({ success: true, prepareToken: issuePrepareToken(binding) })
+    );
+    assert.notEqual(fresh.prepareToken, prepared.prepareToken);
+  });
+
+  it('replays a committed outcome after tab loss without handoff or a second effect', async () => {
+    const world = sharedAuthorityWorld();
+    const issuer = world.realm();
+    await issuer.setup();
+    const request = { requestId: 'committed', senderId: 'player', sessionId: 'one' };
+    let effects = 0;
+    const first = await issuer.run(request, () => ({
+      success: true, receipt: ++effects,
+      rollHandoff: { formula: 'PRIVATE_HANDOFF', total: 17 },
+    }));
+    assert.equal(first.rollHandoff.formula, 'PRIVATE_HANDOFF');
+    assert.equal(world.ledger.state.requests.committed.response.rollHandoff, undefined);
+    const reloaded = world.realm();
+    assert.equal(await reloaded.shouldHandleRequest(request), true);
+    assert.equal((await reloaded.bootstrapRecovery()).success, true);
+    assert.deepEqual(await reloaded.run(request, () => ({ success: true, receipt: ++effects })),
+      { success: true, receipt: 1 });
+    assert.equal(effects, 1);
+    for (const [kind, state] of world.log) {
+      if (kind === 'write') assert.doesNotMatch(JSON.stringify(state), /PRIVATE_HANDOFF/);
+    }
+  });
+
   /**
    * An execution grant is a bearer token, so the ONLY thing standing between it and an unrelated
    * privileged call is the per-field binding comparison and the single-use flag (issue 1648).
@@ -1701,4 +1984,188 @@ describe('journal run authority ledger', () => {
     assert.equal(response.reason, 'operation-failed', JSON.stringify(response));
     assert.match(response.message, /handler exploded/);
   });
+
+  it('records the logical operation identity, defaulting to the request for run callers', async () => {
+    const world = sharedAuthorityWorld();
+    const authority = world.realm();
+    await authority.run({ requestId: 'legacy', senderId: 'gm', sessionId: 'one' }, async () => ({
+      success: true,
+    }));
+    await authority.run(
+      { requestId: 'retry-2', operationId: 'Operation0000001', senderId: 'gm', sessionId: 'two' },
+      async () => ({ success: true })
+    );
+    const { requests } = world.ledger.state;
+    assert.equal(requests.legacy.operationId, 'legacy', 'an omitted operationId is the request');
+    assert.equal(requests['retry-2'].operationId, 'Operation0000001');
+    assert.equal(requests['retry-2'].sessionId, 'two', 'request and session stay their own');
+  });
+
+  it('hands the handler the exact held claim and verifies it against the server copy', async () => {
+    const world = sharedAuthorityWorld();
+    let elected = true;
+    const authority = world.realm('gm', {
+      getActiveGM: () => (elected ? { id: 'gm', isGM: true } : { id: 'other', isGM: true }),
+    });
+    const observed = [];
+    await authority.run({ requestId: 'held', senderId: 'gm', sessionId: 'one' }, async (helpers) => {
+      const { heldClaim } = helpers;
+      assert.ok(Object.isFrozen(heldClaim));
+      assert.equal(heldClaim.ledger, world.ledger, 'the exact live ledger the claim is on');
+      assert.equal(heldClaim.requestId, 'held');
+      assert.equal(heldClaim.claimId, world.ledger.claim.claimId);
+      assert.deepEqual(await heldClaim.readAuthoritativeLedger(world.ledger.id), {
+        status: 'available',
+        ledger: world.ledger,
+      });
+      observed.push(['held', await heldClaim.claimStillHeld()]);
+
+      const original = world.ledger.claim;
+      world.ledger.claim = { ...original, requestId: 'another-request' };
+      observed.push(['request mismatch', await heldClaim.claimStillHeld()]);
+      world.ledger.claim = { ...original, claimId: 'replacement' };
+      observed.push(['replaced', await heldClaim.claimStillHeld()]);
+      world.ledger.claim = null;
+      observed.push(['removed', await heldClaim.claimStillHeld()]);
+      world.ledger.claim = original;
+      elected = false;
+      observed.push(['election lost', await heldClaim.claimStillHeld()]);
+      elected = true;
+      observed.push(['restored', await heldClaim.claimStillHeld()]);
+      return { success: true };
+    });
+    assert.deepEqual(observed, [
+      ['held', true],
+      ['request mismatch', false],
+      ['replaced', false],
+      ['removed', false],
+      ['election lost', false],
+      ['restored', true],
+    ]);
+  });
+
+  it('fails the held-claim check closed whenever the server copy cannot be read', async () => {
+    for (const [label, readAuthoritativeLedger] of [
+      ['a rejection', async () => Promise.reject(new Error('socket closed'))],
+      ['an unavailable answer', async () => ({ status: 'unavailable' })],
+      ['a different ledger', async () => ({ status: 'available', ledger: { id: 'elsewhere' } })],
+      ['no reader at all', null],
+    ]) {
+      const world = sharedAuthorityWorld();
+      const authority = world.realm('gm', { readAuthoritativeLedger });
+      let held;
+      let read;
+      await authority.run({ requestId: 'r', senderId: 'gm', sessionId: 's' }, async (helpers) => {
+        held = await helpers.heldClaim.claimStillHeld();
+        read = await helpers.heldClaim.readAuthoritativeLedger(world.ledger.id);
+        return { success: true };
+      });
+      assert.equal(held, false, label);
+      assert.deepEqual(read, { status: 'unavailable' }, label);
+    }
+  });
+
+  it('never deletes a duplicate ledger holding operation or unrecognised pages', async () => {
+    const world = sharedAuthorityWorld();
+    world.addLedger();
+    const evidence = world.addLedger();
+    evidence.pages = 1;
+    const gm = world.realm('gm', { hasLedgerEvidence: async (ledger) => (ledger.pages ?? 0) > 0 });
+    assert.deepEqual(await gm.bootstrapRecovery(), { success: true });
+    assert.deepEqual(
+      world.ledgers().map((entry) => entry.id),
+      [evidence.id],
+      'the page-bearing ledger outranks the empty one, which alone is deleted'
+    );
+
+    const ambiguous = sharedAuthorityWorld();
+    ambiguous.addLedger().pages = 1;
+    ambiguous.addLedger().pages = 1;
+    const judge = ambiguous.realm('gm', {
+      hasLedgerEvidence: async (ledger) => (ledger.pages ?? 0) > 0,
+    });
+    assert.deepEqual(await judge.bootstrapRecovery(), {
+      success: false,
+      reason: 'ledger-ambiguous',
+    });
+    assert.equal(ambiguous.ledgers().length, 2, 'two evidence-bearing ledgers need a person');
+  });
+
+  it('treats an unanswered page inspection as unsettled, never as permission to delete', async () => {
+    for (const [label, hasLedgerEvidence] of [
+      ['a null answer', async () => null],
+      ['a rejection', async () => Promise.reject(new Error('socket closed'))],
+    ]) {
+      const world = sharedAuthorityWorld();
+      world.addLedger();
+      world.addLedger();
+      const gm = world.realm('gm', { hasLedgerEvidence });
+      const boot = await gm.bootstrapRecovery();
+      assert.deepEqual(boot, { success: false, reason: 'ledger-unsettled' }, label);
+      assert.equal(world.ledgers().length, 2, `${label} deleted nothing`);
+    }
+  });
+
+  it('inspects live and server pages in the Foundry adapter before deleting a duplicate', async () => {
+    let failRead = false;
+    const authority = foundryAuthorityFixture(
+      { randomUUID: () => 'uuid' },
+      { failServerRead: (query) => failRead && Object.hasOwn(query, '_id') }
+    );
+    const source = {
+      flags: {
+        fabricate: {
+          journalRunAuthorityLedger: true,
+          journalRunAuthorityState: { version: 1, requests: {}, prepareTokens: {} },
+        },
+      },
+    };
+    const first = authority.makeEntry(source);
+    const second = authority.makeEntry(source);
+    second._stats = { createdTime: 6000 };
+    authority.journal.push(first, second);
+    for (const entry of [first, second]) {
+      entry.delete = async () => authority.journal.splice(authority.journal.indexOf(entry), 1);
+    }
+    // A malformed operation page known only to the server: its create broadcast never arrived.
+    second.serverPages.set('Operation0000001', { id: 'Operation0000001', getFlag: () => null });
+
+    failRead = true;
+    assert.equal((await authority.bootstrapRecovery()).reason, 'ledger-unsettled');
+    assert.equal(authority.journal.length, 2, 'an unanswered page read deletes nothing');
+
+    failRead = false;
+    assert.deepEqual(await authority.bootstrapRecovery(), { success: true });
+    assert.deepEqual(authority.journal, [second], 'only the empty earlier ledger is deleted');
+  });
+});
+
+// The flag write deep-merges, so a scrub that only omits a key leaves it on every player client.
+forEachDeletionForm('deletes legacy private fields from the persisted Foundry flag on boot', async (deletion) => {
+  deletion.apply();
+  const authority = foundryAuthorityFixture({ randomUUID: () => 'secure-uuid' });
+  const response = { success: true, checkRequired: true, prepareToken: 'old' };
+  const ledger = authority.makeEntry({ flags: { fabricate: {
+    journalRunAuthorityLedger: true,
+    journalRunAuthorityState: {
+      version: 1,
+      requests: { legacy: { kind: 'command', status: 'settled', senderId: 'player', sessionId: 'one',
+        response: { ...response, promptDescriptor: { formula: 'LEGACY_PROMPT' },
+          rollHandoff: { formula: 'LEGACY_HANDOFF' } } } },
+      prepareTokens: { old: { status: 'active', expiresAt: 2000, binding: {
+        senderId: 'player', actorUuid: 'Actor.a', runType: 'crafting', runId: 'run-1',
+        expectedRevision: 2, privateEvaluation: { formula: 'LEGACY_FORMULA' } } } },
+      reconciliations: [],
+    },
+  } } });
+  authority.journal.push(ledger);
+
+  assert.equal((await authority.bootstrapRecovery()).success, true);
+
+  assert.doesNotMatch(JSON.stringify(ledger.flags), /LEGACY_/);
+  assert.deepEqual(ledger.state.requests.legacy.response, response, 'the safe outcome survives');
+  assert.equal(ledger.state.prepareTokens.old.status, 'released');
+  assert.equal(ledger.state.prepareTokens.old.binding.runId, 'run-1');
+  deletion.assertOperators(ledger.updates[0], 3);
+  assert.ok(ledger.updates.length > 1, 'the deletions precede the state write, never share it');
 });

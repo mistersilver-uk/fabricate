@@ -1,15 +1,9 @@
 /**
- * PURE builder for the GM migration-abort recovery prompt: the abort context to a Foundry-free
- * config the `src/main.js` edge feeds to `DialogV2`. Keeping it pure is what lets a unit test assert
- * the default choice and the surfaced remediation. Spec § Startup Migration Flow step 10 and
- * § Migration Abort Recovery Guidance own the content and the explicit, user-initiated retry.
+ * A pure builder for the abort recovery prompt's `DialogV2` config. Spec § Startup Migration Flow
+ * step 10 and § Migration Abort Recovery Guidance own the content and the user-initiated retry.
  */
 
-/**
- * The recommended downgrade action. A complete sentence in each register rather than a template
- * with a value interpolated in, so the console guidance and the GM dialog cannot drift apart and
- * neither can leak an internal token into a GM-facing string.
- */
+/** Complete sentences, so console and dialog cannot drift or leak an internal token. */
 export const DOWNGRADE_ADVICE = Object.freeze({
   promptKey: 'FABRICATE.Migration.Recovery.Downgrade',
   promptFallback: (version) =>
@@ -18,16 +12,13 @@ export const DOWNGRADE_ADVICE = Object.freeze({
     `downgrade Fabricate to version ${version} to continue using your existing data without manual remediation.`,
 });
 
-/** Stable action keys for the two prompt buttons. `KEEP` is the default choice. */
+/** `KEEP` is the default. */
 export const MIGRATION_RECOVERY_ACTIONS = Object.freeze({
   KEEP: 'keep',
   FIX_AND_RETRY: 'fixAndRetry',
 });
 
-/**
- * Build the recovery prompt configuration. `localize` is an i18n seam; without it the English
- * fallbacks are used, so the helper is usable off a Foundry runtime.
- */
+/** Without `localize`, the English fallbacks. */
 export function buildMigrationRecoveryPrompt(
   { downgradeTo = null, documents = [], label = '' } = {},
   localize
@@ -41,8 +32,7 @@ export function buildMigrationRecoveryPrompt(
 
   const content = buildContent({ t, label: String(label ?? ''), downgradeTarget, failures });
 
-  // `Keep existing data` is always the default and is ordered first. The fix/retry button is
-  // informational: it does NOT trigger a same-pass retry.
+  // Keep is the default and first; fix/retry is informational, with no same-pass retry.
   const buttons = [
     {
       action: MIGRATION_RECOVERY_ACTIONS.KEEP,
@@ -68,12 +58,9 @@ export function buildMigrationRecoveryPrompt(
   };
 }
 
-/** Build the HTML content mirroring the console recovery guidance. */
 function buildContent({ t, label, downgradeTarget, failures }) {
-  // Scoped to THIS PASS, deliberately. "A failed migration leaves your data unchanged" is not true
-  // in general: a NON-FATAL error is logged and the pass continues, so the next migration's success
-  // advances the version and writes. What is true here is narrower — the aborted pass returns
-  // before the first write.
+  // Scoped to this pass: a non-fatal error lets later migrations advance and write, but an
+  // aborted pass returns before the first write.
   const intro = `<p>${escapeHtml(
     t(
       'FABRICATE.Migration.Recovery.Intro',
@@ -121,7 +108,6 @@ function buildContent({ t, label, downgradeTarget, failures }) {
   return [intro, abortedDuring, downgrade, documentsBlock, retryHint].join('');
 }
 
-/** Build a single per-document remediation list item. */
 function buildDocumentLine(t, doc) {
   const type = doc?.type ?? 'unknown';
   const identity = doc?.id ?? doc?.name ?? 'unknown';
@@ -149,10 +135,7 @@ function buildDocumentLine(t, doc) {
   return line;
 }
 
-/**
- * Wrap an optional Foundry-style localizer into a `(key, data, fallback)` helper, collapsing
- * `format` and `localize` into one call shape. Without one, the English fallback is returned.
- */
+/** One `(key, data, fallback)` shape over `format` and `localize`. */
 function makeLocalizer(localize) {
   if (typeof localize !== 'function') {
     return (_key, _data, fallback = '') => fallback;

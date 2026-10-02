@@ -122,6 +122,13 @@ and the browse half is the one that scales with the corpus.
   A dismissed interactive prompt returns `{ success: false, cancelled: true, results: null }`
   with zero mutation, and any phantom run created by that call is discarded — the same
   interactive/cancelled contract as salvage (see the path-agnostic §Interactive Roll Prompt).
+- A misconfigured required check returns `{ success: false, results: null, message, misconfigured: true }`,
+  the discriminator salvage carries, and a check target refusal adds `data.targetRefusal`
+  naming its reason (`resolution-modes/spec.md` § Check Target Resolution); a timed FINISH
+  returns the same shape and leaves the run resumable.
+  The public craft runs the versioned lifecycle, whose descriptor refuses a target by throwing `CHECK_TARGET_INVALID` (`resolution-modes/spec.md` § Check Target Resolution); the run authority answers that refusal as `{ success: false, reason: 'roll-unavailable', message }` with the localized refusal sentence, exactly as it answers a check that cannot roll at evaluation (#2139).
+  The Crafting tab clears the recipe's last result for a `roll-unavailable` refusal as it does for a `misconfigured` one, so no stale result box stands beside the refusal.
+  Either way a target refusal answers before the roll prompt opens and posts no chat card and no roll message, and the Crafting tab notifies the refusal sentence.
 - A non-GM crafts directly against owned actors; there is no GM relay for player
   crafting.
 - Time-based countdowns are driven by world time only: a new `subscribeWorldTime`
@@ -145,6 +152,7 @@ Stated as its own section, a sibling of §Craft Execution, because the outcome s
   Treating `success` as "done" would show a success state for a run that gave the player nothing, and the flag exists so no caller has to re-derive that from `results == null` — which is also what a no-result success looks like.
   The flag is additive and `success` is unchanged, and it is present only when a salvage run manager is available to arm the time gate: a runless salvage carrying a `timeRequirement` never returns `waiting`.
 - A misconfigured required check (routed or progressive with no authored roll formula) returns `{ success: false, misconfigured: true }` with zero mutation and a GM-config message.
+  A check target refusal returns the same shape with `data.targetRefusal` naming its reason.
   Like a dismissed roll prompt, it **discards a run created by that call**, so a misconfigured abort never leaves a persisted `inProgress` salvage run; a reused pre-existing run is left untouched.
   The **salvage-configuration validation abort carries the same `misconfigured: true` discriminator**, and it is the branch that actually fires in a wired world: validation runs before the check does, so a GM-side config error (an unsupported salvage mode, a routed success tier routing nowhere, a `simple` mode with two success groups) never reaches the check's own misconfigured return.
   Without the flag there, a caller reads a broken config as a rolled failure and tells the player "nothing recovered" about a config only their GM can fix.
@@ -216,19 +224,95 @@ Permanently deleting the selected components, as a peer of bulk salvage rather t
 ### Interactive Roll Prompt (path-agnostic)
 
 A check-bearing execution accepts a per-call `interactive` flag (default `false`, keeping macros/API silent).
+Every check-bearing execution that accepts `interactive`, the Journal run command included, also accepts `additionalDice` (default 0; issue 2008), honoured only when non-interactive, where an interactive call's prompt chooses instead.
+An invalid, unoffered or unaffordable value, or a non-zero value while additional dice are unavailable, refuses with a reason and is never clamped.
 When `true`, the shared system-agnostic dialog (`src/ui/svelte/apps/crafting/rollPrompt.js`, `promptCheckRoll`/`buildInteractiveRollOptions`) prompts the player to roll; a dismissed prompt yields `{ success: false, cancelled: true, results: null }` with guaranteed zero mutation, distinct from `success: false`.
 This is the PR #497 per-call-flag decision, consumed uniformly by the crafting store, salvage (inventory) store, alchemy store, gathering view, and the Journal Trigger Next Step path; `CraftingEngine.craft` discards any phantom run created by a cancelled interactive call.
+
+- **One modal, one header.**
+The prompt renders in Fabricate's shared modal chrome (`ManagerModal`), never in a Foundry dialog, so it has one header: the activity check as its title and the actor and subject beneath it.
+It mounts over the Fabricate window the player started the roll from, unless that window is minimized, whatever the input device: the control that starts a roll records its own window for as long as the roll it started runs.
+Only when no control recorded one does it fall back to the window holding focus or, when focus is nowhere, the window under the pointer.
+Any other call, such as a companion or macro, mounts it on a themed standalone layer on the page that stays frontmost and that closing removes.
+When the window hosting it closes, the prompt answers with the not-confirmed shape and unmounts.
+It is 500px wide within the viewport, and when crowded only its body scrolls while the footer stays visible.
+A stray outside click never dismisses it; Escape and the close control dismiss it with the not-confirmed shape, focus enters it on open and stays inside it, it keeps every key from Foundry's window-level keybindings while open, and focus returns to the opener on every exit, or to the window hosting it while the opener is still disabled.
+- **Order and controls.**
+The body reads: a generic dice glyph beside the formula and, when the check has one target, its DC chip (`DC N · meet or beat` inclusive, `DC N · beat` strict); the applied modifier chips or the bounded player choice; the situational bonus; roll mode; then the footer.
+A roll-over check against a character value names its number a target, never a DC: `Target N · meet or beat` or `Target N · beat`.
+The roll mode is the shared `Select`, whose options are Fabricate's own labels over the legacy `publicroll`/`gmroll`/`blindroll`/`selfroll` tokens, defaulting to the client's supported setting and otherwise to a public roll.
+A check whose advantage offer (issue 2007) is empty shows one Roll (`data-action="roll"`).
+Otherwise the footer shows Disadvantage (when offered), Roll and Advantage in that order, each outer action carrying the sub-label its rule states.
+Advantage eligibility follows the check's advantage rule and is no longer tied to a plain `1d20`.
+Roll is the form's only submit button, so Enter from any field rolls normally and never with Advantage or Disadvantage.
+Displayed comparison and applied modifiers come from the actual normalized runner and the selected formula contributions, and existing result keys are unchanged.
+The posted roll's chat flavor, on the direct and versioned paths alike, carries the `(DC n)` suffix only for a summed roll-over check against a fixed DC; any other evaluation posts no DC in its flavor.
+A summed pass/fail roll under a target or against a character value carries `(Target n)` instead, naming the final target — the anchor plus every settled benefit, the number the prompt chip and the result's Target row show — placed before any appended modifier label.
+A routed roll of any other summed evaluation names no target in its flavor, relative or fixed-range, because each tier grades against its own threshold, and a secret Journal roll names none.
+A counting check's flavor carries the `({n} successes needed)` suffix (`(1 success needed)`) in the same place, never `(DC n)`, and a secret handoff carries neither.
+- **The count prompt.**
+A `product: 'count'` check shows no formula and no DC chip; its body instead reads a pool line (`{pool}d{die} · each {comparison} {threshold}`, the chat card's own wording so the two cannot disagree), a rule line and a successes chip ("N successes needed").
+The pool line shows the SETTLED pool, floored after every benefit, and the settled threshold, and updates as the player's picks and flat bonus change without constructing or evaluating a Roll; a pending rolled bonus reads as `{pool}d{die} + {formula} dice · each {comparison} {threshold}` when bonuses add dice, or `{pool}d{die} · each {comparison} {threshold} + {formula}` when they move the threshold, and the line is announced politely.
+The rule line states the effective per-die threshold, whether it came from a character value (`(character value {v})`) and how far modifiers moved it, signed by the benefit so a +1 bonus reads `moved +1` in either direction, then the actual explode and cancel faces (`explodes on 9 or above once`, `2 or under cancels a success`) — the authored face, never the default one.
+A settled pool at or below zero that fails shows a warning `Notice`, "This roll fails automatically: the pool is reduced to zero.", and Roll stays enabled unless additional dice are enabled and even the most dice the player can buy cannot lift it, when each roll action whose pool stays at zero is disabled with a note (issue 2008 ruling R4, judged per action by `resolution-modes/spec.md` § Additional Dice).
+No such warning shows while a pending rolled bonus could still add dice.
+A Tool bonus is rolled when the check is prepared, so the prompt's pool already carries its total; a rolled Tool contribution handed to the check runner unsettled is pending instead, with or without additional dice, so it shows no zero-pool warning, the pool line names it, and reachability never disables an action that could succeed with it.
+No retained formula, DC, expression or path is shown on a count prompt, single or bulk, and the prompt gains no focusable control of its own other than the additional-dice stepper.
+The same count region serves the single, bulk salvage and Journal prompts, which forward the settled threshold source and anchor and the explode and cancel faces as numbers and enums only; the unentitled public prompt allowlist is unchanged.
+Its modifier-destination copy and situational-bonus help ("Each adds dice"/"Each moves the threshold") replace the summed wording, matching `pool.modifierDestination`.
+A hidden or redacted pool, meaning its `pool`, `die` and `threshold` are all unresolved, shows neither the pool line nor the rule line, but keeps its successes chip and modifier-destination wording, and never falls back to the retained roll formula or a summed DC.
+A fixed-range routed count check reads no `pool.required` either, so its prompt shows no successes chip, matching a fixed-range routed sum check's own missing DC chip.
+- **Additional dice.**
+  With additional dice enabled on a counting check (issue 2008; `resolution-modes/spec.md` § Additional Dice), the prompt offers an `Additional dice` control between the situational bonus and roll mode, drawn in the shared `<Well>`: its title, a resource line and a spend line, the shared `Stepper` from 0 to the limit at the row's end, and one `Notice` beneath.
+  The stepper defaults to 0, so opening the prompt and pressing Enter spends nothing; the shortfall is stated and never pre-selected.
+  The lines read `{resource} {available} available · Spends {n} {resource}`, or without a resource name `{available} available · Spends {n}`, inked `--fab-text-muted`.
+  Its states, the first that holds winning, are:
+
+  - **unavailable**: the stepper disabled at 0, `{resource} unavailable · Spends 0` (`Unavailable · Spends 0`), and an info message naming the reason, never `{n} available`; an unreadable value reads `{actor} has no {resource} value · Spends 0` (`{actor} has no value to spend · Spends 0`) instead;
+  - **unreachable**: a danger message, `Cannot reach {needed} successes.` followed by `{pool} dice need at least {shortfall} more, and at most {max} can ever be added.` or `…, and you can afford {limit}.`, or `Cannot reach {needed} successes with these dice.` when no die can qualify, with each footer action disabled by resolution-modes § Additional Dice and a note naming what is disabled.
+    When Advantage can still reach, the message opens `Without Advantage, these dice cannot reach {needed} successes.` (`…reach 1 success.`) in place of `Cannot reach {needed} successes.`
+    When modifiers take the pool below zero and it fails at zero (`zeroPoolFails` on), its reason reads `Modifiers reduce the pool below zero, so at least {shortfall} dice are needed, and at most {max} can ever be added.` (`…, and you can afford {limit}.`);
+  - **shortfall**: a warning, `At least {shortfall} additional dice needed to be able to succeed.` (`…to succeed without exploding dice.` when the pool explodes), or a success message, `At least {shortfall} additional dice are needed. You have enough.`, once enough are chosen;
+  - **unaffordable**: the stepper disabled and an info message, `Not enough {resource} to buy a die.` (`Not enough to buy a die.`).
+
+  A rescued unreachable attempt keeps its danger message, which adds `A trigger on this check can still succeed it.`, and every action enabled.
+  The block note sits under the footer's action row as a status region in danger ink.
+  With every action disabled it reads `Rolling is disabled: this attempt cannot reach the successes it needs.`, or `Rolling is disabled: the pool is reduced to zero, and the dice you can add cannot lift it.` when each fails for a zero pool; with Roll and Disadvantage disabled it reads `Only Advantage can reach the successes needed.`, and with Disadvantage alone `Disadvantage cannot reach the successes needed.`
+  A disabled footer action stays in place with `aria-disabled` and an `aria-describedby` naming the note, never the native `disabled`, and initial focus never lands on it: the modal focuses the first of the bonus field, an enabled stepper, an unblocked Roll and an unblocked Advantage, else its close control.
+  Neither Enter nor a click rolls a disabled action, and the prompt stays answerable once a bonus change unblocks it.
+  The pool line and zero-pool notice include the chosen dice.
+  It names no path or macro.
+  A secret or unentitled prompt shows only the resource and spend lines with the unavailable or unaffordable message and disables nothing; a progressive or prepared routed prompt also states no needed count or shortfall, though an unliftable zero pool still disables its actions.
+  The answer carries `additionalDice`, re-bounded on return: a non-integer, negative or above-limit value refuses with its reason and is never clamped, and a headless answer buys 0.
+  A refused choice or spend raises one warning notice naming its reason from the surface that started the attempt, and a roll that could not complete after its spend raises `{n} {resource} spent; the roll could not be completed.` (`{n} spent; …`).
+  The crafting, alchemy and gathering surfaces run the Journal run command, so they also receive its reply shape: a reply carrying a top-level `additionalDiceRefusal` raises only its per-reason sentence, never the generic refusal message beside it, and a non-success reply carrying a top-level `boughtDice` above 0 raises the spent notice before the reply's own refusal message.
+  Salvage, single and bulk, rolls immediately and receives the immediate shape.
+- **The roll-under target chip.**
+A summed roll-under check's target chip names the target after the player's applied flat modifiers, any Tool bonus and a typed flat situational bonus, all of which raise it: `Target {T} · stay at or under` (inclusive) or `Target {T} · stay under` (strict).
+A contribution still to roll — a rolled modifier or a typed dice bonus — is named beside the settled number as `Target {T} + {formula} · stay at or under`, never averaged in, and text the dice engine rejects (`Roll.validate`) is never named as pending.
+Choosing picks and typing update the chip without constructing or evaluating a Roll.
+Beside the chip, wrapping beneath it, a character-value target's explanation line always names its basis — the acting character, the exact expression the GM authored and the value it resolved, `Sera Vane @skills.smith.level 12` — then the Difficulty Adjustment by its tier name (`Hard Work −2`, else `difficulty −2`) and each benefit that raised it (`tools +1`, `modifiers +1`, `situational +2`), joined by middots with the true minus sign and `×½`.
+A fixed target's line stays empty unless a Tool bonus, a flat modifier or a typed flat bonus raised it, in which case it reads `Base {base}` followed by whichever raised it.
+The chip and its line sit in one persistent `aria-live="polite"` region, so each change is announced from the same node; a roll-over prompt renders neither the region nor the line.
+A roll-under prompt's formula note reads `The dice are compared as rolled.`, its modifier choice states `Each raises the target.`, and its bonus help reads `A bonus raises the target. A rolled bonus such as 1d4 is rolled first, and its result is applied.`; the roll-over help keeps `A rolled bonus such as 1d4 is rolled with the check.`
+The displayed formula never carries a roll-under benefit.
+- **The situational-bonus offer.**
+A check whose `offerSituationalBonus` is `false` shows no situational-bonus input, caption or help, so the modal's initial focus falls through to Roll; Enter still rolls and Escape still dismisses.
+The offer is display only: `allowsSituationalModifier` stays the authority gate, and a bonus supplied programmatically, by a companion, in a forwarded decision or on a prepared Journal check still applies.
+A bulk prompt hides the field only when every subject with a usable check has its offer off, and a typed bulk bonus is applied only to the subjects whose own check offers it.
+A companion's Standalone Check Roll always offers the field.
 
 - **The companion path opens the SAME dialog, on the EXECUTING GM's client.**
 A Standalone Check Roll published to a companion (`companion-api/spec.md`) opens this dialog and no other — never the subject player's client, and never a relayed one.
 Its chat flavor and its dialog titles are built from the caller's own `label`, defaulted to a **localized activity noun** so that no flavor can render `undefined` and none can render a doubled "check check".
 Its bulk prompt's item count is the caller's **whole batch**, not the usable subset, so a batch in which some formulas cannot roll still reads as the number of things the player queued.
 A dismissal is reported to the caller as `cancelled` with **zero mutation**, which is the property that capability exists to preserve.
+A companion's interactive count request opens the count prompt above on the standalone overlay (`.fabricate-standalone-overlay`) when no Fabricate window started it, and grades against `pool.required`.
 - **Crafting-only "Check modifier" group.**
 When — and only when — the caller supplies `rollOptions.modifierChoice`, the dialog renders one extra control between the formula block and the situational-bonus input: a fieldset legended "Check modifier" holding one input per eligible modifier, each showing that modifier's icon, its label, and a signed value chip (`+3` / `0` / `-2`).
 The **input type follows the descriptor's `maxPicks`**, which is clamped into `[1, options.length]`: at 1 it is the pick-one **radio** group it has always been, and above 1 it is a **checkbox** group whose legend states the bound in words ("Pick up to 3").
 The two are not interchangeable — a radio group that permitted several picks and a checkbox group that permitted one would each lie about the control — so the type is chosen from the bound rather than fixed.
-The best legal selection is pre-checked, and the confirmed choice returns the checked ids as `chosenModifierIds` (falling back to the descriptor's `defaultSelectedIds` when the field is absent, as on the headless no-`DialogV2` path; a legacy single `chosenModifierId` is still honoured).
+The best legal selection is pre-checked, and the confirmed choice returns the checked ids as `chosenModifierIds` (falling back to the descriptor's `defaultSelectedIds` when no selection is submitted, as on the headless path with no page to render into; a legacy single `chosenModifierId` is still honoured).
 Above 1, the dialog disables the unchecked inputs once `maxPicks` are ticked and releases them again when one is cleared.
 That is a UI affordance only: `evaluateCheckRoll` re-imposes the same cap on the returned selection, since a UI control's constraint is never the invariant.
 A descriptor carrying no usable `maxPicks` renders — and is reduced as — a single pick, so a descriptor built before the field existed cannot silently widen.
@@ -236,37 +320,99 @@ This group is only the presentation of the crafting-check `playerPicks` combinat
 **CRAFTING and SALVAGE supply a `modifierChoice`** under `playerPicks` (issue 1095), and their dialogs render the modifier fieldset on the same terms; the pre-1095 claim that salvage never passes one retired with the crafting-only catalogue.
 **GATHERING supplies none**: it threads the modifier context and resolves a `playerPicks` selection deterministically, and its roll-time prompt is deferred to issue 683 with the rest of the seam (`resolution-modes/spec.md` §Check Source is normative).
 A roll under any other combination rule passes none — including `bySubject`, whose selection was already made at authoring time — so no `modifierChoice`, no fieldset.
-The dialog's formula line ends in a trailing `+ (modifier)[Modifiers]` slot while the choice is unanswered.
+On a direct runner the formula line ends in a trailing `+ (modifier)[Modifiers]` slot while the choice is unanswered.
+A versioned Journal prompt shows its prepared formula without the slot or any flavour label, with the choice offered beneath it.
+On both paths the formula line omits the terms of the modifiers the prompt itemises as chips: the producer passes a display formula, the base with any Tool terms and the deferred slot, beside the rolled formula, which is unchanged.
+After confirmation, the selected legal modifiers and any valid situational bonus enter the shared placement plan; under the active sum/over evaluation they keep their existing appended formula order.
+Under any other evaluation, rolling contributions evaluate once outside the main check and share its chat visibility, while cancellation still creates no new modifier roll, check roll or message.
 - **Pre-resolved roll decisions.**
-A caller MAY supply a `rollDecision` (`{ bonus, rollMode, advantage }` — the prompt's own return shape minus `confirmed`).
-The evaluator then treats it as an already-answered choice and **never opens the modal**, running the identical downstream code: the check-modifier append, the advantage transform, the situational-bonus append, the formula-validity net and the effective roll mode.
+A caller MAY supply a `rollDecision` (`{ bonus, rollMode, advantage, additionalDice }` — the prompt's own return shape minus `confirmed`).
+The executing client re-validates `additionalDice` against the limit a fresh read of the resource allows and never clamps it.
+The evaluator then treats it as an already-answered choice and **never opens the modal**, running the identical downstream code: the check-modifier append, the check's advantage rule (the keep transform, a bonus-die contribution or a pool change), the situational-bonus append, the formula-validity net and the effective roll mode; a decision naming a choice the rule does not offer rolls normally.
 With no decision supplied every existing path builds a byte-identical options bag, so single-item salvage, crafting, alchemy and gathering are unchanged.
 A decision carries **no `confirmed` key** and MUST NOT be read as a cancellation; only an explicit `confirmed === false` is one.
 A decision supplied without a prompt function must still apply, or the base formula rolls and the player's answer is silently discarded.
 Only the salvage runners attach a decision today — one gate (`CraftingEngine._salvageRollOptions`) serving all three salvage check paths, so a fourth salvage runner cannot ship without it — because putting the attachment in the shared prompt module would advertise pre-resolved-roll support the crafting and gathering paths do not wire.
 - **The bulk prompt.**
 A bulk run answers **one** prompt whose answer applies to every roll in the batch, and the dialog's own note says so.
-It shows **no formula and no DC** — a batch has no single subject — and instead shows a subject strip of thumbnails with an overflow count, the situational-bonus input and the roll-mode picker.
-Advantage is offered only when **every** usable-check subject's **authored** formula carries a plain `1d20`, computed from the crafting system rather than from the listing projection, which carries no formula at all.
-It is all-or-nothing across those subjects: offering advantage only some rolls could honour would be a lie about the rest of the batch.
+It shows **no formula and no DC** — a batch has no single subject — and instead lists each subject as a row with its display-only need, the situational-bonus input and the roll-mode picker.
+A need is the subject's finite DC, "No check" for a subject with no usable check (never an invented fallback DC), or "No single target" for a routed fixed or progressive check; it never drives evaluation.
+A summed roll-under subject against a fixed target reads `Target N`, and a summed subject reading a character value reads "No single target" in either direction, because its target differs per character.
+When every subject rolls under, the bonus help is the roll-under help above.
+The note that one choice applies to every roll renders on every bulk prompt, including a count-only companion call with no subject rows, which keeps its controls and its normal result.
+The heading names the activity and, for a batch of one actor, that actor with the item count; a caller that names neither reads "Bulk check" over the item count.
+Advantage is offered only when **every** usable-check subject's advantage offer includes it, and Disadvantage only when every one includes Disadvantage, computed from the crafting system's authored checks rather than from the listing projection, which carries no formula at all.
+A sub-label shows only when it is identical for every subject; otherwise the buttons render with no sub-label.
+Each roll applies the one answer by its own check's rule — Advantage on a `2d6` subject and a `1d20` subject in the same batch keeps each subject's own dice.
+It is all-or-nothing across those subjects: offering a choice only some rolls could honour would be a lie about the rest of the batch.
 The prompt is not shown at all when no selected item has a usable check, and dismissal returns the same not-confirmed shape the single-item prompt returns.
+One additional-dice choice (issue 2008) applies to every eligible roll, offered only when those rolls share one actor and one resource.
+Otherwise the control renders its title in the shared `<Well>` with no stepper and an info `Notice`, `Rolls in this batch use different resources, so no dice can be added.`
+Its limit counts the eligible rolls only, its maximum is the lowest any of them allows, and the total spend is shown before confirming: `Spends {n × rolls} {resource} across {rolls} rolls ({n} each)`, or `Not enough {resource} to buy a die for every roll.`
+Each footer action is disabled only when every covered roll would be disabled under it on that roll's own prompt (`resolution-modes/spec.md` § Additional Dice); when every action is, the note reads `Rolling is disabled: none of these rolls can reach the successes they need.` (`…this attempt cannot reach…` for one roll), and otherwise the single prompt's per-action notes apply.
+A row gains the suffix `· cannot reach` in danger ink after its need only when no offered action can reach it and it states a needed count.
+A refused choice cancels the whole batch with zero mutation, and a resource that runs out mid-batch stops it with `{resource} ran out after {done} of {rolls} rolls. The rolls already made stand.`
 
 ### Result Chat Cards
 
 - Crafting and salvage share one card format (built by `buildResultCard`): the subject, recovered/produced results, consumed/forfeited items, broken tools, and failure reason.
 - The card appends the **rolled check total** as its own row, mirroring the salvage summary's "with a roll of N" rule: rendered only for a finite value and omitted for a no-check guaranteed craft/salvage (`rollValue` null).
   The total is the RAW roll (`checkResult.data.total`), not the progressive awarding value, so a forced crit shows the natural roll rather than the `MAX_SAFE_INTEGER`/`0` award sentinel.
+  A public crafting card replaces that row with its dice line (below), and a public salvage card keeps it.
+- **A card whose check is not public states no roll total.**
+  A check rolled as a gmroll, blindroll or selfroll, a secret prepared check, and a check whose executed visibility is unknown are not public, and their crafting, salvage and bulk salvage cards carry no `Roll n` row, no dice line, no evidence rows, no count summary or tiles and no Botch pill, in their content or their flags.
+  Every client receives a message's content and flags whatever its whisper or blind setting, so the card is not whispered to compensate, and a carried award roll would make a whispered card visible to every client anyway.
+  The outcome stays: a crafting card keeps its Success or Failure pill, and every card keeps what was produced, consumed and broken.
+  The check's own Roll is posted by its own message under its roll mode, and Foundry decides who sees it.
+- **A public check's Roll rides its result card.**
+  For a public, non-secret check the crafting card of a Journal run and the single salvage card carry the check's evaluated Roll, followed by its pre-rolls and then any rolled result amounts, in the message's `rolls`, so one message both states the outcome and sounds and animates the dice, and no separate roll message is posted.
+  The carried Rolls are the ones the check evaluated, rebuilt from their serialized data where the card is posted by the GM authority, and are never rerolled.
+  A card carrying a check Roll names the public mode in its create options: `ChatMessage.create` applies a visibility mode only when one is passed, so the option states the card's visibility rather than leaving it to that default.
+  Where the GM authority posts the card, a card carrying a check Roll is authored as the user who asked for the check, taken from the sender the transport attested and never from the request's payload, so the dice are drawn as that user's; a card carrying no check Roll keeps the posting client's own author.
+  The carried Rolls are ordered so that one bearing dice leads whenever any does, and otherwise keep the order above, because a dice-animation module reads the first Roll to decide whether the message has dice at all.
+  An initiator the operation refuses the roll handoff to gets no Roll on the card either, so a roll they may not see is posted nowhere.
+  A public roll whose card is not posted — the system's chat output is off, or the card could not be created — still posts its own roll message, so the dice are never lost.
+  A bulk salvage run keeps one roll message per item beside its aggregate card, a craft resumed on a run that predates the Journal lifecycle keeps its separate roll message, and a gathering roll keeps its own message because the gathering card states no roll.
+- **A crafting card whose check rolled states its outcome.**
+  Below the header it carries a `Success` or `Failure` pill (`fabricate-craft-chat__result`), its tone mixed into the chat ink so it reads inside Foundry's own message; salvage and bulk salvage cards carry no pill.
+- **A summed check states its executed evidence.**
+  For a public, non-secret summed check (`publicroll` on V13, `public` on V14) the crafting card's dice line replaces the roll row: the executed formula with each top-level dice term's kept faces, and a bracketed term that is the lone content of its brackets annotated the same way after the closing bracket (the advantage or disadvantage bonus die, `(1d6)` reads `(1d6) (2)`; a compound bracket group — a second operand, a function argument, or flavour carried inside the same brackets — stays unannotated), then the total, `1d20 (14) + 3 + 7 modifiers = 24`, and under a roll-under check `3d6 (2 + 4 + 3) = 9, compared as rolled`.
+  A flavoured modifier term is named in words (`7 modifiers`) and a typed character path by its path (`3 @abilities.int.mod`); the dice line names only what the executed formula records, so prototype term labels that are not stored (`prof`) are not shown.
+  The crafting and salvage cards and each bulk salvage subject then state evidence rows.
+  A roll-high check against a fixed DC states `Needed` (`DC {T}, meet or beat`, or `DC {T}, beat` when strict) and `Margin` (`{±n}`).
+  Every other summed check states `Target`, `Pre-rolled` and `Margin`:
+  - `Target` reads `{T} · {character} {expression} {value}, {tier} {adjustment}, tools {±t}, modifiers {±m}, situational {±s}`, such as `14 · Sera Vane @skills.smith.level 12, Hard Work −2, modifiers +1, situational +3`, naming only the parts the record holds; a record without the typed formula reads `character value {v}`, one without the tier's name `difficulty {adjustment}`, a fixed anchor `fixed`, and a record without terms the bare number;
+  - `Pre-rolled` reads `{label} {formula} rolled {n}, raising the target` for each pre-roll that landed on the target (`lowering the target` for a disadvantaged bonus die, labelled `Disadvantage`, whose unsigned roll the target loses), joined by semicolons, with the one pair of brackets the resolver wraps a rolled modifier in dropped and an unlabelled one named `Tool`, `Modifier` or `Situational`;
+  - `Margin` reads `{±n} under the target` under a roll-under check and `{±n}` otherwise.
+
+  A fixed range, an Otherwise tier and a progressive result have no target, so they state neither a target nor a margin, and a legacy record omits every row its evidence lacks.
+  Every row is read from the executed check result alone, never from later actor or configuration state, and every `{token}` fills in one pass, so a label containing `{total}` is stated literally.
+  Each row is escaped literal text in which no `[[`, `@path`, `@Name[…]` or `&Name[…]` shape survives for either Foundry enrichment pass or a game system's enricher, because a word joiner follows each; an `@path` may break only after its inner dots.
+  A system enricher with no sigil (such as StarWarsFFG's `:ability:` or `[AB]`) is not neutralized, and because Foundry re-walks text nodes after each pass it can also match text an earlier pass inserted; this is an accepted known limit (#2109).
+  A gmroll, blindroll or selfroll card, or a secret one, states no `Roll n` row, no dice line and no rows, because every client receives a message's content and flags whatever its whisper; the card is never whispered to compensate, no check Roll or pre-roll Roll joins its `rolls`, and it gains no evidence flags.
 - **A ROLLED result amount states its roll beside the produced line** on the crafting and salvage card, in the same `{formula} = {total}` shape and the same treatment the card's rolled-check-total row uses, so the run that says what was produced also says what produced it.
   An EMPTY AWARD — a total of zero or less, which creates no item — is stated as its own row naming what produced nothing, never omitted, because a player who watched the dice fall is owed the outcome.
   The card reads the roll the award recorded and never re-rolls it.
   The evaluated rolls are carried in the message's `rolls`, which is what sounds the dice and animates Dice So Nice; the custom card content survives that, and neither card is ever whispered, so carrying them hides it from nobody.
   The gathering card states no roll — it has its own builder and its own row shape — and the run journal is where a gathered amount's roll is read.
+- **A counting check states its executed dice.**
+  For a public, non-secret counting check (`publicroll` on V13, `public` on V14) the crafting, salvage and bulk salvage cards show the die tiles and the count rows, and the summary line `{pool}d{die}, each {sym} {threshold}` replaces the numeric roll row.
+  Each active die is one tile in roll order with its marks combined (qualified, cancelled and exploded, each by its Font Awesome glyph), and each explosion roll is its own tile straight after the die that produced it.
+  The rows are `Success on` (only when the threshold read the character or modifiers moved it), `Count`, `Needed` (`{required} · margin {±m}`, or `{required} · a net below zero is a botch`) and `Pre-rolled`; a pool reduced to zero states `Pool` and `Result` instead, shows no tile and prints no roll total, and names dice that Disadvantage removed as a `disadvantage` penalty.
+  A failed count that netted below zero reads `Botch` in place of the Failure pill.
+  That evidence is handed to the card builder at post time from the engine's own execution and is never persisted into check data, run history, a roll handoff or message flags; a secret check keeps it inside the authority.
+  A gmroll, blindroll or selfroll count card, or a secret one, shows no net, no count rows and no tiles, and the card is never whispered to compensate.
+  A public count card carries its count Roll and pre-rolls on the rule every public check follows, a card that is not public carries neither, and the gathering card stays roll-free.
+  A count check that bought dice (issue 2008) reads its summary `{pool}d{die} ({unbought} + {bought} bought), each {sym} {threshold}`, adds an `Additional dice` row, `{count} bought · spent {count} {resource}` (`{count} bought · spent {count}` without a resource name), and dashes the tiles of the original dice they added, marked `bought`, under the same public, non-secret gate.
+  The crafting result box and the salvage roll summary state the same row and tiles, and a refused spend posts no card.
+  `data.boughtDice` (`data-models/spec.md` § CraftingRunStepState) is the one part of this evidence the check data keeps, and it names no resource.
 - The card is posted only on resolved success or rolled failure — never on cancelled, misconfigured, or time-gated outcomes.
 - Posting is gated by `features.chatOutput` (default on); `ChatMessage.create` failures are non-fatal (logged only), so a chat error never aborts the craft/salvage.
 - Gathering posts its own result card under the same `features.chatOutput` toggle.
 - **A bulk salvage run posts ONE aggregate card**, and the per-item cards are suppressed.
   Suppression is a `salvage()` option gating **both** poster call sites — the rolled-failure path and the success path — because a missed thread would post the aggregate card plus one stray per-item card for every failed row.
   The card carries N subjects, each with its own roll value, tier step, outcome and message, plus recovered / consumed / broken-tool lists aggregated by name, and it reuses the shared card markup atoms rather than a second copy of them.
+  A subject whose check is not public states no roll value, on the same rule as the single card.
   A subject appears iff **its own** system's `features.chatOutput` is true, and nothing is posted at all when no subject qualifies — not an empty card.
   Per-roll dice posts are deliberately **not** suppressed, since they are the Dice So Nice trigger, so N items produce N dice messages plus one aggregate card.
   A subject's roll total, tier step and broken-tool evidence reach the card only through the salvage **run record**, so a runless call correctly contributes no tool section and no tier step; the raw roll total is preferred over the top-level value for the same reason the single card prefers it, and because the top-level value is threaded only on the success return.
@@ -278,6 +424,48 @@ The prompt is not shown at all when no selected item has a usable check, and dis
   It is the single target's actor for a one-actor run and an explicit alias naming the acting user for a multi-actor run, never inferred — an inferred speaker falls through to the controlled tokens on the canvas, so a GM with an unrelated NPC selected would have the card attributed to that NPC.
   A blind run's card is whispered **and** blind, so its own author sees hidden content; that is correct, the in-panel report is their feedback channel, and the blind flag must not be dropped to "fix" it.
   The card is created with **`author`**, not the legacy `user` key the single-salvage poster still passes.
+
+#### Scenario: A public roll-under craft states its evidence
+
+- **WHEN** a player crafts against `@skills.smith.level` 12 with the Hard Work tier's −2, a library +1 and a typed situational `1d4` that rolls 3, and rolls `3d6` publicly for 9
+- **THEN** the card carries the Success pill and the dice line `3d6 (2 + 4 + 3) = 9, compared as rolled` in place of the roll row
+- **AND** its rows read `Target` `14 · Sera Vane @skills.smith.level 12, Hard Work −2, modifiers +1, situational +3`, `Pre-rolled` `Situational 1d4 rolled 3, raising the target` and `Margin` `+5 under the target`
+
+#### Scenario: A private or secret roll-under card states nothing more
+
+- **WHEN** the same craft is rolled as a private GM, blind or self roll, or its check is secret
+- **THEN** the card keeps its pill, and states no `Roll 9` row, no dice line and no evidence rows
+- **AND** it is not whispered, and carries no check Roll, no pre-roll Roll and no evidence flags
+- **AND** the check's Roll is posted as its own message under its roll mode
+
+#### Scenario: A public craft posts one message
+
+- **WHEN** a player crafts through the Journal and rolls the check publicly
+- **THEN** chat shows one result card, which states the outcome and carries the check's Roll and its pre-rolls in its `rolls`
+- **AND** no separate roll message is posted for that check
+
+#### Scenario: A public roll with no card still posts
+
+- **WHEN** a player rolls a crafting or salvage check publicly in a system whose chat output is off
+- **THEN** the check's Roll is posted as its own message, as it was before the card carried it
+
+#### Scenario: A private or secret check's total reaches no client
+
+- **WHEN** a craft, a salvage, a bulk salvage or a gathering attempt rolls its check as a private GM, blind or self roll, or its check is secret
+- **THEN** no result card the run posts carries the roll total or any check evidence in its content or flags
+- **AND** the same run rolled publicly states the total on its crafting, salvage and bulk salvage card, while the gathering card states no roll in either case
+- **AND** the check's own Roll message is posted under its roll mode and is outside this rule
+
+#### Scenario: A routed roll-under craft lands on Otherwise
+
+- **WHEN** a relative routed check multiplying a character value rolls above every tier's threshold and lands on its Otherwise tier
+- **THEN** the card carries the Failure pill and the dice line, and states no `Target` and no `Margin` row
+
+#### Scenario: A check that cannot read its target refuses
+
+- **WHEN** a player crafts a recipe whose check reads a character value the crafting character does not have
+- **THEN** the craft refuses with "Crafting check cannot roll: the character value its target reads was not found." before any prompt opens
+- **AND** no chat card and no roll message is posted, and the recipe's check card shows the unresolved sentence
 
 #### The GM-only complication card
 
@@ -605,7 +793,8 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
 ##### Browse Status
 
 - Each projected recipe carries exactly one `browseStatus` from the vocabulary:
-  `available`, `locked`, `unknown`, `exhausted`, `missingMaterials`, `discovery`.
+  `available`, `locked`, `unknown`, `exhausted`, `missingMaterials`, `discovery`, `checkUnrollable`.
+- `checkUnrollable` states, before the player presses Craft, that the check the recipe's mode rolls would refuse this character before any roll — a target or pool path the character lacks, or another pre-roll target refusal — decided as the versioned descriptor decides it (#2139); it reads "Check can't roll" with its own blocking sentence.
 - `discovery` is the Discovery-Mode redacted state for an undiscovered recipe (a
   player-facing "Undiscovered" badge).
 - `incomplete` is intentionally NOT a player badge: a recipe is either visible
@@ -613,7 +802,8 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
   authoring state.
 - Status precedence (highest first): Discovery-Mode teaser → `discovery`, locked →
   `locked`, unlearned knowledge → `unknown`, recipe-item uses exhausted →
-  `exhausted`, materials missing → `missingMaterials`, otherwise `available`.
+  `exhausted`, a check that refuses this character → `checkUnrollable`, materials missing →
+  `missingMaterials`, otherwise `available`.
 
 ##### Discovery-Mode Redaction
 
@@ -681,6 +871,13 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
 - It is `null` when the system configures no check block for the recipe's mode.
 - `usable` is derived from an authored, non-empty `rollFormula` — NOT the legacy
   `enabled` flag.
+- A counting check's descriptor carries `successesNeeded`, the recipe tier's successes when it
+  sets them and the check's own otherwise, and the recipe check card reads it as
+  `{n} successes needed` (`1 success needed`) beside the pool line, never as a DC.
+- A summed pass/fail check graded under a target or against a character value names its target on the recipe check card for the selected character as `Target {T} · stay at or under` (or `· stay under`, and `· meet or beat` or `· beat` for a character value read roll-high), with a source line stating the same basis as the roll prompt: `Sera Vane @skills.smith.level 12 · Hard Work −2 · modifiers +1`, or `Base 12 · modifiers +2` for a raised fixed target.
+  It includes the applied flat library modifiers and names a rolled one as pending, as the prompt chip does, but cannot know the Tool bonus the prompt adds.
+  The displayed formula never gains a roll-under benefit, and no value is invented: a target the character cannot resolve shows the unresolved sentence (`FABRICATE.Check.Roll.TargetUnresolved`) in place of a target.
+  A routed, progressive or fixed-range check names no target on the card.
 
 ##### Outcome Tiers
 
@@ -827,6 +1024,12 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
   outcome.
 - Advancing re-invokes the craft seam for the same recipe and ingredient set (it
   carries no separate run id; the engine advances the active step).
+- The Run Summary's result box keeps its `Craft complete` or failure head and rolled total, and states the executed check's evidence rows — the same `Needed`, `Target`, `Pre-rolled` and `Margin` rows the chat card states (§Result Chat Cards) — through `CheckEvidenceRows.svelte`, rendered as keyed fact rows.
+  It withholds them only for a blind or secret roll, so a private or self roll still shows its roller the evidence.
+  A counting check's sentence rows — `Count` (`{q} qualified − {c} cancelled = {n} net`) and a zero pool's `Pool` and `Result` — set in the body face as prose and wrap by word, while its figure rows keep the keyed row's mono (issue 2134); the salvage summary renders the same rows.
+  Its tiles and their legend sit on the same neutral ground as its rows rather than on the box's tint, and the legend keys each mark by the very glyph the tile draws, beside the word that names it.
+  A box whose check states evidence also states the outcome: "The result group is produced." on success, and "Nothing is produced; the failure policy applies." on a failure that awarded nothing; a failure that still awarded items states no sentence.
+  The salvage summary never states that sentence.
 - The unified player-facing Journal screen (see `ui-journal-app/spec.md` _Journal App (Player)_) is the cross-activity
   home for monitoring and advancing these runs; a direct cross-link from the Run
   Summary into the Journal is a deferred follow-up.
@@ -1012,6 +1215,7 @@ The player's route to salvage.
 - **`dcOverride` shifts the simple DC and routed RELATIVE thresholds only.**
   A relative outcome carries a DC **delta**, so its effective threshold is `baseDc + delta` and an override moves it.
   A **fixed** outcome carries an absolute, non-overlapping `[start, end]` segment of the roll range, matches on `start <= total <= end`, and never reads a DC at all — so a **routed + fixed** salvage renders its authored ranges **verbatim** and shows **no DC**.
+  "Verbatim" names the numbers, not the glyphs: the panel renders the range through the same `netRange` formatter the Journal's counting band uses (issue 2152), so a fixed tier whose end is negative separates its bounds with a spaced en dash and the true minus sign (`−2 – −1`), never a raw template interpolation (`-2–-1`), and a single-value segment states its one number (`5`, never `5–5`).
 - The action is **one-shot for every mode**: it rolls AND commits in a single gesture.
   The roll prompt IS the roll step; there is no separate confirm, no reroll, and no pre-roll dice box.
   The label names the gesture — with no usable check it is a plain salvage, with one it is a roll.
@@ -1019,6 +1223,10 @@ The player's route to salvage.
   It never renders a hardcoded formula: the formula is system-authored, and the prompt has already displayed the resolved one.
 - A **cancelled** prompt returns to the pre-roll state with zero mutation and **no notification**.
 - A **time-gated** salvage (`success` with null results) shows a **waiting** state carrying the engine's message, **not** a success state.
+- **A rolled failure shows its evidence, like a failed craft.**
+  A single (non-bulk) salvage whose check actually ran and failed renders a danger-ramp result box carrying the check's Target and Margin evidence rows, withheld for a blind or secret roll by the same shared rule the success summary and the crafting result box obey, plus any items a `perRecord` failure-award policy still produced.
+  The engine's own undifferentiated fallback message is replaced by "Nothing is recovered; the failure policy applies." when the failure awarded nothing, and shown not at all when it awarded something — the awarded list speaks for itself, mirroring the crafting result box's own failure-sentence rule; a system-authored custom check message is shown verbatim in either case.
+  A **pre-roll refusal** (not enough of the component, a missing required tool, a misconfigured salvage) never reached a check and stays **toast-only**, with no result box at all.
 - The success ribbon stays **pinned to the salvaged row** until dismissed or another item is selected — **including when its last copy was consumed and the row leaves the listing**.
   Otherwise the selection falls through to another item and the ribbon renders against the wrong component; with single-copy components this is the common case.
 - **Result-driven tab routing.** A newly-arrived salvage result actively opens or reopens the Salvage tab in one ordered effect keyed on a NEW result reference — so it survives roll-dialog remounts, a manual Info click is not yanked back, a changed item key resets to Info, and the result branch wins when both fire.
@@ -1033,6 +1241,16 @@ The player's route to salvage.
 - **Depleted-stack honesty.** After the last copy is consumed the store reconciles the held row to `totalQuantity` 0, the header reads "None remaining", the ribbon's "Salvage again" is replaced by a nothing-left note, and the pre-roll action disables on depletion or an unavailable required tool (`disabled = busy || misconfigured || waiting || depleted || !toolsAvailable`).
   The "Salvage again" inline reset is the dismissal gesture the "until dismissed" rule alludes to.
 - **Rolled-total summary.** The read-only post-roll summary appends the rolled total in mono ("with a roll of N"), omitted when `rollValue` is null for a no-check salvage.
+- **A salvage under a target or against a character value.** Only a summed roll-over check against a fixed DC shows a DC (`salvageDisplayDc`).
+  A simple or relative-routed salvage whose check rolls under a target or reads a character value states `Target {T} · stay at or under` (or `· stay under`, `· meet or beat`, `· beat`) for the salvaging character, with the check card's source fact, the component's `adjustmentOverride` standing as its tier and the library modifiers and held Tool bonus the prompt adds included; a target that cannot resolve shows the unresolved sentence instead.
+  The simple banner then reads `Roll to break this down. The total must {stay at or under|stay under|meet or beat|beat} the target to recover the materials below.`
+  A fixed-range or progressive salvage states no target.
+  Its post-roll summary states the chat card's `Target`, `Pre-rolled` and `Margin` rows (or `Needed` and `Margin` for a fixed DC read roll-high), withheld only for a blind or secret roll, and keeps the space before `with a roll of`.
+- **A counting salvage.** Its simple body reads `Salvage check · {n} successes needed · d{die}s, success on {sym} {threshold}` for the salvaging character in place of a DC, and its banner says the count must reach the successes needed.
+  Its relative-routed body states each tier's band in net successes from those successes needed, through the Journal's own band presenter and the shared `Chip` (`density="list"`, mono, `danger` for a failing tier) that `OutcomeLadder` uses, with the Journal's `Botch` row while cancelling is on (see `ui-journal-app` _Journal App_), in place of a `Reached at` threshold; a band whose ends include a negative net separates them with a spaced en dash (`−2 – −1`).
+  A successful roll whose net falls below the Botch row's floor marks that row "Your roll" in place of the least demanding tier it routed to; a failed salvage marks no row, as for any failing tier.
+  Every routed tier's figure, a fixed range, a count band or a `Reached at` threshold, renders through that same `Chip`.
+  Its post-roll summary states the die tiles and count rows the crafting result box states, withheld only for a blind or secret roll (the result box rule, which also shows a private or self roll to its roller), and a pool reduced to zero shows no tile and no roll total.
 - **Post-roll reconciliation.** The routed body marks the matched tier with a "Your roll" pill from `salvageRun.checkResult.data.outcomeId`, and the store threads `awardedComponentIds` from `salvageRun.createdResults` for per-stage recovered state; both are null/empty on a runless (no-check) salvage.
 - **Complication disclosure.**
   The panel's progressive body renders the per-stage complication strip defined in §Progressive Stage List, in its forecast tense before a roll and with the fired marks after one.

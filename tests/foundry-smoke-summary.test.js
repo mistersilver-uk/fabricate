@@ -792,9 +792,9 @@ test('explainSmokeSummaryRefusal quotes the failing steps and the un-waived cons
   assert.match(message, /^ {4}- pageerror: Cannot read properties of undefined \(reading 'INTERFACE'\)$/m);
 });
 
-// `degraded` and `rendererCrashed` both fire on runs that PASSED and exited 0 (AGENTS.md:380),
-// so neither block may describe the run as having failed — and each still needs something
-// quotable, or a plain statement that the summary recorded nothing for it.
+// `degraded` and `rendererCrashed` both fire on runs that PASSED and exited 0 (CONTRIBUTING.md's
+// smoke section), so neither block may describe the run as having failed — and each still needs
+// something quotable, or a plain statement that the summary recorded nothing for it.
 test('explainSmokeSummaryRefusal gives degraded and rendererCrashed their own evidence', () => {
   const degradedMessage = refusalFor({
     degraded: true,

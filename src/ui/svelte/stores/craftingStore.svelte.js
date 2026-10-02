@@ -49,6 +49,7 @@
  * @returns {object} The reactive crafting store.
  */
 
+import { notifyAdditionalDice } from '../../presenters/additionalDicePrompt.js';
 import { aggregateShoppingList } from '../util/shoppingListAggregator.js';
 import {
   isResolvedFailureOutcome,
@@ -711,18 +712,23 @@ export function createCraftingStore({ services } = {}) {
         // chat (Dice So Nice). Automation/macros omit this and stay silent.
         interactive: true,
       });
-      // Dismissing the roll dialog is a user choice, not a failure: a cancelled
-      // result is also `success: false`, so it MUST be handled first and returned
-      // quietly (no error notification, no listing refresh churn).
-      if (result && result.cancelled === true) {
-        return result;
-      }
-      // A versioned-run authority refusal carries `reason` and NO `message`, so
-      // notifying `result.message` alone showed the literal text "undefined".
+      const actor = resolveCraftingActorFrom(services?.getCraftingSourceActors?.() ?? []);
+      notifyAdditionalDice(result, services, actor?.name);
+      // A dismissal is a choice, not a failure: a cancelled result (also `success: false`) returns
+      // first and quietly, its only notice a refused additional-dice choice's (issue 2008).
+      if (result?.cancelled === true) return result;
+      // An authority refusal carries `reason` and NO `message`; refused dice already said why.
       if (result && result.success === false && !isResolvedFailureOutcome(result)) {
-        services?.notify?.(
-          journalRefusalMessage(result, services?.localize, services?.craftErrorMessage?.())
-        );
+        if (!result.additionalDiceRefusal) {
+          const generic = services?.craftErrorMessage?.();
+          services?.notify?.(journalRefusalMessage(result, services?.localize, generic));
+        }
+        // A check that cannot roll shows its refusal, never the last attempt's facts (issue 2005).
+        if (result.misconfigured === true || result.reason === 'roll-unavailable') {
+          lastRollResult = Object.fromEntries(
+            Object.entries(lastRollResult).filter(([id]) => id !== recipeId)
+          );
+        }
         return result;
       }
       // A resolved failure falls THROUGH to the success tail on purpose: the check ran, the

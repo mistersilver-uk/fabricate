@@ -22,11 +22,13 @@
   import { localize } from '../../../util/foundryBridge.js';
   import CheckOddsPanel from './CheckOddsPanel.svelte';
   import CheckOutcomePreview from './CheckOutcomePreview.svelte';
-  import SearchablePopover from '../../../components/SearchablePopover.svelte';
+  import PreviewAsPicker from './PreviewAsPicker.svelte';
   import Select from '../../../components/Select.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import { NO_ACTOR_ID } from './checkPreview.js';
+  import { countDigestFormula } from './countPreviewModel.js';
+  import { normalizeCheckEvaluation } from '../../../../../systems/normalize/checkEvaluation.js';
   import { previewRecordSelectOptions } from './checksSelectOptions.js';
   import {
     formatPreviewDifficulties,
@@ -105,34 +107,6 @@
         )
   );
 
-  // The "Preview as" option list. "No actor" LEADS, always, and is a real option rather than a
-  // search's empty state: it is the selection under which the readout renders its
-  // unresolved-roll-data warning, hence its own `data-popover-option` handle.
-  const noActorLabel = text('FABRICATE.Admin.Manager.Checks.PreviewAs.NoActor', 'No actor');
-  const previewActorLabel = text(
-    'FABRICATE.Admin.Manager.Checks.PreviewAs.Actor',
-    'Preview as actor'
-  );
-  const selectedPreviewActor = $derived(
-    previewActorId === NO_ACTOR_ID
-      ? null
-      : (previewActors.find((actor) => actor.id === previewActorId) ?? null)
-  );
-  const previewActorOptions = $derived([
-    {
-      id: NO_ACTOR_ID,
-      label: noActorLabel,
-      icon: 'fas fa-user-slash',
-      dataId: 'no-actor',
-    },
-    ...previewActors.map((actor) => ({
-      id: actor.id,
-      label: actor.name,
-      icon: 'fas fa-user',
-      img: actor.img || '',
-      dataId: actor.id,
-    })),
-  ]);
   const previewRecordOptions = $derived(previewRecordSelectOptions(previewRecords));
 
   const DOCS_BASE = 'https://mistersilver-uk.github.io/fabricate';
@@ -171,12 +145,17 @@
     return list.filter((outcome) => outcome?.success === true).length;
   });
 
-  const hasFormula = $derived(Boolean(activeCheck?.rollFormula));
-  const formulaFact = $derived(
-    hasFormula
-      ? `${text('FABRICATE.Admin.Manager.Checks.Digest.Formula', 'Formula')} · ${activeCheck.rollFormula}`
-      : text('FABRICATE.Admin.Manager.Checks.Digest.NoFormula', 'No roll formula yet')
+  // A count check rolls its pool, so its retained formula is inert here too.
+  const countFormula = $derived(
+    countDigestFormula(activeCheck, normalizeCheckEvaluation(activeCheck?.evaluation), text)
   );
+  const hasFormula = $derived(Boolean(countFormula || activeCheck?.rollFormula));
+  const formulaFact = $derived.by(() => {
+    if (countFormula) return countFormula;
+    return hasFormula
+      ? `${text('FABRICATE.Admin.Manager.Checks.Digest.Formula', 'Formula')} · ${activeCheck.rollFormula}`
+      : text('FABRICATE.Admin.Manager.Checks.Digest.NoFormula', 'No roll formula yet');
+  });
 
   // The odds heading's adjunct names the DOMAIN the enumerator walks, so it is DERIVED. IT IS
   // THE ENUMERATOR'S OWN NUMBER WHERE THERE IS ONE: the regex below reads the AUTHORED
@@ -186,9 +165,13 @@
   const oddsDomain = $derived.by(() => {
     if (odds) {
       if (odds.enumerable !== true) return '';
+      if (odds.product === 'count') return odds.domain;
+      // A roll-under or character-value check names its formula, as the prototype does.
+      if (odds.caption) return odds.caption;
       // TWO SENTENCES, two different facts: one die has FACES, a formula carrying a rolling
       // modifier has a joint SPACE, and calling 160 assignments "faces" names a die nothing rolls.
-      const faces = Number(odds.faces);
+      // A joint space reports `faces: null`, which is not a die with 0 faces.
+      const faces = odds.faces == null ? NaN : Number(odds.faces);
       if (Number.isFinite(faces)) {
         return text('FABRICATE.Admin.Manager.Checks.Odds.Faces', 'all {faces} faces').replace(
           '{faces}',
@@ -351,7 +334,7 @@
   <span class="manager-checks-rail-row-body">
     <span class="manager-checks-rail-row-text">{row.title}</span>
     {#if row.detail}
-      <span class="manager-checks-rail-row-detail">{row.detail}</span>
+      <span class="manager-checks-rail-row-detail" title={row.detail}>{row.detail}</span>
     {/if}
   </span>
 {/snippet}
@@ -438,10 +421,8 @@
            bestiary. Membership is `listPreviewActors`'s shared, GM-configurable player-character
            predicate, so this screen gets no narrower answer of its own.
 
-           The control is the shipped `SearchablePopover`, which searches and renders each actor's own
-           portrait, so a GM picks a face rather than reading a list.
-           `data-checks-preview-actor` stays ON THE TRIGGER via `triggerData`, because a mounted suite
-           and six View Lab cases address the control through it.
+           The control is `PreviewAsPicker`, shared with the salvage and task check overrides; its
+           default `data-checks-preview-actor` trigger hook is the one suites and cases address.
 
            "No actor" is an explicit option rather than an absence: under it every `@` key resolves to
            0 and the readout renders its unresolved warning instead of a plausible wrong total. -->
@@ -452,29 +433,9 @@
         )}
       </div>
       <InspectorCard data-checks-preview-as="">
-        <SearchablePopover
+        <PreviewAsPicker
+          actors={previewActors}
           value={previewActorId}
-          options={previewActorOptions}
-          pickerClass="manager-checks-preview-actor"
-          triggerClass="fabricate-button manager-button manager-travel-picker-trigger manager-checks-preview-actor-trigger"
-          triggerData={{ 'data-checks-preview-actor': '' }}
-          triggerIcon={selectedPreviewActor ? '' : 'fas fa-user-slash'}
-          triggerImg={selectedPreviewActor?.img || ''}
-          triggerLabel={selectedPreviewActor?.name || noActorLabel}
-          triggerAriaLabel={previewActorLabel}
-          dialogAriaLabel={previewActorLabel}
-          searchPlaceholder={text(
-            'FABRICATE.Admin.Manager.Checks.PreviewAs.ActorSearchPlaceholder',
-            'Search characters...'
-          )}
-          searchAriaLabel={text(
-            'FABRICATE.Admin.Manager.Checks.PreviewAs.ActorSearchLabel',
-            'Search characters'
-          )}
-          emptyHint={text(
-            'FABRICATE.Admin.Manager.Checks.PreviewAs.NoActorMatches',
-            'No characters match your search.'
-          )}
           onChoose={(id) => onSelectPreviewActor(id)}
         />
         {#if previewActorSummary}
@@ -544,7 +505,11 @@
           text('FABRICATE.Admin.Manager.Checks.Odds.Title', 'Chance per outcome')
         )}
         {#if oddsDomain}
-          <span class="manager-checks-rail-head-note" data-checks-odds-domain>{oddsDomain}</span>
+          <span
+            class="manager-checks-rail-head-note"
+            data-checks-odds-domain
+            data-checks-odds-expected={odds?.expected}>{oddsDomain}</span
+          >
         {/if}
       </div>
       <InspectorCard data-checks-odds="">

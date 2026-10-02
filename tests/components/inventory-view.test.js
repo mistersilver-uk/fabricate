@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 
 import {
+  CHECK_EVIDENCE_RAW_MODULES,
   MARKS_AND_NOTICES_COMPILED_MODULES,
   PLAYER_APP_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
@@ -40,11 +41,13 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-inventory-view-',
   rawModules: [
+    'src/ui/svelte/util/rollPromptOrigin.js',
     // Issue 1506: the one tone map the converted status pills read at a dynamic site.
     ...STATUS_TONE_RAW_MODULES,
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...CHECK_EVIDENCE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
     'src/ui/svelte/util/craftingArtResolution.js',
@@ -53,6 +56,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/bookRecipeBrowse.js',
     'src/ui/svelte/util/disclosurePhrase.js',
     'src/ui/svelte/util/recipeItemAccessBadge.js',
+    // The shared salvage-failure fallback literal (issue 2092), read by SalvageRollSummary.
+    'src/systems/salvageMessages.js',
     // NOTE: `progressiveStageThresholds.js` / `progressiveResultOrder.js` are NOT needed
     // here. `ProgressiveStageList.svelte` imports neither (only `foundryBridge`); the
     // real importer is `inventoryStore.svelte.js`, which this suite mocks with a POJO.
@@ -82,6 +87,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
     'src/ui/svelte/components/RowDisclosure.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageRollSummary.svelte',
+    'src/ui/svelte/apps/crafting/detail/CheckEvidenceRows.svelte',
+    'src/ui/svelte/components/DiceTiles.svelte',
+    'src/ui/svelte/apps/journal/JournalFactRow.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageSimpleBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageRoutedBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageProgressiveBody.svelte',
@@ -1350,7 +1358,9 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     const target = await openSalvage(services);
 
     assert.ok(target.querySelector('[data-inventory-salvage-body="simple-check"]'));
-    assert.equal(target.querySelector('[data-inventory-salvage-dc]').dataset.inventorySalvageDc, '14');
+    const dc = target.querySelector('[data-inventory-salvage-dc]');
+    assert.equal(dc.dataset.inventorySalvageDc, '14');
+    assert.ok(dc.matches('.salvage-body-title > .salvage-dc'), 'the short DC sits in the kicker row');
     assert.ok(target.querySelector('[data-inventory-salvage-loss-note]'), 'a roll can cost you');
     assert.match(
       target.querySelector('[data-inventory-salvage-action]').textContent,
@@ -1359,8 +1369,60 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     );
   });
 
-  // AC2, rendering half. The builder decides the numbers.
-  it('routed + fixed renders authored ranges and NO DC; routed + relative renders thresholds', async () => {
+  it('a roll-under salvage states its target, source and rule in place of the DC (issue 2005, R4)', async () => {
+    const rule = 'Roll to break this down. The total must stay at or under the target to recover the materials below.';
+    const target = {
+      rule,
+      direction: 'under',
+      text: 'Target 10 · stay at or under',
+      source: 'Akra @skills.craft.value 12 · difficulty −2',
+    };
+    const { services } = salvageServices(salvageItem({ checkUsable: true, dc: null, target }));
+    const root = await openSalvage(services);
+    const line = root.querySelector('[data-inventory-salvage-target="under"]');
+    assert.equal(line.textContent.trim(), 'Target 10 · stay at or under');
+    assert.equal(
+      root.querySelector('[data-inventory-salvage-target-source]').textContent.trim(),
+      'Akra @skills.craft.value 12 · difficulty −2'
+    );
+    assert.ok(!root.querySelector('[data-inventory-salvage-dc]'), 'no DC beside a target');
+    assert.match(root.querySelector('[data-inventory-salvage-banner]').textContent, /stay at or under the target/);
+    assert.doesNotMatch(root.querySelector('[data-inventory-salvage-banner]').textContent, /Meet the DC/);
+  });
+
+  it('a count salvage states its successes-needed rule and line in place of the DC (issue 2006)', async () => {
+    // The target `salvageCheckTarget` builds for a count check (tests/salvage-check-need.test.js).
+    const rule = 'Roll to break this down. The count must reach the successes needed to recover the materials below.';
+    const target = { rule, direction: 'over', text: 'Salvage check · 2 successes needed · d10s, success on ≥ 7' };
+    const { services } = salvageServices(salvageItem({ checkUsable: true, dc: null, target }));
+    const root = await openSalvage(services);
+    const line = root.querySelector('[data-inventory-salvage-target="over"]');
+    assert.equal(line.textContent.trim(), target.text);
+    assert.ok(line.matches('p.salvage-target-source'), 'the count line sits on its own line');
+    assert.ok(!line.closest('.salvage-body-title'), 'never in the kicker row built for "DC 15"');
+    assert.ok(!root.querySelector('[data-inventory-salvage-dc]'), 'no DC beside the successes needed');
+    const banner = root.querySelector('[data-inventory-salvage-banner]').textContent;
+    assert.match(banner, /The count must reach the successes needed/);
+    assert.doesNotMatch(banner, /Meet the DC/);
+  });
+
+  it('a relative routed roll-under salvage states its base target in place of the DC', async () => {
+    const target = { rule: 'unused', direction: 'under', text: 'Target 50 · stay at or under', source: '' };
+    const { services } = salvageServices(
+      salvageItem({ mode: 'routed', checkUsable: true, routedType: 'relative', dc: null, target })
+    );
+    const root = await openSalvage(services);
+    assert.equal(
+      root.querySelector('[data-inventory-salvage-body="routed"] [data-inventory-salvage-target="under"]')
+        .textContent.trim(),
+      'Target 50 · stay at or under'
+    );
+    assert.ok(!root.querySelector('[data-inventory-salvage-dc]'));
+    assert.doesNotMatch(root.querySelector('[data-inventory-salvage-banner]').textContent, /unused/);
+  });
+
+  // AC2, rendering half: the builder decides the numbers, the panel renders `outcome.band`.
+  it('routed + fixed renders the presenter\'s band and NO DC; routed + relative renders thresholds', async () => {
     const fixed = salvageServices(
       salvageItem({
         mode: 'routed',
@@ -1368,7 +1430,16 @@ describe('InventoryView (mounted) — player salvage surface', () => {
         routedType: 'fixed',
         dc: null,
         routedOutcomes: [
-          { id: 'o1', name: 'Fail', success: false, threshold: null, start: 1, end: 9, results: [] },
+          {
+            id: 'o1',
+            name: 'Fail',
+            success: false,
+            threshold: null,
+            start: 1,
+            end: 9,
+            band: '1–9',
+            results: [],
+          },
           {
             id: 'o2',
             name: 'Pass',
@@ -1376,7 +1447,19 @@ describe('InventoryView (mounted) — player salvage surface', () => {
             threshold: null,
             start: 10,
             end: 20,
+            band: '10–20',
             results: [{ id: 'r1', componentId: 'c2', name: 'Iron Shard', img: null, quantity: 1 }],
+          },
+          // A negative-ended tier reads with the true minus, never `-2–-1` (issue 2152).
+          {
+            id: 'o3',
+            name: 'Fumble',
+            success: false,
+            threshold: null,
+            start: -2,
+            end: -1,
+            band: '−2 – −1',
+            results: [],
           },
         ],
       })
@@ -1387,11 +1470,13 @@ describe('InventoryView (mounted) — player salvage surface', () => {
       'fixed'
     );
     assert.equal(target.querySelector('[data-inventory-salvage-dc]'), null, 'a fixed check has no DC');
-    assert.equal(
-      target.querySelector('[data-inventory-outcome-range]').dataset.inventoryOutcomeRange,
-      '1-9'
+    const bands = [...target.querySelectorAll('[data-inventory-outcome-band]')];
+    assert.deepEqual(
+      bands.map((node) => node.dataset.inventoryOutcomeBand),
+      ['1–9', '10–20', '−2 – −1']
     );
     assert.equal(target.querySelector('[data-inventory-outcome-threshold]'), null);
+    assert.equal(target.querySelector('[data-inventory-outcome-range]'), null, 'no raw start–end attribute');
 
     harness.remount();
     const relative = salvageServices(
@@ -1411,7 +1496,33 @@ describe('InventoryView (mounted) — player salvage surface', () => {
       target.querySelector('[data-inventory-outcome-threshold]').dataset.inventoryOutcomeThreshold,
       '15'
     );
-    assert.equal(target.querySelector('[data-inventory-outcome-range]'), null);
+    assert.equal(target.querySelector('[data-inventory-outcome-band]'), null, 'no band for a relative threshold tier');
+  });
+
+  // Issue 2137: a counting check's tier states its net-success band, as the Journal does.
+  it("routed + relative under a counting check renders each tier's band in net successes", async () => {
+    const tier = (id, band) => ({ id, name: id, success: true, threshold: null, band, results: [] });
+    const { services } = salvageServices(
+      salvageItem({
+        mode: 'routed',
+        checkUsable: true,
+        routedType: 'relative',
+        dc: null,
+        routedOutcomes: [tier('crit', '7+'), tier('pass', '2–6'), tier('count-botch', '<0')],
+      })
+    );
+    const target = await openSalvage(services);
+    const bands = [...target.querySelectorAll('[data-inventory-outcome-band]')];
+    assert.deepEqual(
+      bands.map((node) => [node.dataset.inventoryOutcomeBand, node.textContent.trim()]),
+      [['7+', '7+'], ['2–6', '2–6'], ['<0', '<0']]
+    );
+    assert.ok(
+      bands.every((node) => node.querySelector('.manager-chip.is-neutral')),
+      'each band is the shared Chip, as the Journal ladder draws it'
+    );
+    assert.ok(!target.querySelector('[data-inventory-outcome-threshold]'), 'no Reached-at threshold');
+    assert.ok(!target.querySelector('[data-inventory-salvage-dc]'), 'a count names no DC');
   });
 
   // AC2. A routed/progressive salvage with no formula aborts in the engine with a
@@ -2163,6 +2274,39 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     assert.equal(marked.length, 1, 'exactly one tier is marked');
     assert.equal(marked[0].dataset.inventorySalvageOutcome, 'o2', 'and it is the one that matched');
     assert.ok(marked[0].querySelector('[data-inventory-outcome-your-roll]'));
+  });
+
+  // Issue 2137: a successful count whose net is below the Botch row's floor marks that row, in
+  // place of the least demanding tier it routed to; a failed salvage marks no row at all.
+  it('routed count: a net below the Botch floor marks the Botch row "Your roll"', async () => {
+    const ruined = { id: 'o1', name: 'Ruined', success: true, threshold: null, band: '−4 – 0', results: [] };
+    const routed = {
+      mode: 'routed',
+      checkUsable: true,
+      routedType: 'relative',
+      dc: null,
+      routedOutcomes: [
+        { id: 'o2', name: 'Pass', success: true, threshold: null, band: '1+', results: [] },
+        ruined,
+        { ...ruined, id: 'count-botch', name: 'Botch', band: '<−4', below: -4 },
+      ],
+    };
+    const marked = async (salvageResult) => {
+      harness.remount();
+      const { services } = salvageServices(salvageItem(routed), { salvageResult });
+      const target = await openSalvage(services);
+      return [...target.querySelectorAll('[data-outcome-rolled="true"]')].map(
+        (node) => node.dataset.inventorySalvageOutcome
+      );
+    };
+    const success = (rollValue) => ({ systemId: 'sys', componentId: 'c1', state: 'success',
+      message: '', awarded: [], awardedComponentIds: [], outcomeId: 'o1', rollValue });
+    assert.deepEqual(await marked(success(-5)), ['count-botch'], 'below the floor');
+    assert.deepEqual(await marked(success(-4)), ['o1'], 'a net Ruined meets stays on Ruined');
+    // As the store's `failureSnapshot` builds it: no roll value and no outcome id.
+    const failure = { systemId: 'sys', componentId: 'c1', state: 'failure', message: 'Salvage check failed',
+      check: null, awarded: [] };
+    assert.deepEqual(await marked(failure), [], 'a failed salvage marks no row');
   });
 });
 
@@ -2966,6 +3110,30 @@ describe('InventoryView (mounted) — bulk salvage and destroy (issue 859)', () 
     assert.deepEqual(calls.bulkClear, [true]);
   });
 
+  it('records the window the bulk Salvage came from as its roll prompt origin (issue 2053)', async () => {
+    const { activeRollPromptOrigin } = await harness.loadRawModule(
+      'src/ui/svelte/util/rollPromptOrigin.js'
+    );
+    const { services, store } = makeServices(makeItem(), {
+      selectedKeys: ['sys:c1'],
+      entries: [bulkEntry()],
+      salvageable: [bulkEntry()],
+      counts: { selected: 1, salvageable: 1, blocked: 0, atMax: false },
+    });
+    let origin = 'unread';
+    store.bulkSalvage = async () => {
+      origin = activeRollPromptOrigin();
+    };
+    const target = await harness.mount({ services });
+    await settle();
+
+    target.querySelector('[data-inventory-bulk-salvage]').click();
+    await settle();
+
+    assert.ok(origin === target, 'the panel forwards the click and the view records its window');
+    assert.ok(activeRollPromptOrigin() === null, 'the origin is released once the salvage settles');
+  });
+
   it('names BOTH the row count and the unit count on the destroy prompt', async () => {
     // The trigger and the dialog both name them.
     const { services, calls } = makeServices(makeItem(), {
@@ -3007,6 +3175,30 @@ describe('InventoryView (mounted) — bulk salvage and destroy (issue 859)', () 
     await settle();
 
     assert.deepEqual(calls.bulkClear, [true]);
+  });
+
+  it('leaves Escape inside a modal on top, such as the bulk roll prompt, to that modal', async () => {
+    const { services, calls } = makeServices(makeItem(), {
+      selectedKeys: ['sys:c1'],
+      entries: [bulkEntry()],
+      salvageable: [bulkEntry()],
+      counts: { selected: 1, salvageable: 1, blocked: 0, atMax: false },
+    });
+    const target = await harness.mount({ services });
+    await settle();
+    const modal = document.createElement('div');
+    modal.setAttribute('aria-modal', 'true');
+    const field = document.createElement('input');
+    modal.append(field);
+    target.append(modal);
+    let reachedModal = false;
+    modal.addEventListener('keydown', () => (reachedModal = true));
+
+    fire(field, 'keydown', { key: 'Escape' });
+    await settle();
+
+    assert.deepEqual(calls.bulkClear, [], 'the selection underneath is kept');
+    assert.equal(reachedModal, true, 'the key reaches the modal');
   });
 
   it('does NOT arm Escape when the selection is empty', async () => {

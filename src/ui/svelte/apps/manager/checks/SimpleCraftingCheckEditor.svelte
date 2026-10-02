@@ -8,7 +8,9 @@
 
   `showDcSource` (default true) renders the DC-SOURCE half. Salvage and gathering reuse this
   editor with it off, having no records to pick a tier from and no dynamic-DC macro, and take a
-  per-entity DC override elsewhere. Controlled through `onChange`.
+  per-entity DC override elsewhere. Controlled through `onChange`. Outside summed roll-over against
+  a fixed DC (issue 2005, ruling R2) the two-band strip is a read-only picture of the target, and a
+  counting check's (issue 2006) is drawn in net successes.
 -->
 <script>
   import Field from '../../../components/Field.svelte';
@@ -23,6 +25,26 @@
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import Select from '../../../components/Select.svelte';
   import { previewRecordSelectOptions } from './checksSelectOptions.js';
+  import {
+    normalizeCheckEvaluation,
+    normalizeNullableSuccesses,
+  } from '../../../../../systems/normalize/checkEvaluation.js';
+  import { countRequired } from '../../../../../systems/countCheck.js';
+  import { activeCheckEvaluation } from '../../../../../systems/checkTarget.js';
+  import { checkTargetChip, countOutcomeCopy, formulaCardLead } from './checksCopy.js';
+  import { previewTierAdjustment } from './checkAdjustmentLabel.js';
+  import {
+    bandsAreEditable,
+    buildCountBands,
+    buildPassFailBands,
+    countBandScale,
+    countPoolSettlesToZero,
+    describeBandRange,
+    describeCountBandRange,
+    describeBandsUnavailable,
+    previewBandTarget,
+    previewScaleSentence,
+  } from './checkBandModel.js';
 
   // `breakageAuthority` gates the per-trigger break-tools toggle on `checkDriven`, and
   // `section` selects which cards render, so one editor serves the five-section strip.
@@ -46,6 +68,12 @@
     previewLabel = '',
     trackMin = null,
     trackMax = null,
+    // The Preview-as actor, `{ name, rollData }`, that a character-value target resolves against.
+    previewCharacter = null,
+    // The previewed actor's flat check-modifier total; a roll-under strip adds it to the target.
+    previewModifierTotal = 0,
+    // The preview's `{ placement, odds }` a counting Formula card composes from (issue 2006).
+    countPreview = null,
     onSelectPreviewRecord = () => {},
     onChange = () => {},
   } = $props();
@@ -71,6 +99,51 @@
   }
 
   const dc = $derived(Number(value?.dc ?? 0) || 0);
+  // `evaluation` is the authored record the controls write back; `graded` is the one the runtime
+  // grades with, which gates the strip and its direction.
+  const evaluation = $derived(normalizeCheckEvaluation(value?.evaluation));
+  const graded = $derived(activeCheckEvaluation(value));
+  const editableBands = $derived(bandsAreEditable(value?.evaluation));
+  const counts = $derived(graded.product === 'count');
+  const comparison = $derived(value?.thresholdMode === 'exceed' ? 'exceed' : 'meet');
+  const targetChip = $derived(checkTargetChip(evaluation, dc, text));
+
+  // The read-only picture (issue 2005): the previewed record's target, graded by the runtime.
+  const previewedTier = $derived(
+    (Array.isArray(value?.tiers) ? value.tiers : []).find((tier) => tier.id === previewRecordId) ??
+      null
+  );
+  const readonlyTarget = $derived(
+    editableBands || counts
+      ? null
+      : previewBandTarget(
+          {
+            evaluation: graded,
+            anchor: previewedTier ? Number(previewedTier.dc) : dc,
+            tier: previewedTier,
+            character: previewCharacter,
+            modifiers: previewModifierTotal,
+          },
+          text
+        )
+  );
+  // A count grades the previewed record's successes needed, its own when the tier sets none.
+  const countTarget = $derived(
+    counts ? countRequired(graded, normalizeNullableSuccesses(previewedTier?.successes)) : null
+  );
+  const countScale = $derived.by(() => {
+    if (!counts) return '';
+    const pool = { evaluation: graded, thresholdMode: comparison, character: previewCharacter };
+    const zeroPool = countPoolSettlesToZero({ ...pool, placement: countPreview?.placement });
+    const cancels = graded.pool.cancel.enabled;
+    return countBandScale({ required: countTarget, zeroPool, cancels }, text);
+  });
+  // The two outcomes read in the successes needed, in the prototype's words.
+  const countOutcomes = $derived(counts ? countOutcomeCopy(countTarget, recordNoun, text) : null);
+  const readonlyScale = $derived(
+    countScale ||
+      previewScaleSentence(readonlyTarget, { direction: graded.direction, comparison }, text)
+  );
 
   const failureLabel = $derived(
     text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeFailure', 'Failure')
@@ -93,23 +166,46 @@
   const stripMin = $derived(Math.min(suppliedBound(trackMin) ?? dc - 10, dc - 1));
   const stripMax = $derived(Math.max(suppliedBound(trackMax) ?? dc + 10, dc + 1));
 
+  const BAND_COLORS = {
+    failure: 'color-mix(in srgb, var(--fab-danger) 22%, var(--fab-bg-0))',
+    success: 'color-mix(in srgb, var(--fab-success) 22%, var(--fab-bg-0))',
+  };
+  const countBands = $derived.by(() => {
+    if (!counts) return [];
+    const botch = text('FABRICATE.Admin.Manager.Checks.Odds.Botch', 'Botch');
+    const names = { success: successLabel, failure: failureLabel, botch };
+    return buildCountBands({ evaluation: graded, required: countTarget, names }).map((band) => ({
+      ...band,
+      range: describeCountBandRange(band, text),
+      color: band.success ? BAND_COLORS.success : BAND_COLORS.failure,
+    }));
+  });
+  const readonlyBands = $derived(
+    readonlyTarget?.state === 'ok'
+      ? buildPassFailBands({
+          evaluation: graded,
+          comparison,
+          target: readonlyTarget.target,
+          min: suppliedBound(trackMin),
+          max: suppliedBound(trackMax),
+          names: { success: successLabel, failure: failureLabel },
+        }).map((band) => ({
+          ...band,
+          range: describeBandRange(band, text),
+          color: band.success ? BAND_COLORS.success : BAND_COLORS.failure,
+        }))
+      : []
+  );
+
   // TWO bands and therefore ONE handle, the whole outcome model of a simple check.
-  const bandStripBands = $derived([
-    {
-      id: 'failure',
-      index: 0,
-      name: failureLabel,
-      from: stripMin,
-      color: 'color-mix(in srgb, var(--fab-danger) 22%, var(--fab-bg-0))',
-    },
-    {
-      id: 'success',
-      index: 1,
-      name: successLabel,
-      from: dc,
-      color: 'color-mix(in srgb, var(--fab-success) 22%, var(--fab-bg-0))',
-    },
+  const editableBandsList = $derived([
+    { id: 'failure', index: 0, name: failureLabel, from: stripMin, color: BAND_COLORS.failure },
+    { id: 'success', index: 1, name: successLabel, from: dc, color: BAND_COLORS.success },
   ]);
+  const bandStripBands = $derived.by(() => {
+    if (editableBands) return editableBandsList;
+    return counts ? countBands : readonlyBands;
+  });
 
   /**
    * Apply the single boundary move. The strip has already clamped the value inside the track,
@@ -132,9 +228,11 @@
             {text('FABRICATE.Admin.Manager.Checks.Crafting.FormulaTitle', 'Formula')}
           </h3>
           <p class="manager-checks-card-description">
-            {text(
+            {formulaCardLead(
+              evaluation,
+              text,
               'FABRICATE.Admin.Manager.Checks.Crafting.FormulaLead',
-              'Rolled once per attempt.'
+              'Rolled once per attempt. Modifiers from the Modifiers tab are applied by the check; they never appear in the formula.'
             )}
           </p>
         </div>
@@ -146,6 +244,14 @@
           {modifierPolicy}
           {recordNoun}
           {foundrySystemId}
+          {evaluation}
+          thresholdMode={comparison}
+          {targetChip}
+          underTier={previewTierAdjustment(evaluation, previewedTier)}
+          offerSituationalBonus={value?.offerSituationalBonus !== false}
+          advantage={value?.advantage ?? null}
+          character={previewCharacter}
+          {countPreview}
           onChange={emit}
         />
       </div>
@@ -159,6 +265,9 @@
       dcMode={value?.dcMode || 'static'}
       {showDcSource}
       {recordNoun}
+      {evaluation}
+      character={previewCharacter}
+      countTiers={showDcSource ? (value?.tiers ?? []) : []}
       onChange={emit}
     />
   {/if}
@@ -173,12 +282,16 @@
           <h3 class="manager-checks-card-title">
             {text('FABRICATE.Admin.Manager.Checks.Crafting.TwoOutcomesTitle', 'Two outcomes')}
           </h3>
-          <p class="manager-checks-card-description">
-            {text(
-              'FABRICATE.Admin.Manager.Checks.Crafting.TwoOutcomesLead',
-              'A simple check either clears the difficulty or it does not.'
-            )}
-          </p>
+          {#if readonlyScale}
+            <p class="manager-checks-card-description" data-simple-band-scale>{readonlyScale}</p>
+          {:else}
+            <p class="manager-checks-card-description">
+              {text(
+                'FABRICATE.Admin.Manager.Checks.Crafting.TwoOutcomesLead',
+                'A simple check either clears the difficulty or it does not.'
+              )}
+            </p>
+          {/if}
         </div>
       </div>
       <div class="manager-checks-card-body">
@@ -204,30 +317,40 @@
         {/if}
 
         <ThresholdBandStrip
+          readonly={!editableBands}
           binding="simple"
           bands={bandStripBands}
+          leadingTick={bandStripBands[0]?.botch ? '<0' : ''}
           {previewLabel}
-          min={stripMin}
-          max={stripMax}
+          min={editableBands ? stripMin : null}
+          max={editableBands ? stripMax : null}
           groupLabel={text(
             'FABRICATE.Admin.Manager.Checks.Crafting.TwoOutcomesTitle',
             'Two outcomes'
           )}
           boundaryLabel={() =>
             text('FABRICATE.Admin.Manager.Checks.Crafting.SimpleBoundary', 'Difficulty class')}
-          fallbackNote={text(
-            'FABRICATE.Admin.Manager.Checks.Crafting.SimpleBandsFallback',
-            'This check has no reachable range to draw against yet. Set a roll formula and a DC.'
-          )}
+          fallbackNote={readonlyTarget && readonlyTarget.state !== 'ok'
+            ? describeBandsUnavailable(
+                readonlyTarget,
+                { character: previewCharacter, expression: graded.target.expression },
+                text
+              )
+            : text(
+                'FABRICATE.Admin.Manager.Checks.Crafting.SimpleBandsFallback',
+                'This check has no reachable range to draw against yet. Set a roll formula and a DC.'
+              )}
           dataAttr="data-simple-band-strip"
           onChange={applyBandStripChange}
         />
-        <p class="manager-muted" data-simple-band-strip-hint>
-          {text(
-            'FABRICATE.Admin.Manager.Checks.Crafting.SimpleBandsHint',
-            'A total of {dc} or more succeeds; anything lower fails. Drag the edge or type the DC on the Difficulty card — the number is the authority.'
-          ).replace('{dc}', String(dc))}
-        </p>
+        {#if editableBands}
+          <p class="manager-muted" data-simple-band-strip-hint>
+            {text(
+              'FABRICATE.Admin.Manager.Checks.Crafting.SimpleBandsHint',
+              'A total of {dc} or more succeeds; anything lower fails. Drag the edge or type the DC on the Difficulty card — the number is the authority.'
+            ).replace('{dc}', String(dc))}
+          </p>
+        {/if}
 
         <div class="manager-checks-flag-list">
           <IconFactRow
@@ -235,20 +358,22 @@
             dataAttr="data-simple-outcome"
             dataValue="success"
             title={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccess', 'Success')}
-            subtitle={text(
-              'FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccessDesc',
-              'The roll reaches the DC, and the recipe’s result group is produced in full.'
-            )}
+            subtitle={countOutcomes?.success ??
+              text(
+                'FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccessDesc',
+                'The roll reaches the DC, and the recipe’s result group is produced in full.'
+              )}
           />
           <IconFactRow
             icon="fas fa-circle-xmark"
             dataAttr="data-simple-outcome"
             dataValue="failure"
             title={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeFailure', 'Failure')}
-            subtitle={text(
-              'FABRICATE.Admin.Manager.Checks.Crafting.OutcomeFailureDesc',
-              'The roll misses the DC; nothing is produced, and the failure policy decides the cost.'
-            )}
+            subtitle={countOutcomes?.failure ??
+              text(
+                'FABRICATE.Admin.Manager.Checks.Crafting.OutcomeFailureDesc',
+                'The roll misses the DC; nothing is produced, and the failure policy decides the cost.'
+              )}
           />
         </div>
       </div>
@@ -261,6 +386,7 @@
       rollFormula={value?.rollFormula || ''}
       kind="simple"
       showBreakTools={checkDriven}
+      {evaluation}
       onChange={(checkBreakage) => emit({ checkBreakage })}
     />
   {/if}
@@ -273,11 +399,12 @@
       <CheckRecipeTiers
         tiers={value?.tiers || []}
         defaultDc={value?.dc ?? 0}
+        {evaluation}
         onChange={(tiers) => emit({ tiers })}
       />
     </InspectorCard>
     {#if dcMode === 'dynamic'}
-      <CheckDcMacroCard macroUuid={value?.macroUuid ?? null} onChange={emit} />
+      <CheckDcMacroCard macroUuid={value?.macroUuid ?? null} {evaluation} onChange={emit} />
     {/if}
   {/if}
 </div>

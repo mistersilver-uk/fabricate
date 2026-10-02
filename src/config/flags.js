@@ -1,20 +1,9 @@
 export const FABRICATE_FLAG_NAMESPACE = 'fabricate';
 
 /**
- * The durable-flag key the per-actor learned-recipe map is persisted under
- * (`flags.fabricate.fabricate.learnedRecipes`).
- *
- * Published as a constant because the map now has more than one writer: the two book
- * learn paths and the craft-time auto-learn write it through
- * `RecipeVisibilityService._getLearnedMap`/`_setLearnedMap`, and the companion contract's
- * GM knowledge grant writes it through injected flag seams that never reach into the
- * service's private members (see issue 1289's D3). A string literal repeated at each of
- * those sites is a persisted shape spelled four times: a typo at any one of them writes a
- * SECOND flag that reads back empty forever, with nothing failing. There is exactly one
- * spelling here instead.
- *
- * The value is load-bearing and may not be renamed: it names data already persisted in
- * every world.
+ * `flags.fabricate.fabricate.learnedRecipes`, spelled once for its several writers (issue 1289),
+ * since a typo at one writes a second flag that reads back empty forever. Never rename it: it
+ * names data persisted in every world.
  */
 export const LEARNED_RECIPES_FLAG_KEY = 'learnedRecipes';
 
@@ -24,18 +13,13 @@ export const LEARNED_RECIPES_FLAG_KEY = 'learnedRecipes';
  */
 export const FABRICATE_FLAG_KEY_SEGMENT_PATTERN = /^[A-Za-z0-9_-]+$/;
 
-/**
- * Whether a value is safe to interpolate as a single dotted-flag-path segment (see {@link
- * FABRICATE_FLAG_KEY_SEGMENT_PATTERN}).
- */
 export function isSafeFlagKeySegment(segment) {
   return typeof segment === 'string' && FABRICATE_FLAG_KEY_SEGMENT_PATTERN.test(segment);
 }
 
 /**
- * Stamp a durable per-system ROLE identity on a plain item-data payload's flags, BEFORE creation,
- * so the inventory/tool matchers attribute the created item to its OWN definition regardless of
- * naming collisions or Foundry's transitive `_stats.duplicateSource` chain.
+ * Before creation, so the matchers attribute the item to its own definition despite name
+ * collisions or Foundry's transitive `_stats.duplicateSource` chain.
  */
 export function stampItemDataRoleIdentity(itemData, systemId, roleKey, id) {
   if (!itemData || !id || !roleKey || !isSafeFlagKeySegment(systemId)) return;
@@ -91,10 +75,15 @@ function forcedDeletionOperator() {
   return typeof operator === 'function' ? operator : null;
 }
 
-function isDeletableKey(key) {
+function forcedReplacementOperator() {
+  const operator = globalThis.foundry?.data?.operators?.ForcedReplacement;
+  return typeof operator === 'function' && typeof operator.create === 'function' ? operator : null;
+}
+
+function isDeletableKey(key, form = 'deletion') {
   if (PROTOTYPE_SEGMENTS.has(key)) return false;
   if (!isSafeFlagKeySegment(key)) {
-    throw new TypeError(`Fabricate | a forced deletion needs a single flag-key segment: ${key}`);
+    throw new TypeError(`Fabricate | a forced ${form} needs a single flag-key segment: ${key}`);
   }
   return true;
 }
@@ -111,6 +100,19 @@ export function forcedDeletionEntry(parentPath, key) {
 }
 
 /**
+ * The `[path, value]` entry that assigns `value` to `key` wholesale, dropping any inner key it
+ * omits instead of merging: V13 spells it `<parent>.==<key>: value`, V14
+ * `<parent>.<key>: ForcedReplacement.create(value)`, detected on every call. Keys are refused
+ * exactly as {@link forcedDeletionEntry} refuses them.
+ */
+export function forcedReplacementEntry(parentPath, key, value) {
+  if (!isDeletableKey(key, 'replacement')) return null;
+  const Operator = forcedReplacementOperator();
+  if (Operator) return [`${parentPath}.${key}`, Operator.create(value)];
+  return [`${parentPath}.==${key}`, value];
+}
+
+/**
  * Mark `key` deleted inside a `setFlag`/`update` value tree, in the form
  * {@link forcedDeletionEntry} detects. Mark after any `structuredClone`, which destroys an
  * operator. Returns `node`, or `null` (unmarked) for a prototype segment.
@@ -121,4 +123,32 @@ export function markForcedDeletion(node, key) {
   if (Operator) node[key] = new Operator();
   else node[`-=${key}`] = null;
   return node;
+}
+
+/**
+ * The single-slot companion effect marker, `flags.fabricate.companionEffect` (issue 1954): the
+ * effect identity a companion reward write carries in the same update as its value.
+ */
+export const COMPANION_EFFECT_MARKER_PARENT = `flags.${FABRICATE_FLAG_NAMESPACE}`;
+export const COMPANION_EFFECT_MARKER_KEY = 'companionEffect';
+
+/** The update fields that replace the companion effect marker slot wholesale. */
+export function companionEffectMarkerUpdate(marker) {
+  const entry = forcedReplacementEntry(
+    COMPANION_EFFECT_MARKER_PARENT,
+    COMPANION_EFFECT_MARKER_KEY,
+    marker
+  );
+  return Object.fromEntries([entry]);
+}
+
+/** Whether a document's `_source` carries exactly `marker` in the companion effect slot. */
+export function sourceCarriesCompanionEffectMarker(document, marker) {
+  const slot = document?._source?.flags?.[FABRICATE_FLAG_NAMESPACE];
+  const stored = slot && typeof slot === 'object' ? slot[COMPANION_EFFECT_MARKER_KEY] : null;
+  if (!marker || !stored || typeof stored !== 'object') return false;
+  const keys = Object.keys(marker);
+  return (
+    keys.length === Object.keys(stored).length && keys.every((key) => stored[key] === marker[key])
+  );
 }

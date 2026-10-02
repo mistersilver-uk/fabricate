@@ -210,10 +210,10 @@ test('a rejecting version bump defers the pass rather than escaping run()', asyn
 const SEALED_BOUNDARY = '1.17.0';
 const CURRENT_MIGRATIONS = MIGRATIONS.slice(SEALED_MIGRATIONS.length);
 
-test('the registry holds 44 entries with unique versions and labels, strictly ascending', () => {
-  assert.equal(MIGRATIONS.length, 44);
-  assert.equal(new Set(MIGRATIONS.map((m) => m.version)).size, 44, 'unique versions');
-  assert.equal(new Set(MIGRATIONS.map((m) => m.label)).size, 44, 'unique labels');
+test('the registry holds 45 entries with unique versions and labels, strictly ascending', () => {
+  assert.equal(MIGRATIONS.length, 45);
+  assert.equal(new Set(MIGRATIONS.map((m) => m.version)).size, 45, 'unique versions');
+  assert.equal(new Set(MIGRATIONS.map((m) => m.label)).size, 45, 'unique labels');
   for (const [index, migration] of MIGRATIONS.entries()) {
     assert.equal(typeof migration.migrate, 'function', `${migration.version} is runnable`);
     if (index === 0) continue;
@@ -223,12 +223,12 @@ test('the registry holds 44 entries with unique versions and labels, strictly as
       `${migration.version} follows ${MIGRATIONS[index - 1].version}`
     );
   }
-  assert.equal(getHighestRegisteredMigrationVersion(), '1.34.0');
+  assert.equal(getHighestRegisteredMigrationVersion(), '1.35.0');
 });
 
 test('the sealed half is the head of the registry, entry by entry and by identity', () => {
   assert.equal(SEALED_MIGRATIONS.length, 27);
-  assert.equal(CURRENT_MIGRATIONS.length, 17);
+  assert.equal(CURRENT_MIGRATIONS.length, 18);
   for (const [index, migration] of SEALED_MIGRATIONS.entries()) {
     // Identity, not deep equality: a re-literalled or cloned entry is a second copy to maintain.
     assert.equal(MIGRATIONS[index], migration, `sealed entry ${index} is the registry's own`);

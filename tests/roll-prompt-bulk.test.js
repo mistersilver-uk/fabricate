@@ -1,313 +1,330 @@
-/** `promptBulkCheckRoll` — the ONE dialog a whole batch answers (issue 859). */
-
-import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-
-import { promptBulkCheckRoll } from '../src/ui/svelte/apps/crafting/rollPrompt.js';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { describe, it } from 'node:test';
 import {
-  stubDialogCapture,
-  stubDialogDismissal,
-  stubI18n,
-} from './helpers/rollPromptDialogStub.js';
+  actionDeltas,
+  additionalDiceCopy,
+  bulkAdditionalDiceNoticeText,
+  describeAdditionalDice,
+} from '../src/ui/presenters/additionalDicePrompt.js';
+import {
+  buildBulkPromptData,
+  promptActions,
+  promptBulkCheckRoll,
+} from '../src/ui/svelte/apps/crafting/rollPrompt.js';
+import { stubPromptSurface } from './helpers/rollPromptDialogStub.js';
 
-/** The fields a real submitted form carries. */
-const FORM = { situationalBonus: { value: '' }, rollMode: { value: 'publicroll' } };
+const subjects = [
+  { name: 'Ore', need: { kind: 'dc', dc: 17 } },
+  { name: 'Scrap', need: { kind: 'noCheck' } },
+  { name: 'Map', need: { kind: 'noSingleTarget' } },
+];
 
-/** Eight subjects is the strip limit; nine is the first that overflows. */
-const subjects = (count) =>
-  Array.from({ length: count }, (unused, index) => ({
-    name: `Component ${index + 1}`,
-    img: `icons/c${index + 1}.webp`,
-  }));
-
-/** Open the prompt against a captured dialog and hand back both halves. */
-async function open(args, formElements = FORM, options = {}) {
-  const captured = stubDialogCapture(formElements, options);
+async function open(args, answer) {
+  const surface = stubPromptSurface(() => answer);
   try {
-    const choice = await promptBulkCheckRoll(args);
-    return { captured, choice };
+    const result = await promptBulkCheckRoll(args);
+    return { view: surface.view, result };
   } finally {
-    captured.restore();
+    surface.restore();
   }
 }
 
-describe('promptBulkCheckRoll: the headless and dismissal paths', () => {
-  it('confirms without blocking when no DialogV2 exists at all', async () => {
-    // Headless (tests, and any harness with no dialog API). It must not stall a run, and it threads
-    // the SAME shape a confirmed click produces so the caller's downstream code has one path.
-    const original = globalThis.foundry;
-    if (original !== undefined) delete globalThis.foundry;
-    try {
-      const choice = await promptBulkCheckRoll({ allowAdvantage: true, subjects: subjects(3) });
-      assert.deepEqual(choice, {
-        confirmed: true,
-        bonus: null,
-        rollMode: undefined,
-        advantage: 'normal',
-      });
-    } finally {
-      if (original !== undefined) globalThis.foundry = original;
-    }
-  });
-
-  it('returns { confirmed: false } when the dialog resolves null', async () => {
-    // `DialogV2.wait` with the default `rejectClose = false` resolves `result ?? null` on BOTH
-    // Escape and the window X — neither REJECTS, so a `.catch()` alone cannot see a dismissal.
-    const stub = stubDialogDismissal(null);
-    try {
-      assert.deepEqual(await promptBulkCheckRoll({ subjects: subjects(2) }), { confirmed: false });
-    } finally {
-      stub.restore();
-    }
-  });
-
-  it('returns { confirmed: false } for any result that is not a confirmation', async () => {
-    for (const resolved of [undefined, false, {}, { confirmed: false }, { confirmed: 'yes' }]) {
-      const stub = stubDialogDismissal(resolved);
-      try {
-        assert.deepEqual(
-          await promptBulkCheckRoll({ subjects: subjects(1) }),
-          { confirmed: false },
-          JSON.stringify(resolved)
-        );
-      } finally {
-        stub.restore();
-      }
-    }
-  });
-
-  it('tolerates a rejecting wait rather than escaping into the run', async () => {
-    const original = globalThis.foundry;
-    globalThis.foundry = {
-      applications: {
-        api: { DialogV2: { wait: async () => Promise.reject(new Error('closed')) } },
-      },
-    };
-    try {
-      assert.deepEqual(await promptBulkCheckRoll({ subjects: subjects(1) }), { confirmed: false });
-    } finally {
-      if (original === undefined) delete globalThis.foundry;
-      else globalThis.foundry = original;
-    }
-  });
-});
-
-describe('promptBulkCheckRoll: what it deliberately does NOT show', () => {
-  it('renders no DC chip and no formula block', async () => {
-    // A batch has no single subject: each item rolls its OWN system's formula against its own DC /
-    // tiers / stages.
-    const { captured } = await open({ allowAdvantage: true, subjects: subjects(3) });
-    assert.doesNotMatch(captured.content, /fabricate-roll-prompt__dc/, 'no DC chip');
-    assert.doesNotMatch(captured.content, /fabricate-roll-prompt__formula/, 'no formula block');
-    assert.doesNotMatch(captured.content, /\bDC\b/, 'nor the letters in any other guise');
-    assert.doesNotMatch(captured.content, /1d20/, 'and no rolled expression anywhere');
-  });
-
-  it('renders no playerPicks modifier fieldset', async () => {
-    // `playerPicks` is crafting-only, so a salvage batch never carries a `modifierChoice` at all.
-    const { captured } = await open({ allowAdvantage: true, subjects: subjects(2) });
-    assert.doesNotMatch(captured.content, /craftingModifier/);
-  });
-});
-
-describe('promptBulkCheckRoll: the subject strip', () => {
-  it('renders one thumbnail per subject up to the strip limit, with the name as ALT', () => {
-    // Eight captions do not fit the row, so the name is the thumbnail's accessible name
-    // rather than a visible caption — a screen-reader user still learns what is queued.
-    return open({ subjects: subjects(8) }).then(({ captured }) => {
-      const thumbs = captured.content.match(/fabricate-roll-prompt__subject"/g) ?? [];
-      assert.equal(thumbs.length, 8);
-      assert.match(captured.content, /alt="Component 1"/);
-      assert.match(captured.content, /alt="Component 8"/);
-      assert.doesNotMatch(captured.content, /subjects-more/, 'nothing overflowed');
-    });
-  });
-
-  it('caps the strip and states the overflow as "+K more"', async () => {
-    const { captured } = await open({ subjects: subjects(11) });
-    const thumbs = captured.content.match(/fabricate-roll-prompt__subject"/g) ?? [];
-    assert.equal(thumbs.length, 8, 'the strip is bounded');
-    assert.match(captured.content, /fabricate-roll-prompt__subjects-more">\+3 more</);
-  });
-
-  it('falls back to the shared item image for a subject with none', async () => {
-    const { captured } = await open({ subjects: [{ name: 'Iron Ore' }] });
-    assert.match(captured.content, /src="icons\/svg\/item-bag\.svg"/);
-  });
-
-  it('escapes an authored subject name in both the ALT text and the image path', async () => {
-    const { captured } = await open({
-      subjects: [{ name: '<b>Ore</b> & "stuff"', img: '"><script>x</script>' }],
-    });
-    assert.doesNotMatch(captured.content, /<script>/);
-    assert.match(captured.content, /alt="&lt;b&gt;Ore&lt;\/b&gt; &amp; &quot;stuff&quot;"/);
-  });
-
-  it('renders no strip at all for a batch with no subjects', async () => {
-    const { captured } = await open({ subjects: [] });
-    assert.doesNotMatch(captured.content, /fabricate-roll-prompt__subjects/);
-  });
-
-  it('counts from `count` when supplied, and from the subjects otherwise', async () => {
-    const restore = stubI18n({
-      'FABRICATE.App.RollPrompt.BulkHeading': 'One setting for {count} items',
-    });
-    try {
-      const explicit = await open({ count: 25, subjects: subjects(3) });
-      assert.match(explicit.captured.content, /One setting for 25 items/);
-      const implicit = await open({ subjects: subjects(4) });
-      assert.match(implicit.captured.content, /One setting for 4 items/);
-    } finally {
-      restore();
-    }
-  });
-});
-
-describe('promptBulkCheckRoll: advantage is offered only under allowAdvantage', () => {
-  it('offers three buttons and a d20 glyph when advantage is allowed', async () => {
-    const { captured } = await open({ allowAdvantage: true, subjects: subjects(2) });
-    assert.equal(captured.buttons.length, 3, 'Advantage / Normal / Disadvantage');
-    assert.match(captured.content, /fa-dice-d20/, 'the d20 glyph, not the generic die');
-  });
-
-  it('offers one Roll button and a generic die otherwise', async () => {
-    for (const allowAdvantage of [false, undefined, null, 'true', 1]) {
-      const { captured } = await open({ allowAdvantage, subjects: subjects(2) });
-      assert.equal(captured.buttons.length, 1, `allowAdvantage: ${String(allowAdvantage)}`);
-      assert.match(captured.content, /fa-dice"/, 'a generic die above a single Roll button');
-      assert.doesNotMatch(captured.content, /fa-dice-d20/);
-    }
-  });
-
-  it('tags each button with the disposition it represents', async () => {
-    // The disposition reaches `applyD20Advantage` for EVERY roll in the batch, so a
-    // mislabelled button would silently roll the wrong pool twenty-five times.
-    const dispositions = [];
-    for (const index of [0, 1, 2]) {
-      const { choice } = await open({ allowAdvantage: true, subjects: subjects(2) }, FORM, {
-        pick: (buttons) => buttons[index],
-      });
-      dispositions.push(choice.advantage);
-    }
-    assert.deepEqual(dispositions, ['advantage', 'normal', 'disadvantage']);
-  });
-
-  it('reports `normal` from the single-button footer', async () => {
-    const { choice } = await open({ allowAdvantage: false, subjects: subjects(2) });
-    assert.equal(choice.advantage, 'normal');
-  });
-});
-
-describe('promptBulkCheckRoll: bonus normalization', () => {
-  const CASES = [
-    { label: 'empty', typed: '', bonus: null },
-    { label: 'whitespace only', typed: '   ', bonus: null },
-    { label: 'a bare number', typed: '2', bonus: '2' },
-    { label: 'a leading plus', typed: '+2', bonus: '2' },
-    { label: 'a leading plus with spaces', typed: '  +2  ', bonus: '2' },
-    { label: 'a negative', typed: '-1', bonus: '-1' },
-    { label: 'an expression', typed: '1d4 + 1', bonus: '1d4 + 1' },
-    // Only ONE leading plus is stripped, so `++2` stays malformed rather than being silently
-    // repaired into something the player did not type.
-    { label: 'a double plus', typed: '++2', bonus: '+2' },
-  ];
-
-  for (const testCase of CASES) {
-    it(`normalizes ${testCase.label}`, async () => {
-      const { choice } = await open(
-        { allowAdvantage: false, subjects: subjects(1) },
-        {
-          situationalBonus: { value: testCase.typed },
-          rollMode: { value: 'publicroll' },
-        }
-      );
-      assert.equal(choice.bonus, testCase.bonus);
-      assert.equal(choice.confirmed, true);
-    });
-  }
-
-  it('reads null from a form carrying no bonus field at all', async () => {
-    const { choice } = await open({ subjects: subjects(1) }, { rollMode: { value: 'gmroll' } });
-    assert.equal(choice.bonus, null);
-    assert.equal(choice.rollMode, 'gmroll');
-  });
-});
-
-describe('promptBulkCheckRoll: the roll-mode picker keeps the LEGACY vocabulary', () => {
-  it('offers exactly the four legacy tokens', async () => {
-    // Load-bearing, not merely cheap: the aggregate card and the N dice messages then
-    // carry the SAME token on both Foundry versions — the dice through `Roll#toMessage`'s
-    // own legacy map, the card through `applyBulkChatVisibility` using the identical
-    // table — so card visibility and dice visibility cannot diverge.
-    const { captured } = await open({ subjects: subjects(1) });
-    const values = [...captured.content.matchAll(/<option value="([^"]+)"/g)].map(
-      (match) => match[1]
+describe('bulk roll prompt adapter', () => {
+  it('preserves one decision for a mixed batch', async () => {
+    const { view, result } = await open(
+      { count: 3, subjects },
+      { confirmed: true, bonus: '+3', rollMode: 'blindroll', advantage: 'normal' }
     );
-    assert.deepEqual(values, ['publicroll', 'gmroll', 'blindroll', 'selfroll']);
-  });
-
-  it("pre-selects the client's own core.rollMode", async () => {
-    const restore = stubI18n({}, { rollMode: 'blindroll' });
-    try {
-      const { captured, choice } = await open(
-        { subjects: subjects(1) },
-        {
-          situationalBonus: { value: '' },
-        }
-      );
-      assert.match(captured.content, /<option value="blindroll" selected>/);
-      assert.equal(choice.rollMode, 'blindroll', 'and it is what a field-less form returns');
-    } finally {
-      restore();
-    }
-  });
-
-  it('returns the chosen token verbatim', async () => {
-    const { choice } = await open(
-      { subjects: subjects(1) },
-      {
-        situationalBonus: { value: '' },
-        rollMode: { value: 'blindroll' },
-      }
+    assert.equal(view.kind, 'bulk');
+    assert.equal(view.allowAdvantage, false);
+    assert.deepEqual(
+      view.subjects,
+      subjects.map((subject, index) => ({ ...subject, needText: ['DC 17', 'No check', 'No single target'][index] })),
+      'each need arrives formatted beside its raw shape'
     );
-    assert.equal(choice.rollMode, 'blindroll');
+    assert.equal(view.dcText, '', 'a batch has no single DC');
+    assert.deepEqual(result, { confirmed: true, bonus: '3', rollMode: 'blindroll', advantage: 'normal' });
+  });
+
+  it('formats a roll-under row as a target', async () => {
+    const { view } = await open({ count: 1, subjects: [{ name: 'Gear', need: { kind: 'target', target: 12 } }] }, null);
+    assert.equal(view.subjects[0].needText, 'Target 12');
+  });
+
+  it('counts the batch, not the rows, and names the activity and one actor when known', () => {
+    assert.equal(buildBulkPromptData({ count: 25, subjects }).subtitle, '25 items');
+    assert.equal(buildBulkPromptData({ subjects: [...subjects, subjects[0]] }).subtitle, '4 items');
+    const fallback = buildBulkPromptData({ count: 3 });
+    assert.equal(fallback.title, 'Bulk check');
+    assert.deepEqual(fallback.subjects, []);
+    const named = buildBulkPromptData({ count: 3, subjects, activity: 'Salvage', actorName: 'Brenna' });
+    assert.equal(named.title, 'Salvage checks');
+    assert.equal(named.subtitle, 'Brenna · 3 items');
+    assert.equal(buildBulkPromptData({ count: 2, activity: '$&', actorName: '$1' }).subtitle, '$1 · 2 items');
+  });
+
+  it('computes direction from the rows: all-target is under, otherwise over', () => {
+    const under = [{ need: { kind: 'target', target: 12 } }, { need: { kind: 'target', target: 9 } }];
+    const mixed = [{ need: { kind: 'target', target: 12 } }, { need: { kind: 'dc', dc: 15 } }];
+    assert.equal(buildBulkPromptData({ subjects: under }).direction, 'under');
+    assert.equal(buildBulkPromptData({ subjects: mixed }).direction, 'over');
+    assert.equal(buildBulkPromptData({ subjects: [] }).direction, 'over');
+  });
+
+  it('counts an under character-value row as rolling under, and an over one as not', () => {
+    const target = { need: { kind: 'target', target: 12 } };
+    const underValue = { need: { kind: 'noSingleTarget', direction: 'under' } };
+    const overValue = { need: { kind: 'noSingleTarget', direction: 'over' } };
+    assert.equal(buildBulkPromptData({ subjects: [target, underValue] }).direction, 'under');
+    assert.equal(buildBulkPromptData({ subjects: [target, overValue] }).direction, 'over');
+    assert.equal(buildBulkPromptData({ subjects: [{ need: { kind: 'noSingleTarget' } }] }).direction, 'over');
+  });
+
+  it('gives an all-target batch the roll-under bonus help; a mixed batch keeps roll-over copy', async () => {
+    const under = [
+      { name: 'Tempered Blade', need: { kind: 'target', target: 12 } },
+      { name: 'Fitted Hilt', need: { kind: 'target', target: 9 } },
+    ];
+    const mixed = [
+      { name: 'Tempered Blade', need: { kind: 'target', target: 12 } },
+      { name: 'Ore', need: { kind: 'dc', dc: 17 } },
+    ];
+    const { view: underView } = await open({ subjects: under }, null);
+    assert.equal(
+      underView.labels.bonusHelp,
+      'A bonus raises the target. A rolled bonus such as 1d4 is rolled first, and its result is applied.'
+    );
+    const { view: mixedView } = await open({ subjects: mixed }, null);
+    assert.equal(
+      mixedView.labels.bonusHelp,
+      'A bonus adds to the total. A rolled bonus such as 1d4 is rolled with the check.'
+    );
+  });
+
+  it('keeps count-only companion calls operable without subjects', async () => {
+    const { view, result } = await open({ count: 3 }, { confirmed: true, bonus: '' });
+    assert.deepEqual(view.subjects, []);
+    assert.equal(view.subtitle, '3 items');
+    assert.deepEqual(result, { confirmed: true, bonus: null, rollMode: 'publicroll', advantage: 'normal' });
+  });
+
+  it('offers the unchanged three advantage results', async () => {
+    const { view, result } = await open(
+      { allowAdvantage: true, subjects },
+      { confirmed: true, advantage: 'advantage' }
+    );
+    assert.equal(view.allowAdvantage, true);
+    assert.equal(result.advantage, 'advantage');
+    assert.ok(!Object.hasOwn(result, 'chosenModifierIds'), 'a batch offers no modifier choice');
+  });
+
+  it('normalizes dismissal and confirms headlessly', async () => {
+    assert.deepEqual((await open({ subjects }, null)).result, { confirmed: false });
+    assert.deepEqual(await promptBulkCheckRoll({ count: 3 }), {
+      confirmed: true, bonus: null, rollMode: undefined, advantage: 'normal',
+    });
   });
 });
 
-describe('promptBulkCheckRoll: the batch-wide note and the dialog frame', () => {
-  it('says in words that the answer applies to EVERY roll', async () => {
-    // An accepted consequence of the one-prompt design; the note is where the player is
-    // told, rather than being left to infer it from a `+2` that lands twenty-five times.
-    const { captured } = await open({ subjects: subjects(5) });
-    assert.match(captured.content, /fabricate-roll-prompt__bulk-note/);
-    assert.match(captured.content, /every roll in this batch/i);
+const EN = JSON.parse(readFileSync(resolve(import.meta.dirname, '../lang/en.json'), 'utf8'));
+/** The shipped strings, so a missing or misspelt leaf reads as its fallback, never as a key. */
+const shipped = (key, fallback) =>
+  key.split('.').reduce((node, segment) => node?.[segment], EN) ?? fallback;
+
+const ACTION_LABELS = { roll: 'Roll', advantage: 'Advantage', disadvantage: 'Disadvantage' };
+const COUNT_ADVANTAGE = { advantage: true, disadvantage: true, kind: 'count', detail: { dice: 1 } };
+const THREE = actionDeltas(promptActions(COUNT_ADVANTAGE, ACTION_LABELS), COUNT_ADVANTAGE);
+const SINGLE = actionDeltas(promptActions(null, ACTION_LABELS), null);
+
+const batchOffer = (over = {}) => ({
+  available: 0,
+  limit: 0,
+  max: 1,
+  resourceLabel: 'Momentum',
+  unavailable: null,
+  reach: null,
+  ...over,
+});
+
+/** A covered count row: its pool before bought dice and the reach its own prompt would judge. */
+function countRow(needed, { base = 2, zeroPoolFails = true, rescued = false, perDieMost = 1 } = {}) {
+  return {
+    name: `Needs ${needed}`,
+    need: { kind: 'successes', count: needed, destination: 'pool' },
+    offerSituationalBonus: true,
+    additionalDice: {
+      countDice: { base, poolDelta: 0, zeroPoolFails, destination: 'pool' },
+      reach: { needed, perDieMost, explode: 'off', rescued },
+    },
+  };
+}
+
+/** `countRow` with its needed count withheld, as a progressive or routed row carries it. */
+function unstatedRow(options) {
+  const row = countRow(1, options);
+  return { ...row, additionalDice: { ...row.additionalDice, reach: { ...row.additionalDice.reach, needed: null } } };
+}
+
+function judgeBatch(rows, { offer = batchOffer(), deltas = THREE, chosen = 0, bonus = '' } = {}) {
+  return describeAdditionalDice({
+    offer,
+    deltas,
+    chosen,
+    bonus,
+    rows,
+    rolls: rows.filter((row) => row.additionalDice).length,
+    labels: additionalDiceCopy(offer, shipped),
+    actorName: 'Brenna',
+  });
+}
+
+const blockedActions = (view) =>
+  ['disadvantage', 'normal', 'advantage'].filter((action) => view.blocked[action]);
+
+describe('bulk additional dice (issue 2008)', () => {
+  it('states the whole batch spend and an unaffordable batch (frame 36, AD47)', () => {
+    const four = [countRow(1), countRow(1), countRow(1), countRow(1)];
+    const unaffordable = judgeBatch(four, { offer: batchOffer({ available: 2 }) });
+    assert.equal(unaffordable.resourceLine, 'Momentum 2 available');
+    assert.equal(unaffordable.spendLine, 'Spends 0 Momentum across 4 rolls (0 each)');
+    assert.deepEqual(unaffordable.message, {
+      tone: 'info',
+      text: 'Not enough Momentum to buy a die for every roll.',
+    });
+    const three = four.slice(1);
+    const offer = batchOffer({ available: 3, limit: 1 });
+    assert.equal(judgeBatch(three, { offer, chosen: 1 }).spendLine, 'Spends 3 Momentum across 3 rolls (1 each)');
+    const bare = batchOffer({ available: 3, limit: 1, resourceLabel: '' });
+    assert.equal(judgeBatch(three, { offer: bare, chosen: 1 }).spendLine, 'Spends 3 across 3 rolls (1 each)');
+    assert.equal(judgeBatch([countRow(1)], { offer, chosen: 1 }).spendLine, 'Spends 1 Momentum');
   });
 
-  it('carries the shared dialog classes and does not reject on close', async () => {
-    const { captured } = await open({ subjects: subjects(2) });
-    assert.deepEqual(captured.config.classes, [
-      'fabricate',
-      'fabricate-dialog',
-      'fabricate-roll-prompt-dialog',
+  it('disables only the actions every covered roll fails under, and marks no row Advantage reaches (D3)', () => {
+    const view = judgeBatch([countRow(3), countRow(3), countRow(3)]);
+    assert.deepEqual(blockedActions(view), ['disadvantage', 'normal']);
+    assert.equal(view.blockNote, 'Only Advantage can reach the successes needed.');
+    assert.deepEqual(view.unreachableRows, [false, false, false]);
+  });
+
+  it('disables every action and marks every row when no roll can reach (D3, AD47)', () => {
+    const view = judgeBatch([countRow(4), countRow(4)]);
+    assert.deepEqual(blockedActions(view), ['disadvantage', 'normal', 'advantage']);
+    assert.equal(view.blockNote, 'Rolling is disabled: none of these rolls can reach the successes they need.');
+    assert.deepEqual(view.unreachableRows, [true, true]);
+    const one = judgeBatch([countRow(4)], { deltas: SINGLE });
+    assert.deepEqual(blockedActions(one), ['normal']);
+    assert.equal(one.blockNote, 'Rolling is disabled: this attempt cannot reach the successes it needs.');
+  });
+
+  it('keeps every action while some covered roll can still succeed, marking only the row that cannot', () => {
+    const view = judgeBatch([countRow(1), countRow(5), countRow(2)]);
+    assert.deepEqual(blockedActions(view), []);
+    assert.equal(view.blockNote, '');
+    assert.deepEqual(view.unreachableRows, [false, true, false]);
+  });
+
+  it('lets a rescued row, an unjudged row or a row with no offer keep every action (AD47)', () => {
+    const unjudged = { ...countRow(4), additionalDice: { countDice: null, reach: null } };
+    const summed = { name: 'Ore', need: { kind: 'dc', dc: 18 }, offerSituationalBonus: true };
+    for (const [label, keeper] of [
+      ['rescued', countRow(4, { rescued: true })],
+      ['unjudged', unjudged],
+      ['without an offer', summed],
+    ]) {
+      const view = judgeBatch([countRow(4), countRow(4), keeper]);
+      assert.deepEqual(blockedActions(view), [], label);
+      assert.deepEqual(view.unreachableRows, [true, true, false], label);
+    }
+    const noCheck = { name: 'Scrap', need: { kind: 'noCheck' } };
+    assert.deepEqual(
+      blockedActions(judgeBatch([countRow(4), noCheck])),
+      ['disadvantage', 'normal', 'advantage'],
+      'a row that rolls nothing has no say'
+    );
+  });
+
+  it('never lets a rescue lift a zero pool, nor marks a row whose needed count it may not state (R4)', () => {
+    const view = judgeBatch([
+      countRow(1, { base: -1, rescued: true }),
+      unstatedRow({ base: -1, rescued: true }),
     ]);
-    assert.equal(captured.config.rejectClose, false, 'a dismissal RESOLVES, it never rejects');
+    assert.deepEqual(blockedActions(view), ['disadvantage', 'normal', 'advantage']);
+    assert.deepEqual(view.unreachableRows, [true, false], 'a null needed count is never stated');
   });
 
-  it('localizes the title, heading, overflow chip and note', async () => {
-    const restore = stubI18n({
-      'FABRICATE.App.RollPrompt.BulkTitle': 'Jet groupe',
-      'FABRICATE.App.RollPrompt.BulkHeading': 'Un reglage pour {count} objets',
-      'FABRICATE.App.RollPrompt.BulkMore': '+{count} de plus',
-      'FABRICATE.App.RollPrompt.BulkNote': 'Applique a chaque jet.',
+  it('judges the typed batch bonus on every row whose own check takes it', () => {
+    const rows = [countRow(4), countRow(4)];
+    assert.deepEqual(blockedActions(judgeBatch(rows, { bonus: '+2' })), ['disadvantage']);
+    assert.deepEqual(blockedActions(judgeBatch(rows, { bonus: '1d4' })), [], 'a rolled bonus may reach');
+    const declined = rows.map((row) => ({ ...row, offerSituationalBonus: false }));
+    assert.equal(blockedActions(judgeBatch(declined, { bonus: '+2' })).length, 3);
+  });
+
+  it('offers the batch control only over the rows it covers, allowlisted, and answers its dice', async () => {
+    const subjects = [
+      { ...countRow(1), additionalDice: { ...countRow(1).additionalDice, path: 'system.x' } },
+      countRow(2),
+      { name: 'Ore', need: { kind: 'dc', dc: 18 } },
+      { name: 'Scrap', need: { kind: 'noCheck' } },
+    ];
+    const additionalDiceOffer = { ...batchOffer({ available: 4, limit: 1 }), path: 'system.x' };
+    const { view, result } = await open(
+      { count: 4, subjects, actorName: 'Brenna', additionalDiceOffer },
+      { confirmed: true, advantage: 'normal', additionalDice: 1 }
+    );
+    assert.equal(view.additionalDiceRolls, 2, 'never the summed or no-check rows');
+    assert.equal(view.actorName, 'Brenna');
+    assert.ok(!JSON.stringify(view).includes('system.x'), 'no path reaches the view');
+    assert.deepEqual(view.subjects[0].additionalDice.countDice, {
+      base: 2,
+      poolDelta: 0,
+      zeroPoolFails: true,
+      destination: 'pool',
     });
-    try {
-      const { captured } = await open({ subjects: subjects(10) });
-      assert.equal(captured.config.window.title, 'Jet groupe');
-      assert.match(captured.content, /Un reglage pour 10 objets/);
-      assert.match(captured.content, /\+2 de plus/);
-      assert.match(captured.content, /Applique a chaque jet\./);
-    } finally {
-      restore();
-    }
+    assert.equal(view.labels.additionalDice.cannotReach, 'cannot reach');
+    assert.equal(result.additionalDice, 1);
+    const above = await open(
+      { count: 4, subjects, additionalDiceOffer },
+      { confirmed: true, advantage: 'normal', additionalDice: 2 }
+    );
+    assert.equal(above.result.additionalDiceRefusal, 'choiceAboveLimit', 'never clamped');
+    assert.equal((await promptBulkCheckRoll({ count: 4, additionalDiceOffer })).additionalDice, 0);
+  });
+
+  it('notes a batch whose rows differ in actor or resource, with no control', async () => {
+    const { view } = await open({ count: 2, subjects, additionalDiceMixed: true }, null);
+    assert.equal(view.additionalDiceOffer, undefined);
+    assert.equal(
+      view.labels.additionalDiceMixed,
+      'Rolls in this batch use different resources, so no dice can be added.'
+    );
+    const { view: plain } = await open({ count: 2, subjects }, null);
+    assert.equal(plain.labels.additionalDiceMixed, undefined, 'and says nothing otherwise');
+  });
+
+  it('words the mid-batch stop, labelled or not, and a refused batch choice', () => {
+    const stopped = (resourceLabel) => ({
+      items: [{ outcome: 'succeeded' }, { additionalDiceExhaustion: { resourceLabel, done: 2, rolls: 4 } }],
+    });
+    assert.equal(
+      bulkAdditionalDiceNoticeText(stopped('Momentum'), { localize: shipped }),
+      'Momentum ran out after 2 of 4 rolls. The rolls already made stand.'
+    );
+    assert.equal(
+      bulkAdditionalDiceNoticeText(stopped(''), { localize: shipped }),
+      'The resource ran out after 2 of 4 rolls. The rolls already made stand.'
+    );
+    const refused = {
+      cancelled: true,
+      additionalDiceRefusal: 'choiceAboveLimit',
+      additionalDiceNotice: { dice: 2, limit: 1 },
+    };
+    assert.equal(
+      bulkAdditionalDiceNoticeText(refused, { localize: shipped }),
+      '2 additional dice is more than the 1 that can be added.'
+    );
+    assert.equal(bulkAdditionalDiceNoticeText({ items: [{ outcome: 'succeeded' }] }), null);
   });
 });

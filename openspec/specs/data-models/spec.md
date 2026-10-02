@@ -54,7 +54,6 @@ CraftingSystem = {
     salvage: boolean, // default true (absent key defaults on for backward compatibility; an explicit false is honoured)
     chatOutput: boolean, // default true; gates the crafting, salvage, and gathering result chat cards
     refundOnPlayerCancel: boolean, // default true (absent key defaults on; an explicit false is honoured); when a player cancels an in-progress craft, ON restores the consumed ingredients + refunds the spent currency, OFF forfeits them
-    itemPiles: boolean, // default false; the Item Piles integration toggle referenced by integrations/spec.md
   },
 
   // SHADOWED by a world scope setting and still authoritative — requirement 36.
@@ -103,17 +102,19 @@ CraftingSystem = {
     // slot gained its own `dcMode`/`macroUuid` in issue 1096): `_resolveSalvageDc` is
     // arithmetic over the per-component override and the slot's own `dc`. That is a
     // statement about DC resolution ALONE and not a licence to drop the fields:
-    // `simple.tiers` is the preset source for the per-component salvage DC control and
-    // `simple.dcMode` selects that control's system-default label, in EVERY resolution
-    // mode including routed — see the Dynamic DC Macro Contract. No salvage editor
+    // `simple.tiers` is the preset source for the per-component salvage DC control, in
+    // EVERY resolution mode including routed — see the Dynamic DC Macro Contract. No salvage editor
     // renders a tier table (the Checks tab mounts the simple editor with its DC-source
     // half hidden and the routed editor with tiers hidden), so neither slot's `tiers`
     // is authored there.
-    simple: SimpleCheck,               // { rollFormula, dc, thresholdMode, dcMode, tiers, macroUuid, checkBreakage }
-    routed: RoutedCheck,               // { type, rollFormula, dc, thresholdMode, dcMode, macroUuid, tiers, relativeOutcomes, fixedOutcomes, checkBreakage }
+    simple: SimpleCheck,               // { rollFormula, evaluation, advantage, dc, thresholdMode, dcMode, tiers, macroUuid, checkBreakage }
+    routed: RoutedCheck,               // { type, rollFormula, evaluation, advantage, dc, thresholdMode, dcMode, macroUuid, tiers, relativeOutcomes, fixedOutcomes, checkBreakage }
     progressive: {
       awardMode: "partial" | "equal" | "exceed",
+      thresholdMode: "meet" | "exceed", // default "meet"; read only as a count evaluation's per-die test
       rollFormula: string,             // default ""; total drives progressive awarding
+      evaluation: CheckEvaluation,
+      advantage: CheckAdvantage,
       checkBreakage: CheckBreakage,    // unified per-check trigger list (force award-all/none and/or break tools)
     },
 
@@ -137,7 +138,10 @@ CraftingSystem = {
     enabled: boolean,                  // default false
     progressive: {
       awardMode: "partial" | "equal" | "exceed",
+      thresholdMode: "meet" | "exceed", // default "meet"; read only as a count evaluation's per-die test
       rollFormula: string,
+      evaluation: CheckEvaluation,
+      advantage: CheckAdvantage,
       checkBreakage: CheckBreakage,
     },
     routed: RoutedCheck,
@@ -194,7 +198,10 @@ CraftingSystem = {
     routed: RoutedCheck,
     progressive: {
       awardMode: "partial" | "equal" | "exceed",
+      thresholdMode: "meet" | "exceed", // default "meet"; read only as a count evaluation's per-die test
       rollFormula: string,         // default ""; total drives progressive awarding
+      evaluation: CheckEvaluation,
+      advantage: CheckAdvantage,
       checkBreakage: CheckBreakage,
     },
 
@@ -241,24 +248,50 @@ CraftingSystem = {
   // gatheringCraftingCheck so the GM Checks-tab editors are common across activities.
   //   SimpleCheck = {
   //     rollFormula: string,                       // default ""
+  //     evaluation: CheckEvaluation,
+  //     advantage: CheckAdvantage,
   //     dc: number,                                // default 15; the default DC
   //     thresholdMode: "meet" | "exceed",          // default "meet"
   //     dcMode: "static" | "dynamic",              // default "static" (crafting only)
-  //     tiers: { id, name, dc }[],                 // recipe-DC overrides (crafting only)
+  //     tiers: { id, name, dc, adjustment, successes }[], // recipe-DC overrides (crafting only)
   //     macroUuid: string | null,                  // dynamic-DC macro (crafting only)
   //     checkBreakage: CheckBreakage,              // unified per-check trigger list
   //   }
   //   RoutedCheck = {
   //     type: "relative" | "fixed",                // default "relative"
+  //     evaluation: CheckEvaluation,
+  //     advantage: CheckAdvantage,
   //     rollFormula: string, dc: number, thresholdMode: "meet" | "exceed",
   //     dcMode: "static" | "dynamic",              // default "static" (crafting only)
   //     macroUuid: string | null,                  // dynamic-DC macro (crafting only)
-  //     tiers: { id, name, dc }[],                 // recipe-DC overrides (crafting only)
-  //     relativeOutcomes: { id, name, success, breakTools, dc }[],
+  //     tiers: { id, name, dc, adjustment, successes }[], // recipe-DC overrides (crafting only)
+  //     relativeOutcomes: { id, name, success, breakTools, dc, adjustment }[],
   //     fixedOutcomes: { id, name, success, breakTools, start, end }[],
   //     checkBreakage: CheckBreakage,              // unified per-check trigger list
   //   }
   //   // (The progressive check sub-object likewise carries a checkBreakage block.)
+  //
+  //   // Normalized by `normalizeCheckEvaluation`; see § Check evaluation record.
+  //   CheckEvaluation = {
+  //     product: "sum" | "count", direction: "over" | "under",
+  //     target: { source: "fixed" | "attribute", expression: string,
+  //               adjustmentKind: "add" | "multiply", baseAdjustment: number | null },
+  //     pool: {
+  //       die: number, base: string, threshold: string, required: number,
+  //       modifierDestination: "pool" | "threshold", zeroPoolFails: boolean,
+  //       explode: { enabled: boolean, faces: { kind: "best" | "from", value: number | null }, once: boolean },
+  //       cancel: { enabled: boolean, faces: { kind: "worst" | "from", value: number | null } },
+  //       additionalDice: { enabled: boolean, source: "path" | "macro", path: string,
+  //                         readMacroUuid: string, spendMacroUuid: string, max: number,
+  //                         label: string },
+  //     },
+  //   }
+  //
+  //   // Normalized by `normalizeCheckAdvantage`; see § Check advantage record.
+  //   CheckAdvantage = {
+  //     mode: "off" | "keep" | "bonus", extraDice: number, bonusExpression: string,
+  //     offerDisadvantage: boolean, countEnabled: boolean, countDice: number,
+  //   }
   //
   //   // Unified per-check trigger list (issue 419 recombine). Each trigger pairs an
   //   // expressive dice-matching condition with three effects: force an outcome,
@@ -410,6 +443,35 @@ CraftingSystem = {
 }
 ```
 
+### Check evaluation record
+
+Each of the eight normalized check subobjects — crafting and salvage `simple`, `routed` and `progressive`, and gathering `routed` and `progressive` — MUST carry `evaluation` with `product: "sum" | "count"` and `direction: "over" | "under"`, defaulting to `sum/over`.
+Every `progressive` subobject also carries `thresholdMode: "meet" | "exceed"`, defaulting to `meet` and read only as a `count` evaluation's per-die test (#2067); the Checks Studio draft and schema-6 export/import preserve it.
+Its `target` contains `source: "fixed" | "attribute"`, `expression`, `adjustmentKind: "add" | "multiply"` and nullable `baseAdjustment`.
+Its `pool` contains integer `die` (at least 2), string `base` and `threshold` expressions, integer `required` (0–20), `modifierDestination: "pool" | "threshold"`, `zeroPoolFails`, `explode` and `cancel` face configurations, and `additionalDice` enabled/source/path/read-macro/spend-macro/max/label fields.
+The normalized defaults are an empty fixed target expression, additive adjustment, d10, base `"2"`, threshold `"8"`, required 1, pool destination, zero-pool failure on, and explode, cancel and additional dice off with additional maximum 1 and an empty resource name.
+The additional-dice `label` is a string, trimmed, default `''`, and retained whatever `enabled` or `source` is; it is the resource's name on player surfaces (issue 2008 ruling R2, amending decision 22's key set by one optional key).
+Normalization MUST retain inactive mode fields and finite/null sibling adjustments; unknown enum tokens take their defaults, an invalid die reads d10, a finite numeric expression is kept as its string, integer counts clamp to 0–20 and additional maximum clamps to 1–20, and a non-integer count takes its default (1 for `required`, null for a sibling).
+An explode or cancel face `value` is a positive integer or null and is not clamped to `die`, so changing the die loses no authored face; a face the die cannot roll is left for readiness to flag rather than repaired by normalization.
+Checks studio drafts carry the normalized record and the tier and outcome siblings, so a studio save preserves them, and schema-6 export/import MUST preserve the normalized record without a migration.
+Each of the eight subobjects also carries `offerSituationalBonus`, `true` unless explicitly `false`, which survives drafts, draft clones, the mode-change copy across the `routedByIngredients` boundary, save, schema-6 export/import and the prepared `checkConfig`.
+It decides only whether the roll prompt shows the situational-bonus field; `allowsSituationalModifier` stays the authority gate, so a programmatic, companion or prepared bonus still applies when it is `false`.
+Recipe difficulty tiers retain finite nullable `adjustment` and integer nullable `successes` beside their existing DC fields; relative outcome rows retain their finite nullable `adjustment` sibling.
+Component salvage and gathering task overrides retain `adjustmentOverride` and `successesOverride` beside `dcOverride`, including through their save projections.
+Under an attribute target source the runtime reads these sibling adjustments: the selected recipe tier's `adjustment`, the component's `salvage.adjustmentOverride` or the task's `adjustmentOverride` applies when non-null, and a null one inherits `target.baseAdjustment` (see `resolution-modes/spec.md` § Check Target Resolution).
+An added adjustment is any finite number and a multiplier is a finite number above zero; a relative outcome tier's `adjustment` is its multiplier under an attribute/multiply check, where a null one marks the Otherwise tier and a non-finite imported multiplier normalizes to null and so becomes Otherwise.
+A `product: "count"` check ignores the target and adjustment fields entirely and reads its required count from the selected recipe tier's non-null `successes`, the component's non-null `salvage.successesOverride` or the task's non-null `successesOverride`; each falls back to `pool.required` when null, and 0 is a valid required count.
+It also never reads `dc` or any adjustment field, fixed or attribute.
+
+### Check advantage record
+
+Each of the eight normalized check subobjects MUST carry `advantage` as a sibling of `evaluation`, never inside it.
+It holds `mode: "off" | "keep" | "bonus"` (default `keep`; an unknown token reads `keep`), integer `extraDice` 1–4 (default 1), string `bonusExpression` (default `"1d6"` when absent or not a string; any string, including `""`, is kept verbatim), `offerDisadvantage` (true unless explicitly false), `countEnabled` (true unless explicitly false) and integer `countDice` 1–5 (default 1).
+Integers clamp into range, and a non-integer takes its default.
+All six keys are retained whatever the evaluation; summing reads only the first four and counting only the last two.
+The defaults reproduce the rolled formula of a check whose authored first dice group is a plain `1d20`, so no migration runs.
+Checks Studio drafts carry the normalized record, a pass/fail slot move carries it with the evaluation, schema-6 export and import preserve it without a migration, and the private versioned descriptor's `checkConfig` snapshots it.
+
 ### Requirements
 
 1. Every crafting system has a reserved effective recipe category named `general` (`General` in UI copy).
@@ -454,10 +516,11 @@ CraftingSystem = {
 10. `recipeItemDefinitions` are distinct from `components`; a recipe item definition must not be treated as a crafting ingredient/result component unless it is also intentionally imported as a component.
 11. `RecipeItemDefinition.id` values must be unique within a crafting system.
 12. `RecipeItemDefinition.originItemUuid` values should be unique within a crafting system so one system recipe item can be reused across multiple recipes.
-13. **`consumption.breakToolsOnFail` governs Tool usage/breakage on a failed craft or salvage.** It is present on both `craftingCheck.consumption` and `salvageCraftingCheck.consumption`.
+13. **`consumption.breakToolsOnFail` governs Tool usage/breakage on a failed craft, salvage or alchemy check.** It is present on both `craftingCheck.consumption` and `salvageCraftingCheck.consumption`, and applies to alchemy simple/tiered modes when a check fails.
     It defaults to `false` (tools are not broken on failure unless enabled).
     It was renamed from the legacy catalyst-era key `consumeCatalystsOnFail` (retained by name only to defer a persisted-key migration) by the 1.7.0 migration, which rewrites persisted worlds to the new key.
     Normalization reads `breakToolsOnFail` then falls back to the legacy `consumeCatalystsOnFail`, so a pre-migration import/export still loads correctly.
+    Before 1.35.0 a failed alchemy check ignored this field and always broke tools; the 1.35.0 migration stamps `true` onto every existing alchemy system with no explicit value so that behaviour does not change (`destructive-changes-and-migrations/spec.md` § Alchemy Break-Tools-on-Fail Default), and `ui-system-studio/spec.md` § The On-failure section documents the Checks Studio switch that now reads and writes it for alchemy.
 14. When `features.gathering` is true, a crafting system may carry `gatheringRealmSettings`, which holds the participation flag `enabled` (default `false`) and nothing else.
     A system does NOT own a realm library: realms, the reveal mode and the modifier visibility are world scope (see _TravelConfig_).
     `enabled` decides consumption only — whether the party's current location gates this system's environments, what its UI shows, and whether its environments offer the realm controls — so the world's realms stay authorable and resolvable whether or not any system has opted in.
@@ -827,8 +890,9 @@ type CurrencyConfig = {
     The credit additionally requires a positive SAFE-INTEGER amount, refusing anything else rather than truncating it, because a truncated amount is a different amount and because `current + amount` stops being exact beyond that range; the check is deliberately NOT narrowed to match, since narrowing what a published member accepts is a `schemaVersion` bump.
 13. The CHECK performs no write, and it is GM-gated at the facade, so it introduces no player-reachable trigger for GM-authored macro code with caller-chosen arguments.
     That first conjunct is what licensed a world-scoped surface reaching GM-authored macro code with caller-chosen arguments at all, and it is NOT true of the credit.
-14. The CREDIT performs exactly one write per call, and it reaches a GM macro — `increment` — that has never before been reachable from a companion.
+14. The CREDIT performs exactly one actor write per call, and it reaches a GM macro — `increment` — that has never before been reachable from a companion.
     Its safety therefore rests on TWO gates rather than one: the GM gate at the facade, and the call-site and election gate that requires a caller declaring a `broadcast` call site to be this client's elected executor.
+    A companion effect credit keeps that one write: an `actorProperty` credit carries the effect marker in the same update (see § Companion Effect Marker), an `actorInventory` or `macro` credit carries none, and the operation record's intent and receipt are written to the ledger page rather than the actor.
 15. A THIRD pair of world-scoped paths reads and spends against a SET of actors: the pooled balance read and the pooled debit behind the companion contract's pooled holdings members.
     They answer against the WORLD configuration alone on requirement 10's reasoning, and neither consults a crafting system's `requirements.currency.enabled` toggle.
     The pooled read is the only currency path that fires a GM's `balance` macro, and it fires it once per actor, SERIALLY: firing N of a world's own automation concurrently is a behaviour a GM cannot reason about, and the set is a party, so N is small.
@@ -984,7 +1048,8 @@ ModifierLibraryEntry = {
    A finite bound no dice-grammar `Constant` can express (`1e21`, `1e-7`) is the second blocking bounds fault, `modifierBoundsUnsafe`, and contains the entry to 0 in the same way.
 6. **AN ENTRY WITH NO EXPRESSION IS KEPT.** The library has an "Add modifier" button, and an entry that vanished on save the moment it was created would make that button appear broken.
    It is still a runtime misconfiguration wherever it is referenced.
-7. **A ROLL-SHAPED expression is legal for BOTH consumers** (issue 1118): a gathering drop row evaluates the expression and applies the result as a percentage-point delta, and a check appends the DICE to its roll formula so the authored variance survives to the roll and shows on the card.
+7. **A ROLL-SHAPED expression is legal for BOTH consumers** (issue 1118): a gathering drop row evaluates the expression and applies the result as a percentage-point delta, while the active sum/over check appends the DICE to its roll formula so the authored variance survives to the roll and shows on the card.
+   Other evaluations place the same selected, actor-resolved and bounded expression as a separate pre-roll whose actual total benefits the target, threshold, or pool; this changes no persisted modifier shape.
    `isRollExpression` is therefore a DISPLAY classification and never a gate; the blocking `modifierRollExpression` readiness issue is RETIRED.
 
 ## CurrencyUnit
@@ -1330,6 +1395,8 @@ SCOPE and SUBJECT-COPIED-FROM separate them: requirement 9's snapshot is PER-SYS
     toolIds: string[],             // references to per-system library Tools
     resultGroups: ResultGroup[],
     dcOverride: number | null,     // default null; per-component salvage check DC override (replaces salvageCraftingCheck.simple/routed.dc at salvage time)
+    adjustmentOverride: number | null, // default null; per-component adjustment for an attribute target, else the evaluation's baseAdjustment
+    successesOverride: number | null,  // default null; retained per-component required count, clamped 0–20
     outcomeRouting?: { [outcome: string]: string },  // routed only
     timeRequirement?: TimeRequirement,
     currencyRequirement?: CurrencyRequirement,
@@ -3144,7 +3211,7 @@ Committed requests return their recorded outcome.
 7. Gathering persists its terminal record with the planned execution journal before effects and updates receipts in that same history record by run ID.
 It does not delay terminal history until effects finish.
 8. Intent, effect plans, receipts and outcomes retain existing secret and blind-run redaction.
-Authority request deduplication and prepare tokens live in the private authority ledger; the run record retains effect evidence.
+Authority request deduplication and safe prepare-token metadata live in the GM-owned authority ledger; the run record retains effect evidence.
 9. Stage browsing is transient UI state and never changes the persisted executable stage index.
 
 ### Authority Ledger and Recovery Boundary
@@ -3154,7 +3221,8 @@ The authority MUST re-resolve the actor, sender ownership, source actors, run re
 The actor UUID identifies the command target; ownership MUST be checked against the attested sender rather than the executing GM's ambient `isOwner`.
 A local queue or revision comparison alone MUST NOT be treated as a cross-browser lock.
 
-The authority requires exactly one private JournalEntry ledger.
+The authority requires exactly one GM-owned JournalEntry ledger.
+Its flags replicate to player clients even when document ownership defaults to none, so they MUST contain no private prepared inputs or recipient-specific prompt or roll handoff data.
 The active GM MUST provision it automatically when the world holds none, during boot recovery and at the start of the command path, and MUST then run boot reconstruction against it.
 A non-GM realm MUST NOT provision a ledger and keeps its active-GM refusal.
 Provisioning MUST use a server-assigned top-level `_id`, never a fixed one: only the embedded duplicate-`_id` check is enforced, so a fixed top-level `_id` silently overwrites the existing ledger and its durable request state.
@@ -3172,7 +3240,16 @@ Because the claim page lives inside the ledger it was created on, a retry that l
 A command MUST NOT run on holding no claim on the ledger it is writing to: a re-acquisition that fails before the handler MUST refuse, and one that fails after it MUST settle as recovery-required.
 Explicit setup remains available as an idempotent ensure that returns the existing ledger rather than refusing it.
 
-The ledger holds durable request outcomes and one-use prepare tokens; an embedded JournalEntryPage with a fixed ID and `keepId` arbitrates the global execution claim.
+The ledger holds safe durable request outcomes and one-use prepare-token bindings, status, expiry and issuing GM and instance identities; an embedded JournalEntryPage with a fixed ID and `keepId` arbitrates the global execution claim.
+The complete prepared evaluation and recipient-specific preparation reply MUST remain in the issuing authority instance and MUST be removed on consume, release or expiry.
+A missing private snapshot after reload or GM handoff MUST refuse the token before evaluation or effects; the caller may prepare again.
+A token past its expiry MUST be marked released in the ledger the next time the authority issues or consumes a token, so an expired token never stays active.
+An interactive caller whose token is refused after its roll prompt MUST prepare again by re-sending its original command, at most three times per command, and MUST settle the answer already given under the fresh token when the fresh prompt descriptor is equivalent.
+Two descriptors are equivalent when every field but the additional-dice offer is equal, the offer is present in both or neither and keeps its maximum, resource name, availability reason and reach, and its fresh limit still admits the dice the answer bought.
+A fresh descriptor that is not equivalent MUST reopen the prompt with a notice that the roll's details changed, and dismissing that prompt MUST release the fresh token.
+The refusal reaches the player only when the retry limit is exhausted, and a preparation that itself fails MUST answer its own reason.
+Another tab of the same elected GM MUST stay silent before claim and reply for a token or preparation replay issued by its peer, while committed execution MAY replay its safe durable outcome without another effect or roll handoff.
+Under the active-GM claim, bootstrap MUST scrub legacy persisted private bindings and recipient-specific response fields and invalidate their prepared tokens.
 `keepId` is load-bearing: without it the server discards the fixed ID silently, and the cross-browser lock stops existing rather than failing.
 A claim MUST NOT expire on age alone, because an interrupted operation may already have produced irreversible effects.
 Its standing is judged from the REQUEST it guards, read from the ledger's own durable request state, within a bounded live window derived from the command timeout a caller itself waits before treating a reply as unknown.
@@ -3207,7 +3284,7 @@ An operation that fails by throwing remains uncertain, MUST retain its claim, an
 The recovery rule MUST NOT be widened beyond the provable pre-write case, because releasing a genuinely half-applied effect is worse than the block it removes.
 
 Command replies MUST use transport-level recipient routing as well as attested-GM and recipient/session/request/run/revision correlation.
-The private ledger MUST NOT be copied into actor flags or reply payloads.
+The authority ledger MUST NOT be copied into actor flags or reply payloads.
 Initial prompt redaction MUST use the initiating viewer's current entitlement before returning protected identity, image, formula, DC or modifier information.
 Post-commit evaluated-roll handoff MUST independently recheck entitlement against the current actor, viewer and run; that later check cannot protect an already-disclosed initial prompt.
 Secret checks MUST use generic local prompts, GM private posting and sanitized transition replies without serialized roll data.
@@ -3292,7 +3369,7 @@ CraftingRunStepState = {
   selectedRequirementSnapshot?: object, // full selected authored set, including route/currency/tag/essence
 
   // Optional permitted historical meaning and purpose; never a live narrative lookup.
-  resolutionSnapshot?: { kind: "check" | "ingredients" | "none", mode: string },
+  resolutionSnapshot?: { kind: "check" | "ingredients" | "none", mode: string, product?: "sum" | "count", direction?: "over" | "under" },
   presentationSnapshot?: { name: string, description: string },
   currencySpends?: Array<{ unit: string, amount: number }>, // applied settledSpends only
   essenceSpend?: {
@@ -3390,6 +3467,29 @@ CraftingRunStepState = {
 3. `timeGate.availableAt` must be `> initiatedAt` when both are present.
 4. `completedAt` is required when `status` is `succeeded`, or `failed`.
 5. `lastCheckResult.outcome` is only valid in `routedByCheck` mode (and in alchemy when `checkMode` is `tiered`); `lastCheckResult.value` is only valid in progressive mode.
+   An executed formula result's `data` preserves raw `total` and existing `dc` and adds `product`, `direction`, `comparison`, `target`, `margin`, `successes` and `cancelled`.
+   A summed result's `direction` is the executed `over` or `under`; `successes` and `data.cancelled` are null for it, and `data.cancelled` counts cancelled successes rather than the top-level prompt-abort sentinel.
+   `data.dc` names only a fixed target; an attribute result carries `dc: null` and its number in `data.target`.
+   A simple result targets its effective target, which under sum/under includes the settled `targetDelta`; a relative routed result targets the effective threshold of the roll-matched tier, including the tier a below-every-threshold total is clamped to, before forcing or stepping, or null when no tier is matched or clamped to; fixed routed, Otherwise and progressive results have null target and margin, and progressive comparison is null.
+   A non-null margin is benefit-positive — raw total minus target over, target minus raw total under — even when forcing changes the disposition.
+   A check result of any kind — pass/fail, progressive or routed; sum or count — records `data.forcedOutcome: 'success' | 'failure'` when a trigger decided the outcome or, on a routed check, rerouted it to the best succeeding or worst failing tier; it is absent otherwise.
+   Error, prompt cancellation, missing engine and empty formula exits preserve their prior result shape and omit these new execution fields.
+   A target refusal returns `success: false` with `misconfigured: true` and `data.targetRefusal` naming its reason, and carries no executed fields.
+   An executed result's `data.preRolls`, when present, is an ordered array of `{ source, label, expression, total, destination }` for separately evaluated modifiers; the main `total` and `diceGroups` still describe only the authored check roll and its appended terms.
+   Error, prompt cancellation and unrolled exits do not fabricate pre-roll evidence, and a secret prepared check omits it.
+   A summed result with a target, other than a roll-high one against a fixed DC, also records `data.targetSource` (`fixed` or `attribute`) and `data.targetTerms`, an ordered array of `{ kind: 'anchor' | 'adjustment' | 'multiplier' | 'benefit', value, source?, label? }`.
+   The first term is the anchor — the fixed anchor, or the character value after any macro — followed by the difficulty step and then each settled roll-under benefit with its router `source` (`tool`, `library`, `situational` or `advantage`); an `adjustment` or `multiplier` term carries `label` when a tier supplied it (the recipe's selected check tier, or the relative tier the roll matched), and anchor and benefit terms carry none.
+   Folding the terms in order — an adjustment added and a multiplier applied, each rounded down, then each benefit — and then every `preRolls` entry whose `destination` is `target` reproduces `data.target` exactly.
+   A character-value result also records `data.targetExpression`, the typed formula trimmed, and `data.targetActor`, the rolling character's name, each only when present.
+   None of these is recorded for a result with no target (a fixed range, an Otherwise tier or progressive), a refusal, a legacy record or a secret prepared check.
+   A `product: "count"` result's `data.dc` is always null, `data.target` is the effective per-die threshold (never null, even for a fixed-range or progressive result), `data.comparison` is the per-die comparison, `data.successes` and numeric `data.cancelled` count qualifying and cancelling dice, `total` is the raw net (qualified minus cancelled), and `margin` is `total` minus the required count of the tier the roll matched — simple: the required count; relative: required plus `outcome.dc`; null for a fixed-range, progressive or zero-pool result, all before forcing or stepping.
+   A zero-pool count result carries `zeroPool: true` with a null `total`, `successes`, `cancelled` and `margin`, no main Roll, and the same populated `target` and `comparison` a rolled result on the same check would carry.
+   A count refusal carries `misconfigured: true`, `data.targetRefusal` naming the reason and `data.refusedInput` naming the input (`'base' | 'threshold' | 'die' | 'explode' | 'cancel' | 'pool'`), and no executed evidence, exactly as a sum target refusal does.
+   An executed count result's `data.boughtDice`, when present, is `{ count, source }`: the integer dice bought for that roll, at least 1, and `'path' | 'macro'` (`resolution-modes/spec.md` § Additional Dice).
+   It is omitted when no die was bought and never written as 0 or null.
+   It never carries the resource path, a macro UUID, the resource name or an amount.
+   An `explode-unbounded` refusal raised after a spend also carries it, because the spend stands.
+   A main Roll that throws after a spend refuses with `data.targetRefusal: 'roll-failed'`, the error in its message and `data.boughtDice`, never a failed check.
 6. `failureReason` is required when `status` is `failed`.
 7. `preparedConsumption.currencySpends` records what was actually deducted, never what was intended.
    It is the sole input to the cancel reversal's refund, so a spend that did not settle must not appear in it; an empty array is the correct record for a step whose currency deduction settled nothing.
@@ -3405,6 +3505,8 @@ Versioned stage arming captures `presentationSnapshot` from the authoritative ex
 For an implicit single stage whose wrapper has no description, the permitted recipe description supplies that captured purpose.
 Its first permitted name and description remain unchanged through execution and completion; later narrative edits do not rewrite history or require whole-Journal invalidation.
 `resolutionSnapshot` captures effective resolution meaning, with the executed meaning retained at completion and across an applied-prefix reload.
+Only an executed, permitted versioned `kind: "check"` stage may additionally retain a validated `product` and `direction` (`over` or `under`); both history allowlists require an executed versioned boundary and snapshot values that agree with the check result's, beside a finite raw total in that result, and drop both when they disagree.
+No-check, ingredient-routed, fizzle, legacy and gathering d100 snapshots gain no evaluation metadata.
 The canonical active-check resolver determines `kind: "check"`; an unchecked ingredient-routed stage records `"ingredients"`, and another confirmed unchecked stage records `"none"`.
 Actual rolls remain in `lastCheckResult` and selected route identity and authored thresholds remain in `selectedRequirementSnapshot`.
 Neither snapshot duplicates check formula, DC or modifier configuration.
@@ -3412,7 +3514,7 @@ Neither snapshot duplicates check formula, DC or modifier configuration.
 The consumption receipt captures each actor-qualified carrier's source contributions before source deletion can prevent later reads.
 `essenceSpend` retains one row per physical `(actorUuid, itemUuid)` carrier, its actual consumed quantity and every recorded essence contribution; spent totals are derived from those contributions rather than stored again.
 Applied-prefix reconstruction hydrates this evidence, and both successful and failed stage finalization retain it through the manager's persistence allowlist.
-`currencySpends` copies applied `settledSpends` only; prepared intent and an Item Piles deducted boolean are not itemized spend evidence.
+`currencySpends` copies applied `settledSpends` only; prepared intent is not itemized spend evidence.
 Legacy timed `preparedConsumption.currencySpends` remains a valid settled receipt.
 Missing optional evidence stays absent in persistence and projects as `null` (Not recorded), while an explicitly recorded empty array or empty carrier list establishes zero.
 Legacy records gain no retrospective mode, presentation or contribution data from the current catalogue.
@@ -3723,8 +3825,8 @@ StepModel = {
    That predicate names an unmade choice, a physical material shortfall, an essence gap the carrier ledger cannot cover, a price the actor cannot pay, and a required tool the actor does not hold, and both `actions.beginStep` and `actions.execute` MUST stay refused while any of them holds.
    Affordability MUST be asked of the whole selection AGGREGATED onto the common base unit, as the engine's own gate asks it, not option by option: two currency ingredients each affordable alone but not together are not affordable.
    The tool probe MUST exclude the items the selection will spend, as the engine's tool validation does, because one physical Item cannot be both a consumed ingredient and a held tool.
-   Two causes are knowable only asynchronously and so remain the engine's alone: a `macro` spend strategy, whose affordability only the macro can answer, and an Item Piles currency cost read through that module's API.
-   The projection stays OPTIMISTIC on both rather than inventing a refusal it cannot substantiate.
+   One cause is knowable only asynchronously and so remains the engine's alone: a `macro` spend strategy, whose affordability only the macro can answer.
+   The projection stays OPTIMISTIC on it rather than inventing a refusal it cannot substantiate.
    A stage's inputs are spent and its choice is locked when it starts, so a started stage is re-judged only on what is still re-validated live: its tools, which are never consumed and which a sale during the wait can remove.
    The player's own pick MUST be judged on the PERSISTED plan, not on the resolver's verdict: the resolver invents a greedy option and a suggested essence allocation when neither is persisted and then reports success, so a stage whose multi-option group or essence allocation is unrecorded is waiting on a choice however well its inputs resolve.
    Which control renders — the begin decision in place of the resolve action, or the resolve action itself — is decided by `actions.atStageStart` alone, never by `actions.beginStep` being truthy nor by matching `actions.disabledReason`: a refused cause at a stage's start boundary MUST keep the (disabled) begin control on screen rather than silently fall back to an enabled resolve action the command would refuse.
@@ -4101,6 +4203,7 @@ Requirements:
 1. **The task-node link is `linked` by default and may be `unlinked`.** A task-linked interactable (`taskNodeLink: "linked"`, `node: null`) opens the gathering app scoped to its `environmentId` + `taskId` (auto-selecting both) and reads/decrements the SAME `environment.nodeRuntime[taskId]` as opening gathering directly — depletion and respawn follow the task, and it does not alter environment node availability beyond a normal gathering attempt.
    An unlinked node (`taskNodeLink: "unlinked"`) reads/decrements its OWN `system.node` pool: depleting it never touches the environment node, and vice-versa.
    The link is resolved by `GatheringRichStateService._resolveNodeSource`, which returns the environment branch whenever there is no interactable ref, the behaviour is task-linked, or the behaviour/node cannot be resolved.
+   The gathering listing a scoped session shows reads and gates on the same pool the attempt will decrement (issue 2048): the app threads its interactable ref into the listing as well as the attempt, and `GatheringNodeService.interactableRefFor` keeps that ref only on the behaviour's own row (matching `environmentId` and `taskId`, or `environmentId` alone in a blind environment), so every other row keeps the environment pool.
    Only a `gatheringTask` may carry an independent node; a link claiming `unlinked` whose `node` does not normalize **downgrades** to `linked`.
    The link is switchable post-placement and non-destructive — re-linking clears `system.node`, and re-seeding an independent pool reuses any node still carried on the behaviour.
 2. Tool requirements resolve from `task.toolIds` against the system-owned Tools library (`system.tools`) at attempt time (so library edits to a Tool propagate to placed interactables).
@@ -4151,43 +4254,77 @@ They are unrelated mechanisms.
 
 The dynamic DC macro is a **crafting-check** mechanism, and within crafting it reaches exactly the two DC-bearing check slots.
 Those are `craftingCheck.simple` — the shared pass/fail slot backing the `simple` and `routedByIngredients` modes and the alchemy `simple` check mode — and `craftingCheck.routed`, backing `routedByCheck` and the alchemy `tiered` check mode.
-Both resolve their DC through `CraftingEngine._resolveSimpleCheckDc`, which is the sole caller of `CraftingEngine._resolveCheckAnchorDc` and the sole dynamic-DC caller of the shared macro executor.
-No other check reaches either symbol.
+Both resolve their target through `resolveCraftingCheckTarget` (`src/systems/craftingCheckRefusal.js`), which calls `craftingCheckAnchorDc` for the fixed anchor, and then through `CraftingEngine._resolveSimpleCheckDc`, the sole dynamic-DC caller of the shared macro executor.
+No other check reaches either symbol; the player listing's `craftingCheckRefuses` reads the same pre-roll resolution to decide `checkUnrollable` (#2139) and never runs the macro.
 The crafting `progressive` check has no DC at all, and salvage and gathering resolve theirs arithmetically through `CraftingEngine._resolveSalvageDc` and `GatheringEngine._resolveGatheringRoutedDc` — a per-record `dcOverride` when finite, else the slot's static `dc`, else a literal `15` — consulting no `checkTierId`, no `tiers`, and no macro.
+Their targets resolve through `CraftingEngine._resolveSalvageTarget` and `GatheringEngine._resolveGatheringRoutedTarget`, which delegate a fixed target to those DC resolvers and run no macro.
 Salvage and gathering nonetheless persist `dcMode`, `macroUuid`, and `tiers`, because they reuse the `SimpleCheck` and `RoutedCheck` shapes so the Checks-tab editors can be shared.
 No DC-resolution path outside the crafting check reads any of the three.
 They are not inert for that reason.
-Outside the shared Checks-tab editors, which round-trip whatever their slot holds, salvage's `simple.tiers` and `simple.dcMode` have one reader: the per-component salvage DC control (`src/ui/svelte/apps/manager/component/salvageDcPresets.js`) builds its preset options from `salvageCraftingCheck.simple.tiers` in EVERY salvage resolution mode, routed included — there is no `.routed.tiers` sibling for presets — and renders its system-default option without a DC number when `salvageCraftingCheck.simple.dcMode` is `dynamic`, because a macro-computed DC has no number to show.
-Dropping salvage's `simple.tiers` would therefore silently empty that preset list, and dropping its `simple.dcMode` would mislabel the default option, so arithmetic DC resolution licenses removing neither.
+Outside the shared Checks-tab editors, which round-trip whatever their slot holds, salvage's `simple.tiers` has one reader: the per-component salvage DC control (`src/ui/svelte/apps/manager/component/salvageDcPresets.js`) builds its preset options from `salvageCraftingCheck.simple.tiers` in EVERY salvage resolution mode, routed included — there is no `.routed.tiers` sibling for presets.
+Under a fixed target a preset is a named tier's `dc`; under a character-value target it is a named tier's `adjustment` that is valid for the active adjustment kind (any finite number added, a multiplier above zero); under a count check it is a named tier's non-null `successes`.
+Because salvage never runs a DC macro, the control's system-default option names the slot's static DC whatever `simple.dcMode` says, so `simple.dcMode` is round-tripped by the shared editors only.
+Dropping salvage's `simple.tiers` would therefore silently empty that preset list, so arithmetic DC resolution does not license removing it.
+Gathering task overrides have no preset source at all: gathering authors no recipe tiers, so a task's check override is a single number field.
 `macroUuid` is the one of the three with no reader at all on salvage or gathering, and gathering has no manager-side reader of any of them.
 
-Before the configured macro runs, `_resolveCheckAnchorDc` computes an **anchor DC** for the crafting check slot being resolved.
-The anchor is the recipe's selected difficulty tier — `Recipe.checkTierId` matched against that slot's `tiers[].id` — when it names a tier that still exists, and the slot's static `dc` otherwise.
+Before the configured macro runs, `resolveCraftingCheckTarget` computes an **anchor** for the crafting check slot being resolved, and validates it: a target refusal aborts before the macro runs.
+Under a fixed target source the anchor is the anchor DC `craftingCheckAnchorDc` computes; under an attribute source it is the adjusted character value (see `resolution-modes/spec.md` § Check Target Resolution).
+The anchor DC is the recipe's selected difficulty tier — `Recipe.checkTierId` matched against that slot's `tiers[].id` — when it names a tier that still exists, and the slot's static `dc` otherwise.
 `CraftingSystemManager._normalizeSimpleCraftingCheck` and `_normalizeRoutedCraftingCheck` normalize that `dc` to a finite integer, defaulting to 15, on every save, so a normalized crafting check slot's static `dc` is never absent or non-finite.
-`_resolveCheckAnchorDc`'s own fallback to a literal `15` therefore guards only a check config that reached it without that normalization, and is not reachable through normal play.
+`craftingCheckAnchorDc`'s own fallback to a literal `15` therefore guards only a check config that reached it without that normalization, and is not reachable through normal play.
 
-When a crafting slot's `dcMode` is anything other than `dynamic`, or no `macroUuid` is configured, the anchor IS that check's resolved DC and no macro runs.
+When a crafting slot's `dcMode` is anything other than `dynamic`, or no `macroUuid` is configured, the anchor IS that check's resolved target and no macro runs.
 When `dcMode` is `dynamic` and a `macroUuid` is configured, `_resolveSimpleCheckDc` runs that macro and hands it one payload object containing:
 
 - `recipe`
 - `craftingSystem`
 - `craftingActor`
 - `candidateIngredientSet`
-- `anchorDc` — the anchor DC resolved above, before the macro runs
+- `anchorDc` — the anchor resolved above, before the macro runs: the anchor DC under a fixed target, or the adjusted character value under an attribute target
+- `evaluation` — a structured clone of the slot's normalized check evaluation
 
 Fabricate exposes that exact object with identity as `scope`, `context`, and `args`.
 The `scope` identifier provides Foundry-facing familiarity while `context` and `args` remain backward-compatible aliases.
 This is not full native `Macro#execute` behavior: Foundry's native `scope` is a rest copy, and Fabricate does not add Foundry's native `speaker`, `actor`, `token`, or `character` locals.
 
 Fabricate applies `Number(result)` to the macro's return value.
-When the coerced value is finite, Fabricate truncates it to an integer and uses it as that crafting check's DC.
-An absent configured macro, a `dcMode` other than `dynamic`, a thrown error, or a result whose numeric coercion is non-finite all leave the anchor DC in force, so a recipe's difficulty tier and a dynamic DC macro compose rather than acting as alternatives: the tier sets the number the macro is asked to adjust.
+When the coerced value is finite, Fabricate truncates it to an integer and uses it as that crafting check's target, replacing the anchor before any relative multiplication and before a sum/under `targetDelta` applies.
+An absent configured macro, a `dcMode` other than `dynamic`, a thrown error, or a result whose numeric coercion is non-finite all leave the anchor in force, so a recipe's difficulty tier and a dynamic DC macro compose rather than acting as alternatives: the tier sets the number the macro is asked to adjust.
 
 The shared executor deliberately evaluates the selected script Macro command instead of calling `Macro#execute`.
 This keeps player-initiated workflows from being blocked by Foundry's current-user Macro permission gate.
 The direct evaluation bypasses only the client-side Macro document check and grants no additional server or document authority; the script still runs as the current player.
 Foundry runtime globals `game`, `foundry`, `ui`, and `fromUuid` remain directly available and are not injected as payload parameters.
-Errors thrown by a configured macro propagate unchanged to the owning Fabricate workflow, which decides whether to abort or apply a documented fallback such as the anchor-DC fallback above, as does the executor's own `Macro not found or invalid` error when the configured uuid resolves to no document or to one carrying no string `command`.
+Errors thrown by a configured macro propagate unchanged to the owning Fabricate workflow, which decides whether to abort or apply a documented fallback such as the anchor fallback above, as does the executor's own `Macro not found or invalid` error when the configured uuid resolves to no document or to one carrying no string `command`.
+
+### Additional Dice Macro Contract
+
+A count check whose `pool.additionalDice` is enabled with `source: 'macro'` names a read macro and a spend macro (`resolution-modes/spec.md` § Additional Dice).
+Both must be `script` macros, checked at the call site before either runs: a read macro of any other type makes additional dice unavailable (`resourceMacroFailed`), and a spend macro of any other type refuses the spend (`spendRefused`) without running.
+Both run through the shared executor on the client that executes the roll: the acting player's for an immediate roll, bulk salvage included, the claim-holding GM authority for a prepared check, and the executing GM for a Standalone Check Roll.
+Each receives one payload object, exposed with identity as `scope`, `context` and `args`.
+Macros must read the payload.
+The executor binds only `scope`, `context` and `args`, unlike core `Macro#execute`, so a bare `actor`, `token`, `speaker` or `character` is not defined on any path and the macro throws.
+`game.user` is the executing client's user: the GM on a prepared check or a Standalone Check Roll.
+The read payload is `{ actor, user, craftingSystem, activity, recipe, component, task, evaluation, rolls }`:
+
+- `actor` is the acting actor;
+- `user` is the acting user: the rolling client's user on an immediate roll, the attested sender on a prepared check, and the calling GM on a Standalone Check Roll;
+- `activity` is `'crafting' | 'salvage' | 'gathering'`, and `null` on a Standalone Check Roll;
+- `craftingSystem` is the attempt's crafting system, and `recipe`, `component` and `task` its subject, each `null` when the attempt has none to name;
+- on a prepared check and on a Standalone Check Roll, `craftingSystem`, `recipe`, `component` and `task` are `null`, and on the one read a bulk choice is offered from, so is any of them its covered rows do not share;
+- `evaluation` is a structured clone of the normalized evaluation;
+- `rolls` is 1, or the number of rolls one bulk choice covers.
+
+The read macro returns the amount available.
+A finite number of 0 or more is floored; anything else, a numeric string included, or a throw, makes additional dice unavailable (`resourceMacroFailed`) for that attempt, which still rolls without them.
+The spend first runs the read macro again: a failed re-read refuses `resourceMacroFailed`, and an amount now below this roll's dice refuses `resourceChanged`.
+The spend payload is the read payload plus `dice`, the dice bought for this roll, and `delta`, which is `−dice` in resource units at one unit per die; a macro applying another exchange rate converts it.
+The spend macro returns a truthy value once it has deducted.
+A falsy result or a throw aborts that roll before its main dice (`spendRefused`).
+Whatever the macro already changed stands, and Fabricate never refunds or retries.
+On a prepared check it must settle within the 15-second command budget; the executor itself enforces no timeout.
 
 ### Crafting Check Macro Contract (Removed in 1.8.0)
 
@@ -4571,7 +4708,7 @@ This is the same rule the inventory snapshot introduced as the **indexed availab
 
 ### Browse-status precedence
 
-A row's browse status is derived by ONE rule, highest precedence first: teaser, then locked, then knowledge-gated, then recipe-item exhausted, then a material shortfall, otherwise available.
+A row's browse status is derived by ONE rule, highest precedence first: teaser, then locked, then knowledge-gated, then recipe-item exhausted, then a check that refuses the acting character before any roll (`checkUnrollable`, #2139), then a material shortfall, otherwise available.
 Exhaustion is READ from the knowledge access evaluation that already established it and MUST NOT be recomputed — see `recipe-visibility/spec.md` § One Candidate Collection Per Evaluation.
 The material term reads the cheap-availability rule's tristate: only a definitive negative yields a material shortfall, and "not asked" does not.
 
@@ -4609,7 +4746,9 @@ Finite timestamps are injected audit-only wall-clock values and never arbitrate 
 
 A pending decision has null value and evidence, while a resolved decision has non-null saved value and evidence; false, zero and the empty string are valid saved JSON values.
 A pending effect has null evidence and waiver.
-Applied, known-failure and review-required effects require non-null durable evidence; an applying effect may retain evidence but has no waiver.
+Applied, known-failure and review-required effects require non-null durable evidence, and an applying effect has no waiver.
+An applying effect carries either v1 effect evidence or null; one with null evidence is in flight and observation-only, because nothing proves which of its writes happened.
+Every non-null effect evidence satisfies § Companion Effect Evidence.
 A waiver is present if and only if the effect is waived and records a nonblank user, finite timestamp and nonblank reason.
 An unresolved decision dependency permits its effect only to remain pending or be waived.
 
@@ -4624,15 +4763,79 @@ Archive metadata is either two nulls or a finite `hiddenAt` paired with a nonbla
 The first successful archive writes that pair and advances revision; later archive requests return the stored record unchanged.
 There is no erase or unarchive transition, and archival cannot rewrite identity, plan, decisions, effect evidence or outcome.
 
-The record is stored on one embedded `JournalEntryPage` whose id is the operation id, beneath a resolved private ledger.
+The record is stored on one embedded `JournalEntryPage` whose id is the operation id, beneath the resolved GM-owned authority ledger.
 Acceptance first reads that exact parent and page authoritatively; a valid existing record answers duplicate or conflict without issuing a normal-retry create.
 Only a proven absent page in a present readable ledger permits `createEmbeddedDocuments('JournalEntryPage', ..., { keepId: true })`, preserving embedded-id uniqueness as the race boundary.
 A missing parent, unreadable response, malformed flag, rejected write without conclusive readback, empty or cancelled write result, wrong returned id or unverified acknowledgement fails closed.
-After an ambiguous create or archive write, only authoritative readback proving the stored state may report success.
+After an ambiguous create, archive or effect-transition write, only authoritative readback proving the stored state may report success.
 
 Every input and output boundary returns a detached snapshot, including the accepted plan captured before the first awaited write.
 Changing caller input while persistence is pending or changing a returned record cannot alter stored state or later plan comparison.
 The adapter claims neither a V13 compare-and-swap nor a transaction across documents; runtime execution serialization, claims, effects and public methods belong to later delivery increments.
+
+### Companion Effect Evidence
+
+An effect's evidence, when non-null, is exactly `{ evidenceVersion: 1, replayClass, failure, subwrites }`, and each subwrite is exactly `{ subwriteId, target, phase, intent, receipt, failure }`.
+Every key is always present: an empty value is `null`, never an absent key.
+A subwrite id is a nonblank string unique within its effect, its `target` is always a JSON object, and a non-null `intent`, `receipt` or `failure` is a JSON object.
+Unknown versions, missing or extra keys and any pairing below that does not hold fail closed as an invalid record.
+No object key at any depth under a subwrite's `target`, `intent`, `receipt` or `failure`, or under the effect-level `failure`, may contain a `.`: Foundry expands a dotted key on every document write, so such a record could never read back equal to the one sent, and it fails closed as an invalid record.
+A document path therefore travels as a value, never as a key: an `actorProperty` currency credit's intent is `{ unitId, amount, baseValue, creditedBase, strategy, postValues }`, where `postValues` is the list `[{ path, value }]` of the balances its one update intends, and every other credit's intent carries `postValues: null`.
+
+`replayClass` names how a subwrite's effect can be proven, from a closed set:
+
+- `structuredMarker`: the write carries the effect marker, so the target document itself proves it;
+- `structuredObserved`: the write cannot carry the marker, and only the delta measured during the write proves it;
+- `idempotentKey`: the target's own key (a learned-recipe entry) proves it, and no marker is written;
+- `opaqueMacro`: nothing proves it, so an interrupted run always needs review.
+
+Two `failure` fields mean different things.
+The effect-level `failure` is set only by an `effectFailure` change, which refuses a pending effect as a whole before any subwrite exists: it forces `replayClass: null` and `subwrites: []`, and it is the only evidence with no subwrites.
+A subwrite's `failure` carries the detail of that subwrite's `knownFailure` or `uncertain` phase.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Subwrite phase | `intent` | `receipt` | `failure` |
+| --- | --- | --- | --- |
+| `pending` | null | null | null |
+| `applying` | set | null | null |
+| `applied` | set; null only for an `idempotentKey` receipt `{ result: 'alreadyKnown' }` | set | null |
+| `knownFailure` | optional | null | set |
+| `uncertain` | set | null | set |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+The effect phase is derived from its evidence and a stored phase that disagrees is invalid; a waived effect's evidence is checked for shape only.
+Highest precedence first: an effect-level failure gives `knownFailure`; any `uncertain` subwrite gives `reviewRequired`; any `pending` or `applying` subwrite gives `applying`; any `knownFailure` subwrite gives `knownFailure`; otherwise every subwrite is applied and the effect is `applied`.
+A subwrite failing while siblings are still pending therefore leaves the record `pending`, and an uncertain subwrite rolls up to a review-required effect and record.
+At most one subwrite in the whole record is `applying`.
+A mutation is in flight when a subwrite is `applying` or an `applying` effect has null evidence; otherwise only pending subwrites may be resumed.
+
+One effect change is one transition, applied to one subwrite named by effect and subwrite id, and it advances the revision by one and sets `updatedAt`:
+
+- `applying { intent }` from a pending subwrite, only while nothing is in flight;
+- `applied { receipt }` from an applying subwrite, or directly from a pending subwrite of an `idempotentKey` effect whose receipt is `{ result: 'alreadyKnown' }`, with intent left null;
+- `knownFailure { failure }` from a pending or applying subwrite;
+- `uncertain { failure }` from an applying subwrite;
+- `effectFailure { failure }` from a pending effect, naming no subwrite.
+
+The first change a pending effect takes carries a `skeleton` of its `replayClass` and every subwrite's id and target, which it fills in as pending subwrites; an effect that already has evidence refuses one.
+A settled subwrite (`applied`, `knownFailure` or `uncertain`) never changes here: waiver and retry belong to a later increment.
+A change on a terminal record, on an effect whose phase is neither pending nor applying, or on an effect with an unresolved decision is refused as `INVALID_COMPANION_EFFECT_TRANSITION`, and an expected revision that is not the stored one as `COMPANION_OPERATION_STALE_REVISION`.
+A record whose every effect is `applied` completes with the outcome `{ schemaVersion: 1, effects: [{ effectId, kind, subwrites: [{ subwriteId, receipt }] }] }`, derived from the evidence rather than supplied.
+
+A transition write reads the page authoritatively, answers `stale` with the stored record when the revision moved, and otherwise replaces the record flag wholesale by forced replacement, so a key the next record omits cannot survive a merge.
+The write is verified against the returned page; an ambiguous result rereads and answers `updated` only when the stored record equals the intended one, `stale` when the revision moved, and `unavailable` otherwise.
+This is read-then-write, not compare-and-set: the held run claim is what serializes writers.
+
+### Companion Effect Marker
+
+A write made for a `structuredMarker` subwrite carries the marker `{ operationId, effectId, subwriteId }` at `flags.fabricate.companionEffect` of the document it writes, in the same create or update that carries the value.
+In create data it is a plain nested object; in an update it is written by forced replacement of that one key.
+It is never written through `setFabricateFlag`, which nests beneath `flags.fabricate.fabricate`, and a receipt or probe reads the same path.
+The marker is one Fabricate-owned slot per document: it is overwritten by a later operation, never accumulated and never cleared, and a write outside the effect path omits the key rather than writing `null`.
+It is operation evidence, not an idempotency key: a marker proves a write only together with the intended value at its path, and a missing or overwritten marker makes the subwrite uncertain, never unapplied.
+For a stacked item the intended value is the stored count, which must be present; a created item whose source carries no count field holds one unit, so it proves a quantity of 1 exactly as the award admitted it.
 
 ## Behavioural Ownership
 

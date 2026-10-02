@@ -16,7 +16,7 @@ import { deflateSync } from 'node:zlib';
 
 // CODE POINT, not `localeCompare`: a recipe-id list compared by equality must order identically
 // on every machine, and `localeCompare` is locale-dependent.
-import { byCodePoint } from './helpers/ratchetBaseline.js';
+import { byCodePoint } from './helpers/codePointOrder.js';
 import {
   SMOKE_SOURCE,
   SMOKE_SOURCE_SEGMENTS,
@@ -993,8 +993,12 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(idsFor('src/ui/svelte/apps/manager/CraftingSettingsView.svelte'), ['manager-alchemy-settings']);
     // #727 pills — RollResultBox lives under the crafting detail sources.
     assert.ok(idsFor('src/ui/svelte/apps/crafting/detail/RollResultBox.svelte').includes('player-crafting-roll-result'));
-    // #727 roll total — the chat card markup is built in CraftingChatCard.js.
-    assert.deepEqual(idsFor('src/ui/presenters/CraftingChatCard.js'), ['chat-craft-card']);
+    // #727 roll total — the chat card markup is built in CraftingChatCard.js, which also
+    // renders issue 2005's roll-under evidence, so it maps to both recipes.
+    assert.deepEqual(idsFor('src/ui/presenters/CraftingChatCard.js').sort(byCodePoint), [
+      'chat-craft-card',
+      'chat-craft-card-under',
+    ]);
     assert.deepEqual(idsFor('src/ui/presenters/SalvageChatCard.js'), ['chat-craft-card']);
     // #735 row rendering — the shared VocabularyPanel renders the item-tags rows.
     assert.ok(idsFor('src/ui/svelte/apps/manager/VocabularyPanel.svelte').includes('manager-tags-categories-tags-tab'));
@@ -1124,6 +1128,19 @@ describe('UI PR screenshot evidence', () => {
     assert.ok(editorIds.includes('manager-recipe-item-validation-blocked'));
   });
 
+  // Issue 1721 moved the systems library inspector out of the root, and the import report and the
+  // folder-aware drop into a model that opens both import-flow modals.
+  it('maps the systems inspector and the import flow model to the frames they draw', () => {
+    const inspectorIds = mapChangedFilesToViews([
+      'src/ui/svelte/apps/manager/SystemBrowserInspector.svelte',
+    ]).map(view => view.id);
+    assert.deepEqual(inspectorIds, ['manager-systems']);
+    const flowIds = mapChangedFilesToViews([
+      'src/ui/svelte/apps/manager/importFlowModel.svelte.js',
+    ]).map(view => view.id);
+    assert.deepEqual(flowIds, ['manager-import-report', 'manager-import-folder-mapping']);
+  });
+
   it('maps the #492 import-report render files to the manager-import-report recipe', () => {
     for (const file of [
       'src/ui/SvelteCraftingSystemManagerApp.svelte.js',
@@ -1132,7 +1149,7 @@ describe('UI PR screenshot evidence', () => {
       'src/ui/presenters/importReportContent.js',
       // Issue 877 moved the rendering into a Svelte modal built on the shared chrome.
       'src/ui/svelte/apps/manager/ImportReportModal.svelte',
-      'src/ui/svelte/apps/manager/ManagerModal.svelte',
+      'src/ui/svelte/components/ManagerModal.svelte',
     ]) {
       const views = mapChangedFilesToViews([file]);
       assert.ok(
@@ -1148,7 +1165,7 @@ describe('UI PR screenshot evidence', () => {
   // change to it must republish both frames, not just the report's.
   it('maps the shared ManagerModal chrome to both import-flow frames', () => {
     const ids = mapChangedFilesToViews([
-      'src/ui/svelte/apps/manager/ManagerModal.svelte',
+      'src/ui/svelte/components/ManagerModal.svelte',
     ]).map(view => view.id);
     assert.ok(ids.includes('manager-import-report'));
     assert.ok(ids.includes('manager-import-folder-mapping'));

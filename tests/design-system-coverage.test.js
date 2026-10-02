@@ -78,25 +78,25 @@ test('the library has the exact structure the parser assumes', () => {
   // properties below read as if it were a database, and each moves only when someone edits that
   // file — at which point the edit should be accepted deliberately rather than absorbed (issue
   // 1371).
-  assert.equal(library.blockCount, 59, 'spec-head block count');
+  assert.equal(library.blockCount, 60, 'spec-head block count');
   assert.equal(
     library.headingCount,
-    59,
+    60,
     'the one-heading-per-block relation broke: a block with two h4s double-counts its entry, and ' +
       'a block with none drops it out of the set entirely'
   );
-  assert.equal(library.names.length, 71, 'distinct primitive names');
+  assert.equal(library.names.length, 72, 'distinct primitive names');
   assert.equal(
     library.nameOccurrences,
-    71,
+    72,
     'occurrences no longer equal distinct names, so one primitive is now named by two entries ' +
       'and the set has a duplicate'
   );
-  assert.equal(library.headings.length - library.nonPrimitiveHeadings.length, 39, 'naming blocks');
+  assert.equal(library.headings.length - library.nonPrimitiveHeadings.length, 40, 'naming blocks');
   assert.equal(library.nonPrimitiveHeadings.length, 20, 'section-prose blocks');
 
   // The only pair that pins the ANCHOR as narrower than a file-wide scan.
-  assert.equal(library.fileWideNames.length, 82, 'file-wide primitive-shaped names');
+  assert.equal(library.fileWideNames.length, 83, 'file-wide primitive-shaped names');
   assert.equal(library.namesOutsideHeadings.length, 11, 'names outside every spec-head heading');
 });
 
@@ -190,9 +190,9 @@ test('every manifest library name resolves to a library entry', () => {
 });
 
 /**
- * The 26 library entries with no shipped implementation (issue 1505). Re-derived from the array
- * rather than carried forward: `SortableList` left it at issue 1512, when the specified primitive
- * shipped, and the count this docblock states is the array's own length.
+ * The 25 library entries with no shipped implementation (issue 1505). Re-derived from the array
+ * rather than carried forward: `SortableList` left it at issue 1512 and `Well` at issue 2008, when
+ * each specified primitive shipped, and the count this docblock states is the array's own length.
  */
 const SPECIFIED_ONLY = [
   'AppRail', 'AppTitleBar', 'BandedBar', 'BrowseCard', 'ChoiceGroup',
@@ -200,7 +200,7 @@ const SPECIFIED_ONLY = [
   'Meter', 'NavSidebar', 'PageHeader', 'PickerRow', 'Rail',
   'RequirementChooser', 'RuleRow', 'RuleSentence', 'Search', 'SetPicker',
   'StageBars', 'TierTrack', 'ValidationList', 'ValidationSummary',
-  'ViewToggle', 'Well', 'XrefList',
+  'ViewToggle', 'XrefList',
 ];
 
 test('every library entry is either recorded as shipped or recorded as unbuilt', () => {
@@ -604,13 +604,15 @@ test('a divergent entry names the issue that decided it', () => {
 });
 
 /**
- * The 32 shipped rows the library does not name, re-counted at issue 1392 rather than incremented.
+ * Shipped manifest rows without a named library specimen.
  */
 const UNDOCUMENTED_ROWS = [
   // `components/ActionMenu` is the newest arrival and is the ORDINARY kind of growth: a member of
   // the set that no `library.html` specimen names (issue 1458).
   'src/ui/svelte/apps/ActorSelectTopBar.svelte',
   'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',
+  // Issue 2005's executed check evidence rows: no specimen names a key-and-value evidence list.
+  'src/ui/svelte/apps/crafting/detail/CheckEvidenceRows.svelte',
   'src/ui/svelte/apps/manager/BulkDeleteCard.svelte',
   'src/ui/svelte/apps/manager/BulkEditSection.svelte',
   'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
@@ -630,6 +632,13 @@ const UNDOCUMENTED_ROWS = [
   // a page-level vocabulary layout, and each is a COMPOSITION over entries that do exist.
   'src/ui/svelte/apps/manager/VocabularyShell.svelte',
   'src/ui/svelte/apps/manager/VocabularyShellPanel.svelte',
+  // Issue 2005's Preview-as picker and the check overrides' Player sees block: no specimen names a
+  // character picker or a player-view line, and each composes entries that do exist.
+  'src/ui/svelte/apps/manager/checks/CheckCharacterValueField.svelte',
+  // Issue 2008's option group: a titled `<Well>` composition, which no specimen names.
+  'src/ui/svelte/apps/manager/checks/CheckOptionGroup.svelte',
+  'src/ui/svelte/apps/manager/checks/PreviewAsPicker.svelte',
+  'src/ui/svelte/apps/manager/component/OverridePlayerSees.svelte',
   'src/ui/svelte/apps/manager/downtime/WorldDowntimeTabs.svelte',
   'src/ui/svelte/apps/manager/environment/CompositionList.svelte',
   // Issue 1707's gathering modifier panel: no specimen names a condition-and-character editor.
@@ -639,6 +648,7 @@ const UNDOCUMENTED_ROWS = [
   // The manifest records their new shared membership and why no generic library entry applies.
   'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte',
+  'src/ui/svelte/apps/manager/scoped/ScopedEntrySystemsCard.svelte',
   'src/ui/svelte/components/ActionMenu.svelte',
   'src/ui/svelte/components/ArmedDangerButton.svelte',
   'src/ui/svelte/components/ChanceSlider.svelte',

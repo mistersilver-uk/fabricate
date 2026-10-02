@@ -43,6 +43,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/stores\/adminStore\.js$/,
       // `SystemsBrowserView` alone (issue 1515).
       /^src\/ui\/svelte\/apps\/manager\/SystemsBrowserView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/SystemBrowserInspector\.svelte$/,
     ],
   }),
   managerCase({
@@ -84,6 +85,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/SystemsBrowserView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/SystemBrowserInspector\.svelte$/,
     ],
   }),
   managerCase({
@@ -101,6 +103,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
       /^src\/ui\/svelte\/stores\/adminStore\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/SystemBrowserInspector\.svelte$/,
     ],
   }),
   managerCase({
@@ -158,6 +161,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader)\.svelte$/,
       /^src\/ui\/svelte\/stores\/adminStore\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/SystemBrowserInspector\.svelte$/,
     ],
   }),
   managerCase({
@@ -249,7 +253,8 @@ export const CASES = Object.freeze([
       // The expression field this screen is now the only caller of (issue 1373).
       /^src\/ui\/svelte\/apps\/manager\/RollDataExpressionInput\.svelte$/,
       // The icon vocabulary the shared picker lists (issue 1269).
-      /^src\/ui\/svelte\/util\/(?:essenceIcons|foundryIconVocabulary|foundryIconCatalogue)\.(?:js|json)$/,
+      /^src\/ui\/svelte\/util\/(?:essenceIcons|foundryIconVocabulary|foundryIconCatalogue)\.js$/,
+      /^src\/ui\/svelte\/util\/foundryIconCatalogue\.json$/,
       // The positioning seam the open picker's panel is placed by (issue 1500).
       ...ANCHORED_POPOVER_SOURCES,
     ],

@@ -45,7 +45,11 @@
  */
 
 import { buildCheckModifierContext } from '../../systems/checkModifierResolver.js';
+import { activeCheckEvaluation, actorRollData, isFixedSumOver } from '../../systems/checkTarget.js';
+import { countFormulaValues, resolvePool } from '../../systems/countEvaluation.js';
+import { craftingCheckRefuses, memoizedRollData } from '../../systems/craftingCheckRefusal.js';
 import { buildPassInventorySnapshot } from '../../systems/passInventorySnapshot.js';
+import { hasActiveCheck } from '../../systems/salvageCheckUsability.js';
 import { resolvedComponentsFor } from '../../systems/scopedEntityReads.js';
 import { activeRunStepState, buildStepRecipeView } from '../../systems/stepRecipeView.js';
 // The player-visible per-stage complication forecast (issue 1286), attached to the stage
@@ -60,7 +64,13 @@ import {
 } from '../../utils/scalars.js';
 import { resolveRecipeImage } from '../svelte/util/craftingImageDefaults.js';
 
-import { CRAFTING_BROWSE_STATUS, deriveBrowseStatus } from './craftingBrowseStatus.js';
+import { countSuccessesNeeded, describeCheckTarget } from './checkDescriptor.js';
+import {
+  BROWSE_BLOCKING_REASON_KEYS,
+  CRAFTING_BROWSE_STATUS,
+  deriveBrowseStatus,
+} from './craftingBrowseStatus.js';
+import { heldToolBonus } from './heldToolBonus.js';
 import { SUMMARY_AUDIENCE, projectRecipeSummary } from './summaryProjection.js';
 
 /**
@@ -90,20 +100,9 @@ const RESOLUTION_MODE_LABEL_KEYS = {
  */
 export { CRAFTING_BROWSE_STATUS } from './craftingBrowseStatus.js';
 
-/**
- * Localization keys for a recipe's primary blocking reason, keyed by browse
- * status. `available` has no blocking reason.
- */
-const BLOCKING_REASON_KEYS = {
-  [CRAFTING_BROWSE_STATUS.LOCKED]: 'FABRICATE.App.Crafting.Blocking.Locked',
-  [CRAFTING_BROWSE_STATUS.UNKNOWN]: 'FABRICATE.App.Crafting.Blocking.Unknown',
-  [CRAFTING_BROWSE_STATUS.EXHAUSTED]: 'FABRICATE.App.Crafting.Blocking.Exhausted',
-  [CRAFTING_BROWSE_STATUS.DISCOVERY]: 'FABRICATE.App.Crafting.Blocking.Discovery',
-  [CRAFTING_BROWSE_STATUS.MISSING_MATERIALS]: 'FABRICATE.App.Crafting.Blocking.MissingMaterials',
-};
-
 const DEFAULT_TEASER_HIDDEN_FIELDS = ['ingredients', 'results', 'description'];
 const UNKNOWN_COMPONENT_KEY = 'FABRICATE.Labels.UnknownComponent';
+const COUNT_FORMULA_KEY = 'FABRICATE.Check.CountRoll.Pool';
 const TIME_REQUIREMENT_FIELDS = ['minutes', 'hours', 'days', 'months', 'years'];
 
 /**
@@ -232,6 +231,7 @@ export class CraftingListingBuilder {
     );
 
     const summaries = [];
+    const readRollData = memoizedRollData(craftingActor);
     for (const entry of visibleEntries) {
       const recipe = entry?.recipe;
       if (!recipe) continue;
@@ -244,6 +244,7 @@ export class CraftingListingBuilder {
           snapshot,
           craftingActor,
           knowledgeSources,
+          readRollData,
         })
       );
     }
@@ -382,11 +383,20 @@ export class CraftingListingBuilder {
    * summary, so it is emitted as its "not asserted here" value.
    * @private
    */
-  _buildRecipeSummary({ recipe, access, isGM, snapshot, craftingActor, knowledgeSources }) {
+  _buildRecipeSummary({
+    recipe,
+    access,
+    isGM,
+    snapshot,
+    craftingActor,
+    knowledgeSources,
+    readRollData,
+  }) {
     const redacted = !isGM && stringOrEmpty(access?.reason) === 'teaser';
+    const system = this.craftingSystemManager?.getSystem?.(recipe.craftingSystemId) ?? null;
     return projectRecipeSummary({
       recipe,
-      system: this.craftingSystemManager?.getSystem?.(recipe.craftingSystemId) ?? null,
+      system,
       audience: isGM ? SUMMARY_AUDIENCE.GM : SUMMARY_AUDIENCE.PLAYER,
       access,
       snapshot,
@@ -394,6 +404,7 @@ export class CraftingListingBuilder {
         !isGM &&
         !redacted &&
         this._isKnowledgeExhausted(access, recipe, craftingActor, knowledgeSources, snapshot),
+      checkRefused: !redacted && craftingCheckRefuses(system, recipe, craftingActor, readRollData),
       favourite: false,
       localize: this.localize,
     });
@@ -533,9 +544,7 @@ export class CraftingListingBuilder {
       this.recipeManager?.evaluateCraftability?.(
         craftSources,
         this._stepRecipeView(recipe, firstStep),
-        {
-          craftingActor,
-        }
+        { craftingActor }
       ) ?? null;
     const canCraftMaterials = fullCraftability?.canCraft === true;
     const defaultSetId =
@@ -554,7 +563,8 @@ export class CraftingListingBuilder {
     const exhausted =
       !isGM && this._isKnowledgeExhausted(access, recipe, craftingActor, knowledgeSources);
 
-    const browseStatus = this._deriveBrowseStatus({ reason, canCraftMaterials, exhausted });
+    const refused = craftingCheckRefuses(system, recipe, craftingActor);
+    const browseStatus = this._browseStatus({ reason, canCraftMaterials, exhausted, refused });
     const blockingReasons = this._blockingReasons(browseStatus);
 
     return {
@@ -581,7 +591,11 @@ export class CraftingListingBuilder {
       // counts AUTHORED steps and ignores `features.multiStepRecipes`, so a collapsed chain
       // still headlines its terminal product, unlike the Journal run model's `multiStep`.
       stepCount: this._executionSteps(recipe).length,
-      check: this._buildCheck(system, mode, recipe, craftingActor),
+      // The held Tool bonus reads the per-set tool states the rows above already resolved.
+      check: this._buildCheck(system, mode, recipe, craftingActor, [
+        ...ingredientSets.map((row) => row.craftability?.toolStates),
+        ...(ingredientSets.length === 0 ? [fullCraftability?.toolStates] : []),
+      ]),
       outcomeTiers: this._buildOutcomeTiers({ recipe, system, mode }),
       duration: this._buildDuration({ recipe, system, mode }),
       result: this._buildResult({ recipe, system, mode, defaultSet }),
@@ -693,8 +707,7 @@ export class CraftingListingBuilder {
    */
   _evaluateSet({ recipe, set, step = null, craftSources, craftingActor }) {
     if (typeof this.recipeManager?.evaluateCraftability !== 'function') return null;
-    // A shallow copy preserves the recipe's data fields (craftingSystemId,
-    // currencyCost, …) and the IngredientSet instance methods, while narrowing the
+    // A shallow copy preserves the recipe's data fields (craftingSystemId, …) and the IngredientSet instance methods, while narrowing the
     // evaluation to this one set and applying the owning step's tool union (D1) —
     // evaluateCraftability reads recipe data only (never recipe prototype methods),
     // so the copy is sufficient. When no step is supplied (single-step callers) it
@@ -820,38 +833,26 @@ export class CraftingListingBuilder {
     return this.localize('FABRICATE.App.Crafting.Detail.StepFallback', { index: index + 1 });
   }
 
-  /**
-   * Browse-status precedence (highest first):
-   *   teaser → discovery, locked → locked, knowledge → unknown,
-   *   recipe-item exhausted → exhausted, materials missing → missingMaterials,
-   *   otherwise available.
-   * Teaser is handled before this is reached (redacted recipes short-circuit), so
-   * the `reason === 'teaser'` branch is a defensive fallback.
-   *
-   * Delegates to the shared rule (issue 1091) so this detail model and the summary
-   * projection the page rows are built from cannot label the same recipe differently.
-   * The rule reads `materialsAvailable` as a TRISTATE — `null` means no material check
-   * ran — and this builder always ran one, so it passes a boolean and behaves exactly
-   * as the inlined version did.
-   * @private
-   */
-  _deriveBrowseStatus({ reason, canCraftMaterials, exhausted }) {
+  /** The shared rule (issue 1091), so this detail and the summary row cannot disagree. */
+  _browseStatus({ reason, canCraftMaterials, exhausted, refused }) {
     return deriveBrowseStatus({
       reason,
       materialsAvailable: canCraftMaterials === true,
       exhausted: exhausted === true,
+      checkRefused: refused === true,
     });
   }
 
   _blockingReasons(browseStatus) {
-    const key = BLOCKING_REASON_KEYS[browseStatus];
+    const key = BROWSE_BLOCKING_REASON_KEYS[browseStatus];
     return key ? [this.localize(key)] : [];
   }
 
   /**
    * The crafting-check descriptor for the recipe's resolution mode, or null when
    * the system configures no check block for that mode. `usable` is true iff an
-   * authored, non-empty roll formula exists — NOT the legacy `enabled` flag.
+   * authored, non-empty roll formula or an active count check exists — NOT the legacy
+   * `enabled` flag. A count check shows its pool line in place of its retained formula.
    *
    * The displayed `dc` is resolved per-recipe (not per-system) with the same
    * precedence the engine (`CraftingEngine._resolveSimpleCheckDc`) and the GM
@@ -872,9 +873,10 @@ export class CraftingListingBuilder {
    * @param {object|null} [craftingActor] - The acting character, for @-placeholder
    *   resolution of the display formula. Omitted (null) for a teaser projection so
    *   formula resolution stays suppressed.
+   * @param {object[][]} [toolStateLists] - Each ingredient set's tool states, for the Tool bonus.
    * @private
    */
-  _buildCheck(system, mode, recipe, craftingActor = null) {
+  _buildCheck(system, mode, recipe, craftingActor = null, toolStateLists = []) {
     const checks = system?.craftingCheck ?? {};
     // Alchemy selects its check slot from the SYSTEM-level `alchemy.checkMode`:
     // none → no check card, simple → the pass/fail slot, tiered → the routed slot.
@@ -909,18 +911,13 @@ export class CraftingListingBuilder {
     }
     if (!config) return null;
 
+    const evaluation = activeCheckEvaluation(config);
     const rollFormula = typeof config.rollFormula === 'string' ? config.rollFormula.trim() : '';
-    const usable = rollFormula.length > 0;
-    // "Mandatory" reflects whether the engine will actually roll this check and a
-    // failure fails the craft (CraftingEngine._runCraftingCheck) — NOT merely whether
-    // the mode requires a check to be configured. Otherwise a routed-by-ingredients
-    // recipe with an authored simple pass/fail check + DC reads "Optional" even though it is
-    // always rolled and can fail. Active when: the mode requires a check
-    // (routedByCheck / progressive); routedByIngredients with an authored
-    // formula (no enabled toggle); or simple/alchemy with a formula AND checks enabled.
-    // Alchemy check-ness is driven by `alchemy.checkMode` (simple/tiered are
-    // mandatory, independent of the `checksEnabled` toggle); other modes keep the
-    // MANDATORY_CHECK_MODES contract.
+    // An active structured count check is usable, and its retained formula is inert.
+    const usable = hasActiveCheck(config, rollFormula);
+    // "Mandatory" means the engine will roll this check and a failure fails the craft
+    // (`CraftingEngine._runCraftingCheck`): a check-requiring mode, routedByIngredients with an
+    // authored formula, simple with a formula and checks enabled, or alchemy's `checkMode`.
     const requiredByMode =
       MANDATORY_CHECK_MODES.has(mode) ||
       (mode === 'alchemy' && (alchemyCheckMode === 'simple' || alchemyCheckMode === 'tiered'));
@@ -937,53 +934,112 @@ export class CraftingListingBuilder {
       : mode === 'routedByIngredients'
         ? usable
         : usable && checksEnabled;
-    // Resolve the formula's @-placeholders against the acting character for display
-    // (e.g. "1d20 + 3 + 2"). `resolvedFormula` is null when not attempted (no actor /
-    // no dice engine), so the UI falls back to the raw formula; `formulaResolved` is
-    // false when the formula does not reduce to a number for this actor (error state).
-    const resolution =
-      rollFormula.length > 0 && craftingActor
-        ? // The check-modifier context (issues 770, 1055, 1095): the SAME builder the
-          // engine threads to its check runners, not a second literal of the same shape.
-          // The display path and the evaluation path must agree on every axis the context
-          // carries — the combination rule, the activity's default eligible set, the
-          // subject's own picks under `bySubject`, each entry's `min`/`max` clamp, and
-          // the `maxModifierPicks` cap that bounds them — or the listed formula shows a
-          // scalar the roll will not use (`resolution-modes/spec.md` requirement 71).
-          //
-          // THE ACTIVITY ARGUMENT IS LOAD-BEARING (issue 1095). The catalogue is shared
-          // across crafting, salvage and gathering but the SELECTION is not, so an
-          // arity-2 call here would resolve this listed CRAFTING formula against
-          // whichever selection triple the builder happened to default to. This is the
-          // player-facing card; a wrong scalar here is a promise the roll breaks.
-          this._resolveCheckFormula(
-            rollFormula,
-            craftingActor,
-            buildCheckModifierContext(system, 'crafting', recipe)
-          )
-        : null;
+    const { appliedModifiers, ...formula } =
+      evaluation.product === 'count'
+        ? this._countFormulaDisplay(config, evaluation, craftingActor)
+        : this._sumFormulaDisplay({ rollFormula, craftingActor, system, recipe, evaluation });
     // A routed fixed check (routedByCheck, or alchemy tiered) matches by value
     // range, not DC, so it has no meaningful DC — null it so the player card hides
     // its DC chip (its `hasDc` gate).
     const routedFixed =
       (mode === 'routedByCheck' || (mode === 'alchemy' && alchemyCheckMode === 'tiered')) &&
       config.type === 'fixed';
-    // Resolve the displayed DC AFTER the issue 765 suppression guard above (never
-    // reorder it there): routed-fixed and dynamic-DC checks surface no chip
-    // (`null`); otherwise the recipe's tier DC wins over the static fallback. See
-    // the method JSDoc and `_resolveDisplayDc`.
-    const dc =
-      routedFixed || config.dcMode === 'dynamic' ? null : this._resolveDisplayDc(config, recipe);
+    // Resolve the displayed DC AFTER the issue 765 suppression guard above; see `_chipDc`.
+    const dc = this._chipDc(config, recipe, routedFixed, evaluation);
+    // Only the pass/fail slot names one target: a routed or progressive check has none (R1).
+    const target =
+      config === checks.simple &&
+      describeCheckTarget({
+        config,
+        recipe,
+        evaluation,
+        anchor: this._resolveDisplayDc(config, recipe),
+        actor: craftingActor,
+        modifiers: appliedModifiers,
+        tools: heldToolBonus(toolStateLists),
+        localize: this.localize,
+      });
     return {
       dc,
-      rollFormula: rollFormula.length > 0 ? rollFormula : null,
-      resolvedFormula: resolution?.display ?? null,
-      formulaResolved: resolution ? resolution.resolved === true : null,
+      ...(target && { target }),
+      ...countSuccessesNeeded({ config, recipe, evaluation, mode }),
+      ...formula,
       skill: stringOrNull(config.skill),
       optional: !mandatory,
       mandatory,
       usable,
     };
+  }
+
+  /**
+   * A summed check's authored formula and its display resolved for the acting character.
+   * @private
+   */
+  _sumFormulaDisplay({ rollFormula, craftingActor, system, recipe, evaluation }) {
+    // Resolve the formula's @-placeholders against the acting character for display
+    // (e.g. "1d20 + 3 + 2"). `resolvedFormula` is null when not attempted (no actor /
+    // no dice engine), so the UI falls back to the raw formula; `formulaResolved` is
+    // false when the formula does not reduce to a number for this actor (error state).
+    const resolution =
+      rollFormula.length > 0 && craftingActor
+        ? // The SAME check-modifier context the engine rolls with (issues 770, 1055, 1095), for
+          // the CRAFTING activity: the selection is per activity, so the listed formula and the
+          // applied modifiers agree with the roll (`resolution-modes/spec.md` requirement 71).
+          this._resolveCheckFormula(
+            rollFormula,
+            craftingActor,
+            buildCheckModifierContext(system, 'crafting', recipe),
+            evaluation
+          )
+        : null;
+    return {
+      rollFormula: rollFormula.length > 0 ? rollFormula : null,
+      resolvedFormula: resolution?.display ?? null,
+      formulaResolved: resolution ? resolution.resolved === true : null,
+      appliedModifiers: resolution?.modifiers ?? [],
+    };
+  }
+
+  /**
+   * A count check's formula line in place of its inert retained formula: the authored pool and
+   * threshold, each bracketed when read from the character, else null when either is blank; and
+   * for the acting character the pool resolved and floored, or `false` when a value cannot be read.
+   * @private
+   */
+  _countFormulaDisplay(config, evaluation, craftingActor) {
+    const { pool, direction } = evaluation;
+    const comparison = config.thresholdMode;
+    const line = (values) => this.localize(COUNT_FORMULA_KEY, countFormulaValues(values));
+    const base = pool.base.trim();
+    const threshold = pool.threshold.trim();
+    const bracketed = (text, number) => (number.test(text) ? text : `(${text})`);
+    const rollFormula =
+      base && threshold
+        ? line({
+            dice: bracketed(base, /^\d+$/),
+            die: pool.die,
+            direction,
+            comparison,
+            threshold: bracketed(threshold, /^[+-]?\d+(?:\.\d+)?$/),
+          })
+        : null;
+    if (!craftingActor) return { rollFormula, resolvedFormula: null, formulaResolved: null };
+    const rollData = actorRollData(craftingActor);
+    const resolved = resolvePool({ evaluation, thresholdMode: comparison, rollData });
+    return {
+      rollFormula,
+      resolvedFormula: resolved.ok ? line(resolved.policy) : null,
+      formulaResolved: resolved.ok,
+    };
+  }
+
+  /**
+   * The DC chip's value: null for a routed-fixed or dynamic-DC check, and for every evaluation
+   * but a summed roll-over fixed DC, whose target is no single DC to meet or beat.
+   */
+  _chipDc(config, recipe, routedFixed, evaluation) {
+    if (routedFixed || config.dcMode === 'dynamic' || !isFixedSumOver(evaluation)) return null;
+    return this._resolveDisplayDc(config, recipe);
   }
 
   /**
