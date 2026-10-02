@@ -22,6 +22,7 @@ import { installCountDice } from './helpers/countEngineDice.js';
 import { preparedCountCheck } from './helpers/countFixtures.js';
 import { mergeHistoryFlag } from './helpers/journal-fixtures.js';
 import { gatheringFixture } from './helpers/real-gathering-attempt.js';
+import { replicatedAuthorityFixture } from './helpers/replicatedJournalAuthority.js';
 import { UNDER_DATA } from './helpers/checkEvidenceFixtures.js';
 
 import {
@@ -49,6 +50,8 @@ function commandHarness({
   promptCheck = null,
   postRollHandoff = null,
   authority = null,
+  now = undefined,
+  relay = null,
 } = {}) {
   const emitted = [];
   const emissionOptions = [];
@@ -81,9 +84,11 @@ function commandHarness({
     emit: (message, options) => {
       emitted.push(message);
       emissionOptions.push(options);
+      relay?.(message, options);
     },
-    randomId: () => `id-${++id}`,
+    randomId: () => `${currentUserId}-${++id}`,
     timeoutMs,
+    ...(now && { now }),
     operations: operations ?? {
       crafting: {
         getRun: () => run,
@@ -97,43 +102,6 @@ function commandHarness({
     postRollHandoff,
   });
   return { service, emitted, emissionOptions, actor };
-}
-
-function replicatedAuthorityFixture() {
-  let ledger = null;
-  let sequence = 0;
-  const readable = [];
-  const gm = { id: 'gm', isGM: true };
-  const authority = createJournalRunAuthority({
-    currentUser: () => gm,
-    activeGM: () => gm,
-    listLedgers: async () => ledger ? [ledger] : [],
-    listLedgerRecords: async () => ledger ? [{ id: ledger.id, createdTime: 1 }] : [],
-    createLedger: async (source) => {
-      readable.push(structuredClone(source));
-      ledger = { id: 'ledger', state: structuredClone(source.state), claim: null };
-      return ledger;
-    },
-    readState: async () => structuredClone(ledger.state),
-    writeState: async (_entry, state) => {
-      readable.push(structuredClone(state));
-      ledger.state = structuredClone(state);
-    },
-    createClaim: async (_entry, source) => {
-      if (ledger.claim) throw new Error('claim-held');
-      ledger.claim = structuredClone(source);
-      return ledger.claim;
-    },
-    readClaim: async () => ledger.claim,
-    deleteClaim: async (_entry, claimId) => {
-      if (ledger.claim?.claimId !== claimId) return false;
-      ledger.claim = null;
-      return true;
-    },
-    reconstructExecutions: async () => ({ success: true }),
-    randomId: () => `private-${++sequence}`,
-  });
-  return { authority, readable };
 }
 
 it('Journal prompt adapter forwards only named, permitted display fields', async () => {
@@ -1959,6 +1927,71 @@ describe('journal run command protocol', () => {
       serializedRoll: { formula: '1d20', total: 17 },
       serializedPreRolls: [{ formula: '1d4[secret tool]', total: 3 }],
     });
+  });
+
+  it('re-prepares an expired token across the socket, bound to the attested sender', async () => {
+    const clock = { now: 1000 };
+    const now = () => clock.now;
+    const world = replicatedAuthorityFixture({ now });
+    const run = { id: 'run-1', lifecycleVersion: 1, runRevision: 3, status: 'waiting' };
+    const seen = { describes: 0, senders: [] };
+    const operations = {
+      crafting: {
+        getRun: () => run,
+        describeCheck: async ({ sender }) => {
+          seen.describes += 1;
+          seen.senders.push(sender.id);
+          return {
+            required: true,
+            publicPrompt: { label: 'Forge', target: 12 },
+            privateEvaluation: { rollFormula: '1d20' },
+          };
+        },
+        evaluateCheck: async () => ({ engineEvaluated: true, success: true, data: {} }),
+        execute: async ({ senderId }) => ({ success: true, senderId }),
+      },
+    };
+    const services = {};
+    // Each client's socket delivers to the other with the id the server attests for the sender.
+    services.player = commandHarness({
+      timeoutMs: 1000,
+      operations,
+      promptCheck: async () => {
+        clock.now += 61_000;
+        return { confirmed: true };
+      },
+      relay: (message) => services.gm.service.handleSocketMessage(message, 'player'),
+    });
+    services.gm = commandHarness({
+      currentUserId: 'gm',
+      authority: world.authority,
+      operations,
+      now,
+      relay: (message) => services.player.service.handleSocketMessage(message, 'gm'),
+    });
+
+    const response = await services.player.service.executeJournalRunCommand({
+      actorUuid: 'Actor.a',
+      runType: 'crafting',
+      runId: 'run-1',
+      expectedRevision: 3,
+      action: 'execute',
+      payload: { senderId: 'other' },
+    });
+
+    assert.equal(response.success, true, JSON.stringify(response));
+    assert.equal(seen.describes, 2, 'the expired token cost a second preparation, not the roll');
+    assert.deepEqual(seen.senders, ['player', 'player']);
+    const tokens = Object.values(world.state().prepareTokens);
+    assert.deepEqual(
+      tokens.map((record) => record.status),
+      ['released', 'consumed']
+    );
+    assert.deepEqual(
+      tokens.map((record) => record.binding.senderId),
+      ['player', 'player'],
+      'the fresh token is bound to the sender the socket attested, never the payload\'s'
+    );
   });
 
   it('sends a non-interactive check no modifier ids, so the prepared defaults roll', async () => {

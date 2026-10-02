@@ -90,15 +90,31 @@ function modifierEditorShell(subject, attached = []) {
   };
 }
 
-/** Mount the shared panel for one subject and return its root element. */
-function mountModifierEditor(props) {
+/** A mount target that is an application root, which a portalled suggestion list needs. */
+function applicationRootTarget() {
   target?.remove();
   target = document.createElement('div');
+  target.className = 'fabricate-manager';
   document.body.appendChild(target);
+  return target;
+}
+
+/** Mount the shared panel for one subject and return its root element. */
+function mountModifierEditor(props) {
+  applicationRootTarget();
   if (mounted) unmount(mounted);
   mounted = mount(GatheringModifierEditorComponent, { target, props });
   flushSync();
   return target;
+}
+
+/** Type into a subject's character-modifier search, which is what opens its suggestion list. */
+function searchCharacterModifiers(root, subject, term = 'herb') {
+  const input = root.querySelector(`[data-gathering-${subject}-character-modifier-search] input`);
+  input.value = term;
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  flushSync();
+  return input;
 }
 
 /** Register this route’s cases in `manager-mounted.test.js`’s one describe. */
@@ -3402,8 +3418,7 @@ export function registerEnvironmentsCases() {
         { id: 'cm-1', kind: 'biome', conditionId: 'forest', sign: 'positive', display: '+15' },
       ]);
       const other = subject === 'drop' ? 'event' : 'drop';
-      // Nothing else pins the open direction now that it crosses the prop boundary.
-      const props = { ...shell.props, characterModifierSearchOpenUp: true };
+      const props = shell.props;
       const root = mountModifierEditor(props);
 
       assert.ok(
@@ -3431,13 +3446,19 @@ export function registerEnvironmentsCases() {
         `the character-modifier search must carry the ${subject} prefix`
       );
       assert.ok(
-        Boolean(root.querySelector(`[data-gathering-${subject}-character-modifier-suggestions]`)),
-        `the suggestion list must carry the ${subject} prefix`
+        !root.querySelector(`[data-gathering-${subject}-character-modifier-suggestions]`),
+        'the suggestion list stays closed until the GM types a query'
       );
+      const search = searchCharacterModifiers(root, subject);
+      const list = root.querySelector(`[data-gathering-${subject}-character-modifier-suggestions]`);
+      assert.ok(Boolean(list), `the suggestion list must carry the ${subject} prefix`);
       assert.ok(
-        Boolean(root.querySelector('.manager-character-modifier-add-suggestions.is-above')),
-        'the suggestion list opens upwards when the shell says it must'
+        list.parentElement === root,
+        'the list floats in the application root rather than inside its clipped label'
       );
+      assert.equal(list.getAttribute('role'), 'listbox');
+      assert.equal(search.getAttribute('role'), 'combobox');
+      assert.equal(search.getAttribute('aria-controls'), list.id, 'the field names its list');
       assert.ok(
         !root.querySelector(`[data-gathering-${other}-condition-modifiers="biome"]`),
         `no ${other} hook may appear on the ${subject} panel`
@@ -3457,6 +3478,8 @@ export function registerEnvironmentsCases() {
         `[data-gathering-${subject}-character-modifier-suggestion="mod-training"]`
       );
       assert.ok(Boolean(suggestion), `the suggestion must carry the ${subject} prefix`);
+      assert.equal(suggestion.getAttribute('role'), 'option');
+      assert.equal(suggestion.getAttribute('tabindex'), '-1', 'no suggestion is a tab stop');
       assert.ok(
         !root.querySelector(`[data-gathering-${other}-character-modifier-suggestion="mod-training"]`),
         `the suggestion must not carry the ${other} prefix`
@@ -3507,53 +3530,47 @@ export function registerEnvironmentsCases() {
     });
   }
 
-  it('opens the drop panel upwards through GatheringTaskInspector, the leaf that owns it', async () => {
+  it('searches the drop panel through GatheringTaskInspector, the leaf that owns it', async () => {
     const shell = modifierEditorShell('drop', []);
-    target = document.createElement('div');
-    document.body.appendChild(target);
     mounted = mount(GatheringTaskInspectorComponent, {
-      target,
+      target: applicationRootTarget(),
       props: {
         ...shell.props,
         editing: true,
         task: { id: 'task-1' },
         editingTask: { resolutionMode: 'd100' },
         selectedDrop: { id: 'drop-1' },
-        characterModifierSearchOpenUp: true,
         // Forwarded on to the panel via `bind:`; a leaf-level bindable with no fallback of its
-        // own needs an entry value, or the panel's own `$bindable(null)` fallback throws.
-        characterModifierSearchAnchor: null,
+        // own needs an entry value, or the panel's own `$bindable('')` fallback throws.
         characterModifierSearchTerm: '',
       },
     });
     flushSync();
+    searchCharacterModifiers(target, 'drop');
 
     assert.ok(
-      Boolean(target.querySelector('.manager-character-modifier-add-suggestions.is-above')),
-      'the task leaf must forward characterModifierSearchOpenUp to the shared panel'
+      Boolean(target.querySelector('[data-gathering-drop-character-modifier-suggestion]')),
+      'the task leaf must forward the suggestions and the search term to the shared panel'
     );
   });
 
-  it('opens the event panel upwards through GatheringEventInspector, the leaf that owns it', async () => {
+  it('searches the event panel through GatheringEventInspector, the leaf that owns it', async () => {
     const shell = modifierEditorShell('event', []);
-    target = document.createElement('div');
-    document.body.appendChild(target);
     mounted = mount(GatheringEventInspectorComponent, {
-      target,
+      target: applicationRootTarget(),
       props: {
         ...shell.props,
         editing: true,
         editingEvent: { id: 'event-1' },
-        characterModifierSearchOpenUp: true,
-        characterModifierSearchAnchor: null,
         characterModifierSearchTerm: '',
       },
     });
     flushSync();
+    searchCharacterModifiers(target, 'event');
 
     assert.ok(
-      Boolean(target.querySelector('.manager-character-modifier-add-suggestions.is-above')),
-      'the event leaf must forward characterModifierSearchOpenUp to the shared panel'
+      Boolean(target.querySelector('[data-gathering-event-character-modifier-suggestion]')),
+      'the event leaf must forward the suggestions and the search term to the shared panel'
     );
   });
 

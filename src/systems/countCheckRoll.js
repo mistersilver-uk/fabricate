@@ -105,10 +105,11 @@ async function rollCount(CountRoll, { rolled, bought, decision, options, preRoll
   await roll.evaluate({ allowInteractive: false });
   const flavor = countFlavor(decision.flavor, options);
   const posting = { roll, options, flavor, rollMode: decision.rollMode };
-  await postCheckRoll({ ...posting, preRolls });
+  const offered = await postCheckRoll({ ...posting, preRolls });
   const handoff = checkRollHandoff({ ...posting, placement: rolled.modifierPlacement });
   return {
     ...rolled,
+    ...offered,
     total: roll.total,
     diceGroups: rolledDiceGroups(roll),
     countProjection: roll.countProjection(),
@@ -299,6 +300,8 @@ export function carryAdditionalDice(result, checkResult) {
  * roll options it adds: whether it prompts, a non-interactive caller's `additionalDice`, the rolls
  * one choice covers and the macro payload's subject. `source` is a caller's options, an earlier
  * request or a bare boolean; `subject` adds `craftingSystem` and the recipe, component or task.
+ * `cardRolls`, `true` or the offer key the caller minted, is its promise to post a result card and
+ * settle the roll offered to it.
  */
 export function checkRequest(source, subject = {}) {
   const from = source !== null && typeof source === 'object' ? source : { interactive: source };
@@ -307,6 +310,9 @@ export function checkRequest(source, subject = {}) {
     additionalDice: from.additionalDice ?? 0,
     additionalDiceRolls: from.additionalDiceRolls ?? 1,
     additionalDiceSubject: { ...from.additionalDiceSubject, ...subject },
+    ...((from.cardRolls === true || typeof from.cardRolls === 'string') && {
+      cardRolls: from.cardRolls,
+    }),
   };
 }
 

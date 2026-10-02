@@ -59,6 +59,42 @@ export function authorizedPreparedDecision(decision) {
   };
 }
 
+/** A JSON value's text with every object's keys sorted, so two transports of one value match. */
+function canonicalJson(value) {
+  return JSON.stringify(value ?? null, (_key, entry) =>
+    entry && typeof entry === 'object' && !Array.isArray(entry)
+      ? Object.fromEntries(Object.entries(entry).sort(([left], [right]) => (left < right ? -1 : 1)))
+      : entry
+  );
+}
+
+/** A prompt descriptor's check, without the additional-dice offer whose budget moves between reads. */
+function describedCheck(descriptor) {
+  const { additionalDiceOffer, ...check } = descriptor ?? {};
+  return [check, Boolean(additionalDiceOffer)];
+}
+
+/** An offer's terms: everything but the `available` and `limit` a spent or regained resource moves. */
+function offerTerms(offer) {
+  const { max, resourceLabel, unavailable, reach } = offer ?? {};
+  return { max, resourceLabel, unavailable, reach };
+}
+
+/**
+ * Whether a decision answered against one prompt descriptor settles under a freshly prepared one
+ * without asking again: both describe the same check (every field but the additional-dice offer is
+ * equal), the offer keeps its terms, and its new limit still admits the dice the decision bought.
+ */
+export function decisionStandsFor(decision, answered, fresh) {
+  const same = (left, right) => canonicalJson(left) === canonicalJson(right);
+  if (!same(describedCheck(answered), describedCheck(fresh))) return false;
+  const offer = fresh?.additionalDiceOffer;
+  if (!offer) return true;
+  if (!same(offerTerms(answered?.additionalDiceOffer), offerTerms(offer))) return false;
+  const { additionalDice: bought = 0 } = decisionAdditionalDice(decision);
+  return bought <= offer.limit;
+}
+
 const ROLL_MODES = Object.freeze(['publicroll', 'gmroll', 'blindroll', 'selfroll']);
 
 /**

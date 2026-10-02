@@ -43,7 +43,7 @@
 </script>
 
 {#if dirty}
-  <Chip tone="warning" {...dirtyHook}>{dirtyLabel}</Chip>
+  <Chip tone="warning" density="action" {...dirtyHook}>{dirtyLabel}</Chip>
 {/if}
 <!-- Ghost, matching the recipe editor's Back: it is not a peer of Save. -->
 <ManagerButton role="ghost" {...backHook} onclick={() => onBack()} disabled={saving}>

@@ -23,6 +23,16 @@ import { localizeWith } from '../utils/localizeWithFallback.js';
 
 import { getGatheringEngine } from './gatheringRuntime.js';
 
+/** What a player reads when a re-prepared check differs from the one they answered. */
+function checkChangedNotice() {
+  return localizeWith(
+    (key) => globalThis.game?.i18n?.localize?.(key),
+    'FABRICATE.App.Journal.CheckChanged',
+    undefined,
+    "This roll's details changed while you were deciding. Check them and roll again."
+  );
+}
+
 /** Formula flavour such as `[Modifiers]` labels a term for the chat card, not for the prompt. */
 function displayFormula(formula) {
   if (typeof formula !== 'string') return formula;
@@ -32,9 +42,13 @@ function displayFormula(formula) {
     .trim();
 }
 
-/** The entitled Journal descriptor's named display fields are the prompt's only input. */
-export function promptJournalStageCheck(descriptor, prompt = promptCheckRoll) {
+/**
+ * The entitled Journal descriptor's named display fields are the prompt's only input. A prompt
+ * reopened because its check `changed` states that in a notice.
+ */
+export function promptJournalStageCheck(descriptor, prompt = promptCheckRoll, { changed } = {}) {
   return prompt({
+    ...(changed === true && { notice: checkChangedNotice() }),
     name: descriptor?.subject ?? descriptor?.label,
     actorName: descriptor?.actorName,
     activity: descriptor?.activity,
@@ -72,6 +86,19 @@ export function promptJournalStageCheck(descriptor, prompt = promptCheckRoll) {
       additionalDiceOffer: publicAdditionalDiceOffer(descriptor.additionalDiceOffer),
     }),
   });
+}
+
+/**
+ * The requesting client's check seams: the prompt, which states a changed check in a notice, the
+ * entitled roll post, and the toast that says the same as a secondary cue.
+ */
+export function journalCheckSeams() {
+  return {
+    promptCheck: (descriptor, options) =>
+      promptJournalStageCheck(descriptor, promptCheckRoll, options),
+    postRollHandoff: (handoff) => postCheckRollHandoff(handoff),
+    onCheckChanged: () => globalThis.ui?.notifications?.warn?.(checkChangedNotice()),
+  };
 }
 
 /**
@@ -553,8 +580,7 @@ export function createJournalCommandsForFabricate(
     resolveUuid: (uuid) => globalThis.fromUuid?.(uuid),
     emit: (message, options) => game.socket?.emit(EVENT_SCENE_SOCKET, message, options ?? {}),
     randomId: () => foundry.utils.randomID(),
-    promptCheck: (descriptor) => promptJournalStageCheck(descriptor),
-    postRollHandoff: (handoff) => postCheckRollHandoff(handoff),
+    ...journalCheckSeams(),
     getDismissals: () => getSetting(SETTING_KEYS.JOURNAL_RUN_DISMISSALS),
     setDismissals: (value) => setSetting(SETTING_KEYS.JOURNAL_RUN_DISMISSALS, value),
     onDismissalsChanged: (payload) => Hooks.callAll('fabricate.journalDismissalsChanged', payload),

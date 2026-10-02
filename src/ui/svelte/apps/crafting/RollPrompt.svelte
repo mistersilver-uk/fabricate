@@ -6,7 +6,7 @@
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `data` | the view `rollPrompt.js` prepares | none | Localized, pre-formatted labels, roll modes, the choice plan, the footer `actions` and either the single formula or the bulk subject rows. |
+  | `data` | the view `rollPrompt.js` prepares | none | Localized, pre-formatted labels, roll modes, the choice plan, the footer `actions`, an optional `notice` sentence and either the single formula or the bulk subject rows. |
   | `onSubmit(answer)` | function | no-op | Called once with the raw form answer; `rollPrompt.js` translates it. |
   | `onDismiss()` | function | no-op | Called once when Escape or the close control dismisses the prompt. |
 -->
@@ -21,6 +21,7 @@
   import Select from '../../components/Select.svelte';
   import SelectionCheckbox from '../../components/SelectionCheckbox.svelte';
   import ManagerModal from '../../components/ManagerModal.svelte';
+  import Notice from '../../components/Notice.svelte';
   import { modifierValue, rollPromptTarget } from './rollPromptTarget.js';
   import RollPromptAdditionalDice from './RollPromptAdditionalDice.svelte';
   import RollPromptFooter from './RollPromptFooter.svelte';
@@ -105,6 +106,9 @@
 >
   {#snippet body()}
     <div class="fabricate-roll-prompt">
+      {#if data.notice}
+        <Notice tone="warning" title={data.notice} dataAttr="data-roll-prompt-notice" />
+      {/if}
       {#if data.kind === 'single'}
         {#if data.formula || data.dc !== null}
           <div class="formula-row">
@@ -466,7 +470,7 @@
     font-size: 12px;
     font-weight: 500;
   }
-  .fabricate-roll-prompt :global(.bonus-field input::placeholder) {
+  .fabricate-roll-prompt :global(.bonus-field input:not(:focus-visible)::placeholder) {
     color: var(--fab-text-subtle);
   }
   .fabricate-roll-prompt :global(.mode-field .fabricate-select-trigger) {

@@ -521,7 +521,7 @@ test('the tag requirement row keeps its arm whole, and an EMPTY one is a row lik
 test('a suggestion reads from the left edge the typed query does, under the host button rule', async () => {
   // `proto:2280` draws a suggestion as `display:flex; align-items:center; gap:8px; height:30px;
   // padding:0 8px`, then a 12px glyph and a label at `font:500 11px var(--sans)`. There is no
-  // centring anywhere in it, and there cannot be: the panel sits directly beneath the field it
+  // centring anywhere in it, and there cannot be: the panel shares the left edge of the field it
   // completes, so a suggestion that does not start where the query starts is not continuing the
   // GM's own typing (issue 1373, maintainer round 7).
   // IT SHIPPED CENTRED, and the sheet looked right. `.manager-recipe-option-suggestion` is a
@@ -559,15 +559,18 @@ test('a suggestion reads from the left edge the typed query does, under the host
               <span class="manager-recipe-option-name-field">
                 <span class="manager-recipe-option-search is-typing">
                   <i class="fa-solid fa-magnifying-glass"></i>
-                  <input type="text" data-recipe-option-search value="ingot" placeholder="Search components...">
-                </span>
-                <span class="manager-recipe-option-suggestions">
-                  <button type="button" class="manager-recipe-option-suggestion" data-recipe-option-suggestion="sm-iron-ingot">
-                    <i class="fas fa-cube manager-recipe-option-mark is-component"></i><span>Iron Ingot</span>
-                  </button>
+                  <input type="text" data-recipe-option-search value="ingot" role="combobox" placeholder="Search components...">
                 </span>
               </span>
             </div>
+            <!-- The list as it renders: portalled out of the row to the application root, with the
+                 placement the typeahead panel action writes inline, beneath the field and sharing
+                 its left edge. -->
+            <span class="manager-recipe-option-suggestions" role="listbox" style="left: 0px; right: auto; width: 300px; min-width: 300px; max-width: 300px; max-height: 232px; top: 34px; bottom: auto;">
+              <button type="button" class="manager-recipe-option-suggestion" data-recipe-option-suggestion="sm-iron-ingot" role="option" tabindex="-1" aria-selected="false">
+                <i class="fas fa-cube manager-recipe-option-mark is-component"></i><span>Iron Ingot</span>
+              </button>
+            </span>
             <!-- The tag picker's own option row (proto:2261), the same shape from the same
                  panel family and therefore exposed to the same host rule. It is here because
                  reading its declaration is not the same as measuring it: the question the

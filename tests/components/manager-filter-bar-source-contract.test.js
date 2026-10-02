@@ -21,18 +21,19 @@ const RAW_SEARCH_ALLOWLIST = Object.freeze([
       'said a root de-duplication that merged them would legitimately take the pin to 1 rather ' +
       'than read as a regression. Issue 1707 did exactly that: the panel is written once and ' +
       'rendered at both subjects, so the second was de-duplicated rather than converted. It still ' +
-      'renders a `.manager-tag-suggestions` list inside the label and takes `bind:this` on it for ' +
-      'popover positioning, which a component tag cannot supply.',
+      'writes a `.manager-tag-suggestions` list inside the label, which the primitive has no ' +
+      'slot for; the open list is portalled out of the label to the application root (issue ' +
+      '2157), so the label is where the source writes it and not where it renders.',
   }),
   Object.freeze({
     path: 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte',
     sites: 1,
     why:
-      'The component TAG search (`:1753`, re-measured at issue 1508), which renders a ' +
-      '`.manager-tag-suggestions` list inside its label and swaps the glyph to `fa-tags`. Its ' +
-      'three siblings in the same file ' +
-      'converted; this one is a combobox and belongs to `SearchablePopover`, so it is an ' +
-      'adjudicated opt-out rather than deferred work.',
+      'The component TAG search, which writes a `.manager-tag-suggestions` list inside its label ' +
+      'and swaps the glyph to `fa-tags`. Its three siblings in the same file converted; this one ' +
+      'is a typeahead combobox, which `design-system` adjudicates as not a picker, so it is an ' +
+      'adjudicated opt-out rather than deferred work. The open list is portalled out of the label ' +
+      'to the application root (issue 2157).',
   }),
 ]);
 
@@ -101,7 +102,7 @@ const field = definePrimitiveAdoptionContract({
   primitive: FIELD_PATH,
   contractClass: 'manager-search',
   allowlist: RAW_SEARCH_ALLOWLIST,
-  // 19 sites in 16 components as this lands.
+  // 26 sites in 23 components at issue 2157; the floors below keep headroom under that count.
   callSiteFloor: 14,
   fileFloor: 12,
   // `compact` is a declared boolean prop.

@@ -840,6 +840,18 @@
   outline-offset: 2px;
 }
 
+/* A TEXT FIELD's ring is drawn inside its own box: an outset ring on a field flush with a scrolling ancestor loses its left and right arms to that ancestor's clip. `:where()` keeps the module ring's (0,2,1), so a component's own ring still wins. */
+.fabricate :is(input, textarea):where(:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file'], [type='button'], [type='submit'], [type='reset'], [type='image'])):focus-visible {
+  outline: 1px solid var(--fab-accent);
+  outline-offset: -1px;
+}
+
+/* A focused, empty field shows its caret alone: the caret is drawn at the text origin, on top of the placeholder's first glyph, so the hint yields while the field holds focus and returns on blur. */
+.fabricate input:focus-visible::placeholder,
+.fabricate textarea:focus-visible::placeholder {
+  color: transparent;
+}
+
 /* THE THIRD HALF OF THE PAIR ABOVE, because a programmatic `.focus()` following a pointer activation matches `:focus` and NOT `:focus-visible` — the reset strips the ring and the repaint never supplies one. `validationFocus.js` stamps `data-validation-focused` and this block paints it, written FLAT over the reset's own element list because a single `.fabricate [data-validation-focused]` rule is (0,2,0) and loses to the reset outright (issues 1517, 1509). */
 .fabricate a[data-validation-focused],
 .fabricate button[data-validation-focused],
@@ -848,6 +860,11 @@
 .fabricate textarea[data-validation-focused] {
   outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
+}
+
+/* A text field's validation ring is inset for the reason its keyboard ring is: a field flush with a scrolling ancestor loses an outset ring's side arms to that ancestor's clip. */
+.fabricate :is(input, textarea):where(:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file'], [type='button'], [type='submit'], [type='reset'], [type='image']))[data-validation-focused] {
+  outline-offset: -2px;
 }
 
 /* THE `[tabindex]` HALF, SPLIT OFF FOR ONE DECLARATION: the ring is INSET, because a `[tabindex]` carrier is flush with `.manager-editor-tab-panel`'s padding box and a scroll container clips an outward offset off its left arm — measured in Chromium by `tests/components/validation-focus.test.js`. */
@@ -3136,6 +3153,15 @@
   background: var(--fab-surface-soft);
 }
 
+/* A wrapper-drawn field lights the wrapper: the borderless input inside draws no ring of its own. */
+.fabricate-manager :is(.manager-checks-formula-input, .manager-prerequisite-path-input, .manager-component-entry-alias-field):focus-within {
+  border-color: var(--fab-accent);
+}
+
+.fabricate-manager :is(.manager-checks-formula-input, .manager-prerequisite-path-input, .manager-component-entry-alias-field) input:focus-visible {
+  outline: none;
+}
+
 .fabricate-manager .manager-checks-formula-input > i {
   flex: 0 0 auto;
   color: var(--fab-accent);
@@ -3144,6 +3170,7 @@
 
 .fabricate-manager .manager-checks-formula-input input {
   flex: 1 1 auto;
+  align-self: stretch;
   width: auto;
   min-width: 0;
   height: auto;
@@ -3928,11 +3955,6 @@
   text-align: center;
 }
 
-.fabricate-manager .manager-character-modifier-add-suggestions.is-above {
-  top: auto;
-  bottom: calc(100% + 4px);
-}
-
 .fabricate-manager .manager-character-modifier-row-list,
 .fabricate-manager .manager-condition-modifier-row-list {
   display: flex;
@@ -4186,10 +4208,10 @@
   box-shadow: none;
 }
 
-/* THE SEARCH FAMILY'S OWN KEYBOARD RING. Declarations copied verbatim from the module ring (`.fabricate <element>:focus-visible`), which is (0,2,1) too and sits earlier, so this changes nothing wherever a Fabricate root is an ancestor; what it is FOR is the bare host, where a primitive leaning on the module ring would render none (issue 1508). */
+/* THE SEARCH FAMILY'S OWN KEYBOARD RING. Declarations copied verbatim from the module's text-field ring (`.fabricate :is(input, textarea):where(…):focus-visible`), which is (0,2,1) too and sits earlier, so this changes nothing wherever a Fabricate root is an ancestor; what it is FOR is the bare host, where a primitive leaning on the module ring would render none (issue 1508). */
 .fabricate-search input:focus-visible {
-  outline: 2px solid var(--fab-accent);
-  outline-offset: 2px;
+  outline: 1px solid var(--fab-accent);
+  outline-offset: -1px;
 }
 
 /* THE FILTERS' FLOOR (issue 1510). The trigger is sized to its VALUE, so without a floor each
@@ -4223,12 +4245,10 @@
   background: var(--fab-bg-1);
 }
 
+/* No offsets here: `typeaheadPanel` portals the list to the application root and writes its placement inline, at the popover family's stacking level. */
 .fabricate-manager .manager-tag-suggestions {
   position: absolute;
-  z-index: 12;
-  top: 38px;
-  right: 0;
-  left: 0;
+  z-index: 4000;
   display: grid;
   gap: var(--fab-space-2xs);
   max-height: 148px;
@@ -4259,6 +4279,12 @@
 .fabricate-manager .manager-tag-suggestion:focus-visible {
   color: var(--fab-success-text);
   background: var(--fab-success-soft);
+}
+
+/* The keyboard cursor: the field keeps DOM focus, so the active option is drawn from its state. */
+.fabricate-manager .manager-tag-suggestion[aria-selected='true'] {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: -2px;
 }
 
 .fabricate-manager .manager-selected-tag-row {
@@ -8127,11 +8153,16 @@
   box-shadow: none;
 }
 
-/* THE FIELD FAMILY'S OWN KEYBOARD RING. Declarations copied verbatim from the module ring, which is (0,2,1) too and sits earlier, so nothing moves where that ring already reaches; what this is FOR is the bare host (issues 1508, 1511, 1510, 1357). */
+/* THE FIELD FAMILY'S OWN KEYBOARD RING. Both blocks are copied verbatim from the module's pair — the element ring, then its text-field variant with the same exclusion — which is (0,2,1) too and sits earlier, so nothing moves where that ring already reaches; what this is FOR is the bare host (issues 1508, 1511, 1510, 1357). */
 .fabricate-field input:focus-visible,
 .fabricate-field textarea:focus-visible {
   outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
+}
+
+.fabricate-field :is(input, textarea):where(:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file'], [type='button'], [type='submit'], [type='reset'], [type='image'])):focus-visible {
+  outline: 1px solid var(--fab-accent);
+  outline-offset: -1px;
 }
 
 .fabricate-manager .manager-recipe-steps-requirements {
@@ -9373,6 +9404,10 @@
   border-color: var(--fab-accent-border);
 }
 
+.fabricate-manager .manager-recipe-option-search:focus-within {
+  border-color: var(--fab-accent);
+}
+
 .fabricate-manager .manager-recipe-option-search > i {
   flex: 0 0 auto;
   color: var(--fab-text-subtle);
@@ -9382,6 +9417,7 @@
 /* The input paints NOTHING: `.manager-recipe-option-search` draws the box, so the field inside it must not draw a second one. */
 .fabricate-manager .manager-recipe-option-search input[type='text'] {
   flex: 1;
+  align-self: stretch;
   min-width: 0;
   height: auto;
   min-height: 0;
@@ -9394,17 +9430,14 @@
   outline: none;
 }
 
-/* THE SUGGESTIONS, BENEATH THE FIELD (`proto:2279`) rather than in a portaled popover. */
+/* The suggestions, beneath the field (`proto:2279`). No offsets here: `typeaheadPanel` portals the list to the application root and writes its placement inline, at the popover family's stacking level. */
 .fabricate-manager .manager-recipe-option-suggestions {
   position: absolute;
-  top: 33px;
-  right: 0;
-  left: 0;
-  z-index: 30;
+  z-index: 4000;
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2xs);
-  max-height: 190px;
+  max-height: 232px;
   padding: var(--fab-space-1);
   border: 1px solid var(--fab-border-strong);
   border-radius: 9px;
@@ -9440,6 +9473,12 @@
 
 .fabricate-manager .manager-recipe-option-suggestion:hover {
   background: var(--fab-surface-soft);
+}
+
+/* The keyboard cursor: the field keeps DOM focus, so the active option is drawn from its state. */
+.fabricate-manager .manager-recipe-option-suggestion[aria-selected='true'] {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: -2px;
 }
 
 .fabricate-manager .manager-recipe-option-suggestion > i {
@@ -11579,12 +11618,8 @@
   padding-left: 36px;
 }
 
-.fabricate-manager .manager-task-component-tag-search .manager-tag-suggestions {
-  position: absolute;
-  z-index: 5;
-  inset: calc(100% + 4px) 0 auto;
+.fabricate-manager .manager-task-component-tag-suggestions {
   max-height: 132px;
-  overflow-y: auto;
 }
 
 .fabricate-manager .manager-task-component-pills {
@@ -12253,10 +12288,16 @@
   box-shadow: none;
 }
 
-/* THE SLIDER FAMILY'S OWN KEYBOARD RING. Declarations copied verbatim from the module ring (`.fabricate <element>:focus-visible`), which is (0,2,1) too and sits earlier, so this changes nothing wherever a Fabricate root is an ancestor; what it is FOR is the bare host, where a primitive leaning on the module ring would render none (issue 1508). */
-.fabricate-slider input:focus-visible {
+/* THE SLIDER FAMILY'S OWN KEYBOARD RING, on the range half alone. Declarations copied verbatim from the module ring (`.fabricate <element>:focus-visible`), so this changes nothing wherever a Fabricate root is an ancestor; what it is FOR is the bare host, where a primitive leaning on the module ring would render none (issue 1508). */
+.fabricate-slider input[type='range']:focus-visible {
   outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
+}
+
+/* The percent half is a text field, so it takes the module's text-field ring, copied for the bare host. */
+.fabricate-slider .manager-drop-rate-percent input:focus-visible {
+  outline: 1px solid var(--fab-accent);
+  outline-offset: -1px;
 }
 
 .fabricate-manager .manager-tool-breakage-chance-control {
@@ -17418,7 +17459,6 @@
 .fabricate-picker-popover .manager-travel-popover-search input:focus-visible {
   outline: none;
   border-color: var(--fab-accent);
-  box-shadow: 0 0 0 1px var(--fab-accent);
 }
 
 /* `proto:2260`: `max-height:180px; overflow:auto; display:flex; flex-direction:column; gap:2px`, and no inset of its own - the panel's 7px is what every left edge in the popover sits on (issue 1035). */

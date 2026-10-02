@@ -756,7 +756,6 @@ describe('CraftingSystemManager source contract', () => {
       'gathering.reselectDrop',
       'modifiers.resetSearchOnDrop',
       'modifiers.resetSearchOnEvent',
-      'modifiers.syncSearchDirection',
       'modifiers.reconcileDropPickers',
       'modifiers.reconcileEventPickers',
     ],

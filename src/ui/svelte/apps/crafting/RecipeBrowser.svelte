@@ -268,13 +268,14 @@
     flex: 1 1 auto;
     min-width: 0;
     border: none;
+    outline: none;
     background: transparent;
     color: var(--fab-text);
     font-size: 13px;
   }
 
-  .crafting-browser-search input:focus-visible {
-    outline: none;
+  .crafting-browser-search:focus-within {
+    border-color: var(--fab-accent);
   }
 
   /* Filters: the two toggles share a row; the system dropdown sits on its own line. */
@@ -388,8 +389,7 @@
     nav, and per-page controls onto separate lines. (Written before issue 1502, when
     that markup really was .fabricate-manager-scoped and so unstyled here; see the
     note below.)
-  */
-  /*
+
     ISSUE 1502 — THE PAGER'S SHEET RULES NOW REACH THIS BLOCK, and the `1502 base` declarations
     below are what stops that moving the frame. `Pagination` and `IconButton` are rooted at the
     classes they emit, so `styles/fabricate.css` paints this player-app pager where it previously

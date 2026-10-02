@@ -984,6 +984,9 @@ const MODULE_FOCUS_PAIR = Object.freeze([
 /** A primitive's OWN ring: `<root>:focus-visible`, the family class itself with no descendant. */
 const SELF_RING_COMPOUND = /^(\.[\w-]+):focus-visible$/u;
 
+/** A ring narrowed to one input type, `<root> input[type='range']:focus-visible`: still a bare element. */
+const TYPED_RING_COMPOUND = /^(\.[\w-]+) input\[type=['"][a-z]+['"]\]:focus-visible$/u;
+
 /**
  * Every root that may write a `:focus-visible` ring over BARE ELEMENTS, at ANY element shape.
  * Derived from the sheet rather than asserted: 8 roots over 8 blocks, every one of them
@@ -1028,7 +1031,10 @@ const RING_ROOTS = Object.freeze(
 function bareElementRingRoot(selector) {
   const roots = new Set();
   for (const member of splitSelectorList(selector)) {
-    const matched = RING_COMPOUND.exec(member) ?? SELF_RING_COMPOUND.exec(member);
+    const matched =
+      RING_COMPOUND.exec(member) ??
+      SELF_RING_COMPOUND.exec(member) ??
+      TYPED_RING_COMPOUND.exec(member);
     if (matched === null) return null;
     roots.add(matched[1]);
   }

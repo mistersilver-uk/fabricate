@@ -1166,6 +1166,15 @@ export function registerGatheringCases() {
     tagSearch.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
+    const tagList = target.querySelector('[data-gathering-component-tag-suggestions]');
+    assert.equal(tagSearch.getAttribute('role'), 'combobox');
+    assert.equal(tagSearch.getAttribute('aria-controls'), tagList.id, 'the field names its list');
+    assert.equal(tagList.getAttribute('role'), 'listbox');
+    assert.ok(
+      tagList.parentElement.classList.contains('fabricate-manager'),
+      'the list floats in the application root rather than inside the browser card'
+    );
+    assert.equal(tagList.querySelector('[role="option"]').getAttribute('tabindex'), '-1');
     Array.from(target.querySelectorAll('[data-gathering-component-tag-suggestion]'))
       .find((button) => button.textContent.includes('herb'))
       .click();
@@ -2751,29 +2760,15 @@ export function registerGatheringCases() {
     });
   }
 
-  // The term is shared by both subjects, so each clears it when its own record changes, and the
-  // suggestion list opens upwards when the search sits low in its clipping box.
-  it('clears the character-modifier search per record and opens it upwards near the bottom', async () => {
+  // The term is shared by both subjects, so each clears it when its own record changes.
+  it('clears the character-modifier search per record', async () => {
     await openModifierSubject('drop', []);
     const search = () => target.querySelector('[data-gathering-drop-character-modifier-search]');
-    const clip = search().parentElement;
-    clip.style.overflowY = 'auto';
-    clip.getBoundingClientRect = () => ({ top: 100, bottom: 500, left: 0, right: 400 });
-    const opensUpWith = async (spaceBelow) => {
-      setInputValue(search().querySelector('input'), '');
-      await settleSaveAttempt();
-      const bottom = 500 - spaceBelow;
-      search().getBoundingClientRect = () => ({ top: bottom - 30, bottom, left: 0, right: 200 });
-      setInputValue(search().querySelector('input'), 'herb');
-      await settleSaveAttempt();
-      return Boolean(
-        target.querySelector('[data-gathering-drop-character-modifier-suggestions].is-above')
-      );
-    };
-    assert.deepEqual(
-      [await opensUpWith(159), await opensUpWith(160)],
-      [true, false],
-      'the list opens upwards only with under 160px below its clipping box'
+    setInputValue(search().querySelector('input'), 'herb');
+    await settleSaveAttempt();
+    assert.ok(
+      Boolean(target.querySelector('[data-gathering-drop-character-modifier-suggestions]')),
+      'the typed term opens the suggestion list'
     );
 
     target.querySelector('[data-gathering-task-drop-id="drop-root"]').click();

@@ -370,11 +370,6 @@
     color: var(--fab-text);
   }
 
-  .gathering-detail-search input:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: 1px;
-  }
-
   .gathering-detail-task-list {
     display: flex;
     flex-direction: column;

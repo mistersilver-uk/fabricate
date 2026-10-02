@@ -294,15 +294,23 @@ A choice group states OR in its own `ANY ONE OF` pill, so every row OUTSIDE a gr
 Changing it CLEARS the row's value, because an id belonging to the old kind means nothing to the new one and the new kind's own editor could neither see nor clear it.
 - **The name field has two faces.**
 Named, it is a pill carrying the subject's image or icon, its name and a real clear BUTTON.
-Unnamed, it is an inline search field with its suggestions rendered BENEATH it, in the row — never a popover opened over it.
+Unnamed, it is an inline search field — a typeahead combobox, never a trigger that opens a picker — and its suggestion list opens directly BENEATH it, sharing its left edge and at least as wide as the field.
+The list's POSITION is the requirement and its DOM parent is not: it is a floating surface under `design-system`, portalled to the nearest application root, because a list positioned inside the row is clipped by the row's scrolling ancestor.
+It flips ABOVE the field only where that root has no room below, and in neither placement does it cover the field it completes.
 - **A suggestion starts where the query starts.**
-The panel sits directly under the field it completes, so each suggestion's glyph and label are left-aligned against the typed text above them; a suggestion centred in its panel is not continuing what the GM typed.
+The panel shares the left edge of the field it completes, beneath it or flipped above it, so each suggestion's glyph and label are left-aligned against the typed text; a suggestion centred in its panel is not continuing what the GM typed.
 This is a declaration the row has to make rather than a default it can rely on: Foundry styles every `button` on the page as a centred flex box, so a suggestion row that names no justification of its own inherits that centring, and `text-align` cannot undo it because the row is a flex container rather than a text one.
 - **Losing focus commits NOTHING; Enter commits.**
 The DOM fires `change` on a text input on blur as well as on Enter, so a field that committed on `change` committed the raw query the moment a GM clicked a suggestion — and unmounted that suggestion before its own click could run, so the click did nothing and the pill showed the blur handler's value.
-Tabbing to a suggestion fails identically, which is why suppressing the pointer path alone is half a fix.
-- **What Enter commits is the top suggestion, not the typed string.**
+Tabbing to a suggestion failed identically while the list sat in the row's tab order, which is why suppressing the pointer path alone was half a fix.
+The list is no longer in that order, so a suggestion is reached from the field's own keys and never by Tab.
+- **What Enter commits is a suggestion, not the typed string.**
+`Enter` commits the active option, and with none active the TOP suggestion.
 A requirement names a catalogue ENTRY by id rather than carrying a free name, so a query matching nothing commits nothing rather than authoring an unresolvable id.
+- **The field drives its list, and focus never leaves it.**
+The input is the holder of `design-system`'s listbox contract: `ArrowDown` and `ArrowUp` move the active option, which the field names through `aria-activedescendant`, and a new query starts with none active.
+The list is open only while the field holds focus and the query is non-empty, so a blur or a press elsewhere closes it and keeps the query.
+`Escape` clears the query, which closes the list.
 - **An empty catalogue DEGRADES the field rather than blocking it.**
 The input still renders and is still typeable, and its own placeholder says there is nothing to name yet.
 A world with no components and no essences is the state every world starts in, so it is a first-class face of this control rather than an error.

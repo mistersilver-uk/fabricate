@@ -285,6 +285,15 @@
     font-size: 12.5px;
   }
 
+  /* The wrapper draws the field, so focus lights the wrapper and the input draws no ring. */
+  .alchemy-known-search:focus-within {
+    border-color: var(--fab-accent);
+  }
+
+  .alchemy-known-search input:focus-visible {
+    outline: none;
+  }
+
   .alchemy-known-list {
     list-style: none;
     margin: 0;

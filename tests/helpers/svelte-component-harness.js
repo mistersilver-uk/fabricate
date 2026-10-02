@@ -188,7 +188,14 @@ export const SEARCHABLE_POPOVER_RAW_MODULES = Object.freeze([
   'src/ui/svelte/actions/dismissOnOutsideClick.js',
   'src/ui/svelte/actions/portal.js',
   'src/ui/svelte/actions/anchoredPopover.js',
+  // The typeahead combobox's portalled suggestion list, a wrapper over the action above.
+  'src/ui/svelte/actions/typeaheadPanel.js',
   'src/ui/svelte/util/overlayBounds.js'
+]);
+
+/** The typeahead combobox's controller, compiled into every tree that renders a typeahead field. */
+export const TYPEAHEAD_RUNE_MODULES = Object.freeze([
+  'src/ui/svelte/util/typeaheadCombobox.svelte.js'
 ]);
 
 // The compiled `.svelte` modules `SearchablePopover` ITSELF needs when it is the component under

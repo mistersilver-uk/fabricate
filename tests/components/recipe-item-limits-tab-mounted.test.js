@@ -2,17 +2,22 @@ import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  TYPEAHEAD_RUNE_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-recipe-item-limits-',
+  // Both typeaheads float their list through the shared seam: its controller, and the popover
+  // closure its panel action reaches, which carries the Foundry bridge list with it.
+  runeModules: TYPEAHEAD_RUNE_MODULES,
   rawModules: [
-    ...FOUNDRY_BRIDGE_RAW_MODULES,
-    'src/ui/svelte/util/listReorderAnnouncement.js',
+    ...SEARCHABLE_POPOVER_RAW_MODULES,
     // The Limits tab's "Character prerequisites to learn" picker imports the pure
     // prerequisite engine (issue 544).
     'src/systems/characterPrerequisites.js',
@@ -284,13 +289,80 @@ describe('RecipeItemLimitsTab (mounted)', () => {
       linkedRecipes: [{ id: 'r1', name: 'Alloy Bronze' }],
       characterPrerequisites: [{ id: 'p1', name: 'Expert', path: 'x', op: 'gte', value: 1 }],
     });
-    const rk = root.querySelector('[data-recipe-item-required-knowledge-search]');
-    assert.equal(rk.getAttribute('role'), 'combobox');
-    assert.equal(rk.getAttribute('aria-expanded'), 'false', 'collapsed with no term typed');
-    assert.equal(rk.getAttribute('aria-controls'), 'recipe-item-required-knowledge-suggestions');
-    const cp = root.querySelector('[data-recipe-item-character-prereq-search]');
-    assert.equal(cp.getAttribute('role'), 'combobox');
-    assert.equal(cp.getAttribute('aria-controls'), 'recipe-item-character-prereq-suggestions');
+    for (const [selector, term] of [
+      ['[data-recipe-item-required-knowledge-search]', 'alloy'],
+      ['[data-recipe-item-character-prereq-search]', 'expert'],
+    ]) {
+      const field = root.querySelector(selector);
+      assert.equal(field.getAttribute('role'), 'combobox');
+      assert.equal(field.getAttribute('aria-expanded'), 'false', 'collapsed with no term typed');
+      assert.equal(
+        field.hasAttribute('aria-controls'),
+        false,
+        'nothing is controlled while no listbox is rendered'
+      );
+
+      field.value = term;
+      field.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
+      flushSync();
+      assert.equal(field.getAttribute('aria-expanded'), 'true');
+      const list = root.querySelector(`[id="${field.getAttribute('aria-controls')}"]`);
+      assert.equal(list.getAttribute('role'), 'listbox');
+      assert.ok(
+        list.parentElement === root,
+        'the list floats in the application root rather than inside its clipped column'
+      );
+      const option = list.querySelector('[role="option"]');
+      assert.equal(option.getAttribute('tabindex'), '-1', 'no suggestion is a tab stop');
+
+      field.dispatchEvent(
+        new globalThis.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+      );
+      flushSync();
+      assert.equal(field.value, '', 'Escape clears the query');
+      assert.ok(!root.querySelector('[role="listbox"]'), 'which closes the list');
+    }
+  });
+
+  it('commits the active option on Enter, and nothing while none is active', async () => {
+    const patches = [];
+    const root = await harness.mount({
+      recipeItem: learnDraft({ limitLearning: true }),
+      visibilityMode: 'knowledge',
+      linkedRecipes: [
+        { id: 'r1', name: 'Alloy Bronze' },
+        { id: 'r2', name: 'Alloy Steel' },
+      ],
+      onPatch: (patch) => {
+        patches.push(patch);
+      },
+    });
+    const field = root.querySelector('[data-recipe-item-required-knowledge-search]');
+    const press = (key) => {
+      const event = new globalThis.KeyboardEvent('keydown', {
+        key,
+        bubbles: true,
+        cancelable: true,
+      });
+      field.dispatchEvent(event);
+      flushSync();
+      return event;
+    };
+    field.value = 'alloy';
+    field.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
+    flushSync();
+
+    const idle = press('Enter');
+    assert.equal(idle.defaultPrevented, true, 'Enter is consumed while the list is open');
+    assert.equal(patches.length, 0, 'and commits nothing with no option active');
+
+    press('ArrowDown');
+    press('ArrowDown');
+    const active = root.querySelector(`[id="${field.getAttribute('aria-activedescendant')}"]`);
+    assert.equal(active.getAttribute('data-recipe-item-required-knowledge-option'), 'r2');
+    assert.equal(active.getAttribute('aria-selected'), 'true');
+    press('Enter');
+    assert.deepEqual(patches.at(-1), { caps: { learn: { prerequisiteIds: ['r2'] } } });
   });
 
   it('hides BOTH Required Knowledge and Learning prerequisites when Limited learning is off', async () => {

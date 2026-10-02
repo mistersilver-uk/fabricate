@@ -158,8 +158,16 @@ export const PLAYER_EXTENSION_SOURCES = Object.freeze([
 /** The shared positioning seam every open popover frame draws (issue 1500). */
 export const ANCHORED_POPOVER_SOURCES = Object.freeze([
   /^src\/ui\/svelte\/actions\/anchoredPopover\.js$/,
+  /^src\/ui\/svelte\/actions\/typeaheadPanel\.js$/,
   /^src\/ui\/svelte\/util\/overlayBounds\.js$/,
 ]);
+
+/** The typeahead combobox's holder contract, for a frame whose walk opens a suggestion list. */
+export const TYPEAHEAD_COMBOBOX_SOURCE = /^src\/ui\/svelte\/util\/typeaheadCombobox\.svelte\.js$/;
+
+/** An open requirement-row suggestion list, which renders as a child of the application root. */
+export const REQUIREMENT_SUGGESTION =
+  '.fabricate-manager > .manager-recipe-option-suggestions [data-recipe-option-suggestion]';
 
 /** The environment editor's directory, minus its validation tab (issue 1517). */
 export const ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB =

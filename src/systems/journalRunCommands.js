@@ -1,10 +1,11 @@
-import { checkDisplayForCard } from './craftCardFields.js';
+import { settleCardRolls } from './checkCardRolls.js';
+import { settlePromptedCheck } from './journalCheckPrompt.js';
 import {
   evaluatePreparedJournalCheck,
-  safeRollDecision,
   withPreparedAdditionalDiceOffer,
   withSpentAdditionalDice,
 } from './journalPreparedCheck.js';
+import { cardOffer, executedCheckFor, withEntitledFacts } from './journalRollFacts.js';
 import { decisionAdditionalDice, preparedDecisionPolicy } from './preparedDecisionPolicy.js';
 import { applyGuardedRunMutation } from './runLifecycleState.js';
 
@@ -613,48 +614,6 @@ function serializedOperationResult(result, { secret = false, runId = '' } = {}) 
 }
 
 /**
- * A crafting reply's executed check projection for the player's result box (issue 2005), or null:
- * a blind roll, which the roller never sees, a non-crafting run and a stage with no rolled check
- * have none. The caller attaches it only for an entitled initiator.
- */
-function executedCheckFor(runType, checkResult) {
-  const check = runType === 'crafting' ? checkDisplayForCard(checkResult) : null;
-  return check?.evidence && check.visibility?.rollMode !== 'blindroll' ? check : null;
-}
-
-/**
- * Whether the attested initiator may receive a visible roll's private facts (its handoff and its
- * executed evidence), re-read against the fresh actor, sender and run after the commit.
- */
-async function initiatorEntitled({ operation, request, resolveUuid, getUser, ...authorization }) {
-  if (typeof operation.authorizeRollHandoff !== 'function') return true;
-  try {
-    const freshActor = await resolveUuid(request.actorUuid);
-    const freshSender = getUser?.(request.senderId) ?? null;
-    const freshRun =
-      freshActor && validText(request.runId)
-        ? await operation.getRun?.({
-            actor: freshActor,
-            runId: request.runId,
-            includeHistory: true,
-          })
-        : null;
-    return Boolean(
-      freshActor &&
-      freshSender &&
-      (await operation.authorizeRollHandoff({
-        actor: freshActor,
-        run: freshRun,
-        sender: freshSender,
-        ...authorization,
-      }))
-    );
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Server-attested commands revalidate identity, ownership, revision and expected stage under a claim.
  * Player checks use one-use tokens, local prompts and GM resolution; adapters own disclosure.
  * Replies correlate recipients/user/session/request/run/revision; dismissal preserves actor history.
@@ -669,6 +628,7 @@ async function initiatorEntitled({ operation, request, resolveUuid, getUser, ...
  * @param {number} [deps.timeoutMs=15000] Remote-reply timeout, not cancellation of server work.
  * @param {Function|null} [deps.promptCheck] Local safe-descriptor prompt returning a roll decision.
  * @param {Function|null} [deps.postRollHandoff] Post an already evaluated, entitled roll without rerolling.
+ * @param {Function|null} [deps.onCheckChanged] Tell the player a re-prepared check differs from the one answered.
  * @param {Function} [deps.getDismissals] Read this user's dismissal map.
  * @param {Function} [deps.setDismissals] Awaited replacing write of this user's dismissal map.
  * @param {Function} [deps.now] Wall-clock milliseconds for tokens and dismissal timestamps.
@@ -687,6 +647,7 @@ export function createJournalRunCommandService({
   timeoutMs = JOURNAL_RUN_COMMAND_TIMEOUT_MS,
   promptCheck = null,
   postRollHandoff = null,
+  onCheckChanged = null,
   getDismissals = () => ({}),
   setDismissals = async () => {},
   now = () => Date.now(),
@@ -806,10 +767,12 @@ export function createJournalRunCommandService({
       } = resolvedCheckResult;
       responseRollHandoff = rollHandoff;
       secretCheck = secret === true;
-      trustedContext = {
-        operationId: request.requestId,
-        resolvedCheckResult: trustedResolvedCheckResult,
-      };
+      const entitlement = { operation, request, resolveUuid, getUser, privateEvaluation };
+      const offered = await cardOffer(trustedResolvedCheckResult, rollHandoff, {
+        ...entitlement,
+        payload: request.payload ?? {},
+      });
+      trustedContext = { operationId: request.requestId, resolvedCheckResult: offered };
     } else if (request.action === 'execute' && typeof operation.describeCheck === 'function') {
       const preparationGrant = helpers.createExecutionGrant({
         ...binding,
@@ -851,6 +814,21 @@ export function createJournalRunCommandService({
       };
     }
 
+    const facts = { trustedContext, responseRollHandoff, secretCheck, privateEvaluation };
+    const plan = { binding, preparedPayload, executionOperation };
+    try {
+      return await commitOperation(request, context, helpers, { ...facts, ...plan });
+    } finally {
+      // Every way out closes the card offer; one the reply already settled is gone by now.
+      await settleCardRolls(trustedContext.resolvedCheckResult?.cardRolls);
+    }
+  }
+
+  /** Runs the operation under its execution grant and answers the reply an entitled sender reads. */
+  async function commitOperation(request, context, helpers, prepared) {
+    const { actor, operation, run } = context;
+    const { binding, preparedPayload, executionOperation, trustedContext } = prepared;
+    const { responseRollHandoff, secretCheck, privateEvaluation } = prepared;
     const method = operation[executionOperation];
     if (typeof method !== 'function') return failure('unsupported-operation');
     if (!currentRealmIsActiveGm()) return failure('active-gm-required');
@@ -883,23 +861,11 @@ export function createJournalRunCommandService({
     const check = secretCheck
       ? null
       : executedCheckFor(request.runType, trustedContext.resolvedCheckResult);
-    const handoff = secretCheck ? null : responseRollHandoff;
-    // Evidence and the handoff share one entitlement: an unentitled initiator receives neither.
-    if (
-      (handoff || check) &&
-      (await initiatorEntitled({
-        operation,
-        request,
-        resolveUuid,
-        getUser,
-        payload,
-        privateEvaluation,
-        result,
-      }))
-    ) {
-      return { ...response, ...(check && { check }), ...(handoff && { rollHandoff: handoff }) };
-    }
-    return response;
+    // A handoff the result card carried is not posted again by the requester.
+    const carried = await settleCardRolls(trustedContext.resolvedCheckResult?.cardRolls);
+    const handoff = secretCheck || carried ? null : responseRollHandoff;
+    const entitlement = { operation, request, resolveUuid, getUser, payload, privateEvaluation };
+    return withEntitledFacts(response, { check, handoff }, { ...entitlement, result });
   }
 
   async function handleRequest(request, senderId) {
@@ -1009,27 +975,8 @@ export function createJournalRunCommandService({
       });
     }
     if (typeof promptCheck !== 'function') return failure('check-prompt-unavailable');
-    const decision = await promptCheck(first.promptDescriptor);
-    if (!decision || decision.confirmed === false) {
-      await sendCommand({
-        ...command,
-        action: 'releaseCheck',
-        payload: { prepareToken: first.prepareToken },
-      });
-      return { success: false, cancelled: true, reason: 'roll-cancelled' };
-    }
-    const settled = await sendCommand({
-      ...command,
-      payload: {
-        ...command.payload,
-        prepareToken: first.prepareToken,
-        rollDecision: safeRollDecision(decision),
-      },
-    });
-    if (settled?.rollHandoff && typeof postRollHandoff === 'function') {
-      await postRollHandoff(settled.rollHandoff);
-    }
-    return settled;
+    const seams = { sendCommand, promptCheck, postRollHandoff, onCheckChanged };
+    return settlePromptedCheck(command, first, seams);
   }
 
   function getDismissedJournalRunKeys({ actorUuid, viewerId } = {}) {

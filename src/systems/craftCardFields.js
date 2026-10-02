@@ -1,5 +1,7 @@
 import { executedCheckDisplay } from '../ui/presenters/checkDisplay.js';
 
+import { CARD_ROLLS } from './checkCardRolls.js';
+
 /** The check-result fields a crafting result card states, and the key a versioned execution
  * re-enters `craft()` under: identity-typed, so re-declaring it elsewhere reads as `undefined`. */
 export const VERSIONED_EXECUTION_CONTEXT = Symbol('fabricate.versionedCraftingExecution');
@@ -19,9 +21,11 @@ export function tierStepForCard(checkResult) {
 }
 
 /** The executed check projection a result card gates its evidence rows on, with the executed
- * visibility handed over unpersisted; null when no check ran (issue 2005). */
+ * visibility handed over unpersisted; null when no check ran (issue 2005). A check whose rolls are
+ * offered to the card names the offer under `CARD_ROLLS`, which no clone or transport keeps. */
 export function checkDisplayForCard(checkResult) {
-  return checkResult?.data && typeof checkResult.data === 'object'
-    ? executedCheckDisplay(checkResult)
-    : null;
+  if (!checkResult?.data || typeof checkResult.data !== 'object') return null;
+  const display = executedCheckDisplay(checkResult);
+  const offer = checkResult.cardRolls;
+  return typeof offer === 'string' ? { ...display, [CARD_ROLLS]: offer } : display;
 }

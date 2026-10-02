@@ -285,6 +285,11 @@ for (const version of [13, 14]) {
       });
       assert.equal(result.success, true);
       const content = readable(cards[0]);
+      assert.equal(
+        cards[0].rolls?.length,
+        rollMode === 'publicroll' ? 1 : undefined,
+        'only a public card carries the count Roll'
+      );
       if (rollMode === 'publicroll') {
         assert.equal(tilesOf(content).length, 4);
         assert.ok(content.includes('data-check-count-summary>2d6, each ≥ 1</div>'));

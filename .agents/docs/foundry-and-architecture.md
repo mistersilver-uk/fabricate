@@ -401,6 +401,7 @@ So every non-default action MUST declare `type: "button"`, or Enter fires whiche
 A secondary heading belongs in the dialog's own content, and a frameless dialog needs its own dismiss action (issue 2021).
 - **`KeyboardManager` listens on `window` in the bubble phase, and `hasFocus` reads only `document.activeElement`; while it is false, `core.dismiss` (Escape) closes every framed window.**
 `hasFocus` is true for an `input`, `select` or `textarea`, a content-editable node, a `button` inside a `form`, or any element whose `data-keyboard-focus` is `""` or `"true"` (`"false"` opts out), so a modal that must keep Escape, Tab or Space from Foundry stops the key before it bubbles to `window` (`client/helpers/interaction/keyboard-manager.mjs`, V13.351 and V14.367; issue 2021).
+Every keybinding is skipped while such an element holds focus, so Escape in a typeahead field cannot close the Manager; `DialogV2` listens for Escape on its own element instead, which is why a field inside one still stops the key (issue 2157).
 - **An ApplicationV2 is an event target that emits `close`, and `foundry.applications.instances.get(frame.id)` maps a window frame to its application.**
 `app.addEventListener('close', fn, { once: true })` is how an overlay mounted into a window learns that window is closing; `emittedEvents` is `prerender`, `render`, `close` and `position` on V13.351 (issue 2021).
 - **The `.application` frame is a stacking context, and it becomes the containing block for its fixed descendants only when its position `scale` is not 1, because `setPosition` then writes `transform: scale(…)`.**
@@ -412,6 +413,18 @@ An overlay button portaled into a window whose `data-action` is `close` closes t
 With no explicit roll mode, the bundled post reads the posting client's current `core.rollMode` on V13 or `core.messageMode` on V14 through `chatModeOption`; passing an explicit mode keeps its precedence and the same speaker and flavor apply to the bundle.
 The prepared handoff retains `serializedRoll` and separately ordered `serializedPreRolls`; an entitled client reconstructs each with `Roll.fromData` and posts the bundle without reevaluation, while an old single-roll handoff still uses `Roll#toMessage`.
 Secret execution excludes formula-bearing handoff and pre-roll evidence from the requester; a GM-visible message may still reveal that a roll happened while hiding its content.
+A public crafting or salvage check posts no roll message of its own when its result card is posted: the roll is offered to the card (`src/systems/checkCardRolls.js`), `postResultCard` (`src/systems/resultCardPost.js`) carries it in the card's `rolls` under an explicit public mode, and an offer no card claimed falls back to the bundled post or the handoff.
+- **`ChatMessage.create` applies a visibility mode only when one is passed, and never reads the client's chat-mode selector.**
+The option is `rollMode` on V13.351 and `messageMode` on V14.365; the selector default belongs to `Roll#toMessage`, the chat input, RollTable, Cards and Combat.
+A mode-less message carrying rolls is therefore public whatever the creating GM's selector says, and `postResultCard` (`src/systems/resultCardPost.js`) passes the public mode to state that, not to override a default (issue 2157).
+- **A GM, assistant included, may create a `ChatMessage` whose `author` is another user, and the server keeps it; a non-GM's `author` is forced to their own id.**
+The author holds OWNER on the message.
+`postResultCard` authors a card carrying a check roll as the user the check was rolled for, read from the offer the authority opened with its server-attested sender id (`cardOffer` in `src/systems/journalRollFacts.js`), never from a payload field.
+- **Dice So Nice animates from `createChatMessage` on every client, and reads only the first roll to decide whether a message has dice.**
+It rebuilds `message.rolls` with `Roll.fromData`, hides the message until the animation ends, and returns early when `rolls[0].dice.length === 0` even if a later roll has dice (5.2.5 on V13, 6.4.2 on V14), so `postResultCard` leads with a dice-bearing roll.
+Dice appearance follows the message author on 5.2.5; on 6.4.x the default setting swaps in the speaker actor's unambiguous player owner, else the author.
+- **A Svelte component's styles are injected unlayered, so a scoped rule beats `styles/fabricate.css` whatever its specificity.**
+Module stylesheets load in `layer(modules)` and `svelte.config.js` compiles with `css: 'injected'`, so a scoped declaration can only be stood down by its own selector, never by a more specific module rule; the roll prompt's placeholder colour excludes `:focus-visible` in its own selector for this reason (issue 2157).
 - **`Roll#toJSON` is shallow.**
 A `ParentheticalTerm` serializes its inner Roll as the live object, whose `_root` links back to the outer roll and its actor roll data.
 Serialize roll evidence with a JSON round trip (`cloneJson`), never `structuredClone`, which copies that live graph or throws on it.

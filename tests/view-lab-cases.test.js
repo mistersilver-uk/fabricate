@@ -2525,9 +2525,10 @@ test('the broad SearchablePopoverPanel signal captures every deliberate picker s
   );
 });
 
-// The thirty-three frames a change to the shared positioning seam must publish: every case whose
+// The thirty-five frames a change to the shared positioning seam must publish: every case whose
 // walk leaves a panel measured, clamped and portaled, across both application roots and the two GM
-// canvas windows (issues 1500, 1503, 1504, 1520). Issue 1510's thirteen are the converted manager
+// canvas windows (issues 1500, 1503, 1504, 1520). Issue 2157's two leave a typeahead combobox's
+// suggestion list open over the scroller that used to clip it. Issue 1510's thirteen are the converted manager
 // selects whose panel sits somewhere no other frame puts one: inside a card or a row the walk
 // authors, in an editor, in an inspector rail, in a browse toolbar row of siblings, under a trigger
 // wider than its rung's ceiling at a one-column window, addressed by a caption id, or at a panel
@@ -2549,6 +2550,7 @@ const ANCHORED_POPOVER_FRAMES = [
   'manager-gathering-tasks-availability-filter-list',
   'manager-recipe-edit-ingredients-kind-list',
   'manager-recipe-edit-ingredients-or-menu',
+  'manager-recipe-edit-ingredients-suggestions',
   'manager-recipe-edit-tag-picker',
   'manager-recipe-item-contents-picker',
   'manager-recipes-bulk-edit-check-tier',
@@ -2565,12 +2567,14 @@ const ANCHORED_POPOVER_FRAMES = [
   'player-inventory-page-size',
   'player-inventory-sort-list',
   'player-journal-sort-list',
+  'world-tool-entry-on-break-repair-suggestions',
   'world-tool-entry-on-break-repair-tag-picker-empty',
 ];
 
 // The anchored-panel class families a member's own `expectSelector` can name: every portaled panel
-// in the tree is either a `*-popover` or the action menu's `fabricate-action-menu-panel`.
-const ANCHORED_PANEL_CLAIM = /popover|action-menu-panel/u;
+// in the tree is a `*-popover`, the action menu's `fabricate-action-menu-panel`, or a typeahead
+// combobox's suggestion list addressed as a child of the application root.
+const ANCHORED_PANEL_CLAIM = /popover|action-menu-panel|> \.manager-recipe-option-suggestions/u;
 
 // The one member whose selector claims no panel. Its walk DOES open the shared icon picker, but its
 // `expectSelector` was spent on issue 1117's bounds pair, so it is listed here by name rather than
@@ -2600,6 +2604,7 @@ test('every anchored-popover frame claims an open panel in its own expectSelecto
 
 for (const seamFile of [
   'src/ui/svelte/actions/anchoredPopover.js',
+  'src/ui/svelte/actions/typeaheadPanel.js',
   'src/ui/svelte/util/overlayBounds.js',
 ]) {
   test(`${seamFile} publishes every frame that rests on an open panel`, () => {
