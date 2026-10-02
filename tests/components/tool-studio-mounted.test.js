@@ -304,6 +304,12 @@ after(() => harness.teardown());
 afterEach(() => harness.remount());
 
 describe('Tool Studio editor (mounted)', () => {
+  it('draws the dirty chip at the action density of the buttons beside it', async () => {
+    const root = await harness.mount(props({ dirty: true }));
+    const chip = root.querySelector('.manager-header-actions [data-tool-editor-status]');
+    assert.ok(chip.classList.contains('is-action'), 'the chip stands in a 34px button cluster');
+  });
+
   it('renders header-only actions, three accessible tabs, and no Kind', async () => {
     const navigation = [];
     const root = await harness.mount(
