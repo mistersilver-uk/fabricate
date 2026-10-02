@@ -164,7 +164,7 @@ function withFixedBands(rows) {
  * successes needed. Rows of any other check are returned as they are.
  * A routed fixed check's rows are banded in their authored range instead (issue 2152).
  */
-export function withSalvageCountBands(rows, { config, component, localize }) {
+export function withSalvageBands(rows, { config, component, localize }) {
   if (config?.type === 'fixed') return withFixedBands(rows);
   const need = salvageCheckNeed({ mode: 'routed', config, checkUsable: true, component });
   if (need.kind !== 'successes') return rows;

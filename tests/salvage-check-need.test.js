@@ -6,7 +6,7 @@ import {
   salvageCheckNeed,
   salvageCheckTarget,
   salvageDisplayDc,
-  withSalvageCountBands,
+  withSalvageBands,
 } from '../src/ui/presenters/salvageCheckNeed.js';
 import { fill } from '../src/utils/fillPlaceholders.js';
 
@@ -90,7 +90,7 @@ test('a routed FIXED tier bands its authored [start, end] through the shared net
     { id: 'o4', name: 'Open', success: true, threshold: null, start: null, end: null, results: [] },
   ];
   const config = { type: 'fixed' };
-  const banded = withSalvageCountBands(rows, { config, component: null, localize: () => '' });
+  const banded = withSalvageBands(rows, { config, component: null, localize: () => '' });
   assert.deepEqual(
     banded.map((row) => row.band),
     ['−2 – −1', '10–20', '5', null],
@@ -100,7 +100,7 @@ test('a routed FIXED tier bands its authored [start, end] through the shared net
   // A non-counting (summed) fixed check reaches the same branch and is banded identically:
   // fixed routing never reads a DC either way, so there is nothing to discriminate on.
   assert.equal(
-    withSalvageCountBands(
+    withSalvageBands(
       [{ id: 'o1', success: true, threshold: null, start: -2, end: -1, results: [] }],
       { config: { type: 'fixed', evaluation: { product: 'sum', direction: 'over' } }, component: null, localize: () => '' }
     )[0].band,
