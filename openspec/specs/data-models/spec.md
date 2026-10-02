@@ -3480,6 +3480,7 @@ CraftingRunStepState = {
    It is omitted when no die was bought and never written as 0 or null.
    It never carries the resource path, a macro UUID, the resource name or an amount.
    An `explode-unbounded` refusal raised after a spend also carries it, because the spend stands.
+   A main Roll that throws after a spend refuses with `data.targetRefusal: 'roll-failed'`, the error in its message and `data.boughtDice`, never a failed check.
 6. `failureReason` is required when `status` is `failed`.
 7. `preparedConsumption.currencySpends` records what was actually deducted, never what was intended.
    It is the sole input to the cancel reversal's refund, so a spend that did not settle must not appear in it; an empty array is the correct record for a step whose currency deduction settled nothing.

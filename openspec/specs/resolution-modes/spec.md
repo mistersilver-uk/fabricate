@@ -420,8 +420,7 @@ Spends on one client are serialized: a path spend per actor and path, and a macr
 Across clients a path spend is not atomic, because Foundry has no compare-and-set.
 One bulk choice buys the same number for every roll it covers, offered only while those rolls share one actor and one resource, and spends per roll.
 Each bulk footer action is disabled only when every roll the batch rolls would be disabled under it on its own prompt; a roll with no additional dice, or one whose pool a Check Modifier or a Tool could move, keeps every action enabled, and a routed roll is judged by its zero-pool limb alone.
-When a spend fails mid-batch, or a roll's fresh read no longer affords the choice, the batch stops, its remaining rolls are skipped as `resourceExhausted`, and rolls already made stand.
-A roll whose fresh read refuses `resourceMacroFailed`, `resourceOverridden` or `resourceNotWritable` stops the batch the same way, and the batch names that reason once.
+When a spend fails mid-batch, a roll's fresh read no longer affords the choice, or the resource becomes unavailable (`resourceUnreadable`, `resourceOverridden`, `resourceNotWritable` or `resourceMacroFailed`), the batch stops, its remaining rolls are skipped as `resourceExhausted`, and rolls already made stand; the row that stopped it carries its refusal and notice facts, and the batch names an unavailable reason once.
 The Checks Studio simulator places simulated bought dice through the same contribution, reading and spending nothing.
 
 ### Check Target Resolution

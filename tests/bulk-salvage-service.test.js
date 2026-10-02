@@ -1785,7 +1785,7 @@ describe('BulkSalvageService.run: additional dice (issue 2008)', () => {
   });
 
   const STOPPING = ['resourceChanged', 'spendRefused', 'spendUnconfirmed', 'choiceAboveLimit'];
-  const UNAVAILABLE = ['resourceMacroFailed', 'resourceOverridden', 'resourceNotWritable'];
+  const UNAVAILABLE = ['resourceMacroFailed', 'resourceOverridden', 'resourceNotWritable', 'resourceUnreadable'];
   for (const reason of [...STOPPING, ...UNAVAILABLE]) {
     it(`stops the batch when a spend refuses ${reason}, keeping the rolls already made (AD45)`, async () => {
       const notice = { dice: 1, limit: 1, available: 0, label: 'Momentum', source: 'path' };

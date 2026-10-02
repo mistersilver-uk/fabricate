@@ -61,6 +61,7 @@ const STOPPING_REFUSALS = new Set([
   'resourceMacroFailed',
   'resourceOverridden',
   'resourceNotWritable',
+  'resourceUnreadable',
 ]);
 
 /** A batch that offers no additional dice. */
