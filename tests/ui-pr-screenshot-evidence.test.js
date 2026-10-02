@@ -919,13 +919,13 @@ describe('UI PR screenshot evidence', () => {
     assert.ok(harness.includes(`[data-io-group="essences"] .crafting-io-essence-icon`));
     assert.ok(harness.includes(`[data-shopping-acquire-components] [data-medallion="glyph"]`));
 
-    // The alternatives picker is now the chooser ONE slot opens, so the walk must open
-    // that slot before waiting on the section. Bounded to one module (issue 1692): a lazy
+    // The alternatives are the panel ONE slot opens, so the walk must open that slot before
+    // waiting on its panel. Bounded to one module (issue 1692): a lazy
     // `[^]*?` scan over the whole concatenated harness could otherwise be satisfied by text
     // spanning two unrelated modules.
     assert.ok(
       withinOneModule(
-        /\[data-requirement-slot\]\[data-slot-kind="choice"\][^]*?\[data-recipe-section="alternatives"\]/
+        /\[data-requirement-slot\]\[data-slot-kind="choice"\][^]*?\[data-requirement-panel\]/
       ),
       'the alternatives capture must open its slot before waiting on the chooser, in one module'
     );

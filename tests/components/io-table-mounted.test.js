@@ -56,6 +56,14 @@ function optionChoice(groupId, groupName) {
   };
 }
 
+/** The open panel's alternative tiles, and the pressable button each wraps. */
+function alternativesIn(root) {
+  return [...root.querySelectorAll('[data-requirement-alternative]')];
+}
+function alternativeButtons(root) {
+  return alternativesIn(root).map((tile) => tile.querySelector('button'));
+}
+
 function twoChoiceCraftability() {
   return craftability({
     canCraft: false,
@@ -113,25 +121,27 @@ describe('IoTable mounted behavior', () => {
       craftability: twoChoiceCraftability(),
       openSlotId: 'g-metal',
     });
-    const groups = [...target.querySelectorAll('[role="radiogroup"]')];
-    assert.equal(groups.length, 1, 'one focused group, not one per choice');
-    assert.equal(groups[0].getAttribute('data-alt-group'), 'g-metal');
+    const panels = [...target.querySelectorAll('[data-requirement-panel]')];
+    assert.equal(panels.length, 1, 'one focused group, not one per choice');
+    assert.equal(panels[0].getAttribute('data-requirement-panel'), 'g-metal');
+    assert.deepEqual(
+      alternativesIn(target).map((tile) => tile.textContent.trim().replaceAll(/\s+/g, ' ')),
+      ['1/1 Metal A', '0/1 Metal B']
+    );
     assert.ok(!target.querySelector('[data-recipe-section="essence-pool"]'));
   });
 
-  it('preserves the alternatives roving-tabindex radio model inside the rail', async () => {
+  it('draws the open group’s options as pressable tiles, the chosen one pressed', async () => {
     const target = await harness.mount({
       craftability: twoChoiceCraftability(),
+      chosenGroupIds: ['g-herb'],
       openSlotId: 'g-herb',
     });
-    const radios = [...target.querySelectorAll('[role="radio"]')];
     assert.deepEqual(
-      radios.map((radio) => [radio.getAttribute('aria-checked'), radio.getAttribute('tabindex')]),
-      [
-        ['true', '0'],
-        ['false', '-1'],
-      ]
+      alternativeButtons(target).map((button) => button.getAttribute('aria-pressed')),
+      ['true', 'false']
     );
+    assert.ok(!target.querySelector('[role="radiogroup"]'), 'no option radios beside them');
   });
 
   it('routes the chosen option back through onChooseOption', async () => {
@@ -141,7 +151,7 @@ describe('IoTable mounted behavior', () => {
       openSlotId: 'g-herb',
       onChooseOption: (groupId, choice) => calls.push([groupId, choice]),
     });
-    target.querySelectorAll('[role="radio"]')[1].click();
+    alternativeButtons(target)[1].click();
     assert.deepEqual(calls.at(-1), ['g-herb', { optionIndex: 1 }]);
   });
 
@@ -151,7 +161,7 @@ describe('IoTable mounted behavior', () => {
       openSlotId: 'essence-pool',
     });
     assert.ok(target.querySelector('[data-recipe-section="essence-pool"]'));
-    assert.ok(!target.querySelector('[role="radiogroup"]'));
+    assert.equal(alternativesIn(target).length, 0);
     assert.equal(
       target.querySelectorAll('[data-essence-meter]').length,
       2,
@@ -178,7 +188,7 @@ describe('IoTable mounted behavior', () => {
       craftability: twoChoiceCraftability(),
       openSlotId: 'g-herb',
     });
-    const panel = target.querySelector('[role="radiogroup"]').closest('[aria-labelledby]');
+    const panel = alternativesIn(target)[0].closest('[aria-labelledby]');
     assert.equal(panel.getAttribute('role'), 'region');
     assert.equal(panel.getAttribute('aria-labelledby'), 'fabricate-slot-g-herb');
   });
@@ -194,10 +204,8 @@ describe('IoTable mounted behavior', () => {
     const [region] = regions;
     assert.equal(region.getAttribute('id'), 'fabricate-req-panel');
     assert.equal(region.getAttribute('aria-labelledby'), 'fabricate-slot-g-primal');
-    assert.equal(
-      region.querySelector('[role="radiogroup"]').getAttribute('data-alt-group'),
-      'g-primal'
-    );
+    assert.equal(region.getAttribute('data-requirement-panel'), 'g-primal');
+    assert.equal(alternativesIn(region).length, 2, 'the group’s alternatives come first');
     const pool = region.querySelector('[data-recipe-section="essence-pool"]');
     assert.ok(pool, 'the pool renders inside the alternatives region');
     assert.ok(!pool.hasAttribute('id'), 'only the region carries the panel id');
@@ -214,7 +222,7 @@ describe('IoTable mounted behavior', () => {
         calls.push([groupId, choice]);
       },
     });
-    target.querySelector('[role="region"]').querySelectorAll('[role="radio"]')[0].click();
+    alternativeButtons(target.querySelector('[role="region"]'))[0].click();
     assert.deepEqual(calls.at(-1), ['g-primal', { optionIndex: 0 }]);
   });
 
@@ -247,7 +255,7 @@ describe('IoTable mounted behavior', () => {
     const panel = target.querySelector('[data-recipe-section="essence-pool"]').closest('[role="region"]');
     assert.equal(panel.getAttribute('id'), 'fabricate-req-panel');
     assert.equal(panel.getAttribute('aria-labelledby'), 'fabricate-slot-g-radiant');
-    assert.ok(!target.querySelector('[role="radiogroup"]'), 'no group was opened');
+    assert.equal(alternativesIn(target).length, 0, 'no group was opened');
   });
 
   it('shows only the open group when two choice groups both chose an essence', async () => {
@@ -267,9 +275,10 @@ describe('IoTable mounted behavior', () => {
       }),
       openSlotId: 'g-ember',
     });
-    const groups = [...target.querySelectorAll('[role="radiogroup"]')];
     assert.deepEqual(
-      groups.map((group) => group.getAttribute('data-alt-group')),
+      [...target.querySelectorAll('[data-requirement-panel]')].map(
+        (panel) => panel.dataset.requirementPanel
+      ),
       ['g-ember']
     );
     assert.equal(target.querySelectorAll('[data-recipe-section="essence-pool"]').length, 1);
@@ -283,7 +292,7 @@ describe('IoTable mounted behavior', () => {
     });
     const region = target.querySelector('[role="region"]');
     assert.equal(region.getAttribute('id'), 'fabricate-req-panel');
-    assert.ok(region.querySelector('[role="radiogroup"]'));
+    assert.equal(alternativesIn(region).length, 2);
     assert.ok(!target.querySelector('[data-recipe-section="essence-pool"]'));
   });
 
@@ -304,7 +313,7 @@ describe('IoTable mounted behavior', () => {
       readOnly: true,
     });
     assert.ok(!target.querySelector('[data-recipe-section="essence-pool"]'));
-    assert.ok(!target.querySelector('[role="radiogroup"]'));
+    assert.equal(alternativesIn(target).length, 0);
     assert.ok(target.querySelector('[data-requirement-rail-readonly]'));
   });
 
@@ -433,7 +442,7 @@ describe('IoTable mounted behavior', () => {
       }),
       openSlotId: 'g-herb',
     });
-    assert.ok(target.querySelector('[role="radiogroup"][data-alt-group="g-herb"]'));
+    assert.equal(alternativesIn(target.querySelector('[data-requirement-panel="g-herb"]')).length, 2);
     assert.ok(!target.querySelector('[data-recipe-section="essence-pool"]'));
   });
 

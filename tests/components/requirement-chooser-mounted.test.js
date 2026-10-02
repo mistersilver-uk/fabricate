@@ -329,6 +329,29 @@ describe('RequirementChooser mounted behavior', () => {
     assert.equal(chosen[0][1].id, 'bog', 'and the alternative the player picked');
   });
 
+  // The smoke harness and the View Lab select a crafting alternative by its caller's hooks.
+  it('spreads an alternative’s wrapperProps on its wrapper and appends their class to its own', async () => {
+    const hooked = (alternative, index) => ({
+      ...alternative,
+      wrapperProps: { class: 'caller-option', 'data-option-index': index },
+    });
+    const target = await harness.mount({
+      slots: [{ ...CHOICE, alternatives: CHOICE.alternatives.map(hooked) }],
+      openSlotId: 'g-haft',
+    });
+    const [oak, bog] = alternativesIn(target);
+    assert.deepEqual(
+      [oak, bog].map((entry) => entry.getAttribute('data-option-index')),
+      ['0', '1']
+    );
+    for (const entry of [oak, bog]) {
+      assert.ok(entry.classList.contains('caller-option'), 'the caller class is added');
+      assert.ok(entry.classList.contains('fab-requirement-alternative'), 'and replaces nothing');
+    }
+    assert.ok(bog.classList.contains('is-short'), 'the state class survives the spread');
+    assert.ok(!oak.hasAttribute('wrapperProps'));
+  });
+
   it('renders the caller panel beneath the alternatives, for the open slot', async () => {
     const target = await harness.mount({ slots: SLOTS, openSlotId: 'g-haft', panel: POOL });
     const panel = target.querySelector('[data-requirement-panel="g-haft"]');

@@ -1,57 +1,49 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  IngredientOptionSelector is the player-facing per-slot picker (issue 552): for a
-  recipe ingredient group that lists MULTIPLE acceptable components ("Red Herb OR
-  Blue Herb"), it lets the player choose WHICH alternative the craft consumes, and
-  — for a tag option matching several held stacks — WHICH held item. It is the
-  per-slot analogue of IngredientSetSelector's route picker; a recipe can have both.
+  The held-stack picker in an open requirement's panel: when the group's chosen option is a tag
+  matching several held stacks, it lets the player choose WHICH held item the craft consumes. The
+  group's alternatives themselves are the requirement chooser's tiles, drawn above it.
 
-  It is data-driven from `craftability.ingredientChoices` (built by
-  RecipeManager._buildIngredientChoices), so the selection state is NOT computed in
-  the UI: choosing an option calls `onChoose(groupId, choice)`, which drives a
-  re-evaluation through the same resolver the engine consumes (keeping tiles ==
-  consumed). Each choice is one `role="radiogroup"`; each option/stack is a
-  `<button role="radio">`. A short option or stack stays selectable but is flagged
-  (`is-short` and a danger have/need chip) — the recipe header then draws no Craft primary and
-  states the missing materials. Renders nothing when no group offers a choice.
+  Props:
+  | prop | values | default | contract |
+  | --- | --- | --- | --- |
+  | `choices` | craftability `ingredientChoices` | `[]` | Only `stack` entries render; renders nothing without one. |
+  | `need` | number | `0` | The open slot's requirement; a stack holding less is short. |
 
-  `need` is the open slot's requirement, which a held stack is short of when it holds less.
-  A currency option has no held-against-needed pair, so its name never states one.
+  Callbacks:
+  - `onChoose(groupId, { optionIndex, heldItemId })` — a stack was chosen; the store re-evaluates
+    through the resolver the engine consumes, so the selection is never computed here.
+
+  Invariants:
+  - Each group is one `role="radiogroup"` of `<button role="radio">`s with a roving tabindex. A
+    short stack stays selectable and is flagged in danger ink and in its accessible name.
 -->
 <script>
   import Medallion from '../../../components/Medallion.svelte';
   import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
-  import { normalizeEssenceIcon } from '../../../util/essenceIcons.js';
   import { localize } from '../../../util/foundryBridge.js';
   import { statusChipTone } from '../../../util/statusChipTone.js';
-  import { haveOfNeedText, stackCountText } from '../../../util/craftingQuantityReading.js';
+  import { stackCountText } from '../../../util/craftingQuantityReading.js';
   import Chip from '../../../components/Chip.svelte';
   import Kicker from '../../../components/Kicker.svelte';
 
   let { choices = [], need = 0, onChoose = null } = $props();
 
-  const groups = $derived(Array.isArray(choices) ? choices : []);
+  const groups = $derived(
+    Array.isArray(choices) ? choices.filter((choice) => choice?.kind === 'stack') : []
+  );
 
-  // A shortfall is stated in the option's name as well as in danger ink.
-  function optionLabel(name, short, have, required) {
+  function stackLabel(name, short, have) {
     return short
-      ? localize('FABRICATE.App.Crafting.Io.ChooseShortOption', { name, have, need: required })
+      ? localize('FABRICATE.App.Crafting.Io.ChooseShortOption', { name, have, need })
       : localize('FABRICATE.App.Crafting.Io.ChooseOption', { name });
   }
 
-  function commitOption(choice, optionIndex) {
-    onChoose?.(choice.groupId, { optionIndex });
-  }
   function commitStack(choice, heldItemId) {
     onChoose?.(choice.groupId, { optionIndex: choice.optionIndex, heldItemId });
   }
 
-  // Roving-tabindex keyboard model: Arrow keys move focus + selection within the
-  // group, Home/End jump to the ends, Space/Enter commit the focused radio. Reads
-  // the group's radios off the DOM so it works for both option and stack groups.
-  // Returns the index the key moves focus to, or -1 for a key this model ignores.
-  // Returning directly keeps `nextIndex` a const at the call site, so no code path
-  // can reach the commit with an unassigned index.
+  // The index a key moves focus and selection to, or -1 for a key this model ignores.
   function rovingTargetIndex(key, currentIndex, length) {
     if (key === 'ArrowRight' || key === 'ArrowDown') return (currentIndex + 1) % length;
     if (key === 'ArrowLeft' || key === 'ArrowUp') return (currentIndex - 1 + length) % length;
@@ -60,148 +52,67 @@
     return -1;
   }
 
-  function onRadioKeydown(event, commit, values, currentValue) {
-    const key = event.key;
+  function onRadioKeydown(event, choice) {
+    const values = choice.stacks.map((stack) => stack.itemId);
     const radios = [...event.currentTarget.parentElement.querySelectorAll('[role="radio"]')];
-    const currentIndex = values.indexOf(currentValue);
-    if (key === ' ' || key === 'Enter') {
+    const currentIndex = values.indexOf(choice.selectedHeldItemId);
+    if (event.key === ' ' || event.key === 'Enter') {
       event.preventDefault();
-      commit(values[currentIndex < 0 ? 0 : currentIndex]);
+      commitStack(choice, values[currentIndex < 0 ? 0 : currentIndex]);
       return;
     }
-    const nextIndex = rovingTargetIndex(key, currentIndex, values.length);
+    const nextIndex = rovingTargetIndex(event.key, currentIndex, values.length);
     if (nextIndex < 0) return;
     event.preventDefault();
-    commit(values[nextIndex]);
+    commitStack(choice, values[nextIndex]);
     radios[nextIndex]?.focus();
   }
 </script>
 
-{#if groups.length > 0}
-  <section class="crafting-alt" data-recipe-section="alternatives">
-    <Kicker as="p">
-      {localize('FABRICATE.App.Crafting.Io.AlternativesTitle')}
-    </Kicker>
-    <p class="crafting-alt-hint">{localize('FABRICATE.App.Crafting.Io.AlternativesHint')}</p>
-
-    {#each groups as choice (choice.kind + ':' + choice.groupId + ':' + (choice.optionIndex ?? ''))}
-      {#if choice.kind === 'option'}
-        {@const values = choice.options.map((option) => option.optionIndex)}
-        <div
-          class="crafting-alt-group"
-          role="radiogroup"
-          aria-label={choice.groupName}
-          data-alt-group={choice.groupId}
-          data-alt-kind="option"
+{#each groups as choice (choice.groupId + ':' + choice.optionIndex)}
+  {@const title = localize('FABRICATE.App.Crafting.Io.ChooseStackTitle', {
+    name: choice.groupName,
+  })}
+  <section class="crafting-alt" data-recipe-section="stacks">
+    <Kicker as="p">{title}</Kicker>
+    <div
+      class="crafting-alt-group"
+      role="radiogroup"
+      aria-label={title}
+      data-alt-group={choice.groupId}
+      data-alt-kind="stack"
+    >
+      {#each choice.stacks as stack (stack.itemId)}
+        {@const selected = stack.itemId === choice.selectedHeldItemId}
+        {@const short = Number(stack.have) < Number(need)}
+        <button
+          type="button"
+          class="crafting-alt-option"
+          class:is-selected={selected}
+          class:is-short={short}
+          role="radio"
+          aria-checked={selected}
+          aria-label={stackLabel(stack.name, short, stack.have)}
+          tabindex={selected ? 0 : -1}
+          data-keyboard-focus="true"
+          data-held-id={stack.itemId}
+          data-option-satisfied={short ? 'false' : 'true'}
+          onclick={() => commitStack(choice, stack.itemId)}
+          onkeydown={(event) => onRadioKeydown(event, choice)}
         >
-          {#each choice.options as option (option.optionIndex)}
-            {@const selected = option.optionIndex === choice.selectedOptionIndex}
-            <button
-              type="button"
-              class="crafting-alt-option"
-              class:is-selected={selected}
-              class:is-short={!option.satisfied}
-              role="radio"
-              aria-checked={selected}
-              aria-label={optionLabel(
-                option.name,
-                !option.satisfied && !option.isCurrency,
-                option.have,
-                option.need
-              )}
-              tabindex={selected ? 0 : -1}
-              data-keyboard-focus="true"
-              data-option-index={option.optionIndex}
-              data-option-satisfied={option.satisfied ? 'true' : 'false'}
-              onclick={() => commitOption(choice, option.optionIndex)}
-              onkeydown={(event) =>
-                onRadioKeydown(
-                  event,
-                  (value) => commitOption(choice, value),
-                  values,
-                  choice.selectedOptionIndex
-                )}
-            >
-              {#if option.isEssence}
-                <Medallion icon={normalizeEssenceIcon(option.icon)} size={40} glyph={17} />
-              {:else}
-                <Medallion {...resolveCraftingArt(option.img)} alt="" size={40} />
-              {/if}
-              <span class="crafting-alt-name">{option.name}</span>
-              {#if option.isCurrency}
-                <Chip
-                  density="list"
-                  emphasis="solid"
-                  tone={statusChipTone(option.affordable ? 'success' : 'danger')}
-                  icon="fas fa-coins">{option.costLabel}</Chip
-                >
-              {:else}
-                <Chip
-                  density="list"
-                  emphasis="solid"
-                  tone={statusChipTone(option.satisfied ? 'success' : 'danger')}
-                  >{haveOfNeedText(option.have, option.need)}</Chip
-                >
-              {/if}
-              {#if selected}
-                <i class="crafting-alt-tick fa-solid fa-circle-check" aria-hidden="true"></i>
-              {/if}
-            </button>
-          {/each}
-        </div>
-      {:else if choice.kind === 'stack'}
-        {@const values = choice.stacks.map((stack) => stack.itemId)}
-        <div
-          class="crafting-alt-group"
-          role="radiogroup"
-          aria-label={localize('FABRICATE.App.Crafting.Io.ChooseStackTitle', {
-            name: choice.groupName,
-          })}
-          data-alt-group={choice.groupId}
-          data-alt-kind="stack"
-        >
-          {#each choice.stacks as stack (stack.itemId)}
-            {@const selected = stack.itemId === choice.selectedHeldItemId}
-            {@const short = Number(stack.have) < Number(need)}
-            <button
-              type="button"
-              class="crafting-alt-option"
-              class:is-selected={selected}
-              class:is-short={short}
-              role="radio"
-              aria-checked={selected}
-              aria-label={optionLabel(stack.name, short, stack.have, need)}
-              tabindex={selected ? 0 : -1}
-              data-keyboard-focus="true"
-              data-held-id={stack.itemId}
-              data-option-satisfied={short ? 'false' : 'true'}
-              onclick={() => commitStack(choice, stack.itemId)}
-              onkeydown={(event) =>
-                onRadioKeydown(
-                  event,
-                  (value) => commitStack(choice, value),
-                  values,
-                  choice.selectedHeldItemId
-                )}
-            >
-              <Medallion {...resolveCraftingArt(stack.img)} alt="" size={40} />
-              <span class="crafting-alt-name">{stack.name}</span>
-              <Chip
-                density="list"
-                emphasis="solid"
-                tone={statusChipTone(short ? 'danger' : 'neutral')}
-                >{stackCountText(stack.have)}</Chip
-              >
-              {#if selected}
-                <i class="crafting-alt-tick fa-solid fa-circle-check" aria-hidden="true"></i>
-              {/if}
-            </button>
-          {/each}
-        </div>
-      {/if}
-    {/each}
+          <Medallion {...resolveCraftingArt(stack.img)} alt="" size={40} />
+          <span class="crafting-alt-name">{stack.name}</span>
+          <Chip density="list" emphasis="solid" tone={statusChipTone(short ? 'danger' : 'neutral')}
+            >{stackCountText(stack.have)}</Chip
+          >
+          {#if selected}
+            <i class="crafting-alt-tick fa-solid fa-circle-check" aria-hidden="true"></i>
+          {/if}
+        </button>
+      {/each}
+    </div>
   </section>
-{/if}
+{/each}
 
 <style>
   .crafting-alt {
@@ -210,23 +121,14 @@
     gap: 6px;
   }
 
-  .crafting-alt-hint {
-    margin: 0;
-    font-size: 12px;
-    color: var(--fab-text-muted);
-  }
-
   .crafting-alt-group {
     display: flex;
     flex-wrap: wrap;
     gap: var(--fab-space-2);
   }
 
-  /* Foundry's global button chrome centres content and pins a fixed height; reset it
-     (font/line-height/height:auto/min-height/justify/white-space) or the option row
-     collapses and its thumb clips (EnvironmentCard / .crafting-option-card pattern).
-     No scoped focus ring: the .fabricate-app focus-visible block in fabricate.css
-     paints the accent ring. */
+  /* Foundry's global button chrome centres content and pins a fixed height, so the box is reset;
+     the module's focus-visible block paints the ring. */
   .crafting-alt-option {
     box-sizing: border-box;
     display: inline-flex;
@@ -256,9 +158,7 @@
     background: var(--fab-accent-soft);
   }
 
-  /* A short option stays selectable but flagged (issue 552): the danger border reads
-     "blocking" whether or not the row is selected, and the selected variant takes a
-     danger-tinted fill so it still reads as chosen. */
+  /* A short stack reads "blocking" whether or not it is selected; selected, it keeps a fill. */
   .crafting-alt-option.is-short {
     border-color: var(--fab-danger-border);
   }

@@ -12,8 +12,9 @@
   | `ariaLabel` / `alternativesLabel` | localized strings | `''` | The accessible names of the tile group and of the alternatives group. |
   | `class` | class string | `''` | An extra class on the root. |
 
-  An alternative carries `id`, `name`, `label`, `art` / `icon` / `tint`, `pip`, `selected`, `short`
-  and `reading`, the shortfall stated in words.
+  An alternative carries `id`, `name`, `label`, `art` / `icon` / `tint`, `pip`, `selected`, `short`,
+  `reading`, the shortfall stated in words, and `wrapperProps`, the caller's hooks spread on its wrapper
+  with any `class` appended to the wrapper's own.
 
   Snippets:
   - `panel(slot)` — the caller's content for the open slot, such as an essence pool; it lands in
@@ -166,12 +167,14 @@
           aria-label={alternativesLabel || undefined}
         >
           {#each alternatives as alternative (alternative.id)}
+            {@const { class: hookClass = '', ...hooks } = alternative.wrapperProps ?? {}}
             <div
-              class="fab-requirement-alternative"
+              class={['fab-requirement-alternative', hookClass]}
               class:is-short={alternative.short === true}
               data-requirement-alternative={alternative.id}
               data-alternative-state={alternative.short ? 'short' : 'met'}
               use:describedBy={shortfalls.includes(alternative) ? shortfallId(alternative) : null}
+              {...hooks}
             >
               <SlotTile
                 label={alternative.name}

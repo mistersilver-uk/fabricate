@@ -24,8 +24,9 @@ const COMPONENTS = toRepositoryPaths(repoRoot, COMPONENT_FILES).map((path, index
 const MAP_READERS = COMPONENTS.filter(({ source }) => source.includes(MAP_MODULE));
 
 /** THE CONVERTED SITES, COUNTED, so the clause below cannot pass over nothing. */
-// #1648 replaces HistoryRow's mapped status chip with a labeled outcome glyph.
-const MAPPED_TONE_SITES = 25;
+// #1648 replaces HistoryRow's mapped status chip with a labeled outcome glyph. #1518 moves the
+// option selector's two option chips onto the chooser's alternatives.
+const MAPPED_TONE_SITES = 23;
 
 /** The one shipped chip that asks for the flat plate. */
 const OUTLINED_CHIP = 'src/ui/svelte/apps/manager/component/ComponentIdentityStrip.svelte';

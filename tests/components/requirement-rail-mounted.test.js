@@ -96,6 +96,7 @@ const harness = createMountedComponentHarness({
   'src/ui/svelte/util/foundryIconCatalogue.js',
   'src/ui/svelte/util/foundryIconCatalogue.json',
     'src/ui/svelte/util/requirementSlots.js',
+    'src/ui/svelte/util/craftingQuantityReading.js',
   ],
   compiledModules: [
     'src/ui/svelte/components/Medallion.svelte',
@@ -135,6 +136,41 @@ const STATES = [
 
 function slots(states = STATES) {
   return buildRequirementSlots({ ingredientStates: states });
+}
+
+/** The choice slot's option entry: a met item, a short item and an affordable cost. */
+const HERBS = {
+  kind: 'option',
+  groupId: 'g-choice',
+  groupName: 'Herb',
+  selectedOptionIndex: 1,
+  options: [
+    { optionIndex: 0, name: 'Red Herb', img: 'icons/red.webp', need: 1, have: 2, satisfied: true },
+    { optionIndex: 1, name: 'Blue Herb', img: null, need: 1, have: 0, satisfied: false },
+    {
+      optionIndex: 2,
+      name: '12 gp',
+      isCurrency: true,
+      costLabel: '12 gp',
+      affordable: true,
+      satisfied: true,
+    },
+  ],
+};
+
+/** The rail with the choice slot open and picked from, so the default is not a to-do. */
+function openChoice(props = {}) {
+  return harness.mount({
+    slots: buildRequirementSlots({ ingredientStates: STATES }, { chosenGroupIds: ['g-choice'] }),
+    choices: [HERBS],
+    openSlotId: 'g-choice',
+    panelId: 'panel-1',
+    ...props,
+  });
+}
+
+function alternativesIn(target) {
+  return [...target.querySelectorAll('[data-requirement-alternative]')];
 }
 
 function tilesIn(target) {
@@ -346,6 +382,70 @@ describe('RequirementRail mounted behavior', () => {
     } finally {
       restoreI18n();
     }
+  });
+
+  it('draws the open choice slot’s options as chooser tiles carrying the smoke harness hooks', async () => {
+    const target = await openChoice();
+    const tiles = alternativesIn(target);
+    assert.deepEqual(
+      tiles.map((tile) => tile.getAttribute('data-option-index')),
+      ['0', '1', '2']
+    );
+    assert.ok(tiles.every((tile) => tile.classList.contains('crafting-alt-option')));
+    assert.ok(target.querySelector(':scope #panel-1 .fab-requirement-alternatives'), 'inside the panel');
+    assert.deepEqual(
+      tiles.map((tile) => tile.querySelector('.fab-slot-pip').textContent.trim()),
+      ['2/1', '0/1', '12 gp'],
+      'an item states held against needed, and a cost states its price'
+    );
+    assert.deepEqual(
+      tiles.map((tile) => tile.querySelector('button').getAttribute('aria-pressed')),
+      ['false', 'true', 'false'],
+      'the option the craft will use is pressed'
+    );
+  });
+
+  it('routes a pressed alternative to onChooseOption with its group and option index', async () => {
+    const chosen = [];
+    const target = await openChoice({
+      onChooseOption: (groupId, choice) => {
+        chosen.push([groupId, choice]);
+      },
+    });
+    alternativesIn(target)[0].querySelector('button').click();
+    alternativesIn(target)[2].querySelector('button').click();
+    assert.deepEqual(chosen, [
+      ['g-choice', { optionIndex: 0 }],
+      ['g-choice', { optionIndex: 2 }],
+    ]);
+  });
+
+  it('states a short alternative in visible words its tile is described by', async () => {
+    const target = await openChoice();
+    const [met, short, coin] = alternativesIn(target).map((tile) => tile.querySelector('button'));
+    const reading = target.querySelector('[data-requirement-shortfall="1"]');
+    assert.match(reading.textContent, /Slots\.TileShort/);
+    assert.match(reading.textContent, /"name":"Blue Herb","have":0,"need":1/);
+    assert.equal(short.getAttribute('aria-describedby'), reading.id);
+    assert.match(short.getAttribute('aria-label'), /Io\.ChooseOption:\{"name":"Blue Herb"\}/);
+    assert.match(met.getAttribute('aria-label'), /Slots\.TileMet:.*"have":2,"need":1/);
+    assert.match(coin.getAttribute('aria-label'), /Slots\.TileCurrencyMet:\{"name":"12 gp"/);
+    assert.equal(target.querySelectorAll('[data-requirement-shortfall]').length, 1);
+  });
+
+  // An unchosen choice is a to-do: a ticked default would contradict its open face.
+  it('presses no alternative on a choice the player has not picked from', async () => {
+    const target = await openChoice({ slots: slots() });
+    const pressed = target.querySelectorAll(':scope [data-requirement-alternative] [aria-pressed="true"]');
+    assert.equal(pressed.length, 0);
+  });
+
+  it('offers alternatives only for the open slot, and none on a read-only rail', async () => {
+    const closed = await openChoice({ openSlotId: 'essence-pool' });
+    assert.equal(alternativesIn(closed).length, 0);
+    harness.remount();
+    const inert = await openChoice({ readOnly: true });
+    assert.equal(alternativesIn(inert).length, 0);
   });
 
   it('reports the opened slot id on click', async () => {

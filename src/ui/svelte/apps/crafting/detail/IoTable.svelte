@@ -1,8 +1,8 @@
 <!-- Svelte 5 runes mode -->
 <!--
   IoTable is the recipe detail's material-economy region and the composition root for the
-  requirement surface: the slot rail with its single open chooser (an alternatives picker, the
-  shared essence pool, or both when a group's chosen alternative is an essence) and the
+  requirement surface: the slot rail with its single open chooser (the group's alternatives as
+  tiles, then its held-stack picker or the shared essence pool when it has either) and the
   consumption-plan panel, followed by the legacy set-level essence rows, the tool rows and the
   produced outputs.
 
@@ -72,10 +72,12 @@
   // Any open essence slot shows the pool: the shared pool slot, or a group whose chosen
   // alternative is an essence (beneath that group's alternatives).
   const poolOpen = $derived(!readOnly && openSlot?.kind === SLOT_KIND.ESSENCE);
-  const openChoices = $derived(
+  const openStacks = $derived(
     readOnly || !openSlotId
       ? []
-      : ingredientChoices.filter((choice) => choice?.groupId === openSlotId)
+      : ingredientChoices.filter(
+          (choice) => choice?.kind === 'stack' && choice.groupId === openSlotId
+        )
   );
   const overshoots = $derived(essenceOvershoots(craftability?.essencePool ?? null));
 
@@ -92,7 +94,7 @@
     <div class="crafting-io-group" data-io-group="ingredients">
       {#snippet chooser()}
         <IngredientOptionSelector
-          choices={openChoices}
+          choices={openStacks}
           need={openSlot?.need ?? 0}
           onChoose={onChooseOption}
         />
@@ -111,9 +113,11 @@
         {readOnly}
         {announcement}
         {panelId}
+        choices={ingredientChoices}
         {onOpenSlot}
+        {onChooseOption}
         {onPickForMe}
-        chooser={openChoices.length > 0 || poolOpen ? chooser : null}
+        chooser={openStacks.length > 0 || poolOpen ? chooser : null}
       />
       <ConsumptionPlanPanel {plan} {overshoots} {formatList} />
     </div>

@@ -633,7 +633,7 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
           .first();
         await altRecipeRow.scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {});
         await altRecipeRow.locator('.crafting-recipe-row-main').click({ timeout: 5000 });
-        // Issue 917 re-point: `[data-recipe-section="alternatives"]` is no longer always present.
+        // The open choice slot's panel holds its alternative tiles (issue 1518).
         await appShell
           .locator('[data-recipe-section="requirement-rail"]')
           .first()
@@ -642,7 +642,7 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
           .locator('[data-requirement-slot][data-slot-kind="choice"]')
           .first();
         await ensureSlotOpen(altSlotTile).catch(() => {});
-        const altSection = appShell.locator('[data-recipe-section="alternatives"]').first();
+        const altSection = appShell.locator('[data-requirement-panel]').first();
         await altSection.waitFor({ state: 'visible', timeout: 10_000 });
         // Pointer hit-test (issue 917): the whole 80px slot-tile column is the control, under the
         // rail's wrapping flex row. happy-dom computes no cascade, so only a real frame can prove
@@ -785,9 +785,7 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
             `Requirement rail states were ${JSON.stringify(railStates)}, expected ${JSON.stringify(expectedRailStates)}`
           );
         }
-        const openChoosers = await appShell
-          .locator('[data-recipe-section="alternatives"], [data-recipe-section="essence-pool"]')
-          .count();
+        const openChoosers = await appShell.locator('[data-requirement-panel]').count();
         if (openChoosers !== 1) {
           throw new Error(
             `Requirement rail had ${openChoosers} choosers open, expected exactly one`
@@ -814,9 +812,8 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
             ).length,
             // Issue 1506: the fallback glyph is the shared art tile's glyph face.
             glyphTiles: rail.querySelectorAll('[data-medallion="glyph"]').length,
-            openChoosers: document.querySelectorAll(
-              '#fabricate-app [data-recipe-section="alternatives"], #fabricate-app [data-recipe-section="essence-pool"]'
-            ).length,
+            openChoosers: document.querySelectorAll('#fabricate-app [data-requirement-panel]')
+              .length,
           };
         });
         if (!tagReport) throw new Error('Tag-requirement rail did not render');

@@ -1016,7 +1016,7 @@ export const CASES = Object.freeze([
     id: 'player-crafting-essence-alternative',
     label: 'Player app — Crafting essence alternative',
     smokeLabels: ['player-crafting-essence-alternative'],
-    // The counterpart wants an open alternatives radiogroup whose essence option draws the glyph face.
+    // The counterpart wants an open choice slot whose essence alternative draws the glyph face.
     reaches: 'exact',
     query: { tab: 'crafting' },
     steps: [
@@ -1102,12 +1102,15 @@ export const CASES = Object.freeze([
       { selector: '.crafting-recipe-row[data-recipe-id="sm-r-tidebound"]' },
       { selector: '[data-requirement-slot][data-slot-kind="essence"]' },
       { selector: '[data-requirement-slot][data-slot-kind="choice"]' },
-      { selector: '[data-alt-group="sm-set-tidebound-g2"] [data-option-index="1"]' },
+      {
+        selector:
+          '[data-requirement-panel="sm-set-tidebound-g2"] .crafting-alt-option[data-option-index="1"] button',
+      },
     ],
     expectSelector:
       '[data-recipe-section="requirement-rail"]' +
       ':has([data-requirement-slot][data-slot-kind="choice"][aria-expanded="true"])' +
-      ':has(.crafting-alt-option.is-selected[data-option-index="1"])' +
+      ':has(.crafting-alt-option[data-option-index="1"] [aria-pressed="true"])' +
       ':has(.crafting-alt-option.is-short[data-option-index="0"])',
     kinds: ['player', 'crafting'],
     sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
