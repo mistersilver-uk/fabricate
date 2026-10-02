@@ -928,6 +928,27 @@ describe('the gathering facade and the prepared gathering read', () => {
     assert.deepEqual(executed, [{ interactive: false, additionalDice: 2 }, { interactive: false }]);
   });
 
+  test('a gathering descriptor that buys no dice keeps its check config byte for byte', () => {
+    const engine = new GatheringEngine({ localize: (key) => key });
+    const { actor } = heroWith(3);
+    for (const evaluation of [
+      undefined,
+      countEvaluation(),
+      countEvaluation({ additionalDice: { ...PAID, enabled: false } }),
+    ]) {
+      const fixture = gatheringFixture({ mode: 'routed' });
+      const routed = {
+        ...fixture.system.gatheringCraftingCheck.routed,
+        ...(evaluation && { rollFormula: '', dc: 1, evaluation }),
+      };
+      fixture.system.gatheringCraftingCheck.routed = routed;
+      const run = { taskId: fixture.task.id };
+      const descriptor = engine._versionedCheckDescriptor({ actor, run, ...fixture });
+      const label = evaluation?.pool.additionalDice ? 'disabled' : (evaluation?.product ?? 'sum');
+      assert.deepEqual(descriptor.privateEvaluation.checkConfig, routed, label);
+    }
+  });
+
   test('the prepared gathering read names its activity, at the describe and the evaluation', async () => {
     const reads = [];
     const macro = {

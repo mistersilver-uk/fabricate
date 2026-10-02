@@ -125,7 +125,7 @@ const DEFAULT_BLOCKED_REASON_KEYS = Object.freeze({
 });
 
 const BLIND_TASK_LABEL_KEY = 'FABRICATE.Gathering.BlindTaskLabel';
-const PREPARED_ACTIVITY = Object.freeze({ activity: 'gathering' });
+const ACTIVITY = Object.freeze({ craftingModifier: Object.freeze({ activity: 'gathering' }) });
 const UNKNOWN_TOOL_LABEL_KEY = 'FABRICATE.App.Gathering.Detail.UnknownTool';
 const DEFAULT_TOOL_IMG = 'icons/svg/item-bag.svg';
 const VERSIONED_START_CONTEXT = Symbol('versionedGatheringStartContext');
@@ -844,7 +844,7 @@ export class GatheringEngine {
         mode: checkMode,
         slot,
         rollFormula,
-        checkConfig: config && { ...cloneJson(config), craftingModifier: PREPARED_ACTIVITY },
+        checkConfig: config && { ...cloneJson(config), ...(count?.additionalDice && ACTIVITY) },
         decisionPolicy: {
           dc: target.source === 'fixed' ? dc : null,
           target: dc,
