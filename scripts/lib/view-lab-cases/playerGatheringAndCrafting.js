@@ -407,6 +407,28 @@ export const CASES = Object.freeze([
     kinds: ['player', 'crafting'],
     sourceMatches: CHAT_SOURCES,
   }),
+  // Issue 2153: the GM-only card's needs-attention line, for a complication macro it cannot run.
+  playerCase({
+    id: 'player-crafting-chat-card-gm-complication-fault',
+    label: 'Player app — GM-only complication card, with a macro that needs attention',
+    smokeLabels: [],
+    reaches: 'beyond',
+    // The GM crafts, so the elected GM applies the delivery on its own client and whispers the card.
+    query: { tab: 'crafting', viewer: 'gm', rollPromptState: 'complication-fault', chatLog: '1' },
+    steps: [
+      { selector: '.crafting-browser-search input', fill: 'Reduce a Stillroom' },
+      { selector: '.crafting-recipe-row[data-recipe-id="hb-r-stillroom"]' },
+      { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
+    ],
+    allowedConsoleErrors: [/names a macro that could not be resolved to a script macro/],
+    expectSelector: '.fabricate-craft-chat--gm .fabricate-craft-chat__complication-fault',
+    expectVisible: `${LAB_CHAT('whisper')} .fabricate-craft-chat__complication-fault`,
+    kinds: ['player', 'crafting'],
+    sourceMatches: [
+      /^src\/systems\/complicationRuntime\.js$/,
+      /^src\/bootstrap\/socketRouter\.js$/,
+    ],
+  }),
   // The control: a sum/over fixed card gains the pill, dice line, and Needed and Margin rows (M1, M3).
   playerCase({
     id: 'player-crafting-chat-card-over-control',
@@ -614,6 +636,24 @@ export const CASES = Object.freeze([
     ],
     kinds: ['player', 'gathering'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//],
+  }),
+  // Issue 2153: the posted result card's event section, re-inked for the chat's parchment.
+  playerCase({
+    id: 'player-gathering-chat-card-event',
+    label: 'Player app — gathering result card, with the event that fired',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'gathering', rollPromptState: 'gathering-event', chatLog: '1' },
+    steps: [
+      { selector: '.gathering-env-card[data-environment-id="sm-env-mine"]' },
+      { selector: '.gathering-task-row[data-task-id="sm-task-prospect"] .gathering-task-summary' },
+      { selector: '.gathering-task-detail-attempt' },
+    ],
+    expectSelector:
+      '.fabricate-gather-chat .fabricate-gather-chat__section--event .fabricate-gather-chat__heading',
+    expectVisible: `${LAB_CHAT('public')} .fabricate-gather-chat__section--event`,
+    kinds: ['player', 'gathering'],
+    sourceMatches: [/^src\/ui\/presenters\/GatheringChatCard\.js$/],
   }),
   playerCase({
     id: 'player-gathering-drop-open',

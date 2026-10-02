@@ -10,6 +10,7 @@ import {
   seedAdditionalDiceJournal,
   seedAdditionalDicePrompt,
 } from './additionalDiceFixtures.js';
+import { CHAT_CARD_STATES, seedChatCardState } from './chatCardFixtures.js';
 import { COUNT_RESULT_STATES, seedCountResult } from './countResultFixtures.js';
 
 export async function seedRollPromptFixture(world, state) {
@@ -41,6 +42,7 @@ export async function seedRollPromptFixture(world, state) {
     await patchSimpleCheck(world, 'lab-smithing', { advantage: COUNT_ADVANTAGE[state] });
   }
   if (state === 'journal-bonus') await seedJournalBonus(world);
+  if (Object.hasOwn(CHAT_CARD_STATES, state)) await seedChatCardState(world, state);
   if (Object.hasOwn(COUNT_RESULT_STATES, state)) await seedCountResult(world, state);
   if (Object.hasOwn(ADDITIONAL_DICE_PROMPT_STATES, state)) {
     await seedAdditionalDicePrompt(world, state);

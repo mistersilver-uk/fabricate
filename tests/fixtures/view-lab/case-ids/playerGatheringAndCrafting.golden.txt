@@ -17,6 +17,7 @@ player-crafting-chat-card-under-public
 player-crafting-chat-card-under-whispered
 player-crafting-chat-card-under-blind
 player-crafting-chat-card-under-fail
+player-crafting-chat-card-gm-complication-fault
 player-crafting-chat-card-over-control
 player-crafting-roll-prompt-count
 player-crafting-roll-prompt-count-threshold
@@ -28,6 +29,7 @@ player-crafting-roll-prompt-light
 player-gathering-events
 player-gathering-task-ready
 player-gathering-after-success
+player-gathering-chat-card-event
 player-gathering-drop-open
 player-gathering-tool-blocked
 player-gathering-timed-ready
