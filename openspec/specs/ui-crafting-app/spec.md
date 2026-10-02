@@ -1002,7 +1002,7 @@ Marking the fired tense onto an already-attached list is the paired `markFiredSt
 - The Run Summary's result box keeps its `Craft complete` or failure head and rolled total, and states the executed check's evidence rows — the same `Needed`, `Target`, `Pre-rolled` and `Margin` rows the chat card states (§Result Chat Cards) — through `CheckEvidenceRows.svelte`, rendered as keyed fact rows.
   It withholds them only for a blind or secret roll, so a private or self roll still shows its roller the evidence.
   A counting check's sentence rows — `Count` (`{q} qualified − {c} cancelled = {n} net`) and a zero pool's `Pool` and `Result` — set in the body face as prose and wrap by word, while its figure rows keep the keyed row's mono (issue 2134); the salvage summary renders the same rows.
-  The legend under its tiles keys each mark by the very glyph the tile draws, beside the word that names it.
+  Its tiles and their legend sit on the same neutral ground as its rows rather than on the box's tint, and the legend keys each mark by the very glyph the tile draws, beside the word that names it.
   A box whose check states evidence also states the outcome: "The result group is produced." on success, and "Nothing is produced; the failure policy applies." on a failure that awarded nothing; a failure that still awarded items states no sentence.
   The salvage summary never states that sentence.
 - The unified player-facing Journal screen (see `ui-journal-app/spec.md` _Journal App (Player)_) is the cross-activity

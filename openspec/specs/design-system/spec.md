@@ -1874,8 +1874,9 @@ A bought die that does not qualify has no tone, so its dash is inked `--fab-text
 An explosion roll a bought die produces is `generated`, not bought.
 The optional legend appends `dashed = bought` only when bought dice are present.
 Each legend key draws the very Font Awesome glyph its tile draws, `aria-hidden`, beside the word that names the mark (issue 2134), so one mark reads by one glyph on the tile and in its key and a screen reader hears the words alone; the chat renderer writes the same keys.
-A toned tile keeps its tone's fill inside a toned result box, a RECORDED deviation from prototype frame 39, which sets success tiles on a neutral box: the design system names no neutral tile ground for a toned container, so a qualified tile inside a success-toned box separates by its border.
-Measured against that box over the run column, its fill reaches 1.16:1 (`foundry-native`) to 1.37:1 (`starglass-arcana`) and its `--fab-success-border` 2.08:1 to 3.14:1, under 3:1 in five of the seven palettes; the face, the marks and the `aria-label` carry the state, so no information rests on that edge.
+Inside a toned result box the tile row sits on a neutral ground, never on the box's own tint: `CheckEvidenceRows` frames the tiles and their legend as it frames its evidence rows, a 1px `--fab-border` at radius 9 over `--fab-bg-2`, so a qualified tile reads as success against neutral, as prototype frame 39 sets it, and the box stays one construction (issue 2134).
+Against that ground a qualified tile's `--fab-success-border` measures 3.20:1 (`ironblood-forge`) to 3.83:1 (`starglass-arcana`) in six palettes.
+`foundry-native` alone is a RECORDED deviation at 2.02:1, its success border being the faintest of the seven; the face, the marks and the `aria-label` carry the state, so no information rests on that edge.
 
 #### Scenario: A die explodes and qualifies
 
