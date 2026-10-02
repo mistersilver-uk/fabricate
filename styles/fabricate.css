@@ -840,9 +840,16 @@
   outline-offset: 2px;
 }
 
+/* A TEXT FIELD's ring is drawn inside its own box: an outset ring on a field flush with a scrolling ancestor loses its left and right arms to that ancestor's clip. `:where()` keeps the module ring's (0,2,1), so a component's own ring still wins. */
+.fabricate :is(input, textarea):where(:not([type='checkbox'], [type='radio'], [type='range'])):focus-visible {
+  outline: 1px solid var(--fab-accent);
+  outline-offset: -1px;
+  box-shadow: inset 0 0 0 3px var(--fab-accent-soft);
+}
+
 /* A focused, empty field shows its caret alone: the caret is drawn at the text origin, on top of the placeholder's first glyph, so the hint yields while the field holds focus and returns on blur. */
-.fabricate input:focus::placeholder,
-.fabricate textarea:focus::placeholder {
+.fabricate input:focus-visible::placeholder,
+.fabricate textarea:focus-visible::placeholder {
   color: transparent;
 }
 
@@ -4187,10 +4194,11 @@
   box-shadow: none;
 }
 
-/* THE SEARCH FAMILY'S OWN KEYBOARD RING. Declarations copied verbatim from the module ring (`.fabricate <element>:focus-visible`), which is (0,2,1) too and sits earlier, so this changes nothing wherever a Fabricate root is an ancestor; what it is FOR is the bare host, where a primitive leaning on the module ring would render none (issue 1508). */
+/* THE SEARCH FAMILY'S OWN KEYBOARD RING. Declarations copied verbatim from the module's text-field ring (`.fabricate :is(input, textarea):where(…):focus-visible`), which is (0,2,1) too and sits earlier, so this changes nothing wherever a Fabricate root is an ancestor; what it is FOR is the bare host, where a primitive leaning on the module ring would render none (issue 1508). */
 .fabricate-search input:focus-visible {
-  outline: 2px solid var(--fab-accent);
-  outline-offset: 2px;
+  outline: 1px solid var(--fab-accent);
+  outline-offset: -1px;
+  box-shadow: inset 0 0 0 3px var(--fab-accent-soft);
 }
 
 /* THE FILTERS' FLOOR (issue 1510). The trigger is sized to its VALUE, so without a floor each
@@ -8132,11 +8140,12 @@
   box-shadow: none;
 }
 
-/* THE FIELD FAMILY'S OWN KEYBOARD RING. Declarations copied verbatim from the module ring, which is (0,2,1) too and sits earlier, so nothing moves where that ring already reaches; what this is FOR is the bare host (issues 1508, 1511, 1510, 1357). */
+/* THE FIELD FAMILY'S OWN KEYBOARD RING. Declarations copied verbatim from the module's text-field ring, which is (0,2,1) too and sits earlier, so nothing moves where that ring already reaches; what this is FOR is the bare host (issues 1508, 1511, 1510, 1357). */
 .fabricate-field input:focus-visible,
 .fabricate-field textarea:focus-visible {
-  outline: 2px solid var(--fab-accent);
-  outline-offset: 2px;
+  outline: 1px solid var(--fab-accent);
+  outline-offset: -1px;
+  box-shadow: inset 0 0 0 3px var(--fab-accent-soft);
 }
 
 .fabricate-manager .manager-recipe-steps-requirements {

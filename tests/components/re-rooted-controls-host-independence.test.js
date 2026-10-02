@@ -1906,6 +1906,11 @@ test('the caller-override measurement reds when the baseline is written at the f
   }
 });
 
+const TEXT_FIELD_RINGS = new Set([
+  '.fabricate-field input:focus-visible, .fabricate-field textarea:focus-visible',
+  '.fabricate-search input:focus-visible',
+]);
+
 test('each re-rooted family declares its own focus ring, and none of them reaches a select', async () => {
   const tab = await browser.newPage();
   try {
@@ -1939,14 +1944,19 @@ test('each re-rooted family declares its own focus ring, and none of them reache
     ]) {
       const ring = rules.filter((rule) => rule.selectorText === repaint);
       assert.equal(ring.length, 1, `${repaint} must be declared exactly once`);
+      // A text-field family copies the module's inset text-field ring, every other family its
+      // outset one.
+      const textField = TEXT_FIELD_RINGS.has(repaint);
       assert.match(
         ring[0].cssText,
-        /outline:\s*2px solid var\(--fab-accent\)/,
+        textField
+          ? /outline:\s*1px solid var\(--fab-accent\)/
+          : /outline:\s*2px solid var\(--fab-accent\)/,
         `${repaint} must carry the same outline the module ring declares`
       );
       assert.match(
         ring[0].cssText,
-        /outline-offset:\s*2px/,
+        textField ? /outline-offset:\s*-1px/ : /outline-offset:\s*2px/,
         `${repaint} must carry the module ring's outline offset`
       );
 
