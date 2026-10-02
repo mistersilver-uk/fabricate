@@ -10,25 +10,13 @@
   arm are all stated in `openspec/specs/ui-entity-editors/spec.md` → "Ingredients tab" → "The
   requirement row". This file implements that section and adds nothing to it.
 
-  WHERE PREMIUM AND THE DESIGN DISAGREE, WE FOLLOW PREMIUM. Six values below follow the shipped
-  `RewardRow` rather than the mockup, each deliberately, and they are recorded because an audit
-  measuring this row against the mockup alone would read all six as drift and "correct" them back
-  — putting this row out of step with the fourth instance of the same idea. The argument is the
-  same in every case: the mockup is fixed-width with no running implementation, premium is a
-  control a GM already uses, and where the two disagree on something a GM can SEE ACROSS BOTH
-  PRODUCTS in one session the shipped one wins, because the mismatch is paid for at the seam.
-
-    1. Control height 30px, not 28: 30 is Fabricate's shipped control-height rung, so 28 would
-       make this the one row on the screen off the ladder.
-    2. The resting search border is `--fab-border-strong`, accenting only WHILE TYPING, where an
-       accent at rest reads as a field already holding a value.
-    3. The plate glyph is 12px, not 11.  4. The suggestion panel is offset 33px.
-    5. The kind picker is on the `inline` rung, so 11.5px not 11 (issue 1510).  6. The tint is per KIND, not per
-       entity — and that last one is NOT a departure from the design, whose own kind table tints
-       per kind too.
-
-  The seventh disagreement — what Enter commits — is forced by a Fabricate requirement being
-  ID-valued rather than by taste, and is stated in the spec section named above.
+  Where premium and the design disagree, this row follows the shipped `RewardRow`, because a GM
+  sees both products in one session and the mockup has no running implementation. An audit against
+  the mockup alone would read these as drift: the control height is 30px, the shipped rung, not
+  28; the resting search border is `--fab-border-strong` and accents only while typing; the plate
+  glyph is 12px, not 11; the kind picker is on the `inline` rung, so 11.5px not 11 (issue 1510).
+  What Enter commits differs too, forced by a requirement being id-valued, and is stated in the
+  spec section named above. The suggestion list is the shared typeahead seam's (issue 2157).
 -->
 <script module>
   // Alternatives carry no id, so the tag-match radio group's `name` is minted per INSTANCE here:
@@ -55,13 +43,16 @@
   // The ONE kind table: the plate's glyph and tint and the kind select's four words are read from
   // it rather than restated here.
   import { INGREDIENT_KIND_ORDER, ingredientKindMeta } from './ingredientKindMeta.js';
+  import { typeaheadPanel } from '../../../actions/typeaheadPanel.js';
+  import { createTypeaheadCombobox } from '../../../util/typeaheadCombobox.svelte.js';
 
   tagMatchGroupSeq += 1;
   const tagMatchGroupId = tagMatchGroupSeq;
 
-  // How many suggestions the inline list offers: the field is inside a row rather than a dialog,
-  // so an unbounded list would cover the rows beneath it.
+  // How many suggestions the list offers, and the height of that many rows with the panel's own
+  // padding and border, so a full list never slices its last row.
   const MAX_SUGGESTIONS = 7;
+  const SUGGESTIONS_HEIGHT = 232;
 
   let {
     option = {},
@@ -288,14 +279,26 @@
     emit({ match: { type: 'component', componentId: value || null } });
   }
 
-  /** Take what the GM typed, on ENTER and on nothing else: the TOP SUGGESTION, never the raw
-   *  string, and nothing at all when the query matches nothing. */
+  /** Take what the GM typed, on ENTER with no option active and on nothing else: the TOP
+   *  SUGGESTION, never the raw string, and nothing at all when the query matches nothing. */
   function commitTyped() {
     if (normalizedQuery === '') return;
     const top = suggestions[0];
     if (!top) return;
     choose(top.id);
   }
+
+  const combo = createTypeaheadCombobox({
+    component: 'RecipeIngredientOption',
+    anchor: '.manager-recipe-option-name-field',
+    query: () => query,
+    count: () => suggestions.length,
+    onInput: (event) => (query = event.currentTarget.value),
+    onClear: () => (query = ''),
+    onChoose: (index) => choose(suggestions[index].id),
+    onEnterUnchosen: commitTyped,
+    maxHeightCap: SUGGESTIONS_HEIGHT,
+  });
 
   /**
    * Retype this row. The old value goes with the old kind, because leaving it behind would
@@ -508,10 +511,8 @@
           >
         </span>
       {:else}
-        <!-- THE DEGRADED FACE, the one every world starts in. STATED ON THE PLACEHOLDER RATHER
-             THAN IN A SECOND ELEMENT BESIDE IT: the row must stay on one line, so a `nowrap`
-             sentence beside the field starved the field down to about thirty pixels, and it
-             repeated word for word what the placeholder inside it already said. -->
+        <!-- The degraded face every world starts in is stated on the placeholder: a second
+             element beside the field starved it of width on a row that must stay on one line. -->
         <span
           class="manager-recipe-option-search"
           class:is-typing={normalizedQuery !== ''}
@@ -525,28 +526,24 @@
             value={query}
             placeholder={catalogue.length === 0 ? emptyCatalogueHint : searchPlaceholder}
             aria-label={searchPlaceholder}
-            oninput={(event) => {
-              query = event.currentTarget.value;
-            }}
-            onkeydown={(event) => {
-              if (event.key !== 'Enter') return;
-              event.preventDefault();
-              commitTyped();
-            }}
+            {...combo.field}
           />
         </span>
-        {#if normalizedQuery !== ''}
-          <span class="manager-recipe-option-suggestions">
-            <!-- KEYED ON POSITION plus the id, never the id alone: the rosters are injected and this
-                 row can make no uniqueness promise about them, while Svelte throws
-                 `each_key_duplicate` in PRODUCTION as well as development, so one repeat would
-                 blank the editor. The id rides along so a narrowed row is re-created. -->
+        {#if combo.listed}
+          <span
+            class="manager-recipe-option-suggestions"
+            aria-label={searchPlaceholder}
+            {...combo.list}
+            use:typeaheadPanel={combo.panel}
+          >
+            <!-- Keyed on position plus the id: the rosters are injected with no uniqueness promise,
+                 and a duplicate key throws in production and would blank the editor. -->
             {#each suggestions as suggestion, index (`${index}:${suggestion.id}`)}
               <button
                 type="button"
                 class="manager-recipe-option-suggestion"
                 data-recipe-option-suggestion={suggestion.id}
-                onclick={() => choose(suggestion.id)}
+                {...combo.option(index)}
               >
                 {#if suggestion.img}
                   <img src={suggestion.img} alt="" class="manager-recipe-option-chosen-img" />
@@ -559,11 +556,16 @@
                 <span>{suggestion.label}</span>
               </button>
             {/each}
-            {#if suggestions.length === 0}
-              <span class="manager-recipe-option-no-matches" data-recipe-option-no-matches
-                >{text('FABRICATE.Admin.Manager.Recipe.NoMatches', 'No matches')}</span
-              >
-            {/if}
+          </span>
+        {:else if combo.open}
+          <span
+            class="manager-recipe-option-suggestions"
+            {...combo.note}
+            use:typeaheadPanel={combo.panel}
+          >
+            <span class="manager-recipe-option-no-matches" data-recipe-option-no-matches
+              >{text('FABRICATE.Admin.Manager.Recipe.NoMatches', 'No matches')}</span
+            >
           </span>
         {/if}
       {/if}
@@ -571,10 +573,8 @@
   {/if}
 
   <div class="manager-recipe-option-controls">
-    <!-- EVERY row type edits its count through the SAME Stepper in the SAME end-of-row position,
-         but the MODEL differs: a component/tag row counts with `option.quantity` while essence
-         and currency carry theirs on the MATCH (`match.amount`). So the marker attribute stays
-         per-kind — a shared one would claim these write the same field. -->
+    <!-- One Stepper for every row type, but a component or tag row counts on `option.quantity`
+         and essence and currency on `match.amount`, so the marker attribute stays per-kind. -->
     {#if matchType === 'essence'}
       <Stepper
         value={essenceAmount}

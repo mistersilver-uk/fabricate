@@ -9394,17 +9394,14 @@
   outline: none;
 }
 
-/* THE SUGGESTIONS, BENEATH THE FIELD (`proto:2279`) rather than in a portaled popover. */
+/* The suggestions, beneath the field (`proto:2279`). No offsets here: `typeaheadPanel` portals the list to the application root and writes its placement inline, at the popover family's stacking level. */
 .fabricate-manager .manager-recipe-option-suggestions {
   position: absolute;
-  top: 33px;
-  right: 0;
-  left: 0;
-  z-index: 30;
+  z-index: 4000;
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2xs);
-  max-height: 190px;
+  max-height: 232px;
   padding: var(--fab-space-1);
   border: 1px solid var(--fab-border-strong);
   border-radius: 9px;
@@ -9440,6 +9437,12 @@
 
 .fabricate-manager .manager-recipe-option-suggestion:hover {
   background: var(--fab-surface-soft);
+}
+
+/* The keyboard cursor: the field keeps DOM focus, so the active option is drawn from its state. */
+.fabricate-manager .manager-recipe-option-suggestion[aria-selected='true'] {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: -2px;
 }
 
 .fabricate-manager .manager-recipe-option-suggestion > i {

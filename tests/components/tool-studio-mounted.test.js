@@ -9,6 +9,7 @@ import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
   STATUS_TONE_RAW_MODULES,
+  TYPEAHEAD_RUNE_MODULES,
 } from '../helpers/svelte-component-harness.js';
 import { WORLD_TOOL_SCOPE_RAW_MODULES } from '../helpers/toolMountModules.js';
 import { ANNOUNCE_AFTER_FOCUS_MS } from '../../src/ui/svelte/util/announceAfterFocus.js';
@@ -77,6 +78,7 @@ const harness = createMountedComponentHarness({
     ...WORLD_TOOL_SCOPE_RAW_MODULES,
     ...SEARCHABLE_POPOVER_RAW_MODULES,
   ],
+  runeModules: TYPEAHEAD_RUNE_MODULES,
   compiledModules: [
     // The shared side-panel explainer card and icon fact row (issue 881).
     'src/ui/svelte/apps/manager/ExplainerCard.svelte',
@@ -306,8 +308,9 @@ afterEach(() => harness.remount());
 describe('Tool Studio editor (mounted)', () => {
   it('draws the dirty chip at the action density of the buttons beside it', async () => {
     const root = await harness.mount(props({ dirty: true }));
-    const chip = root.querySelector('.manager-header-actions [data-tool-editor-status]');
-    assert.ok(chip.classList.contains('is-action'), 'the chip stands in a 34px button cluster');
+    const chip = root.querySelector('[data-tool-editor-status]');
+    assert.ok(Boolean(chip.closest('.manager-header-actions')), 'the chip is in the cluster');
+    assert.ok(chip.classList.contains('is-action'), 'the chip stands beside 34px buttons');
   });
 
   it('renders header-only actions, three accessible tabs, and no Kind', async () => {

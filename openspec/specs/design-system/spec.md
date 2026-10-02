@@ -1087,6 +1087,13 @@ Three families have been adjudicated against it, and each verdict is recorded in
 
 - A TYPEAHEAD COMBOBOX is not a picker.
 It has no trigger, its suggestion list hangs off an input whose expanded state is driven by the query rather than by a control, and it therefore has no closed state to open from.
+Being a non-member exempts it from the PICKER and from nothing else.
+Its suggestion list is a floating surface, so it is portalled to the nearest application root and positioned through the `anchoredPopover` action, directly beneath its input, sharing the input's left edge, at least as wide as the input, and flipped above it only where the root has no room below.
+A suggestion list positioned inside its own row is clipped by that row's scrolling ancestor and lengthens the ancestor's scroll area instead of floating over the page, and five shipped lists did exactly that before issue 2157.
+Its input is the HOLDER of the listbox contract above: DOM focus never leaves it, the holder's key map moves an active option it names through `aria-activedescendant`, and each suggestion is a `role="option"` row with `tabindex="-1"`.
+The list is open only while the input holds focus and its query is non-empty.
+`Escape` empties the query from the holder rather than from the document, because an empty query is the only closed state this widget has.
+`Enter` commits the active option, and with none active it commits nothing unless the call site's own requirement names what it commits.
 - An ACTION MENU is not a picker.
 `role="menu"` with `role="menuitem"` children announces a list of things to DO, while the picker announces `role="listbox"` with `role="option"` children, a list of things to BE — converting one to the other changes what a screen reader says about the widget, not how it looks.
 It is a SET MEMBER in its own right rather than merely a non-member, and the requirement below states what it owns.
