@@ -102,7 +102,7 @@ const field = definePrimitiveAdoptionContract({
   primitive: FIELD_PATH,
   contractClass: 'manager-search',
   allowlist: RAW_SEARCH_ALLOWLIST,
-  // 19 sites in 16 components as this lands.
+  // 26 sites in 23 components at issue 2157; the floors below keep headroom under that count.
   callSiteFloor: 14,
   fileFloor: 12,
   // `compact` is a declared boolean prop.
