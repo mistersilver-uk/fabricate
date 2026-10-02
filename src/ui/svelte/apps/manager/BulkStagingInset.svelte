@@ -283,6 +283,10 @@
     background: var(--fab-bg-1);
   }
 
+  .fab-bulk-inset-search:focus-within {
+    border-color: var(--fab-accent);
+  }
+
   .fab-bulk-inset-search > i {
     flex: 0 0 auto;
     color: var(--fab-text-subtle);
@@ -387,7 +391,8 @@
     cursor: default;
   }
 
-  :global(.fab-bulk-inset button.fab-bulk-inset-row:focus-visible) {
+  :global(.fab-bulk-inset button.fab-bulk-inset-row:focus-visible),
+  .fab-bulk-inset-page:focus-visible {
     outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
   }
@@ -529,11 +534,6 @@
   .fab-bulk-inset-page:disabled {
     color: var(--fab-text-disabled);
     cursor: default;
-  }
-
-  .fab-bulk-inset-page:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: 2px;
   }
 
   .fab-bulk-inset-page-label {

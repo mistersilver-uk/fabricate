@@ -872,7 +872,6 @@
 
   $effect(() => modifiers.resetSearchOnDrop());
   $effect(() => modifiers.resetSearchOnEvent());
-  $effect(() => modifiers.syncSearchDirection());
   $effect(() => modifiers.reconcileDropPickers());
   $effect(() => modifiers.reconcileEventPickers());
 
@@ -5923,7 +5922,6 @@
             eventCharacterModifierSearchSuggestions={modifiers.eventCharacterModifierSearchSuggestions}
             {sortedDangerTags}
             {selectedSystemModifiers}
-            characterModifierSearchOpenUp={modifiers.characterModifierSearchOpenUp}
             gatheringConditionAvailableOptions={modifiers.gatheringConditionAvailableOptions}
             gatheringConditionLabel={gathering.gatheringConditionLabel}
             gatheringConditionModifierRows={modifiers.gatheringConditionModifierRows}
@@ -5959,7 +5957,6 @@
             {truncateDescription}
             travelSaving={$viewState.travelSaving === true}
             environmentSaveError={$viewState.environmentSaveError}
-            bind:characterModifierSearchAnchor={modifiers.characterModifierSearchAnchor}
             bind:characterModifierSearchTerm={modifiers.characterModifierSearchTerm}
             onDuplicateDrop={drafts.duplicateGatheringTaskDrop}
             onDeleteDrop={drafts.deleteGatheringTaskDrop}

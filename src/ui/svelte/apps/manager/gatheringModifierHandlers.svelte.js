@@ -54,37 +54,9 @@ function characterModifierRef(modifierId, refs) {
   };
 }
 
-function characterModifierSearchClippingBounds(node) {
-  const documentRef = globalThis.document;
-  const windowRef = globalThis.window || globalThis;
-  const viewportTop = 0;
-  const viewportBottom =
-    Number(globalThis.innerHeight || windowRef.innerHeight) ||
-    documentRef?.documentElement?.clientHeight ||
-    0;
-  let parent = node?.parentElement;
-  while (parent && parent !== documentRef?.documentElement) {
-    const style = globalThis.getComputedStyle?.(parent);
-    const overflow = `${style?.overflow || ''} ${style?.overflowY || ''} ${style?.overflowX || ''}`;
-    if (/(auto|scroll|hidden|clip)/.test(overflow)) {
-      const rect = parent.getBoundingClientRect?.();
-      if (rect) {
-        return {
-          top: Math.max(viewportTop, rect.top),
-          bottom: Math.min(viewportBottom || rect.bottom, rect.bottom),
-        };
-      }
-    }
-    parent = parent.parentElement;
-  }
-  return { top: viewportTop, bottom: viewportBottom };
-}
-
-/** The Modifier Library search both subjects share, and which way its suggestions open. */
+/** The Modifier Library search both subjects share. */
 function createCharacterModifierSearch({ gathering, selectedSystemModifiers }) {
   let characterModifierSearchTerm = $state('');
-  let characterModifierSearchAnchor = $state(null);
-  let characterModifierSearchOpenUp = $state(false);
 
   function suggestionsFor(record) {
     const term = characterModifierSearchTerm.trim().toLowerCase();
@@ -107,35 +79,12 @@ function createCharacterModifierSearch({ gathering, selectedSystemModifiers }) {
     suggestionsFor(gathering.editingGatheringEvent)
   );
 
-  function updateCharacterModifierSearchDirection() {
-    const node = characterModifierSearchAnchor;
-    const rect = node?.getBoundingClientRect?.();
-    if (!rect) {
-      characterModifierSearchOpenUp = false;
-      return;
-    }
-    const bounds = characterModifierSearchClippingBounds(node);
-    const spaceBelow = bounds.bottom - rect.bottom;
-    const spaceAbove = rect.top - bounds.top;
-    const openUpThreshold = 160;
-    characterModifierSearchOpenUp = spaceBelow < openUpThreshold && spaceAbove > spaceBelow;
-  }
-
   return {
     get characterModifierSearchTerm() {
       return characterModifierSearchTerm;
     },
     set characterModifierSearchTerm(term) {
       characterModifierSearchTerm = term;
-    },
-    get characterModifierSearchAnchor() {
-      return characterModifierSearchAnchor;
-    },
-    set characterModifierSearchAnchor(node) {
-      characterModifierSearchAnchor = node;
-    },
-    get characterModifierSearchOpenUp() {
-      return characterModifierSearchOpenUp;
     },
     get characterModifierSearchSuggestions() {
       return characterModifierSearchSuggestions;
@@ -148,13 +97,6 @@ function createCharacterModifierSearch({ gathering, selectedSystemModifiers }) {
     },
     resetSearchOnEvent() {
       if (gathering.editingGatheringEvent?.id) characterModifierSearchTerm = '';
-    },
-    syncSearchDirection() {
-      if (characterModifierSearchSuggestions.length === 0) {
-        characterModifierSearchOpenUp = false;
-        return;
-      }
-      updateCharacterModifierSearchDirection();
     },
   };
 }

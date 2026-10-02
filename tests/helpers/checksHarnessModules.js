@@ -135,6 +135,8 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/systems/preparedDecisionPolicy.js',
   'src/systems/checkRouting.js',
   'src/systems/checkRollOutput.js',
+  // `checkRollOutput.js` offers a public roll to its result card through this leaf.
+  'src/systems/checkCardRolls.js',
   'src/systems/checkModifierRolls.js',
   'src/systems/bulkChatVisibility.js',
   'src/utils/progressiveAward.js',

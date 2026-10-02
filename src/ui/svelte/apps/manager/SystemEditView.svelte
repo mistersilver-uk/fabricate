@@ -347,7 +347,7 @@
           -->
                   <div class="manager-action-group">
                     {#if detailsDirty}
-                      <Chip tone="warning" data-system-details-dirty
+                      <Chip tone="warning" density="action" data-system-details-dirty
                         >{text('FABRICATE.Admin.Manager.SystemEdit.Dirty', 'Unsaved')}</Chip
                       >
                     {/if}

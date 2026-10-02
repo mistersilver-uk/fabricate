@@ -690,6 +690,17 @@ It named five roots until the three interactables windows and the roll-prompt di
 The licence extends to COPIES and not to VARIANTS.
 Where an area rule declares a DIFFERENT treatment it is not a copy and it survives while it has a carrier: the roll-prompt dialog kept a `:focus-visible` ring of its own on `select`, painting an inset `box-shadow` where the module ring paints an outset `outline`, because an outset ring on a `<select>` flush to that dialog's overflow-clipped edge is clipped and reads as a one-sided flash; it went with the dialog when issue 2021 moved the prompt into `ManagerModal`.
 So the dialog left the reset exemption and stayed in the ring population in the same commit, and the ratchet cannot tell the two cases apart on its own — its population is keyed on ELEMENTS, which is the part a variant shares with the rule it varies from, so membership is never a licence to delete.
+A TEXT FIELD — a text-like `input` or a `textarea` — is the module ring's one stated variant: its ring is a 1px accent `outline` at a NEGATIVE offset, drawn on the field's own border, because the outset ring on a field flush with a scrolling ancestor loses its left and right arms to that ancestor's clip (issue 2157).
+The variant adds no glow and no second line: a field whose wrapper draws the box suppresses the input's own ring and lights the wrapper's border while the field inside holds focus, so an inset shadow on the input would paint a box inside the box.
+The `Field` and search-field families and the chance slider's percent half copy that variant rather than the outset ring, and every input that is not text-like — a checkbox, a radio, a range, a colour, a file and the four button types — keeps the outset one.
+A text field's validation ring is inset the same way, at its own 2px width.
+The variant has three stated exceptions and no others.
+The `Stepper` input keeps its own ring, 2px at a 1px offset, which its scoped rule draws around the value between the two adjuncts.
+A text input carrying a `tabindex` attribute still matches the module ring's `[tabindex]` leg at (0,3,0) and keeps the outset ring, which is stated here rather than chased with a fourth selector.
+A wrapper-drawn field draws no ring on its input at all: its wrapper takes the full accent on `:focus-within`, and a wrapper that also marks a typed-in state keeps the partial accent for that state alone.
+While a text field holds focus its placeholder is not drawn, because the caret is painted at the text origin, over the placeholder's first glyph.
+An auto-focused field therefore never draws its placeholder, and that is accepted rather than opted out of: the shared picker's search is named by its trigger and its `aria-label`, and an opt-out would put the caret back over the glyph.
+A borderless input inside a box-drawing wrapper MUST stretch to that wrapper's height rather than size to its own text line, because an input exactly one line tall clips the caret an empty field draws.
 Readonly is DISTINCT from disabled: a readonly control takes focus and refuses edit, while a disabled control does not take focus.
 A focus SUPPRESSION and the ring that replaces it are a PAIR, and their element lists MUST stay identical, or an element type is stripped of a ring by the first half and given none by the second.
 Foundry core also rings the STATE class `.active` exactly as it rings `:focus`, so a module that uses `.active` as its own selected marker MUST normalise that class alongside the focus reset and at the same rank — otherwise core's ring rides along with selection and merely hides while the element is focused, appearing the moment focus moves elsewhere.
@@ -895,6 +906,8 @@ The distinction is the surface, not the subject — a recipe is a record in both
 
 A record's STATE, read-only, renders on the ONE chip: its tone names the state and its density names the surface the chip sits on.
 A second pill component is a MISSING DENSITY on that chip and never a new member of the set — four retired into it, each of which had been a scale and a tone vocabulary of its own.
+The `action` density is the adjacent button's geometry IN FULL — height, corner, type size and inline padding — and never its height alone, truncated or not.
+A state chip standing in an action cluster with 34px buttons MUST take it, because a chip that matches one of the four reads as a fifth control drawn wrong; a toolbar count chip is not in such a cluster and keeps its own density.
 
 A record's ART is an icon chip, and an ACTOR's art — a person, a party, a vehicle or a place — is an avatar, with `shape` CALLER-SUPPLIED because actor type is system-defined and eligibility comes from a GM world setting rather than a type map.
 The two are separate entries rather than one tile taking a `kind` prop, because they differ in the corner and in what they draw with no artwork: a record's tile falls back to a GLYPH and an actor's to INITIALS.
@@ -1085,6 +1098,13 @@ Three families have been adjudicated against it, and each verdict is recorded in
 
 - A TYPEAHEAD COMBOBOX is not a picker.
 It has no trigger, its suggestion list hangs off an input whose expanded state is driven by the query rather than by a control, and it therefore has no closed state to open from.
+Being a non-member exempts it from the PICKER and from nothing else.
+Its suggestion list is a floating surface, so it is portalled to the nearest application root and positioned through the `anchoredPopover` action, directly beneath its field, sharing the field's left edge, at least as wide as the field, and flipped above it only where the root has no room below.
+A suggestion list positioned inside its own row is clipped by that row's scrolling ancestor and lengthens the ancestor's scroll area instead of floating over the page, and five shipped lists did exactly that before issue 2157.
+Its input is the HOLDER of the listbox contract above: DOM focus never leaves it, the holder's key map moves an active option it names through `aria-activedescendant`, and each suggestion is a `role="option"` row with `tabindex="-1"`.
+The list is open only while the input holds focus and its query is non-empty.
+`Escape` empties the query from the holder rather than from the document, because an empty query is the only closed state this widget has.
+`Enter` commits the active option, and with none active it commits nothing unless the call site's own requirement names what it commits.
 - An ACTION MENU is not a picker.
 `role="menu"` with `role="menuitem"` children announces a list of things to DO, while the picker announces `role="listbox"` with `role="option"` children, a list of things to BE — converting one to the other changes what a screen reader says about the widget, not how it looks.
 It is a SET MEMBER in its own right rather than merely a non-member, and the requirement below states what it owns.

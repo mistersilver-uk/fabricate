@@ -6,8 +6,8 @@
   `subject` is the record a modifier attaches to, never the persisted condition `kind` this markup
   binds. It picks the hook prefix, feeds the card-copy helpers their `scope`, and gates the
   drop-only "No modifiers attached." body. The unit derives nothing: the shell hands down every
-  reader and writer already bound to this record, because an effect here over `suggestions` would
-  silently change the event dropdown's open direction.
+  reader and writer already bound to this record. The character-modifier search is a typeahead
+  combobox whose list floats in the application root (`util/typeaheadCombobox.svelte.js`).
 
   Invariants:
   - one `<CharacterModifierBoundsRow>` for both subjects — `stepper-call-site-contract.test.js`.
@@ -17,6 +17,8 @@
   import CharacterModifierBoundsRow from './CharacterModifierBoundsRow.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
   import { localize } from '../../../util/foundryBridge.js';
+  import { typeaheadPanel } from '../../../actions/typeaheadPanel.js';
+  import { createTypeaheadCombobox } from '../../../util/typeaheadCombobox.svelte.js';
 
   let {
     /**
@@ -30,9 +32,6 @@
     idPrefix = '',
     suggestions = [],
     characterModifierLibrary = [],
-    /** Whether the suggestion list opens upwards. Computed by the shell, never here. */
-    characterModifierSearchOpenUp = false,
-    characterModifierSearchAnchor = $bindable(null),
     characterModifierSearchTerm = $bindable(''),
     /* The shell's shared readers, which take this record and the condition kind. */
     gatheringConditionAvailableOptions = () => [],
@@ -67,6 +66,23 @@
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
   }
+
+  // No `anchor`: the wrapping label is an inline box, so the input is the field's visual box.
+  const search = createTypeaheadCombobox({
+    component: 'GatheringModifierEditor',
+    query: () => characterModifierSearchTerm,
+    setQuery: (value) => (characterModifierSearchTerm = value),
+    count: () => suggestions.length,
+    onChoose: (index) => onPickCharacterModifier(suggestions[index].id),
+    maxHeightCap: 148,
+    rows: { pitch: 34, gap: 2, chrome: 10 },
+  });
+  const searchLabel = $derived(
+    text(
+      'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.AddSearchLabel',
+      'Search character modifiers to add'
+    )
+  );
 
   // Literals, not composed: every mirror guard that resolves a selector greps `src/` for the
   // attribute name (the View Lab registry's does), and a composed name is invisible to all of
@@ -255,7 +271,6 @@
   </header>
   <div class="manager-character-modifier-add-search-row">
     <label
-      bind:this={characterModifierSearchAnchor}
       class="fabricate-search manager-search is-compact manager-character-modifier-add-search"
       {...hook('characterModifierSearch')}
     >
@@ -263,17 +278,11 @@
       <input
         type="search"
         value={characterModifierSearchTerm}
-        oninput={(event) => {
-          characterModifierSearchTerm = event.currentTarget.value;
-        }}
         placeholder={text(
           'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.AddSearchPlaceholder',
           'Search character modifiers...'
         )}
-        aria-label={text(
-          'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.AddSearchLabel',
-          'Search character modifiers to add'
-        )}
+        aria-label={searchLabel}
         disabled={characterModifierLibrary.length === 0}
         data-tooltip={characterModifierLibrary.length === 0
           ? text(
@@ -281,19 +290,22 @@
               'Add a modifier to the system library first to reference it here.'
             )
           : null}
+        {...search.field}
       />
-      {#if suggestions.length > 0}
+      {#if search.listed}
         <div
           class="manager-tag-suggestions manager-character-modifier-add-suggestions"
-          class:is-above={characterModifierSearchOpenUp}
+          aria-label={searchLabel}
           {...hook('characterModifierSuggestions')}
+          {...search.list}
+          use:typeaheadPanel={search.panel}
         >
-          {#each suggestions as option (option.id)}
+          {#each suggestions as option, index (option.id)}
             <button
               type="button"
               class="manager-tag-suggestion manager-character-modifier-add-suggestion"
               {...hook('characterModifierSuggestion', option.id)}
-              onclick={() => onPickCharacterModifier(option.id)}
+              {...search.option(index)}
             >
               <i class={option.icon || 'fa-solid fa-user'} aria-hidden="true"></i>
               <span>{option.label || option.id}</span>

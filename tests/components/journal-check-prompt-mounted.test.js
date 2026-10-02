@@ -75,13 +75,16 @@ async function openedPrompt() {
   return dialog;
 }
 
-/** Open `descriptor` through the Journal's adapter, answering through the real modal. */
-async function promptFor(descriptor) {
+/**
+ * Open `descriptor` through the Journal's adapter, answering through the real modal; `options` are
+ * the ones `settlePromptedCheck` passes a reopened prompt.
+ */
+async function promptFor(descriptor, options = undefined) {
   document.body.replaceChildren();
   const component = await harness.loadRuneModule(ROLL_PROMPT_PATH);
   const loadComponent = async () => component;
   const restore = overrideRollPromptSurface((view) => openRollPromptModal(view, { loadComponent }));
-  const answer = promptJournalStageCheck(descriptor);
+  const answer = promptJournalStageCheck(descriptor, undefined, options);
   return { dialog: await openedPrompt(), answer, restore };
 }
 
@@ -90,6 +93,30 @@ const text = (root, hook) => root.querySelector(`[${hook}]`)?.textContent.trim()
 describe('the Journal-prepared prompt offers additional dice (issue 2008)', () => {
   before(() => harness.setup());
   after(() => harness.teardown());
+
+  it('states why it reopened in a warning notice above the check, and only then', async () => {
+    const first = await promptFor(DESCRIPTOR);
+    try {
+      assert.ok(
+        !first.dialog.querySelector('[data-roll-prompt-notice]'),
+        'a first prompt has none'
+      );
+    } finally {
+      first.restore();
+    }
+    const { dialog, restore } = await promptFor(DESCRIPTOR, { changed: true });
+    try {
+      const notice = dialog.querySelector('[data-roll-prompt-notice]');
+      assert.ok(Boolean(notice), 'the reopened prompt states the change');
+      assert.ok(notice.classList.contains('fab-notice') && notice.classList.contains('is-warning'));
+      assert.equal(notice.getAttribute('role'), 'status');
+      assert.match(notice.textContent, /details changed while you were deciding/);
+      const body = dialog.querySelector('.fabricate-roll-prompt');
+      assert.equal(body.firstElementChild, notice, 'above everything the prompt asks');
+    } finally {
+      restore();
+    }
+  });
 
   it('states the offer, and answers the die the player buys as the decision', async () => {
     const { dialog, answer, restore } = await promptFor(DESCRIPTOR);

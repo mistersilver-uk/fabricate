@@ -228,7 +228,7 @@
         </div>
       </div>
       <div class="manager-header-actions manager-tool-edit-actions">
-        {#if dirty}<Chip tone="warning" data-tool-editor-status
+        {#if dirty}<Chip tone="warning" density="action" data-tool-editor-status
             >{text('FABRICATE.Admin.Manager.Tools.Dirty', 'Unsaved')}</Chip
           >{/if}
         {#if dirty}<span data-tool-editor-dirty hidden>dirty</span>{/if}

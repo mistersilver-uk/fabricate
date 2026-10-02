@@ -2,7 +2,11 @@
  * World scope: the tool entry editor, its tabs and its on-break authoring states.
  */
 
-import { ANCHORED_POPOVER_SOURCES } from './caseConstants.js';
+import {
+  ANCHORED_POPOVER_SOURCES,
+  REQUIREMENT_SUGGESTION,
+  TYPEAHEAD_COMBOBOX_SOURCE,
+} from './caseConstants.js';
 import { managerCase } from './caseFactories.js';
 
 export const CASES = Object.freeze([
@@ -620,13 +624,10 @@ export const CASES = Object.freeze([
       { selector: '[data-tool-repair-requirements] [data-recipe-option-search]', fill: 'ingot' },
     ],
     expectView: 'world-tool-entry',
-    expectSelector: '[data-tool-repair-requirements] [data-recipe-option-suggestion]',
-    // The panel under the field it completes.
+    // The list is portalled out of the row, so it is addressed as a child of the application root.
+    expectSelector: REQUIREMENT_SUGGESTION,
     expectContained: [
-      {
-        container: '[data-scoped-page="world-tool-entry"]',
-        target: '[data-tool-repair-requirements] [data-recipe-option-suggestion]',
-      },
+      { container: '[data-scoped-page="world-tool-entry"]', target: REQUIREMENT_SUGGESTION },
     ],
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
@@ -634,6 +635,8 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRepairRequirements\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeIngredientOption\.svelte$/,
+      TYPEAHEAD_COMBOBOX_SOURCE,
+      ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
 ]);

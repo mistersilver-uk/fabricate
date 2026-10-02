@@ -1447,6 +1447,7 @@
           "LoadingPreview": "Working out your current chances…",
           "PreviewError": "Current chances could not be loaded. Showing the authored chances."
         },
+        "CheckChanged": "This roll's details changed while you were deciding. Check them and roll again.",
         "Reason": {
           "ActiveRun": "This character already has a run of this kind in progress. Finish or cancel it first.",
           "ActorNotFound": "That character could not be found. Reopen Fabricate and choose the character again.",

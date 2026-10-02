@@ -194,6 +194,10 @@
     outline: none;
   }
 
+  .inventory-search:focus-within {
+    border-color: var(--fab-accent);
+  }
+
   .inventory-filters-row {
     display: flex;
     flex-wrap: wrap;

@@ -1,10 +1,37 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { promptJournalStageCheck, withPromptActivity } from '../src/bootstrap/journalOperations.js';
+import {
+  journalCheckSeams,
+  promptJournalStageCheck,
+  withPromptActivity,
+} from '../src/bootstrap/journalOperations.js';
 import { buildSinglePromptData, promptCheckRoll } from '../src/ui/svelte/apps/crafting/rollPrompt.js';
 import { stubPromptSurface } from './helpers/rollPromptDialogStub.js';
 
 describe('Journal roll prompt adapter', () => {
+  it('states a changed check in the reopened prompt, and as a warning toast beside it', async () => {
+    const seams = journalCheckSeams();
+    const toasts = [];
+    const previousUi = globalThis.ui;
+    const warn = (message) => {
+      toasts.push(message);
+    };
+    Object.assign(globalThis, { ui: { notifications: { warn } } });
+    const surface = stubPromptSurface(() => null);
+    try {
+      await seams.promptCheck({ subject: 'Horseshoe' });
+      assert.ok(!('notice' in surface.view), 'a first prompt states no notice');
+      await seams.promptCheck({ subject: 'Horseshoe' }, { changed: true });
+      assert.match(surface.view.notice, /details changed while you were deciding/);
+      seams.onCheckChanged();
+      assert.deepEqual(toasts, [surface.view.notice], 'the toast says the same sentence');
+    } finally {
+      surface.restore();
+      if (previousUi === undefined) delete globalThis.ui;
+      else Object.assign(globalThis, { ui: previousUi });
+    }
+  });
+
   it('shows the prepared formula without its chat-card flavour labels', async () => {
     let received;
     await promptJournalStageCheck(

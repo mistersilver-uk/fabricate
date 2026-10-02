@@ -134,6 +134,7 @@ import {
 } from './itemStackQuantity.js';
 import { planFirstFitDrain, pooledItemOrder } from './pooledAllocation.js';
 import { resolveCheckTriggerMatches } from './ResolutionModeService.js';
+import { postResultCard } from './resultCardPost.js';
 import { resolveRolledAmount, rolledAwardRecord } from './rolledAmountResolver.js';
 import { getCommittedExecutionOutcome, observeExecutionJournal } from './runExecutionJournal.js';
 import {
@@ -163,6 +164,7 @@ import {
   resolveSalvageRunRecord,
   runSalvageCheck,
   salvageRefusal,
+  settleSalvageRoll,
   validateSalvageTools,
 } from './salvagePipeline.js';
 import {
@@ -6053,15 +6055,7 @@ export class CraftingEngine {
 
     // The rolls sound the dice and animate Dice So Nice; the custom `content` survives them
     // because the card has child elements, and a result card is never whispered.
-    try {
-      await ChatMessage.create({
-        speaker: ChatMessage.getSpeaker({ actor: craftingActor }),
-        content,
-        ...(rolls.length > 0 && { rolls }),
-      });
-    } catch (error) {
-      console.error('Fabricate | Failed to post crafting chat message:', error);
-    }
+    await postResultCard({ actor: craftingActor, content, rolls, check, label: 'crafting' });
   }
 
   /** `[{ tool, item }]` matches as `{ name, img }` chat entries by the tool's authored name, since
@@ -6178,15 +6172,7 @@ export class CraftingEngine {
       localize
     );
 
-    try {
-      await ChatMessage.create({
-        speaker: ChatMessage.getSpeaker({ actor }),
-        content,
-        ...(rolls.length > 0 && { rolls }),
-      });
-    } catch (error) {
-      console.error('Fabricate | Failed to post salvage chat message:', error);
-    }
+    await postResultCard({ actor, content, rolls, check, label: 'salvage' });
   }
 
   async _runPropertyMacro(
@@ -6447,11 +6433,20 @@ export class CraftingEngine {
     if (tools) return tools.result;
     const opened = await openSalvageRun(this, ctx);
     if (opened) return opened.result;
-    const checked = await runSalvageCheck(this, ctx);
-    if (checked) return checked.result;
-    // The settlement write stays outside the bracket: its rejection must escape uncaught, since
-    // inside it `_recordSalvageUncertainty` would answer with a second write to the same flag.
-    await beginSalvageSettlement(this, ctx);
+    try {
+      const checked = await runSalvageCheck(this, ctx);
+      if (checked) return checked.result;
+      // The settlement write stays outside the inner bracket: its rejection must escape uncaught,
+      // since inside it `_recordSalvageUncertainty` would answer with a second write to the flag.
+      await beginSalvageSettlement(this, ctx);
+      return await this._settleSalvage(ctx);
+    } finally {
+      await settleSalvageRoll(ctx);
+    }
+  }
+
+  /** The award bracket: a failure inside it is recorded as uncertain before it escapes. */
+  async _settleSalvage(ctx) {
     try {
       await resolveSalvageFailure(this, ctx);
       const failed = await publishSalvageFailure(this, ctx);

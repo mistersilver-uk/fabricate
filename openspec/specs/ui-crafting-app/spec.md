@@ -364,6 +364,15 @@ A refused choice cancels the whole batch with zero mutation, and a resource that
   Every client receives a message's content and flags whatever its whisper or blind setting, so the card is not whispered to compensate, and a carried award roll would make a whispered card visible to every client anyway.
   The outcome stays: a crafting card keeps its Success or Failure pill, and every card keeps what was produced, consumed and broken.
   The check's own Roll is posted by its own message under its roll mode, and Foundry decides who sees it.
+- **A public check's Roll rides its result card.**
+  For a public, non-secret check the crafting card of a Journal run and the single salvage card carry the check's evaluated Roll, followed by its pre-rolls and then any rolled result amounts, in the message's `rolls`, so one message both states the outcome and sounds and animates the dice, and no separate roll message is posted.
+  The carried Rolls are the ones the check evaluated, rebuilt from their serialized data where the card is posted by the GM authority, and are never rerolled.
+  A card carrying a check Roll names the public mode in its create options: `ChatMessage.create` applies a visibility mode only when one is passed, so the option states the card's visibility rather than leaving it to that default.
+  Where the GM authority posts the card, a card carrying a check Roll is authored as the user who asked for the check, taken from the sender the transport attested and never from the request's payload, so the dice are drawn as that user's; a card carrying no check Roll keeps the posting client's own author.
+  The carried Rolls are ordered so that one bearing dice leads whenever any does, and otherwise keep the order above, because a dice-animation module reads the first Roll to decide whether the message has dice at all.
+  An initiator the operation refuses the roll handoff to gets no Roll on the card either, so a roll they may not see is posted nowhere.
+  A public roll whose card is not posted — the system's chat output is off, or the card could not be created — still posts its own roll message, so the dice are never lost.
+  A bulk salvage run keeps one roll message per item beside its aggregate card, a craft resumed on a run that predates the Journal lifecycle keeps its separate roll message, and a gathering roll keeps its own message because the gathering card states no roll.
 - **A crafting card whose check rolled states its outcome.**
   Below the header it carries a `Success` or `Failure` pill (`fabricate-craft-chat__result`), its tone mixed into the chat ink so it reads inside Foundry's own message; salvage and bulk salvage cards carry no pill.
 - **A summed check states its executed evidence.**
@@ -380,7 +389,7 @@ A refused choice cancels the whole batch with zero mutation, and a resource that
   Every row is read from the executed check result alone, never from later actor or configuration state, and every `{token}` fills in one pass, so a label containing `{total}` is stated literally.
   Each row is escaped literal text in which no `[[`, `@path`, `@Name[…]` or `&Name[…]` shape survives for either Foundry enrichment pass or a game system's enricher, because a word joiner follows each; an `@path` may break only after its inner dots.
   A system enricher with no sigil (such as StarWarsFFG's `:ability:` or `[AB]`) is not neutralized, and because Foundry re-walks text nodes after each pass it can also match text an earlier pass inserted; this is an accepted known limit (#2109).
-  A gmroll, blindroll or selfroll card, or a secret one, states no `Roll n` row, no dice line and no rows, because every client receives a message's content and flags whatever its whisper; the card is never whispered to compensate, no pre-roll Roll joins its `rolls`, and it gains no evidence flags.
+  A gmroll, blindroll or selfroll card, or a secret one, states no `Roll n` row, no dice line and no rows, because every client receives a message's content and flags whatever its whisper; the card is never whispered to compensate, no check Roll or pre-roll Roll joins its `rolls`, and it gains no evidence flags.
 - **A ROLLED result amount states its roll beside the produced line** on the crafting and salvage card, in the same `{formula} = {total}` shape and the same treatment the card's rolled-check-total row uses, so the run that says what was produced also says what produced it.
   An EMPTY AWARD — a total of zero or less, which creates no item — is stated as its own row naming what produced nothing, never omitted, because a player who watched the dice fall is owed the outcome.
   The card reads the roll the award recorded and never re-rolls it.
@@ -393,7 +402,7 @@ A refused choice cancels the whole batch with zero mutation, and a resource that
   A failed count that netted below zero reads `Botch` in place of the Failure pill.
   That evidence is handed to the card builder at post time from the engine's own execution and is never persisted into check data, run history, a roll handoff or message flags; a secret check keeps it inside the authority.
   A gmroll, blindroll or selfroll count card, or a secret one, shows no net, no count rows and no tiles, and the card is never whispered to compensate.
-  No count Roll or pre-roll is attached to the card, whose only Foundry roll stays the count Roll's own post, and the gathering card stays roll-free.
+  A public count card carries its count Roll and pre-rolls on the rule every public check follows, a card that is not public carries neither, and the gathering card stays roll-free.
   A count check that bought dice (issue 2008) reads its summary `{pool}d{die} ({unbought} + {bought} bought), each {sym} {threshold}`, adds an `Additional dice` row, `{count} bought · spent {count} {resource}` (`{count} bought · spent {count}` without a resource name), and dashes the tiles of the original dice they added, marked `bought`, under the same public, non-secret gate.
   The crafting result box and the salvage roll summary state the same row and tiles, and a refused spend posts no card.
   `data.boughtDice` (`data-models/spec.md` § CraftingRunStepState) is the one part of this evidence the check data keeps, and it names no resource.
@@ -426,7 +435,19 @@ A refused choice cancels the whole batch with zero mutation, and a resource that
 
 - **WHEN** the same craft is rolled as a private GM, blind or self roll, or its check is secret
 - **THEN** the card keeps its pill, and states no `Roll 9` row, no dice line and no evidence rows
-- **AND** it is not whispered, and carries no pre-roll Roll and no evidence flags
+- **AND** it is not whispered, and carries no check Roll, no pre-roll Roll and no evidence flags
+- **AND** the check's Roll is posted as its own message under its roll mode
+
+#### Scenario: A public craft posts one message
+
+- **WHEN** a player crafts through the Journal and rolls the check publicly
+- **THEN** chat shows one result card, which states the outcome and carries the check's Roll and its pre-rolls in its `rolls`
+- **AND** no separate roll message is posted for that check
+
+#### Scenario: A public roll with no card still posts
+
+- **WHEN** a player rolls a crafting or salvage check publicly in a system whose chat output is off
+- **THEN** the check's Roll is posted as its own message, as it was before the card carried it
 
 #### Scenario: A private or secret check's total reaches no client
 

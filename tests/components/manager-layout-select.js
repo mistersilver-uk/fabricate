@@ -382,7 +382,8 @@ test('the composed picker cascade resolves to the shared panel and the callers o
         let order = -1;
         for (const rule of rules) {
           order += 1;
-          for (const selector of rule.selectorText.split(',')) {
+          // Split at top-level commas only: a comma inside `:is()` or `:not()` is not a list break.
+          for (const selector of rule.selectorText.split(/,(?![^()]*\))/)) {
             const trimmed = selector.trim();
             let matched;
             try {

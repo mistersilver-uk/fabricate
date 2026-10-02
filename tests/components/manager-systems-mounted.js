@@ -1170,6 +1170,10 @@ export function registerSystemsCases() {
     const dirtyChip = heading.querySelector('[data-system-details-dirty]');
     assert.ok(dirtyChip, 'the Unsaved chip lights while the identity form is dirty');
     assert.ok(
+      dirtyChip.classList.contains('is-action'),
+      'the chip takes the action density of the Save details button beside it'
+    );
+    assert.ok(
       dirtyChip.compareDocumentPosition(heading.querySelector('button[type="submit"]')) &
         Node.DOCUMENT_POSITION_FOLLOWING,
       'the chip precedes the Save details button'

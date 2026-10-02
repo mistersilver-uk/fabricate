@@ -14,6 +14,8 @@
   import StatusToggle from '../../components/StatusToggle.svelte';
   import { stepperLabels } from '../../components/stepperLabels.js';
   import { formatList, localize } from '../../util/foundryBridge.js';
+  import { typeaheadPanel } from '../../actions/typeaheadPanel.js';
+  import { createTypeaheadCombobox } from '../../util/typeaheadCombobox.svelte.js';
   import {
     defaultEnvironmentOptions,
     depletionTimingOptions,
@@ -183,9 +185,8 @@
   let selectedComponentTags = $state([]);
   let componentPageIndex = $state(0);
   let lastTaskId = $state('');
-  // One open flag per availability menu (issue 1458). Each menu is its own `SearchablePopover`
-  // and owns its open state; this map exists so the task-switch reset below can force all three
-  // shut, and mutual exclusion comes from the primitive's outside-click dismissal.
+  // One open flag per availability menu (issue 1458), so the task-switch reset below can force
+  // all three shut; mutual exclusion comes from `SearchablePopover`'s outside-click dismissal.
   let availabilityMenuOpen = $state({ biomes: false, timeOfDay: false, weather: false });
   let componentPageSize = $state(6);
   let toolSearchTerm = $state('');
@@ -251,13 +252,9 @@
       (componentPageIndex + 1) * componentPageSize
     )
   );
-  // This picker paginates the SAME `itemCards` the component browser renders, and since issue
-  // 1081 a card's linked source document — and therefore the live description fallback this
-  // picker's "No description has been added." message is the absence of — resolves on demand.
-  // This view never mounts `ComponentsBrowserView`, so without asking here a GM who comes straight
-  // to the task editor sees that fallback permanently. Scoped to this picker's own page; see
-  // `ComponentsBrowserView` for why it is called off the card rather than through the projection
-  // helper.
+  // This picker paginates the same `itemCards` the component browser renders, whose linked source
+  // document resolves on demand (issue 1081). This view never mounts `ComponentsBrowserView`, so it
+  // asks here, scoped to its own page, or a GM sees the no-description fallback permanently.
   $effect(() => {
     for (const card of paginatedComponentCards) card?.hydrate?.()?.catch?.(() => {});
   });
@@ -383,10 +380,9 @@
   }
 
   // Display precedence, per `data-models` `## Tool` requirement 13 and mirroring `toolStudio.js`:
-  // authored label, then the registration display SNAPSHOT, then the linked managed component,
-  // then the fallback. The snapshot rung is load-bearing — a first-class item-sourced tool carries
-  // `componentId: null` (issue 561), so the component-only resolver this replaced rendered
-  // "Unnamed tool" for a fully-populated tool (issue 976).
+  // authored label, then the registration display snapshot, then the linked managed component,
+  // then the fallback. An item-sourced tool carries `componentId: null`, so the snapshot rung is
+  // what names it (issues 561, 976).
   // The required-tools row's live region, on the same terms as `availabilitySummary` above: one
   // polite summary per host row, because a chip primitive cannot own one and a removal announces
   // nothing without it.
@@ -458,9 +454,19 @@
     componentPageIndex = 0;
   }
 
-  function onComponentTagSearchInput(event) {
-    componentTagSearchTerm = event.currentTarget.value;
-  }
+  const tagSearch = createTypeaheadCombobox({
+    component: 'GatheringTaskEditView',
+    anchor: '.manager-task-component-tag-search',
+    query: () => componentTagSearchTerm,
+    setQuery: (value) => (componentTagSearchTerm = value),
+    count: () => componentTagSuggestions.length,
+    onChoose: (index) => addComponentTag(componentTagSuggestions[index]),
+    maxHeightCap: 132,
+    rows: { pitch: 30, gap: 2, chrome: 10 },
+  });
+  const tagSearchLabel = $derived(
+    text('FABRICATE.Admin.Manager.Environment.Tasks.SearchComponentTags', 'Search component tags')
+  );
 
   function onComponentDragStart(item, event) {
     const componentId = String(item?.id || '').trim();
@@ -602,12 +608,10 @@
     return text('FABRICATE.Admin.Manager.Environment.Tasks.AnyTimeTitle', 'Any Time');
   }
 
-  // ONE live region per host row, and it is the CALLER'S to own: `Chip.svelte`'s `removable` note
-  // records that a bare chip cannot have one, because neither adding nor removing a member moves
-  // focus into the row. It restates the whole set on every change rather than announcing an event:
-  // a region wrapped around the row would read each added chip's whole subtree and say nothing at
-  // all on a removal, since `aria-relevant` defaults to `additions text`. The names come through
-  // the active language's list conventions, because "3 selected" does not say WHICH three.
+  // One live region per host row, owned by the caller because a bare chip cannot have one (see
+  // `Chip.svelte`'s `removable` note). It restates the whole set on every change, since a region
+  // wrapped around the row says nothing on a removal, and names the members through the active
+  // language's list conventions, because "3 selected" does not say which three.
   function availabilitySummary(kind) {
     const options = selectedConditionOptions(kind);
     const body =
@@ -694,9 +698,8 @@
     onUpdateTask({ staminaCostModifiers: staminaCostModifiers.filter((_, i) => i !== index) });
   }
   // Per-task check override, routed only (progressive has no target). One field (R3, issue 2005):
-  // `dcOverride` under a fixed target, `adjustmentOverride` under a character value,
-  // `successesOverride` under a count, and none is ever rewritten by another. null = use the system
-  // gathering check's own value.
+  // `dcOverride` under a fixed target, `adjustmentOverride` under a character value, or
+  // `successesOverride` under a count, none rewritten by another; null uses the system check's.
   const dcOverrideEnabled = $derived(taskResolutionMode === 'routed');
   const checkEvaluation = $derived(normalizeCheckEvaluation(checkConfig?.evaluation));
   const overrideField = $derived(checkOverrideField(checkEvaluation));
@@ -1049,10 +1052,8 @@
 </script>
 
 <!--
-  Every task section opens with the same card header — an `<h3>` title over an optional muted hint
-  — so the markup is declared once here instead of at each section. The two headers that also host
-  a controls cluster keep their own markup: a header with a second child is a different
-  composition.
+  The card header every task section opens with: an `<h3>` title over an optional muted hint. The
+  two headers that also host a controls cluster are a different composition and keep their own.
 -->
 {#snippet taskCardHeader(title, hint)}
   <div class="manager-task-card-header">
@@ -1237,12 +1238,10 @@
         {#each ['biomes', 'timeOfDay', 'weather'] as kind (kind)}
           <Field as="div" data-gathering-task-field={kind}>
             <span>{availabilityFieldLabel(kind)}</span>
-            <!-- `SearchablePopover`, not a hand-rolled trigger-plus-listbox (issue 1458), the same
-                 conversion as `GatheringEventEditView`'s. `showSearch={false}` keeps
-                 `triggerHasPopup="listbox"` truthful and keeps the empty branch reading "All
-                 biomes selected". `bind:open` exists for ONE reason: the task-switch effect above
-                 closes every open menu, and a portaled panel that outlived its task would hang
-                 over a form whose contents had changed underneath it. -->
+            <!-- `SearchablePopover` (issue 1458). `showSearch={false}` keeps
+                 `triggerHasPopup="listbox"` truthful and the empty branch reading "All biomes
+                 selected". `bind:open` lets the task-switch effect above close every open menu, or
+                 a portaled panel would outlive its task over a form that changed beneath it. -->
             <SearchablePopover
               bind:open={availabilityMenuOpen[kind]}
               options={availabilityMenuOptions(kind)}
@@ -1804,13 +1803,11 @@
       </div>
 
       <div class="manager-task-required-tools-attached" data-gathering-task-required-tools-attached>
-        <!-- THE ROW IS THE LAST RUNG OF THE CHIP'S FOCUS LADDER (issue 1515), which is why it is
-             rendered in BOTH states rather than only when it holds chips. `Chip` takes its focus
-             destination before it removes the chip — the next remove control, else the previous
-             one, else the nearest `[data-chip-remove-fallback]` — and the library search below
-             carries that hook only while this system HAS a tool library. A row that appeared only
-             alongside chips could not be that rung either: it would be resolved, focused, and then
-             replaced by the empty state in the same removal. -->
+        <!-- The row is the last rung of the chip's focus ladder (issue 1515), so it renders in
+             both states. `Chip` takes its focus destination before it removes the chip: the next
+             remove control, else the previous one, else the nearest `[data-chip-remove-fallback]`,
+             which the library search below carries only while this system has a tool library. A
+             row present only alongside chips would be focused and replaced in the same removal. -->
         <div
           class="manager-chip-row"
           tabindex="-1"
@@ -2165,25 +2162,28 @@
               <input
                 type="search"
                 value={componentTagSearchTerm}
-                oninput={onComponentTagSearchInput}
                 placeholder={text(
                   'FABRICATE.Admin.Manager.Environment.Tasks.SearchTagsPlaceholder',
                   'Search tags...'
                 )}
-                aria-label={text(
-                  'FABRICATE.Admin.Manager.Environment.Tasks.SearchComponentTags',
-                  'Search component tags'
-                )}
+                aria-label={tagSearchLabel}
+                {...tagSearch.field}
               />
-              {#if componentTagSuggestions.length > 0}
-                <div class="manager-tag-suggestions" data-gathering-component-tag-suggestions>
-                  {#each componentTagSuggestions as tag (tag)}
+              {#if tagSearch.listed}
+                <div
+                  class="manager-tag-suggestions manager-task-component-tag-suggestions"
+                  data-gathering-component-tag-suggestions
+                  aria-label={tagSearchLabel}
+                  {...tagSearch.list}
+                  use:typeaheadPanel={tagSearch.panel}
+                >
+                  {#each componentTagSuggestions as tag, index (tag)}
                     <button
                       type="button"
                       data-keyboard-focus="true"
                       class="manager-tag-suggestion"
                       data-gathering-component-tag-suggestion={tag}
-                      onclick={() => addComponentTag(tag)}
+                      {...tagSearch.option(index)}
                     >
                       {tag}
                     </button>
