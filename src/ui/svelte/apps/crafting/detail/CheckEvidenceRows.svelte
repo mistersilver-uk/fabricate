@@ -2,7 +2,8 @@
   The executed check's evidence rows in a player result box (issue 2005), read from the result's
   display projection and never from later actor or config state. Each row is the shared fact row
   in its keyed form; a box narrower than 360px sets the chat card's 88px key column. A count check
-  states its die tiles with their legend above its count rows (issue 2006).
+  states its die tiles with their legend above its count rows (issue 2006); its sentence rows set
+  as prose, its figure rows as figures (issue 2134).
 
   Props:
   | prop | values | default | contract |
@@ -23,6 +24,9 @@
   import JournalFactRow from '../../journal/JournalFactRow.svelte';
 
   let { check = null } = $props();
+
+  /** The count rows that read as a sentence rather than a figure. */
+  const PROSE_ROWS = new Set(['count', 'pool', 'result']);
 
   // The roller never sees a blind roll's result, and a secret check's evidence is the GM's.
   const withheld = $derived(
@@ -54,6 +58,7 @@
         <JournalFactRow
           icon={null}
           keyed
+          prose={counted && PROSE_ROWS.has(row.id)}
           danger={row.tone === 'danger'}
           label={row.label}
           value={pathBreakSegments(row.text)}
