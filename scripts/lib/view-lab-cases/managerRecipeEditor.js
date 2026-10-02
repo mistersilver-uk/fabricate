@@ -499,7 +499,10 @@ export const CASES = Object.freeze([
       ':has([data-recipe-option] ~ [data-recipe-option])' +
       ':not(:has(.manager-recipe-or-trigger)) [data-recipe-add="alternative-component"]',
     expectContained: [
-      { container: '[data-recipe-group].has-alternatives', target: '[data-recipe-option]' },
+      {
+        container: '[data-recipe-group].has-alternatives',
+        target: '[data-recipe-group].has-alternatives [data-recipe-option]',
+      },
     ],
     kinds: ['manager', 'recipes'],
     sourceMatches: [
