@@ -840,6 +840,12 @@
   outline-offset: 2px;
 }
 
+/* A focused, empty field shows its caret alone: the caret is drawn at the text origin, on top of the placeholder's first glyph, so the hint yields while the field holds focus and returns on blur. */
+.fabricate input:focus::placeholder,
+.fabricate textarea:focus::placeholder {
+  color: transparent;
+}
+
 /* THE THIRD HALF OF THE PAIR ABOVE, because a programmatic `.focus()` following a pointer activation matches `:focus` and NOT `:focus-visible` — the reset strips the ring and the repaint never supplies one. `validationFocus.js` stamps `data-validation-focused` and this block paints it, written FLAT over the reset's own element list because a single `.fabricate [data-validation-focused]` rule is (0,2,0) and loses to the reset outright (issues 1517, 1509). */
 .fabricate a[data-validation-focused],
 .fabricate button[data-validation-focused],
