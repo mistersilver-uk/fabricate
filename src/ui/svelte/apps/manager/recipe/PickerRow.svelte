@@ -1,22 +1,39 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  ONE REQUIREMENT ROW, FOR EVERY SURFACE THAT AUTHORS ONE. Three screens mount it — the recipe
-  editor's ingredient list, the Tool Breakage tab's repair set and the world Tool entry's copy of
-  that same set — and `fabricate-premium`'s downtime rewards picker is a fourth instance of the
-  same idea, which is the point: a fourth row anatomy would be a fourth thing to keep in step.
+  The one requirement row: a kind plate, a kind select, a name field that is a search until it is
+  named and a pill after, an amount, and the caller's trailing controls. Its anatomy is specified in
+  `openspec/specs/ui-entity-editors/spec.md` under "The requirement row".
 
-  Its anatomy (kind FIRST, value second), the name field's two faces, the commit rule, the degraded
-  empty-catalogue face, the per-kind tint, the absence of a `REQUIRED` badge and the one-line tag
-  arm are all stated in `openspec/specs/ui-entity-editors/spec.md` → "Ingredients tab" → "The
-  requirement row". This file implements that section and adds nothing to it.
+  Props:
+  | prop | values | default | contract |
+  | --- | --- | --- | --- |
+  | `value` | `{ kind, id, tags, tagMatch, quantity, quantityFormula }` | `{}` | `toValue(entry)` from `pickerRowKinds.js`. A `kind` the kind table does not name draws the misconfigured face. |
+  | `kinds` | match types | all four | What the kind select offers; the row's own kind is always listed too. |
+  | `catalogue` | `{ [kind]: [{ id, label, icon, img, offered }] }` | `{}` | Suggestions list the entries whose `offered` is not `false`; the named pill resolves `value.id` against all of them. `catalogue.tags` is the tag picker's vocabulary. |
+  | `readonlyKinds` | match types | `[]` | Kinds drawn on the read-only face. Only `currency` has one, for a system whose currency feature is off. |
+  | `disabled` | boolean | `false` | Forwarded to every control the row draws. The `convert` and `trailing` snippets are the caller's own. |
+  | `invalid` | `{ amount?: string }` | `{}` | Marks the amount control invalid and describes it with the message. |
+  | `amount` | `false` \| `{ min, max, unit, inputProps, ariaLabel, … }` | `{}` | `false` draws no amount; the object's keys, which carry the amount slot's localized copy, are stated in `PickerRowAmount.svelte`. |
+  | `rollable` / `removable` | booleans | `false` / `true` | The Fixed \| Rolled toggle on a `component` row; and the remove button. |
+  | `density` | `'default'` \| a rung name | `'default'` | Any other value adds `is-<density>` to the root for the caller's sheet rule. |
 
-  Where premium and the design disagree, this row follows the shipped `RewardRow`, because a GM
-  sees both products in one session and the mockup has no running implementation. An audit against
-  the mockup alone would read these as drift: the control height is 30px, the shipped rung, not
-  28; the resting search border is `--fab-border-strong` and accents only while typing; the plate
-  glyph is 12px, not 11; the kind picker is on the `inline` rung, so 11.5px not 11 (issue 1510).
-  What Enter commits differs too, forced by a requirement being id-valued, and is stated in the
-  spec section named above. The suggestion list is the shared typeahead seam's (issue 2157).
+  Snippets:
+  - `convert` — the requirement's "or…" control, after the amount and a divider.
+  - `trailing` — the caller's own controls, before the remove button.
+
+  Callbacks:
+  - `onChange(value)` — the whole next `value`; the caller merges it with `fromValue(entry, value)`.
+  - `onRemove()` — the remove button was pressed.
+
+  Rest spread:
+  - `{...rest}` lands on the root `<div>`, written after `class={…}` and `data-recipe-option`.
+  - `class` is a named prop, because a rest key would replace the row's classes instead of
+    extending them.
+
+  Invariants:
+  - The row imports nothing from `src/ui/model/`: the caller filters, and says so through `offered`.
+  - The typed query is local and never reaches `value`; Enter commits the top suggestion, never the
+    raw string. Pinned by `tests/components/picker-row-matrix-mounted.test.js`.
 -->
 <script module>
   // Alternatives carry no id, so the tag-match radio group's `name` is minted per INSTANCE here:
@@ -27,22 +44,13 @@
 <script>
   import Chip from '../../../components/Chip.svelte';
   import { localize } from '../../../util/foundryBridge.js';
-  // The add-new offer projection, feeding the SUGGESTION list only; `selectedEssence` below
-  // resolves against the UNFILTERED prop, so an authored requirement on a disabled essence still
-  // reads back by name rather than collapsing to an empty search field.
-  import { visibleEssenceOptions } from '../../../../model/essenceValidation.js';
-  import {
-    currencyUnitLabel,
-    currencyUnitIcon,
-    findCurrencyUnit,
-  } from '../../../util/recipeCurrency.js';
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
   import Select from '../../../components/Select.svelte';
   import SegmentedControl from '../../../components/SegmentedControl.svelte';
-  import Stepper from '../../../components/Stepper.svelte';
+  import PickerRowAmount from './PickerRowAmount.svelte';
   // The ONE kind table: the plate's glyph and tint and the kind select's four words are read from
   // it rather than restated here.
-  import { INGREDIENT_KIND_ORDER, ingredientKindMeta } from './pickerRowKinds.js';
+  import { KIND_ORDER, isKnownKind, kindMeta } from './pickerRowKinds.js';
   import { typeaheadPanel } from '../../../actions/typeaheadPanel.js';
   import { createTypeaheadCombobox } from '../../../util/typeaheadCombobox.svelte.js';
 
@@ -55,22 +63,22 @@
   const SUGGESTIONS_HEIGHT = 232;
 
   let {
-    option = {},
-    componentOptions = [],
-    itemTags = [],
-    currencyUnits = [],
-    // Whether the system's currency feature is enabled. A currency alternative persisted while it
-    // was on stays VISIBLE once it is disabled, read-only, so no authored data is hidden.
-    currencyEnabled = true,
-    // The system's essences ({ id, name, icon, enabled }), for an essence row's own search, and
-    // UNFILTERED by contract: the suggestion list narrows to enabled essences itself, but
-    // `selectedEssence` must resolve an already-authored disabled essence by name.
-    essenceOptions = [],
-    // The requirement's single "or…" popover, passed by the parent so it renders inline here.
-    orControl = null,
+    value = {},
+    kinds = KIND_ORDER,
+    catalogue = {},
+    readonlyKinds = [],
+    disabled = false,
+    invalid = {},
+    amount = {},
+    rollable = false,
+    removable = true,
+    density = 'default',
+    class: className = '',
+    convert = null,
+    trailing = null,
     onChange = () => {},
     onRemove = () => {},
-    canRemove = true,
+    ...rest
   } = $props();
 
   function text(key, fallback) {
@@ -83,144 +91,37 @@
   // name saved as data. The parent keys rows by INDEX, so a row keeps this across a sibling edit.
   let query = $state('');
 
-  const matchType = $derived(
-    option?.match?.type === 'tags' ||
-      option?.match?.type === 'currency' ||
-      option?.match?.type === 'essence'
-      ? option.match.type
-      : 'component'
-  );
-  const quantity = $derived(Number(option?.quantity) > 0 ? Number(option.quantity) : 1);
-  const componentId = $derived(
-    option?.match?.type === 'component' ? option.match.componentId || '' : ''
-  );
-  const tags = $derived(
-    option?.match?.type === 'tags' && Array.isArray(option.match.tags) ? option.match.tags : []
-  );
-  const tagMatch = $derived(option?.match?.tagMatch === 'all' ? 'all' : 'any');
+  const matchType = $derived(value?.kind ?? 'component');
+  const misconfigured = $derived(!isKnownKind(matchType));
+  const tags = $derived(Array.isArray(value?.tags) ? value.tags : []);
+  const tagMatch = $derived(value?.tagMatch === 'all' ? 'all' : 'any');
+  const readonly = $derived(matchType === 'currency' && readonlyKinds.includes('currency'));
 
-  const currencyUnitId = $derived(
-    option?.match?.type === 'currency' ? option.match.unit || '' : ''
+  // Every entry of this row's kind, and the ones a GM may newly choose. `chosen` resolves against
+  // all of them, so a requirement on a since-withheld subject still reads back by name.
+  const entries = $derived(Array.isArray(catalogue?.[matchType]) ? catalogue[matchType] : []);
+  const offered = $derived(entries.filter((entry) => entry.offered !== false));
+  const chosen = $derived(
+    value?.id ? entries.find((entry) => entry.id === value.id) || null : null
   );
-  const currencyAmount = $derived(
-    option?.match?.type === 'currency' && Number(option.match.amount) > 0
-      ? Number(option.match.amount)
-      : 1
-  );
-  const selectedCurrencyUnit = $derived(findCurrencyUnit(currencyUnits, currencyUnitId));
-  // A currency alternative that outlived its feature: read-only rather than dropped.
-  const currencyReadonly = $derived(matchType === 'currency' && !currencyEnabled);
-  const currencyUnitReadonlyLabel = $derived(
-    selectedCurrencyUnit
-      ? currencyUnitLabel(currencyUnits, currencyUnitId)
-      : currencyUnitId ||
-          text('FABRICATE.Admin.Manager.Recipe.CurrencyDisabledUnitFallback', 'Currency')
-  );
-
-  const essenceId = $derived(option?.match?.type === 'essence' ? option.match.essenceId || '' : '');
-  const essenceAmount = $derived(
-    option?.match?.type === 'essence' && Number(option.match.amount) > 0
-      ? Number(option.match.amount)
-      : 1
-  );
-  const selectedEssence = $derived(
-    essenceId ? (essenceOptions || []).find((essence) => essence.id === essenceId) || null : null
-  );
-  // Every ENABLED essence, plus whichever one this option already names — which is what makes a
-  // requirement on a since-disabled essence editable and clearable rather than stranded.
-  const essenceCatalogue = $derived(
-    visibleEssenceOptions(essenceOptions, (essence) => essence?.id === essenceId).map(
-      (essence) => ({
-        id: essence.id,
-        label: essence.name,
-        icon: essence.icon || 'fas fa-flask-vial',
-      })
-    )
-  );
-
-  const selectedComponent = $derived(
-    componentId ? (componentOptions || []).find((item) => item.id === componentId) || null : null
-  );
-
-  const componentCatalogue = $derived(
-    (componentOptions || []).map((item) => ({
-      id: item.id,
-      label: item.name,
-      img: item.img,
-      icon: 'fas fa-cube',
-    }))
-  );
-
-  const currencyCatalogue = $derived(
-    (currencyUnits || []).map((unit) => ({
-      id: unit.id,
-      label: currencyUnitLabel(currencyUnits, unit.id),
-      icon: currencyUnitIcon(currencyUnits, unit.id),
-    }))
-  );
+  const named = $derived(Boolean(chosen));
 
   // The tag picker offers system tags not already on this option.
   const tagPickerOptions = $derived(
-    (itemTags || [])
-      .filter((tag) => !tags.includes(tag))
-      .map((tag) => ({ id: tag, label: tag, icon: 'fas fa-tag' }))
+    entries
+      .filter((entry) => !tags.includes(entry.id))
+      .map(({ id, label, icon }) => ({ id, label, icon }))
   );
 
-  // WHICH KINDS THE SELECT OFFERS: what the ADDERS offer, plus this row's OWN kind always, per
-  // `openspec/specs/ui-entity-editors/spec.md` → "The requirement row".
-  const canAddCost = $derived(currencyEnabled && (currencyUnits || []).length > 0);
-  // The UNFILTERED roster, matching the adders: a system whose essences are all disabled keeps
-  // the essence match type, and the withholding happens in the SUGGESTION list below.
-  const canAddEssence = $derived((essenceOptions || []).length > 0);
-  // The four words come from the shared kind table, which the `or…` menu also reads, so the two
-  // name the same kinds with the same nouns. What stays HERE is the offer rule.
-  const kindOffered = $derived({
-    component: true,
-    tags: true,
-    essence: canAddEssence,
-    currency: canAddCost,
-  });
+  const kindWord = (kind) =>
+    isKnownKind(kind) ? text(kindMeta(kind).labelKey, kindMeta(kind).label) : String(kind);
+  // The caller's kinds in table order, plus this row's own kind always.
   const kindOptions = $derived(
-    INGREDIENT_KIND_ORDER.filter((kind) => kindOffered[kind] || kind === matchType).map((kind) => ({
-      value: kind,
-      label: text(ingredientKindMeta(kind).labelKey, ingredientKindMeta(kind).label),
-    }))
+    [...KIND_ORDER, ...(misconfigured ? [matchType] : [])]
+      .filter((kind) => kinds.includes(kind) || kind === matchType)
+      .map((kind) => ({ value: kind, label: kindWord(kind) }))
   );
 
-  // THE NAME FIELD'S SUBJECT, PER KIND: one shape (`{ catalogue, chosen, placeholder, emptyHint }`)
-  // so the markup below reads the same three branches whichever kind the row is.
-  const named = $derived.by(() => {
-    if (matchType === 'essence') return Boolean(selectedEssence);
-    if (matchType === 'currency') return Boolean(selectedCurrencyUnit);
-    return Boolean(selectedComponent);
-  });
-  const catalogue = $derived.by(() => {
-    if (matchType === 'essence') return essenceCatalogue;
-    if (matchType === 'currency') return currencyCatalogue;
-    return componentCatalogue;
-  });
-  const chosen = $derived.by(() => {
-    if (!named) return null;
-    if (matchType === 'essence') {
-      return {
-        label: selectedEssence.name,
-        icon: selectedEssence.icon || 'fas fa-flask-vial',
-        img: '',
-      };
-    }
-    if (matchType === 'currency') {
-      return {
-        label: currencyUnitLabel(currencyUnits, currencyUnitId),
-        icon: currencyUnitIcon(currencyUnits, currencyUnitId),
-        img: '',
-      };
-    }
-    return {
-      label: selectedComponent.name,
-      icon: 'fas fa-cube',
-      img: selectedComponent.img || '',
-    };
-  });
   const searchPlaceholder = $derived.by(() => {
     if (matchType === 'essence')
       return text('FABRICATE.Admin.Manager.Recipe.EssenceSearchPlaceholder', 'Search essences...');
@@ -241,7 +142,7 @@
 
   const normalizedQuery = $derived(query.trim().toLowerCase());
   const suggestions = $derived(
-    catalogue
+    offered
       .filter((entry) =>
         String(entry.label || '')
           .toLowerCase()
@@ -251,13 +152,7 @@
   );
 
   function emit(next) {
-    onChange({ ...option, ...next });
-  }
-
-  // Quantities are capped at four digits, which keeps the stepper narrow.
-  function setQuantity(value) {
-    const next = Number(value);
-    emit({ quantity: Number.isFinite(next) && next > 0 ? Math.min(9999, next) : 1 });
+    onChange({ ...value, ...next });
   }
 
   /**
@@ -266,17 +161,8 @@
    * @param {string} id the catalogue id the GM chose (or '' to clear the row)
    */
   function choose(id) {
-    const value = String(id || '');
     query = '';
-    if (matchType === 'essence') {
-      emit({ match: { type: 'essence', essenceId: value, amount: essenceAmount } });
-      return;
-    }
-    if (matchType === 'currency') {
-      emit({ match: { type: 'currency', unit: value, amount: currencyAmount } });
-      return;
-    }
-    emit({ match: { type: 'component', componentId: value || null } });
+    emit({ id: String(id || '') });
   }
 
   /** Take what the GM typed, on ENTER with no option active and on nothing else: the TOP
@@ -289,7 +175,7 @@
   }
 
   const combo = createTypeaheadCombobox({
-    component: 'RecipeIngredientOption',
+    component: 'PickerRow',
     anchor: '.manager-recipe-option-name-field',
     query: () => query,
     count: () => suggestions.length,
@@ -299,74 +185,31 @@
     maxHeightCap: SUGGESTIONS_HEIGHT,
   });
 
-  /**
-   * Retype this row. The old value goes with the old kind, because leaving it behind would
-   * persist a field the new kind's own editor can neither see nor clear.
-   *
-   * @param {string} kind one of `component` / `tags` / `essence` / `currency`
-   */
+  // Retype this row. The subject and the tags leave with the old kind.
   function setKind(kind) {
     if (kind === matchType) return;
     query = '';
-    if (kind === 'tags') {
-      emit({ quantity, match: { type: 'tags', tags: [], tagMatch: 'any' } });
-      return;
-    }
-    if (kind === 'essence') {
-      emit({ quantity: 1, match: { type: 'essence', essenceId: '', amount: 1 } });
-      return;
-    }
-    if (kind === 'currency') {
-      emit({ quantity: 1, match: { type: 'currency', unit: '', amount: 1 } });
-      return;
-    }
-    emit({ quantity, match: { type: 'component', componentId: null } });
+    emit({ kind, id: '', tags: [], tagMatch: 'any' });
   }
 
   function addTag(tag) {
-    const value = String(tag || '').trim();
-    if (!value || tags.includes(value)) return;
-    emit({ match: { type: 'tags', tags: [...tags, value], tagMatch } });
+    const next = String(tag || '').trim();
+    if (!next || tags.includes(next)) return;
+    emit({ tags: [...tags, next] });
   }
 
   function removeTag(tag) {
-    emit({ match: { type: 'tags', tags: tags.filter((t) => t !== tag), tagMatch } });
+    emit({ tags: tags.filter((t) => t !== tag) });
   }
 
-  function setTagMatch(mode) {
-    emit({ match: { type: 'tags', tags: [...tags], tagMatch: mode === 'all' ? 'all' : 'any' } });
-  }
-
-  // Currency amounts share the four-digit cap and live on the MATCH, not the option quantity.
-  function setCurrencyAmount(value) {
-    const next = Number(value);
-    emit({
-      match: {
-        type: 'currency',
-        unit: currencyUnitId,
-        amount: Number.isFinite(next) && next > 0 ? Math.min(9999, next) : 1,
-      },
-    });
-  }
-
-  // Essence amounts share the four-digit cap and live on the MATCH, not the option quantity.
-  function setEssenceAmount(value) {
-    const next = Number(value);
-    emit({
-      match: {
-        type: 'essence',
-        essenceId,
-        amount: Number.isFinite(next) && next > 0 ? Math.min(9999, next) : 1,
-      },
-    });
-  }
-
-  // THE KIND'S OWN TINT, on the GLYPH and never the tile, reaching every glyph the row draws for
-  // its subject. Glyph and tint come from ONE table because they were once a pair of ternaries
-  // here and a DIFFERENTLY-SPELLED pair in the `or…` menu, so the glyph a GM pressed to add a
-  // component was `fa-cube` while the row it produced drew `fa-cubes`.
-  const leadTone = $derived(ingredientKindMeta(matchType).tone);
-  const leadIcon = $derived(ingredientKindMeta(matchType).icon);
+  // The kind's own tint, on the glyph and never the tile; a misconfigured row draws a warning.
+  const leadTone = $derived(kindMeta(matchType).tone);
+  const leadIcon = $derived(
+    misconfigured ? 'fa-solid fa-triangle-exclamation' : kindMeta(matchType).icon
+  );
+  const extraClass = $derived(
+    `${density === 'default' ? '' : ` is-${density}`}${className ? ` ${className}` : ''}`
+  );
 
   const removeLabel = $derived(
     matchType === 'component'
@@ -388,9 +231,31 @@
     { value: 'any', labelKey: 'FABRICATE.Admin.Manager.Recipe.TagMatchAny', fallback: 'Any of' },
     { value: 'all', labelKey: 'FABRICATE.Admin.Manager.Recipe.TagMatchAll', fallback: 'All of' },
   ];
+  const tagMatchOptions = $derived(
+    disabled
+      ? TAG_MATCH_OPTIONS.map((option) => ({ ...option, disabled: true }))
+      : TAG_MATCH_OPTIONS
+  );
 </script>
 
-<div class={`manager-recipe-ingredient-option-row is-${leadTone}`} data-recipe-option>
+{#snippet remove()}
+  <button
+    type="button"
+    class="manager-recipe-option-remove"
+    data-recipe-remove="alternative"
+    aria-label={removeLabel}
+    title={removeLabel}
+    {disabled}
+    onclick={() => onRemove()}><i class="fas fa-xmark" aria-hidden="true"></i></button
+  >
+{/snippet}
+
+<!-- The hook is written empty and first: a bare attribute beside a spread serializes as "true". -->
+<div
+  data-recipe-option=""
+  class={`manager-recipe-ingredient-option-row is-${leadTone}${extraClass}`}
+  {...rest}
+>
   <span class={`manager-recipe-option-lead is-${leadTone}`} aria-hidden="true">
     <i class={leadIcon}></i>
   </span>
@@ -406,6 +271,7 @@
     triggerTitle={kindLabel}
     triggerProps={{ 'data-recipe-option-kind': '' }}
     onChange={setKind}
+    {disabled}
   />
 
   {#if matchType === 'tags'}
@@ -423,6 +289,7 @@
             data-recipe-remove="tag"
             aria-label={text('FABRICATE.Admin.Manager.Recipe.RemoveTag', 'Remove tag')}
             title={text('FABRICATE.Admin.Manager.Recipe.RemoveTag', 'Remove tag')}
+            {disabled}
             onclick={() => removeTag(tag)}><i class="fas fa-times" aria-hidden="true"></i></button
           >
         </Chip>
@@ -444,6 +311,7 @@
         searchLabel={text('FABRICATE.Admin.Manager.Recipe.TagSearchPlaceholder', 'Search tags...')}
         emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoTagsDefined', 'No tags defined')}
         showChevron={false}
+        {disabled}
         onSelect={(tag) => addTag(tag)}
       />
     </span>
@@ -451,22 +319,30 @@
          colour. It is the only thing a tag row carries that the other three kinds do not, so its
          size decides whether an empty tag row stands level with its siblings. -->
     <SegmentedControl
-      options={TAG_MATCH_OPTIONS}
+      options={tagMatchOptions}
       value={tagMatch}
       tone="tag"
       groupName={`tag-match-${tagMatchGroupId}`}
       ariaLabel={text('FABRICATE.Admin.Manager.Recipe.TagMatch', 'Tag match')}
       optionDataAttr="data-recipe-tag-match"
-      onChange={(mode) => setTagMatch(mode)}
+      onChange={(mode) => emit({ tagMatch: mode === 'all' ? 'all' : 'any' })}
     />
-  {:else if currencyReadonly}
+  {:else if misconfigured}
+    <!-- A kind the table does not name: stated, never drawn as a component. -->
+    <span class="manager-recipe-option-name-field" data-recipe-option-misconfigured={matchType}>
+      <span class="manager-recipe-req-tag is-disabled">{matchType}</span>
+    </span>
+  {:else if readonly}
     <!-- Currency feature disabled: a static label rather than a searchable field, flagged inert,
          with the value still visible so nothing the recipe requires is hidden. -->
     <span class="manager-recipe-option-name-field" data-recipe-option-currency>
       <span
         class="manager-recipe-currency-unit is-readonly"
         data-recipe-currency-unit
-        data-recipe-currency-readonly>{currencyUnitReadonlyLabel}</span
+        data-recipe-currency-readonly
+        >{chosen?.label ||
+          value?.id ||
+          text('FABRICATE.Admin.Manager.Recipe.CurrencyDisabledUnitFallback', 'Currency')}</span
       >
       <span
         class="manager-recipe-req-tag is-disabled"
@@ -503,6 +379,7 @@
               'Clear and search again'
             )}
             title={text('FABRICATE.Admin.Manager.Recipe.ClearChoice', 'Clear and search again')}
+            {disabled}
             onclick={() => choose('')}><i class="fa-solid fa-xmark" aria-hidden="true"></i></button
           >
         </span>
@@ -512,16 +389,17 @@
         <span
           class="manager-recipe-option-search"
           class:is-typing={normalizedQuery !== ''}
-          class:is-empty-catalogue={catalogue.length === 0}
-          data-recipe-option-empty-catalogue={catalogue.length === 0 ? '' : undefined}
+          class:is-empty-catalogue={offered.length === 0}
+          data-recipe-option-empty-catalogue={offered.length === 0 ? '' : undefined}
         >
           <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
           <input
             type="text"
             data-recipe-option-search
             value={query}
-            placeholder={catalogue.length === 0 ? emptyCatalogueHint : searchPlaceholder}
+            placeholder={offered.length === 0 ? emptyCatalogueHint : searchPlaceholder}
             aria-label={searchPlaceholder}
+            {disabled}
             {...combo.field}
           />
         </span>
@@ -569,91 +447,29 @@
   {/if}
 
   <div class="manager-recipe-option-controls">
-    <!-- One Stepper for every row type, but a component or tag row counts on `option.quantity`
-         and essence and currency on `match.amount`, so the marker attribute stays per-kind. -->
-    {#if matchType === 'essence'}
-      <Stepper
-        value={essenceAmount}
-        min={1}
-        max={9999}
-        ariaLabel={text('FABRICATE.Admin.Manager.Recipe.Quantity', 'Quantity')}
-        decrementLabel={text(
-          'FABRICATE.Admin.Manager.Recipe.QuantityDecrement',
-          'Decrease quantity'
-        )}
-        incrementLabel={text(
-          'FABRICATE.Admin.Manager.Recipe.QuantityIncrement',
-          'Increase quantity'
-        )}
-        inputProps={{
-          'data-recipe-essence-amount': '',
-          class: 'fab-stepper-input manager-recipe-option-quantity',
-        }}
-        onChange={(value) => setEssenceAmount(value)}
-      />
-    {:else if matchType === 'currency' && currencyReadonly}
-      <!-- Read-only amount, on the same marker so the currency count stays locatable. -->
-      <span
-        class="manager-recipe-option-quantity is-readonly"
-        data-recipe-currency-amount
-        data-recipe-currency-readonly-amount>{currencyAmount}</span
-      >
-    {:else if matchType === 'currency'}
-      <Stepper
-        value={currencyAmount}
-        min={1}
-        max={9999}
-        ariaLabel={text('FABRICATE.Admin.Manager.Recipe.Quantity', 'Quantity')}
-        decrementLabel={text(
-          'FABRICATE.Admin.Manager.Recipe.QuantityDecrement',
-          'Decrease quantity'
-        )}
-        incrementLabel={text(
-          'FABRICATE.Admin.Manager.Recipe.QuantityIncrement',
-          'Increase quantity'
-        )}
-        inputProps={{
-          'data-recipe-currency-amount': '',
-          class: 'fab-stepper-input manager-recipe-option-quantity',
-        }}
-        onChange={(value) => setCurrencyAmount(value)}
-      />
-    {:else}
-      <Stepper
-        value={quantity}
-        min={1}
-        max={9999}
-        ariaLabel={text('FABRICATE.Admin.Manager.Recipe.Quantity', 'Quantity')}
-        decrementLabel={text(
-          'FABRICATE.Admin.Manager.Recipe.QuantityDecrement',
-          'Decrease quantity'
-        )}
-        incrementLabel={text(
-          'FABRICATE.Admin.Manager.Recipe.QuantityIncrement',
-          'Increase quantity'
-        )}
-        inputProps={{
-          'data-recipe-option-quantity': '',
-          class: 'fab-stepper-input manager-recipe-option-quantity',
-        }}
-        onChange={(value) => setQuantity(value)}
+    {#if amount !== false && !misconfigured}
+      <PickerRowAmount
+        {value}
+        {amount}
+        {rollable}
+        {readonly}
+        {disabled}
+        invalid={invalid?.amount || ''}
+        onChange={emit}
       />
     {/if}
 
-    {#if orControl}
+    {#if convert}
       <span class="manager-recipe-option-divider" aria-hidden="true"></span>
-      {@render orControl()}
+      {@render convert()}
     {/if}
 
-    {#if canRemove}
-      <button
-        type="button"
-        class="manager-recipe-option-remove"
-        data-recipe-remove="alternative"
-        aria-label={removeLabel}
-        title={removeLabel}
-        onclick={() => onRemove()}><i class="fas fa-xmark" aria-hidden="true"></i></button
-      >
+    <!-- Nested rather than a sibling block, so a row with no `trailing` gains no text node. -->
+    {#if trailing}
+      {@render trailing()}
+      {#if removable}{@render remove()}{/if}
+    {:else if removable}
+      {@render remove()}
     {/if}
   </div>
 </div>

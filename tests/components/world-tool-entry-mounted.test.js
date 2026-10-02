@@ -104,6 +104,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/recipe/RecipeIngredientSetCard.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeIngredientGroupCard.svelte',
     'src/ui/svelte/apps/manager/recipe/PickerRow.svelte',
+    'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte',
     // The per-row match-type segmented control those three render.
     'src/ui/svelte/components/SegmentedControl.svelte',
     'src/ui/svelte/components/Pagination.svelte',

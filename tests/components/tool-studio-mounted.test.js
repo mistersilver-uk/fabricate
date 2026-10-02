@@ -109,6 +109,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/tools/ToolSystemScopeCards.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeIngredientGroupCard.svelte',
     'src/ui/svelte/apps/manager/recipe/PickerRow.svelte',
+    'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeIngredientSetCard.svelte',
     // The shared scoped-entity patterns the Tool Studio is converted onto (issue 1362).
     'src/ui/svelte/apps/manager/scoped/ScopedEntityPreview.svelte',

@@ -79,6 +79,8 @@ const RAW_MODULES = [
   'src/models/match/matchTypes.js',
   // The ONE ingredient-kind table (issue 1373, round 8).
   'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
+  // The row's amount slot imports the roll-expression field, which reads these display helpers.
+  'src/systems/characterModifierPrerequisiteCopy.js',
   // The validation tab consumes the pure readiness evaluator.
   'src/ui/svelte/apps/manager/recipe/recipeReadiness.js',
   // RecipeEditView resolves, focuses and marks the control a validation row addresses
@@ -163,6 +165,8 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/apps/manager/recipe/RecipeIngredientSetCard.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeIngredientGroupCard.svelte',
   'src/ui/svelte/apps/manager/recipe/PickerRow.svelte',
+  'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte',
+  'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte',
@@ -5114,8 +5118,8 @@ describe('RecipeEditView (mounted)', () => {
       { props: { essenceOptions: MIXED_ESSENCE_OPTIONS } }
     );
 
-    // The PROP boundary: `RecipeIngredientOption` resolves its display through the
-    // unfiltered `essenceOptions`, so an authored requirement on a disabled essence reads
+    // The PROP boundary: `PickerRow` resolves its display through the whole essence
+    // catalogue the group card builds, so an authored requirement on a disabled essence reads
     // back by NAME on its chip. Filtering the prop would leave the row on its empty search
     // face, showing a GM a blank field where their own authored requirement used to be.
     const chosen = target.querySelector(
