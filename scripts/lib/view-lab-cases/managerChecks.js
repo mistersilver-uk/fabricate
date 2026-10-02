@@ -2370,6 +2370,9 @@ export const CASES = Object.freeze([
       ) +
       ` ${ADDITIONAL_DICE}:has([data-check-additional-dice-read-macro]:has-text("Read Momentum"))` +
       ' [data-check-additional-dice-spend-macro]:has-text("Announce Momentum")',
+    // The linked uuid wraps under its Copy button rather than running beneath it.
+    expectNoHorizontalOverflow:
+      '[data-check-additional-dice-read-macro] .manager-item-drop-zone-copy',
   }),
   additionalDiceCase({
     id: 'manager-checks-v3-count-additional-dice-no-actor',

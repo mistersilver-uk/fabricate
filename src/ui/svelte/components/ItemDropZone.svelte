@@ -136,6 +136,9 @@
     font-family: var(--fab-font-mono);
     font-size: 0.68rem;
     color: var(--fab-text-subtle);
+    /* Foundry's `code` keeps one unbroken line, which ran the uuid beneath the actions. */
+    white-space: normal;
+    word-break: normal;
     overflow-wrap: anywhere;
   }
 </style>
