@@ -8,6 +8,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
+import { tick } from 'svelte';
+
 import { normalizeCheckEvaluation } from '../../src/systems/normalize/checkEvaluation.js';
 import { previewCharacter } from '../../src/ui/svelte/apps/manager/checks/checkPreview.js';
 import {
@@ -168,7 +170,8 @@ function restoreGlobals() {
   Object.assign(globalThis, saved);
 }
 
-const settle = () => new Promise((resolveSettled) => setTimeout(resolveSettled, 0));
+/** The macro lookups and clipboard writes resolve in microtasks; `tick` flushes what they set. */
+const settle = () => tick();
 
 /** A controlled mount: every emission is fed back as the next `value`, as the route model does. */
 async function mountControlled(harness, value, props = {}) {
