@@ -22,6 +22,7 @@ import {
 } from './view-lab-cases/broadSignals.js';
 import { CASES as canvasInteractablesCases } from './view-lab-cases/canvasInteractables.js';
 import { CANVAS_APPS, DEFAULT_POSITION, MANAGER, PLAYER } from './view-lab-cases/caseConstants.js';
+import { withThemeVariants } from './view-lab-cases/caseFactories.js';
 import { CASES as coverageMatrixCases } from './view-lab-cases/coverageMatrix.js';
 import { CASES as managerChecksCases } from './view-lab-cases/managerChecks.js';
 import { CASES as managerComponentsCases } from './view-lab-cases/managerComponents.js';
@@ -85,7 +86,7 @@ const CASE_FILE_DIRECTORY = 'scripts/lib/view-lab-cases/';
 
 /** One manifest entry: the path a diff names a case file by, and the cases it declares. */
 const caseFile = (name, cases) =>
-  Object.freeze({ path: `${CASE_FILE_DIRECTORY}${name}.js`, cases });
+  Object.freeze({ path: `${CASE_FILE_DIRECTORY}${name}.js`, cases: withThemeVariants(cases) });
 
 /**
  * Every case file, in registry order. It is read twice — flattened into {@link VIEW_LAB_CASES}, and
@@ -204,6 +205,19 @@ export function fallbackCase() {
   return getCaseById(FALLBACK_CASE_ID);
 }
 
+/** The query a case's frame is mounted with: its own, plus its palette, id and capture geometry. */
+export function labQueryFor(viewCase) {
+  return {
+    ...viewCase.query,
+    ...(viewCase.theme && { theme: viewCase.theme }),
+    case: viewCase.id,
+    ...(viewCase.position && {
+      w: String(viewCase.position.width),
+      h: String(viewCase.position.height),
+    }),
+  };
+}
+
 // Surface coverage — what a change the registry cannot attribute captures.
 
 /**
@@ -268,6 +282,15 @@ export const LAB_SURFACE_CASES = Object.freeze(chooseSurfaceRepresentatives());
 /** @type {readonly string[]} */
 export const LAB_SURFACE_CASE_IDS = Object.freeze(LAB_SURFACE_CASES.map((viewCase) => viewCase.id));
 
+/**
+ * Ids plus each one's palette variants (issue 2151), which render what their base renders. Surface
+ * coverage is never passed through this: a palette is not a surface.
+ */
+function withThemeVariantIds(ids) {
+  for (const viewCase of VIEW_LAB_CASES) if (ids.has(viewCase.baseCaseId)) ids.add(viewCase.id);
+  return ids;
+}
+
 /** The cases a set of render files selects, by the `sourceMatches` patterns each case declares. */
 function selectRenderFileCases(renderFiles) {
   const selected = new Set();
@@ -283,6 +306,7 @@ function selectRenderFileCases(renderFiles) {
     }
   }
 
+  withThemeVariantIds(selected);
   if (sawBroadSignal) for (const id of REPRESENTATIVE_CASE_IDS) selected.add(id);
   return selected;
 }
@@ -786,7 +810,7 @@ function casesFromCaseFilePatch(patch, attribution) {
     attribution.sourceLines,
     attribution.regions
   );
-  return widenedByCoverage(keys, unattributable);
+  return widenedByCoverage(withThemeVariantIds(keys), unattributable);
 }
 
 /** The cases a REGION-attributed lab input selects: the union of what each touched region feeds. */

@@ -738,6 +738,12 @@ A case also declares `reaches`: `exact` when the frame lands on its smoke counte
 A `beyond` case carries an empty `smokeLabels`, because there is nothing to compare it against.
 A `window` case's shortfall is accounted for by a class-level entry in the known-gaps register in `scripts/README.md`, not by a per-case comment.
 
+Every case renders the default `fabricate` palette unless it says otherwise.
+A case that lists palette ids in `themeVariants` gains one variant per palette, registered directly after it: the same case under the id `<case-id>-<palette>`, with `theme` set to that palette, `reaches: 'beyond'` and no smoke labels.
+The capture carries `theme` to the page as a query flag, and the page applies it with the production `applyFabricateTheme` to the document element and to every `.fabricate` root, including the roots that mount after the page is ready.
+An id that is not a shipped palette fails, both when the registry loads and in the page, so a variant can never quietly render the default palette.
+Whatever selects a case also selects its palette variants, but surface coverage never contains one, because a palette is not a surface.
+
 A change to the lab's own inputs is attributed rather than treated like an ordinary render-file change.
 By default a PR touching the case registry, `labActors.js`, `labRunStates.js`, or any other file the lab depends on selects **surface coverage**: one frame of every route and tab the lab renders — every manager route, every player tab, one per single-screen canvas window, plus the light-theme pair.
 A shared input can alter any frame at once, so the selection has to be wide; what it has to PROVE is that the lab still boots, still mounts both windows and still reaches and photographs every route and tab, and that is what coverage answers.

@@ -2451,6 +2451,8 @@ test('changed files map to the windows they affect', () => {
     'fabricate-app-shell',
     'manager-components-normal',
     'manager-gathering-task-editor-normal',
+    // Its Hearth & Herb variant (issue 2151), which a palette's token change is photographed in.
+    'manager-gathering-task-editor-normal-hearth-herb',
     'manager-world-downtime-collapsed',
     'manager-world-downtime-tracking',
   ]);
@@ -3671,7 +3673,9 @@ test('every case literal parses as its own attributable region', () => {
     assert.deepEqual(
       inline.filter((id) => {
         const selected = selectedIds([path], file.patches([caseIdLine(id)]));
-        return selected.length !== 1 || selected[0] !== id;
+        // The literal's own case, and the palette variants it declares (issue 2151).
+        const expected = cases.filter((entry) => [entry.id, entry.baseCaseId].includes(id));
+        return selected.join(',') !== expected.map((entry) => entry.id).join(',');
       }),
       [],
       `${path}: a patch confined to these case literals widens past them, so \`CASE_OPEN_PATTERN\` ` +

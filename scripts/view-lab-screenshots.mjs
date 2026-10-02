@@ -49,7 +49,7 @@ import { chromium } from 'playwright';
 
 import { missingChromeMessage, resolveChromeCache } from './lib/foundryChromeCache.js';
 import { APP_CHROME, APP_CHROME_IDS, minimumViewportFor } from './lib/foundryChromeSpec.js';
-import { partitionConsoleErrors, publishableCases } from './lib/viewLabCases.js';
+import { labQueryFor, partitionConsoleErrors, publishableCases } from './lib/viewLabCases.js';
 import { groupFrames, renderIndexHtml, summarise } from './lib/viewLabIndex.js';
 import { assertViewLabLayout } from './lib/viewLabLayoutAssertion.js';
 import {
@@ -632,14 +632,7 @@ function mergeManifest({ existing, rendered, outputDir }) {
 function renderOptionsFor(viewCase) {
   return {
     appId: viewCase.app,
-    query: {
-      ...viewCase.query,
-      case: viewCase.id,
-      ...(viewCase.position && {
-        w: String(viewCase.position.width),
-        h: String(viewCase.position.height),
-      }),
-    },
+    query: labQueryFor(viewCase),
     label: viewCase.id,
     steps: viewCase.steps ?? [],
     expectView: viewCase.expectView ?? null,

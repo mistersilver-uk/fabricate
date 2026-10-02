@@ -156,6 +156,8 @@ export const CASES = Object.freeze([
           '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
       },
     ],
+    // Hearth & Herb, the palette where the control outline is weakest (issue 2151).
+    themeVariants: ['hearth-herb'],
     expectView: 'gathering-task-edit',
     kinds: ['manager', 'environments'],
     sourceMatches: [

@@ -11,6 +11,7 @@ import {
   findLabInjectedContentWidthLosses,
   measureWithoutLabStyles,
 } from './labInjectedLayoutGuard.js';
+import { installLabTheme, readLabTheme } from './labTheme.js';
 import { LAB_INTERACTABLE_REFS } from './world/labInteractables.js';
 import { buildLabWorld } from './world/labWorld.js';
 import { installLabChatLog } from './labChatLog.js';
@@ -108,6 +109,8 @@ function readParams() {
     // DARK by default, because that is what the smoke renders and the smoke is the fidelity
     // authority.
     colorScheme: params.get('colorScheme') === 'light' ? 'light' : 'dark',
+    // The Fabricate palette, which an unknown id refuses rather than letting it fall back (issue 2151).
+    theme: readLabTheme(params),
     // Which crafting system the manager opens on.
     system: params.get('system') ?? null,
     gatheringTaskMode: params.get('gatheringTaskMode') ?? null,
@@ -917,6 +920,8 @@ async function boot() {
   if (params.longDowntimeLabels) applyLongDowntimeLocalization(world);
   const localize = world ? world.localize : (key) => key;
   configureLabPage({ colorScheme: params.colorScheme });
+  // After the world build, whose startup applies the stored theme setting to the document.
+  installLabTheme(params.theme);
 
   const built = buildAppWindow({
     appId: params.appId,
