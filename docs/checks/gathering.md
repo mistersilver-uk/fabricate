@@ -25,6 +25,9 @@ See [Roll-under and character-value checks]({% link checks/crafting.md %}#roll-u
 
 Set the gathering check to **Count successes** to roll a dice pool and count qualifying dice instead of adding them into one total.
 See [Success-counting checks]({% link checks/crafting.md %}#success-counting-checks) for the full guide, including a **Routed** task's own **Successes needed override**.
+A counting gathering check can also let a player buy additional dice.
+A gathering check the Game Master resolves from the Journal, because the task is timed, reads and spends on the Game Master's own computer.
+See [Additional dice]({% link checks/crafting.md %}#additional-dice).
 
 ## What the check decides
 

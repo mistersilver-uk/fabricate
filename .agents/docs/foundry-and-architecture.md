@@ -465,6 +465,30 @@ The CSS counter-example makes the same point one layer over — the `font` / `--
 `InteractableManager.registerKeybinding` (`src/canvas/InteractableManager.js`) is therefore called from the `init` hook in `src/bootstrap/hooks.js`, and a registration that still throws is logged with `console.warn` rather than swallowed (issues #1835, #1881).
 - **A client keybinding's `onDown` returns truthy only when it actually acted.**
 The dispatch loop stops at the first truthy `onDown` in `(precedence, order)` sequence, so an unconditional `true` silently eats a later action on the same key, including a core default such as `ascend` on `KeyE`.
+- **`Document#update` resolves to `undefined` exactly when nothing was written, never when something was** (issue 2008).
+A `preUpdateActor`/`_preUpdate` veto, a validation failure, and an empty diff all resolve `undefined`, and a successful write resolves the updated document itself.
+The additional-dice stored-path spend (`spendAdditionalDice` in `src/systems/additionalDice.js`) checks the return value rather than assuming success, through `requireDocumentAcknowledgment` (`src/systems/runHistoryEvidence.js`), which also rejects a resolved value that is not the SAME document instance passed in.
+- **A synthetic (unlinked-token) actor's `update` resolves to the same `token.actor` instance, not a new object.**
+So the identity check above still passes for a token actor exactly as it does for a world actor, and one acknowledgment helper covers both without special-casing either.
+- **A resource Fabricate intends to WRITE must be read from `_source`, never from prepared data, and a path present in `actor.overrides` must be treated as not writable even though it still reads a number** (issue 2008).
+`readStoredResource` (`src/systems/additionalDiceReach.js`) reads `foundry.utils.getProperty(actor._source, path)` for exactly this reason: prepared data can show a value an Active Effect is holding in place, and writing underneath that effect would not change what anyone sees.
+`foundry.utils.hasProperty(actor.overrides, path)` is the standing check for "an Active Effect currently overrides this path", and additional dice refuse to spend from an overridden path (`resourceOverridden`) rather than writing a value the effect would immediately mask again.
+- **`fromUuidSync` answers a compendium INDEX entry for an unloaded compendium document, and an index entry carries no `documentName` and no `type`.**
+Core's compendium index is deliberately thin (`compendiumIndexFields` on `CompendiumCollection`, `client/documents/collections/compendium-collection.mjs`), and a Macro's index entry in particular carries no `type` at all (`common/documents/macro.mjs`).
+Code that resolves a macro reference synchronously — the additional-dice readiness row in `src/ui/svelte/apps/manager/checks/countReadiness.js` is one — must tell apart three answers: `null` (missing), a loaded Document (test `documentName`, then `type`), and an unloaded index entry with no `documentName` at all (unresolved rather than invalid, because its type cannot be known without loading it).
+- **Foundry has no atomic increment or compare-and-set on a Document field.**
+Every write is read-then-`update`, so two clients writing the same path at nearly the same moment can both read the pre-write value, and one decrement is lost.
+The additional-dice spend queue (`additionalDice.js`, keyed by actor UUID plus path, or by the spend-macro UUID alone) only serializes spends issued from ONE client.
+It cannot, and does not claim to, serialize across clients, which is a documented and accepted limitation rather than a defect (issue 2008).
+- **`ManagerModal`'s `initialFocus` is a single selector LIST resolved with one `querySelector` call, which returns the first match in DOCUMENT order, not the order the selectors are listed in** (`src/ui/svelte/components/ManagerModal.svelte`).
+A selector meant as a fallback must already sit later in the markup than the control it falls back from, or it wins first regardless of where it sits in the comma-separated selector list.
+- **Core `Macro#execute` binds `speaker`, `actor`, `token` and `character` locals in addition to `scope`; Fabricate's shared `MacroExecutor` (`src/utils/MacroExecutor.js`) binds only `scope`, `context` and `args`, all identical by reference.**
+A macro ported from ordinary Foundry use that reads a bare `actor` or `token` is `undefined` on every Fabricate-run path, the Additional Dice Macro Contract (`data-models/spec.md` § Additional Dice Macro Contract) included, so such a macro must read everything from its payload argument instead.
+- **A module flag SCOPE is a package id, which core allows to contain hyphens and to start with a digit; a stored document PATH's own segments do not allow either, because a bare dot-path cannot otherwise tell a hyphen from a minus sign or a leading digit from a list index.**
+Core validates a package id against `/^[A-Za-z0-9-_]+$/` (`common/packages/base-package.mjs`), so `flags.my-module.momentum` and `flags.5e-helper.points` are both valid stored paths whose first SEGMENT is a flag scope, not a plain identifier.
+Additional dice's path validation (`countAdditionalDicePathInvalid` in `src/ui/svelte/apps/manager/checks/countReadiness.js`) special-cases exactly that first segment rather than banning a hyphen or a leading digit everywhere in the path.
+- **Foundry's own `Die#explode` throws "Maximum recursion depth" once a recursive explosion has checked more than 1000 results, and that limit is Foundry's, not Fabricate's.**
+`FabricateCountRoll` (`src/systems/countRoll.js`) catches exactly that message and maps it to its own `explode-unbounded` refusal, while any other error during evaluation is rethrown rather than swallowed.
 - Update compatibility metadata if new Foundry API requirements are introduced.
 
 ## Architecture Pointers

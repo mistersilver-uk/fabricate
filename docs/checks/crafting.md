@@ -570,6 +570,86 @@ An executed success-counting check states its dice tiles, one per die, and its c
 The chat card states them only for a public roll, the same rule its roll total follows: a private, blind, self, or secret roll's card states neither the tiles, the rows, nor the net.
 The result box, and a salvage's own result summary, are more forgiving: both still state the tiles and the rows for a private roll or a self roll, and withhold them only for a blind roll or one marked secret.
 
+### Additional dice
+
+Turn on **Allow players to roll additional dice**, under the pool controls, to let a player spend a resource to roll more dice than the pool's **Base pool** alone would give them.
+Bought dice always add straight to the pool itself, even on a check where **Modifiers and bonuses** sends other bonuses to the threshold instead.
+Set **Most additional dice per roll** to cap how many dice one roll can ever buy, from one up to twenty.
+
+Choose what pays for them with **Paid for by**.
+
+- **Value on the crafting character** spends a number stored on the character, such as a resource your game system tracks on the character sheet.
+Type its path under **Path on the crafting character**.
+Fabricate reads and writes that value directly, so a player can only spend from a character they themselves can edit, and the roll prompt tells them so when they cannot.
+An Active Effect currently changing that value also makes it unavailable to spend from, because spending would not actually lower a value the effect is holding in place.
+- **Read and spend macros** hand the whole question to two Script Macros you write and drop into the **Read macro** and **Spend macro** areas: one that reports how many units the character, or whatever the resource represents, can currently afford, and one that deducts the cost once dice are bought.
+A macro is not limited to reading and writing the rolling character, so this is also how you offer a resource no single player owns outright, such as a shared pool of points a whole party spends together and you track wherever you choose.
+
+Either way, give the resource a name under **Resource name** so the prompt names what is being spent, for example "Momentum 2 available · Spends 1 Momentum."
+Leave it blank and the prompt names only the amount, with no resource name attached.
+
+#### Writing the macros
+
+Both the read macro and the spend macro must be Script Macros.
+Fabricate hands each one everything it needs as its one argument, so write the macro to read from that argument rather than from the rolling character, the token, or the active speaker: Fabricate does not set any of those up as separate values the way Foundry's own macro execution does.
+The read macro returns how many units can currently be spent.
+The spend macro deducts the cost and returns a truthy value once it has done so.
+A spend macro that deducts the resource and then returns a falsy value, or throws, tells Fabricate the spend failed, so the roll is aborted even though the macro already took the cost.
+Fabricate never undoes or refunds whatever a macro already changed, so write a spend macro that only reports failure when you are sure nothing was taken.
+On a check the Game Master resolves from the Journal, both macros must finish within fifteen seconds.
+The read macro also runs often on its own: Fabricate asks it how much is available every time a prepared counting check with additional dice turned on is described in the Journal, so write it with no side effects of its own, reporting a number and changing nothing else.
+
+#### Where the macros run, and as whom
+
+A salvage roll, single or in a batch, always reads, spends, and rolls on the spot, on the salvager's own computer.
+An immediately-resolved crafting, alchemy, or gathering check works the same way.
+A check the Game Master instead resolves later from the Journal, because the activity is timed, reads and spends on the Game Master's own computer once the Game Master resolves it, acting on behalf of whichever player started the attempt.
+
+#### No refunds
+
+Fabricate never refunds additional dice, for any reason.
+If the main roll cannot complete after the resource has already been spent, for example because the dice exploded past what Foundry allows, the spend still stands and the player is told so.
+The same is true when a Game Master-resolved crafting stage or gathering step refuses or fails after the check has already settled: whatever was spent to buy dice for that roll is gone, even though the stage or step itself did not complete.
+A cancelled run that would normally hand back its ingredients never hands back a spent resource.
+
+#### Spending from more than one computer at once
+
+On one computer, every spend that uses the same macro pair happens one at a time, whichever character it is spending for, because Fabricate queues by the macro pair itself rather than by the character.
+Buying for two different characters through the same macros on one computer therefore never collides, but the second spend always waits for the first to finish.
+Across different computers there is no such queue.
+Foundry has no way to check and update a stored value as one atomic step across computers, so a character value, in particular, can occasionally lose a decrement when two players buy from it at nearly the same moment.
+If your macro pair represents a shared, heavily contested resource, write the spend macro to protect itself against that, since Fabricate cannot protect it for you across computers.
+
+#### The roll prompt
+
+When additional dice are available, the roll prompt adds a stepper for choosing how many to buy, up to the limit the resource and **Most additional dice per roll** allow together, and states what buying that many would spend.
+
+Each button in the prompt, Roll, Advantage, and Disadvantage, is judged on its own.
+A button a player could never succeed with, even after buying the most dice they can afford, is disabled with a note explaining why, but a sibling button that still has a path to success is never blocked along with it.
+Advantage, for example, can stay enabled and offer a real chance of success even while Roll and Disadvantage are both disabled.
+
+When modifiers have already reduced the pool all the way to zero, and even the most dice the player could afford still could not lift it back above zero, Fabricate blocks the roll outright and says so, because no amount of buying would help.
+
+On a secret check, the prompt never states how many successes are needed and never blocks a button on that basis.
+The player may always buy dice and roll, exactly as before additional dice existed.
+
+A batch of salvage rolls offers one shared control for the whole batch, when every row in it draws on the same character and the same resource.
+Buying a number of dice there spends that many for every roll the batch covers, and a button is disabled only when every roll in the batch would be disabled under it on its own.
+
+#### The Preview simulator
+
+On a counting check with additional dice turned on, the **Outcome preview** panel gains its own stepper for trying out different numbers of bought dice.
+Rolling from the preview never spends anything and never runs either macro: it is a what-if tool, not a real purchase.
+
+#### Readiness
+
+The **Validation** page flags additional dice left half set up.
+Turning the toggle on with no resource chosen yet raises a blocking issue telling you to finish setting one up, or to turn additional dice off.
+A **Path on the crafting character** that is not a plain stored value, such as one written as an expression or naming a list entry, raises a second blocking issue.
+A **Read macro** or **Spend macro** that cannot be resolved as a Script Macro raises a third.
+Choosing a character under **Preview as** can also surface a note that the chosen character has no number there to spend, without that note counting toward **Validation**.
+Turning additional dice on also raises how many successes the check could ever reach for the purposes of [Warnings you may see on Validation](#warnings-you-may-see-on-validation), since bought dice are now part of what the pool could produce.
+
 ### Converting a free-text formula that counts successes
 
 A check you import, or one you typed a formula into before switching to **Count successes**, can carry a formula that already uses a success-counting die suffix while **What the roll produces** is still set to **Add the dice**.

@@ -29,6 +29,8 @@ See [Roll-under and character-value checks]({% link checks/crafting.md %}#roll-u
 
 Set the salvage check to **Count successes** to roll a dice pool and count qualifying dice instead of adding them into one total.
 See [Success-counting checks]({% link checks/crafting.md %}#success-counting-checks) for the full guide, including the component's own **Successes needed override**.
+A counting salvage check can also let a player buy additional dice, single rolls and a batch alike, with the spend always happening on the salvager's own computer.
+See [Additional dice]({% link checks/crafting.md %}#additional-dice).
 
 ## What players see
 
