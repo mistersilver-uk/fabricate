@@ -486,6 +486,28 @@ export const CASES = Object.freeze([
       /^src\/systems\/runJournalOutcomeBands\.js$/,
     ],
   }),
+  // Issue 2152: a routed fixed salvage states its authored segments and no DC, a negative-ended
+  // tier with the true minus spaced from the dash.
+  playerCase({
+    id: 'player-salvage-fixed-routed',
+    label: 'Player app — Routed salvage on fixed ranges, a negative-ended tier and no DC',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'inventory', rollPromptState: 'salvage-fixed-routed' },
+    steps: [
+      { selector: '.inventory-filters input', fill: 'Ruined Slag' },
+      { selector: CARD_BUTTON('lab-runework:rw-slag') },
+      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+    ],
+    expectSelector:
+      '[data-inventory-salvage-body="routed"][data-inventory-routed-type="fixed"]' +
+      ':not(:has([data-inventory-salvage-dc])):has([data-inventory-outcome-band="−2 – −1"])',
+    kinds: ['player', 'inventory'],
+    sourceMatches: [
+      ...SALVAGE_TARGET_SOURCES,
+      /^src\/ui\/presenters\/InventoryListingBuilder\.js$/,
+    ],
+  }),
   playerCase({
     id: 'player-salvage-misconfigured',
     label: 'Player app — Salvage misconfigured',
