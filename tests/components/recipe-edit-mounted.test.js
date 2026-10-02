@@ -4263,6 +4263,26 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  it('takes its portalled suggestion list down when the editor leaves the tab', async () => {
+    const { target } = await mountSingleGroup([UNNAMED_COMPONENT_ROW], {
+      props: { componentOptions: COMPONENT_OPTIONS },
+    });
+    const page = target.ownerDocument;
+    const field = target.querySelector('[data-recipe-option-search]');
+    await typeInto(field, 'Water');
+    const list = suggestionListOf(field);
+    assert.ok(Boolean(list), 'the list opened');
+    assert.ok(!field.closest('[data-recipe-option]').contains(list), 'and left its own row');
+
+    await openTab(target, 'results');
+    assert.equal(
+      page.querySelectorAll('.manager-recipe-option-suggestions').length,
+      0,
+      'a list outside the tab panel must not outlive the row that opened it'
+    );
+    editHarness.remount();
+  });
+
   it('patches the option quantity when the quantity input changes', async () => {
     const { target, patches } = await mountSingleGroup(
       [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],

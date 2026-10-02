@@ -1,8 +1,9 @@
 /*
- * THE MANAGER PAGE HEADER'S TWO GEOMETRY CONTRACTS, measured in a real engine.
+ * The Manager page header's two geometry contracts, measured in a real engine.
  *  1. The `Unsaved` chip takes the geometry of the buttons it sits beside in full: height,
  *     corner, type size and inline padding. A chip matching only one of the four reads as a
  *     further control drawn wrong.
+ *  2. A long identity subtitle or title truncates on one line, so the action cluster never wraps.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';

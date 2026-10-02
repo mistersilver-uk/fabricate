@@ -58,6 +58,8 @@ const GAP = 4;
 const VIEWPORT = Object.freeze({ width: 1280, height: 800 });
 const SHORTER = Object.freeze({ width: 1280, height: 700 });
 const NARROWER = Object.freeze({ width: 1000, height: 800 });
+/** A root narrower than the wide requirement field, so the panel's clamp to the root engages. */
+const CLAMPING = Object.freeze({ width: 420, height: 800 });
 
 /**
  * One row per shipped list. `field` is the closest ancestor of the input that is the field's
@@ -120,6 +122,9 @@ function twoFrames(page) {
   );
 }
 
+/** How many frames a panel may take to stop moving before the suite calls it unsettled. */
+const SETTLE_FRAMES = 60;
+
 /** The geometry every clause reads, taken in one pass so its rects are mutually consistent. */
 function measure(page, family) {
   return page.evaluate(({ clip, input, field, panel, committed }) => {
@@ -177,9 +182,13 @@ function measure(page, family) {
  *   with room in the root beneath, or on the root's own bottom edge
  * @param {number} [options.width] the stage width, which decides the field's
  * @param {number} [options.matching] how many names match the typed query
+ * @param {object} [options.viewport] the page's viewport, which decides the root's width
  */
-async function openList(family, { edge = 'scroller', width = 560, matching = 4 } = {}) {
-  const page = await fixtureServer.newPage({ viewport: VIEWPORT });
+async function openList(
+  family,
+  { edge = 'scroller', width = 560, matching = 4, viewport = VIEWPORT } = {}
+) {
+  const page = await fixtureServer.newPage({ viewport });
   const consoleErrors = [];
   page.on('console', (message) => {
     if (message.type() === 'error') consoleErrors.push(message.text());
@@ -198,8 +207,7 @@ async function openList(family, { edge = 'scroller', width = 560, matching = 4 }
   await page.focus(family.input);
   await page.keyboard.type(QUERY);
   await page.waitForSelector(family.panel);
-  await twoFrames(page);
-  const open = await measure(page, family);
+  const open = await settledMeasure(page, family);
 
   // What every clause below stands on: without these a list that is not clipped proves nothing.
   assert.notEqual(
@@ -216,6 +224,18 @@ async function openList(family, { edge = 'scroller', width = 560, matching = 4 }
     );
   }
   return { page, closed, open, consoleErrors };
+}
+
+/** The first measurement whose panel rect a further frame did not move. */
+async function settledMeasure(page, family) {
+  let previous = await measure(page, family);
+  for (let frame = 0; frame < SETTLE_FRAMES; frame += 1) {
+    await page.evaluate(() => new Promise((done) => requestAnimationFrame(done)));
+    const next = await measure(page, family);
+    if (JSON.stringify(next.panel) === JSON.stringify(previous.panel)) return next;
+    previous = next;
+  }
+  throw new Error(`${family.panel} was still moving after ${SETTLE_FRAMES} frames`);
 }
 
 /** A real pointer click at the centre of one measured option. */
@@ -237,12 +257,26 @@ function assertHittable(open, where) {
   }
 }
 
-/** The panel shares its field's left edge and sits one gap beneath it or one gap above it. */
-function assertBesideField(measured, when) {
+function assertSharesLeftEdge(measured, when) {
   assert.ok(
     Math.abs(measured.panel.left - measured.field.left) <= EPSILON,
     `${when} the panel starts at ${measured.panel.left}px against a field at ${measured.field.left}px`
   );
+}
+
+/** The panel shares its field's left edge and sits one gap beneath it. */
+function assertBeneathField(measured, when) {
+  assertSharesLeftEdge(measured, when);
+  const beneath = measured.panel.top - measured.field.bottom;
+  assert.ok(
+    Math.abs(beneath - GAP) <= EPSILON,
+    `${when} the root has room below, and the panel is ${beneath}px beneath its field`
+  );
+}
+
+/** The resize clause's looser form: one gap beneath the field or one gap above it. */
+function assertBesideField(measured, when) {
+  assertSharesLeftEdge(measured, when);
   const beneath = measured.panel.top - measured.field.bottom;
   const above = measured.field.top - measured.panel.bottom;
   assert.ok(
@@ -275,6 +309,8 @@ for (const family of FAMILIES) {
       }
     });
 
+    // Required Knowledge and the modifier list pass (c) either way: content beneath the field, or
+    // a flip, already bounds the scroll area there, and (b) is the clause that tells them apart.
     it('(c) gives its scrolling ancestor no scroll area', async () => {
       const { page, closed, open } = await openList(family);
       await page.close();
@@ -299,11 +335,14 @@ for (const family of FAMILIES) {
     it('(e) shares its field’s left edge, is at least as wide, and never covers it', async () => {
       // The requirement row's field takes its width from the stage, so it is measured both under
       // the panel's floor and over it; the other fields state their own width.
-      const widths = family.name === 'requirement' ? [420, 760] : [560];
+      const stretches = family.name === 'requirement';
+      const widths = stretches ? [420, 760] : [560];
+      const fields = [];
       for (const width of widths) {
         const { page, open } = await openList(family, { width });
         await page.close();
-        assertBesideField(open, `at ${width}px`);
+        fields.push(open.field.width);
+        assertBeneathField(open, `at ${width}px`);
         const expected = Math.min(
           Math.max(open.field.width, MIN_PANEL_WIDTH),
           open.host.width - 2 * HOST_INSET
@@ -313,6 +352,10 @@ for (const family of FAMILIES) {
           `at ${width}px the panel is ${open.panel.width}px wide beside a ${open.field.width}px field`
         );
       }
+      if (!stretches) return;
+      const [narrow, wide] = fields;
+      assert.ok(narrow < MIN_PANEL_WIDTH, `the ${narrow}px narrow field never reaches the floor`);
+      assert.ok(wide > MIN_PANEL_WIDTH, `the ${wide}px wide field never leaves the floor`);
     });
 
     it('(f) follows its field when an ancestor scrolls', async () => {
@@ -367,6 +410,26 @@ for (const family of FAMILIES) {
     });
   });
 }
+
+describe('typeahead suggestion list: the root’s clamp', () => {
+  const family = FAMILIES.find((entry) => entry.name === 'requirement');
+
+  it('is no wider than the root less its insets, under a field that is', async () => {
+    const { page, open } = await openList(family, { width: 760, viewport: CLAMPING });
+    await page.close();
+    const room = open.host.width - 2 * HOST_INSET;
+    assert.ok(room < open.field.width, `the ${open.field.width}px field fits the ${room}px root`);
+    assert.ok(
+      Math.abs(open.panel.width - room) <= EPSILON,
+      `the panel is ${open.panel.width}px wide in a root with ${room}px of room`
+    );
+    assert.ok(
+      open.panel.left >= open.host.left + HOST_INSET - EPSILON &&
+        open.panel.right <= open.host.right - HOST_INSET + EPSILON,
+      'the clamped panel crosses the root’s inset'
+    );
+  });
+});
 
 describe('typeahead suggestion list: the panel’s own scroll', () => {
   const family = FAMILIES.find((entry) => entry.name === 'knowledge');
