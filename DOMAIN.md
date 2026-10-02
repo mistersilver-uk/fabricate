@@ -1240,10 +1240,45 @@ The `qualified`/`cancelled`/`exploded` marks one rolled die in a **Count Check**
 
 #### Count Display Evidence
 
-The allowlisted `count` projection every non-secret executed **Count Check** folds onto its `checkDisplay`, literal numbers and two enumerated words only, never persisted beyond the post.
+The allowlisted `count` projection every non-secret executed **Count Check** folds onto its `checkDisplay`, literal numbers and two enumerated words only, plus the escaped **Resource Name** of a public roll's **Bought Dice**, never persisted beyond the post.
 A chat card states it only on a public roll, while the result box and the salvage summary state it on any roll but a blind or secret one.
 
 [Notes](docs/domain/terms.md#count-display-evidence)
+
+#### Additional Dice
+
+The authored `pool.additionalDice` policy that lets a **Count Check**'s roller buy up to `limit = min(max, floor(available / rolls))` extra pool dice at roll time, at one unit of a resource per die.
+The resource is a number stored at a document path in the acting actor's `_source`, or a read/spend macro pair, and the cost is spent immediately before the main dice and never refunded.
+
+[Notes](docs/domain/terms.md#additional-dice)
+
+#### Bought Dice
+
+The dice **Additional Dice** added to one roll: a count-only pool contribution placed after advantage, never a modifier, settled with every other pool change into the one count Roll.
+An executed result records them as `data.boughtDice = { count, source }`, omitted when none were bought, and a public result marks the last original dice in roll order `bought` with a dashed tile border.
+
+[Notes](docs/domain/terms.md#bought-dice)
+
+#### Resource Name
+
+The optional authored `pool.additionalDice.label` that player surfaces use to name what pays for **Bought Dice**, as in `Momentum 2 available · Spends 1 Momentum`.
+Without one they fall back to the amount alone (`2 available · Spends 1`), and no player surface ever shows the stored path or a macro UUID.
+
+[Notes](docs/domain/terms.md#resource-name)
+
+#### Shortfall
+
+The fewest **Bought Dice** whose settled pool is not a zero pool and holds the needed count, with every pending rolled contribution at its least favourable value.
+The roll prompt states it and never pre-selects it, and states none where it may not show the needed count.
+
+[Notes](docs/domain/terms.md#shortfall)
+
+#### Unreachable Attempt
+
+One footer action, judged on its own, whose pool even with `limit` **Bought Dice** and every pending rolled contribution at its most favourable value is still a zero pool, or whose dice times the most one die can contribute stay below the needed count.
+The roll prompt disables it unless a count trigger can rescue it, which a zero pool never can, while a secret or unentitled prompt judges none and a non-interactive caller is never blocked.
+
+[Notes](docs/domain/terms.md#unreachable-attempt)
 
 #### Target Source
 

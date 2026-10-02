@@ -1705,12 +1705,88 @@ Spec reference: openspec/specs/design-system/spec.md, openspec/specs/ui-crafting
 
 The allowlisted `count` projection `buildCheckDisplay` folds onto every non-secret executed **Count Check**'s `checkDisplay`, from the engine's own unpersisted `countDisplay` and never re-derived from the live check or actor: `die`, `tiles` (a **Die Qualification Marks** tile model), `qualified`, `cancelled`, `net`, `required`, `margin`, `zeroPool`, and the settled `pool`/`threshold` each as `{ base/anchor, terms, rolled/effective }`, `threshold` also carrying the enumerated `source` (`'fixed'`/`'character'`).
 It holds literal numbers and those two enumerated words only, never an expression, path, label or policy, so a card that renders it can never leak a hidden formula or DC.
+The one exception is a public roll's `boughtDice: { count, marked, resourceLabel }` (issue 2008): the persisted **Bought Dice** count, the original dice the roll marked, and the **Resource Name**, made inert by breaking `[[` and `@` exactly as a check label is; a non-public roll folds no `boughtDice` at all.
 Folding it onto the projection is not the same gate as showing it: a chat card states it only for `isPublicCheckDisplay` (a public, non-secret roll), while a result box and a salvage summary withhold it only for a blind or a secret roll, so a gmroll or a selfroll still states it there.
 It is handed to the card builders at post time beside **Executed Check Evidence**'s own visibility gate, and, like that evidence, is never written into `data`, run history, `rollHandoff`, or ChatMessage flags.
 
-Canonical mapping: `countProjection`/`countResult`/`countTerms`/`buildCheckDisplay` in `src/ui/presenters/checkDisplay.js`; `reportedCountDisplay`/`countRollReport` in `src/systems/countDisplayEvidence.js`
+Canonical mapping: `countProjection`/`boughtProjection`/`inertLabel`/`countResult`/`countTerms`/`buildCheckDisplay` in `src/ui/presenters/checkDisplay.js`; `reportedCountDisplay`/`countRollReport` in `src/systems/countDisplayEvidence.js`
 
 Spec reference: openspec/specs/ui-crafting-app/spec.md, openspec/specs/data-models/spec.md
+
+## Additional Dice
+
+`evaluation.pool.additionalDice` is `{ enabled, source: 'path'|'macro', path, readMacroUuid, spendMacroUuid, max, label }`, with `max` an integer 1–20 (default 1) and `label` the **Resource Name**; every field is retained while the policy is off or the source switches, so turning it off or changing the source loses nothing.
+It applies only to an enabled `count` evaluation: while it is off, or on a `sum` check, no nested field renders, validates or is read at roll time.
+The roller may buy 0 up to `limit = min(max, floor(available / rolls))` dice, where `available` is the integer the resource reads, `rolls` is 1 or the number of rolls one bulk choice covers, and each die costs one unit; any other exchange rate is the spend macro's to apply.
+A **path** source reads a finite, non-negative number at a stored document path such as `system.resources.momentum.value` in the acting actor's `_source`, never prepared data and never a roll-data `@path`, and writes it back with `Actor#update`; a module flag scope such as `flags.my-module.momentum` is a stored path.
+A **macro** source names a read macro and a spend macro under the data-models Additional Dice Macro Contract: both must be `script` macros, they read the payload rather than the globals, and a read macro must be free of side effects because the GM authority runs it whenever it describes a prepared count check.
+The budget is read only for an interactive decision or for a decision naming a non-zero count, so a call that buys nothing runs no read macro.
+Additional dice are **unavailable**, with a stated reason, when the source is missing (`sourceMissing`), the stored value is absent, not a number or negative (`resourceUnreadable`), an active effect overrides the path (`resourceOverridden`), the acting user cannot update the actor (`resourceNotWritable`), the read macro fails (`resourceMacroFailed`), or a companion request arrived on a `broadcast` call site (`broadcastCallSite`); the check still rolls without them, and only a non-zero choice refuses.
+They are **unaffordable** when readable and writable but `limit` is 0.
+A choice refuses `notOffered`, `choiceInvalid`, its unavailable reason or `choiceAboveLimit`, and a spend refuses `resourceChanged`, `spendRefused` or `spendUnconfirmed`; a value is never clamped, and those twelve reasons are the one closed list `ADDITIONAL_DICE_REFUSALS`.
+The cost is spent once per roll on the client that executes it — the acting player's for an immediate roll and bulk salvage, the claim-holding GM authority for a prepared check, and the executing GM for a **Standalone Check Roll** — after every refusal decidable without the main dice and immediately before them.
+A path spend re-reads the stored value inside a per-client queue keyed by actor and path, and succeeds only when the update is acknowledged and the value fell by exactly the cost; a macro spend is queued by its spend-macro UUID alone.
+A refused choice or spend aborts that roll with the dismissed-prompt zero-mutation result plus `additionalDiceRefusal`, never a thrown failure.
+Spent resource is never refunded: not on a failed or botched check, a later run cancel, a main Roll that throws after the spend, or a stage that refuses after a GM-evaluated check.
+Across clients a path spend is not atomic, because Foundry has no compare-and-set, so two clients spending one resource at once can lose a decrement; a macro source can serialize itself.
+There is no actor relay for a GM-owned actor: a party resource the player cannot update is reached through the macro pair.
+
+Canonical mapping: `pool.additionalDice` in `normalizeCheckEvaluation` (`src/systems/normalize/checkEvaluation.js`); `ADDITIONAL_DICE_REFUSALS`/`boundAdditionalDice`/`readStoredResource`/`publicAdditionalDiceOffer` in `src/systems/additionalDiceReach.js`; `resolveAdditionalDiceBudget`/`spendAdditionalDice`/`withAdditionalDiceRefusal` in `src/systems/additionalDice.js`; authored by `CheckAdditionalDiceFields.svelte`; `FABRICATE.Check.AdditionalDiceRefusal.*` and `FABRICATE.Admin.Manager.Checks.AdditionalDice.*` in `lang/en.json`
+
+Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/data-models/spec.md, openspec/specs/ui-system-studio/spec.md, openspec/specs/companion-api/spec.md
+
+## Bought Dice
+
+The dice one roll bought under **Additional Dice** are one count-only scalar contribution, `{ source: 'additionalDice', form: 'scalar', value: n }`, placed after advantage and always sent to the pool, whatever `pool.modifierDestination` says.
+They are not modifiers: the pool's modifier terms never count them, so they never read as "pool grown by modifiers".
+They settle through the same `resolvePool` as every other pool change, so the one-die floor, `zeroPoolFails` and the 999-die limit apply to the total, dice bought below the floor add nothing, and one count Roll carries them, so explosion, cancellation and Dice So Nice treat them like base dice.
+A pool still at zero after them fails as a zero pool and spends nothing.
+The **marked** dice are the last original dice in roll order that the purchase added to the settled pool; an explosion a bought die rolls is a generated die, not a bought one.
+An executed result records `data.boughtDice = { count, source }` — the integer dice paid for, at least 1, and `'path'|'macro'` — omitted when none were bought and never naming the path, a macro UUID, the **Resource Name** or an amount; a main Roll that throws after the spend, Foundry's explosion limit included, keeps it on its refusal because the spend stands.
+A non-success Journal reply after a non-zero spend carries a top-level `boughtDice`, and a companion executed answer carries `boughtDice` (`0` when none), so each caller can state what was spent.
+Under the public, non-secret gate the chat card's summary reads `{pool}d{die} ({unbought} + {bought} bought)`, the chat cards, the crafting result box and the salvage roll summary add an `Additional dice` row, `{count} bought · spent {count} {resource}`, and the tiles dash the border of each marked die, marked `bought`; a legend, where one is drawn, ends `dashed = bought`.
+
+Canonical mapping: the `additionalDice` source in `src/systems/checkModifierRouter.js`; `boughtEvidence`/`mainRollRefusal` in `src/systems/countCheckRoll.js`; the replay `bought` in `countReplayPolicy` (`src/systems/countRoll.js`); `reportedCountDisplay` in `src/systems/countDisplayEvidence.js`; `tileModel` in `src/ui/presenters/countDiceTiles.js`; `FABRICATE.Check.BoughtDice.*` in `lang/en.json`
+
+Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/data-models/spec.md, openspec/specs/ui-crafting-app/spec.md, openspec/specs/design-system/spec.md
+
+## Resource Name
+
+`pool.additionalDice.label` is a trimmed string, default `''`, retained whatever `enabled` or `source` is; it amends decision 22's fixed key set by one optional key (issue 2008 ruling R2), and the companion schema accepts it additively.
+The Studio authors it, for both sources, in a plain `Resource name` field whose hint (`FABRICATE.Admin.Manager.Checks.AdditionalDice.LabelHint`) tells the GM that a blank name shows the amount alone.
+Labelled copy names it (`Momentum 2 available · Spends 1 Momentum`, `Not enough Momentum to buy a die.`, `1 Momentum spent; the roll could not be completed.`), and unlabelled copy drops the noun rather than rendering an empty one (`2 available · Spends 1`).
+It is the only authored string the allowlisted offer and the **Count Display Evidence** carry, inert, and no player surface ever shows the stored path or a macro UUID in its place; the Studio alone shows the authored path, in mono.
+Rows in one batch sharing a resource under different names take the unlabelled copy.
+
+Canonical mapping: `label` in `normalizeCheckEvaluation` (`src/systems/normalize/checkEvaluation.js`) and the companion schema (`src/systems/companionCheckEvaluation.js`); the offer's `resourceLabel` in `publicAdditionalDiceOffer` (`src/systems/additionalDiceReach.js`); `additionalDiceCopy` in `src/ui/presenters/additionalDicePrompt.js`
+
+Spec reference: openspec/specs/data-models/spec.md, openspec/specs/ui-crafting-app/spec.md, openspec/specs/companion-api/spec.md
+
+## Shortfall
+
+The least `n ≥ 0` bought dice for which the pool, settled through `resolvePool` with every pending rolled contribution at its least favourable value, is not a zero pool and holds at least the needed count of dice; it is never computed as `needed − dice`, because the floor and `zeroPoolFails` change what a bought die adds.
+The **needed** count is the graded required count on a simple check, and on a routed check the lowest succeeding tier's threshold (0 when a clamped relative check's lowest tier succeeds, none when no tier succeeds); a progressive check has none.
+The roll prompt opens at 0 and states the shortfall as a warning, `At least {shortfall} additional dice needed to be able to succeed.` (`…to succeed without exploding dice.` when the pool explodes), then as a success once enough are chosen; it never pre-selects it, so opening the prompt and pressing Enter spends nothing.
+None is stated where the prompt may not show the needed count: on a secret or unentitled prompt, whose offer carries `reach: null`, nor on a progressive or prepared routed prompt, whose offer carries `reach.needed: null`.
+
+Canonical mapping: `shortfallOf`/`resolveAdditionalDiceReach` in `src/systems/additionalDiceReach.js`; `describeAdditionalDice` in `src/ui/presenters/additionalDicePrompt.js`; `FABRICATE.App.RollPrompt.AdditionalDice.Short*`/`Enough*` in `lang/en.json`
+
+Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/ui-crafting-app/spec.md
+
+## Unreachable Attempt
+
+Each offered footer action — Roll, Advantage, Disadvantage, or the single Roll judged as `normal` — is its own attempt, including that action's count advantage dice (issue 2008 ruling R1).
+An attempt is unreachable when, with `limit` **Bought Dice** and every pending rolled contribution at its most favourable value, its pool is still a zero pool (ruling R4), or its dice times the most one original die can contribute — 0, 1, 2 under explode `once`, unbounded under a recursive explode — stay below the needed count; that second limb never holds for a recursive explode, a needed count of 0 or none, and neither limb holds while a pending contribution's most favourable value cannot be computed purely.
+A rolled Tool bonus that lands in the pool is a pending contribution too, so an attempt it could carry to success is never disabled.
+The prompt disables an unreachable action unless a **rescuing trigger** exists — one that can fire in count mode and forces success or, on a routed check, steps or targets a tier — and a zero-pool attempt is never rescued; a rescued attempt keeps its danger message and every action enabled.
+Pool size is monotone across the actions, so the disabled set is Disadvantage alone, Disadvantage and Roll, or all three, each with its block note; a disabled action keeps its place with `aria-disabled`, and neither Enter nor a click rolls it.
+A secret or unentitled prompt never judges an attempt (ruling R3); a progressive or prepared routed prompt judges only the zero-pool limb.
+A bulk footer action is disabled only when every covered roll would be disabled under it on its own prompt (driver decision D3), and a row that no offered action can reach is marked `· cannot reach` rather than blocked.
+Blocking is a prompt affordance, never an engine refusal: a non-interactive caller or a pre-resolved decision is never blocked.
+
+Canonical mapping: `resolveAdditionalDiceReach`/`buildAdditionalDiceReach` in `src/systems/additionalDiceReach.js`; `countTriggerRescues`/`poolCanFire` in `src/systems/countTriggerReach.js`; `describeAdditionalDice` in `src/ui/presenters/additionalDicePrompt.js`; `RollPromptFooter.svelte`; `FABRICATE.App.RollPrompt.AdditionalDice.Unreachable*`/`Blocked*` in `lang/en.json`
+
+Spec reference: openspec/specs/resolution-modes/spec.md, openspec/specs/ui-crafting-app/spec.md
 
 ## Target Source
 
