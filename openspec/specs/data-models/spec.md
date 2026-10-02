@@ -4294,7 +4294,9 @@ A count check whose `pool.additionalDice` is enabled with `source: 'macro'` name
 Both must be `script` macros, checked at the call site before either runs: a read macro of any other type makes additional dice unavailable (`resourceMacroFailed`), and a spend macro of any other type refuses the spend (`spendRefused`) without running.
 Both run through the shared executor on the client that executes the roll: the acting player's for an immediate roll, bulk salvage included, the claim-holding GM authority for a prepared check, and the executing GM for a Standalone Check Roll.
 Each receives one payload object, exposed with identity as `scope`, `context` and `args`.
-Macros must read the payload, not the globals, because on GM-executed paths `actor`, `character` and `game.user` resolve on the GM's client.
+Macros must read the payload.
+The executor binds only `scope`, `context` and `args`, unlike core `Macro#execute`, so a bare `actor`, `token`, `speaker` or `character` is not defined on any path and the macro throws.
+`game.user` is the executing client's user: the GM on a prepared check or a Standalone Check Roll.
 The read payload is `{ actor, user, craftingSystem, activity, recipe, component, task, evaluation, rolls }`:
 
 - `actor` is the acting actor;

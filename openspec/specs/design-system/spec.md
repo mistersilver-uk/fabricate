@@ -528,6 +528,7 @@ Every colour, spacing value and shadow MUST come from a `--fab-*` token.
 A raw `rgba()`, hex literal or named colour under `src/ui` or `styles` outside the approved theme blocks fails `tests/components/theme-colour-contract.test.js`, so a literal is a gate failure rather than a style preference.
 
 Four background levels carry all depth: `--fab-bg-0` is the page ground, `--fab-bg-1` is rails, rows and wells, `--fab-bg-2` is cards and panels, and `--fab-bg-3` is icon chips.
+A well on a modal body, which is itself `--fab-bg-1`, takes the next level, `--fab-bg-2`, so its fill stays distinct from the body.
 Interaction state is carried by `--fab-surface-soft` at rest, `--fab-surface-raised` on hover, and `--fab-surface-active` when pressed or selected.
 Each semantic family — accent, success, info, warning, danger — ships `-text`, `-soft` and `-border` beside its base, and a tinted surface MUST take fill, border and ink from ONE family.
 Within a family the INK is the `-text` token wherever the mark is small: the chip's `accent` tone inks with `--fab-accent-text` rather than with the family base, because the raw accent over `--fab-accent-soft` measures 4.60:1 on `--fab-bg-1` and 4.03:1 on `--fab-bg-2` in `ironblood-forge` at the chip's 9.92px — the second under the 4.5:1 small-text threshold and the first inside a tenth of it — against 8.34:1 and 7.30:1 for `--fab-accent-text` at the same two grounds.
@@ -1846,13 +1847,15 @@ Widening the composition with a background prop for one such caller is not the a
 
 A nested container inside a card MUST be drawn by `<Well>` (`src/ui/svelte/components/Well.svelte`, issue 2008), the level below `<Card>` that the library specifies, and never hand-rolled at a call site.
 Its geometry is fixed — a 1px `--fab-border` frame, radius 9 and `--fab-space-3` padding on `--fab-bg-1` — and it takes no radius, padding or fill prop, because a well a caller could re-shape would be the drift the pair exists to end.
+On a modal body (`ManagerModal`), which is itself `--fab-bg-1`, the well takes the next background level, `--fab-bg-2`, by a rule `Well.svelte` scopes to the modal, so its fill and hairline stay distinct from the body.
 An optional `label` draws a kicker at its head and names the well as a group; it renders a plain element, never a section, and its rest spread lands last so a caller's role, name and hooks win.
 The Checks Studio's titled option groups and the roll prompt's additional-dice control draw their frame through it.
 
 #### Scenario: A Studio option group and the prompt's additional-dice control share one frame
 
 - **WHEN** the Checks Studio renders "In the roll prompt" or the additional-dice group, or the roll prompt renders its additional-dice control
-- **THEN** each frame is a `<Well>` with the same border, radius, padding and fill
+- **THEN** each frame is a `<Well>` with the same border, radius and padding
+- **AND** the Studio's wells fill with `--fab-bg-1` and the prompt's, on a modal body, with `--fab-bg-2`
 - **AND** no call site declares its own well geometry
 
 ### Requirement: The die tiles of a success-counting roll are one primitive

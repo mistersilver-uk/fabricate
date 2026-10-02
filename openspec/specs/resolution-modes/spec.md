@@ -377,7 +377,8 @@ While it is off, no nested field is validated or read at roll time.
 On a `sum` check the policy is inert.
 The resource is either a finite, non-negative number stored at a document path in the acting actor's `_source`, never prepared data, written with `Actor#update`, or a read/spend macro pair (`data-models/spec.md` § Additional Dice Macro Contract).
 A read macro must be free of side effects, because the authority runs it whenever it describes a prepared count check with additional dice enabled.
-The budget is read only for an interactive decision or a non-interactive request naming a non-zero count, so a call that buys nothing runs no read macro.
+The budget is read only for an interactive decision or for a request or pre-resolved decision naming a non-zero count.
+A pre-resolved decision of 0, or a non-interactive call that omits the choice, reads no budget and runs no read macro, so on a prepared check the describe-time read is the only one.
 Additional dice are unavailable, with a stated reason, before the prompt opens when:
 
 - the source is missing (`sourceMissing`);
@@ -399,6 +400,7 @@ An attempt is unreachable when, even with `limit` bought dice and every pending 
 - The needed count is the graded required count on a simple check, and the lowest succeeding tier's threshold on a routed check: 0 when a clamped relative check's lowest tier succeeds, and none when no tier succeeds.
 - A progressive check has none, so only its zero-pool limb applies.
 - Neither limb holds for a pending rolled contribution whose most favourable value cannot be computed purely.
+- A rolled Tool bonus that lands in the pool is a pending rolled contribution, so it never makes unreachable an attempt that could succeed.
 - Each offered advantage action is its own attempt, including its count advantage dice.
 
 The shortfall is the fewest bought dice whose settled pool is no zero pool and holds the needed count, with every pending rolled contribution at its least favourable value.
@@ -413,11 +415,13 @@ A pool still at zero after bought dice fails as a zero pool and spends nothing.
 A path spend re-reads the stored value inside the spend and succeeds only when the update is acknowledged and the stored value fell by exactly the cost.
 A refused choice or spend aborts that roll with the dismissed-prompt zero-mutation result plus its reason, and a timed FINISH stays resumable.
 Spent resource is never refunded, whatever happens after the spend, a main Roll that throws or a stage that refuses after a GM-evaluated check included.
-Spends on one client are serialized per actor and resource.
+Any throw after a successful spend, building or evaluating the count Roll included, keeps the spend and records `data.boughtDice` on the result.
+Spends on one client are serialized: a path spend per actor and path, and a macro spend by its spend-macro UUID alone, so one macro spending for two actors runs one spend at a time.
 Across clients a path spend is not atomic, because Foundry has no compare-and-set.
 One bulk choice buys the same number for every roll it covers, offered only while those rolls share one actor and one resource, and spends per roll.
 Each bulk footer action is disabled only when every roll the batch rolls would be disabled under it on its own prompt; a roll with no additional dice, or one whose pool a Check Modifier or a Tool could move, keeps every action enabled, and a routed roll is judged by its zero-pool limb alone.
 When a spend fails mid-batch, or a roll's fresh read no longer affords the choice, the batch stops, its remaining rolls are skipped as `resourceExhausted`, and rolls already made stand.
+A roll whose fresh read refuses `resourceMacroFailed`, `resourceOverridden` or `resourceNotWritable` stops the batch the same way, and the batch names that reason once.
 The Checks Studio simulator places simulated bought dice through the same contribution, reading and spending nothing.
 
 ### Check Target Resolution
