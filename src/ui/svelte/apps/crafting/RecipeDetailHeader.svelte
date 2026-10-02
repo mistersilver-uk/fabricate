@@ -5,7 +5,8 @@
   not craftable). For a redaction teaser it shows only the generic identity + a discovery hint —
   never any ingredient/result detail.
 
-  Props: `recipe`, `authorityRefusal` (the localized refusal, or `''`), `craftLabel` (the commit
+  Props: `recipe`, `authorityRefusal` (the localized refusal, or `''`), `canCraft` (the live
+  craftability: `true`, `false`, or `null` when nothing evaluated it), `craftLabel` (the commit
   verb, or `''` when it is unavailable, which renders no primary), `busy`, `onCraft`.
 -->
 <script>
@@ -17,11 +18,16 @@
   import Chip from '../../components/Chip.svelte';
   import Notice from '../../components/Notice.svelte';
   import { craftingRecipeStatus } from '../../util/craftingRecipeStatus.js';
+  import {
+    BROWSE_BLOCKING_REASON_KEYS,
+    CRAFTING_BROWSE_STATUS,
+  } from '../../../presenters/craftingBrowseStatus.js';
   import { TIME_UNITS, formatTimeRequirementCompact } from '../../util/recipeDuration.js';
 
   let {
     recipe = null,
     authorityRefusal = '',
+    canCraft = null,
     craftLabel = '',
     busy = false,
     onCraft = null,
@@ -30,8 +36,17 @@
   const name = $derived(String(recipe?.name ?? ''));
   const modeLabel = $derived(String(recipe?.modeLabel ?? ''));
   const flavor = $derived(String(recipe?.flavor ?? ''));
-  const status = $derived(String(recipe?.browseStatus ?? ''));
   const redacted = $derived(recipe?.redaction?.redacted === true);
+  // The listing bakes its status once, while the player's own choices re-evaluate craftability, so
+  // a baked "available" yields to the live reading: `false` reads as missing materials, and
+  // `null` claims nothing, neither readiness nor a shortfall.
+  const listedStatus = $derived(String(recipe?.browseStatus ?? ''));
+  const unconfirmed = $derived(
+    listedStatus === CRAFTING_BROWSE_STATUS.AVAILABLE && !redacted && !busy && canCraft !== true
+  );
+  const status = $derived(
+    unconfirmed && canCraft === false ? CRAFTING_BROWSE_STATUS.MISSING_MATERIALS : listedStatus
+  );
   // Pre-craft duration: the recipe's authored time requirement, surfaced read-only so a
   // player can see how long a timed recipe takes BEFORE starting the craft (issue 846).
   // Reuse the manager's compact formatter so both surfaces render durations identically.
@@ -60,9 +75,10 @@
   // truth, mirroring the RecipeListRow treatment.
   const uncraftable = $derived(descriptor.tone === 'danger');
   const statusLabel = $derived(localize(descriptor.labelKey));
-  const blockingReasons = $derived(
-    Array.isArray(recipe?.blockingReasons) ? recipe.blockingReasons : []
-  );
+  const blockingReasons = $derived.by(() => {
+    if (status !== listedStatus) return [localize(BROWSE_BLOCKING_REASON_KEYS[status])];
+    return Array.isArray(recipe?.blockingReasons) ? recipe.blockingReasons : [];
+  });
   // An authority refusal blocks the craft whatever the recipe's own browse status says, so it
   // drops the status chip. The recipe's own blocker leads the callout, because it is the one the
   // player can act on, and the refusal states its consequence because the primary stays enabled:
@@ -123,7 +139,7 @@
         </span>
       {/if}
       <!-- Uncraftable moves the status onto the tile's pip, so the labelled chip is dropped. -->
-      {#if !uncraftable && !refusal}
+      {#if !uncraftable && !refusal && !unconfirmed}
         <Chip
           density="list"
           tone={statusChipTone(descriptor.tone)}

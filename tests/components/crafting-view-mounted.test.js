@@ -247,6 +247,45 @@ describe('CraftingView mounted behavior', () => {
     assert.deepEqual(calls.allocate.at(-1), ['Item.dusk-1', 2]);
   });
 
+  // The listing is baked per load; the store re-evaluates craftability on an option override
+  // and on a pool allocation. The header follows the live reading.
+  for (const [name, live] of [
+    [
+      'an override to a short alternative',
+      craftability({
+        canCraft: false,
+        ingredientStates: [
+          {
+            groupId: 'g-herb',
+            name: 'Blue Herb',
+            img: null,
+            need: 1,
+            have: 0,
+            satisfied: false,
+            hasChoice: true,
+            choiceCount: 2,
+          },
+        ],
+      }),
+    ],
+    ['a pool stepped below its need', essenceCraftability()],
+  ]) {
+    it(`drops the ready chip and the primary, and says why, after ${name}`, async () => {
+      const store = fakeCraftingStore({ recipes: [recipe()], selectedCraftability: live });
+      const target = await harness.mount({ services: services(store) });
+      const header = target.querySelector('[data-recipe-header]');
+      assert.ok(!header.querySelector('[data-crafting-craft]'), 'no Craft primary');
+      assert.ok(
+        !header.querySelector('.player-detail-header-meta [data-crafting-status]'),
+        'and no chip that still reads Ready to craft'
+      );
+      const notice = header.querySelector('[data-recipe-blocking]');
+      assert.equal(notice.getAttribute('data-notice-tone'), 'danger');
+      assert.ok(notice.textContent.includes('FABRICATE.App.Crafting.Blocking.MissingMaterials'));
+      assert.ok(!notice.hasAttribute('data-recipe-authority-blocked'));
+    });
+  }
+
   // Issue 1648, the reported bug's own header. EVERY player-app craft routes through the
   // versioned-run authority, so "Ready to craft" over a refused authority promised something
   // the Craft button could only refuse. The header now drops the chip and leads its blocking

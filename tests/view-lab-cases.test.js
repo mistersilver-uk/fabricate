@@ -2311,8 +2311,8 @@ test('every crafting case claims exactly the resolution-mode body it renders', (
   // draft, and passed clean.
   assert.equal(
     examined.length,
-    124,
-    `expected the 124 crafting-path cases to be examined, saw ${examined.length}`
+    125,
+    `expected the 125 crafting-path cases to be examined, saw ${examined.length}`
   );
   assert.ok(
     examined.filter((id) =>

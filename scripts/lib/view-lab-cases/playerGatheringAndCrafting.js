@@ -1134,6 +1134,36 @@ export const CASES = Object.freeze([
     sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),
   playerCase({
+    id: 'player-crafting-unmet-by-allocation',
+    label: 'Player app — Crafting recipe the player stepped below its need',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting' },
+    // A ready recipe whose pool the player stepped down: no Craft primary, no ready chip, and the
+    // header states the missing materials.
+    steps: [
+      { selector: '.crafting-recipe-row[data-recipe-id="sm-r-deepbind"]' },
+      {
+        selector:
+          '.essence-pool-carrier[data-essence-carrier="Item.sm-iron-ore"] .fab-stepper-input',
+        fill: '0',
+      },
+    ],
+    expectSelector:
+      '[data-recipe-header]' +
+      ':has([data-recipe-blocking][data-notice-tone="danger"])' +
+      ':has(.player-detail-header-tile [data-crafting-status="missingMaterials"])' +
+      ':not(:has([data-crafting-craft]))' +
+      ':not(:has(.player-detail-header-meta [data-crafting-status]))',
+    kinds: ['player', 'crafting'],
+    sourceMatches: [
+      CRAFTING_SHARED,
+      CRAFTING_SIMPLE,
+      PLAYER_DETAIL_HEADER,
+      /^src\/ui\/svelte\/stores\/craftingStore/,
+    ],
+  }),
+  playerCase({
     id: 'player-crafting-pick-for-me',
     label: 'Player app — Crafting pick for me',
     smokeLabels: ['player-crafting-pick-for-me'],

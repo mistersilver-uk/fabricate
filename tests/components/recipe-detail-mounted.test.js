@@ -170,6 +170,9 @@ describe('RecipeDetail mounted behavior', () => {
     assert.equal(primary.getAttribute('data-crafting-craft-disabled'), 'true');
     assert.match(primary.textContent, /Button\.Crafting/u);
     assert.ok(Boolean(primary.querySelector('i.fa-spinner')));
+    // The inputs a craft in flight has spent are not a shortfall.
+    assert.ok(!target.querySelector('.crafting-detail-pip'), 'no missing-materials pip');
+    assert.ok(!target.querySelector('[data-recipe-blocking]'), 'and no missing-materials notice');
   });
 
   it('renders ingredients as rail slot tiles with state-coloured borders and pips', async () => {
@@ -1014,10 +1017,73 @@ describe('RecipeDetail mounted behavior', () => {
     );
   });
 
+  // The listing bakes `available`; an override to a short alternative, a short set or a pool
+  // stepped below its need re-evaluates craftability without reloading the listing.
+  it('reads a listed-available recipe the live evaluation refuses as missing materials', async () => {
+    const target = await harness.mount({
+      recipe: recipe({ browseStatus: 'available', blockingReasons: [] }),
+      selectedSetId: recipe().defaultSetId,
+      craftability: craftability({ canCraft: false }),
+    });
+
+    const header = target.querySelector('[data-recipe-header]');
+    assert.equal(primaryButtons(target).length, 0, 'the commit verb is unavailable');
+    assert.ok(
+      !header.querySelector('.player-detail-header-meta [data-crafting-status]'),
+      'so no chip may still say the recipe is ready'
+    );
+    const tile = header.querySelector('.player-detail-header-tile.is-dimmed');
+    assert.ok(Boolean(tile.querySelector('.crafting-detail-pip')), 'the status moves to the pip');
+    assert.equal(
+      tile.querySelector('[data-crafting-status]').getAttribute('data-crafting-status'),
+      'missingMaterials',
+      'which states the live status, not the listed one'
+    );
+    const notice = header.querySelector('[data-recipe-blocking]');
+    assert.equal(notice.getAttribute('data-notice-tone'), 'danger');
+    assert.ok(
+      notice.textContent.includes('FABRICATE.App.Crafting.Blocking.MissingMaterials'),
+      'and the absent primary is explained in words'
+    );
+  });
+
+  it('leads the callout with the live shortfall when the authority also refuses', async () => {
+    const target = await harness.mount({
+      recipe: recipe({ browseStatus: 'available', blockingReasons: [] }),
+      selectedSetId: recipe().defaultSetId,
+      craftability: craftability({ canCraft: false }),
+      authorityRefusal: 'No GM is connected.',
+    });
+    const text = target.querySelector('[data-recipe-blocking]').textContent;
+    const shortfall = text.indexOf('Blocking.MissingMaterials');
+    assert.ok(
+      shortfall >= 0 && shortfall < text.indexOf('No GM is connected.'),
+      'the blocker the player can act on comes first'
+    );
+  });
+
+  // No craftability is no evaluation, as on the no-actor view: no readiness claim, no shortfall
+  // claim, and no commit verb.
+  it('claims neither readiness nor a shortfall when nothing evaluated the recipe', async () => {
+    const target = await harness.mount({
+      recipe: recipe({ browseStatus: 'available', blockingReasons: [] }),
+      selectedSetId: recipe().defaultSetId,
+      craftability: null,
+    });
+
+    const header = target.querySelector('[data-recipe-header]');
+    assert.equal(primaryButtons(target).length, 0, 'no commit verb without a craftable reading');
+    assert.ok(!header.querySelector('[data-crafting-status]'), 'no ready chip and no status pip');
+    assert.ok(!header.querySelector('.crafting-detail-pip'));
+    assert.ok(!header.querySelector('[data-recipe-blocking]'), 'and no invented shortfall');
+    assert.ok(Boolean(header.querySelector('.crafting-detail-mode-chip')), 'the facts remain');
+  });
+
   it('keeps the labelled status badge (no pip) for a craftable recipe', async () => {
     const target = await harness.mount({
       recipe: recipe({ browseStatus: 'available' }),
       selectedSetId: recipe().defaultSetId,
+      craftability: craftability(),
     });
 
     const header = target.querySelector('[data-recipe-header]');
@@ -1037,6 +1103,7 @@ describe('RecipeDetail mounted behavior', () => {
     const target = await harness.mount({
       recipe: recipe({ browseStatus: 'available' }),
       selectedSetId: recipe().defaultSetId,
+      craftability: craftability(),
     });
 
     const chip = target.querySelector('.player-detail-header-meta [data-crafting-status]');

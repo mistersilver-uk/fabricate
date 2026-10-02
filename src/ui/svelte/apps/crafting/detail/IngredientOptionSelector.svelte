@@ -12,8 +12,8 @@
   re-evaluation through the same resolver the engine consumes (keeping tiles ==
   consumed). Each choice is one `role="radiogroup"`; each option/stack is a
   `<button role="radio">`. A short option or stack stays selectable but is flagged
-  (`is-short` and a danger have/need chip) — the Craft button then blocks with the
-  missing-materials message on that choice. Renders nothing when no group offers a choice.
+  (`is-short` and a danger have/need chip) — the recipe header then draws no Craft primary and
+  states the missing materials. Renders nothing when no group offers a choice.
 
   `need` is the open slot's requirement, which a held stack is short of when it holds less.
 -->

@@ -116,7 +116,14 @@
   </div>
 {:else}
   <div class="crafting-detail" data-crafting-detail-state="selected" data-recipe-detail-mode={mode}>
-    <RecipeDetailHeader {recipe} {authorityRefusal} {craftLabel} {busy} {onCraft} />
+    <RecipeDetailHeader
+      {recipe}
+      {authorityRefusal}
+      canCraft={craftability ? canCraft : null}
+      {craftLabel}
+      {busy}
+      {onCraft}
+    />
     {#if !redacted}
       <div class="crafting-detail-body" data-crafting-detail-scroll>
         <Body
