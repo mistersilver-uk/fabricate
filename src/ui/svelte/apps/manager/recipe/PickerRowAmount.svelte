@@ -19,6 +19,8 @@
   Invariants:
   - Rolled never writes `quantity`, and opening Rolled with nothing typed writes nothing.
   - The typed expression is kept here across Rolled → Fixed → Rolled, so switching back restores it.
+  - That Fixed | Rolled state is per component instance, so a `rollable` caller keys its rows by
+    stable entry identity.
   - Fixed ↔ Rolled moves no focus; the swapped control is the next tab stop. All pinned by
     `tests/components/picker-row-matrix-mounted.test.js`.
 -->
@@ -149,7 +151,7 @@
     <RollDataExpressionInput
       sigil={false}
       value={stored}
-      placeholder="1d4"
+      placeholder="1d4+1"
       {disabled}
       inputAttrs={{
         'data-recipe-option-formula': '',

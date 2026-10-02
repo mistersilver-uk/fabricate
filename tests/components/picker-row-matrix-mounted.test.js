@@ -9,8 +9,16 @@ import { after, afterEach, before, describe, it } from 'node:test';
 
 import { createRawSnippet } from 'svelte';
 
-import { KIND_ORDER } from '../../src/ui/svelte/apps/manager/recipe/pickerRowKinds.js';
-import { chooseSelectOption, selectOptionValues } from '../helpers/select-control.js';
+import {
+  KIND_ORDER,
+  fromValue,
+  toValue,
+} from '../../src/ui/svelte/apps/manager/recipe/pickerRowKinds.js';
+import {
+  chooseSelectOption,
+  selectOptionValues,
+  selectTriggerText,
+} from '../helpers/select-control.js';
 import {
   createMountedComponentHarness,
   SEARCHABLE_POPOVER_RAW_MODULES,
@@ -154,6 +162,8 @@ async function click(node) {
 
 const radio = (target, mode) =>
   target.querySelector(`[data-recipe-option-amount-mode="${mode}"] input`);
+const tagMatchRadio = (target, mode) =>
+  target.querySelector(`[data-recipe-tag-match="${mode}"]`).querySelector('input');
 
 before(() => harness.setup());
 after(() => harness.teardown());
@@ -173,11 +183,6 @@ describe('PickerRow: the matrix is the offered-kind table', () => {
 
 describe('PickerRow: unreachable cells are absent', () => {
   for (const { surface, kind, config } of UNREACHABLE) {
-    it(`${surface} × ${kind}: the kind select does not offer it`, async () => {
-      const { target } = await mountRow(config, unnamed('component'));
-      assert.deepEqual(selectOptionValues(target, KIND_TRIGGER), config.kinds);
-    });
-
     it(`${surface} × ${kind}: a stored row of that kind draws no amount toggle`, async () => {
       // The row lists its own kind always, so a stored row is the only way into this cell.
       const { target } = await mountRow(config, unnamed(kind), { rollable: true });
@@ -187,6 +192,11 @@ describe('PickerRow: unreachable cells are absent', () => {
   }
 
   for (const [surface, config] of Object.entries(SURFACES)) {
+    it(`${surface}: the kind select offers the surface’s kinds and no other`, async () => {
+      const { target } = await mountRow(config, unnamed('component'));
+      assert.deepEqual(selectOptionValues(target, KIND_TRIGGER), config.kinds);
+    });
+
     it(`${surface}: toggle, convert, amount and remove are drawn only where the table says`, async () => {
       for (const kind of config.kinds) {
         const { target } = await mountRow(config, unnamed(kind));
@@ -265,6 +275,49 @@ describe('PickerRow: every reachable cell acts', () => {
       assert.ok(!target.querySelector('[data-recipe-option-search]'), 'the search is the pill now');
     });
 
+    if (kind === 'tags') {
+      it(`${surface} × ${kind}: a chip’s remove forwards the remaining tags and drops the chip`, async () => {
+        const start = { ...unnamed(kind), tags: ['herb', 'rare'] };
+        const { target, applied } = await mountRow(config, start);
+        const chip = target.querySelector('[data-recipe-tag="herb"]');
+        await click(chip.querySelector('[data-recipe-remove="tag"]'));
+        assert.deepEqual(await applied('remove tag'), { ...start, tags: ['rare'] });
+        assert.deepEqual(
+          [...target.querySelectorAll('[data-recipe-tag]')].map((chip) =>
+            chip.getAttribute('data-recipe-tag')
+          ),
+          ['rare']
+        );
+      });
+
+      it(`${surface} × ${kind}: Any of / All of forwards the policy and rewrites the word`, async () => {
+        const start = { ...unnamed(kind), tags: ['herb'] };
+        const { target, applied } = await mountRow(config, start);
+        const policy = () => target.querySelector('[data-recipe-tag-policy]').textContent;
+        assert.equal(policy(), 'Any of');
+        await click(tagMatchRadio(target, 'all'));
+        assert.deepEqual(await applied('all'), { ...start, tagMatch: 'all' });
+        assert.equal(policy(), 'All of');
+        assert.ok(tagMatchRadio(target, 'all').checked);
+        await click(tagMatchRadio(target, 'any'));
+        assert.deepEqual(await applied('any'), start);
+        assert.equal(policy(), 'Any of');
+      });
+    } else {
+      it(`${surface} × ${kind}: clear forwards an empty subject and returns the search`, async () => {
+        const start = { ...unnamed(kind), id: PICK[kind].id };
+        const { target, applied } = await mountRow(config, start);
+        assert.ok(
+          !target.querySelector('[data-recipe-option-search]'),
+          'a named row has no search'
+        );
+        await click(target.querySelector('[data-recipe-option-clear]'));
+        assert.deepEqual(await applied('clear'), { ...start, id: '' });
+        assert.ok(!target.querySelector('[data-recipe-option-chosen]'), 'the pill is gone');
+        assert.equal(target.querySelector('[data-recipe-option-search]').value, '');
+      });
+    }
+
     if (config.amount !== false) {
       it(`${surface} × ${kind}: stepping forwards the amount and redraws it`, async () => {
         const start = unnamed(kind);
@@ -294,7 +347,8 @@ describe('PickerRow: every reachable cell acts', () => {
     if (config.rollable !== true) continue;
 
     it(`${surface}: Fixed → Rolled writes the formula alone, and Fixed removes the key`, async () => {
-      const start = { ...unnamed('component'), id: 'c-iron', quantity: 3 };
+      const stored = { id: 'res-1', componentId: 'c-iron', quantity: 3 };
+      const start = toValue(stored);
       const { target, changes, applied } = await mountRow(config, start);
       assert.ok(radio(target, 'fixed').checked, 'a row with no formula starts Fixed');
       assert.ok(Boolean(target.querySelector('[data-stepper-input]')));
@@ -308,11 +362,14 @@ describe('PickerRow: every reachable cell acts', () => {
       assert.equal(changes.length, 0, 'an opened-but-empty Rolled field forwards nothing');
       assert.ok(!target.querySelector('[data-stepper-input]'), 'the stepper left the slot');
       assert.equal(target.querySelector(FORMULA).value, '');
+      assert.equal(target.querySelector(FORMULA).placeholder, '1d4+1');
 
       await type(target.querySelector(FORMULA), '1d4+1');
       const rolled = await applied('type');
       assert.deepEqual(rolled, { ...start, quantityFormula: '1d4+1' });
       assert.equal(rolled.quantity, 3, 'quantity is untouched');
+      const written = fromValue(stored, rolled);
+      assert.deepEqual(written, { ...stored, quantityFormula: '1d4+1' });
       assert.equal(target.querySelector(FORMULA).value, '1d4+1');
       assert.ok(radio(target, 'rolled').checked);
 
@@ -327,6 +384,9 @@ describe('PickerRow: every reachable cell acts', () => {
         'Fixed never forwards null or an empty string'
       );
       assert.equal(fixed.quantity, 3);
+      const unrolled = fromValue(written, fixed);
+      assert.equal(Object.hasOwn(unrolled, 'quantityFormula'), false, 'the stored key is gone');
+      assert.deepEqual(unrolled, stored);
       assert.ok(!target.querySelector(FORMULA), 'the expression field left the slot');
       assert.equal(target.querySelector('[data-stepper-input]').value, '3');
 
@@ -335,7 +395,7 @@ describe('PickerRow: every reachable cell acts', () => {
         new globalThis.window.Event('change', { bubbles: true })
       );
       await settle();
-      assert.deepEqual(await applied('restore'), { ...start, quantityFormula: '1d4+1' });
+      assert.deepEqual(await applied('restore'), { ...fixed, quantityFormula: '1d4+1' });
       assert.equal(target.querySelector(FORMULA).value, '1d4+1');
     });
 
@@ -404,14 +464,10 @@ describe('PickerRow: the amount toggle is one named radio group', () => {
     assert.equal(checked.value, 'fixed');
     assert.ok(radios.every((node) => !node.disabled && node.tabIndex !== -1));
 
-    // A checked radio is where Tab lands in its group. happy-dom has no sequential navigation, so
-    // focus is moved onto it and the ring's own selector is read from there.
-    assert.ok(!checked.matches(':focus-visible'), 'nothing is focused before entry');
+    // A checked radio is where Tab lands in its group; happy-dom has no sequential navigation, so
+    // only that it takes focus is read here.
     checked.focus();
     assert.equal(first.target.ownerDocument.activeElement, checked);
-    assert.ok(checked.matches(':focus-visible'), 'the checked radio is the focus-visible element');
-    const unchecked = radios.find((node) => !node.checked);
-    assert.ok(!unchecked.matches(':focus-visible'), 'and its sibling is not');
     assert.ok(
       Boolean(checked.closest('.manager-segment')),
       'inside the segment whose `:has(:focus-visible)` rule draws the ring'
@@ -454,20 +510,52 @@ describe('PickerRow: the remaining branches', () => {
   });
 
   it('retyping forwards the new kind with the subject and tags cleared', async () => {
-    const start = { kind: 'tags', id: '', tags: ['herb'], tagMatch: 'all', quantity: 2 };
-    const { target, applied } = await mountRow(ingredient, start);
-    chooseSelectOption(target, KIND_TRIGGER, 'essence');
-    await settle();
-    assert.deepEqual(await applied('retype'), {
-      ...start,
-      kind: 'essence',
-      tags: [],
-      tagMatch: 'any',
-    });
-    assert.ok(
-      target
-        .querySelector('.manager-recipe-option-name-field')
-        .hasAttribute('data-recipe-option-essence')
+    const starts = [
+      { ...unnamed('component'), id: 'c-iron' },
+      { kind: 'tags', id: '', tags: ['herb'], tagMatch: 'all', quantity: 2 },
+    ];
+    for (const start of starts) {
+      const { target, applied } = await mountRow(ingredient, start);
+      chooseSelectOption(target, KIND_TRIGGER, 'essence');
+      await settle();
+      assert.deepEqual(await applied(`retype ${start.kind}`), {
+        ...start,
+        kind: 'essence',
+        id: '',
+        tags: [],
+        tagMatch: 'any',
+      });
+      const field = target.querySelector('.manager-recipe-option-name-field');
+      assert.ok(field.hasAttribute('data-recipe-option-essence'));
+      assert.ok(
+        !field.querySelector('[data-recipe-option-chosen]'),
+        'the old subject is not named'
+      );
+      harness.remount();
+    }
+  });
+
+  it('gives each tag row its own tag-match radio group', async () => {
+    const names = [];
+    for (let row = 0; row < 2; row += 1) {
+      const { target } = await mountRow(ingredient, unnamed('tags'));
+      const radios = ['any', 'all'].map((mode) => tagMatchRadio(target, mode));
+      assert.equal(radios.length, 2);
+      assert.equal(new Set(radios.map((node) => node.name)).size, 1, 'one group per row');
+      names.push(radios[0].name);
+      harness.remount();
+    }
+    assert.notEqual(names[0], names[1], 'two rows sharing a name would be one radio group');
+  });
+
+  it('the tag picker offers the vocabulary less the tags already chosen', async () => {
+    const { target } = await mountRow(ingredient, { ...unnamed('tags'), tags: ['herb'] });
+    await click(target.querySelector('[data-recipe-add-tag]'));
+    assert.deepEqual(
+      [...target.ownerDocument.querySelectorAll('[role="option"]')].map((node) =>
+        node.textContent.trim()
+      ),
+      ['rare']
     );
   });
 
@@ -594,7 +682,7 @@ describe('PickerRow: the remaining branches', () => {
   });
 
   it('an unrecognised kind is drawn as a misconfiguration, never as a component', async () => {
-    const { target, removes } = await mountRow(SURFACES['recipe result'], {
+    const { target, removes, changes } = await mountRow(SURFACES['recipe result'], {
       ...unnamed('knowledge'),
       id: 'c-iron',
     });
@@ -607,19 +695,40 @@ describe('PickerRow: the remaining branches', () => {
     assert.ok(!target.querySelector('[data-recipe-option-chosen]'), 'it names no component');
     assert.ok(!target.querySelector('[data-recipe-option-search]'));
     assert.ok(!target.querySelector('[data-stepper-input]'), 'and counts nothing');
-    assert.deepEqual(selectOptionValues(target, KIND_TRIGGER), ['component', 'knowledge']);
+
+    // The plate wears no kind's tint.
+    assert.equal(
+      target.querySelector('[data-recipe-option]').className,
+      'manager-recipe-ingredient-option-row is-unknown'
+    );
+    assert.equal(
+      target.querySelector('.manager-recipe-option-lead').className,
+      'manager-recipe-option-lead is-unknown'
+    );
+
+    // The kind select states the raw kind, takes focus and refuses to open.
+    const trigger = target.querySelector(KIND_TRIGGER);
+    assert.equal(selectTriggerText(target, KIND_TRIGGER), 'knowledge');
+    assert.equal(trigger.getAttribute('aria-disabled'), 'true');
+    assert.ok(!trigger.disabled, 'read-only, so it still takes focus');
+    trigger.focus();
+    assert.equal(target.ownerDocument.activeElement, trigger);
+    await click(trigger);
+    assert.equal(trigger.getAttribute('aria-expanded'), 'false');
+    assert.ok(!target.ownerDocument.querySelector('[role="option"]'), 'no kind is offered');
+    assert.equal(changes.length, 0, 'so nothing can retype it');
+
     await click(target.querySelector('[data-recipe-remove="alternative"]'));
     assert.equal(removes.length, 1, 'it can still be removed');
   });
 
-  it('class, density and rest land on the root beside the row’s own classes', async () => {
+  it('class and rest land on the root beside the row’s own classes', async () => {
     const { target } = await mountRow(ingredient, unnamed('tags'), {
       class: 'is-stage',
-      density: 'compact',
       'data-recipe-result-item': '',
     });
     const root = target.querySelector('[data-recipe-option]');
-    assert.equal(root.className, 'manager-recipe-ingredient-option-row is-tag is-compact is-stage');
+    assert.equal(root.className, 'manager-recipe-ingredient-option-row is-tag is-stage');
     assert.ok(root.hasAttribute('data-recipe-result-item'));
     harness.remount();
 

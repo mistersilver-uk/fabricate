@@ -15,7 +15,6 @@
   | `invalid` | `{ amount?: string }` | `{}` | Marks the amount control invalid and describes it with the message. |
   | `amount` | `false` \| `{ min, max, unit, inputProps, ariaLabel, … }` | `{}` | `false` draws no amount; the object's keys, which carry the amount slot's localized copy, are stated in `PickerRowAmount.svelte`. |
   | `rollable` / `removable` | booleans | `false` / `true` | The Fixed \| Rolled toggle on a `component` row; and the remove button. |
-  | `density` | `'default'` \| a rung name | `'default'` | Any other value adds `is-<density>` to the root for the caller's sheet rule. |
 
   Snippets:
   - `convert` — the requirement's "or…" control, after the amount and a divider.
@@ -34,6 +33,8 @@
   - The row imports nothing from `src/ui/model/`: the caller filters, and says so through `offered`.
   - The typed query is local and never reaches `value`; Enter commits the top suggestion, never the
     raw string. Pinned by `tests/components/picker-row-matrix-mounted.test.js`.
+  - The Fixed | Rolled state is per component instance, so a `rollable` caller keys its rows by
+    stable entry identity.
 -->
 <script module>
   // Alternatives carry no id, so the tag-match radio group's `name` is minted per INSTANCE here:
@@ -72,7 +73,6 @@
     amount = {},
     rollable = false,
     removable = true,
-    density = 'default',
     class: className = '',
     convert = null,
     trailing = null,
@@ -86,9 +86,8 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  // WHAT THE GM HAS TYPED INTO THIS ROW'S NAME FIELD, component-local rather than lifted because
-  // it is not part of the requirement: a query reaching the persisted shape would be a half-typed
-  // name saved as data. The parent keys rows by INDEX, so a row keeps this across a sibling edit.
+  // What the GM has typed into this row's name field. It is local to the instance and never part
+  // of the requirement: a query reaching the persisted shape would be a half-typed name saved.
   let query = $state('');
 
   const matchType = $derived(value?.kind ?? 'component');
@@ -202,14 +201,13 @@
     emit({ tags: tags.filter((t) => t !== tag) });
   }
 
-  // The kind's own tint, on the glyph and never the tile; a misconfigured row draws a warning.
-  const leadTone = $derived(kindMeta(matchType).tone);
+  // The kind's own tint, on the glyph and never the tile; a misconfigured row draws a warning
+  // in no kind's tint.
+  const leadTone = $derived(misconfigured ? 'unknown' : kindMeta(matchType).tone);
   const leadIcon = $derived(
     misconfigured ? 'fa-solid fa-triangle-exclamation' : kindMeta(matchType).icon
   );
-  const extraClass = $derived(
-    `${density === 'default' ? '' : ` is-${density}`}${className ? ` ${className}` : ''}`
-  );
+  const extraClass = $derived(className ? ` ${className}` : '');
 
   const removeLabel = $derived(
     matchType === 'component'
@@ -271,6 +269,7 @@
     triggerTitle={kindLabel}
     triggerProps={{ 'data-recipe-option-kind': '' }}
     onChange={setKind}
+    readonly={misconfigured}
     {disabled}
   />
 

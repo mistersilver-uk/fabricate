@@ -110,6 +110,10 @@ test('an unedited round trip keeps a zero amount, an absent quantity and an unkn
   );
   assertUntouched({ componentId: 'c-iron', quantity: 1, award: 'kept' }, 'unknown result field');
   assertUntouched(
+    { componentId: 'c-iron', quantity: 1, quantityFormula: '' },
+    'result with a stored blank formula'
+  );
+  assertUntouched(
     { quantity: 2, match: { type: 'mystery', componentId: 'c-iron' } },
     'unknown type'
   );
@@ -228,7 +232,9 @@ test('a result reads its kind and never has one written', () => {
   const retyped = fromValue(RESULTS.fixed, { ...toValue(RESULTS.fixed), kind: 'tags' });
   assert.ok(!Object.hasOwn(retyped, 'kind'), 'a result gains no kind');
   assert.ok(!Object.hasOwn(retyped, 'match'), 'and no match');
-  assert.deepEqual(fromValue(unknown, { ...toValue(unknown), kind: 'component' }), unknown);
+  // The row's own retype payload: it must not reach the subject of a result.
+  const payload = { ...toValue(unknown), kind: 'component', id: '', tags: [], tagMatch: 'any' };
+  assert.deepEqual(fromValue(unknown, payload), unknown);
 });
 
 test('a rolled amount is written beside quantity, and Fixed removes the key', () => {

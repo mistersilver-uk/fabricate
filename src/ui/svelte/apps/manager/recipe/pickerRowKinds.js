@@ -1,18 +1,9 @@
 /**
- * The four ingredient KINDS a requirement can be, and the one table every surface reads them
- * from: the row's plate, the row's kind select, the choice group's alt adders and the `or…`
- * menu's four entries. One table is why those four cannot disagree about what a kind is called
- * or what colour it is — this repository had FOUR copies, and two had already drifted, so the
- * glyph a GM pressed in the menu (`fa-cube`, `fa-tags`) was not the glyph on the row it created
- * (`fa-cubes`, `fa-tag`). Nothing failed and the only way to see it was to open the menu.
- *
- * What is here is a kind's ICON, TONE and LABEL KEY — not its localized text, so this module
- * stays free of the Foundry bridge and is a leaf every mounted harness can copy verbatim. The
- * TONE is a class suffix rather than a colour: `styles/fabricate.css` declares the four
- * `.manager-recipe-option-mark.is-<tone>` rules ONCE beside the plate they also ink, and
- * `tests/components/manager-layout.test.js` measures that equality in a real cascade.
- *
- * The keys are the model's MATCH TYPES, so a caller keys straight off `option.match.type`.
+ * The requirement row's kind table and its mapping to both persisted shapes. `KIND_META` holds a
+ * kind's icon, tone and label key under the model's match type, for the row's plate and kind select,
+ * the choice group's adders and the `or…` menu; `toValue` / `fromValue` carry an ingredient option
+ * or a result entry to and from the row's `value`. A tone is a class suffix, not a colour: the
+ * `.manager-recipe-option-mark.is-<tone>` rules are in `styles/fabricate.css`.
  */
 
 /**
@@ -68,7 +59,7 @@ export function kindMeta(matchType) {
 
 /**
  * The full class string for a glyph carrying a kind's tint: its icon plus the shared
- * tinted-mark pair. ONE string, because `SearchablePopover` renders an option's `icon` as the
+ * tinted-mark pair. One string, because `SearchablePopover` renders an option's `icon` as the
  * whole `class` attribute of its `<i>` and the row's own marks are written the same way.
  *
  * @param {string} matchType a requirement option's `match.type`
@@ -153,6 +144,7 @@ function ingredientFrom(entry, before, value) {
 }
 
 function resultFrom(entry, before, value) {
+  if (value.kind !== before.kind) return entry;
   const next = { ...entry };
   if (value.id !== before.id) next.componentId = value.id || null;
   if (value.quantity !== before.quantity) next.quantity = writtenAmount(value.quantity);
