@@ -5,7 +5,11 @@ import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
 import { projectCountResults } from '../../src/systems/countEvaluation.js';
-import { renderDiceTilesHtml, tileModel } from '../../src/ui/presenters/countDiceTiles.js';
+import {
+  DICE_TILE_GLYPHS,
+  renderDiceTilesHtml,
+  tileModel,
+} from '../../src/ui/presenters/countDiceTiles.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import { renderWithCascade } from '../helpers/layout-harness.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
@@ -133,7 +137,7 @@ describe('2006 DiceTiles', () => {
     });
     assert.equal(
       root.querySelector('[data-checks-simulator-legend]').textContent.trim(),
-      '✓ qualified · ✕ cancelled · ↻ exploded'
+      'qualified · cancelled · exploded'
     );
     assert.equal(root.querySelectorAll('[data-checks-simulator-face]').length, 8);
     assert.equal(root.querySelectorAll('[data-dice-tile-face], [data-dice-tiles-legend]').length, 0);
@@ -167,9 +171,17 @@ describe('2006 DiceTiles', () => {
       'the last original die, after the explosions earlier dice rolled'
     );
     assert.equal(bought[0].getAttribute('aria-label'), '2, bought');
+    const legend = root.querySelector('[data-dice-tiles-legend]');
     assert.equal(
-      root.querySelector('[data-dice-tiles-legend]').textContent.trim(),
-      '✓ qualified · ✕ cancelled · ↻ exploded · dashed\u{A0}=\u{A0}bought'
+      legend.textContent.trim(),
+      'qualified · cancelled · exploded · dashed\u{A0}=\u{A0}bought',
+      'the words carry the key to a screen reader'
+    );
+    // Each key draws the very glyph its tile draws, hidden from a screen reader (issue 2134).
+    const glyphs = [...legend.querySelectorAll('i')];
+    assert.deepEqual(
+      glyphs.map((glyph) => [glyph.className, glyph.getAttribute('aria-hidden')]),
+      ['qualified', 'cancelled', 'exploded'].map((mark) => [DICE_TILE_GLYPHS[mark], 'true'])
     );
     assert.deepEqual(
       canonical(root.querySelector('.fabricate-dice-tiles')),

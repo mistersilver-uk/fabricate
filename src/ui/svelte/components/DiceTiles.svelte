@@ -9,7 +9,7 @@
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `model` | `{ tiles: [{ face, marks, generated, bought? }], more, bought? }` | `null` | `tileModel(...)`'s output. Nothing renders without a tile. |
-  | `legend` | boolean | `false` | Adds the key under the tiles; the result boxes and the simulator draw it, chat does not. |
+  | `legend` | boolean | `false` | Adds the key under the tiles, each mark's own glyph beside its word; the result boxes and the simulator draw it, chat does not. |
   | `faceDataAttr` / `marksDataAttr` / `legendDataAttr` | `data-*` names | `DICE_TILE_HOOKS` | A host's own hook names; a tile's marks are space-separated. |
 
   Invariants:
@@ -23,7 +23,8 @@
   import {
     DICE_TILE_GLYPHS,
     DICE_TILE_HOOKS,
-    legendText,
+    legendKeys,
+    legendSeparator,
     moreText,
     tileLabel,
     tileMarkTokens,
@@ -41,6 +42,7 @@
 
   const tiles = $derived(Array.isArray(model?.tiles) ? model.tiles : []);
   const more = $derived(Number(model?.more) > 0 ? Number(model.more) : 0);
+  const keys = $derived(legendKeys(localize, model?.bought));
 </script>
 
 {#if tiles.length > 0 || more > 0}
@@ -75,7 +77,10 @@
     </ul>
     {#if legend}
       <p class="fabricate-dice-tiles__legend" {...{ [legendDataAttr]: '' }}>
-        {legendText(localize, model?.bought)}
+        {#each keys as key, index (index)}{#if index > 0}{legendSeparator(localize)}{/if}<span
+            class="fabricate-dice-tiles__key"
+            >{#if key.glyph}<i class={key.glyph} aria-hidden="true"></i>{/if}{key.text}</span
+          >{/each}
       </p>
     {/if}
   </div>

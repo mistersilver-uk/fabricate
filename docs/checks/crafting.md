@@ -679,7 +679,7 @@ If an authored outcome lets a below-zero result still succeed, there is no separ
 The **Outcome preview** panel rolls a real test check and announces the whole result together.
 A medallion at the top carries the net successes, captioned "net", above a breakdown line reading the qualifying and cancelling dice and the character rolled for, for example "3 qualified − 1 cancelled = 2 net · Sera Vane".
 Beside the net sits a line stating how many successes the check needs and the margin by which the roll cleared or missed that, for example "needs 2 · margin +1".
-Under that sit the dice themselves, one tile per die, marked qualified, cancelled, or exploded with its own glyph, over the legend "✓ qualified · ✕ cancelled · ↻ exploded".
+Under that sit the dice themselves, one tile per die, marked qualified, cancelled, or exploded with its own glyph, over a legend that repeats each of those glyphs beside its word: qualified, cancelled, exploded.
 A card below states the outcome, tinted for success or failure, titled "Success", "Failure", the outcome tier's name, or, only when the net fell below zero and the roll still failed, "Botch", each naming what it does.
 Most results carry a note under the card explaining that the margin is shown so that higher is always better, counting successes over what was needed.
 A trigger that forced or rerouted the result explains that in the note instead, and an unrescued botch shows no note at all.

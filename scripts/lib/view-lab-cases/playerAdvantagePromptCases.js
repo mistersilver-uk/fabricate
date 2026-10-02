@@ -174,7 +174,10 @@ export function playerAdvantagePromptCases() {
         chatLog: '1',
       },
       steps: [...CRAFT_HORSESHOE, ADVANTAGE],
-      expectSelector: '.fabricate-craft-chat .fabricate-craft-chat__dice:has-text("+ 20 + (1d6)")',
+      // The bonus die's own roll is annotated after its closing bracket (issue 2141), `(1d6) (`;
+      // the digit is not asserted since the bonus die is really rolled, not fixture-pinned.
+      expectSelector:
+        '.fabricate-craft-chat .fabricate-craft-chat__dice:has-text("+ 20 + (1d6) (")',
       kinds: ['player', 'crafting'],
       sourceMatches: CHAT_SOURCES,
     }),

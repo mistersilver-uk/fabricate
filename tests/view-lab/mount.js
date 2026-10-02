@@ -200,8 +200,9 @@ function readParams() {
     // `enter` (the default) to press whichever button Foundry marks default, or a button action by
     // name.
     dialog: params.get('dialog') ?? DEFAULT_LAB_DIALOG_ANSWER,
-    // Dock a chat log in the window, so a case can photograph the result card it posts.
-    chatLog: params.get('chatLog') === '1',
+    // Dock a chat log in the window, so a case can photograph the result card it posts: `1` on
+    // the right, `left` over the recipe list when the right column is what the case names.
+    chatLog: ['1', 'left'].includes(params.get('chatLog')) ? params.get('chatLog') : null,
   };
 }
 
@@ -942,7 +943,11 @@ async function boot() {
     if (params.manyPlayers) world.shim.seedPlayerRoster();
     // Before any step can click something that confirms.
     world.shim.setDialogAnswer(params.dialog);
-    if (params.chatLog) installLabChatLog(built.frame);
+    if (params.chatLog) {
+      installLabChatLog(built.frame, undefined, {
+        side: params.chatLog === '1' ? 'right' : 'left',
+      });
+    }
     mounted = await mountAppFor(built.content, params);
     await settle([built.frame], mounted?.services ?? null);
     // After settle, because the check needs the populated tree — an empty window has nothing

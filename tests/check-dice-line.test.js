@@ -48,24 +48,42 @@ test('a roll-high line names each die in formula order, then the total (frame 37
 });
 
 test('a die the record cannot match, and a record without a formula, invent nothing', () => {
-  assert.equal(line(summed('over', '1d20 + 2', [{ group: '1d12', results: [3] }], 5)), '1d20 + 2 = 5');
+  assert.equal(
+    line(summed('over', '1d20 + 2', [{ group: '1d12', results: [3] }], 5)),
+    '1d20 + 2 = 5'
+  );
   assert.equal(line(summed('over', '1d20', [], 9)), '1d20 = 9');
   assert.equal(line({ ...summed('over', '', [], 9), resolvedFormula: undefined }), '');
 });
 
-test('a flavor tag never splits a term, and a bracketed or clamped term is never annotated (G4)', () => {
+test('a flavor tag never splits a term, and a compound bracketed or clamped term is never annotated (G4)', () => {
   assert.equal(
-    line(summed('over', '1d20[attack] + (1d4[fire])', [
-      { group: '1d20', results: [14] },
-      { group: '1d4', results: [3] },
-    ], 17)),
-    '1d20 (14) attack + (1d4 fire) = 17'
+    line(
+      summed(
+        'over',
+        '1d20[attack] + (1d4[fire])',
+        [
+          { group: '1d20', results: [14] },
+          { group: '1d4', results: [3] },
+        ],
+        17
+      )
+    ),
+    '1d20 (14) attack + (1d4 fire) = 17',
+    'flavour carried inside the brackets makes the group compound, so it stays unannotated'
   );
   assert.equal(
-    line(summed('over', 'max(1d4, 2) + 1d6', [
-      { group: '1d4', results: [1] },
-      { group: '1d6', results: [5] },
-    ], 7)),
+    line(
+      summed(
+        'over',
+        'max(1d4, 2) + 1d6',
+        [
+          { group: '1d4', results: [1] },
+          { group: '1d6', results: [5] },
+        ],
+        7
+      )
+    ),
     'max(1d4, 2) + 1d6 (5) = 7',
     'the clamped die keeps its place in dice order, so the later die still matches'
   );
@@ -73,6 +91,53 @@ test('a flavor tag never splits a term, and a bracketed or clamped term is never
     line(summed('over', '1d20 + 2[Ring of 2d6]', [{ group: '1d20', results: [9] }], 11)),
     '1d20 (9) + 2 Ring of 2d6 = 11',
     'a die named in a flavour is never read as a term'
+  );
+});
+
+test('a bracketed term that is the lone content of its brackets is annotated like a bare term, the advantage bonus die shape (issue 2141)', () => {
+  assert.equal(
+    line(
+      summed(
+        'over',
+        '1d4 + 20 + (1d6)',
+        [
+          { group: '1d4', results: [4] },
+          { group: '1d6', results: [2] },
+        ],
+        26
+      )
+    ),
+    '1d4 (4) + 20 + (1d6) (2) = 26'
+  );
+  assert.equal(
+    line(
+      summed(
+        'over',
+        '1d4 + 20 - (1d6)',
+        [
+          { group: '1d4', results: [4] },
+          { group: '1d6', results: [5] },
+        ],
+        19
+      )
+    ),
+    '1d4 (4) + 20 - (1d6) (5) = 19',
+    'a disadvantaged bonus die, subtracted, is annotated the same way'
+  );
+  assert.equal(
+    line(
+      summed(
+        'over',
+        '1d4 + 20 + (1d8 + 1)',
+        [
+          { group: '1d4', results: [4] },
+          { group: '1d8', results: [6] },
+        ],
+        31
+      )
+    ),
+    '1d4 (4) + 20 + (1d8 + 1) = 31',
+    'a multi-term bonus expression stays a compound group and is never annotated'
   );
 });
 
@@ -93,7 +158,8 @@ test('a flavoured term is named in words, never as its raw roll flavour (frame 3
         17
       )
     ),
-    '1d20 (11) + 2 Smith’s Hammer + 1 modifiers + (1d4) modifiers = 17'
+    '1d20 (11) + 2 Smith’s Hammer + 1 modifiers + (1d4) (3) modifiers = 17',
+    'a bracketed term that is the lone content of its brackets is annotated like a bare term (issue 2141)'
   );
 });
 

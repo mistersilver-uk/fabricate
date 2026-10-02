@@ -394,6 +394,9 @@ describe('AC-7 — a pre-resolved decision drives the roll without opening a dia
 
     assert.equal(result.outcome, COMPANION_OUTCOMES.checkPassed);
     assert.equal(calls.prompt.length, 1, 'the injected prompt was asked');
+    // The resolved actor names the prompt's subtitle; a request carries no recipe (issue 2134).
+    assert.equal(calls.prompt[0].actorName, 'Idrin');
+    assert.ok(!calls.prompt[0].name, 'no subject beside the actor');
   });
 
   it('opens NO dialog when a decision is supplied, and the decision still reaches the roll', async () => {

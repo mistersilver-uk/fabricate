@@ -5,8 +5,9 @@ import { describe, it } from 'node:test';
 import { projectCountResults } from '../src/systems/countEvaluation.js';
 import {
   DICE_TILE_BOUGHT,
+  DICE_TILE_GLYPHS,
   DICE_TILE_LIMIT,
-  legendText,
+  legendKeys,
   renderDiceTilesHtml,
   tileLabel,
   tileMarkTokens,
@@ -14,6 +15,17 @@ import {
   tileTone,
 } from '../src/ui/presenters/countDiceTiles.js';
 import { shippedLocalize } from './helpers/checkEvidenceFixtures.js';
+
+/** The legend as written: each mark's tile glyph beside its word (issue 2134), then the dashed key. */
+const LEGEND_OPEN = '<p class="fabricate-dice-tiles__legend" data-dice-tiles-legend="">';
+const glyphKey = (glyph, word) =>
+  `<span class="fabricate-dice-tiles__key"><i class="fa-solid fa-${glyph}" aria-hidden="true"></i>${word}</span>`;
+const LEGEND_KEYS = [
+  glyphKey('check', 'qualified'),
+  glyphKey('xmark', 'cancelled'),
+  glyphKey('rotate', 'exploded'),
+].join(' · ');
+const DASHED_KEY = '<span class="fabricate-dice-tiles__key">dashed\u{A0}=\u{A0}bought</span>';
 
 /** Six d10s at 8 or better, tens exploding and ones cancelling (the lab's smithing pool). */
 const POLICY = Object.freeze({
@@ -170,10 +182,7 @@ describe('renderDiceTilesHtml', () => {
     assert.match(html, /<li class="fabricate-dice-tiles__more" data-dice-tiles-more="3">\+3 more<\/li>/);
     assert.doesNotMatch(html, /legend/);
     const legend = renderDiceTilesHtml(tileModel(smithing()), shippedLocalize, { legend: true });
-    assert.match(
-      legend,
-      /<p class="fabricate-dice-tiles__legend" data-dice-tiles-legend="">✓ qualified · ✕ cancelled · ↻ exploded<\/p><\/div>$/
-    );
+    assert.ok(legend.endsWith(`${LEGEND_OPEN}${LEGEND_KEYS}</p></div>`), legend);
   });
 
   it('escapes the face and the translated copy it writes', () => {
@@ -238,9 +247,15 @@ describe('bought dice (issue 2008)', () => {
     assert.equal(tileLabel({ ...tile, marks: [] }, shippedLocalize), '11, bought');
     assert.equal(tileLabel(tile, (key) => key), '11, qualified, bought', 'English fallback');
     assert.equal(DICE_TILE_BOUGHT, 'bought');
-    assert.equal(legendText(shippedLocalize, 1), '✓ qualified · ✕ cancelled · ↻ exploded · dashed\u{A0}=\u{A0}bought');
-    assert.equal(legendText(shippedLocalize, 0), '✓ qualified · ✕ cancelled · ↻ exploded');
-    assert.equal(legendText(shippedLocalize), '✓ qualified · ✕ cancelled · ↻ exploded');
+    const marks = ['qualified', 'cancelled', 'exploded'].map((mark) => ({
+      glyph: DICE_TILE_GLYPHS[mark],
+      text: mark,
+    }));
+    const dashed = { glyph: null, text: 'dashed\u{A0}=\u{A0}bought' };
+    assert.deepEqual(legendKeys(shippedLocalize, 1), [...marks, dashed]);
+    assert.deepEqual(legendKeys(shippedLocalize, 0), marks);
+    assert.deepEqual(legendKeys(shippedLocalize), marks);
+    assert.deepEqual(legendKeys((key) => key, 1), [...marks, dashed], 'English fallback');
   });
 
   it('renders the bought tile dashed by class, its token and its label, and the legend key', () => {
@@ -260,7 +275,7 @@ describe('bought dice (issue 2008)', () => {
     assert.ok(
       tiles.filter((_, index) => index !== 2).every((tile) => !tile.classes.includes('fabricate-dice-tiles__tile--bought'))
     );
-    assert.match(html, /data-dice-tiles-legend="">✓ qualified · ✕ cancelled · ↻ exploded · dashed\u{A0}=\u{A0}bought<\/p>/u);
+    assert.ok(html.includes(`${LEGEND_OPEN}${LEGEND_KEYS} · ${DASHED_KEY}</p>`), html);
     const glyphs = html.split('<li ', 4)[3].match(/<i class="[^"]*"/g);
     assert.deepEqual(glyphs, ['<i class="fa-solid fa-check"', '<i class="fa-solid fa-rotate"'], 'no glyph for bought');
     assert.doesNotMatch(

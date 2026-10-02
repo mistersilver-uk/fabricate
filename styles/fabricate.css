@@ -16565,6 +16565,13 @@
   font-size: 10px;
 }
 
+/* A legend key draws its mark's own tile glyph before the word (issue 2134). */
+.fabricate-dice-tiles__key {
+  display: inline-flex;
+  gap: var(--fab-space-2xs);
+  align-items: baseline;
+}
+
 /* On a chat card the overflow count and legend read in the chat's own ink, at the subtitle's 72%, as the tiles do. */
 .fabricate-craft-chat .fabricate-dice-tiles__more,
 .fabricate-craft-chat .fabricate-dice-tiles__legend {

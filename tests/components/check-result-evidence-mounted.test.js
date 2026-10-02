@@ -291,6 +291,31 @@ describe('RollResultBox evidence rows', () => {
     assert.equal(rolled.querySelector('[data-roll-total]').textContent, '2', 'positive control');
   });
 
+  it('sets the count and zero-pool sentences as prose, figure rows mono (issue 2134)', async () => {
+    const proseOf = (root) =>
+      [...root.querySelectorAll('[data-check-evidence]')].map((row) => [
+        row.dataset.checkEvidence,
+        row.querySelector('.journal-fact-row').classList.contains('is-prose'),
+      ]);
+    const counted = await harness.mount({ result: { ...result(executedCountCheck()), total: 2 } });
+    assert.deepEqual(proseOf(counted), [
+      ['successOn', false],
+      ['count', true],
+      ['needed', false],
+    ]);
+    harness.remount();
+    const zero = await harness.mount({
+      result: { success: false, items: [], check: executedCountCheck(ZERO_COUNT_DISPLAY) },
+    });
+    assert.deepEqual(proseOf(zero), [
+      ['pool', true],
+      ['result', true],
+    ]);
+    harness.remount();
+    const summed = await harness.mount({ result: result(executedCheck()) });
+    assert.ok(proseOf(summed).every(([, prose]) => !prose), 'a summed check states figures');
+  });
+
   it('says a failed count that netted below zero botched', async () => {
     const botch = { ...COUNT_DISPLAY, net: -1, margin: -3, qualified: 0, cancelled: 1 };
     const root = await harness.mount({

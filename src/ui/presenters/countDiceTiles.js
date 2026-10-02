@@ -39,13 +39,10 @@ const COPY = Object.freeze({
   generated: ['FABRICATE.Common.DiceTiles.Generated', 'rolled by an explosion'],
   join: ['FABRICATE.Admin.Manager.Checks.Simulator.MarkJoin', ' and '],
   label: ['FABRICATE.Admin.Manager.Checks.Simulator.FaceMarked', '{face}, {marks}'],
-  legend: [
-    'FABRICATE.Admin.Manager.Checks.Simulator.CountLegend',
-    '✓ qualified · ✕ cancelled · ↻ exploded',
-  ],
+  legendSeparator: ['FABRICATE.Common.DiceTiles.LegendSeparator', ' · '],
   more: ['FABRICATE.Common.DiceTiles.More', '+{count} more'],
   bought: ['FABRICATE.Check.BoughtDice.TileLabel', '{label}, bought'],
-  boughtLegend: ['FABRICATE.Check.BoughtDice.Legend', '{legend} · dashed\u{A0}=\u{A0}bought'],
+  boughtLegend: ['FABRICATE.Check.BoughtDice.Legend', 'dashed\u{A0}=\u{A0}bought'],
 });
 
 function copy(localize, id) {
@@ -153,10 +150,31 @@ export function moreText(count, localize) {
   return fill(copy(localize, 'more'), { count });
 }
 
-/** The key under the tiles: which glyph means which mark, and the dashed border when `bought`. */
-export function legendText(localize, bought = 0) {
-  const legend = copy(localize, 'legend');
-  return Number(bought) > 0 ? fill(copy(localize, 'boughtLegend'), { legend }) : legend;
+/**
+ * The keys under the tiles, `[{ glyph, text }]`: each mark's own tile glyph beside its word, then
+ * the dashed border, which has no glyph, when `bought` (issue 2134).
+ */
+export function legendKeys(localize, bought = 0) {
+  const keys = DICE_TILE_MARKS.map((mark) => ({
+    glyph: DICE_TILE_GLYPHS[mark],
+    text: copy(localize, mark),
+  }));
+  if (Number(bought) > 0) keys.push({ glyph: null, text: copy(localize, 'boughtLegend') });
+  return keys;
+}
+
+/** The text between two legend keys. */
+export function legendSeparator(localize) {
+  return copy(localize, 'legendSeparator');
+}
+
+function legendHtml(localize, bought) {
+  const keys = legendKeys(localize, bought).map(({ glyph, text }) => {
+    const icon = glyph ? `<i class="${glyph}" aria-hidden="true"></i>` : '';
+    return `<span class="fabricate-dice-tiles__key">${icon}${esc(text)}</span>`;
+  });
+  const separator = esc(legendSeparator(localize));
+  return `<p class="fabricate-dice-tiles__legend" ${DICE_TILE_HOOKS.legend}="">${keys.join(separator)}</p>`;
 }
 
 function tileHtml(tile, localize) {
@@ -196,9 +214,7 @@ export function renderDiceTilesHtml(model, localize = (key) => key, { legend = f
       ? `<li class="fabricate-dice-tiles__more" data-dice-tiles-more="${more}">${esc(moreText(more, localize))}</li>`
       : '',
     '</ul>',
-    legend
-      ? `<p class="fabricate-dice-tiles__legend" ${DICE_TILE_HOOKS.legend}="">${esc(legendText(localize, model?.bought))}</p>`
-      : '',
+    legend ? legendHtml(localize, model?.bought) : '',
     '</div>',
   ].join('');
 }
