@@ -3243,6 +3243,11 @@ Explicit setup remains available as an idempotent ensure that returns the existi
 The ledger holds safe durable request outcomes and one-use prepare-token bindings, status, expiry and issuing GM and instance identities; an embedded JournalEntryPage with a fixed ID and `keepId` arbitrates the global execution claim.
 The complete prepared evaluation and recipient-specific preparation reply MUST remain in the issuing authority instance and MUST be removed on consume, release or expiry.
 A missing private snapshot after reload or GM handoff MUST refuse the token before evaluation or effects; the caller may prepare again.
+A token past its expiry MUST be marked released in the ledger the next time the authority issues or consumes a token, so an expired token never stays active.
+An interactive caller whose token is refused after its roll prompt MUST prepare again by re-sending its original command, at most three times per command, and MUST settle the answer already given under the fresh token when the fresh prompt descriptor is equivalent.
+Two descriptors are equivalent when every field but the additional-dice offer is equal, the offer is present in both or neither and keeps its maximum, resource name, availability reason and reach, and its fresh limit still admits the dice the answer bought.
+A fresh descriptor that is not equivalent MUST reopen the prompt with a notice that the roll's details changed, and dismissing that prompt MUST release the fresh token.
+The refusal reaches the player only when the retry limit is exhausted, and a preparation that itself fails MUST answer its own reason.
 Another tab of the same elected GM MUST stay silent before claim and reply for a token or preparation replay issued by its peer, while committed execution MAY replay its safe durable outcome without another effect or roll handoff.
 Under the active-GM claim, bootstrap MUST scrub legacy persisted private bindings and recipient-specific response fields and invalidate their prepared tokens.
 `keepId` is load-bearing: without it the server discards the fixed ID silently, and the cross-browser lock stops existing rather than failing.

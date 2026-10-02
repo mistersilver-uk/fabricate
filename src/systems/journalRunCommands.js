@@ -1,7 +1,7 @@
 import { checkDisplayForCard } from './craftCardFields.js';
+import { settlePromptedCheck } from './journalCheckPrompt.js';
 import {
   evaluatePreparedJournalCheck,
-  safeRollDecision,
   withPreparedAdditionalDiceOffer,
   withSpentAdditionalDice,
 } from './journalPreparedCheck.js';
@@ -669,6 +669,7 @@ async function initiatorEntitled({ operation, request, resolveUuid, getUser, ...
  * @param {number} [deps.timeoutMs=15000] Remote-reply timeout, not cancellation of server work.
  * @param {Function|null} [deps.promptCheck] Local safe-descriptor prompt returning a roll decision.
  * @param {Function|null} [deps.postRollHandoff] Post an already evaluated, entitled roll without rerolling.
+ * @param {Function|null} [deps.onCheckChanged] Tell the player a re-prepared check differs from the one answered.
  * @param {Function} [deps.getDismissals] Read this user's dismissal map.
  * @param {Function} [deps.setDismissals] Awaited replacing write of this user's dismissal map.
  * @param {Function} [deps.now] Wall-clock milliseconds for tokens and dismissal timestamps.
@@ -687,6 +688,7 @@ export function createJournalRunCommandService({
   timeoutMs = JOURNAL_RUN_COMMAND_TIMEOUT_MS,
   promptCheck = null,
   postRollHandoff = null,
+  onCheckChanged = null,
   getDismissals = () => ({}),
   setDismissals = async () => {},
   now = () => Date.now(),
@@ -1009,27 +1011,8 @@ export function createJournalRunCommandService({
       });
     }
     if (typeof promptCheck !== 'function') return failure('check-prompt-unavailable');
-    const decision = await promptCheck(first.promptDescriptor);
-    if (!decision || decision.confirmed === false) {
-      await sendCommand({
-        ...command,
-        action: 'releaseCheck',
-        payload: { prepareToken: first.prepareToken },
-      });
-      return { success: false, cancelled: true, reason: 'roll-cancelled' };
-    }
-    const settled = await sendCommand({
-      ...command,
-      payload: {
-        ...command.payload,
-        prepareToken: first.prepareToken,
-        rollDecision: safeRollDecision(decision),
-      },
-    });
-    if (settled?.rollHandoff && typeof postRollHandoff === 'function') {
-      await postRollHandoff(settled.rollHandoff);
-    }
-    return settled;
+    const seams = { sendCommand, promptCheck, postRollHandoff, onCheckChanged };
+    return settlePromptedCheck(command, first, seams);
   }
 
   function getDismissedJournalRunKeys({ actorUuid, viewerId } = {}) {

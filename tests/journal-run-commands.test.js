@@ -22,6 +22,7 @@ import { installCountDice } from './helpers/countEngineDice.js';
 import { preparedCountCheck } from './helpers/countFixtures.js';
 import { mergeHistoryFlag } from './helpers/journal-fixtures.js';
 import { gatheringFixture } from './helpers/real-gathering-attempt.js';
+import { replicatedAuthorityFixture } from './helpers/replicatedJournalAuthority.js';
 import { UNDER_DATA } from './helpers/checkEvidenceFixtures.js';
 
 import {
@@ -97,43 +98,6 @@ function commandHarness({
     postRollHandoff,
   });
   return { service, emitted, emissionOptions, actor };
-}
-
-function replicatedAuthorityFixture() {
-  let ledger = null;
-  let sequence = 0;
-  const readable = [];
-  const gm = { id: 'gm', isGM: true };
-  const authority = createJournalRunAuthority({
-    currentUser: () => gm,
-    activeGM: () => gm,
-    listLedgers: async () => ledger ? [ledger] : [],
-    listLedgerRecords: async () => ledger ? [{ id: ledger.id, createdTime: 1 }] : [],
-    createLedger: async (source) => {
-      readable.push(structuredClone(source));
-      ledger = { id: 'ledger', state: structuredClone(source.state), claim: null };
-      return ledger;
-    },
-    readState: async () => structuredClone(ledger.state),
-    writeState: async (_entry, state) => {
-      readable.push(structuredClone(state));
-      ledger.state = structuredClone(state);
-    },
-    createClaim: async (_entry, source) => {
-      if (ledger.claim) throw new Error('claim-held');
-      ledger.claim = structuredClone(source);
-      return ledger.claim;
-    },
-    readClaim: async () => ledger.claim,
-    deleteClaim: async (_entry, claimId) => {
-      if (ledger.claim?.claimId !== claimId) return false;
-      ledger.claim = null;
-      return true;
-    },
-    reconstructExecutions: async () => ({ success: true }),
-    randomId: () => `private-${++sequence}`,
-  });
-  return { authority, readable };
 }
 
 it('Journal prompt adapter forwards only named, permitted display fields', async () => {

@@ -23,6 +23,16 @@ import { localizeWith } from '../utils/localizeWithFallback.js';
 
 import { getGatheringEngine } from './gatheringRuntime.js';
 
+/** What a player reads when a re-prepared check differs from the one they answered. */
+function checkChangedNotice() {
+  return localizeWith(
+    (key) => globalThis.game?.i18n?.localize?.(key),
+    'FABRICATE.App.Journal.CheckChanged',
+    undefined,
+    "This roll's details changed while you were deciding. Check them and roll again."
+  );
+}
+
 /** Formula flavour such as `[Modifiers]` labels a term for the chat card, not for the prompt. */
 function displayFormula(formula) {
   if (typeof formula !== 'string') return formula;
@@ -555,6 +565,7 @@ export function createJournalCommandsForFabricate(
     randomId: () => foundry.utils.randomID(),
     promptCheck: (descriptor) => promptJournalStageCheck(descriptor),
     postRollHandoff: (handoff) => postCheckRollHandoff(handoff),
+    onCheckChanged: () => globalThis.ui?.notifications?.info?.(checkChangedNotice()),
     getDismissals: () => getSetting(SETTING_KEYS.JOURNAL_RUN_DISMISSALS),
     setDismissals: (value) => setSetting(SETTING_KEYS.JOURNAL_RUN_DISMISSALS, value),
     onDismissalsChanged: (payload) => Hooks.callAll('fabricate.journalDismissalsChanged', payload),

@@ -262,6 +262,7 @@ An entitled prepared check that counts successes MUST open the same count prompt
 The prompt projection MUST omit private configuration, outcome tiers, source actors, speaker and execution results.
 The complete prepared evaluation MUST stay in the issuing GM authority instance rather than replicated JournalEntry flags.
 If that instance loses its snapshot or another GM takes over, the pending token MUST fail without evaluation or effects and the viewer may prepare a fresh check.
+Taking longer than the token's lifetime over the roll prompt MUST NOT cost the viewer their roll: the client prepares again and settles the answer already given when nothing the prompt showed has changed, and otherwise reopens the prompt on the fresh check with a notice (`data-models/spec.md`, the authority ledger's prepare tokens).
 Changing the modifier library or actor roll data after preparation MUST NOT change the prepared modifier contribution or its displayed value.
 Secret evaluation uses GM private posting and a sanitized response without player roll-data handoff.
 A non-secret evaluated-roll handoff MUST separately recheck the initiating viewer's entitlement after commit; this cannot substitute for initial-prompt redaction.
