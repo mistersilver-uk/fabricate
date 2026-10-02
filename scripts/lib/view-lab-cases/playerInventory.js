@@ -506,6 +506,8 @@ export const CASES = Object.freeze([
     sourceMatches: [
       ...SALVAGE_TARGET_SOURCES,
       /^src\/ui\/presenters\/InventoryListingBuilder\.js$/,
+      // `netRange` spaces the negative-ended tier's dash.
+      /^src\/systems\/runJournalOutcomeBands\.js$/,
     ],
   }),
   playerCase({

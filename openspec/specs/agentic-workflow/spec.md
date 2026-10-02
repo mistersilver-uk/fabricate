@@ -701,6 +701,14 @@ The caption MUST sit beside the image rather than in its alt text, which is read
 - **AND** the reason this is gated is that an unclaimed path does not produce NO evidence — selection falls back — it produces UNRELATED evidence, a frame of a different window offered as proof of a change it does not contain
 - **AND** a path deliberately left unclaimed carries a recorded reason, and that record is itself gated so it cannot outlive the thing it exempts
 
+#### Scenario: a case names a file that is not a render file
+
+- **WHEN** a PR changes a file that is neither a render file nor one of the producer's own inputs, such as an engine module, and a case's own selection patterns name it
+- **THEN** that case is selected, unioned with whatever the PR's render files and producer inputs select
+- **AND** such a file selects nothing beyond the cases naming it: no representative set, no surface coverage and no fallback frame, so a file no case names selects nothing
+- **AND** it never arms the evidence gate, which still arms on render files alone, so a PR whose only changes are such files renders and publishes nothing
+- **AND** every selection pattern, and each alternative within one, names a tracked file, so a rename cannot silently stop a case being selected
+
 #### Scenario: the producer's own inputs change
 
 - **WHEN** a PR changes any input the producer itself renders from — the fixture world, the mounting page, the case registry, the capture driver, or the window-chrome specification — rather than a file the product renders

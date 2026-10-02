@@ -119,17 +119,23 @@ jobs:
           # them for very large diffs) costs frames, never evidence.
           gh api "repos/$PR_REPO/pulls/$PR_NUMBER/files" --paginate \
             --jq '.[] | {filename: .filename, patch: (.patch // "")} | @json' > changed-files.jsonl
+          # A case's `sourceMatches` selects it from any changed file (issue 2153), engine modules
+          # included, but a change with no render file and no lab input has nothing to render and no
+          # harvest to verify, so it selects no frame here and boots no Foundry.
           SELECTION=$(node -e '
             const { readFileSync } = require("node:fs");
-            import("./scripts/lib/viewLabCases.js").then(({ mapChangedFilesToCases, hasUiChanges }) => {
+            import("./scripts/lib/viewLabCases.js").then(({ mapChangedFilesToCases, hasUiChanges, hasLabInputChanges }) => {
               const entries = readFileSync("changed-files.jsonl", "utf8")
                 .split("\n")
                 .filter(Boolean)
                 .map((line) => JSON.parse(line));
               const files = entries.map((entry) => entry.filename);
               const patches = Object.fromEntries(entries.map((entry) => [entry.filename, entry.patch]));
-              const ids = mapChangedFilesToCases(files, { patches }).map((c) => c.id);
-              process.stdout.write(`${hasUiChanges(files)}\n${ids.join(",")}`);
+              const hasUi = hasUiChanges(files);
+              const ids = hasUi || hasLabInputChanges(files)
+                ? mapChangedFilesToCases(files, { patches }).map((c) => c.id)
+                : [];
+              process.stdout.write(`${hasUi}\n${ids.join(",")}`);
             });
           ')
           HAS_UI=$(printf '%s' "$SELECTION" | head -n 1)

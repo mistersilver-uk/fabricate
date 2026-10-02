@@ -291,6 +291,13 @@ function withThemeVariantIds(ids) {
   return ids;
 }
 
+/** Add every case whose own `sourceMatches` names one file. */
+function addCasesNaming(file, selected) {
+  for (const viewCase of VIEW_LAB_CASES) {
+    if (viewCase.sourceMatches.some((pattern) => pattern.test(file))) selected.add(viewCase.id);
+  }
+}
+
 /** The cases a set of render files selects, by the `sourceMatches` patterns each case declares. */
 function selectRenderFileCases(renderFiles) {
   const selected = new Set();
@@ -301,14 +308,23 @@ function selectRenderFileCases(renderFiles) {
       for (const id of BROAD_SIGNAL_CASE_OVERRIDES[file] ?? []) selected.add(id);
       continue;
     }
-    for (const viewCase of VIEW_LAB_CASES) {
-      if (viewCase.sourceMatches.some((pattern) => pattern.test(file))) selected.add(viewCase.id);
-    }
+    addCasesNaming(file, selected);
   }
 
   withThemeVariantIds(selected);
   if (sawBroadSignal) for (const id of REPRESENTATIVE_CASE_IDS) selected.add(id);
   return selected;
+}
+
+/**
+ * The cases a set of files that are neither render files nor lab inputs selects (issue 2153):
+ * exactly those whose `sourceMatches` name one. No render-file heuristic applies — no broad
+ * signal, no surface coverage, no fallback — so a file no case names selects nothing.
+ */
+function selectNamedCases(files) {
+  const selected = new Set();
+  for (const file of files) addCasesNaming(file, selected);
+  return withThemeVariantIds(selected);
 }
 
 // Diff-aware selection, for the lab inputs whose diff can be attributed.
@@ -866,27 +882,40 @@ function normalizePatches(patches) {
   return byPath;
 }
 
-/** Map a changed-file set onto the cases that should be captured. */
-export function mapChangedFilesToCases(files = [], { patches } = {}) {
-  const normalized = files.map((file) => normalizePath(file)).filter(Boolean);
-  const labInputs = normalized.filter((file) => LAB_INFRASTRUCTURE_PATTERN.test(file));
-  // Disjoint from `labInputs` so each path is attributed exactly once: `tests/view-lab/cascade.css`
-  // is both a lab input and a `.css` file, and it is the lab input rule that governs it.
-  const renderFiles = normalized.filter(
-    (file) => isUiFile(file) && !LAB_INFRASTRUCTURE_PATTERN.test(file)
-  );
+/** Whether one path is an input of the lab itself rather than of the product it renders. */
+function isLabInput(file) {
+  return LAB_INFRASTRUCTURE_PATTERN.test(file);
+}
 
-  if (labInputs.length === 0 && renderFiles.length === 0) {
-    // Nothing here renders, so there is no frame to select — a lang-only change included.
-    return [];
-  }
+/** Whether a changed set touches one of the lab's own inputs. */
+export function hasLabInputChanges(files = []) {
+  return files.some((file) => isLabInput(normalizePath(file)));
+}
 
+/** The render-file and lab-input selection, with the fallback frame when it found none. */
+function selectRenderAndLabCases(renderFiles, labInputs, patches) {
   // A union at every level, never a replacement. Five levels carry it — one candidate anchor, a
   // hunk's candidates, a patch's hunks, an input's patch, and a change's inputs — and this is the
   // last of them.
   const selected = selectRenderFileCases(renderFiles);
   for (const id of selectAllLabInputCases(labInputs, normalizePatches(patches))) selected.add(id);
   if (selected.size === 0) selected.add(FALLBACK_CASE_ID);
+  return selected;
+}
+
+/** Map a changed-file set onto the cases that should be captured. */
+export function mapChangedFilesToCases(files = [], { patches } = {}) {
+  const normalized = files.map((file) => normalizePath(file)).filter(Boolean);
+  const labInputs = normalized.filter(isLabInput);
+  // Disjoint from `labInputs` so each path is attributed exactly once: `tests/view-lab/cascade.css`
+  // is both a lab input and a `.css` file, and it is the lab input rule that governs it.
+  const renderFiles = normalized.filter((file) => isUiFile(file) && !isLabInput(file));
+  const otherFiles = normalized.filter((file) => !isUiFile(file) && !isLabInput(file));
+
+  const selected = selectNamedCases(otherFiles);
+  if (labInputs.length > 0 || renderFiles.length > 0) {
+    for (const id of selectRenderAndLabCases(renderFiles, labInputs, patches)) selected.add(id);
+  }
 
   return VIEW_LAB_CASES.filter((viewCase) => selected.has(viewCase.id) && viewCase.publish);
 }

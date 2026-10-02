@@ -424,9 +424,13 @@ export const CASES = Object.freeze([
     expectSelector: '.fabricate-craft-chat--gm .fabricate-craft-chat__complication-fault',
     expectVisible: `${LAB_CHAT('whisper')} .fabricate-craft-chat__complication-fault`,
     kinds: ['player', 'crafting'],
-    // `complicationRuntime.js` builds this card, but only a render file selects a case; the card
-    // escapes through this presenter, which also draws the crafted card beside it.
-    sourceMatches: [/^src\/ui\/presenters\/CraftingChatCard\.js$/],
+    // The runtime builds this card, the router delivers it to the elected GM, and the presenter
+    // escapes it beside the crafted card.
+    sourceMatches: [
+      /^src\/systems\/complicationRuntime\.js$/,
+      /^src\/bootstrap\/socketRouter\.js$/,
+      /^src\/ui\/presenters\/CraftingChatCard\.js$/,
+    ],
   }),
   // The control: a sum/over fixed card gains the pill, dice line, and Needed and Margin rows (M1, M3).
   playerCase({
