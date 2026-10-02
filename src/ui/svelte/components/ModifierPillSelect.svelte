@@ -134,6 +134,7 @@
   }
 </script>
 
+<!-- ratchet-exempt(design-system): the spread is this primitive's own rest, forwarded to the root it composes -->
 <Field
   as="div"
   class={`fabricate-pill-select manager-availability-multi${extraClasses}`}

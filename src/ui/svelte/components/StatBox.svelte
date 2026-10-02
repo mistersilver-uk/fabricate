@@ -64,6 +64,7 @@
     {#if icon}<i class={icon} aria-hidden="true"></i>{/if}
     <span class="fab-stat-box-figure">{value}</span>
   </span>
+  <!-- ratchet-exempt(design-system): the spread is the one `labelDataAttr` hook the caller names, or nothing -->
   <Kicker as="span" {...labelHookAttributes}>{label}</Kicker>
 </div>
 

@@ -416,6 +416,7 @@
     </header>
 
     {#if stateNotice}
+      <!-- ratchet-exempt(design-system): the spread is `runStateNotice`'s `hooks`, which holds `data-journal-*` names only -->
       <Notice
         tone={stateNotice.tone}
         blocking={stateNotice.blocking}

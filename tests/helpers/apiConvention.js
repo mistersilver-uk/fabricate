@@ -3,11 +3,17 @@
  * in, so the gate and its mutation controls run the same code. The convention's wording is the
  * five-rules block of `openspec/specs/design-system/library.html`; this rules on prop names only.
  */
+/*
+ * Known limits. A key is read by its literal name, so a computed key, or a key retired or
+ * misspelled for one primitive only, passes. Rest-after-`class` matches the attribute's name, so
+ * a fixed `class="x"` before the spread passes. What a spread carries is not read. A primitive
+ * reached through a barrel, an alias, a member tag, `<svelte:component>` or a dynamic import is
+ * not read as a primitive tag. Nothing under `tests/` is scanned.
+ */
 import path from 'node:path';
 
 import { parse } from 'svelte/compiler';
 
-import { byCodePoint } from './codePointOrder.js';
 import { walkNodes } from './moduleAst.js';
 import { lineOf } from './svelteTemplateScan.js';
 
@@ -89,6 +95,19 @@ export const REST_HTML_ATTRIBUTES = Object.freeze([
   'type',
   'value',
 ]);
+
+/** Primitives whose contract refuses `class` and `style`: their rest takes `data-*` alone. */
+export const HOOK_ONLY_PRIMITIVES = Object.freeze(['Kicker', 'Notice', 'StatBox']);
+
+/** An attribute a primitive writes from a declared prop; a caller passes it by that prop. */
+export const NAMING_ATTRIBUTES = Object.freeze({
+  'aria-label': 'ariaLabel',
+  'aria-labelledby': 'ariaLabelledBy',
+  'aria-describedby': 'ariaDescribedBy',
+});
+
+/** The ratchet id of one spread a caller writes onto a primitive's tag. */
+export const CALLER_SPREAD = 'spread onto a primitive tag';
 
 const ELEMENT_TYPES = new Set(['RegularElement', 'SvelteElement', 'Component']);
 
@@ -261,13 +280,17 @@ export function declarationViolations(declaration) {
 
 /**
  * Split violations by the register: those no entry excuses, entries that excuse nothing, and
- * entries with no stated reason.
+ * entries with no stated reason. An entry excuses the one `fault` it names, on its `component`
+ * and `name`.
  */
 export function applyRegister(violations, exceptions) {
   const used = new Set();
   const unexcused = violations.filter((violation) => {
     const entry = exceptions.find(
-      (held) => held.component === violation.component && held.name === violation.name
+      (held) =>
+        held.component === violation.component &&
+        held.name === violation.name &&
+        held.fault === violation.fault
     );
     if (entry) used.add(entry);
     return !entry;
@@ -279,6 +302,7 @@ export function applyRegister(violations, exceptions) {
   };
 }
 
+/** The primitives a template imports, by local name. Throws on any form but a default import. */
 function importedPrimitives(file, ast) {
   const found = new Map();
   for (const node of scriptBodies(ast)) {
@@ -286,14 +310,20 @@ function importedPrimitives(file, ast) {
     const target = path.posix.join(path.posix.dirname(file), node.source.value);
     if (path.posix.dirname(target) !== COMPONENTS_DIR || !target.endsWith('.svelte')) continue;
     for (const specifier of node.specifiers) {
-      if (specifier.type !== 'ImportDefaultSpecifier') continue;
+      if (specifier.type !== 'ImportDefaultSpecifier') {
+        throw new Error(
+          `${file} imports ${node.source.value} by a form other than its default, so the gate ` +
+            'cannot tell which tags are that primitive'
+        );
+      }
       found.set(specifier.local.name, path.posix.basename(target, '.svelte'));
     }
   }
   return found;
 }
 
-function restAllows(name) {
+function restAllows(component, name) {
+  if (HOOK_ONLY_PRIMITIVES.includes(component)) return /^data-[a-z0-9-]+$/u.test(name);
   return (
     /^(?:data|aria)-[a-z0-9-]+$/u.test(name) ||
     /^on[a-z]+$/u.test(name) ||
@@ -311,7 +341,13 @@ function attributeFault(attribute, component, declaration) {
   if (BANNED_NAMES.includes(name) || RETIRED_BY_COMPONENT[component]?.includes(name)) {
     return `\`${name}\`, a retired spelling`;
   }
-  if (declaration.rest && attribute.type === 'Attribute' && restAllows(name)) return null;
+  const prop = NAMING_ATTRIBUTES[name];
+  if (prop && declaration.names.includes(prop)) {
+    return `\`${name}\`, which the primitive takes as \`${prop}\``;
+  }
+  if (declaration.rest && attribute.type === 'Attribute' && restAllows(component, name)) {
+    return null;
+  }
   return `\`${name}\`, which the primitive does not declare`;
 }
 
@@ -327,27 +363,48 @@ function contentProps(node) {
   return [...names];
 }
 
-/**
- * What one template passes to the primitives it imports: every attribute a primitive does not
- * take, as `{ file, line, component, fault }`, and how many spreads it writes onto their tags.
- * `declarations` maps a primitive's name to its `readDeclaration`.
- */
-export function callerReport({ file, source, ast }, declarations) {
+/** Every tag in one template that renders an imported primitive, as `{ node, component }`. */
+function primitiveTags({ file, ast }) {
   const imported = importedPrimitives(file, ast);
-  const violations = [];
-  let spreads = 0;
-  let tags = 0;
+  const found = [];
+  if (imported.size === 0) return found;
   for (const node of walkNodes(ast.fragment)) {
     if (node.type !== 'Component' || !imported.has(node.name)) continue;
-    tags += 1;
-    const component = imported.get(node.name);
+    found.push({ node, component: imported.get(node.name) });
+  }
+  return found;
+}
+
+/**
+ * Every spread one template writes onto a primitive's tag, as a ratchet site at the tag's own
+ * line, where a `ratchet-exempt` marker above the tag excuses it.
+ */
+export function callerSpreadSites(template) {
+  return primitiveTags(template).flatMap(({ node }) =>
+    node.attributes
+      .filter((attribute) => attribute.type === 'SpreadAttribute')
+      .map(() => ({
+        file: template.file,
+        line: lineOf(template.source, node.start),
+        id: CALLER_SPREAD,
+      }))
+  );
+}
+
+/**
+ * What one template passes to the primitives it imports: every attribute a primitive does not
+ * take, as `{ file, line, component, fault }`, and how many primitive tags it read.
+ * `declarations` maps a primitive's name to its `readDeclaration`.
+ */
+export function callerReport(template, declarations) {
+  const { file, source } = template;
+  const violations = [];
+  const tags = primitiveTags(template);
+  for (const { node, component } of tags) {
     const declaration = declarations.get(component);
     if (!declaration) throw new Error(`${file} imports ${component}, which the gate did not read`);
     for (const attribute of node.attributes) {
-      if (attribute.type === 'SpreadAttribute') {
-        spreads += 1;
-        continue;
-      }
+      if (attribute.type === 'SpreadAttribute') continue;
       const fault = attributeFault(attribute, component, declaration);
       if (fault) violations.push({ file, line: lineOf(source, attribute.start), component, fault });
     }
@@ -357,10 +414,10 @@ export function callerReport({ file, source, ast }, declarations) {
       violations.push({ file, line: lineOf(source, node.start), component, fault });
     }
   }
-  return { violations, spreads, tags };
+  return { violations, tags: tags.length };
 }
 
-/** Every banned key an object literal in one parsed module writes, as `{ file, line, name }`. */
+/** Every banned key an object literal in one parsed module or template writes. */
 export function bannedKeys(file, ast) {
   const found = [];
   for (const node of walkNodes(ast)) {
@@ -372,12 +429,4 @@ export function bannedKeys(file, ast) {
     }
   }
   return found;
-}
-
-/** The per-file differences between counted caller spreads and the pinned counts. */
-export function spreadDrift(counted, pinned) {
-  const files = [...new Set([...Object.keys(counted), ...Object.keys(pinned)])].sort(byCodePoint);
-  return files
-    .filter((file) => (counted[file] ?? 0) !== (pinned[file] ?? 0))
-    .map((file) => `${file}: ${counted[file] ?? 0} spread(s), pinned at ${pinned[file] ?? 0}`);
 }
