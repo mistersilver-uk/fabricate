@@ -2,14 +2,14 @@
 <!--
   The structured pool a counting check rolls instead of a typed formula (issue 2006): die, base
   pool, success threshold and per-die test, explode, cancel, where bonuses land and the zero-pool
-  rule, then the composed roll and its expected successes.
+  rule, then the composed roll and its expected successes, then the additional-dice group (issue 2008).
 
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `evaluation` | normalized evaluation | — | Every control writes `{ evaluation }` with one pool field changed. |
   | `thresholdMode` | `'meet'` \| `'exceed'` \| `null` | `null` | Under count it is the per-die test, edited only here; `null` is a slot with no comparison (progressive), which offers no test. |
-  | `character` | `{ name, rollData }` \| `null` | `null` | The Preview-as actor the value fields and the actor line read. |
+  | `character` | `{ name, rollData, readStored }` \| `null` | `null` | The Preview-as actor the value fields and the actor line read. |
   | `modifiers` | `[{ id, name, icon }]` | `[]` | The applied modifiers, drawn as chips on the term they move. |
   | `placement` / `odds` | placement plan / odds model \| `null` | `null` | The preview's own placement and odds model; the reading is the odds panel's expected net. |
 
@@ -29,6 +29,7 @@
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
   import { localize } from '../../../util/foundryBridge.js';
+  import CheckAdditionalDiceFields from './CheckAdditionalDiceFields.svelte';
   import CheckCountInputField from './CheckCountInputField.svelte';
   import CheckCountInset from './CheckCountInset.svelte';
   import {
@@ -369,6 +370,12 @@
 </div>
 
 <CheckCountInset {evaluation} {thresholdMode} {character} {modifiers} {placement} {odds} />
+
+<CheckAdditionalDiceFields
+  additionalDice={pool.additionalDice}
+  {character}
+  onChange={(next) => emitPool({ additionalDice: next })}
+/>
 
 <style>
   /* The prototype's settings rows: a 150px label-and-hint column, controls beside it, ruled off. */

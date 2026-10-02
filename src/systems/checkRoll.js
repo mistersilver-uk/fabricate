@@ -39,6 +39,7 @@ import {
 } from './checkTarget.js';
 import { preparedCountEvaluation, preparedCountOptions } from './countCheck.js';
 import {
+  carryAdditionalDice,
   evaluateCountCheckRoll,
   preparedCountResult,
   runCountPassFail,
@@ -49,6 +50,9 @@ import { authorizedPreparedDecision, validatedPreparedDecision } from './prepare
 
 export { classifyCheckTotal, resolveForcedOutcome } from './checkRouting.js';
 export { rolledDiceGroups } from './checkRollOutput.js';
+
+const noRoll = () => ({ engine: false, total: 0, diceGroups: [], resolvedFormula: null });
+const cancelled = (data) => ({ success: false, cancelled: true, outcome: null, value: null, data });
 
 /**
  * `data.targetTerms` outside sum/over/fixed (issue 2005): the resolved target's terms, else its
@@ -177,27 +181,19 @@ function resolveRolledCheck(
 export async function evaluateCheckRoll(formula, actor, options = {}) {
   // A count check rolls its structured pool, so its retained formula never reaches `Roll`.
   if (ownEvaluation(options).product === 'count') return evaluateCountCheckRoll(actor, options);
-  if (typeof globalThis.Roll !== 'function')
-    return { engine: false, total: 0, diceGroups: [], resolvedFormula: null };
+  if (typeof globalThis.Roll !== 'function') return noRoll();
   // The retirement shim runs first, unconditionally (issue 1094): a surviving token never
   // reaches `Roll` or double-counts against the appended term.
   const authoredFormula = stripRetiredModifierPlaceholder(String(formula));
   // A formula the shim emptied is not a check. The usability readers already gate on it; this
   // backstop keeps `new Roll('')` (a rolled, consuming failure) unreachable by any other route.
-  if (authoredFormula.trim() === '')
-    return { engine: false, total: 0, diceGroups: [], resolvedFormula: null };
+  if (authoredFormula.trim() === '') return noRoll();
   const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
   const evaluation = ownEvaluation(options);
   const deferred = defersModifierChoice(options);
   const resolvedCheck = deferred
     ? { formula: authoredFormula, selected: [] }
-    : resolveRolledCheck(
-        authoredFormula,
-        actor,
-        options?.craftingModifier,
-        globalThis.Roll,
-        evaluation
-      );
+    : resolveRolledCheck(authoredFormula, actor, options?.craftingModifier, undefined, evaluation);
   const decision = await resolveCheckDecision({
     authoredFormula,
     actor,
@@ -209,7 +205,7 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
     Roll: globalThis.Roll,
   });
   if (decision.cancelled) {
-    return { engine: true, cancelled: true, total: 0, diceGroups: [], resolvedFormula: null };
+    return carryAdditionalDice({ ...noRoll(), engine: true, cancelled: true }, decision);
   }
   const {
     formula: effectiveFormula,
@@ -315,6 +311,8 @@ export async function evaluatePreparedCheck(preparation, actor, decision = {}) {
     resolvedFormula: null,
     modifierPlacement: result.modifierPlacement,
     ...(result.refusal && { refusal: result.refusal }),
+    ...(result.bought && { bought: result.bought }),
+    ...(result.cancelled && carryAdditionalDice({ cancelled: true }, result)),
     ...(result.policy && {
       policy: result.policy,
       zeroPool: result.zeroPool === true,
@@ -324,7 +322,7 @@ export async function evaluatePreparedCheck(preparation, actor, decision = {}) {
   };
 }
 
-function preparedCheckKind(preparation) {
+export function preparedCheckKind(preparation) {
   const slot = String(preparation?.slot ?? '').toLowerCase();
   const mode = String(preparation?.mode ?? '').toLowerCase();
   if (slot.includes('progressive') || mode.includes('progressive')) return 'progressive';
@@ -455,7 +453,7 @@ function gradePreparedTotal(
  */
 function preparedRollOptions(
   preparation,
-  { config, advantage, evaluation, count, kind, secret, anchor, rollMode }
+  { config, advantage, evaluation, count, kind, secret, anchor, rollMode, user }
 ) {
   return {
     flavor:
@@ -471,6 +469,7 @@ function preparedRollOptions(
     // A pass/fail roll names its final target; a secret one never carries it.
     ...(kind === 'simple' && !secret && { flavorTarget: anchor }),
     reportVisibility: true,
+    user,
   };
 }
 
@@ -483,7 +482,7 @@ export async function evaluatePreparedRunCheck(
   preparation,
   actor,
   decision = {},
-  { secret = false, failureMessage = 'Check failed', label = 'Crafting' } = {}
+  { secret = false, failureMessage = 'Check failed', label = 'Crafting', user = null } = {}
 ) {
   const checkConfig =
     preparation?.checkConfig && typeof preparation.checkConfig === 'object'
@@ -506,6 +505,9 @@ export async function evaluatePreparedRunCheck(
   }
   const anchor = decisionPolicy.target ?? config.resolvedDc ?? config.dc;
   const authoritativeDecision = authorizedPreparedDecision(decision);
+  if (authoritativeDecision.additionalDiceRefusal) {
+    return carryAdditionalDice(cancelled({}), authoritativeDecision);
+  }
   const options = preparedRollOptions(preparation, {
     config,
     advantage: checkConfig.advantage,
@@ -515,15 +517,14 @@ export async function evaluatePreparedRunCheck(
     secret,
     anchor,
     rollMode: authoritativeDecision.rollMode,
+    user,
   });
   const rolled = await evaluatePreparedCheck(
     { formula: preparation?.rollFormula, secret, options },
     actor,
     authoritativeDecision
   );
-  if (rolled.cancelled) {
-    return { success: false, cancelled: true, outcome: null, value: null, data: {} };
-  }
+  if (rolled.cancelled) return carryAdditionalDice(cancelled({}), rolled);
   if (count) {
     const grading = { config, required: count.required, secret, failureMessage, label };
     return preparedCountResult(kind, rolled, grading);
@@ -742,9 +743,7 @@ async function rollRunnerFormula({ formula, actor, options, label, kind = '', da
       },
     };
   }
-  if (rolled.cancelled) {
-    return { exit: { success: false, cancelled: true, outcome: null, value: null, data } };
-  }
+  if (rolled.cancelled) return { exit: carryAdditionalDice(cancelled(data), rolled) };
   if (!rolled.engine) return { exit: headless };
   const { total, diceGroups, resolvedFormula } = rolled;
   return { rolled, total, diceGroups, resolvedFormula };

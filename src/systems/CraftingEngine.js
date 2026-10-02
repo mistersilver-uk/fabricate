@@ -80,6 +80,7 @@ import {
   progressiveCheckRefusal,
   resolveActivityCheck,
 } from './countCheck.js';
+import { checkRequest, checkRequestOptions } from './countCheckRoll.js';
 import {
   checkDisplayForCard,
   rollTotalForCard,
@@ -93,6 +94,7 @@ import {
 } from './CraftingLifecycleExecutor.js';
 import { craftingStepHistoryEvidence } from './CraftingRunManager.js';
 import {
+  cancelledCraftResult,
   commitCraft,
   continueCollapsedChain,
   misconfiguredCheckResult,
@@ -191,6 +193,11 @@ function checkRollOptions(options, { contributions, evaluation }, config) {
     ...authoredOfferOptions(config),
     reportVisibility: true,
   };
+}
+
+/** The prompt options `input` builds, with its `interactive` request's own roll options. */
+function requestRollOptions(input) {
+  return { ...buildInteractiveRollOptions(input), ...checkRequestOptions(input.interactive) };
 }
 
 /** The executed target's opening terms: the resolution's, unless a dynamic macro replaced its
@@ -3261,7 +3268,7 @@ export class CraftingEngine {
       ingredientSet,
       step,
       {
-        interactive: options?.interactive === true,
+        interactive: checkRequest(options),
         toolItems,
       }
     );
@@ -3270,13 +3277,8 @@ export class CraftingEngine {
       // GM-side gap: inputs stay consumed, and the run stays resumable for a fixed check.
       return { resolved: true, result: misconfiguredCheckResult(checkResult) };
     }
-    if (checkResult.cancelled) {
-      // A dismissed roll is retryable: inputs stay consumed and the run stays active.
-      return {
-        resolved: true,
-        result: { success: false, cancelled: true, results: null, message: 'Crafting cancelled' },
-      };
-    }
+    // A dismissed roll is retryable: inputs stay consumed and the run stays active.
+    if (checkResult.cancelled) return { resolved: true, result: cancelledCraftResult(checkResult) };
 
     await this._beginNativeStage({
       craftingActor,
@@ -5444,19 +5446,16 @@ export class CraftingEngine {
     // Routing is a property of the system mode; the param keeps the positional signature.
     _step = null,
     // `interactive` opts a UI-triggered craft into the confirm-roll dialog and chat post.
-    { interactive = false, toolItems = [] } = {}
+    { interactive: requested = false, toolItems = [] } = {}
   ) {
     const resolutionService =
       this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
     const systemId = recipe?.craftingSystemId;
-    if (!systemId) {
-      return { success: true, outcome: null, value: null, data: {} };
-    }
+    if (!systemId) return { success: true, outcome: null, value: null, data: {} };
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const system = systemManager?.getSystem(systemId);
-    if (!system) {
-      return { success: true, outcome: null, value: null, data: {} };
-    }
+    if (!system) return { success: true, outcome: null, value: null, data: {} };
+    const interactive = checkRequest(requested, { craftingSystem: system, recipe });
 
     const mode = resolutionService?.getMode(recipe) || system?.resolutionMode || 'simple';
 
@@ -5637,7 +5636,7 @@ export class CraftingEngine {
       label: 'Crafting',
       craftingModifier,
       rollOptions: checkRollOptions(
-        buildInteractiveRollOptions({
+        requestRollOptions({
           interactive,
           actor: craftingActor,
           name: recipe?.name,
@@ -5713,7 +5712,7 @@ export class CraftingEngine {
       // null for alchemy tiered.
       minOutcomeId: applyMinSuccessOutcome ? (recipe?.minSuccessOutcomeId ?? null) : null,
       rollOptions: checkRollOptions(
-        buildInteractiveRollOptions({
+        requestRollOptions({
           interactive,
           actor: craftingActor,
           name: recipe?.name,
@@ -5757,7 +5756,7 @@ export class CraftingEngine {
     interactive,
     evaluation = SUM_OVER_EVALUATION
   ) {
-    if (interactive !== true) return null;
+    if (checkRequest(interactive).interactive !== true) return null;
     // No usable formula means no check to modify, unless the check counts successes.
     const counts = evaluation?.product === 'count';
     if (!counts && stripRetiredModifierPlaceholder(String(formula ?? '')).trim() === '') {
@@ -5805,7 +5804,7 @@ export class CraftingEngine {
       label: 'Crafting',
       craftingModifier,
       rollOptions: checkRollOptions(
-        buildInteractiveRollOptions({
+        requestRollOptions({
           interactive,
           actor: craftingActor,
           name: recipe?.name,
@@ -6948,7 +6947,7 @@ export class CraftingEngine {
     formula = '',
     craftingModifier = null,
   }) {
-    const rollOptions = buildInteractiveRollOptions({
+    const rollOptions = requestRollOptions({
       interactive,
       actor,
       name: component?.name,

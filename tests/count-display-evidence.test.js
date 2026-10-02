@@ -100,3 +100,23 @@ test('a fixed-range routed count card states no Needed row, since its ranges gra
   assert.ok(!card('fixed').includes('needed'), 'a range grades the net itself');
   assert.ok(card('relative').includes('needed'), 'a relative ladder states its required count');
 });
+
+test('bought dice are never a modifier term, and the display names them only when bought (issue 2008)', () => {
+  const bought = { source: 'additionalDice', label: 'Momentum', form: 'scalar', value: 2 };
+  assert.deepEqual(countPlacementTerms(toPool, [scalar('library', 1), bought]), {
+    pool: [{ source: 'library', value: 1 }],
+    threshold: [],
+  });
+  const policy = { die: 6, dice: 4, threshold: 5, resolved: { base: 2, threshold: 5 } };
+  const rolled = {
+    policy,
+    total: 1,
+    countProjection: { results: [], successes: 1, cancelled: 0 },
+    rollMode: 'publicroll',
+  };
+  const plain = reportedCountDisplay(rolled, 1).countDisplay;
+  assert.equal('bought' in plain || 'resourceLabel' in plain, false);
+  const marked = { count: 2, source: 'path', marked: 2, resourceLabel: 'Momentum' };
+  const { countDisplay } = reportedCountDisplay({ ...rolled, bought: marked }, 1);
+  assert.deepEqual([countDisplay.bought, countDisplay.resourceLabel], [2, 'Momentum']);
+});

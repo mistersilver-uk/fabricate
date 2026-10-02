@@ -114,8 +114,19 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/systems/countCheckRoll.js',
   'src/systems/countDisplayEvidence.js',
   'src/systems/countRoll.js',
+  // Additional dice's read, spend and reach (issue 2008), and the acknowledgment the spend reuses.
+  'src/systems/additionalDice.js',
+  'src/systems/additionalDiceReach.js',
+  'src/systems/countTriggerReach.js',
+  'src/utils/MacroExecutor.js',
+  'src/systems/runHistoryEvidence.js',
+  'src/systems/runLifecycleState.js',
   'src/systems/normalize/checkEvaluation.js',
   'src/systems/normalize/checkAdvantage.js',
+  // The additional-dice group's macro wells (issue 2008): the drop target and its macro checks.
+  'src/ui/svelte/actions/dragDrop.js',
+  'src/ui/svelte/util/dropUtils.js',
+  'src/ui/model/macroReference.js',
   'src/systems/checkRollDecision.js',
   // `checkRollDecision.js` plans the keep transform the main roll takes (issue 2007).
   'src/systems/checkKeepTransform.js',
@@ -220,6 +231,11 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/checks/CheckCountInputField.svelte',
   'src/ui/svelte/apps/manager/checks/CheckCountInset.svelte',
   'src/ui/svelte/apps/manager/checks/CheckCountPoolFields.svelte',
+  // The pool's additional-dice group and the option well it shares with the roll-prompt group.
+  'src/ui/svelte/apps/manager/checks/CheckAdditionalDiceFields.svelte',
+  'src/ui/svelte/apps/manager/checks/CheckOptionGroup.svelte',
+  'src/ui/svelte/components/Well.svelte',
+  'src/ui/svelte/components/ItemDropZone.svelte',
   'src/ui/svelte/apps/manager/checks/CheckOutcomeRow.svelte',
   // The progressive editor's roll-under refusal (issue 2005).
   'src/ui/svelte/components/Notice.svelte',
@@ -243,16 +259,10 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
 ]);
 
 /** The three check EDITORS beside the tree above, for a suite mounting one directly (issue 2005). */
-export const CHECK_EDITOR_RAW_MODULES = Object.freeze([
-  ...CHECKS_TREE_RAW_MODULES,
-  'src/ui/svelte/actions/dragDrop.js',
-  'src/ui/svelte/util/dropUtils.js',
-  'src/ui/model/macroReference.js',
-]);
+export const CHECK_EDITOR_RAW_MODULES = Object.freeze([...CHECKS_TREE_RAW_MODULES]);
 
 export const CHECK_EDITOR_COMPILED_MODULES = Object.freeze([
   ...CHECKS_TREE_COMPILED_MODULES,
-  'src/ui/svelte/components/ItemDropZone.svelte',
   'src/ui/svelte/apps/manager/checks/CheckDcMacroCard.svelte',
   'src/ui/svelte/apps/manager/checks/CheckDifficultyCard.svelte',
   'src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte',

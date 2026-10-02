@@ -69,13 +69,24 @@ export function progressiveCheckRefusal(config, readRollData) {
   return pool.ok ? null : namedPoolRefusal(pool, evaluation, rollData);
 }
 
+const ADDITIONAL_DICE_SNAPSHOT = Object.freeze([
+  'enabled',
+  'source',
+  'path',
+  'readMacroUuid',
+  'spendMacroUuid',
+  'max',
+  'label',
+]);
+
 /**
  * The private `decisionPolicy.count` a prepared run replays: the pool resolved before any Tool
- * roll, with the required count the macro already settled, and whether its threshold read the
- * character. It holds numbers and that one word, never expressions.
+ * roll, with the required count the macro already settled, whether its threshold read the
+ * character, and an enabled additional-dice policy, so execute never re-reads the live config.
  */
 export function countDecisionPolicy(evaluation, policy, required) {
   const { pool } = evaluation;
+  const additionalDice = pool.additionalDice?.enabled === true && pool.additionalDice;
   return {
     thresholdSource: countThresholdSource(evaluation),
     die: policy.die,
@@ -88,6 +99,11 @@ export function countDecisionPolicy(evaluation, policy, required) {
     cancel: structuredClone(pool.cancel),
     zeroPoolFails: pool.zeroPoolFails,
     modifierDestination: pool.modifierDestination,
+    ...(additionalDice && {
+      additionalDice: Object.fromEntries(
+        ADDITIONAL_DICE_SNAPSHOT.map((key) => [key, additionalDice[key]])
+      ),
+    }),
   };
 }
 
@@ -110,6 +126,7 @@ export function preparedCountEvaluation(count) {
       zeroPoolFails: count.zeroPoolFails,
       explode: count.explode,
       cancel: count.cancel,
+      ...(count.additionalDice && { additionalDice: { ...count.additionalDice } }),
     },
   };
   const thresholdSource = count.thresholdSource === 'character' ? 'character' : 'fixed';

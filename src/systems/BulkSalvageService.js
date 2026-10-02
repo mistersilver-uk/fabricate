@@ -19,21 +19,138 @@ import { localizeWith } from '../utils/localizeWithFallback.js';
 import { applyPlayerResultOrder } from '../utils/progressiveResultOrder.js';
 import { checkTriggerIdsOf } from '../utils/progressiveStageComplications.js';
 
+import { buildAdditionalDiceReach, resolveAdditionalDiceBudget } from './additionalDice.js';
 import { advantageOfferFields, intersectAdvantageOffers } from './checkAdvantage.js';
-import { activeCheckEvaluation } from './checkTarget.js';
+import { buildCheckModifierContext, resolveEligibleModifierIds } from './checkModifierResolver.js';
+import { activeCheckEvaluation, actorRollData } from './checkTarget.js';
+import { countRequired } from './countCheck.js';
+import { additionalDiceOffer } from './countCheckRoll.js';
+import { resolvePool } from './countEvaluation.js';
 import { awardReceipts } from './runHistoryEvidence.js';
 import { resolveSalvageCheck } from './salvageCheckUsability.js';
-import { resolvedComponentsFor } from './scopedEntityReads.js';
+import { resolvedComponentsFor, salvageToolsFor } from './scopedEntityReads.js';
 
 /** Whether a subject's salvage check offers the prompt's situational bonus (issue 2005). */
 function offersSituationalBonus(system) {
   return resolveSalvageCheck(system).config?.offerSituationalBonus !== false;
 }
 
-/** The batch decision one subject rolls with: a typed bonus applies only where its check offers one. */
-function subjectRollDecision(system, rollDecision) {
-  if (!rollDecision || offersSituationalBonus(system)) return rollDecision;
-  return { ...rollDecision, bonus: null };
+/**
+ * The batch decision one subject rolls with: a typed bonus applies only where its check offers
+ * one, and bought dice only on a row the additional-dice choice covers (issue 2008).
+ */
+function subjectRollDecision(entry, rollDecision, dice) {
+  if (!rollDecision) return rollDecision;
+  const keepBonus = offersSituationalBonus(entry.system);
+  const keepDice = rollDecision.additionalDice === undefined || dice.eligible.has(entry);
+  if (keepBonus && keepDice) return rollDecision;
+  const { additionalDice, ...rest } = rollDecision;
+  return {
+    ...rest,
+    ...(!keepBonus && { bonus: null }),
+    ...(keepDice && additionalDice !== undefined && { additionalDice }),
+  };
+}
+
+/** The refusals that stop a batch: its resource ran out or became unavailable (issue 2008). */
+const STOPPING_REFUSALS = new Set([
+  'resourceChanged',
+  'spendRefused',
+  'spendUnconfirmed',
+  'choiceAboveLimit',
+  'resourceMacroFailed',
+  'resourceOverridden',
+  'resourceNotWritable',
+  'resourceUnreadable',
+]);
+
+/** A batch that offers no additional dice. */
+const NO_DICE = Object.freeze({ eligible: new Set(), rows: new Map(), offer: null, mixed: false });
+
+/** A usable row's additional-dice policy when its count check offers them, else null. */
+function entryAdditionalDice(entry) {
+  const evaluation = activeCheckEvaluation(resolveSalvageCheck(entry.system).config);
+  const policy = evaluation.pool?.additionalDice;
+  return evaluation.product === 'count' && policy?.enabled === true ? policy : null;
+}
+
+/** The resource a policy pays from: its stored path, or its read and spend macro pair. */
+function resourceKey(policy) {
+  return policy.source === 'macro'
+    ? ['macro', policy.readMacroUuid, policy.spendMacroUuid].join('\n')
+    : ['path', String(policy.path ?? '').trim()].join('\n');
+}
+
+/**
+ * One covered row's pool before bought dice and its reach, as its own prompt would judge them.
+ * Both are null where a library modifier or a Tool could move the pool, which the batch prompt
+ * cannot settle, so that row never disables an action.
+ */
+function rowAdditionalDice(entry, actor) {
+  const unjudged = { countDice: null, reach: null };
+  const { mode, config } = resolveSalvageCheck(entry.system);
+  const context = buildCheckModifierContext(entry.system, 'salvage', entry.component);
+  if (resolveEligibleModifierIds(context).length > 0) return unjudged;
+  if (salvageToolsFor(entry.system, entry.component?.salvage).length > 0) return unjudged;
+  const evaluation = activeCheckEvaluation(config);
+  const rollData = actorRollData(actor);
+  const pool = resolvePool({ evaluation, thresholdMode: config?.thresholdMode, rollData });
+  if (!pool.ok) return unjudged;
+  const override = entry.component?.salvage?.successesOverride;
+  return {
+    countDice: {
+      base: pool.policy.resolved.base,
+      poolDelta: 0,
+      zeroPoolFails: evaluation.pool?.zeroPoolFails !== false,
+      destination: evaluation.pool?.modifierDestination === 'threshold' ? 'threshold' : 'pool',
+    },
+    reach: buildAdditionalDiceReach({
+      policy: pool.policy,
+      needed: mode === 'simple' ? countRequired(evaluation, override) : null,
+      triggers: config?.checkBreakage?.triggers ?? [],
+      evaluation,
+      routed: mode === 'routed',
+    }),
+  };
+}
+
+/** The read macro's payload for one batch read (data-models § Additional Dice Macro Contract). */
+function batchPayload(eligible, actor) {
+  const [first] = eligible;
+  const systems = new Set(eligible.map((entry) => entry.system));
+  return {
+    actor,
+    craftingSystem: systems.size === 1 ? first.system : null,
+    activity: 'salvage',
+    recipe: null,
+    component: eligible.length === 1 ? first.component : null,
+    task: null,
+    evaluation: structuredClone(activeCheckEvaluation(resolveSalvageCheck(first.system).config)),
+    rolls: eligible.length,
+  };
+}
+
+/** One batch budget read as the rolling user, the user every row then spends as. */
+function readBudgetAsUser({ additionalDice, actor, payload }) {
+  const user = globalThis.game?.user ?? null;
+  return resolveAdditionalDiceBudget({
+    additionalDice,
+    actor,
+    user,
+    payload: { ...payload, user },
+  });
+}
+
+/** Mark a row the batch never ran; the row that stopped it also carries `stop` (issue 2008). */
+function markExhausted(entry, exhaustion, stop = null) {
+  entry.outcome = 'skipped';
+  Object.assign(entry.item, {
+    outcome: 'skipped',
+    skipReason: BULK_SALVAGE_SKIP_REASONS.resourceExhausted,
+    message: '',
+    additionalDiceExhaustion: exhaustion,
+    ...stop,
+  });
 }
 
 /**
@@ -42,7 +159,10 @@ function subjectRollDecision(system, rollDecision) {
  */
 export const BULK_MAX_ITEMS = 25;
 
-/** Pre-flight refusals, advisory: the engine stays authoritative and can still fail a row. */
+/**
+ * Pre-flight refusals, advisory: the engine stays authoritative and can still fail a row.
+ * `resourceExhausted` alone is not pre-flight: a mid-batch stop marks the rows it never ran.
+ */
 export const BULK_SALVAGE_SKIP_REASONS = Object.freeze({
   unknownSystem: 'unknownSystem',
   featureDisabled: 'featureDisabled',
@@ -50,6 +170,7 @@ export const BULK_SALVAGE_SKIP_REASONS = Object.freeze({
   salvageDisabled: 'salvageDisabled',
   duplicate: 'duplicate',
   bulkLimit: 'bulkLimit',
+  resourceExhausted: 'resourceExhausted',
 });
 
 /**
@@ -137,7 +258,8 @@ export class BulkSalvageService {
    * owns speaker, visibility and creation. Without `deliverComplications` the rows still fire
    * their complications and relay none, the drop a GM-less world takes. `getPlayerResultOrder` is
    * the engine's own seam, read with the same `salvage:<systemId>:<componentId>` id, and only the
-   * forecast reads it; a row resolves against the order its run captured.
+   * forecast reads it; a row resolves against the order its run captured. `getActor` and
+   * `readAdditionalDiceBudget` read the one batch budget additional dice are offered from.
    */
   constructor({
     salvage,
@@ -148,6 +270,8 @@ export class BulkSalvageService {
     getPlayerResultOrder = null,
     localize = (key) => key,
     maxItems = BULK_MAX_ITEMS,
+    getActor = (uuid) => globalThis.fromUuidSync?.(uuid) ?? null,
+    readAdditionalDiceBudget = readBudgetAsUser,
   } = {}) {
     this.salvage = salvage;
     this.getCraftingSystem = getCraftingSystem;
@@ -158,6 +282,8 @@ export class BulkSalvageService {
       typeof getPlayerResultOrder === 'function' ? getPlayerResultOrder : () => null;
     this.localize = typeof localize === 'function' ? localize : (key) => key;
     this.maxItems = Number.isFinite(maxItems) && maxItems > 0 ? maxItems : BULK_MAX_ITEMS;
+    this.getActor = getActor;
+    this.readAdditionalDiceBudget = readAdditionalDiceBudget;
   }
 
   /**
@@ -174,22 +300,15 @@ export class BulkSalvageService {
 
     const decision = await this._resolveRollDecision(runnable, interactive);
     if (decision.cancelled)
-      return { cancelled: true, items: [], counts: countBy([]), posted: false };
+      return {
+        cancelled: true,
+        items: [],
+        counts: countBy([]),
+        posted: false,
+        ...decision.refusal,
+      };
 
-    // Progress counts every entry, pre-flight skips included, since the panel marks the queued
-    // rows in this order.
-    let completed = 0;
-    for (const entry of entries) {
-      // SEQUENTIAL BY CONTRACT (see the module header); a skipped row still advances the count.
-      if (entry.outcome === null) {
-        await this._runOne(entry, {
-          interactive,
-          rollDecision: subjectRollDecision(entry.system, decision.rollDecision),
-        });
-      }
-      completed += 1;
-      reportBulkProgress(onProgress, completed, entries.length);
-    }
+    await this._runEntries(entries, decision, { interactive, onProgress });
 
     const items = entries.map((entry) => entry.item);
     // Beside the aggregate card as one relay, and before it: the relay is ordered "after the award
@@ -197,6 +316,74 @@ export class BulkSalvageService {
     this._deliverComplications(entries);
     const posted = await this._postAggregateCard(entries, decision.rollDecision);
     return { cancelled: false, items, counts: countBy(items), posted };
+  }
+
+  /**
+   * Run every entry in order, SEQUENTIAL BY CONTRACT (see the module header). Progress counts every
+   * entry, pre-flight skips included, since the panel marks the queued rows in this order. A row
+   * whose resource ran out stops the batch: it and every later row are skipped (issue 2008).
+   */
+  async _runEntries(entries, { rollDecision, dice = NO_DICE }, { interactive, onProgress }) {
+    let completed = 0;
+    let rolled = 0;
+    let exhaustion = null;
+    for (const entry of entries) {
+      if (entry.outcome === null && exhaustion) markExhausted(entry, exhaustion);
+      else if (entry.outcome === null) {
+        const covered = dice.eligible.has(entry);
+        await this._runOne(entry, {
+          interactive,
+          rollDecision: subjectRollDecision(entry, rollDecision, dice),
+          additionalDiceRolls: covered ? dice.rolls : null,
+        });
+        if (entry.additionalDiceStop) {
+          exhaustion = Object.freeze({
+            resourceLabel: dice.label,
+            done: rolled,
+            rolls: dice.rolls,
+          });
+          markExhausted(entry, exhaustion, entry.additionalDiceStop);
+        } else if (covered) rolled += 1;
+      }
+      completed += 1;
+      reportBulkProgress(onProgress, completed, entries.length);
+    }
+  }
+
+  /**
+   * The batch's additional-dice plan (issue 2008): the rows one choice covers and the offer, read
+   * once for every roll, when they share one actor and one resource; `mixed` when they do not.
+   * The offer's `max` is the lowest any covered row allows.
+   */
+  async _additionalDicePlan(usable) {
+    const eligible = usable.filter((entry) => entryAdditionalDice(entry));
+    if (eligible.length === 0) return NO_DICE;
+    const policies = eligible.map(entryAdditionalDice);
+    const owners = eligible.map((entry, index) => {
+      return `${entry.target?.actorUuid}\n${resourceKey(policies[index])}`;
+    });
+    if (new Set(owners).size > 1) return { ...NO_DICE, mixed: true };
+    const actor = this.getActor(eligible[0].target?.actorUuid);
+    const labels = new Set(policies.map((policy) => policy.label ?? ''));
+    const policy = {
+      ...policies[0],
+      max: Math.min(...policies.map((entry) => entry.max)),
+      label: labels.size === 1 ? [...labels][0] : '',
+    };
+    const budget = await this.readAdditionalDiceBudget({
+      additionalDice: policy,
+      actor,
+      payload: batchPayload(eligible, actor),
+    });
+    const rolls = eligible.length;
+    return {
+      eligible: new Set(eligible),
+      rows: new Map(eligible.map((entry) => [entry, rowAdditionalDice(entry, actor)])),
+      offer: additionalDiceOffer({ additionalDice: policy, budget, rolls }),
+      mixed: false,
+      rolls,
+      label: policy.label,
+    };
   }
 
   /**
@@ -354,34 +541,19 @@ export class BulkSalvageService {
       })
     );
     const actorNames = new Set(runnable.map((entry) => entry.item.actorName));
+    const dice = await this._additionalDicePlan(usable);
     const choice = await this.promptRollDecision({
       allowAdvantage: advantageOffer.advantage,
       advantageOffer,
       activity: this._salvageActivity(),
       actorName: actorNames.size === 1 ? [...actorNames][0] || undefined : undefined,
       count: runnable.length,
-      subjects: runnable.map((entry) => ({
-        name: entry.item.name,
-        img: entry.item.img,
-        need: salvageCheckNeed({
-          ...resolveSalvageCheck(entry.system),
-          component: entry.component,
-        }),
-        offerSituationalBonus: offersSituationalBonus(entry.system),
-      })),
+      subjects: runnable.map((entry) => promptSubject(entry, dice)),
+      ...(dice.offer && { additionalDiceOffer: dice.offer }),
+      ...(dice.mixed && { additionalDiceMixed: true }),
     });
     if (!choice || choice.confirmed === false) return { cancelled: true, rollDecision: null };
-
-    // `promptCheckRoll`'s shape minus `confirmed`, so the engine reads a pre-resolved choice,
-    // never a fresh prompt result a tightened early exit could read as a cancellation.
-    return {
-      cancelled: false,
-      rollDecision: {
-        bonus: choice.bonus,
-        rollMode: choice.rollMode,
-        advantage: choice.advantage,
-      },
-    };
+    return batchDecision(choice, dice);
   }
 
   /** The prompt heading's activity, localized when the key resolves. */
@@ -395,7 +567,7 @@ export class BulkSalvageService {
   }
 
   /** Salvage one target, never throwing: a throw becomes an `error` row and the run goes on. */
-  async _runOne(entry, { interactive, rollDecision }) {
+  async _runOne(entry, { interactive, rollDecision, additionalDiceRolls = null }) {
     const { item } = entry;
     try {
       const result = await this.salvage(
@@ -405,9 +577,19 @@ export class BulkSalvageService {
         // Deferred, so a 25-row run is ONE socket message per (system, actor) pair rather than
         // 25, inside the GM-side rate limit; each row still fires its own complications and
         // returns the GM requests for `_deliverComplications` to batch.
-        { interactive, rollDecision, suppressChat: true, deferComplicationDelivery: true }
+        {
+          interactive,
+          rollDecision,
+          suppressChat: true,
+          deferComplicationDelivery: true,
+          ...(additionalDiceRolls && { additionalDiceRolls }),
+        }
       );
       const outcome = classifySalvageOutcome(result);
+      entry.additionalDiceStop = STOPPING_REFUSALS.has(result?.additionalDiceRefusal) && {
+        additionalDiceRefusal: result.additionalDiceRefusal,
+        additionalDiceNotice: result.additionalDiceNotice ?? null,
+      };
       const salvageRun = result?.salvageRun ?? null;
 
       entry.outcome = outcome;
@@ -500,6 +682,47 @@ export class BulkSalvageService {
       return false;
     }
   }
+}
+
+/** One prompt row: its need, its bonus offer, and the pool and reach a covered row is judged by. */
+function promptSubject(entry, dice) {
+  return {
+    name: entry.item.name,
+    img: entry.item.img,
+    need: salvageCheckNeed({ ...resolveSalvageCheck(entry.system), component: entry.component }),
+    offerSituationalBonus: offersSituationalBonus(entry.system),
+    ...(dice.rows.has(entry) && { additionalDice: dice.rows.get(entry) }),
+  };
+}
+
+/**
+ * `promptCheckRoll`'s shape minus `confirmed`, so the engine reads a pre-resolved choice, never a
+ * fresh prompt result a tightened early exit could read as a cancellation. Bought dice ride along
+ * when chosen; a choice the offer refuses cancels the batch with its reason, mutating nothing.
+ */
+function batchDecision(choice, dice) {
+  const { offer } = dice;
+  if (offer && choice.additionalDiceRefusal) {
+    const notice = { dice: choice.additionalDice, limit: offer.limit, available: offer.available };
+    return {
+      cancelled: true,
+      rollDecision: null,
+      refusal: {
+        additionalDiceRefusal: choice.additionalDiceRefusal,
+        additionalDiceNotice: { ...notice, label: dice.label, source: null },
+      },
+    };
+  }
+  return {
+    cancelled: false,
+    rollDecision: {
+      bonus: choice.bonus,
+      rollMode: choice.rollMode,
+      advantage: choice.advantage,
+      ...(offer && choice.additionalDice > 0 && { additionalDice: choice.additionalDice }),
+    },
+    dice,
+  };
 }
 
 /** Resolve a component id against a system's managed components. */

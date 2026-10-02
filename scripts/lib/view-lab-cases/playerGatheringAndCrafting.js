@@ -12,6 +12,7 @@ import {
   CRAFTING_SIMPLE,
 } from './caseConstants.js';
 import { playerCase, responsiveLayout } from './caseFactories.js';
+import { playerAdditionalDicePromptCases } from './playerAdditionalDicePromptCases.js';
 import { playerAdvantagePromptCases } from './playerAdvantagePromptCases.js';
 import { playerCountResultCases } from './playerCountResultCases.js';
 
@@ -20,7 +21,7 @@ const SINGLE_PROMPT = '.fabricate-app .manager-modal[data-roll-prompt="single"]'
 /** The files a count prompt case is drawn from (issue 2006). */
 const COUNT_PROMPT_SOURCES = Object.freeze([
   CRAFTING_SIMPLE,
-  /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target)?\.svelte$/,
+  /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target|Footer)?\.svelte$/,
   /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
 ]);
 
@@ -50,7 +51,7 @@ const LAB_CHAT = (visibility) =>
   `[data-view-lab-chat-log] > .chat-message[data-view-lab-chat-visibility="${visibility}"]`;
 const PROMPT_SOURCES = [
   CRAFTING_SIMPLE,
-  /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target)?\.svelte$/,
+  /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target|Footer)?\.svelte$/,
   /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
 ];
 const RESULT_SOURCES = [
@@ -90,7 +91,7 @@ export const CASES = Object.freeze([
     kinds: ['player', 'crafting'],
     sourceMatches: [
       CRAFTING_SIMPLE,
-      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target)?\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target|Footer)?\.svelte$/,
       /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
       /^src\/ui\/svelte\/apps\/crafting\/rollPromptHost\.js$/,
     ],
@@ -116,7 +117,7 @@ export const CASES = Object.freeze([
     kinds: ['player', 'crafting'],
     sourceMatches: [
       CRAFTING_SIMPLE,
-      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target)?\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target|Footer)?\.svelte$/,
       /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
     ],
   }),
@@ -142,7 +143,7 @@ export const CASES = Object.freeze([
     kinds: ['player', 'crafting'],
     sourceMatches: [
       CRAFTING_SIMPLE,
-      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target)?\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target|Footer)?\.svelte$/,
       /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
     ],
   }),
@@ -420,7 +421,7 @@ export const CASES = Object.freeze([
     kinds: ['player', 'crafting'],
     sourceMatches: [
       CRAFTING_SIMPLE,
-      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target)?\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target|Footer)?\.svelte$/,
       /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
     ],
   }),
@@ -446,7 +447,7 @@ export const CASES = Object.freeze([
     kinds: ['player', 'crafting'],
     sourceMatches: [
       CRAFTING_SIMPLE,
-      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target)?\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target|Footer)?\.svelte$/,
       /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
     ],
   }),
@@ -495,7 +496,8 @@ export const CASES = Object.freeze([
       SINGLE_PROMPT +
       COUNT_ADVANTAGE_FOOTER +
       ':has(.formula-content .formula[data-roll-prompt-count="over"]:text-is("0d10 · each ≥ 7"))' +
-      ':has(button[type="submit"]:not([disabled]))' +
+      ':has(button[type="submit"]:not([disabled]):not([aria-disabled]))' +
+      ':not(:has([data-roll-prompt-additional-dice-group]))' +
       ' .formula-content [data-roll-prompt-zero-pool]',
     kinds: ['player', 'crafting'],
     sourceMatches: COUNT_PROMPT_SOURCES,
@@ -544,7 +546,7 @@ export const CASES = Object.freeze([
     kinds: ['player', 'crafting'],
     sourceMatches: [
       CRAFTING_SIMPLE,
-      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target)?\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target|Footer)?\.svelte$/,
       /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
     ],
   }),
@@ -850,7 +852,7 @@ export const CASES = Object.freeze([
       // Narrow rather than `CRAFTING_SHARED`: `rollPrompt.js` builds this dialog end to end and nothing else does.
       /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
       /^src\/ui\/svelte\/apps\/crafting\/rollPromptHost\.js$/,
-      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target)?\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target|Footer)?\.svelte$/,
       CRAFTING_PROGRESSIVE,
       /^src\/ui\/svelte\/stores\/craftingStore/,
       /^src\/ui\/svelte\/stores\/playerResultOrder/,
@@ -878,7 +880,7 @@ export const CASES = Object.freeze([
     kinds: ['player', 'crafting'],
     sourceMatches: [
       CRAFTING_PROGRESSIVE,
-      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target)?\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target|Footer)?\.svelte$/,
       /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
     ],
   }),
@@ -903,7 +905,7 @@ export const CASES = Object.freeze([
     kinds: ['player', 'crafting'],
     sourceMatches: [
       CRAFTING_PROGRESSIVE,
-      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target)?\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target|Footer)?\.svelte$/,
       /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
     ],
   }),
@@ -930,7 +932,7 @@ export const CASES = Object.freeze([
     kinds: ['player', 'crafting'],
     sourceMatches: [
       CRAFTING_PROGRESSIVE,
-      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target)?\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Target|Footer)?\.svelte$/,
       /^src\/ui\/svelte\/apps\/crafting\/rollPrompt(?:Target)?\.js$/,
       /^src\/ui\/svelte\/apps\/crafting\/rollPromptHost\.js$/,
     ],
@@ -1249,4 +1251,5 @@ export const CASES = Object.freeze([
   }),
   ...playerCountResultCases(),
   ...playerAdvantagePromptCases(),
+  ...playerAdditionalDicePromptCases(),
 ]);

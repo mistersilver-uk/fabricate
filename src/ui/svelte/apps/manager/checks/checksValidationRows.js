@@ -42,6 +42,9 @@ export const CHECK_TO_ISSUES = Object.freeze({
   summedFormulaCountsNothing: ['freeTextCountingFormula'],
   countFacesSet: ['countFaceMissing'],
   countTriggersReachable: ['countTriggerGroupUnreachable'],
+  countAdditionalDiceSourceSet: ['countAdditionalDiceSourceMissing'],
+  countAdditionalDicePathStored: ['countAdditionalDicePathInvalid'],
+  countAdditionalDiceMacrosScript: ['countAdditionalDiceMacroInvalid'],
 });
 
 /**

@@ -118,6 +118,21 @@ export function installUpdateSemantics(document) {
 }
 
 /**
+ * Core's stored-data members on a lab Actor (issue 2008): `_source` reads the same live data
+ * `update` writes, never a copy, `overrides` stores an effect's change nested as core does, and
+ * `canUserModify` answers core's OWNER test, which every lab viewer passes.
+ *
+ * @param {object} actor Actor to equip.
+ * @returns {object} The same actor.
+ */
+export function installSourceSemantics(actor) {
+  Object.defineProperty(actor, '_source', { get: () => actor, configurable: true });
+  actor.overrides = {};
+  actor.canUserModify = () => true;
+  return actor;
+}
+
+/**
  * Seed a Fabricate flag at the depth production writes it.
  *
  * @param {object} document Document to stock.

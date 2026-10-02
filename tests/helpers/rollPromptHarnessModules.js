@@ -20,6 +20,11 @@ export const ROLL_PROMPT_RAW_MODULES = Object.freeze([
   // The count line settles through the router and the pool's own floor (issue 2006).
   'src/systems/checkModifierRouter.js',
   'src/systems/countEvaluation.js',
+  // The additional-dice control reads its reach through the prompt-safe leaf (issue 2008).
+  'src/ui/presenters/additionalDicePrompt.js',
+  'src/ui/svelte/util/journalRunReasons.js',
+  'src/systems/additionalDiceReach.js',
+  'src/systems/countTriggerReach.js',
   ...CHECK_TARGET_RAW_MODULES,
   'src/utils/fillPlaceholders.js',
   'src/ui/svelte/apps/manager/checks/checkAdjustmentLabel.js',
@@ -41,5 +46,10 @@ export const ROLL_PROMPT_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/ManagerModal.svelte',
   'src/ui/svelte/apps/crafting/RollPromptTarget.svelte',
+  'src/ui/svelte/components/Stepper.svelte',
+  'src/ui/svelte/components/Kicker.svelte',
+  'src/ui/svelte/components/Well.svelte',
+  'src/ui/svelte/apps/crafting/RollPromptAdditionalDice.svelte',
+  'src/ui/svelte/apps/crafting/RollPromptFooter.svelte',
   ROLL_PROMPT_PATH,
 ]);

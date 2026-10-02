@@ -697,7 +697,14 @@ describe('CHECK_READINESS_ISSUE_IDS is the source of truth for every issue id', 
     );
   });
 
-  it('carries every id the evaluator actually emits across its branches', () => {
+  it('carries every id the evaluator actually emits across its branches', (t) => {
+    const previous = Object.getOwnPropertyDescriptor(globalThis, 'fromUuidSync');
+    const missing = { value: () => null, configurable: true, writable: true };
+    Object.defineProperty(globalThis, 'fromUuidSync', missing);
+    t.after(() => {
+      if (previous) Object.defineProperty(globalThis, 'fromUuidSync', previous);
+      else delete globalThis.fromUuidSync;
+    });
     // A behavioural sweep, deliberately kept ALONGSIDE the mechanical guards rather than
     // instead of them: it proves the registry is not merely consistent with itself.
     const emitted = new Set();
@@ -875,9 +882,20 @@ describe('CHECK_READINESS_ISSUE_IDS is the source of truth for every issue id', 
       { rollFormula: '1d20', advantage: { mode: 'bonus', bonusExpression: '' } },
       { mode: 'simple' }
     );
-    // The base-pool ceiling row fires only once additional dice (issue 2008) raise the ceiling
-    // above the base, so no check reaches it yet; `countCeilingIssues` proves its branch.
-    emitted.add('countRequiredExceedsBasePool');
+    // Additional dice (issue 2008): the base-pool ceiling they raise, a missing source, a path
+    // that is not stored, a macro that is not a script, and the Preview-as actor's stored value.
+    const extra = (additionalDice) =>
+      count({ base: '2', required: 3, additionalDice: { enabled: true, max: 1, ...additionalDice } });
+    collect(extra({ source: 'path', path: 'system.resources.momentum.value' }), { mode: 'simple' });
+    collect(extra({ source: 'path', path: '' }), { mode: 'simple' });
+    collect(extra({ source: 'path', path: '@resources.momentum.value' }), { mode: 'simple' });
+    collect(extra({ source: 'macro', readMacroUuid: 'Macro.gone', spendMacroUuid: 'Macro.gone' }), {
+      mode: 'simple',
+    });
+    collect(extra({ source: 'path', path: 'system.resources.momentum.value' }), {
+      mode: 'simple',
+      previewActor: { name: 'Vosk', rollData: {}, readStored: () => ({ value: undefined }) },
+    });
     for (const id of emitted) {
       assert.ok(
         CHECK_READINESS_ISSUE_IDS.includes(id),

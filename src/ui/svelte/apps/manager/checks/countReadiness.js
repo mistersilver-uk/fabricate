@@ -9,6 +9,7 @@ import {
   MAX_COUNT_POOL,
   resolvePool,
 } from '../../../../../systems/countEvaluation.js';
+import { poolCanFire } from '../../../../../systems/countTriggerReach.js';
 import { normalizeNullableSuccesses } from '../../../../../systems/normalize/checkEvaluation.js';
 import { parseDiceGroups } from '../../../../../utils/craftingCheckExpression.js';
 import { trimString as trimmed } from '../../../../../utils/scalars.js';
@@ -60,24 +61,6 @@ function countFaceReadiness(result, evaluation, thresholdMode, raise) {
     resolvePool({ evaluation: literal, thresholdMode }).reason === 'explode-unbounded';
   result.checks.push({ id: 'countExplosionStops', satisfied: !unbounded });
   if (unbounded) raise(result.issues, 'countExplodeUnbounded', 'critical');
-}
-
-const FACE_TESTS = Object.freeze({
-  '==': (face, value) => face === value,
-  '<=': (face, value) => face <= value,
-  '>=': (face, value) => face >= value,
-  '<': (face, value) => face < value,
-  '>': (face, value) => face > value,
-});
-
-/** Whether a dice condition can fire on the pool's one group: group 0, a face the die shows. */
-function poolCanFire(condition, { groupId, sides }) {
-  if (Number(condition?.groupId) !== groupId) return false;
-  if (condition.aggregate === 'total') return true;
-  const test = FACE_TESTS[condition.operator];
-  const value = Number(condition.value);
-  for (let face = 1; face <= sides; face += 1) if (test?.(face, value)) return true;
-  return false;
 }
 
 /**
@@ -132,7 +115,7 @@ function countTriggerReadiness(result, check, evaluation, raise) {
  * The issue data for the requirements whose count exceeds the authored ceiling (`overMax`) and
  * those above the base pool but within the ceiling (`overBase`): tier `names`, and `defaultRecord`
  * when the check's own count is among them, which the copy layer names in the reader's language.
- * The ceiling is the base alone until additional dice (issue 2008) raise it.
+ * The ceiling is the base plus the additional-dice max while they are enabled (issue 2008).
  */
 export function countCeilingIssues({ base, ceiling, requirements }) {
   const group = (predicate) => {
@@ -192,13 +175,11 @@ export function countRequiredReadiness(result, evaluation, { tiers, literal, rai
     { defaultRecord: true, required: pool.required },
     ...tierRequired.map((tier) => ({ name: tier.name, required: tier.successes ?? pool.required })),
   ];
-  const { overMax, overBase } = countCeilingIssues({ base, ceiling: base, requirements });
+  const ceiling = base + (pool.additionalDice.enabled ? pool.additionalDice.max : 0);
+  const { overMax, overBase } = countCeilingIssues({ base, ceiling, requirements });
   result.checks.push({ id: 'countRequiredWithinMaxPool', satisfied: !raisesAny(overMax) });
   if (raisesAny(overMax)) {
-    raise(result.issues, 'countRequiredExceedsMaxPool', 'critical', {
-      ...overMax,
-      ceiling: base,
-    });
+    raise(result.issues, 'countRequiredExceedsMaxPool', 'critical', { ...overMax, ceiling });
   }
   if (raisesAny(overBase)) {
     result.checks.push({ id: 'countRequiredWithinBasePool', satisfied: false });
@@ -227,6 +208,82 @@ function previewActorPoolWarnings(transient, evaluation, { thresholdMode, previe
 }
 
 /**
+ * A stored document path: dot-separated keys (letters, digits, `_`, `$`, `-`; a module flag scope
+ * is a package id), never `@`, a space, an operator, a bracket or an all-digit list index.
+ */
+const STORED_PATH = /^(?!\d+(?:\.|$))[\p{L}\p{N}_$-]+(?:\.(?!\d+(?:\.|$))[\p{L}\p{N}_$-]+)*$/u;
+
+const MACRO_FIELDS = Object.freeze({ read: 'readMacroUuid', spend: 'spendMacroUuid' });
+
+/** The first field the authored source leaves blank (`path`, `read` or `spend`), else null. */
+function missingSourceField(additional) {
+  const fields =
+    additional.source === 'macro'
+      ? Object.entries(MACRO_FIELDS).map(([kind, field]) => [kind, additional[field]])
+      : [['path', additional.path]];
+  return fields.find(([, value]) => trimmed(value) === '')?.[0] ?? null;
+}
+
+/**
+ * Whether a linked macro synchronously resolves to nothing, to another document, or to a macro
+ * that is not a script. A compendium index entry carries no `documentName` (nor a Macro `type`)
+ * and a lookup that throws is unresolved, so neither is flagged here.
+ */
+function macroFlagged(uuid) {
+  if (typeof globalThis.fromUuidSync !== 'function') return false;
+  let found;
+  try {
+    found = globalThis.fromUuidSync(uuid, { strict: false });
+  } catch {
+    return false;
+  }
+  if (found == null) return true;
+  if (!found.documentName) return false;
+  return found.documentName !== 'Macro' || found.type !== 'script';
+}
+
+function additionalDiceMacroReadiness(result, additional, raise) {
+  const linked = Object.entries(MACRO_FIELDS).filter(([, field]) => trimmed(additional[field]));
+  if (linked.length === 0) return;
+  const flagged = linked.filter(([, field]) => macroFlagged(trimmed(additional[field])));
+  result.checks.push({ id: 'countAdditionalDiceMacrosScript', satisfied: flagged.length === 0 });
+  for (const [kind] of flagged) {
+    raise(result.issues, 'countAdditionalDiceMacroInvalid', 'critical', { kind });
+  }
+}
+
+/** The Preview-as actor's stored value at the path: a transient warning when it cannot pay. */
+function previewActorResourceWarning(transient, path, previewActor, raise) {
+  if (typeof previewActor.readStored !== 'function') return;
+  const { value, overridden } = previewActor.readStored(path) ?? {};
+  const unread = typeof value !== 'number' || !Number.isFinite(value);
+  if (!unread && !overridden) return;
+  const actor = previewActor.name ?? '';
+  const data = unread ? { actor, path } : { actor, path, overridden: true };
+  raise(transient, 'countAdditionalDicePathUnresolvedForPreview', 'warning', data);
+}
+
+/** Readiness of the additional-dice policy (issue 2008), silent while it is switched off. */
+function additionalDiceReadiness(result, additional, previewActor, raise) {
+  if (!additional.enabled) return;
+  const missing = missingSourceField(additional);
+  result.checks.push({ id: 'countAdditionalDiceSourceSet', satisfied: !missing });
+  if (missing) {
+    raise(result.issues, 'countAdditionalDiceSourceMissing', 'critical', { input: missing });
+  }
+  if (additional.source === 'macro') {
+    additionalDiceMacroReadiness(result, additional, raise);
+    return;
+  }
+  const path = trimmed(additional.path);
+  if (!path) return;
+  const stored = STORED_PATH.test(path);
+  result.checks.push({ id: 'countAdditionalDicePathStored', satisfied: stored });
+  if (!stored) raise(result.issues, 'countAdditionalDicePathInvalid', 'critical');
+  else if (previewActor) previewActorResourceWarning(result.transient, path, previewActor, raise);
+}
+
+/**
  * Readiness of a success-counting pool. Fixed ranges and progressive checks grade no required
  * count, so only the pool itself and its triggers apply to them.
  */
@@ -249,6 +306,7 @@ export function countReadiness(result, check, evaluation, context) {
   const gradesRequired = mode === 'simple' || (mode === 'routed' && check?.type !== 'fixed');
   const tiers = activity === 'crafting' && Array.isArray(check?.tiers) ? check.tiers : [];
   if (gradesRequired) countRequiredReadiness(result, evaluation, { tiers, literal, raise });
+  additionalDiceReadiness(result, evaluation.pool.additionalDice, previewActor, raise);
   countTriggerReadiness(result, check, evaluation, raise);
   if (previewActor && !baseFault && !thresholdFault) {
     previewActorPoolWarnings(result.transient, evaluation, { thresholdMode, previewActor, raise });

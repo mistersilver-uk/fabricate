@@ -63,6 +63,16 @@ const harness = createMountedComponentHarness({
     'src/utils/scalars.js',
     'src/ui/svelte/apps/journal/stageHeading.js',
     'src/ui/svelte/apps/journal/runRecovery.js',
+    // The store words an additional-dice refusal with the roll prompt's notice (issue 2008).
+    'src/ui/presenters/additionalDicePrompt.js',
+    'src/systems/additionalDiceReach.js',
+    'src/utils/fillPlaceholders.js',
+    'src/utils/localizeWithFallback.js',
+    'src/systems/countEvaluation.js',
+    'src/systems/countTriggerReach.js',
+    'src/systems/normalize/checkEvaluation.js',
+    'src/systems/checkEvaluation.js',
+    'src/systems/checkTarget.js',
   ],
   runeModules: [
     'src/ui/svelte/stores/browseListing.svelte.js',

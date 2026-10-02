@@ -173,6 +173,13 @@ It surfaces `resolved === false` — the signal `resolveCheckFormulaDisplay` alr
 It treats `Actor#getRollData()`'s live `system` object as read-only and clones before any local augmentation.
 A rolled readout describes ONE (formula, actor, record, evaluation, target) tuple and is dropped when any of them changes, because a total no current configuration produces must not stay on screen.
 
+With additional dice enabled on a counting check, an `Additional dice` stepper above the roll button, its caption visible, adds dice to the simulated roll only (issue 2008).
+It is bounded by `min(max, available)` from the Preview-as actor's stored value for a path source, by `max` for a macro source, because the preview never runs the read macro, and by 0 otherwise, a path an active effect overrides included, and it is clamped to the bounds whenever they change, so a count above a lowered bound is never rolled.
+Its note reads `Up to {limit} for {actor} ({resource} {available}, at most {max} per roll).` (without a resource name `Up to {limit} for {actor} ({available} available, at most {max} per roll).`), `The preview never runs the read macro, so up to {max} can be added here.`, `{actor} has no stored number at {path}, so no dice can be added.`, `An active effect changes {actor}'s {path}, so no dice can be added.`, `Choose a character to see how many they can add.` or `This check has no source to pay for additional dice.`
+It never spends, updates a document or runs a macro: the count reaches the runner as the internal `simulatedAdditionalDice` option, which places the same contribution a real roll places, and no public allowlist forwards it.
+At 0 the stepper adds nothing: the simulated roll and its readout are those of the same check with additional dice off.
+Simulated bought dice render as bought tiles.
+
 #### Per-outcome odds histogram
 
 The histogram ENUMERATES the faces of the formula's single die group and buckets each one through the SAME classifier `runFormulaRouted` uses, extracted as `classifyCheckTotal` so resolution and preview cannot drift; a pass/fail check buckets through the same forced-outcome resolution plus the comparison, and a progressive check through the same `resolveProgressiveAward` loop the engines award through.
@@ -206,6 +213,8 @@ Under roll-under the preview arg-builder appends no Tool term; it hands the term
 The SITUATIONAL bonus is unreachable from a preview at all: it lives behind `interactive === true`, and a null roll-options bag spreads to `{}`.
 Because a system with an empty catalogue resolves a ZERO scalar and makes the append a no-op, this rule MUST be exercised with a non-empty catalogue and a non-zero resolved scalar or it is graded vacuously.
 Progressive checks bucket by AWARD COUNT and OMIT a count no face can reach, while an award of nothing is listed wherever it is reachable.
+
+The odds and the Formula card's expected-successes reading ignore the simulator's additional dice and describe the base pool.
 
 ##### The progressive preview sandbox
 
@@ -372,11 +381,18 @@ A zero pool rolls nothing: it shows `0` captioned `net` and `pool reduced to 0`,
 A progressive count check shows its raw net and awards `max(0, net)`.
 Negative counts use the true minus sign.
 
-Readiness raises, in The roll: `countPoolInvalid` and `countThresholdInvalid` (critical: blank, dice or not arithmetic once every path is neutralized), `countFaceBeyondDie` (warning: an enabled explode or cancel face beyond the die, naming what follows), `countExplodeUnbounded` (critical: a recursive explosion on every face), `countTierWithoutSuccesses` (critical: a crafting recipe tier with no successes needed, raised only while at least one tier exists), and, for a literal base, `countPoolTooLarge` (critical: above the 999 dice Foundry rolls at once, raising no ceiling row), `countRequiredExceedsMaxPool` (critical) and `countRequiredExceedsBasePool` (warning) against the authored ceiling, which is the base alone until additional dice (issue 2008) raise it; the base settles through the runtime's own pool resolver, so it floors float noise, rolls at least one die when a zero pool does not fail, and never reads below zero dice.
+Readiness raises, in The roll: `countPoolInvalid` and `countThresholdInvalid` (critical: blank, dice or not arithmetic once every path is neutralized), `countFaceBeyondDie` (warning: an enabled explode or cancel face beyond the die, naming what follows), `countExplodeUnbounded` (critical: a recursive explosion on every face), `countTierWithoutSuccesses` (critical: a crafting recipe tier with no successes needed, raised only while at least one tier exists), and, for a literal base, `countPoolTooLarge` (critical: above the 999 dice Foundry rolls at once, raising no ceiling row), `countRequiredExceedsMaxPool` (critical) and `countRequiredExceedsBasePool` (warning) against the authored ceiling, which is the literal base plus `pool.additionalDice.max` while additional dice (issue 2008) are enabled and the base alone otherwise, a disabled record's retained `max` ignored; the base settles through the runtime's own pool resolver, so it floors float noise, rolls at least one die when a zero pool does not fail, and never reads below zero dice.
 A base reading the character raises no ceiling issue and ticks `countPoolCharacterDependent` on Validation only, never as a Difficulty card callout (frame 06 draws none); fixed ranges and progressive checks grade no required count.
 Frame 08's `Successes needed above the most dice that can be rolled`, frame 07's `Successes needed above the base pool` and frame 19's `A character path does not resolve` are among the count issues' titles.
 Each of these rows names the control that clears it, as "Success-counting authoring" lists, so a notice's Review and a Validation row's View focus that control.
 With a Preview-as actor chosen it raises the TRANSIENT `countPathUnresolvedForPreview` and `countValueNotNumericForPreview`, which follow the same rule as the roll-under transient warnings: a section notice and a Validation row, and never a badge, dot, tally or enable gate.
+While additional dice are enabled on a count check, readiness adds three critical rows to The roll, and none fires while they are off or on a summing check.
+`countAdditionalDiceSourceMissing` fires for a path source with a blank path or a macro source with a blank read or spend UUID, naming the first blank of the path, the read macro and the spend macro, and reads `Additional dice are allowed but have no source` over `Set the value on the crafting character or the macro pair that pays for them, or turn additional dice off.`
+`countAdditionalDicePathInvalid` fires for a non-blank path that is not dot-separated key segments — an `@`, a space, an operator other than a hyphen inside a key, a bracket or an all-digit segment (a list index) — and reads `The value that pays for additional dice must be a path on the character, such as system.resources.momentum.value, not an expression or a list entry.`
+A key may hold letters, digits, `_`, `$` and `-`, so a module flag scope such as `flags.my-module.momentum` is a stored path.
+`countAdditionalDiceMacroInvalid` fires once per linked macro that `fromUuidSync` (non-strict) resolves to nothing, to a loaded Document whose `documentName` is not `Macro`, or to a loaded Macro whose `type` is not `script`, and reads `The {read|spend} macro is missing or is not a script macro, so players cannot buy additional dice. Link a script macro.`; a compendium index entry, which carries no `documentName` and no `type`, and a lookup that throws are unresolved and raise nothing, leaving the type to the drop and the roll.
+Their Validation ticks are `countAdditionalDiceSourceSet`, `countAdditionalDicePathStored` and `countAdditionalDiceMacrosScript`.
+With a Preview-as actor chosen and a valid path, the TRANSIENT `countAdditionalDicePathUnresolvedForPreview` warns `{actor} has no stored number at {path}, so no dice can be added for them.`, or `An active effect changes {actor}'s {path}, so no dice can be added for them.`, under the transient rule above: a section notice and a Validation row, never a badge, dot, tally or enable gate.
 
 #### Success-counting authoring
 
@@ -394,11 +410,27 @@ The inset under the pool states the composed roll as authored — the pool, the 
 It never shows a Foundry formula, a `cs`/`df` token or the retained `rollFormula`, and it constructs and evaluates no Roll; with no actor and a character-dependent input it asks for one, and a missing path is named rather than read as zero.
 Every surface that describes a count policy formats it from the one Foundry-free `describeCountPolicy`.
 
+A counting Formula card shows the `Allow players to roll additional dice` group (issue 2008) after the composed-roll inset and before `In the roll prompt`, on every count slot that rolls in all three activities.
+Both groups draw one titled option-group frame, the shared `<Well>` (`design-system/spec.md`), and this one carries its `StatusToggle` (`aria-pressed`, `aria-controls` naming the nested region) at the head's end.
+It is off by default, and while off no nested field renders, validates or is read.
+While on, it shows:
+
+- "Paid for by", a `SegmentedControl` of `Value on the crafting character` / `Read and spend macros`;
+- for the path source, "Path on the crafting character", a plain stored-path input with the placeholder `system.resources.momentum.value` and a line read from the Preview-as actor's stored data, never prepared data: resolved `{actor} → {value}`, no actor `Choose a character in Preview as to see what this resolves to.`, blank (danger) `No source set. Players cannot be offered additional dice until one is.`, no number at the path (warning) `{actor} has no stored number at {path}, so they could not buy additional dice.`, and overridden by an active effect (warning) `An active effect changes {actor}'s {path}, so spending it would not lower it. Use a stored value.`;
+- for the macro source, two `ItemDropZone` macro wells, `Read macro` (`Returns what the character can spend`) and `Spend macro` (`Deducts what was spent`), side by side until either would fall under 220px, where a dropped macro that is not a script macro is refused with a notice;
+- "Resource name", a plain text field hinting `What players see this resource called. Leave it blank to show the amount alone.`, for both sources;
+- "Most additional dice per roll", a `Stepper` from 1 to 20, default 1.
+
+"Paid for by" and "Most additional dice per roll" are visible captions naming their control, not only accessible names.
+Switching the source or turning the toggle off rewrites no field, so the path, both macro UUIDs, the resource name and the maximum survive both ways.
+The inset and the expected-successes reading ignore bought dice.
+
 The Difficulty card of a counting check edits `pool.required` as `Successes needed` (0–20) with its static or dynamic source, and states the `countRequiredExceedsMaxPool` and `countRequiredExceedsBasePool` sentences as callouts, never a predicate of its own; a progressive counting check has no Difficulty card.
 Recipe tiers edit `tiers[].successes` in a `Successes` column; a tier with none reads `—` beside `Set successes needed`, and a tier added while counting starts at the check's successes needed.
 Relative outcome rows edit the shared delta as `Extra successes`, and a count band strip is a read-only picture in net successes (see `ui-visual-style`).
 
 Every count readiness id has a clearing control: `countPoolInvalid` and `countPoolTooLarge` the base pool, `countThresholdInvalid` the threshold, `countFaceBeyondDie` the explode or cancel face it names, `countExplodeUnbounded` the explode choice, the two ceiling rows the successes needed, and `countTierWithoutSuccesses` the first tier without successes.
+The additional-dice rows name `checks-additional-dice-path`, `checks-additional-dice-read-macro` or `checks-additional-dice-spend-macro`, whichever the row reports.
 Two issues are added.
 `countFaceMissing` (critical, The roll) blocks an enabled explode or cancel `from` face with no value, which only imported or API data can hold; it is raised once per missing face, under one `countFacesSet` tick, each with its own notice.
 `countTriggerGroupUnreachable` (a warning, Triggers, outside the enable gate) names each kept trigger whose dice condition reads a group or face the pool never rolls, quoted and titled against the formula it was written for — its die, a repeated die by its ordinal, and a group that formula lacks as `dice group {n}` — in a singular sentence for one trigger; the trigger is kept and works again after switching back to adding the dice.

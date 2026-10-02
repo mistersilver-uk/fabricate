@@ -3,7 +3,7 @@
  * Original contribution indices identify pre-rolls even when labels repeat.
  */
 
-const SOURCES = new Set(['tool', 'library', 'situational', 'advantage']);
+const SOURCES = new Set(['tool', 'library', 'situational', 'advantage', 'additionalDice']);
 
 /** The compatibility evaluation every caller places by until an engine activates another mode. */
 export const SUM_OVER_EVALUATION = Object.freeze({
@@ -16,13 +16,13 @@ function placementOrder({ source, form }) {
   if (source === 'tool') return 0;
   if (source === 'library') return form === 'scalar' ? 1 : 2;
   if (source === 'situational') return 3;
-  return 4;
+  return source === 'advantage' ? 4 : 5;
 }
 
 /** Where one source's benefit lands for `evaluation`: `append`, `target`, `pool` or `threshold`. */
 export function destinationFor(evaluation, source) {
   if (evaluation.product === 'sum') return evaluation.direction === 'over' ? 'append' : 'target';
-  if (source === 'advantage') return 'pool';
+  if (source === 'advantage' || source === 'additionalDice') return 'pool';
   return evaluation.pool?.modifierDestination === 'threshold' ? 'threshold' : 'pool';
 }
 
@@ -59,8 +59,15 @@ function validateEvaluation(evaluation) {
   }
 }
 
-function validateContribution(contribution) {
-  if (!SOURCES.has(contribution?.source)) throw new TypeError('Unknown contribution source');
+function validateSource(source, evaluation) {
+  if (!SOURCES.has(source)) throw new TypeError('Unknown contribution source');
+  if (source === 'additionalDice' && evaluation.product !== 'count') {
+    throw new TypeError('Bought dice belong only to a count pool');
+  }
+}
+
+function validateContribution(contribution, evaluation) {
+  validateSource(contribution?.source, evaluation);
   if (contribution.form === 'scalar') {
     if (!Number.isFinite(contribution.value)) throw new TypeError('Scalar benefit must be finite');
   } else if (
@@ -117,7 +124,7 @@ export function planModifierPlacement({ evaluation, contributions = [] } = {}) {
 
   const ordered = contributions
     .map((contribution, index) => {
-      validateContribution(contribution);
+      validateContribution(contribution, evaluation);
       return { contribution, index };
     })
     .sort(

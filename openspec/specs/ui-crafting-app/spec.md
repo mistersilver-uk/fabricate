@@ -223,6 +223,8 @@ Permanently deleting the selected components, as a peer of bulk salvage rather t
 ### Interactive Roll Prompt (path-agnostic)
 
 A check-bearing execution accepts a per-call `interactive` flag (default `false`, keeping macros/API silent).
+Every check-bearing execution that accepts `interactive`, the Journal run command included, also accepts `additionalDice` (default 0; issue 2008), honoured only when non-interactive, where an interactive call's prompt chooses instead.
+An invalid, unoffered or unaffordable value, or a non-zero value while additional dice are unavailable, refuses with a reason and is never clamped.
 When `true`, the shared system-agnostic dialog (`src/ui/svelte/apps/crafting/rollPrompt.js`, `promptCheckRoll`/`buildInteractiveRollOptions`) prompts the player to roll; a dismissed prompt yields `{ success: false, cancelled: true, results: null }` with guaranteed zero mutation, distinct from `success: false`.
 This is the PR #497 per-call-flag decision, consumed uniformly by the crafting store, salvage (inventory) store, alchemy store, gathering view, and the Journal Trigger Next Step path; `CraftingEngine.craft` discards any phantom run created by a cancelled interactive call.
 
@@ -251,12 +253,39 @@ A counting check's flavor carries the `({n} successes needed)` suffix (`(1 succe
 A `product: 'count'` check shows no formula and no DC chip; its body instead reads a pool line (`{pool}d{die} · each {comparison} {threshold}`, the chat card's own wording so the two cannot disagree), a rule line and a successes chip ("N successes needed").
 The pool line shows the SETTLED pool, floored after every benefit, and the settled threshold, and updates as the player's picks and flat bonus change without constructing or evaluating a Roll; a pending rolled bonus reads as `{pool}d{die} + {formula} dice · each {comparison} {threshold}` when bonuses add dice, or `{pool}d{die} · each {comparison} {threshold} + {formula}` when they move the threshold, and the line is announced politely.
 The rule line states the effective per-die threshold, whether it came from a character value (`(character value {v})`) and how far modifiers moved it, signed by the benefit so a +1 bonus reads `moved +1` in either direction, then the actual explode and cancel faces (`explodes on 9 or above once`, `2 or under cancels a success`) — the authored face, never the default one.
-A settled pool at or below zero that fails shows a warning `Notice`, "This roll fails automatically: the pool is reduced to zero.", and Roll stays enabled; no such warning shows while a pending rolled bonus could still add dice.
-No retained formula, DC, expression or path is shown on a count prompt, single or bulk, and the prompt gains no focusable control of its own.
+A settled pool at or below zero that fails shows a warning `Notice`, "This roll fails automatically: the pool is reduced to zero.", and Roll stays enabled unless additional dice are enabled and even the most dice the player can buy cannot lift it, when each roll action whose pool stays at zero is disabled with a note (issue 2008 ruling R4, judged per action by `resolution-modes/spec.md` § Additional Dice).
+No such warning shows while a pending rolled bonus could still add dice.
+A Tool bonus is rolled when the check is prepared, so the prompt's pool already carries its total; a rolled Tool contribution handed to the check runner unsettled is pending instead, with or without additional dice, so it shows no zero-pool warning, the pool line names it, and reachability never disables an action that could succeed with it.
+No retained formula, DC, expression or path is shown on a count prompt, single or bulk, and the prompt gains no focusable control of its own other than the additional-dice stepper.
 The same count region serves the single, bulk salvage and Journal prompts, which forward the settled threshold source and anchor and the explode and cancel faces as numbers and enums only; the unentitled public prompt allowlist is unchanged.
 Its modifier-destination copy and situational-bonus help ("Each adds dice"/"Each moves the threshold") replace the summed wording, matching `pool.modifierDestination`.
 A hidden or redacted pool, meaning its `pool`, `die` and `threshold` are all unresolved, shows neither the pool line nor the rule line, but keeps its successes chip and modifier-destination wording, and never falls back to the retained roll formula or a summed DC.
 A fixed-range routed count check reads no `pool.required` either, so its prompt shows no successes chip, matching a fixed-range routed sum check's own missing DC chip.
+- **Additional dice.**
+  With additional dice enabled on a counting check (issue 2008; `resolution-modes/spec.md` § Additional Dice), the prompt offers an `Additional dice` control between the situational bonus and roll mode, drawn in the shared `<Well>`: its title, a resource line and a spend line, the shared `Stepper` from 0 to the limit at the row's end, and one `Notice` beneath.
+  The stepper defaults to 0, so opening the prompt and pressing Enter spends nothing; the shortfall is stated and never pre-selected.
+  The lines read `{resource} {available} available · Spends {n} {resource}`, or without a resource name `{available} available · Spends {n}`, inked `--fab-text-muted`.
+  Its states, the first that holds winning, are:
+
+  - **unavailable**: the stepper disabled at 0, `{resource} unavailable · Spends 0` (`Unavailable · Spends 0`), and an info message naming the reason, never `{n} available`; an unreadable value reads `{actor} has no {resource} value · Spends 0` (`{actor} has no value to spend · Spends 0`) instead;
+  - **unreachable**: a danger message, `Cannot reach {needed} successes.` followed by `{pool} dice need at least {shortfall} more, and at most {max} can ever be added.` or `…, and you can afford {limit}.`, or `Cannot reach {needed} successes with these dice.` when no die can qualify, with each footer action disabled by resolution-modes § Additional Dice and a note naming what is disabled.
+    When Advantage can still reach, the message opens `Without Advantage, these dice cannot reach {needed} successes.` (`…reach 1 success.`) in place of `Cannot reach {needed} successes.`
+    When modifiers take the pool below zero and it fails at zero (`zeroPoolFails` on), its reason reads `Modifiers reduce the pool below zero, so at least {shortfall} dice are needed, and at most {max} can ever be added.` (`…, and you can afford {limit}.`);
+  - **shortfall**: a warning, `At least {shortfall} additional dice needed to be able to succeed.` (`…to succeed without exploding dice.` when the pool explodes), or a success message, `At least {shortfall} additional dice are needed. You have enough.`, once enough are chosen;
+  - **unaffordable**: the stepper disabled and an info message, `Not enough {resource} to buy a die.` (`Not enough to buy a die.`).
+
+  A rescued unreachable attempt keeps its danger message, which adds `A trigger on this check can still succeed it.`, and every action enabled.
+  The block note sits under the footer's action row as a status region in danger ink.
+  With every action disabled it reads `Rolling is disabled: this attempt cannot reach the successes it needs.`, or `Rolling is disabled: the pool is reduced to zero, and the dice you can add cannot lift it.` when each fails for a zero pool; with Roll and Disadvantage disabled it reads `Only Advantage can reach the successes needed.`, and with Disadvantage alone `Disadvantage cannot reach the successes needed.`
+  A disabled footer action stays in place with `aria-disabled` and an `aria-describedby` naming the note, never the native `disabled`, and initial focus never lands on it: the modal focuses the first of the bonus field, an enabled stepper, an unblocked Roll and an unblocked Advantage, else its close control.
+  Neither Enter nor a click rolls a disabled action, and the prompt stays answerable once a bonus change unblocks it.
+  The pool line and zero-pool notice include the chosen dice.
+  It names no path or macro.
+  A secret or unentitled prompt shows only the resource and spend lines with the unavailable or unaffordable message and disables nothing; a progressive or prepared routed prompt also states no needed count or shortfall, though an unliftable zero pool still disables its actions.
+  The answer carries `additionalDice`, re-bounded on return: a non-integer, negative or above-limit value refuses with its reason and is never clamped, and a headless answer buys 0.
+  A refused choice or spend raises one warning notice naming its reason from the surface that started the attempt, and a roll that could not complete after its spend raises `{n} {resource} spent; the roll could not be completed.` (`{n} spent; …`).
+  The crafting, alchemy and gathering surfaces run the Journal run command, so they also receive its reply shape: a reply carrying a top-level `additionalDiceRefusal` raises only its per-reason sentence, never the generic refusal message beside it, and a non-success reply carrying a top-level `boughtDice` above 0 raises the spent notice before the reply's own refusal message.
+  Salvage, single and bulk, rolls immediately and receives the immediate shape.
 - **The roll-under target chip.**
 A summed roll-under check's target chip names the target after the player's applied flat modifiers, any Tool bonus and a typed flat situational bonus, all of which raise it: `Target {T} · stay at or under` (inclusive) or `Target {T} · stay under` (strict).
 A contribution still to roll — a rolled modifier or a typed dice bonus — is named beside the settled number as `Target {T} + {formula} · stay at or under`, never averaged in, and text the dice engine rejects (`Roll.validate`) is never named as pending.
@@ -296,7 +325,8 @@ On both paths the formula line omits the terms of the modifiers the prompt itemi
 After confirmation, the selected legal modifiers and any valid situational bonus enter the shared placement plan; under the active sum/over evaluation they keep their existing appended formula order.
 Under any other evaluation, rolling contributions evaluate once outside the main check and share its chat visibility, while cancellation still creates no new modifier roll, check roll or message.
 - **Pre-resolved roll decisions.**
-A caller MAY supply a `rollDecision` (`{ bonus, rollMode, advantage }` — the prompt's own return shape minus `confirmed`).
+A caller MAY supply a `rollDecision` (`{ bonus, rollMode, advantage, additionalDice }` — the prompt's own return shape minus `confirmed`).
+The executing client re-validates `additionalDice` against the limit a fresh read of the resource allows and never clamps it.
 The evaluator then treats it as an already-answered choice and **never opens the modal**, running the identical downstream code: the check-modifier append, the check's advantage rule (the keep transform, a bonus-die contribution or a pool change), the situational-bonus append, the formula-validity net and the effective roll mode; a decision naming a choice the rule does not offer rolls normally.
 With no decision supplied every existing path builds a byte-identical options bag, so single-item salvage, crafting, alchemy and gathering are unchanged.
 A decision carries **no `confirmed` key** and MUST NOT be read as a cancellation; only an explicit `confirmed === false` is one.
@@ -315,6 +345,12 @@ A sub-label shows only when it is identical for every subject; otherwise the but
 Each roll applies the one answer by its own check's rule — Advantage on a `2d6` subject and a `1d20` subject in the same batch keeps each subject's own dice.
 It is all-or-nothing across those subjects: offering a choice only some rolls could honour would be a lie about the rest of the batch.
 The prompt is not shown at all when no selected item has a usable check, and dismissal returns the same not-confirmed shape the single-item prompt returns.
+One additional-dice choice (issue 2008) applies to every eligible roll, offered only when those rolls share one actor and one resource.
+Otherwise the control renders its title in the shared `<Well>` with no stepper and an info `Notice`, `Rolls in this batch use different resources, so no dice can be added.`
+Its limit counts the eligible rolls only, its maximum is the lowest any of them allows, and the total spend is shown before confirming: `Spends {n × rolls} {resource} across {rolls} rolls ({n} each)`, or `Not enough {resource} to buy a die for every roll.`
+Each footer action is disabled only when every covered roll would be disabled under it on that roll's own prompt (`resolution-modes/spec.md` § Additional Dice); when every action is, the note reads `Rolling is disabled: none of these rolls can reach the successes they need.` (`…this attempt cannot reach…` for one roll), and otherwise the single prompt's per-action notes apply.
+A row gains the suffix `· cannot reach` in danger ink after its need only when no offered action can reach it and it states a needed count.
+A refused choice cancels the whole batch with zero mutation, and a resource that runs out mid-batch stops it with `{resource} ran out after {done} of {rolls} rolls. The rolls already made stand.`
 
 ### Result Chat Cards
 
@@ -356,6 +392,9 @@ The prompt is not shown at all when no selected item has a usable check, and dis
   That evidence is handed to the card builder at post time from the engine's own execution and is never persisted into check data, run history, a roll handoff or message flags; a secret check keeps it inside the authority.
   A gmroll, blindroll or selfroll count card, or a secret one, shows no net, no count rows and no tiles, and the card is never whispered to compensate.
   No count Roll or pre-roll is attached to the card, whose only Foundry roll stays the count Roll's own post, and the gathering card stays roll-free.
+  A count check that bought dice (issue 2008) reads its summary `{pool}d{die} ({unbought} + {bought} bought), each {sym} {threshold}`, adds an `Additional dice` row, `{count} bought · spent {count} {resource}` (`{count} bought · spent {count}` without a resource name), and dashes the tiles of the original dice they added, marked `bought`, under the same public, non-secret gate.
+  The crafting result box and the salvage roll summary state the same row and tiles, and a refused spend posts no card.
+  `data.boughtDice` (`data-models/spec.md` § CraftingRunStepState) is the one part of this evidence the check data keeps, and it names no resource.
 - The card is posted only on resolved success or rolled failure — never on cancelled, misconfigured, or time-gated outcomes.
 - Posting is gated by `features.chatOutput` (default on); `ChatMessage.create` failures are non-fatal (logged only), so a chat error never aborts the craft/salvage.
 - Gathering posts its own result card under the same `features.chatOutput` toggle.

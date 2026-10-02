@@ -31,8 +31,16 @@ player-inventory-bulk-roll-prompt-under-attribute
 player-inventory-bulk-roll-prompt-count
 player-inventory-bulk-roll-prompt-advantage
 player-inventory-bulk-roll-prompt-advantage-shared
+player-inventory-bulk-roll-prompt-count-additional
+player-inventory-bulk-roll-prompt-count-additional-blocked
+player-inventory-bulk-roll-prompt-count-additional-blocked-all
+player-inventory-bulk-roll-prompt-count-additional-partial
+player-inventory-bulk-roll-prompt-count-additional-mixed
 player-inventory-bulk-destroy-confirm
 player-inventory-bulk-broken-queued
 player-inventory-bulk-report
 player-salvage-count-simple
 player-salvage-count-result
+player-salvage-count-result-bought
+player-salvage-count-result-bought-chat
+player-inventory-bulk-salvage-bought-chat

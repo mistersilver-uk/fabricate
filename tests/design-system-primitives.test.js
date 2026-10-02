@@ -160,6 +160,8 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/Stepper.svelte',
   'src/ui/svelte/components/ThresholdBandStrip.svelte',
   'src/ui/svelte/components/ToggleCard.svelte',
+  // Issue 2008: the well below a card, a primitive ARRIVING, on the Formula card's option groups.
+  'src/ui/svelte/components/Well.svelte',
   // Issue 1515: THE SHEET, and the first key here that is not a component path. It sorts last
   // because this list is compared against `Object.keys(...).sort()` and `'src/'` < `'styles/'`.
   'src/ui/svelte/components/WorldClockChip.svelte',
@@ -226,9 +228,10 @@ test('the inputs every property below quantifies over are alive', () => {
   // screen is its second independent caller, and property (e) below reported it as a component that
   // had crossed the membership bar with nobody adjudicating it.
   // 68 as of issue 2005, which promoted the shared Preview-as picker, the Player sees block and the
-  // executed check evidence rows; 70 as of issue 2006, whose result boxes promoted the die tiles.
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 70, 'the shipped primitive set changed size');
-  // 16 as of issue 2006, which promoted the die tiles once the result boxes drew them.
+  // executed check evidence rows; 70 as of issue 2006, whose result boxes promoted the die tiles;
+  // 72 as of issue 2008: the Formula card's option well, and the `<Well>` on its second caller.
+  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 72, 'the shipped primitive set changed size');
+  // 16 as of issue 2006's die tiles, and again once issue 2008 promoted the `<Well>` it built.
   assert.equal(NOT_A_PRIMITIVE.length, 16, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(

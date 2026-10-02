@@ -5,11 +5,17 @@
  */
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { SvelteMap } from 'svelte/reactivity';
 
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { createSvelteModuleCompiler } from '../helpers/compile-svelte-module.js';
 import { expectedMemberKinds, storeMemberKinds } from '../helpers/storeMemberKinds.js';
+
+const EN = JSON.parse(readFileSync(resolve(import.meta.dirname, '../../lang/en.json'), 'utf8'));
+/** The shipped string at a dotted `lang/en.json` key, as the window's `localize` answers it. */
+const shipped = (key) => key.split('.').reduce((node, segment) => node?.[segment], EN) ?? key;
 
 const MODULE_PATH = 'src/ui/svelte/stores/inventorySalvageExecution.svelte.js';
 
@@ -68,6 +74,7 @@ function setup({
         return typeof result === 'function' ? result() : result;
       },
       notify: (message) => log.push(['notify', message]),
+      localize: shipped,
     },
   });
   return { execution, log, bag };
@@ -105,6 +112,27 @@ describe('createSalvageExecution', () => {
       ['flushOrder', 'salvageComponent', 'holdSelection', 'reload']
     );
     assert.equal(log[1][1].actorId, 'a1', 'decision 8: the acting participation OWNS the documents');
+  });
+
+  it('raises one additional-dice notice naming the salvaging actor, then returns quietly (issue 2008)', async () => {
+    const refusal = {
+      success: false,
+      cancelled: true,
+      additionalDiceRefusal: 'spendRefused',
+      additionalDiceNotice: { dice: 1, limit: 1, available: 1, label: 'Momentum', source: 'path' },
+    };
+    const sources = [{ actorId: 'a1', actorName: 'Akra', quantity: 1 }];
+    const { execution, log } = setup({ item: card({ sources }), result: refusal });
+    const outcome = await execution.salvage('sys', 'c1');
+    assert.equal(outcome, refusal);
+    assert.deepEqual(
+      log.filter(([name]) => name === 'notify'),
+      [['notify', "Fabricate could not spend Akra's Momentum, so the check was not rolled."]]
+    );
+    assert.equal(execution.salvageResult, null, 'no ribbon for a roll that never ran');
+    const quiet = setup({ result: { success: false, cancelled: true } });
+    await quiet.execution.salvage('sys', 'c1');
+    assert.deepEqual(quiet.log.filter(([name]) => name === 'notify'), [], 'a dismissal is silent');
   });
 
   it('ABORTS on a rejected order flush, consuming nothing and reporting the revert', async () => {

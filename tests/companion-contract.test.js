@@ -29,6 +29,7 @@ import {
   POOLED_HOLDINGS_CONSUME_MESSAGE_KEYS,
   POOLED_HOLDINGS_READ_ENTRY_OUTCOMES,
   POOLED_HOLDINGS_READ_MESSAGE_KEYS,
+  additionalDiceCallSiteRefusal,
   affordabilityResult,
   bulkCheckDecisionResult,
   checkRollResult,
@@ -104,6 +105,7 @@ const EXPECTED_OUTCOMES = Object.freeze([
   'evaluationUnsupported',
   'targetUnresolved',
   'poolUnresolved',
+  'additionalDiceRefused',
   'cancelled',
   'invalidCallSite',
   'notElected',
@@ -307,7 +309,7 @@ test('the descriptor publishes versioned evaluation features, frozen', () => {
       { product: 'count', direction: 'over', targetSources: ['fixed', 'attribute'], interactive: true },
       { product: 'count', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: true },
     ],
-    additionalDice: false,
+    additionalDice: true,
   });
   assert.ok(Object.isFrozen(COMPANION_CONTRACT.features));
   assert.ok(Object.isFrozen(COMPANION_CONTRACT.features.checkEvaluation));
@@ -929,6 +931,37 @@ test('a count pass or fail picks the count key, and a zero pool picks its own (i
     { ...countEvidence, total: 0, zeroPool: false }
   );
   assert.equal(nonZero.message, CHECK_ROLL_MESSAGE_KEYS.checkFailedCount);
+});
+
+test('an additional-dice refusal reports its reason key, and an executed answer its bought dice (issue 2008)', () => {
+  const reasonKey = 'FABRICATE.Check.AdditionalDiceRefusal.SpendRefused';
+  const data = { label: 'Fabricate', reason: 'spendRefused', actor: 'Idrin', resource: 'Momentum' };
+  const refused = checkRollResult('additionalDiceRefused', data, { refusalKey: reasonKey, total: 3 });
+  assertContractResult(refused, {
+    ...checkRollRefusal('additionalDiceRefused', data),
+    message: reasonKey,
+  });
+  // A refusal with no reason key falls back to the outcome's own key.
+  const bare = checkRollResult('additionalDiceRefused', { label: 'Fabricate' });
+  assertContractResult(bare, checkRollRefusal('additionalDiceRefused', { label: 'Fabricate' }));
+  // `refusalKey` re-keys this refusal alone; a dismissal sharing its shape keeps its own words.
+  const cancelled = checkRollResult('cancelled', { label: 'Fabricate' }, { refusalKey: reasonKey });
+  assert.equal(cancelled.message, CHECK_ROLL_MESSAGE_KEYS.cancelled);
+
+  const evidence = { total: 2, product: 'count', successes: 2, cancelled: 0 };
+  const label = { label: 'Fabricate', total: 2, required: 1 };
+  assert.equal(checkRollResult('checkPassed', label, { ...evidence, boughtDice: 1 }).boughtDice, 1);
+  assert.equal(checkRollResult('checkPassed', label, evidence).boughtDice, 0, 'none bought is 0');
+  assert.equal('boughtDice' in checkRollResult('rollFailed', { label: 'x', detail: '' }), false);
+});
+
+test('only a gmAction purchase may spend: a broadcast refuses broadcastCallSite (issue 2008)', () => {
+  assert.equal(additionalDiceCallSiteRefusal({ callSite: COMPANION_CALL_SITES.gmAction }), null);
+  assert.equal(
+    additionalDiceCallSiteRefusal({ callSite: COMPANION_CALL_SITES.broadcast }),
+    'broadcastCallSite'
+  );
+  assert.equal(additionalDiceCallSiteRefusal(null), null, 'the call-site gate owns a missing one');
 });
 
 test('an ungraded roll has no pass, and a bulk answer derives its own three fields', () => {

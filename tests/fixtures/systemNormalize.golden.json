@@ -2133,7 +2133,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
@@ -2194,7 +2195,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
@@ -2257,7 +2259,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
@@ -2329,7 +2332,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
@@ -2391,7 +2395,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
@@ -2455,7 +2460,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
@@ -2522,7 +2528,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
@@ -2579,7 +2586,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
@@ -2828,7 +2836,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
@@ -2889,7 +2898,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
@@ -2952,7 +2962,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
@@ -3024,7 +3035,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
@@ -3086,7 +3098,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
@@ -3150,7 +3163,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
@@ -3217,7 +3231,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
@@ -3274,7 +3289,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
@@ -3730,7 +3746,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
@@ -3791,7 +3808,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
@@ -3854,7 +3872,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
@@ -3926,7 +3945,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
@@ -3988,7 +4008,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
@@ -4052,7 +4073,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
@@ -4119,7 +4141,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
@@ -4176,7 +4199,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
@@ -4351,7 +4375,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
@@ -4412,7 +4437,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
@@ -4475,7 +4501,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
@@ -4547,7 +4574,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
@@ -4609,7 +4637,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
@@ -4673,7 +4702,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
@@ -4740,7 +4770,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
@@ -4797,7 +4828,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
@@ -5008,7 +5040,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
@@ -5069,7 +5102,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
@@ -5132,7 +5166,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
@@ -5204,7 +5239,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
@@ -5266,7 +5302,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
@@ -5330,7 +5367,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
@@ -5397,7 +5435,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },
@@ -5454,7 +5493,8 @@
                 "path": "",
                 "readMacroUuid": "",
                 "spendMacroUuid": "",
-                "max": 1
+                "max": 1,
+                "label": ""
               }
             }
           },

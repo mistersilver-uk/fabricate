@@ -90,6 +90,11 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/checks/CheckCountInputField.svelte',
     'src/ui/svelte/apps/manager/checks/CheckCountInset.svelte',
     'src/ui/svelte/apps/manager/checks/CheckCountPoolFields.svelte',
+    // The additional-dice group and its option well (issue 2008). Manifest only.
+    'src/ui/svelte/apps/manager/checks/CheckAdditionalDiceFields.svelte',
+    'src/ui/svelte/apps/manager/checks/CheckOptionGroup.svelte',
+    'src/ui/svelte/components/Well.svelte',
+    'src/ui/svelte/components/Kicker.svelte',
     // The tier card renders the product's ONE ordered list (issue 1512), which draws its controls
     // through the icon button and its opener through the row disclosure.
     'src/ui/svelte/components/SortableList.svelte',

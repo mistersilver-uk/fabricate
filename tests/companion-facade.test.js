@@ -43,6 +43,8 @@ import {
   assertMessageDataCovers,
   assertMessageIsFromTable,
 } from './helpers/companionContractOutcomes.js';
+import { installCountDice } from './helpers/countEngineDice.js';
+import { countEvaluation } from './helpers/countFixtures.js';
 import {
   CurrencyCraftingActorFake,
   makeCurrencyConfigStoreStub,
@@ -53,6 +55,7 @@ import {
   installFacadeGame,
   makeFacadeActor,
 } from './helpers/fabricateFacadeHarness.js';
+import { installFoundryPropertyUtils, withStoredResource } from './helpers/storedResourceActor.js';
 
 const GM = { id: 'user-gm', isGM: true };
 const PLAYER = { id: 'user-player', isGM: false };
@@ -568,13 +571,12 @@ describe('AC-14 (facade half) — the delegator forwards NAMED KEYS, never the r
       actor: impostorActor,
       speaker: impostorSpeaker,
       prompt: callerPrompt,
-      // Every product/direction/source combination is published interactively (issue 2006), so an
-      // interactive count with active additional dice is what stays unsupported (issue 2008).
+      // A malformed evaluation refuses before any runner, whatever else the request carries.
       interactive: true,
-      evaluation: { product: 'count', pool: { additionalDice: { enabled: true } } },
+      evaluation: { product: 'count', pool: { die: '6' } },
     };
-    const unsupported = await facade.rollActorCheck(request);
-    assert.equal(unsupported.outcome, 'evaluationUnsupported');
+    const malformed = await facade.rollActorCheck(request);
+    assert.equal(malformed.outcome, 'evaluationInvalid');
     assert.deepEqual(checkCalls.bags, []);
 
     request.interactive = false;
@@ -1417,6 +1419,43 @@ describe('each actor-targeted delegator refuses in its OWN words, GM -> actor ->
     for (const set of ['apiKeys', 'macroApiKeys', 'gatheringKeys']) {
       assert.ok(golden[set].length > 0, `${set} is populated`);
       assert.equal(golden[set].includes('grantRecipeKnowledge'), false, `${set} names no grant`);
+    }
+  });
+});
+
+// Additional dice (issue 2008) — the facade forwards the key, and the member spends it as the GM
+
+describe('additionalDice through the facade (issue 2008)', () => {
+  const PATH = 'system.resources.momentum.value';
+
+  /** The rollable actor, holding 2 Momentum in `_source` that its `update` writes. */
+  function momentumActor() {
+    const actor = Object.assign(makeGrantTargetActor('actor-1'), { getRollData: () => ({}) });
+    return withStoredResource(actor, PATH, 2);
+  }
+
+  it('publishes the capability, forwards the key and spends it for the calling GM', async () => {
+    assert.equal(COMPANION_CONTRACT.features.checkEvaluation.additionalDice, true);
+    const { actor, writes, permissionChecks } = momentumActor();
+    const { facade, checkCalls } = standUpFacade({ actors: [actor] });
+    const restoreFoundry = installFoundryPropertyUtils();
+    const dice = installCountDice({ faces: [9, 9, 3] });
+    try {
+      const additionalDice = { enabled: true, source: 'path', path: PATH, max: 2, label: 'Momentum' };
+      const result = await facade.rollActorCheck({
+        actorId: 'actor-1',
+        callSite: 'gmAction',
+        evaluation: countEvaluation({ additionalDice }),
+        additionalDice: 1,
+      });
+      assert.equal(result.outcome, COMPANION_OUTCOMES.checkPassed);
+      assert.equal(result.boughtDice, 1);
+      assert.equal(checkCalls.bags[0].rollOptions.additionalDice, 1, 'the facade forwarded the key');
+      assert.deepEqual(writes, [{ [PATH]: 1 }], 'spent before the roll, on this GM client');
+      assert.deepEqual(permissionChecks[0], [globalThis.game.user, 'update'], 'as the calling GM');
+    } finally {
+      dice.restore();
+      restoreFoundry();
     }
   });
 });

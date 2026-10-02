@@ -268,6 +268,18 @@ export const CHECK_EVIDENCE_RAW_MODULES = Object.freeze([
   'src/utils/scalars.js',
 ]);
 
+/**
+ * The additional-dice notice the player stores and views raise (issue 2008): the prompt presenter
+ * and the prompt-safe reach leaf it words refusals through. Their remaining closure is
+ * `CHECK_EVIDENCE_RAW_MODULES`, which every list spreading this one also carries.
+ */
+export const ADDITIONAL_DICE_NOTICE_RAW_MODULES = Object.freeze([
+  'src/ui/presenters/additionalDicePrompt.js',
+  'src/ui/svelte/util/journalRunReasons.js',
+  'src/systems/additionalDiceReach.js',
+  'src/systems/countTriggerReach.js',
+]);
+
 export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`, spread
   // from the roster above rather than copied so the two cannot drift.
@@ -372,6 +384,8 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/ui/svelte/actions/dismissOnOutsideClick.js',
   // Issue 2053: the Craft button records the window a roll prompt opens in.
   'src/ui/svelte/util/rollPromptOrigin.js',
+  // Issue 2008: `craftingStore` words a refused additional-dice choice through the prompt presenter.
+  ...ADDITIONAL_DICE_NOTICE_RAW_MODULES,
   ...CHECK_EVIDENCE_RAW_MODULES
 ]);
 

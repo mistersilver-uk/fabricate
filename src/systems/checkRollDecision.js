@@ -2,6 +2,7 @@
 
 import { localizeWith } from '../utils/localizeWithFallback.js';
 
+import { publicAdditionalDiceOffer } from './additionalDiceReach.js';
 import { offeredDecision, resolveAdvantageOffer } from './checkAdvantage.js';
 import { planKeepTransform } from './checkKeepTransform.js';
 import {
@@ -91,12 +92,11 @@ export function attributeTargetPromptField(evaluation) {
 }
 
 /**
- * A count prompt's fields, numbers and enums only, from the pool resolved before the prompt opens
- * (`policy`, or null): `pool` and `threshold` are the resolved base and threshold with any scalar
- * Tool benefit already settled on them, unfloored, which the prompt settles its picks and bonus
- * onto; `thresholdAnchor` is the resolved threshold before any benefit, read from the character or
- * `fixed` as `thresholdSource` says; `explode` and `cancel` name the face each acts from. The
- * required count is null when nothing grades against it: progressive, fixed-range routed, hidden.
+ * A count prompt's fields from the pool resolved before the prompt opens (`policy`, or null):
+ * `pool` and `threshold` carry any scalar Tool benefit, unfloored, and `pendingTools` the rolled
+ * Tool formulas still to settle; `thresholdAnchor` is the threshold before any benefit, read as
+ * `thresholdSource` says; `explode` and `cancel` name the face each acts from. The required
+ * count is null when nothing grades against it: progressive, fixed-range routed, hidden.
  */
 export function countPromptFields(evaluation, policy, required, toolContributions = []) {
   const direction = evaluation.direction === 'under' ? 'under' : 'over';
@@ -115,8 +115,10 @@ export function countPromptFields(evaluation, policy, required, toolContribution
     contributions: settledToolBenefits(toolContributions),
   });
   const { explode, cancel } = describeCountPolicy(policy);
+  const pendingTools = rolledToolFormulas(toolContributions);
   return {
     ...shared,
+    ...(pendingTools.length > 0 && { pendingTools }),
     pool: policy.resolved.base + tools.poolDelta,
     die: policy.die,
     threshold: policy.resolved.threshold + tools.thresholdDelta,
@@ -150,6 +152,14 @@ function settledToolBenefits(toolContributions) {
     .map((tool) => ({ source: 'tool', label: '', form: 'scalar', value: tool.value }));
 }
 
+/** The Tool benefits still to roll at evaluation, which may yet add to the pool (issue 2008). */
+function rolledToolFormulas(toolContributions) {
+  return (Array.isArray(toolContributions) ? toolContributions : [])
+    .filter((tool) => tool?.form === 'expression' && tool.negate !== true)
+    .map((tool) => (typeof tool.expression === 'string' ? tool.expression.trim() : ''))
+    .filter(Boolean);
+}
+
 function promptInput({
   authoredFormula,
   actor,
@@ -160,6 +170,7 @@ function promptInput({
   deferred,
   countPolicy,
   advantageOffer,
+  additionalDiceOffer,
 }) {
   // A count check shows no formula, so no bare deferred slot either (issue 2004).
   const formula =
@@ -192,6 +203,7 @@ function promptInput({
     offerSituationalBonus: options.offerSituationalBonus !== false,
     ...(evaluation.product === 'count' &&
       countPromptFields(evaluation, countPolicy, options.required, options.toolContributions)),
+    ...(additionalDiceOffer && { additionalDiceOffer }),
   };
 }
 
@@ -261,10 +273,32 @@ export function planDecisionPlacement({ evaluation, toolContributions, selected,
 }
 
 /**
+ * The bought dice a decision places (issue 2008): `{ dice }`, or `{ refusal }` for a count the
+ * check's additional-dice `purchase` cannot honour (null when it offers none). It never clamps; a
+ * simulated preview places its own count without a budget.
+ */
+function boughtDiceDecision(purchase, requested) {
+  if (Number.isInteger(purchase?.simulated)) return { dice: purchase.simulated };
+  if ([undefined, null, 0].includes(requested)) return { dice: 0 };
+  if (!purchase) return { refusal: 'notOffered' };
+  if (!Number.isInteger(requested) || requested < 0) return { refusal: 'choiceInvalid' };
+  if (purchase.offer.unavailable) return { refusal: purchase.offer.unavailable };
+  if (requested > purchase.offer.limit) return { refusal: 'choiceAboveLimit' };
+  return { dice: requested };
+}
+
+/** The one count-only scalar bought dice add to the pool, after advantage; none for zero dice. */
+function boughtContribution(purchase, dice) {
+  if (!(dice > 0)) return null;
+  return { source: 'additionalDice', label: purchase.resourceLabel, form: 'scalar', value: dice };
+}
+
+/**
  * The prompt returns a decision, but never determines the selected modifier data directly.
  * `deferred` means the offered `modifierChoice` is selected by that decision; a count check
  * passes the `countPolicy` its pool resolved to before the prompt, and gets back the
  * `contributions` it placed. `keep` is the keep transform the main roll takes, or null.
+ * `purchase` is a count check's additional-dice offer; a refused count cancels with its reason.
  */
 export async function resolveCheckDecision({
   authoredFormula,
@@ -276,6 +310,7 @@ export async function resolveCheckDecision({
   displayFormula,
   Roll,
   countPolicy = null,
+  purchase = null,
 }) {
   let formula = resolvedCheck.formula;
   let flavor = options?.flavor;
@@ -285,6 +320,7 @@ export async function resolveCheckDecision({
   let keep = null;
   let advantaged = null;
   const preResolved = options?.rollDecision ?? null;
+  let requested = options?.additionalDice;
 
   if (options?.interactive === true && (preResolved || typeof options.prompt === 'function')) {
     const advantage = normalizeCheckAdvantage(options.advantage);
@@ -302,9 +338,11 @@ export async function resolveCheckDecision({
           deferred,
           countPolicy,
           advantageOffer,
+          additionalDiceOffer: publicAdditionalDiceOffer(purchase?.offer),
         })
       ));
     if (!choice || choice.confirmed === false) return { cancelled: true };
+    requested = choice.additionalDice;
 
     if (deferred) {
       const selection = resolveModifierSelection(options.modifierChoice, choice);
@@ -329,11 +367,13 @@ export async function resolveCheckDecision({
     if (choice.rollMode) rollMode = choice.rollMode;
   }
 
+  const bought = boughtDiceDecision(purchase, requested);
+  if (bought.refusal) return { cancelled: true, additionalDiceRefusal: bought.refusal, requested };
   const { contributions, placementPlan } = planDecisionPlacement({
     evaluation,
     toolContributions: options?.toolContributions,
     selected: selectedModifiers,
-    answered: [situational, advantaged].filter(Boolean),
+    answered: [situational, advantaged, boughtContribution(purchase, bought.dice)].filter(Boolean),
   });
   return {
     formula,
@@ -344,6 +384,7 @@ export async function resolveCheckDecision({
     resolvedFormula: displayFormula(formula, actor)?.display ?? null,
     keep,
     ...(evaluation.product === 'count' && { contributions }),
+    ...(bought.dice > 0 && { additionalDice: bought.dice }),
   };
 }
 

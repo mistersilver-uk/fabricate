@@ -84,7 +84,7 @@ See [What the previews will tell you]({% link checks/crafting.md %}#what-the-pre
 Every check's **The roll** section opens with a **What the roll produces** setting, choosing between **Add the dice**, the classic check every other section on this page describes, and **Count successes**, where the check rolls a pool of dice and counts how many of them individually clear a threshold instead of adding them into one total.
 It appears on every check that rolls, except gathering's immediate d100 mode and an Alchemy check switched off, neither of which rolls a check at all.
 Switching between the two keeps everything you authored on both sides, so trying **Count successes** and switching back costs you nothing.
-See [Success-counting checks]({% link checks/crafting.md %}#success-counting-checks) for the full guide to authoring one.
+See [Success-counting checks]({% link checks/crafting.md %}#success-counting-checks) for the full guide to authoring one, and [Additional dice]({% link checks/crafting.md %}#additional-dice) for letting a player spend a resource to roll more dice than a counting check's pool alone would give them.
 
 ## Which way is better
 

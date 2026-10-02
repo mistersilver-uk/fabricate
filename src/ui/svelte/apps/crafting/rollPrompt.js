@@ -1,4 +1,5 @@
 /** The single and bulk check prompt: view preparation, the modal surface and answer translation. */
+import { publicAdditionalDiceOffer } from '../../../../systems/additionalDiceReach.js';
 import {
   bracketBonusExpression,
   publicAdvantageOffer,
@@ -6,6 +7,7 @@ import {
 import { isFixedSumOver } from '../../../../systems/checkTarget.js';
 import { describeCountPolicy } from '../../../../systems/countEvaluation.js';
 import { fill } from '../../../../utils/fillPlaceholders.js';
+import { additionalDiceCopy } from '../../../presenters/additionalDicePrompt.js';
 import { countFaceClauses } from '../manager/checks/countInsetModel.js';
 
 import { openRollPromptModal } from './rollPromptHost.js';
@@ -109,8 +111,23 @@ export function normalizeSituationalBonus(value) {
   return bonus || null;
 }
 
-/** Any answer but an explicit confirmation is a dismissal; the pick cap is re-imposed here. */
-export function translatePromptAnswer(answer, { defaultRollMode, choicePlan }) {
+/** Why a choice of `dice` additional dice refuses under `offer`, else null; zero never refuses. */
+function additionalDiceChoiceRefusal(dice, offer) {
+  if (dice === 0) return null;
+  if (!offer) return 'notOffered';
+  if (!Number.isInteger(dice) || dice < 0) return 'choiceInvalid';
+  if (offer.unavailable) return offer.unavailable;
+  return dice > offer.limit ? 'choiceAboveLimit' : null;
+}
+
+/**
+ * Any answer but an explicit confirmation is a dismissal; the pick cap is re-imposed here, and an
+ * additional-dice choice the offer does not admit keeps its value, never clamped, with its refusal.
+ */
+export function translatePromptAnswer(
+  answer,
+  { defaultRollMode, choicePlan, additionalDiceOffer = null }
+) {
   if (answer?.confirmed !== true) return { confirmed: false };
   const result = {
     confirmed: true,
@@ -125,6 +142,12 @@ export function translatePromptAnswer(answer, { defaultRollMode, choicePlan }) {
     const ids = picked.map(String).slice(0, choicePlan.maxPicks);
     result.chosenModifierIds = ids;
     if (ids.length > 0) result.chosenModifierId = ids[0];
+  }
+  const dice = answer.additionalDice ?? 0;
+  if (additionalDiceOffer || dice !== 0) {
+    const refusal = additionalDiceChoiceRefusal(dice, additionalDiceOffer);
+    result.additionalDice = dice;
+    if (refusal) result.additionalDiceRefusal = refusal;
   }
   return result;
 }
@@ -272,6 +295,18 @@ function formatCopy(data, choicePlan) {
     if (line.note) formatted.labels.formulaNote = line.note;
   }
   // The one target chip: a count's successes needed, else the DC or target and its comparison.
+  if (data.additionalDiceOffer) {
+    formatted.labels.additionalDice = additionalDiceCopy(data.additionalDiceOffer, localize);
+  }
+  if (data.additionalDiceMixed) {
+    formatted.labels.additionalDice = {
+      title: localize('FABRICATE.App.RollPrompt.AdditionalDice.Title', 'Additional dice'),
+    };
+    formatted.labels.additionalDiceMixed = localize(
+      'FABRICATE.App.RollPrompt.AdditionalDice.Bulk.Mixed',
+      'Rolls in this batch use different resources, so no dice can be added.'
+    );
+  }
   formatted.chipText = data.count
     ? formatted.neededText
     : formatted.dcText &&
@@ -389,7 +424,11 @@ export async function waitForPrompt(data, allowAdvantage, choicePlan, open = res
   } catch (error) {
     console.error('Fabricate | Roll prompt failed:', error);
   }
-  return translatePromptAnswer(answer, { defaultRollMode, choicePlan });
+  return translatePromptAnswer(answer, {
+    defaultRollMode,
+    choicePlan,
+    additionalDiceOffer: data.additionalDiceOffer ?? null,
+  });
 }
 
 /** A bulk row's need rolls under when it names a target or reads an under character value. */
@@ -399,7 +438,8 @@ function rollsUnder(need) {
 
 /**
  * A count check's view: the pool and threshold its picks and bonus settle onto, the threshold's
- * anchor and source, the faces it explodes and cancels on, and the required count.
+ * anchor and source, the faces it explodes and cancels on, the required count, and the rolled
+ * Tool formulas still to settle.
  */
 function countPromptView({
   pool,
@@ -412,8 +452,12 @@ function countPromptView({
   zeroPoolFails,
   required,
   modifierDestination,
+  pendingTools,
 }) {
   const finite = (value) => (Number.isFinite(value) ? value : null);
+  const rolled = Array.isArray(pendingTools)
+    ? pendingTools.filter((formula) => typeof formula === 'string' && formula.trim())
+    : [];
   return {
     pool: finite(pool),
     die: finite(die),
@@ -425,6 +469,7 @@ function countPromptView({
     zeroPoolFails: zeroPoolFails !== false,
     required: Number.isInteger(required) ? required : null,
     destination: modifierDestination === 'threshold' ? 'threshold' : 'pool',
+    ...(rolled.length > 0 && { pendingTools: rolled }),
   };
 }
 
@@ -472,6 +517,7 @@ export function buildSinglePromptData({
   zeroPoolFails,
   required,
   modifierDestination,
+  pendingTools,
   offerSituationalBonus,
   targetSource,
 } = {}) {
@@ -510,6 +556,7 @@ export function buildSinglePromptData({
         zeroPoolFails,
         required,
         modifierDestination,
+        pendingTools,
       }),
     };
   }
@@ -573,23 +620,67 @@ function withAdvantageOffer(data, offer) {
   return offer ? { ...data, advantageOffer: publicAdvantageOffer(offer) } : data;
 }
 
+/** A count prompt's allowlisted additional-dice offer and the actor it names (issue 2008). */
+function withAdditionalDiceOffer(data, offer, actorName) {
+  const publicOffer = data.count ? publicAdditionalDiceOffer(offer) : null;
+  return publicOffer
+    ? { ...data, additionalDiceOffer: publicOffer, actorName: actorName || '' }
+    : data;
+}
+
 export async function promptCheckRoll(options = {}) {
-  const { modifierChoice, allowAdvantage, advantageOffer } = options;
+  const { modifierChoice, allowAdvantage, advantageOffer, additionalDiceOffer } = options;
   const plan = planModifierChoice(modifierChoice);
   const open = resolveSurface();
   if (!open) {
-    return modifierChoice
-      ? {
-          confirmed: true,
-          chosenModifierIds: plan.defaultSelectedIds,
-          ...(plan.defaultSelectedIds.length > 0 && {
-            chosenModifierId: plan.defaultSelectedIds[0],
-          }),
-        }
-      : { confirmed: true };
+    return {
+      confirmed: true,
+      ...(modifierChoice && { chosenModifierIds: plan.defaultSelectedIds }),
+      ...(modifierChoice &&
+        plan.defaultSelectedIds.length > 0 && { chosenModifierId: plan.defaultSelectedIds[0] }),
+      ...(additionalDiceOffer && { additionalDice: 0 }),
+    };
   }
-  const data = withAdvantageOffer(buildSinglePromptData(options), advantageOffer);
+  const data = withAdditionalDiceOffer(
+    withAdvantageOffer(buildSinglePromptData(options), advantageOffer),
+    additionalDiceOffer,
+    options.actorName
+  );
   return waitForPrompt(data, allowAdvantage, plan, open);
+}
+
+/** A batch row's pool and reach facts, numbers and enums only; null for a row with none. */
+function bulkRowDice(row) {
+  const { countDice, reach } = row?.additionalDice ?? {};
+  const finite = (value) => (Number.isFinite(value) ? value : null);
+  return {
+    countDice: countDice && {
+      base: finite(countDice.base),
+      poolDelta: finite(countDice.poolDelta) ?? 0,
+      zeroPoolFails: countDice.zeroPoolFails !== false,
+      destination: countDice.destination === 'threshold' ? 'threshold' : 'pool',
+    },
+    reach: publicAdditionalDiceOffer({ reach })?.reach ?? null,
+  };
+}
+
+/**
+ * A batch's additional-dice offer (issue 2008), the rolls one choice covers and the one actor it
+ * names, each covered row keeping its own pool and reach; else the note that rows differ.
+ */
+function withBulkAdditionalDice(data, { additionalDiceOffer, additionalDiceMixed, actorName }) {
+  const offer = publicAdditionalDiceOffer(additionalDiceOffer);
+  if (!offer) return additionalDiceMixed === true ? { ...data, additionalDiceMixed: true } : data;
+  const subjects = data.subjects.map((row) =>
+    row?.additionalDice ? { ...row, additionalDice: bulkRowDice(row) } : row
+  );
+  return {
+    ...data,
+    subjects,
+    additionalDiceOffer: offer,
+    additionalDiceRolls: subjects.filter((row) => row?.additionalDice).length,
+    actorName: actorName || '',
+  };
 }
 
 export async function promptBulkCheckRoll({
@@ -599,13 +690,26 @@ export async function promptBulkCheckRoll({
   subjects,
   activity,
   actorName,
+  additionalDiceOffer,
+  additionalDiceMixed,
 } = {}) {
   const open = resolveSurface();
-  if (!open) return { confirmed: true, bonus: null, rollMode: undefined, advantage: 'normal' };
+  if (!open) {
+    return {
+      confirmed: true,
+      bonus: null,
+      rollMode: undefined,
+      advantage: 'normal',
+      ...(additionalDiceOffer && { additionalDice: 0 }),
+    };
+  }
   return waitForPrompt(
-    withAdvantageOffer(
-      buildBulkPromptData({ count, subjects, activity, actorName }),
-      advantageOffer
+    withBulkAdditionalDice(
+      withAdvantageOffer(
+        buildBulkPromptData({ count, subjects, activity, actorName }),
+        advantageOffer
+      ),
+      { additionalDiceOffer, additionalDiceMixed, actorName }
     ),
     allowAdvantage,
     planModifierChoice(null),

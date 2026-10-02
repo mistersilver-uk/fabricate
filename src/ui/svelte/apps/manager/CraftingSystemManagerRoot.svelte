@@ -33,7 +33,7 @@
   import { parseDiceGroups } from '../../../../utils/craftingCheckExpression.js';
   import { interpolate } from './checks/checksCopy.js';
   import { summariseCondition } from './checks/checkTriggerSummary.js';
-  import { cloneRollData, listPreviewActors, resolvePreviewActor } from './checks/checkPreview.js';
+  import { listPreviewActors, resolvePreviewCharacter } from './checks/checkPreview.js';
   import { salvagePresetTiers } from './component/salvageDcPresets.js';
   import { buildVocabularyUsage, dedupeVocabularyEntries } from '../../../model/vocabularyUsage.js';
   import {
@@ -633,10 +633,6 @@
       ? listPreviewActors()
       : []
   );
-  function resolveOverrideCharacter(actorId) {
-    const actor = resolvePreviewActor(actorId);
-    return actor ? { name: actor.name, rollData: cloneRollData(actor) } : null;
-  }
   // System components offered to the salvage yield picker.
   const salvageComponentOptions = $derived(selectedSystem?.managedItemOptions || []);
 
@@ -5454,7 +5450,7 @@
         routedOutcomeTiers={gathering.gatheringTaskRoutedOutcomeTiers}
         checkConfig={selectedSystem?.gatheringCraftingCheck?.routed ?? null}
         previewActors={overridePreviewActors}
-        resolvePreviewCharacter={resolveOverrideCharacter}
+        {resolvePreviewCharacter}
         resultValidationErrors={gathering.gatheringTaskValidation.resultErrors || []}
         {itemCards}
         managedItemOptions={selectedSystem.managedItemOptions || []}
@@ -5624,7 +5620,7 @@
           {salvageCheckDc}
           {salvageCheckConfig}
           previewActors={overridePreviewActors}
-          resolvePreviewCharacter={resolveOverrideCharacter}
+          {resolvePreviewCharacter}
           componentOptions={salvageComponentOptions}
           {complicationActivities}
           {complicationTriggerOptions}

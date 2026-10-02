@@ -53,7 +53,8 @@ export function countRollReport(options, { decision, evaluation, placement }) {
 /**
  * `{ countDisplay }` for a graded count roll that reported its visibility, else nothing: the
  * projected dice, the totals, the required count it was graded against (null where none applies)
- * and the resolved pool and threshold with their settled terms.
+ * and the resolved pool and threshold with their settled terms. A roll that bought dice adds
+ * `bought`, the original dice they added, and the Resource name (issue 2008).
  */
 export function reportedCountDisplay(rolled, required) {
   if (!rolled || !Object.hasOwn(rolled, 'rollMode')) return {};
@@ -78,6 +79,10 @@ export function reportedCountDisplay(rolled, required) {
         terms: terms.threshold,
         effective: policy.threshold,
       },
+      ...(rolled.bought && {
+        bought: rolled.bought.marked,
+        resourceLabel: rolled.bought.resourceLabel,
+      }),
     },
   };
 }

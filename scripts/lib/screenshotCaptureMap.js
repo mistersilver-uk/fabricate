@@ -20,6 +20,7 @@ export const CLASS_A_LABELS = Object.freeze(
     'chat-craft-card-count-fail',
     'chat-craft-card-count-botch',
     'chat-craft-card-count-zero',
+    'chat-craft-card-count-bought',
     'chat-craft-card-over-control',
     'chat-craft-card-under-pass',
     'chat-craft-card-under-fail',
@@ -231,6 +232,8 @@ export const SCREENSHOT_CAPTURE_ORDER = Object.freeze([
   'chat-craft-card-count-fail',
   'chat-craft-card-count-botch',
   'chat-craft-card-count-zero',
+  // Issue 2008: a bought die, spent from the crafter's resource before the roll.
+  'chat-craft-card-count-bought',
   'chat-craft-card-over-control',
   // Issue 2005: the roll-under cards and the refusal, crafted after the counting cards.
   'chat-craft-card-under-pass',

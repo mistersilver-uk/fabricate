@@ -240,6 +240,41 @@ const authoringCase = ({
     ...rest,
   });
 const COUNTING = '.fabricate-manager:has([data-check-product-option="count"].is-active)';
+
+/*
+ * Issue 2008's additional-dice group on issue 2004's `dice-pool-faults` crafting pool, which pays
+ * one die from a stored Momentum (`tests/view-lab/world/labCheckPreviews.js`): Idrin holds 2,
+ * Brenna's is set by an active effect and Vosk has none. Each state is authored by steps.
+ */
+const ADDITIONAL_DICE = '[data-check-additional-dice-group]';
+const SHOW_ADDITIONAL_DICE = Object.freeze({ selector: ADDITIONAL_DICE, scroll: true });
+const ADDITIONAL_DICE_PATH = '[data-check-additional-dice-path]';
+const PATH_LINE = (tone, text) =>
+  `:has([data-check-additional-dice-path-line="${tone}"]:text-is("${text}"))`;
+const PREVIEW_NOTE = (kind, text) =>
+  `:has([data-checks-preview-additional-dice-note="${kind}"]:text-is("${text}"))`;
+const MOMENTUM_PATH = 'system.resources.momentum.value';
+const additionalDiceCase = ({ steps, expectSelector, ...rest }) =>
+  authoringCase({
+    state: 'dice-pool-faults',
+    steps: [...steps, SHOW_ADDITIONAL_DICE],
+    expectSelector: `.fabricate-manager${expectSelector}`,
+    ...rest,
+  });
+const VALIDATION_NAV = Object.freeze({ selector: '#manager-checks-nav-validation' });
+const additionalDiceValidationCase = ({ steps, issue, expectSelector, ...rest }) =>
+  authoringCase({
+    state: 'dice-pool-faults',
+    nav: 'validation',
+    steps: [
+      { selector: '#manager-checks-nav-crafting' },
+      ...steps,
+      VALIDATION_NAV,
+      { selector: `[data-issue="${issue}"]`, scroll: true },
+    ],
+    expectSelector: `.fabricate-manager [data-checks-panel="validation"]${expectSelector}`,
+    ...rest,
+  });
 const EXPLODE_ROW = Object.freeze({ selector: '[data-check-count-row-explode]', scroll: true });
 
 /*
@@ -294,7 +329,7 @@ const FIXED_BANDS = Object.freeze([
  * controls on a summing crafting check, or on issue 2004's seeded counting pool.
  */
 const ADVANTAGE_SOURCES = Object.freeze([
-  /^src\/ui\/svelte\/apps\/manager\/checks\/(CheckPromptOptions\.svelte|checkAdvantageCopy\.js)$/,
+  /^src\/ui\/svelte\/apps\/manager\/checks\/(CheckPromptOptions\.svelte|CheckOptionGroup\.svelte|checkAdvantageCopy\.js)$/,
 ]);
 const ADVANTAGE_VALIDATION_SOURCES = Object.freeze([
   /^src\/ui\/svelte\/apps\/manager\/checks\/(?:ChecksValidationTab\.svelte|checksReadiness\.js|checksCopy\.js)$/,
@@ -1935,6 +1970,7 @@ export const CASES = Object.freeze([
     expectSelector:
       '.fabricate-manager' +
       ':has([data-checks-section-notice="countRequiredExceedsMaxPool"])' +
+      ':has([data-checks-section-notice="countRequiredExceedsBasePool"])' +
       ':has([data-checks-section-notice="countTierWithoutSuccesses"])',
   }),
   // The worst realistic roll pile-up at the declared floor, blocking notices first (issue 2082);
@@ -1964,9 +2000,11 @@ export const CASES = Object.freeze([
     expectSelector:
       '.fabricate-manager' +
       ':has([data-issue="countRequiredExceedsMaxPool"])' +
+      ':has([data-issue="countRequiredExceedsBasePool"])' +
       ':has([data-issue="countTierWithoutSuccesses"])' +
       ':has([data-issue="countThresholdInvalid"])' +
-      ':has([data-issue="countPoolInvalid"])',
+      ':has([data-issue="countPoolInvalid"])' +
+      ':not(:has([data-issue^="countAdditionalDice"]))',
   }),
   authoringCase({
     id: 'manager-checks-v3-count-over',
@@ -2030,6 +2068,7 @@ export const CASES = Object.freeze([
       ':has([data-check-count-threshold-mode-option="value"].is-active)' +
       ':has([data-check-count-test-option="meet"].is-active)' +
       ':has([data-check-count-destination-option="threshold"].is-active)' +
+      ':has([data-check-additional-dice-group] [data-check-additional-dice][aria-pressed="false"])' +
       ':not(:has([data-threshold-mode]))' +
       ' [data-check-count-actor-line="resolved"]',
   }),
@@ -2224,7 +2263,182 @@ export const CASES = Object.freeze([
     steps: [{ selector: '[data-issue="countTriggerGroupUnreachable"]', scroll: true }],
     expectSelector:
       '.fabricate-manager:has([data-issue="countFaceMissing"][data-issue-severity="critical"])' +
+      ':has([data-issue="countRequiredExceedsBasePool"][data-issue-severity="warning"])' +
+      ':not(:has([data-issue^="countAdditionalDice"]))' +
       ' [data-issue="countTriggerGroupUnreachable"][data-issue-severity="warning"]',
+  }),
+  // Frame 08 (`cntExtraOff`): the toggle off keeps the group's head and no nested fields.
+  additionalDiceCase({
+    id: 'manager-checks-v3-count-additional-dice-off',
+    label: 'additional dice turned off',
+    frame: '08',
+    steps: [{ selector: '[data-check-additional-dice][aria-pressed="true"]' }],
+    expectSelector:
+      ` ${ADDITIONAL_DICE}:has([data-check-additional-dice][aria-pressed="false"])` +
+      ':not(:has([data-check-additional-dice-fields]))',
+  }),
+  // Frame 07 (`cntLo`): paid from Idrin's stored Momentum, the group after the composed-roll inset,
+  // and the Preview's stepper bounded by what Idrin holds.
+  additionalDiceCase({
+    id: 'manager-checks-v3-count-additional-dice-path',
+    label: 'paid from a stored path, Idrin holding 2 Momentum',
+    frame: '07',
+    steps: [...COUNT_IDRIN],
+    expectSelector:
+      PREVIEW_NOTE('path', 'Up to 1 for Idrin Ashfall (Momentum 2, at most 1 per roll).') +
+      ':not(:has([data-checks-simulator-readout]))' +
+      ` ${ADDITIONAL_DICE}` +
+      ':has([data-check-additional-dice-source-option="path"].is-active)' +
+      PATH_LINE('resolved', 'Idrin Ashfall → 2') +
+      ':has([data-check-additional-dice-label-field])' +
+      ':has([data-check-additional-dice-max])',
+  }),
+  additionalDiceCase({
+    id: 'manager-checks-v3-count-additional-dice-path-narrow',
+    label: 'paid from a stored path, at 1024x640',
+    frame: '07',
+    position: { width: 1024, height: 640 },
+    steps: [...COUNT_IDRIN],
+    expectSelector:
+      ':not(:has([data-checks-simulator-readout]))' +
+      ` ${ADDITIONAL_DICE}:has([data-check-additional-dice-source-option="path"].is-active)` +
+      PATH_LINE('resolved', 'Idrin Ashfall → 2'),
+  }),
+  // `rdySrc` in the Studio: the path cleared, so nothing can be offered.
+  additionalDiceCase({
+    id: 'manager-checks-v3-count-additional-dice-path-empty',
+    label: 'with no path set',
+    frame: '07, path cleared',
+    steps: [...COUNT_IDRIN, { selector: ADDITIONAL_DICE_PATH, fill: '' }],
+    expectSelector:
+      PREVIEW_NOTE('no-source', 'This check has no source to pay for additional dice.') +
+      ` ${ADDITIONAL_DICE}` +
+      PATH_LINE('danger', 'No source set. Players cannot be offered additional dice until one is.'),
+  }),
+  // Vosk holds no Momentum: a warning line, and the Preview adds no dice for him.
+  additionalDiceCase({
+    id: 'manager-checks-v3-count-additional-dice-unresolved',
+    label: 'a Preview-as character with no value at the path',
+    frame: '07, unresolved',
+    steps: [...previewAsActor('lab-actor-vosk')],
+    expectSelector:
+      PREVIEW_NOTE(
+        'unreadable',
+        `Vosk has no stored number at ${MOMENTUM_PATH}, so no dice can be added.`
+      ) +
+      ` ${ADDITIONAL_DICE}` +
+      PATH_LINE(
+        'warning',
+        `Vosk has no stored number at ${MOMENTUM_PATH}, so they could not buy additional dice.`
+      ),
+  }),
+  additionalDiceCase({
+    id: 'manager-checks-v3-count-additional-dice-overridden',
+    label: 'a Preview-as character whose value an active effect sets',
+    frame: '— (overridden)',
+    steps: [...previewAsActor('lab-actor-brenna')],
+    expectSelector:
+      PREVIEW_NOTE(
+        'overridden',
+        `An active effect changes Brenna Karrunsdottir's ${MOMENTUM_PATH}, so no dice can be added.`
+      ) +
+      ':has(input[data-checks-preview-additional-dice]:disabled)' +
+      ` ${ADDITIONAL_DICE}` +
+      PATH_LINE(
+        'warning',
+        `An active effect changes Brenna Karrunsdottir's ${MOMENTUM_PATH}, so spending it would not lower it. Use a stored value.`
+      ),
+  }),
+  // The retained read macro shows once the source switches; the spend macro is still unset.
+  additionalDiceCase({
+    id: 'manager-checks-v3-count-additional-dice-macro',
+    label: 'paid by macros, the spend macro not yet linked',
+    frame: '07, macros',
+    steps: [{ selector: '[data-check-additional-dice-source-option="macro"]' }],
+    expectSelector:
+      PREVIEW_NOTE('no-source', 'This check has no source to pay for additional dice.') +
+      ` ${ADDITIONAL_DICE}:not(:has(${ADDITIONAL_DICE_PATH}))` +
+      ':has([data-check-additional-dice-read-macro]:has-text("Read Momentum"))' +
+      ' [data-check-additional-dice-spend-macro]:has-text("Drop a macro here")',
+  }),
+  // Both macros linked: the Preview never runs the read macro, so the maximum bounds it.
+  additionalDiceCase({
+    id: 'manager-checks-v3-count-additional-dice-macro-pair',
+    label: 'paid by a linked read and spend macro',
+    frame: '07, macros',
+    state: 'dice-pool-faults-macro',
+    steps: [],
+    expectSelector:
+      PREVIEW_NOTE(
+        'macro',
+        'The preview never runs the read macro, so up to 1 can be added here.'
+      ) +
+      ` ${ADDITIONAL_DICE}:has([data-check-additional-dice-read-macro]:has-text("Read Momentum"))` +
+      ' [data-check-additional-dice-spend-macro]:has-text("Announce Momentum")',
+    // The linked uuid wraps under its Copy button rather than running beneath it.
+    expectNoHorizontalOverflow:
+      '[data-check-additional-dice-read-macro] .manager-item-drop-zone-copy',
+  }),
+  additionalDiceCase({
+    id: 'manager-checks-v3-count-additional-dice-no-actor',
+    label: 'with no Preview-as character',
+    frame: '10 (`noActor`)',
+    steps: [],
+    expectSelector:
+      PREVIEW_NOTE('no-actor', 'Choose a character to see how many they can add.') +
+      ` ${ADDITIONAL_DICE}` +
+      PATH_LINE('muted', 'Choose a character in Preview as to see what this resolves to.'),
+  }),
+  // Frames 07 and 17: additional dice raise the ceiling, so Arcane Work's three successes need
+  // bought dice while Impossible Work's four stay past the most that can ever be rolled.
+  authoringCase({
+    id: 'manager-checks-v3-count-ceiling-additional',
+    label: 'successes needed above the base pool, within additional dice',
+    frame: '07 and 17',
+    state: 'dice-pool-faults',
+    steps: [{ selector: '[data-check-count-callouts]', scroll: true }],
+    expectSelector:
+      `${COUNTING}:has(${ADDITIONAL_DICE} [data-check-additional-dice][aria-pressed="true"])` +
+      ':has([data-check-additional-dice-path-line="muted"])' +
+      ' [data-check-count-callouts]' +
+      ':has([data-check-count-callout="countRequiredExceedsBasePool"]:has-text("Arcane Work"))' +
+      ':not(:has([data-check-count-callout="countRequiredExceedsMaxPool"]:has-text("Arcane Work")))' +
+      ' [data-check-count-callout="countRequiredExceedsMaxPool"]:has-text("Impossible Work")',
+  }),
+  // Frame 22 (`rdySrc`): the path cleared raises the critical row beside the base-pool warning.
+  additionalDiceValidationCase({
+    id: 'manager-checks-validation-additional-dice',
+    issue: 'countAdditionalDiceSourceMissing',
+    label: 'additional dice with no source, on Validation',
+    frame: '22',
+    steps: [{ selector: ADDITIONAL_DICE_PATH, fill: '' }],
+    expectSelector:
+      ':has([data-issue="countRequiredExceedsBasePool"][data-issue-severity="warning"])' +
+      ' [data-issue="countAdditionalDiceSourceMissing"][data-issue-severity="critical"]',
+  }),
+  // A list entry is not a stored path the spend can write back.
+  additionalDiceValidationCase({
+    id: 'manager-checks-validation-additional-dice-path-invalid',
+    issue: 'countAdditionalDicePathInvalid',
+    label: 'an additional-dice value that is not a stored path, on Validation',
+    frame: '— (path invalid)',
+    steps: [{ selector: ADDITIONAL_DICE_PATH, fill: 'system.items.0.value' }],
+    expectSelector:
+      ':not(:has([data-issue="countAdditionalDiceSourceMissing"]))' +
+      ' [data-issue="countAdditionalDicePathInvalid"][data-issue-severity="critical"]',
+  }),
+  // The spend macro is a chat macro, which Fabricate never runs.
+  additionalDiceValidationCase({
+    id: 'manager-checks-validation-additional-dice-macro-invalid',
+    issue: 'countAdditionalDiceMacroInvalid',
+    label: 'a spend macro that is not a script macro, on Validation',
+    frame: '— (macro invalid)',
+    state: 'dice-pool-faults-macro',
+    steps: [],
+    expectSelector:
+      ':not(:has([data-issue="countAdditionalDiceSourceMissing"]))' +
+      ' [data-issue="countAdditionalDiceMacroInvalid"][data-issue-severity="critical"]' +
+      ':has-text("The spend macro is missing or is not a script macro")',
   }),
   advantageCase({
     id: 'manager-checks-crafting-advantage-keep',

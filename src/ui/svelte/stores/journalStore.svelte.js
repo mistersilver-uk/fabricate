@@ -1,8 +1,5 @@
-import {
-  isResolvedFailureOutcome,
-  journalRefusalMessage,
-  resolvedFailureMessage,
-} from '../util/journalRunReasons.js';
+import { journalCommandRefusal, spentDiceNotice } from '../../presenters/additionalDicePrompt.js';
+import { isResolvedFailureOutcome, resolvedFailureMessage } from '../util/journalRunReasons.js';
 
 import { createPageWindow } from './browseListing.svelte.js';
 
@@ -312,10 +309,10 @@ export function createJournalStore({ services } = {}) {
       if (outcome) message = resolvedFailureMessage(services?.localize);
       if (refused) {
         const generic = services?.craftErrorMessage?.();
-        message = journalRefusalMessage(result, services?.localize, generic);
+        message = journalCommandRefusal(result, services?.localize, generic);
         setCommandError(request, message);
       }
-      if (message) services?.notify?.(message);
+      notifyEach(services, [message, spentDiceNotice(result, services?.localize)]);
       await load(true);
       if (
         action === 'execute' &&
@@ -564,6 +561,10 @@ export function createJournalStore({ services } = {}) {
     dismiss,
     tickWorldTime,
   };
+}
+
+function notifyEach(services, messages) {
+  for (const message of messages) if (message) services?.notify?.(message);
 }
 
 function matchesKind(kind) {

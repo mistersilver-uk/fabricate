@@ -26,7 +26,24 @@ const COUNT_REQUEST = Object.freeze({
   },
 });
 
-export function installLabCompanionRoll(doc) {
+/** The same request paying for additional dice from the actor's Momentum (issue 2008). */
+const ADDITIONAL_DICE = Object.freeze({
+  enabled: true,
+  source: 'path',
+  path: 'system.resources.momentum.value',
+  max: 1,
+  label: 'Momentum',
+});
+
+/** The request a variant sends: `count`, or `count-additional` offering additional dice. */
+function requestFor(variant) {
+  const request = structuredClone(COUNT_REQUEST);
+  if (variant === 'count-additional')
+    request.evaluation.pool.additionalDice = { ...ADDITIONAL_DICE };
+  return request;
+}
+
+export function installLabCompanionRoll(doc, variant = 'count') {
   const trigger = doc.createElement('button');
   trigger.type = 'button';
   trigger.textContent = 'Companion roll';
@@ -35,7 +52,7 @@ export function installLabCompanionRoll(doc) {
   trigger.setAttribute('data-lab-companion-roll', '');
   trigger.addEventListener('click', () => {
     trigger.style.opacity = '0';
-    globalThis.game.fabricate.rollActorCheck(structuredClone(COUNT_REQUEST));
+    globalThis.game.fabricate.rollActorCheck(requestFor(variant));
   });
   doc.body.append(trigger);
 }

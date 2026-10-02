@@ -34,9 +34,64 @@ const COUNT_BONUS_HELP =
   'A bonus adds that many dice. A rolled bonus such as 1d4 is rolled first, and its result is applied.';
 const BULK_PROMPT_SOURCES = [
   ...BULK_DEFAULTS.sourceMatches,
-  /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/,
+  /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Footer)?\.svelte$/,
   /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/,
 ];
+
+/**
+ * Issue 2008's bulk additional dice (frame 36): Air Shard and the Longsword on Smithing's simple
+ * salvage, with Runework's routed Ruined Slag where a batch names it, every row paid from Sera
+ * Vane's Momentum and seeded with no salvage tool, so each row's own reach is judged.
+ */
+const BULK_ADDITIONAL_SOURCES = [
+  ...BULK_PROMPT_SOURCES,
+  /^src\/ui\/svelte\/apps\/crafting\/RollPromptAdditionalDice\.svelte$/,
+  /^src\/ui\/presenters\/additionalDicePrompt\.js$/,
+];
+const bulkAdditionalSteps = (keys) => [
+  ...chooseSelectOption('.inventory-grid-pagination [data-pagination-size]', '75'),
+  ...keys.map((key) => SHIFT_CLICK(key)),
+  { selector: '[data-inventory-bulk-salvage]' },
+];
+const SMITHING_ROWS = ['lab-smithing:sm-air-shard', 'lab-smithing:sm-longsword'];
+const THREE_ROWS = [...SMITHING_ROWS, 'lab-runework:rw-slag'];
+const BULK_BLOCKED = (action) =>
+  `:has(.manager-modal-footer button[data-action="${action}"][aria-disabled="true"])`;
+const BULK_ENABLED = (action) =>
+  `:has(.manager-modal-footer button[data-action="${action}"]:not([aria-disabled]))`;
+const BULK_NOTE = (text) => `:has([data-roll-prompt-block-note]:text-is("${text}"))`;
+const UNREACHABLE_ROWS = (count) =>
+  `:has(.bulk-row:nth-child(${count}) [data-roll-prompt-bulk-unreachable])` +
+  `:not(:has(.bulk-row:nth-child(${count + 1})))`;
+/** Buy one die on the standing prompt, then roll (issue 2008). */
+const buyOneAndRoll = (prompt) => [
+  { selector: `${prompt} [data-roll-prompt-additional-dice-stepper] [data-stepper-increment]` },
+  { selector: `${prompt} button[type="submit"]` },
+];
+const SINGLE_SALVAGE_PROMPT = '.fabricate-app .manager-modal[data-roll-prompt="single"]';
+/** The Longsword's single salvage, its one bought die rolled at or under 20 (frame 39). */
+const SALVAGE_LONGSWORD_BOUGHT = Object.freeze([
+  { selector: '.inventory-filters input', fill: 'Longsword' },
+  { selector: CARD_BUTTON('lab-smithing:sm-longsword') },
+  { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+  { selector: '[data-inventory-salvage-action]' },
+  ...buyOneAndRoll(SINGLE_SALVAGE_PROMPT),
+]);
+const LAST_TILE_BOUGHT = '.fabricate-dice-tiles__tile:last-child[data-dice-tile-marks~="bought"]';
+const BOUGHT_SALVAGE_SOURCES = [
+  /^src\/ui\/presenters\/(?:SalvageChatCard|BulkSalvageChatCard|countDiceTiles|countEvidenceRows)\.js$/,
+];
+function bulkAdditionalCase({ id, label, state, keys = SMITHING_ROWS, expectSelector }) {
+  return playerCase({
+    ...BULK_DEFAULTS,
+    id,
+    label: `Player app — Inventory bulk roll prompt, additional dice ${label}`,
+    query: { tab: 'inventory', dialog: 'open', rollPromptState: state },
+    steps: bulkAdditionalSteps(keys),
+    expectSelector: BULK_PROMPT + expectSelector,
+    sourceMatches: BULK_ADDITIONAL_SOURCES,
+  });
+}
 
 /** The Salvage tab's roll-under target line (issue 2005): its presenter and the bodies drawing it. */
 const SALVAGE_TARGET_SOURCES = Object.freeze([
@@ -637,7 +692,7 @@ export const CASES = Object.freeze([
       ':has(.bulk-list + .bulk-note) .bulk-row',
     sourceMatches: [
       ...BULK_DEFAULTS.sourceMatches,
-      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/RollPrompt(?:Footer)?\.svelte$/,
       /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/,
       /^src\/ui\/svelte\/apps\/crafting\/rollPromptHost\.js$/,
     ],
@@ -737,6 +792,70 @@ export const CASES = Object.freeze([
       ' .bulk-list:has(> .bulk-row > .bulk-name:text-is("Ruined Slag") + .bulk-need:text-is("Target 11"))',
     sourceMatches: BULK_PROMPT_SOURCES,
   }),
+  // Frame 36 (`pBulk`): three rolls share Sera Vane's 2 Momentum, too few for a die each.
+  bulkAdditionalCase({
+    id: 'player-inventory-bulk-roll-prompt-count-additional',
+    label: 'too few for a die each (prototype frame 36)',
+    state: 'salvage-count-additional',
+    keys: THREE_ROWS,
+    expectSelector:
+      ':has([data-roll-prompt-additional-dice-resource]:text-is("Momentum 2 available"))' +
+      ':has([data-roll-prompt-additional-dice-spend]:text-is("Spends 0 Momentum across 3 rolls (0 each)"))' +
+      ':has([data-roll-prompt-additional-dice-message].is-info:has-text("Not enough Momentum to buy a die for every roll."))' +
+      ':has(input[data-roll-prompt-additional-dice]:disabled)' +
+      ':not(:has([data-roll-prompt-bulk-unreachable]))' +
+      BULK_ENABLED('normal'),
+  }),
+  // R1 across the batch: no row reaches three successes without Advantage's extra die.
+  bulkAdditionalCase({
+    id: 'player-inventory-bulk-roll-prompt-count-additional-blocked',
+    label: 'every row reaching only with Advantage (ruling R1)',
+    state: 'salvage-count-additional-blocked',
+    expectSelector:
+      BULK_BLOCKED('disadvantage') +
+      BULK_BLOCKED('normal') +
+      BULK_ENABLED('advantage') +
+      BULK_NOTE('Only Advantage can reach the successes needed.') +
+      ':not(:has([data-roll-prompt-bulk-unreachable]))',
+  }),
+  bulkAdditionalCase({
+    id: 'player-inventory-bulk-roll-prompt-count-additional-blocked-all',
+    label: 'no row able to reach under any action (ruling R1)',
+    state: 'salvage-count-additional-blocked-all',
+    expectSelector:
+      BULK_BLOCKED('disadvantage') +
+      BULK_BLOCKED('normal') +
+      BULK_BLOCKED('advantage') +
+      BULK_NOTE('Rolling is disabled: none of these rolls can reach the successes they need.') +
+      UNREACHABLE_ROWS(2),
+  }),
+  // One row cannot reach, the other can, so the batch keeps every action and marks the one row.
+  bulkAdditionalCase({
+    id: 'player-inventory-bulk-roll-prompt-count-additional-partial',
+    label: 'one row unable to reach (ruling R1)',
+    state: 'salvage-count-additional-partial',
+    expectSelector:
+      BULK_ENABLED('disadvantage') +
+      BULK_ENABLED('normal') +
+      BULK_ENABLED('advantage') +
+      ':not(:has([data-roll-prompt-block-note]))' +
+      ':has(.bulk-row:nth-child(1) > .bulk-name:text-is("Air Shard"))' +
+      ':has(.bulk-row:nth-child(1) [data-roll-prompt-bulk-unreachable])' +
+      ':has(.bulk-row:nth-child(2) > .bulk-need:text-is("1 needed"))' +
+      ':not(:has(.bulk-row:nth-child(2) [data-roll-prompt-bulk-unreachable]))',
+  }),
+  // Two resources in one batch: the titled well with no stepper, and its note says why.
+  bulkAdditionalCase({
+    id: 'player-inventory-bulk-roll-prompt-count-additional-mixed',
+    label: 'paid from two different resources',
+    state: 'salvage-count-additional-mixed',
+    keys: THREE_ROWS,
+    expectSelector:
+      ' .fab-well[data-roll-prompt-additional-dice-group]' +
+      ':not(:has(input[data-roll-prompt-additional-dice]))' +
+      ':has([data-roll-prompt-additional-dice-title]:text-is("Additional dice"))' +
+      ' [data-roll-prompt-additional-dice-message].is-info:has-text("Rolls in this batch use different resources, so no dice can be added.")',
+  }),
   playerCase({
     ...BULK_DEFAULTS,
     id: 'player-inventory-bulk-destroy-confirm',
@@ -835,5 +954,71 @@ export const CASES = Object.freeze([
       /^src\/ui\/presenters\/(?:checkDisplay|countDiceTiles|countEvidenceRows)\.js$/,
       /^src\/ui\/svelte\/stores\/inventorySalvageExecution/,
     ],
+  }),
+  // Issue 2008 (frame 39 on salvage): the summary marks the bought die and states its row.
+  playerCase({
+    id: 'player-salvage-count-result-bought',
+    label: 'Player app — Salvage summary after a counting salvage with one bought die',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'inventory', dialog: 'open', rollPromptState: 'salvage-count-result-bought' },
+    steps: [
+      ...SALVAGE_LONGSWORD_BOUGHT,
+      {
+        selector: '[data-inventory-salvage-summary="success"] [data-check-count-tiles]',
+        scroll: true,
+      },
+    ],
+    expectSelector:
+      '[data-inventory-salvage-summary="success"]' +
+      ':has([data-check-evidence="additionalDice"]:has-text("1 bought · spent 1 Momentum"))' +
+      ':has([data-dice-tiles-legend]:has-text("dashed = bought"))' +
+      ` [data-check-count-tiles] ${LAST_TILE_BOUGHT}`,
+    kinds: ['player', 'inventory'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/inventory\/detail\/salvage\/SalvageRollSummary\.svelte$/,
+      /^src\/ui\/svelte\/apps\/crafting\/detail\/CheckEvidenceRows\.svelte$/,
+      /^src\/ui\/presenters\/(?:checkDisplay|countDiceTiles|countEvidenceRows)\.js$/,
+    ],
+  }),
+  // The single salvage's posted card: its summary, the dashed tile and the Additional dice row.
+  playerCase({
+    id: 'player-salvage-count-result-bought-chat',
+    label: 'Player app — salvage result card with one bought die',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: {
+      tab: 'inventory',
+      dialog: 'open',
+      rollPromptState: 'salvage-count-result-bought',
+      chatLog: '1',
+    },
+    steps: SALVAGE_LONGSWORD_BOUGHT,
+    expectSelector:
+      '.fabricate-craft-chat:has-text("Source: Longsword")' +
+      ':has([data-check-count-summary]:has-text("3d20 (2 + 1 bought), each ≤ 20"))' +
+      ':has([data-check-evidence="additionalDice"]:has-text("1 bought · spent 1 Momentum"))' +
+      ` ${LAST_TILE_BOUGHT}`,
+    kinds: ['player', 'inventory'],
+    sourceMatches: BOUGHT_SALVAGE_SOURCES,
+  }),
+  // A bulk batch buying one die for each of its two rolls: each subject marks its own bought die.
+  playerCase({
+    ...BULK_DEFAULTS,
+    id: 'player-inventory-bulk-salvage-bought-chat',
+    label: 'Player app — bulk salvage result card, one bought die on each roll',
+    query: {
+      tab: 'inventory',
+      dialog: 'open',
+      rollPromptState: 'salvage-count-result-bought',
+      chatLog: '1',
+    },
+    steps: [...bulkAdditionalSteps(SMITHING_ROWS), ...buyOneAndRoll(BULK_PROMPT)],
+    expectSelector:
+      '.fabricate-craft-chat' +
+      ':has(.fabricate-craft-chat__item--evidence:nth-child(2) [data-check-evidence="additionalDice"])' +
+      ' .fabricate-craft-chat__item--evidence [data-check-evidence="additionalDice"]' +
+      ':has-text("1 bought · spent 1 Momentum")',
+    sourceMatches: BOUGHT_SALVAGE_SOURCES,
   }),
 ]);

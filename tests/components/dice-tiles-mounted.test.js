@@ -29,6 +29,10 @@ const harness = createMountedComponentHarness({
 
 /** Six d10s at 8 or better, tens exploding and ones cancelling: 8 10 1 3 9 2, then 10 and 1. */
 function smithing() {
+  return tileModel(projectedSmithing());
+}
+
+function projectedSmithing() {
   const policy = {
     dice: 6,
     die: 10,
@@ -40,7 +44,7 @@ function smithing() {
   };
   const faces = [8, 10, 1, 3, 9, 2, 10, 1];
   const results = faces.map((result, index) => ({ result, exploded: result === 10 && index < 7 }));
-  return tileModel(projectCountResults({ policy, results, number: 6 }));
+  return projectCountResults({ policy, results, number: 6 });
 }
 
 const tilesOf = (root) => [...root.querySelectorAll('.fabricate-dice-tiles__tile')];
@@ -150,6 +154,71 @@ describe('2006 DiceTiles', () => {
     assert.equal(more.tagName, 'LI');
     assert.equal(more.dataset.diceTilesMore, '12');
     assert.equal(more.textContent.trim(), '+12 more');
+  });
+
+  it('marks the bought die, says so in its label and the legend, as the chat renderer does', async () => {
+    const model = tileModel({ ...projectedSmithing(), bought: 1 });
+    const root = await harness.mount({ model, legend: true });
+    const tiles = tilesOf(root);
+    const bought = tiles.filter((tile) => tile.classList.contains('fabricate-dice-tiles__tile--bought'));
+    assert.deepEqual(
+      bought.map((tile) => [tile.dataset.diceTileFace, tile.dataset.diceTileMarks]),
+      [['2', 'bought']],
+      'the last original die, after the explosions earlier dice rolled'
+    );
+    assert.equal(bought[0].getAttribute('aria-label'), '2, bought');
+    assert.equal(
+      root.querySelector('[data-dice-tiles-legend]').textContent.trim(),
+      '✓ qualified · ✕ cancelled · ↻ exploded · dashed\u{A0}=\u{A0}bought'
+    );
+    assert.deepEqual(
+      canonical(root.querySelector('.fabricate-dice-tiles')),
+      parsed(renderDiceTilesHtml(model, (key) => key, { legend: true }))
+    );
+  });
+
+  it('dashes a bought tile’s border and keeps the colour its tone gives it', async () => {
+    const tile = (face, marks, bought = false) => ({ face, marks, generated: false, ...(bought && { bought }) });
+    const model = {
+      tiles: [tile(9, ['qualified']), tile(9, ['qualified'], true), tile(1, ['cancelled'], true), tile(3, [], true)],
+      more: 0,
+      bought: 3,
+    };
+    const tokens = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+    for (const host of ['', 'fabricate-craft-chat']) {
+      const view = await renderWithCascade(
+        `<div class="${host}">${renderDiceTilesHtml(model)}</div>`,
+        [tokens],
+        { viewport: { width: 400, height: 300 } }
+      );
+      try {
+        const borders = await view.page.evaluate(() =>
+          [...document.querySelectorAll('.fabricate-dice-tiles__tile')].map((node) => {
+            const style = getComputedStyle(node);
+            return [style.borderTopStyle, style.borderTopColor, style.borderTopWidth];
+          })
+        );
+        const plain = await view.page.evaluate(() => {
+          const probe = document.createElement('li');
+          probe.className = 'fabricate-dice-tiles__tile';
+          document.querySelector('.fabricate-dice-tiles__list').append(probe);
+          const danger = probe.cloneNode();
+          danger.classList.add('fabricate-dice-tiles__tile--danger');
+          probe.after(danger);
+          return [probe, danger].map((node) => getComputedStyle(node).borderTopColor);
+        });
+        assert.deepEqual(borders.map(([style]) => style), ['solid', 'dashed', 'dashed', 'dashed'], host);
+        assert.equal(new Set([borders[0][1], ...plain]).size, 3, `${host} the three tones differ`);
+        assert.equal(borders[1][1], borders[0][1], `${host} a bought success tile keeps the success border`);
+        assert.equal(borders[2][1], plain[1], `${host} a bought cancel keeps the danger border`);
+        // An untoned bought die inks its dash (WCAG 1.4.11); a chat card mixes it into its own ink.
+        if (host) assert.equal(borders[3][1], plain[0], `${host} a bought plain die keeps the hairline`);
+        else assert.equal(borders[3][1], 'rgba(217, 184, 156, 0.74)', 'a bought plain die inks its dash');
+        assert.ok(borders.every((border) => border[2] === '1px'), `${host} only the style changes`);
+      } finally {
+        await view.close();
+      }
+    }
   });
 
   it('wraps inside a 280px chat column with no horizontal scroll', async () => {

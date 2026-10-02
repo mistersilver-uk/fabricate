@@ -789,7 +789,11 @@ export const VIEW_RECIPES = Object.freeze([
     id: 'player-crafting-roll-prompt',
     label: 'Player crafting — interactive check roll prompt',
     smokeLabels: ['player-crafting-roll-prompt'],
-    matches: [/^src\/ui\/svelte\/apps\/crafting\/(?:rollPrompt\.js|rollPromptHost\.js|RollPrompt\.svelte)$/],
+    matches: [
+      /^src\/ui\/svelte\/apps\/crafting\/(?:rollPrompt\.js|rollPromptHost\.js|RollPrompt(?:Footer|AdditionalDice)?\.svelte)$/,
+      // Issue 2008: the additional-dice control's presenter.
+      /^src\/ui\/presenters\/additionalDicePrompt\.js$/,
+    ],
   },
   {
     id: 'player-crafting-essence-legacy',
@@ -1003,6 +1007,7 @@ export const VIEW_RECIPES = Object.freeze([
       'chat-craft-card-count-fail',
       'chat-craft-card-count-botch',
       'chat-craft-card-count-zero',
+      'chat-craft-card-count-bought',
       'chat-craft-card-over-control',
       // Issue 2007: the same count presenters also render the counting advantage case.
       'chat-craft-card-advantage-count',

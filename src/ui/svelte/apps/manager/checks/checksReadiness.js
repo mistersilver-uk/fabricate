@@ -84,11 +84,16 @@ export const CHECK_READINESS_ISSUE_IDS = Object.freeze([
   'countPoolTooLarge',
   'countFaceMissing',
   'countTriggerGroupUnreachable',
+  // Additional dice (issue 2008)
+  'countAdditionalDiceSourceMissing',
+  'countAdditionalDicePathInvalid',
+  'countAdditionalDiceMacroInvalid',
   // Transient: they name the Preview-as actor and feed no badge, dot, tally or enable gate.
   'attributePathUnresolvedForPreview',
   'attributeValueNotNumeric',
   'countPathUnresolvedForPreview',
   'countValueNotNumericForPreview',
+  'countAdditionalDicePathUnresolvedForPreview',
 ]);
 
 const REGISTERED_ISSUE_IDS = new Set(CHECK_READINESS_ISSUE_IDS);
@@ -153,6 +158,10 @@ export const CHECK_ISSUE_SECTIONS = Object.freeze({
   attributeValueNotNumeric: 'roll',
   countPathUnresolvedForPreview: 'roll',
   countValueNotNumericForPreview: 'roll',
+  countAdditionalDiceSourceMissing: 'roll',
+  countAdditionalDicePathInvalid: 'roll',
+  countAdditionalDiceMacroInvalid: 'roll',
+  countAdditionalDicePathUnresolvedForPreview: 'roll',
 });
 
 const FACE_CONTROLS = Object.freeze({
@@ -162,6 +171,11 @@ const FACE_CONTROLS = Object.freeze({
 const INPUT_CONTROLS = Object.freeze({
   base: 'checks-count-base',
   threshold: 'checks-count-threshold',
+});
+const ADDITIONAL_DICE_CONTROLS = Object.freeze({
+  path: 'checks-additional-dice-path',
+  read: 'checks-additional-dice-read-macro',
+  spend: 'checks-additional-dice-spend-macro',
 });
 
 /**
@@ -196,6 +210,10 @@ export const CHECK_ISSUE_CONTROLS = Object.freeze({
   countRequiredExceedsBasePool: 'checks-count-required',
   countPathUnresolvedForPreview: INPUT_CONTROLS,
   countValueNotNumericForPreview: INPUT_CONTROLS,
+  countAdditionalDiceSourceMissing: ADDITIONAL_DICE_CONTROLS,
+  countAdditionalDicePathInvalid: 'checks-additional-dice-path',
+  countAdditionalDiceMacroInvalid: ADDITIONAL_DICE_CONTROLS,
+  countAdditionalDicePathUnresolvedForPreview: 'checks-additional-dice-path',
 });
 
 /** The control one raised issue names, or `undefined` for a route-only one. */

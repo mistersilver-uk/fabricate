@@ -23,6 +23,7 @@ import {
   ROLL_PROMPT_PATH,
   ROLL_PROMPT_RAW_MODULES,
 } from '../helpers/rollPromptHarnessModules.js';
+import { installFoundryPropertyUtils, withStoredResource } from '../helpers/storedResourceActor.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -198,6 +199,67 @@ describe('a companion interactive check through the real prompt host (issue 2006
         restoreSurface();
         dice.restore();
       }
+    }
+  });
+
+  it('buys additional dice on the companion prompt, and a broadcast shows why it cannot (issue 2008)', async () => {
+    const PATH = 'system.resources.momentum.value';
+    const saved = { user: game.user, users: game.users };
+    const restoreFoundry = installFoundryPropertyUtils();
+    Object.assign(game, { user: { id: 'gm' }, users: { activeGM: { id: 'gm' } } });
+    const loadComponent = () => harness.loadRuneModule(ROLL_PROMPT_PATH);
+    const additionalDice = { enabled: true, source: 'path', path: PATH, max: 2, label: 'Momentum' };
+    try {
+      for (const [callSite, faces, bought] of [
+        ['gmAction', [9, 9, 3], 1],
+        ['broadcast', [9, 9], 0],
+      ]) {
+        document.body.replaceChildren();
+        const { actor, source } = withStoredResource({ ...ACTOR }, PATH, 2);
+        const dice = installCountDice({ faces });
+        const restoreSurface = overrideRollPromptSurface((view) =>
+          openRollPromptModal(view, { loadComponent })
+        );
+        try {
+          const pending = rollActorCheck(
+            {
+              ...requestFor(cells.find(({ mode }) => mode.product === 'count')),
+              actor,
+              callSite,
+              evaluation: countEvaluation({ required: 2, additionalDice }),
+            },
+            companionFacade._companionCheckSeams()
+          );
+          const { dialog } = await openedPrompt();
+          const control = dialog.querySelector('[data-roll-prompt-additional-dice-group]');
+          assert.ok(control, `${callSite}: the prompt offers additional dice`);
+          const line = control.querySelector('[data-roll-prompt-additional-dice-line]');
+          const input = control.querySelector('input[data-roll-prompt-additional-dice]');
+          if (bought) {
+            assert.equal(line.textContent, 'Momentum 2 available · Spends 0 Momentum');
+            control.querySelector('[data-stepper-increment]').click();
+            flushSync();
+            assert.equal(line.textContent, 'Momentum 2 available · Spends 1 Momentum');
+          } else {
+            assert.equal(line.textContent, 'Momentum unavailable · Spends 0');
+            assert.equal(input.disabled, true, 'nothing can be bought on a broadcast');
+            // The harness localizes to the key: the reason names the broadcast call site.
+            assert.match(control.textContent, /AdditionalDiceRefusal\.BroadcastCallSite/);
+          }
+          dialog.querySelector('button[type="submit"]').click();
+          const result = await pending;
+          assert.equal(result.outcome, 'checkPassed', `${callSite}: ${JSON.stringify(result)}`);
+          assert.equal(result.boughtDice, bought, callSite);
+          assert.equal(source.system.resources.momentum.value, 2 - bought, `${callSite}: spent`);
+          assert.equal(dice.posts[0].rolls[0].dice[0].results.length, 2 + bought, callSite);
+        } finally {
+          restoreSurface();
+          dice.restore();
+        }
+      }
+    } finally {
+      restoreFoundry();
+      Object.assign(game, { user: saved.user, users: saved.users });
     }
   });
 });

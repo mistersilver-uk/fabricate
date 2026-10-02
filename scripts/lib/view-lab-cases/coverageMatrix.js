@@ -614,4 +614,36 @@ export const CASES = Object.freeze([
     kinds: ['player', 'extension'],
     sourceMatches: PLAYER_EXTENSION_SOURCES,
   }),
+  // Issue 2008: the Preview stepper adds one bought die to the simulated roll only, marked on the
+  // last original tile, while the odds and the inset reading stay at the base pool.
+  managerCase({
+    id: 'manager-checks-count-simulator-bought',
+    label: 'Manager — Checks count preview, a simulated roll with one bought die (frame 07 rail)',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', checkPreviewState: 'dice-pool-faults' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      ...previewAsActor('lab-actor-idrin'),
+      {
+        selector:
+          '[data-checks-preview-additional-dice-field] .fab-stepper [data-stepper-increment]',
+      },
+      { selector: '[data-checks-simulator-roll]' },
+      { selector: '[data-checks-simulator-panel]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    expectSelector:
+      '.fabricate-manager:has([data-check-count-expected="1.30"])' +
+      ':has([data-checks-odds-expected="1.30"])' +
+      ' [data-checks-simulator-readout][data-checks-simulator-product="count"]' +
+      ':has([data-checks-simulator-legend]:has-text("dashed = bought"))' +
+      ':not(:has([data-checks-simulator-face-marks~="bought"] ~ li))' +
+      ' [data-checks-simulator-face-marks~="bought"]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/(?:CheckOutcomePreview\.svelte|checkPreview\.js|checkReadoutModel\.js)$/,
+    ],
+  }),
 ]);

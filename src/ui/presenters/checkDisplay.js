@@ -155,20 +155,44 @@ function countTerms(terms) {
     .filter((term) => term.source && term.value !== null);
 }
 
+/** A label in which no `[[`, `&Name[` or `@` survives for an enricher to match (issue 2005). */
+function inertLabel(value) {
+  return text(value)
+    .replaceAll(/\[(?=\[)/g, '[\u{2060}')
+    .replaceAll(/&(?=\w+\[)/g, '&\u{2060}')
+    .replaceAll('@', '@\u{2060}');
+}
+
+/**
+ * The dice a count bought (issue 2008): the persisted `count`, the `marked` dice the roll added
+ * (`countDisplay.bought`) and the inert Resource name; never a path, macro or source. Null for
+ * none.
+ */
+function boughtProjection(boughtDice, display) {
+  const count = boughtDice?.count;
+  if (!Number.isInteger(count) || count < 1) return null;
+  const marked = Number.isInteger(display.bought)
+    ? Math.min(Math.max(display.bought, 0), count)
+    : 0;
+  return { count, marked, resourceLabel: inertLabel(display.resourceLabel) };
+}
+
 /**
  * The executed dice of a count check (issue 2006), folded from the engine's unpersisted
  * `countDisplay`: tiles, totals, the required count and margin, and the pool and threshold with
- * their settled terms. Literal numbers and enumerated words only, never an expression, path,
- * label or policy; null without one.
+ * their settled terms. Literal numbers and enumerated words only, never an expression, path or
+ * policy, and no label but the Resource name of the dice `boughtDice` bought; null without one.
  */
-function countProjection(display) {
+function countProjection(display, boughtDice) {
   if (!display || typeof display !== 'object') return null;
   const results = Array.isArray(display.results) ? display.results.map(countResult) : [];
   const pool = display.pool ?? {};
   const threshold = display.threshold ?? {};
+  const bought = boughtProjection(boughtDice, display);
+  const shown = results.filter((entry) => entry.face !== null);
   return {
     die: numberOrNull(display.die),
-    tiles: tileModel({ results: results.filter((entry) => entry.face !== null) }),
+    tiles: tileModel({ results: shown, bought: bought?.marked ?? 0 }),
     qualified: numberOrNull(display.qualified),
     cancelled: numberOrNull(display.cancelled),
     net: numberOrNull(display.net),
@@ -186,6 +210,7 @@ function countProjection(display) {
       terms: countTerms(threshold.terms),
       effective: numberOrNull(threshold.effective),
     },
+    ...(bought && { boughtDice: bought }),
   };
 }
 
@@ -198,7 +223,8 @@ function executedVisibility(visibility) {
 /**
  * The projection itself. `evaluation` contributes only its product and direction; `terms` are the
  * permitted source terms, and `destination` is where a modifier lands for that evaluation. A count
- * projection also carries `count`, its executed dice, from the engine's `countDisplay`.
+ * projection also carries `count`, its executed dice, from the engine's `countDisplay`, and the
+ * dice `boughtDice` records only for a public check.
  */
 export function buildCheckDisplay({
   evaluation = null,
@@ -208,8 +234,11 @@ export function buildCheckDisplay({
   evidence = null,
   visibility = null,
   countDisplay = null,
+  boughtDice = null,
 } = {}) {
   const product = oneOf(['sum', 'count'], evaluation?.product) ?? 'sum';
+  const executed = executedVisibility(visibility);
+  const bought = isPublicCheckDisplay({ visibility: executed }) ? boughtDice : null;
   const direction = oneOf(['over', 'under'], evaluation?.direction) ?? 'over';
   let destination = null;
   if (product === 'sum') destination = direction === 'under' ? 'target' : 'append';
@@ -220,8 +249,8 @@ export function buildCheckDisplay({
     terms: sanitizeTargetTerms(terms),
     destination,
     evidence: evidence ? structuredClone(evidence) : null,
-    visibility: executedVisibility(visibility),
-    ...(product === 'count' && { count: countProjection(countDisplay) }),
+    visibility: executed,
+    ...(product === 'count' && { count: countProjection(countDisplay, bought) }),
   });
 }
 
@@ -244,5 +273,6 @@ export function executedCheckDisplay(checkResult) {
     evidence,
     visibility: checkResult?.visibility,
     countDisplay: checkResult?.countDisplay,
+    boughtDice: data?.boughtDice,
   });
 }

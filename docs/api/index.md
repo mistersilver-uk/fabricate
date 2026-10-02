@@ -729,7 +729,7 @@ Its shape is `{ version, modes, additionalDice }`: each `modes` row is `{ produc
 `version` names this descriptor's shape, not its rows.
 Activating a mode appends a row without changing it, so match rows rather than comparing versions.
 At version 1 the descriptor publishes five rows: `{ product: 'sum', direction: 'over', targetSources: ['fixed'], interactive: true }`, `{ product: 'sum', direction: 'over', targetSources: ['attribute'], interactive: true }`, `{ product: 'sum', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: true }`, `{ product: 'count', direction: 'over', targetSources: ['fixed', 'attribute'], interactive: true }`, and `{ product: 'count', direction: 'under', targetSources: ['fixed', 'attribute'], interactive: true }`.
-`additionalDice` stays `false`, so additional dice have no standalone execution route.
+`additionalDice` is `true`, so a count evaluation whose pool has additional dice enabled may buy them through this member too, as described below.
 On the fixed sum-over row the evaluation only selects the mode, `target.expression` and the pool settings are validated but never change the roll, and Fabricate still grades `formula` against `dc` through `compare`, so a request without a finite `dc` rolls ungraded.
 On an attribute row Fabricate ignores `dc` entirely and resolves the target from `target.expression` against the actor's roll data instead, using the same lookup Foundry's own `Roll.replaceFormulaData` uses, plus the row's `baseAdjustment`.
 An unresolved or non-numeric target refuses the outcome `targetUnresolved` before any roll, and an invalid multiplier refuses `evaluationInvalid`.
@@ -740,15 +740,23 @@ A pool that resolves to zero or fewer dice answers `checkFailed` with no Roll co
 An interactive count request opens Fabricate's roll prompt, which shows the dice pool and the successes needed rather than a formula or DC, and a situational bonus there adds dice or moves the threshold, as the pool's `modifierDestination` says.
 A forwarded `rollDecision` applies its bonus the same way without opening the prompt.
 Advantage and Disadvantage move the pool by the default rule's one die: an interactive count request that forwards `advantage: 'advantage'` adds a die, `'disadvantage'` removes one, and the pool floor and `zeroPoolFails` apply after that adjustment.
-Bought dice are not offered on a count yet: an interactive count request whose `pool.additionalDice.enabled` is `true` refuses `evaluationUnsupported` before anything is prompted or rolled.
-A non-interactive count request with additional dice enabled rolls its authored pool alone.
+A count evaluation whose pool has additional dice enabled may buy them through a top-level `additionalDice` request key: a non-negative integer, honoured only on a **non-interactive** request and only from `callSite: 'gmAction'`.
+A non-zero `additionalDice` on a `broadcast` request refuses `additionalDiceRefused` with reason `broadcastCallSite` before any read, and a `broadcast` interactive request shows the prompt's additional-dice control as unavailable for that same reason.
+A non-zero `additionalDice` on an **interactive** request refuses `invalidRollDecision` instead: there the player buys through Fabricate's own roll prompt, or you forward a pre-resolved `rollDecision.additionalDice`, validated the same way and the only additional-dice key a forwarded decision carries.
+A non-zero `additionalDice` on any evaluation other than an enabled count refuses `notOffered`.
+
+A refused purchase, or a refused spend, answers the outcome `additionalDiceRefused`: a `success: false` refusal with no executed fields, answered before any main roll.
+Its `messageData` is `{ label, reason, actor, resource, n, limit, available }`, with `reason` one of the closed `ADDITIONAL_DICE_REFUSALS` list, and `message` is already that reason's own sentence for the resource name you authored and the source you chose.
+An executed answer additionally carries `boughtDice`, the integer dice bought for that roll, `0` when none were bought.
+A main roll that still fails after a successful spend, for example once Foundry's own dice-explosion limit is hit, answers `evaluationInvalid` with `messageData.boughtDice`, because the spend already stands and nothing is refunded.
 
 A malformed evaluation returns `evaluationInvalid`.
 A valid evaluation whose mode is absent from the advertised rows returns `evaluationUnsupported`.
 Both outcomes are stable refusals before Fabricate prompts or rolls.
 
-Only `checkPassed`, `checkFailed` and `rolled` results carry executed evaluation metadata from the runner: `product`, `direction`, `comparison`, `target`, `margin`, `successes` and `cancelled`.
-Every refusal omits those fields, including evaluation refusals.
+Only `checkPassed`, `checkFailed` and `rolled` results carry executed evaluation metadata from the runner: `product`, `direction`, `comparison`, `target`, `margin`, `successes`, `cancelled` and `boughtDice` (`0` when none were bought).
+Every refusal omits those fields, including evaluation refusals, with one exception: a post-spend `evaluationInvalid` still carries `boughtDice` alone, because that spend already happened and stands.
+`additionalDiceRefused` is answered before any spend and carries no executed fields at all.
 
 A graded answer against a resolved target, meaning an attribute row or any sum-under row, reports through `FABRICATE.Check.Roll.PassedTarget` or `FailedTarget` instead of the plain `Passed`/`Failed` keys, with `messageData` `{ label, total, target }` taken from the roll's own executed target, never from the request `dc`.
 Only the fixed sum-over row keeps `Passed`/`Failed` with `{ label, total, dc }`.

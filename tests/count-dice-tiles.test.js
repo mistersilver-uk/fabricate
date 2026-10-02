@@ -4,9 +4,12 @@ import { describe, it } from 'node:test';
 
 import { projectCountResults } from '../src/systems/countEvaluation.js';
 import {
+  DICE_TILE_BOUGHT,
   DICE_TILE_LIMIT,
+  legendText,
   renderDiceTilesHtml,
   tileLabel,
+  tileMarkTokens,
   tileModel,
   tileTone,
 } from '../src/ui/presenters/countDiceTiles.js';
@@ -191,5 +194,78 @@ describe('renderDiceTilesHtml', () => {
   it('renders nothing for a model with no tile', () => {
     assert.equal(renderDiceTilesHtml(tileModel(null)), '');
     assert.equal(renderDiceTilesHtml(null), '');
+  });
+});
+
+/** Three d6s at 4 or better, sixes exploding: 2 4 6, the 6 rolling a 3; `bought` dice marked. */
+function boughtPool(bought) {
+  const policy = { ...POLICY, dice: 3, die: 6, threshold: 4, cancel: null };
+  const results = [{ result: 2 }, { result: 4 }, { result: 6, exploded: true }, { result: 3 }];
+  return { ...projectCountResults({ policy, results, number: 3 }), bought };
+}
+
+const boughtSummary = (model) =>
+  model.tiles.map((tile) => [tile.face, tileMarkTokens(tile), tile.generated]);
+
+describe('bought dice (issue 2008)', () => {
+  it('marks the last original dice in roll order, never the dice their explosions rolled', () => {
+    assert.deepEqual(boughtSummary(tileModel(boughtPool(1))), [
+      [2, '', false],
+      [4, 'qualified', false],
+      [6, 'qualified exploded bought', false],
+      [3, '', true],
+    ]);
+    const twice = tileModel({ ...smithing(), bought: 2 });
+    assert.deepEqual(
+      twice.tiles.filter((tile) => tile.bought).map((tile) => tile.face),
+      [9, 2],
+      'the last two of six originals, past the explosions the 10 rolled'
+    );
+    assert.equal(twice.bought, 2);
+  });
+
+  it('keeps the shape of a roll that bought nothing', () => {
+    for (const bought of [0, undefined, null, 1.5, -1, '1']) {
+      const model = tileModel(boughtPool(bought));
+      assert.ok(!Object.hasOwn(model, 'bought'), `bought ${bought}`);
+      assert.ok(model.tiles.every((tile) => !Object.hasOwn(tile, 'bought')), `bought ${bought}`);
+    }
+  });
+
+  it('names a bought die after its marks, and the legend gains the dashed key only for one', () => {
+    const tile = { face: 11, marks: ['qualified'], generated: false, bought: true };
+    assert.equal(tileLabel(tile, shippedLocalize), '11, qualified, bought');
+    assert.equal(tileLabel({ ...tile, marks: [] }, shippedLocalize), '11, bought');
+    assert.equal(tileLabel(tile, (key) => key), '11, qualified, bought', 'English fallback');
+    assert.equal(DICE_TILE_BOUGHT, 'bought');
+    assert.equal(legendText(shippedLocalize, 1), '✓ qualified · ✕ cancelled · ↻ exploded · dashed\u{A0}=\u{A0}bought');
+    assert.equal(legendText(shippedLocalize, 0), '✓ qualified · ✕ cancelled · ↻ exploded');
+    assert.equal(legendText(shippedLocalize), '✓ qualified · ✕ cancelled · ↻ exploded');
+  });
+
+  it('renders the bought tile dashed by class, its token and its label, and the legend key', () => {
+    const html = renderDiceTilesHtml(tileModel(boughtPool(1)), shippedLocalize, { legend: true });
+    const tiles = renderedTiles(html);
+    assert.deepEqual(tiles[2], {
+      classes: [
+        'fabricate-dice-tiles__tile',
+        'fabricate-dice-tiles__tile--success',
+        'fabricate-dice-tiles__tile--bought',
+      ],
+      face: '6',
+      marks: 'qualified exploded bought',
+      generated: false,
+      label: '6, qualified and exploded, bought',
+    });
+    assert.ok(
+      tiles.filter((_, index) => index !== 2).every((tile) => !tile.classes.includes('fabricate-dice-tiles__tile--bought'))
+    );
+    assert.match(html, /data-dice-tiles-legend="">✓ qualified · ✕ cancelled · ↻ exploded · dashed\u{A0}=\u{A0}bought<\/p>/u);
+    const glyphs = html.split('<li ', 4)[3].match(/<i class="[^"]*"/g);
+    assert.deepEqual(glyphs, ['<i class="fa-solid fa-check"', '<i class="fa-solid fa-rotate"'], 'no glyph for bought');
+    assert.doesNotMatch(
+      renderDiceTilesHtml(tileModel(boughtPool(0)), shippedLocalize, { legend: true }),
+      /bought/
+    );
   });
 });

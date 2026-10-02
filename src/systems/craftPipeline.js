@@ -4,6 +4,7 @@
  * a Foundry global, assigns `ctx.resolved`, or handles the errors these propagate.
  */
 import { refusalData } from './checkTarget.js';
+import { carryAdditionalDice, checkRequest } from './countCheckRoll.js';
 import {
   VERSIONED_EXECUTION_CONTEXT,
   checkDisplayForCard,
@@ -27,13 +28,20 @@ const refuse = (message) => ({
 /** A misconfigured check's craft result, keeping the discriminator and any target refusal. */
 export function misconfiguredCheckResult(checkResult) {
   const data = refusalData(checkResult);
-  return {
+  const result = {
     success: false,
     results: null,
     message: checkResult?.message,
     misconfigured: true,
     ...(data && { data }),
   };
+  return carryAdditionalDice(result, checkResult);
+}
+
+/** A dismissed roll's zero-mutation result, or a refused additional-dice choice or spend's. */
+export function cancelledCraftResult(checkResult) {
+  const result = { success: false, cancelled: true, results: null, message: 'Crafting cancelled' };
+  return carryAdditionalDice(result, checkResult);
 }
 
 /** The recipe-access guard, the execution step this call runs, and mode validation of the recipe. */
@@ -302,7 +310,7 @@ export async function runCraftCheck(engine, ctx, craftInputs) {
       ingredientSet,
       ctx.step,
       {
-        interactive: options?.interactive === true,
+        interactive: checkRequest(options),
         toolItems: toolValidation.tools, // ratchet-exempt(world-scope): not-a-system
       }
     ));
@@ -316,12 +324,7 @@ export async function runCraftCheck(engine, ctx, craftInputs) {
   // The player dismissed the interactive roll dialog: a user choice, not a
   // failure. Abort with ZERO mutation (no consumption, no breakage, no chat)
   // before the failure-consumption path in `resolveCheckFailure`.
-  if (checkResult.cancelled) {
-    return {
-      result: { success: false, cancelled: true, results: null, message: 'Crafting cancelled' },
-      resolved: false,
-    };
-  }
+  if (checkResult.cancelled) return { result: cancelledCraftResult(checkResult), resolved: false };
   return null;
 }
 

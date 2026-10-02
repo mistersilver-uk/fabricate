@@ -215,6 +215,7 @@ export const gatheringFacade = {
         this.executeJournalRunCommand(command, commandOptions),
       // A required check still opens its dialog; an omitted flag stays silent (issue 1780).
       interactive: withRememberedActor.interactive === true,
+      additionalDice: withRememberedActor.additionalDice ?? 0,
     });
   },
 

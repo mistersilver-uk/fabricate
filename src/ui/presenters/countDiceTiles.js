@@ -15,6 +15,9 @@ export const DICE_TILE_LIMIT = 40;
 /** The marks a tile can carry, in the order it states them (decision 28). */
 export const DICE_TILE_MARKS = Object.freeze(['qualified', 'cancelled', 'exploded']);
 
+/** The token a bought die adds to its marks hook (issue 2008); its dashed border is its only paint. */
+export const DICE_TILE_BOUGHT = 'bought';
+
 /** Font Awesome Free glyphs, one per mark. */
 export const DICE_TILE_GLYPHS = Object.freeze({
   qualified: 'fa-solid fa-check',
@@ -41,6 +44,8 @@ const COPY = Object.freeze({
     '✓ qualified · ✕ cancelled · ↻ exploded',
   ],
   more: ['FABRICATE.Common.DiceTiles.More', '+{count} more'],
+  bought: ['FABRICATE.Check.BoughtDice.TileLabel', '{label}, bought'],
+  boughtLegend: ['FABRICATE.Check.BoughtDice.Legend', '{legend} · dashed\u{A0}=\u{A0}bought'],
 });
 
 function copy(localize, id) {
@@ -48,12 +53,23 @@ function copy(localize, id) {
   return localizeWith(localize, key, undefined, fallback);
 }
 
-function tileOf(entry) {
+function tileOf(entry, bought) {
   return {
     face: entry.face,
     marks: DICE_TILE_MARKS.filter((mark) => entry[mark] === true),
     generated: Number.isInteger(entry.explodedFrom),
+    ...(bought.has(entry.index) && { bought: true }),
   };
+}
+
+/** The indices of the last `count` original dice in roll order: the dice bought for the roll. */
+function boughtIndices(results, count) {
+  if (!Number.isInteger(count) || count < 1) return new Set();
+  const originals = results
+    .filter((entry) => !Number.isInteger(entry.explodedFrom))
+    .map((entry) => entry.index)
+    .sort((left, right) => left - right);
+  return new Set(originals.slice(-count));
 }
 
 /** The projection's entries in display order: each die, then the dice its explosions rolled. */
@@ -83,16 +99,27 @@ function displayOrder(results) {
 }
 
 /**
- * `{ tiles: [{ face, marks, generated }], more }` from an executed count projection's `results`
- * (`projectCountResults`' entries: `index`, `face`, `active`, `explodedFrom` and the three mark
- * flags). One tile per active die, capped at `limit`; `more` counts the tiles the cap left out.
+ * `{ tiles: [{ face, marks, generated, bought? }], more, bought? }` from an executed count
+ * projection's `results` (`projectCountResults`' entries: `index`, `face`, `active`,
+ * `explodedFrom` and the three mark flags) and its `bought` count. One tile per active die, capped
+ * at `limit`; `more` counts the tiles the cap left out, and `bought` the dice marked bought.
  */
 export function tileModel(countDisplay, { limit = DICE_TILE_LIMIT } = {}) {
   const results = Array.isArray(countDisplay?.results) ? countDisplay.results : [];
+  const bought = boughtIndices(results, countDisplay?.bought);
   const active = displayOrder(results)
     .filter((entry) => entry.active !== false)
-    .map(tileOf);
-  return { tiles: active.slice(0, limit), more: Math.max(0, active.length - limit) };
+    .map((entry) => tileOf(entry, bought));
+  return {
+    tiles: active.slice(0, limit),
+    more: Math.max(0, active.length - limit),
+    ...(bought.size > 0 && { bought: bought.size }),
+  };
+}
+
+/** The tokens a tile's marks hook carries: each mark, then `bought` for a bought die. */
+export function tileMarkTokens(tile) {
+  return [...tile.marks, ...(tile.bought === true ? [DICE_TILE_BOUGHT] : [])].join(' ');
 }
 
 /** A tile's tone: a cancel reads danger, a qualifying or exploding die success, else none. */
@@ -101,8 +128,7 @@ export function tileTone(marks) {
   return marks.includes('qualified') || marks.includes('exploded') ? 'success' : '';
 }
 
-/** "10, qualified and exploded": the face, then every mark, and whether an explosion rolled it. */
-export function tileLabel(tile, localize) {
+function markedLabel(tile, localize) {
   const words = tile.marks.map((mark) => copy(localize, mark));
   if (tile.generated) words.push(copy(localize, 'generated'));
   if (words.length === 0) return String(tile.face);
@@ -113,25 +139,39 @@ export function tileLabel(tile, localize) {
   return fill(copy(localize, 'label'), { face: tile.face, marks: joined });
 }
 
+/**
+ * "10, qualified and exploded": the face, then every mark, and whether an explosion rolled it; a
+ * bought die appends ", bought".
+ */
+export function tileLabel(tile, localize) {
+  const label = markedLabel(tile, localize);
+  return tile.bought === true ? fill(copy(localize, 'bought'), { label }) : label;
+}
+
 /** `+{count} more`, for the tiles the cap left out. */
 export function moreText(count, localize) {
   return fill(copy(localize, 'more'), { count });
 }
 
-/** The key under the tiles: which glyph means which mark. */
-export function legendText(localize) {
-  return copy(localize, 'legend');
+/** The key under the tiles: which glyph means which mark, and the dashed border when `bought`. */
+export function legendText(localize, bought = 0) {
+  const legend = copy(localize, 'legend');
+  return Number(bought) > 0 ? fill(copy(localize, 'boughtLegend'), { legend }) : legend;
 }
 
 function tileHtml(tile, localize) {
   const tone = tileTone(tile.marks);
-  const classes = ['fabricate-dice-tiles__tile', tone && `fabricate-dice-tiles__tile--${tone}`];
+  const classes = [
+    'fabricate-dice-tiles__tile',
+    tone && `fabricate-dice-tiles__tile--${tone}`,
+    tile.bought === true && 'fabricate-dice-tiles__tile--bought',
+  ];
   const marks = tile.marks
     .map((mark) => `<i class="${DICE_TILE_GLYPHS[mark]}" aria-hidden="true"></i>`)
     .join('');
   return [
     `<li class="${classes.filter(Boolean).join(' ')}"`,
-    ` ${DICE_TILE_HOOKS.face}="${esc(tile.face)}" ${DICE_TILE_HOOKS.marks}="${tile.marks.join(' ')}"`,
+    ` ${DICE_TILE_HOOKS.face}="${esc(tile.face)}" ${DICE_TILE_HOOKS.marks}="${tileMarkTokens(tile)}"`,
     tile.generated ? ' data-dice-tile-generated=""' : '',
     ` aria-label="${esc(tileLabel(tile, localize))}">`,
     `<span class="fabricate-dice-tiles__face" aria-hidden="true">${esc(tile.face)}</span>`,
@@ -157,7 +197,7 @@ export function renderDiceTilesHtml(model, localize = (key) => key, { legend = f
       : '',
     '</ul>',
     legend
-      ? `<p class="fabricate-dice-tiles__legend" ${DICE_TILE_HOOKS.legend}="">${esc(legendText(localize))}</p>`
+      ? `<p class="fabricate-dice-tiles__legend" ${DICE_TILE_HOOKS.legend}="">${esc(legendText(localize, model?.bought))}</p>`
       : '',
     '</div>',
   ].join('');

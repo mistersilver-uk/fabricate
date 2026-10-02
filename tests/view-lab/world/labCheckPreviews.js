@@ -5,6 +5,7 @@
  * pools and drive the rest through the Studio's own controls.
  */
 import { LAB_SYSTEM_IDS } from './labContent.js';
+import { LAB_MACRO_UUIDS } from './labMacros.js';
 
 const BEST = Object.freeze({ enabled: true, faces: { kind: 'best' } });
 const WORST = Object.freeze({ enabled: true, faces: { kind: 'worst' } });
@@ -105,11 +106,29 @@ const DICE_POOL_EXTENDED = {
 };
 
 /**
+ * Issue 2008: the pool's additional dice, paid from a stored Momentum, with a read macro linked
+ * for when the source switches to macros.
+ */
+const MOMENTUM_DICE = Object.freeze({
+  enabled: true,
+  source: 'path',
+  path: 'system.resources.momentum.value',
+  readMacroUuid: LAB_MACRO_UUIDS.readMomentum,
+  max: 1,
+  label: 'Momentum',
+});
+
+/**
  * Frames 07, 08, 16 and 17: two d20s against four recipe tiers, one needing more successes than
- * dice (additional dice wait for issue 2008), a threshold that rolls dice and a pool that does.
+ * the base pool and one more than additional dice can add, a threshold that rolls dice and a pool
+ * that does. Idrin holds 2 Momentum, Brenna's is set by an active effect and Vosk has none.
  */
 const DICE_POOL_FAULTS = {
   resolutionMode: 'simple',
+  momentum: {
+    'lab-actor-idrin': { value: 2 },
+    'lab-actor-brenna': { value: 2, overridden: true },
+  },
   crafting: {
     simple: {
       evaluation: count('under', {
@@ -118,12 +137,7 @@ const DICE_POOL_FAULTS = {
         threshold: '13',
         required: 2,
         modifierDestination: 'threshold',
-        additionalDice: {
-          enabled: true,
-          source: 'path',
-          path: 'system.resources.momentum.value',
-          max: 1,
-        },
+        additionalDice: MOMENTUM_DICE,
       }),
       tiers: [
         tier('lab-tier-complex-work', 'Complex Work', 2),
@@ -164,6 +178,24 @@ const DICE_POOL_FAULTS = {
           tierStep: { mode: 'none', steps: 1, tierId: null },
         },
       ],
+    },
+  },
+};
+
+/** Frame 07's macro pair: the read macro is a script, the spend macro a chat macro (issue 2008). */
+const DICE_POOL_FAULTS_MACRO = {
+  ...DICE_POOL_FAULTS,
+  crafting: {
+    simple: {
+      ...DICE_POOL_FAULTS.crafting.simple,
+      evaluation: count('under', {
+        ...DICE_POOL_FAULTS.crafting.simple.evaluation.pool,
+        additionalDice: {
+          ...MOMENTUM_DICE,
+          source: 'macro',
+          spendMacroUuid: LAB_MACRO_UUIDS.chatMomentum,
+        },
+      }),
     },
   },
 };
@@ -369,6 +401,7 @@ export const LAB_CHECK_PREVIEW_STATES = Object.freeze({
   'dice-pool': DICE_POOL,
   'dice-pool-extended': DICE_POOL_EXTENDED,
   'dice-pool-faults': DICE_POOL_FAULTS,
+  'dice-pool-faults-macro': DICE_POOL_FAULTS_MACRO,
   'roll-under-fixed': ROLL_UNDER_FIXED,
   'roll-under-dynamic': ROLL_UNDER_DYNAMIC,
   'roll-under-add': ROLL_UNDER_ADD,
@@ -434,4 +467,14 @@ export function seedCheckPreviewState(content, actors, stateId) {
   gathering.economy = { ...gathering.economy, resolutionMode: 'routed' };
   const idrin = actors.find((actor) => actor.id === 'lab-actor-idrin');
   idrin.system.skills = { ...idrin.system.skills, smith: { rank: 4 } };
+  stampMomentum(actors, state.momentum ?? {});
+}
+
+/** Each actor's stored Momentum, and the active effect that sets it where one does. */
+function stampMomentum(actors, table) {
+  for (const [actorId, { value, overridden }] of Object.entries(table)) {
+    const actor = actors.find((entry) => entry.id === actorId);
+    actor.system.resources = { ...actor.system.resources, momentum: { value } };
+    if (overridden) actor.overrides = { system: { resources: { momentum: { value: 5 } } } };
+  }
 }

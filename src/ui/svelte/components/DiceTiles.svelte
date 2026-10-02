@@ -8,13 +8,13 @@
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `model` | `{ tiles: [{ face, marks, generated }], more }` | `null` | `tileModel(...)`'s output. Nothing renders without a tile. |
+  | `model` | `{ tiles: [{ face, marks, generated, bought? }], more, bought? }` | `null` | `tileModel(...)`'s output. Nothing renders without a tile. |
   | `legend` | boolean | `false` | Adds the key under the tiles; the result boxes and the simulator draw it, chat does not. |
   | `faceDataAttr` / `marksDataAttr` / `legendDataAttr` | `data-*` names | `DICE_TILE_HOOKS` | A host's own hook names; a tile's marks are space-separated. |
 
   Invariants:
   - Every glyph is `aria-hidden`; each tile's `aria-label` names its face and marks, so colour is
-    never the only signal.
+    never the only signal. A bought die dashes its border and its label says so (issue 2008).
   - The tiles wrap inside the host and never scroll sideways.
   - The `fabricate-dice-tiles` family is styled once in `styles/fabricate.css`, because a chat card
     sits outside every Fabricate window and draws the same markup.
@@ -26,6 +26,7 @@
     legendText,
     moreText,
     tileLabel,
+    tileMarkTokens,
     tileTone,
   } from '../../presenters/countDiceTiles.js';
   import { localize } from '../util/foundryBridge.js';
@@ -51,7 +52,8 @@
           class="fabricate-dice-tiles__tile"
           class:fabricate-dice-tiles__tile--success={tone === 'success'}
           class:fabricate-dice-tiles__tile--danger={tone === 'danger'}
-          {...{ [faceDataAttr]: tile.face, [marksDataAttr]: tile.marks.join(' ') }}
+          class:fabricate-dice-tiles__tile--bought={tile.bought === true}
+          {...{ [faceDataAttr]: tile.face, [marksDataAttr]: tileMarkTokens(tile) }}
           data-dice-tile-generated={tile.generated ? '' : undefined}
           aria-label={tileLabel(tile, localize)}
         >
@@ -73,7 +75,7 @@
     </ul>
     {#if legend}
       <p class="fabricate-dice-tiles__legend" {...{ [legendDataAttr]: '' }}>
-        {legendText(localize)}
+        {legendText(localize, model?.bought)}
       </p>
     {/if}
   </div>

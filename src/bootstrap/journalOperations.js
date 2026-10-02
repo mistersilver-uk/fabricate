@@ -4,6 +4,7 @@
  */
 
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
+import { publicAdditionalDiceOffer } from '../systems/additionalDiceReach.js';
 import { publicAdvantageOffer } from '../systems/checkAdvantage.js';
 import { evaluatePreparedCraftingCheck, postCheckRollHandoff } from '../systems/checkRoll.js';
 import { EVENT_SCENE_SOCKET } from '../systems/eventSceneCoordinator.js';
@@ -65,6 +66,10 @@ export function promptJournalStageCheck(descriptor, prompt = promptCheckRoll) {
       zeroPoolFails: descriptor.zeroPoolFails,
       required: descriptor.required,
       modifierDestination: descriptor.modifierDestination,
+      pendingTools: descriptor.pendingTools,
+    }),
+    ...(descriptor?.additionalDiceOffer && {
+      additionalDiceOffer: publicAdditionalDiceOffer(descriptor.additionalDiceOffer),
     }),
   });
 }
@@ -333,6 +338,7 @@ function buildCheckOperations(fabricate, authorizeRollHandoff) {
         );
       return evaluatePreparedCraftingCheck(privateEvaluation, actor, decision, {
         secret: !visible,
+        user: sender,
       });
     },
     authorizeRollHandoff,

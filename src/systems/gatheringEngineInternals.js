@@ -45,6 +45,15 @@ export function plainObjectOrNull(value) {
   return { ...value };
 }
 
+export function mergeCharacterModifierSnapshots(base, environmental) {
+  const baseSnapshot = plainObjectOrNull(base) ?? {};
+  const environmentalSnapshot = plainObjectOrNull(environmental) ?? {};
+  return {
+    rows: normalizeList(baseSnapshot.rows),
+    events: normalizeList(environmentalSnapshot.events),
+  };
+}
+
 /** De-duplicated trimmed non-empty strings; a scalar is a one-element list. */
 export function normalizeStringList(value) {
   return [

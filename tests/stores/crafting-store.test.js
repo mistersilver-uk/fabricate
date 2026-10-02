@@ -4,6 +4,11 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 
+import {
+  evaluatePreparedJournalCheck,
+  withSpentAdditionalDice,
+} from '../../src/systems/journalPreparedCheck.js';
+import { executePublicCraft } from '../../src/systems/journalRunCommands.js';
 import { createSvelteModuleCompiler } from '../helpers/compile-svelte-module.js';
 import { expectedMemberKinds, storeMemberKinds } from '../helpers/storeMemberKinds.js';
 import { progressiveStageThresholds } from '../../src/utils/progressiveStageThresholds.js';
@@ -1649,5 +1654,142 @@ describe('craftingStore check evidence (issue 2005)', () => {
     await store.craft({ id: 'r1' });
     flushSync();
     assert.ok(Boolean(store.lastRollResult.r1), 'a refusal that is not the check changes nothing');
+  });
+});
+
+describe('craftingStore additional-dice notices (issue 2008)', () => {
+  let compiler;
+  let createCraftingStore;
+
+  before(async () => {
+    ({ compiler, createCraftingStore } = await setupCraftingStoreCompiler('fabricate-craft-dice-'));
+  });
+  after(() => compiler.cleanup());
+
+  const notice = { dice: 2, limit: 1, available: 1, label: 'Momentum', source: 'path' };
+  const craftWith = async (reply) => {
+    const { services, calls } = makeServices({
+      craftRecipe: typeof reply === 'function' ? reply : async () => reply,
+      sourceActors: [{ id: 'actor-1', name: 'Brenna' }],
+    });
+    const result = await createCraftingStore({ services }).craft({ id: 'r1' });
+    return { result, calls };
+  };
+
+  it('raises one notice for a refused choice before the quiet cancelled return', async () => {
+    const reply = {
+      success: false,
+      cancelled: true,
+      additionalDiceRefusal: 'resourceChanged',
+      additionalDiceNotice: notice,
+    };
+    const { result, calls } = await craftWith(reply);
+    assert.equal(result, reply, 'the cancelled result returns as before');
+    assert.deepEqual(calls.notify, [
+      "Brenna's Momentum changed before the roll, and 1 is fewer than the 2 chosen. Nothing was spent or rolled.",
+    ]);
+    assert.equal(calls.listCraftingForActor.length, 0, 'no listing churn');
+  });
+
+  it('says what a misconfigured roll spent, beside its refusal, and nothing for a dismissal', async () => {
+    const spent = await craftWith({
+      success: false,
+      misconfigured: true,
+      message: 'The check is misconfigured.',
+      data: { boughtDice: { count: 1, source: 'path' } },
+      additionalDiceNotice: { dice: 1, label: 'Momentum', source: 'path' },
+    });
+    assert.deepEqual(spent.calls.notify, [
+      '1 Momentum spent; the roll could not be completed.',
+      'The check is misconfigured.',
+    ]);
+    const dismissed = await craftWith({ success: false, cancelled: true });
+    assert.deepEqual(dismissed.calls.notify, [], 'a dismissal stays silent');
+  });
+
+  // The crafting app's Craft button runs the Journal command, so these are the replies it gets.
+  it('raises one warning for a Journal-shaped refusal, and says what a Journal-shaped stop spent', async () => {
+    const refused = await craftWith({
+      success: false,
+      reason: 'additional-dice-refused',
+      additionalDiceRefusal: 'resourceChanged',
+      additionalDiceNotice: { ...notice, actorName: 'Brenna' },
+    });
+    assert.deepEqual(refused.calls.notify, [
+      "Brenna's Momentum changed before the roll, and 1 is fewer than the 2 chosen. Nothing was spent or rolled.",
+    ]);
+    const spent = await craftWith({
+      success: false,
+      reason: 'roll-unavailable',
+      boughtDice: 1,
+      additionalDiceNotice: { dice: 1, label: 'Momentum', source: 'path', actorName: 'Brenna' },
+    });
+    assert.deepEqual(spent.calls.notify, [
+      '1 Momentum spent; the roll could not be completed.',
+      langLeaf('FABRICATE.App.Journal.Reason.RollUnavailable'),
+    ]);
+  });
+
+  // Composed: the real one-call craft and the real Journal reply builders, into the real store.
+  it('carries a refusal and a spend from executePublicCraft to one warning each', async () => {
+    const actor = { uuid: 'Actor.brenna', name: 'Brenna' };
+    const engine = {
+      craft: async () => ({
+        success: true,
+        requiresExecution: true,
+        canExecuteImmediately: true,
+        runId: 'run-1',
+        runRevision: 3,
+      }),
+    };
+    const label = { decisionPolicy: { count: { additionalDice: { label: 'Momentum' } } } };
+    const executeCommand = (checkResult) => async (request) => {
+      const spent = {};
+      const prepared = await evaluatePreparedJournalCheck({
+        request: { ...request, payload: { prepareToken: 'token' } },
+        context: { actor },
+        binding: {},
+        evaluate: async () => checkResult,
+        consumePrepareToken: () => ({ binding: { privateEvaluation: label } }),
+        currentRealmIsActiveGm: () => true,
+        spent,
+      });
+      // The command's own answer for a check that cannot roll (`executeOperation`).
+      const response = prepared.response ?? {
+        success: false,
+        reason: 'roll-unavailable',
+        message: checkResult.message,
+      };
+      return withSpentAdditionalDice(response, spent, request.expectedRevision);
+    };
+    const craftThrough = (checkResult) =>
+      craftWith((options) =>
+        executePublicCraft({
+          engine,
+          actor,
+          sourceActors: [actor],
+          recipe: { id: 'r1' },
+          options,
+          executeCommand: executeCommand(checkResult),
+        })
+      );
+    const refused = await craftThrough({
+      additionalDiceRefusal: 'resourceChanged',
+      additionalDiceNotice: notice,
+    });
+    assert.equal(refused.result.reason, 'additional-dice-refused', 'positive control: refused');
+    assert.deepEqual(refused.calls.notify, [
+      "Brenna's Momentum changed before the roll, and 1 is fewer than the 2 chosen. Nothing was spent or rolled.",
+    ]);
+    const spent = await craftThrough({
+      misconfigured: true,
+      message: 'The check is misconfigured.',
+      data: { boughtDice: { count: 2, source: 'path' } },
+    });
+    assert.equal(spent.result.boughtDice, 2, 'positive control: the reply carries the spend');
+    assert.deepEqual(spent.calls.notify, [
+      '2 Momentum spent; the roll could not be completed.',
+      'The check is misconfigured.',
+    ]);
   });
 });

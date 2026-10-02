@@ -148,6 +148,7 @@ test('all eight check slots retain inactive evaluation choices through a second 
         readMacroUuid: 'Macro.read',
         spendMacroUuid: 'Macro.spend',
         max: 4,
+        label: 'Momentum',
       },
     },
   };

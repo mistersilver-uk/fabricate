@@ -7,6 +7,7 @@ import { publicComplications } from '../utils/complicationPlan.js';
 import { activityPermitsFailureResults } from '../utils/failureResultPolicy.js';
 
 import { refusalData } from './checkTarget.js';
+import { carryAdditionalDice, checkRequest } from './countCheckRoll.js';
 import { checkDisplayForCard, rollTotalForCard, tierStepForCard } from './craftCardFields.js';
 import { readStackQuantity } from './itemStackQuantity.js';
 import {
@@ -192,7 +193,7 @@ export async function openSalvageRun(engine, ctx) {
 export async function runSalvageCheck(engine, ctx) {
   const { actor, component, options, salvageRunManager, system, toolValidation } = ctx;
   const checkResult = await engine._runSalvageCraftingCheck(component, system, actor, {
-    interactive: options?.interactive === true,
+    interactive: checkRequest(options, { craftingSystem: system, component }),
     toolItems: toolValidation.tools, // ratchet-exempt(world-scope): not-a-system
     rollDecision: options?.rollDecision ?? null,
   });
@@ -208,7 +209,7 @@ export async function runSalvageCheck(engine, ctx) {
     if (salvageRunManager && ctx.salvageRun && ctx.salvageRunCreatedThisCall) {
       await salvageRunManager.discardRun(actor, ctx.salvageRun.id);
     }
-    return refuse(checkResult.message, {
+    const { result: misconfigured } = refuse(checkResult.message, {
       // Additive discriminator (issue 859): a GM-side config gap, NOT a rolled
       // failure. `success` is unchanged, so no existing consumer regresses; a caller
       // that cares can now say "not configured — tell your GM" instead of reporting a
@@ -217,6 +218,7 @@ export async function runSalvageCheck(engine, ctx) {
       salvageRun: ctx.salvageRunCreatedThisCall ? null : ctx.salvageRun,
       ...(refusal && { data: refusal }),
     });
+    return { result: carryAdditionalDice(misconfigured, checkResult) };
   }
 
   // The player dismissed the interactive roll dialog: a user choice, not a failure. Abort with
@@ -226,10 +228,11 @@ export async function runSalvageCheck(engine, ctx) {
     if (salvageRunManager && ctx.salvageRun && ctx.salvageRunCreatedThisCall) {
       await salvageRunManager.discardRun(actor, ctx.salvageRun.id);
     }
-    return refuse('Salvage cancelled', {
+    const { result: cancelled } = refuse('Salvage cancelled', {
       cancelled: true,
       salvageRun: ctx.salvageRunCreatedThisCall ? null : ctx.salvageRun,
     });
+    return { result: carryAdditionalDice(cancelled, checkResult) };
   }
   return null;
 }

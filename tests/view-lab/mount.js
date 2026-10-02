@@ -159,8 +159,11 @@ function readParams() {
     playerProviderFault: params.get('playerProviderFault') === '1',
     // Evidence-only label stress for the rail's truncation rule.
     longPlayerLabels: params.get('longPlayerLabels') === '1',
-    // A stand-in companion's interactive count roll, prompting on the standalone overlay.
-    companionRoll: params.get('companionRoll') === 'count',
+    // A stand-in companion's interactive count roll, prompting on the standalone overlay; the
+    // `count-additional` request also offers additional dice (issue 2008).
+    companionRoll: ['count', 'count-additional'].includes(params.get('companionRoll'))
+      ? params.get('companionRoll')
+      : null,
     // view-lab-region:end
     // view-lab-region:canvas-mount-params
     // The two params only the three CANVAS windows read (issue 1520).
@@ -335,7 +338,7 @@ async function mountPlayerApp(content, params) {
   const instance = mount(FabricateAppRoot, { target: content, props });
   if (params.companionRoll) {
     const { installLabCompanionRoll } = await import('./labCompanionRoll.js');
-    installLabCompanionRoll(content.ownerDocument);
+    installLabCompanionRoll(content.ownerDocument, params.companionRoll);
   }
   return { instance, services, props };
 }
