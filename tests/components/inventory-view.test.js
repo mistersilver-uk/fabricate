@@ -1421,8 +1421,10 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     assert.doesNotMatch(root.querySelector('[data-inventory-salvage-banner]').textContent, /unused/);
   });
 
-  // AC2, rendering half. The builder decides the numbers.
-  it('routed + fixed renders authored ranges and NO DC; routed + relative renders thresholds', async () => {
+  // AC2, rendering half. The builder decides the numbers; the presenter formats the range
+  // through `netRange` (issue 2152), so the panel renders `outcome.band`, never a raw
+  // `outcome.start`–`outcome.end` interpolation.
+  it('routed + fixed renders the presenter\'s band and NO DC; routed + relative renders thresholds', async () => {
     const fixed = salvageServices(
       salvageItem({
         mode: 'routed',
@@ -1430,7 +1432,16 @@ describe('InventoryView (mounted) — player salvage surface', () => {
         routedType: 'fixed',
         dc: null,
         routedOutcomes: [
-          { id: 'o1', name: 'Fail', success: false, threshold: null, start: 1, end: 9, results: [] },
+          {
+            id: 'o1',
+            name: 'Fail',
+            success: false,
+            threshold: null,
+            start: 1,
+            end: 9,
+            band: '1–9',
+            results: [],
+          },
           {
             id: 'o2',
             name: 'Pass',
@@ -1438,7 +1449,20 @@ describe('InventoryView (mounted) — player salvage surface', () => {
             threshold: null,
             start: 10,
             end: 20,
+            band: '10–20',
             results: [{ id: 'r1', componentId: 'c2', name: 'Iron Shard', img: null, quantity: 1 }],
+          },
+          // A negative-ended fixed tier reads with the true minus sign, spaced apart from the
+          // dash — the Journal's own formatting, never `-2–-1`.
+          {
+            id: 'o3',
+            name: 'Fumble',
+            success: false,
+            threshold: null,
+            start: -2,
+            end: -1,
+            band: '−2 – −1',
+            results: [],
           },
         ],
       })
@@ -1449,11 +1473,13 @@ describe('InventoryView (mounted) — player salvage surface', () => {
       'fixed'
     );
     assert.equal(target.querySelector('[data-inventory-salvage-dc]'), null, 'a fixed check has no DC');
-    assert.equal(
-      target.querySelector('[data-inventory-outcome-range]').dataset.inventoryOutcomeRange,
-      '1-9'
+    const bands = [...target.querySelectorAll('[data-inventory-outcome-band]')];
+    assert.deepEqual(
+      bands.map((node) => node.dataset.inventoryOutcomeBand),
+      ['1–9', '10–20', '−2 – −1']
     );
     assert.equal(target.querySelector('[data-inventory-outcome-threshold]'), null);
+    assert.equal(target.querySelector('[data-inventory-outcome-range]'), null, 'no raw start–end attribute');
 
     harness.remount();
     const relative = salvageServices(
@@ -1473,7 +1499,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
       target.querySelector('[data-inventory-outcome-threshold]').dataset.inventoryOutcomeThreshold,
       '15'
     );
-    assert.equal(target.querySelector('[data-inventory-outcome-range]'), null);
+    assert.equal(target.querySelector('[data-inventory-outcome-band]'), null, 'no band for a relative threshold tier');
   });
 
   // Issue 2137: a counting check's tier states its net-success band, as the Journal does.

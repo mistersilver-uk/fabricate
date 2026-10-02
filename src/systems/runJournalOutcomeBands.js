@@ -164,7 +164,7 @@ function countBand(outcome, routed, required) {
 }
 
 /** `low–high`, spaced (`−2 – 1`) when either end is negative so its minus reads apart from the dash. */
-function netRange(low, high) {
+export function netRange(low, high) {
   if (low === high) return formatNet(low);
   const dash = low < 0 || high < 0 ? ' – ' : '–';
   return `${formatNet(low)}${dash}${formatNet(high)}`;

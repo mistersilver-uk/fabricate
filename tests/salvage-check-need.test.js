@@ -6,6 +6,7 @@ import {
   salvageCheckNeed,
   salvageCheckTarget,
   salvageDisplayDc,
+  withSalvageCountBands,
 } from '../src/ui/presenters/salvageCheckNeed.js';
 import { fill } from '../src/utils/fillPlaceholders.js';
 
@@ -78,6 +79,32 @@ test('a summed roll-under row names its fixed target, and a character value has 
   assert.deepEqual(
     salvageCheckNeed({ mode: 'progressive', config: { evaluation: { direction: 'under' } }, checkUsable: true }),
     { kind: 'noSingleTarget' }
+  );
+});
+
+test('a routed FIXED tier bands its authored [start, end] through the shared netRange formatter (issue 2152)', () => {
+  const rows = [
+    { id: 'o1', name: 'Fail', success: false, threshold: null, start: -2, end: -1, results: [] },
+    { id: 'o2', name: 'Pass', success: true, threshold: null, start: 10, end: 20, results: [] },
+    { id: 'o3', name: 'Even', success: true, threshold: null, start: 5, end: 5, results: [] },
+    { id: 'o4', name: 'Open', success: true, threshold: null, start: null, end: null, results: [] },
+  ];
+  const config = { type: 'fixed' };
+  const banded = withSalvageCountBands(rows, { config, component: null, localize: () => '' });
+  assert.deepEqual(
+    banded.map((row) => row.band),
+    ['−2 – −1', '10–20', '5', null],
+    'a negative-ended range spaces its dash from the true minus; a positive one stays tight; ' +
+      'a single-value range collapses; a row missing a bound bands nothing'
+  );
+  // A non-counting (summed) fixed check reaches the same branch and is banded identically:
+  // fixed routing never reads a DC either way, so there is nothing to discriminate on.
+  assert.equal(
+    withSalvageCountBands(
+      [{ id: 'o1', success: true, threshold: null, start: -2, end: -1, results: [] }],
+      { config: { type: 'fixed', evaluation: { product: 'sum', direction: 'over' } }, component: null, localize: () => '' }
+    )[0].band,
+    '−2 – −1'
   );
 });
 
