@@ -115,12 +115,12 @@ export async function evaluateCountCheckRoll(actor, options = {}) {
   };
 }
 
-/** Whether `options` reach a decision through a prompt or a pre-resolved `rollDecision`. */
-function decidesInteractively(options) {
-  return (
-    options.interactive === true &&
-    (Boolean(options.rollDecision) || typeof options.prompt === 'function')
-  );
+/** Whether the budget is read: a prompt offers it, or a decision or request buys dice. */
+function readsBudget({ interactive, rollDecision, prompt, additionalDice }) {
+  const decided = interactive === true && Boolean(rollDecision);
+  if (!decided && interactive === true && typeof prompt === 'function') return true;
+  const requested = decided ? rollDecision.additionalDice : additionalDice;
+  return Number.isInteger(requested) && requested > 0;
 }
 
 /** The read and spend macros' payload (data-models § Additional Dice Macro Contract). */
@@ -157,7 +157,7 @@ export function additionalDiceOffer({ additionalDice, budget, reach = null, roll
 
 /**
  * A count check's additional-dice purchase, or null when it offers none: the budget, read only for
- * a decision or a non-zero request, and its offer. A simulated preview reads and spends nothing.
+ * a prompt or a choice that buys dice, and its offer. A simulated preview reads and spends nothing.
  */
 async function offerAdditionalDice(actor, options, policy) {
   const { evaluation } = options;
@@ -166,7 +166,7 @@ async function offerAdditionalDice(actor, options, policy) {
   const purchase = { source: additionalDice.source, resourceLabel: additionalDice.label ?? '' };
   const simulated = options.simulatedAdditionalDice;
   if (Number.isInteger(simulated) && simulated >= 0) return { ...purchase, simulated };
-  if (!decidesInteractively(options) && !options.additionalDice) return purchase;
+  if (!readsBudget(options)) return purchase;
   const user = options.user ?? globalThis.game?.user ?? null;
   const payload = additionalDicePayload(actor, options, user);
   const budget = await resolveAdditionalDiceBudget({

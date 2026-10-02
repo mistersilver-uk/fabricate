@@ -193,6 +193,23 @@ test('buying nothing reads nothing and records no bought dice anywhere', async (
   });
 });
 
+test('a pre-resolved decision that buys no dice runs no read macro', async () => {
+  const { actor } = heldActor(2);
+  for (const rollDecision of [{}, { additionalDice: 0 }, { additionalDice: null }]) {
+    await withDice([9, 3], async (dice) => {
+      const evaluation = paidEvaluation({}, MACROS);
+      const result = await passFail(actor, evaluation, { interactive: true, rollDecision });
+      assert.deepEqual(macroCalls.reads, [], JSON.stringify(rollDecision));
+      assert.deepEqual([dice.formulas(), 'boughtDice' in result.data], [['2d10'], false]);
+    });
+  }
+  await withDice([9, 3, 8], async () => {
+    const rollDecision = { additionalDice: 1 };
+    await passFail(actor, paidEvaluation({}, MACROS), { interactive: true, rollDecision });
+  });
+  assert.equal(macroCalls.reads.length, 2, 'a decision that buys reads, then re-reads to spend');
+});
+
 test('the spend runs after the pre-rolls and before the main dice', async () => {
   const { actor } = heldActor(2);
   const rolledAtSpend = [];

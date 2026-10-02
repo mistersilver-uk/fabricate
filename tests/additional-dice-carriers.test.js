@@ -784,6 +784,38 @@ describe('the Journal command offers, validates and spends on the claim holder',
     }
   });
 
+  test('a non-interactive Journal command naming no dice reads its macro only to describe', async () => {
+    const reads = [];
+    const macro = {
+      type: 'script',
+      command: 'globalThis.additionalDiceReads.push(scope); return 2;',
+    };
+    Object.assign(globalThis, {
+      additionalDiceReads: reads,
+      fromUuid: async (uuid) => (uuid.startsWith('Macro.') ? macro : null),
+    });
+    const paid = { ...PAID, source: 'macro', path: '', readMacroUuid: 'Macro.read' };
+    const { actor } = heroWith(3);
+    const descriptor = paidDescriptor({
+      privateEvaluation: paidPreparation({ ...paid, spendMacroUuid: 'Macro.spend' }),
+    });
+    const { service } = gmService({ actor, describe: () => descriptor, stage: completed });
+    await withDice([9, 3], async () => {
+      const settled = await service.executeJournalRunCommand(
+        {
+          actorUuid: actor.uuid,
+          runType: 'crafting',
+          runId: 'run-1',
+          expectedRevision: 3,
+          action: 'execute',
+        },
+        { interactive: false }
+      );
+      assert.equal(settled.success, true, JSON.stringify(settled));
+    });
+    assert.equal(reads.length, 1, 'the describe reads; an evaluation that buys nothing does not');
+  });
+
   test('a blind gathering check settled without a prompt rolls with no bought dice', async () => {
     const { actor, writes } = heroWith(3);
     const descriptor = paidDescriptor({
@@ -982,23 +1014,23 @@ describe('the gathering facade and the prepared gathering read', () => {
     });
     const prompt = await withPreparedAdditionalDiceOffer(descriptor, { actor, sender: PLAYER });
     assert.equal(prompt.additionalDiceOffer.limit, 2, 'the read macro answered 2');
-    await withDice([9, 3], async () => {
-      const result = await evaluatePreparedRunCheck(
-        descriptor.privateEvaluation,
-        actor,
-        {},
-        {
-          user: PLAYER,
-        }
-      );
+    await withDice([9, 3, 8], async () => {
+      const decision = { additionalDice: 1, ...preparedDecisionPolicy(prompt) };
+      const { privateEvaluation } = descriptor;
+      const result = await evaluatePreparedRunCheck(privateEvaluation, actor, decision, {
+        user: PLAYER,
+      });
       assert.equal(result.engineEvaluated, true, JSON.stringify(result));
     });
     assert.deepEqual(
-      reads.map((payload) => [payload.activity, payload.user]),
+      reads.map((payload) => [payload.activity, payload.user, payload.delta]),
       [
-        ['gathering', PLAYER],
-        ['gathering', PLAYER],
-      ]
+        ['gathering', PLAYER, undefined],
+        ['gathering', PLAYER, undefined],
+        ['gathering', PLAYER, undefined],
+        ['gathering', PLAYER, -1],
+      ],
+      'the describe and the evaluation read, then the spend re-reads and spends'
     );
   });
 });
