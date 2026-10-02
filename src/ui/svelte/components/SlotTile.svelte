@@ -1,3 +1,4 @@
+<!-- ratchet-exempt(design-system): promoted on its second importer, RequirementChooser (issue 1518); its partial face and rendered acceptance stay with issue 1644 -->
 <!-- Material-choice tiles retain the library's 56px image and overlaid quantity pip. -->
 <script>
   import Medallion from './Medallion.svelte';
