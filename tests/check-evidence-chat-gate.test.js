@@ -50,15 +50,16 @@ function installRoll(rollMessages) {
   };
 }
 
-/** A V13 or V14 `ChatMessage` whose created messages are recorded whole. */
-function installChatMessage(version, created) {
+/** A V13 or V14 `ChatMessage` whose created messages are recorded whole, each beside its options. */
+function installChatMessage(version, created, createOptions = []) {
   const applier =
     version === 13
       ? { applyRollMode: (data, mode) => Object.assign(data, { rollMode: mode }) }
       : { applyMode: (data, mode) => Object.assign(data, { messageMode: mode }) };
   globalThis.ChatMessage = {
-    create: async (data) => {
+    create: async (data, options) => {
       created.push(data);
+      createOptions.push(options);
       return { id: `msg-${created.length}` };
     },
     getSpeaker: () => ({ alias: 'Salvager' }),
@@ -88,28 +89,52 @@ async function salvageAs(version, rollMode) {
   world.actor.system.skills = { craft: { value: 12 } };
   globalThis.game.i18n.localize = shippedLocalize;
   const created = [];
+  const createOptions = [];
   const rollMessages = [];
   installRoll(rollMessages);
-  installChatMessage(version, created);
+  installChatMessage(version, created, createOptions);
   const result = await world.salvage({ interactive: true, rollDecision: { rollMode } });
   delete globalThis.Roll;
-  const cards = created.filter((data) => String(data.content).includes('fabricate-craft-chat'));
-  return { result, cards, rollMessages };
+  const isCard = (data) => String(data.content).includes('fabricate-craft-chat');
+  const cards = created.filter(isCard);
+  const cardOptions = createOptions[created.findIndex(isCard)];
+  // The check roll and its rolled 1d4 leave as one bundled message when no card carries them.
+  const bundles = created.filter((data) => !isCard(data));
+  return { result, cards, cardOptions, bundles, rollMessages };
 }
 
 for (const version of [13, 14]) {
   for (const rollMode of ROLL_MODES) {
     test(`V${version} ${rollMode}: the card states evidence only for a public roll`, async () => {
-      const { result, cards, rollMessages } = await salvageAs(version, rollMode);
+      const { result, cards, cardOptions, bundles, rollMessages } = await salvageAs(
+        version,
+        rollMode
+      );
       assert.equal(result.success, true, 'the 3d6 of 9 stays at or under 13');
       assert.equal(cards.length, 1);
       const [card] = cards;
       assert.ok(!('whisper' in card) && !('blind' in card), 'a result card is never whispered');
       assert.ok(!card.flags?.fabricate, 'and carries no evidence flags');
-      assert.equal(card.rolls, undefined, 'and no pre-roll Roll instances');
-      const modeKey = version === 13 ? 'rollMode' : 'messageMode';
-      assert.ok(rollMessages.every((options) => modeKey in options), `the roll used ${modeKey}`);
+      assert.deepEqual(rollMessages, [], 'a roll with a pre-roll never posts through toMessage');
       const content = String(card.content);
+      if (rollMode === 'publicroll') {
+        assert.deepEqual(
+          card.rolls.map((roll) => roll.formula),
+          ['3d6', '(1d4)'],
+          'the public card carries the check roll, then its pre-roll'
+        );
+        assert.deepEqual(
+          cardOptions,
+          version === 13 ? { rollMode: 'publicroll' } : { messageMode: 'public' },
+          'and names the public mode, so the posting client\'s chat mode cannot whisper it'
+        );
+        assert.equal(bundles.length, 0, 'so no separate roll message is posted');
+      } else {
+        assert.equal(card.rolls, undefined, 'a private card carries no check or pre-roll Roll');
+        assert.equal(cardOptions, undefined);
+        assert.equal(bundles.length, 1, 'and the roll keeps its own message');
+        assert.equal(bundles[0].rolls.length, 2);
+      }
       if (rollMode === 'publicroll') {
         assert.match(content, /data-check-evidence="target"/);
         assert.match(content, /data-check-evidence="preRolled"/);

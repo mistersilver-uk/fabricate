@@ -266,3 +266,4 @@ Taking longer than the token's lifetime over the roll prompt MUST NOT cost the v
 Changing the modifier library or actor roll data after preparation MUST NOT change the prepared modifier contribution or its displayed value.
 Secret evaluation uses GM private posting and a sanitized response without player roll-data handoff.
 A non-secret evaluated-roll handoff MUST separately recheck the initiating viewer's entitlement after commit; this cannot substitute for initial-prompt redaction.
+A public crafting check's evaluated roll that the stage's result card carried MUST NOT be handed back, so the viewer posts no second message for it (`ui-crafting-app/spec.md`, Result Chat Cards).

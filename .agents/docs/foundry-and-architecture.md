@@ -412,6 +412,7 @@ An overlay button portaled into a window whose `data-action` is `close` closes t
 With no explicit roll mode, the bundled post reads the posting client's current `core.rollMode` on V13 or `core.messageMode` on V14 through `chatModeOption`; passing an explicit mode keeps its precedence and the same speaker and flavor apply to the bundle.
 The prepared handoff retains `serializedRoll` and separately ordered `serializedPreRolls`; an entitled client reconstructs each with `Roll.fromData` and posts the bundle without reevaluation, while an old single-roll handoff still uses `Roll#toMessage`.
 Secret execution excludes formula-bearing handoff and pre-roll evidence from the requester; a GM-visible message may still reveal that a roll happened while hiding its content.
+A public crafting or salvage check posts no roll message of its own when its result card is posted: the roll is offered to the card (`src/systems/checkCardRolls.js`), `postResultCard` (`src/systems/resultCardPost.js`) carries it in the card's `rolls` under an explicit public mode, and an offer no card claimed falls back to the bundled post or the handoff.
 - **`Roll#toJSON` is shallow.**
 A `ParentheticalTerm` serializes its inner Roll as the live object, whose `_root` links back to the outer roll and its actor roll data.
 Serialize roll evidence with a JSON round trip (`cloneJson`), never `structuredClone`, which copies that live graph or throws on it.

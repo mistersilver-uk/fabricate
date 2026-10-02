@@ -14,7 +14,7 @@ import {
   resolveCheckModifierFormula,
   resolvedLibraryContributions,
 } from './checkModifierResolver.js';
-import { postBundledCheckRoll, resolveModifierPreRolls } from './checkModifierRolls.js';
+import { resolveModifierPreRolls } from './checkModifierRolls.js';
 import { planModifierPlacement, SUM_OVER_EVALUATION } from './checkModifierRouter.js';
 import { defersModifierChoice, resolveCheckDecision } from './checkRollDecision.js';
 import {
@@ -49,7 +49,7 @@ import {
 import { authorizedPreparedDecision, validatedPreparedDecision } from './preparedDecisionPolicy.js';
 
 export { classifyCheckTotal, resolveForcedOutcome } from './checkRouting.js';
-export { rolledDiceGroups } from './checkRollOutput.js';
+export { postCheckRollHandoff, rolledDiceGroups } from './checkRollOutput.js';
 
 const noRoll = () => ({ engine: false, total: 0, diceGroups: [], resolvedFormula: null });
 const cancelled = (data) => ({ success: false, cancelled: true, outcome: null, value: null, data });
@@ -226,7 +226,7 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
   const total = Number.isFinite(rolledTotal) ? rolledTotal : 0;
   const flavor = settledFlavor(options, effectiveFlavor, evaluation, modifierPlacement);
 
-  await postCheckRoll({ roll, preRolls, options, flavor, rollMode: effectiveRollMode });
+  const posting = { roll, options, flavor, rollMode: effectiveRollMode };
   const result = {
     engine: true,
     total,
@@ -235,14 +235,9 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
     modifierPlacement,
     ...(benefitTerms?.length > 0 && { benefitTerms }),
     ...(options?.reportVisibility === true && { rollMode: effectiveRollMode ?? null }),
+    ...(await postCheckRoll({ ...posting, preRolls })),
   };
-  const rollHandoff = checkRollHandoff({
-    roll,
-    placement: modifierPlacement,
-    options,
-    flavor,
-    rollMode: effectiveRollMode,
-  });
+  const rollHandoff = checkRollHandoff({ ...posting, placement: modifierPlacement });
   if (rollHandoff) result.rollHandoff = rollHandoff;
   return result;
 }
@@ -582,45 +577,6 @@ export function evaluatePreparedCraftingCheck(preparation, actor, decision = {},
     failureMessage: 'Crafting check failed',
     ...options,
   });
-}
-
-/** Reconstruct and post an entitled GM-evaluated roll, including serialized pre-rolls without rerolling. */
-export async function postCheckRollHandoff(handoff, { Roll = globalThis.Roll } = {}) {
-  if (!handoff?.serializedRoll || typeof Roll?.fromData !== 'function') {
-    return { success: false, reason: 'invalid-roll-handoff' };
-  }
-  try {
-    const roll = Roll.fromData(handoff.serializedRoll);
-    if (!roll) {
-      return { success: false, reason: 'invalid-roll-handoff' };
-    }
-    const serializedPreRolls = handoff.serializedPreRolls;
-    if (Array.isArray(serializedPreRolls) && serializedPreRolls.length > 0) {
-      const preRolls = serializedPreRolls.map((data) => Roll.fromData(data));
-      if (preRolls.some((entry) => !entry)) {
-        return { success: false, reason: 'invalid-roll-handoff' };
-      }
-      await postBundledCheckRoll({
-        mainRoll: roll,
-        preRolls,
-        speaker: handoff.speaker ?? undefined,
-        flavor: handoff.flavor ?? undefined,
-        rollMode: handoff.rollMode,
-      });
-    } else {
-      if (typeof roll.toMessage !== 'function') {
-        return { success: false, reason: 'invalid-roll-handoff' };
-      }
-      await roll.toMessage(
-        { speaker: handoff.speaker ?? undefined, flavor: handoff.flavor ?? undefined },
-        { ...chatModeOption(handoff.rollMode), create: true }
-      );
-    }
-    return { success: true };
-  } catch (error) {
-    console.error('Fabricate | Failed to post authoritative check roll to chat:', error);
-    return { success: false, reason: 'chat-post-failed' };
-  }
 }
 
 /**

@@ -134,6 +134,7 @@ import {
 } from './itemStackQuantity.js';
 import { planFirstFitDrain, pooledItemOrder } from './pooledAllocation.js';
 import { resolveCheckTriggerMatches } from './ResolutionModeService.js';
+import { postResultCard } from './resultCardPost.js';
 import { resolveRolledAmount, rolledAwardRecord } from './rolledAmountResolver.js';
 import { getCommittedExecutionOutcome, observeExecutionJournal } from './runExecutionJournal.js';
 import {
@@ -163,6 +164,7 @@ import {
   resolveSalvageRunRecord,
   runSalvageCheck,
   salvageRefusal,
+  settleSalvageRoll,
   validateSalvageTools,
 } from './salvagePipeline.js';
 import {
@@ -6053,15 +6055,7 @@ export class CraftingEngine {
 
     // The rolls sound the dice and animate Dice So Nice; the custom `content` survives them
     // because the card has child elements, and a result card is never whispered.
-    try {
-      await ChatMessage.create({
-        speaker: ChatMessage.getSpeaker({ actor: craftingActor }),
-        content,
-        ...(rolls.length > 0 && { rolls }),
-      });
-    } catch (error) {
-      console.error('Fabricate | Failed to post crafting chat message:', error);
-    }
+    await postResultCard({ actor: craftingActor, content, rolls, check, label: 'crafting' });
   }
 
   /** `[{ tool, item }]` matches as `{ name, img }` chat entries by the tool's authored name, since
@@ -6178,15 +6172,7 @@ export class CraftingEngine {
       localize
     );
 
-    try {
-      await ChatMessage.create({
-        speaker: ChatMessage.getSpeaker({ actor }),
-        content,
-        ...(rolls.length > 0 && { rolls }),
-      });
-    } catch (error) {
-      console.error('Fabricate | Failed to post salvage chat message:', error);
-    }
+    await postResultCard({ actor, content, rolls, check, label: 'salvage' });
   }
 
   async _runPropertyMacro(
@@ -6463,6 +6449,8 @@ export class CraftingEngine {
     } catch (error) {
       await this._recordSalvageUncertainty(ctx, error);
       throw error;
+    } finally {
+      await settleSalvageRoll(ctx);
     }
   }
 

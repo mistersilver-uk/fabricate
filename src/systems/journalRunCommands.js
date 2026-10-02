@@ -1,3 +1,4 @@
+import { settleCardRolls, withOfferedHandoff } from './checkCardRolls.js';
 import { checkDisplayForCard } from './craftCardFields.js';
 import { settlePromptedCheck } from './journalCheckPrompt.js';
 import {
@@ -655,6 +656,21 @@ async function initiatorEntitled({ operation, request, resolveUuid, getUser, ...
 }
 
 /**
+ * A public crafting check's result with its handoff offered to the stage's result card under the
+ * request id. The gathering card states no roll, so a gathering roll keeps its own message.
+ */
+function cardOffer(request, checkResult, handoff) {
+  if (request.runType !== 'crafting') return checkResult;
+  return withOfferedHandoff(checkResult, handoff, request.requestId);
+}
+
+/** Evidence and the handoff share one entitlement: an unentitled initiator receives neither. */
+async function withEntitledFacts(response, { check, handoff }, authorization) {
+  if (!(handoff || check) || !(await initiatorEntitled(authorization))) return response;
+  return { ...response, ...(check && { check }), ...(handoff && { rollHandoff: handoff }) };
+}
+
+/**
  * Server-attested commands revalidate identity, ownership, revision and expected stage under a claim.
  * Player checks use one-use tokens, local prompts and GM resolution; adapters own disclosure.
  * Replies correlate recipients/user/session/request/run/revision; dismissal preserves actor history.
@@ -808,10 +824,8 @@ export function createJournalRunCommandService({
       } = resolvedCheckResult;
       responseRollHandoff = rollHandoff;
       secretCheck = secret === true;
-      trustedContext = {
-        operationId: request.requestId,
-        resolvedCheckResult: trustedResolvedCheckResult,
-      };
+      const offered = cardOffer(request, trustedResolvedCheckResult, rollHandoff);
+      trustedContext = { operationId: request.requestId, resolvedCheckResult: offered };
     } else if (request.action === 'execute' && typeof operation.describeCheck === 'function') {
       const preparationGrant = helpers.createExecutionGrant({
         ...binding,
@@ -885,23 +899,11 @@ export function createJournalRunCommandService({
     const check = secretCheck
       ? null
       : executedCheckFor(request.runType, trustedContext.resolvedCheckResult);
-    const handoff = secretCheck ? null : responseRollHandoff;
-    // Evidence and the handoff share one entitlement: an unentitled initiator receives neither.
-    if (
-      (handoff || check) &&
-      (await initiatorEntitled({
-        operation,
-        request,
-        resolveUuid,
-        getUser,
-        payload,
-        privateEvaluation,
-        result,
-      }))
-    ) {
-      return { ...response, ...(check && { check }), ...(handoff && { rollHandoff: handoff }) };
-    }
-    return response;
+    // A handoff the result card carried is not posted again by the requester.
+    const carried = await settleCardRolls(trustedContext.resolvedCheckResult?.cardRolls);
+    const handoff = secretCheck || carried ? null : responseRollHandoff;
+    const entitlement = { operation, request, resolveUuid, getUser, payload, privateEvaluation };
+    return withEntitledFacts(response, { check, handoff }, { ...entitlement, result });
   }
 
   async function handleRequest(request, senderId) {
