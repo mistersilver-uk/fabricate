@@ -131,10 +131,15 @@ async function showRefusalInCraftingTab(page, { recipeId, recipeName }) {
     .waitFor({ state: 'visible', timeout: 15_000 });
   await app.locator('.crafting-browser-search input').first().fill(recipeName);
   await page.waitForTimeout(350);
-  await app
-    .locator(`[data-recipe-id="${recipeId}"] .crafting-recipe-row-main`)
-    .first()
-    .click({ timeout: 5000 });
+  // The narrowed list selects its only recipe itself; a DOM click covers the case where it has not.
+  const row = app.locator(`[data-recipe-id="${recipeId}"]`).first();
+  await row.waitFor({ state: 'attached', timeout: 10_000 });
+  if ((await row.getAttribute('data-selected')) !== 'true') {
+    await row
+      .locator('.crafting-recipe-row-main')
+      .first()
+      .evaluate((main) => main.click());
+  }
   const note = app.locator('[data-recipe-section="check"] [data-check-target-unresolved]').first();
   await note.waitFor({ state: 'visible', timeout: 10_000 });
   return (await note.isVisible()) ? ((await note.textContent()) ?? '').trim() : '';
