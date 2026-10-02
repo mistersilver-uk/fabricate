@@ -7,6 +7,9 @@
   Three regions: a have/need meter per requirement, a stepper row per carrier the
   player can spend units of, and a recap of what those steppers currently commit.
 
+  An overshoot is a sentence beneath the carrier list, one per essence: a meter's ratio is
+  capped at its need and its fill clamps at full, so neither states the surplus.
+
   The meter is built HERE rather than reusing the gathering ChanceBar: that is a 0–1
   percentage meter which hard-codes `aria-valuemax="100"`, prints a percentage and
   has one flat fill, whereas a `2 / 4` ratio needs `aria-valuemax = need`, a
@@ -28,6 +31,7 @@
   import Kicker from '../../../components/Kicker.svelte';
   import FillBar from '../../../components/FillBar.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
+  import { essenceOvershoots } from './essenceOvershoot.js';
 
   let {
     // `craftability.essencePool` — requirements, carriers, allocation, suggested.
@@ -43,6 +47,7 @@
   const allocated = $derived(
     carriers.filter((carrier) => Number(carrier?.allocatedUnits ?? 0) > 0)
   );
+  const overshoots = $derived(essenceOvershoots(pool));
   const title = $derived(
     requirements.length === 1
       ? localize('FABRICATE.App.Crafting.Pool.Title')
@@ -78,38 +83,17 @@
     return Math.min(100, Math.round((Number(requirement?.delivered ?? 0) / need) * 100));
   }
 
-  /**
-   * The bar's SEMANTIC tone, for a requirement whose essence declares no colour.
-   *
-   * These are the three fills the deleted `.essence-pool-bar-fill` state rules painted, moved
-   * from CSS onto the prop `FillBar` publishes for exactly this: a scoped block in this file
-   * cannot reach a child component's element, so the state that used to be a descendant
-   * selector has to arrive as data. `short` is `delivered === 0`, so its danger fill renders at
-   * 0% width and was never visible — it is stated anyway, because the three states of the
-   * matrix are declared together here as they were there.
-   *
-   * @param {object} requirement one pool requirement
-   * @returns {string} a `FillBar` tone
-   */
+  // The bar's tone for a requirement whose essence declares no colour. A scoped block cannot
+  // reach a child component's element, so the state arrives as `FillBar`'s own prop.
   function meterTone(requirement) {
     const state = meterState(requirement);
     if (state === 'met') return 'success';
     return state === 'short' ? 'danger' : 'accent';
   }
 
-  /**
-   * A COLOURED essence keeps its own colour in every state, so the bar you fill reads as the
-   * same essence as the pip you filled it from — which is what the deleted `has-tint` triple
-   * said in CSS. `--fab-chip-color` is declared by `tintOf` on the meter this bar sits in and
-   * INHERITS into the bar, so the caller hands the primitive a reference rather than a value
-   * and no colour literal reaches this file.
-   *
-   * Losing the green does not lose the STATE: the ratio beside the name reads `5/5`, the fill
-   * reaches full width, and `data-essence-meter-state` still says `met`.
-   *
-   * @param {object} requirement one pool requirement
-   * @returns {string} a CSS colour reference, or '' to leave the tone in charge
-   */
+  // A coloured essence keeps its colour in every state, so the bar reads as the same essence as
+  // its pip. `--fab-chip-color` is declared by `tintOf` on the meter and inherits into the bar,
+  // so the primitive is handed a reference and no colour literal reaches this file.
   function meterColor(requirement) {
     return tintTokenOf(requirement) ? 'var(--fab-chip-color)' : '';
   }
@@ -242,6 +226,14 @@
           </li>
         {/each}
       </ul>
+      {#each overshoots as overshoot (overshoot.essenceId)}
+        <p class="essence-pool-overshoot" data-essence-overshoot={overshoot.essenceId}>
+          {localize('FABRICATE.App.Crafting.Pool.Overshoot', {
+            essence: overshoot.name,
+            amount: overshoot.amount,
+          })}
+        </p>
+      {/each}
     {/if}
 
     {#if allocated.length > 0}
@@ -440,6 +432,12 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--fab-space-2);
+  }
+
+  .essence-pool-overshoot {
+    margin: 0;
+    font-size: 11px;
+    color: var(--fab-text-muted);
   }
 
   .essence-pool-owned {

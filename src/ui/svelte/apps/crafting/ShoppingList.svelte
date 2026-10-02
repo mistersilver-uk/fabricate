@@ -15,6 +15,7 @@
   import StatBox from '../../components/StatBox.svelte';
   import Kicker from '../../components/Kicker.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
+  import Chip from '../../components/Chip.svelte';
 
   let {
     aggregate = null,
@@ -127,7 +128,7 @@
   function ratioChip(have, need) {
     return {
       mode: 'ratio',
-      tone: 'tone-danger',
+      tone: 'danger',
       label: localize('FABRICATE.App.Crafting.Shopping.Owned', { have, need }),
       title: null,
     };
@@ -149,7 +150,7 @@
     if (ing.issue) {
       return {
         mode: 'currency-unavailable',
-        tone: 'tone-warning',
+        tone: 'warning',
         label: localize('FABRICATE.App.Crafting.Shopping.CurrencyUnavailable'),
         title: ing.issue,
       };
@@ -158,14 +159,14 @@
       const count = ing.costRepeats ?? 1;
       return {
         mode: 'currency-unchecked',
-        tone: 'tone-neutral',
+        tone: 'neutral',
         label: localize('FABRICATE.App.Crafting.Shopping.CurrencyRepeats', { count }),
         title: localize('FABRICATE.App.Crafting.Shopping.CurrencyRepeatsHint', { count }),
       };
     }
     return {
       mode: 'currency',
-      tone: 'tone-danger',
+      tone: 'danger',
       label: localize('FABRICATE.App.Crafting.Shopping.CurrencyShort'),
       title: null,
     };
@@ -312,13 +313,13 @@
                   <Medallion {...resolveCraftingArt(row.img)} alt="" size={28} />
                 {/if}
                 <span class="crafting-shopping-acquire-name" title={row.name}>{row.name}</span>
-                <span
-                  class={`crafting-shopping-chip ${row.chip.tone}`}
+                <Chip
+                  density="list"
+                  emphasis="solid"
+                  tone={row.chip.tone}
                   data-shopping-chip={row.chip.mode}
-                  title={row.chip.title}
+                  title={row.chip.title}>{row.chip.label}</Chip
                 >
-                  {row.chip.label}
-                </span>
               </li>
             {/each}
           </ul>
@@ -626,14 +627,5 @@
     color: var(--fab-warning-text);
     border: 1px solid var(--fab-warning-border);
     background: var(--fab-warning-soft);
-  }
-
-  /* The row states a fact and no verdict (issue 1493): a currency cost whose affordability
-     was only ever checked for a single craft. Neither red nor amber would be honest, so it
-     borrows the surrounding chrome rather than any status hue. */
-  .crafting-shopping-chip.tone-neutral {
-    color: var(--fab-text-muted);
-    border: 1px solid var(--fab-border);
-    background: var(--fab-surface-soft);
   }
 </style>

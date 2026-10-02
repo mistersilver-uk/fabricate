@@ -313,6 +313,8 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/ingredientOptionStatus.js',
   // The requirement rail's pure slot/consumption-plan projection (issue 917).
   'src/ui/svelte/util/requirementSlots.js',
+  // The pool's surplus per essence, which the pool and the consumption plan both state.
+  'src/ui/svelte/apps/crafting/detail/essenceOvershoot.js',
   // RecipeDetailHeader surfaces the recipe's authored craft duration pre-craft (issue 846) via this
   // formatter.
   'src/ui/svelte/util/recipeDuration.js',

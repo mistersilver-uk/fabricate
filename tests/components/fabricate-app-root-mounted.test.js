@@ -124,6 +124,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/disclosurePhrase.js',
     'src/ui/svelte/util/recipeItemAccessBadge.js',
     'src/ui/svelte/util/requirementSlots.js',
+    'src/ui/svelte/apps/crafting/detail/essenceOvershoot.js',
     'src/ui/svelte/util/sceneImages.js',
     'src/ui/svelte/util/worldTimeLabel.js',
     'src/utils/checkModifierPicks.js',

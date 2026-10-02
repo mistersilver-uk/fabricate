@@ -35,6 +35,7 @@
   import RequirementRail from './RequirementRail.svelte';
   import EssencePoolPanel from './EssencePoolPanel.svelte';
   import ConsumptionPlanPanel from './ConsumptionPlanPanel.svelte';
+  import { essenceOvershoots } from './essenceOvershoot.js';
   import Kicker from '../../../components/Kicker.svelte';
 
   let {
@@ -87,6 +88,7 @@
       ? []
       : ingredientChoices.filter((choice) => choice?.groupId === openSlotId)
   );
+  const overshoots = $derived(essenceOvershoots(craftability?.essencePool ?? null));
 
   function essenceLabel(state) {
     return String(state?.name ?? state?.label ?? state?.type ?? state?.essenceType ?? '');
@@ -128,7 +130,11 @@
           role="region"
           aria-labelledby={openTileId ?? undefined}
         >
-          <IngredientOptionSelector choices={openChoices} onChoose={onChooseOption} />
+          <IngredientOptionSelector
+            choices={openChoices}
+            need={openSlot?.need ?? 0}
+            onChoose={onChooseOption}
+          />
           {#if poolOpen}
             {@render essencePool(null, null)}
           {/if}
@@ -136,7 +142,7 @@
       {:else if poolOpen}
         {@render essencePool(panelId, openTileId)}
       {/if}
-      <ConsumptionPlanPanel {plan} {formatList} />
+      <ConsumptionPlanPanel {plan} {overshoots} {formatList} />
     </div>
   {/if}
 
@@ -151,14 +157,16 @@
               <span class="crafting-io-name">{essenceLabel(state)}</span>
             </span>
             <span class="crafting-io-tags">
-              <!-- The reading is a WORD and a COUNT, two children rather than one string, so the
-                   chip's own gap still separates them the way the retired tag's did. -->
-              <Chip density="list" tone={statusChipTone(state.satisfied ? 'success' : 'neutral')}
+              <!-- A word and a count as two children, so the chip's own gap separates them. -->
+              <Chip
+                density="list"
+                emphasis="solid"
+                tone={statusChipTone(state.satisfied ? 'success' : 'neutral')}
                 ><span>{localize('FABRICATE.App.Crafting.Io.Have')}</span><span
                   >{countText(state.have)}</span
                 ></Chip
               >
-              <Chip density="list" tone={statusChipTone('neutral')}
+              <Chip density="list" emphasis="solid" tone={statusChipTone('neutral')}
                 ><span>{localize('FABRICATE.App.Crafting.Io.Need')}</span><span
                   >{countText(state.need)}</span
                 ></Chip

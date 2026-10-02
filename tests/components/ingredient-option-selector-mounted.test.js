@@ -1,5 +1,6 @@
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import {
@@ -8,10 +9,12 @@ import {
   STATUS_TONE_RAW_MODULES,
   createMountedComponentHarness
 } from '../helpers/svelte-component-harness.js';
+import { chipGroundAlpha, themeTokens } from '../helpers/chipPaint.js';
 import { chipToneOf } from '../helpers/chipTone.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
+const THEMES = themeTokens(readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8'));
 
 const harness = createMountedComponentHarness({
   repoRoot,
@@ -103,11 +106,58 @@ describe('IngredientOptionSelector mounted behavior', () => {
     assert.match(radio.textContent, /0\/1/, 'have/need remains visible');
   });
 
-  it('flags an insufficient option as selectable-but-flagged', async () => {
+  it('flags a short option as selectable-but-flagged', async () => {
     const target = await harness.mount({ choices: [optionChoice()], onChoose: null });
     const radios = target.querySelectorAll('[role="radio"]');
-    assert.equal(radios[1].getAttribute('data-option-satisfied'), 'false', 'insufficient option is flagged');
+    assert.equal(radios[1].getAttribute('data-option-satisfied'), 'false', 'a short option is flagged');
+    assert.ok(radios[1].classList.contains('is-short'));
+    assert.ok(!radios[0].classList.contains('is-short'));
     assert.equal(radios[1].hasAttribute('disabled'), false, 'but stays reachable (not disabled)');
+    // The shortfall is a sentence as well as danger ink.
+    assert.match(radios[1].getAttribute('title'), /Slots\.TileShort/);
+    assert.match(radios[1].getAttribute('title'), /"name":"Blue Herb"/);
+    assert.ok(!radios[0].hasAttribute('title'), 'a met option states none');
+  });
+
+  it('stands every have/need chip on a solid ground', async () => {
+    const target = await harness.mount({ choices: [optionChoice()], onChoose: null });
+    const chips = [...target.querySelectorAll('[role="radio"]')].map((radio) =>
+      radio.querySelector('.manager-chip')
+    );
+    assert.equal(chips.length, 2);
+    for (const chip of chips) assert.equal(chipGroundAlpha(chip, THEMES), 1);
+  });
+
+  it('flags a held stack that is short of the slot need, and keeps it selectable', async () => {
+    const calls = [];
+    const target = await harness.mount({
+      choices: [
+        {
+          kind: 'stack',
+          groupId: 'g1',
+          groupName: 'Hardwood',
+          optionIndex: 0,
+          selectedHeldItemId: 'Item.oak',
+          stacks: [
+            { itemId: 'Item.oak', name: 'Oak Haft', img: null, have: 12 },
+            { itemId: 'Item.bog', name: 'Bog Oak', img: null, have: 1 },
+          ],
+        },
+      ],
+      need: 2,
+      onChoose: (groupId, choice) => {
+        calls.push([groupId, choice]);
+      },
+    });
+    const [oak, bog] = target.querySelectorAll('[role="radio"]');
+    assert.ok(!oak.classList.contains('is-short'));
+    assert.ok(bog.classList.contains('is-short'), 'one held against a need of two');
+    assert.equal(chipToneOf(bog.querySelector('.manager-chip')), 'danger');
+    assert.equal(chipGroundAlpha(bog.querySelector('.manager-chip'), THEMES), 1);
+    assert.equal(bog.hasAttribute('disabled'), false);
+    assert.match(bog.getAttribute('title'), /"name":"Bog Oak".*"have":1.*"need":2/);
+    bog.click();
+    assert.deepEqual(calls.at(-1), ['g1', { optionIndex: 0, heldItemId: 'Item.bog' }]);
   });
 
   it('invokes onChoose with the group id and option index on click', async () => {

@@ -11,9 +11,11 @@
   the UI: choosing an option calls `onChoose(groupId, choice)`, which drives a
   re-evaluation through the same resolver the engine consumes (keeping tiles ==
   consumed). Each choice is one `role="radiogroup"`; each option/stack is a
-  `<button role="radio">`. An insufficient option stays selectable but is flagged
-  (red have/need chip) — the Craft button then blocks with the missing-materials
-  message on that choice. Renders nothing when no group offers a choice.
+  `<button role="radio">`. A short option or stack stays selectable but is flagged
+  (`is-short` and a danger have/need chip) — the Craft button then blocks with the
+  missing-materials message on that choice. Renders nothing when no group offers a choice.
+
+  `need` is the open slot's requirement, which a held stack is short of when it holds less.
 -->
 <script>
   import Medallion from '../../../components/Medallion.svelte';
@@ -25,9 +27,14 @@
   import Chip from '../../../components/Chip.svelte';
   import Kicker from '../../../components/Kicker.svelte';
 
-  let { choices = [], onChoose = null } = $props();
+  let { choices = [], need = 0, onChoose = null } = $props();
 
   const groups = $derived(Array.isArray(choices) ? choices : []);
+
+  // A shortfall is stated in words as well as in danger ink. A currency option has no ratio.
+  function shortfall(name, have, required) {
+    return localize('FABRICATE.App.Crafting.Slots.TileShort', { name, have, need: required });
+  }
 
   function commitOption(choice, optionIndex) {
     onChoose?.(choice.groupId, { optionIndex });
@@ -90,7 +97,7 @@
               type="button"
               class="crafting-alt-option"
               class:is-selected={selected}
-              class:is-insufficient={!option.satisfied}
+              class:is-short={!option.satisfied}
               role="radio"
               aria-checked={selected}
               aria-label={localize('FABRICATE.App.Crafting.Io.ChooseOption', { name: option.name })}
@@ -98,6 +105,9 @@
               data-keyboard-focus="true"
               data-option-index={option.optionIndex}
               data-option-satisfied={option.satisfied ? 'true' : 'false'}
+              title={option.satisfied || option.isCurrency
+                ? undefined
+                : shortfall(option.name, option.have, option.need)}
               onclick={() => commitOption(choice, option.optionIndex)}
               onkeydown={(event) =>
                 onRadioKeydown(
@@ -116,11 +126,15 @@
               {#if option.isCurrency}
                 <Chip
                   density="list"
+                  emphasis="solid"
                   tone={statusChipTone(option.affordable ? 'success' : 'danger')}
                   icon="fas fa-coins">{option.costLabel}</Chip
                 >
               {:else}
-                <Chip density="list" tone={statusChipTone(option.satisfied ? 'success' : 'danger')}
+                <Chip
+                  density="list"
+                  emphasis="solid"
+                  tone={statusChipTone(option.satisfied ? 'success' : 'danger')}
                   >{haveOfNeedText(option.have, option.need)}</Chip
                 >
               {/if}
@@ -143,16 +157,20 @@
         >
           {#each choice.stacks as stack (stack.itemId)}
             {@const selected = stack.itemId === choice.selectedHeldItemId}
+            {@const short = Number(stack.have) < Number(need)}
             <button
               type="button"
               class="crafting-alt-option"
               class:is-selected={selected}
+              class:is-short={short}
               role="radio"
               aria-checked={selected}
               aria-label={localize('FABRICATE.App.Crafting.Io.ChooseOption', { name: stack.name })}
               tabindex={selected ? 0 : -1}
               data-keyboard-focus="true"
               data-held-id={stack.itemId}
+              data-option-satisfied={short ? 'false' : 'true'}
+              title={short ? shortfall(stack.name, stack.have, need) : undefined}
               onclick={() => commitStack(choice, stack.itemId)}
               onkeydown={(event) =>
                 onRadioKeydown(
@@ -164,7 +182,10 @@
             >
               <Medallion {...resolveCraftingArt(stack.img)} alt="" size={40} />
               <span class="crafting-alt-name">{stack.name}</span>
-              <Chip density="list" tone={statusChipTone('neutral')}
+              <Chip
+                density="list"
+                emphasis="solid"
+                tone={statusChipTone(short ? 'danger' : 'neutral')}
                 >{stackCountText(stack.have)}</Chip
               >
               {#if selected}
@@ -231,21 +252,19 @@
     background: var(--fab-accent-soft);
   }
 
-  /* Insufficient options stay selectable-but-flagged (issue 552 decision 1): a red
-     border reads "blocking" whether the row is selected or not, so a player who
-     picks an unaffordable component still sees the choice is short (the tile pip +
-     have/need chip also go red). The selected-and-insufficient variant keeps the
-     danger border while adopting a danger-tinted fill so it still reads as chosen. */
-  .crafting-alt-option.is-insufficient {
+  /* A short option stays selectable but flagged (issue 552): the danger border reads
+     "blocking" whether or not the row is selected, and the selected variant takes a
+     danger-tinted fill so it still reads as chosen. */
+  .crafting-alt-option.is-short {
     border-color: var(--fab-danger-border);
   }
 
-  .crafting-alt-option.is-insufficient.is-selected {
+  .crafting-alt-option.is-short.is-selected {
     border-color: var(--fab-danger);
     background: var(--fab-danger-soft);
   }
 
-  .crafting-alt-option.is-insufficient .crafting-alt-name {
+  .crafting-alt-option.is-short .crafting-alt-name {
     color: var(--fab-text-muted);
   }
 

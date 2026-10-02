@@ -1,6 +1,7 @@
 /** IoTable (issue 917) as the requirement surface's COMPOSITION ROOT. */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import {
@@ -14,9 +15,11 @@ import {
   essenceCraftability,
   sharedEssenceCraftability,
 } from '../helpers/crafting-fixtures.js';
+import { chipGroundAlpha, themeTokens } from '../helpers/chipPaint.js';
 import { chipToneOf } from '../helpers/chipTone.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
+const THEMES = themeTokens(readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8'));
 
 const harness = createMountedComponentHarness({
   repoRoot,
@@ -368,6 +371,28 @@ describe('IoTable mounted behavior', () => {
     // The word and the count stay two children.
     assert.equal(have.querySelectorAll('span').length, 2, 'the reading is a word and a count');
     assert.match(have.textContent.replaceAll(/\s+/g, ' ').trim(), /2$/, 'the count is the holding');
+    // Read over artwork of unknown colour, so both stand on an opaque ground.
+    assert.equal(chipGroundAlpha(have, THEMES), 1, 'the have chip is solid');
+    assert.equal(chipGroundAlpha(need, THEMES), 1, 'and so is the need chip');
+  });
+
+  it('states a pool overshoot in the consumption plan, one line per essence', async () => {
+    const base = essenceCraftability();
+    const [carrier] = base.essencePool.carriers;
+    const over = essenceCraftability({
+      essencePool: { ...base.essencePool, carriers: [{ ...carrier, allocatedUnits: 3 }] },
+    });
+    const target = await harness.mount({ craftability: over, openSlotId: 'essence-pool' });
+    const plan = target.querySelector('[data-recipe-section="consumption-plan"]');
+    const line = plan.querySelector('[data-consumption-overshoot="radiant"]');
+    // Three units of two against a need of four.
+    assert.match(line.textContent, /ConsumptionPlan\.Overshoot/);
+    assert.match(line.textContent, /"essence":"Radiant"/);
+    assert.match(line.textContent, /"amount":2/);
+
+    harness.remount();
+    const exact = await harness.mount({ craftability: base, openSlotId: 'essence-pool' });
+    assert.ok(!exact.querySelector('[data-consumption-overshoot]'), 'no surplus, no line');
   });
 
   it('draws an unavailable tool as a danger chip with its own glyph', async () => {

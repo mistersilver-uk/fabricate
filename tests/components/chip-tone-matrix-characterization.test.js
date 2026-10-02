@@ -5,6 +5,14 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import {
+  compiledPaint,
+  injectedCss,
+  themeTokens,
+  tokenOf,
+  translucentIn,
+  withoutComments,
+} from '../helpers/chipPaint.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -19,16 +27,6 @@ const harness = createMountedComponentHarness({
   compiledModules: ['src/ui/svelte/components/Chip.svelte'],
   componentPath: 'src/ui/svelte/components/Chip.svelte',
 });
-
-/**
- * `chipSource`, or a slice of it, with its block and line comments removed.
- *
- * @param {string} text
- * @returns {string}
- */
-function withoutComments(text) {
-  return text.replaceAll(/\/\*[\s\S]*?\*\//g, '').replaceAll(/\/\/[^\n]*/g, '');
-}
 
 /**
  * The values one closed vocabulary `Set` declares.
@@ -96,69 +94,6 @@ function ruleIndex(className) {
 
 function chipNode(target) {
   return target.querySelector('.manager-chip');
-}
-
-/** The stylesheet the mount injected, comments stripped. */
-function injectedCss() {
-  return withoutComments(
-    [...document.querySelectorAll('style')].map((node) => node.textContent).join('\n')
-  );
-}
-
-/** One selector list split into its selectors, with each trailing `:is()` list expanded. */
-function selectorsOf(head) {
-  return head
-    .replaceAll(/:where\(\.svelte-\w+\)|\.svelte-\w+/g, '')
-    .split(/,(?![^(]*\))/)
-    .map((selector) => selector.trim())
-    .flatMap((selector) => {
-      const [, stem, list] = /^(.*):is\(([^)]*)\)$/.exec(selector) ?? [];
-      return list ? list.split(',').map((leg) => stem + leg.trim()) : [selector];
-    });
-}
-
-/**
- * The compiled rules that select the chip root by class alone, in sheet order.
- *
- * @returns {Array<{ classes: string[], order: number, declarations: Map<string, string> }>}
- */
-function compiledRootRules() {
-  const rules = [];
-  for (const [, head, body] of injectedCss().matchAll(/([^{}]+)\{([^}]*)\}/g)) {
-    const declarations = new Map(
-      body
-        .split(';')
-        .map((line) => line.split(':'))
-        .filter((parts) => parts.length > 1)
-        .map(([property, ...value]) => [property.trim(), value.join(':').trim()])
-    );
-    for (const selector of selectorsOf(head)) {
-      const classes = selector.split('.').slice(1);
-      if (selector.startsWith('.') && classes.every((name) => /^[\w-]+$/.exec(name))) {
-        rules.push({ classes, order: rules.length, declarations });
-      }
-    }
-  }
-  return rules;
-}
-
-/**
- * What the compiled sheet paints on a mounted chip: the declaration that wins each property by
- * specificity, then by sheet order.
- *
- * @param {Element} node the mounted chip root
- * @returns {Map<string, string>}
- */
-function compiledPaint(node) {
-  const held = new Set(node.classList);
-  const painted = new Map();
-  const applying = compiledRootRules()
-    .filter((rule) => rule.classes.every((name) => held.has(name)))
-    .toSorted((a, b) => a.classes.length - b.classes.length || a.order - b.order);
-  for (const rule of applying) {
-    for (const [property, value] of rule.declarations) painted.set(property, value);
-  }
-  return painted;
 }
 
 /** The authored classes, with Svelte's per-component scope hash removed. */
@@ -734,29 +669,7 @@ describe('1518 Chip — the solid emphasis', () => {
 
   after(() => harness.teardown());
 
-  /** Each theme block's custom properties, read from the sheet that declares them. */
-  const THEMES = new Map(
-    [
-      ...readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8').matchAll(
-        /\.fabricate\[data-fabricate-theme="([\w-]+)"\]\s*\{([^}]*)\}/g
-      ),
-    ].map(([, theme, body]) => [
-      theme,
-      new Map([...body.matchAll(/(--fab-[\w-]+):\s*([^;]+);/g)].map(([, name, value]) => [name, value])),
-    ])
-  );
-
-  /** The token a `var(--fab-…)` declaration names, or `''` when the value is anything else. */
-  const tokenOf = (value) => /^var\((--fab-[\w-]+)\)$/.exec(value ?? '')?.[1] ?? '';
-
-  /** The themes in which `token` is not a six-digit hex, which is the only opaque form declared. */
-  const translucentIn = (token) =>
-    [...THEMES]
-      .filter(([, tokens]) => {
-        const value = tokens.get(token) ?? '';
-        return !(value.startsWith('#') && value.length === 7);
-      })
-      .map(([theme]) => theme);
+  const THEMES = themeTokens(readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8'));
 
   async function paintOf(props) {
     const paint = compiledPaint(chipNode(await harness.mount(props)));
@@ -805,7 +718,7 @@ describe('1518 Chip — the solid emphasis', () => {
         `tone "${tone}" with the solid emphasis must take its ground from one theme token`
       );
       assert.deepEqual(
-        translucentIn(ground),
+        translucentIn(THEMES, ground),
         [],
         `tone "${tone}" stands on ${ground}, which is not opaque in every theme. A rule written ` +
           'above a tone rule loses the fill to it, and a soft token is a wash, not a ground.'

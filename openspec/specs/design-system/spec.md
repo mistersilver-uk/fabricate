@@ -1699,11 +1699,18 @@ The environment editor's validation tab was ADJUDICATED a different surface at i
 
 ### Requirement: A player chooses the item, not just the requirement
 
+A requirement renders as a slot, and a slot is `fixed`, a `choice` or an essence slot.
+Its state is `met`, `partial` or `short`.
+At most one slot's chooser is open at a time.
+
 Where a requirement names a CLASS rather than a record — a tag requirement — the player still chooses which held item satisfies it, so every held item carrying the tag renders as a candidate.
 A candidate whose count falls short renders dimmed rather than hidden, because knowing what almost works is what tells a player what to go and find.
+A short alternative is dimmed, still offered, and stated in words as well as in danger ink.
 
 An essence requirement has no single source: several components each contribute, so the surface states the TOTAL against the requirement and shows which items make it up and by how much.
 An overshoot is stated rather than hidden, because spending more of an essence than the requirement asks is a real cost the player is choosing.
+It is stated in words beneath the source list, never in a requirement's ratio and never clamped away.
+A bar's fill may clamp at full, because a fill has no state above full; the stated count may not.
 
 A held-versus-needed count renders on a SOLID ground rather than a soft wash: it is read at a glance against artwork of unknown colour, and a translucent fill cannot be relied on to stay legible over it.
 The shared chip states that ground as its `solid` emphasis, which a held-versus-needed chip takes: an opaque theme token under every tone, with a coloured tone filled in its own colour and inked to read on that fill.
@@ -1713,6 +1720,12 @@ The shared chip states that ground as its `solid` emphasis, which a held-versus-
 - **WHEN** a player resolves a tag requirement and holds four items carrying it
 - **THEN** all four render as candidates
 - **AND** the ones that cannot meet the count are dimmed rather than omitted
+
+#### Scenario: A threshold is exceeded
+
+- **WHEN** an essence's delivered total exceeds what its requirement asks
+- **THEN** a sentence beneath the source list names the essence and the surplus
+- **AND** the ratio beside the requirement states neither
 
 ### Requirement: A multi-step flow inside the manager uses the shared modal
 

@@ -1011,6 +1011,7 @@
           "Owned": "You own {count}.",
           "Contribution": "{amount} {name}",
           "Meter": "{name} has {delivered} of {need} delivered.",
+          "Overshoot": "{essence}: {amount} more than required",
           "Allocate": "Units of {name} to spend",
           "AllocateLess": "Spend one less {name}",
           "AllocateMore": "Spend one more {name}"
@@ -1020,6 +1021,7 @@
           "Empty": "This craft doesn't use any components.",
           "Owned": "You own {count}.",
           "StillToChoose": "Still to choose: {items}.",
+          "Overshoot": "{essence}: {amount} more than required",
           "EssenceRequirement": "{name} essence"
         },
         "Shopping": {
