@@ -264,15 +264,17 @@ A fixed-range routed count check reads no `pool.required` either, so its prompt 
 - **Additional dice.**
   With additional dice enabled on a counting check (issue 2008; `resolution-modes/spec.md` § Additional Dice), the prompt offers an `Additional dice` control between the situational bonus and roll mode, drawn in the shared `<Well>`: its title, a resource line and a spend line, the shared `Stepper` from 0 to the limit at the row's end, and one `Notice` beneath.
   The stepper defaults to 0, so opening the prompt and pressing Enter spends nothing; the shortfall is stated and never pre-selected.
-  The lines read `{resource} {available} available · Spends {n} {resource}`, or without a resource name `{available} available · Spends {n}`.
+  The lines read `{resource} {available} available · Spends {n} {resource}`, or without a resource name `{available} available · Spends {n}`, inked `--fab-text-muted`.
   Its states, the first that holds winning, are:
 
   - **unavailable**: the stepper disabled at 0, `{resource} unavailable · Spends 0` (`Unavailable · Spends 0`), and an info message naming the reason, never `{n} available`; an unreadable value reads `{actor} has no {resource} value · Spends 0` (`{actor} has no value to spend · Spends 0`) instead;
-  - **unreachable**: a danger message, `Cannot reach {needed} successes.` followed by `{pool} dice need at least {shortfall} more, and at most {max} can ever be added.` or `…, and you can afford {limit}.`, or `Cannot reach {needed} successes with these dice.` when no die can qualify, with each footer action disabled by resolution-modes § Additional Dice and a note naming what is disabled;
+  - **unreachable**: a danger message, `Cannot reach {needed} successes.` followed by `{pool} dice need at least {shortfall} more, and at most {max} can ever be added.` or `…, and you can afford {limit}.`, or `Cannot reach {needed} successes with these dice.` when no die can qualify, with each footer action disabled by resolution-modes § Additional Dice and a note naming what is disabled.
+    When Advantage can still reach, the message opens `Without Advantage, these dice cannot reach {needed} successes.` (`…reach 1 success.`) in place of `Cannot reach {needed} successes.`
+    When the settled pool is reduced to zero, its reason reads `Modifiers reduce the pool below zero, so at least {shortfall} dice are needed, and at most {max} can ever be added.` (`…, and you can afford {limit}.`);
   - **shortfall**: a warning, `At least {shortfall} additional dice needed to be able to succeed.` (`…to succeed without exploding dice.` when the pool explodes), or a success message, `At least {shortfall} additional dice are needed. You have enough.`, once enough are chosen;
   - **unaffordable**: the stepper disabled and an info message, `Not enough {resource} to buy a die.` (`Not enough to buy a die.`).
 
-  A rescued unreachable attempt keeps its danger message and every action enabled.
+  A rescued unreachable attempt keeps its danger message, which adds `A trigger on this check can still succeed it.`, and every action enabled.
   The block note sits under the footer's action row as a status region in danger ink.
   With every action disabled it reads `Rolling is disabled: this attempt cannot reach the successes it needs.`, or `Rolling is disabled: the pool is reduced to zero, and the dice you can add cannot lift it.` when each fails for a zero pool; with Roll and Disadvantage disabled it reads `Only Advantage can reach the successes needed.`, and with Disadvantage alone `Disadvantage cannot reach the successes needed.`
   A disabled footer action stays in place with `aria-disabled` and an `aria-describedby` naming the note, never the native `disabled`, and initial focus never lands on it: the modal focuses the first of the bonus field, an enabled stepper, an unblocked Roll and an unblocked Advantage, else its close control.
@@ -342,7 +344,8 @@ A sub-label shows only when it is identical for every subject; otherwise the but
 Each roll applies the one answer by its own check's rule — Advantage on a `2d6` subject and a `1d20` subject in the same batch keeps each subject's own dice.
 It is all-or-nothing across those subjects: offering a choice only some rolls could honour would be a lie about the rest of the batch.
 The prompt is not shown at all when no selected item has a usable check, and dismissal returns the same not-confirmed shape the single-item prompt returns.
-One additional-dice choice (issue 2008) applies to every eligible roll, offered only when those rolls share one actor and one resource; otherwise the prompt reads `Rolls in this batch use different resources, so no dice can be added.`
+One additional-dice choice (issue 2008) applies to every eligible roll, offered only when those rolls share one actor and one resource.
+Otherwise the control renders its title in the shared `<Well>` with no stepper and an info `Notice`, `Rolls in this batch use different resources, so no dice can be added.`
 Its limit counts the eligible rolls only, its maximum is the lowest any of them allows, and the total spend is shown before confirming: `Spends {n × rolls} {resource} across {rolls} rolls ({n} each)`, or `Not enough {resource} to buy a die for every roll.`
 Each footer action is disabled only when every covered roll would be disabled under it on that roll's own prompt (`resolution-modes/spec.md` § Additional Dice); when every action is, the note reads `Rolling is disabled: none of these rolls can reach the successes they need.` (`…this attempt cannot reach…` for one roll), and otherwise the single prompt's per-action notes apply.
 A row gains the suffix `· cannot reach` in danger ink after its need only when no offered action can reach it and it states a needed count.

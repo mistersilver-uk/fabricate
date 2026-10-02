@@ -1868,6 +1868,7 @@ An optional legend sits under the tiles; the model caps at 40 tiles and adds a `
 The `fabricate-dice-tiles` class family is styled ONCE in `styles/fabricate.css` from the root tokens, because a chat card sits outside every Fabricate window, and no core Foundry dice class is used or restyled.
 `Medallion` owns record art and is not a die tile.
 A tile may be `bought` (issue 2008): the last original dice in roll order that bought additional dice added to the pool, shown by a dashed border that keeps the tile's state colour, plus the `bought` mark token and the `, bought` label.
+A bought die that does not qualify has no tone, so its dash is inked `--fab-text-subtle` to meet WCAG 1.4.11's 3:1, and a toned tile keeps its tone's border.
 An explosion roll a bought die produces is `generated`, not bought.
 The optional legend appends `dashed = bought` only when bought dice are present.
 
