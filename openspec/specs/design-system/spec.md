@@ -42,7 +42,7 @@ The host MAY arrange dense rows in a four-column `minmax(0, 1fr)` grid without c
 The broader browse, selection, loading and error forms remain targets in the library.
 HistoricalRunDetail and StageCard are the initial independent result-row callers.
 
-Pagination's opt-in `compact` presentation MUST keep the range, arrows and page-size control in one row while retaining accessible page-position and page-size labels.
+Pagination's opt-in `density="compact"` presentation MUST keep the range, arrows and page-size control in one row while retaining accessible page-position and page-size labels.
 The default presentation and arithmetic MUST remain unchanged for callers that do not opt in.
 Compact controls MUST retain at least 24px hit areas, and both landmarks MUST retain their caller-supplied names.
 Journal browse density uses the existing 30px search rung, inline Select and spacing tokens so four default Active and four Finished entries can share the wide window's vertical budget.
@@ -743,7 +743,7 @@ An adoption that moves a panel MUST enumerate them, and a retained declaration w
 
 ### Requirement: Naming, announcement and hit targets are component obligations
 
-A control whose visible text is a glyph or a bare number MUST take its accessible name as a REQUIRED prop rather than an optional one.
+A control whose visible text is a glyph or a bare number MUST take its accessible name as a REQUIRED prop, named `ariaLabel`, rather than an optional one.
 A name composed from a value MUST be derived by a shared helper, because the alternative drifted across 23 call sites before `src/ui/svelte/components/stepperLabels.js` existed.
 
 A name-bearing prop MUST NOT default to untranslated text, because a default written into a `$props()` destructuring never reaches `game.i18n` and no world can change it; a localization KEY default is the shape that can.
@@ -774,6 +774,21 @@ A count pip on such an item sits on the OUTER CORNER of that well with a ground-
 - **WHEN** a primitive renders a control whose only visible content is a glyph
 - **THEN** its accessible name is a required prop
 - **AND** its hit area is at least 24 by 24 pixels
+
+### Requirement: Shared primitives share one API convention
+
+Every component under `src/ui/svelte/components/` MUST name its props by the API convention `openspec/specs/design-system/library.html` publishes in its five-rules block; the library holds the convention's wording and this requirement binds it.
+The convention fixes the accessible-name props, with `label` reserved for visible text; `density` as the one density prop, with `size` naming a published ladder rung only; `tone`; a `role` prop on `Button` only, which is its verb role, so an ARIA `role` reaches any other primitive's root through `...rest`; the callback names; and the passthrough shape of `class` plus a rest spread on the root, `<part>Props` for a fixed sub-element and `<part>DataAttr` for a per-item hook.
+A prop name outside the convention MUST be carried in the gate's exceptions register with its component and a reason, and a register entry that matches no declared prop MUST fail.
+`tests/design-system-api-convention.test.js` is the gate, and it rules on prop NAMES because a `$props()` destructuring declares nothing else; it is a fixed rule, not a ratchet.
+Which densities or tones a member accepts is its specimen's to state and is not gated here.
+A component outside that directory is not bound by this requirement, even where it carries a manifest row.
+
+#### Scenario: A primitive declares a retired prop spelling
+
+- **WHEN** a component under `src/ui/svelte/components/` declares a prop the convention retires, such as `dataAttr`
+- **THEN** the convention gate fails naming the component and the prop
+- **AND** it passes only when the prop is renamed or the register carries it with a reason
 
 ### Requirement: The Foundry contract binds every primitive
 
