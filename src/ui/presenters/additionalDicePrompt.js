@@ -9,6 +9,7 @@ import {
 } from '../../systems/additionalDiceReach.js';
 import { fill } from '../../utils/fillPlaceholders.js';
 import { localizeWith } from '../../utils/localizeWithFallback.js';
+import { journalRefusalMessage } from '../svelte/util/journalRunReasons.js';
 
 const PLAIN_TERM = /^(?:(\d*)d(\d+)|(\d+))$/i;
 const NO_RANGE = Object.freeze({ least: null, most: null });
@@ -402,16 +403,16 @@ const EXHAUSTED = Object.freeze({
 });
 
 /**
- * The one warning the surface that started an immediate attempt raises (issue 2008): a refused
- * choice or spend, or a roll that could not complete after its dice were spent; null for neither.
- * `localize(key)` is the surface's own; the engine's `additionalDiceNotice` supplies the facts.
+ * The one warning the surface that started an attempt raises (issue 2008): a refused choice or
+ * spend, or a roll that could not complete after its dice were spent; null for neither. Reads the
+ * immediate and the Journal reply alike; `additionalDiceNotice` supplies the facts.
  */
 export function additionalDiceNoticeText(result, { actorName = '', localize } = {}) {
   const notice = result?.additionalDiceNotice ?? {};
   const label = typeof notice.label === 'string' ? notice.label.trim() : '';
-  const bought = result?.data?.boughtDice?.count;
+  const bought = result?.data?.boughtDice?.count ?? result?.boughtDice;
   const values = {
-    actor: actorName,
+    actor: notice.actorName || actorName,
     resource: label,
     n: notice.dice ?? bought ?? 0,
     available: notice.available ?? 0,
@@ -424,21 +425,47 @@ export function additionalDiceNoticeText(result, { actorName = '', localize } = 
     });
     return key ? fill(localizeWith(localize, key, undefined, key), values) : null;
   }
-  if (result?.misconfigured !== true || !(bought > 0)) return null;
+  const spent = result?.misconfigured === true || result?.boughtDice > 0;
+  if (!spent || !(bought > 0)) return null;
   const [key, fallback] = label ? SPENT.labelled : SPENT.unlabelled;
   return fill(localizeWith(localize, key, undefined, fallback), values);
 }
 
+/** A refused command's wording: why the authority refused bought dice, else the refusal chain. */
+export function journalCommandRefusal(result, localize, generic) {
+  const refused = result?.additionalDiceRefusal && additionalDiceNoticeText(result, { localize });
+  return refused || journalRefusalMessage(result, localize, generic);
+}
+
+/** The warning for bought dice a check spent before its stage refused or threw: never refunded. */
+export function spentDiceNotice(result, localize) {
+  if (!(result?.boughtDice > 0)) return '';
+  return additionalDiceNoticeText({ ...result, additionalDiceRefusal: null }, { localize }) ?? '';
+}
+
+/** The refusals that stop a batch because its resource cannot be spent at all, not ran out. */
+const UNSPENDABLE_STOPS = new Set([
+  'resourceMacroFailed',
+  'resourceOverridden',
+  'resourceNotWritable',
+]);
+
 /**
- * A bulk run's one warning (issue 2008): a refused batch choice, or the resource running out
- * mid-batch, read off the rows the run marked; null for neither.
+ * A bulk run's one warning (issue 2008): a refused batch choice, or the resource running out or
+ * becoming unspendable mid-batch, read off the rows the run marked; null for neither.
  */
 export function bulkAdditionalDiceNoticeText(result, { actorName = '', localize } = {}) {
   if (result?.additionalDiceRefusal)
     return additionalDiceNoticeText(result, { actorName, localize });
   const items = Array.isArray(result?.items) ? result.items : [];
-  const stop = items.find((item) => item?.additionalDiceExhaustion)?.additionalDiceExhaustion;
+  const stopped = items.find((item) => item?.additionalDiceExhaustion);
+  const stop = stopped?.additionalDiceExhaustion;
   if (!stop) return null;
+  if (UNSPENDABLE_STOPS.has(stopped.additionalDiceRefusal)) {
+    const additionalDiceNotice = { label: stop.resourceLabel, ...stopped.additionalDiceNotice };
+    const refusal = { additionalDiceRefusal: stopped.additionalDiceRefusal, additionalDiceNotice };
+    return additionalDiceNoticeText(refusal, { actorName, localize });
+  }
   const [key, fallback] = stop.resourceLabel ? EXHAUSTED.labelled : EXHAUSTED.unlabelled;
   return fill(localizeWith(localize, key, undefined, fallback), {
     resource: stop.resourceLabel,

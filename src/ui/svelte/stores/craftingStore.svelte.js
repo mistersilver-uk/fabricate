@@ -717,12 +717,12 @@ export function createCraftingStore({ services } = {}) {
       // A dismissal is a choice, not a failure: a cancelled result (also `success: false`) returns
       // first and quietly, its only notice a refused additional-dice choice's (issue 2008).
       if (result?.cancelled === true) return result;
-      // A versioned-run authority refusal carries `reason` and NO `message`, so
-      // notifying `result.message` alone showed the literal text "undefined".
+      // An authority refusal carries `reason` and NO `message`; refused dice already said why.
       if (result && result.success === false && !isResolvedFailureOutcome(result)) {
-        services?.notify?.(
-          journalRefusalMessage(result, services?.localize, services?.craftErrorMessage?.())
-        );
+        if (!result.additionalDiceRefusal) {
+          const generic = services?.craftErrorMessage?.();
+          services?.notify?.(journalRefusalMessage(result, services?.localize, generic));
+        }
         // A check that cannot roll shows its refusal, never the last attempt's facts (issue 2005).
         if (result.misconfigured === true || result.reason === 'roll-unavailable') {
           lastRollResult = Object.fromEntries(

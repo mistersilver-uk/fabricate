@@ -12,8 +12,11 @@ import {
   actionDeltas,
   additionalDiceCopy,
   additionalDiceNoticeText,
+  bulkAdditionalDiceNoticeText,
   describeAdditionalDice,
+  journalCommandRefusal,
   pendingDiceRange,
+  spentDiceNotice,
 } from '../src/ui/presenters/additionalDicePrompt.js';
 import {
   buildSinglePromptData,
@@ -486,5 +489,73 @@ describe('the attempt notices an immediate surface raises (issue 2008)', () => {
       null,
       'nothing was spent'
     );
+  });
+
+  // The Journal's replies, which the crafting, alchemy and gathering apps also receive.
+  const journalRefused = {
+    success: false,
+    reason: 'additional-dice-refused',
+    additionalDiceRefusal: 'spendRefused',
+    additionalDiceNotice: { dice: 1, limit: 3, available: 3, label: 'Focus', actorName: 'Hero' },
+  };
+  const journalSpent = {
+    success: false,
+    reason: 'roll-unavailable',
+    boughtDice: 2,
+    additionalDiceNotice: { dice: 2, label: 'Focus', source: 'path', actorName: 'Hero' },
+  };
+
+  it('words the Journal-shaped replies, naming the character the authority read', () => {
+    assert.equal(
+      notice(journalRefused),
+      "Fabricate could not spend Hero's Focus, so the check was not rolled."
+    );
+    assert.equal(notice(journalSpent), '2 Focus spent; the roll could not be completed.');
+    const { additionalDiceNotice, ...bare } = journalSpent;
+    assert.equal(additionalDiceNotice.dice, 2);
+    assert.equal(notice(bare), '2 spent; the roll could not be completed.', 'the count alone');
+    assert.equal(notice({ ...bare, boughtDice: 0 }), null, 'nothing was bought');
+  });
+
+  it('gives a refused Journal command one wording, and its spent dice their own', () => {
+    assert.equal(
+      journalCommandRefusal(journalRefused, localize, 'Failed.'),
+      notice(journalRefused)
+    );
+    assert.equal(
+      journalCommandRefusal({ success: false, reason: 'ledger-missing' }, localize, 'Failed.'),
+      localize('FABRICATE.App.Journal.Actions.LedgerMissing')
+    );
+    assert.equal(journalCommandRefusal({ success: false }, localize, 'Failed.'), 'Failed.');
+    assert.equal(spentDiceNotice(journalSpent, localize), notice(journalSpent));
+    assert.equal(spentDiceNotice(journalRefused, localize), '', 'a refusal spent nothing');
+  });
+
+  it('names once why a batch stopped on a resource it could not spend', () => {
+    const stop = { resourceLabel: 'Momentum', done: 1, rolls: 3 };
+    const stopped = (additionalDiceRefusal, over = {}) => ({
+      items: [
+        { outcome: 'succeeded' },
+        { additionalDiceExhaustion: stop, additionalDiceRefusal, ...over },
+        { additionalDiceExhaustion: stop },
+      ],
+    });
+    const bulk = (result) =>
+      bulkAdditionalDiceNoticeText(result, { actorName: 'Brenna', localize });
+    assert.equal(
+      bulk(stopped('resourceNotWritable')),
+      "Additional dice are unavailable: you cannot change Brenna's Momentum."
+    );
+    assert.equal(
+      bulk(stopped('resourceOverridden')),
+      "Additional dice are unavailable: an active effect sets Brenna's Momentum, so it cannot be spent."
+    );
+    assert.equal(
+      bulk(stopped('resourceMacroFailed', { additionalDiceNotice: { label: '' } })),
+      'Additional dice are unavailable: the macro that reads what can be spent did not return a number.'
+    );
+    const ranOut = 'Momentum ran out after 1 of 3 rolls. The rolls already made stand.';
+    assert.equal(bulk(stopped('spendRefused')), ranOut, 'a spend that ran out still says so');
+    assert.equal(bulk(stopped(undefined)), ranOut);
   });
 });

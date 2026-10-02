@@ -23,7 +23,7 @@
  */
 
 import { canonicalSignatureKey } from '../../../utils/alchemySignatureKey.js';
-import { notifyAdditionalDice } from '../../presenters/additionalDicePrompt.js';
+import { journalCommandRefusal, notifyAdditionalDice } from '../../presenters/additionalDicePrompt.js';
 import { isResolvedFailureOutcome, journalRefusalMessage } from '../util/journalRunReasons.js';
 
 import { createListingLoad } from './browseListing.svelte.js';
@@ -546,13 +546,11 @@ export function createAlchemyStore({ services } = {}) {
       } else if (result && result.disposition === 'no-match') {
         lastBrew = { status: 'no-match-fizzle', discovered: null, message: result.message ?? '' };
       } else if (typeof result?.reason === 'string' && result.reason.trim() !== '') {
-        const refusal = journalRefusalMessage(
-          result,
-          services?.localize,
-          services?.craftErrorMessage?.()
-        );
+        const generic = services?.craftErrorMessage?.();
+        const refusal = journalCommandRefusal(result, services?.localize, generic);
         lastBrew = { status: 'refused', discovered: null, message: refusal };
-        if (refusal) services?.notify?.(refusal);
+        // Refused dice already raised their one warning above.
+        if (refusal && !result.additionalDiceRefusal) services?.notify?.(refusal);
       } else {
         const message = journalRefusalMessage(result, services?.localize, '');
         lastBrew = { status: 'no-match-fizzle', discovered: null, message };

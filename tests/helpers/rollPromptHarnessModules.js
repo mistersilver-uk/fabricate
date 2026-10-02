@@ -22,6 +22,7 @@ export const ROLL_PROMPT_RAW_MODULES = Object.freeze([
   'src/systems/countEvaluation.js',
   // The additional-dice control reads its reach through the prompt-safe leaf (issue 2008).
   'src/ui/presenters/additionalDicePrompt.js',
+  'src/ui/svelte/util/journalRunReasons.js',
   'src/systems/additionalDiceReach.js',
   'src/systems/countTriggerReach.js',
   ...CHECK_TARGET_RAW_MODULES,

@@ -244,6 +244,31 @@ describe('createBulkActions', () => {
     );
   });
 
+  it('warns once, naming why, when the resource could not be spent mid-batch (issue 2008)', async () => {
+    const exhaustion = { resourceLabel: 'Momentum', done: 1, rolls: 3 };
+    const exhausted = { outcome: 'skipped', skipReason: 'resourceExhausted' };
+    const { bulk, log } = setup({
+      rows: [listingRow('c1', 'Iron')],
+      results: {
+        salvage: {
+          cancelled: false,
+          items: [
+            { outcome: 'succeeded' },
+            { ...exhausted, additionalDiceExhaustion: exhaustion, additionalDiceRefusal: 'resourceOverridden' },
+            { ...exhausted, additionalDiceExhaustion: exhaustion },
+          ],
+        },
+      },
+    });
+    bulk.toggleBulkSelection('sys:c1');
+    flushSync();
+    await bulk.bulkSalvage();
+    assert.deepEqual(
+      log.filter(([name]) => name === 'notify'),
+      [['notify', "Additional dice are unavailable: an active effect sets Akra's Momentum, so it cannot be spent."]]
+    );
+  });
+
   it('warns once for a refused batch choice, naming the actor, and not for a plain run (issue 2008)', async () => {
     const refused = {
       cancelled: true,

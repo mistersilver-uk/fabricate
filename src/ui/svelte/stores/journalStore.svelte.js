@@ -1,9 +1,5 @@
-import { additionalDiceNoticeText } from '../../presenters/additionalDicePrompt.js';
-import {
-  isResolvedFailureOutcome,
-  journalRefusalMessage,
-  resolvedFailureMessage,
-} from '../util/journalRunReasons.js';
+import { journalCommandRefusal, spentDiceNotice } from '../../presenters/additionalDicePrompt.js';
+import { isResolvedFailureOutcome, resolvedFailureMessage } from '../util/journalRunReasons.js';
 
 import { createPageWindow } from './browseListing.svelte.js';
 
@@ -569,30 +565,6 @@ export function createJournalStore({ services } = {}) {
 
 function notifyEach(services, messages) {
   for (const message of messages) if (message) services?.notify?.(message);
-}
-
-const noticeContext = (result, localize) => ({
-  actorName: result?.additionalDiceNotice?.actorName ?? '',
-  localize,
-});
-
-/** A refusal's wording; additional dice the authority refused say why (issue 2008). */
-function journalCommandRefusal(result, localize, generic) {
-  const refused = result?.additionalDiceRefusal
-    ? additionalDiceNoticeText(result, noticeContext(result, localize))
-    : null;
-  return refused || journalRefusalMessage(result, localize, generic);
-}
-
-/** The warning for bought dice a check spent before its stage refused or threw: never refunded. */
-function spentDiceNotice(result, localize) {
-  if (!(result?.boughtDice > 0)) return '';
-  const spent = {
-    misconfigured: true,
-    data: { boughtDice: { count: result.boughtDice } },
-    additionalDiceNotice: result.additionalDiceNotice,
-  };
-  return additionalDiceNoticeText(spent, noticeContext(result, localize)) ?? '';
 }
 
 function matchesKind(kind) {

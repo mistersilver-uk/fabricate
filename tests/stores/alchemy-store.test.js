@@ -523,6 +523,44 @@ describe('alchemyStore', () => {
     assert.equal(harness.calls.notify.length, before, 'a dismissal raises nothing');
   });
 
+  it('raises one warning for a Journal-shaped refused brew, and banners its reason (issue 2008)', async () => {
+    const sentence =
+      "Brenna's Focus did not fall by 1 as expected, so the check was not rolled. Check the value on the character.";
+    const replies = [
+      {
+        success: false,
+        reason: 'additional-dice-refused',
+        additionalDiceRefusal: 'spendUnconfirmed',
+        additionalDiceNotice: { dice: 1, label: 'Focus', source: 'path', actorName: 'Brenna' },
+      },
+      {
+        success: false,
+        reason: 'roll-unavailable',
+        message: 'The check is misconfigured.',
+        boughtDice: 2,
+        additionalDiceNotice: { dice: 2, label: 'Focus', source: 'path', actorName: 'Brenna' },
+      },
+    ];
+    const harness = makeServices({ submitAlchemyAttempt: async () => replies.shift() });
+    const store = createAlchemyStore({ services: harness.services });
+    await store.load();
+    flushSync();
+    const brewOnce = async () => {
+      store.add('ashsalt');
+      flushSync();
+      await store.brew();
+      flushSync();
+    };
+    await brewOnce();
+    assert.deepEqual(harness.calls.notify, [sentence], 'one warning, worded by its reason');
+    assert.deepEqual([store.lastBrew.status, store.lastBrew.message], ['refused', sentence]);
+    await brewOnce();
+    assert.deepEqual(harness.calls.notify.slice(1), [
+      '2 Focus spent; the roll could not be completed.',
+      'The check is misconfigured.',
+    ]);
+  });
+
   it('a fizzled brew banners a no-reaction (no discovery) and runs no roll expectation', async () => {
     const harness = makeServices({
       submitAlchemyAttempt: async () => ({ success: false, disposition: 'no-match', message: 'FIZZLE', consumed: true }),

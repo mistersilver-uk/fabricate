@@ -588,11 +588,23 @@ describe('GatheringView ↔ actor bar wiring', () => {
       message: 'The check is misconfigured.',
       data: { boughtDice: { count: 1, source: 'path' } },
     };
+    // The Journal's replies, which a versioned attempt receives through `executePublicGather`.
+    const { cancelled, ...journalRefused } = refused;
+    const journalSpent = { success: false, reason: 'roll-unavailable', boughtDice: 1 };
     const cases = [
       [refused, ['FABRICATE.Check.AdditionalDiceRefusal.ChoiceInvalid']],
       [misconfigured, ['1 spent; the roll could not be completed.', 'The check is misconfigured.']],
       [{ success: false, cancelled: true }, []],
+      [
+        { accepted: true, ...journalRefused, reason: 'additional-dice-refused' },
+        ['FABRICATE.Check.AdditionalDiceRefusal.ChoiceInvalid'],
+      ],
+      [
+        { accepted: true, ...journalSpent },
+        ['1 spent; the roll could not be completed.', 'FABRICATE.App.Journal.Reason.RollUnavailable'],
+      ],
     ];
+    assert.equal(cancelled, true);
     for (const [reply, expected] of cases) {
       const warns = [];
       const notifications = {

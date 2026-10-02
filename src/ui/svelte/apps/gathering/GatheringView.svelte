@@ -268,10 +268,9 @@
       if (result?.cancelled === true) return;
       if (result && result.accepted === false) {
         notifyWarn(describeBlockedReasons(result.blockedReasons, localize));
-      } else if (result && result.success === false) {
-        // A versioned start goes through the run authority, whose refusal shape is
-        // `{success:false, reason}` with NO `accepted` and no `message` — so it
-        // missed the branch above entirely and the attempt was a silent no-op.
+      } else if (result && result.success === false && !result.additionalDiceRefusal) {
+        // A versioned start's refusal is `{success:false, reason}` with NO `accepted` and no
+        // `message`, so it missed the branch above and the attempt was a silent no-op.
         notifyWarn(journalRefusalMessage(result, localize, describeBlockedReasons(null, localize)));
       }
       await load();
