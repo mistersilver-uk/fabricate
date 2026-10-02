@@ -245,6 +245,23 @@ describe('IngredientOptionSelector mounted behavior', () => {
     assert.equal(chipToneOf(chip), 'positive', 'an affordable cost reads as green');
     assert.ok(chip.querySelector('i.fa-coins'), 'and keeps its coin glyph');
     assert.equal(chip.textContent.trim(), '12 gp', 'the cost label is the chip');
+    assert.equal(chipGroundAlpha(chip, THEMES), 1, 'standing on a solid ground');
+  });
+
+  // A cost has no held-against-needed pair, so an unaffordable one is named plainly.
+  it('names an unaffordable currency option without a have/need sentence', async () => {
+    const choice = optionChoice();
+    choice.options[1] = {
+      ...choice.options[1],
+      isCurrency: true,
+      costLabel: '40 gp',
+      affordable: false,
+    };
+    const target = await harness.mount({ choices: [choice], onChoose: null });
+    const coin = target.querySelectorAll('[role="radio"]')[1];
+    assert.match(coin.getAttribute('aria-label'), /Io\.ChooseOption:/);
+    assert.ok(!coin.hasAttribute('title'));
+    assert.equal(chipToneOf(coin.querySelector('.manager-chip')), 'danger');
   });
 
   it('draws a held stack count behind the multiplication sign', async () => {

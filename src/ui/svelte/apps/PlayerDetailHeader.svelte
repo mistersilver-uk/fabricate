@@ -1,5 +1,5 @@
 <!-- Svelte 5 runes mode -->
-<!-- ratchet-exempt(design-system): PlayerDetailHeader is a composition of shipped members (Medallion, Avatar and ManagerButton, with the caller's own Chip row), so it draws no control of its own and takes no manifest row -->
+<!-- ratchet-exempt(design-system): PlayerDetailHeader is a composition of design-system members (Medallion, Avatar and ManagerButton, with the caller's own Chip row), so it draws no control of its own and takes no manifest row -->
 <!--
   The identity row a player detail pane leads with: the art tile, the name, optional meta and
   chips, and at most one primary action. Zero primaries is a correct state; two never is.

@@ -56,6 +56,44 @@ test('an essence no requirement asks for is never reported', () => {
   assert.deepEqual(essenceOvershoots(pool), []);
 });
 
+test('a fractional surplus prints at the precision its inputs are authored with', () => {
+  assert.deepEqual(
+    essenceOvershoots({
+      requirements: [radiant({ need: 0.3 })],
+      carriers: [carrier(3, { radiant: 0.2 })],
+    }),
+    [{ essenceId: 'radiant', name: 'Radiant', amount: 0.3 }]
+  );
+  assert.deepEqual(
+    essenceOvershoots({
+      requirements: [radiant({ need: 0.6 })],
+      carriers: [carrier(3, { radiant: 0.2 })],
+    }),
+    [],
+    'a sum that misses its need by a rounding error is exact, not an overshoot'
+  );
+});
+
+test('a requirement that needs nothing reports no surplus', () => {
+  assert.deepEqual(
+    essenceOvershoots({
+      requirements: [radiant({ need: 0 })],
+      carriers: [carrier(2, { radiant: 2 })],
+    }),
+    []
+  );
+});
+
+test('a missing requirement entry is skipped, as a missing carrier is', () => {
+  assert.deepEqual(
+    essenceOvershoots({
+      requirements: [null, radiant({ need: 1 })],
+      carriers: [null, carrier(1, { radiant: 2 })],
+    }),
+    [{ essenceId: 'radiant', name: 'Radiant', amount: 1 }]
+  );
+});
+
 test('an unnamed requirement is named by its id, and a missing pool reports nothing', () => {
   assert.deepEqual(
     essenceOvershoots({

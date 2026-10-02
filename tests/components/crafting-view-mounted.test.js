@@ -15,6 +15,7 @@ import {
   listing,
   recipe
 } from '../helpers/crafting-fixtures.js';
+import { assertIdentityHeader, primaryButtons } from '../helpers/playerDetailHeaderAssertions.js';
 import { assertViewErrorTreatment } from '../helpers/playerViewStateAssertions.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -149,6 +150,23 @@ describe('CraftingView mounted behavior', () => {
     );
   });
 
+  // The run summary's own "Craft another" sits outside the detail pane and is the one extra
+  // craft action allowed beside the header primary until Phase 4 of issue 1518 makes it a ghost.
+  it('hands the roll to the detail, which renames its one primary Craft another', async () => {
+    const store = fakeCraftingStore({
+      recipes: [recipe()],
+      lastRollResult: { 'recipe-1': { success: true, items: [] } },
+    });
+    const target = await harness.mount({ services: services(store) });
+    const [primary] = primaryButtons(
+      assertIdentityHeader(target.querySelector('[data-crafting-detail-state="selected"]'), {
+        primaries: 1,
+      })
+    );
+    assert.equal(primary.textContent.trim(), 'FABRICATE.App.Crafting.Button.CraftAnother');
+    assertIdentityHeader(target, { primaries: 1, outside: 1 });
+  });
+
   it('disables the run summary "Craft another" when the selection is no longer craftable (non-progressive)', async () => {
     const built = recipe({
       ingredientSets: [{ id: 'set-a', label: 'Option A', craftability: craftability({ canCraft: false }) }]
@@ -276,7 +294,7 @@ describe('CraftingView mounted behavior', () => {
       const header = target.querySelector('[data-recipe-header]');
       assert.ok(!header.querySelector('[data-crafting-craft]'), 'no Craft primary');
       assert.ok(
-        !header.querySelector('.player-detail-header-meta [data-crafting-status]'),
+        !header.querySelector(':scope .player-detail-header-meta [data-crafting-status]'),
         'and no chip that still reads Ready to craft'
       );
       const notice = header.querySelector('[data-recipe-blocking]');

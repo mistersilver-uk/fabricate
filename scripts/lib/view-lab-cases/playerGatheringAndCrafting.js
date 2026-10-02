@@ -1094,11 +1094,14 @@ export const CASES = Object.freeze([
     smokeLabels: [],
     reaches: 'beyond',
     query: { tab: 'crafting' },
-    // The chooser open on a choice slot the player has picked from: the picked alternative is
-    // selected, and the other is short and still offered.
+    // The chooser opened by pressing the choice tile, not by auto-advance, on a slot the player has
+    // picked from: the picked alternative is selected, and the other is short and still offered.
+    // No fixture group pairs a met alternative with a short one, so both read short.
     steps: [
       { selector: '.crafting-browser-search input', fill: 'Temper a Tidebound' },
       { selector: '.crafting-recipe-row[data-recipe-id="sm-r-tidebound"]' },
+      { selector: '[data-requirement-slot][data-slot-kind="essence"]' },
+      { selector: '[data-requirement-slot][data-slot-kind="choice"]' },
       { selector: '[data-alt-group="sm-set-tidebound-g2"] [data-option-index="1"]' },
     ],
     expectSelector:
@@ -1160,6 +1163,37 @@ export const CASES = Object.freeze([
       CRAFTING_SHARED,
       CRAFTING_SIMPLE,
       PLAYER_DETAIL_HEADER,
+      /^src\/ui\/svelte\/stores\/craftingStore/,
+    ],
+  }),
+  playerCase({
+    id: 'player-crafting-essence-overshoot',
+    label: 'Player app — Crafting essence pool funded past its need',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting' },
+    // Four Steel Ingots give 8 Earth of 6 and 8 Fire of 3: one surplus sentence per essence.
+    steps: [
+      { selector: '.crafting-recipe-row[data-recipe-id="sm-r-deepbind"]' },
+      {
+        selector:
+          '.essence-pool-carrier[data-essence-carrier="Item.sm-steel-ingot"] .fab-stepper-input',
+        fill: '4',
+      },
+      { selector: '[data-essence-overshoot="fire"]', scroll: true },
+    ],
+    expectSelector:
+      '[data-recipe-section="essence-pool"]' +
+      ':has([data-essence-overshoot="earth"])' +
+      ':has([data-essence-overshoot="fire"])',
+    expectContained: [
+      { container: '[data-crafting-detail-scroll]', target: '[data-essence-overshoot="fire"]' },
+    ],
+    kinds: ['player', 'crafting'],
+    sourceMatches: [
+      CRAFTING_SHARED,
+      CRAFTING_SIMPLE,
+      /^src\/ui\/svelte\/apps\/crafting\/detail\/essenceOvershoot\.js$/,
       /^src\/ui\/svelte\/stores\/craftingStore/,
     ],
   }),

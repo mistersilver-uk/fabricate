@@ -395,6 +395,48 @@ describe('IoTable mounted behavior', () => {
     assert.ok(!exact.querySelector('[data-consumption-overshoot]'), 'no surplus, no line');
   });
 
+  it('flags a held stack short of the open slot\'s need, from the slot the rail opened', async () => {
+    const target = await harness.mount({
+      craftability: craftability({
+        canCraft: false,
+        ingredientStates: [choiceState('g-wood', 'Hardwood', { need: 2, choiceCount: 0 })],
+        ingredientChoices: [
+          {
+            kind: 'stack',
+            groupId: 'g-wood',
+            groupName: 'Hardwood',
+            optionIndex: 0,
+            selectedHeldItemId: 'Item.oak',
+            stacks: [
+              { itemId: 'Item.oak', name: 'Oak Haft', img: null, have: 12 },
+              { itemId: 'Item.bog', name: 'Bog Oak', img: null, have: 1 },
+            ],
+          },
+        ],
+      }),
+      openSlotId: 'g-wood',
+    });
+    const [oak, bog] = target.querySelectorAll(':scope [data-alt-kind="stack"] [role="radio"]');
+    assert.ok(!oak.classList.contains('is-short'), 'twelve held against a need of two');
+    assert.ok(bog.classList.contains('is-short'), 'one held against a need of two');
+    assert.match(bog.getAttribute('aria-label'), /"have":1.*"need":2/);
+  });
+
+  it('opens the pool for an essence slot only, never beside a plain choice', async () => {
+    const pooled = essenceCraftability();
+    const target = await harness.mount({
+      craftability: craftability({
+        canCraft: false,
+        ingredientStates: [choiceState('g-herb', 'Herb'), ...pooled.ingredientStates],
+        ingredientChoices: [optionChoice('g-herb', 'Herb')],
+        essencePool: pooled.essencePool,
+      }),
+      openSlotId: 'g-herb',
+    });
+    assert.ok(target.querySelector('[role="radiogroup"][data-alt-group="g-herb"]'));
+    assert.ok(!target.querySelector('[data-recipe-section="essence-pool"]'));
+  });
+
   it('draws an unavailable tool as a danger chip with its own glyph', async () => {
     const target = await harness.mount({
       craftability: craftability({

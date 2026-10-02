@@ -1,10 +1,8 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  CraftButton is the single craft-action primitive used by every recipe-detail
-  body and the run-summary "craft next step" action. The `label` prop differs by
-  context ("Craft 1 item" vs "Craft Another" vs "Craft next step"); the disabled
-  state carries an accessible reason (title + aria-label) so a player learns WHY a
-  craft is blocked, and `busy` reflects store.craftInFlight.
+  CraftButton is the run summary's craft action: "Craft another", or "Craft next step" on a
+  progressive run. The disabled state carries an accessible reason (title + aria-label) so a
+  player learns why a craft is blocked, and `busy` reflects store.craftInFlight.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';

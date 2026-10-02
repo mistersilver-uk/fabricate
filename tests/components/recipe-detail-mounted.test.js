@@ -160,6 +160,34 @@ describe('RecipeDetail mounted behavior', () => {
     });
   }
 
+  it('names the primary Craft before a roll and Craft another after one', async () => {
+    const label = (target) => primaryButtons(target)[0].textContent.trim();
+    const fresh = await harness.mount({ recipe: recipe(), craftability: craftability() });
+    assert.equal(label(fresh), 'FABRICATE.App.Crafting.Button.Craft');
+    harness.remount();
+    const again = await harness.mount({
+      recipe: recipe(),
+      craftability: craftability(),
+      rollResult: { success: true, items: [] },
+    });
+    assert.equal(label(again), 'FABRICATE.App.Crafting.Button.CraftAnother');
+  });
+
+  // Availability is a cache the boot and journal hooks refresh, so a stale refusal must not
+  // remove the pane's only way forward: the primary stays live beside the stated refusal.
+  it('keeps the primary live under an authority refusal', async () => {
+    const target = await harness.mount({
+      recipe: recipe(),
+      craftability: craftability(),
+      authorityRefusal: 'No GM is connected.',
+    });
+    const [primary] = primaryButtons(assertIdentityHeader(target, { primaries: 1 }));
+    assert.equal(primary.disabled, false);
+    assert.ok(
+      target.querySelector('[data-recipe-blocking]').hasAttribute('data-recipe-authority-blocked')
+    );
+  });
+
   it('keeps the one primary, disabled and renamed, while a craft is in flight', async () => {
     const target = await harness.mount({
       recipe: recipe(),
@@ -1008,7 +1036,7 @@ describe('RecipeDetail mounted behavior', () => {
       'error pip overlays the faded thumbnail'
     );
     // The pip is the shared icon-only chip at its published default square, not a local disc.
-    const pip = header.querySelector('.crafting-detail-pip > .manager-chip');
+    const pip = header.querySelector(':scope .crafting-detail-pip > .manager-chip');
     assert.deepEqual(
       ['is-icon-only', 'is-solid', 'is-danger'].filter((name) => !pip.classList.contains(name)),
       []
@@ -1043,7 +1071,7 @@ describe('RecipeDetail mounted behavior', () => {
     const header = target.querySelector('[data-recipe-header]');
     assert.equal(primaryButtons(target).length, 0, 'the commit verb is unavailable');
     assert.ok(
-      !header.querySelector('.player-detail-header-meta [data-crafting-status]'),
+      !header.querySelector(':scope .player-detail-header-meta [data-crafting-status]'),
       'so no chip may still say the recipe is ready'
     );
     const tile = header.querySelector('.player-detail-header-tile.is-dimmed');
@@ -1071,7 +1099,7 @@ describe('RecipeDetail mounted behavior', () => {
     const text = target.querySelector('[data-recipe-blocking]').textContent;
     const shortfall = text.indexOf('Blocking.MissingMaterials');
     assert.ok(
-      shortfall >= 0 && shortfall < text.indexOf('No GM is connected.'),
+      shortfall !== -1 && shortfall < text.indexOf('No GM is connected.'),
       'the blocker the player can act on comes first'
     );
   });

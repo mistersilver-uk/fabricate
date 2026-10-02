@@ -1,8 +1,17 @@
 /** Assertions over the identity row a player detail pane leads with (`PlayerDetailHeader`). */
 import assert from 'node:assert/strict';
 
-/** Every `ManagerButton role="primary"` rendered under `root`. */
-export const primaryButtons = (root) => [...root.querySelectorAll('.manager-button.is-primary')];
+/**
+ * Every primary-styled or craft action rendered under `root`: a `ManagerButton role="primary"`, a
+ * hand-rolled `.is-primary` button, or any Craft verb. The run summary's `CraftButton` matches
+ * too; it is allowed beside the header primary, as one `outside` action, until Phase 4 of
+ * issue 1518 converts it to a ghost.
+ */
+export const primaryButtons = (root) => [
+  ...root.querySelectorAll(
+    '.manager-button.is-primary, button.is-primary, [data-crafting-craft], .crafting-craft-button'
+  ),
+];
 
 /**
  * Assert `pane` leads with one identity row carrying one `h2` and a 38px tile, that the row holds

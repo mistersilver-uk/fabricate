@@ -745,16 +745,17 @@ describe('1518 Chip — the solid emphasis', () => {
     }
   });
 
-  // At the chip's 9px the recessive inks fall below 4.5:1 on the raised ground, so every chip
-  // that has no fill of its own takes the one ink that clears it in each theme.
-  it('gives a recessive chip the raised ground and the secondary ink, and leaves its edge', async () => {
+  // At the chip's 9px every recessive rung falls below 4.5:1 on the raised ground in some shipped
+  // theme, so a chip with no fill of its own takes the full ink, the one rung that clears it in all
+  // seven (`chip-status-tone-parity.test.js` measures it).
+  it('gives a recessive chip the raised ground and the full ink, and leaves its edge', async () => {
     for (const tone of ['', 'neutral', 'muted', 'secondary', 'subtle', 'tag']) {
       const solid = await paintOf({ tone, emphasis: 'solid' });
       assert.equal(tokenOf(solid.get('background')), '--fab-bg-3', `${tone} stands on bg-3`);
       assert.equal(
         tokenOf(solid.get('color')),
-        '--fab-text-secondary',
-        `"${tone}" is inked --fab-text-secondary, never a weaker rung of the ladder`
+        '--fab-text',
+        `"${tone}" is inked --fab-text, never a weaker rung of the ladder`
       );
     }
     const plain = await paintOf({ tone: 'neutral' });

@@ -489,7 +489,7 @@
 
   /* Every solid ground is an opaque token, written after each tone so its paint wins the tie. */
   .manager-chip.is-solid {
-    color: var(--fab-text-secondary);
+    color: var(--fab-text);
     background: var(--fab-bg-3);
   }
 
