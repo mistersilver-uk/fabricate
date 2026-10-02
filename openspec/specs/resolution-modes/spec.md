@@ -400,7 +400,7 @@ An attempt is unreachable when, even with `limit` bought dice and every pending 
 - The needed count is the graded required count on a simple check, and the lowest succeeding tier's threshold on a routed check: 0 when a clamped relative check's lowest tier succeeds, and none when no tier succeeds.
 - A progressive check has none, so only its zero-pool limb applies.
 - Neither limb holds for a pending rolled contribution whose most favourable value cannot be computed purely.
-- A rolled Tool bonus that lands in the pool is a pending rolled contribution, so it never makes unreachable an attempt that could succeed.
+- A Tool bonus is rolled when the check is prepared, so the pool already carries its total; a rolled Tool contribution handed to the check runner unsettled is a pending rolled contribution, so it never makes unreachable an attempt that could succeed.
 - Each offered advantage action is its own attempt, including its count advantage dice.
 
 The shortfall is the fewest bought dice whose settled pool is no zero pool and holds the needed count, with every pending rolled contribution at its least favourable value.
