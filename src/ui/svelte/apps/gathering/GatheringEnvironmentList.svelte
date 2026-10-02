@@ -260,11 +260,6 @@
     color: var(--fab-text);
   }
 
-  .gathering-env-search input:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: 1px;
-  }
-
   /*
     Full-width filter row beneath the search input: Fabricate's pill switch on
     the left and a descriptive label to its right — the same track+knob control

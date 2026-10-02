@@ -1,0 +1,45 @@
+/*
+ * Foundry 14.365's text-input chrome, verbatim from `css/foundry2.css` `@layer elements.forms`
+ * with its selector list cut to the types the gates render. Loaded after `foundry-core-min.css`,
+ * whose layer order it relies on, and only by the gates that measure a focused text field: the
+ * resting transparent outline, the `:focus` ring and the placeholder colour are what Fabricate's
+ * text-field rules override.
+ */
+@layer variables {
+  :root {
+    --input-height: 2rem;
+    --input-background-color: #302831;
+    --input-border-color: transparent;
+    --input-text-color: #e7d1b1;
+    --input-placeholder-color: #9f8475;
+    --input-focus-outline-color: #584a75;
+  }
+}
+
+@layer elements.forms {
+  input[type='text'],
+  input[type='number'],
+  input[type='search'] {
+    width: 100%;
+    height: var(--input-height);
+    line-height: var(--input-height);
+    padding: 0 0.5rem;
+    background: var(--input-background-color);
+    border: 1px solid var(--input-border-color);
+    border-radius: 4px;
+    outline: 1px solid transparent;
+    font-family: inherit;
+    font-size: inherit;
+    color: var(--input-text-color);
+    transition: outline-color 0.5s;
+  }
+  input[type='text']:focus,
+  input[type='number']:focus,
+  input[type='search']:focus {
+    outline: 2px solid var(--input-focus-outline-color);
+    outline-offset: -2px;
+  }
+  ::placeholder {
+    color: var(--input-placeholder-color);
+  }
+}

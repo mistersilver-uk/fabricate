@@ -466,7 +466,7 @@
     font-size: 12px;
     font-weight: 500;
   }
-  .fabricate-roll-prompt :global(.bonus-field input::placeholder) {
+  .fabricate-roll-prompt :global(.bonus-field input:not(:focus-visible)::placeholder) {
     color: var(--fab-text-subtle);
   }
   .fabricate-roll-prompt :global(.mode-field .fabricate-select-trigger) {
