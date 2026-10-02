@@ -8,7 +8,7 @@
   because a one-link cap is the incompatibility that keeps a hand-rolled card alive (issue 883).
 -->
 <script>
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
   import InspectorCard from '../../components/InspectorCard.svelte';
 
   const DEFAULT_LINK_ICON = 'fas fa-arrow-up-right-from-square';
@@ -51,7 +51,7 @@
   {#if docsLinks.length > 0}
     <div class="manager-setup-links">
       {#each docsLinks as link (link.href)}
-        <ManagerButton
+        <Button
           role="ghost"
           tag="a"
           class="manager-explainer-card-docs"
@@ -60,7 +60,7 @@
         >
           <i class={link.icon || DEFAULT_LINK_ICON} aria-hidden="true"></i>
           <span>{link.label}</span>
-        </ManagerButton>
+        </Button>
       {/each}
     </div>
   {/if}

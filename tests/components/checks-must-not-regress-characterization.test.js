@@ -37,7 +37,7 @@ const harness = createMountedComponentHarness({
     ...CHECKS_TREE_COMPILED_MODULES,
     'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/components/SegmentedControl.svelte',
-    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/apps/manager/checks/CheckDcMacroCard.svelte',
     'src/ui/svelte/apps/manager/checks/CheckDifficultyCard.svelte',

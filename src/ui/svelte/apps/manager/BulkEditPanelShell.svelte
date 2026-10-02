@@ -23,7 +23,7 @@
     `tests/components/bulk-edit-dock-pinning.test.js`.
 -->
 <script>
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
   import { localize } from '../../util/foundryBridge.js';
 
   let {
@@ -100,7 +100,7 @@
     class:has-foot={Boolean(dockFoot)}
     class:is-bleed-space-4={dockBleed === 'space-4'}
   >
-    <ManagerButton
+    <Button
       class="fab-bulk-edit-apply"
       {...applyHook}
       disabled={!canApply}
@@ -108,7 +108,7 @@
     >
       <i class="fas fa-check-double" aria-hidden="true"></i>
       <span>{applyLabel}</span>
-    </ManagerButton>
+    </Button>
     {@render dockFoot?.()}
   </div>
 </section>
@@ -272,7 +272,7 @@
   /* Full-width and accent, inert until an axis is staged. Geometry, weight and foreground are the
      browser inspector's primary button verbatim, because this button swaps places with it in the
      rail's bottom slot. `:global()` AND chained, both load-bearing (issue 1118): `:global()`
-     because Apply is a `<ManagerButton>` whose internals Svelte does not stamp, so a scoped
+     because Apply is a `<Button>` whose internals Svelte does not stamp, so a scoped
      selector matches nothing with no unused-selector warning; chained because `:global()` alone is
      (0,2,0) and loses to the primitive's own (0,3,0) compound. The `:hover`, `:disabled` and
      `:focus-visible` companions below are written the same way. */

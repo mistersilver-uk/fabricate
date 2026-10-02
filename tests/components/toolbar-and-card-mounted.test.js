@@ -15,8 +15,8 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const toolbarHarness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-manager-toolbar-',
-  compiledModules: ['src/ui/svelte/components/ManagerToolbar.svelte'],
-  componentPath: 'src/ui/svelte/components/ManagerToolbar.svelte',
+  compiledModules: ['src/ui/svelte/components/FilterBar.svelte'],
+  componentPath: 'src/ui/svelte/components/FilterBar.svelte',
 });
 
 const cardHarness = createMountedComponentHarness({
@@ -46,8 +46,8 @@ function composedClasses(file, label) {
 /** The two primitives, and the facts each clause below is stated over. */
 const PRIMITIVES = Object.freeze([
   Object.freeze({
-    name: 'ManagerToolbar',
-    file: 'src/ui/svelte/components/ManagerToolbar.svelte',
+    name: 'FilterBar',
+    file: 'src/ui/svelte/components/FilterBar.svelte',
     harness: toolbarHarness,
     root: 'fabricate-filter-bar',
     hook: 'manager-toolbar',
@@ -159,7 +159,7 @@ describe('the filter bar and the card shell emit their family root on the render
     });
   }
 
-  it('ManagerToolbar names its landmark from the ariaLabel prop', async () => {
+  it('FilterBar names its landmark from the ariaLabel prop', async () => {
     const target = await toolbarHarness.mount({ ariaLabel: 'Filter components' });
     assert.equal(target.querySelector('section').getAttribute('aria-label'), 'Filter components');
   });

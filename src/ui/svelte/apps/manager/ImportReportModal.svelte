@@ -4,7 +4,7 @@
 
   Until issue 877 this was a DialogV2 built from an HTML string, so it inherited
   Foundry's own defaults: serif headings sized like page titles, raw `<ul>` bullets and
-  a full-width default footer button. It is now the same `ManagerModal` chrome the
+  a full-width default footer button. It is now the same `Modal` chrome the
   folder-mapping step uses, which is the other dialog in the very same import flow —
   one implementation of "manager modal dialog", not two technologies side by side.
 
@@ -21,8 +21,8 @@
 <script>
   import Chip from '../../components/Chip.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
-  import ManagerModal from '../../components/ManagerModal.svelte';
+  import Button from '../../components/Button.svelte';
+  import Modal from '../../components/Modal.svelte';
   import { localize } from '../../util/foundryBridge.js';
 
   let {
@@ -53,7 +53,7 @@
   }
 </script>
 
-<ManagerModal
+<Modal
   {open}
   title={content?.title || text('FABRICATE.Admin.ImportReport.Title', 'Import report')}
   subtitle={content?.headline || ''}
@@ -102,11 +102,11 @@
   {/snippet}
 
   {#snippet footer()}
-    <ManagerButton role="primary" data-import-report-close onclick={() => onClose()}>
+    <Button role="primary" data-import-report-close onclick={() => onClose()}>
       {text('FABRICATE.Admin.ImportReport.Close', 'Close')}
-    </ManagerButton>
+    </Button>
   {/snippet}
-</ManagerModal>
+</Modal>
 
 <style>
   .manager-import-report-list {

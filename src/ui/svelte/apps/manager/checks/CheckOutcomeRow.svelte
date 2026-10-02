@@ -7,7 +7,7 @@
   column header names each field on screen; every control also carries its own accessible name.
 -->
 <script>
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
   import Stepper from '../../../components/Stepper.svelte';
@@ -172,7 +172,7 @@
     </span>
   {/if}
 
-  <ManagerButton
+  <Button
     role="danger"
     class="manager-checks-tier-remove"
     data-remove-outcome
@@ -180,7 +180,7 @@
     onclick={onRemove}
   >
     <i class="fas fa-trash" aria-hidden="true"></i>
-  </ManagerButton>
+  </Button>
 </div>
 
 <style>

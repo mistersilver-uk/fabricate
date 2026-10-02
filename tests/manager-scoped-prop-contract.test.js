@@ -74,9 +74,9 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   // THE SHIPPED TWO-STEP DESTRUCTIVE CONTROL, for the world Tool entry's HEADER `Delete` (issue
   // 1373's parity round).
   '../../components/ArmedDangerButton.svelte',
+  '../../components/Button.svelte',
   // Moved by issue 1710, not added.
   '../../components/EmptyState.svelte',
-  '../../components/ManagerButton.svelte',
   '../../util/announceAfterFocus.js',
   '../../util/componentEditor.js',
   '../../util/craftingImageDefaults.js',

@@ -6,8 +6,8 @@
 <script>
   import ArmedDangerButton from '../../../components/ArmedDangerButton.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
-  import ManagerSearchField from '../../../components/ManagerSearchField.svelte';
+  import Button from '../../../components/Button.svelte';
+  import SearchField from '../../../components/SearchField.svelte';
   import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import { componentEntrySystemFilters } from './componentScoped.js';
 
@@ -109,7 +109,7 @@
           )}
       </p>
     </div>
-    <ManagerButton
+    <Button
       class="manager-component-entry-head-action"
       data-scoped-entry-add-to-systems
       onclick={revealAddable}
@@ -121,12 +121,12 @@
           'Add to systems…'
         )}</span
       >
-    </ManagerButton>
+    </Button>
   </div>
 
   <div class="manager-component-entry-systems-toolbar">
     <div class="manager-component-entry-systems-search" bind:this={searchField}>
-      <ManagerSearchField
+      <SearchField
         density="compact"
         value={search}
         onChange={(next) => (search = next)}
@@ -189,7 +189,7 @@
         <div class="manager-scoped-membership-actions manager-component-entry-row-actions">
           {#if row.member === true}
             {#if onOpenSystemRules}
-              <ManagerButton
+              <Button
                 class="manager-component-entry-system-rules"
                 data-scoped-entry-system-rules={row.systemId}
                 title={openRulesAria(row) ||
@@ -213,7 +213,7 @@
                   )}</span
                 >
                 <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
-              </ManagerButton>
+              </Button>
             {/if}
             <ArmedDangerButton
               token={removeToken(row)}
@@ -231,7 +231,7 @@
               onConfirm={() => onRemove(row.systemId)}
             />
           {:else}
-            <ManagerButton
+            <Button
               role="dashed"
               class="manager-component-entry-system-add"
               data-scoped-membership-add
@@ -244,7 +244,7 @@
               onclick={() => onAdd(row.systemId)}
             >
               {text('FABRICATE.Admin.Manager.Scoped.Component.Entry.AddToSystem', 'Add to system')}
-            </ManagerButton>
+            </Button>
           {/if}
         </div>
       </li>

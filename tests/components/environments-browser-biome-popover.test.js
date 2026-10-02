@@ -14,7 +14,7 @@ import { describeBrowserListState } from '../helpers/browserListStateCases.js';
 const repoRoot = resolve(import.meta.dirname, '../..');
 
 // EnvironmentsBrowserView's Settings tab renders the biome vocabulary panel, which
-// mounts IconPicker + (conditionally) ManagerColorPopover side by side, plus every
+// mounts IconPicker + (conditionally) TintPopover side by side, plus every
 // retained Gathering and World content views EnvironmentsBrowserView statically imports. A `.svelte`
 // or `.js` the mounted tree renders but this allowlist omits does NOT fail the
 // suite — it HANGS (reported as `# cancelled`).
@@ -69,12 +69,12 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Pagination.svelte',
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
-    'src/ui/svelte/components/ManagerColorPicker.svelte',
-    'src/ui/svelte/components/ManagerColorPopover.svelte',
-    'src/ui/svelte/components/ManagerSearchField.svelte',
+    'src/ui/svelte/components/TintPicker.svelte',
+    'src/ui/svelte/components/TintPopover.svelte',
+    'src/ui/svelte/components/SearchField.svelte',
     // The parties pane's refusal banner is the shared notice as of issue 1515.
     'src/ui/svelte/components/Notice.svelte',
-    'src/ui/svelte/components/ManagerToolbar.svelte',
+    'src/ui/svelte/components/FilterBar.svelte',
     'src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte',
     'src/ui/svelte/apps/manager/GatheringEventsBrowserView.svelte',
     'src/ui/svelte/apps/manager/GatheringEconomyView.svelte',

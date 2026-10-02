@@ -59,8 +59,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/StatusToggle.svelte',
     // THE CARD SHELL the world break-mode card is now written as (issue 1427).
     'src/ui/svelte/components/InspectorCard.svelte',
-    'src/ui/svelte/components/ManagerSearchField.svelte',
-    'src/ui/svelte/components/ManagerToolbar.svelte',
+    'src/ui/svelte/components/SearchField.svelte',
+    'src/ui/svelte/components/FilterBar.svelte',
     // THE MEMBERSHIP FILTER IS A SEGMENTED TRACK NOW (issue 1373), not a `<select>`.
     'src/ui/svelte/components/SegmentedControl.svelte',
     'src/ui/svelte/components/Medallion.svelte',

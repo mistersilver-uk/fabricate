@@ -20,7 +20,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import Callout from '../../../components/Callout.svelte';
   import ScopedValidationTab from '../scoped/ScopedValidationTab.svelte';
   import {
@@ -174,13 +174,13 @@
 <!-- Declared here rather than inline so the prop can be UNSET: an empty snippet is still truthy,
      and a `Callout` taking one draws an empty flex item and its gap. -->
 {#snippet worldToolAction()}
-  <ManagerButton
+  <Button
     data-tool-identity-route={String(tool?.id ?? '')}
     aria-label={text('FABRICATE.Admin.Manager.Tools.EditWorldTool', 'Edit the world Tool')}
     onclick={() => onEditWorldTool(String(tool?.id ?? ''))}
     ><i class="fas fa-globe" aria-hidden="true"></i><span
       >{text('FABRICATE.Admin.Manager.Tools.WorldToolAction', 'World Tool')}</span
-    ></ManagerButton
+    ></Button
   >
 {/snippet}
 

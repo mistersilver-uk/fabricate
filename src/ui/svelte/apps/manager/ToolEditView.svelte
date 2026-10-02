@@ -1,6 +1,6 @@
 <script>
   import Chip from '../../components/Chip.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import ToolBehaviorPreview from './tools/ToolBehaviorPreview.svelte';
   import ToolBreakageTab from './tools/ToolBreakageTab.svelte';
@@ -232,13 +232,13 @@
             >{text('FABRICATE.Admin.Manager.Tools.Dirty', 'Unsaved')}</Chip
           >{/if}
         {#if dirty}<span data-tool-editor-dirty hidden>dirty</span>{/if}
-        <!-- These three are the AUTHORITY for `ManagerButton` (issue 1096) and go through the
+        <!-- These three are the AUTHORITY for `Button` (issue 1096) and go through the
              primitive so the two screens cannot drift apart again. -->
         <!-- BOTH NAVIGATIONS TAKE ONE TREATMENT, because the design gives them one (issue 1373):
              the GHOST role, or two adjacent buttons that both leave this screen read as two
              different weights of verb. `Save rules` stays `primary` and green, a standing ruling. -->
         {#if worldRecordExists}
-          <ManagerButton
+          <Button
             role="ghost"
             data-tool-editor-world-tool={String(tool?.id ?? '')}
             aria-label={text('FABRICATE.Admin.Manager.Tools.EditWorldTool', 'Edit the world Tool')}
@@ -246,12 +246,12 @@
             disabled={saving}
             ><i class="fas fa-globe" aria-hidden="true"></i><span
               >{text('FABRICATE.Admin.Manager.Tools.WorldToolAction', 'World Tool')}</span
-            ></ManagerButton
+            ></Button
           >
         {/if}
         <!-- `Back to Tool Rules` and `Save rules`, not `Back to tools` and `Save tool`: what this
              screen saves is one crafting system's RULES for a Tool. -->
-        <ManagerButton
+        <Button
           role="ghost"
           data-tool-editor-back
           aria-label={text(
@@ -266,9 +266,9 @@
           disabled={saving}
           ><i class="fas fa-arrow-left" aria-hidden="true"></i><span
             >{text('FABRICATE.Admin.Manager.Tools.BackToToolRules', 'Back to Tool Rules')}</span
-          ></ManagerButton
+          ></Button
         >
-        <ManagerButton
+        <Button
           role="primary"
           data-tool-editor-save
           aria-label={text('FABRICATE.Admin.Manager.Tools.Editor.SaveLabel', 'Save Tool rules')}
@@ -282,7 +282,7 @@
               )}
           ><i class={saving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i><span
             >{text('FABRICATE.Admin.Manager.Tools.SaveRules', 'Save rules')}</span
-          ></ManagerButton
+          ></Button
         >
       </div>
     </div>

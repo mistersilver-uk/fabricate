@@ -18,7 +18,7 @@
   import EmptyState from '../../components/EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
   import Medallion from '../../components/Medallion.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
   import CollapsibleGroupHeader from '../../components/CollapsibleGroupHeader.svelte';
@@ -41,8 +41,8 @@
   } from '../../../model/recipeBrowserModel.js';
   import IconButton from '../../components/IconButton.svelte';
   import Notice from '../../components/Notice.svelte';
-  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
-  import ManagerToolbar from '../../components/ManagerToolbar.svelte';
+  import SearchField from '../../components/SearchField.svelte';
+  import FilterBar from '../../components/FilterBar.svelte';
   import Select from '../../components/Select.svelte';
 
   let {
@@ -386,7 +386,7 @@
   <!-- `tabindex="-1"` makes this landmark a FOCUS TARGET without making it a tab stop (issue
        1157) — see the twin note in `EssenceBrowserView`. The manager root addresses it through
        `data-recipe-toolbar`. -->
-  <ManagerToolbar
+  <FilterBar
     class="manager-recipe-toolbar"
     tabindex="-1"
     data-keyboard-focus="true"
@@ -394,7 +394,7 @@
     ariaLabel={text('FABRICATE.Admin.Manager.Recipe.Filters', 'Recipe filters')}
   >
     <div class="manager-recipe-filter-row">
-      <ManagerSearchField
+      <SearchField
         value={recipeSearchTerm || ''}
         onChange={(next) => onSearchChange(next)}
         placeholder={text('FABRICATE.Admin.Manager.Recipe.SearchPlaceholder', 'Search recipes...')}
@@ -480,7 +480,7 @@
           triggerProps={{ 'data-recipe-sort': '' }}
           onChange={(next) => (ui.sortKey = next)}
         />
-        <ManagerButton
+        <Button
           class="manager-recipe-sort-direction"
           data-recipe-sort-direction={ui.sortDirection}
           aria-label={text(
@@ -500,7 +500,7 @@
               ? text('FABRICATE.Admin.Manager.Recipe.SortAscending', 'Asc')
               : text('FABRICATE.Admin.Manager.Recipe.SortDescending', 'Desc')}</span
           >
-        </ManagerButton>
+        </Button>
       </div>
     </div>
 
@@ -553,7 +553,7 @@
       onSelectAllResults={selection.selectAllResults}
       onClear={selection.clear}
     />
-  </ManagerToolbar>
+  </FilterBar>
 
   <section
     class="manager-table-scroll"
@@ -578,8 +578,8 @@
           'No recipes match your filters.'
         )}
       >
-        <ManagerButton data-clear-filters="recipes" onclick={clearFilters}
-          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</ManagerButton
+        <Button data-clear-filters="recipes" onclick={clearFilters}
+          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</Button
         >
       </EmptyState>
     {:else}

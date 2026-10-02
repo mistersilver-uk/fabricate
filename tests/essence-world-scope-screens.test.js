@@ -49,7 +49,7 @@ const ESSENCE_PAIR = {
   at: 'ScopedEntryHeaderActions',
   where: ['backAttribute', 'data-world-essence-back'],
 };
-const CREATE_BUTTON = { at: 'ManagerButton', where: ['data-world-essence-create', true] };
+const CREATE_BUTTON = { at: 'Button', where: ['data-world-essence-create', true] };
 
 const ROSTER = [
   { id: 'sys-a', name: 'Mythwright Forge' },

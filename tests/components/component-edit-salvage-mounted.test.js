@@ -786,7 +786,7 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
         : 'data-add-salvage-result';
       assert.ok(
         add.classList.contains('fab-manager-button'),
-        `${named} renders through the ManagerButton primitive, got ${add.className}`
+        `${named} renders through the Button primitive, got ${add.className}`
       );
       assert.ok(
         add.classList.contains('is-dashed'),

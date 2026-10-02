@@ -23,7 +23,7 @@ function createHarness(name, dependencies = [], rawModules = []) {
 const runActionHarness = createHarness(
   'RunActionBar',
   [
-    component('ManagerButton'),
+    component('Button'),
     component('IconButton'),
     'src/ui/svelte/components/SegmentedControl.svelte',
   ],
@@ -43,7 +43,7 @@ const essenceHarness = createHarness('EssencePool', [
   component('Stepper'),
 ]);
 const progressHarness = createHarness('RunProgress', [component('FillBar')]);
-const stageNavHarness = createHarness('StageNav', [component('IconButton'), component('ManagerButton')]);
+const stageNavHarness = createHarness('StageNav', [component('IconButton'), component('Button')]);
 const resultModules = ['ListRow', 'Medallion', 'Chip'].map(component);
 const stageCardHarness = createHarness('StageCard', [...resultModules, component('Kicker')]);
 const yieldHarness = createHarness('YieldScale', resultModules);

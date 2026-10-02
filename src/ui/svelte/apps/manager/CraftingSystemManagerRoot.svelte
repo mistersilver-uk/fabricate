@@ -62,7 +62,7 @@
     toBulkEssenceEdit,
   } from '../../../model/essenceBulkEditModel.js';
   import { resolveRecipeImage } from '../../util/craftingImageDefaults.js';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
   import { buildComponentEditorState } from '../../util/componentEditor.js';
   import { getCurrencyProvidersForFoundrySystem } from '../../../../config/currencyProviders.js';
   import ComponentEditView from './ComponentEditView.svelte';
@@ -6091,7 +6091,7 @@
                   'Essence resources'
                 )}
               >
-                <ManagerButton
+                <Button
                   tag="a"
                   href="https://mistersilver-uk.github.io/fabricate/essences"
                   target="_blank"
@@ -6104,8 +6104,8 @@
                       'Essence docs'
                     )}</span
                   >
-                </ManagerButton>
-                <ManagerButton
+                </Button>
+                <Button
                   tag="a"
                   href="https://mistersilver-uk.github.io/fabricate/essences/effect-transfer"
                   target="_blank"
@@ -6118,7 +6118,7 @@
                       'Effect transfer'
                     )}</span
                   >
-                </ManagerButton>
+                </Button>
               </div>
             </section>
           {:else}
@@ -6246,7 +6246,7 @@
                   'Component resources'
                 )}
               >
-                <ManagerButton
+                <Button
                   tag="a"
                   href="https://mistersilver-uk.github.io/fabricate/components/"
                   target="_blank"
@@ -6259,8 +6259,8 @@
                       'Component docs'
                     )}</span
                   >
-                </ManagerButton>
-                <ManagerButton
+                </Button>
+                <Button
                   tag="a"
                   href="https://mistersilver-uk.github.io/fabricate/help/quickstart"
                   target="_blank"
@@ -6273,7 +6273,7 @@
                       'Quickstart'
                     )}</span
                   >
-                </ManagerButton>
+                </Button>
               </div>
             </section>
           {:else}

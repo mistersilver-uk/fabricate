@@ -56,7 +56,7 @@ function compiledCss(file, source) {
 /** The primitives this guard covers, and the classes each emits UNCONDITIONALLY. */
 const PRIMITIVES = Object.freeze([
   Object.freeze({
-    tag: 'ManagerButton',
+    tag: 'Button',
     contractClasses: ['manager-button', 'fab-manager-button'],
     minimumTokens: 20,
   }),
@@ -80,9 +80,9 @@ const PRIMITIVES = Object.freeze([
   // is 1, for a stronger version of the same reason — only two of its nineteen sites carry a
   // bespoke class, and both of those rules live in `styles/fabricate.css` rather than in a
   // scoped block.
-  Object.freeze({ tag: 'ManagerToolbar', contractClasses: ['manager-toolbar'], minimumTokens: 5 }),
+  Object.freeze({ tag: 'FilterBar', contractClasses: ['manager-toolbar'], minimumTokens: 5 }),
   Object.freeze({
-    tag: 'ManagerSearchField',
+    tag: 'SearchField',
     contractClasses: ['manager-search'],
     minimumTokens: 1,
   }),
@@ -238,8 +238,8 @@ test('no component scopes a rule onto a class it hands to a shared primitive', (
   assert.deepEqual(
     violations.sort((left, right) => (left === right ? 0 : left < right ? -1 : 1)),
     [],
-    'these rules select a class that only a `<ManagerButton>`, `<IconButton>`, ' +
-      '`<InspectorCard>`, `<ManagerToolbar>`, `<ManagerSearchField>`, ' +
+    'these rules select a class that only a `<Button>`, `<IconButton>`, ' +
+      '`<InspectorCard>`, `<FilterBar>`, `<SearchField>`, ' +
       '`<EditorValidationSurface>`, `<SearchablePopover>` or `<ActionMenu>` carries, so they ' +
       'match ' +
       'NOTHING ' +

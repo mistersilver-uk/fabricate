@@ -53,7 +53,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Field.svelte',
     // The shared button primitive: the `Add trigger` control is the prototype's full-width
     // dashed row under the list rather than a button in the card head (issue 1096).
-    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',

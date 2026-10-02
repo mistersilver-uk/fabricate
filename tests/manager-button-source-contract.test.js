@@ -19,7 +19,7 @@ const CONTRACT_CLASS = 'manager-button';
 const PRIMITIVE_CLASS = 'fab-manager-button';
 const ROOT_CLASS = 'fabricate-button';
 const KEYBOARD_FOCUS_ATTRIBUTE = 'data-keyboard-focus="true"';
-const PRIMITIVE_FILE = 'src/ui/svelte/components/ManagerButton.svelte';
+const PRIMITIVE_FILE = 'src/ui/svelte/components/Button.svelte';
 
 /**
  * The two `.svelte` files under `src/` that may still write the literal, each for its own reason.
@@ -84,12 +84,12 @@ test('no .svelte under src writes the manager-button class literal', () => {
   // NON-VACUITY, in the precedent's own style and for the precedent's own reason: an absence check
   // over an empty corpus passes forever and reports itself satisfied.
   const callSiteFiles = svelte.filter((path) =>
-    readFileSync(join(repoRoot, path), 'utf8').includes('<ManagerButton')
+    readFileSync(join(repoRoot, path), 'utf8').includes('<Button')
   );
   assert.ok(
     callSiteFiles.length >= 41,
     `expected the manager's button call sites to still be here, found ${callSiteFiles.length} ` +
-      `files rendering <ManagerButton across ${svelte.length} components under src/`
+      `files rendering <Button across ${svelte.length} components under src/`
   );
 
   // TOKEN-AWARE, not a prefix probe (issue 1502).
@@ -104,7 +104,7 @@ test('no .svelte under src writes the manager-button class literal', () => {
   assert.deepEqual(
     offenders,
     [],
-    'a manager button is a `<ManagerButton role="…">`, never a remembered class string. The ' +
+    'a manager button is a `<Button role="…">`, never a remembered class string. The ' +
       'role vocabulary is closed and a per-site visual tweak travels as a pass-through on the ' +
       '`class` prop — see `openspec/specs/ui-visual-style/spec.md` `### Shared product UI primitives`:\n  ' +
       offenders.join('\n  ')

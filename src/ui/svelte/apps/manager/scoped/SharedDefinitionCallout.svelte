@@ -7,7 +7,7 @@
   Every prop is PRE-LOCALIZED; `onOpen()` navigates, because a page cannot route.
 -->
 <script>
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import Chip from '../../../components/Chip.svelte';
 
@@ -36,10 +36,10 @@
       </p>
     </div>
     {#if onOpen}
-      <ManagerButton {disabled} data-scoped-shared-definition-open onclick={() => onOpen()}>
+      <Button {disabled} data-scoped-shared-definition-open onclick={() => onOpen()}>
         <span>{actionLabel}</span>
         <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
-      </ManagerButton>
+      </Button>
     {/if}
   </div>
 </section>

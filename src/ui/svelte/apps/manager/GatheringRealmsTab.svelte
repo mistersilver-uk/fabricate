@@ -15,8 +15,8 @@
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import RealmEnvironmentsEditor from './RealmEnvironmentsEditor.svelte';
-  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
-  import ManagerToolbar from '../../components/ManagerToolbar.svelte';
+  import SearchField from '../../components/SearchField.svelte';
+  import FilterBar from '../../components/FilterBar.svelte';
   import { createTravelRealmsBrowserState } from '../../../model/managerBrowserViewState.js';
 
   let {
@@ -123,11 +123,11 @@
   aria-labelledby="manager-travel-nav-realms"
   data-travel-panel="realms"
 >
-  <ManagerToolbar
+  <FilterBar
     class="manager-travel-realms-toolbar"
     ariaLabel={text('FABRICATE.Admin.Manager.Travel.Realms.Filters', 'Realm filters')}
   >
-    <ManagerSearchField
+    <SearchField
       value={searchTerm}
       onChange={(next) => (ui.searchTerm = next)}
       placeholder={text(
@@ -136,7 +136,7 @@
       )}
       ariaLabel={text('FABRICATE.Admin.Manager.Travel.Realms.SearchLabel', 'Search realms')}
     />
-  </ManagerToolbar>
+  </FilterBar>
 
   <div class="manager-table-scroll">
     {#if filteredRealms.length === 0}

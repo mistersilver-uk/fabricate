@@ -44,17 +44,17 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     // A `.svelte` the tree renders but the harness omits HANGS the suite (# cancelled)
     // rather than failing it, so the whole static closure is declared.
-    // Each panel's sort is a `Select`, whose closure also carries `ManagerButton` for
+    // Each panel's sort is a `Select`, whose closure also carries `Button` for
     // VocabularyPanel`s confirm pair and InlineVocabularyAdd`s Add.
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/IconPicker.svelte',
     'src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte',
     'src/ui/svelte/apps/manager/VocabularyPanel.svelte',
     'src/ui/svelte/components/IconButton.svelte',
-    'src/ui/svelte/components/ManagerSearchField.svelte',
+    'src/ui/svelte/components/SearchField.svelte',
     // The shared shell and the sort toolbar it hangs each panel's controls on (issue 1915). The
     // tab strip and `EditorTabs` behind it left this tree with the tabs.
-    'src/ui/svelte/components/ManagerToolbar.svelte',
+    'src/ui/svelte/components/FilterBar.svelte',
     'src/ui/svelte/apps/manager/VocabularyShell.svelte',
     'src/ui/svelte/apps/manager/VocabularyShellPanel.svelte',
     'src/ui/svelte/apps/manager/TagsCategoriesView.svelte',

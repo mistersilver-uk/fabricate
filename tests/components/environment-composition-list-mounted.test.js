@@ -553,7 +553,7 @@ describe('CompositionList mounted layout', () => {
     assert.ok(forceAdd.textContent.includes('Force add'));
     assert.ok(
       forceAdd.classList.contains('fab-manager-button'),
-      `the labelled Force add renders through the ManagerButton primitive, got ${forceAdd.className}`
+      `the labelled Force add renders through the Button primitive, got ${forceAdd.className}`
     );
     assert.ok(
       forceAdd.classList.contains('is-warning-action'),

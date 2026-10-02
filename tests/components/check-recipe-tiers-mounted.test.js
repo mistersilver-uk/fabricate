@@ -29,7 +29,7 @@ const harness = createMountedComponentHarness({
   ],
   compiledModules: [
     'src/ui/svelte/components/Stepper.svelte',
-    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/Button.svelte',
     // The tier row is the shared ordered list's row as of issue 1512, and the list renders the
     // icon button and the row disclosure behind it.
     'src/ui/svelte/components/IconButton.svelte',

@@ -19,7 +19,7 @@ const fabricateCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'ut
 const SCOPED_COMPONENTS = [
   'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/components/Medallion.svelte',
-  // NOT `ManagerButton.svelte`: it emits no scoped CSS at all. Every declaration a header
+  // NOT `Button.svelte`: it emits no scoped CSS at all. Every declaration a header
   // button renders with lives in `styles/fabricate.css`, which is exactly why its height and
   // the chip's are decided in two different places and by two different layers.
 ].map((componentPath) => scopedComponentCss(resolve(repoRoot, componentPath)));

@@ -11,7 +11,7 @@
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import IconButton from '../../components/IconButton.svelte';
-  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import SearchField from '../../components/SearchField.svelte';
   import { createRealmEnvironmentsBrowserState } from '../../../model/managerBrowserViewState.js';
 
   let {
@@ -111,7 +111,7 @@
           'Available environments'
         )}
       </h4>
-      <ManagerSearchField
+      <SearchField
         value={availableSearch}
         onChange={(next) => (ui.availableSearchTerm = next)}
         placeholder={text(
@@ -186,7 +186,7 @@
           'Included environments'
         )}
       </h4>
-      <ManagerSearchField
+      <SearchField
         value={includedSearch}
         onChange={(next) => (ui.includedSearchTerm = next)}
         placeholder={text(

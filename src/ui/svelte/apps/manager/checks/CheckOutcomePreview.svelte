@@ -18,7 +18,7 @@
   import IconFactRow from '../IconFactRow.svelte';
   import DiceTiles from '../../../components/DiceTiles.svelte';
   import Kicker from '../../../components/Kicker.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import { localize } from '../../../util/foundryBridge.js';
@@ -123,9 +123,9 @@
     <!-- THE STUDIO'S BUTTON PRIMITIVE, not a hand-written class string: a bare
              `manager-button is-primary` matches no rule stating a type size, so the label lands on
              Foundry's inherited app base while every other button reads at the primitive's size —
-             the drift `ManagerButton` exists to end, and one a remembered class string cannot be
+             the drift `Button` exists to end, and one a remembered class string cannot be
              checked for. A CONVERSION, not a wrapper: the element below is already the button. -->
-    <ManagerButton
+    <Button
       role="primary"
       class="manager-checks-simulator-roll"
       data-checks-simulator-roll
@@ -135,7 +135,7 @@
     >
       <i class="fas fa-dice-d20" aria-hidden="true"></i>
       <span>{preview.rollLabel}</span>
-    </ManagerButton>
+    </Button>
 
     {#if dynamicNote}
       <p class="manager-muted" data-checks-simulator-note={preview.dynamicNote}>

@@ -103,7 +103,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/ModifierPillSelect.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
-    'src/ui/svelte/components/ManagerSearchField.svelte',
+    'src/ui/svelte/components/SearchField.svelte',
     'src/ui/svelte/components/Notice.svelte',
     'src/ui/svelte/apps/manager/checks/PreviewAsPicker.svelte',
     'src/ui/svelte/components/Callout.svelte',
@@ -257,7 +257,7 @@ describe('Gathering task editor steppers (issue 1050)', () => {
     assert.ok(Boolean(addModifier), 'the stamina card renders its Add modifier control');
     assert.ok(
       addModifier.classList.contains('fab-manager-button'),
-      `Add modifier renders through the ManagerButton primitive, got ${addModifier.className}`
+      `Add modifier renders through the Button primitive, got ${addModifier.className}`
     );
     assert.ok(
       addModifier.classList.contains('is-dashed'),
@@ -272,7 +272,7 @@ describe('Gathering task editor steppers (issue 1050)', () => {
     assert.ok(Boolean(addDrop), 'the drops toolbar renders its Add drop rule control');
     assert.ok(
       addDrop.classList.contains('fab-manager-button'),
-      `Add drop rule renders through the ManagerButton primitive, got ${addDrop.className}`
+      `Add drop rule renders through the Button primitive, got ${addDrop.className}`
     );
     assert.ok(
       addDrop.classList.contains('is-primary'),

@@ -545,7 +545,7 @@ export function registerComponentsCases() {
     assertHeaderBackIsGhost('[data-component-edit-back]', 'component-edit');
     assert.ok(
       saveButton.classList.contains('fab-manager-button'),
-      `the header Save renders through the ManagerButton primitive, got ${saveButton.className}`
+      `the header Save renders through the Button primitive, got ${saveButton.className}`
     );
     assert.ok(
       saveButton.classList.contains('is-primary') && !saveButton.classList.contains('is-ghost'),

@@ -4,13 +4,13 @@
   import EmptyState from '../../components/EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
   import { buildSystemLabelMap, systemDisplayLabel } from '../../util/systemDisambiguation.js';
   import IconButton from '../../components/IconButton.svelte';
   import ActionMenu from '../../components/ActionMenu.svelte';
-  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
-  import ManagerToolbar from '../../components/ManagerToolbar.svelte';
+  import SearchField from '../../components/SearchField.svelte';
+  import FilterBar from '../../components/FilterBar.svelte';
   import Select from '../../components/Select.svelte';
   import {
     DEFAULT_BROWSER_PAGE_SIZE,
@@ -151,8 +151,8 @@
 </script>
 
 <main class="manager-main" aria-label={text('FABRICATE.Admin.Manager.Nav.SystemsShort', 'Systems')}>
-  <ManagerToolbar ariaLabel={text('FABRICATE.Admin.Manager.SystemFilters', 'System filters')}>
-    <ManagerSearchField
+  <FilterBar ariaLabel={text('FABRICATE.Admin.Manager.SystemFilters', 'System filters')}>
+    <SearchField
       value={searchTerm}
       onChange={(next) => (ui.searchTerm = next)}
       placeholder={text(
@@ -181,16 +181,12 @@
         .replace('{total}', systems.length)}</Chip
     >
     {#if filtersActive}
-      <ManagerButton
-        class="manager-clear-filters"
-        data-clear-filters="systems"
-        onclick={clearFilters}
-      >
+      <Button class="manager-clear-filters" data-clear-filters="systems" onclick={clearFilters}>
         <i class="fas fa-times" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</span>
-      </ManagerButton>
+      </Button>
     {/if}
-  </ManagerToolbar>
+  </FilterBar>
 
   <section
     class="manager-table-scroll"
@@ -215,10 +211,10 @@
           'Create a system to start organizing components and recipes.'
         )}
       >
-        <ManagerButton role="primary" onclick={onCreateSystem}>
+        <Button role="primary" onclick={onCreateSystem}>
           <i class="fas fa-plus" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.CreateSystem', 'Create system')}</span>
-        </ManagerButton>
+        </Button>
       </EmptyState>
     {:else if filteredSystems.length === 0}
       <EmptyState
@@ -229,8 +225,8 @@
           'Clear the search to show all configured systems.'
         )}
       >
-        <ManagerButton onclick={() => (ui.searchTerm = '')}
-          >{text('FABRICATE.Admin.Manager.ClearSearch', 'Clear search')}</ManagerButton
+        <Button onclick={() => (ui.searchTerm = '')}
+          >{text('FABRICATE.Admin.Manager.ClearSearch', 'Clear search')}</Button
         >
       </EmptyState>
     {:else}

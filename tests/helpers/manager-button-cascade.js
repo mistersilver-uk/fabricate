@@ -1,11 +1,11 @@
-/** The cascade instrument for the `manager-button` → `ManagerButton` conversion (issue 1118). */
+/** The cascade instrument for the `manager-button` → `Button` conversion (issue 1118). */
 import { compile } from 'svelte/compiler';
 
 import { collectWorkingTreeSources } from './sourceScan.js';
 
 const GLOBAL_SHEET = 'styles/fabricate.css';
 const PRIMITIVE_CLASS = 'fab-manager-button';
-// The class the family is ROOTED at since issue 1502. `ManagerButton.svelte` emits it as the
+// The class the family is ROOTED at since issue 1502. `Button.svelte` emits it as the
 // leading literal of its `classes` array, so a site the sweep converts gains it exactly as it gains
 // `fab-manager-button`, and `collectSites` adds both synthetically for the same reason: a converted
 // site writes NEITHER in the markup this scanner reads.

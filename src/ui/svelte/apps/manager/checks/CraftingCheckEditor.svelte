@@ -21,7 +21,7 @@
   import { activeCheckEvaluation } from '../../../../../systems/checkTarget.js';
   import { routedOutcomeOrder } from '../../../../../systems/checkRouting.js';
   import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import ThresholdBandStrip from '../../../components/ThresholdBandStrip.svelte';
   import { bandToneFor, bandsAreEditable, describeBandsUnavailable } from './checkBandModel.js';
   import { readonlyBandPicture } from './readonlyBandPicture.js';
@@ -632,7 +632,7 @@
                      the empty sentence and NOTHING to press — the state every routed check starts in.
                      Placed BENEATH that sentence, as `CheckRecipeTiers` and `CheckTriggers` do, on the
                      list's own gap, so the populated state is pixel-unchanged. -->
-        <ManagerButton
+        <Button
           role="dashed"
           class="manager-checks-outcome-add"
           data-add-outcome-tier
@@ -645,7 +645,7 @@
               'Add outcome tier'
             )}</span
           >
-        </ManagerButton>
+        </Button>
       </div>
     </InspectorCard>
   {/if}

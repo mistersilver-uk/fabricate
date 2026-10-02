@@ -39,7 +39,7 @@
  * written — one modelling the Tool Studio header, which has rendered through the primitive since
  * issue 1096 and passed only because the values happened to agree.
  *
- * @typedef {object} ManagerButtonFixtureExemption
+ * @typedef {object} ButtonFixtureExemption
  * @property {string} file Repository-relative POSIX path of the suite holding the fixture.
  * @property {string} classes The exact `class` attribute value, token order included.
  * @property {number} count How many identical attributes that suite is allowed to hold.
@@ -50,7 +50,7 @@
  *   it names being converted, deleted or re-rooted.
  */
 
-/** @type {ReadonlyArray<ManagerButtonFixtureExemption>} */
+/** @type {ReadonlyArray<ButtonFixtureExemption>} */
 export const FIXTURE_ALLOWLIST = Object.freeze([
   Object.freeze({
     file: 'tests/components/manager-layout-tools.js',

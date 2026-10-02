@@ -13,7 +13,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import EmptyState from '../../../components/EmptyState.svelte';
   import Avatar from '../../../components/Avatar.svelte';
-  import ManagerSearchField from '../../../components/ManagerSearchField.svelte';
+  import SearchField from '../../../components/SearchField.svelte';
 
   let {
     characters = [],
@@ -47,7 +47,7 @@
 >
   <!-- The `flex: 0 0 auto` override is authored against `.manager-knowledge-roster .manager-search`,
        beside the Access roster's identical one, so this needs no class of its own. -->
-  <ManagerSearchField
+  <SearchField
     value={searchTerm}
     onChange={(next) => onSearch(next)}
     placeholder={text(

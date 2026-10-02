@@ -27,7 +27,7 @@
   import LibraryCard from '../library/LibraryCard.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import SelectionCheckbox from '../../../components/SelectionCheckbox.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
   import { essenceCapabilityPills } from './essenceStudio.js';
   import IconButton from '../../../components/IconButton.svelte';
@@ -191,14 +191,14 @@
 {/snippet}
 
 {#snippet addToSystemButton()}
-  <ManagerButton
+  <Button
     role="primary"
     data-essence-add-to-system={essence.id}
     onclick={() => onAddToSystem?.(essence.id)}
   >
     <i class="fas fa-plus" aria-hidden="true"></i>
     <span>{text('FABRICATE.Admin.Manager.Essence.AddToSystem', 'Add to this system')}</span>
-  </ManagerButton>
+  </Button>
 {/snippet}
 
 <!-- NEVER hidden for a disabled essence, since hiding a pill removes state: they render muted. -->
@@ -451,7 +451,7 @@
   }
 
   /* THE LABELLED VARIANT OF `.manager-icon-button`, every value COPIED from the labelled-button
-     authority rather than chosen; it cannot BE a `ManagerButton`, whose auto width would fight the
+     authority rather than chosen; it cannot BE a `Button`, whose auto width would fight the
      square 34px box. Compounded through `.manager-essence-row` on purpose, because a bare selector
      ties at (0,2,0) and is decided by injection order. THE CHILD HALF IS `:global` BECAUSE
      `IconButton.svelte` WRITES THE BUTTON: a forwarded `class` carries no `svelte-<hash>`, so a

@@ -115,7 +115,7 @@ export default {
         .click();
 
       // Since issue 877 the report is a Svelte modal portaled INTO the manager window
-      // (the shared ManagerModal chrome the folder-mapping step below also uses), not
+      // (the shared Modal chrome the folder-mapping step below also uses), not
       // a separate DialogV2 application.
       const reportDialog = page.locator('.fabricate-manager [data-import-report]').first();
       await reportDialog.waitFor({ state: 'visible', timeout: 15_000 });

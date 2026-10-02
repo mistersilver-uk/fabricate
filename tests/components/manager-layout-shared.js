@@ -115,7 +115,7 @@ export async function readWorkspaceGrid(width, view, worldTravelTab = '') {
 }
 
 // ── The tool studio is the AUTHORITY for a manager button (issue 1096) ─────────────────────
-const managerButtonPath = resolve(__dirname, '../../src/ui/svelte/components/ManagerButton.svelte');
+const managerButtonPath = resolve(__dirname, '../../src/ui/svelte/components/Button.svelte');
 const managerButtonSource = readFileSync(managerButtonPath, 'utf8');
 
 // The role modifier is read from the component's NAMED mapping rather than rebuilt here as
@@ -125,7 +125,7 @@ const managerButtonSource = readFileSync(managerButtonPath, 'utf8');
 // while reporting green (issue 1118).
 const managerButtonRoleClasses = (() => {
   const mapping = managerButtonSource.match(/const ROLE_CLASSES = \{([\s\S]*?)\};/);
-  assert.ok(mapping, 'ManagerButton declares its role-to-class mapping as one named object');
+  assert.ok(mapping, 'Button declares its role-to-class mapping as one named object');
   return Object.fromEntries(
     [...mapping[1].matchAll(/(\w+):\s*'([\w-]+)'/g)].map(([, role, className]) => [role, className])
   );
@@ -134,13 +134,13 @@ const managerButtonRoleClasses = (() => {
 // The three unconditional classes, likewise read out of the component rather than restated.
 const managerButtonBaseClasses = (() => {
   const literal = managerButtonSource.match(/const classes = \$derived\(\s*\[([\s\S]*?)\]/);
-  assert.ok(literal, 'ManagerButton declares its emitted classes as one array literal');
+  assert.ok(literal, 'Button declares its emitted classes as one array literal');
   const base = [...literal[1].matchAll(/'([a-z][\w-]*)'/g)].map(([, token]) => token);
   assert.ok(
     base.includes('fabricate-button') &&
       base.includes('manager-button') &&
       base.includes('fab-manager-button'),
-    'ManagerButton must emit the family root, the convention class and the primitive class, ' +
+    'Button must emit the family root, the convention class and the primitive class, ' +
       `got ${base.join(' ')}`
   );
   return base;
@@ -152,7 +152,7 @@ export function managerButtonClassesFor(role) {
   const modifier = managerButtonRoleClasses[role];
   assert.ok(
     modifier,
-    `ManagerButton must declare a class for the '${role}' role, got ${Object.keys(managerButtonRoleClasses).join(' ')}`
+    `Button must declare a class for the '${role}' role, got ${Object.keys(managerButtonRoleClasses).join(' ')}`
   );
   return `${managerButtonBaseClasses.join(' ')} ${modifier}`;
 }

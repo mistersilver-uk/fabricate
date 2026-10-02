@@ -17,7 +17,7 @@
 -->
 <script>
   import EmptyState from '../../../components/EmptyState.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import { localize } from '../../../util/foundryBridge.js';
 
   let {
@@ -162,7 +162,7 @@
       />
     {/if}
 
-    <ManagerButton
+    <Button
       class="manager-recipe-tab-action"
       data-recipe-open-access
       onclick={() => onOpenAccess()}
@@ -170,7 +170,7 @@
       <i class="fas fa-user-shield" aria-hidden="true"></i>
       <span>{text('FABRICATE.Admin.Manager.Recipe.AccessTab.ManageAccess', 'Manage access')}</span>
       <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
-    </ManagerButton>
+    </Button>
   </div>
 </section>
 

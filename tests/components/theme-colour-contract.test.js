@@ -19,7 +19,7 @@ const readCorpusRoots = [resolve(repoRoot, 'src'), resolve(repoRoot, 'styles')];
 const readCorpusExtensions = new Set(['.js', '.mjs', '.svelte', '.css']);
 // `--fab-tag-*` is read as `var(--fab-tag-${token})`, which no static scan can see.
 const dynamicTagReadSites = Object.freeze([
-  { path: 'src/ui/svelte/components/ManagerColorPicker.svelte', marker: 'var(--fab-tag-${' },
+  { path: 'src/ui/svelte/components/TintPicker.svelte', marker: 'var(--fab-tag-${' },
   { path: 'src/ui/svelte/components/Medallion.svelte', marker: 'var(--fab-tag-${' },
   {
     path: 'src/ui/svelte/apps/manager/scoped/essenceScoped.js',

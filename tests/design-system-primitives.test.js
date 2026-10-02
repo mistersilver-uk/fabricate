@@ -102,6 +102,7 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/EssencePool.svelte',
   'src/ui/svelte/components/EssenceSourceSelector.svelte',
   'src/ui/svelte/components/Field.svelte',
+  'src/ui/svelte/components/FilterBar.svelte',
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/IconPicker.svelte',
   'src/ui/svelte/components/InspectorCard.svelte',
@@ -109,13 +110,11 @@ const EXPECTED_OVERRIDE_KEYS = [
   // Issue 1505: the uppercase micro-label, on sixteen converted eyebrow sites.
   'src/ui/svelte/components/Kicker.svelte',
   'src/ui/svelte/components/ListRow.svelte',
-  // Issue 2021: the modal chrome's banded frame, which every dialog draws since epic 1997.
-  'src/ui/svelte/components/ManagerModal.svelte',
-  'src/ui/svelte/components/ManagerSearchField.svelte',
-  'src/ui/svelte/components/ManagerToolbar.svelte',
   // Issue 1506: the app's ONE art tile, after it absorbed both crafting thumbnails. ONE frame,
   // because one STATE is what neither representative frame reaches: a TINTED glyph-chip tile.
   'src/ui/svelte/components/Medallion.svelte',
+  // Issue 2021: the modal chrome's banded frame, which every dialog draws since epic 1997.
+  'src/ui/svelte/components/Modal.svelte',
   // Issue 1458: the pill multi-select's add menu became a `SearchablePopover`, which left the
   // component exactly one painted rule of its own — the at-cap trigger treatment — and that rule
   // had to be re-anchored through `:global()` because the button is the primitive's element now.
@@ -134,6 +133,7 @@ const EXPECTED_OVERRIDE_KEYS = [
   // override itself and everything about where it sorts.
   'src/ui/svelte/components/RunActionBar.svelte',
   'src/ui/svelte/components/RunProgress.svelte',
+  'src/ui/svelte/components/SearchField.svelte',
   'src/ui/svelte/components/SearchablePopover.svelte',
   // Issue 1719: the picker's portaled panel, extracted as an internal part of the entry above. It
   // sorts immediately after its parent, which is the whole reason the part is named for the part
@@ -203,14 +203,14 @@ const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/apps/manager/ExplainerCard.svelte',
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
   'src/ui/svelte/components/ArmedDangerButton.svelte',
+  'src/ui/svelte/components/Button.svelte',
   'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
   'src/ui/svelte/components/FillBar.svelte',
-  'src/ui/svelte/components/ManagerButton.svelte',
-  'src/ui/svelte/components/ManagerColorPicker.svelte',
-  'src/ui/svelte/components/ManagerColorPopover.svelte',
   'src/ui/svelte/components/Pagination.svelte',
   'src/ui/svelte/components/SegmentedControl.svelte',
+  'src/ui/svelte/components/TintPicker.svelte',
+  'src/ui/svelte/components/TintPopover.svelte',
 ];
 
 test('the inputs every property below quantifies over are alive', () => {

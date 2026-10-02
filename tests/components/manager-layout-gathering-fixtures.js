@@ -10,7 +10,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const colorPickerPath = resolve(
   __dirname,
-  '../../src/ui/svelte/components/ManagerColorPicker.svelte'
+  '../../src/ui/svelte/components/TintPicker.svelte'
 );
 const partyExpandedBodyPath = resolve(
   __dirname,

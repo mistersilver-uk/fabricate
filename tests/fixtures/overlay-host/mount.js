@@ -5,9 +5,9 @@ import ActionMenu from '../../../src/ui/svelte/components/ActionMenu.svelte';
 import ActorSelectTopBar from '../../../src/ui/svelte/apps/ActorSelectTopBar.svelte';
 import EssenceSourceSelector from '../../../src/ui/svelte/components/EssenceSourceSelector.svelte';
 import IconPicker from '../../../src/ui/svelte/components/IconPicker.svelte';
-import ManagerColorPicker from '../../../src/ui/svelte/components/ManagerColorPicker.svelte';
 import RecipeDurationEditor from '../../../src/ui/svelte/apps/manager/recipe/RecipeDurationEditor.svelte';
 import SearchablePopover from '../../../src/ui/svelte/components/SearchablePopover.svelte';
+import TintPicker from '../../../src/ui/svelte/components/TintPicker.svelte';
 
 const params = new URLSearchParams(globalThis.location.search);
 const hostKind = params.get('host') ?? 'manager';
@@ -134,7 +134,7 @@ const COMPONENTS = {
       onChange: () => {},
     },
   ],
-  color: [ManagerColorPicker, { colorToken: 'sage', ariaLabel: 'Choose a colour' }],
+  color: [TintPicker, { colorToken: 'sage', ariaLabel: 'Choose a colour' }],
   // THE SIXTH COPY OF THE POSITIONING PASS (issue 1500), and the only one of the six that had no
   // row here.
   duration: [

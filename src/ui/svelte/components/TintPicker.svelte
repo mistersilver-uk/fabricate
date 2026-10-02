@@ -1,9 +1,13 @@
+<!--
+  The swatch trigger that opens the shared tint palette as an anchored popover. It is the trigger
+  wrapper, not the specimen: `TintPopover.svelte` implements the library's `<TintPicker>`.
+-->
 <script>
   import { anchoredPopover, hostRelativePopoverLayout } from '../actions/anchoredPopover.js';
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
   import { computeIconPickerPopoverLayout } from '../util/iconPickerPopover.js';
   import { MANAGER_MAIN_SELECTOR } from '../util/overlayBounds.js';
-  import ManagerColorPopover from './ManagerColorPopover.svelte';
+  import TintPopover from './TintPopover.svelte';
   import { normalizeManagerColorToken } from '../util/managerColorTokens.js';
 
   const popoverLayout = hostRelativePopoverLayout(computeIconPickerPopoverLayout);
@@ -59,14 +63,14 @@
   }
 
   // `anchoredPopover` is applied HERE rather than with `use:` on the panel, because the panel is
-  // `ManagerColorPopover` — a separate shared component this one does not own the markup of. An
+  // `TintPopover` — a separate shared component this one does not own the markup of. An
   // action is a plain function, so the picker drives it against the node the popover registers:
   // same contract, same teardown, no new prop on a component three other surfaces render.
   $effect(() => {
     if (!popoverRoot) return;
 
     const handle = anchoredPopover(popoverRoot, {
-      component: 'ManagerColorPicker',
+      component: 'TintPicker',
       trigger: () => triggerButton,
       layout: popoverLayout,
       layoutOptions: () => ({ horizontalAlign: 'left', minWidth: 220, maxWidth: 220 }),
@@ -78,7 +82,7 @@
 </script>
 
 <!-- `fabricate-color-picker` is this primitive's NAMESPACE root. ONE class, not two: this
-     component renders no panel of its own — its panel is `ManagerColorPopover`, which carries its
+     component renders no panel of its own — its panel is `TintPopover`, which carries its
      own root class. -->
 <span
   bind:this={pickerRoot}
@@ -103,7 +107,7 @@
     <span class="manager-color-swatch" aria-hidden="true"></span>
   </button>
   {#if open}
-    <ManagerColorPopover
+    <TintPopover
       {colorToken}
       {customColor}
       {presetGridLabel}

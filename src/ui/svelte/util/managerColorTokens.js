@@ -1,7 +1,7 @@
 // The manager's ONE colour vocabulary (issue 1036): the eight `--fab-tag-*` palette keys in render
 // order, with their localization keys and English fallbacks. The labels are all a screen reader
 // gets from a colour cell (`aria-label` and `title`), so they live under a SHARED namespace —
-// `ManagerColorPopover` also draws the biome and character-modifier pickers, so the keys cannot sit
+// `TintPopover` also draws the biome and character-modifier pickers, so the keys cannot sit
 // under `Essence.*`. Import-free, and `localize` is the caller's: every mount harness compiling
 // either colour component must copy this module verbatim, dependencies and all.
 export const MANAGER_COLOR_TOKENS = Object.freeze([

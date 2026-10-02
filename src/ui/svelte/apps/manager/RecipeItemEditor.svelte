@@ -710,7 +710,7 @@
      `svelte-<hash>` onto the elements THIS component writes — never onto a child component's
      internals — so a scoped `.manager-recipe-item-satisfied-toggle` would be emitted with the
      hash appended and match nothing, silently un-right-aligning the switch.
-     `ManagerButton.svelte` records the same trap and the same two repairs; this rule stays in
+     `Button.svelte` records the same trap and the same two repairs; this rule stays in
      this file rather than moving to `styles/fabricate.css` because it has exactly one call
      site, and it is CHAINED with the primitive's own class so it is not a bare global. */
   :global(.manager-status-toggle.manager-recipe-item-satisfied-toggle) {

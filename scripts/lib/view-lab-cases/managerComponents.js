@@ -274,7 +274,7 @@ export const CASES = Object.freeze([
     expectView: 'components',
     expectSelector: '[data-component-add-from-catalogue-dialog]',
     kinds: ['manager', 'components'],
-    // The picker's own file, and not `ManagerModal.svelte`.
+    // The picker's own file, and not `Modal.svelte`.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/ComponentAddFromCatalogueDialog\.svelte$/,
     ],

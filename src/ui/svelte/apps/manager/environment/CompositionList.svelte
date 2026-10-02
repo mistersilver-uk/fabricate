@@ -10,7 +10,7 @@
   import RuntimeStatePill from './RuntimeStatePill.svelte';
   import CompositionStatePill from './CompositionStatePill.svelte';
   import OverrideIndicator from './OverrideIndicator.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import Pagination from '../../../components/Pagination.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
@@ -627,7 +627,7 @@
                     onSelect={(action) => runMenuAction(action, entry)}
                   />
                 {:else}
-                  <ManagerButton
+                  <Button
                     class="manager-environment-restore"
                     data-action="restore"
                     onclick={() => onRestore(kind, entry.id)}
@@ -639,7 +639,7 @@
                         'Restore'
                       )}</span
                     >
-                  </ManagerButton>
+                  </Button>
                 {/if}
               </div>
             </li>
@@ -728,7 +728,7 @@
                          automatic mode, the one mode with a filter for it to override — so
                          the guard now tests composition state alone and takes its mode from
                          the enclosing section. This is the `warning` role's live consumer. -->
-                    <ManagerButton
+                    <Button
                       role="warning"
                       class="manager-environment-force-include"
                       data-action="force-include"
@@ -741,7 +741,7 @@
                           'Force add'
                         )}</span
                       >
-                    </ManagerButton>
+                    </Button>
                   {:else if entry.compositionState === 'libraryDisabled'}
                     <span class="manager-muted manager-environment-comp-disabled-note"
                       >{text(

@@ -1,5 +1,5 @@
 /**
- * The cascade guard for the `manager-button` → `ManagerButton` sweep (issue 1118).
+ * The cascade guard for the `manager-button` → `Button` sweep (issue 1118).
  * BE PRECISE ABOUT WHAT ENTERS THE DERIVED SET, because this docblock used to claim more than
  * the file delivers and a reviewer proved it by experiment: append a fresh
  * `.fabricate-manager .manager-header-actions .manager-button.is-ghost { font-size: 3rem }`
@@ -132,7 +132,7 @@ const CONVERTED_BATCHES = Object.freeze([
       }),
       Object.freeze({ file: 'src/ui/svelte/apps/manager/RecipeStepsCard.svelte', sites: 1 }),
       // REMOVED at issue 1444, and the removal is recorded rather than performed silently.
-      // The entry was `recipe/RecipeValidationTab.svelte`, booked for the ONE `<ManagerButton>`
+      // The entry was `recipe/RecipeValidationTab.svelte`, booked for the ONE `<Button>`
       // its issue rows rendered as the View deep-link. That tab renders through
       // `EditorValidationSurface` now, and the surface already draws that button from its OWN
       // booked site (task 7 above) — so the control did not change file, it MERGED into one
@@ -359,7 +359,7 @@ const REVIEWED = [
       'children — button, chip and save-error. The primitive states the same 0.72rem with no ' +
       'ancestor requirement, so the tie it used to derive was provably zero-pixel. With task ' +
       '9 that tie is no longer derivable at all: every button in this container is a ' +
-      '`<ManagerButton>` now, including the two `ComponentEditorHeader` renders into the ' +
+      '`<Button>` now, including the two `ComponentEditorHeader` renders into the ' +
       'root`s copy of it, which no static count can attribute to either file. So the ' +
       'container`s OWN population is counted from the tree instead.',
   },
@@ -889,7 +889,7 @@ function endOfOpeningTag(source, from) {
  * `tests/components/manager-filter-bar-source-contract.test.js` is what makes that visible, by
  * refusing a raw element carrying the class anywhere else.
  */
-const CONTAINER_PRIMITIVES = Object.freeze({ 'manager-toolbar': 'ManagerToolbar' });
+const CONTAINER_PRIMITIVES = Object.freeze({ 'manager-toolbar': 'FilterBar' });
 
 /**
  * Every region of `source` enclosed by an element whose class list holds `containerClass`.
@@ -936,7 +936,7 @@ function regionsInside(source, containerClass) {
 }
 
 /**
- * How many `<ManagerButton>`s a component renders that a rule with this shape would reach.
+ * How many `<Button>`s a component renders that a rule with this shape would reach.
  *
  * @param {string} source component source text
  * @param {{container?: string, role?: string}} shape what the rule demands of the button
@@ -946,7 +946,7 @@ function primitivesMatching(source, { container, role }) {
   const scopes = container ? regionsInside(source, container) : [source];
   let total = 0;
   for (const scope of scopes) {
-    for (const opening of scope.matchAll(/<ManagerButton[\s/>]/g)) {
+    for (const opening of scope.matchAll(/<Button[\s/>]/g)) {
       const end = endOfOpeningTag(scope, opening.index);
       if (end < 0) continue;
       if (role && !scope.slice(opening.index, end).includes(`role="${role}"`)) continue;
@@ -1126,10 +1126,10 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   // two assertions above are defending.
   for (const { file, sites } of converted) {
     const source = readFileSync(resolve(repoRoot, file), 'utf8');
-    const rendered = source.match(/<ManagerButton[\s/>]/g)?.length ?? 0;
+    const rendered = source.match(/<Button[\s/>]/g)?.length ?? 0;
     assert.ok(
       rendered >= sites,
-      `${file} is booked as ${sites} converted sites but renders ManagerButton ${rendered} times`
+      `${file} is booked as ${sites} converted sites but renders Button ${rendered} times`
     );
     assert.ok(
       !writesContractLiteral(source),
@@ -1151,7 +1151,7 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   // `<select>` plus a field the GM types into — so the row's three `SearchablePopover` triggers
   // (component, essence, currency unit) are not triggers any more, they are an inline search
   // with its suggestions beneath it, and the two set-level adders that were PICKERS became
-  // plain dashed `<ManagerButton>`s that create an empty row. The sixth is `+ Tag`, which the
+  // plain dashed `<Button>`s that create an empty row. The sixth is `+ Tag`, which the
   // design draws as a dashed tag-tinted PILL (`proto:2256`) and which is a `triggerChip` now,
   // writing no `manager-button` class at all.
   assert.equal(
@@ -1184,7 +1184,7 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   );
   assert.match(
     readFileSync(resolve(repoRoot, POPULATION_C_FILE), 'utf8'),
-    /<ManagerButton\b[^]*?class=\{`is-subtle manager-import-mapping-skip/,
+    /<Button\b[^]*?class=\{`is-subtle manager-import-mapping-skip/,
     `${POPULATION_C_FILE} should still build the skip toggle's class from a template, on the ` +
       'primitive — a template that vanished would satisfy the count above by deletion'
   );

@@ -163,7 +163,7 @@ describe('M12a — a manager button takes the corner its height is on', () => {
 });
 
 describe('M12b — the 38px rung is reachable on the toolbar controls the reference draws at 38', () => {
-  const FIELD = 'src/ui/svelte/components/ManagerSearchField.svelte';
+  const FIELD = 'src/ui/svelte/components/SearchField.svelte';
   const harness = createMountedComponentHarness({
     repoRoot,
     tmpPrefix: 'fabricate-search-field-rung-',
@@ -273,7 +273,7 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
   });
 
   // ── THE BUTTON TAKES THE SAME RUNG, AND THE SAME TOKEN (issue 1371, round 6) ───────────────
-  const BUTTON = 'src/ui/svelte/components/ManagerButton.svelte';
+  const BUTTON = 'src/ui/svelte/components/Button.svelte';
   const buttonRule = '.fabricate-button.manager-button.fab-manager-button.is-size-38';
 
   it('gives the button the rung and NOT a second corner, because 34 and 38 share one', () => {

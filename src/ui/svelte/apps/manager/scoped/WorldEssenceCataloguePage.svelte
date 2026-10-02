@@ -307,7 +307,7 @@
 
 <!--
   THE INSPECTOR'S ONE PRIMARY ACTION, PINNED TO ITS FOOT rather than left below a system list of
-  arbitrary length. An `InspectorActionButton`, NOT a `ManagerButton`: `role="primary"` emits the
+  arbitrary length. An `InspectorActionButton`, NOT a `Button`: `role="primary"` emits the
   SUCCESS family, and the sheet declaring it is closed to this lane.
 -->
 {#snippet essenceInspectorFoot(entry)}

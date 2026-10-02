@@ -36,11 +36,11 @@ describe('GatheringEventsBrowserView source contract', () => {
   it('renders an event library tabpanel with the expected toolbar filters', () => {
     assert.ok(browserSource.includes("class=\"manager-gathering-panel manager-gathering-panel-events\""), 'browser should use the event panel class');
     assert.ok(browserSource.includes('data-gathering-events-browser'), 'browser should expose a data attribute hook for tests');
-    // The search input's markup moved into `components/ManagerSearchField.svelte` (issue
+    // The search input's markup moved into `components/SearchField.svelte` (issue
     // 1039), so the browser is asserted to RENDER the primitive rather than to write the
     // input itself — a source assertion left pointing at moved markup passes for the wrong
     // reason or fails for one.
-    assert.ok(browserSource.includes('<ManagerSearchField'), 'browser should render the shared search field');
+    assert.ok(browserSource.includes('<SearchField'), 'browser should render the shared search field');
     // The term is no longer this component's to own (issue 1438).
     assert.ok(browserSource.includes('value={searchTerm}'), 'browser should render the search term');
     assert.ok(

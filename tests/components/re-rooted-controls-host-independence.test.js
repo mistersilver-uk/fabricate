@@ -41,8 +41,8 @@ function composedClasses(source, label) {
 }
 
 const MANAGER_BUTTON_CLASSES = composedClasses(
-  read('src/ui/svelte/components/ManagerButton.svelte'),
-  'ManagerButton'
+  read('src/ui/svelte/components/Button.svelte'),
+  'Button'
 ).join(' ');
 const ICON_BUTTON_CLASSES = composedClasses(
   read('src/ui/svelte/components/IconButton.svelte'),
@@ -59,16 +59,16 @@ const FIELD_CLASSES = composedClasses(
   'Field'
 ).join(' ');
 
-/** `ManagerSearchField`'s `is-compact` literal belongs to a conditional expression. */
+/** `SearchField`'s `is-compact` literal belongs to a conditional expression. */
 const SEARCH_CLASSES = composedClasses(
-  read('src/ui/svelte/components/ManagerSearchField.svelte'),
-  'ManagerSearchField'
+  read('src/ui/svelte/components/SearchField.svelte'),
+  'SearchField'
 ).join(' ');
 
-/** `ManagerToolbar` and `InspectorCard` each compose exactly two unconditional literals. */
+/** `FilterBar` and `InspectorCard` each compose exactly two unconditional literals. */
 const TOOLBAR_CLASSES = composedClasses(
-  read('src/ui/svelte/components/ManagerToolbar.svelte'),
-  'ManagerToolbar'
+  read('src/ui/svelte/components/FilterBar.svelte'),
+  'FilterBar'
 ).join(' ');
 const CARD_CLASSES = composedClasses(
   read('src/ui/svelte/components/InspectorCard.svelte'),
@@ -249,8 +249,8 @@ test('the fifteen class strings under measurement are the ones the primitives em
   // reports as unemitted while every re-rooted rule in the sheet keeps matching.
   for (const [file, label, root] of [
     ['src/ui/svelte/components/Field.svelte', 'Field', 'fabricate-field'],
-    ['src/ui/svelte/components/ManagerSearchField.svelte', 'ManagerSearchField', 'fabricate-search'],
-    ['src/ui/svelte/components/ManagerToolbar.svelte', 'ManagerToolbar', 'fabricate-filter-bar'],
+    ['src/ui/svelte/components/SearchField.svelte', 'SearchField', 'fabricate-search'],
+    ['src/ui/svelte/components/FilterBar.svelte', 'FilterBar', 'fabricate-filter-bar'],
     ['src/ui/svelte/components/InspectorCard.svelte', 'InspectorCard', 'fabricate-card'],
     ['src/ui/svelte/components/StatusToggle.svelte', 'StatusToggle', 'fabricate-toggle'],
     [
@@ -669,7 +669,7 @@ const FIELD_COMPARED = Object.freeze([
   'line-height',
 ]);
 
-/** And on `ManagerSearchField`'s own `<input type="search">`. */
+/** And on `SearchField`'s own `<input type="search">`. */
 const SEARCH_COMPARED = Object.freeze([
   'height',
   'border-radius',
@@ -2282,7 +2282,7 @@ test('the issue-1508 controls depend on host chrome for box-sizing, and nothing 
 
 /*
  * ── THE TWO FAMILIES THAT OWN NO CONTROL (issue 1508, phase 2) ──────────────────────────────
- * `ManagerToolbar` and `InspectorCard` are the first re-rooted families whose root is not a
+ * `FilterBar` and `InspectorCard` are the first re-rooted families whose root is not a
  * control and does not CONTAIN one of their own: the bar renders `{@render children?.()}` and the
  * card renders its caller's children. So they declare no font floor and no focus pair, and the
  * two clauses below are the two halves of that decision.
@@ -2596,7 +2596,7 @@ test('the validation surface declares no font floor and no focus pair', async ()
       '`.fabricate-validation` declares a focus rule. This family owns no control of its own, so ' +
         'a strip or a repaint here would paint chrome for a control ANOTHER primitive owns — and ' +
         'it would WIN: `<root> <element>:focus-visible` is (0,2,1) and out-ranks the composed ' +
-        '`ManagerButton`s own `.fabricate-button:focus-visible` ring at (0,2,0), so the row`s ' +
+        '`Button`s own `.fabricate-button:focus-visible` ring at (0,2,0), so the row`s ' +
         'View action would lose its family ring to this one. That displacement is what the ' +
         'design-system requirement refuses, and it is why the pair is REFUSED here rather than ' +
         'merely absent.'

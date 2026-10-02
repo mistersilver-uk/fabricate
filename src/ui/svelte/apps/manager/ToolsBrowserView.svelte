@@ -5,9 +5,9 @@
   import Pagination from '../../components/Pagination.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
   import InspectorCard from '../../components/InspectorCard.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
-  import ManagerToolbar from '../../components/ManagerToolbar.svelte';
-  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import Button from '../../components/Button.svelte';
+  import FilterBar from '../../components/FilterBar.svelte';
+  import SearchField from '../../components/SearchField.svelte';
   import SegmentedControl from '../../components/SegmentedControl.svelte';
   import Select from '../../components/Select.svelte';
   import { projectToolRow, toolSearchText } from './tools/toolStudio.js';
@@ -371,8 +371,8 @@
       name so band and control do not announce alike.
     -->
     <section class="manager-tools-library-card" data-manager-tools-search>
-      <ManagerToolbar ariaLabel={text('FABRICATE.Admin.Manager.Tools.Filters', 'Tool filters')}>
-        <ManagerSearchField
+      <FilterBar ariaLabel={text('FABRICATE.Admin.Manager.Tools.Filters', 'Tool filters')}>
+        <SearchField
           value={searchTerm}
           onChange={(next) => {
             ui.searchTerm = next;
@@ -403,7 +403,7 @@
             ui.pageIndex = 0;
           }}
         />
-      </ManagerToolbar>
+      </FilterBar>
     </section>
 
     <!-- Sort and the result count on one row, the only place the count says something useful:
@@ -466,7 +466,7 @@
           >
             <div class="manager-tools-empty-actions">
               {#if ghostRows.length > 0}
-                <ManagerButton
+                <Button
                   role="primary"
                   data-tool-empty-browse-world={String(ghostRows.length)}
                   onclick={() => {
@@ -481,9 +481,9 @@
                       'Show the {count} world Tools you can add'
                     ).replace('{count}', String(ghostRows.length))}</span
                   >
-                </ManagerButton>
+                </Button>
               {/if}
-              <ManagerButton data-tool-empty-open-catalogue onclick={onOpenWorldCatalogue}>
+              <Button data-tool-empty-open-catalogue onclick={onOpenWorldCatalogue}>
                 <i class="fas fa-globe" aria-hidden="true"></i>
                 <span
                   >{text(
@@ -491,7 +491,7 @@
                     'Open the world Tools Catalogue'
                   )}</span
                 >
-              </ManagerButton>
+              </Button>
             </div>
           </EmptyState>
         {:else if filteredTools.length === 0}
@@ -683,11 +683,11 @@
   }
 
   /* THE TOOLBAR: two rows, matching the prototype. Here rather than in `styles/fabricate.css` so
-     `VIEW_RECIPES` maps a change to the tool views alone. The first row's box is `ManagerToolbar`'s,
+     `VIEW_RECIPES` maps a change to the tool views alone. The first row's box is `FilterBar`'s,
      which states the wrap, centring and gap for every browse screen; what remains is the grow. */
 
   /* `:global()` on the FIELD half only (issue 1039): `.manager-search` sits on a
-     `<ManagerSearchField>` tag rather than an element this component writes, so Svelte stamps no
+     `<SearchField>` tag rather than an element this component writes, so Svelte stamps no
      `svelte-<hash>` and prunes the whole selector, failing `lint:svelte:warnings`. The ANCESTOR half
      stays local, keeping the same three components of specificity. */
   [data-manager-tools-search] :global(.manager-search) {

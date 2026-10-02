@@ -12,7 +12,7 @@
 <script>
   import Field from '../../components/Field.svelte';
   import IconPicker from '../../components/IconPicker.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
 
   let {
     inputId = '',
@@ -110,7 +110,7 @@
         />
       </Field>
     {/if}
-    <ManagerButton
+    <Button
       role="primary"
       type="submit"
       data-vocabulary-add
@@ -118,7 +118,7 @@
     >
       <i class="fas fa-plus" aria-hidden="true"></i>
       <span>{addLabel}</span>
-    </ManagerButton>
+    </Button>
   </div>
 
   {#if feedback}

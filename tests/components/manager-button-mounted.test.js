@@ -20,12 +20,12 @@ import { describe, it, before, after, afterEach } from 'node:test';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
-const componentPath = 'src/ui/svelte/components/ManagerButton.svelte';
+const componentPath = 'src/ui/svelte/components/Button.svelte';
 
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-manager-button-',
-  compiledModules: ['src/ui/svelte/components/ManagerButton.svelte'],
+  compiledModules: ['src/ui/svelte/components/Button.svelte'],
   componentPath,
 });
 
@@ -35,7 +35,7 @@ afterEach(() => harness.remount());
 
 const button = () => document.body.querySelector('.manager-button');
 
-describe('ManagerButton emits the element and classes its call sites are styled against', () => {
+describe('Button emits the element and classes its call sites are styled against', () => {
   it('renders a real <button type="button"> with no role modifier by default', async () => {
     await harness.mount({});
     const node = button();
@@ -105,7 +105,7 @@ describe('ManagerButton emits the element and classes its call sites are styled 
 
   it('emits is-size-38 when asked, between its own modifiers and the caller class', async () => {
     await harness.mount({ role: 'primary', size: '38', fullWidth: true, class: 'manager-thing' });
-    // The documented order, and the same one `ManagerSearchField` states for the same token:
+    // The documented order, and the same one `SearchField` states for the same token:
     assert.equal(
       button().className,
       'fabricate-button manager-button fab-manager-button is-primary is-full-width is-size-38 manager-thing'
@@ -189,7 +189,7 @@ describe('ManagerButton emits the element and classes its call sites are styled 
       assert.ok(!button().hasAttribute('disabled'), 'an anchor must not carry disabled');
       // Silently dropping it would leave a call site believing it had disabled the control.
       assert.ok(
-        warnings.some((warning) => warning.includes('ManagerButton')),
+        warnings.some((warning) => warning.includes('Button')),
         `expected a named warning, got ${JSON.stringify(warnings)}`
       );
     } finally {

@@ -647,7 +647,7 @@ export function registerBulkCases() {
     assert.ok(Boolean(remove), 'the inspector renders its Delete');
     assert.ok(
       remove.classList.contains('fab-manager-button'),
-      'Delete renders through the ManagerButton primitive, not a hand-written class'
+      'Delete renders through the Button primitive, not a hand-written class'
     );
     assert.ok(
       remove.classList.contains('is-danger'),

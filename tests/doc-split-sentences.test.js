@@ -865,10 +865,18 @@ const RENAMED = [
       'Pinning how code is written with a `Source.includes(` assertion, answered by `tests/source-pin-ratchet.test.js`.',
     identifiers: [['`tests/source-pin-ratchet.test.js`', '`tests/source-pin-ledger.txt`']],
   },
+  // Issue 1507 renamed the shared modal component's file.
+  {
+    before:
+      'A dialog mounted unconditionally at `CraftingSystemManagerRoot.svelte` with `open` passed as a prop is never unmounted: `ManagerModal.svelte` gates only its chrome behind `{#if open}`, so the caller component instance, and every `$state` it declares, lives for the whole manager session.',
+    after:
+      'A dialog mounted unconditionally at `CraftingSystemManagerRoot.svelte` with `open` passed as a prop is never unmounted: `Modal.svelte` gates only its chrome behind `{#if open}`, so the caller component instance, and every `$state` it declares, lives for the whole manager session.',
+    identifiers: [['`Modal.svelte`', '`ManagerModal.svelte`']],
+  },
 ];
 
 /** Pinned for the same reason as DEDUPLICATED_COUNT. */
-const RENAMED_COUNT = 30;
+const RENAMED_COUNT = 31;
 
 /** Everything `extract` yields from the post-split set, as one multiset. */
 function survivingLines(extract) {

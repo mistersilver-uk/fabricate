@@ -30,7 +30,7 @@ const harness = createMountedComponentHarness({
     // HANGS the suite rather than failing it.
     'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/components/Medallion.svelte',
-    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/apps/manager/component/ComponentIdentityStrip.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/component/ComponentIdentityStrip.svelte',

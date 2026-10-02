@@ -56,7 +56,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/components/SearchablePopoverPanel.svelte',
     'src/ui/svelte/components/Field.svelte',
-    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/apps/manager/world/WorldModifiersTab.svelte',
@@ -440,7 +440,7 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
       'Done is the quiet verb, as Back is in the Tool Studio'
     );
 
-    // Both go through `ManagerButton`, which is what stops the pair drifting apart again.
+    // Both go through `Button`, which is what stops the pair drifting apart again.
     for (const [name, button] of [
       ['Delete modifier', del],
       ['Done', done],

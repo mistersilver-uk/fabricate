@@ -303,7 +303,7 @@ describe('1466 a portaled overlay is positioned against the host it was portaled
   for (const [component, label] of [
     ['icon', 'IconPicker'],
     ['source', 'EssenceSourceSelector'],
-    ['color', 'ManagerColorPicker'],
+    ['color', 'TintPicker'],
   ]) {
     it(`${label} lands at its trigger inside the manager, which is where it always worked`, async () => {
       const measured = await openOverlayIn({ host: 'manager', component });

@@ -15,7 +15,7 @@
 -->
 <script>
   import Field from '../../../components/Field.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import Select from '../../../components/Select.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { interpolate } from './checksCopy.js';
@@ -412,14 +412,14 @@
     <div class="manager-checks-card-body">
       <div class="manager-checks-trigger-presets">
         {#each presets as preset (preset.id)}
-          <ManagerButton
+          <Button
             role="dashed"
             data-add-trigger-preset={preset.id}
             onclick={() => addPreset(preset.id)}
           >
             <i class={preset.icon} aria-hidden="true"></i>
             <span>{phrase(preset)}</span>
-          </ManagerButton>
+          </Button>
         {/each}
       </div>
     </div>
@@ -822,8 +822,8 @@
 
   <!-- A full-width dashed control UNDER the list rather than a button in a card head: the
          action that grows the list belongs at the end of the list it grows. -->
-  <ManagerButton role="dashed" data-add-trigger onclick={addTrigger}>
+  <Button role="dashed" data-add-trigger onclick={addTrigger}>
     <i class="fas fa-plus" aria-hidden="true"></i>
     <span>{text('FABRICATE.Admin.Manager.Checks.Breakage.AddTrigger', 'Add trigger')}</span>
-  </ManagerButton>
+  </Button>
 </div>

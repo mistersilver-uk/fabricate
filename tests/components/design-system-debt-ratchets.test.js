@@ -285,7 +285,7 @@ test('a primitive family’s focus STRIP half is recognised, and a look-alike is
       'nine is the strip half of a pair `design-system/spec.md` requires, so one disappearing ' +
       'means that family repaints its ring ON TOP of Foundry core`s treatment in any host ' +
       'carrying neither application root — a deliberate edit here, never a silent one. `Field` ' +
-      'and `ManagerSearchField` joined at issue 1508 phase 1 and `ChanceSlider` and ' +
+      'and `SearchField` joined at issue 1508 phase 1 and `ChanceSlider` and ' +
       '`StatusToggle` at its phase 3, as each family was rooted at the class it emits; ' +
       '`Field`s member is ONE `:is()` compound because this recogniser accepts ' +
       'exactly one list member, while its RING half is two comma-separated legs because ' +
@@ -991,7 +991,7 @@ const TYPED_RING_COMPOUND = /^(\.[\w-]+) input\[type=['"][a-z]+['"]\]:focus-visi
  * Every root that may write a `:focus-visible` ring over BARE ELEMENTS, at ANY element shape.
  * Derived from the sheet rather than asserted: 8 roots over 8 blocks, every one of them
  * legitimate today, which is exactly why a ninth would not stand out to a reader. It was 9
- * over 10 until issue 1508 rooted `Field` and `ManagerSearchField` at the classes they emit and
+ * over 10 until issue 1508 rooted `Field` and `SearchField` at the classes they emit and
  * each gained the ring half of its own pair, and 11 over 12 until its third phase did the same
  * for `ChanceSlider`. Issue 1509 rooted `EditorTabs` and its tab strip gained
  * `.fabricate-tabs button:focus-visible` — a `<root> <element>:focus-visible` block over a bare
@@ -1006,7 +1006,7 @@ const TYPED_RING_COMPOUND = /^(\.[\w-]+) input\[type=['"][a-z]+['"]\]:focus-visi
  * flush to an overflow-clipped container is clipped — and it was deleted rather than narrowed
  * because the player app's last native select converted and no carrier is left under that root.
  * Issue 2021 took `.fabricate-roll-prompt-dialog` out the same way, one root over one block: the
- * prompt left DialogV2 for `ManagerModal`, so its dialog-rooted `select` ring has no carrier.
+ * prompt left DialogV2 for `Modal`, so its dialog-rooted `select` ring has no carrier.
  * `StatusToggle` is NOT here and must not be, for a structural reason rather than an oversight:
  */
 const RING_ROOTS = Object.freeze(
