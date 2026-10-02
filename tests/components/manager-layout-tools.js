@@ -209,19 +209,21 @@ test('manager character modifier search suggestions render with availability-sty
               <section>
                 <label class="fabricate-search manager-search is-compact manager-character-modifier-add-search">
                   <i class="fa-solid fa-search" aria-hidden="true"></i>
-                  <input type="search" value="wis" aria-label="Search character modifiers">
-                  <div class="manager-tag-suggestions manager-character-modifier-add-suggestions" role="listbox" aria-label="Character modifiers">
-                    <button type="button" class="manager-tag-suggestion manager-character-modifier-add-suggestion" role="option">
-                      <i class="fa-solid fa-user" aria-hidden="true"></i>
-                      <span>Wisdom modifier</span>
-                    </button>
-                    <button type="button" class="manager-tag-suggestion manager-character-modifier-add-suggestion" role="option">
-                      <i class="fa-solid fa-hand-fist" aria-hidden="true"></i>
-                      <span>Strength modifier</span>
-                    </button>
-                  </div>
+                  <input type="search" value="wis" role="combobox" aria-label="Search character modifiers">
                 </label>
               </section>
+            </div>
+            <!-- The list as it renders: portalled out of its label to the application root, with
+                 the placement the typeahead panel action writes inline. -->
+            <div class="manager-tag-suggestions manager-character-modifier-add-suggestions" role="listbox" aria-label="Character modifiers" style="left: 376px; right: auto; width: 320px; min-width: 320px; max-width: 320px; max-height: 144px; top: 62px; bottom: auto;">
+              <button type="button" class="manager-tag-suggestion manager-character-modifier-add-suggestion" role="option" tabindex="-1" aria-selected="false">
+                <i class="fa-solid fa-user" aria-hidden="true"></i>
+                <span>Wisdom modifier</span>
+              </button>
+              <button type="button" class="manager-tag-suggestion manager-character-modifier-add-suggestion" role="option" tabindex="-1" aria-selected="false">
+                <i class="fa-solid fa-hand-fist" aria-hidden="true"></i>
+                <span>Strength modifier</span>
+              </button>
             </div>
           </main>
         </body>

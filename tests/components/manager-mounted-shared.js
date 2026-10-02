@@ -82,7 +82,7 @@ async function prepareManagerSuite() {
     GatheringModifierEditorComponent: await load(
       'src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte'
     ),
-    // Mounted directly to pin `characterModifierSearchOpenUp`'s forward across this boundary too.
+    // Mounted directly to pin the search's forward across this boundary too.
     GatheringTaskInspectorComponent: await load(
       'src/ui/svelte/apps/manager/environment/GatheringTaskInspector.svelte'
     ),

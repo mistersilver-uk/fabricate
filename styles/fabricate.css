@@ -3928,11 +3928,6 @@
   text-align: center;
 }
 
-.fabricate-manager .manager-character-modifier-add-suggestions.is-above {
-  top: auto;
-  bottom: calc(100% + 4px);
-}
-
 .fabricate-manager .manager-character-modifier-row-list,
 .fabricate-manager .manager-condition-modifier-row-list {
   display: flex;
@@ -4223,12 +4218,10 @@
   background: var(--fab-bg-1);
 }
 
+/* No offsets here: `typeaheadPanel` portals the list to the application root and writes its placement inline, at the popover family's stacking level. */
 .fabricate-manager .manager-tag-suggestions {
   position: absolute;
-  z-index: 12;
-  top: 38px;
-  right: 0;
-  left: 0;
+  z-index: 4000;
   display: grid;
   gap: var(--fab-space-2xs);
   max-height: 148px;
@@ -4259,6 +4252,12 @@
 .fabricate-manager .manager-tag-suggestion:focus-visible {
   color: var(--fab-success-text);
   background: var(--fab-success-soft);
+}
+
+/* The keyboard cursor: the field keeps DOM focus, so the active option is drawn from its state. */
+.fabricate-manager .manager-tag-suggestion[aria-selected='true'] {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: -2px;
 }
 
 .fabricate-manager .manager-selected-tag-row {
@@ -11582,12 +11581,8 @@
   padding-left: 36px;
 }
 
-.fabricate-manager .manager-task-component-tag-search .manager-tag-suggestions {
-  position: absolute;
-  z-index: 5;
-  inset: calc(100% + 4px) 0 auto;
+.fabricate-manager .manager-task-component-tag-suggestions {
   max-height: 132px;
-  overflow-y: auto;
 }
 
 .fabricate-manager .manager-task-component-pills {

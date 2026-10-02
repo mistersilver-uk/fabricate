@@ -95,7 +95,7 @@ class TypeaheadCombobox {
   get panel() {
     return {
       component: this.#config.component,
-      trigger: () => this.#input?.closest?.(this.#config.anchor) ?? this.#input,
+      trigger: this.#anchor,
       maxHeightCap: this.#config.maxHeightCap,
       rows: this.#config.rows,
       count: this.#count,
@@ -106,6 +106,11 @@ class TypeaheadCombobox {
   get #listId() {
     return `${this.#prefix}-list`;
   }
+
+  #anchor = () => {
+    const selector = this.#config.anchor;
+    return (selector && this.#input?.closest?.(selector)) || this.#input;
+  };
 
   #dismiss = () => {
     this.#dismissedAt = this.#query;
@@ -119,7 +124,7 @@ class TypeaheadCombobox {
 
   #onInput = (event) => {
     this.#hold(event);
-    this.#config.onInput(event);
+    this.#config.setQuery(event.currentTarget.value);
   };
 
   #onBlur = () => {
@@ -157,7 +162,7 @@ class TypeaheadCombobox {
       if (String(this.#config.query() ?? '') === '') return;
       event.preventDefault();
       event.stopPropagation();
-      this.#config.onClear();
+      this.#config.setQuery('');
       return;
     }
     if (this.#listed) {
@@ -174,11 +179,11 @@ class TypeaheadCombobox {
 /**
  * @param {object} config
  * @param {string} config.component the overlay's name in a missing-host report
- * @param {string} config.anchor selector of the field's visual box, an ancestor of the input
+ * @param {string} [config.anchor] selector of the field's visual box, an ancestor of the input;
+ *   the input itself when omitted
  * @param {() => string} config.query the field's current value
  * @param {() => number} config.count how many suggestions the query yields
- * @param {(event: Event) => void} config.onInput writes the typed value to the caller's query
- * @param {() => void} config.onClear empties the caller's query
+ * @param {(value: string) => void} config.setQuery writes the caller's query; Escape writes ''
  * @param {(index: number) => void} config.onChoose commits one suggestion
  * @param {() => void} [config.onEnterUnchosen] what Enter commits with no option active; a field
  *   that supplies it consumes every Enter, open or not

@@ -7,6 +7,7 @@ import { resolve } from 'node:path';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
+  TYPEAHEAD_RUNE_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import {
@@ -281,6 +282,7 @@ const GATHERING_PICKER = '[data-subject-modifier-picker="gathering-check-modifie
 const gatheringHarness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-gathering-modifier-pick-',
+  runeModules: TYPEAHEAD_RUNE_MODULES,
   rawModules: [
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
