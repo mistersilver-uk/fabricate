@@ -172,6 +172,9 @@ const DRIVER_HOOKS = [
   // `fabricate-manager` is deliberately NOT here.
 ];
 
+/** The one module outside `src/ui/` that renders a chat card: the GM-only complication card. */
+const CHAT_CARD_EMITTERS = new Set(['src/systems/complicationRuntime.js']);
+
 /**
  * Every source file that can carry a UI hook, keyed by path so a check can be scoped to the
  * component that actually renders the thing rather than to the whole tree.
@@ -182,7 +185,8 @@ function renderSources() {
       ([file]) =>
         file.endsWith('.svelte') ||
         file === 'lang/en.json' ||
-        (file.startsWith('src/ui/') && file.endsWith('.js'))
+        (file.startsWith('src/ui/') && file.endsWith('.js')) ||
+        CHAT_CARD_EMITTERS.has(file)
     )
   );
 }
@@ -1142,13 +1146,15 @@ test('the capture runner threads the per-case console allowance into the render'
     declaring,
     // The Knowledge error frame's rejected read is rethrown by the store (issue 1969), and a failed
     // roll-under or counting craft or salvage raises the resolved-failure toast the lab reports as
-    // a warning (issues 2005, 2092, 2006, 2007 and 2132).
+    // a warning (issues 2005, 2092, 2006, 2007 and 2132). The GM complication card's skipped macro
+    // is reported as a warning beside the card that names it (issue 2153).
     [
       'manager-recipes-blocked-enable-flash',
       'manager-knowledge-error',
       'player-salvage-under-result-fail',
       'player-crafting-roll-result-under-fail',
       'player-crafting-chat-card-under-fail',
+      'player-crafting-chat-card-gm-complication-fault',
       'player-crafting-roll-result-count-fail',
       'player-crafting-roll-result-count-botch',
       'player-crafting-roll-result-count-botch-light',
@@ -2451,6 +2457,8 @@ test('changed files map to the windows they affect', () => {
     'fabricate-app-shell',
     'manager-components-normal',
     'manager-gathering-task-editor-normal',
+    // Its Hearth & Herb variant (issue 2151), which a palette's token change is photographed in.
+    'manager-gathering-task-editor-normal-hearth-herb',
     'manager-world-downtime-collapsed',
     'manager-world-downtime-tracking',
   ]);
@@ -3671,7 +3679,9 @@ test('every case literal parses as its own attributable region', () => {
     assert.deepEqual(
       inline.filter((id) => {
         const selected = selectedIds([path], file.patches([caseIdLine(id)]));
-        return selected.length !== 1 || selected[0] !== id;
+        // The literal's own case, and the palette variants it declares (issue 2151).
+        const expected = cases.filter((entry) => [entry.id, entry.baseCaseId].includes(id));
+        return selected.join(',') !== expected.map((entry) => entry.id).join(',');
       }),
       [],
       `${path}: a patch confined to these case literals widens past them, so \`CASE_OPEN_PATTERN\` ` +
@@ -5135,7 +5145,7 @@ test('the capture workflow renders and publishes the one id list it computed', (
   // its own slice of it, and the merge is checked against the whole list before anything publishes.
   assert.match(
     workflow,
-    /view-lab-shards\.mjs plan "\$IDS" "\$HAS_UI"/,
+    /view-lab-shards\.mjs plan "\$IDS" "\$RENDER"/,
     'the shard plan must be cut from the one computed id list'
   );
   assert.match(workflow, /include: \$\{\{ fromJSON\(needs\.select\.outputs\.matrix\) }}/);

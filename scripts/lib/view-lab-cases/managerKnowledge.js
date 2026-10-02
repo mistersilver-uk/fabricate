@@ -56,9 +56,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/KnowledgeView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/knowledge\//,
       /^src\/ui\/SvelteCraftingSystemManagerApp\.svelte\.js$/,
-      // The snapshot projection this frame renders moved out of the shell (issue 1674). Inert
-      // until `mapChangedFilesToCases` stops pre-filtering the changed set through `isUiFile`,
-      // which drops a `src/systems/` path before `sourceMatches` is consulted (issue 1896).
+      // The snapshot projection this frame renders moved out of the shell (issue 1674).
       /^src\/systems\/knowledgeSnapshot\.js$/,
     ],
   }),

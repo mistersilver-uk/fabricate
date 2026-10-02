@@ -596,6 +596,8 @@ export const CASES = Object.freeze([
         target: '[data-tool-prerequisites-summary]',
       },
     ],
+    // Hearth & Herb, the palette where the control outline is weakest (issue 2151).
+    themeVariants: ['hearth-herb'],
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'tools'],
     sourceMatches: [

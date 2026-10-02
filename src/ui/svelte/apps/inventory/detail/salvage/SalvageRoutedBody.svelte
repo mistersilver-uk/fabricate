@@ -13,6 +13,7 @@
     FIXED     each outcome carries an absolute, non-overlapping [start, end] segment
               of the roll range and matches on `start <= total <= end`. It never
               reads a DC, so an override shifts NOTHING and there is no DC to show.
+              Rendered as the presenter's `band` (issue 2152).
 
   All of that arithmetic is decided builder-side; this component only reads it.
 
@@ -108,19 +109,8 @@
                 >
               </span>
             {/if}
-            {#if routedType === 'fixed'}
-              {#if outcome.start !== null && outcome.end !== null}
-                <span
-                  class="salvage-outcome-threshold"
-                  data-inventory-outcome-range={`${outcome.start}-${outcome.end}`}
-                >
-                  <Chip density="list" mono tone={figureTone(outcome)}
-                    >{outcome.start}–{outcome.end}</Chip
-                  >
-                </span>
-              {/if}
-            {:else if outcome.band}
-              <!-- A counting check's band in net successes, as the Journal states it (issue 2137). -->
+            {#if outcome.band}
+              <!-- The presenter's band: a fixed tier's [start, end] or a count's net successes. -->
               <span class="salvage-outcome-threshold" data-inventory-outcome-band={outcome.band}>
                 <Chip density="list" mono tone={figureTone(outcome)}>{outcome.band}</Chip>
               </span>

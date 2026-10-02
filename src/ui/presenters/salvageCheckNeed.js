@@ -6,7 +6,11 @@ import {
 import { activeCheckEvaluation, isFixedSumOver } from '../../systems/checkTarget.js';
 import { countRequired } from '../../systems/countCheck.js';
 import { countFormulaValues, resolvePool } from '../../systems/countEvaluation.js';
-import { craftingOutcomeBand, withCountBotch } from '../../systems/runJournalOutcomeBands.js';
+import {
+  craftingOutcomeBand,
+  netRange,
+  withCountBotch,
+} from '../../systems/runJournalOutcomeBands.js';
 import { isCountCheck } from '../../systems/salvageCheckUsability.js';
 import { salvageToolsFor } from '../../systems/scopedEntityReads.js';
 
@@ -144,11 +148,24 @@ export function salvageCheckNeed({ mode, config, checkUsable, component }) {
 }
 
 /**
+ * A routed fixed tier's authored [start, end] through `netRange`, as the Journal states it
+ * (issue 2152); a row missing a bound has no band.
+ */
+function withFixedBands(rows) {
+  return rows.map((row) => ({
+    ...row,
+    band: row.start !== null && row.end !== null ? netRange(row.start, row.end) : null,
+  }));
+}
+
+/**
  * Routed salvage rows under a counting check, each with the Journal's band in net successes and
  * a Botch row while cancelling is on (issue 2137), from the same presenter and the salvage's own
  * successes needed. Rows of any other check are returned as they are.
+ * A routed fixed check's rows are banded in their authored range instead (issue 2152).
  */
-export function withSalvageCountBands(rows, { config, component, localize }) {
+export function withSalvageBands(rows, { config, component, localize }) {
+  if (config?.type === 'fixed') return withFixedBands(rows);
   const need = salvageCheckNeed({ mode: 'routed', config, checkUsable: true, component });
   if (need.kind !== 'successes') return rows;
   const outcomes = config.relativeOutcomes;

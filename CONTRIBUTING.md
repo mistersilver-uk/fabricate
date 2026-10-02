@@ -738,6 +738,12 @@ A case also declares `reaches`: `exact` when the frame lands on its smoke counte
 A `beyond` case carries an empty `smokeLabels`, because there is nothing to compare it against.
 A `window` case's shortfall is accounted for by a class-level entry in the known-gaps register in `scripts/README.md`, not by a per-case comment.
 
+Every case renders the default `fabricate` palette unless it says otherwise.
+A case that lists palette ids in `themeVariants` gains one variant per palette, registered directly after it: the same case under the id `<case-id>-<palette>`, with `theme` set to that palette, `reaches: 'beyond'` and no smoke labels.
+The capture carries `theme` to the page as a query flag, and the page applies it with the production `applyFabricateTheme` to the document element and to every `.fabricate` root, including the roots that mount after the page is ready.
+An id that is not a shipped palette fails, both when the registry loads and in the page, so a variant can never quietly render the default palette.
+Whatever selects a case also selects its palette variants, but surface coverage never contains one, because a palette is not a surface.
+
 A change to the lab's own inputs is attributed rather than treated like an ordinary render-file change.
 By default a PR touching the case registry, `labActors.js`, `labRunStates.js`, or any other file the lab depends on selects **surface coverage**: one frame of every route and tab the lab renders — every manager route, every player tab, one per single-screen canvas window, plus the light-theme pair.
 A shared input can alter any frame at once, so the selection has to be wide; what it has to PROVE is that the lab still boots, still mounts both windows and still reaches and photographs every route and tab, and that is what coverage answers.
@@ -777,6 +783,8 @@ Each case pins the size its smoke counterpart photographs rather than the app's 
 - For a view covered by the canonical registry (`scripts/lib/viewLabCases.js`) — which is the normal case — the **View Lab** is the producer, and it is what CI runs on every PR push: `node scripts/view-lab-screenshots.mjs apps` renders every case, or pass a comma-separated id list to render a subset, into `ui-screenshot-artifact/apps/`.
 How many cases that is, and how many of them surface coverage selects, are deliberately not quoted anywhere in prose: `publishableCases()` and `LAB_SURFACE_CASE_IDS` in the registry are the only counts.
 Selection is targeted, and no single changed file selects the whole registry: a render file selects the cases whose `sourceMatches` claim it, a broad shared primitive or stylesheet selects a small representative set, and a change to one of the lab's OWN inputs (fixture world, capture driver, registry shared code) selects **surface coverage** — one frame of every route and tab the lab renders — rather than every state of every screen.
+A changed file that is neither a render file nor a lab input, such as an engine module, selects exactly the cases whose `sourceMatches` name it, and never a representative set, surface coverage or the fallback frame.
+It never arms `check-screenshots`, but its cases are still rendered and published, so an engine fix shipped alone carries the frames it changes as evidence the gate does not demand.
 A detailed state is captured when the files that govern it change; if you need one alongside such a change, name its case id in the run rather than widening the selection.
 Measured at a 155-frame registry: ~5.6s per frame locally (14 min for that whole corpus), a five-case subset in 36s, one case in 22s — against ~31s per frame for the smoke's `screenshots` profile.
 The per-frame rate is the durable figure; the whole-corpus total scales with the registry.

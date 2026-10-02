@@ -1717,6 +1717,12 @@ describe('InventoryListingBuilder - salvage view-model', () => {
         ['Crit', 20, 30, null],
       ]
     );
+    // Issue 2152: the panel's threshold reads the presenter's `band`, through the same
+    // `netRange` formatter the Journal ladder uses, never a raw `start–end` interpolation.
+    assert.deepEqual(
+      salvage.routedOutcomes.map((o) => o.band),
+      ['1–9', '10–19', '20–30']
+    );
 
     // The load-bearing half: an override must move NOTHING here.
     const overridden = salvageOf(
@@ -1731,6 +1737,23 @@ describe('InventoryListingBuilder - salvage view-model', () => {
         [20, 30],
       ],
       'dcOverride shifts the simple DC and routed RELATIVE thresholds ONLY'
+    );
+  });
+
+  // Issue 2152: a negative-ended fixed tier bands with the true minus, spaced apart from the
+  // dash, exactly as the Journal's own `netRange` formatter states it.
+  it('routed + FIXED bands a negative-ended range with the true minus, spaced from the dash', () => {
+    const check = {
+      routed: {
+        type: 'fixed',
+        rollFormula: '1d20 - 6',
+        fixedOutcomes: [{ id: 'o1', name: 'Fumble', success: false, start: -2, end: -1 }],
+      },
+    };
+    const salvage = salvageOf(salvageSystem({ mode: 'routed', check }));
+    assert.deepEqual(
+      salvage.routedOutcomes.map((o) => o.band),
+      ['−2 – −1']
     );
   });
 

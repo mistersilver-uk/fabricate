@@ -10,6 +10,7 @@ import {
   seedAdditionalDiceJournal,
   seedAdditionalDicePrompt,
 } from './additionalDiceFixtures.js';
+import { CHAT_CARD_STATES, seedChatCardState } from './chatCardFixtures.js';
 import { COUNT_RESULT_STATES, seedCountResult } from './countResultFixtures.js';
 
 export async function seedRollPromptFixture(world, state) {
@@ -35,12 +36,14 @@ export async function seedRollPromptFixture(world, state) {
   if (Object.hasOwn(ADVANTAGE_STATES, state)) await seedAdvantage(world, ADVANTAGE_STATES[state]);
   if (Object.hasOwn(EVIDENCE_STATES, state)) await seedCheckEvidence(world, EVIDENCE_STATES[state]);
   if (Object.hasOwn(SALVAGE_CHECKS, state)) await seedSalvageChecks(world, state);
+  if (state === 'salvage-fixed-routed') await seedFixedRoutedSalvage(world);
   if (Object.hasOwn(COUNT_POOLS, state)) await seedCount(world, state);
   if (Object.hasOwn(COUNT_ADVANTAGE, state)) {
     await seedCount(world, 'count');
     await patchSimpleCheck(world, 'lab-smithing', { advantage: COUNT_ADVANTAGE[state] });
   }
   if (state === 'journal-bonus') await seedJournalBonus(world);
+  if (Object.hasOwn(CHAT_CARD_STATES, state)) await seedChatCardState(world, state);
   if (Object.hasOwn(COUNT_RESULT_STATES, state)) await seedCountResult(world, state);
   if (Object.hasOwn(ADDITIONAL_DICE_PROMPT_STATES, state)) {
     await seedAdditionalDicePrompt(world, state);
@@ -290,6 +293,27 @@ async function seedSalvageChecks(world, state) {
         evaluation: runeworkEvaluation,
         ...(runeworkAdvantage && { advantage: runeworkAdvantage }),
       },
+    },
+  });
+}
+
+/**
+ * Issue 2152: Runework's routed salvage on authored fixed segments of a `1d20 - 3`, its Ruined
+ * tier wholly below zero. The tier names keep the slag's outcome routing.
+ */
+async function seedFixedRoutedSalvage(world) {
+  const manager = world.fabricate.craftingSystemManager;
+  const runework = manager.getSystem('lab-runework');
+  const routed = runework.salvageCraftingCheck.routed;
+  const segments = { Masterwork: [12, 17], Standard: [0, 11], Ruined: [-2, -1] };
+  const fixedOutcomes = routed.relativeOutcomes.map(({ id, name, success, breakTools }) => {
+    const [start, end] = segments[name];
+    return { id, name, success, breakTools, start, end };
+  });
+  await manager.updateSystem(runework.id, {
+    salvageCraftingCheck: {
+      ...runework.salvageCraftingCheck,
+      routed: { ...routed, type: 'fixed', rollFormula: '1d20 - 3', fixedOutcomes },
     },
   });
 }

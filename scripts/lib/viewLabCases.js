@@ -22,6 +22,7 @@ import {
 } from './view-lab-cases/broadSignals.js';
 import { CASES as canvasInteractablesCases } from './view-lab-cases/canvasInteractables.js';
 import { CANVAS_APPS, DEFAULT_POSITION, MANAGER, PLAYER } from './view-lab-cases/caseConstants.js';
+import { withThemeVariants } from './view-lab-cases/caseFactories.js';
 import { CASES as coverageMatrixCases } from './view-lab-cases/coverageMatrix.js';
 import { CASES as managerChecksCases } from './view-lab-cases/managerChecks.js';
 import { CASES as managerComponentsCases } from './view-lab-cases/managerComponents.js';
@@ -85,7 +86,7 @@ const CASE_FILE_DIRECTORY = 'scripts/lib/view-lab-cases/';
 
 /** One manifest entry: the path a diff names a case file by, and the cases it declares. */
 const caseFile = (name, cases) =>
-  Object.freeze({ path: `${CASE_FILE_DIRECTORY}${name}.js`, cases });
+  Object.freeze({ path: `${CASE_FILE_DIRECTORY}${name}.js`, cases: withThemeVariants(cases) });
 
 /**
  * Every case file, in registry order. It is read twice — flattened into {@link VIEW_LAB_CASES}, and
@@ -204,6 +205,19 @@ export function fallbackCase() {
   return getCaseById(FALLBACK_CASE_ID);
 }
 
+/** The query a case's frame is mounted with: its own, plus its palette, id and capture geometry. */
+export function labQueryFor(viewCase) {
+  return {
+    ...viewCase.query,
+    ...(viewCase.theme && { theme: viewCase.theme }),
+    case: viewCase.id,
+    ...(viewCase.position && {
+      w: String(viewCase.position.width),
+      h: String(viewCase.position.height),
+    }),
+  };
+}
+
 // Surface coverage — what a change the registry cannot attribute captures.
 
 /**
@@ -268,6 +282,22 @@ export const LAB_SURFACE_CASES = Object.freeze(chooseSurfaceRepresentatives());
 /** @type {readonly string[]} */
 export const LAB_SURFACE_CASE_IDS = Object.freeze(LAB_SURFACE_CASES.map((viewCase) => viewCase.id));
 
+/**
+ * Ids plus each one's palette variants (issue 2151), which render what their base renders. Surface
+ * coverage is never passed through this: a palette is not a surface.
+ */
+function withThemeVariantIds(ids) {
+  for (const viewCase of VIEW_LAB_CASES) if (ids.has(viewCase.baseCaseId)) ids.add(viewCase.id);
+  return ids;
+}
+
+/** Add every case whose own `sourceMatches` names one file. */
+function addCasesNaming(file, selected) {
+  for (const viewCase of VIEW_LAB_CASES) {
+    if (viewCase.sourceMatches.some((pattern) => pattern.test(file))) selected.add(viewCase.id);
+  }
+}
+
 /** The cases a set of render files selects, by the `sourceMatches` patterns each case declares. */
 function selectRenderFileCases(renderFiles) {
   const selected = new Set();
@@ -278,13 +308,23 @@ function selectRenderFileCases(renderFiles) {
       for (const id of BROAD_SIGNAL_CASE_OVERRIDES[file] ?? []) selected.add(id);
       continue;
     }
-    for (const viewCase of VIEW_LAB_CASES) {
-      if (viewCase.sourceMatches.some((pattern) => pattern.test(file))) selected.add(viewCase.id);
-    }
+    addCasesNaming(file, selected);
   }
 
+  withThemeVariantIds(selected);
   if (sawBroadSignal) for (const id of REPRESENTATIVE_CASE_IDS) selected.add(id);
   return selected;
+}
+
+/**
+ * The cases a set of files that are neither render files nor lab inputs selects (issue 2153):
+ * exactly those whose `sourceMatches` name one. No render-file heuristic applies — no broad
+ * signal, no surface coverage, no fallback — so a file no case names selects nothing.
+ */
+function selectNamedCases(files) {
+  const selected = new Set();
+  for (const file of files) addCasesNaming(file, selected);
+  return withThemeVariantIds(selected);
 }
 
 // Diff-aware selection, for the lab inputs whose diff can be attributed.
@@ -786,7 +826,7 @@ function casesFromCaseFilePatch(patch, attribution) {
     attribution.sourceLines,
     attribution.regions
   );
-  return widenedByCoverage(keys, unattributable);
+  return widenedByCoverage(withThemeVariantIds(keys), unattributable);
 }
 
 /** The cases a REGION-attributed lab input selects: the union of what each touched region feeds. */
@@ -842,27 +882,46 @@ function normalizePatches(patches) {
   return byPath;
 }
 
-/** Map a changed-file set onto the cases that should be captured. */
-export function mapChangedFilesToCases(files = [], { patches } = {}) {
-  const normalized = files.map((file) => normalizePath(file)).filter(Boolean);
-  const labInputs = normalized.filter((file) => LAB_INFRASTRUCTURE_PATTERN.test(file));
-  // Disjoint from `labInputs` so each path is attributed exactly once: `tests/view-lab/cascade.css`
-  // is both a lab input and a `.css` file, and it is the lab input rule that governs it.
-  const renderFiles = normalized.filter(
-    (file) => isUiFile(file) && !LAB_INFRASTRUCTURE_PATTERN.test(file)
-  );
+/** Whether one path is an input of the lab itself rather than of the product it renders. */
+function isLabInput(file) {
+  return LAB_INFRASTRUCTURE_PATTERN.test(file);
+}
 
-  if (labInputs.length === 0 && renderFiles.length === 0) {
-    // Nothing here renders, so there is no frame to select — a lang-only change included.
-    return [];
-  }
+/**
+ * Whether the capture renders and publishes a changed set's frames: when it arms
+ * `check-screenshots`, or when a case names one of its non-render files (issue 2153). A change to
+ * the lab's own inputs alone is verified but not rendered.
+ */
+export function rendersCapture(files = []) {
+  if (hasUiChanges(files)) return true;
+  const productFiles = files.map((file) => normalizePath(file)).filter((file) => !isLabInput(file));
+  return mapChangedFilesToCases(productFiles).length > 0;
+}
 
+/** The render-file and lab-input selection, with the fallback frame when it found none. */
+function selectRenderAndLabCases(renderFiles, labInputs, patches) {
   // A union at every level, never a replacement. Five levels carry it — one candidate anchor, a
   // hunk's candidates, a patch's hunks, an input's patch, and a change's inputs — and this is the
   // last of them.
   const selected = selectRenderFileCases(renderFiles);
   for (const id of selectAllLabInputCases(labInputs, normalizePatches(patches))) selected.add(id);
   if (selected.size === 0) selected.add(FALLBACK_CASE_ID);
+  return selected;
+}
+
+/** Map a changed-file set onto the cases that should be captured. */
+export function mapChangedFilesToCases(files = [], { patches } = {}) {
+  const normalized = files.map((file) => normalizePath(file)).filter(Boolean);
+  const labInputs = normalized.filter(isLabInput);
+  // Disjoint from `labInputs` so each path is attributed exactly once: `tests/view-lab/cascade.css`
+  // is both a lab input and a `.css` file, and it is the lab input rule that governs it.
+  const renderFiles = normalized.filter((file) => isUiFile(file) && !isLabInput(file));
+  const otherFiles = normalized.filter((file) => !isUiFile(file) && !isLabInput(file));
+
+  const selected = selectNamedCases(otherFiles);
+  if (labInputs.length > 0 || renderFiles.length > 0) {
+    for (const id of selectRenderAndLabCases(renderFiles, labInputs, patches)) selected.add(id);
+  }
 
   return VIEW_LAB_CASES.filter((viewCase) => selected.has(viewCase.id) && viewCase.publish);
 }

@@ -1168,7 +1168,7 @@ export async function exerciseToolStudioPointerTargets(ctx, { systemId, recipeNa
     page,
     'patchToolDraft',
     'Tool invalid prerequisite fixture',
-    () => selectedPrerequisite.click(),
+    () => selectedPrerequisite.locator('.. >> .fab-selection-check').click(),
     async () => {
       if (
         (await editor
@@ -1201,7 +1201,7 @@ export async function exerciseToolStudioPointerTargets(ctx, { systemId, recipeNa
     page,
     'patchToolDraft',
     'Tool prerequisite fixture restore',
-    () => prerequisiteToRestore.click(),
+    () => prerequisiteToRestore.locator('.. >> .fab-selection-check').click(),
     async () => {
       if (!(await prerequisiteToRestore.isChecked())) {
         throw new Error('Tool prerequisite fixture did not restore its selected prerequisite');

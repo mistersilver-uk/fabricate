@@ -762,12 +762,14 @@ function gmApplyWorld({
       { id: 'complication-2', name: 'Cinders', severity: 'minor', visibility: 'gmOnly' },
     ],
   });
-  globalThis.fabricate = {
-    craftingSystemManager: {
-      getComponentsForSystem: (id) => (id === 'system-1' ? [authored] : []),
-      getSystem: (id) => ({ id, features: { chatOutput } }),
-    },
+  const craftingSystemManager = {
+    getComponentsForSystem: (id) => (id === 'system-1' ? [authored] : []),
+    getSystem: (id) => ({ id, features: { chatOutput } }),
   };
+  // Where a real boot puts each: the facade on `game.fabricate`, and on `globalThis.fabricate`
+  // only the macro API, which holds no manager (issue 2153).
+  globalThis.game.fabricate = { craftingSystemManager };
+  globalThis.fabricate = { listCraftingSystems: () => [] };
   return { log, actor };
 }
 

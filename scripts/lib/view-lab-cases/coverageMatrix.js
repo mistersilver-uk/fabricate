@@ -321,11 +321,12 @@ export const CASES = Object.freeze([
     // A bucket that must exist, not merely a bar.
     expectSelector: '.fabricate-manager [data-checks-odds-row="award-0"]',
     kinds: ['manager', 'checks'],
-    // No entry for `src/systems/progressiveCheckSandbox.js`: `isUiFile` admits no such path, so a pattern would be dead.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/checkOdds\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/checks\/CheckOddsPanel\.svelte$/,
       CHECKS_ROUTE_MODEL_PATTERN,
+      // The preview sandbox the award-count histogram is bucketed from.
+      /^src\/systems\/progressiveCheckSandbox\.js$/,
     ],
   }),
   managerCase({

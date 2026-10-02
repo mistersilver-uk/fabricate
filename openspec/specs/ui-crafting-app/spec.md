@@ -1194,6 +1194,7 @@ The player's route to salvage.
 - **`dcOverride` shifts the simple DC and routed RELATIVE thresholds only.**
   A relative outcome carries a DC **delta**, so its effective threshold is `baseDc + delta` and an override moves it.
   A **fixed** outcome carries an absolute, non-overlapping `[start, end]` segment of the roll range, matches on `start <= total <= end`, and never reads a DC at all — so a **routed + fixed** salvage renders its authored ranges **verbatim** and shows **no DC**.
+  "Verbatim" names the numbers, not the glyphs: the panel renders the range through the same `netRange` formatter the Journal's counting band uses (issue 2152), so a fixed tier whose end is negative separates its bounds with a spaced en dash and the true minus sign (`−2 – −1`), never a raw template interpolation (`-2–-1`), and a single-value segment states its one number (`5`, never `5–5`).
 - The action is **one-shot for every mode**: it rolls AND commits in a single gesture.
   The roll prompt IS the roll step; there is no separate confirm, no reroll, and no pre-roll dice box.
   The label names the gesture — with no usable check it is a plain salvage, with one it is a roll.

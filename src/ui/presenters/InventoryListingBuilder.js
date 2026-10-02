@@ -97,7 +97,7 @@ import { matchRecipeItemDefinition, resolveToolForItem } from '../../utils/sourc
 // item-bag literal (the "treat as no image" sentinel).
 import { GENERIC_ITEM_IMAGE } from '../svelte/util/craftingImageDefaults.js';
 
-import { salvageCheckTarget, salvageDisplayDc, withSalvageCountBands } from './salvageCheckNeed.js';
+import { salvageCheckTarget, salvageDisplayDc, withSalvageBands } from './salvageCheckNeed.js';
 
 // A shared empty set for the GM path, where no entity is visibility-hidden — avoids
 // allocating a throwaway Set per system on every listing build.
@@ -1753,7 +1753,7 @@ export class InventoryListingBuilder {
           : [],
       };
     });
-    return withSalvageCountBands(rows, { config, component, localize: this.localize });
+    return withSalvageBands(rows, { config, component, localize: this.localize });
   }
 
   /**

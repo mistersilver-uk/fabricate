@@ -3,6 +3,8 @@
  * from. Each factory supplies the window, its default geometry and `publish: true`.
  */
 
+import { FABRICATE_THEME_CHOICES, normalizeFabricateTheme } from '../../../src/ui/theme.js';
+
 import {
   CANVAS_BROWSER,
   CANVAS_CONFIG,
@@ -69,4 +71,32 @@ export function playerCase(entry) {
 
 export function responsiveLayout(containerSelector, gridSelector) {
   return { containerSelector, gridSelector, maxContentBoxInlineSize: 960 };
+}
+
+/**
+ * A case list with each case's `themeVariants` expanded after it (issue 2151): the same case under
+ * another Fabricate palette, id-suffixed with the palette and keyed to its base by `baseCaseId`.
+ * An unknown palette throws, so a variant cannot silently render the default one.
+ */
+export function withThemeVariants(cases) {
+  return cases.flatMap((viewCase) => [
+    viewCase,
+    ...(viewCase.themeVariants ?? []).map((theme) => themeVariant(viewCase, theme)),
+  ]);
+}
+
+function themeVariant({ themeVariants, ...base }, theme) {
+  if (normalizeFabricateTheme(theme) !== theme) {
+    throw new Error(`view lab case "${base.id}": unknown Fabricate theme "${theme}"`);
+  }
+  return {
+    ...base,
+    id: `${base.id}-${theme}`,
+    label: `${base.label}, ${FABRICATE_THEME_CHOICES[theme]} palette`,
+    theme,
+    baseCaseId: base.id,
+    // The smoke photographs no palette but the default on these screens.
+    reaches: 'beyond',
+    smokeLabels: [],
+  };
 }
