@@ -341,7 +341,7 @@
         selectedValue={breakageChoice}
         groupName="tool-breakage-mode"
         columns={2}
-        dataGroup="tool-breakage-mode"
+        data-radio-card-group="tool-breakage-mode"
         optionDataAttr="data-tool-breakage-choice"
         onChange={changeMode}
       />
@@ -463,7 +463,7 @@
         selectedValue={tool?.checkBreakable === false ? 'immune' : 'breakable'}
         groupName="tool-check-breakable"
         columns={2}
-        dataGroup="tool-breakability"
+        data-radio-card-group="tool-breakability"
         optionDataAttr="data-tool-breakability-choice"
         onChange={(value) => onPatch({ checkBreakable: value === 'breakable' })}
       />
@@ -512,7 +512,7 @@
         groupName="tool-on-break"
         columns={3}
         disabled={immune}
-        dataGroup="tool-on-break"
+        data-radio-card-group="tool-on-break"
         optionDataAttr="data-tool-on-break-choice"
         onChange={setOnBreakMode}
       />

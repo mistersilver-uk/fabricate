@@ -415,11 +415,11 @@
               showSearch={false}
               triggerHasPopup="listbox"
               triggerClass="manager-condition-menu-button"
-              triggerData={{ 'data-chip-remove-fallback': '' }}
+              triggerProps={{ 'data-chip-remove-fallback': '' }}
               triggerLabel={availabilityMenuLabel(kind)}
-              dialogAriaLabel={availabilityFieldLabel(kind)}
+              panelLabel={availabilityFieldLabel(kind)}
               emptyHint={availabilityMenuLabel(kind)}
-              onChoose={(id) => addAvailability(kind, id)}
+              onSelect={(id) => addAvailability(kind, id)}
             />
             <div class="manager-chip-row" data-gathering-event-availability-pills={kind}>
               {#if selectedConditionOptions(kind).length > 0}

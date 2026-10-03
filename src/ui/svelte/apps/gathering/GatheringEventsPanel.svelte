@@ -117,8 +117,7 @@
     <Callout
       tone="info"
       text={localize('FABRICATE.App.Gathering.Detail.EventSafeHint')}
-      dataAttr="data-gathering-safe-hint"
-      dataValue=""
+      data-gathering-safe-hint
     />
   {/if}
 </div>
@@ -145,8 +144,7 @@
       <EmptyState
         note
         hint={localize('FABRICATE.App.Gathering.Detail.NoEventMatches')}
-        dataAttr="data-gathering-no-event-matches"
-        dataValue=""
+        data-gathering-no-event-matches
       />
     {:else}
       <div class="gathering-detail-event-list" role="list">
@@ -180,8 +178,7 @@
   <EmptyState
     note
     hint={localize('FABRICATE.App.Gathering.Detail.EventsHiddenHint')}
-    dataAttr="data-gathering-events-hidden"
-    dataValue=""
+    data-gathering-events-hidden
   />
 {/if}
 

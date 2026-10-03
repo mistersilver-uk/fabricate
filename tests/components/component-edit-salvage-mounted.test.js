@@ -124,9 +124,9 @@ describe('ToggleCard — the issue-658 retrofit seams (D9)', () => {
     cardHarness.remount();
   });
 
-  it('subAttr emits the sub-line hook the Locked card needs', async () => {
+  it('subDataAttr emits the sub-line hook the Locked card needs', async () => {
     // Mirrors `data-recipe-locked-state` on the Overview Locked card.
-    const target = await mountCard({ subAttr: 'data-recipe-locked-state' });
+    const target = await mountCard({ subDataAttr: 'data-recipe-locked-state' });
     assert.ok(
       target.querySelector('.manager-recipe-status-sub[data-recipe-locked-state]'),
       'the hook lands on the sub-line'
@@ -134,7 +134,7 @@ describe('ToggleCard — the issue-658 retrofit seams (D9)', () => {
     cardHarness.remount();
   });
 
-  it('an unset subAttr adds no stray attribute', async () => {
+  it('an unset subDataAttr adds no stray attribute', async () => {
     const target = await mountCard();
     const sub = target.querySelector('.manager-recipe-status-sub');
     assert.deepEqual(

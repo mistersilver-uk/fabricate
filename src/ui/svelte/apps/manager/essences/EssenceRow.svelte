@@ -235,7 +235,7 @@
 
 {#snippet selectionBox()}
   <SelectionCheckbox
-    size="lg"
+    density="comfortable"
     wrapper="label"
     checked={bulkSelected}
     ariaLabel={format('FABRICATE.Admin.Manager.BulkEdit.SelectRow', 'Select {name} for bulk edit', {

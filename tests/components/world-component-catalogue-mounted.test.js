@@ -2405,7 +2405,7 @@ describe('world Component Catalogue (issue 1371)', () => {
       );
 
       // ISSUE 1504 MOVED THE TOKEN OFF THE ELEMENT AND ONTO THE SELECT ROOT. These controls are
-      // shared `<Select>`s now: the hook rides the trigger through `triggerData` and the caller's
+      // shared `<Select>`s now: the hook rides the trigger through `triggerProps` and the caller's
       // `class` lands on the picker root the trigger sits in, which is where the sheet's rung
       // rule reaches it from.
       const rootOf = (control) => control.closest('.fabricate-select');

@@ -34,7 +34,11 @@
         data-run-progress-track={index}
         data-stage-progress-state={stageTone(stage, index)}
       >
-        <FillBar value={stageProgress(stage, index)} size="sm" tone={stageTone(stage, index)} />
+        <FillBar
+          value={stageProgress(stage, index)}
+          density="compact"
+          tone={stageTone(stage, index)}
+        />
       </span>
     {/each}
   </div>

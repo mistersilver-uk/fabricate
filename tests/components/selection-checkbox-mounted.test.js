@@ -99,15 +99,19 @@ describe('SelectionCheckbox', () => {
     harness.remount();
   });
 
-  it('carries the declared size, and falls back rather than emitting an unstyled class', async () => {
-    for (const size of ['sm', 'md', 'lg']) {
-      const target = await harness.mount({ size });
+  it('carries the declared density, and falls back rather than emitting an unstyled class', async () => {
+    for (const [density, size] of [
+      ['compact', 'sm'],
+      ['default', 'md'],
+      ['comfortable', 'lg'],
+    ]) {
+      const target = await harness.mount({ density });
       assert.equal(box(target).classList.contains(`is-${size}`), true);
       harness.remount();
     }
 
-    const target = await harness.mount({ size: 'huge' });
-    assert.equal(box(target).classList.contains('is-md'), true, 'an unknown size renders a box');
+    const target = await harness.mount({ density: 'huge' });
+    assert.equal(box(target).classList.contains('is-md'), true, 'an unknown density renders a box');
     assert.equal(box(target).classList.contains('is-huge'), false);
     harness.remount();
   });

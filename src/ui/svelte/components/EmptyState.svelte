@@ -34,11 +34,13 @@
    - contextClass: extra class(es) whose rules live in the global sheet because they
      describe how a specific container places this panel (fill, min-height). Never use it
      for appearance — add a prop here instead.
-   - dataAttr / dataValue: an optional test/screenshot hook, e.g.
-     `dataAttr="data-knowledge-learned-empty"`.
    - children: trailing content inside the panel — a "Clear filters" button, a primary
      CTA, or a docs link. It is the way out of the dead end, so it belongs inside the
      panel rather than beside it.
+
+  Rest spread:
+  - `{...rest}` lands on the root, written after `class`, and carries a caller's `data-*` hook.
+    The root's class prop is `contextClass`, so `class` is not a prop here.
 
   Invariants:
   - The DOM shape is part of the contract: the icon, title and body rules are written as
@@ -62,15 +64,9 @@
     note = false,
     filtered = false,
     contextClass = '',
-    dataAttr = '',
-    dataValue = '',
     children = undefined,
+    ...rest
   } = $props();
-
-  // Spread, so an unset hook is absent rather than an empty attribute a selector would match.
-  // `dataValue || true` COERCES A BARE HOOK TO `="true"` and an explicit `dataValue=""` does not
-  // change that (issue 1514); every shipped reader is a presence selector, so nothing breaks.
-  const hookAttributes = $derived(dataAttr ? { [dataAttr]: dataValue || true } : {});
 </script>
 
 <div
@@ -81,7 +77,7 @@
   class:is-fill={fill}
   class:is-note={note}
   class:is-filtered={filtered}
-  {...hookAttributes}
+  {...rest}
 >
   <div>
     {#if icon}

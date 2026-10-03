@@ -39,7 +39,7 @@
   ariaLabelKey="FABRICATE.Admin.Manager.SystemEdit.Tabs.Label"
   ariaLabel="System overview sections"
   idStem="system"
-  hookAttribute="data-system-tab"
+  tabDataAttr="data-system-tab"
   containerClass="manager-environment-tabs manager-system-tabs"
   buttonClass="manager-environment-tab-button"
   badgeClass="manager-environment-tab-badge"

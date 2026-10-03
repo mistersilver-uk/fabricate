@@ -120,7 +120,7 @@
     value={staged}
     groupName="world-tool-bulk-status"
     ariaLabel={text('FABRICATE.Admin.Manager.Tools.BulkEdit.StatusLabel', 'World status')}
-    dataAttr="data-world-tool-bulk-status"
+    data-world-tool-bulk-status
     optionDataAttr="data-world-tool-bulk-status-option"
     onChange={(next) => {
       if (!inert) staged = next;
@@ -134,6 +134,6 @@
       'FABRICATE.Admin.Manager.Tools.BulkEdit.PerToolNote',
       'Breakage, on-break, prerequisites and the check bonus each carry a value of their own, so they stay per-Tool — open a Tool to edit them.'
     )}
-    dataAttr="data-world-tool-bulk-per-tool-note"
+    data-world-tool-bulk-per-tool-note
   />
 </BulkEditPanelShell>

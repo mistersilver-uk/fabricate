@@ -49,13 +49,13 @@
        beside the Access roster's identical one, so this needs no class of its own. -->
   <ManagerSearchField
     value={searchTerm}
-    onInput={(next) => onSearch(next)}
+    onChange={(next) => onSearch(next)}
     placeholder={text(
       'FABRICATE.Admin.Manager.Knowledge.SearchPlaceholder',
       'Search characters...'
     )}
     ariaLabel={text('FABRICATE.Admin.Manager.Knowledge.SearchLabel', 'Search characters')}
-    inputAttrs={{ 'data-knowledge-search': '' }}
+    inputProps={{ 'data-knowledge-search': '' }}
   />
 
   <div class="manager-knowledge-roster-scroll">
@@ -67,7 +67,7 @@
           'FABRICATE.Admin.Manager.Knowledge.RosterLoadingTitle',
           'Loading player characters...'
         )}
-        dataAttr="data-knowledge-roster-loading"
+        data-knowledge-roster-loading
       />
     {:else if error}
       <!-- The detail pane carries the failure notice; the roster makes no claim at all. -->

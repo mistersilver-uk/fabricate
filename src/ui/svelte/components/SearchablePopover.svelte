@@ -19,14 +19,14 @@
   | `inlineSearchTrigger` / `inlineCloseLabel` | boolean / string | `false` / `''` | The trigger REPLACES ITSELF with the query field while open and the panel's search row is suppressed, so there is exactly one query in exactly one field; it wins over every trigger form while open. |
   | `popoverTitle` / `showFilteredCount` / `filteredCountTemplate` / `compactOptionRows` | string / boolean / template / boolean | `''` / `false` / `'{matched} of {total}'` / `false` | The shared panel header — the caller supplies the template so its words stay localized, while this primitive owns the live numbers because it owns the query — and the dense full-width presentation as a WHOLE: the 5px frame, bordered rows with a 24px leading tile, an accent fill on the current value, and the 30px bordered search field. |
   | `as` / `columns` | `'list'` \| `'grid'` / integer | `'list'` / `1` | The list's FORM and a grid's cells per row, EMITTED as `data-picker-as`/`data-picker-columns` and never as an inline style, because `anchoredPopover` rewrites the list's whole `style` attribute on every measure. `columns` also re-maps the cursor. |
-  | `trigger` | snippet `{ attributes, open }` | `undefined` | REPLACES this component's trigger button; the caller spreads `attributes` onto its own element LAST, names and titles the button itself, passes neither `triggerAriaLabel` nor `triggerTitle`, and gets `triggerClass` as a declared no-op. See the spread invariant. |
+  | `trigger` | snippet `{ attributes, open }` | `undefined` | Replaces this component's trigger button; the caller spreads `attributes` onto its own element last, names and titles the button itself, passes neither `ariaLabel` nor `triggerTitle`, and gets `triggerClass` as a declared no-op. See the spread invariant. |
   | `option` | snippet `(option)` | `undefined` | Draws the row's CONTENT while this component keeps the row ELEMENT. When supplied it is the row's SOLE content — no `Chip`, no trailing marker, no label span — because a picker's suite reads its row label with `span:last-child`. |
   | `header` / `footer` | snippets | `undefined` | Caller-owned content above and below the list. `header` is rendered with `(matched, total)`, because a caller counting its own `options` computes a number that cannot change while the list shrinks. |
   | `maxHeight` / `minWidth` / `maxWidth` | px | `0` / `240` / `340` | The panel's size band; `0` takes the layout's own value. |
-  | `triggerAddMarker` / `triggerData` / `triggerTitle` / `triggerHasPopup` | string / attribute bag / string / `'dialog'` \| `'listbox'` | `''` / `{}` / `''` / `'dialog'` | Stable hooks and a native tooltip stamped on the trigger button itself rather than on a wrapper, plus what activating it opens. `triggerData` is spread FIRST, so it can never override this component's `type`, `onclick` or ARIA contract; and `'listbox'` is passed ONLY with `showSearch={false}` and WHENEVER `showSearch={false}`, both directions being refused at the source by `tests/components/searchable-popover-source-contract.test.js`, which also holds the two `trigger`-snippet refusals above. |
+  | `triggerAddMarker` / `triggerProps` / `triggerTitle` / `triggerHasPopup` | string / attribute object / string / `'dialog'` \| `'listbox'` | `''` / `{}` / `''` / `'dialog'` | Stable hooks and a native tooltip stamped on the trigger button itself rather than on a wrapper, plus what activating it opens. `triggerProps` is spread first, so it can never override this component's `type`, `onclick` or ARIA contract; and `'listbox'` is passed only with `showSearch={false}` and whenever `showSearch={false}`, both directions being refused at the source by `tests/components/searchable-popover-source-contract.test.js`, which also holds the two `trigger`-snippet refusals above. |
   | `triggerAriaDisabled` | boolean | `false` | Render `aria-disabled="true"` and refuse to open while leaving the trigger ENABLED and focusable. Not a synonym for `disabled`: several screen readers drop a `disabled` button from the tab order and `focus()` on one silently no-ops. The trade is that `aria-disabled` does not suppress the click, so `toggle()` must. |
-  | `triggerAriaLabel` / `triggerAriaLabelledBy` / `triggerAriaDescribedBy` / `searchPlaceholder` / `searchAriaLabel` | strings and id lists | `''` | The trigger's name as a string, its name as a pointer, its description, and the query field's placeholder and name; all omitted when empty, so an absent pointer is absent rather than pointing at no element. |
-  | `dialogAriaLabel` / `dialogAriaLabelledBy` | string / id list | `''` | The PANEL's name, emitted on both the `role="dialog"` and the `role="listbox"` from ONE derived value. A labelledby SUPPRESSES the label rather than joining it. |
+  | `ariaLabel` / `ariaLabelledBy` / `ariaDescribedBy` / `searchPlaceholder` / `searchLabel` | strings and id lists | `''` | The trigger's name as a string, its name as a pointer, its description, and the query field's placeholder and name; all omitted when empty, so an absent pointer is absent rather than pointing at no element. |
+  | `panelLabel` / `panelLabelledBy` | string / id list | `''` | The panel's name, emitted on both the `role="dialog"` and the `role="listbox"` from one derived value. A labelledby suppresses the label rather than joining it. |
   | `horizontalAlign` / `bounds` / `ignoreScrollWithin` | `'left'` \| `'right'` / selector, element or resolver / boolean | `'left'` / `pickerScrollerBounds` / `false` | Which of the panel's edges meets the trigger's, the clipping boundary it is clamped inside, and whether to drop viewport events that started INSIDE the panel, which is anchored to the trigger and moves with neither. A shared component must not name an area's own scroller, so the `bounds` default comes from `util/overlayBounds.js`. |
   | `emptyHint` / `emptyDetail` / `noMatchesHint` | localized strings | `''` / `''` / `FABRICATE.Common.Picker.NoMatches` | THE TWO EMPTINESSES ARE DIFFERENT FACTS. `emptyHint` is for a list that holds NOTHING and feeds `EmptyState`'s `title` slot, so it stays SHORT; `emptyDetail` feeds the `hint` slot and is suppressed with `emptyHint`. A filtered emptiness gets `noMatchesHint`. This is the OPPOSITE slot mapping from `VocabularyPanel`. |
   | `filterOptions(options, query)` | function | label-substring | Replaces this component's own filter, called with the raw options and the normalized query. IT IS CALLED ON EVERY PASS, INCLUDING AN EMPTY QUERY, and the DEFAULT short-circuits rather than the seam, so a pinned resolved row is not silently dropped. It is the only place a caller can see the query, and so the only home for alias matching and ranking; it may return NEW row objects, and its result is coerced to an array. |
@@ -34,8 +34,8 @@
   | `open` | bindable boolean | `false` | Bind it to open the picker from something other than the trigger, or to force it shut from outside. |
 
   Callbacks:
-  - `onChoose(id)` — the chosen option's id. COMMIT-ON-CHOOSE IS THE CALLER'S BUSINESS: the primitive
-    holds no selection of its own and emits one call per click, in every mode.
+  - `onSelect(id)` — the chosen option's id. Committing on select is the caller's business: the
+    primitive holds no selection of its own and emits one call per click, in every mode.
 
   Invariants:
   - `fabricate-picker` AND `fabricate-picker-popover` ARE THE PRIMITIVE'S OWN NAMESPACE ROOTS, one on
@@ -130,17 +130,17 @@
     maxHeight = 0,
     popoverClass = '',
     triggerAddMarker = '',
-    triggerData = {},
+    triggerProps = {},
     triggerTitle = '',
     triggerHasPopup = 'dialog',
     triggerAriaDisabled = false,
-    triggerAriaLabel = '',
-    triggerAriaLabelledBy = '',
-    triggerAriaDescribedBy = '',
-    dialogAriaLabel = '',
-    dialogAriaLabelledBy = '',
+    ariaLabel = '',
+    ariaLabelledBy = '',
+    ariaDescribedBy = '',
+    panelLabel = '',
+    panelLabelledBy = '',
     searchPlaceholder = '',
-    searchAriaLabel = '',
+    searchLabel = '',
     emptyHint = '',
     emptyDetail = '',
     noMatchesHint = '',
@@ -157,7 +157,7 @@
     maxWidth = 340,
     bounds = pickerScrollerBounds,
     open = $bindable(false),
-    onChoose = () => {},
+    onSelect = () => {},
   } = $props();
 
   const instanceId = $props.id();
@@ -310,7 +310,7 @@
   }
 
   function choose(id) {
-    onChoose(id);
+    onSelect(id);
     if (staysOpenOnChoose) return;
     close();
   }
@@ -336,13 +336,11 @@
     triggerOnKeydown?.(event);
   }
 
-  const dialogNameAttribute = $derived(
-    dialogAriaLabelledBy ? undefined : dialogAriaLabel || undefined
-  );
-  const dialogNamedBy = $derived(dialogAriaLabelledBy || undefined);
+  const dialogNameAttribute = $derived(panelLabelledBy ? undefined : panelLabel || undefined);
+  const dialogNamedBy = $derived(panelLabelledBy || undefined);
 
   const triggerAttributes = $derived({
-    ...triggerData,
+    ...triggerProps,
     type: 'button',
     'aria-haspopup': triggerHasPopup,
     'aria-expanded': open,
@@ -350,9 +348,9 @@
     disabled,
     'data-recipe-add': triggerAddMarker || undefined,
     title: triggerTitle || undefined,
-    'aria-label': triggerAriaLabel || undefined,
-    'aria-labelledby': triggerAriaLabelledBy || undefined,
-    'aria-describedby': triggerAriaDescribedBy || undefined,
+    'aria-label': ariaLabel || undefined,
+    'aria-labelledby': ariaLabelledBy || undefined,
+    'aria-describedby': ariaDescribedBy || undefined,
     ...(showSearch
       ? {}
       : {
@@ -390,14 +388,14 @@
     [triggerElementKey]: captureTrigger,
   });
 
-  const searchFieldAttributes = $derived({
+  const searchProps = $derived({
     type: 'text',
     role: 'combobox',
     'aria-expanded': open,
     'aria-controls': controlledListId,
     'aria-activedescendant': activeDescendantId,
     placeholder: searchPlaceholder,
-    'aria-label': searchAriaLabel || undefined,
+    'aria-label': searchLabel || undefined,
     onkeydown: onHolderKeydown,
   });
 
@@ -437,7 +435,7 @@
   {#if inlineSearchTrigger && open}
     <div class="manager-travel-picker-inline">
       <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
-      <input bind:this={searchInput} bind:value={search} {...searchFieldAttributes} />
+      <input bind:this={searchInput} bind:value={search} {...searchProps} />
       <button
         type="button"
         class="manager-travel-picker-inline-close"
@@ -493,7 +491,7 @@
       {showSearch}
       {inlineSearchTrigger}
       {searchClass}
-      {searchFieldAttributes}
+      {searchProps}
       {filteredOptions}
       totalCount={options.length}
       {groupedOptions}

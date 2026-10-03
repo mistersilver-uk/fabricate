@@ -210,7 +210,7 @@
         {options}
         ariaLabelledBy={titleId}
         {disabled}
-        triggerData={{ 'data-salvage-dc-preset': '' }}
+        triggerProps={{ 'data-salvage-dc-preset': '' }}
         onChange={choose}
       />
       {#if selection === SALVAGE_DC_CUSTOM}
@@ -296,7 +296,7 @@
   </div>
   <!-- A Callout, not a Notice: a kept value is a standing fact about the record (library routing rule). -->
   {#each keptNotices as notice (notice)}
-    <Callout text={notice} dataAttr="data-salvage-override-kept" />
+    <Callout text={notice} data-salvage-override-kept />
   {/each}
   <OverridePlayerSees
     subject={text('FABRICATE.Admin.Manager.Checks.PlayerSees.SalvageSubject', 'Salvage check')}

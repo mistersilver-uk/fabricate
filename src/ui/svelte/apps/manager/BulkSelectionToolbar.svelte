@@ -107,7 +107,7 @@
       <label class="fab-bulk-selection-all">
         <SelectionCheckbox
           wrapper="contents"
-          size="md"
+          density="default"
           checked={pageSelectionState === 'all'}
           indeterminate={pageSelectionState === 'some'}
           ariaLabel={selectAllLabel}

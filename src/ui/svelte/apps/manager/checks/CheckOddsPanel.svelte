@@ -186,10 +186,9 @@
           <span class="manager-checks-odds-label">{row.label}</span>
           <FillBar
             value={row.percent}
-            size="sm"
+            density="compact"
             tone={toneOf(row, index)}
-            dataAttr="data-checks-odds-bar"
-            dataValue={row.id}
+            data-checks-odds-bar={row.id || true}
           />
           <span class="manager-checks-odds-percent" data-checks-odds-percent={row.id}>
             {row.percent}%

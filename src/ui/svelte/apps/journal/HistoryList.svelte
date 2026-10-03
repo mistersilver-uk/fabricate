@@ -73,8 +73,8 @@
       {pageIndex}
       {pageSizeOptions}
       persistent
-      compact
-      label={localize('FABRICATE.App.Journal.History.Title')}
+      density="compact"
+      ariaLabel={localize('FABRICATE.App.Journal.History.Title')}
       navLabel={localize('FABRICATE.App.Journal.History.Title')}
       onPageChange={(index) => onPageChange?.(index)}
       onPageSizeChange={(size) => onPageSizeChange?.(size)}

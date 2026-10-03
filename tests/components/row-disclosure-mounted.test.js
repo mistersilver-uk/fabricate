@@ -32,7 +32,7 @@ describe('RowDisclosure (mounted)', () => {
     const root = await harness.mount({
       expanded: false,
       controls: 'checks-rail-odds-body',
-      label: 'Chance per outcome',
+      ariaLabel: 'Chance per outcome',
     });
     const button = control(root);
     assert.equal(button.tagName, 'BUTTON');
@@ -47,13 +47,13 @@ describe('RowDisclosure (mounted)', () => {
   });
 
   it('reflects the expanded state in both the attribute and the glyph', async () => {
-    const collapsed = await harness.mount({ expanded: false, label: 'Outcome preview' });
+    const collapsed = await harness.mount({ expanded: false, ariaLabel: 'Outcome preview' });
     assert.equal(control(collapsed).getAttribute('aria-expanded'), 'false');
     assert.ok(!control(collapsed).classList.contains('is-expanded'));
     const collapsedIcon = collapsed.querySelector('.fab-row-disclosure > i').className;
 
     harness.remount();
-    const expanded = await harness.mount({ expanded: true, label: 'Outcome preview' });
+    const expanded = await harness.mount({ expanded: true, ariaLabel: 'Outcome preview' });
     assert.equal(control(expanded).getAttribute('aria-expanded'), 'true');
     assert.ok(control(expanded).classList.contains('is-expanded'));
     const expandedIcon = expanded.querySelector('.fab-row-disclosure > i').className;
@@ -64,10 +64,10 @@ describe('RowDisclosure (mounted)', () => {
   });
 
   it('points the collapsed chevron either way, without changing anything announced', async () => {
-    const trailing = await harness.mount({ expanded: false, side: 'trailing', label: 'Row' });
+    const trailing = await harness.mount({ expanded: false, side: 'trailing', ariaLabel: 'Row' });
     const trailingIcon = trailing.querySelector('i').className;
     harness.remount();
-    const leading = await harness.mount({ expanded: false, side: 'leading', label: 'Row' });
+    const leading = await harness.mount({ expanded: false, side: 'leading', ariaLabel: 'Row' });
     assert.notEqual(leading.querySelector('i').className, trailingIcon);
     assert.equal(
       control(leading).getAttribute('aria-expanded'),
@@ -80,7 +80,7 @@ describe('RowDisclosure (mounted)', () => {
     const seen = [];
     const collapsed = await harness.mount({
       expanded: false,
-      label: 'Row',
+      ariaLabel: 'Row',
       onToggle: (next) => seen.push(next),
     });
     control(collapsed).click();
@@ -89,7 +89,7 @@ describe('RowDisclosure (mounted)', () => {
     harness.remount();
     const expanded = await harness.mount({
       expanded: true,
-      label: 'Row',
+      ariaLabel: 'Row',
       onToggle: (next) => seen.push(next),
     });
     control(expanded).click();
@@ -101,7 +101,7 @@ describe('RowDisclosure (mounted)', () => {
     const root = await harness.mount({
       expanded: false,
       disabled: true,
-      label: 'Row',
+      ariaLabel: 'Row',
       onToggle: (next) => seen.push(next),
     });
     assert.ok(control(root).disabled, 'the DOM control is genuinely disabled, not just dimmed');
@@ -112,19 +112,19 @@ describe('RowDisclosure (mounted)', () => {
   it('omits aria-controls entirely rather than pointing at nothing', async () => {
     // An `aria-controls=""` is an IDREF to nowhere.
     // broken relationship. A caller with no stable id has a layout problem, not an ARIA one.
-    const root = await harness.mount({ expanded: false, label: 'Row' });
+    const root = await harness.mount({ expanded: false, ariaLabel: 'Row' });
     assert.ok(!control(root).hasAttribute('aria-controls'));
   });
 
   it('offers an optional test hook that is genuinely absent when unset', async () => {
     const hooked = await harness.mount({
       expanded: false,
-      label: 'Row',
-      dataAttr: 'data-checks-odds-disclosure',
+      ariaLabel: 'Row',
+      'data-checks-odds-disclosure': true,
     });
     assert.ok(control(hooked).hasAttribute('data-checks-odds-disclosure'));
     harness.remount();
-    const plain = await harness.mount({ expanded: false, label: 'Row' });
+    const plain = await harness.mount({ expanded: false, ariaLabel: 'Row' });
     assert.ok(
       !control(plain).hasAttribute('data-checks-odds-disclosure'),
       'spread, so a selector cannot match an unhooked instance'

@@ -233,7 +233,7 @@
 
           {#if rows.length > 0}
             <div class="manager-checks-simulator-facts">
-              <Kicker dataAttr="data-checks-simulator-facts-heading">
+              <Kicker data-checks-simulator-facts-heading="">
                 {text('FABRICATE.Admin.Manager.Checks.Simulator.WhatHappens', 'What happens')}
               </Kicker>
               <div class="manager-checks-flag-list">

@@ -404,7 +404,7 @@
     options={kindOptions}
     ariaLabel={kindLabel}
     triggerTitle={kindLabel}
-    triggerData={{ 'data-recipe-option-kind': '' }}
+    triggerProps={{ 'data-recipe-option-kind': '' }}
     onChange={setKind}
   />
 
@@ -433,21 +433,18 @@
         triggerClass="manager-recipe-tag-trigger"
         triggerIcon="fa-solid fa-plus"
         triggerLabel={text('FABRICATE.Admin.Manager.Recipe.TagTypeLabel', 'Tag')}
-        triggerData={{ 'data-recipe-add-tag': '' }}
-        triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
+        triggerProps={{ 'data-recipe-add-tag': '' }}
+        ariaLabel={text('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
         triggerTitle={text('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
-        dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
+        panelLabel={text('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
         searchPlaceholder={text(
           'FABRICATE.Admin.Manager.Recipe.TagSearchPlaceholder',
           'Search tags...'
         )}
-        searchAriaLabel={text(
-          'FABRICATE.Admin.Manager.Recipe.TagSearchPlaceholder',
-          'Search tags...'
-        )}
+        searchLabel={text('FABRICATE.Admin.Manager.Recipe.TagSearchPlaceholder', 'Search tags...')}
         emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoTagsDefined', 'No tags defined')}
         showChevron={false}
-        onChoose={(tag) => addTag(tag)}
+        onSelect={(tag) => addTag(tag)}
       />
     </span>
     <!-- `tone="tag"` and NO `density`: the tone carries this control's scale as well as its

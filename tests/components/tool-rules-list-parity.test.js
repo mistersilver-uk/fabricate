@@ -441,10 +441,10 @@ test('the Tools browser renders its search and its filter through the shared bar
       'ARE that band, and a control left outside it is a second bar the recipe does not have'
   );
   assert.ok(
-    inBar('dataAttr="data-tool-membership-filter"'),
+    /\sdata-tool-membership-filter(?=[\s/>])/u.test(markup.slice(bars[0].index, barEnds)),
     'the membership filter renders inside the filter bar for the same reason - it narrows the ' +
-      'list below, which is what a filter is. It is addressed by the `<SegmentedControl>` prop ' +
-      'that stamps its hook rather than by the retired `manager-tools-membership-filter` class: ' +
+      'list below, which is what a filter is. It is addressed by the hook its `<SegmentedControl>` ' +
+      'tag writes rather than by the retired `manager-tools-membership-filter` class: ' +
       'issue 1515 replaced this view`s hand-rolled radiogroup with the shared primitive, and a ' +
       'class assertion left behind would have gone on passing against the deleted markup`s name'
   );

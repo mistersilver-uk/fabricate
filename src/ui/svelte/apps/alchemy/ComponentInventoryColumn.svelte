@@ -61,8 +61,7 @@
         icon="fas fa-box-open"
         title={localize('FABRICATE.App.Alchemy.EmptyInventoryTitle')}
         hint={localize('FABRICATE.App.Alchemy.EmptyInventoryHint')}
-        dataAttr="data-alchemy-empty-inventory"
-        dataValue=""
+        data-alchemy-empty-inventory
       />
     </div>
   {:else if components.length === 0}
@@ -79,8 +78,7 @@
       <EmptyState
         filtered
         hint={localize('FABRICATE.App.Alchemy.NoComponentMatchesHint')}
-        dataAttr="data-alchemy-inventory-no-matches"
-        dataValue=""
+        data-alchemy-inventory-no-matches
       />
     </div>
   {:else}

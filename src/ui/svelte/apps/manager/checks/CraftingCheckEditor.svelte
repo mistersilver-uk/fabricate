@@ -532,7 +532,7 @@
               value={selectedPreviewRecordId}
               options={previewAgainstOptions}
               ariaLabelledBy="checks-preview-against-label"
-              triggerData={{ 'data-preview-against-select': '' }}
+              triggerProps={{ 'data-preview-against-select': '' }}
               onChange={selectPreviewRecord}
             />
           </div>
@@ -548,7 +548,7 @@
             leadingTick={bandStripBands[0]?.botch ? '<0' : ''}
             {previewDc}
             {previewLabel}
-            groupLabel={text('FABRICATE.Admin.Manager.Checks.Crafting.BandsTitle', 'Outcome bands')}
+            ariaLabel={text('FABRICATE.Admin.Manager.Checks.Crafting.BandsTitle', 'Outcome bands')}
             boundaryLabel={(band, nextBand) =>
               text(
                 'FABRICATE.Admin.Manager.Checks.Crafting.BandsBoundary',
@@ -557,7 +557,7 @@
                 .replace('{from}', band?.name || '')
                 .replace('{to}', nextBand?.name || '')}
             fallbackNote={bandsFallback}
-            dataAttr="data-outcome-band-strip"
+            data-outcome-band-strip
             onChange={applyBandStripChange}
           />
           {#if editableBands}

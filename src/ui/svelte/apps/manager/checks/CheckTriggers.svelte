@@ -548,7 +548,7 @@
                     options={conditionTypeOptions}
                     ariaLabelledBy={`fab-trigger-${trigger.id}-when`}
                     minWidth={140}
-                    triggerData={{ 'data-trigger-condition-type': '' }}
+                    triggerProps={{ 'data-trigger-condition-type': '' }}
                     onChange={(next) => setConditionType(trigger.id, next)}
                   />
                 </Field>
@@ -564,7 +564,7 @@
                       options={diceGroupRows}
                       ariaLabelledBy={`fab-trigger-${trigger.id}-group`}
                       minWidth={140}
-                      triggerData={{ 'data-trigger-group': '' }}
+                      triggerProps={{ 'data-trigger-group': '' }}
                       onChange={(next) => updateCondition(trigger.id, { groupId: Number(next) })}
                     />
                   </Field>
@@ -578,7 +578,7 @@
                       options={aggregateOptions}
                       ariaLabelledBy={`fab-trigger-${trigger.id}-aggregate`}
                       minWidth={140}
-                      triggerData={{ 'data-trigger-aggregate': '' }}
+                      triggerProps={{ 'data-trigger-aggregate': '' }}
                       onChange={(next) => updateCondition(trigger.id, { aggregate: next })}
                     />
                   </Field>
@@ -631,7 +631,7 @@
                       options={operatorOptions}
                       ariaLabelledBy={`fab-trigger-${trigger.id}-operator`}
                       minWidth={140}
-                      triggerData={{ 'data-trigger-operator': '' }}
+                      triggerProps={{ 'data-trigger-operator': '' }}
                       onChange={(next) => updateCondition(trigger.id, { operator: next })}
                     />
                   </Field>
@@ -751,7 +751,7 @@
                           'FABRICATE.Admin.Manager.Checks.Breakage.TierStepTier',
                           'Tier'
                         )}
-                        triggerData={{ 'data-trigger-tier-step-target': '' }}
+                        triggerProps={{ 'data-trigger-tier-step-target': '' }}
                         onChange={(next) => updateTierStep(trigger.id, { tierId: next || null })}
                       />
                     {:else}
@@ -782,7 +782,7 @@
                 <ToggleCard
                   icon="fas fa-hammer"
                   section="trigger-break-tools"
-                  toggleAttr="data-trigger-break"
+                  toggleDataAttr="data-trigger-break"
                   title={text(
                     'FABRICATE.Admin.Manager.Checks.Breakage.BreakToolsCardTitle',
                     'Break the required tools'

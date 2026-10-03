@@ -278,7 +278,7 @@
       'FABRICATE.Admin.Manager.Tools.SelectHint',
       'Choose a Tool to inspect its behaviour.'
     )}
-    dataAttr="data-tool-browser-inspector-empty"
+    data-tool-browser-inspector-empty
   />
 {/if}
 

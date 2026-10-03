@@ -63,7 +63,7 @@
   <!-- The bulk checkbox belongs only to records this system can edit. -->
   {#if member}
     <SelectionCheckbox
-      size="lg"
+      density="comfortable"
       wrapper="label"
       checked={bulkSelected}
       ariaLabel={selectLabel}

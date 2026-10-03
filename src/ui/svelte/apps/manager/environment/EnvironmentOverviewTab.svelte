@@ -339,7 +339,7 @@
                       options={realmAddOptions}
                       showTick={false}
                       ariaLabel={addRealmLabel()}
-                      triggerData={{ 'data-chip-remove-fallback': '' }}
+                      triggerProps={{ 'data-chip-remove-fallback': '' }}
                       onChange={addRealm}
                     />
                   {/if}
@@ -420,7 +420,7 @@
                 options={dangerSelectOptions}
                 ariaLabelledBy={dangerCaptionId}
                 ariaDescribedBy={dangerHintId}
-                triggerData={{ 'data-environment-field': 'dangerLevel' }}
+                triggerProps={{ 'data-environment-field': 'dangerLevel' }}
                 onChange={(next) => onUpdate({ dangerLevel: next })}
               />
             </Field>
@@ -447,7 +447,7 @@
                 options={biomeAddOptions}
                 showTick={false}
                 ariaLabel={addBiomeLabel()}
-                triggerData={{ 'data-chip-remove-fallback': '' }}
+                triggerProps={{ 'data-chip-remove-fallback': '' }}
                 onChange={addBiome}
               />
             {/if}

@@ -49,22 +49,16 @@
   triggerIcon="fas fa-link"
   triggerLabel={selectedName}
   valueClass="manager-map-link-value"
-  triggerAriaLabel={text(
-    'FABRICATE.Admin.Manager.Travel.MapLinks.LinkLabel',
-    'Linked Fabricate region'
-  )}
-  dialogAriaLabel={text(
-    'FABRICATE.Admin.Manager.Travel.MapLinks.LinkLabel',
-    'Linked Fabricate region'
-  )}
+  ariaLabel={text('FABRICATE.Admin.Manager.Travel.MapLinks.LinkLabel', 'Linked Fabricate region')}
+  panelLabel={text('FABRICATE.Admin.Manager.Travel.MapLinks.LinkLabel', 'Linked Fabricate region')}
   searchPlaceholder={text(
     'FABRICATE.Admin.Manager.Travel.MapLinks.SearchPlaceholder',
     'Search regions...'
   )}
-  searchAriaLabel={text('FABRICATE.Admin.Manager.Travel.MapLinks.SearchLabel', 'Search regions')}
+  searchLabel={text('FABRICATE.Admin.Manager.Travel.MapLinks.SearchLabel', 'Search regions')}
   emptyHint={text(
     'FABRICATE.Admin.Manager.Travel.MapLinks.NoMatches',
     'No regions match your search.'
   )}
-  onChoose={(id) => onChoose(id || null)}
+  onSelect={(id) => onChoose(id || null)}
 />

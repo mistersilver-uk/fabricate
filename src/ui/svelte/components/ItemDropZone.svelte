@@ -10,7 +10,7 @@
   | `address` / `subline` | strings | `''` | The resolved document's own address, a mono line directly UNDER the name and not a sub-line; and a SECOND sub-line under `hint`, for a card carrying both a uuid and a description. Each renders only when supplied. |
   | `compact` / `purpose` | boolean / string | `false` / `''` | A PROMPT, NEVER A SUMMARY (see the invariants); and WHAT THE ZONE IS FOR, as a per-site id on `data-item-drop-zone` rather than a branch selector. |
   | `hookAttrs` | bag keyed by region | `{}` | The test and styling hooks, over a CLOSED region set — `root`, `hint`, `copy`, `unlink` — each an object of attribute name to value. `{}` for an absent region, so a caller naming none renders byte-identically to one that passed no bag. A caller's bag need not be static: one shipped site's two hooks are two faces of ONE state. |
-  | `unlinkAttr` / `onDrop(data)` | attribute name / function | `''` / no-op | ONE unlink attribute rather than a set, deliberately not folded into the bag, so a caller passing both gets both; and a handler receiving the RAW drag data, which is the shipped contract — several consumers read `pack`/`id` for provenance. |
+  | `unlinkDataAttr` / `onDrop(data)` | attribute name / function | `''` / no-op | One unlink attribute rather than a set, deliberately not folded into the bag, so a caller passing both gets both; and a handler receiving the raw drag data, which is the shipped contract — several consumers read `pack`/`id` for provenance. |
 
   Invariants:
   - THE REGION SET IS CLOSED AND GUARDED AT THE SOURCE, because a bag keyed by name is otherwise
@@ -51,7 +51,7 @@
     disabled = false,
     copyLabel = '',
     unlinkLabel = '',
-    unlinkAttr = '',
+    unlinkDataAttr = '',
     hookAttrs = {},
     onDrop = () => {},
     onCopy = null,
@@ -59,7 +59,7 @@
   } = $props();
 
   const isMissing = $derived(Boolean(item) && state === 'missing');
-  const unlinkAttrs = $derived(unlinkAttr ? { [unlinkAttr]: true } : {});
+  const unlinkAttrs = $derived(unlinkDataAttr ? { [unlinkDataAttr]: true } : {});
   const hooksFor = (region) => hookAttrs?.[region] ?? {};
 
   function handleDrop(data) {

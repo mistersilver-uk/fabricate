@@ -44,7 +44,7 @@ describe('GatheringEventsBrowserView source contract', () => {
     // The term is no longer this component's to own (issue 1438).
     assert.ok(browserSource.includes('value={searchTerm}'), 'browser should render the search term');
     assert.ok(
-      browserSource.includes('onInput={(next) => (ui.searchTerm = next)}'),
+      browserSource.includes('onChange={(next) => (ui.searchTerm = next)}'),
       'browser should write the search term back to the lifted view-state'
     );
     assert.ok(browserSource.includes("value={statusFilter}"), 'browser should expose a status filter');

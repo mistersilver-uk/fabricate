@@ -88,7 +88,7 @@
       value={sortKey}
       options={sortKeyOptions}
       ariaLabelledBy={sortLabelId}
-      triggerData={{ 'data-vocabulary-sort': kind }}
+      triggerProps={{ 'data-vocabulary-sort': kind }}
       onChange={(next) => (ui.sortKey = next)}
     />
     <!-- The direction is a TOGGLE that states its position. `data-keyboard-focus="true"` is not

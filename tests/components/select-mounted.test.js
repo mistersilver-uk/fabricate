@@ -1022,9 +1022,9 @@ describe('1504 Select — the select every screen renders', () => {
       }
     });
 
-    it('forwards triggerData, id, name, invalid and mono onto the control itself', async () => {
+    it('forwards triggerProps, id, name, invalid and mono onto the control itself', async () => {
       await mountSelect({
-        triggerData: { 'data-pagination-size': '' },
+        triggerProps: { 'data-pagination-size': '' },
         id: 'page-size',
         name: 'pageSize',
         invalid: true,
@@ -1063,23 +1063,23 @@ describe('1504 Select — the select every screen renders', () => {
       harness.remount();
     });
 
-    it('forwards triggerTitle onto the trigger, and drops a title placed in triggerData', async () => {
-      // THE PROP EXISTS BECAUSE `triggerData` CANNOT CARRY A TITLE.
+    it('forwards triggerTitle onto the trigger, and drops a title placed in triggerProps', async () => {
+      // THE PROP EXISTS BECAUSE `triggerProps` CANNOT CARRY A TITLE.
       await mountSelect({
         triggerTitle: 'System actions',
-        triggerData: { title: 'ignored' },
+        triggerProps: { title: 'ignored' },
       });
       assert.equal(
         trigger().getAttribute('title'),
         'System actions',
-        'the prop is the route, and it beats a title placed in triggerData'
+        'the prop is the route, and it beats a title placed in triggerProps'
       );
       harness.remount();
 
-      await mountSelect({ triggerData: { title: 'ignored' } });
+      await mountSelect({ triggerProps: { title: 'ignored' } });
       assert.ok(
         !trigger().getAttribute('title'),
-        'and a title in triggerData alone reaches the trigger not at all — which is why the ' +
+        'and a title in triggerProps alone reaches the trigger not at all — which is why the ' +
           'prop had to exist, rather than being a convenience beside a working route'
       );
       harness.remount();

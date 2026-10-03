@@ -247,7 +247,7 @@
         value={normalizedEvaluation.product}
         groupName="check-evaluation-product"
         ariaLabel={productLabel}
-        dataAttr="data-check-product"
+        data-check-product
         optionDataAttr="data-check-product-option"
         onChange={setProduct}
       />
@@ -261,7 +261,7 @@
         value={direction}
         groupName="check-evaluation-direction"
         ariaLabel={directionLabel}
-        dataAttr="data-check-direction"
+        data-check-direction
         optionDataAttr="data-check-direction-option"
         onChange={setDirection}
       />

@@ -89,7 +89,7 @@ describe('RadioCardGroup emits the namespace root its rules are anchored on (iss
       groupName: 'field-mounted-radio',
       options: [...RADIO_OPTIONS],
       selectedValue: 'simple',
-      dataGroup: 'field-mounted',
+      'data-radio-card-group': 'field-mounted',
     });
     const group = root.querySelector('[data-radio-card-group="field-mounted"]');
     assert.ok(Boolean(group), 'the radio card group must render at all');
@@ -117,7 +117,7 @@ describe('RadioCardGroup emits the namespace root its rules are anchored on (iss
       groupName: 'field-mounted-radio',
       options: [...RADIO_OPTIONS],
       selectedValue: 'simple',
-      dataGroup: 'field-mounted',
+      'data-radio-card-group': 'field-mounted',
     });
     const row = root.querySelector('.manager-resolution-option');
     assert.ok(Boolean(row), 'an option row must render, or this assertion has no subject');
@@ -184,7 +184,7 @@ describe('Field (mounted, through its real callers)', () => {
       groupName: 'field-mounted-radio',
       options: [...RADIO_OPTIONS],
       selectedValue: 'simple',
-      dataGroup: 'field-mounted',
+      'data-radio-card-group': 'field-mounted',
     });
     const group = root.querySelector('[data-radio-card-group="field-mounted"]');
     assert.ok(Boolean(group), 'the radio card group rendered');
@@ -207,7 +207,7 @@ describe('Field (mounted, through its real callers)', () => {
       groupName: 'field-mounted-radio',
       options: [...RADIO_OPTIONS],
       selectedValue: 'simple',
-      dataGroup: 'field-mounted',
+      'data-radio-card-group': 'field-mounted',
       configCards: false,
     });
     const group = root.querySelector('[data-radio-card-group="field-mounted"]');
@@ -221,7 +221,7 @@ describe('Field (mounted, through its real callers)', () => {
       groupName: 'field-mounted-radio',
       options: [...RADIO_OPTIONS],
       selectedValue: 'simple',
-      dataGroup: 'field-mounted',
+      'data-radio-card-group': 'field-mounted',
     };
     const on = await radioHarness.mount({ ...props, disabled: true });
     const disabledGroup = on.querySelector('[data-radio-card-group="field-mounted"]');

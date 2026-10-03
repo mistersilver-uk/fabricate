@@ -203,7 +203,7 @@
           'FABRICATE.Admin.Manager.Knowledge.LoadingHint',
           "Fabricate is reading each player character's recipe items and learned recipes."
         )}
-        dataAttr="data-knowledge-loading"
+        data-knowledge-loading
       />
     {:else if loadError}
       <div class="manager-knowledge-error-slot">
@@ -217,7 +217,7 @@
             'FABRICATE.Admin.Manager.Knowledge.LoadErrorHint',
             'Open another section, then return to Knowledge to try again. The browser console has the error.'
           )}
-          dataAttr="data-knowledge-error"
+          data-knowledge-error=""
         />
       </div>
     {:else if !selectedCharacter}
@@ -228,7 +228,7 @@
           'FABRICATE.Admin.Manager.Knowledge.NoSelectionHint',
           'Pick a player character to review the recipe items they carry and the recipes they have learned.'
         )}
-        dataAttr="data-knowledge-no-selection"
+        data-knowledge-no-selection
       />
     {:else}
       <header class="manager-knowledge-detail-header" data-knowledge-detail-header>

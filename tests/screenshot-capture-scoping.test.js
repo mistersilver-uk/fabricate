@@ -1134,7 +1134,7 @@ function assertEveryConvertedHookResolves() {
   // component-emitted attribute, and one collector for the tree is one collector.
   const sources = Object.values(SOURCES);
   const missing = CONVERTED_SELECT_HOOKS.filter((hook) => {
-    // A valued hook is written `'data-x': 'y'` through `triggerData`, never as the literal
+    // A valued hook is written `'data-x': 'y'` through `triggerProps`, never as the literal
     // attribute, so both spellings count as resolving it.
     const valued = /^([^=]+)="(.+)"$/u.exec(hook);
     const needles = valued ? [`'${valued[1]}': '${valued[2]}'`, hook] : [hook];

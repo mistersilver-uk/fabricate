@@ -158,7 +158,7 @@
           'No player or character has been granted this recipe yet.'
         )}
         contextClass="manager-recipe-tab-empty"
-        dataAttr="data-recipe-access-empty"
+        data-recipe-access-empty
       />
     {/if}
 

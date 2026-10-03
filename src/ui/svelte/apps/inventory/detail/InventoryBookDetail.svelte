@@ -393,7 +393,7 @@
                 value={recipePageSize}
                 options={pageSizeOptions}
                 ariaLabelledBy={pageSizeCaptionId}
-                triggerData={{ 'data-inventory-page-size': '' }}
+                triggerProps={{ 'data-inventory-page-size': '' }}
                 onChange={chooseRecipePageSize}
               />
             </span>

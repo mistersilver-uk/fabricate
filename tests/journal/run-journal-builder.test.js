@@ -2440,7 +2440,7 @@ test('an unbegun stage with no route chosen waits on the player rather than on t
   // Guidance, not an alarm: an unbegun stage is ordinary play.
   assert.equal(notice(run).tone, 'info');
   assert.equal(notice(run).blocking, false);
-  assert.equal(notice(run).dataAttr, 'data-journal-awaiting-choice');
+  assert.equal(notice(run).hooks['data-journal-awaiting-choice'], 'true');
   assert.equal(notice(run).title, 'FABRICATE.App.Journal.Notice.ChoiceTitle');
 });
 
@@ -2503,7 +2503,7 @@ test('an untimed stage keeps its choices open for its whole life and says so', (
   assert.equal(run.actions.setSelection, true);
   assert.equal(run.currentStep.selectionAvailability.essencePool.requirements[0].owned, 3);
   assert.equal(run.awaitingChoice, true, 'the pool is coverable; the allocation is what is missing');
-  assert.equal(notice(run).dataAttr, 'data-journal-awaiting-choice');
+  assert.equal(notice(run).hooks['data-journal-awaiting-choice'], 'true');
 
   // The ABSENT allocation, which is what the engine actually refuses: the resolver SUGGESTS
   // one and reports success, so only the persisted-plan question separates it from a ready
@@ -2546,8 +2546,7 @@ test('a known material shortfall reads as materials, never as a choice', () => {
   // `beginVersionedStage`'s own "Missing required items" refusal.
   assert.equal(run.actions.atStageStart, true);
   assert.equal(run.actions.beginStep, false);
-  assert.equal(notice(run).dataAttr, 'data-journal-action-blocker');
-  assert.equal(notice(run).dataValue, 'selectionRequired');
+  assert.equal(notice(run).hooks['data-journal-action-blocker'], 'selectionRequired');
   assert.equal(notice(run).title, 'FABRICATE.App.Journal.Actions.SelectionRequired');
 });
 
@@ -2563,7 +2562,7 @@ test('a shortfall choosing cannot repair is never reported as a choice', () => {
   assert.equal(shortEssence.actions.execute, false);
   assert.equal(shortEssence.actions.disabledReason, 'essenceRequired');
   assert.equal(runAttentionPresentation(shortEssence).kind, 'essences');
-  assert.equal(notice(shortEssence).dataValue, 'essenceRequired');
+  assert.equal(notice(shortEssence).hooks['data-journal-action-blocker'], 'essenceRequired');
 
   const currency = new IngredientSet({ id: 'coin', ingredientGroups: [{ id: 'fee',
     options: [{ match: { type: 'currency', unit: 'gp', amount: 10 } }] }] });
@@ -2574,7 +2573,7 @@ test('a shortfall choosing cannot repair is never reported as a choice', () => {
   assert.equal(unaffordable.actions.execute, false, 'a price the actor cannot pay refuses the stage');
   assert.equal(unaffordable.actions.disabledReason, 'currencyRequired');
   assert.equal(runAttentionPresentation(unaffordable).kind, 'currency');
-  assert.equal(notice(unaffordable).dataValue, 'currencyRequired');
+  assert.equal(notice(unaffordable).hooks['data-journal-action-blocker'], 'currencyRequired');
 });
 
 test('a started stage and a paused run hold the choices they already made', () => {
@@ -2596,7 +2595,7 @@ test('a started stage and a paused run hold the choices they already made', () =
   assert.equal(paused.currentStep.selectionAvailability.staleRoute, true, 'the stage plan itself is open');
   assert.equal(paused.awaitingChoice, false, 'a paused run waits on a resume, not on a pick');
   assert.equal(runAttentionPresentation(paused), null);
-  assert.equal(notice(paused).dataAttr, 'data-journal-paused');
+  assert.deepEqual(notice(paused).hooks, { 'data-journal-paused': 'true' });
 });
 
 // Issue 1648, M21. A started stage's materials are gone, so the held/needed probe that describes an
@@ -2727,7 +2726,7 @@ test('a started stage whose locked route is deleted reports the edit, not an imp
   assert.equal(orphaned.actions.execute, false, 'and the engine refuses the stage either way');
   assert.equal(orphaned.actions.disabledReason, 'routeUnavailable');
   assert.equal(orphaned.actions.cancel, true, 'cancel is the way out that actually exists');
-  assert.equal(notice(orphaned).dataValue, 'routeUnavailable');
+  assert.equal(notice(orphaned).hooks['data-journal-action-blocker'], 'routeUnavailable');
 });
 
 test('the projection reads a stage duration exactly as the run manager arms it', () => {

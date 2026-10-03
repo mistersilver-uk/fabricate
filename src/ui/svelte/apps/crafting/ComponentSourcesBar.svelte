@@ -164,11 +164,11 @@
       value={selectedSourceIds}
       optionClass="crafting-source-option"
       popoverClass="crafting-sources-popover"
-      dialogAriaLabel={localize('FABRICATE.App.Crafting.Sources.Edit')}
+      panelLabel={localize('FABRICATE.App.Crafting.Sources.Edit')}
       searchPlaceholder={localize('FABRICATE.App.Crafting.Sources.SearchCharacters')}
-      searchAriaLabel={localize('FABRICATE.App.Crafting.Sources.SearchCharacters')}
+      searchLabel={localize('FABRICATE.App.Crafting.Sources.SearchCharacters')}
       emptyDetail={localize('FABRICATE.App.Crafting.Sources.Empty')}
-      onChoose={toggleAvailable}
+      onSelect={toggleAvailable}
     >
       <!-- THE TRIGGER IS THIS FILE'S OWN BUTTON, through the primitive's `trigger` snippet, and
            that is a decision rather than an oversight. The dashed 40px square is the `+` well
@@ -180,7 +180,7 @@
            `aria-expanded` and the attachment the panel is anchored to.
 
            `aria-label` and `title` are written on the button rather than passed as
-           `triggerAriaLabel`/`triggerTitle`: the primitive renders NO button of its own in this
+           `ariaLabel`/`triggerTitle`: the primitive renders no button of its own in this
            shape, so those props would ride the spread and OVERRIDE the name this snippet writes
            rather than naming anything. They are written BEFORE the spread because the primitive
            omits undefined-valued keys precisely so a caller's own name survives it. -->

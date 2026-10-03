@@ -127,9 +127,9 @@
   <div class="manager-component-entry-systems-toolbar">
     <div class="manager-component-entry-systems-search" bind:this={searchField}>
       <ManagerSearchField
-        compact
+        density="compact"
         value={search}
-        onInput={(next) => (search = next)}
+        onChange={(next) => (search = next)}
         placeholder={text(
           'FABRICATE.Admin.Manager.Scoped.Component.Entry.SystemSearch',
           'Find a system…'
@@ -138,7 +138,7 @@
           'FABRICATE.Admin.Manager.Scoped.Component.Entry.SystemSearch',
           'Find a system…'
         )}
-        inputAttrs={{ 'data-scoped-entry-system-search': '' }}
+        inputProps={{ 'data-scoped-entry-system-search': '' }}
       />
     </div>
     <SegmentedControl
@@ -153,7 +153,7 @@
         'FABRICATE.Admin.Manager.Scoped.Component.SystemFilterLabel',
         'Filter systems by whether they have rules'
       )}
-      dataAttr="data-scoped-entry-system-filters"
+      data-scoped-entry-system-filters
       optionDataAttr="data-scoped-entry-system-filter"
     />
     <span class="manager-component-entry-system-count" data-scoped-entry-system-count

@@ -94,8 +94,7 @@
       tone="danger"
       title={localize('FABRICATE.App.Gathering.Detail.DropsError')}
       detail={localize('FABRICATE.App.Gathering.Detail.DropsErrorDetail')}
-      dataAttr="data-gathering-drops-error"
-      dataValue=""
+      data-gathering-drops-error=""
     />
   </div>
 {:else if hasDrops}
@@ -150,7 +149,7 @@
                 class="gathering-task-drop-chance"
                 data-gathering-drop-value={pct(drop.finalChance)}
               >
-                <FillBar value={pct(drop.finalChance)} size="sm" />
+                <FillBar value={pct(drop.finalChance)} density="compact" />
                 <span class="gathering-task-drop-percent">{pct(drop.finalChance)}%</span>
               </span>
             </span>

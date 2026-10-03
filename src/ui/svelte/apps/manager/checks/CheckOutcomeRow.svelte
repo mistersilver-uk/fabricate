@@ -153,7 +153,7 @@
     value={outcome.success === true ? 'success' : 'failure'}
     groupName={`outcome-success-${outcome.id}`}
     ariaLabel={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccess', 'Success')}
-    dataAttr="data-outcome-success"
+    data-outcome-success
     optionDataAttr="data-outcome-success-option"
     onChange={(next) => onUpdate({ success: next === 'success' })}
   />

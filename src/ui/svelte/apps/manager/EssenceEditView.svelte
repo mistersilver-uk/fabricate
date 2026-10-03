@@ -664,7 +664,7 @@
                 disabled={saving}
                 section="enabled"
                 field="essence-enabled"
-                subAttr="data-essence-enabled-state"
+                subDataAttr="data-essence-enabled-state"
                 toggleLabel={enabled !== false
                   ? text('FABRICATE.Admin.Manager.Essence.DisableThis', 'Disable this essence')
                   : text('FABRICATE.Admin.Manager.Essence.EnableThis', 'Enable this essence')}
@@ -682,8 +682,7 @@
                   'No rules in {system}. Add it here to give this system its own record; it inherits every world default until you override a section.',
                   { system: systemName }
                 )}
-                dataAttr="data-essence-scope-state"
-                dataValue="no-membership"
+                data-essence-scope-state="no-membership"
               />
               <MembershipActions
                 entityType="essence"

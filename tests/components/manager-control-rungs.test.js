@@ -241,7 +241,7 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
   it('emits is-size-38 when asked, and keeps the documented class order', async () => {
     const root = await harness.mount({
       size: '38',
-      compact: true,
+      density: 'compact',
       class: 'manager-access-roster-search'
     });
     assert.equal(

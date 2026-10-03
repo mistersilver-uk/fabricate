@@ -244,7 +244,7 @@
   <!-- `Callout` is the manager's standing-statement primitive and already draws exactly this. -->
   {#if intro}
     <!-- NEUTRAL, per `openspec/specs/ui-visual-style/spec.md` → "Standing statements". -->
-    <Callout tone="neutral" text={intro} dataAttr="data-tool-requirements-intro" />
+    <Callout tone="neutral" text={intro} data-tool-requirements-intro />
   {/if}
 
   <ToolInheritCard
@@ -343,7 +343,7 @@
                      is already a `<label>`. The input is NESTED rather than the row becoming a
                      `role="checkbox"` wrapper, which is the trap the row's own header records. -->
                 <SelectionCheckbox
-                  size="sm"
+                  density="compact"
                   wrapper="contents"
                   value={option.id}
                   checked={(prerequisites.ids || []).includes(option.id)}
@@ -368,7 +368,7 @@
           selectedValue={prerequisites.gateMode}
           groupName="tool-gate-mode"
           columns={2}
-          dataGroup="tool-gate-mode"
+          data-radio-card-group="tool-gate-mode"
           onChange={(gateMode) => patchPrerequisites({ gateMode })}
         />
       {:else}

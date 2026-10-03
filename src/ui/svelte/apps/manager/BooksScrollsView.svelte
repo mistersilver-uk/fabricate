@@ -306,13 +306,13 @@
   >
     <ManagerSearchField
       value={searchTerm}
-      onInput={(next) => {
+      onChange={(next) => {
         searchTerm = next;
         pageIndex = 0;
       }}
       placeholder={text('FABRICATE.Admin.Manager.BooksScrolls.Search', 'Search recipe items')}
       ariaLabel={text('FABRICATE.Admin.Manager.BooksScrolls.Search', 'Search recipe items')}
-      inputAttrs={{ 'data-books-scrolls-search': '' }}
+      inputProps={{ 'data-books-scrolls-search': '' }}
     />
     <!-- Three `<span>`s rather than the `<label>`s they were: `Select.svelte`'s host invariant.
          The first two triggers keep the `aria-label` their select carried; the limits filter is
@@ -329,7 +329,7 @@
           'FABRICATE.Admin.Manager.BooksScrolls.StatusFilterLabel',
           'Filter recipe items by status'
         )}
-        triggerData={{ 'data-books-scrolls-status-filter': '' }}
+        triggerProps={{ 'data-books-scrolls-status-filter': '' }}
         onChange={(next) => (statusFilter = next)}
       />
     </span>
@@ -343,7 +343,7 @@
           'FABRICATE.Admin.Manager.BooksScrolls.TypeFilterLabel',
           'Filter recipe items by type'
         )}
-        triggerData={{ 'data-books-scrolls-type-filter': '' }}
+        triggerProps={{ 'data-books-scrolls-type-filter': '' }}
         onChange={(next) => (typeFilter = next)}
       />
     </span>
@@ -359,7 +359,7 @@
         options={capSelectOptions}
         showTick={false}
         ariaLabelledBy={capCaptionId}
-        triggerData={{ 'data-books-scrolls-cap-filter': '' }}
+        triggerProps={{ 'data-books-scrolls-cap-filter': '' }}
         onChange={(next) => (capFilter = next)}
       />
     </span>
@@ -392,7 +392,7 @@
           'FABRICATE.Admin.Manager.BooksScrolls.EmptyHint',
           'Drag a world or compendium item onto the drop-zone above to create your first recipe item, then link recipes to it.'
         )}
-        dataAttr="data-books-scrolls-empty"
+        data-books-scrolls-empty
       />
     {:else if filteredItems.length === 0}
       <EmptyState
@@ -405,7 +405,7 @@
           'FABRICATE.Admin.Manager.BooksScrolls.EmptyFilterHint',
           'Clear the filters to show every recipe item in this system.'
         )}
-        dataAttr="data-books-scrolls-empty-filtered"
+        data-books-scrolls-empty-filtered
       >
         <ManagerButton onclick={clearFilters}
           >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</ManagerButton

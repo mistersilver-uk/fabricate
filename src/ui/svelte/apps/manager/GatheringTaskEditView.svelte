@@ -428,7 +428,7 @@
     );
   }
 
-  // Takes the VALUE rather than the event: `<ManagerSearchField>` hands its `onInput` the new
+  // Takes the value rather than the event: `<ManagerSearchField>` hands its `onChange` the new
   // string, having already updated its own `value`.
   function onToolSearchInput(next) {
     toolSearchTerm = next;
@@ -1170,7 +1170,7 @@
               showTick={false}
               ariaLabelledBy={captionIds.defaultEnvironment}
               ariaDescribedBy={captionIds.defaultEnvironmentHint}
-              triggerData={{ 'data-gathering-task-field': 'defaultEnvironmentId' }}
+              triggerProps={{ 'data-gathering-task-field': 'defaultEnvironmentId' }}
               onChange={(next) => setDefaultEnvironment(next)}
             />
             <span id={captionIds.defaultEnvironmentHint} class="manager-muted"
@@ -1211,7 +1211,7 @@
         groupName={`gathering-task-resolution-${task.id}`}
         columns={3}
         legendVisible={false}
-        dataAttr="data-gathering-task-resolution-mode"
+        data-gathering-task-resolution-mode
         optionDataAttr="data-gathering-task-resolution-option"
         onChange={setTaskResolutionMode}
       />
@@ -1248,11 +1248,11 @@
               showSearch={false}
               triggerHasPopup="listbox"
               triggerClass="manager-condition-menu-button"
-              triggerData={{ 'data-chip-remove-fallback': '' }}
+              triggerProps={{ 'data-chip-remove-fallback': '' }}
               triggerLabel={availabilityMenuLabel(kind)}
-              dialogAriaLabel={availabilityFieldLabel(kind)}
+              panelLabel={availabilityFieldLabel(kind)}
               emptyHint={availabilityMenuLabel(kind)}
-              onChoose={(id) => addAvailability(kind, id)}
+              onSelect={(id) => addAvailability(kind, id)}
             />
             <div class="manager-chip-row" data-gathering-task-availability-pills={kind}>
               {#if selectedConditionOptions(kind).length > 0}
@@ -1528,7 +1528,7 @@
           </p>
         {/if}
         {#each keptOverrideNotices as notice (notice)}
-          <Callout text={notice} dataAttr="data-gathering-task-override-kept" />
+          <Callout text={notice} data-gathering-task-override-kept />
         {/each}
         <OverridePlayerSees
           subject={task?.name || ''}
@@ -1585,7 +1585,7 @@
               options={depleteOptions}
               showTick={false}
               ariaLabelledBy={captionIds.deplete}
-              triggerData={{ 'data-gathering-task-node-deplete': '' }}
+              triggerProps={{ 'data-gathering-task-node-deplete': '' }}
               onChange={(next) => updateNodes({ depletionTiming: next })}
             />
           </Field>
@@ -1600,7 +1600,7 @@
               options={respawnPolicySelectOptions}
               showTick={false}
               ariaLabelledBy={captionIds.respawn}
-              triggerData={{ 'data-gathering-task-node-respawn': '' }}
+              triggerProps={{ 'data-gathering-task-node-respawn': '' }}
               onChange={(next) => setRespawnPolicy(next)}
             />
           </Field>
@@ -1630,7 +1630,7 @@
                     'FABRICATE.Admin.Manager.Economy.RespawnIntervalUnit',
                     'Respawn interval unit'
                   )}
-                  triggerData={{ 'data-gathering-task-node-interval-unit': '' }}
+                  triggerProps={{ 'data-gathering-task-node-interval-unit': '' }}
                   onChange={(next) => setRespawnInterval(intervalParts.value, next)}
                 />
               </div>
@@ -1646,7 +1646,7 @@
                 options={gainModeOptions}
                 showTick={false}
                 ariaLabelledBy={captionIds.gainMode}
-                triggerData={{ 'data-gathering-task-node-gain-mode': '' }}
+                triggerProps={{ 'data-gathering-task-node-gain-mode': '' }}
                 onChange={(next) => setRespawnGainMode(next)}
               />
             </Field>
@@ -1875,15 +1875,15 @@
 
       {#if libraryToolList.length > 0}
         <div class="manager-task-required-tools-search">
-          <!-- THE FOCUS HOOK RIDES `inputAttrs`, NOT THE REST SPREAD (issue 1515). This component's
-               rest spread lands on the `<label>` and only `inputAttrs` reaches the `<input>` inside
+          <!-- The focus hook rides `inputProps`, not the rest spread (issue 1515). This component's
+               rest spread lands on the `<label>` and only `inputProps` reaches the `<input>` inside
                it, so the hook used to name a `<label>`, which is focusable only through the
                browser's own label delegation. `Chip`'s contract says nothing about delegation, and
                the input is the control the GM lands on. -->
           <ManagerSearchField
-            compact
+            density="compact"
             value={toolSearchTerm}
-            onInput={onToolSearchInput}
+            onChange={onToolSearchInput}
             placeholder={text(
               'FABRICATE.Admin.Manager.Environment.Tasks.SearchTools',
               'Search tools...'
@@ -1893,7 +1893,7 @@
               'Search tools by name'
             )}
             data-gathering-task-required-tools-search=""
-            inputAttrs={{ 'data-chip-remove-fallback': '' }}
+            inputProps={{ 'data-chip-remove-fallback': '' }}
           />
         </div>
       {/if}
@@ -1911,7 +1911,7 @@
               'FABRICATE.Admin.Manager.Environment.Tasks.RequiredToolsLibraryEmptyHint',
               'Open the Tools page from the left rail to add tools first.'
             )}
-            dataAttr="data-gathering-task-required-tools-library-empty"
+            data-gathering-task-required-tools-library-empty
           />
         {:else if filteredLibraryTools.length === 0}
           <EmptyState
@@ -2141,9 +2141,9 @@
           </div>
           <div class="manager-task-component-browser-controls">
             <ManagerSearchField
-              compact
+              density="compact"
               value={componentSearchTerm}
-              onInput={onComponentSearchInput}
+              onChange={onComponentSearchInput}
               placeholder={text(
                 'FABRICATE.Admin.Manager.Environment.Tasks.SearchComponentsPlaceholder',
                 'Search components...'
@@ -2337,7 +2337,7 @@
           </div>
           <div class="manager-task-drop-controls">
             <ManagerSearchField
-              compact
+              density="compact"
               bind:value={searchTerm}
               placeholder={text(
                 'FABRICATE.Admin.Manager.Environment.Tasks.SearchDropsPlaceholder',

@@ -10,9 +10,9 @@
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `items` | `[{ id, label, icon?, disabled?, danger?, data? }]` | `[]` | `label` is ALREADY-LOCALIZED; `danger` emits `is-danger`; `data` is stamped verbatim on that item's button and spread FIRST, so a caller can never override this component's own `type`, `role`, `tabindex` or `onclick`. |
-  | `triggerLabel` | pre-localized string | `''` | REQUIRED in the sense `design-system/spec.md` requires it of any icon-only control. A caller rendering ONE menu per row must name the RECORD in it; the menu ITEMS stay generic, because the trigger the menu was opened from is what identifies the row. |
-  | `triggerClass` / `triggerIcon` / `triggerTitle` / `triggerData` | strings / bag | `''` / `{}` | The trigger's extra class, glyph, native tooltip and hooks. The trigger IS `<IconButton>`, so the primitive that owns the icon-only-button meaning keeps owning it. |
-  | `menuAriaLabel` / `menuClass` | string / class string | `triggerLabel` / `''` | The panel's accessible name, and an extra class on the PORTALED panel, which escapes this component's root, so a caller's popover-scoped hook has to ride the panel itself. |
+  | `ariaLabel` | pre-localized string | `''` | The trigger's accessible name, required in the sense `design-system/spec.md` requires it of any icon-only control. A caller rendering one menu per row names the record in it; the menu items stay generic, because the trigger the menu was opened from is what identifies the row. |
+  | `triggerClass` / `triggerIcon` / `triggerTitle` / `triggerProps` | strings / attribute object | `''` / `{}` | The trigger's extra class, glyph, native tooltip and hooks. The trigger is `<IconButton>`, so the primitive that owns the icon-only-button meaning keeps owning it. |
+  | `panelLabel` / `menuClass` | string / class string | `ariaLabel` / `''` | The panel's accessible name, and an extra class on the portaled panel, which escapes this component's root, so a caller's popover-scoped hook has to ride the panel itself. |
   | `open` | bindable boolean | `false` | For a surface that must close the menu from outside itself. |
 
   Callbacks:
@@ -52,11 +52,11 @@
     disabled = false,
     triggerClass = '',
     triggerIcon = 'fas fa-ellipsis-vertical',
-    triggerLabel = '',
+    ariaLabel = '',
     triggerTitle = '',
-    triggerData = {},
+    triggerProps = {},
     menuClass = '',
-    menuAriaLabel = '',
+    panelLabel = '',
     open = $bindable(false),
     onSelect = () => {},
   } = $props();
@@ -67,7 +67,7 @@
 
   let pendingFocusIndex = 0;
 
-  const panelLabel = $derived(menuAriaLabel || triggerLabel || undefined);
+  const panelName = $derived(panelLabel || ariaLabel || undefined);
 
   function focusableItems() {
     if (!panelRoot) return [];
@@ -184,9 +184,9 @@
   <IconButton
     bind:element={triggerButton}
     class={triggerClass}
-    ariaLabel={triggerLabel}
+    {ariaLabel}
     {disabled}
-    {...triggerData}
+    {...triggerProps}
     aria-haspopup="menu"
     aria-expanded={open}
     title={triggerTitle || undefined}
@@ -203,7 +203,7 @@
       role="menu"
       tabindex="-1"
       data-keyboard-focus="true"
-      aria-label={panelLabel}
+      aria-label={panelName}
       use:anchoredPopover={{
         component: 'ActionMenu',
         trigger: triggerButton,

@@ -105,8 +105,6 @@ const field = definePrimitiveAdoptionContract({
   // 26 sites in 23 components at issue 2157; the floors below keep headroom under that count.
   callSiteFloor: 14,
   fileFloor: 12,
-  // `compact` is a declared boolean prop.
-  booleanProps: Object.freeze(['compact']),
   detectorFixture: {
     source: detectorSource({
       contract: 'manager-search',
@@ -120,14 +118,14 @@ const field = definePrimitiveAdoptionContract({
   rawRemedy:
     'these components hand-roll the `.manager-search` pill that ' +
     '`src/ui/svelte/components/ManagerSearchField.svelte` owns. Render `<ManagerSearchField ' +
-    'ariaLabel={…} placeholder={…}>` instead — `compact` emits `is-compact`, a bespoke class ' +
+    'ariaLabel={…} placeholder={…}>` instead — `density="compact"` emits `is-compact`, a bespoke class ' +
     'travels on `class`, a label hook rides the rest spread and an INPUT hook goes in ' +
-    '`inputAttrs`. If the site is a combobox with its own suggestion list, it belongs to ' +
+    '`inputProps`. If the site is a combobox with its own suggestion list, it belongs to ' +
     '`SearchablePopover` and to the allowlist above, not to this primitive',
   valuelessRemedy:
     'write `attribute=""` instead — that renders identically on a raw element and through the ' +
     'rest spread, where a bare `data-knowledge-search` arrives as the boolean `true` and ' +
-    'renders `="true"`. The same is true of an `inputAttrs` entry: spell its value `\'\'`',
+    'renders `="true"`. The same is true of an `inputProps` entry: spell its value `\'\'`',
 });
 
 /** Every call site of both primitives, tagged with the primitive it belongs to. */

@@ -244,7 +244,7 @@ describe('IconPicker trigger, across the primitive`s spread', () => {
   it('keeps the caller`s own name, class, style and context menu, and gains the primitive`s contract', async () => {
     const root = await harness.mount({
       value: 'fas fa-cog',
-      buttonTitle: 'Change icon',
+      ariaLabel: 'Change icon',
       iconOnly: true,
       triggerClass: 'manager-vocabulary-icon-trigger',
       triggerStyle: 'color: rgb(1, 2, 3)',

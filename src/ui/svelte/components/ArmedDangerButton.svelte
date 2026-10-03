@@ -8,7 +8,7 @@
   | `token` | `<action>:<documentId>` | `''` | The stable arm token. See the invariants: NEVER a row index. |
   | `armed` | boolean | `false` | Whether THIS button holds the single armed token. Mutual exclusion is the owner's invariant. |
   | `idleLabel` / `armedLabel` / `busyLabel` / `idleIcon` / `armedIcon` / `busyIcon` | localized strings / Font Awesome classes | `''` / trash, triangle-exclamation, spinner | Button copy and glyph per face; `idleIcon=""` suppresses the IDLE glyph only. |
-  | `idleAriaLabel` / `armedAriaLabel` / `describedBy` | consequence sentences / element id | `''` | Each sentence MUST contain its state's visible label; `describedBy` names an element describing the consequence and is omitted rather than emitted empty. |
+  | `idleAriaLabel` / `armedAriaLabel` / `ariaDescribedBy` | consequence sentences / element id | `''` | Each sentence must contain its state's visible label; `ariaDescribedBy` names an element describing the consequence and is omitted rather than emitted empty. |
   | `disabled` | boolean | `false` | Disables both arming and confirming. |
   | `busy` | boolean | `false` | An optional third face for a caller whose confirm starts a write it can await. Not a variant of `armed` — see the invariants. |
   | `showTitle` | boolean | `true` | Whether the accessible name is ALSO a hover `title`. |
@@ -57,7 +57,7 @@
     armedIcon = 'fas fa-triangle-exclamation',
     idleAriaLabel = '',
     armedAriaLabel = '',
-    describedBy = '',
+    ariaDescribedBy = '',
     disabled = false,
     busy = false,
     busyLabel = '',
@@ -118,7 +118,7 @@
   data-busy={inFlight ? 'true' : 'false'}
   data-arm-token={token}
   aria-label={consequence}
-  aria-describedby={describedBy || undefined}
+  aria-describedby={ariaDescribedBy || undefined}
   aria-busy={inFlight ? 'true' : undefined}
   title={showTitle ? consequence : undefined}
   disabled={isInert}

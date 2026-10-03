@@ -266,8 +266,7 @@
           ? localize('FABRICATE.App.Gathering.Detail.NodeExhaustedPermanent')
           : localize('FABRICATE.App.Gathering.Detail.NodeDepletedRespawns')}
         detail={nodeExhausted ? '' : respawnEtaText}
-        dataAttr="data-gathering-node-depleted"
-        dataValue=""
+        data-gathering-node-depleted=""
       />
     {:else if nodeNonRegenerating && nodeScarcePermanentText !== ''}
       <!--
@@ -281,8 +280,7 @@
         tone="info"
         icon="fas fa-mountain-sun"
         title={nodeScarcePermanentText}
-        dataAttr="data-gathering-node-scarce"
-        dataValue=""
+        data-gathering-node-scarce=""
       />
     {/if}
 

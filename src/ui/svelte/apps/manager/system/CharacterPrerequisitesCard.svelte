@@ -260,7 +260,7 @@
                     >
                     <IconPicker
                       value={entry.icon || DEFAULT_PREREQUISITE_ICON}
-                      buttonTitle={text(
+                      ariaLabel={text(
                         'FABRICATE.Admin.Manager.CharacterPrerequisites.ChangeIcon',
                         'Change icon'
                       )}
@@ -318,7 +318,7 @@
                       value={entry.op}
                       options={operatorOptions}
                       ariaLabelledBy={operatorCaptionId(entry.id)}
-                      triggerData={{ 'data-prerequisite-operator': '' }}
+                      triggerProps={{ 'data-prerequisite-operator': '' }}
                       minWidth={160}
                       onChange={(next) => onUpdate(entry.id, { op: next })}
                     />

@@ -128,11 +128,11 @@ describe('run primitives mounted behavior', () => {
 
   it('keeps the default pager face and opts into compact without changing its named controls', async () => {
     const props = { totalCount: 12, pageSize: 4, pageSizeOptions: [4, 6, 12], persistent: true,
-      label: 'Finished runs', navLabel: 'Finished pages' };
+      ariaLabel: 'Finished runs', navLabel: 'Finished pages' };
     const target = await pagerHarness.mount(props);
     assert.ok(!target.querySelector('[data-pagination-compact], .manager-pagination-hidden'));
     const page = target.querySelector('[data-pagination-page]').textContent;
-    await pagerHarness.setProps({ ...props, compact: true });
+    await pagerHarness.setProps({ ...props, density: 'compact' });
     assert.equal(target.querySelector('[data-pagination-page]').textContent, page);
     assert.equal(target.querySelector('section').getAttribute('aria-label'), 'Finished runs');
     assert.equal(target.querySelector('nav').getAttribute('aria-label'), 'Finished pages');

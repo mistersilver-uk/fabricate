@@ -140,8 +140,8 @@
         {expanded}
         {controls}
         {disabled}
-        label={disclosureLabel || name}
-        dataAttr="data-complication-disclosure"
+        ariaLabel={disclosureLabel || name}
+        data-complication-disclosure
         onToggle={() => onToggle(!expanded)}
       />
       {#if onDelete}

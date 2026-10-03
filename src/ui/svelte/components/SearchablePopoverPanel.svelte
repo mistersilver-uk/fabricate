@@ -42,7 +42,7 @@
     showSearch = true,
     inlineSearchTrigger = false,
     searchClass = '',
-    searchFieldAttributes = {},
+    searchProps = {},
     filteredOptions = [],
     totalCount = 0,
     groupedOptions = [],
@@ -182,7 +182,7 @@
       class:is-compact={compactOptionRows}
     >
       {#if compactOptionRows}<i class="fas fa-magnifying-glass" aria-hidden="true"></i>{/if}
-      <input bind:this={search} bind:value={query} {...searchFieldAttributes} />
+      <input bind:this={search} bind:value={query} {...searchProps} />
     </div>
   {/if}
 

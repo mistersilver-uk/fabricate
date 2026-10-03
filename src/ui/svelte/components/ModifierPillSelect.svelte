@@ -8,10 +8,14 @@
   | --- | --- | --- | --- |
   | `options` / `selectedIds` / `onToggle(id, nextSelected)` | arrays / function | `[]` / no-op | The vocabulary, the current selection, and one toggle per gesture; the parent owns the set write. |
   | `disabled` | boolean | `false` | The whole control off. |
-  | `addDisabled` | boolean | `false` | Disables the ADD path ALONE, leaving every pill removable, because a selection that has hit its cap must stay editable in the one direction that can un-hit it. The caller states WHY through `describedBy`; this leaf authors no copy. |
-  | `menuLabel` / `emptyMenuLabel` / `placeholder` / `dataAttr` | pre-localized strings / attribute name | `''` | The closed menu button's label, the note shown when every option is selected, the empty pill-row text, and a test hook on the outer element. |
-  | `labelledBy` | element id | `''` | The caller's own label element. The control is a GROUP of controls rather than a labelled field, so it takes `role="group"` + `aria-labelledby`: the menu button and every pill remove button are separate focus stops that would otherwise be announced with no shared context. |
-  | `describedBy` | element id | `''` | A caller-owned element describing a CONSTRAINT on the group. It goes on the GROUP rather than on the menu button, because a `disabled` button is skipped by several screen readers' tab order. |
+  | `addDisabled` | boolean | `false` | Disables the add path alone, leaving every pill removable, because a selection that has hit its cap must stay editable in the one direction that can un-hit it. The caller states why through `ariaDescribedBy`; this leaf authors no copy. |
+  | `triggerLabel` / `allSelectedLabel` / `noneSelectedLabel` / `class` | pre-localized strings / class string | `''` | The closed menu button's visible label, which also names the panel it opens; the note shown when every option is selected; the empty pill-row text; and an extra class appended to the root's own. |
+  | `ariaLabelledBy` | element id | `''` | The caller's own label element. The control is a group of controls rather than a labelled field, so it takes `role="group"` + `aria-labelledby`: the menu button and every pill remove button are separate focus stops that would otherwise be announced with no shared context. |
+  | `ariaDescribedBy` | element id | `''` | A caller-owned element describing a constraint on the group. It goes on the group rather than on the menu button, because a `disabled` button is skipped by several screen readers' tab order. |
+
+  Rest spread:
+  - `{...rest}` lands on the `<Field>` root, written after `class`, and carries the caller's
+    `data-modifier-pill-select` hook.
 
   Invariants:
   - THE AT-CAP STATE IS `aria-disabled`, THE LIVE REGION IS THIS SUMMARY ALONE rather than the pill
@@ -37,14 +41,17 @@
     selectedIds = [],
     disabled = false,
     addDisabled = false,
-    menuLabel = '',
+    triggerLabel = '',
     allSelectedLabel = '',
     noneSelectedLabel = '',
-    testId = '',
-    labelledBy = '',
-    describedBy = '',
+    ariaLabelledBy = '',
+    ariaDescribedBy = '',
     onToggle = () => {},
+    class: extraClass = '',
+    ...rest
   } = $props();
+
+  const extraClasses = $derived(extraClass ? ` ${extraClass}` : '');
 
   let open = $state(false);
 
@@ -94,7 +101,7 @@
   });
 
   const menuButtonLabel = $derived(
-    menuLabel || text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillAdd', 'Add modifier')
+    triggerLabel || text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillAdd', 'Add modifier')
   );
 
   const menuOptions = $derived(
@@ -127,13 +134,14 @@
   }
 </script>
 
+<!-- ratchet-exempt(design-system): the spread is this primitive's own rest, forwarded to the root it composes -->
 <Field
   as="div"
-  class="fabricate-pill-select manager-availability-multi"
+  class={`fabricate-pill-select manager-availability-multi${extraClasses}`}
   role="group"
-  aria-labelledby={labelledBy || undefined}
-  aria-describedby={describedBy || undefined}
-  data-modifier-pill-select={testId || undefined}
+  aria-labelledby={ariaLabelledBy || undefined}
+  aria-describedby={ariaDescribedBy || undefined}
+  {...rest}
 >
   <SearchablePopover
     bind:open
@@ -142,16 +150,16 @@
     triggerHasPopup="listbox"
     triggerClass="manager-availability-menu-button"
     triggerLabel={menuButtonLabel}
-    dialogAriaLabel={menuButtonLabel}
+    panelLabel={menuButtonLabel}
     triggerAriaDisabled={addDisabled}
-    triggerData={{ 'data-modifier-pill-menu-button': '' }}
+    triggerProps={{ 'data-modifier-pill-menu-button': '' }}
     {disabled}
     emptyHint={allSelectedLabel ||
       text(
         'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillAllSelected',
         'All modifiers selected.'
       )}
-    onChoose={add}
+    onSelect={add}
   />
   <div class="manager-availability-pill-row" data-modifier-pill-row>
     {#each selectedOptions as option (option.id)}

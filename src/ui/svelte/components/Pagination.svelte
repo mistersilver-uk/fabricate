@@ -10,7 +10,8 @@
   | `persistent` | boolean | `false` | Render the bar ALWAYS, with disabled arrows rather than no nav, for a browse surface whose footer is part of its frame: a footer that appears past a threshold reads as a layout glitch. |
   | `showPageSize` | boolean | `true` | Opt-OUT. A page-size choice is a BROWSE-SCREEN control; an INSPECTOR's pager walks a fixed window over one record's rows in a 300px column, where offering one changes a number nothing else on the screen refers to. A prop rather than a second component, because the summary, the nav, the disabled-arrow rule and the range arithmetic are identical. |
   | `multiPageOnly` | boolean | `false` | Opt-in THIRD MODE: render only when there is more than one page. The default is neither, and `persistent` WINS if both are set. THE COST, recorded rather than discovered: hiding the bar hides the per-page selector with it, so a reader who chooses a size that fits the whole list cannot choose a smaller one again from this screen. |
-  | `label` / `navLabel` | resolved strings | `''` | The names of the two landmarks this component emits. |
+  | `ariaLabel` / `navLabel` | resolved strings | `''` | The names of the two landmarks this component emits: the region and the nav inside it. |
+  | `density` | `'default'` \| `'compact'` | `'default'` | `compact` keeps a browse rail's bar on one row; the full page sentence stays in the accessibility tree. |
 
   Invariants:
   - THE ROOT `<section>` CARRIES `fabricate-pagination` AHEAD OF `manager-pagination`, written inline
@@ -40,11 +41,12 @@
     persistent = false,
     showPageSize = true,
     multiPageOnly = false,
-    label = '',
+    ariaLabel = '',
     navLabel = '',
-    // Compact browse rails keep one row; the full page sentence remains accessible.
-    compact = false,
+    density = 'default',
   } = $props();
+
+  const compact = $derived(density === 'compact');
 
   const totalPages = $derived(Math.max(1, Math.ceil(totalCount / Math.max(1, pageSize))));
   const firstShown = $derived(totalCount === 0 ? 0 : pageIndex * pageSize + 1);
@@ -85,7 +87,7 @@
     class="fabricate-pagination manager-pagination"
     class:is-compact={compact}
     data-pagination-compact={compact || undefined}
-    aria-label={label || text('FABRICATE.Admin.Manager.Pagination.Label', 'Pagination')}
+    aria-label={ariaLabel || text('FABRICATE.Admin.Manager.Pagination.Label', 'Pagination')}
   >
     <span class="manager-pagination-summary" data-pagination-summary>
       {text('FABRICATE.Admin.Manager.Pagination.Range', 'Showing {first}–{last} of {total}')
@@ -137,7 +139,7 @@
           value={pageSize}
           options={sizeOptions}
           ariaLabelledBy={captionId}
-          triggerData={{ 'data-pagination-size': '' }}
+          triggerProps={{ 'data-pagination-size': '' }}
           onChange={changePageSize}
         />
       </span>

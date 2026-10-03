@@ -66,8 +66,7 @@
             'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.NoActiveTasksHint',
             'Add or include tasks in this environment so they appear here.'
           )}
-      dataAttr="data-record-inspector-empty"
-      dataValue={recordKind}
+      data-record-inspector-empty={recordKind || true}
     />
   {/if}
 </aside>

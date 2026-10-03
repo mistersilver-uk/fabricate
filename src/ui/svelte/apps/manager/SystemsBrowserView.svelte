@@ -154,7 +154,7 @@
   <ManagerToolbar ariaLabel={text('FABRICATE.Admin.Manager.SystemFilters', 'System filters')}>
     <ManagerSearchField
       value={searchTerm}
-      onInput={(next) => (ui.searchTerm = next)}
+      onChange={(next) => (ui.searchTerm = next)}
       placeholder={text(
         'FABRICATE.Admin.Manager.SearchPlaceholder',
         'Search by name or description'
@@ -204,7 +204,7 @@
           'FABRICATE.Admin.Manager.LoadingSystemsHint',
           'Fabricate is finishing startup before the system library is shown.'
         )}
-        dataAttr="data-systems-loading"
+        data-systems-loading
       />
     {:else if (systems || []).length === 0}
       <EmptyState
@@ -342,7 +342,7 @@
               </IconButton>
               <ActionMenu
                 items={rowMenuItems()}
-                triggerLabel={text(
+                ariaLabel={text(
                   'FABRICATE.Admin.Manager.SystemActionsFor',
                   'System actions for {name}'
                 ).replace('{name}', systemDisplayLabel(system, systemLabels))}

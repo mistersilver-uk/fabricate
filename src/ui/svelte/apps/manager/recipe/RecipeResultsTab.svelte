@@ -128,7 +128,7 @@
         'FABRICATE.Admin.Manager.Recipe.CollapsedResultsNote',
         'Multi-step recipes are disabled, so this recipe runs as one combined action. You are editing its final results — the output the combined action produces.'
       )}
-      dataAttr="data-recipe-collapsed-results-note"
+      data-recipe-collapsed-results-note
     />
   {/if}
 
@@ -148,7 +148,7 @@
         'FABRICATE.Admin.Manager.Recipe.ResultsProgressiveInfo',
         'Roll budget flows down the list · each stage consumes its difficulty before the next is produced'
       )}
-      dataAttr="data-recipe-info-strip"
+      data-recipe-info-strip
     />
 
     <ToggleCard

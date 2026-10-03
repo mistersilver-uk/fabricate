@@ -349,7 +349,7 @@
       groupName={`journal-route-${step?.stepId}`}
       disabled={!editable || busy}
       onChange={chooseRoute}
-      dataAttr="data-journal-route"
+      data-journal-route
     >
       {#snippet optionBody(route)}
         <div class="fab-stack" data-gap="1">

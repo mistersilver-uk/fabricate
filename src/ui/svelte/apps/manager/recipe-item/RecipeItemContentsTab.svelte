@@ -126,7 +126,7 @@
       <!-- THE CONTROL HALF of the validation row action (issue 1517): the `recipeLinked` blocker
            is answered by linking a recipe, and this trigger is the one control that does it, so
            `RecipeItemValidationTab` addresses it as `recipe-item-link-recipe` through
-           `triggerData`. A trigger is a real `<button>` and needs no tabindex — but it IS
+           `triggerProps`. A trigger is a real `<button>` and needs no tabindex — but it is
            disabled when every recipe is already linked, and `validationFocus.js` refuses a
            disabled target rather than focusing a control the GM cannot use. The row still
            changes tab. -->
@@ -139,11 +139,8 @@
         triggerClass="manager-recipe-item-link-recipe-toggle is-neutral"
         triggerIcon="fas fa-plus"
         triggerLabel={text('FABRICATE.Admin.Manager.RecipeItem.Contents.LinkRecipe', 'Link recipe')}
-        dialogAriaLabel={text(
-          'FABRICATE.Admin.Manager.RecipeItem.Contents.LinkRecipe',
-          'Link recipe'
-        )}
-        triggerData={{
+        panelLabel={text('FABRICATE.Admin.Manager.RecipeItem.Contents.LinkRecipe', 'Link recipe')}
+        triggerProps={{
           'data-recipe-item-link-recipe-toggle': '',
           'data-validation-target': 'recipe-item-link-recipe',
         }}
@@ -151,7 +148,7 @@
           'FABRICATE.Admin.Manager.RecipeItem.Contents.SearchRecipes',
           'Search recipes…'
         )}
-        searchAriaLabel={text(
+        searchLabel={text(
           'FABRICATE.Admin.Manager.RecipeItem.Contents.SearchRecipes',
           'Search recipes…'
         )}
@@ -160,7 +157,7 @@
           'FABRICATE.Admin.Manager.RecipeItem.Contents.NoneLinkable',
           'Every recipe is already linked'
         )}
-        onChoose={linkRecipe}
+        onSelect={linkRecipe}
       />
     </div>
   </div>

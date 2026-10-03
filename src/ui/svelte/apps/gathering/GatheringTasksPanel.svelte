@@ -89,8 +89,7 @@
   <Callout
     tone="info"
     text={localize('FABRICATE.App.Gathering.Detail.EventRiskNote')}
-    dataAttr="data-gathering-event-risk-note"
-    dataValue=""
+    data-gathering-event-risk-note
   />
 {:else if eventVisibility === 'encounterChance'}
   <div class="gathering-detail-event" data-gathering-event-summary>
@@ -100,8 +99,7 @@
       <Callout
         tone="info"
         text={localize('FABRICATE.App.Gathering.Detail.EventSafeHint')}
-        dataAttr="data-gathering-safe-hint"
-        dataValue=""
+        data-gathering-safe-hint
       />
     {/if}
   </div>
@@ -175,8 +173,7 @@
       <EmptyState
         note
         hint={localize('FABRICATE.App.Gathering.Detail.NoTaskMatches')}
-        dataAttr="data-gathering-no-task-matches"
-        dataValue=""
+        data-gathering-no-task-matches
       />
     {:else if filteredTasks.length > 0}
       <div class="gathering-detail-task-list" role="list">

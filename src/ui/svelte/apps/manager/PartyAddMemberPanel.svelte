@@ -181,8 +181,7 @@
         compact
         title={emptyReason}
         hint={emptyDetail || undefined}
-        dataAttr="data-manager-party-add-empty"
-        dataValue={emptyReasonKind}
+        data-manager-party-add-empty={emptyReasonKind || true}
       />
     {/if}
   </div>

@@ -526,7 +526,7 @@
       `${KEY}.PerComponentNote`,
       "Names, art and source links are world catalogue data and stay per component. What you change in bulk here is this system's own rules: its category, its tags and its essence values."
     )}
-    dataAttr="data-component-bulk-per-component-note"
+    data-component-bulk-per-component-note
   />
 
   <BulkEditSection
@@ -711,8 +711,7 @@
           'This will change or remove authored essence values on {count} of the selected components.',
           { count: essenceWarningCount }
         )}
-        dataAttr="data-component-bulk-essence-warning"
-        dataValue={String(essenceWarningCount)}
+        data-component-bulk-essence-warning={String(essenceWarningCount) || true}
       />
     {/if}
     <!-- The same `BulkStagingInset` `stepper` kind the world Component catalogue draws, over this
@@ -836,7 +835,7 @@
       busyLabel={text(`${KEY}.RemoveBusy`, 'Removing…')}
       idleAriaLabel={removeLabel}
       armedAriaLabel={`${removeArmedLabel} — ${removeNote}`}
-      describedBy="component-bulk-remove-note"
+      ariaDescribedBy="component-bulk-remove-note"
       showTitle={false}
       onArm={onArmDelete}
       onDisarm={onDisarmDelete}

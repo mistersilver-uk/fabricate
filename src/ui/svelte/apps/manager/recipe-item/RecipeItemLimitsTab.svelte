@@ -385,7 +385,7 @@
                   'FABRICATE.Admin.Manager.RecipeItem.Limits.WhenSpent',
                   'When the last use is spent'
                 )}
-                dataAttr="data-recipe-item-when-spent"
+                data-recipe-item-when-spent
                 optionDataAttr="data-recipe-item-when-spent-option"
               />
             </div>
@@ -465,7 +465,7 @@
                     'FABRICATE.Admin.Manager.RecipeItem.Limits.AppliesTo',
                     'Limit applies'
                   )}
-                  dataAttr="data-recipe-item-learn-scope"
+                  data-recipe-item-learn-scope
                   optionDataAttr="data-recipe-item-learn-scope-option"
                 />
               </div>
@@ -551,7 +551,7 @@
                       'FABRICATE.Admin.Manager.RecipeItem.Limits.RequiredKnowledgeEmpty',
                       'No recipes to require yet'
                     )}
-                    dataAttr="data-recipe-item-required-knowledge-empty"
+                    data-recipe-item-required-knowledge-empty
                   />
                 {:else}
                   <div class="manager-tag-search">
@@ -646,7 +646,7 @@
                       'FABRICATE.Admin.Manager.RecipeItem.Limits.CharacterPrerequisitesNone',
                       'No prerequisites yet — add them in System Settings; they are shared by every crafting system.'
                     )}
-                    dataAttr="data-recipe-item-character-prereq-empty"
+                    data-recipe-item-character-prereq-empty
                   />
                 {:else}
                   <div class="manager-tag-search">

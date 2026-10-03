@@ -195,7 +195,7 @@
     'New rules inherit the world category and essence values until this system overrides them; nothing else is copied.'
   )}
   closeLabel={text('FABRICATE.Admin.Manager.Component.AddFrom.Close', 'Close')}
-  rootAttributes={{ 'data-component-add-from-catalogue-dialog': '' }}
+  dialogProps={{ 'data-component-add-from-catalogue-dialog': '' }}
   width="580px"
   onClose={dismiss}
 >
@@ -210,7 +210,7 @@
         'FABRICATE.Admin.Manager.Component.AddFrom.SearchLabel',
         'Search catalogue components'
       )}
-      inputAttrs={{ 'data-component-add-from-catalogue-search': '' }}
+      inputProps={{ 'data-component-add-from-catalogue-search': '' }}
     />
 
     {#if refusedCount > 0}
@@ -267,7 +267,7 @@
               data-component-add-from-catalogue-row={row.id}
             >
               <SelectionCheckbox
-                size="sm"
+                density="compact"
                 wrapper="contents"
                 checked={selectedIds.has(row.id)}
                 disabled={applying}

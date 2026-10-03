@@ -10,8 +10,11 @@
   can still avoid, since a screen that paints its permanent hint in `warning` has spent the colour
   meant to make the hazard stand out. At `accent` the ink is `--fab-accent-text`, not `--fab-accent`,
   which measures 4.48:1 in `ironblood-forge` and fails AA. `title`, `text`, `icon`, an `actions`
-  snippet drawn inside the strip so a note and the control answering it are one object, and a
-  `dataAttr`/`dataValue` hook are the rest.
+  snippet drawn inside the strip so a note and the control answering it are one object, and an
+  extra `class` are the rest.
+
+  Rest spread:
+  - `{...rest}` lands on the root, written after `class`, and carries a caller's `data-*` hook.
 
   The geometry is the specimen's and the QUIET treatment is the DEFAULT (issue 1505), with
   `tone="info"` opt-in; there is deliberately no `quiet` prop, because a second geometry is the drift
@@ -25,8 +28,8 @@
     text = '',
     icon = '',
     actions = undefined,
-    dataAttr = '',
-    dataValue = '',
+    class: extraClass = '',
+    ...rest
   } = $props();
 
   const TONES = new Set(['neutral', 'info', 'accent', 'warning', 'success', 'danger']);
@@ -45,22 +48,19 @@
 
   // A `<p>` cannot legally contain a heading-shaped child or a button, so the root follows content.
   const structured = $derived(Boolean(title) || Boolean(actions));
-
-  // Spread, so an unset hook is absent rather than an empty attribute a selector would match.
-  const hookAttributes = $derived(dataAttr ? { [dataAttr]: dataValue || true } : {});
 </script>
 
 <svelte:element
   this={structured ? 'div' : 'p'}
   role={structured ? 'note' : undefined}
-  class="manager-callout"
+  class={['manager-callout', extraClass]}
   class:is-info={resolvedTone === 'info'}
   class:is-accent={resolvedTone === 'accent'}
   class:is-warning={resolvedTone === 'warning'}
   class:is-success={resolvedTone === 'success'}
   class:is-danger={resolvedTone === 'danger'}
   data-callout-tone={resolvedTone}
-  {...hookAttributes}
+  {...rest}
 >
   <i class={resolvedIcon} aria-hidden="true"></i>
   <span class="manager-callout-body">

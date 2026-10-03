@@ -160,7 +160,7 @@
     {armedLabel}
     {idleAriaLabel}
     {armedAriaLabel}
-    describedBy={impactId}
+    ariaDescribedBy={impactId}
     showTitle={false}
     {onArm}
     {onDisarm}

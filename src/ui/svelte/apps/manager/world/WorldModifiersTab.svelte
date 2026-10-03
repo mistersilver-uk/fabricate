@@ -397,7 +397,7 @@
                       <span>{text('FABRICATE.Admin.Manager.Modifiers.Icon', 'Icon')}</span>
                       <IconPicker
                         value={entry.icon || 'fa-solid fa-user'}
-                        buttonTitle={text(
+                        ariaLabel={text(
                           'FABRICATE.Admin.Manager.Modifiers.ChangeIcon',
                           'Change icon'
                         )}

@@ -204,7 +204,7 @@
     </span>
     <div class="manager-subject-modifier-mode">
       <SelectionCheckbox
-        size="sm"
+        density="compact"
         checked={authored}
         {disabled}
         ariaLabel={text(copy.authorKey, copy.author)}
@@ -227,10 +227,10 @@
         selectedIds={picked}
         {disabled}
         addDisabled={atCap}
-        {testId}
-        {describedBy}
-        labelledBy={LABEL_ID}
-        menuLabel={text('FABRICATE.Admin.Manager.Recipe.CraftingModifierAdd', 'Add modifier')}
+        data-modifier-pill-select={testId || undefined}
+        ariaDescribedBy={describedBy}
+        ariaLabelledBy={LABEL_ID}
+        triggerLabel={text('FABRICATE.Admin.Manager.Recipe.CraftingModifierAdd', 'Add modifier')}
         allSelectedLabel={text(
           'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillAllSelected',
           'All modifiers selected.'

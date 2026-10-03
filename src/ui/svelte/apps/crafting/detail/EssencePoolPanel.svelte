@@ -179,7 +179,7 @@
             })}
           >
             <FillBar
-              size="sm"
+              density="compact"
               value={meterPercent(requirement)}
               tone={meterTone(requirement)}
               color={meterColor(requirement)}

@@ -135,8 +135,7 @@
           'FABRICATE.Admin.Manager.Travel.Inspector.RealmsPlaceholder',
           'Select a realm to see its details.'
         )}
-        dataAttr="data-travel-inspector-empty"
-        dataValue="realms"
+        data-travel-inspector-empty="realms"
       />
     {/if}
   {:else if travelTab === 'map'}
@@ -276,8 +275,7 @@
           'FABRICATE.Admin.Manager.Travel.Inspector.MapLinksPlaceholder',
           'Select a region to map it to Scene Regions.'
         )}
-        dataAttr="data-travel-inspector-empty"
-        dataValue="map"
+        data-travel-inspector-empty="map"
       />
     {/if}
   {/if}

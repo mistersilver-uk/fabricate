@@ -374,7 +374,7 @@
       <ManagerToolbar ariaLabel={text('FABRICATE.Admin.Manager.Tools.Filters', 'Tool filters')}>
         <ManagerSearchField
           value={searchTerm}
-          onInput={(next) => {
+          onChange={(next) => {
             ui.searchTerm = next;
             ui.pageIndex = 0;
           }}
@@ -392,7 +392,7 @@
           density="compact"
           tone="accent"
           groupName="tool-membership-filter"
-          dataAttr="data-tool-membership-filter"
+          data-tool-membership-filter
           optionDataAttr="data-tool-membership-option"
           ariaLabel={text(
             'FABRICATE.Admin.Manager.Tools.FilterLabel',
@@ -423,7 +423,7 @@
         showTick={false}
         minWidth={112}
         ariaLabel={text('FABRICATE.Admin.Manager.Tools.SortBy', 'Sort by')}
-        triggerData={{ 'data-tool-sort-key': '' }}
+        triggerProps={{ 'data-tool-sort-key': '' }}
         onChange={(next) => {
           ui.sortKey = next;
           ui.pageIndex = 0;
@@ -462,7 +462,7 @@
               'FABRICATE.Admin.Manager.Tools.EmptyHintWorld',
               'Add a Tool from the world Tools Catalogue, where Tools are created.'
             )}
-            dataAttr="data-tool-library-empty"
+            data-tool-library-empty
           >
             <div class="manager-tools-empty-actions">
               {#if ghostRows.length > 0}
@@ -504,7 +504,7 @@
               'FABRICATE.Admin.Manager.Tools.EmptyFiltered',
               'Nothing matches that filter.'
             )}
-            dataAttr="data-tool-library-filtered-empty"
+            data-tool-library-filtered-empty
           />
         {:else}
           <div class="manager-tools-library-list" role="list">

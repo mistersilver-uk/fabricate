@@ -244,7 +244,7 @@
           'FABRICATE.Admin.Manager.World.Parties.Empty.Body',
           'Gathering still runs: a character in no party has no current realm, so ungated environments stay open and location-gated ones stay out of reach. Create a party when you want realm gating to apply.'
         )}
-        dataAttr="data-travel-parties-none"
+        data-travel-parties-none
       >
         <button
           type="button"
@@ -272,19 +272,19 @@
              the pane's only announcement that a query narrowed the list — and drops the border,
              the height, the corner and the fill the field now paints for itself.
 
-             THE INPUT KEEPS BOTH OF ITS OWN ATTRIBUTES through `inputAttrs`, because the rest
+             The input keeps both of its own attributes through `inputProps`, because the rest
              spread belongs to the `<label>`: the capture hook the View Lab case types into, and
              the `aria-describedby` that ties the field to that counter. -->
         <div class="manager-travel-parties-search">
           <ManagerSearchField
             value={searchTerm}
-            onInput={onSearchInput}
+            onChange={onSearchInput}
             placeholder={text(
               'FABRICATE.Admin.Manager.World.Parties.Search.Placeholder',
               'Search by party, member or travel actor'
             )}
             ariaLabel={text('FABRICATE.Admin.Manager.World.Parties.Search.Label', 'Search parties')}
-            inputAttrs={{
+            inputProps={{
               'data-manager-party-search': '',
               'aria-describedby': 'manager-world-parties-match-count',
             }}
@@ -308,17 +308,12 @@
            the type scale, which is why the two looked like two different things. -->
       {#if paneError}
         <div class="manager-travel-parties-summary">
-          <Notice
-            blocking
-            tone="danger"
-            title={paneError}
-            dataAttr="data-manager-party-summary-error"
-          />
+          <Notice blocking tone="danger" title={paneError} data-manager-party-summary-error="" />
         </div>
       {/if}
 
       {#if filteredParties.length === 0}
-        <EmptyState filtered hint={noMatchHint} dataAttr="data-travel-parties-no-match" />
+        <EmptyState filtered hint={noMatchHint} data-travel-parties-no-match />
       {:else}
         <div
           class="manager-travel-parties-list"

@@ -166,7 +166,7 @@
       value={String(pool.die)}
       options={dieOptions}
       ariaLabel={text('FABRICATE.Admin.Manager.Checks.Count.Die', 'Die')}
-      triggerData={{ 'data-check-count-die': '' }}
+      triggerProps={{ 'data-check-count-die': '' }}
       onChange={(next) => emitPool({ die: Number(next) })}
     />
   </span>
@@ -213,7 +213,7 @@
           value={thresholdMode === 'exceed' ? 'exceed' : 'meet'}
           groupName="check-count-test"
           ariaLabel={text('FABRICATE.Admin.Manager.Checks.Count.TestTitle', 'Per-die test')}
-          dataAttr="data-check-count-test"
+          data-check-count-test
           optionDataAttr="data-check-count-test-option"
           onChange={(next) => onChange({ thresholdMode: next })}
         />
@@ -237,7 +237,7 @@
       value={faceChoice(pool.explode)}
       groupName="check-count-explode"
       ariaLabel={text('FABRICATE.Admin.Manager.Checks.Count.ExplodeTitle', 'Explode')}
-      dataAttr="data-check-count-explode"
+      data-check-count-explode
       optionDataAttr="data-check-count-explode-option"
       onChange={(next) => chooseFace('explode', 'best', best, next)}
     />
@@ -254,7 +254,7 @@
         value={pool.explode.once ? 'once' : 'keeps'}
         groupName="check-count-explode-repeat"
         ariaLabel={text('FABRICATE.Admin.Manager.Checks.Count.RepeatTitle', 'Explode repeat')}
-        dataAttr="data-check-count-explode-repeat"
+        data-check-count-explode-repeat
         optionDataAttr="data-check-count-explode-repeat-option"
         onChange={(next) => emitPool({ explode: { ...pool.explode, once: next === 'once' } })}
       />
@@ -277,7 +277,7 @@
       value={faceChoice(pool.cancel)}
       groupName="check-count-cancel"
       ariaLabel={text('FABRICATE.Admin.Manager.Checks.Count.CancelTitle', 'Cancel')}
-      dataAttr="data-check-count-cancel"
+      data-check-count-cancel
       optionDataAttr="data-check-count-cancel-option"
       onChange={(next) => chooseFace('cancel', 'worst', worst, next)}
     />
@@ -299,7 +299,7 @@
         'FABRICATE.Admin.Manager.Checks.Count.DestinationTitle',
         'Modifiers and bonuses'
       )}
-      dataAttr="data-check-count-destination"
+      data-check-count-destination
       optionDataAttr="data-check-count-destination-option"
       onChange={(next) => emitPool({ modifierDestination: next })}
     />

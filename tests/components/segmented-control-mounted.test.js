@@ -511,12 +511,12 @@ describe('SegmentedControl (mounted)', () => {
     );
   });
 
-  it('stamps dataAttr and optionDataAttr hooks', async () => {
+  it('stamps the root hook and the optionDataAttr hook', async () => {
     const root = await harness.mount({
       options: OPTIONS,
       value: 'destroyed',
       groupName: 'g',
-      dataAttr: 'data-when-spent-control',
+      'data-when-spent-control': true,
       optionDataAttr: 'data-when-spent-option'
     });
     assert.ok(root.querySelector('[data-when-spent-control]'));

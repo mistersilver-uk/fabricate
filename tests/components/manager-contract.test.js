@@ -1000,9 +1000,9 @@ describe('CraftingSystemManager source contract', () => {
       ['legend', 'Salvage resolution mode'],
       ['cardId', 'manager-crafting-salvage-resolution-mode'],
       ['groupName', 'manager-crafting-salvage-resolution-mode'],
-      ['dataAttr', 'data-crafting-salvage-resolution-mode'],
       ['optionDataAttr', 'data-crafting-salvage-resolution-mode-option'],
     ],
+    writes: ['data-crafting-salvage-resolution-mode'],
   });
 
   // The recipe card's own legend fallback, stated apart from the salvage card's.
@@ -1478,7 +1478,7 @@ describe('CraftingSystemManager source contract', () => {
   // `tests/components/manager-essences-mounted.js`. What stays is the seam and what was deleted.
   defineStructureContract('keeps essence browsing browser-only', ESSENCE_BROWSER, {
     declaresProp: ['onEditEssence', 'showSourceUi', 'browserState'],
-    spellsExactly: ['data-essence-membership-filter'],
+    writes: ['data-essence-membership-filter'],
     namesNo: ['onUpdateEssence'],
     spellsNo: [
       'manager-essence-edit-row',

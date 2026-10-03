@@ -759,9 +759,9 @@
         ariaLabelKey="FABRICATE.Admin.Manager.Scoped.Entry.Tabs"
         ariaLabel="Tool entry sections"
         idStem="world-tool-entry"
-        hookAttribute="data-world-tool-entry-tab"
+        tabDataAttr="data-world-tool-entry-tab"
         badges={tabBadges}
-        badgeAttribute="data-world-tool-entry-tab-badge"
+        badgeDataAttr="data-world-tool-entry-tab-badge"
         danger
       />
 
@@ -831,7 +831,7 @@
                   )}
               onDrop={onSourceDrop}
               unlinkLabel={text('FABRICATE.Admin.Manager.Tools.UnlinkItem', 'Unlink Item')}
-              unlinkAttr="data-world-tool-entry-source-unlink"
+              unlinkDataAttr="data-world-tool-entry-source-unlink"
               onUnlink={sourceLinked ? onUnlinkSource : null}
             />
             <!-- READ-ONLY, and it is the linked Item's OWN description rather than this record's.
@@ -978,7 +978,7 @@
               groupName="world-tool-breakage-mode"
               columns={2}
               legend={sectionLabel('breakage')}
-              dataGroup="world-tool-breakage-mode"
+              data-radio-card-group="world-tool-breakage-mode"
               optionDataAttr="data-world-tool-entry-breakage-mode"
               onChange={changeBreakageChoice}
             />
@@ -1137,7 +1137,7 @@
               groupName="world-tool-onbreak-mode"
               columns={3}
               legend={sectionLabel('onBreak')}
-              dataGroup="world-tool-onbreak-mode"
+              data-radio-card-group="world-tool-onbreak-mode"
               optionDataAttr="data-world-tool-entry-onbreak-mode"
               onChange={(mode) => patchSection('onBreak', { mode })}
             />

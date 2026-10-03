@@ -97,7 +97,7 @@
       <Notice
         tone="warning"
         title={targetRefusalSentence(refusal, text)}
-        dataAttr="data-check-progressive-refusal"
+        data-check-progressive-refusal=""
       />
     {/if}
   {/if}

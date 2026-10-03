@@ -96,7 +96,7 @@
   subtitle={data.subtitle}
   closeLabel={data.labels.close}
   width="500px"
-  rootAttributes={{ 'data-roll-prompt': data.kind }}
+  dialogProps={{ 'data-roll-prompt': data.kind }}
   closeOnOutsideClick={false}
   trapFocus
   initialFocus={INITIAL_FOCUS}
@@ -107,7 +107,7 @@
   {#snippet body()}
     <div class="fabricate-roll-prompt">
       {#if data.notice}
-        <Notice tone="warning" title={data.notice} dataAttr="data-roll-prompt-notice" />
+        <Notice tone="warning" title={data.notice} data-roll-prompt-notice="" />
       {/if}
       {#if data.kind === 'single'}
         {#if data.formula || data.dc !== null}
@@ -171,7 +171,7 @@
               >
                 {#if multiPick}
                   <SelectionCheckbox
-                    size="sm"
+                    density="compact"
                     wrapper="contents"
                     name="craftingModifier"
                     value={modifier.id}

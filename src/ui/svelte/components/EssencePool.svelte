@@ -174,7 +174,7 @@
           >
             <FillBar
               value={need > 0 ? (got / need) * 100 : 100}
-              size="sm"
+              density="compact"
               tone={isMet ? 'success' : 'neutral'}
               color={!isMet && tint ? `var(--fab-tag-${tint})` : ''}
             />

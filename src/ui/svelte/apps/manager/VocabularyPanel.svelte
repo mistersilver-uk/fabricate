@@ -212,7 +212,7 @@
     <ManagerSearchField
       class="manager-vocabulary-search"
       value={searchTerm}
-      onInput={(next) => (ui.searchTerm = next)}
+      onChange={(next) => (ui.searchTerm = next)}
       placeholder={searchPlaceholder}
       ariaLabel={searchLabel}
     />
@@ -252,7 +252,7 @@
                 value={row.icon || defaultIcon}
                 iconOnly={true}
                 triggerClass="manager-vocabulary-icon-trigger"
-                buttonTitle={changeIconLabel}
+                ariaLabel={changeIconLabel}
                 onChange={(icon) => onSetIcon(row.name, icon)}
               />
             </span>

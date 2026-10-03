@@ -136,7 +136,7 @@
             onChange={completion.onChange}
             groupName={completion.groupName || `run-completion-${run?.id || 'run'}`}
             ariaLabel={completion.ariaLabel || runLabel}
-            dataAttr="data-run-completion-switch"
+            data-run-completion-switch
           />
         </div>
       {/if}

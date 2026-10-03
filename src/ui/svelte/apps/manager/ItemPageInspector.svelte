@@ -144,7 +144,7 @@
         'FABRICATE.Admin.Manager.BooksScrolls.SelectHint',
         'Select a recipe item to see its page.'
       )}
-      dataAttr="data-item-page-empty"
+      data-item-page-empty
     />
   {:else}
     <p class="manager-kicker">
@@ -194,24 +194,21 @@
       <StatBox
         value={recipeCount}
         label={text('FABRICATE.Admin.Manager.BooksScrolls.Recipes', 'Recipes')}
-        dataAttr="data-item-page-stat"
-        dataValue="recipes"
+        data-item-page-stat="recipes"
         valueDataAttr="data-item-page-recipe-count"
       />
       <StatBox
         value={midValue}
         label={midLabel}
         tone="info"
-        dataAttr="data-item-page-stat"
-        dataValue={isItemMode ? 'uses' : 'learning'}
+        data-item-page-stat={isItemMode ? 'uses' : 'learning'}
         valueDataAttr="data-item-page-mid-value"
         labelDataAttr="data-item-page-mid-label"
       />
       <StatBox
         value={item.learnedByCount || 0}
         label={text('FABRICATE.Admin.Manager.BooksScrolls.LearnedBy', 'Learned by')}
-        dataAttr="data-item-page-stat"
-        dataValue="learned-by"
+        data-item-page-stat="learned-by"
         valueDataAttr="data-item-page-learned-by"
       />
     </div>

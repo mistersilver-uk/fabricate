@@ -352,7 +352,7 @@
               'FABRICATE.Admin.Manager.Checks.Evaluation.KindTitle',
               'Difficulty adjustment'
             )}
-            dataAttr="data-check-adjustment-kind"
+            data-check-adjustment-kind
             optionDataAttr="data-check-adjustment-kind-option"
             onChange={(next) => emitTarget({ adjustmentKind: next })}
           />
@@ -428,7 +428,7 @@
               'FABRICATE.Admin.Manager.Checks.Crafting.ThresholdComparison',
               'Comparison'
             )}
-            dataAttr="data-threshold-mode"
+            data-threshold-mode
             optionDataAttr="data-threshold-mode-option"
             onChange={(next) => onChange({ thresholdMode: next })}
           />
@@ -442,8 +442,7 @@
             tone={callout.tone}
             icon={callout.icon}
             text={callout.text}
-            dataAttr="data-check-count-callout"
-            dataValue={callout.id}
+            data-check-count-callout={callout.id || true}
           />
         {/each}
       </div>

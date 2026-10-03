@@ -11,12 +11,16 @@
   | `bands` | `{ id, name, color, ink, from, to?, index? }[]` | `[]` | ABSOLUTE track values, whatever the binding underneath. `to` is derived from the next band's `from` when omitted. `ink` travels with `color` because the two are ONE decision: the name is drawn ON the fill, so whoever picks the fill is the only party that can know what stays readable on it. Bands are DRAWN in value order and WRITTEN through `index`, the position in the caller's own AUTHORED array; the two differ for a descending tier list, and sorting the authored array instead would reorder the tier rows from a drag. |
   | `previewDc` / `previewLabel` | number / string | `0` / `''` | The previewed record. Only `relative` reads the DC, to convert absolute ↔ offset. |
   | `step` / `pageStep` / `min` / `max` | numbers or `null` | `1` / `5` / `null` / `null` | The keyboard increments and snap grid, and the track domain overrides `simple` passes the DC stepper's own range through. |
-  | `groupLabel` / `boundaryLabel(band, next)` | string / function | `'Outcome bands'` / name pair | The group's accessible name, and the accessible name of the handle between two bands. |
+  | `ariaLabel` / `boundaryLabel(band, next)` | string / function | `'Outcome bands'` / name pair | The group's accessible name, composed with `previewLabel`, and the accessible name of the handle between two bands. |
   | `fallbackNote` | string | `''` | Rendered INSTEAD of the strip when the authored set is not contiguous: a gapped or overlapping FIXED set is reachable and a contiguous strip cannot draw it, so the tier rows are left as the only editor. |
-  | `disabled` / `dataAttr` / `dataValue` | boolean / strings | `false` / `''` | The handles go inert, and the caller's own hook on the root. |
+  | `disabled` / `class` | boolean / class string | `false` / `''` | The handles go inert, and an extra class appended to the root's own. |
   | `leadingTick` | string | `''` | A label under the track's start, before the boundary ticks: a count strip passes `<0` under its Botch band. |
   | `readonly` | boolean | `false` | A derived band PICTURE: no handles, so no slider role, tabindex or drag cursor, and the group is described by a visually hidden list of each band's `name` and caller-formatted `range` (`bands[].range`). |
   | `onChange(patch)` | function | no-op | The authored patch, per binding above. |
+
+  Rest spread:
+  - `{...rest}` lands on the root, written after `class`, whichever of the strip and its fallback
+    note renders, and carries a caller's `data-*` hook.
 
   Invariants:
   - NO GRADIENT, AND NO VISUAL-STYLE EXEMPTION CLAIMED: `ui-visual-style/spec.md` exempts a
@@ -47,15 +51,15 @@
     pageStep = 5,
     min = null,
     max = null,
-    groupLabel = 'Outcome bands',
+    ariaLabel = 'Outcome bands',
     boundaryLabel = (band, nextBand) => `${band?.name || ''} / ${nextBand?.name || ''}`,
     fallbackNote = '',
     disabled = false,
-    dataAttr = '',
-    dataValue = '',
     readonly = false,
     leadingTick = '',
     onChange = () => {},
+    class: extraClass = '',
+    ...rest
   } = $props();
 
   const instanceId = $props.id();
@@ -63,8 +67,6 @@
 
   let trackElement = $state(null);
   let dragIndex = $state(-1);
-
-  const hookAttributes = $derived(dataAttr ? { [dataAttr]: dataValue || true } : {});
 
   const numeric = (value) => {
     if (value === null || value === undefined || value === '') return null;
@@ -234,17 +236,17 @@
 </script>
 
 {#if !resolved}
-  <p class="fab-band-strip-fallback" data-band-strip-fallback {...hookAttributes}>
+  <p class={['fab-band-strip-fallback', extraClass]} data-band-strip-fallback {...rest}>
     {fallbackNote}
   </p>
 {:else}
-  <div class="fab-band-strip" {...hookAttributes}>
+  <div class={['fab-band-strip', extraClass]} {...rest}>
     <div
       class="fab-band-strip-track"
       class:is-disabled={disabled}
       bind:this={trackElement}
       role="group"
-      aria-label={previewLabel ? `${groupLabel} — ${previewLabel}` : groupLabel}
+      aria-label={previewLabel ? `${ariaLabel} — ${previewLabel}` : ariaLabel}
       aria-describedby={readonly ? bandListId : undefined}
       data-band-strip-track
     >

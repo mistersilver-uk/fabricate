@@ -345,7 +345,7 @@
             options={regenPolicyOptions}
             showTick={false}
             label={text('FABRICATE.Admin.Manager.Economy.RegenPolicy', 'Regeneration')}
-            triggerData={{ 'data-economy-regen-policy': '' }}
+            triggerProps={{ 'data-economy-regen-policy': '' }}
             onChange={(next) => updateRegen({ policy: next })}
           />
           {#if economy.stamina.regen.policy === 'overTime'}
@@ -354,7 +354,7 @@
               options={regenUnitOptions}
               showTick={false}
               label={text('FABRICATE.Admin.Manager.Economy.RegenPer', 'Per')}
-              triggerData={{ 'data-economy-regen-unit': '' }}
+              triggerProps={{ 'data-economy-regen-unit': '' }}
               onChange={(next) => updateRegen({ unit: next })}
             />
           {/if}

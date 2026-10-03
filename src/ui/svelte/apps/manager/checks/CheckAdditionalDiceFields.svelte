@@ -230,7 +230,7 @@
           value={rule.source}
           groupName={`${uid}-additional-dice-source`}
           ariaLabel={titles.source}
-          dataAttr="data-check-additional-dice-source"
+          data-check-additional-dice-source
           optionDataAttr="data-check-additional-dice-source-option"
           onChange={(next) => write('source', next)}
         />

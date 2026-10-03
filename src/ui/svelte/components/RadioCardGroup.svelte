@@ -2,6 +2,10 @@
   A fieldset of radio CARDS for a closed mode set: one card per option, with an optional inline
   second datum and a sentence line beneath the name. Nine callers, all closed mode sets.
 
+  Rest spread:
+  - `{...rest}` lands on the `<Field>` fieldset root, written after `class`, and carries the
+    group's hooks, `data-radio-card-group` among them; `class` is appended to the root's own.
+
   Invariants:
   - A RECORDED DEVIATION FROM THE PROTOTYPE, WHICH IS NOT GOING TO BE CORRECTED. MAINTAINER RULING:
     control heights, radii and spacing stay on Fabricate's shipped scale, while TYPE and COLOUR come
@@ -41,13 +45,15 @@
     groupName = '',
     columns = 2,
     disabled = false,
-    dataGroup = '',
-    dataAttr = '',
     optionDataAttr = '',
     configCards = true,
     optionBody = null,
     onChange = () => {},
+    class: extraClass = '',
+    ...rest
   } = $props();
+
+  const extraClasses = $derived(extraClass ? ` ${extraClass}` : '');
 
   function text(key, fallback) {
     if (!key) return fallback;
@@ -64,10 +70,9 @@
 <Field
   as="fieldset"
   id={cardId}
-  class={`fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group${configCards ? ' is-config-cards' : ''}${legendVisible ? ' is-legend-visible' : ''}`}
+  class={`fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group${configCards ? ' is-config-cards' : ''}${legendVisible ? ' is-legend-visible' : ''}${extraClasses}`}
   {disabled}
-  data-radio-card-group={dataGroup || undefined}
-  {...{ [dataAttr]: dataAttr ? true : undefined }}
+  {...rest}
 >
   <legend class="manager-resolution-mode-legend">{text(legendKey, legend)}</legend>
   {#if hintKey || hint}

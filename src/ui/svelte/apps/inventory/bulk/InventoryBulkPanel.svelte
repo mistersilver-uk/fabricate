@@ -372,8 +372,7 @@
         <EmptyState
           note
           hint={localize('FABRICATE.App.Inventory.Bulk.NothingToSalvage')}
-          dataAttr="data-inventory-bulk-empty"
-          dataValue=""
+          data-inventory-bulk-empty
         />
       {:else}
         <!-- ABOVE the queue, and PRE-COMMIT only. The forecast is what the player weighs

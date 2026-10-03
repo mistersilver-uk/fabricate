@@ -1091,7 +1091,7 @@
       'FABRICATE.Admin.Manager.Checks.FailureResults.GatheringDormant',
       'Routed and progressive gathering are still being built, so nothing on this screen changes what a failed gathering attempt does yet. What you set here is kept and takes effect when they arrive.'
     )}
-    dataAttr="data-gathering-failure-dormant"
+    data-gathering-failure-dormant
   />
   <InspectorCard data-gathering-failure-outcome="">
     <h3 class="manager-checks-card-title">
@@ -1143,8 +1143,7 @@
 {#snippet inapplicableSection(sectionLabel)}
   <EmptyState
     icon="fas fa-circle-minus"
-    dataAttr="data-checks-section-empty"
-    dataValue={activeSection}
+    data-checks-section-empty={activeSection || true}
     title={text('FABRICATE.Admin.Manager.Checks.Sections.InapplicableTitle', 'Nothing to set here')}
     hint={text(
       'FABRICATE.Admin.Manager.Checks.Sections.InapplicableHint',
@@ -1204,8 +1203,7 @@
               title={issue.title}
               detail={issue.detail}
               action={issue.action}
-              dataAttr="data-checks-section-notice"
-              dataValue={issue.id}
+              data-checks-section-notice={issue.id === undefined ? '' : issue.id}
             />
           {/each}
         </div>
@@ -1243,7 +1241,7 @@
         <div class="manager-checks-page" data-checks-panel={activity} data-checks-off>
           <EmptyState
             icon="fas fa-dice-d20"
-            dataAttr="data-checks-off-empty"
+            data-checks-off-empty
             title={text('FABRICATE.Admin.Manager.Checks.Off.Title', 'This activity needs no check')}
             hint={text(
               'FABRICATE.Admin.Manager.Checks.Off.Lead',
@@ -1280,7 +1278,7 @@
                 selectedValue={alchemyCheckMode}
                 groupName="crafting-alchemy-checkmode"
                 columns={2}
-                dataAttr="data-crafting-alchemy-checkmode"
+                data-crafting-alchemy-checkmode
                 optionDataAttr="data-crafting-alchemy-checkmode-option"
                 onChange={(mode) => onSetAlchemyCheckMode(mode)}
               />
@@ -1526,7 +1524,7 @@
                 'FABRICATE.Admin.Manager.Checks.Crafting.FailureSalvageNote',
                 'Salvage failures follow their own separate policy on the Salvage check. An individual trigger can also break tools on its own — see Triggers.'
               )}
-              dataAttr="data-failure-salvage-note"
+              data-failure-salvage-note
             />
           {/if}
 

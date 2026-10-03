@@ -143,7 +143,7 @@ test('every icon button is given an accessible name', () => {
   );
 
   const offenders = contract.callSiteTags
-    .filter(([, tag]) => !/\bariaLabel=/.test(tag))
+    .filter(([, tag]) => !/(?:^|\s)(?:ariaLabel=|\{ariaLabel\})/.test(tag))
     .map(([file, tag]) => `${file}: ${tag.replaceAll(/\s+/g, ' ').slice(0, 120)}`);
 
   assert.deepEqual(

@@ -208,9 +208,8 @@ describe('1505 Notice — the API the library states', () => {
   it('carries both root hooks verbatim, the bare one as an empty string', async () => {
     const target = await harness.mount({
       title: 'Brewed',
-      dataAttr: 'data-alchemy-banner',
-      stateDataAttr: 'data-alchemy-banner-status',
-      stateDataValue: 'brewing',
+      'data-alchemy-banner': '',
+      'data-alchemy-banner-status': 'brewing',
     });
     const notice = noticeOf(target);
     assert.equal(

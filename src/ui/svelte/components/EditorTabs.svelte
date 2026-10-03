@@ -10,8 +10,12 @@
   | `ariaLabelKey` / `ariaLabel` | strings | `''` | The strip's own accessible name. |
   | `idStem` / `buttonIdStem` / `panelIdStem` | strings | `'editor'` / `''` / `''` | `idStem` builds `<stem>-tab-<id>` and `aria-controls="<stem>-panel-<id>"`; the other two override either half of that pair for a site whose ids do not share the `-tab-`/`-panel-` shape. |
   | `activePanelOnly` | boolean | `false` | Emit `aria-controls` ONLY on the selected tab. Not cosmetic: a strip rendering one panel at a time otherwise points every unselected tab at an id not in the document, which assistive technology reports as a broken relationship rather than as "not currently shown". |
-  | `hookAttribute` / `containerAttribute` / `badgeAttribute` / `countAttribute` / `dotAttribute` | `data-*` names | see source | The per-button, per-tablist and per-vehicle hooks carrying the tab id; `''` renders none. One per vehicle because the shipped hooks do not share a stem. |
+  | `tabDataAttr` / `badgeDataAttr` / `countDataAttr` / `dotDataAttr` | `data-*` names | see source | The per-button and per-vehicle hooks carrying the tab id; `''` renders none. One per vehicle because the shipped hooks do not share a stem. |
   | `containerClass` / `buttonClass` / `badgeClass` / `danger` | class strings / boolean | the primitive's own family / `false` | The site's existing classes, kept so no shipped rule stops matching — the COUNT and DOT have no such prop, because their classes ARE the drawing — and whether a danger chip also tints its button. |
+
+  Rest spread:
+  - `{...rest}` lands on the tablist root, written after `class`, and carries the per-tablist hook.
+    The root's class prop is `containerClass`, so `class` is not a prop here.
 
   Invariants:
   - THE DOM CONTRACT IS A PROP, because the converging sites do not share one: the hook attribute
@@ -53,15 +57,15 @@
     buttonIdStem = '',
     panelIdStem = '',
     activePanelOnly = false,
-    hookAttribute = 'data-editor-tab-button',
-    containerAttribute = '',
-    badgeAttribute = '',
-    countAttribute = '',
-    dotAttribute = '',
+    tabDataAttr = 'data-editor-tab-button',
+    badgeDataAttr = '',
+    countDataAttr = '',
+    dotDataAttr = '',
     containerClass = DEFAULT_CLASSES.container,
     buttonClass = DEFAULT_CLASSES.button,
     badgeClass = DEFAULT_CLASSES.badge,
     danger = false,
+    ...rest
   } = $props();
 
   const buttonStem = $derived(buttonIdStem || `${idStem}-tab`);
@@ -127,21 +131,16 @@
     );
   }
 
-  function containerAttributes() {
-    if (!containerAttribute) return {};
-    return { [containerAttribute]: '' };
-  }
-
   function buttonAttributes(tab) {
-    if (!hookAttribute) return {};
-    return { [hookAttribute]: tab.id };
+    if (!tabDataAttr) return {};
+    return { [tabDataAttr]: tab.id };
   }
 
   function markAttributes(tab, mark) {
-    if (mark.vehicle === 'count') return countAttribute ? { [countAttribute]: tab.id } : {};
-    if (mark.vehicle === 'dot') return dotAttribute ? { [dotAttribute]: tab.id } : {};
-    const attributes = badgeAttribute
-      ? { [badgeAttribute]: tab.id, 'data-badge-tone': mark.tone }
+    if (mark.vehicle === 'count') return countDataAttr ? { [countDataAttr]: tab.id } : {};
+    if (mark.vehicle === 'dot') return dotDataAttr ? { [dotDataAttr]: tab.id } : {};
+    const attributes = badgeDataAttr
+      ? { [badgeDataAttr]: tab.id, 'data-badge-tone': mark.tone }
       : {};
     if (mark.name) attributes['aria-label'] = mark.name;
     return attributes;
@@ -173,7 +172,7 @@
   class={`fabricate-tabs ${containerClass}`}
   role="tablist"
   aria-label={text(ariaLabelKey, ariaLabel)}
-  {...containerAttributes()}
+  {...rest}
 >
   {#each tabs as tab, index (tab.id)}
     <button

@@ -374,7 +374,7 @@
           <Notice
             tone="danger"
             title={localize('FABRICATE.App.Inventory.Detail.BrokenBanner')}
-            dataAttr="data-inventory-broken-banner"
+            data-inventory-broken-banner=""
           />
         </div>
       {/if}

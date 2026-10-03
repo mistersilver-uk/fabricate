@@ -129,7 +129,7 @@
   >
     <ManagerSearchField
       value={searchTerm}
-      onInput={(next) => (ui.searchTerm = next)}
+      onChange={(next) => (ui.searchTerm = next)}
       placeholder={text(
         'FABRICATE.Admin.Manager.Travel.Realms.SearchPlaceholder',
         'Search realms...'
@@ -146,7 +146,7 @@
         title={realms.length === 0
           ? text('FABRICATE.Admin.Manager.Travel.Realms.Empty', 'No realms yet.')
           : text('FABRICATE.Admin.Manager.Travel.Realms.NoMatches', 'No realms match your search.')}
-        dataAttr="data-travel-realms-empty"
+        data-travel-realms-empty
       />
     {:else}
       <div class="manager-travel-realms-list" role="list">

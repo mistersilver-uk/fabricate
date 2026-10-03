@@ -55,7 +55,6 @@
       ? localize('FABRICATE.App.Journal.TimeRemaining.AvailableAt', { when: whenLabel })
       : ''}
     text={localize(hintKey)}
-    dataAttr="data-journal-time-remaining"
-    dataValue=""
+    data-journal-time-remaining
   />
 {/if}
