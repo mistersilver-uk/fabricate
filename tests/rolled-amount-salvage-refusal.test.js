@@ -14,14 +14,17 @@ import { rollDataRollClass, seededRollClass, withRoll } from './helpers/seededRo
 
 const { Roll: DATA_ROLL } = rollDataRollClass();
 
-/** One salvage of a single ore that yields shards whose amount rolls `formula`. */
-function rolledSalvage(formula, rollData) {
+/** One salvage of a single ore that yields shards whose amount rolls `formula`, after `fixed`. */
+function rolledSalvage(formula, rollData, fixed = []) {
   const world = salvageProbe({
     resultGroups: [
       {
         id: 'grp',
         name: 'Shards',
-        results: [{ id: 'res', componentId: 'shard', quantity: 1, quantityFormula: formula }],
+        results: [
+          ...fixed,
+          { id: 'res', componentId: 'shard', quantity: 1, quantityFormula: formula },
+        ],
       },
     ],
   });
@@ -60,6 +63,22 @@ test('1516: the same salvage consumes and awards the rolled amount for a charact
   });
 });
 
+test('1516: a set mixing a fixed and a rolled amount awards both, or refuses whole', async () => {
+  const fixed = [{ id: 'fixed', componentId: 'shard', quantity: 2 }];
+  await withRoll(DATA_ROLL, async () => {
+    const world = rolledSalvage('1d4 + @name', { name: 2 }, fixed);
+    const result = await world.salvage();
+    assert.equal(result.success, true, result.message);
+    const [, card] = world.journal.entries.find(([name]) => name === 'chat.create');
+    assert.match(card.text, /2× Shard 6× Shard/, 'the fixed two, then the rolled six');
+
+    const refused = rolledSalvage('1d4 + @name', { name: 'Elf' }, fixed);
+    assert.equal((await refused.salvage()).success, false);
+    assert.deepEqual(effects(refused), ['returned'], 'the fixed result is not awarded alone');
+    assert.equal(refused.sourceItem.system.quantity, 3);
+  });
+});
+
 test('1516: a salvage refuses an unrollable or never-positive amount with nothing consumed', async () => {
   const { Roll } = seededRollClass({ maxima: { 0: 0 }, unparsable: ['max(, 2)'] });
   await withRoll(Roll, async () => {
@@ -69,6 +88,7 @@ test('1516: a salvage refuses an unrollable or never-positive amount with nothin
       assert.equal(result.success, false, formula);
       assert.match(result.message, /Salvage result quantity formula/, formula);
       assert.deepEqual(effects(world), ['returned'], formula);
+      assert.equal(world.sourceItem.system.quantity, 3, formula);
     }
   });
 });
@@ -168,4 +188,15 @@ test('1516: a progressive salvage saves its formula unchecked, and an edit witho
     manager.getSystem('sys1').components[0].salvage = salvageWith('0');
     const renamed = await manager.updateItem('sys1', 'ore', { category: 'metal' });
     assert.equal(renamed.category, 'metal', 'an edit that sends no salvage is not refused by it');
+  }));
+
+test('1516: a disabled salvage is not floored, so the editor saves around an imported bad formula', () =>
+  withRoll(FLOOR_ROLL, async () => {
+    const { manager, saves } = managerWith('simple');
+    const disabled = { ...salvageWith('max(, 2)'), enabled: false };
+    manager.getSystem('sys1').components[0].salvage = disabled;
+    const saved = await manager.updateItem('sys1', 'ore', { category: 'metal', salvage: disabled });
+    assert.equal(saved.category, 'metal');
+    assert.equal(saved.salvage.resultGroups[0].results[0].quantityFormula, 'max(, 2)');
+    assert.equal(saves(), 1);
   }));

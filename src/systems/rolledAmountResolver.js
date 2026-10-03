@@ -99,8 +99,10 @@ export function salvageResultAmountErrors(salvage, Roll) {
 const salvageAmountRoll = (system) =>
   resolveSalvageCheck(system).mode === 'progressive' ? null : diceEngine();
 
-/** Throws when `salvage`, authored under `system`, fails the amount floor; the save is refused. */
+/** Throws when an enabled `salvage`, authored under `system`, fails the amount floor; the save is
+ *  refused. A disabled one is never salvaged, so it is not floored. */
 export function assertSalvageAmounts(salvage, system) {
+  if (salvage?.enabled !== true) return;
   const errors = salvageResultAmountErrors(salvage, salvageAmountRoll(system));
   if (errors.length > 0) throw new Error(`Invalid salvage: ${errors.join(', ')}`);
 }
