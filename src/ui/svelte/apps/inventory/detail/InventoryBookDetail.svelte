@@ -18,15 +18,15 @@
   scrolling column, the identity header and the shared body leaves. It used to
   hand-roll all of those itself, at PRE-redesign values, so clicking component ->
   book silently changed the name face, the thumb size, the eyebrow and the
-  "N total" colour. It also reuses the shared `InventoryDetailPager` rather than
-  re-declaring one — the component inspector's five lists already page through it.
+  "N total" colour. Its recipe list pages through the shared `Pagination`, page-size choice
+  included, because a book's recipe list is browsed rather than walked.
 
   Prop-driven; learning routes back through the store seams.
 -->
 <script>
   import ManagerSearchField from '../../../components/ManagerSearchField.svelte';
   import Medallion from '../../../components/Medallion.svelte';
-  import Select from '../../../components/Select.svelte';
+  import Pagination from '../../../components/Pagination.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
   import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
   import { disclosurePhraseKey } from '../../../util/disclosurePhrase.js';
@@ -37,12 +37,10 @@
     countRecipePages,
     learnCapAdmitsWholeBook,
     matchRecipes,
-    recipePageSizeOptions,
     recipePageSlice,
     unlearnedRecipeIds,
   } from '../../../util/bookRecipeBrowse.js';
   import InventoryDetailHeader from './InventoryDetailHeader.svelte';
-  import InventoryDetailPager from './InventoryDetailPager.svelte';
 
   let {
     item = null,
@@ -163,15 +161,8 @@
     recipeSearch = next;
     recipePage = 0;
   }
-  // The caption the trigger is named by, per instance: two book inspectors can render in one
-  // document (the GM preview beside the player's), so the id is minted rather than fixed.
-  const instanceId = $props.id();
-  const pageSizeCaptionId = `${instanceId}-recipe-page-size`;
+  const recipesTitle = $derived(localize('FABRICATE.App.Inventory.Detail.RecipesTitle'));
 
-  const pageSizeOptions = recipePageSizeOptions();
-
-  // `Select` hands back the caller's OWN typed value, so this arrives as the number the option
-  // carried rather than as the string a `<select>`'s `value` gave the old handler to parse.
   function chooseRecipePageSize(size) {
     recipePageSize = RECIPE_PAGE_SIZES.includes(size) ? size : RECIPE_PAGE_SIZES[0];
     recipePage = 0;
@@ -372,34 +363,18 @@
           {/each}
         </ul>
         {#if filteredRecipes.length > RECIPE_PAGE_SIZES[0]}
-          <div class="inventory-detail-recipe-pager" data-inventory-recipe-pager>
-            <!-- A `<span>` RATHER THAN THE `<label>` THIS WAS (issue 1511), for the reason the
-                 canonical rule states: a `<label>` forwards a caption click into the `<button>`
-                 the control now is, and with the panel open that click could only re-open the
-                 list its own mousedown had just dismissed. `showTick={false}` because this is
-                 the same page-size choice `Pagination` draws unticked - the trigger already
-                 states the value, and the three rows are digits rather than close cousins. -->
-            <span class="inventory-detail-recipe-pagesize">
-              <span id={pageSizeCaptionId}
-                >{localize('FABRICATE.App.Inventory.Detail.RecipesPerPage')}</span
-              >
-              <Select
-                size="inline"
-                showTick={false}
-                value={recipePageSize}
-                options={pageSizeOptions}
-                ariaLabelledBy={pageSizeCaptionId}
-                triggerProps={{ 'data-inventory-page-size': '' }}
-                onChange={chooseRecipePageSize}
-              />
-            </span>
-            <InventoryDetailPager
-              list={filteredRecipes}
-              sectionKey="recipes"
-              ariaLabel={localize('FABRICATE.App.Inventory.Detail.RecipesTitle')}
-              page={Math.min(recipePage, recipePageCount - 1)}
+          <div data-inventory-recipe-pager>
+            <Pagination
+              totalCount={filteredRecipes.length}
               pageSize={recipePageSize}
-              onPage={(value) => (recipePage = value)}
+              pageSizeOptions={RECIPE_PAGE_SIZES}
+              pageIndex={Math.min(recipePage, recipePageCount - 1)}
+              persistent
+              density="compact"
+              ariaLabel={recipesTitle}
+              navLabel={recipesTitle}
+              onPageChange={(value) => (recipePage = value)}
+              onPageSizeChange={chooseRecipePageSize}
             />
           </div>
         {/if}
@@ -590,49 +565,5 @@
   .inventory-detail-accordion-body {
     padding: 0 var(--fab-space-2) var(--fab-space-2)
       calc(40px + var(--fab-space-2) + var(--fab-space-3));
-  }
-
-  .inventory-detail-recipe-pager {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding-top: 4px;
-  }
-
-  .inventory-detail-recipe-pagesize {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 11px;
-    color: var(--fab-text-muted);
-  }
-
-  /* A WIDTH FLOOR AT THE WIDEST OPTION (issue 1511). The three values are 6, 9 and 12, so a
-     content-hugging `<button>` would be one digit narrower on two of them and would squeeze the
-     pager beside it every time the value changed - this row is `justify-content: space-between`
-     and declares no `flex-wrap`, so its risk is a squeezed sibling rather than a wrapped row.
-     The floor is the measured width of the trigger showing `12`, taken in both faces in
-     `tests/fixtures/player-select/` under Chromium and set at the next whole pixel above the
-     wider: 46.80px under the Arial fallback the repository's Chromium gates render against,
-     46.42px under Foundry's own Signika, both at the `inline` rung's 11.5px.
-
-     RE-DERIVED AT REVIEW ROUND 1, and this floor MOVED: 60px stood on a recorded pair of 58.30
-     and 56.48 that the fixture does not reproduce. The Arial figure was 11.50px - one whole rung
-     font-size - above what the control measures, as it was at both sibling floors, so it was
-     arithmetic rather than measurement. It was also unfalsifiable until now: the invariance
-     clause that guards it mounted the control twice on the SAME value, so a floor of any size
-     would have passed. It is driven through the option list now.
-
-     NO PANEL FLOOR HERE, and that is a measurement rather than an omission: the widest ROW label
-     is `12` at 13.36px, and this list is UNTICKED, so it spends 32px on chrome rather than a
-     ticked row's 52 and needs 45.36px against the `inline` rung's own 96px floor. The sibling
-     sort controls both needed one; see `Select.svelte`'s band docblock for when a caller does.
-
-     Everything else about the control - height, corner, fill, type, focus - is the `inline`
-     rung's, against the 6px corner and `--fab-surface` fill this block used to declare.
-     Ancestor-qualified, because a leading bare `:global()` reaches the whole document. */
-  .inventory-detail-recipe-pagesize :global(.fabricate-select-trigger) {
-    min-width: 47px;
   }
 </style>

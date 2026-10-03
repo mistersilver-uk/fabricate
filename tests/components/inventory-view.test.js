@@ -2604,28 +2604,28 @@ describe('InventoryView (mounted) — one card per unified physical stack (issue
     assert.deepEqual(picks, [SYS_B], 'the drop-down drives the store selection');
   });
 
-  it('pages a book’s recipes through an UNTICKED app-drawn list, floored so a digit does not resize it', async () => {
+  it('pages a book’s recipes through one shared pager whose page-size list is unticked', async () => {
     const { services } = makeServices(makeBookItem());
     const target = await harness.mount({ services });
     await settle();
 
-    const hook = '[data-inventory-page-size]';
+    const pager = target.querySelector('[data-inventory-recipe-pager]');
+    assert.ok(Boolean(pager), 'the recipe pager renders past its six-recipe guard');
+    assert.equal(pager.querySelectorAll('.fabricate-pagination').length, 1, 'one shared pager');
+    assert.ok(
+      !target.querySelector('.inventory-detail-recipe-pagesize, [data-inventory-pager="recipes"]'),
+      'no hand-rolled page-size row beside a second pager'
+    );
+    const hook = '[data-inventory-recipe-pager] [data-pagination-size]';
     const trigger = target.querySelector(hook);
-    assert.ok(Boolean(trigger), 'the page-size control renders past its six-recipe guard');
-    assert.equal(target.querySelector('.inventory-detail-recipe-pagesize').tagName, 'SPAN', 'wrapper demoted');
-    const caption = target.querySelector('.inventory-detail-recipe-pagesize span[id]');
-    assert.ok(Boolean(caption), 'the bare caption span gained an id');
-    assert.equal(trigger.getAttribute('aria-labelledby'), caption.id, 'and names the trigger');
+    const caption = pager.querySelector(':scope .manager-pagination-size span[id]');
+    assert.equal(trigger.getAttribute('aria-labelledby'), caption.id, 'named by its caption');
 
-    // UNTICKED, which is `showTick={false}` reaching the panel's own class list. This is the same
-    // page-size choice `Pagination` draws unticked, and the polarity is a PROP rather than a
-    // variant, so it is worth an assertion that the caller passed it.
     const panel = openSelectPanel(target, hook);
     assert.ok(
       !panel.classList.contains('fabricate-select-popover-ticked'),
-      'the page-size list drops the tick column, as `Pagination` draws the same control'
+      'the page-size list drops the tick column'
     );
-
     assert.deepEqual(
       selectOptionLabels(target, hook),
       ['6', '9', '12'],
@@ -2642,13 +2642,12 @@ describe('InventoryView (mounted) — one card per unified physical stack (issue
     assert.equal(
       target.querySelectorAll('[data-inventory-learn-recipe]').length,
       7,
-      'choosing 12 hands the caller the NUMBER it declared, not a string of it, so the whole ' +
-        'book fits one page'
+      'choosing 12 fits the whole book on one page'
     );
-    assert.equal(
-      selectTriggerText(target, hook),
-      '12',
-      'and the trigger states the chosen value'
+    assert.equal(selectTriggerText(target, hook), '12', 'and the trigger states the chosen value');
+    assert.ok(
+      Boolean(target.querySelector(':scope [data-inventory-recipe-pager] [data-pagination-prev]')),
+      'the pager stays drawn on one page, so a smaller size can be chosen again'
     );
   });
 

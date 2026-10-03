@@ -6,7 +6,7 @@
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `list` / `pageSize` / `page` | array / number / number | `[]` / `6` / `0` | The whole list, the window size and the caller-owned page index. |
+  | `list` / `pageSize` / `page` | array / number / number | `[]` / `6` / `0` | The whole list, the window size and the caller-owned page index, already clamped to the list. |
   | `sectionKey` | string | `''` | The wrapper's `data-inventory-pager` value, which tells the inspector's pagers apart. |
   | `ariaLabel` | resolved string | `''` | The section title, naming the pager's region and nav landmarks. |
 
@@ -26,7 +26,6 @@
   } = $props();
 
   const total = $derived(Array.isArray(list) ? list.length : 0);
-  const lastPage = $derived(Math.max(0, Math.ceil(total / (pageSize > 0 ? pageSize : 1)) - 1));
 </script>
 
 {#if total > pageSize}
@@ -34,7 +33,7 @@
     <Pagination
       totalCount={total}
       {pageSize}
-      pageIndex={Math.min(Math.max(0, page), lastPage)}
+      pageIndex={page}
       persistent
       showPageSize={false}
       density="compact"
