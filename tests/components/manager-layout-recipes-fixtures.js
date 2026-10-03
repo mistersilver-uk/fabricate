@@ -122,7 +122,7 @@ export const OR_MENU_GLYPHS = {
 };
 // ── THE KIND PICKER (issue 1510) ─────────────────────────────────────────────────────────
 /**
- * The requirement row's kind control exactly as `RecipeIngredientOption` renders it: the picker ROOT
+ * The requirement row's kind control exactly as `PickerRow` renders it: the picker ROOT
  * with the trigger nested inside, because the root is where `.fabricate-select` and the caller's
  * `.manager-recipe-option-kind` land while the rung is `.fabricate-select
  * .fabricate-select-trigger-inline`. A trigger-only fixture matches neither, and the row-parity and

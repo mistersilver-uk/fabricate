@@ -22,6 +22,7 @@ import {
   assertSelectHasResolvedName,
   chooseSelectOption,
   selectOptionLabels,
+  selectOptionValues,
   selectTriggerText,
 } from '../helpers/select-control.js';
 
@@ -66,7 +67,7 @@ const harness = createMountedComponentHarness({
     // The repair block's plain-language readback (issue 1373, maintainer round 5).
     'src/ui/svelte/apps/manager/tools/toolRepairSummary.js',
     // The ONE ingredient-kind table (issue 1373, round 8).
-    'src/ui/svelte/apps/manager/recipe/ingredientKindMeta.js',
+    'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
     // `toolStudio.js` delegates the Tool display precedence to this layering-neutral leaf
     // so the engines and chat cards can reuse it too (issue 1119).
     'src/models/toolDisplay.js',
@@ -108,7 +109,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/tools/ToolInheritCard.svelte',
     'src/ui/svelte/apps/manager/tools/ToolSystemScopeCards.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeIngredientGroupCard.svelte',
-    'src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte',
+    'src/ui/svelte/apps/manager/recipe/PickerRow.svelte',
+    'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeIngredientSetCard.svelte',
     // The shared scoped-entity patterns the Tool Studio is converted onto (issue 1362).
     'src/ui/svelte/apps/manager/scoped/ScopedEntityPreview.svelte',
@@ -1284,6 +1286,76 @@ describe('Tool Studio editor (mounted)', () => {
     root.querySelector('.manager-recipe-or-trigger').click();
     assert.equal(document.querySelector('[data-recipe-add="alternative-essence"]'), null);
     assert.equal(document.querySelector('[data-recipe-add="alternative-currency"]'), null);
+    assert.deepEqual(
+      selectOptionValues(root, '.fabricate-select-trigger[data-recipe-option-kind]'),
+      ['component', 'tags'],
+      'and the row’s own kind select offers neither'
+    );
+  });
+
+  it('edits a repair row in place: names it, steps it and removes it', async () => {
+    const patches = [];
+    const unnamed = {
+      id: 'g1',
+      options: [{ quantity: 1, match: { type: 'component', componentId: null } }],
+    };
+    const kept = {
+      id: 'g2',
+      options: [{ quantity: 2, match: { type: 'tags', tags: ['metal'], tagMatch: 'any' } }],
+    };
+    const repairing = (repairRequirements) =>
+      tool({ onBreak: { mode: 'flagBroken' }, repairRequirements });
+    const root = await harness.mount(
+      props({
+        activeTab: 'breakage',
+        tool: repairing([unnamed, kept]),
+        onPatch: (patch) => {
+          patches.push(patch);
+        },
+      })
+    );
+    const row = () =>
+      root.querySelector('[data-recipe-group-id="g1"]').querySelector('[data-recipe-option]');
+    /** The one repair set the editor forwarded, applied back as the Tool it edits. */
+    async function forwarded() {
+      await new Promise((done) => setTimeout(done, 0));
+      assert.equal(patches.length, 1, 'one edit forwards one patch');
+      const { repairRequirements } = patches.pop();
+      await harness.setProps({ tool: repairing(repairRequirements) });
+      return repairRequirements;
+    }
+
+    const field = row().querySelector('[data-recipe-option-search]');
+    field.focus();
+    field.value = 'scrap';
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    document.querySelector('[data-recipe-option-suggestion="scrap"]').click();
+    const named = {
+      id: 'g1',
+      options: [{ quantity: 1, match: { type: 'component', componentId: 'scrap' } }],
+    };
+    assert.deepEqual(await forwarded(), [named, kept]);
+    assert.equal(
+      row().querySelector('.manager-recipe-option-chosen-name').textContent,
+      'Iron Scrap'
+    );
+
+    row().querySelector('[data-stepper-increment]').click();
+    assert.deepEqual(await forwarded(), [
+      { id: 'g1', options: [{ ...named.options[0], quantity: 2 }] },
+      kept,
+    ]);
+    assert.equal(row().querySelector('[data-recipe-option-quantity]').value, '2');
+
+    row().querySelector('[data-recipe-remove="alternative"]').click();
+    assert.deepEqual(await forwarded(), [kept]);
+    assert.deepEqual(
+      [...root.querySelectorAll('[data-recipe-group]')].map((group) =>
+        group.getAttribute('data-recipe-group-id')
+      ),
+      ['g2']
+    );
   });
 
   // Whitespace between sibling elements is significant in Svelte markup: a newline in the

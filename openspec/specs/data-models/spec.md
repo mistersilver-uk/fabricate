@@ -1973,7 +1973,7 @@ Ingredient = {
   extractEffects: boolean,
 
   match: {
-    type: "component" | "tags" | "currency",
+    type: "component" | "tags" | "currency" | "essence",
 
     // type = "component"
     componentId?: string,
