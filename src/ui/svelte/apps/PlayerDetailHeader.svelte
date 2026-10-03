@@ -8,7 +8,7 @@
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `name` | string | `''` | The record's name, drawn on the row's one `h2`. |
-  | `art` / `icon` / `tint` | resolved image path / Font Awesome classes / bare `--fab-tag-*` key | `''` / the tile's own / `''` | Forwarded to the tile, which is always 38px. The caller resolves the image. |
+  | `art` / `icon` / `tint` | resolved image path / Font Awesome classes / bare `--fab-tag-*` key | `''` / the tile's own / `''` | Forwarded to the tile: a 38px record tile, or a 32px portrait. The caller resolves the image. |
   | `portrait` | boolean | `false` | The subject is an actor, so the tile is an `Avatar` drawing initials from `name` when `art` is empty. |
   | `artDimmed` | boolean | `false` | Fades the artwork beneath `tileOverlay`, never the overlay itself. |
   | `primaryLabel` | string | `''` | The primary's visible text. Empty renders no primary at all. |
@@ -64,7 +64,7 @@
   <span class="player-detail-header-tile" class:is-dimmed={artDimmed}>
     <span class="player-detail-header-art">
       {#if portrait}
-        <Avatar {art} {name} alt="" size={38} />
+        <Avatar {art} {name} alt="" size={32} />
       {:else}
         <Medallion {art} {icon} {tint} alt="" size={38} />
       {/if}

@@ -111,7 +111,7 @@ describe('PlayerDetailHeader', () => {
     );
   });
 
-  it('draws an actor as a 38px portrait, with initials when there is no artwork', async () => {
+  it('draws an actor as a 32px portrait, with initials when there is no artwork', async () => {
     const target = await header.mount({ name: 'Akra Vey', portrait: true });
     const row = assertIdentityHeader(target, { primaries: 0, name: 'Akra Vey' });
     assert.equal(row.querySelector('.fab-avatar').textContent.trim(), 'AV');

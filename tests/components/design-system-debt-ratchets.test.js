@@ -837,65 +837,92 @@ test('no corner radius leaves the published ladder', (t) => {
   );
 });
 
-/** The four rungs the icon-chip size ladder publishes. */
-const ART_SIZE_LADDER = new Set([22, 26, 30, 38]);
+/** The two size ladders `design-system/spec.md` publishes: a record's art and an actor's portrait. */
+const SIZE_LADDERS = Object.freeze({
+  art: new Set([22, 26, 30, 38]),
+  portrait: new Set([26, 32]),
+});
 
-/** The components that ARE the art tile. */
+/** The components that ARE the art tile, each with its own default size and the ladder it is held to. */
 const ART_TILE_COMPONENTS = new Map([
-  ['Medallion', 40],
-  ['Avatar', 32],
+  ['Medallion', { kind: 'art', defaultSize: 40 }],
+  ['Avatar', { kind: 'portrait', defaultSize: 32 }],
 ]);
 
 /**
- * Every art-tile render site, as `{ file, line, size }` with `size` a number or `dynamic`.
+ * Every art-tile render site, as `{ file, line, kind, size }` with `size` a number or `dynamic`.
  *
- * @returns {{ file: string, line: number, size: number|'dynamic' }[]}
+ * @returns {{ file: string, line: number, kind: 'art'|'portrait', size: number|'dynamic' }[]}
  */
 function artTileSizes(templates) {
   const found = [];
   for (const { file, source, ast } of templates) {
     walkElements(ast.fragment ?? ast, (element) => {
       if (element.type !== 'Component' || !ART_TILE_COMPONENTS.has(element.name)) return;
+      const { kind, defaultSize } = ART_TILE_COMPONENTS.get(element.name);
       const text = attributeText(source, element, 'size');
       const line = lineOf(source, element.start);
       // An absent `size` takes the primitive's OWN default.
       if (text === null) {
-        found.push({ file, line, size: ART_TILE_COMPONENTS.get(element.name) });
+        found.push({ file, line, kind, size: defaultSize });
         return;
       }
       const literal = /^size=\{\s*(\d+(?:\.\d+)?)\s*\}$/u.exec(text);
-      found.push({ file, line, size: literal ? Number(literal[1]) : 'dynamic' });
+      found.push({ file, line, kind, size: literal ? Number(literal[1]) : 'dynamic' });
     });
   }
   return found;
 }
 
-const isOffArtLadder = (site) => site.size === 'dynamic' || !ART_SIZE_LADDER.has(site.size);
+const isOnLadder = (site) => SIZE_LADDERS[site.kind].has(site.size);
 
 const ART_SIZE_GATE = templateGate((templates) =>
   artTileSizes(templates)
-    .filter(isOffArtLadder)
-    .map((site) => ({ ...site, id: `off-ladder art size ${site.size}` }))
+    .filter((site) => !isOnLadder(site))
+    .map(({ file, line, kind, size }) => ({
+      file,
+      line,
+      size,
+      id: `off-ladder ${kind} size ${size}`,
+    }))
 );
+
+test('each art tile is held to its own kind of ladder', () => {
+  const fixture = templatesOf(
+    () =>
+      '<Avatar size={32} /><Avatar size={38} /><Avatar size={size} />' +
+      '<Medallion size={38} /><Medallion size={32} /><Medallion />',
+    ['src/ui/svelte/Fixture.svelte']
+  );
+  assert.deepEqual(
+    artTileSizes(fixture)
+      .filter((site) => !isOnLadder(site))
+      .map((site) => `${site.kind} ${site.size}`),
+    ['portrait 38', 'portrait dynamic', 'art 32', 'art 40'],
+    'a portrait at its 32px rung is on its ladder and a 38px portrait is not, while a record tile ' +
+      'is held to the art ladder and its 40px default is off it'
+  );
+});
 
 test('no new art tile renders at an off-ladder size', (t) => {
   const sites = artTileSizes(treeTemplates());
 
-  // NON-VACUITY, and it is worth its own line here. A scan that had stopped recognising the tile's
-  // component name would produce an empty `sites` and report every base offender as paid down
-  // rather than the scan as broken. The floor says that in the gate's own language; this says it
-  // about the tile itself.
-  assert.ok(
-    sites.some((site) => ART_SIZE_LADDER.has(site.size)),
-    'no art tile in the tree renders at a published rung, so the ladder this gate filters ' +
-      'against is matching nothing and every site would be recorded as debt'
-  );
+  // Non-vacuity: a scan that had stopped recognising a tile's component name would report every
+  // base offender of that kind as paid down rather than the scan as broken.
+  for (const kind of Object.keys(SIZE_LADDERS)) {
+    assert.ok(
+      sites.some((site) => site.kind === kind && isOnLadder(site)),
+      `no ${kind} tile in the tree renders at a published rung, so the ladder this gate filters ` +
+        'that kind against is matching nothing and every site would be recorded as debt'
+    );
+  }
   assertFloor('off-ladder art-tile sizes', sites.length, 40);
   checkGate(
     t,
     ART_SIZE_GATE,
-    'Art and portraits carry their own size ladder — 22, 26, 30 and 38, default 26 — and this ' +
-      'gate fails a render site off it that the base commit does not have. A new one is not ' +
+    'Art and portraits carry their own size ladders — art at 22, 26, 30 and 38, default 26; a ' +
+      'portrait at 32 alone and 26 stacked — and this ' +
+      'gate fails a render site off its ladder that the base commit does not have. A new one is not ' +
       'automatically wrong: restricting `size` would move almost every art tile in the app, so ' +
       'the geometry sweep owns that correction. What a new site does mean is that a decision was ' +
       'taken about one tile in isolation, so state the rung you rejected and why in a ' +
