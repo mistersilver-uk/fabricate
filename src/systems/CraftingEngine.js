@@ -165,6 +165,7 @@ import {
   openSalvageRun,
   publishSalvageFailure,
   publishSalvageSuccess,
+  refuseSalvage,
   resolveSalvageFailure,
   resolveSalvageRunRecord,
   runSalvageCheck,
@@ -6430,7 +6431,7 @@ export class CraftingEngine {
    */
   async salvage(actorUuid, craftingSystemId, componentId, options = {}) {
     const ctx = await this._openSalvageContext(actorUuid, craftingSystemId, componentId, options);
-    if (ctx.refusal) return ctx.refusal;
+    if (ctx.refusal) return refuseSalvage(this, ctx);
     const record = await resolveSalvageRunRecord(this, ctx);
     if (record) return record.result;
     const tools = await validateSalvageTools(this, ctx);
@@ -6466,7 +6467,7 @@ export class CraftingEngine {
   }
 
   /** The Foundry edge, call inputs and component for this salvage; every `refusal` is reached
-   * before any salvage run exists. */
+   * before this call creates or advances a salvage run. */
   async _openSalvageContext(actorUuid, craftingSystemId, componentId, options) {
     const ctx = {
       actorUuid,
