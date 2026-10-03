@@ -13,6 +13,7 @@ import {
   TYPEAHEAD_RUNE_MODULES,
   SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
+  LOCALIZE_OR_RAW_MODULES,
 } from '../helpers/svelte-component-harness.js';
 import {
   TOOL_TREE_COMPILED_MODULES,
@@ -31,6 +32,7 @@ const harness = createMountedComponentHarness({
   rawModules: [
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     ...TOOL_TREE_RAW_MODULES,
     ...WORLD_TOOL_SCOPE_RAW_MODULES,
     // The BUFFERED edit this page stages into.

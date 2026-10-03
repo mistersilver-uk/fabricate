@@ -5,7 +5,7 @@ import { after, before, describe, it } from 'node:test';
 import { createRawSnippet } from 'svelte';
 
 import { createMountedComponentHarness, SELECT_COMPILED_MODULES, SEARCHABLE_POPOVER_RAW_MODULES } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const component = (name) => `src/ui/svelte/components/${name}.svelte`;
@@ -27,7 +27,7 @@ const runActionHarness = createHarness(
     component('IconButton'),
     'src/ui/svelte/components/SegmentedControl.svelte',
   ],
-  [...FOUNDRY_BRIDGE_RAW_MODULES]
+  [...FOUNDRY_BRIDGE_RAW_MODULES, ...LOCALIZE_OR_RAW_MODULES]
 );
 const worldClockHarness = createHarness('WorldClockChip', [component('Chip')]);
 const listRowHarness = createHarness('ListRow', [component('Medallion')]);
@@ -48,7 +48,10 @@ const resultModules = ['ListRow', 'Medallion', 'Chip'].map(component);
 const stageCardHarness = createHarness('StageCard', [...resultModules, component('Kicker')]);
 const yieldHarness = createHarness('YieldScale', resultModules);
 const outcomeHarness = createHarness('OutcomeLadder', resultModules);
-const pagerHarness = createHarness('Pagination', [...SELECT_COMPILED_MODULES, component('IconButton')], SEARCHABLE_POPOVER_RAW_MODULES);
+const pagerHarness = createHarness('Pagination', [...SELECT_COMPILED_MODULES, component('IconButton')], [
+  ...SEARCHABLE_POPOVER_RAW_MODULES,
+  ...LOCALIZE_OR_RAW_MODULES,
+]);
 const harnesses = [
   runActionHarness,
   worldClockHarness,

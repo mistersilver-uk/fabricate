@@ -24,7 +24,7 @@
     overridden — `tests/components/check-additional-dice-fields-mounted.test.js`.
 -->
 <script>
-  import { localize } from '../../../util/foundryBridge.js';
+  import { localizeOr } from '../../../util/localizeOr.js';
   import RollDataExpressionInput from '../RollDataExpressionInput.svelte';
   import { interpolate } from './checksCopy.js';
   import { targetValueStatus } from './checkTargetStatus.js';
@@ -40,18 +40,13 @@
     onChange = () => {},
   } = $props();
 
-  function text(key, fallback) {
-    const translated = localize(key);
-    return translated && translated !== key ? translated : fallback;
-  }
-
   function storedPathStatus(path, copy) {
     const key = String(path ?? '').trim();
     if (!key) return { tone: 'danger', text: copy.empty };
     if (!character) {
       return {
         tone: 'muted',
-        text: text(
+        text: localizeOr(
           'FABRICATE.Admin.Manager.Checks.Evaluation.ValueNoActor',
           'Choose a character in Preview as to see what this resolves to.'
         ),
@@ -63,7 +58,7 @@
       return { tone: 'warning', text: interpolate(copy.unresolved, words) };
     }
     if (read.overridden) return { tone: 'warning', text: interpolate(copy.overridden, words) };
-    const resolved = text(
+    const resolved = localizeOr(
       'FABRICATE.Admin.Manager.Checks.Evaluation.ValueResolved',
       '{actor} → {value}'
     );
@@ -71,7 +66,9 @@
   }
 
   const resolution = $derived(
-    documentPath ? storedPathStatus(value, documentPath) : targetValueStatus(value, character, text)
+    documentPath
+      ? storedPathStatus(value, documentPath)
+      : targetValueStatus(value, character, localizeOr)
   );
   const uid = $props.id();
   const hintId = `${uid}-value-hint`;
@@ -112,7 +109,7 @@
     <!-- The path syntax stays the field's description for assistive tech; the prototype draws only
        the live reading beneath the field. -->
     <small class="visually-hidden" id={hintId} {...attr(hooks.hint)}>
-      {text(
+      {localizeOr(
         'FABRICATE.Admin.Manager.Checks.Evaluation.ValueHint',
         'A character path with its leading @, or arithmetic on paths without dice, such as @skills.craft.value - 2.'
       )}

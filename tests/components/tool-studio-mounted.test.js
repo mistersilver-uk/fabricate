@@ -17,7 +17,7 @@ import {
   describeValidationAddressPairing,
   describeValidationHostContract,
 } from '../helpers/validationAddressContracts.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import {
   assertSelectHasResolvedName,
   chooseSelectOption,
@@ -51,6 +51,7 @@ const harness = createMountedComponentHarness({
     // The add-new essence offer projection (issue 1036).
     'src/ui/model/essenceValidation.js',
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/components/stepperLabels.js',
     'src/ui/svelte/util/chanceColorScale.js',

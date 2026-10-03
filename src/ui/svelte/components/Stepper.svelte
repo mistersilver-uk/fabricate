@@ -172,8 +172,8 @@
   }
 
   function commitDraft(input) {
-    const text = input.value.trim();
-    emitFormatted(text === formattedDisplay ? undefined : parsedDraft(text), input);
+    const typed = input.value.trim();
+    emitFormatted(typed === formattedDisplay ? undefined : parsedDraft(typed), input);
   }
 
   function keyedValue(key) {

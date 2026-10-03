@@ -1,7 +1,7 @@
 /** The mount-harness module closure of `ComponentEditView.svelte`. */
 
 import { COMPONENT_SCOPE_LEAF_MODULES } from './componentScopeMountModules.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from './foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from './foundryBridgeModules.js';
 import { CHECK_TARGET_RAW_MODULES } from './svelte-component-harness.js';
 
 /** Raw (uncompiled) modules the harness copies into the temp tree verbatim. */
@@ -21,6 +21,7 @@ export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
   'src/utils/rollExpressionAverage.js',
   'src/utils/rollFormulaRollability.js',
   ...FOUNDRY_BRIDGE_RAW_MODULES,
+  ...LOCALIZE_OR_RAW_MODULES,
   'src/ui/svelte/util/listReorderAnnouncement.js',
   // The ONE derivation of a `<Stepper>`'s three accessible names from its field label
   // (issue 1050); the tree reaches it through the salvage check override's custom field.

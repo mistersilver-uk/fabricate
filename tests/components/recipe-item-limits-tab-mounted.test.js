@@ -6,6 +6,7 @@ import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   TYPEAHEAD_RUNE_MODULES,
   createMountedComponentHarness,
+  LOCALIZE_OR_RAW_MODULES,
 } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -18,6 +19,7 @@ const harness = createMountedComponentHarness({
   runeModules: TYPEAHEAD_RUNE_MODULES,
   rawModules: [
     ...SEARCHABLE_POPOVER_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     // The Limits tab's "Character prerequisites to learn" picker imports the pure
     // prerequisite engine (issue 544).
     'src/systems/characterPrerequisites.js',

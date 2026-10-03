@@ -11,7 +11,7 @@ import {
   describeValidationAddressPairing,
   describeValidationHostContract,
 } from '../helpers/validationAddressContracts.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -20,6 +20,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-essence-edit-',
   rawModules: [
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/managerColorTokens.js',
     'src/ui/svelte/util/essenceIcons.js',

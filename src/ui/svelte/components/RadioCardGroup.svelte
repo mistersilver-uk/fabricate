@@ -31,7 +31,7 @@
 -->
 <script>
   import Field from './Field.svelte';
-  import { localize } from '../util/foundryBridge.js';
+  import { localizeOr } from '../util/localizeOr.js';
 
   let {
     cardId = undefined,
@@ -55,12 +55,6 @@
 
   const extraClasses = $derived(extraClass ? ` ${extraClass}` : '');
 
-  function text(key, fallback) {
-    if (!key) return fallback;
-    const translated = localize(key);
-    return translated && translated !== key ? translated : fallback;
-  }
-
   function choose(option, event) {
     if (disabled || option.disabled) return;
     onChange(event.currentTarget.value);
@@ -74,11 +68,11 @@
   {disabled}
   {...rest}
 >
-  <legend class="manager-resolution-mode-legend">{text(legendKey, legend)}</legend>
+  <legend class="manager-resolution-mode-legend">{localizeOr(legendKey, legend)}</legend>
   {#if hintKey || hint}
     <p class="manager-resolution-mode-note" role="note">
       <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
-      <span>{text(hintKey, hint)}</span>
+      <span>{localizeOr(hintKey, hint)}</span>
     </p>
   {/if}
   <div class="manager-resolution-mode-options" style={`--manager-radio-card-columns: ${columns}`}>
@@ -105,19 +99,19 @@
         {/if}
         <div class="manager-resolution-option-body">
           <span class="manager-resolution-option-name" data-tool-choice-title>
-            {text(option.labelKey, option.label || option.fallback)}
+            {localizeOr(option.labelKey, option.label || option.fallback)}
             {#if option.meta}<code class="manager-resolution-option-meta" data-radio-card-meta
                 >{option.meta}</code
               >{/if}
             {#if option.disabled && (option.badgeKey || option.badgeFallback)}
               <span class="manager-resolution-option-badge"
-                >{text(option.badgeKey, option.badgeFallback)}</span
+                >{localizeOr(option.badgeKey, option.badgeFallback)}</span
               >
             {/if}
           </span>
           {#if option.description || option.descFallback}
             <span class="manager-resolution-option-desc" data-tool-choice-description
-              >{text(option.descKey, option.description || option.descFallback)}</span
+              >{localizeOr(option.descKey, option.description || option.descFallback)}</span
             >
           {/if}
           {#if optionBody}{@render optionBody(option)}{/if}

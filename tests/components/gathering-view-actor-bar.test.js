@@ -16,7 +16,7 @@ import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -160,7 +160,7 @@ describe('GatheringView ↔ actor bar wiring', () => {
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     // Issue 2053: the attempt buttons record the window a roll prompt opens in.
-    for (const rawModule of [...SEARCHABLE_POPOVER_RAW_MODULES, 'src/ui/svelte/util/rollPromptOrigin.js']) {
+    for (const rawModule of [...SEARCHABLE_POPOVER_RAW_MODULES, ...LOCALIZE_OR_RAW_MODULES, 'src/ui/svelte/util/rollPromptOrigin.js']) {
       const rawDestination = join(tempRoot, rawModule);
       mkdirSync(dirname(rawDestination), { recursive: true });
       writeFileSync(rawDestination, readFileSync(resolve(repoRoot, rawModule), 'utf8'));
