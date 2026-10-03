@@ -93,9 +93,6 @@ function validateMountedComponentDependencies({ repoRoot, rawModules, runeModule
  */
 export { rewriteClientImports };
 
-/** Re-exported beside the popover roster it usually accompanies, from its own leaf. */
-export { LOCALIZE_OR_RAW_MODULES } from './foundryBridgeModules.js';
-
 /**
  * Guard the whole CLIENT/SERVER split every mounted suite depends on. Svelte's exports are
  * condition-mapped: the `browser` condition selects the real client build and every other condition

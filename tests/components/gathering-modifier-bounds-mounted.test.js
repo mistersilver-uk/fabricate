@@ -18,7 +18,7 @@ const EDITOR_PATH = 'src/ui/svelte/apps/manager/environment/GatheringModifierEdi
 
 const harness = createMountedComponentHarness({
   repoRoot,
-  tmpPrefix: 'fabricate-character-modifier-bounds-row-',
+  tmpPrefix: 'fabricate-gathering-modifier-bounds-',
   rawModules: [
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...LOCALIZE_OR_RAW_MODULES,

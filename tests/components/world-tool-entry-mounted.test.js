@@ -1,26 +1,26 @@
 /** The world Tool entry, mounted (issue 1373, epic 1357). */
 import assert from 'node:assert/strict';
-import { after, before, describe, it } from 'node:test';
 import { dirname, resolve } from 'node:path';
+import { after, before, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { tick } from 'svelte';
 
+import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js';
+import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   TYPEAHEAD_RUNE_MODULES,
   SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
-  LOCALIZE_OR_RAW_MODULES,
 } from '../helpers/svelte-component-harness.js';
 import {
   TOOL_TREE_COMPILED_MODULES,
   TOOL_TREE_RAW_MODULES,
   WORLD_TOOL_SCOPE_RAW_MODULES,
 } from '../helpers/toolMountModules.js';
-import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 

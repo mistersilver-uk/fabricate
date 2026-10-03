@@ -9,7 +9,6 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
-  CHARACTER_MODIFIER_BOUNDS_PATH,
   CHARACTER_MODIFIER_PANEL_PATH,
   CHARACTER_MODIFIER_PANEL_LEAVES,
   CHARACTER_MODIFIER_RAIL_PATH,
@@ -263,11 +262,11 @@ describe('Stepper unset-value split (issue 1050, D1a)', () => {
     // And the component the two of them render really is the one the table entry resolves in,
     // so this cannot pass against some other file with the same tag name.
     assert.ok(
-      Object.hasOwn(markup, CHARACTER_MODIFIER_BOUNDS_PATH),
+      Object.hasOwn(markup, CHARACTER_MODIFIER_PANEL_PATH),
       'the panel holding the bounds row is a tracked component in the scanned corpus'
     );
     assert.equal(
-      stepperTags(markup[CHARACTER_MODIFIER_BOUNDS_PATH]).length,
+      stepperTags(markup[CHARACTER_MODIFIER_PANEL_PATH]).length,
       1,
       'and it holds exactly one Stepper, which is what makes one table entry cover four fields'
     );

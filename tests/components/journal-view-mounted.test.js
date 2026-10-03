@@ -1,20 +1,21 @@
-import { after, afterEach, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { after, afterEach, before, describe, it } from 'node:test';
+
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
+import { RunJournalBuilder } from '../../src/ui/presenters/RunJournalBuilder.js';
+import { byCodePoint } from '../helpers/codePointOrder.js';
+import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { makeCraftingRun, makeGatheringRun, makeSucceededRun } from '../helpers/journal-fixtures.js';
+import { chooseSelectOption } from '../helpers/select-control.js';
 import {
   PLAYER_APP_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
   STATUS_TONE_RAW_MODULES,
   createMountedComponentHarness,
-  LOCALIZE_OR_RAW_MODULES,
 } from '../helpers/svelte-component-harness.js';
-import { makeCraftingRun, makeGatheringRun, makeSucceededRun } from '../helpers/journal-fixtures.js';
-import { RunJournalBuilder } from '../../src/ui/presenters/RunJournalBuilder.js';
-import { byCodePoint } from '../helpers/codePointOrder.js';
-import { chooseSelectOption } from '../helpers/select-control.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const english = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));

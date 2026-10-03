@@ -14,6 +14,7 @@ import {
   fromValue,
   toValue,
 } from '../../src/ui/svelte/apps/manager/recipe/pickerRowKinds.js';
+import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import {
   chooseSelectOption,
   selectOptionValues,
@@ -24,7 +25,6 @@ import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
   TYPEAHEAD_RUNE_MODULES,
-  LOCALIZE_OR_RAW_MODULES,
 } from '../helpers/svelte-component-harness.js';
 
 const harness = createMountedComponentHarness({
