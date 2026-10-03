@@ -3,9 +3,10 @@
   InventorySalvagePanel is the player's salvage surface (issue 675) — the first one
   Fabricate has ever had. It lives INLINE in the inspector; there is no modal.
 
-  Structure: mode banner -> read-only roll summary (after resolution only) -> the
-  per-mode body -> the footer note. The one-shot action it explains is the inspector
-  header's primary (`salvageAction.js` holds its state for both).
+  Structure: tool-block note (when a tool blocks the action) -> mode banner -> read-only
+  roll summary (after resolution only) -> the per-mode body -> the footer note. The
+  one-shot action both notes explain is the inspector header's primary
+  (`salvageAction.js` holds its state for both).
 
   BODY DISPATCH IS ON THE PAIR `(mode, checkUsable)`, not a four-way taxonomy. A check
   is usable iff its mode's roll formula is authored, and that is the only gate the
@@ -142,26 +143,30 @@
         )
   );
 
-  // The note explains what pressing the button COSTS, and that cost is not the same in
-  // both states: with a usable check the button is the roll — it commits, once, with no
+  // The footer note explains what pressing the button COSTS, and that cost is not the same
+  // in both states: with a usable check the button is the roll — it commits, once, with no
   // reroll, which is the surprise worth warning about. Without one there is nothing to
   // roll and nothing to lose. One note for both said neither.
   //
-  // A missing required tool SUPERSEDES the cost note (issue 777): the footer slot shows
-  // exactly one note, so when the action is blocked on a tool it explains WHY the button
-  // is off rather than what pressing it would cost — the block is the more actionable fact.
+  // A missing required tool SUPERSEDES the cost note (issue 777): the block is the more
+  // actionable fact, so it is stated at the top of the panel, nearest the header action
+  // it disables, and the footer is not drawn.
   const footerNote = $derived(
     localize(
-      toolBlocked
-        ? 'FABRICATE.App.Inventory.Salvage.ToolBlockedNote'
-        : checkUsable
-          ? 'FABRICATE.App.Inventory.Salvage.FooterNoteRoll'
-          : 'FABRICATE.App.Inventory.Salvage.FooterNote'
+      checkUsable
+        ? 'FABRICATE.App.Inventory.Salvage.FooterNoteRoll'
+        : 'FABRICATE.App.Inventory.Salvage.FooterNote'
     )
   );
 </script>
 
 <div class="salvage-panel" data-inventory-salvage-panel={mode}>
+  {#if toolBlocked}
+    <!-- The header action names this note by its id. -->
+    <p class="salvage-footer-note" id="salvage-footer-note" data-inventory-salvage-footer-note>
+      {localize('FABRICATE.App.Inventory.Salvage.ToolBlockedNote')}
+    </p>
+  {/if}
   {#if actingSystemLabel}
     <Kicker data-inventory-salvage-acting-system="">{actingSystemLabel}</Kicker>
   {/if}
@@ -255,11 +260,10 @@
         </span>
       {/if}
     </p>
-  {:else}
-    <!-- A ruled row closing the panel: what pressing the header's action costs, or why it is
-         off. The header action names this note by its id. -->
+  {:else if !toolBlocked}
+    <!-- A ruled row closing the panel: what pressing the header's action costs. -->
     <div class="salvage-footer">
-      <p class="salvage-footer-note" id="salvage-footer-note" data-inventory-salvage-footer-note>
+      <p class="salvage-footer-note" data-inventory-salvage-footer-note>
         {footerNote}
       </p>
     </div>
@@ -297,7 +301,7 @@
   }
 
   /* Foundry's global `.app button` pins a fixed height and centers content; reset the
-     inherited box or the inline reset is cropped. */
+     inherited box or 'Salvage again' is cropped. */
   .salvage-again {
     box-sizing: border-box;
     appearance: none;

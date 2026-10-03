@@ -1718,6 +1718,15 @@ describe('InventoryView (mounted) — player salvage surface', () => {
       'salvage-footer-note',
       'the disabled action points at the block note'
     );
+    const panel = target.querySelector('[data-inventory-salvage-panel]');
+    const note = panel.firstElementChild;
+    assert.equal(note.id, 'salvage-footer-note', 'the block note opens the panel, under the tabs');
+    assert.match(note.textContent, /Salvage\.ToolBlockedNote/, 'and states the block');
+    assert.equal(
+      panel.querySelectorAll('[data-inventory-salvage-footer-note]').length,
+      1,
+      'the footer cost note is not drawn beside it'
+    );
   });
 
   it('renders no tools section when no tool is required', async () => {
