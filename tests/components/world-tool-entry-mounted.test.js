@@ -103,7 +103,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/tools/ToolRepairRequirements.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeIngredientSetCard.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeIngredientGroupCard.svelte',
-    'src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte',
+    'src/ui/svelte/apps/manager/recipe/PickerRow.svelte',
+    'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte',
     // The per-row match-type segmented control those three render.
     'src/ui/svelte/components/SegmentedControl.svelte',
     'src/ui/svelte/components/Pagination.svelte',
@@ -1673,6 +1674,61 @@ describe('the world Tool entry (issue 1373)', () => {
         [],
         'the seed must not travel through the section write path, which would refuse its name'
       );
+    });
+
+    it('writes each edit to a seeded repair row: a name, an amount, then its removal', async () => {
+      const writes = [];
+      const seed = (repairRequirements) => ({
+        onBreak: { mode: 'flagBroken' },
+        repairRequirements,
+      });
+      const blank = { quantity: 1, match: { type: 'component', componentId: null } };
+      const second = {
+        id: 'g2',
+        options: [{ quantity: 3, match: { type: 'component', componentId: 'ingot' } }],
+      };
+      const target = await mountBreakage(null, {
+        worldDefault: seed([{ id: 'g1', options: [blank] }, second]),
+        actions: {
+          setWorldRepairRequirements: (id, groups) => {
+            writes.push([id, groups]);
+            return true;
+          },
+        },
+      });
+      const first = () =>
+        target.querySelector('[data-recipe-group-id="g1"]')?.querySelector('[data-recipe-option]');
+      /** The one write the page made, re-projected as the world default it now holds. */
+      async function written() {
+        await new Promise((done) => setTimeout(done, 0));
+        assert.equal(writes.length, 1, 'one edit makes one write');
+        const [id, groups] = writes.pop();
+        assert.equal(id, 'pick');
+        await harness.setProps({ scope: scopeFor(seed(groups)) });
+        return groups;
+      }
+
+      const search = first().querySelector('[data-recipe-option-search]');
+      search.focus();
+      search.value = 'glass';
+      search.dispatchEvent(new Event('input', { bubbles: true }));
+      await tick();
+      target.ownerDocument.querySelector('[data-recipe-option-suggestion="shard"]').click();
+      const shard = { ...blank, match: { type: 'component', componentId: 'shard' } };
+      assert.deepEqual(await written(), [{ id: 'g1', options: [shard] }, second]);
+      assert.equal(first().querySelector('[data-recipe-option-chosen]').title, 'Glass Shard');
+
+      first().querySelector('[data-stepper-increment]').click();
+      assert.deepEqual(await written(), [
+        { id: 'g1', options: [{ ...shard, quantity: 2 }] },
+        second,
+      ]);
+      assert.equal(first().querySelector('[data-stepper-input]').value, '2');
+
+      first().querySelector('[data-recipe-remove="alternative"]').click();
+      assert.deepEqual(await written(), [second]);
+      assert.equal(target.querySelectorAll('[data-recipe-group]').length, 1);
+      assert.ok(!first(), 'the removed requirement is no longer drawn');
     });
 
     // ── CURRENCY IS WORLD SCOPE (issue 1373, maintainer round 5) ──────────────────────────

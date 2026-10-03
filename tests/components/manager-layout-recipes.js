@@ -383,7 +383,7 @@ test('the tag requirement row keeps its arm whole, and an EMPTY one is a row lik
         <span class="manager-chip is-tag manager-recipe-tag-chip" data-recipe-tag="abrasive"><span>abrasive</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>
         <span class="manager-chip is-tag manager-recipe-tag-chip" data-recipe-tag="hide"><span>hide</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>`;
 
-  // The row exactly as `RecipeIngredientOption` renders a tag requirement: the plate.
+  // The row exactly as `PickerRow` renders a tag requirement: the plate.
   const tagRow = (caseName, chips) =>
     stamp(`
     <div class="manager-recipe-ingredient-option-row is-tag" data-recipe-option data-case="${caseName}">
@@ -1455,7 +1455,7 @@ test("the requirement row's two dashed affordances paint at all, and at the desi
   );
   assert.doesNotMatch(
     readFileSync(
-      resolve(__dirname, '../../src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte'),
+      resolve(__dirname, '../../src/ui/svelte/apps/manager/recipe/PickerRow.svelte'),
       'utf8'
     ),
     /\n\s+triggerChip\b/,

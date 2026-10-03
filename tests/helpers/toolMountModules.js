@@ -15,7 +15,7 @@ export const TOOL_TREE_RAW_MODULES = Object.freeze([
   // The repair block's plain-language readback (issue 1373, maintainer round 5).
   'src/ui/svelte/apps/manager/tools/toolRepairSummary.js',
   // The ONE ingredient-kind table (issue 1373, round 8).
-  'src/ui/svelte/apps/manager/recipe/ingredientKindMeta.js',
+  'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
   ...FOUNDRY_BRIDGE_RAW_MODULES,
   'src/ui/svelte/util/overlayHost.js',
   // The one tone map the converted status chips read (issue 1506).

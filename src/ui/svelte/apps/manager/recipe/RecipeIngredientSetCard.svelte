@@ -11,9 +11,9 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  // No essence OFFER projection here: the adder creates an unnamed row, so the offer lives in
-  // `RecipeIngredientOption`'s own field and the adder gates on the UNFILTERED roster, because a
-  // system whose essences are all disabled must keep the match type.
+  // No essence offer projection here: the adder creates an unnamed row and the group card applies
+  // the offer to the row's catalogue. The adder gates on the unfiltered roster, because a system
+  // whose essences are all disabled must keep the match type.
   import RecipeIngredientGroupCard from './RecipeIngredientGroupCard.svelte';
   import Button from '../../../components/Button.svelte';
   import IconButton from '../../../components/IconButton.svelte';

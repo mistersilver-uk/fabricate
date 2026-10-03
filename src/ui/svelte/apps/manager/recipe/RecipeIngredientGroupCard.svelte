@@ -13,16 +13,16 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  // No essence OFFER projection here: the adder seeds nothing, so the offer lives where the
-  // choice is made, in `RecipeIngredientOption`'s own field. `essenceOptions` stays UNFILTERED,
-  // because `hasEssences` gates the whole essence match TYPE on it and filtering would take
-  // essence requirements away from a system whose essences are all disabled.
-  import RecipeIngredientOption from './RecipeIngredientOption.svelte';
+  // The add-new essence offer reaches a row as its catalogue's `offered` flag. `essenceOptions`
+  // itself stays unfiltered, because `hasEssences` gates the whole essence match type on it.
+  import { visibleEssenceOptions } from '../../../../model/essenceValidation.js';
+  import { currencyUnitIcon, currencyUnitLabel } from '../../../util/recipeCurrency.js';
+  import PickerRow from './PickerRow.svelte';
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
   import Button from '../../../components/Button.svelte';
   // The ONE kind table, shared with the row's plate and kind select: the `or…` menu's entries and
   // the choice group's adders read their glyph, tint class and one-word name from it.
-  import { ingredientKindMarkClass, ingredientKindMeta } from './ingredientKindMeta.js';
+  import { fromValue, kindMarkClass, kindMeta, toValue } from './pickerRowKinds.js';
 
   let {
     group = {},
@@ -65,6 +65,39 @@
   // A currency alternative is authorable only when the feature is enabled AND units exist.
   const canAddCost = $derived(currencyEnabled && (currencyUnits || []).length > 0);
 
+  // What every row of this requirement may offer and name: the kinds the adders offer, the
+  // currency read-only face once its feature is off, and one catalogue per kind.
+  const kinds = $derived([
+    'component',
+    'tags',
+    ...(hasEssences ? ['essence'] : []),
+    ...(canAddCost ? ['currency'] : []),
+  ]);
+  const readonlyKinds = $derived(currencyEnabled ? [] : ['currency']);
+  const catalogue = $derived.by(() => {
+    const offered = new Set(visibleEssenceOptions(essenceOptions).map((essence) => essence.id));
+    return {
+      component: (componentOptions || []).map((item) => ({
+        id: item.id,
+        label: item.name,
+        img: item.img,
+        icon: 'fas fa-cube',
+      })),
+      tags: (itemTags || []).map((tag) => ({ id: tag, label: tag, icon: 'fas fa-tag' })),
+      essence: (essenceOptions || []).map((essence) => ({
+        id: essence.id,
+        label: essence.name,
+        icon: essence.icon || 'fas fa-flask-vial',
+        offered: offered.has(essence.id),
+      })),
+      currency: (currencyUnits || []).map((unit) => ({
+        id: unit.id,
+        label: currencyUnitLabel(currencyUnits, unit.id),
+        icon: currencyUnitIcon(currencyUnits, unit.id),
+      })),
+    };
+  });
+
   // The accessible name for the trigger, the dialog and its search field.
   const orMenuLabel = $derived(
     text('FABRICATE.Admin.Manager.Recipe.AcceptInstead', 'Accept instead')
@@ -79,8 +112,8 @@
   const orMenuChoice = (kind, addMarker) => ({
     id: kind,
     addMarker,
-    icon: ingredientKindMarkClass(kind),
-    label: text(ingredientKindMeta(kind).labelKey, ingredientKindMeta(kind).label),
+    icon: kindMarkClass(kind),
+    label: text(kindMeta(kind).labelKey, kindMeta(kind).label),
   });
   const orMenuOptions = $derived([
     orMenuChoice('component', 'alternative-component'),
@@ -206,15 +239,12 @@
             <span>{text('FABRICATE.Admin.Manager.Recipe.Or', 'OR')}</span>
           </div>
         {/if}
-        <RecipeIngredientOption
-          {option}
-          {componentOptions}
-          {itemTags}
-          {currencyUnits}
-          {currencyEnabled}
-          {essenceOptions}
-          canRemove={true}
-          onChange={(nextOption) => updateOption(index, nextOption)}
+        <PickerRow
+          value={toValue(option)}
+          {kinds}
+          {catalogue}
+          {readonlyKinds}
+          onChange={(value) => updateOption(index, fromValue(option, value))}
           onRemove={() => removeOption(index)}
         />
       {/each}
@@ -228,7 +258,7 @@
         data-recipe-add="alternative-component"
         onclick={() => appendAlternative('component')}
       >
-        <i class={ingredientKindMeta('component').icon} aria-hidden="true"></i>
+        <i class={kindMeta('component').icon} aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.AltComponent', 'alt component')}</span>
       </Button>
       <Button
@@ -236,7 +266,7 @@
         data-recipe-add="alternative-tag"
         onclick={() => appendAlternative('tags')}
       >
-        <i class={ingredientKindMeta('tags').icon} aria-hidden="true"></i>
+        <i class={kindMeta('tags').icon} aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.AltTag', 'alt tag')}</span>
       </Button>
       {#if hasEssences}
@@ -245,7 +275,7 @@
           data-recipe-add="alternative-essence"
           onclick={() => appendAlternative('essence')}
         >
-          <i class={ingredientKindMeta('essence').icon} aria-hidden="true"></i>
+          <i class={kindMeta('essence').icon} aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Recipe.AltEssence', 'alt essence')}</span>
         </Button>
       {/if}
@@ -255,7 +285,7 @@
           data-recipe-add="alternative-cost"
           onclick={() => appendAlternative('currency')}
         >
-          <i class={ingredientKindMeta('currency').icon} aria-hidden="true"></i>
+          <i class={kindMeta('currency').icon} aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Recipe.AltCurrency', 'alt currency')}</span>
         </Button>
       {/if}
@@ -264,16 +294,13 @@
     <!-- Bare requirement: a single row with the "or…" popover inline at its right end. -->
     <div class="manager-recipe-ingredient-requirement-options">
       {#each options as option, index (index)}
-        <RecipeIngredientOption
-          {option}
-          {componentOptions}
-          {itemTags}
-          {currencyUnits}
-          {currencyEnabled}
-          {essenceOptions}
-          canRemove={true}
-          orControl={orMenu}
-          onChange={(nextOption) => updateOption(index, nextOption)}
+        <PickerRow
+          value={toValue(option)}
+          {kinds}
+          {catalogue}
+          {readonlyKinds}
+          convert={orMenu}
+          onChange={(value) => updateOption(index, fromValue(option, value))}
           onRemove={() => removeOption(index)}
         />
       {/each}
