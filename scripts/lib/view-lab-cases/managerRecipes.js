@@ -748,11 +748,15 @@ export const CASES = Object.freeze([
       { selector: '[data-recipe-item-preview] [data-inventory-recipe-pager]', scroll: true },
     ],
     expectView: 'recipe-item-edit',
-    // The trigger, inside the preview, by the hook `triggerData` puts on the button.
-    expectSelector: '[data-recipe-item-preview] [data-inventory-page-size]',
+    // The shared pager's page-size trigger, inside the preview's recipe pager.
+    expectSelector:
+      '[data-recipe-item-preview] [data-inventory-recipe-pager] [data-pagination-size]',
     // In the photograph, not merely in the document.
     expectContained: [
-      { container: '[data-recipe-item-preview]', target: '[data-inventory-page-size]' },
+      {
+        container: '[data-recipe-item-preview]',
+        target: '[data-inventory-recipe-pager] [data-pagination-size]',
+      },
     ],
     kinds: ['manager', 'books-scrolls'],
     // `apps/inventory/detail/` is named here because this is the only case rendering an inventory detail body in the manager.

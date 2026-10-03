@@ -1123,8 +1123,8 @@ describe('1286 the complication row exposes its name treatment, and prose is not
     resolve(repoRoot, 'src/ui/svelte/apps/manager/ComponentEditView.svelte'),
     'utf8'
   );
-  // The Recipe Studio's band left `RecipeResultItemRow.svelte` at issue 1512: it is the shared
-  // ordered list's BODY now, and `RecipeStageComplicationBand.svelte` is where that call site lives.
+  // The Recipe Studio's band is the shared ordered list's BODY (issue 1512), so
+  // `RecipeStageComplicationBand.svelte` is where that call site lives.
   const recipeStageBandSource = readFileSync(
     resolve(repoRoot, 'src/ui/svelte/apps/manager/recipe/RecipeStageComplicationBand.svelte'),
     'utf8'

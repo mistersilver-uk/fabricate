@@ -130,6 +130,9 @@ test('round-trip: export → import(keep) → export is deep-equal modulo volati
       ]
     }
   ];
+  // Issue 1516: a recipe result's rolled amount, authored through the result card, rides the same trip.
+  const rolledResult = { id: 'res-rolled', componentId: 'comp-herb', quantity: 2, quantityFormula: '1d4+1' };
+  fixture.recipes[0].resultGroups = [{ id: 'rg-1', name: 'Vigor', results: [rolledResult] }];
   const h = makeHarness(fixture);
 
   const first = exportCurrent(h, FIXTURE_SYSTEM_ID);
@@ -255,6 +258,9 @@ test('round-trip: export → import(keep) → export is deep-equal modulo volati
     false,
     '…and a component that authored nothing keeps the key ABSENT, so it goes on inheriting'
   );
+  const [recipeResult] = second.recipes[0].resultGroups[0].results;
+  assert.equal(recipeResult.quantityFormula, '1d4+1', 'a recipe result keeps its rolled amount');
+  assert.equal(recipeResult.quantity, 2, 'beside the authored quantity');
   const task = second.gatheringConfig.system.tasks.find((entry) => entry.name === 'Forage Herbs');
   assert.equal(task.resolutionMode, 'routed');
   assert.deepEqual(task.resultGroups, sourceTask.resultGroups);

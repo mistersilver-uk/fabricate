@@ -459,7 +459,7 @@ What `IngredientSet.resolveIngredientSelection` reports about the search that pr
 
 #### Slot
 
-The player-facing name for one requirement position in the crafting app's requirement rail.
+The player-facing name for one requirement position in the crafting app's requirement rail, drawn as one tile of the shared requirement chooser.
 
 [Notes](docs/domain/terms.md#slot)
 

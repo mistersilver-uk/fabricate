@@ -1,6 +1,7 @@
 /** The player shell's mounted tier. */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { tick } from '../../node_modules/svelte/src/index-client.js';
 import {
@@ -35,6 +36,8 @@ const harness = createMountedComponentHarness({
   // import closure and names the importer chain, the specifier and the target list.
   rawModules: [
     'src/ui/svelte/util/rollPromptOrigin.js',
+    // The salvage action's state the inspector header and panel share (issue 1518).
+    'src/ui/svelte/apps/inventory/detail/salvage/salvageAction.js',
     // Issue 1506: the one tone map the converted status pills read at a dynamic site.
     ...STATUS_TONE_RAW_MODULES,
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
@@ -124,7 +127,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/disclosurePhrase.js',
     'src/ui/svelte/util/recipeItemAccessBadge.js',
     'src/ui/svelte/util/requirementSlots.js',
+    'src/ui/svelte/apps/crafting/detail/essenceOvershoot.js',
     'src/ui/svelte/util/sceneImages.js',
+    'src/ui/svelte/apps/gathering/linkedSceneImage.js',
     'src/ui/svelte/util/worldTimeLabel.js',
     'src/utils/checkModifierPicks.js',
     // The player complication projection (issue 1286). Reached TWICE from this tree:
@@ -181,7 +186,6 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/RowDisclosure.svelte',
     'src/ui/svelte/apps/crafting/detail/RecipeBodyShell.svelte',
     'src/ui/svelte/apps/crafting/detail/RequirementRail.svelte',
-    'src/ui/svelte/apps/crafting/detail/RequirementTile.svelte',
     'src/ui/svelte/apps/crafting/detail/RollResultBox.svelte',
     'src/ui/svelte/apps/crafting/detail/RoutedByCheckBody.svelte',
     'src/ui/svelte/apps/crafting/detail/SimpleRecipeBody.svelte',
@@ -190,6 +194,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/gathering/EnvironmentCard.svelte',
     'src/ui/svelte/apps/gathering/GatheringDetail.svelte',
     'src/ui/svelte/apps/gathering/GatheringDetailTabs.svelte',
+    'src/ui/svelte/components/EditorTabs.svelte',
     'src/ui/svelte/apps/gathering/GatheringDropModifiers.svelte',
     'src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte',
     'src/ui/svelte/apps/gathering/GatheringEventDetail.svelte',
@@ -770,23 +775,57 @@ describe('FabricateAppRoot (mounted, against a real player registry)', () => {
     );
   });
 
-  it('lets the rail button yield the scrollbar gutter rather than overflowing the 84px column', async () => {
-    // ASSERTED AS A DECLARATION, not as measured overflow.
+  it('draws the rail as 72px of 44px wells that yield the scrollbar gutter', async () => {
+    // Asserted as declarations: headless Chromium's overlay scrollbars take no layout width.
     const { root } = await mountOnCompanionTab();
     const css = shellStyleSheet(root);
 
-    assert.match(
-      ruleBody(css, 'fabricate-app-nav-item'),
-      /width:\s*min\(64px,\s*100%\)/,
-      'a non-shrinkable 64px button inside a 68px content box puts a VISIBLE horizontal '
-        + 'scrollbar in the rail once a thin classic scrollbar takes its ~12px'
-    );
+    assert.match(ruleBody(css, 'fabricate-app-nav'), /flex:\s*0 0 72px/, 'the rail is 72px');
     assert.match(
       ruleBody(css, 'fabricate-app-nav'),
       /scrollbar-gutter:\s*stable/,
-      'and the gutter is reserved up front, so crossing the entry count that starts the scroll '
-        + 'does not reflow the whole column'
+      'the gutter is reserved up front, so crossing the entry count that starts the scroll does '
+        + 'not reflow the column'
     );
+    const item = ruleBody(css, 'fabricate-app-nav-item');
+    assert.match(item, /width:\s*100%/, 'an item fills the rail column rather than capping at 64px');
+    assert.match(item, /height:\s*auto/, 'and grows with its well and label rather than a fixed 64px');
+    assert.doesNotMatch(item, /position\s*:/, "the item declares no position, so it is never the pip's containing block");
+    const well = ruleBody(css, 'fabricate-app-nav-well');
+    assert.match(well, /position:\s*relative/, "the well is the pip's containing block");
+    assert.match(well, /height:\s*44px/, 'each item is a 44px icon well');
+    assert.match(well, /border-radius:\s*9px/, 'at radius 9');
+    assert.match(
+      well,
+      /width:\s*min\(44px,\s*100%\)/,
+      'a well that cannot shrink below 44px inside a 60px rail puts a visible horizontal '
+        + 'scrollbar in it once a thin classic scrollbar takes its ~12px'
+    );
+    assert.match(ruleBody(css, 'fabricate-app-nav-label'), /font-size:\s*10px/, 'labels are 10px');
+  });
+
+  it("puts the journal count pip on the well's outer corner with a ground ring", async () => {
+    const registry = createPlayerExtensionsRegistry({ emitHook: () => {} });
+    const props = makeHost(registry).props();
+    props.services.journal.navCount = 3;
+    const root = await harness.mount(props);
+
+    const pip = root.querySelector('[data-nav-count="journal"]');
+    assert.equal(pip?.textContent, '3', 'the journal entry renders its active-run count');
+    assert.ok(
+      pip.parentElement.classList.contains('fabricate-app-nav-well'),
+      'the pip is positioned against the icon well, never against the whole item'
+    );
+    const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+    const pipRule = /\.fabricate-app \.fabricate-app-nav-count\s*\{([^}]*)\}/.exec(sheet)?.[1] ?? '';
+    assert.match(pipRule, /top:\s*-3px/, 'the pip overhangs the top edge of the well');
+    assert.match(pipRule, /right:\s*-3px/, 'and its right edge, clear of the glyph');
+    assert.match(
+      pipRule,
+      /box-shadow:\s*0 0 0 2px var\(--fab-surface-soft\),\s*0 0 0 2px var\(--fab-bg-1\)/,
+      'a 2px ring in the rail ground separates the pip from the well it overhangs'
+    );
+    assert.match(pipRule, /min-width:\s*16px/, 'the pip is at least 16px');
   });
 });
 

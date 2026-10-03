@@ -333,7 +333,7 @@ export const JOURNAL_PROTOTYPE_BINDINGS = Object.freeze({
   'filter-paused': 'tonic',
   'empty-search': 'rivets',
   dismissal: 'h1/dismiss',
-  'kind-menu-open': 'runs/kind-menu',
+  'kind-toggles': 'runs/kind-menu',
   'automatic-completion': 'poultice/automatic',
   'automatic-blocker': 'canonical/automatic-no-spend',
   wide: 'rivets',

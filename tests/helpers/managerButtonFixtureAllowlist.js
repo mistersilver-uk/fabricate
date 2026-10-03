@@ -127,22 +127,6 @@ export const FIXTURE_ALLOWLIST = Object.freeze([
     }),
   }),
   Object.freeze({
-    file: 'tests/components/recipe-studio-font-size.test.js',
-    classes: 'fabricate-button manager-recipe-component-trigger',
-    count: 1,
-    why:
-      'Population B: the recipe ingredient picker trigger. Root-carrying since issue 1502, and ' +
-      'the fixture whose measurement proved the root is load-bearing rather than cosmetic.',
-  }),
-  Object.freeze({
-    file: 'tests/components/recipe-studio-font-size.test.js',
-    classes: 'fabricate-button manager-recipe-component-trigger manager-recipe-stage-trigger',
-    count: 1,
-    why:
-      'Population B: the recipe stage picker trigger. Root-carrying since issue 1502, and still ' +
-      'unconverted, so it keeps its place here.',
-  }),
-  Object.freeze({
     file: 'tests/components/component-studio-font-size.test.js',
     classes: 'fabricate-button manager-salvage-component-trigger',
     count: 1,

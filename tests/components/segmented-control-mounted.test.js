@@ -427,6 +427,17 @@ describe('SegmentedControl (mounted)', () => {
     );
   });
 
+  it('draws the inline density as its own track class', async () => {
+    const root = await harness.mount({ options: OPTIONS, value: 'inert', density: 'inline' });
+    const track = root.querySelector('.manager-segmented');
+    assert.deepEqual(
+      [...track.classList].filter((name) => !name.startsWith('svelte-')),
+      ['manager-segmented', 'is-inline'],
+      'one density class, no other'
+    );
+    // Its rule exists by the mirror guard below; its 30px is measured in the View Lab, not here.
+  });
+
   it('paints every declared shape and tone in the scoped style block', () => {
     // The mirror guard, in both directions. A value accepted by the class builder but never
     // given a rule renders as the shipped track while the class assertions above still pass:

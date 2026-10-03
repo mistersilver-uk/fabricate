@@ -23,6 +23,8 @@ const OPEN_PROSPECT_TASK = Object.freeze([
   },
 ]);
 const TASK_PREVIEW = '[data-gathering-task-dc] [data-override-preview-actor]';
+/** A Direct task's result rows; a step or a single-element check reads the first. */
+const STRAIGHT_RESULT = '[data-gathering-task-results="straight"] [data-recipe-result-item]';
 const taskOverrideCase = ({ id, label, field, frame, sees, claim = '' }) =>
   managerCase({
     id,
@@ -372,6 +374,44 @@ export const CASES = Object.freeze([
       GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringTaskEditView)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe\/Recipe(ResultGroupCard|ResultsSection)\.svelte$/,
+    ],
+  }),
+  // A Direct task's result on Rolled beside a second on Fixed (issue 1516): the gathering surface of
+  // the result row.
+  managerCase({
+    id: 'manager-gathering-task-editor-straight-rolled',
+    label: 'Manager — Gathering task Direct yields, a rolled amount',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-herbalism', gatheringTaskMode: 'straight' },
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-tasks' },
+      {
+        selector:
+          '[data-gathering-task-id="hb-task-slowbloom"] .fabricate-icon-button[aria-label^="Edit"]',
+      },
+      { selector: '[data-gathering-task-results]', scroll: true },
+      { selector: `${STRAIGHT_RESULT} [data-recipe-option-amount-mode="rolled"]` },
+      { selector: `${STRAIGHT_RESULT} [data-recipe-option-formula]`, fill: '1d4+1' },
+      { selector: '[data-gathering-task-results="straight"] [data-recipe-add="result-item"]' },
+      { selector: '.manager-travel-option:has-text("Moonleaf")' },
+    ],
+    expectView: 'gathering-task-edit',
+    expectSelector: `${STRAIGHT_RESULT} [data-recipe-option-formula]:not([aria-invalid])`,
+    expectLayout: {
+      containerSelector: '[data-gathering-task-results="straight"]',
+      oneLineRows: STRAIGHT_RESULT,
+      alignedRight: `${STRAIGHT_RESULT} .manager-recipe-option-remove`,
+      alignedLeft: `${STRAIGHT_RESULT} [role="radiogroup"]`,
+    },
+    expectContained: [
+      { container: STRAIGHT_RESULT, target: `${STRAIGHT_RESULT} .manager-recipe-option-remove` },
+    ],
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/(Recipe(ResultGroupCard|ResultsSection)|PickerRow|PickerRowAmount)\.svelte$/,
     ],
   }),
   ...['selector', 'straight', 'routed'].map((mode) =>

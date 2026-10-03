@@ -58,6 +58,7 @@ describe('ComponentInventoryColumn (mounted)', () => {
       onSearch: (value) => calls.push(value)
     });
     const input = target.querySelector('.alchemy-inventory-search input');
+    assert.ok(input.closest('.fabricate-search'), 'the shared search field');
     assert.ok(input, 'the search input renders');
     input.value = 'ash';
     input.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
@@ -131,6 +132,8 @@ describe('KnownRecipesColumn (mounted)', () => {
       canSwitch: true
     });
     const switchBtn = target.querySelector('[data-alchemy-switch]');
+    assert.ok(switchBtn.classList.contains('fab-manager-button'), 'the shared button, neutral');
+    assert.ok(!/is-(primary|ghost|danger)/.test(switchBtn.className));
     const title = target.querySelector('.alchemy-known-title');
     assert.ok(switchBtn && title, 'both the Switch and the heading render');
     // The switch must precede the heading in document order (block sits above it).
@@ -139,6 +142,22 @@ describe('KnownRecipesColumn (mounted)', () => {
       relation & globalThis.window.Node.DOCUMENT_POSITION_FOLLOWING,
       'the discipline block is above the "Known recipes" heading'
     );
+  });
+
+  it('searches the known recipes through the shared search field', async () => {
+    const calls = [];
+    const target = await harness.mount({
+      recipes: [knownRecipe('vigor', 'Elixir of Vigor')],
+      knownCount: 1,
+      onSearch: (value) => {
+        calls.push(value);
+      },
+    });
+    const input = target.querySelector(':scope .alchemy-known-search input');
+    assert.ok(input.closest('.fabricate-search'));
+    input.value = 'vig';
+    input.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
+    assert.deepEqual(calls, ['vig']);
   });
 
   it('shows the distinct filtered "no matches" state when a search hides every revealed recipe', async () => {

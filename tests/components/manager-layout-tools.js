@@ -392,12 +392,10 @@ test("the checks rail follows the Tool Studio's inspector convention", () => {
 test('Tool replacement Component picker resists Foundry button height and image overrides', () => {
   const triggerBlock = blockFor(
     '.fabricate-button.fabricate-button.manager-salvage-component-trigger,\n' +
-      '.fabricate-button.fabricate-button.manager-recipe-component-trigger,\n' +
       '.fabricate-button.fabricate-button.manager-tool-replacement-component-trigger'
   );
   const portraitBlock = blockFor(
     '.fabricate-manager .manager-salvage-component-trigger .manager-travel-portrait,\n' +
-      '.fabricate-manager .manager-recipe-component-trigger .manager-travel-portrait,\n' +
       '.fabricate-manager .manager-tool-replacement-component-trigger .manager-travel-portrait'
   );
   const toolOverrideSelector =

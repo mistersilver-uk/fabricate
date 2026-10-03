@@ -6,19 +6,19 @@
    - 'dangerLevelOnly': a risk note above the tasks.
    - 'encounterChance': the encounter-chance bar (or a "safe" hint) above the
      tasks.
-  Then, for blind environments, an "Attempt gathering" button (a blind gather
-  omits the task id so the engine picks a candidate) plus — when the effective
-  reveal policy is not `never` — a "Discovered Tasks (x/y)" list; for targeted
-  environments the selectable task list. Searchable + paginated, with search +
-  pagination state owned here, independent of the events panel. Selecting a row
-  drives the right-column task inspector via onSelectTask; the blind attempt
-  button calls onAttempt with a null task id.
+  Then, for blind environments — when the effective reveal policy is not `never` —
+  a "Discovered Tasks (x/y)" list; for targeted environments the selectable task
+  list. Searchable + paginated, with search + pagination state owned here,
+  independent of the events panel. Selecting a row drives the right-column task
+  inspector via onSelectTask. The panel draws no action: the blind gather is the
+  primary of GatheringDetail's identity header.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
-  import { withRollPromptOrigin } from '../../util/rollPromptOrigin.js';
   import Callout from '../../components/Callout.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
+  import InspectorCard from '../../components/InspectorCard.svelte';
+  import SearchField from '../../components/SearchField.svelte';
   import Pagination from '../../components/Pagination.svelte';
   import GatheringTaskRow from './GatheringTaskRow.svelte';
   import ChanceBar from './ChanceBar.svelte';
@@ -28,12 +28,9 @@
     showDiscovered = false,
     discoveredTaskCount = 0,
     composedTaskCount = 0,
-    blindAttemptable = false,
     activeTasks = [],
     selectedTaskId = null,
     onSelectTask = null,
-    onAttempt = null,
-    busy = false,
     envId = '',
     eventVisibility = 'full',
     eventChance = 0,
@@ -92,7 +89,7 @@
     data-gathering-event-risk-note
   />
 {:else if eventVisibility === 'encounterChance'}
-  <div class="gathering-detail-event" data-gathering-event-summary>
+  <InspectorCard class="gathering-detail-event" data-gathering-event-summary="">
     {#if hasEvent}
       <ChanceBar value={eventChance} scale="event" />
     {:else}
@@ -102,30 +99,7 @@
         data-gathering-safe-hint
       />
     {/if}
-  </div>
-{/if}
-
-{#if isBlind}
-  <div class="gathering-detail-blind-card" data-gathering-blind-card>
-    <div class="gathering-detail-blind-card-lead">
-      <i class="fas fa-mask" aria-hidden="true"></i>
-      <span>{localize('FABRICATE.App.Gathering.Detail.BlindAttemptPrompt')}</span>
-    </div>
-    <span class="gathering-detail-blind-card-divider" aria-hidden="true"></span>
-    <div class="gathering-detail-blind-card-action">
-      <button
-        type="button"
-        class="gathering-detail-blind-attempt"
-        data-gathering-blind-attempt
-        disabled={!blindAttemptable || busy}
-        onclick={(event) =>
-          withRollPromptOrigin(event, () => onAttempt?.({ environmentId: envId, taskId: null }))}
-      >
-        <i class="fas fa-dice" aria-hidden="true"></i>
-        {localize('FABRICATE.App.Gathering.Detail.BlindAttempt')}
-      </button>
-    </div>
-  </div>
+  </InspectorCard>
 {/if}
 
 {#if !isBlind || showDiscovered}
@@ -148,16 +122,13 @@
         </h3>
       {/if}
       {#if activeTasks.length > 0}
-        <label class="gathering-detail-search">
-          <i class="fas fa-search" aria-hidden="true"></i>
-          <input
-            type="search"
-            bind:value={taskSearchTerm}
-            placeholder={localize('FABRICATE.App.Gathering.Detail.TaskSearchPlaceholder')}
-            aria-label={localize('FABRICATE.App.Gathering.Detail.TaskSearchLabel')}
-            data-gathering-task-search
-          />
-        </label>
+        <SearchField
+          class="gathering-detail-search"
+          bind:value={taskSearchTerm}
+          placeholder={localize('FABRICATE.App.Gathering.Detail.TaskSearchPlaceholder')}
+          ariaLabel={localize('FABRICATE.App.Gathering.Detail.TaskSearchLabel')}
+          inputProps={{ 'data-gathering-task-search': '' }}
+        />
       {/if}
     </header>
 
@@ -206,101 +177,6 @@
 {/if}
 
 <style>
-  /* The restricted-tier event summary that opens the tasks panel. */
-  .gathering-detail-event {
-    flex: 0 0 auto;
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-2);
-    padding: var(--fab-space-3);
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface-soft);
-  }
-
-  /* Blind call-to-action card: a flavour lead (icon + prompt) on the left, a
-     faint partial-height divider, then the centered attempt button. */
-  .gathering-detail-blind-card {
-    flex: 0 0 auto;
-    display: flex;
-    align-items: stretch;
-    gap: var(--fab-space-3);
-    padding: var(--fab-space-3);
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface-soft);
-  }
-
-  .gathering-detail-blind-card-lead {
-    flex: 0 0 auto;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    padding: 0 var(--fab-space-3);
-    text-align: center;
-    color: var(--fab-text-muted);
-  }
-
-  .gathering-detail-blind-card-lead i {
-    font-size: 30px;
-  }
-
-  .gathering-detail-blind-card-lead span {
-    font-size: 13px;
-  }
-
-  .gathering-detail-blind-card-divider {
-    flex: 0 0 auto;
-    width: 1px;
-    align-self: stretch;
-    margin: var(--fab-space-2) 0;
-    background: var(--fab-border);
-  }
-
-  .gathering-detail-blind-card-action {
-    flex: 1 1 auto;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .gathering-detail-blind-attempt {
-    flex: 0 0 auto;
-    appearance: none;
-    -webkit-appearance: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    height: 38px;
-    padding: 0 18px;
-    border: 1px solid var(--fab-accent);
-    border-radius: 6px;
-    background: var(--fab-accent);
-    color: var(--fab-on-accent);
-    font: inherit;
-    font-weight: 600;
-    cursor: pointer;
-  }
-
-  .gathering-detail-blind-attempt:hover:not(:disabled) {
-    background: var(--fab-accent-hover);
-  }
-
-  .gathering-detail-blind-attempt:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: 2px;
-  }
-
-  .gathering-detail-blind-attempt:disabled {
-    opacity: 0.5;
-    cursor: default;
-    background: var(--fab-surface-raised);
-    border-color: var(--fab-border);
-    color: var(--fab-text-muted);
-  }
-
   /*
     Sections stack at their natural height and the column (.gathering-detail,
     overflow-y: auto) scrolls. They must NOT flex-grow/shrink: with two stacked
@@ -340,31 +216,10 @@
     min-width: 0;
   }
 
-  /* Search box, mirroring the left column's environment search. */
-  .gathering-detail-search {
-    position: relative;
+  /* The field's slot in this wrapping row; its box is the shared field's own. */
+  .gathering-detail-section-head > :global(.gathering-detail-search) {
     flex: 1 1 160px;
     min-width: 140px;
-  }
-
-  .gathering-detail-search i {
-    position: absolute;
-    left: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--fab-text-muted);
-    pointer-events: none;
-  }
-
-  .gathering-detail-search input {
-    width: 100%;
-    height: 32px;
-    box-sizing: border-box;
-    padding: 0 10px 0 32px;
-    border: 1px solid var(--fab-border);
-    border-radius: 6px;
-    background: var(--fab-surface);
-    color: var(--fab-text);
   }
 
   .gathering-detail-task-list {
@@ -372,118 +227,5 @@
     flex-direction: column;
     gap: var(--fab-space-2);
     min-width: 0;
-  }
-
-  .gathering-detail-pagination {
-    flex: 0 0 auto;
-  }
-
-  /*
-    Pagination.svelte renders .fabricate-pagination* + .fabricate-icon-button markup.
-    Theme it here with base --fab-* tokens (mirrors the left column). Scoped Svelte
-    styles do NOT leak from the parent, so each panel carries its own copy of this
-    :global override block. (Written before issue 1502, when that markup really was
-    .fabricate-manager-scoped and so unstyled here; see the note below.)
-  */
-  /*
-    ISSUE 1502 — THE PAGER'S SHEET RULES NOW REACH THIS BLOCK, and the `1502 base` declarations
-    below are what stops that moving the frame. `Pagination` and `IconButton` are rooted at the
-    classes they emit, so `styles/fabricate.css` paints this player-app pager where it previously
-    only painted the manager's — the markup is no longer "unstyled" here, which is why that word
-    is gone from the sentence above. Every property this block already declares still WINS (a
-    Svelte `:global` block is injected unlayered; the sheet is imported at `layer(modules)`), so
-    only the remainder is newly painted — and each `1502 base` declaration restates what the
-    remainder rendered BEFORE the widening, which for this control is Foundry core's own `button`
-    / `select` chrome. The per-property audit for all six player callers is in
-    `components/Pagination.svelte`'s docblock.
-  */
-  .gathering-detail-pagination :global(.fabricate-pagination) {
-    display: flex;
-    flex-wrap: nowrap;
-    align-items: center;
-    gap: var(--fab-space-2);
-    padding: var(--fab-space-2) 0 0;
-    border-top: 1px solid var(--fab-border);
-    font-size: 12px;
-    color: var(--fab-text-muted);
-    /* 1502 base: the sheet's `background: var(--fab-overlay-light-03)` is newly painted here
-       and this bar has always been transparent. */
-    background: transparent;
-  }
-
-  .gathering-detail-pagination :global(.manager-pagination-summary) {
-    flex: 0 1 auto;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .gathering-detail-pagination :global(.manager-pagination-nav) {
-    flex: 0 0 auto;
-    display: inline-flex;
-    gap: 4px;
-    align-items: center;
-  }
-
-  .gathering-detail-pagination :global(.manager-pagination-page) {
-    color: var(--fab-text);
-    white-space: nowrap;
-    /* 1502 base: the sheet newly paints `min-width: 96px` and `font-weight: 700` on this
-       label. It has always been a content-width flex item at the inherited weight; the
-       sheet's `text-align: center` is adopted and is inert on a content-width box. */
-    min-width: auto;
-    font-weight: 400;
-  }
-
-  .gathering-detail-pagination :global(.manager-pagination-size) {
-    flex: 0 0 auto;
-    display: inline-flex;
-    gap: 6px;
-    align-items: center;
-    margin-left: auto;
-    white-space: nowrap;
-  }
-
-  /* 1504: the per-page control is a `<Select size="inline">`, so its height, corner, border
-     and colour come from the sheet's `.fabricate-select*` family rather than from this block.
-     Its height (30) and corner (7) are the `inline` rung's, where this block declared 26 and 6;
-     only the border and the ink are unchanged. Only the FILL is this pager's own, and the
-     sheet's family note records how this block still beats the family for it. */
-  .gathering-detail-pagination :global(.manager-pagination-size .fabricate-select-trigger) {
-    background: var(--fab-surface);
-    /* And this row REFUSES the pager's 64px width floor, as it refused the same floor on the
-       native select it replaces: the footer is one nowrap line in a narrow column, and a floor
-       is the thing that would wrap it. */
-    min-width: 0;
-  }
-
-  .gathering-detail-pagination :global(.fabricate-icon-button) {
-    /* 1502 base: Foundry core's `button` rule gives every button `min-height: 2em` and
-       `font-size: var(--font-size-14)`, and the sheet newly overrides both with
-       `min-height: 0` and `font: inherit`. Restated, so the arrow keeps its 28px box (the
-       core minimum, not the 26px below) and the chevron keeps its 14px glyph. */
-    min-height: var(--button-size, 2em);
-    font-size: var(--font-size-14, 0.875rem);
-    flex: 0 0 auto;
-    width: 26px;
-    height: 26px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid var(--fab-border);
-    border-radius: 7px; /* 1504: the specimen's icon rung, so the pager reads as one pair */
-    background: var(--fab-surface);
-    color: var(--fab-text);
-    cursor: pointer;
-  }
-
-  .gathering-detail-pagination :global(.fabricate-icon-button:disabled) {
-    opacity: 0.5;
-    cursor: default;
-  }
-
-  .gathering-detail-pagination :global(.fabricate-icon-button:hover:not(:disabled)) {
-    background: var(--fab-surface-raised);
   }
 </style>

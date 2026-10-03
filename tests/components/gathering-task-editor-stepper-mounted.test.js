@@ -7,6 +7,8 @@ import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
   TYPEAHEAD_RUNE_MODULES,
+  RESULT_ROW_COMPILED_MODULES,
+  RESULT_ROW_RAW_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import { stepMigratedNumberField, stepNativeNumberInput } from '../helpers/numericKeyboardStep.js';
@@ -20,6 +22,11 @@ import {
 } from '../helpers/select-control.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+
+const { missingCensusHooks } = await import('../helpers/resultRowCensus.js');
+const { normalizeGatheringResultGroups } = await import(
+  '../../src/systems/gatheringResultGroups.js'
+);
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const EDITOR_PATH = 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte';
@@ -77,6 +84,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/component/taskOverrideCopy.js',
     'src/systems/countCheck.js',
     'src/systems/countEvaluation.js',
+    ...RESULT_ROW_RAW_MODULES,
   ],
   // A component missing here does not fail this suite — it HANGS it, reported as `# cancelled`.
   compiledModules: [
@@ -94,7 +102,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/SortableList.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeStageComplicationBand.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte',
-    'src/ui/svelte/apps/manager/recipe/RecipeResultItemRow.svelte',
+    ...RESULT_ROW_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte',
     // The SHARED subject check-modifier picker (issue 1095) and the two primitives it
     // renders. Omitting a `.svelte` the tree reaches HANGS the suite (# cancelled).
@@ -844,5 +852,51 @@ describe('the task check override follows the routed check evaluation (issue 200
     commit(successesInput(view), '1');
     await view.sync();
     assert.equal(view.sees(), 'Riverbed Ore · 1 success needed');
+  });
+});
+
+describe('the gathering task result row is the requirement row (issue 1516)', () => {
+  const RESULTS = [
+    { id: 'results', name: 'Ore', results: [{ id: 'ore', componentId: 'cmp-ore', quantity: 3 }] },
+  ];
+
+  /** A Direct task, its one result set controlled through `onUpdateTask` as the host does. */
+  async function mountResults(resultGroups) {
+    const updates = [];
+    let task = { ...taskFixture(), resolutionMode: 'straight', resultGroups };
+    const root = await harness.mount({
+      task,
+      resolutionMode: 'straight',
+      managedItemOptions: [{ id: 'cmp-ore', name: 'Iron Ore', img: 'icons/ore.webp' }],
+      onUpdateTask: (patch) => {
+        updates.push(patch);
+        task = { ...task, ...patch };
+      },
+    });
+    const row = () =>
+      root.querySelector(':scope [data-gathering-task-results="straight"] [data-recipe-result-item]');
+    return { root, updates, row, task: () => task };
+  }
+
+  it('answers the retired row’s hooks, and a typed formula survives save and remount', async () => {
+    const view = await mountResults(RESULTS);
+    assert.deepEqual(missingCensusHooks(view.row(), 'flat'), []);
+
+    const rolled = view.row().querySelector(':scope [data-recipe-option-amount-mode="rolled"] input');
+    rolled.checked = true;
+    rolled.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+    await new Promise((done) => setTimeout(done, 0));
+    assert.equal(view.updates.length, 0, 'opening Rolled leaves the task clean');
+    const field = view.row().querySelector('[data-recipe-option-formula]');
+    field.value = '1d4+1';
+    field.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
+    await new Promise((done) => setTimeout(done, 0));
+    const [saved] = normalizeGatheringResultGroups(view.task().resultGroups);
+    harness.remount();
+
+    const reopened = await mountResults([saved]);
+    assert.ok(reopened.row().querySelector(':scope [data-recipe-option-amount-mode="rolled"] input').checked);
+    assert.equal(reopened.row().querySelector('[data-recipe-option-formula]').value, '1d4+1');
+    assert.equal(saved.results[0].quantity, 3, 'quantity is unchanged');
   });
 });

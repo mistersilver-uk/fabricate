@@ -677,16 +677,9 @@ const REVIEWED = [
     why: 'Salvage component popover trigger, population B.',
   },
   {
-    id: globalRule('.fabricate-button.fabricate-button.manager-recipe-component-trigger'),
-    disposition: 'EXCLUDE',
-    why:
-      "NOT IN THE SEEDED LIST as its own entry: the seed named only the group's first line, " +
-      'and this is the second of its three selectors, reaching two more population-B triggers.',
-  },
-  {
     id: globalRule('.fabricate-button.fabricate-button.manager-tool-replacement-component-trigger'),
     disposition: 'EXCLUDE',
-    why: 'The third selector of that same group, likewise population B only.',
+    why: 'The second selector of that same group, likewise population B only.',
   },
   {
     id: globalRule(
@@ -1156,8 +1149,8 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   // writing no `fabricate-button` class at all.
   assert.equal(
     cascade.sites.filter((site) => site.population === 'B').length,
-    12,
-    'plus the 12 SearchablePopover triggerClass sites still named as debt'
+    11,
+    'plus the 11 SearchablePopover triggerClass sites still named as debt'
   );
   // ...AND THE ONE THAT LEFT LEFT BY CONVERSION AND THEN BY RULING.
   const retiredSite = readFileSync(resolve(repoRoot, POPULATION_B_RETIRED_SITE_FILE), 'utf8');

@@ -1,22 +1,14 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  IoTable is the recipe detail's material-economy region and, since issue 917, the
-  COMPOSITION ROOT for the requirement surface: the slot rail, the single open
-  chooser (an alternatives picker, the shared essence pool, or both when a group's
-  chosen alternative is an essence), and the consumption-plan panel — followed by
-  the unchanged legacy set-level essence rows, the tool rows and the produced outputs.
+  IoTable is the recipe detail's material-economy region and the composition root for the
+  requirement surface: the slot rail with its single open chooser (the group's alternatives as
+  tiles, then its held-stack picker or the shared essence pool when it has either) and the
+  consumption-plan panel, followed by the legacy set-level essence rows, the tool rows and the
+  produced outputs.
 
-  The three-surface presentation it replaces (a flat image grid, a separately
-  stacked alternatives picker and an essence list) could not tell a player which
-  requirement still needed attention, which is the whole job of this area. The
-  have/need pip moved into RequirementTile with it; the `fa-layer-group` alternatives
-  badge was NOT carried across — the rail's disclosure line already states that a
-  slot has alternatives, and the badge used the exact accent trio the open state now
-  claims.
-
-  Legacy set-level `ingredientSet.essences` are threshold-only and never consumed,
-  so they cannot enter an allocation pool and keep their existing row presentation
-  (which also preserves the pinned `[data-io-group="essences"]` smoke selector).
+  Legacy set-level `ingredientSet.essences` are threshold-only and never consumed, so they
+  cannot enter an allocation pool and keep their row presentation (which also preserves the
+  pinned `[data-io-group="essences"]` smoke selector).
 -->
 <script>
   import Medallion from '../../../components/Medallion.svelte';
@@ -35,6 +27,7 @@
   import RequirementRail from './RequirementRail.svelte';
   import EssencePoolPanel from './EssencePoolPanel.svelte';
   import ConsumptionPlanPanel from './ConsumptionPlanPanel.svelte';
+  import { essenceOvershoots } from './essenceOvershoot.js';
   import Kicker from '../../../components/Kicker.svelte';
 
   let {
@@ -73,20 +66,20 @@
   const outputs = $derived(Array.isArray(result?.items) ? result.items : []);
 
   const panelId = $derived(`${idPrefix}-panel`);
-  // The tile the open panel is labelled back at. Every plain essence tile opens the same
-  // pool, so the first of them owns the label.
   const openSlot = $derived(
     slots.find((slot) => slot.interactive && slot.slotId === openSlotId) ?? null
   );
-  const openTileId = $derived(openSlot ? `fabricate-slot-${openSlot.key}` : null);
   // Any open essence slot shows the pool: the shared pool slot, or a group whose chosen
   // alternative is an essence (beneath that group's alternatives).
   const poolOpen = $derived(!readOnly && openSlot?.kind === SLOT_KIND.ESSENCE);
-  const openChoices = $derived(
+  const openStacks = $derived(
     readOnly || !openSlotId
       ? []
-      : ingredientChoices.filter((choice) => choice?.groupId === openSlotId)
+      : ingredientChoices.filter(
+          (choice) => choice?.kind === 'stack' && choice.groupId === openSlotId
+        )
   );
+  const overshoots = $derived(essenceOvershoots(craftability?.essencePool ?? null));
 
   function essenceLabel(state) {
     return String(state?.name ?? state?.label ?? state?.type ?? state?.essenceType ?? '');
@@ -99,44 +92,34 @@
 <section class="crafting-io" data-recipe-section="io">
   {#if slots.length > 0}
     <div class="crafting-io-group" data-io-group="ingredients">
+      {#snippet chooser()}
+        <IngredientOptionSelector
+          choices={openStacks}
+          need={openSlot?.need ?? 0}
+          onChoose={onChooseOption}
+        />
+        {#if poolOpen}
+          <EssencePoolPanel
+            pool={craftability?.essencePool ?? null}
+            {readOnly}
+            onAllocate={(itemKey, units) => onAllocateEssence?.(itemKey, units)}
+          />
+        {/if}
+      {/snippet}
+      <!-- The rail's chooser owns the one panel region, so a slot with nothing to show opens none. -->
       <RequirementRail
         {slots}
         {openSlotId}
         {readOnly}
         {announcement}
         {panelId}
+        choices={ingredientChoices}
         {onOpenSlot}
+        {onChooseOption}
         {onPickForMe}
+        chooser={openStacks.length > 0 || poolOpen ? chooser : null}
       />
-      {#snippet essencePool(id, labelledBy)}
-        <EssencePoolPanel
-          pool={craftability?.essencePool ?? null}
-          {readOnly}
-          panelId={id}
-          {labelledBy}
-          onAllocate={(itemKey, units) => onAllocateEssence?.(itemKey, units)}
-        />
-      {/snippet}
-      {#if openChoices.length > 0}
-        <!-- `role="region"` is load-bearing: `aria-labelledby` on a roleless `<div>` is
-             not exposed at all, so without it the panel the open tile points
-             `aria-controls` at would be an unnamed generic. A pool nested here carries
-             no id of its own, so exactly one element is the panel. -->
-        <div
-          class="crafting-io-chooser"
-          id={panelId}
-          role="region"
-          aria-labelledby={openTileId ?? undefined}
-        >
-          <IngredientOptionSelector choices={openChoices} onChoose={onChooseOption} />
-          {#if poolOpen}
-            {@render essencePool(null, null)}
-          {/if}
-        </div>
-      {:else if poolOpen}
-        {@render essencePool(panelId, openTileId)}
-      {/if}
-      <ConsumptionPlanPanel {plan} {formatList} />
+      <ConsumptionPlanPanel {plan} {overshoots} {formatList} />
     </div>
   {/if}
 
@@ -151,14 +134,16 @@
               <span class="crafting-io-name">{essenceLabel(state)}</span>
             </span>
             <span class="crafting-io-tags">
-              <!-- The reading is a WORD and a COUNT, two children rather than one string, so the
-                   chip's own gap still separates them the way the retired tag's did. -->
-              <Chip density="list" tone={statusChipTone(state.satisfied ? 'success' : 'neutral')}
+              <!-- A word and a count as two children, so the chip's own gap separates them. -->
+              <Chip
+                density="list"
+                emphasis="solid"
+                tone={statusChipTone(state.satisfied ? 'success' : 'neutral')}
                 ><span>{localize('FABRICATE.App.Crafting.Io.Have')}</span><span
                   >{countText(state.have)}</span
                 ></Chip
               >
-              <Chip density="list" tone={statusChipTone('neutral')}
+              <Chip density="list" emphasis="solid" tone={statusChipTone('neutral')}
                 ><span>{localize('FABRICATE.App.Crafting.Io.Need')}</span><span
                   >{countText(state.need)}</span
                 ></Chip
@@ -221,13 +206,6 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
-  }
-
-  /* The open group's alternatives, with the essence pool beneath when one is chosen. */
-  .crafting-io-chooser {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-2);
   }
 
   .crafting-io-list {

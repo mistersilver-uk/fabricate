@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { injectedCss } from '../helpers/chipPaint.js';
 import {
   createMountedComponentHarness,
   PLAYER_APP_COMPILED_MODULES,
@@ -66,6 +67,27 @@ describe('Workbench (mounted)', () => {
     assert.ok(statusPill(target).textContent.includes('Elixir of Vigor'), 'status names the ready recipe');
     assert.equal(brewButton(target).disabled, false, 'ready mode enables Brew');
     assert.equal(target.querySelector('[data-alchemy-status]').getAttribute('aria-live'), 'polite');
+  });
+
+  // Issue 1518: the shared button family at its shipped geometry; no ready pulse.
+  it('draws Brew as the bench’s one full-width primary and Clear as a ghost, with no pulse', async () => {
+    const target = await harness.mount({
+      mode: 'ready',
+      targetName: 'X',
+      benchEmpty: false,
+      benchChips: BENCH,
+      result: RESULT,
+      brewEnabled: true,
+    });
+    const brew = brewButton(target);
+    for (const name of ['fab-manager-button', 'is-primary', 'is-full-width']) {
+      assert.ok(brew.classList.contains(name), `Brew carries ${name}`);
+    }
+    assert.equal(target.querySelectorAll('.fabricate-button.is-primary').length, 1, 'one primary');
+    const clear = target.querySelector('[data-alchemy-clear]');
+    assert.ok(clear.classList.contains('fab-manager-button') && clear.classList.contains('is-ghost'));
+    assert.equal(clear.disabled, false);
+    assert.ok(!/brewpulse|@keyframes/.test(injectedCss()), 'no ready pulse is declared');
   });
 
   it('assembling mode: Brew is disabled (mid-build)', async () => {

@@ -135,7 +135,7 @@ import {
 import { planFirstFitDrain, pooledItemOrder } from './pooledAllocation.js';
 import { resolveCheckTriggerMatches } from './ResolutionModeService.js';
 import { postResultCard } from './resultCardPost.js';
-import { resolveRolledAmount, rolledAwardRecord } from './rolledAmountResolver.js';
+import { resolveRolledAmount, rolledAwardRecord, validateCraft } from './rolledAmountResolver.js';
 import { getCommittedExecutionOutcome, observeExecutionJournal } from './runExecutionJournal.js';
 import {
   attachAwardReceipts,
@@ -844,9 +844,8 @@ export class CraftingEngine {
     return versionedFailure(error?.message || 'The crafting stage could not be started.');
   }
 
-  /** Why a versioned run may not start: a missing recipe or actor, a viewer the recipe is not
-   * craftable for, or an invalid recipe. A grant-attested alchemy match bypasses the visibility
-   * guard. `null` when the run may start. */
+  /** Why a versioned run may not start, `null` when it may: no recipe or actor, a viewer it is not
+   * craftable for (unless a grant attests an alchemy match), or `validateCraft`'s refusal. */
   _versionedRunStartRefusal({ viewer, actor, sourceActors, recipe, trusted, runManager }) {
     if (!runManager || !recipe) return versionedFailure('The crafting recipe is unavailable.');
     if (!actor || !Array.isArray(sourceActors) || sourceActors.length === 0) {
@@ -869,7 +868,7 @@ export class CraftingEngine {
           : null;
       if (guard?.craftable !== true) return versionedFailure('Crafting is unavailable.');
     }
-    const validation = recipe.validate?.({ Roll: diceEngine() }) ?? { valid: true, errors: [] };
+    const validation = validateCraft(recipe, actor, this.resolutionModeService);
     if (validation.valid) return null;
     return versionedFailure(`Invalid recipe: ${(validation.errors || []).join(', ')}`);
   }
@@ -2863,7 +2862,7 @@ export class CraftingEngine {
       };
       return ctx;
     }
-    const validation = recipe.validate({ Roll: diceEngine() });
+    const validation = validateCraft(recipe, craftingActor, ctx.resolutionService);
     if (!validation.valid) {
       ctx.refusal = {
         success: false,

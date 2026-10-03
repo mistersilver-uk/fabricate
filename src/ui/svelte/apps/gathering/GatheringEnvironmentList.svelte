@@ -11,7 +11,9 @@
   import { localize } from '../../util/foundryBridge.js';
   import EmptyState from '../../components/EmptyState.svelte';
   import EnvironmentCard from './EnvironmentCard.svelte';
+  import SearchField from '../../components/SearchField.svelte';
   import Pagination from '../../components/Pagination.svelte';
+  import StatusToggle from '../../components/StatusToggle.svelte';
 
   let { environments = [], selectedId = null, onSelect = null, services = null } = $props();
 
@@ -102,31 +104,23 @@
     <p class="gathering-env-list-hint">
       {localize('FABRICATE.App.Gathering.Environments.Hint')}
     </p>
-    <label class="gathering-env-search">
-      <i class="fas fa-search" aria-hidden="true"></i>
-      <input
-        type="search"
-        bind:value={searchTerm}
-        placeholder={localize('FABRICATE.App.Gathering.Environments.SearchPlaceholder')}
-        aria-label={localize('FABRICATE.App.Gathering.Environments.SearchLabel')}
-      />
-    </label>
+    <SearchField
+      class="gathering-env-search"
+      bind:value={searchTerm}
+      placeholder={localize('FABRICATE.App.Gathering.Environments.SearchPlaceholder')}
+      ariaLabel={localize('FABRICATE.App.Gathering.Environments.SearchLabel')}
+    />
     <div
       class="gathering-env-hide-filter"
       title={localize('FABRICATE.App.Gathering.Environments.HideUnavailableTooltip')}
     >
-      <button
-        type="button"
-        class={`gathering-env-hide-toggle ${hideUnavailable ? 'is-on' : 'is-off'}`}
-        aria-pressed={hideUnavailable}
+      <StatusToggle
+        class="gathering-env-hide-toggle"
+        on={hideUnavailable}
         aria-labelledby={hideLabelId}
-        data-gathering-env-hide-toggle
+        data-gathering-env-hide-toggle=""
         onclick={() => setHideUnavailable(!hideUnavailable)}
-      >
-        <span class="gathering-env-hide-toggle-track" aria-hidden="true">
-          <span class="gathering-env-hide-toggle-knob"></span>
-        </span>
-      </button>
+      />
       <span id={hideLabelId} class="gathering-env-hide-filter-label">{hideLabel}</span>
     </div>
   </header>
@@ -234,39 +228,13 @@
     color: var(--fab-text-muted);
   }
 
-  .gathering-env-search {
-    position: relative;
-    display: block;
+  /* The field's family basis is a toolbar width, which in this column would be its height. */
+  .gathering-env-list-header > :global(.gathering-env-search) {
+    flex: none;
+    min-width: 0;
   }
 
-  .gathering-env-search i {
-    position: absolute;
-    left: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--fab-text-muted);
-    pointer-events: none;
-  }
-
-  .gathering-env-search input {
-    width: 100%;
-    height: 34px;
-    padding: 0 10px 0 32px;
-    border: 1px solid var(--fab-border);
-    border-radius: 6px;
-    background: var(--fab-surface);
-    color: var(--fab-text);
-  }
-
-  /*
-    Full-width filter row beneath the search input: Fabricate's pill switch on
-    the left and a descriptive label to its right — the same track+knob control
-    used across the GM apps (`.fabricate-toggle`), re-themed here with the
-    base `--fab-*` player tokens. The switch is a plain <button> (NOT a
-    checkbox), so Foundry paints none of the control and the track/knob are the
-    only visual (no On/Off text); the label to its right is the accessible name
-    (aria-labelledby). The extra top margin sets the row off from the search.
-  */
+  /* The shared switch on the left and its label, its accessible name, to the right. */
   .gathering-env-hide-filter {
     display: flex;
     align-items: center;
@@ -283,60 +251,6 @@
     white-space: nowrap;
     font-size: 12px;
     color: var(--fab-text-muted);
-  }
-
-  /*
-    Bare, labelless switch: no button chrome (border/background) — the track IS
-    the control and carries the on/off signal by recolouring. The knob slides
-    across and darkens on so it reads against the accent-filled track.
-  */
-  .gathering-env-hide-toggle {
-    appearance: none;
-    -webkit-appearance: none;
-    flex: 0 0 auto;
-    display: inline-flex;
-    align-items: center;
-    padding: 0;
-    border: 0;
-    border-radius: 999px;
-    background: none;
-    cursor: pointer;
-  }
-
-  .gathering-env-hide-toggle:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: 2px;
-  }
-
-  .gathering-env-hide-toggle-track {
-    display: inline-flex;
-    align-items: center;
-    width: 24px;
-    height: 14px;
-    flex: 0 0 24px;
-    padding: var(--fab-space-2xs);
-    border-radius: 999px;
-    background: var(--fab-overlay-light-14);
-    transition: background-color 120ms ease;
-  }
-
-  .gathering-env-hide-toggle.is-on .gathering-env-hide-toggle-track {
-    background: var(--fab-accent);
-  }
-
-  .gathering-env-hide-toggle-knob {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: var(--fab-text-muted);
-    transition:
-      transform 120ms ease,
-      background-color 120ms ease;
-  }
-
-  .gathering-env-hide-toggle.is-on .gathering-env-hide-toggle-knob {
-    transform: translateX(10px);
-    background: var(--fab-bg-0);
   }
 
   .gathering-env-list-scroll {
@@ -379,122 +293,5 @@
   .gathering-env-show-unavailable:focus-visible {
     outline: 2px solid var(--fab-accent);
     outline-offset: 1px;
-  }
-
-  .gathering-env-pagination {
-    flex: 0 0 auto;
-  }
-
-  /*
-    Pagination.svelte renders .fabricate-pagination* + .fabricate-icon-button markup.
-    Theme it here with base --fab-* tokens. (Written before issue 1502, when that
-    markup really was .fabricate-manager-scoped and so unstyled here; see the note
-    below.)
-  */
-  /*
-    ISSUE 1502 — THE PAGER'S SHEET RULES NOW REACH THIS BLOCK, and the `1502 base` declarations
-    below are what stops that moving the frame. `Pagination` and `IconButton` are rooted at the
-    classes they emit, so `styles/fabricate.css` paints this player-app pager where it previously
-    only painted the manager's — the markup is no longer "unstyled" here, which is why that word
-    is gone from the sentence above. Every property this block already declares still WINS (a
-    Svelte `:global` block is injected unlayered; the sheet is imported at `layer(modules)`), so
-    only the remainder is newly painted — and each `1502 base` declaration restates what the
-    remainder rendered BEFORE the widening, which for this control is Foundry core's own `button`
-    / `select` chrome. The per-property audit for all six player callers is in
-    `components/Pagination.svelte`'s docblock.
-  */
-  .gathering-env-pagination :global(.fabricate-pagination) {
-    /*
-      Single inline row in the narrow (~300px) column: never wrap, keep the
-      controls compact, and let only the summary shrink (with an ellipsis) so
-      the nav + per-page stay on one line with the rest of the details.
-    */
-    display: flex;
-    flex-wrap: nowrap;
-    align-items: center;
-    gap: var(--fab-space-2);
-    padding: var(--fab-space-2) 0 0;
-    border-top: 1px solid var(--fab-border);
-    font-size: 12px;
-    color: var(--fab-text-muted);
-    /* 1502 base: the sheet's `background: var(--fab-overlay-light-03)` is newly painted here
-       and this bar has always been transparent. */
-    background: transparent;
-  }
-
-  .gathering-env-pagination :global(.manager-pagination-summary) {
-    flex: 0 1 auto;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .gathering-env-pagination :global(.manager-pagination-nav) {
-    flex: 0 0 auto;
-    display: inline-flex;
-    gap: 4px;
-    align-items: center;
-  }
-
-  .gathering-env-pagination :global(.manager-pagination-page) {
-    color: var(--fab-text);
-    white-space: nowrap;
-    /* 1502 base: the sheet newly paints `min-width: 96px` and `font-weight: 700` on this
-       label. It has always been a content-width flex item at the inherited weight; the
-       sheet's `text-align: center` is adopted and is inert on a content-width box. */
-    min-width: auto;
-    font-weight: 400;
-  }
-
-  .gathering-env-pagination :global(.manager-pagination-size) {
-    flex: 0 0 auto;
-    display: inline-flex;
-    gap: 6px;
-    align-items: center;
-    margin-left: auto;
-    white-space: nowrap;
-  }
-
-  /* 1504: the per-page control is a `<Select size="inline">`, so its height, corner, border
-     and colour come from the sheet's `.fabricate-select*` family rather than from this block.
-     Its height (30) and corner (7) are the `inline` rung's, where this block declared 26 and 6;
-     only the border and the ink are unchanged. Only the FILL is this pager's own, and the
-     sheet's family note records how this block still beats the family for it. */
-  .gathering-env-pagination :global(.manager-pagination-size .fabricate-select-trigger) {
-    background: var(--fab-surface);
-    /* And this row REFUSES the pager's 64px width floor, as it refused the same floor on the
-       native select it replaces: the footer is one nowrap line in a narrow column, and a floor
-       is the thing that would wrap it. */
-    min-width: 0;
-  }
-
-  .gathering-env-pagination :global(.fabricate-icon-button) {
-    /* 1502 base: Foundry core's `button` rule gives every button `min-height: 2em` and
-       `font-size: var(--font-size-14)`, and the sheet newly overrides both with
-       `min-height: 0` and `font: inherit`. Restated, so the arrow keeps its 28px box (the
-       core minimum, not the 26px below) and the chevron keeps its 14px glyph. */
-    min-height: var(--button-size, 2em);
-    font-size: var(--font-size-14, 0.875rem);
-    flex: 0 0 auto;
-    width: 26px;
-    height: 26px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid var(--fab-border);
-    border-radius: 7px; /* 1504: the specimen's icon rung, so the pager reads as one pair */
-    background: var(--fab-surface);
-    color: var(--fab-text);
-    cursor: pointer;
-  }
-
-  .gathering-env-pagination :global(.fabricate-icon-button:disabled) {
-    opacity: 0.5;
-    cursor: default;
-  }
-
-  .gathering-env-pagination :global(.fabricate-icon-button:hover:not(:disabled)) {
-    background: var(--fab-surface-raised);
   }
 </style>

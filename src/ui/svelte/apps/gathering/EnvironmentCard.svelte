@@ -22,7 +22,7 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
-  import { sceneDocumentImage } from '../../util/sceneImages.js';
+  import { watchSceneImage } from './linkedSceneImage.js';
   import { riskClass, riskLabel, biomeChipStyle } from '../../util/gatheringFormat.js';
   import { DEFAULT_GATHERING_ENVIRONMENT_IMG } from '../../../../gatheringImageDefaults.js';
 
@@ -33,25 +33,9 @@
   const img = $derived(String(environment?.img ?? ''));
   const sceneUuid = $derived(String(environment?.sceneUuid ?? ''));
 
-  // When the environment links a scene, show that scene's thumbnail instead of
-  // the environment image (resolved client-side via fromUuid, mirroring
-  // LinkedScene). Falls back to the environment image when there's no linked
-  // scene or its thumbnail can't be resolved.
+  // A linked scene's image stands in for the environment's own, as in `GatheringDetail`'s header.
   let sceneThumb = $state('');
-  $effect(() => {
-    const uuid = sceneUuid;
-    sceneThumb = '';
-    if (!uuid || typeof globalThis.fromUuid !== 'function') return;
-    let cancelled = false;
-    Promise.resolve(globalThis.fromUuid(uuid))
-      .then((doc) => {
-        if (!cancelled && doc) sceneThumb = sceneDocumentImage(doc) || '';
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  });
+  $effect(() => watchSceneImage(sceneUuid, (image) => (sceneThumb = image)));
   const displayImg = $derived(sceneThumb || img);
   const description = $derived(String(environment?.description ?? ''));
   const locked = $derived(environment?.locked === true);

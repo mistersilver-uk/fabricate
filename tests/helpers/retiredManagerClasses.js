@@ -63,6 +63,18 @@ export const HISTORICAL_LINES = Object.freeze([
   },
   {
     file: 'openspec/specs/design-system/library.html',
+    includes: 'restyled <code>.manager-pagination</code> (a class issue 1507 retired) per caller',
+    tokens: 1,
+    why: 'records the player re-themes issue 1518 deleted, and says the class is retired',
+  },
+  {
+    file: 'openspec/specs/design-system/library.html',
+    includes: 'restyled <code>.manager-pagination</code> (a class issue 1507 retired) in their own',
+    tokens: 1,
+    why: 'records the ruled player pager re-themes, and says the class is retired',
+  },
+  {
+    file: 'openspec/specs/design-system/library.html',
     includes: '<code>class="manager-inspector-card"</code> sections (a class issue 1507 retired)',
     tokens: 1,
     why: REPLACED,

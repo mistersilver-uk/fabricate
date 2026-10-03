@@ -158,6 +158,10 @@ describe('GatheringView mounted behavior', () => {
     const sceneImagesDestination = join(tempRoot, 'src/ui/svelte/util/sceneImages.js');
     mkdirSync(dirname(sceneImagesDestination), { recursive: true });
     writeFileSync(sceneImagesDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/sceneImages.js'), 'utf8'));
+    // The linked-scene image the environment card and the centre header share (issue 1518).
+    const linkedSceneImage = 'src/ui/svelte/apps/gathering/linkedSceneImage.js';
+    mkdirSync(dirname(join(tempRoot, linkedSceneImage)), { recursive: true });
+    writeFileSync(join(tempRoot, linkedSceneImage), readFileSync(resolve(repoRoot, linkedSceneImage), 'utf8'));
 
     // GatheringTaskDetail (in the detail tree) imports the calendar-aware
     // respawn-ETA duration formatter, which imports the foundryCalendar helpers.
@@ -202,7 +206,13 @@ describe('GatheringView mounted behavior', () => {
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskRow.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEventRow.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEventDetail.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDetailTabs.svelte');
+    // The tab strip and the shared EditorTabs it renders (issue 1518).
+    for (const tabStrip of [
+      'src/ui/svelte/apps/gathering/GatheringDetailTabs.svelte',
+      'src/ui/svelte/components/EditorTabs.svelte',
+    ]) {
+      writeCompiledSvelte(tabStrip);
+    }
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTasksPanel.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEventsPanel.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDetail.svelte');
@@ -704,6 +714,15 @@ describe('GatheringView mounted behavior', () => {
       // An environment without a linked scene keeps its own image.
       const plainThumb = target.querySelector('[data-environment-id="env-plain"] .gathering-env-card-thumb');
       assert.equal(plainThumb.getAttribute('src'), 'icons/svg/sun.svg', 'no linked scene keeps the environment image');
+
+      target.querySelector('[data-environment-id="env-scene"]').click();
+      await tick();
+      await tick();
+      flushSync();
+      const headerArt = target.querySelector(
+        ':scope [data-gathering-detail-state="selected"] [data-player-detail-header] img'
+      );
+      assert.equal(headerArt?.getAttribute('src'), 'scenes/cave-thumb.webp', 'the identity header draws the card’s image');
     } finally {
       delete globalThis.fromUuid;
     }

@@ -108,6 +108,7 @@ See the [API reference]({% link api/recipe-manager.md %}) for the methods that c
 
 {: .note }
 > Each result must point to a managed component with a difficulty of at least 1.
+> Stage rows have no amount, and any rolled amount is ignored.
 
 ## Setting Component Difficulty
 

@@ -79,7 +79,7 @@ export function journalLifecycleCases() {
     'essence-overshoot',
     'past-routed-stage',
     'future-routed-stage',
-    'kind-menu-open',
+    'kind-toggles',
     'history-settling',
   ];
   const selectRivets = [
@@ -103,7 +103,7 @@ export function journalLifecycleCases() {
           'empty-search',
           'wide',
           'narrow',
-          'kind-menu-open',
+          'kind-toggles',
           'finished-cancelled',
         ],
       ],
@@ -142,6 +142,11 @@ export function journalLifecycleCases() {
       { selector: '[data-journal-search] input', fill: '' },
     ];
   };
+  const kindToggle = (kind) => `[data-journal-kind-toggle="${kind}"]`;
+  const showOnlyKind = (kind) =>
+    ['crafting', 'gathering', 'salvage', 'alchemy']
+      .filter((other) => other !== kind)
+      .map((other) => ({ selector: kindToggle(other) }));
   const steps = {
     // A paused run holds the choices it made (D-028), so its rail is inert and the walk stops at the pause.
     paused: [{ selector: '[data-run-action="pause"]' }],
@@ -188,17 +193,11 @@ export function journalLifecycleCases() {
     'stale-action': [{ selector: '[data-run-action="primary"]' }],
     'command-timeout': [{ selector: '[data-run-action="primary"]' }],
     'roll-cancelled': [{ selector: '[data-run-action="primary"]' }],
-    alchemy: [
-      { selector: '[data-journal-kind-filter]' },
-      { selector: '[data-popover-option="alchemy"]' },
-    ],
-    salvage: [
-      { selector: '[data-journal-kind-filter]' },
-      { selector: '[data-popover-option="salvage"]' },
-    ],
+    alchemy: showOnlyKind('alchemy'),
+    salvage: showOnlyKind('salvage'),
     'past-routed-stage': [{ selector: '[data-stage-nav-index="0"]' }],
     'future-routed-stage': [{ selector: '[data-stage-nav-index="3"]' }],
-    'kind-menu-open': [{ selector: '[data-journal-kind-filter]' }],
+    'kind-toggles': [{ selector: kindToggle('gathering') }],
     'essence-overshoot': [
       { selector: '[data-essence-source$=".Item.jp-duskglass"] [data-stepper-increment]' },
       { selector: '[data-essence-source$=".Item.jp-duskglass"] [data-stepper-increment]' },
@@ -303,7 +302,7 @@ export function journalLifecycleCases() {
       '.journal-view-container' +
       has(
         '[data-run-id="lab-v1-awaiting-choice"] [data-run-attention="choice"]',
-        `${detail} .journal-detail-meta [data-run-attention="choice"]`,
+        `${detail} .player-detail-header-meta [data-run-attention="choice"]`,
         '[data-journal-awaiting-choice="true"][data-notice-tone="info"]',
         '[data-journal-route] input:not(:disabled)'
       ) +
@@ -480,7 +479,7 @@ export function journalLifecycleCases() {
       has(
         '[data-run-action="primary"]:not(:disabled)',
         '[data-journal-stage-consumed] [data-list-row]',
-        '.journal-detail-identity img[src$="bottle-bulb-corked-glowing-red.webp"]'
+        '.journal-detail-header [data-player-detail-header] img[src$="bottle-bulb-corked-glowing-red.webp"]'
       ) +
       lacks('[data-journal-verdict]', '[data-slot-row]'),
     salvage: terminal('succeeded', '[data-history-items="produced"]'),
@@ -560,7 +559,13 @@ export function journalLifecycleCases() {
         '[data-stage-nav-return]'
       ) +
       lacks('[data-journal-summary]', '[data-journal-time-remaining]'),
-    'kind-menu-open': '[role="listbox"] [data-popover-option="gathering"]',
+    'kind-toggles':
+      '.journal-view-container' +
+      has(
+        `${kindToggle('gathering')}[aria-pressed="false"]`,
+        `${kindToggle('crafting')}[aria-pressed="true"]`,
+        '[data-run-id]'
+      ),
     'history-checked-choice': terminal(
       'succeeded',
       '[data-history-summary="check"] ~ [data-history-items="consumed"] ~ [data-history-items="produced"]'
@@ -680,7 +685,7 @@ export function journalLifecycleCases() {
       expectSelector: expected[state],
       ...(pointerTargets[state] && { expectCenterHit: pointerTargets[state] }),
       ...(state === 'filter-paused' && { expectCenterHit: steps[state].at(-1).selector }),
-      ...(state === 'kind-menu-open' && { expectCenterHit: '[data-popover-option="gathering"]' }),
+      ...(state === 'kind-toggles' && { expectCenterHit: kindToggle('gathering') }),
       ...(state === 'current-choice-closed' && {
         expectCenterHit: '[data-slot-row] button.fab-slot-tile',
       }),

@@ -55,8 +55,11 @@ player-crafting-essence-legacy
 player-crafting-essence-ingredient
 player-crafting-essence-shopping
 player-crafting-slot-rail
+player-crafting-chooser-open
 player-crafting-tag-unmatched
 player-crafting-essence-pool
+player-crafting-unmet-by-allocation
+player-crafting-essence-overshoot
 player-crafting-pick-for-me
 player-crafting-essence-pool-shared
 player-crafting-consumption-plan

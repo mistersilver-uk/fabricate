@@ -190,15 +190,16 @@ test('every manifest library name resolves to a library entry', () => {
 });
 
 /**
- * The 24 library entries with no shipped implementation (issue 1505). Re-derived from the array
- * rather than carried forward: `SortableList` left it at issue 1512 and `Well` at issue 2008, when
- * each specified primitive shipped, and the count this docblock states is the array's own length.
+ * The 23 library entries with no shipped implementation (issue 1505). Re-derived from the array
+ * rather than carried forward: `SortableList` left it at issue 1512, `Well` at issue 2008,
+ * `PickerRow` at issue 1516 and `RequirementChooser` at issue 1518, when each specified primitive
+ * shipped, and the count this docblock states is the array's own length.
  */
 const SPECIFIED_ONLY = [
   'AppRail', 'AppTitleBar', 'BandedBar', 'BrowseCard', 'ChoiceGroup',
   'DataTable', 'InfoStrip', 'LogList', 'Menu',
   'Meter', 'NavSidebar', 'PageHeader', 'Rail',
-  'RequirementChooser', 'RuleRow', 'RuleSentence', 'Search', 'SetPicker',
+  'RuleRow', 'RuleSentence', 'Search', 'SetPicker',
   'StageBars', 'TierTrack', 'ValidationList', 'ValidationSummary',
   'ViewToggle', 'XrefList',
 ];

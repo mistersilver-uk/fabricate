@@ -153,6 +153,7 @@ If the environment is `targeted`:
 If the environment is `blind`:
 
 - show one generic gather action or equivalent environment-level action for unrevealed hidden tasks
+- the generic gather action, "Attempt gathering", is the environment detail's identity-header primary; the task list draws no second one, and with a discovered task selected the task inspector carries that task's own Attempt, so each pane holds one primary
 - do not expose alternate unrevealed per-task choices to the player
 - if progressive reveal is enabled, revealed blind tasks may appear as named task rows for the relevant actor/user/party/global scope while unrevealed tasks remain hidden
 - still show task-derived time requirement, stamina cost, node availability, and requirement summaries where useful and safe to reveal
@@ -175,6 +176,9 @@ Before creating a run, the UI must check:
 When the game is paused, the app must keep environment browsing readable, show a paused-game blocker, disable start actions, and avoid implying that stamina, nodes, catalysts, rolls, chat, history, or item awards were consumed.
 
 Start actions must surface blocking reasons for missing stamina, depleted nodes, scene/token access, duplicate active runs, hidden tasks, missing catalysts/tools, attempt limits, provider diagnostics, and paused game.
+A blocked Attempt stays a disabled primary with its visible label, in the pane's identity header.
+Its reason is a visible warning notice directly under the header, "Can't attempt — {reason}", which the Attempt references by `aria-describedby`.
+A blind environment's header Attempt states only the generic reason, because its blockers may be derived from tasks the player cannot see.
 
 If `task.timeRequirement` is absent:
 

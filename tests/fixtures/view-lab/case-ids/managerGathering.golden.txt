@@ -15,6 +15,7 @@ manager-gathering-task-availability-feedback-narrow
 manager-gathering-task-tools-feedback-narrow
 manager-gathering-event-availability-feedback-narrow
 manager-gathering-task-editor-straight
+manager-gathering-task-editor-straight-rolled
 manager-gathering-task-editor-selector-narrow
 manager-gathering-task-editor-straight-narrow
 manager-gathering-task-editor-routed-narrow

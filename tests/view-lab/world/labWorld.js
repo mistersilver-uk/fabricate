@@ -4,7 +4,7 @@ import { createLocalizer, toI18nStub } from '../labI18n.js';
 import { JOURNAL_RUN_SOCKET_KIND } from '../../../src/systems/journalRunCommands.js';
 import { JOURNAL_RUN_CLAIM_PAGE_ID } from '../../../src/systems/journalRunAuthority.js';
 
-import { buildLabActors, buildDocumentIndex } from './labActors.js';
+import { buildLabActors, buildDocumentIndex, seedLearnableBook } from './labActors.js';
 import {
   buildLabContent,
   ICON_BASE,
@@ -28,6 +28,17 @@ const FABRICATE_NAMESPACE = 'fabricate';
 
 // These variants change persisted authoring before the real services initialize. The default
 // world remains unchanged, including every existing d100 editor and gathering screenshot.
+
+/** `unnamed`: the horseshoe recipe's result names no component, as an item-only one does (1516). */
+function seedResultRowState(content, state) {
+  if (state !== 'unnamed') return;
+  const recipe = content.recipes.find((entry) => entry.id === 'sm-r-horseshoe');
+  const [result] = recipe?.resultGroups?.[0]?.results ?? [];
+  if (!result) return;
+  delete result.componentId;
+  result.itemUuid = 'Item.sm-horseshoe';
+}
+
 function seedGatheringTaskMode(content, mode) {
   // Roll-under evaluations: `routed-under` reads Brenna's Intelligence (issue 2073), and
   // `routed-under-fixed` is the fixed ladder whose Journal bands read `≤` (issue 2005); and
@@ -459,6 +470,9 @@ function stripAuthoredWorldComponents(content) {
  * @param {boolean} [options.noSceneRegions] Give the active scene NO regions, for the Map Region
  *   Links no-regions empty state. It also skips the interactable seed, which needs a region.
  * @param {string|null} [options.journalCaseState] Focused persisted Journal state for View Lab.
+ * @param {string|null} [options.resultRowState] `unnamed` for a recipe result naming no component.
+ * @param {boolean} [options.learnableBook] Hand Brenna a book she can learn whole. See
+ *   {@link seedLearnableBook}.
  * @returns {Promise<object>} The world, with `fabricate`, `shim`, and `content` attached.
  */
 export async function buildLabWorld({
@@ -477,6 +491,8 @@ export async function buildLabWorld({
   checkOverride = null,
   journalCaseState = null,
   checkPreviewState = null,
+  resultRowState = null,
+  learnableBook = false,
 } = {}) {
   const content = buildLabContent({ journalCaseState });
   if (
@@ -486,6 +502,7 @@ export async function buildLabWorld({
   }
   if (journalCaseState === 'future-stage-under') seedJournalUnderCheck(content);
   seedGatheringTaskMode(content, gatheringTaskMode);
+  seedResultRowState(content, resultRowState);
   seedRuneworkCheckMode(content, runeworkCheckMode);
   seedCheckOverride(content, checkOverride);
   if (noTools) stripTools(content);
@@ -494,6 +511,7 @@ export async function buildLabWorld({
   if (clearSystem) content.systems = [];
   const actors = buildLabActors(content);
   seedCheckPreviewState(content, actors, checkPreviewState);
+  if (learnableBook) seedLearnableBook(content, actors);
   const documents = buildDocumentIndex(content, actors);
   registerLabMacros(documents);
   const shippedLocalize = await createLocalizer();

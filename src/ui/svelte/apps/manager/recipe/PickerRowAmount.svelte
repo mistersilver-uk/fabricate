@@ -7,7 +7,8 @@
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `value` | the row's `value` | `{}` | Reads `kind`, `quantity` and `quantityFormula`; an absent or non-positive `quantity` shows as 1 and is not written back. |
-  | `amount` | `{ min, max, unit, inputProps, ariaLabel, fixedLabel, rolledLabel, modeAriaLabel, formulaAriaLabel }` | `{}` | The stepper's bounds, a unit drawn after it, attributes added to its input beside the row's own hook, and the caller's localized copy: the stepper's name, the two segment words, and the toggle's and the expression's names, which fall back to the stepper's. A `rollable` caller supplies the two segment words. |
+  | `amount` | `{ min, max, unit, inputProps, ariaLabel, fixedLabel, rolledLabel, modeAriaLabel, formulaAriaLabel }` | `{}` | The stepper's bounds, a unit drawn after it, attributes added to its input beside the row's own hook, and copy that overrides this slot's own: the stepper's name, the two segment words, and the toggle's and the expression's names. |
+  | `name` | string | `''` | The subject's name, or the kind word while unnamed: the stepper is `Quantity for {name}`, the toggle `Amount for {name}` and the expression `Rolled amount for {name}`. |
   | `rollable` | boolean | `false` | Draws the Fixed \| Rolled toggle. Only a `component` row has a formula, so every other kind ignores it. |
   | `readonly` / `disabled` | booleans | `false` | The static read-only amount; and every control off. |
   | `invalid` | string | `''` | A message: sets `aria-invalid` on the amount control and describes it with the message. |
@@ -49,6 +50,7 @@
   let {
     value = {},
     amount = {},
+    name = '',
     rollable = false,
     readonly = false,
     disabled = false,
@@ -90,12 +92,21 @@
   const invalidAttrs = $derived(
     invalid ? { 'aria-invalid': 'true', 'aria-describedby': errorId } : {}
   );
+  const named = (key, fallback) => text(key, fallback).replace('{name}', name);
   const stepperName = $derived(
-    amount.ariaLabel || text('FABRICATE.Admin.Manager.Recipe.Quantity', 'Quantity')
+    amount.ariaLabel || named('FABRICATE.Admin.Manager.Recipe.QuantityFor', 'Quantity for {name}')
   );
   const modes = $derived([
-    { value: 'fixed', fallback: amount.fixedLabel ?? '', disabled },
-    { value: 'rolled', fallback: amount.rolledLabel ?? '', disabled },
+    {
+      value: 'fixed',
+      fallback: amount.fixedLabel || text('FABRICATE.Admin.Manager.Recipe.AmountFixed', 'Fixed'),
+      disabled,
+    },
+    {
+      value: 'rolled',
+      fallback: amount.rolledLabel || text('FABRICATE.Admin.Manager.Recipe.AmountRolled', 'Rolled'),
+      disabled,
+    },
   ]);
 </script>
 
@@ -141,9 +152,10 @@
   <SegmentedControl
     options={modes}
     value={rolled ? 'rolled' : 'fixed'}
-    density="compact"
+    density="inline"
     groupName={`picker-row-amount-${instance}`}
-    ariaLabel={amount.modeAriaLabel || stepperName}
+    ariaLabel={amount.modeAriaLabel ||
+      named('FABRICATE.Admin.Manager.Recipe.AmountFor', 'Amount for {name}')}
     optionDataAttr="data-recipe-option-amount-mode"
     onChange={setMode}
   />
@@ -155,7 +167,13 @@
       {disabled}
       inputAttrs={{
         'data-recipe-option-formula': '',
-        'aria-label': amount.formulaAriaLabel || stepperName,
+        'aria-label':
+          amount.formulaAriaLabel ||
+          named('FABRICATE.Admin.Manager.Recipe.RolledAmountFor', 'Rolled amount for {name}'),
+        title: text(
+          'FABRICATE.Admin.Manager.Recipe.RolledAmountHint',
+          'A dice expression such as 1d4+1, rolled when the result is awarded. A missing character value counts as 0.'
+        ),
         ...invalidAttrs,
       }}
       onChange={writeFormula}

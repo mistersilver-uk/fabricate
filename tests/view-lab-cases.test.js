@@ -668,10 +668,11 @@ function caseSelectors(viewCase) {
   return selectors;
 }
 
-// The five player cases whose layout expectation asserts "this STACKED at 1024px": one
+// The six player cases whose layout expectation asserts "this STACKED at 1024px": one
 // resolved track, inside a 960px content box.
 const RESPONSIVE_LAYOUT_CASE_IDS = [
   'player-inventory-bulk-mixed-narrow',
+  'player-inventory-book-read-learn-stacked',
   'player-gathering-stacked',
   'player-crafting-stacked',
   'player-alchemy-stacked',
@@ -695,7 +696,18 @@ const RAIL_FILL_LAYOUT_CASES = {
   'manager-world-downtime-narrow': { tracks: 2, width: 960 },
 };
 const RAIL_FILL_LAYOUT_CASE_IDS = Object.keys(RAIL_FILL_LAYOUT_CASES);
+// And the requirement row's result cases (issue 1516), which assert row geometry and no grid, each
+// at its own window.
+const ROW_GEOMETRY_LAYOUT_CASE_IDS = [
+  'manager-recipe-edit-results-rolled',
+  'manager-recipe-edit-results-rolled-hearth-herb',
+  'manager-recipe-edit-results-rolled-narrow',
+  'manager-recipe-edit-results-progressive',
+  'manager-recipe-edit-results-narrow',
+  'manager-gathering-task-editor-straight-rolled',
+];
 const LAYOUT_CASE_IDS = [
+  ...ROW_GEOMETRY_LAYOUT_CASE_IDS,
   ...RESPONSIVE_LAYOUT_CASE_IDS,
   ...FULL_WIDTH_LAYOUT_CASE_IDS,
   ...FRAME_STACK_LAYOUT_CASE_IDS,
@@ -717,6 +729,11 @@ test('exactly the declared layout cases carry complete layout expectations', () 
       assert.deepEqual(viewCase.position, { width: narrow ? 1024 : 1240, height: 880 });
       assert.equal(viewCase.expectLayout.expectedTracks, narrow ? 1 : 2);
       assert.equal(viewCase.expectLayout.maxContentBoxInlineSize, narrow ? 960 : undefined);
+      continue;
+    }
+    if (ROW_GEOMETRY_LAYOUT_CASE_IDS.includes(viewCase.id)) {
+      assert.equal(viewCase.expectLayout.gridSelector, undefined, 'row geometry needs no grid');
+      assert.equal(typeof viewCase.expectLayout.oneLineRows, 'string');
       continue;
     }
     // THE WINDOW IS PER GROUP, because the breakpoint each group asserts is a different one and a
@@ -982,7 +999,7 @@ test('all Journal lifecycle captures assert defining product state rather than a
     'essence-overshoot',
     'past-routed-stage',
     'future-routed-stage',
-    'kind-menu-open',
+    'kind-toggles',
     'history-settling',
   ]) {
     assert.ok(byState.has(state), `issue #1648 v4 explicitly requires ${state}`);
@@ -1006,28 +1023,18 @@ test('layout expectation selectors name UI that still exists', () => {
   const haystack = [...sources.values()].join('\n');
   const missing = [];
   for (const viewCase of VIEW_LAB_CASES.filter((entry) => entry.expectLayout)) {
-    collectSelectorHookFailures(
-      viewCase,
-      viewCase.expectLayout.containerSelector,
-      sources,
-      haystack,
-      missing
-    );
-    collectSelectorHookFailures(
-      viewCase,
-      viewCase.expectLayout.gridSelector,
-      sources,
-      haystack,
-      missing
-    );
-    if (viewCase.expectLayout.fillSelector) {
-      collectSelectorHookFailures(
-        viewCase,
-        viewCase.expectLayout.fillSelector,
-        sources,
-        haystack,
-        missing
-      );
+    const { containerSelector, gridSelector, fillSelector, minInlineSize, ...rows } =
+      viewCase.expectLayout;
+    for (const selector of [
+      containerSelector,
+      gridSelector,
+      fillSelector,
+      rows.oneLineRows,
+      rows.alignedRight,
+      rows.alignedLeft,
+      minInlineSize?.selector,
+    ]) {
+      if (selector) collectSelectorHookFailures(viewCase, selector, sources, haystack, missing);
     }
   }
   assert.deepEqual(
@@ -2311,8 +2318,8 @@ test('every crafting case claims exactly the resolution-mode body it renders', (
   // draft, and passed clean.
   assert.equal(
     examined.length,
-    123,
-    `expected the 123 crafting-path cases to be examined, saw ${examined.length}`
+    126,
+    `expected the 126 crafting-path cases to be examined, saw ${examined.length}`
   );
   assert.ok(
     examined.filter((id) =>
@@ -2551,6 +2558,7 @@ const ANCHORED_POPOVER_FRAMES = [
   'manager-recipe-edit-ingredients-kind-list',
   'manager-recipe-edit-ingredients-or-menu',
   'manager-recipe-edit-ingredients-suggestions',
+  'manager-recipe-edit-results-suggestions',
   'manager-recipe-edit-tag-picker',
   'manager-recipe-item-contents-picker',
   'manager-recipes-bulk-edit-check-tier',

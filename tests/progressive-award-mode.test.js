@@ -621,3 +621,36 @@ test('1645: a progressive stage drops its quantityFormula with its quantity', ()
   assert.equal(awarded.quantity, 1, 'a stage awards exactly one');
   assert.equal(awarded.quantityFormula, null, 'so the rolled amount never reaches the resolver');
 });
+
+test('1516: a progressive system validates no amount formula, because its award drops it', async () => {
+  const { Recipe } = await import('../src/models/Recipe.js');
+  const { validateRecipeForPersistence } = await import('../src/systems/recipeValidation.js');
+  const { seededRollClass } = await import('./helpers/seededRoll.js');
+  const { Roll } = seededRollClass({ unparsable: ['max(, 2)'] });
+  // Every id is stated, so the model mints none and needs no Foundry `randomID`.
+  const recipe = Recipe.fromJSON({
+    id: 'imported',
+    name: 'Imported',
+    craftingSystemId: 'test-system',
+    metadata: { version: '1.0.0' },
+    ingredientSets: [{ id: 'set', ingredientGroups: [{ id: 'g', options: [{ quantity: 1 }] }] }],
+    resultGroups: [{ id: 'rg', results: [{ id: 'res', componentId: 'item-A', quantityFormula: 'max(, 2)' }] }],
+  });
+  const formulaErrors = (validation) =>
+    validation.errors.filter((error) => error.includes('quantity formula'));
+
+  assert.equal(formulaErrors(recipe.validate({ Roll })).length, 1, 'any other mode refuses it');
+  assert.deepEqual(formulaErrors(recipe.validate({ Roll, progressive: true })), []);
+  assert.deepEqual(formulaErrors(recipe.validateStructure({ Roll, progressive: true })), []);
+
+  // The save path reads the mode off the recipe's own system.
+  const deps = (resolutionMode) => ({
+    roll: Roll,
+    system: () => buildSystem({ resolutionMode }),
+    essencesOfSystem: () => [],
+    resolutionMode: () => ({ valid: true, errors: [] }),
+  });
+  const saved = (mode) => formulaErrors(validateRecipeForPersistence(recipe, deps(mode)));
+  assert.deepEqual(saved('progressive'), []);
+  assert.equal(saved('simple').length, 1);
+});

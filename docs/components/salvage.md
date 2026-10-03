@@ -190,7 +190,7 @@ A tool the salvaging character holds but which is broken also reads **Unavailabl
 {% include screenshot.html case="player-salvage-tools" %}
 
 While any required tool reads **Unavailable**, the **Salvage** button stays disabled.
-The footer then carries a note explaining that a required tool is missing, in place of the footer's usual one-shot reminder.
+A note directly beneath the Info | Salvage tabs then explains that a required tool is missing, and it replaces the one-shot reminder at the foot of the tab.
 Bringing the tool onto the salvaging character clears the block and makes the button usable.
 
 This is separate from salvaging a broken tool, covered in [Broken Tools](#broken-tools).
@@ -238,8 +238,10 @@ This cannot be undone.
 
 ### Making the Attempt
 
-The footer holds a single button that rolls and commits in one press.
+With the **Salvage** tab open, the item's header holds a single button that rolls and commits in one press.
 It reads **Salvage** when the mode needs no roll, and **Salvage roll** when it has a usable check.
+A note at the foot of the tab states what pressing it costs.
+When a required tool is missing, the button is disabled and a note directly beneath the tabs says why.
 Pressing it opens the standard roll prompt, where the player picks Advantage, Normal or Disadvantage when the formula allows it, adds a situational bonus, and chooses a roll mode.
 The roll is posted to chat, so Dice So Nice animates it.
 There is no reroll and no separate confirmation step.
