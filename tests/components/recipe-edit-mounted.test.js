@@ -6077,7 +6077,7 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
     const openBooks = books.querySelector('[data-recipe-open-books]');
     assert.equal(
       openBooks?.className,
-      'fabricate-button manager-button fab-manager-button manager-recipe-tab-action',
+      'fabricate-button fab-manager-button manager-recipe-tab-action',
       'Open Books & Scrolls keeps its own class and the primitive`s'
     );
     editHarness.remount();
@@ -6089,7 +6089,7 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
     const openAccess = access.querySelector('[data-recipe-open-access]');
     assert.equal(
       openAccess?.className,
-      'fabricate-button manager-button fab-manager-button manager-recipe-tab-action',
+      'fabricate-button fab-manager-button manager-recipe-tab-action',
       'Manage access keeps its own class and the primitive`s'
     );
     editHarness.remount();
@@ -6135,7 +6135,7 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
     assert.ok(target.querySelector('[data-recipe-item-link="ri-b"]'), 'lists the second book');
 
     // The per-row unlink removes only that book.
-    target.querySelector('[data-recipe-item-link="ri-b"] .manager-icon-button.is-danger').click();
+    target.querySelector('[data-recipe-item-link="ri-b"] .fabricate-icon-button.is-danger').click();
     assert.deepEqual(removed, ['ri-b'], 'unlink calls onRemoveRecipeItem with the book id');
     editHarness.remount();
   });

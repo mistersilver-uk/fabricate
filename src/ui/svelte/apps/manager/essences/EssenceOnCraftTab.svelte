@@ -468,7 +468,7 @@
     grid-column: 1;
   }
 
-  .manager-essence-inherit-slot :global(.manager-status-toggle) {
+  .manager-essence-inherit-slot :global(.fabricate-toggle) {
     grid-column: 2;
     grid-row: 1 / -1;
   }

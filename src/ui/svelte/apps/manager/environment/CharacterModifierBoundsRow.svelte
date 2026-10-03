@@ -18,7 +18,7 @@
   lower bound is meaningful and has to stay reachable from the `−` adjunct.
 
   The row's chrome (`.manager-character-modifier-row-bounds` and the `flex: 1 1 80px`
-  on its `.manager-field` children) lives in the global sheet rather than a scoped
+  on its `.fabricate-field` children) lives in the global sheet rather than a scoped
   `<style>` block here, which is why moving the markup into this component leaves the
   layout untouched: `fill` still stretches each stepper to a real, sized flex track.
 -->

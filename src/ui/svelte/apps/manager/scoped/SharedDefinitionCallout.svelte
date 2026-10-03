@@ -96,7 +96,7 @@
 
   /* The exit never wraps and never shrinks: a two-line label turns a 34px control into a 48px one
      and pushes the card taller than every other card on the route. */
-  .manager-scoped-shared-head :global(.manager-button) {
+  .manager-scoped-shared-head :global(.fabricate-button) {
     flex: none;
     white-space: nowrap;
   }

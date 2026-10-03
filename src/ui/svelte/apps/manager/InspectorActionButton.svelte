@@ -6,7 +6,7 @@
   `tone`: `primary` is the ONE loud verb per rail, `danger` destroys a record, `warning` BREAKS A
   LINK rather than destroying one (`Unlink Source` is the shipped case), and an unknown value
   renders neutral. `label` arrives localized and `{...rest}` lands on the `<button>`. It is NOT
-  `.manager-button`, because that class would put the global sheet's tones ahead of this
+  `.fabricate-button`, because that class would put the global sheet's tones ahead of this
   primitive's own; it takes the area-agnostic `fab-` namespace and the Foundry `<button>` reset.
 -->
 <script>

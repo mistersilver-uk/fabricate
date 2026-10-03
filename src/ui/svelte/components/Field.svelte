@@ -1,5 +1,5 @@
 <!--
-  THE manager's labelled form field — the `.manager-field` column that stacks a caption over its
+  THE manager's labelled form field — the `.fabricate-field` column that stacks a caption over its
   control.
 
   Props:
@@ -40,9 +40,7 @@
   const FALLBACK_HOST = 'div';
 
   const host = $derived(HOSTS.has(as) ? as : FALLBACK_HOST);
-  const classes = $derived(
-    ['fabricate-field', 'manager-field', extraClass].filter(Boolean).join(' ')
-  );
+  const classes = $derived(['fabricate-field', extraClass].filter(Boolean).join(' '));
 
   $effect(() => {
     if (HOSTS.has(as)) return;

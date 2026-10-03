@@ -555,15 +555,15 @@ export const CASES = Object.freeze([
     expectContained: [
       {
         container: '[data-vocabulary-panel="recipeCategories"]',
-        target: '[data-recipe-category-id] .manager-icon-button',
+        target: '[data-recipe-category-id] .fabricate-icon-button',
       },
       {
         container: '[data-vocabulary-panel="componentCategories"]',
-        target: '[data-component-category-id] .manager-icon-button',
+        target: '[data-component-category-id] .fabricate-icon-button',
       },
       {
         container: '[data-vocabulary-panel="componentTags"]',
-        target: '[data-component-tag-id] .manager-icon-button',
+        target: '[data-component-tag-id] .fabricate-icon-button',
       },
     ],
     // Taller than the world scoped-entity cases, and the extra 100px is the full-width tag band (issue 1392).

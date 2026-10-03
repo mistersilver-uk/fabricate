@@ -24,7 +24,7 @@ const card = createMountedComponentHarness({
 
 /** Focus the armed control, then disable it exactly as a caller flipping `busy` would. */
 function measureDisableWhileFocused() {
-  const button = document.querySelector('.fab-bulk-delete-card .manager-button');
+  const button = document.querySelector('.fab-bulk-delete-card .fabricate-button');
   if (!button) return { rendered: false };
 
   const events = [];
@@ -86,7 +86,7 @@ describe('1132 disabling the focused delete control fires blur in a real browser
     // Anti-vacuity, asserted before anything it bounds.
     assert.ok(
       measured.rendered,
-      `${CARD_PATH} rendered no .fab-bulk-delete-card .manager-button — the control this gate measures is not in the markup`
+      `${CARD_PATH} rendered no .fab-bulk-delete-card .fabricate-button — the control this gate measures is not in the markup`
     );
     assert.ok(measured.focusedBefore, 'the control did not take focus, so the disable below cannot blur it');
   });

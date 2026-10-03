@@ -92,7 +92,7 @@ export default {
 
       // Open the real import file-picker dialog (file-import icon is unique to it).
       await page
-        .locator('.fabricate-manager button.manager-button:has(i.fa-file-import)')
+        .locator('.fabricate-manager button.fabricate-button:has(i.fa-file-import)')
         .first()
         .click();
       const importDialog = page

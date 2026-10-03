@@ -418,8 +418,8 @@
      takes it to (0,4,0). The SECOND selector is the half a plain re-chain would have broken: the
      "Add tag" control is a `SearchablePopover` trigger from a `triggerClass` STRING and will never
      carry `fab-manager-button`, so it is named by its own trigger class instead. */
-  .manager-import-mapping-row :global(.manager-button.fab-manager-button),
-  .manager-import-mapping-row :global(.manager-button.manager-recipe-routing-add-trigger) {
+  .manager-import-mapping-row :global(.fabricate-button.fab-manager-button),
+  .manager-import-mapping-row :global(.fabricate-button.manager-recipe-routing-add-trigger) {
     min-height: 28px;
     padding: 0 var(--fab-space-2);
     font-size: var(--fab-recipe-control-font);
@@ -428,7 +428,7 @@
   /* `InlineVocabularyAdd`'s Add is `role="primary"`, whose companion rule ties the one above at
      (0,4,0) and is settled by injection order, so the row's compact padding is restated one class
      higher. Only `padding`: the other two are uncontested. */
-  .manager-import-mapping-row :global(.manager-button.fab-manager-button.is-primary) {
+  .manager-import-mapping-row :global(.fabricate-button.fab-manager-button.is-primary) {
     padding: 0 var(--fab-space-2);
   }
 
@@ -473,7 +473,7 @@
 
   /* The field labels read as the bulk rail's micro-labels rather than as body text: the two
      surfaces caption the same vocabulary and sat at two different scales. */
-  .manager-import-mapping-controls :global(.manager-field > span) {
+  .manager-import-mapping-controls :global(.fabricate-field > span) {
     font-size: 0.58rem;
     font-weight: 700;
     letter-spacing: 0.08em;
@@ -497,7 +497,7 @@
   /* ONE RULE, ON THE TRIGGER (issue 1510), where this was two blocks with the identical selector,
      both element-typed against a `<select>` this row no longer renders — an element-typed leg in a
      scoped block dies SILENTLY on conversion and no gate sees it. `:global(...)` chained with
-     `.manager-field`, because a scoped rule cannot reach a class handed to a child, and the
+     `.fabricate-field`, because a scoped rule cannot reach a class handed to a child, and the
      compound restores the (0,2,0) the scoped form had.
 
      THE FLOOR IS WHAT KEEPS THE ROW STILL: the controls row is `flex-wrap` with
@@ -509,7 +509,7 @@
      cannot help while the trigger is the floor and the categories are world-authored. No View Lab
      case can photograph it — the modal opens only on a drop — so
      `tests/components/manager-select-conversion-rendered.test.js` measures it. */
-  :global(.manager-field.manager-import-mapping-category .fabricate-select-trigger) {
+  :global(.fabricate-field.manager-import-mapping-category .fabricate-select-trigger) {
     min-width: 140px;
     font-size: var(--fab-recipe-control-font);
   }

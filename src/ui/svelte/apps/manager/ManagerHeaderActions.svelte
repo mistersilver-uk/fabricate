@@ -325,7 +325,7 @@
       </Button>
     {:else}
       <!-- `data-manager-import-system` is a zero-behaviour hook: the only other handle on this
-           button is `manager-button`, which a dozen header controls share. -->
+           button is `fabricate-button`, which a dozen header controls share. -->
       <Button data-manager-import-system onclick={importSystem}>
         <i class="fas fa-file-import" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Import', 'Import')}</span>

@@ -1363,7 +1363,7 @@
   /* THE UNLINK IS A DESTRUCTIVE CONTROL AND IS DRAWN AS ONE (`proto:2093`): `IconButton.is-danger`
      carries the danger edge and ink but leaves the resting fill neutral. */
   .manager-world-tool-entry-card[data-world-tool-entry-card='linked-item']
-    :global(.manager-item-drop-zone-actions .manager-icon-button) {
+    :global(.manager-item-drop-zone-actions .fabricate-icon-button) {
     flex: 0 0 30px;
     width: 30px;
     height: 30px;
@@ -1471,7 +1471,7 @@
   }
 
   /* AN INVALID FORMULA IS EDGE-MARKED as well as explained; two selectors deep so it beats the
-     shipped `.manager-field input` border. */
+     shipped `.fabricate-field input` border. */
   :global(.manager-world-tool-entry-formula) input[aria-invalid='true'] {
     border-color: var(--fab-danger-border);
   }

@@ -566,7 +566,7 @@ test('the controls nested inside a callout and a notice own their own pointer ta
             <span class="manager-callout-actions"
               ><button
                 type="button"
-                class="fabricate-button manager-button fab-manager-button"
+                class="fabricate-button fab-manager-button"
                 data-probe="callout-action"
                 ><i class="fas fa-globe" aria-hidden="true"></i><span>World Tool</span></button
               ></span
@@ -899,14 +899,14 @@ test('design-system colour tokens are declared in the theme layer as the agreed 
 
 test('manager icon buttons normalize host button defaults and keep pointer targets stable', () => {
   const block = blockFor(
-    '.fabricate-button.manager-button,\n.fabricate-icon-button.manager-icon-button'
+    '.fabricate-button.fabricate-button,\n.fabricate-icon-button.fabricate-icon-button'
   );
-  const primaryIconBlock = blockFor('.fabricate-icon-button.manager-icon-button.is-primary');
+  const primaryIconBlock = blockFor('.fabricate-icon-button.fabricate-icon-button.is-primary');
   const primaryIconHoverBlock = blockFor(
-    '.fabricate-icon-button.manager-icon-button.is-primary:not(:disabled):hover'
+    '.fabricate-icon-button.fabricate-icon-button.is-primary:not(:disabled):hover'
   );
   const iconBlocks = Array.from(
-    css.matchAll(/\.fabricate-icon-button\.manager-icon-button\s*\{[\s\S]*?\}/g)
+    css.matchAll(/\.fabricate-icon-button\.fabricate-icon-button\s*\{[\s\S]*?\}/g)
   );
   const iconBlock = iconBlocks.at(-1)?.[0] || '';
 
@@ -949,11 +949,11 @@ test('manager icon buttons normalize host button defaults and keep pointer targe
     'primary icon buttons should keep a soft green hover state'
   );
   assert.ok(
-    css.includes('.fabricate-button.manager-button:disabled'),
+    css.includes('.fabricate-button.fabricate-button:disabled'),
     'disabled manager buttons should have explicit disabled styling'
   );
   assert.ok(
-    css.includes('.fabricate-button.manager-button:not(:disabled):hover'),
+    css.includes('.fabricate-button.fabricate-button:not(:disabled):hover'),
     'manager hover styles should not target disabled buttons'
   );
 });
@@ -1402,7 +1402,7 @@ test('every remaining hand-rolled chip site is declared, so the migration can on
 });
 
 test('the armed danger button paints a solid danger fill with its own readable foreground', () => {
-  const armedBlock = blockFor('.fabricate-button.manager-button.is-danger.is-armed');
+  const armedBlock = blockFor('.fabricate-button.fabricate-button.is-danger.is-armed');
   const rosterRowBlock = blockFor('.fabricate-manager .manager-knowledge-roster-row');
   const rosterFocusBlock = blockFor(
     '.fabricate-manager .manager-knowledge-roster-row:focus-visible'
@@ -1475,7 +1475,7 @@ test('a disabled manager button paints from the disabled rule in every role and 
   );
   assert.ok(
     DISABLED_CONTEXTS.length >= ANCESTOR_CONTEXT_FLOOR,
-    `the sheet must yield at least ${ANCESTOR_CONTEXT_FLOOR} manager-button containers, got ` +
+    `the sheet must yield at least ${ANCESTOR_CONTEXT_FLOOR} fabricate-button containers, got ` +
       `${DISABLED_CONTEXTS.length} — a shorter list means the prelude scan broke, not that the ` +
       'sheet stopped styling containers'
   );
@@ -1599,7 +1599,7 @@ test('a disabled manager button paints from the disabled rule in every role and 
       for (const role of DISABLED_ROLE_PROBES) {
         record(
           samePaint(off[role], disabledPaint),
-          `${entry.id}: a disabled ${role} button must paint from .manager-button:disabled, ` +
+          `${entry.id}: a disabled ${role} button must paint from .fabricate-button:disabled, ` +
             `not from its role or its container — got border ${off[role].borderColor}, ink ` +
             `${off[role].color}, fill ${off[role].background}; expected border ` +
             `${disabledPaint.borderColor}, ink ${disabledPaint.color}, fill ${disabledPaint.background}`
@@ -1663,7 +1663,7 @@ test('the warning role paints amber, and the is-warning spelling it replaces pai
               <button type="button" class="${managerButtonClassesFor('warning')}" data-probe="warning"><span>Force add</span></button>
               <button type="button" class="${neutral} is-warning" data-probe="misspelt"><span>Force add</span></button>
               <button type="button" class="${neutral}" data-probe="neutral"><span>Force add</span></button>
-              <span class="fabricate-icon-button manager-icon-button is-warning-action" data-probe="icon"></span>
+              <span class="fabricate-icon-button is-warning-action" data-probe="icon"></span>
             </section>
             <span data-token="border" style="color: var(--fab-warning-border)"></span>
             <span data-token="ink" style="color: var(--fab-warning-text)"></span>
@@ -1717,7 +1717,7 @@ test('the warning role paints amber, and the is-warning spelling it replaces pai
     // The pair this repair originally reunited no longer exists. Issue 1315 moved Force add to
     // automatic composition mode, where it renders as the labelled button alone; the icon twin
     // lived in the manual-mode Available-to-add list, which is now plain add/remove, and it was
-    // deleted along with `.manager-icon-button.is-warning-action`. Asserting the two paint alike
+    // deleted along with `.fabricate-icon-button.is-warning-action`. Asserting the two paint alike
     // would compare the live control against a class nothing writes — green, and about nothing.
   } finally {
     await context.close();

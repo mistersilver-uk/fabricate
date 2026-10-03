@@ -653,7 +653,7 @@ export function registerChecksCases() {
     // card, and the exemption that excused it has been overruled rather than reworded.
     assert.ok(
       !target.querySelector(
-        '[data-checks-panel="crafting"] .manager-inspector-card [data-recipe-section="failure-consume-ingredients"]'
+        '[data-checks-panel="crafting"] .fabricate-card [data-recipe-section="failure-consume-ingredients"]'
       ),
       'no card wraps the two failure flags'
     );

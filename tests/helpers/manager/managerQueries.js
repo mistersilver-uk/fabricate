@@ -47,7 +47,7 @@ async function waitForQueuedAnnouncement() {
 
 
 function headerSaveButton(target) {
-  return Array.from(target.querySelectorAll('.manager-header-actions .manager-button')).find(
+  return Array.from(target.querySelectorAll('.manager-header-actions .fabricate-button')).find(
     (button) => button.textContent.includes('Save')
   );
 }
@@ -155,7 +155,7 @@ export function createManagerQueries(getTarget) {
 
   /** Run one browse row's overflow command (issue 1515). */
   async function openRowMenu(rowSelector) {
-    const trigger = getTarget().querySelector(`${rowSelector} .manager-icon-button[aria-haspopup="menu"]`);
+    const trigger = getTarget().querySelector(`${rowSelector} .fabricate-icon-button[aria-haspopup="menu"]`);
     assert.ok(Boolean(trigger), `${rowSelector} renders no overflow menu trigger`);
     await act(trigger);
 
@@ -170,7 +170,7 @@ export function createManagerQueries(getTarget) {
     const labels = Array.from(panel.querySelectorAll('[role="menuitem"]')).map((item) =>
       item.textContent.trim()
     );
-    getTarget().querySelector(`${rowSelector} .manager-icon-button[aria-haspopup="menu"]`).click();
+    getTarget().querySelector(`${rowSelector} .fabricate-icon-button[aria-haspopup="menu"]`).click();
     await tick();
     flushSync();
     return labels;

@@ -1,6 +1,6 @@
 <!--
   THE manager's labelled push-button. The role is a required-shaped PROP rather than the remembered
-  `class="manager-button"` plus modifier this replaced, because a forgotten modifier is invisible to
+  hand-written class string plus modifier this replaced, because a forgotten modifier is invisible to
   lint, to `format:check` and to every source-contract test, and visible only on the screen.
 
   Props:
@@ -33,7 +33,7 @@
     the ADD action at the foot of its list, `neutral` the empty modifier. A control that does both
     of the first two is `danger`, and a per-site visual tweak is a pass-through on `class`.
   - THE ROLE-TO-CLASS RELATION IS A NAMED MAPPING, never an `is-${role}` template: the sheet's amber
-    treatment is `.manager-button.is-warning-action` and `.manager-button.is-warning` is declared
+    treatment is `.fabricate-button.is-warning-action` and `.fabricate-button.is-warning` is declared
     nowhere, so a guessed spelling ships with no treatment; and `scripts/lib/stylesheetLiveClasses.js`
     never widens an `is-` class through a positional wildcard, so a class only ever BUILT here would
     read as a rule with no customer.
@@ -90,7 +90,6 @@
   const classes = $derived(
     [
       'fabricate-button',
-      'manager-button',
       'fab-manager-button',
       roleClass,
       fullWidth ? FULL_WIDTH_CLASS : '',

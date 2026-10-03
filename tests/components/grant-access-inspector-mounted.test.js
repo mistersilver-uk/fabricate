@@ -124,7 +124,7 @@ describe('GrantAccessInspector (mounted)', () => {
     });
 
     // Toggle the first character on; the existing player grant must be preserved.
-    const charToggle = root.querySelector('[data-access-character-row] .manager-status-toggle');
+    const charToggle = root.querySelector('[data-access-character-row] .fabricate-toggle');
     charToggle.click();
     flushSync();
 
@@ -142,7 +142,7 @@ describe('GrantAccessInspector (mounted)', () => {
       onSaveAccess: (recipeId, access) => calls.push({ recipeId, access })
     });
 
-    const playerToggle = root.querySelector('[data-access-player-row] .manager-status-toggle');
+    const playerToggle = root.querySelector('[data-access-player-row] .fabricate-toggle');
     playerToggle.click();
     flushSync();
 
@@ -198,7 +198,7 @@ describe('GrantAccessInspector (mounted)', () => {
     // Page 2 shows the remaining 2 characters.
     assert.equal(root.querySelectorAll('[data-access-character-row]').length, 2);
     // c7 (granted) is on page 2 and its toggle reflects the granted state.
-    const toggles = root.querySelectorAll('[data-access-character-row] .manager-status-toggle');
+    const toggles = root.querySelectorAll('[data-access-character-row] .fabricate-toggle');
     const grantedToggle = Array.from(toggles).find((t) => t.getAttribute('aria-pressed') === 'true');
     assert.ok(grantedToggle, 'the granted character on page 2 keeps its on state');
 

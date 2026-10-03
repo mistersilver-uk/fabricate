@@ -442,7 +442,7 @@
      onto a second line: a pager that says there is more and hides the control that reaches it.
      The region class carries the scoping hash, so the DESCENDANT is what must be `:global`,
      written that way so the reach is this rail rather than every pager in the manager. */
-  .manager-tool-required-for > :global(.manager-pagination) {
+  .manager-tool-required-for > :global(.fabricate-pagination) {
     flex: 0 0 auto;
     flex-wrap: nowrap;
     gap: var(--fab-space-2);
@@ -460,7 +460,7 @@
     white-space: nowrap;
   }
 
-  .manager-tool-required-for :global(.manager-pagination-nav .manager-icon-button) {
+  .manager-tool-required-for :global(.manager-pagination-nav .fabricate-icon-button) {
     flex: 0 0 24px;
     width: 24px;
     height: 24px;

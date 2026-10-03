@@ -736,7 +736,7 @@ describe('GatheringView mounted behavior', () => {
       'only the first page of 6 cards renders'
     );
     // The pagination footer is shown once there are more items than the smallest option.
-    assert.ok(target.querySelector('.manager-pagination'), 'pagination footer renders past pageSize');
+    assert.ok(target.querySelector('.fabricate-pagination'), 'pagination footer renders past pageSize');
     assert.ok(target.querySelector('[data-pagination-next]'), 'a next-page control is present');
   });
 
@@ -910,7 +910,7 @@ describe('GatheringView mounted behavior', () => {
   it('hides the pager footer at exactly 6 environments and shows it with two pages at 7', async () => {
     // At <= 6 the footer is hidden (showPagination = totalCount > minPageSize, minPageSize 6).
     await mountView(makeServices(listing(manyEnvironments(6))));
-    assert.equal(target.querySelector('.manager-pagination'), null, 'no pager footer at exactly 6 environments');
+    assert.equal(target.querySelector('.fabricate-pagination'), null, 'no pager footer at exactly 6 environments');
 
     // afterEach unmounts the first mount; remount with 7 to cross the boundary.
     unmount(mounted);
@@ -919,7 +919,7 @@ describe('GatheringView mounted behavior', () => {
     target = null;
 
     await mountView(makeServices(listing(manyEnvironments(7))));
-    assert.ok(target.querySelector('.manager-pagination'), 'pager footer appears at 7 environments');
+    assert.ok(target.querySelector('.fabricate-pagination'), 'pager footer appears at 7 environments');
     assert.ok(target.querySelector('[data-pagination-next]'), 'next control present (2 pages)');
     assert.ok(target.querySelector('[data-pagination-prev]'), 'prev control present (2 pages)');
   });

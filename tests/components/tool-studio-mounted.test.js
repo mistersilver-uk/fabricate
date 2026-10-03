@@ -799,7 +799,7 @@ describe('Tool Studio editor (mounted)', () => {
     const label = root.querySelector('[data-tool-label]');
     label.value = 'Display-only name';
     label.dispatchEvent(new Event('input', { bubbles: true }));
-    root.querySelector('[data-tool-enabled] .manager-status-toggle').click();
+    root.querySelector('[data-tool-enabled] .fabricate-toggle').click();
 
     assert.deepEqual(patches, [{ label: 'Display-only name' }]);
     assert.deepEqual(enabled, [false]);
@@ -1127,7 +1127,7 @@ describe('Tool Studio editor (mounted)', () => {
     assert.equal(
       root
         .querySelector('.manager-tool-replacement-component-trigger')
-        .classList.contains('manager-button'),
+        .classList.contains('fabricate-button'),
       true
     );
     assert.ok(
@@ -1578,20 +1578,20 @@ describe('Tool Studio editor (mounted)', () => {
       ]
     );
     assert.ok(
-      root.querySelector('[data-tool-prerequisites-enabled]').closest('.manager-status-toggle')
+      root.querySelector('[data-tool-prerequisites-enabled]').closest('.fabricate-toggle')
     );
-    assert.ok(root.querySelector('[data-tool-bonus-enabled]').closest('.manager-status-toggle'));
+    assert.ok(root.querySelector('[data-tool-bonus-enabled]').closest('.fabricate-toggle'));
     assert.equal(
       root
         .querySelector('[data-tool-prerequisites-enabled]')
-        .closest('.manager-status-toggle')
+        .closest('.fabricate-toggle')
         .textContent.trim(),
       ''
     );
     assert.equal(
       root
         .querySelector('[data-tool-bonus-enabled]')
-        .closest('.manager-status-toggle')
+        .closest('.fabricate-toggle')
         .textContent.trim(),
       ''
     );

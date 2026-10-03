@@ -39,7 +39,7 @@ export const CASES = Object.freeze([
       {
         selector:
           '.manager-recipe-row[data-recipe-id="sm-r-runeplate-draft"]' +
-          ' .manager-recipe-status .manager-status-toggle',
+          ' .manager-recipe-status .fabricate-toggle',
       },
     ],
     expectView: 'recipes',

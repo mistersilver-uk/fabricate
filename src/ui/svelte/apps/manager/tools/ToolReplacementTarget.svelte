@@ -108,7 +108,7 @@
         {disabled}
         showChevron={false}
         pickerClass="manager-tool-replacement-picker"
-        triggerClass="fabricate-button manager-button manager-tool-replacement-component-trigger"
+        triggerClass="fabricate-button manager-tool-replacement-component-trigger"
         triggerIcon="fas fa-cube"
         triggerImg={selected.img || ''}
         triggerLabel={selected.name}
@@ -176,7 +176,7 @@
         {disabled}
         showChevron={false}
         pickerClass="manager-tool-replacement-picker"
-        triggerClass="fabricate-button manager-button manager-tool-replacement-component-trigger"
+        triggerClass="fabricate-button manager-tool-replacement-component-trigger"
         triggerIcon="fas fa-magnifying-glass"
         triggerLabel={text(
           'FABRICATE.Admin.Manager.Tools.Editor.ReplacementSearchLabel',
@@ -239,7 +239,7 @@
      it the shared component-picker box, which is what drew the select; anchoring each rule below
      on TWO classes this component writes puts it deeper than that sheet's, so nothing depends on
      injection order. `:global()` is required because `SearchablePopover` writes the picker root,
-     the button and the portrait. `manager-button` STAYS: stripping it hands the control back to
+     the button and the portrait. `fabricate-button` STAYS: stripping it hands the control back to
      Foundry's own `.application button` rule, whose fixed height crops a two-line label. */
   .manager-tool-replacement
     .manager-tool-replacement-tile
@@ -289,7 +289,7 @@
   /* THE UNLINK, in the same danger treatment as the Overview tab's source unlink.
      `IconButton.is-danger` carries the edge and the ink and leaves the resting fill neutral, so
      the fill is what this adds. */
-  .manager-tool-replacement .manager-tool-replacement-tile > :global(.manager-icon-button) {
+  .manager-tool-replacement .manager-tool-replacement-tile > :global(.fabricate-icon-button) {
     flex: 0 0 30px;
     width: 30px;
     height: 30px;

@@ -168,7 +168,7 @@ describe('GatheringRealmsTab mounted behavior', () => {
 
   it('keeps the pager outside the scroller, after it', async () => {
     await mountTab({ realms: makeRealms(7) });
-    const pager = target.querySelector('.manager-pagination');
+    const pager = target.querySelector('.fabricate-pagination');
     assert.ok(Boolean(pager), 'seven realms render a pager');
     const panel = target.querySelector('[data-travel-panel="realms"]');
     const scroller = panel.querySelector(':scope > .manager-table-scroll');

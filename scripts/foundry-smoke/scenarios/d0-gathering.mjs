@@ -127,7 +127,7 @@ export default {
     await page.locator('.fabricate-manager #manager-gathering-nav-environments').first().click();
     await page
       .locator(
-        '.fabricate-manager .manager-environment-row:has-text("Azure Grove") .manager-icon-button'
+        '.fabricate-manager .manager-environment-row:has-text("Azure Grove") .fabricate-icon-button'
       )
       .nth(0)
       .click();
@@ -204,7 +204,7 @@ export default {
     // Verify it's clickable, then navigate back via the side nav.
     await softClick(
       page.locator(
-        '.fabricate-manager .manager-header-actions .manager-button:has-text("Back to environments")'
+        '.fabricate-manager .manager-header-actions .fabricate-button:has-text("Back to environments")'
       ),
       { trial: true }
     );

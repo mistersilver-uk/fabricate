@@ -59,7 +59,7 @@
   /**
    * Land keyboard focus on the picker's search field once the portaled panel has mounted. A
    * QUERY rather than a `bind:this`, because neither `Modal` nor `SearchField`
-   * publishes an element seam and a wrapper would break `.manager-search`'s flex sizing; it goes
+   * publishes an element seam and a wrapper would break `.fabricate-search`'s flex sizing; it goes
    * through this dialog's own two hooks. `queueMicrotask` because the panel is PORTALED.
    */
   function focusIntoDialog() {

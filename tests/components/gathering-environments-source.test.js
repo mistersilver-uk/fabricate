@@ -242,12 +242,12 @@ describe('GatheringEnvironmentList labeled region', () => {
     );
   });
 
-  it('themes the unstyled manager-pagination markup with base tokens and renders a no-match message', () => {
+  it('themes the unstyled fabricate-pagination markup with base tokens and renders a no-match message', () => {
     assert.ok(
-      listSource.includes(':global(.manager-pagination)'),
-      'list themes the manager-pagination markup in the player scope'
+      listSource.includes(':global(.fabricate-pagination)'),
+      'list themes the fabricate-pagination markup in the player scope'
     );
-    assert.ok(listSource.includes(':global(.manager-icon-button)'), 'list themes the pagination nav buttons');
+    assert.ok(listSource.includes(':global(.fabricate-icon-button)'), 'list themes the pagination nav buttons');
     assert.ok(listSource.includes('FABRICATE.App.Gathering.Environments.NoMatches'), 'no-match copy localized');
   });
 });

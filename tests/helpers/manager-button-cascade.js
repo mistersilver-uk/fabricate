@@ -1,4 +1,4 @@
-/** The cascade instrument for the `manager-button` → `Button` conversion (issue 1118). */
+/** The cascade instrument for the hand-written button class → `Button` conversion (issue 1118). */
 import { compile } from 'svelte/compiler';
 
 import { collectWorkingTreeSources } from './sourceScan.js';
@@ -10,7 +10,7 @@ const PRIMITIVE_CLASS = 'fab-manager-button';
 // `fab-manager-button`, and `collectSites` adds both synthetically for the same reason: a converted
 // site writes NEITHER in the markup this scanner reads.
 const ROOT_CLASS = 'fabricate-button';
-const CONTRACT_CLASS = 'manager-button';
+const CONTRACT_CLASS = 'fabricate-button';
 const APP_ROOT_CLASS = 'fabricate-manager';
 // `ArmedDangerButton` renders the same CSS contract but is a primitive in its own right and is
 // explicitly out of the conversion's scope, so its site is enumerated and then held back.
@@ -851,8 +851,8 @@ function readCorpus() {
 /**
  * The call sites, by population.
  *
- * A — literal `class="manager-button…"`; C — the one backtick-template `class={…}`; both
- * convert. B — `triggerClass="manager-button…"`, which `SearchablePopover` renders itself and
+ * A — literal `class="fabricate-button…"`; C — the one backtick-template `class={…}`; both
+ * convert. B — `triggerClass="fabricate-button…"`, which `SearchablePopover` renders itself and
  * which therefore never gains `fab-manager-button`.
  */
 function decidePopulation({ triggersContract, element }) {
@@ -900,10 +900,10 @@ function collectSites(trees) {
       // carrying `fab-manager-button`, and the two must be answered once. They were not:
       // `classes` used to add the primitive class to everything outside population B, which
       // handed it to `ArmedDangerButton` as well — a component that renders
-      // `class="manager-button is-danger"` from its own markup, is held out of the conversion
+      // `class="fabricate-button is-danger"` from its own markup, is held out of the conversion
       // on purpose, and will never gain it. The consequence was not academic. A chained
       // selector still appeared to reach it, so `.manager-knowledge-row-actions
-      // .manager-button` derived as safe to re-chain when chaining it would have left that
+      // .fabricate-button` derived as safe to re-chain when chaining it would have left that
       // row's Delete button at the ambient ~1rem beside the 0.72rem Expend button next to it.
       const converting = population !== 'B' && !NON_CONVERTING_FILES.has(file);
       sites.push({
@@ -1333,7 +1333,7 @@ function describeBlindSpots({ sites, unbalanced, atRisk }) {
     'Specificity is COMPUTED, not measured. `manager-layout.test.js` remains the real-browser ' +
       'gate; this module tells it where to look.',
     'Custom-property indirection is NOT resolved, so a reported value change can still compute ' +
-      'identically. `.fabricate-toggle.manager-status-toggle` declares ' +
+      'identically. `.fabricate-toggle.fabricate-toggle` declares ' +
       '`--fab-toggle-track: var(--fab-bg-3)`, so a winner change between `--fab-toggle-track` ' +
       'and `--fab-bg-3` is a zero-pixel change this report nevertheless prints as a change.',
     '`@media` and `@container` rules are scored like any other and carry their condition in the ' +
@@ -1449,7 +1449,7 @@ function renderInventory(
   );
   const lines = [
     '',
-    '════ manager-button cascade inventory (issue 1118) ════',
+    '════ fabricate-button cascade inventory (issue 1118) ════',
     'a `(scoped)` origin line number is the line in the COMPILED component sheet, not the .svelte',
     `rules parsed: ${rules.length} (global sheet + every compiled scoped component sheet)`,
     `primitive rules (key compound requires .${PRIMITIVE_CLASS}): ${primitives.length}`,

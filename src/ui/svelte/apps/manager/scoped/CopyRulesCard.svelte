@@ -215,7 +215,7 @@
     text-transform: none;
   }
 
-  .manager-scoped-copy-head :global(.manager-button) {
+  .manager-scoped-copy-head :global(.fabricate-button) {
     flex: none;
     white-space: nowrap;
   }

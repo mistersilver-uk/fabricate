@@ -234,8 +234,8 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       'the inspector imports the shared button'
     );
     // TOKEN-AWARE, not a prefix (issue 1502). The family is rooted at the class the primitive
-    // emits, so a hand-rolled site now spells `class="fabricate-button manager-button …"` — and
-    // `class="manager-button` no longer matches it. The probe would have gone quietly blind at
+    // emits, so a hand-rolled site spells `class="fabricate-button …"` — and a prefix probe for
+    // the class that used to lead it no longer matches it. The probe would have gone quietly blind at
     // exactly the moment the spelling it guards against changed, which is the failure mode this
     // whole family of guards exists to prevent. Bounded to one `<tag …>` span so that a message
     // literal or a JS string mentioning the class cannot pose as fixture markup: this file holds
@@ -243,7 +243,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
     // prose below it.
     const handRolled = [...inspectorSource.matchAll(/<[a-zA-Z][\w-]*\b[^<>]*>/g)]
       .flatMap((tag) => [...tag[0].matchAll(/class="([^"]*)"/g)].map(([, value]) => value))
-      .filter((value) => value.split(/\s+/).includes('manager-button'));
+      .filter((value) => value.split(/\s+/).includes('fabricate-button'));
     assert.deepEqual(handRolled, [], 'and hand-rolls no manager button of its own');
     const primitive = readFileSync(
       resolve(repoRoot, 'src/ui/svelte/apps/manager/InspectorActionButton.svelte'),
@@ -289,14 +289,14 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
     // The rendered symptom (maintainer feedback).
     const styles = styleBlock(bulkDeleteCardSource);
     assert.ok(
-      /:global\(\.manager-inspector-card\.fab-bulk-delete-card \.manager-button\) \{[^}]*font-size: 0\.72rem;/s.test(
+      /:global\(\.fabricate-card\.fab-bulk-delete-card \.fabricate-button\) \{[^}]*font-size: 0\.72rem;/s.test(
         styles
       ),
       'the delete card scopes its button to the shared inspector-action label size'
     );
     // Scoped to the delete card only.
     assert.equal(
-      styles.includes('.manager-button.is-danger'),
+      styles.includes('.fabricate-button.is-danger'),
       false,
       'the colour treatment is not re-declared here, only the type scale'
     );
@@ -419,7 +419,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
         `${hook} must render in its section's trailing slot, not as a full-width button below it`
       );
     }
-    // This used to pin the ABSENCE of `class="manager-button" data-essence-bulk-`.
+    // This used to pin the ABSENCE of a hand-written button class beside `data-essence-bulk-`.
     for (const hook of ['data-essence-bulk-icon-reset', 'data-essence-bulk-colour-reset']) {
       const start = bulkPanelSource.lastIndexOf('<', bulkPanelSource.indexOf(hook));
       // The tag ends at the first `>` that is not the tail of an `=>`.
@@ -436,7 +436,7 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
           'second stacked button under the control'
       );
       assert.equal(
-        /\bmanager-button\b/.test(tag),
+        /\bfabricate-button\b/.test(tag),
         false,
         `${hook} must not be a manager button at all; it is a Chip`
       );
@@ -509,9 +509,9 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
     const actionsBody = identityTabSource.slice(actionsOpen, actionsClose);
     assert.ok(actionsOpen > 0 && actionsClose > actionsOpen, 'the actions row is found intact');
     assert.equal(
-      actionsBody.includes('manager-icon-button'),
+      actionsBody.includes('fabricate-icon-button'),
       false,
-      'no manager-icon-button remains beside the picker in the actions row'
+      'no fabricate-icon-button remains beside the picker in the actions row'
     );
     assert.ok(
       /\.fabricate-manager \.manager-essence-icon-actions \{[^}]*display: flex;/s.test(globalCss),

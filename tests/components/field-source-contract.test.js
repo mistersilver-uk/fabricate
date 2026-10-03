@@ -1,4 +1,4 @@
-/** The END STATE of the `.manager-field` conversion, pinned in source (issue 1428). */
+/** The END STATE of the `.fabricate-field` conversion, pinned in source (issue 1428). */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -10,7 +10,7 @@ import {
 /** The primitive whose adoption this file pins. */
 const FIELD_PATH = 'src/ui/svelte/components/Field.svelte';
 
-/** The components still writing a raw `class="manager-field …"`, with their EXACT site count. */
+/** The components still writing a raw `class="fabricate-field …"`, with their EXACT site count. */
 const RAW_FIELD_ALLOWLIST = Object.freeze([
   Object.freeze({
     path: 'src/ui/svelte/apps/manager/SystemBrowserInspector.svelte',
@@ -40,10 +40,10 @@ const RAW_FIELD_ALLOWLIST = Object.freeze([
 ]);
 
 const { callSites } = definePrimitiveAdoptionContract({
-  label: 'manager-field',
+  label: 'fabricate-field',
   tag: 'Field',
   primitive: FIELD_PATH,
-  contractClass: 'manager-field',
+  contractClass: 'fabricate-field',
   allowlist: RAW_FIELD_ALLOWLIST,
   callSiteFloor: 70,
   fileFloor: 20,
@@ -51,29 +51,29 @@ const { callSites } = definePrimitiveAdoptionContract({
   detectorFixture: {
     source: [
       '<!--',
-      '  Prose mentioning manager-field, which is how five real components document the box.',
+      '  Prose mentioning fabricate-field, which is how five real components document the box.',
       '-->',
       '<script>',
       "  import Field from '../../components/Field.svelte';",
       '</script>',
       '',
-      '<label class="manager-field">a converted-looking site that is still raw</label>',
-      '<div class="wrapper manager-field manager-thing">a second one, mid-list</div>',
+      '<label class="fabricate-field">a converted-looking site that is still raw</label>',
+      '<div class="wrapper fabricate-field manager-thing">a second one, mid-list</div>',
       '<span class="manager-field-error">a different class entirely</span>',
       '<div class="fab-manager-fields">a different class again</div>',
       '<Field as="div" class="manager-thing">the converted shape</Field>',
       '',
       '<style>',
-      '  .manager-field { color: red; }',
+      '  .fabricate-field { color: red; }',
       '</style>',
     ].join('\n'),
     expected: 2,
-    lowered: ['class="manager-field"', 'class="manager-box"'],
+    lowered: ['class="fabricate-field"', 'class="manager-box"'],
     loweredExpected: 1,
   },
 
   rawRemedy:
-    'these components hand-roll the `.manager-field` box that `src/ui/svelte/components/' +
+    'these components hand-roll the `.fabricate-field` box that `src/ui/svelte/components/' +
     'Field.svelte` owns. Render `<Field as="label|div|fieldset">` instead — and choose the ' +
     '`as` from what the markup MEANS, because a `<label>` names the control it wraps and a ' +
     '`<div>` does not',

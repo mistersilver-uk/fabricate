@@ -393,7 +393,7 @@ describe('InteractableBrowserRoot body', () => {
       `the search field is asked for the 38px rung:\n${searchTag?.[0]}`
     );
     assert.ok(
-      /\.fabricate-search\.manager-search\.is-size-38 input\s*\{[^}]*height:\s*38px/.test(sheetSource),
+      /\.fabricate-search\.fabricate-search\.is-size-38 input\s*\{[^}]*height:\s*38px/.test(sheetSource),
       'and that rung is 38px in the sheet'
     );
     assert.ok(

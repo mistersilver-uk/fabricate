@@ -282,7 +282,7 @@ export function registerEnvironmentsCases() {
       await tick();
       flushSync();
       target
-        .querySelector('[data-environment-id="env-forest"] .manager-icon-button[aria-label^="Edit"]')
+        .querySelector('[data-environment-id="env-forest"] .fabricate-icon-button[aria-label^="Edit"]')
         .click();
       await tick();
       flushSync();
@@ -852,7 +852,7 @@ export function registerEnvironmentsCases() {
     target.querySelector('[data-clear-filters="gathering-tasks"]').click();
     await tick();
     flushSync();
-    target.querySelector('[data-gathering-task-id="task-herbs"] .manager-status-toggle').click();
+    target.querySelector('[data-gathering-task-id="task-herbs"] .fabricate-toggle').click();
     await runRowMenuCommand('[data-gathering-task-id="task-herbs"]', 'Duplicate gathering task');
     await runRowMenuCommand('[data-gathering-task-id="task-herbs"]', 'Delete gathering task');
     assert.ok(
@@ -1274,7 +1274,7 @@ export function registerEnvironmentsCases() {
     const mediaColumn = coreEditor.querySelector('.manager-task-media-column');
     const taskImagePicker = coreEditor.querySelector('.manager-task-image-picker');
     const taskStatus = coreEditor.querySelector('.manager-task-core-status');
-    const taskStatusToggle = taskStatus.querySelector('.manager-status-toggle');
+    const taskStatusToggle = taskStatus.querySelector('.fabricate-toggle');
     assert.equal(mediaColumn.firstElementChild, taskImagePicker);
     assert.equal(mediaColumn.children[1], taskStatus);
     assert.equal(taskStatusToggle.tagName, 'BUTTON');
@@ -1516,7 +1516,7 @@ export function registerEnvironmentsCases() {
     assert.equal(clearComponentEvent.defaultPrevented, true);
     const clearedDropRow = target.querySelector('[data-gathering-task-drop-id="drop-nightshade"]');
     assert.ok(clearedDropRow.textContent.includes('No Component'));
-    const saveButton = target.querySelector('.manager-header-actions .manager-button.is-primary');
+    const saveButton = target.querySelector('.manager-header-actions .fabricate-button.is-primary');
     assert.ok(saveButton, 'gathering task editor should expose a Save button');
     saveButton.click();
     await tick();
@@ -1535,7 +1535,7 @@ export function registerEnvironmentsCases() {
       25,
       'Save should persist the ChanceSlider value through the task dropRows payload'
     );
-    target.querySelector('.manager-header-actions .manager-button:not(.is-primary)').click();
+    target.querySelector('.manager-header-actions .fabricate-button:not(.is-primary)').click();
     await tick();
     flushSync();
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'environments');
@@ -1563,7 +1563,7 @@ export function registerEnvironmentsCases() {
     await tick();
     flushSync();
     assert.equal(gatheringSubitem('Settings').getAttribute('aria-current'), 'page');
-    assert.equal(target.querySelector('.manager-toolbar'), null);
+    assert.equal(target.querySelector('.fabricate-filter-bar'), null);
     assert.equal(target.querySelector('.manager-environments-table'), null);
     // The Gathering tab's page hint is the SHELL's since issue 1515 deleted the browse view's own
     // section header, so it reads the rail record's fallback — which is the one that agrees with
@@ -1620,7 +1620,7 @@ export function registerEnvironmentsCases() {
     );
     // The three inline `Add` submits carry the PRIMARY role (issue 1118). Each is the create
     // verb of its own little form — the same shape `InlineVocabularyAdd` already paints
-    // `manager-button is-primary` — and all three shipped role-less, so they read as the
+    // `fabricate-button is-primary` — and all three shipped role-less, so they read as the
     // neutral secondary beside the field they complete.
     for (const hook of [
       '[data-gathering-condition-add="timeOfDay"]',
@@ -1953,7 +1953,7 @@ export function registerEnvironmentsCases() {
     assert.equal(forestRow.textContent.includes('results'), false);
     assert.equal(forestRow.textContent.includes('catalysts'), false);
     assert.equal(forestRow.querySelector('.manager-environment-task-count.manager-chip'), null);
-    assert.ok(forestRow.querySelector('.manager-status-toggle'));
+    assert.ok(forestRow.querySelector('.fabricate-toggle'));
     assert.ok(forestRow.querySelector('.manager-environment-action-grid'));
     assert.ok(forestRow.querySelector('[aria-label="Edit Moonlit Forest"]'));
     // Edit stays the row's own `<IconButton>`.
@@ -1990,7 +1990,7 @@ export function registerEnvironmentsCases() {
       'selected environment inspector should not duplicate row quick actions'
     );
 
-    const search = target.querySelector('.manager-toolbar input[type="search"]');
+    const search = target.querySelector('.fabricate-filter-bar input[type="search"]');
     search.value = 'cavern';
     search.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
@@ -1999,7 +1999,7 @@ export function registerEnvironmentsCases() {
     assert.ok(target.textContent.includes('Quiet Cavern'));
 
     const cavernToggle = target.querySelector(
-      '[data-environment-id="env-cavern"] .manager-status-toggle'
+      '[data-environment-id="env-cavern"] .fabricate-toggle'
     );
     cavernToggle.click();
     await tick();
@@ -2066,7 +2066,7 @@ export function registerEnvironmentsCases() {
     navButton('Gathering').click();
     await tick();
     flushSync();
-    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
+    target.querySelector('.manager-header-actions .fabricate-button.is-primary').click();
     await tick();
     flushSync();
 
@@ -2157,7 +2157,7 @@ export function registerEnvironmentsCases() {
     );
 
     // Open the editor on the forest draft (scene linked).
-    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
+    target.querySelector('.manager-header-actions .fabricate-button.is-primary').click();
     await tick();
     flushSync();
     assert.equal(
@@ -2187,7 +2187,7 @@ export function registerEnvironmentsCases() {
     );
 
     // Unlink the scene → the identity image returns to the editable stored value.
-    target.querySelector('[data-environment-summary-scene] .manager-icon-button.is-danger').click();
+    target.querySelector('[data-environment-summary-scene] .fabricate-icon-button.is-danger').click();
     await tick();
     flushSync();
 
@@ -2225,7 +2225,7 @@ export function registerEnvironmentsCases() {
     navButton('Gathering').click();
     await tick();
     flushSync();
-    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
+    target.querySelector('.manager-header-actions .fabricate-button.is-primary').click();
     await tick();
     flushSync();
     assert.equal(
@@ -2234,7 +2234,7 @@ export function registerEnvironmentsCases() {
     );
 
     const backButton = Array.from(
-      target.querySelectorAll('.manager-header-actions .manager-button')
+      target.querySelectorAll('.manager-header-actions .fabricate-button')
     ).find((button) => button.textContent.includes('Back to environments'));
     assert.ok(backButton, 'env-edit header should render a Back to environments button');
     backButton.click();

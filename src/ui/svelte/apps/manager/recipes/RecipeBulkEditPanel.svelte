@@ -942,7 +942,7 @@
         options={bookOptions}
         disabled={inert}
         pickerClass="fab-bulk-book-picker"
-        triggerClass="fabricate-button manager-button manager-travel-picker-trigger fab-bulk-book-trigger"
+        triggerClass="fabricate-button manager-travel-picker-trigger fab-bulk-book-trigger"
         triggerIcon="fas fa-magnifying-glass"
         triggerLabel={text(
           'FABRICATE.Admin.Manager.Recipe.BulkEdit.BookPick',

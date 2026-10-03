@@ -2155,7 +2155,7 @@
               data-gathering-component-name-search=""
             />
             <label
-              class="fabricate-search manager-search is-compact manager-task-component-tag-search"
+              class="fabricate-search is-compact manager-task-component-tag-search"
               data-gathering-component-tag-search
             >
               <i class="fas fa-tags" aria-hidden="true"></i>
@@ -2783,7 +2783,7 @@
 
   /* The DC override is a single field on an otherwise empty card, so nothing in the chain
      above it ever gave it a width: `.manager-task-dc-card` and `.manager-task-dc-row` are
-     full-bleed and `.manager-field` is a `flex-direction: column` box that inherits its
+     full-bleed and `.fabricate-field` is a `flex-direction: column` box that inherits its
      parent's width. The filled stepper therefore resolved `width: 100%` against the whole
      card — ~670px at `manager-gathering-task-editor-normal` and ~960px at `-stacked` — and
      put the − and + most of a foot apart with the value floating between them.
@@ -2792,11 +2792,11 @@
      `width: auto`, and `align-items: stretch` widens it to exactly the same box, leaving a 48px
      input marooned in a stretched border. 160px is the width the `fill` variant was measured
      against. Taking a SIZE from the layout context is permitted; restyling the primitive is not. */
-  /* `:global(...)`, chained with `.manager-field`: this class sits on a `<Field>`, and a scoped
-     rule cannot reach a class the component hands to a child. The `.manager-field` compound is not
+  /* `:global(...)`, chained with `.fabricate-field`: this class sits on a `<Field>`, and a scoped
+     rule cannot reach a class the component hands to a child. The `.fabricate-field` compound is not
      decoration — it restores the (0,2,0) the scoped form had, which a bare `:global()` would drop
      to (0,1,0). */
-  :global(.manager-field.manager-task-dc-field) {
+  :global(.fabricate-field.manager-task-dc-field) {
     max-width: 160px;
   }
 
@@ -2847,7 +2847,7 @@
   }
 
   /* Size the unit picker to its content: this field's standing refusal of the `width: 100%` the
-     other four converted fields ask for by class, answered against `.manager-field select` before
+     other four converted fields ask for by class, answered against `.fabricate-field select` before
      the conversion and against a caller rule now. `:global()` is load-bearing and so is the
      attribute — the trigger is a `<button>` a child component renders and Svelte stamps no scoping
      hash on one, so the scoped spelling would match nothing and die silently, while the scoping
@@ -2915,9 +2915,9 @@
     align-items: start;
   }
 
-  /* `:global(...)`, chained with `.manager-field`, for the reason `.manager-task-dc-field` above
+  /* `:global(...)`, chained with `.fabricate-field`, for the reason `.manager-task-dc-field` above
      records: the compound restores the (0,2,0) the scoped form had. */
-  :global(.manager-field.manager-task-stamina-cost-field) {
+  :global(.fabricate-field.manager-task-stamina-cost-field) {
     width: 100%;
   }
 
@@ -2925,11 +2925,11 @@
      a rule whose first is `:global(...)`, and with a BARE `.svelte-hash` rather than
      `:where(.svelte-hash)` — which reaches the span correctly and lifts the rule from (0,2,1) to
      (0,3,1). A repair may not move the cascade. */
-  :global(.manager-field.manager-task-stamina-cost-field > span) {
+  :global(.fabricate-field.manager-task-stamina-cost-field > span) {
     white-space: nowrap;
   }
 
-  :global(.manager-field.manager-task-stamina-modifiers) {
+  :global(.fabricate-field.manager-task-stamina-modifiers) {
     min-width: 0;
     display: flex;
     flex-direction: column;

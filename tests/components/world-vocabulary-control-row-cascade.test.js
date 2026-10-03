@@ -94,7 +94,7 @@ function panelFixture(kind) {
       '<span class="manager-vocabulary-icon is-decorative"><i class="fas fa-hashtag"></i></span>' +
       `<div class="manager-vocabulary-main"><strong>Entry ${index}</strong></div>` +
       '<span class="manager-chip">3 references</span>' +
-      '<button class="fabricate-icon-button manager-icon-button"><i class="fas fa-trash"></i></button>' +
+      '<button class="fabricate-icon-button"><i class="fas fa-trash"></i></button>' +
       '</div></div>'
   ).join('');
   return (
@@ -105,7 +105,7 @@ function panelFixture(kind) {
     '<h3 class="manager-checks-card-title">Component categories</h3>' +
     '<p class="manager-subtitle">One per component, offered by every crafting system.</p>' +
     '</div></header>' +
-    '<section class="fabricate-filter-bar manager-toolbar manager-scoped-list-toolbar" aria-label="Sort">' +
+    '<section class="fabricate-filter-bar manager-scoped-list-toolbar" aria-label="Sort">' +
     `<span class="manager-vocabulary-shell-sort-label ${panel.hashClass}" id="sort-${kind}">Sort by</span>` +
     // The converted sort as `Select` renders it: the picker root, then its toolbar-rung trigger.
     '<div class="fabricate-picker manager-travel-picker fabricate-select">' +
@@ -120,12 +120,12 @@ function panelFixture(kind) {
     // EMPTY, because the shell panel always passes `hint=""`.
     '<p class="manager-vocabulary-desc manager-muted"></p>' +
     '<form class="manager-vocabulary-form"><div class="manager-vocabulary-form-fields">' +
-    '<label class="fabricate-field manager-field"><span class="manager-field-label">Name</span>' +
+    '<label class="fabricate-field"><span class="manager-field-label">Name</span>' +
     // `fab-manager-button` is the primitive's OWN class.
     '<input type="text"></label>' +
-    '<button class="fabricate-button manager-button fab-manager-button">Add</button></div></form>' +
+    '<button class="fabricate-button fab-manager-button">Add</button></div></form>' +
     '<div class="manager-vocabulary-search-row">' +
-    '<label class="fabricate-search manager-search"><input type="text"></label>' +
+    '<label class="fabricate-search"><input type="text"></label>' +
     '<span class="manager-chip">3 entries</span></div>' +
     `<div class="manager-vocabulary-list">${cards}</div></section></section>`
   );

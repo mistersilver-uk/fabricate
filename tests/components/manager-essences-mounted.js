@@ -213,9 +213,9 @@ export function registerEssencesCases() {
       'and, separately, how many recipes require it'
     );
 
-    // The FIRST `.manager-icon-button` in the row must remain the Edit pencil.
+    // The FIRST `.fabricate-icon-button` in the row must remain the Edit pencil.
     assert.equal(
-      earthRow.querySelector('.manager-icon-button').getAttribute('data-essence-edit'),
+      earthRow.querySelector('.fabricate-icon-button').getAttribute('data-essence-edit'),
       'earth',
       'the first icon button in a row is still the Edit pencil'
     );
@@ -399,7 +399,7 @@ export function registerEssencesCases() {
     );
     // The AMBER survives the extraction (issue 1036, maintainer round 2). Both source
     // actions now render through `InspectorActionButton`, the shared right-inspector button,
-    // and the modifier moved with them: `.manager-button.is-warning-action` was the global
+    // and the modifier moved with them: `.fabricate-button.is-warning-action` was the global
     // sheet's, `is-warning` is the primitive's own tone. Unlinking breaks a reference and
     // destroys nothing, so it must not land in the danger family on the way across.
     assert.ok(
@@ -548,7 +548,7 @@ export function registerEssencesCases() {
     );
     // The Tool Studio's grouped icon pair.
     const linkedActions = linkedSource.querySelectorAll(
-      '.manager-item-drop-zone-actions .manager-icon-button'
+      '.manager-item-drop-zone-actions .fabricate-icon-button'
     );
     assert.equal(linkedActions.length, 1, 'a source with no uuid offers unlink alone');
     assert.ok(
@@ -596,7 +596,7 @@ export function registerEssencesCases() {
     // and colour, from the screen whose own rail says identity is the Essence Catalogue's. The
     // reference's Essence Rules header carries nothing on the right at all.
     assert.ok(
-      !target.querySelector('.manager-header-actions .manager-button'),
+      !target.querySelector('.manager-header-actions .fabricate-button'),
       'the Essence Rules header carries no action'
     );
     navButton('Component Rules').click();
@@ -909,7 +909,7 @@ export function registerEssencesCases() {
     failedName.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
-    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
+    target.querySelector('.manager-header-actions .fabricate-button.is-primary').click();
     await tick();
     await tick();
     flushSync();
@@ -944,7 +944,7 @@ export function registerEssencesCases() {
     rejectedName.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
-    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
+    target.querySelector('.manager-header-actions .fabricate-button.is-primary').click();
     await tick();
     await tick();
     flushSync();

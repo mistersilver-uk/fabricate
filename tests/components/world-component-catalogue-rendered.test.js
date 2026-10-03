@@ -262,7 +262,7 @@ function measureListFrame() {
     dropZone: box('[data-item-drop-zone="component-create"]'),
     registerAction: box('[data-scoped-list-register-item]'),
     firstRow: box('[data-scoped-list-row]'),
-    pager: box('.manager-scoped-list-column > .manager-pagination'),
+    pager: box('.manager-scoped-list-column > .fabricate-pagination'),
     pagerSummary: box('[data-pagination-summary]'),
   };
 }

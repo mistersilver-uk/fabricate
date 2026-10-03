@@ -1952,6 +1952,7 @@ describe('world Component entry editor (issue 1371)', () => {
       const action = card.querySelector('[data-scoped-entry-add-to-systems]');
       assert.ok(Boolean(action), '`proto:925` pins it to the head trailing edge');
       assert.equal(action.textContent.trim(), 'Add to systems…');
+      assert.ok(action.classList.contains('fabricate-button'), 'it is the shared Button');
     });
 
     it('and the vocabulary exit is a bare text action, not a filled button', async () => {
@@ -1960,7 +1961,7 @@ describe('world Component entry editor (issue 1371)', () => {
       const { target } = await open('ingot');
       const exit = target.querySelector('[data-scoped-entry-vocabulary-exit]');
       assert.ok(exit.classList.contains('manager-inline-link'), `it read "${exit.className}"`);
-      assert.ok(!exit.classList.contains('manager-button'));
+      assert.ok(!exit.classList.contains('fabricate-button'));
       assert.ok(Boolean(exit.querySelector('.fa-arrow-up-right-from-square')));
     });
   });

@@ -539,7 +539,7 @@ function assertScrollContract(target) {
   for (const kind of ['active', 'finished']) {
     const section = target.querySelector(`[data-journal-list="${kind}"]`);
     const scroller = section?.querySelector('[data-journal-list-scroll]');
-    const pager = section?.querySelector('.manager-pagination');
+    const pager = section?.querySelector('.fabricate-pagination');
     assert.ok(section && scroller && pager, `${kind} has section, scroller, and pager`);
     assert.ok(!scroller.contains(pager), `${kind} pager stays outside its scroller`);
   }
@@ -2539,7 +2539,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
 
     const active = target.querySelector('[data-journal-list="active"]');
     const activeScroller = active.querySelector('[data-journal-list-scroll]');
-    const activePager = active.querySelector('.manager-pagination');
+    const activePager = active.querySelector('.fabricate-pagination');
     activeScroller.appendChild(activePager);
     assert.throws(() => assertScrollContract(target));
     active.appendChild(activePager);

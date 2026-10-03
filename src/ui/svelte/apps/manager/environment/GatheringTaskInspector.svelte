@@ -84,7 +84,7 @@
 
 {#if task}
   {#if !editing}
-    <section class="fabricate-card manager-inspector-card" data-gathering-task-inspector>
+    <section class="fabricate-card" data-gathering-task-inspector>
       <div class="manager-inspector-title-row is-hero-large">
         <img class="manager-recipe-preview" src={gatheringTaskImage(task)} alt="" />
         <div class="manager-inspector-copy">
@@ -111,7 +111,7 @@
       </p>
     </section>
 
-    <section class="fabricate-card manager-inspector-card">
+    <section class="fabricate-card">
       <h3 class="manager-card-title">
         {text('FABRICATE.Admin.Manager.Environment.Tasks.Details', 'Gathering task details')}
       </h3>
@@ -151,7 +151,7 @@
       </div>
     </section>
 
-    <section class="fabricate-card manager-inspector-card" data-task-drops-summary>
+    <section class="fabricate-card" data-task-drops-summary>
       <h3 class="manager-card-title">
         {text('FABRICATE.Admin.Manager.Environment.Tasks.DropsSummary', 'Drops summary')}
       </h3>
@@ -179,10 +179,7 @@
       {/if}
     </section>
 
-    <section
-      class="fabricate-card manager-inspector-card manager-task-environment-usage-card"
-      data-task-environment-usage
-    >
+    <section class="fabricate-card manager-task-environment-usage-card" data-task-environment-usage>
       <h3 class="manager-card-title">
         {text(
           'FABRICATE.Admin.Manager.Environment.Tasks.UsedInEnvironmentsCard',
@@ -218,7 +215,7 @@
   {#if editing}
     {#if (editingTask?.resolutionMode || 'd100') === 'd100' && selectedDrop}
       <div class="manager-drop-inspector-stack" data-gathering-task-drop-inspector>
-        <section class="fabricate-card manager-inspector-card manager-drop-editor-header-card">
+        <section class="fabricate-card manager-drop-editor-header-card">
           <h3 class="manager-card-title">
             {text('FABRICATE.Admin.Manager.Environment.Tasks.SelectedDrop', 'Selected drop rule')}
           </h3>
@@ -266,10 +263,10 @@
         <div class="manager-drop-inspector-divider" aria-hidden="true"></div>
 
         <div class="manager-drop-inspector-scroll">
-          <section class="fabricate-card manager-inspector-card manager-drop-editor-card">
+          <section class="fabricate-card manager-drop-editor-card">
             <div class="manager-drop-editor-values">
               <label
-                class="fabricate-field manager-field manager-drop-rate-editor"
+                class="fabricate-field manager-drop-rate-editor"
                 data-gathering-drop-inspector-rate
               >
                 <span
@@ -299,7 +296,7 @@
               </label>
 
               <label
-                class="fabricate-field manager-field manager-drop-count-editor"
+                class="fabricate-field manager-drop-count-editor"
                 data-gathering-drop-inspector-count
               >
                 <span
@@ -369,7 +366,7 @@
         </div>
       </div>
     {:else if (editingTask?.resolutionMode || 'd100') === 'd100'}
-      <section class="fabricate-card manager-inspector-card" data-gathering-task-drop-inspector>
+      <section class="fabricate-card" data-gathering-task-drop-inspector>
         <h3 class="manager-card-title">
           {text('FABRICATE.Admin.Manager.Environment.Tasks.SelectedDrop', 'Selected drop rule')}
         </h3>

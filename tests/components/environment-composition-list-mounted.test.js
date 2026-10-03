@@ -114,7 +114,7 @@ function quickAction(recordId, action) {
 
 /** Open one row's overflow menu and return the PORTALED panel. */
 async function openRowMenu(recordId) {
-  target.querySelector(`[data-record-id="${recordId}"] .manager-icon-button[aria-haspopup="menu"]`).click();
+  target.querySelector(`[data-record-id="${recordId}"] .fabricate-icon-button[aria-haspopup="menu"]`).click();
   await tick();
   flushSync();
   const panels = target.querySelectorAll('[role="menu"]');
@@ -400,7 +400,7 @@ describe('CompositionList mounted layout', () => {
     removeQuick.click();
     assert.deepEqual(calls.at(-1), ['exclude', 'event', 'included']);
     assert.equal(
-      target.querySelector('[data-record-id="included"] .manager-icon-button[aria-label="Open source event"]'),
+      target.querySelector('[data-record-id="included"] .fabricate-icon-button[aria-label="Open source event"]'),
       null,
       'included manual event rows do not render a standalone edit-source action'
     );
@@ -565,6 +565,16 @@ describe('CompositionList mounted layout', () => {
     );
     forceAdd.click();
     assert.deepEqual(calls.at(-1), ['forceInclude', 'event', 'nonmatching']);
+    // The positive half of the manual-mode absence above: the same selector does find the
+    // standalone edit-source action where the list renders one.
+    assert.ok(
+      Boolean(
+        target.querySelector(
+          ':scope [data-record-id="nonmatching"] .fabricate-icon-button[aria-label="Open source event"]'
+        )
+      ),
+      'a non-matching event row renders the standalone edit-source action'
+    );
 
     assert.ok(
       !target.querySelector('[data-record-id="disabled"] .manager-environment-force-include'),

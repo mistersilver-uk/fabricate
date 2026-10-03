@@ -110,7 +110,7 @@ function row(probe, extraClass, name, enabled = false) {
     </button>
     <div class="manager-tools-library-actions">
       <span class="manager-tools-row-recipes" data-probe="${probe}-recipes"><strong>1</strong><small>Recipes</small></span>
-      <button type="button" class="fabricate-toggle manager-status-toggle manager-tools-enabled-toggle ${enabled ? 'is-on' : 'is-off'}" aria-pressed="${enabled}" aria-label="Enable Tool" data-probe="${probe}-switch"><span class="manager-status-toggle-track" aria-hidden="true" data-probe="${probe}-switch-track"><span class="manager-status-toggle-knob" data-probe="${probe}-switch-knob"></span></span></button>
+      <button type="button" class="fabricate-toggle manager-tools-enabled-toggle ${enabled ? 'is-on' : 'is-off'}" aria-pressed="${enabled}" aria-label="Enable Tool" data-probe="${probe}-switch"><span class="manager-status-toggle-track" aria-hidden="true" data-probe="${probe}-switch-track"><span class="manager-status-toggle-knob" data-probe="${probe}-switch-knob"></span></span></button>
       <button type="button" class="manager-tools-edit-rules" data-probe="${probe}-edit"><span>Edit rules</span><i class="fas fa-arrow-up-right-from-square"></i></button>
     </div>
   </article>`;
@@ -141,7 +141,7 @@ const listScreen = (rows = SIX_ROWS) => `
     <nav class="manager-rail"></nav>
     <main class="manager-main manager-tools-main" data-tool-library data-probe="pane">
       <div class="manager-tools-main-content" data-probe="toolbar-stack">
-        <section class="fabricate-card manager-inspector-card manager-tools-authority-card" data-manager-tools-authority="" data-probe="authority-card">
+        <section class="fabricate-card manager-tools-authority-card" data-manager-tools-authority="" data-probe="authority-card">
           <div class="manager-tools-authority-heading">
             <span><i class="fas fa-sliders"></i></span>
             <div class="manager-tools-authority-title">
@@ -156,8 +156,8 @@ const listScreen = (rows = SIX_ROWS) => `
           </div>
         </section>
         <section class="manager-tools-library-card" data-manager-tools-search>
-          <section class="fabricate-filter-bar manager-toolbar" aria-label="Which Tools this list shows" data-probe="filter-bar">
-            <label class="fabricate-search manager-search"><i class="fas fa-search"></i><input type="search" data-probe="search" placeholder="Search tools"></label>
+          <section class="fabricate-filter-bar" aria-label="Which Tools this list shows" data-probe="filter-bar">
+            <label class="fabricate-search"><i class="fas fa-search"></i><input type="search" data-probe="search" placeholder="Search tools"></label>
             <div class="manager-segmented is-compact is-accent" role="radiogroup" data-tool-membership-filter="true">
               <label class="manager-segment is-active" data-tool-membership-option="in"><input type="radio" class="manager-segment-input" name="b" checked><span class="manager-segment-label">In this system</span><span class="manager-segment-count">3</span></label>
               <label class="manager-segment" data-tool-membership-option="all"><input type="radio" class="manager-segment-input" name="b"><span class="manager-segment-label">All world tools</span><span class="manager-segment-count">11</span></label>
@@ -180,7 +180,7 @@ const listScreen = (rows = SIX_ROWS) => `
       </div>
     </main>
     <aside class="manager-inspector" data-probe="aside">
-      <section class="fabricate-card manager-inspector-card manager-tool-browser-inspector" data-tool-browser-inspector="">
+      <section class="fabricate-card manager-tool-browser-inspector" data-tool-browser-inspector="">
         <p class="manager-kicker manager-tool-inspector-kicker" data-probe="kicker">Selected tool</p>
         <div class="manager-tool-inspector-hero">
           <img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="">
@@ -202,10 +202,10 @@ const listScreen = (rows = SIX_ROWS) => `
           </div>
         </div>
         <div class="manager-tool-inspector-routes">
-          <button type="button" class="fabricate-button manager-button fab-manager-button" data-tool-inspector-edit-world="t1" data-probe="edit-world"><i class="fas fa-globe" data-probe="edit-world-glyph"></i><span>Edit the world Tool</span></button>
+          <button type="button" class="fabricate-button fab-manager-button" data-tool-inspector-edit-world="t1" data-probe="edit-world"><i class="fas fa-globe" data-probe="edit-world-glyph"></i><span>Edit the world Tool</span></button>
         </div>
         <div class="manager-tool-inspector-foot" data-probe="foot">
-          <button type="button" class="fabricate-button manager-button fab-manager-button is-primary" data-tool-inspector-edit="t1" data-probe="primary">Edit rules in Smithing</button>
+          <button type="button" class="fabricate-button fab-manager-button is-primary" data-tool-inspector-edit="t1" data-probe="primary">Edit rules in Smithing</button>
         </div>
       </section>
     </aside>
@@ -319,19 +319,19 @@ function inspectorColumn(sections, footState) {
   ).join('');
   const foot =
     footState === 'member'
-      ? `<button type="button" class="fabricate-button manager-button fab-manager-button is-primary" data-tool-inspector-edit="t1" data-probe="cta-member">Edit rules in Smithing</button>`
-      : `<button type="button" class="fabricate-button manager-button fab-manager-button is-primary" data-tool-inspector-add="t1" data-probe="cta-absent">Add Mining Pick to Smithing</button>`;
+      ? `<button type="button" class="fabricate-button fab-manager-button is-primary" data-tool-inspector-edit="t1" data-probe="cta-member">Edit rules in Smithing</button>`
+      : `<button type="button" class="fabricate-button fab-manager-button is-primary" data-tool-inspector-add="t1" data-probe="cta-absent">Add Mining Pick to Smithing</button>`;
   return `
 <div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="tools">
   <div class="manager-body" style="display: grid; grid-template-columns: 210px minmax(0, 1fr) 340px; height: 600px">
     <nav class="manager-rail"></nav>
     <main class="manager-main manager-tools-main"></main>
     <aside class="manager-inspector" style="min-height: 0" data-probe="aside">
-      <section class="fabricate-card manager-inspector-card manager-tool-browser-inspector" data-tool-browser-inspector="">
+      <section class="fabricate-card manager-tool-browser-inspector" data-tool-browser-inspector="">
         <p class="manager-kicker manager-tool-inspector-kicker">Selected tool</p>
         <div class="manager-tool-inspector-inheritance">${rows}</div>
         <div class="manager-tool-inspector-routes">
-          <button type="button" class="fabricate-button manager-button fab-manager-button" data-tool-inspector-edit-world="t1"><span>Edit the world Tool</span></button>
+          <button type="button" class="fabricate-button fab-manager-button" data-tool-inspector-edit-world="t1"><span>Edit the world Tool</span></button>
         </div>
         <div class="manager-tool-inspector-foot" data-probe="foot">${foot}</div>
       </section>
@@ -366,7 +366,7 @@ const READ_PINNED_BAND = () => {
 
 test('the Tools browser writes ONE search field, and it is inside the search card', () => {
   // THE FIXTURE ABOVE IS A COPY, AND THIS IS THE DRIFT GUARD BESIDE IT. `LIST_SCREEN` writes
-  // two `.manager-tools-library-card` sections and one `.manager-search` by hand, so it goes on
+  // two `.manager-tools-library-card` sections and one `.fabricate-search` by hand, so it goes on
   // measuring the same three rules however the real view is edited. This clause reads the SOURCE.
   const viewPath = 'src/ui/svelte/apps/manager/ToolsBrowserView.svelte';
   const source = readFileSync(resolve(repoRoot, viewPath), 'utf8');

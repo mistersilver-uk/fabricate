@@ -452,7 +452,7 @@
   .fabricate-roll-prompt :global(.fabricate-field.prompt-field) {
     gap: var(--fab-space-chip);
   }
-  .fabricate-roll-prompt :global(.fabricate-field.manager-field.bonus-field input[type='text']) {
+  .fabricate-roll-prompt :global(.fabricate-field.fabricate-field.bonus-field input[type='text']) {
     width: 100%;
     box-sizing: border-box;
     height: 30px;
@@ -464,7 +464,7 @@
     color: var(--fab-text);
     line-height: normal;
   }
-  .fabricate-roll-prompt :global(.fabricate-field.manager-field.bonus-field input[type='text']),
+  .fabricate-roll-prompt :global(.fabricate-field.fabricate-field.bonus-field input[type='text']),
   .fabricate-roll-prompt :global(.bonus-field input::placeholder) {
     font-family: var(--fab-font-mono);
     font-size: 12px;

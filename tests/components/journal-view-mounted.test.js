@@ -276,9 +276,9 @@ describe('JournalView mounted behavior', () => {
     const finishedList = target.querySelector('[data-journal-list="finished"]');
     assert.ok(activeList.querySelector('[data-journal-list-scroll]'));
     assert.ok(finishedList.querySelector('[data-journal-list-scroll]'));
-    assert.ok(!activeList.querySelector('[data-journal-list-scroll]').contains(activeList.querySelector('.manager-pagination')));
-    assert.ok(!finishedList.querySelector('[data-journal-list-scroll]').contains(finishedList.querySelector('.manager-pagination')));
-    assert.equal(target.querySelectorAll('.journal-list-footer .manager-pagination').length, 2);
+    assert.ok(!activeList.querySelector('[data-journal-list-scroll]').contains(activeList.querySelector('.fabricate-pagination')));
+    assert.ok(!finishedList.querySelector('[data-journal-list-scroll]').contains(finishedList.querySelector('.fabricate-pagination')));
+    assert.equal(target.querySelectorAll('.journal-list-footer .fabricate-pagination').length, 2);
     assert.ok(target.querySelector('[data-journal-list="active"] [data-pagination-page]'));
     assert.ok(target.querySelector('[data-journal-list="finished"] [data-pagination-page]'));
     assert.ok(target.querySelector('[data-journal-detail]'));

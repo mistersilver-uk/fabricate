@@ -425,7 +425,7 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
     return { root, row };
   }
 
-  // DEFECT 1. `Delete modifier` and `Done` shipped a BARE `manager-button`.
+  // DEFECT 1. `Delete modifier` and `Done` shipped a bare hand-written button class.
   it('gives Delete the danger role and Done the ghost role, through the shared primitive', async () => {
     const { row } = await openEditor();
 
@@ -446,7 +446,7 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
       ['Done', done],
     ]) {
       assert.ok(
-        button.classList.contains('manager-button') &&
+        button.classList.contains('fabricate-button') &&
           button.classList.contains('fab-manager-button'),
         `${name} renders through the shared primitive, not a hand-written class string`
       );
@@ -460,7 +460,7 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
     // header-actions class, and this change converted only this one.
     const actions = [
       ...root.querySelectorAll(
-        ':scope [data-world-modifiers] .manager-character-modifier-card-header-actions .manager-button'
+        ':scope [data-world-modifiers] .manager-character-modifier-card-header-actions .fabricate-button'
       ),
     ];
 

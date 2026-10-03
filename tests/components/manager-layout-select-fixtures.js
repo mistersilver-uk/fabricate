@@ -126,7 +126,7 @@ export const SOURCE_TRIGGER_SITES = [
          </div>
        </form>
      </main>`,
-    '<section class="fabricate-card manager-inspector-card">Inspector</section>'
+    '<section class="fabricate-card">Inspector</section>'
   ),
   // THE PICKER'S OWN RULE, outside any drop zone.
   `<div style="width:1280px;height:200px">

@@ -261,7 +261,7 @@
   /*
     Full-width filter row beneath the search input: Fabricate's pill switch on
     the left and a descriptive label to its right — the same track+knob control
-    used across the GM apps (`.manager-status-toggle`), re-themed here with the
+    used across the GM apps (`.fabricate-toggle`), re-themed here with the
     base `--fab-*` player tokens. The switch is a plain <button> (NOT a
     checkbox), so Foundry paints none of the control and the track/knob are the
     only visual (no On/Off text); the label to its right is the accessible name
@@ -386,7 +386,7 @@
   }
 
   /*
-    Pagination.svelte renders .manager-pagination* + .manager-icon-button markup.
+    Pagination.svelte renders .fabricate-pagination* + .fabricate-icon-button markup.
     Theme it here with base --fab-* tokens. (Written before issue 1502, when that
     markup really was .fabricate-manager-scoped and so unstyled here; see the note
     below.)
@@ -403,7 +403,7 @@
     / `select` chrome. The per-property audit for all six player callers is in
     `components/Pagination.svelte`'s docblock.
   */
-  .gathering-env-pagination :global(.manager-pagination) {
+  .gathering-env-pagination :global(.fabricate-pagination) {
     /*
       Single inline row in the narrow (~300px) column: never wrap, keep the
       controls compact, and let only the summary shrink (with an ellipsis) so
@@ -469,7 +469,7 @@
     min-width: 0;
   }
 
-  .gathering-env-pagination :global(.manager-icon-button) {
+  .gathering-env-pagination :global(.fabricate-icon-button) {
     /* 1502 base: Foundry core's `button` rule gives every button `min-height: 2em` and
        `font-size: var(--font-size-14)`, and the sheet newly overrides both with
        `min-height: 0` and `font: inherit`. Restated, so the arrow keeps its 28px box (the
@@ -489,12 +489,12 @@
     cursor: pointer;
   }
 
-  .gathering-env-pagination :global(.manager-icon-button:disabled) {
+  .gathering-env-pagination :global(.fabricate-icon-button:disabled) {
     opacity: 0.5;
     cursor: default;
   }
 
-  .gathering-env-pagination :global(.manager-icon-button:hover:not(:disabled)) {
+  .gathering-env-pagination :global(.fabricate-icon-button:hover:not(:disabled)) {
     background: var(--fab-surface-raised);
   }
 </style>

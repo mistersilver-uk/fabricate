@@ -1320,7 +1320,7 @@ describe('the world Tool entry (issue 1373)', () => {
         'the window is four rows deep in a 300px column'
       );
       assert.ok(
-        Boolean(region.querySelector('.manager-pagination')),
+        Boolean(region.querySelector('.fabricate-pagination')),
         'and the overflow is a pager rather than a sentence with nothing behind it'
       );
       assert.doesNotMatch(region.textContent, /more$/);

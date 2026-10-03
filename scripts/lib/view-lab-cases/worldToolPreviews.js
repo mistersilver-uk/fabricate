@@ -88,7 +88,7 @@ export const CASES = Object.freeze([
         selector: '[data-scoped-list-row="sm-tool-hammer"] [data-scoped-list-action="open-entry"]',
       },
       // Scrolled, because the column is what this frame is about and it does not fit.
-      { selector: '[data-tool-required-for] .manager-pagination', scroll: true },
+      { selector: '[data-tool-required-for] .fabricate-pagination', scroll: true },
     ],
     expectView: 'world-tool-entry',
     expectSelector: '[data-world-tool-entry-preview]',
@@ -114,7 +114,7 @@ export const CASES = Object.freeze([
       },
       {
         container: '[data-world-tool-entry-preview]',
-        target: '[data-tool-required-for] .manager-pagination',
+        target: '[data-tool-required-for] .fabricate-pagination',
       },
     ],
     position: { width: 1280, height: 900 },

@@ -3,7 +3,7 @@
   A name + generic icon + grant-toggle row for the Access rosters (who may see /
   read a recipe item). Purely presentational: it renders one roster entry and
   reports a toggle intent. No class, colour, or seat concept — just a name, an
-  optional subtitle, and an On/Off grant toggle (reusing `.manager-status-toggle`).
+  optional subtitle, and an On/Off grant toggle (reusing `.fabricate-toggle`).
 
   Props:
    - name: the entry's display name (serif via the inherited `--font-primary`).

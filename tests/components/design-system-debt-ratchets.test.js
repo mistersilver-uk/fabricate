@@ -154,7 +154,7 @@ const PRIMITIVE_FOCUS_STRIPS = Object.freeze([
   '.fabricate-slider input:focus',
   '.fabricate-tabs button:focus',
   '.fabricate-toggle .manager-tool-setting-toggle-input:focus',
-  '.fabricate-toggle.manager-status-toggle:focus',
+  '.fabricate-toggle.fabricate-toggle:focus',
 ]);
 
 /** The strip half's declaration set, exactly — property to normalised value, nothing else. */
@@ -279,7 +279,7 @@ test('a primitive family’s focus STRIP half is recognised, and a look-alike is
       '.fabricate-slider input:focus',
       '.fabricate-tabs button:focus',
       '.fabricate-toggle .manager-tool-setting-toggle-input:focus',
-      '.fabricate-toggle.manager-status-toggle:focus',
+      '.fabricate-toggle.fabricate-toggle:focus',
     ],
     'the set of primitive families declaring their own focus strip has changed. Each of the ' +
       'nine is the strip half of a pair `design-system/spec.md` requires, so one disappearing ' +

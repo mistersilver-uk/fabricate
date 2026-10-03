@@ -362,7 +362,7 @@ export function registerGatheringCases() {
       ?.getAttribute(`data-gathering-${kind}-id`);
 
   const headerButton = (label) =>
-    Array.from(target.querySelectorAll('.manager-header-actions .manager-button')).find((button) =>
+    Array.from(target.querySelectorAll('.manager-header-actions .fabricate-button')).find((button) =>
       button.textContent.includes(label)
     );
 
@@ -378,7 +378,7 @@ export function registerGatheringCases() {
 
   async function openEditor(kind, id) {
     target
-      .querySelector(`[data-gathering-${kind}-id="${id}"] .manager-icon-button[aria-label^="Edit"]`)
+      .querySelector(`[data-gathering-${kind}-id="${id}"] .fabricate-icon-button[aria-label^="Edit"]`)
       .click();
     await settleRouteExit();
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, `gathering-${kind}-edit`);
@@ -480,7 +480,7 @@ export function registerGatheringCases() {
       gatheringSubitem('Environments').click();
       await settleRouteExit();
       target
-        .querySelector('[data-environment-id="env-forest"] .manager-icon-button[aria-label^="Edit"]')
+        .querySelector('[data-environment-id="env-forest"] .fabricate-icon-button[aria-label^="Edit"]')
         .click();
       await settleRouteExit();
       store.viewState.update((state) => ({
@@ -700,7 +700,7 @@ export function registerGatheringCases() {
     );
 
     const headerDeleteButton = target.querySelector(
-      '.manager-header-actions .manager-button.is-danger'
+      '.manager-header-actions .fabricate-button.is-danger'
     );
     assert.ok(headerDeleteButton, 'editor toolbar should expose a destructive delete button');
     assert.ok(headerDeleteButton.textContent.includes('Delete gathering task'));
@@ -833,7 +833,7 @@ export function registerGatheringCases() {
       'routed tiers match result-group names after trimming and case folding'
     );
 
-    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
+    target.querySelector('.manager-header-actions .fabricate-button.is-primary').click();
     await tick();
     flushSync();
     const saved = calls.find(
@@ -970,7 +970,7 @@ export function registerGatheringCases() {
         (node) => node.dataset.gatheringTaskDropId
       )
     );
-    Array.from(target.querySelectorAll('.manager-task-card-header .manager-button'))
+    Array.from(target.querySelectorAll('.manager-task-card-header .fabricate-button'))
       .find((button) => button.textContent.includes('Add drop rule'))
       .click();
     await tick();
@@ -1779,7 +1779,7 @@ export function registerGatheringCases() {
       'removing the long-label member hands focus to the remaining remover'
     );
 
-    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
+    target.querySelector('.manager-header-actions .fabricate-button.is-primary').click();
     await tick();
     flushSync();
     assert.ok(
@@ -1920,7 +1920,7 @@ export function registerGatheringCases() {
         .textContent.includes('No tools required')
     );
 
-    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
+    target.querySelector('.manager-header-actions .fabricate-button.is-primary').click();
     await tick();
     flushSync();
     assert.ok(

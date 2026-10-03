@@ -369,7 +369,7 @@ export const CASES = Object.freeze([
       'Gathering',
       {
         selector:
-          '.manager-environment-row[data-environment-id="hb-env-thicket"] .manager-icon-button[aria-label^="Edit"]',
+          '.manager-environment-row[data-environment-id="hb-env-thicket"] .fabricate-icon-button[aria-label^="Edit"]',
       },
       { selector: '#environment-tab-tasks' },
     ],
@@ -393,7 +393,7 @@ export const CASES = Object.freeze([
       'Gathering',
       {
         selector:
-          '.manager-environment-row[data-environment-id="hb-env-thicket"] .manager-icon-button[aria-label^="Edit"]',
+          '.manager-environment-row[data-environment-id="hb-env-thicket"] .fabricate-icon-button[aria-label^="Edit"]',
       },
       { selector: '#environment-tab-tasks' },
     ],
@@ -418,12 +418,12 @@ export const CASES = Object.freeze([
       'Gathering',
       {
         selector:
-          '.manager-environment-row[data-environment-id="hb-env-grove"] .manager-icon-button[aria-label^="Edit"]',
+          '.manager-environment-row[data-environment-id="hb-env-grove"] .fabricate-icon-button[aria-label^="Edit"]',
       },
       { selector: '#environment-tab-tasks' },
       {
         selector:
-          '[data-section-row="non-matching"][data-record-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="More actions"]',
+          '[data-section-row="non-matching"][data-record-id="hb-task-slowbloom"] .fabricate-icon-button[aria-label^="More actions"]',
       },
     ],
     expectView: 'environment-edit',
@@ -449,7 +449,7 @@ export const CASES = Object.freeze([
       'Gathering',
       {
         selector:
-          '.manager-environment-row[data-environment-id="hb-env-thicket"] .manager-icon-button[aria-label^="Edit"]',
+          '.manager-environment-row[data-environment-id="hb-env-thicket"] .fabricate-icon-button[aria-label^="Edit"]',
       },
       { selector: '#environment-tab-validation' },
     ],

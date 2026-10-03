@@ -383,7 +383,7 @@
   }
 
   /*
-    Pagination.svelte renders .manager-pagination* + .manager-icon-button markup.
+    Pagination.svelte renders .fabricate-pagination* + .fabricate-icon-button markup.
     Theme it here with base --fab-* tokens as a single compact inline row (mirrors
     the gathering environment list), rather than the block that stacks the summary,
     nav, and per-page controls onto separate lines. (Written before issue 1502, when
@@ -401,7 +401,7 @@
     / `select` chrome. The per-property audit for all six player callers is in
     `components/Pagination.svelte`'s docblock.
   */
-  .crafting-browser-pagination :global(.manager-pagination) {
+  .crafting-browser-pagination :global(.fabricate-pagination) {
     display: flex;
     flex-wrap: nowrap;
     align-items: center;
@@ -471,7 +471,7 @@
     padding-inline: var(--fab-space-2);
   }
 
-  .crafting-browser-pagination :global(.manager-icon-button) {
+  .crafting-browser-pagination :global(.fabricate-icon-button) {
     /* 1502 base: Foundry core's `button` rule gives every button `min-height: 2em` and
        `font-size: var(--font-size-14)`, and the sheet newly overrides both with
        `min-height: 0` and `font: inherit`. Restated, so the arrow keeps its 28px box (the
@@ -491,12 +491,12 @@
     cursor: pointer;
   }
 
-  .crafting-browser-pagination :global(.manager-icon-button:disabled) {
+  .crafting-browser-pagination :global(.fabricate-icon-button:disabled) {
     opacity: 0.5;
     cursor: default;
   }
 
-  .crafting-browser-pagination :global(.manager-icon-button:hover:not(:disabled)) {
+  .crafting-browser-pagination :global(.fabricate-icon-button:hover:not(:disabled)) {
     background: var(--fab-surface-raised);
   }
 </style>

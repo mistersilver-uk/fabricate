@@ -46,7 +46,7 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8">
       <input type="checkbox" />
     </div>
     <div class="fabricate-roll-prompt ${rollPrompt.hashClass}" data-case="prompt">
-      <label class="fabricate-field manager-field prompt-field bonus-field">
+      <label class="fabricate-field prompt-field bonus-field">
         <input type="text" name="situationalBonus" placeholder="+0" />
       </label>
     </div>

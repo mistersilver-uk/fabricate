@@ -605,7 +605,7 @@ describe('run primitives mounted behavior', () => {
     // Named as the WHOLE selector list.
     expectGeometry(
       'StageNav',
-      ':global(.fabricate-icon-button.manager-icon-button.fab-stage-nav-arrow),\n  .fab-stage-nav-number',
+      ':global(.fabricate-icon-button.fabricate-icon-button.fab-stage-nav-arrow),\n  .fab-stage-nav-number',
       [/width:\s*26px/u, /height:\s*26px/u, /border-radius:\s*7px/u]
     );
     stageNavHarness.remount();

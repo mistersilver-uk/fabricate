@@ -356,7 +356,7 @@
 
 <style>
   /* THE WIDTH THE ELEMENT-TYPED SHEET RULE NO LONGER SUPPLIES (issue 1510).
-     `.fabricate-field.manager-field select { width: 100% }` painted this control until it became
+     `.fabricate-field.fabricate-field select { width: 100% }` painted this control until it became
      a `<button>`, and `.fabricate-select-trigger` declares no width at all by design — a
      trigger's box belongs to the row it sits in. Without this rule the button hugs its value, so
      the operator control measured 72.91px on "is false", 92.28px on "≥ · at least" and 109.66px

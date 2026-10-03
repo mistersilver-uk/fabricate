@@ -176,7 +176,7 @@ describe('GatheringPartiesTab (mounted)', () => {
   it('renders the shared filtered panel and NO card list when nothing matches', async () => {
     const root = await mountTab({ parties: makeParties(3) });
     // The negative control for the pager assertion below.
-    assert.ok(Boolean(root.querySelector('.manager-pagination')), 'the matched pane pages');
+    assert.ok(Boolean(root.querySelector('.fabricate-pagination')), 'the matched pane pages');
 
     typeSearch(root, 'zzz');
     assert.ok(Boolean(root.querySelector('[data-travel-parties-no-match]')), 'filtered panel');
@@ -185,7 +185,7 @@ describe('GatheringPartiesTab (mounted)', () => {
     // `tpl:2545` is `pager: { show: matched.length > 0 }`. Outside the matched branch the
     // pager drew "Showing 0-0 of 0 / Page 1 of 1" under the no-match panel — and the
     // zero-parties state above already draws no pager, so it was inconsistent with itself.
-    assert.ok(!root.querySelector('.manager-pagination'), 'nothing matched, so nothing to page');
+    assert.ok(!root.querySelector('.fabricate-pagination'), 'nothing matched, so nothing to page');
   });
 
   it('returns to page 1 on a search keystroke', async () => {
@@ -304,7 +304,7 @@ describe('GatheringPartiesTab (mounted)', () => {
     const root = await mountTab({ parties: makeParties(5) });
     const scroller = root.querySelector('.manager-travel-parties-content');
     const footer = root.querySelector('[data-manager-party-pagination]');
-    const pager = footer.querySelector('.manager-pagination');
+    const pager = footer.querySelector('.fabricate-pagination');
 
     assert.equal(footer.parentElement, root.querySelector('.manager-travel-parties'));
     assert.ok(!scroller.contains(footer), 'the footer cannot scroll over cards');

@@ -33,7 +33,7 @@ export function withoutComments(source) {
   return source.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
 }
 
-const CHAINED_MANAGER_BUTTON = String.raw`\.manager-button(?:\.fab-manager-button)?`;
+const CHAINED_MANAGER_BUTTON = String.raw`\.fabricate-button(?:\.fab-manager-button)?`;
 const OPTIONAL_ENABLED_STATE = String.raw`(?::not\(:disabled\))?`;
 
 function selectorPattern(selector) {
@@ -45,7 +45,8 @@ function selectorPattern(selector) {
           .trim()
           .replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)
           .replaceAll(/\s+/g, String.raw`\s+`)
-          .replaceAll(String.raw`\.manager-button`, CHAINED_MANAGER_BUTTON) + OPTIONAL_ENABLED_STATE
+          .replaceAll(String.raw`\.fabricate-button`, CHAINED_MANAGER_BUTTON) +
+        OPTIONAL_ENABLED_STATE
     )
     .join(String.raw`,\s+`);
 }
@@ -120,7 +121,7 @@ const managerButtonSource = readFileSync(managerButtonPath, 'utf8');
 
 // The role modifier is read from the component's NAMED mapping rather than rebuilt here as
 // `is-${role}`. `warning` emits `is-warning-action` — the sheet declares no
-// `.manager-button.is-warning` at all — so a template would hand this harness a class string
+// `.fabricate-button.is-warning` at all — so a template would hand this harness a class string
 // the product never renders, and the probe would measure a selector that matches nothing
 // while reporting green (issue 1118).
 const managerButtonRoleClasses = (() => {
@@ -138,7 +139,7 @@ const managerButtonBaseClasses = (() => {
   const base = [...literal[1].matchAll(/'([a-z][\w-]*)'/g)].map(([, token]) => token);
   assert.ok(
     base.includes('fabricate-button') &&
-      base.includes('manager-button') &&
+      base.includes('fabricate-button') &&
       base.includes('fab-manager-button'),
     'Button must emit the family root, the convention class and the primitive class, ' +
       `got ${base.join(' ')}`
@@ -171,11 +172,11 @@ export const stepperScoped = scopedComponentCss(
 export function pagerBarFixture({ probe, value = '4', arrows = false }) {
   const arrow = (side, marked) => `<button
         type="button"
-        class="fabricate-icon-button manager-icon-button"
+        class="fabricate-icon-button"
         data-keyboard-focus="true"
         ${marked ? `data-probe="arrow-${probe}"` : ''}
       ><i class="fas fa-chevron-${side}" aria-hidden="true"></i></button>`;
-  return `<div class="fabricate-pagination manager-pagination">
+  return `<div class="fabricate-pagination">
     <span class="manager-pagination-summary">Showing 1-4 of 8</span>
     ${
       arrows

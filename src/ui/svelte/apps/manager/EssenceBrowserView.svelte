@@ -633,10 +633,10 @@
     align-items: stretch;
   }
 
-  /* THE SEARCH FIELD SHRINKS BEFORE THE ROW WRAPS: the shipped `.manager-search` basis is sized for
+  /* THE SEARCH FIELD SHRINKS BEFORE THE ROW WRAPS: the shipped `.fabricate-search` basis is sized for
      a bar with one or two controls, and at 1280px it pushed the membership control onto a fourth
      band. `flex: 1 1 220px` keeps a floor a query is legible in. */
-  .manager-essence-filter-row :global(.manager-search) {
+  .manager-essence-filter-row :global(.fabricate-search) {
     flex: 1 1 220px;
     min-width: 0;
   }
@@ -644,7 +644,7 @@
   /* Search wraps onto its own line before the segmented controls start colliding. The row is
      already `flex-wrap`, so this only has to release the search field's basis. */
   @container fabricate-manager (max-width: 1000px) {
-    .manager-essence-filter-row :global(.manager-search) {
+    .manager-essence-filter-row :global(.fabricate-search) {
       flex: 1 1 100%;
     }
   }

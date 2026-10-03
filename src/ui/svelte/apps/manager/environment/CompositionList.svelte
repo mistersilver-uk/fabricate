@@ -715,8 +715,8 @@
                 {:else}
                   {#if entry.compositionState === 'notMatching'}
                     <!-- THE `warning` REPAIR (issue 1118). This spelt its modifier
-                         `is-warning`, and the sheet declares `.manager-button.is-warning-action`
-                         while declaring `.manager-button.is-warning` NOWHERE — so Force add
+                         `is-warning`, and the sheet declares `.fabricate-button.is-warning-action`
+                         while declaring `.fabricate-button.is-warning` NOWHERE — so Force add
                          shipped with no warning treatment at all, and the amber treatment
                          shipped with no call site. `role="warning"` emits the class that
                          exists, which is why the role-to-class relation in the primitive is a

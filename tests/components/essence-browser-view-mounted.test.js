@@ -349,18 +349,18 @@ describe('1036 EssenceBrowserView — rows, cards and presentation', () => {
 
   it('keeps the Edit pencil the FIRST icon button in the row', async () => {
     // The View Lab case `manager-essence-edit-first-state` navigates by
-    // `.manager-essence-row[data-essence-id="…"] .manager-icon-button`. The row also carries
-    // a toggle and a selection box; the toggle wears `.manager-status-toggle` and
+    // `.manager-essence-row[data-essence-id="…"] .fabricate-icon-button`. The row also carries
+    // a toggle and a selection box; the toggle wears `.fabricate-toggle` and
     // `SelectionCheckbox` renders no `<button>` at all, so neither can intercept.
     const root = await harness.mount(props([CONFIGURED_DISABLED]));
     const row = root.querySelector('.manager-essence-row[data-essence-id="aether"]');
     assert.equal(
-      row.querySelector('.manager-icon-button').dataset.essenceEdit,
+      row.querySelector('.fabricate-icon-button').dataset.essenceEdit,
       'aether',
       'a new icon button placed before the pencil would silently repoint the capture'
     );
     assert.equal(
-      row.querySelectorAll('.manager-icon-button').length,
+      row.querySelectorAll('.fabricate-icon-button').length,
       1,
       'and the row has exactly one, so "first" is unambiguous'
     );
@@ -393,11 +393,11 @@ describe('1036 EssenceBrowserView — rows, cards and presentation', () => {
       'the labelled variant names the essence AND the layer it opens'
     );
     // NON-VACUITY, and the reason the label could not simply replace the class.
-    // smoke reaches this control as `.manager-icon-button[title*="Edit" i]` behind a
+    // smoke reaches this control as `.fabricate-icon-button[title*="Edit" i]` behind a
     // `count() > 0` guard, so a lost class or a retitled control would stop producing the
     // `manager-essence-edit-first-state` frame WITHOUT failing anything.
     assert.ok(
-      edit.classList.contains('manager-icon-button'),
+      edit.classList.contains('fabricate-icon-button'),
       'it is still the primitive three surfaces address it by'
     );
     assert.ok(

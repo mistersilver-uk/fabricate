@@ -140,11 +140,11 @@ function managerRows() {
           <p>Recipe, component, essence, and environment management</p>
         </div>
       </div>
-      <button type="button" class="fabricate-toggle manager-status-toggle ${index % 2 ? 'is-off' : 'is-on'}" data-contrast-soft data-boundary>
+      <button type="button" class="fabricate-toggle ${index % 2 ? 'is-off' : 'is-on'}" data-contrast-soft data-boundary>
         <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
         <span class="manager-status-toggle-label">${index % 2 ? 'Off' : 'On'}</span>
       </button>
-      <button type="button" class="fabricate-button manager-button fab-manager-button" data-boundary>Open</button>
+      <button type="button" class="fabricate-button fab-manager-button" data-boundary>Open</button>
     </article>
   `).join('');
 }
@@ -192,7 +192,7 @@ function managerFixture(theme, width, height) {
           <p class="manager-subtitle preview-copy">Checks buttons, tags, toggles, text, focus rings, and fixed app-width layout.</p>
         </div>
         <div class="manager-header-actions">
-          <button id="focus-target" type="button" class="fabricate-button manager-button fab-manager-button is-primary" data-hit data-contrast-solid data-boundary>Create System</button>
+          <button id="focus-target" type="button" class="fabricate-button fab-manager-button is-primary" data-hit data-contrast-solid data-boundary>Create System</button>
         </div>
       </header>
       <div class="manager-body">
@@ -214,8 +214,8 @@ function managerFixture(theme, width, height) {
           </button>
         </nav>
         <section class="manager-main" data-region data-boundary>
-          <div class="fabricate-filter-bar manager-toolbar">
-            <input class="fabricate-search manager-search" value="Alchemy and harvesting" aria-label="Search">
+          <div class="fabricate-filter-bar">
+            <input class="fabricate-search" value="Alchemy and harvesting" aria-label="Search">
             <span class="manager-chip manager-selected-tag-pill" data-contrast-soft data-boundary>Rare ingredient category <button type="button">x</button></span>
             <span class="manager-chip is-warning" data-contrast-soft data-boundary>Warning</span>
           </div>
@@ -224,7 +224,7 @@ function managerFixture(theme, width, height) {
         <aside class="manager-inspector" data-region data-boundary>
           <h2 data-contrast-surface>Palette</h2>
           <p class="manager-empty-copy preview-copy">Shared theme tokens drive every mounted Fabricate surface.</p>
-          <button type="button" class="fabricate-button manager-button fab-manager-button is-danger" data-hit data-contrast-solid data-boundary>Delete</button>
+          <button type="button" class="fabricate-button fab-manager-button is-danger" data-hit data-contrast-solid data-boundary>Delete</button>
           <!-- The armed half of the inline two-step row confirmation (issue 785). It is
                the product's first SOLID fab-danger surface, so it carries its OWN
                contrast probe: contrastSample reads the FIRST node matching a
@@ -233,7 +233,7 @@ function managerFixture(theme, width, height) {
                node. The fab-on-accent token fails 4.5:1 against fab-danger in
                foundry-native and is marginal in ironblood-forge, which is why
                fab-on-danger exists at all. -->
-          <button type="button" class="fabricate-button manager-button is-danger is-armed" data-armed="true" data-contrast-solid-armed data-boundary>Confirm?</button>
+          <button type="button" class="fabricate-button is-danger is-armed" data-armed="true" data-contrast-solid-armed data-boundary>Confirm?</button>
           <!-- The two QUIET roles (issue 1118). Both paint muted ink on no fill at all -
                is-ghost and is-dashed both take fab-text-muted, is-dashed at 11px -
                and between them they are now the treatment for every navigational verb and
@@ -243,8 +243,8 @@ function managerFixture(theme, width, height) {
                whose whole design is to recede is exactly the one a theme's contrast can fail
                quietly, so each carries its own probe. They sit here rather than in the header
                because contrastSample reads the FIRST node matching a selector. -->
-          <button type="button" class="fabricate-button manager-button fab-manager-button is-ghost" data-contrast-quiet-ghost data-boundary>Back to systems</button>
-          <button type="button" class="fabricate-button manager-button fab-manager-button is-dashed" data-contrast-quiet-dashed data-boundary>Add outcome tier</button>
+          <button type="button" class="fabricate-button fab-manager-button is-ghost" data-contrast-quiet-ghost data-boundary>Back to systems</button>
+          <button type="button" class="fabricate-button fab-manager-button is-dashed" data-contrast-quiet-dashed data-boundary>Add outcome tier</button>
           ${bulkEditSubhint()}
           ${bulkBookPickCard()}
           <!-- The solid fab-info fill inked by fab-on-info, which no rule in this repository
@@ -475,10 +475,10 @@ function liveUpdateFixture(origin) {
       </head>
       <body>
         <section id="mounted-surface" class="fabricate fabricate-manager" data-fabricate-theme="fabricate" data-manager-view="systems">
-          <header class="manager-header"><h1 class="manager-title">Mounted Fabricate Surface</h1><button class="fabricate-button manager-button fab-manager-button is-primary">Action</button></header>
+          <header class="manager-header"><h1 class="manager-title">Mounted Fabricate Surface</h1><button class="fabricate-button fab-manager-button is-primary">Action</button></header>
           <div class="manager-body">
             <nav class="manager-rail"><button class="manager-nav-button is-active">Systems</button></nav>
-            <main class="manager-main"><div class="fabricate-filter-bar manager-toolbar"><span class="manager-chip manager-selected-tag-pill">Live theme</span></div></main>
+            <main class="manager-main"><div class="fabricate-filter-bar"><span class="manager-chip manager-selected-tag-pill">Live theme</span></div></main>
             <aside class="manager-inspector"><p>Inspector stays mounted.</p></aside>
           </div>
         </section>

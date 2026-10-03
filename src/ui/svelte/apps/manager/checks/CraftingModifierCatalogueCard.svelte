@@ -574,14 +574,14 @@
        narrow.
 
        `:global()` AND ANCHORED ON THE TWO CARDS' OWN HOOKS: both cards are `<InspectorCard>`s, so
-       `manager-inspector-card` is written by that primitive and a scoped rule stopped matching —
+       `fabricate-card` is written by that primitive and a scoped rule stopped matching —
        SILENTLY, because an `<i class={…}>` here makes every class selector in the block
        possibly-matching, so it was emitted with the hash attached and `lint:svelte:warnings`
        reported nothing. Anchored on the two `data-` hooks rather than the `.manager-checks-card`
        modifier the cards share, because that has eleven other sites and `container-type` creates a
        containment context rather than painting. Each half stays at (0,2,0). */
-  :global(.manager-inspector-card[data-crafting-modifier-catalogue]),
-  :global(.manager-inspector-card[data-crafting-modifier-policy-card]) {
+  :global(.fabricate-card[data-crafting-modifier-catalogue]),
+  :global(.fabricate-card[data-crafting-modifier-policy-card]) {
     container-type: inline-size;
   }
 
@@ -595,8 +595,8 @@
        What stays here is layout CONTEXT rather than the chip's geometry. RE-ANCHORED ON THE CARD
        for the reason the rule above records: the row moved into `ModifierLibraryRow`, so its class
        carries THAT component's hash. Each half stays at the (0,3,0) the scoped form had. */
-  :global(.manager-inspector-card[data-crafting-modifier-catalogue] .manager-modifier-bounds-chip),
-  :global(.manager-inspector-card[data-crafting-modifier-catalogue] .manager-modifier-roll-chip) {
+  :global(.fabricate-card[data-crafting-modifier-catalogue] .manager-modifier-bounds-chip),
+  :global(.fabricate-card[data-crafting-modifier-catalogue] .manager-modifier-roll-chip) {
     flex: 0 0 auto;
   }
 
@@ -606,12 +606,8 @@
      second scale to adopt. So this states the measured value where it is measured and leaves
      the primitive alone, by the same unlayered `:global()` route the chips above take, anchored
      per card for the reason the container rule states. Each half stays at (0,3,0). */
-  :global(
-    .manager-inspector-card[data-crafting-modifier-catalogue] .manager-resolution-mode-options
-  ),
-  :global(
-    .manager-inspector-card[data-crafting-modifier-policy-card] .manager-resolution-mode-options
-  ) {
+  :global(.fabricate-card[data-crafting-modifier-catalogue] .manager-resolution-mode-options),
+  :global(.fabricate-card[data-crafting-modifier-policy-card] .manager-resolution-mode-options) {
     gap: 10px;
   }
 
@@ -659,10 +655,10 @@
      dropping `fill`, an unfilled `.fab-stepper` still being a stretched flex item. 160px is
      the width the other four such call sites use.
 
-     `:global(...)` chained with `.manager-field`, because this class sits on a `<Field>` and a
+     `:global(...)` chained with `.fabricate-field`, because this class sits on a `<Field>` and a
      scoped rule cannot reach a class a component hands to a child. The compound is not
      decoration: it restores the (0,2,0) the scoped form had. */
-  :global(.manager-field.manager-modifier-max-picks-field) {
+  :global(.fabricate-field.manager-modifier-max-picks-field) {
     flex: 0 0 auto;
     width: 160px;
     max-width: 160px;

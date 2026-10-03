@@ -1219,7 +1219,7 @@ describe('world Component Catalogue (issue 1371)', () => {
     /** The danger leg's control, whatever primitive draws it. */
     function dangerControl(target) {
       return target.querySelector(
-        '[data-world-component-bulk-danger] .manager-button, ' +
+        '[data-world-component-bulk-danger] .fabricate-button, ' +
           '[data-world-component-bulk-danger] button'
       );
     }
@@ -2397,7 +2397,7 @@ describe('world Component Catalogue (issue 1371)', () => {
     it('takes the 38px rung on the LEAD row’s two controls and nowhere else', async () => {
       // `proto:577`-`578` draws the search field and the source select at 38.
       const target = await mounted();
-      const field = target.querySelector('[data-scoped-list-search]').closest('.manager-search');
+      const field = target.querySelector('[data-scoped-list-search]').closest('.fabricate-search');
       assert.ok(Boolean(field), 'the search field is the shared primitive');
       assert.ok(
         field.classList.contains('is-size-38'),

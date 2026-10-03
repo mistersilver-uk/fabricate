@@ -623,7 +623,7 @@
   /* THE HAND-TYPED ROW'S SENTENCE, a SIBLING of that row rather than a third line inside it, as
      the Checks Studio states its own per-entry fault; the radio names it through
      `aria-describedby`. Only the WEIGHT is stated here, resetting the 700 inherited from
-     `.manager-field`: this is the field's VALUE, not its caption. */
+     `.fabricate-field`: this is the field's VALUE, not its caption. */
   .manager-tool-bonus-hand-typed {
     margin: 0;
     font-weight: 500;

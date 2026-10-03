@@ -174,7 +174,7 @@
 </script>
 
 {#if selectedSystem}
-  <section class="fabricate-card manager-inspector-card">
+  <section class="fabricate-card">
     <div class="manager-inspector-title-row is-hero-large">
       <span class="manager-inspector-icon is-hero-large" aria-hidden="true">
         <i class="fas fa-layer-group"></i>
@@ -203,7 +203,7 @@
     </p>
   </section>
 
-  <section class="fabricate-card manager-inspector-card">
+  <section class="fabricate-card">
     <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Counts', 'Counts')}</h3>
     <div class="manager-fact-grid">
       {#each selectedCountFacts as fact (fact.id)}
@@ -235,7 +235,7 @@
   </section>
 
   <section
-    class="fabricate-card manager-inspector-card"
+    class="fabricate-card"
     aria-label={text('FABRICATE.Admin.Manager.EnabledFeatures', 'Enabled features')}
   >
     <h3 class="manager-card-title">
@@ -256,7 +256,7 @@
 
   {#if selectedGatheringConditionShortcuts.length > 0}
     <section
-      class="fabricate-card manager-inspector-card manager-condition-shortcut-card"
+      class="fabricate-card manager-condition-shortcut-card"
       data-systems-gathering-conditions
       aria-label={text('FABRICATE.Admin.Manager.GlobalConditions', 'Global conditions')}
     >
@@ -266,7 +266,7 @@
       <div class="manager-condition-shortcut-list">
         {#each selectedGatheringConditionShortcuts as condition (condition.kind)}
           <label
-            class="fabricate-field manager-field manager-condition-shortcut"
+            class="fabricate-field manager-condition-shortcut"
             data-systems-gathering-condition={condition.kind}
           >
             <span class="manager-condition-shortcut-label">

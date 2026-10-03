@@ -25,7 +25,7 @@ export const CASES = Object.freeze([
     query: { system: 'lab-jewelry' },
     steps: [
       'Crafting',
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '.fabricate-icon-button[aria-label^="Edit"]' },
       { selector: '#recipe-tab-results' },
     ],
     expectView: 'recipe-edit',
@@ -43,7 +43,7 @@ export const CASES = Object.freeze([
     query: { system: 'lab-runework' },
     steps: [
       'Crafting',
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '.fabricate-icon-button[aria-label^="Edit"]' },
       { selector: '#recipe-tab-results' },
     ],
     expectView: 'recipe-edit',
@@ -531,7 +531,7 @@ export const CASES = Object.freeze([
     query: { system: 'lab-jewelry' },
     steps: [
       'Crafting',
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '.fabricate-icon-button[aria-label^="Edit"]' },
       { selector: '#recipe-tab-overview' },
     ],
     expectView: 'recipe-edit',

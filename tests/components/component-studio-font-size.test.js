@@ -15,9 +15,9 @@ const FIXTURE = `
   <div class="application theme-dark">
     <section class="window-content">
       <div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="components">
-        <section class="fabricate-filter-bar manager-toolbar manager-component-toolbar">
+        <section class="fabricate-filter-bar manager-component-toolbar">
           <div class="manager-component-filter-row">
-            <label class="fabricate-search manager-search">
+            <label class="fabricate-search">
               <input type="search" data-m="search" value="iron">
             </label>
             <!-- The toolbar controls are the shared Select, drawn as it renders: the picker ROOT
@@ -29,7 +29,7 @@ const FIXTURE = `
             <span class="manager-component-filter-divider"></span>
             <div class="manager-component-filter-field">
               <span class="manager-component-filter-label" data-m="filter-label">Group by category</span>
-              <button class="fabricate-toggle manager-status-toggle is-on" data-component-group-by-category>
+              <button class="fabricate-toggle is-on" data-component-group-by-category>
                 <span class="manager-status-toggle-track"><span class="manager-status-toggle-knob"></span></span>
               </button>
             </div>
@@ -39,12 +39,12 @@ const FIXTURE = `
               <div class="fabricate-picker manager-travel-picker fabricate-select"><button type="button" class="fabricate-select-trigger fabricate-select-trigger-toolbar" data-m="sort-select" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-label="Sort components"><span class="manager-travel-picker-value fabricate-select-value">Name</span><i class="fas fa-chevron-down" aria-hidden="true"></i></button></div>
               <!-- Carries fab-manager-button because the shipped control does (issue 1118):
                    ComponentsBrowserView renders this toggle through Button, and the
-                   .manager-button.manager-component-sort-direction rule was chained onto the
+                   .fabricate-button.manager-component-sort-direction rule was chained onto the
                    primitive class so its 9px radius and compact scale stop depending on source
                    order. Note this fixture still measured 11.52px WITHOUT the marker, because
                    the components view has a toolbar rule of its own that supplies it — so it
                    would have gone on passing while measuring a rule it does not name. -->
-              <button class="fabricate-button manager-button fab-manager-button manager-component-sort-direction" data-m="toolbar-button"><span>Asc</span></button>
+              <button class="fabricate-button fab-manager-button manager-component-sort-direction" data-m="toolbar-button"><span>Asc</span></button>
             </div>
           </div>
           <div class="manager-component-filter-row is-chips">
@@ -205,9 +205,9 @@ const FIXTURE = `
                  .fab-bulk-edit-apply was a SCOPED rule at (0,2,0), the primitive's (0,3,0)
                  control would have taken its 38px/0.78rem down to 34px/0.72rem and broken the
                  bottom-slot equality below against a shipped control that has not moved.
-                 That rule now names .manager-button.fab-manager-button and compiles to
+                 That rule now names .fabricate-button.fab-manager-button and compiles to
                  (0,4,0), so the box this fixture measures is the same box it always was. -->
-            <button type="button" class="fabricate-button manager-button fab-manager-button fab-bulk-edit-apply" data-m="bulk-apply"><i class="fas fa-check-double"></i><span>Apply to 2 components</span></button>
+            <button type="button" class="fabricate-button fab-manager-button fab-bulk-edit-apply" data-m="bulk-apply"><i class="fas fa-check-double"></i><span>Apply to 2 components</span></button>
           </div>
           <!--
             THE OTHER HALF OF THE SWAP, rendered as a SIBLING of the dock rather than inside
@@ -219,8 +219,8 @@ const FIXTURE = `
 
             The pair is asserted as a RELATIONSHIP below, not as two constants, because the
             two sides get their geometry from DIFFERENT mechanisms: this one from the global
-            rule at styles/fabricate.css (.manager-button.manager-recipe-browser-inspector-edit,
-            .manager-button.manager-component-browser-inspector-edit) and Apply from
+            rule at styles/fabricate.css (.fabricate-button.manager-recipe-browser-inspector-edit,
+            .fabricate-button.manager-component-browser-inspector-edit) and Apply from
             BulkEditPanelShell.svelte's scoped block. A source-substring pin on either file
             cannot see a cascade change that moves one RENDERED value while both sources sit
             unchanged, which is the drift that desynchronises the slot.
@@ -230,7 +230,7 @@ const FIXTURE = `
                (0,3,0) it only TIED the primitive's own control and held its 38px and 0.78rem
                by source order alone. Unmarked, this fixture matched no rule at all and fell to
                Foundry's 14px app base — which is how it failed, loudly, rather than drifting. -->
-          <button type="button" class="fabricate-button manager-button fab-manager-button manager-component-browser-inspector-edit" data-m="inspector-edit"><span>Edit component</span></button>
+          <button type="button" class="fabricate-button fab-manager-button manager-component-browser-inspector-edit" data-m="inspector-edit"><span>Edit component</span></button>
         </section>
       </div>
 
@@ -281,16 +281,16 @@ const FIXTURE = `
                 <span class="manager-component-micro-label" data-m="micro-label">Enabled</span>
               </div>
             </div>
-            <div class="fabricate-field manager-field">
+            <div class="fabricate-field">
               <span class="manager-component-readonly-label" data-m="readonly-label"><span>Results</span></span>
               <ul class="fabricate-sortable-list">
                 <li class="fabricate-sortable-list-row manager-salvage-stage-row">
                  <div class="fabricate-sortable-list-line">
-                  <button type="button" class="fabricate-icon-button manager-icon-button is-size-24 fabricate-sortable-list-grip"><i class="fas fa-grip-vertical" data-m="stage-grip"></i></button>
+                  <button type="button" class="fabricate-icon-button is-size-24 fabricate-sortable-list-grip"><i class="fas fa-grip-vertical" data-m="stage-grip"></i></button>
                   <span class="fabricate-sortable-list-ordinal" data-m="stage-ordinal">1</span>
                   <span class="manager-salvage-component-field">
                     <span class="fabricate-picker manager-travel-picker manager-salvage-component-picker">
-                      <button type="button" class="fabricate-button manager-button manager-salvage-component-trigger" data-m="stage-picker">
+                      <button type="button" class="fabricate-button manager-salvage-component-trigger" data-m="stage-picker">
                         <span class="manager-travel-portrait"><img src="" alt=""></span>
                         <span class="manager-travel-picker-value manager-salvage-component-name" data-m="stage-picker-name">Brass Casing</span>
                         <i class="fas fa-chevron-down"></i>
@@ -300,7 +300,7 @@ const FIXTURE = `
                   <span class="manager-salvage-result-difficulty" data-m="stage-dc">DC 8</span>
                   <button class="manager-salvage-stage-edit" data-m="stage-edit"><span>Edit</span></button>
                   <span class="fabricate-sortable-list-rocker">
-                    <button type="button" class="fabricate-icon-button manager-icon-button is-size-24 fabricate-sortable-list-move"><i class="fas fa-chevron-up" data-m="stage-move"></i></button>
+                    <button type="button" class="fabricate-icon-button is-size-24 fabricate-sortable-list-move"><i class="fas fa-chevron-up" data-m="stage-move"></i></button>
                   </span>
                  </div>
                 </li>
@@ -434,7 +434,7 @@ const EXPECTED = {
   // The ordinal badge is the shared ordered list's as of issue 1512, at the specimen's 10px mono.
   'stage-ordinal': 10,
   // The yield picker replaced the stage row's native <select> (issue 676). It measures the
-  // SAME 13.12 the select did — the `.manager-field`'s 0.82rem, inherited — so swapping a
+  // SAME 13.12 the select did — the `.fabricate-field`'s 0.82rem, inherited — so swapping a
   // native control for a popover trigger re-typed nothing. That is the point of checking:
   // a <button> is exactly the element Foundry's core `button` rule would otherwise size.
   'stage-picker': 13.12, // 0.82rem — inherits the field size, as the select did

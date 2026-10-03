@@ -537,16 +537,16 @@
 
 <style>
   /* THE WIDTH THE ELEMENT-TYPED SHEET RULE NO LONGER SUPPLIES (issue 1510).
-     `.fabricate-field.manager-field select { width: 100% }` painted the two regeneration controls
+     `.fabricate-field.fabricate-field select { width: 100% }` painted the two regeneration controls
      until they became `<button>`s, and `.fabricate-select-trigger` declares no width at all.
      Without this rule the two cells of a two-column grid rendered at different widths and the unit
      cell re-sized as the GM changed it.
 
      Both are the primitive's own labelled form, whose `<Field>` emits `.fabricate-select-field`, so
-     the rule names `.manager-field` and reaches both. The `:global()` is anchored at
+     the rule names `.fabricate-field` and reaches both. The `:global()` is anchored at
      `.manager-economy-regen-grid`, which THIS component writes, so it keeps a scoping hash rather
      than reaching every trigger in the document. */
-  .manager-economy-regen-grid :global(.manager-field .fabricate-select-trigger) {
+  .manager-economy-regen-grid :global(.fabricate-field .fabricate-select-trigger) {
     width: 100%;
   }
 
@@ -778,11 +778,11 @@
      `tests/components/manager-button-scoped-class-reach.test.js` is the guard that now does.
 
      Then chained, because at (0,2,0) this rule did not beat
-     `.fabricate-button.manager-button.fab-manager-button` (0,3,0) at all. Naming the ancestor and
+     `.fabricate-button.fabricate-button.fab-manager-button` (0,3,0) at all. Naming the ancestor and
      the primitive's classes takes it to (0,5,0), which wins on specificity rather than on where the
      sheet happens to be injected. */
   :global(
-    .fabricate-manager .manager-button.fab-manager-button.is-primary.manager-economy-bulk-save
+    .fabricate-manager .fabricate-button.fab-manager-button.is-primary.manager-economy-bulk-save
   ) {
     width: auto;
     justify-self: center;
@@ -792,7 +792,7 @@
     line-height: 1.1;
   }
 
-  /* `:global`, and CHAINED with `.manager-icon-button`, because the roll button is an
+  /* `:global`, and CHAINED with `.fabricate-icon-button`, because the roll button is an
      `<IconButton>` (issue 1422): the scoped spelling emits `.manager-economy-actor-roll.svelte-<hash>`
      and matches NOTHING.
 
@@ -804,20 +804,20 @@
 
      The chain keeps the specificity identical rather than merely making the rule reach: the dead
      scoped form was (0,2,0) and a bare `:global()` would be (0,1,0). */
-  :global(.manager-icon-button.manager-economy-actor-roll) {
+  :global(.fabricate-icon-button.manager-economy-actor-roll) {
     justify-self: center;
   }
 
   /* Emphasise the dice button on characters that have not been rolled yet. The fill is a NEUTRAL
      overlay for the reason `.manager-economy-mode-option.is-active` records above. */
-  :global(.manager-icon-button.manager-economy-actor-roll.is-roll-needed) {
+  :global(.fabricate-icon-button.manager-economy-actor-roll.is-roll-needed) {
     color: var(--fab-accent);
     border-color: var(--fab-accent);
     background: var(--fab-overlay-light-035);
   }
 
   /* Keep the actor-list pagination compact and on a single line. */
-  .manager-economy-subsection :global(.manager-pagination) {
+  .manager-economy-subsection :global(.fabricate-pagination) {
     flex-wrap: nowrap;
     gap: 8px;
     padding: 8px 0 0;

@@ -1037,7 +1037,7 @@
   /* THE ROWS TAKE THE SLACK AND THE CHROME DOES NOT. Without the explicit pair the column hands
      its height to whichever child grows, and the browse archetype's rule — the pagination bar sits
      OUTSIDE the scroll area so it never moves — is the opposite of that. */
-  :global(.manager-toolbar.manager-scoped-list-toolbar) {
+  :global(.fabricate-filter-bar.manager-scoped-list-toolbar) {
     flex: 0 0 auto;
   }
 
@@ -1053,10 +1053,10 @@
     flex: 0 0 auto;
   }
 
-  /* `Pagination` renders its own `<section>` carrying two classes since issue 1502 — the family
-     root `fabricate-pagination` and `manager-pagination` — so a scoped rule cannot reach it and
-     the sizing has to be stated from this side of the boundary. */
-  .manager-scoped-list-column > :global(.manager-pagination) {
+  /* `Pagination` renders its own `<section>` carrying the family root `fabricate-pagination`, so
+     a scoped rule cannot reach it and the sizing has to be stated from this side of the
+     boundary. */
+  .manager-scoped-list-column > :global(.fabricate-pagination) {
     flex: 0 0 auto;
   }
 

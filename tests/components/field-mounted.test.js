@@ -1,4 +1,4 @@
-/** `Field`, the manager's labelled `.manager-field` column, RENDERED (issue 1428). */
+/** `Field`, the manager's labelled `.fabricate-field` column, RENDERED (issue 1428). */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -64,9 +64,9 @@ const RADIO_OPTIONS = Object.freeze([
 
 /** The exact class string the `<fieldset>` carries, in source order. */
 const RADIO_CLASS_CONFIG_CARDS =
-  'fabricate-field manager-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards';
+  'fabricate-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards';
 const RADIO_CLASS_PLAIN =
-  'fabricate-field manager-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group';
+  'fabricate-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group';
 
 before(async () => {
   await vocabularyHarness.setup();
@@ -138,8 +138,8 @@ describe('Field (mounted, through its real callers)', () => {
     const input = root.querySelector('#field-mounted-vocabulary');
     assert.ok(Boolean(input), 'the vocabulary text input rendered');
 
-    const field = input.closest('.manager-field');
-    assert.ok(Boolean(field), 'the input sits inside a `.manager-field`');
+    const field = input.closest('.fabricate-field');
+    assert.ok(Boolean(field), 'the input sits inside a `.fabricate-field`');
     assert.equal(
       field.tagName,
       'LABEL',
@@ -166,7 +166,7 @@ describe('Field (mounted, through its real callers)', () => {
         'would announce a name that reaches nothing'
     );
     assert.ok(
-      iconField.classList.contains('manager-field'),
+      iconField.classList.contains('fabricate-field'),
       'the primitive class is emitted whatever the host'
     );
     assert.ok(

@@ -82,7 +82,7 @@ describe('1477 ActionMenu announces a MENU, never a listbox', () => {
     assert.equal(button.getAttribute('aria-expanded'), 'false');
     assert.equal(
       button.className,
-      'fabricate-icon-button manager-icon-button',
+      'fabricate-icon-button',
       'the trigger IS the shared IconButton, root class first (issue 1502)'
     );
     assert.equal(

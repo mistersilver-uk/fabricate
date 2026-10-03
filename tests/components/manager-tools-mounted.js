@@ -144,13 +144,13 @@ export function registerToolsCases() {
     // THE BROWSE ARCHETYPE'S FILTER BAR (issue 1515). The search and the membership filter are
     // the screen's two filters and render in one `FilterBar` INSIDE the search card, which
     // is why the band above still reports as `search`: the card is unchanged and the bar nests
-    // in it. Identity rather than presence, because two `.manager-toolbar` elements on one
+    // in it. Identity rather than presence, because two `.fabricate-filter-bar` elements on one
     // screen - a bar per control - is the failure this reads for, and `querySelector` would
     // find the first either way.
-    const toolsBar = target.querySelector('[data-manager-tools-search] .manager-toolbar');
+    const toolsBar = target.querySelector('[data-manager-tools-search] .fabricate-filter-bar');
     assert.ok(Boolean(toolsBar), 'the Tools search band renders the shared filter bar');
     assert.equal(
-      target.querySelectorAll('[data-manager-tools-search] .manager-toolbar').length,
+      target.querySelectorAll('[data-manager-tools-search] .fabricate-filter-bar').length,
       1,
       'one bar, not one per control'
     );
@@ -177,7 +177,7 @@ export function registerToolsCases() {
     const enabledSwitch = target.querySelector('.manager-tools-enabled-toggle');
     assert.ok(Boolean(enabledSwitch), 'the row still writes its enable switch');
     assert.equal(enabledSwitch.tagName, 'BUTTON');
-    for (const token of ['fabricate-toggle', 'manager-status-toggle', 'is-on']) {
+    for (const token of ['fabricate-toggle', 'is-on']) {
       assert.ok(
         enabledSwitch.classList.contains(token),
         `the enable switch is the shared control and carries \`${token}\``
@@ -215,7 +215,7 @@ export function registerToolsCases() {
       'the bottom-pinned pager slot must survive the bar it no longer holds'
     );
     assert.ok(
-      !target.querySelector('[data-tool-browser-pagination] .manager-pagination'),
+      !target.querySelector('[data-tool-browser-pagination] .fabricate-pagination'),
       'a one-page list must draw no foot pager at all'
     );
     // NO ON-BREAK CHIP on a system row. The on-break action is a WORLD default.
@@ -279,7 +279,7 @@ export function registerToolsCases() {
       8,
       'the page size the pager is judged against is not the one this list actually pages by'
     );
-    const bar = target.querySelector('[data-tool-browser-pagination] .manager-pagination');
+    const bar = target.querySelector('[data-tool-browser-pagination] .fabricate-pagination');
     assert.ok(Boolean(bar), 'a two-page list must still draw its foot pager');
     assert.match(bar.querySelector('[data-pagination-summary]').textContent, /of 9/);
     assert.ok(
@@ -891,7 +891,7 @@ export function registerToolsCases() {
       'the widened list gets its layout slot back'
     );
     assert.ok(
-      !target.querySelector('[data-tool-browser-pagination] .manager-pagination'),
+      !target.querySelector('[data-tool-browser-pagination] .fabricate-pagination'),
       'a single page still draws no bar inside that slot'
     );
   });
@@ -919,7 +919,7 @@ export function registerToolsCases() {
     await tick();
     flushSync();
 
-    const bar = target.querySelector('[data-tool-browser-pagination] .manager-pagination');
+    const bar = target.querySelector('[data-tool-browser-pagination] .fabricate-pagination');
     assert.ok(
       Boolean(bar),
       'twelve world Tools over eight rows a page is two pages, so the bar must RENDER — ' +

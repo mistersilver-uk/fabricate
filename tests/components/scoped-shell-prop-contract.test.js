@@ -799,13 +799,13 @@ describe('the system-rules roster states its surfaces as opt-in props', () => {
     );
     assert.match(
       source,
-      /:global\(\.manager-search\.manager-scoped-roster-search-well input\)/,
+      /:global\(\.fabricate-search\.manager-scoped-roster-search-well input\)/,
       'and the surface rule is selected on it'
     );
     // Round 4's exact spelling, as a negative: a `background`.
     const shared = [
       ...source.matchAll(
-        /:global\(\.manager-search\.manager-scoped-roster-search(?![\w-])[^)]*\)\s*\{([^}]*)\}/g
+        /:global\(\.fabricate-search\.manager-scoped-roster-search(?![\w-])[^)]*\)\s*\{([^}]*)\}/g
       ),
     ].map(([, body]) => body);
     assert.ok(shared.length >= 2, 'NON-VACUITY: the shared class still has rules of its own');

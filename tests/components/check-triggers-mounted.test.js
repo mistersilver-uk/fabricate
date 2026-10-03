@@ -628,15 +628,20 @@ describe('CheckTriggers (mounted): the collapsed head', () => {
   it('draws no card around the list: the triggers sit in the pane', async () => {
     const root = await mountPair();
     // The invented `Check triggers` wrapper is what the structural parity pass reported as an
-    // EXTRA CARD. Its class is the tell: a `manager-inspector-card` around the whole list.
+    // EXTRA CARD. Its class is the tell: a `fabricate-card` around the whole list.
     assert.ok(
-      !root.querySelector('.manager-inspector-card [data-trigger]'),
+      !root.querySelector('.fabricate-card [data-trigger]'),
       'no card wraps the trigger list'
     );
     assert.ok(
       Boolean(root.querySelector('[data-check-triggers] > .manager-checks-trigger-list')),
       'the list is a direct child of the route wrapper'
     );
+    // The positive half: the same selector finds a trigger once a card does wrap it.
+    const host = root.ownerDocument.createElement('div');
+    host.innerHTML = '<section class="fabricate-card"></section>';
+    host.firstChild.append(root.querySelector('[data-trigger]').cloneNode(true));
+    assert.ok(Boolean(host.querySelector(':scope .fabricate-card [data-trigger]')), 'it can match');
   });
 
   it('states each trigger’s condition, effect, glyph and result chip while collapsed', async () => {

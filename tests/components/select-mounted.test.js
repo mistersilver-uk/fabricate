@@ -345,10 +345,10 @@ describe('1504 Select — the select every screen renders', () => {
       await mountSelect({ label: 'Resolution', hint: 'Applies to every recipe here.' });
 
       // THE HOST IS A `<div>` SINCE ISSUE 1510.
-      const field = harness.target.querySelector('div.manager-field');
+      const field = harness.target.querySelector('div.fabricate-field');
       assert.ok(Boolean(field), 'the labelled form is the shared Field column, on a <div> host');
       assert.ok(
-        !harness.target.querySelector('label.manager-field'),
+        !harness.target.querySelector('label.fabricate-field'),
         'and NOT on a <label> host: a label would forward a caption click into the trigger, ' +
           'which cannot close a list dismissed on mousedown'
       );
@@ -505,7 +505,7 @@ describe('1504 Select — the select every screen renders', () => {
 
     it('an error replaces the hint rather than stacking under it', async () => {
       await mountSelect({ label: 'Resolution', hint: 'Applies here.', error: 'Pick a mode.' });
-      const field = harness.target.querySelector('div.manager-field');
+      const field = harness.target.querySelector('div.fabricate-field');
       assert.equal(
         field.querySelector('.fabricate-select-error').textContent.trim(),
         'Pick a mode.'

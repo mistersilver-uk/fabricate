@@ -21,14 +21,14 @@ const FIXTURE = `
         </div>
         <div class="manager-header-actions">
           <!-- Carries fab-manager-button because the shipped Back button does (issue 1118).
-               The number below does not move: .manager-header-actions .manager-button and the
+               The number below does not move: .manager-header-actions .fabricate-button and the
                primitive both state 0.72rem, which is exactly why the header rule's type scale
                survived while its 38px height was retired. What moves is which rule this
                fixture proves — the container's, or the one the product will match. The resting
-               BORDER moved too: .manager-header-actions .manager-button.is-ghost was retired
+               BORDER moved too: .manager-header-actions .fabricate-button.is-ghost was retired
                as a role paint restated in a container, and the primitive's is-ghost companion
                states the same colours. -->
-          <button class="fabricate-button manager-button fab-manager-button is-ghost" data-m="header-button"><span>Back</span></button>
+          <button class="fabricate-button fab-manager-button is-ghost" data-m="header-button"><span>Back</span></button>
         </div>
         <div class="fabricate-tabs manager-editor-tabs">
           <button class="manager-editor-tab-button is-active" data-m="tab-label"><span>Ingredients</span>
@@ -43,7 +43,7 @@ const FIXTURE = `
           <!-- Carries fab-manager-button because the shipped control does (issue 1118), and
                see the expected value below: this is the one row in this file that changed
                size. -->
-          <button class="fabricate-button manager-button fab-manager-button is-dashed" data-m="dashed-add"><span>Add tag requirement</span></button>
+          <button class="fabricate-button fab-manager-button is-dashed" data-m="dashed-add"><span>Add tag requirement</span></button>
         </div>
         <p class="manager-muted" data-m="muted">The components, tags and essences this recipe consumes.</p>
         <!-- The FLAT (non-progressive) ingredient/result row's component picker (issue
@@ -58,7 +58,7 @@ const FIXTURE = `
           <div class="manager-recipe-option-target">
             <div class="manager-recipe-option-component">
               <span class="fabricate-picker manager-travel-picker manager-recipe-component-picker">
-                <button class="fabricate-button manager-button manager-recipe-component-trigger" data-m="flat-picker">
+                <button class="fabricate-button manager-recipe-component-trigger" data-m="flat-picker">
                   <img class="manager-travel-portrait" alt="">
                   <span class="manager-travel-picker-value manager-recipe-component-name" data-m="flat-picker-name">Venom Gland</span>
                 </button>
@@ -74,13 +74,13 @@ const FIXTURE = `
         <div class="fabricate-sortable-list">
          <div class="fabricate-sortable-list-row manager-recipe-stage-row">
           <div class="fabricate-sortable-list-line">
-          <button type="button" class="fabricate-icon-button manager-icon-button is-size-24 fabricate-sortable-list-grip"><i class="fas fa-grip-vertical" data-m="stage-grip"></i></button>
+          <button type="button" class="fabricate-icon-button is-size-24 fabricate-sortable-list-grip"><i class="fas fa-grip-vertical" data-m="stage-grip"></i></button>
           <span class="fabricate-sortable-list-ordinal" data-m="stage-ordinal">1</span>
           <div class="manager-recipe-ingredient-option-row">
             <div class="manager-recipe-option-target">
               <div class="manager-recipe-option-component">
                 <span class="fabricate-picker manager-travel-picker manager-recipe-component-picker">
-                  <button class="fabricate-button manager-button manager-recipe-component-trigger manager-recipe-stage-trigger" data-m="stage-picker">
+                  <button class="fabricate-button manager-recipe-component-trigger manager-recipe-stage-trigger" data-m="stage-picker">
                     <img class="manager-travel-portrait" alt="">
                     <span class="manager-recipe-stage-trigger-name" data-m="stage-picker-name">Mountain Herb</span>
                   </button>
@@ -93,7 +93,7 @@ const FIXTURE = `
             </div>
           </div>
           <span class="fabricate-sortable-list-rocker">
-            <button type="button" class="fabricate-icon-button manager-icon-button is-size-24 fabricate-sortable-list-move"><i class="fas fa-chevron-up" data-m="stage-move"></i></button>
+            <button type="button" class="fabricate-icon-button is-size-24 fabricate-sortable-list-move"><i class="fas fa-chevron-up" data-m="stage-move"></i></button>
           </span>
           </div>
          </div>
@@ -143,7 +143,7 @@ const FIXTURE = `
         anything the recipes VIEW scopes applies as it does in the shipped tree.
       -->
       <div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="recipes">
-        <section class="fabricate-filter-bar manager-toolbar manager-recipe-toolbar">
+        <section class="fabricate-filter-bar manager-recipe-toolbar">
           <!-- The multi-select row is the LAST row of this toolbar, immediately above the
                list. The host row class is a PROP of the shared toolbar primitive, so this
                studio names its own ("manager-recipe-filter-row") and its own data hook.
@@ -268,9 +268,9 @@ const FIXTURE = `
                  The marking and the re-chain landed in ONE commit, and had to: while the
                  scoped .fab-bulk-edit-apply rule was (0,2,0), the primitive's (0,3,0) control
                  would have handed this box 34px/0.72rem while the shipped control had not
-                 moved. That rule now names .manager-button.fab-manager-button and compiles to
+                 moved. That rule now names .fabricate-button.fab-manager-button and compiles to
                  (0,4,0), so the box is the same box it always was. -->
-            <button type="button" class="fabricate-button manager-button fab-manager-button fab-bulk-edit-apply" data-m="bulk-apply"><i class="fas fa-check-double"></i><span>Apply to 3 recipes</span></button>
+            <button type="button" class="fabricate-button fab-manager-button fab-bulk-edit-apply" data-m="bulk-apply"><i class="fas fa-check-double"></i><span>Apply to 3 recipes</span></button>
           </div>
         </section>
       </div>
@@ -323,7 +323,7 @@ const EXPECTED = {
   'nav-count': 10, // 0.625rem
   // 11px, NOT the 0.7rem (11.2px) this row committed before issue 1118 — a real change, and
   // the one number in this file that moved. It used to come from a CONTAINER rule,
-  // `.manager-recipe-ingredient-set-add .manager-button`, which existed because the dashed
+  // `.manager-recipe-ingredient-set-add .fabricate-button`, which existed because the dashed
   // adds "inherit the ambient ~1rem" and so each recipe container had to state a size for
   // them. That group is RETIRED: the `is-dashed` role states 11px itself now, on every screen
   // and for the `SearchablePopover` triggers among them, so the bleed it defended against
