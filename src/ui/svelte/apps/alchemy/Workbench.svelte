@@ -178,12 +178,7 @@
       <i class="fas fa-mortar-pestle" aria-hidden="true"></i>
       <h2>{localize('FABRICATE.App.Alchemy.Workbench')}</h2>
     </div>
-    <Button
-      role="ghost"
-      data-alchemy-clear=""
-      disabled={benchEmpty}
-      onclick={() => onClear?.()}
-    >
+    <Button role="ghost" data-alchemy-clear="" disabled={benchEmpty} onclick={() => onClear?.()}>
       <i class="fas fa-arrow-rotate-left" aria-hidden="true"></i>
       {localize('FABRICATE.App.Alchemy.Clear')}
     </Button>

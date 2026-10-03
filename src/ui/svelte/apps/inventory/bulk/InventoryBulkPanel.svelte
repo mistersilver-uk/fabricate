@@ -294,12 +294,7 @@
 </script>
 
 {#snippet clearAction()}
-  <Button
-    role="ghost"
-    data-inventory-bulk-clear=""
-    disabled={busy}
-    onclick={() => onClear?.()}
-  >
+  <Button role="ghost" data-inventory-bulk-clear="" disabled={busy} onclick={() => onClear?.()}>
     <i class="fas fa-xmark" aria-hidden="true"></i>
     <span>{localize('FABRICATE.App.Inventory.Bulk.Clear')}</span>
   </Button>
@@ -501,12 +496,7 @@
          entirely once a report stands, leaving only Done. -->
     <div class="bulk-footer" data-inventory-bulk-footer={state}>
       {#if state === 'report'}
-        <Button
-          role="primary"
-          fullWidth
-          data-inventory-bulk-done=""
-          onclick={() => onDone?.()}
-        >
+        <Button role="primary" fullWidth data-inventory-bulk-done="" onclick={() => onDone?.()}>
           <i class="fas fa-check" aria-hidden="true"></i>
           <span>{localize('FABRICATE.App.Inventory.Bulk.Done')}</span>
         </Button>
