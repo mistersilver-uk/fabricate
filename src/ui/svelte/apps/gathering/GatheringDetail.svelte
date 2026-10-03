@@ -190,13 +190,13 @@
           withRollPromptOrigin(event, () => onAttempt?.({ environmentId: envId, taskId: null }))}
       />
       {#if blindBlocked}
-        <Notice
-          tone="warning"
-          icon="fa-solid fa-ban"
-          title={localize('FABRICATE.App.Gathering.Detail.Blocked')}
-          id={blindReasonId}
-          data-gathering-blind-attempt-reason=""
-        />
+        <div id={blindReasonId} data-gathering-blind-attempt-reason>
+          <Notice
+            tone="warning"
+            icon="fa-solid fa-ban"
+            title={localize('FABRICATE.App.Gathering.Detail.Blocked')}
+          />
+        </div>
       {/if}
 
       {#if description !== ''}

@@ -1,5 +1,6 @@
 player-alchemy-chooser
 player-alchemy-workbench
+player-alchemy-brew-enabled
 player-alchemy-stacked
 player-journal-stacked
 player-journal-sort-list

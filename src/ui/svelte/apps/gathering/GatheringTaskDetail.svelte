@@ -201,13 +201,9 @@
       onclick={handleAttempt}
     />
     {#if blocked}
-      <Notice
-        tone="warning"
-        icon="fa-solid fa-ban"
-        title={blockReason}
-        id={reasonId}
-        data-gathering-attempt-reason=""
-      />
+      <div id={reasonId} data-gathering-attempt-reason>
+        <Notice tone="warning" icon="fa-solid fa-ban" title={blockReason} />
+      </div>
     {/if}
 
     <p class="gathering-task-detail-description" class:is-fallback={!hasDescription}>
