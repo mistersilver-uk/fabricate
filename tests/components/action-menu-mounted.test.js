@@ -13,21 +13,35 @@ function flushRender() {
   return new Promise((done) => setTimeout(done, 0));
 }
 
+const RAW_MODULES = [
+  'src/ui/svelte/actions/dismissOnOutsideClick.js',
+  'src/ui/svelte/actions/portal.js',
+  'src/ui/svelte/actions/anchoredPopover.js',
+  'src/ui/svelte/util/actionMenuLayout.js',
+  'src/ui/svelte/util/overlayHost.js',
+];
+const COMPILED_MODULES = [
+  'src/ui/svelte/components/IconButton.svelte',
+  'src/ui/svelte/components/Kicker.svelte',
+  'src/ui/svelte/components/ActionMenu.svelte',
+];
+
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-action-menu-',
-  rawModules: [
-    'src/ui/svelte/actions/dismissOnOutsideClick.js',
-    'src/ui/svelte/actions/portal.js',
-    'src/ui/svelte/actions/anchoredPopover.js',
-    'src/ui/svelte/util/actionMenuLayout.js',
-    'src/ui/svelte/util/overlayHost.js',
-  ],
-  compiledModules: [
-    'src/ui/svelte/components/IconButton.svelte',
-    'src/ui/svelte/components/ActionMenu.svelte',
-  ],
+  rawModules: RAW_MODULES,
+  compiledModules: COMPILED_MODULES,
   componentPath: 'src/ui/svelte/components/ActionMenu.svelte',
+});
+
+/** A caller that hands the primitive its own trigger through the `trigger` snippet. */
+const HOST_PATH = 'tests/fixtures/action-menu/TriggerSnippetHost.svelte';
+const hostHarness = createMountedComponentHarness({
+  repoRoot,
+  tmpPrefix: 'fabricate-action-menu-host-',
+  rawModules: RAW_MODULES,
+  compiledModules: [...COMPILED_MODULES, HOST_PATH],
+  componentPath: HOST_PATH,
 });
 
 /** Three enabled verbs and one disabled note — the shape both callers produce between them. */
@@ -265,5 +279,87 @@ describe('1477 ActionMenu keyboard contract (APG menu button)', () => {
     await flushRender();
     assert.ok(!panel(target), 'neither the pointer nor the keyboard opens a disabled menu');
     harness.remount();
+  });
+});
+
+describe('1516 ActionMenu trigger snippet, heading and item tone', () => {
+  before(() => hostHarness.setup());
+  after(() => hostHarness.teardown());
+
+  const hostTrigger = (target) => target.querySelector('[data-host-trigger]');
+
+  it('the caller’s own trigger receives the menu-button ARIA and toggles aria-expanded', async () => {
+    const target = await hostHarness.mount(props());
+    const button = hostTrigger(target);
+    assert.equal(button.getAttribute('aria-haspopup'), 'menu');
+    assert.equal(button.getAttribute('aria-expanded'), 'false');
+    assert.equal(button.getAttribute('aria-label'), 'Add an alternative', 'the caller names it');
+    assert.ok(!target.querySelector('.fabricate-icon-button'), 'and no IconButton is drawn');
+
+    button.click();
+    await flushRender();
+    assert.equal(button.getAttribute('aria-expanded'), 'true');
+    assert.ok(Boolean(panel(target.ownerDocument)), 'its click handler opens the menu');
+
+    button.click();
+    await flushRender();
+    assert.equal(button.getAttribute('aria-expanded'), 'false', 'and closes it again');
+    hostHarness.remount();
+  });
+
+  it('the snippet’s key handler and element binding reach the primitive', async () => {
+    const target = await hostHarness.mount(props());
+    const doc = target.ownerDocument;
+    keydown(hostTrigger(target), 'ArrowDown');
+    await flushRender();
+    assert.ok(doc.activeElement === enabledItems(doc)[0], 'ArrowDown opens onto the first item');
+
+    keydown(doc, 'Escape');
+    await flushRender();
+    assert.ok(
+      doc.activeElement === hostTrigger(target),
+      'Escape returns focus to the caller’s button, which only the attachment can name'
+    );
+    hostHarness.remount();
+  });
+
+  it('a heading names the menu from outside it, in the same panel', async () => {
+    const target = await hostHarness.mount({ ...props(), heading: 'Accept instead' });
+    hostTrigger(target).click();
+    await flushRender();
+    const doc = target.ownerDocument;
+    const menu = panel(doc);
+    const heading = doc.querySelector(`[id="${menu.getAttribute('aria-labelledby')}"]`);
+    assert.equal(heading?.textContent.trim(), 'Accept instead');
+    assert.ok(!menu.contains(heading), 'the heading is not one of the menu’s children');
+    assert.ok(
+      menu.parentElement === heading.parentElement &&
+        menu.parentElement.classList.contains('fabricate-action-menu-panel'),
+      'both sit in the one portaled panel'
+    );
+    assert.ok(!menu.hasAttribute('aria-label'), 'the heading replaces the label');
+    assert.equal(menuItems(doc).length, 4);
+    hostHarness.remount();
+  });
+
+  it('an item’s tone is a class beside its danger modifier', async () => {
+    const toned = items().map((item, index) =>
+      index === 0 ? { ...item, tone: 'component' } : item
+    );
+    const target = await hostHarness.mount({ ...props(), items: toned });
+    hostTrigger(target).click();
+    await flushRender();
+    const rendered = menuItems(target.ownerDocument);
+    const first = rendered[0];
+    const last = rendered.at(-1);
+    assert.ok(first.classList.contains('is-component'), 'the toned item carries is-<tone>');
+    assert.ok(
+      menuItems(target.ownerDocument)
+        .slice(1)
+        .every((item) => !item.classList.contains('is-component')),
+      'and no other item does'
+    );
+    assert.ok(last.classList.contains('is-danger'), 'danger keeps its own modifier');
+    hostHarness.remount();
   });
 });

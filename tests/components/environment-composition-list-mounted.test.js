@@ -131,7 +131,8 @@ describe('CompositionList mounted layout', () => {
       // THE manager's labelled push-button (issue 1118). Restore and the warning Force add
       // both render it. Omitting a rendered `.svelte` HANGS the suite (# cancelled).
       'src/ui/svelte/components/IconButton.svelte',
-      // THE shared overflow action menu (issue 1477).
+      // THE shared overflow action menu (issue 1477), and the eyebrow its heading renders.
+      'src/ui/svelte/components/Kicker.svelte',
       'src/ui/svelte/components/ActionMenu.svelte',
       // The product's one ordered list and the disclosure it renders (issue 1512). This loop has no
       // dependency validator, so omitting either reports the file as `# cancelled`.

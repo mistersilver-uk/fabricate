@@ -78,6 +78,7 @@ const inspector = createComponentScopeHarness({
   componentPath: 'src/ui/svelte/apps/manager/components/ComponentBrowserInspector.svelte',
   rawExtras: [...SEARCHABLE_POPOVER_RAW_MODULES, 'src/ui/svelte/util/actionMenuLayout.js'],
   compiledExtras: [
+    'src/ui/svelte/components/Kicker.svelte',
     'src/ui/svelte/components/ActionMenu.svelte',
     'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
   ],
