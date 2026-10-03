@@ -610,7 +610,7 @@ export const CASES = Object.freeze([
       { selector: '[data-gathering-detail-tab="events"]' },
     ],
     kinds: ['player', 'gathering'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//, PLAYER_DETAIL_HEADER],
   }),
   playerCase({
     id: 'player-gathering-task-ready',
@@ -624,7 +624,7 @@ export const CASES = Object.freeze([
       { selector: '.gathering-task-row[data-task-id="hb-task-ridgemoss"] .gathering-task-summary' },
     ],
     kinds: ['player', 'gathering'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//, PLAYER_DETAIL_HEADER],
   }),
   playerCase({
     id: 'player-gathering-after-success',
@@ -730,10 +730,10 @@ export const CASES = Object.freeze([
     smokeLabels: ['player-gathering-blind'],
     reaches: 'exact',
     query: { tab: 'gathering' },
-    // A blind-selection environment redacts its task list: one opaque attempt card, with the mask chip above it.
+    // A blind-selection environment redacts its task list; its one generic Attempt is the header's primary.
     steps: [{ selector: '.gathering-env-card[data-environment-id="hb-env-thicket"]' }],
     kinds: ['player', 'gathering'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//, PLAYER_DETAIL_HEADER],
   }),
   playerCase({
     id: 'player-gathering-realm-locked',

@@ -12,7 +12,9 @@
   import { localize } from '../../util/foundryBridge.js';
   import Callout from '../../components/Callout.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
+  import InspectorCard from '../../components/InspectorCard.svelte';
   import Kicker from '../../components/Kicker.svelte';
+  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
   import Pagination from '../../components/Pagination.svelte';
   import GatheringEventRow from './GatheringEventRow.svelte';
   import ChanceBar from './ChanceBar.svelte';
@@ -72,7 +74,7 @@
   });
 </script>
 
-<div class="gathering-detail-event" data-gathering-event-section>
+<InspectorCard class="gathering-detail-event" data-gathering-event-section="">
   <div class="gathering-detail-event-danger">
     <Kicker as="span">{localize('FABRICATE.App.Gathering.Detail.HighestDanger')}</Kicker>
     <span class={`gathering-detail-event-level is-danger ${dangerRiskClass}`}>
@@ -120,7 +122,7 @@
       data-gathering-safe-hint
     />
   {/if}
-</div>
+</InspectorCard>
 
 {#if showEventList}
   <section class="gathering-detail-section" data-gathering-events-section>
@@ -128,16 +130,13 @@
       <h3 class="gathering-detail-section-title">
         {localize('FABRICATE.App.Gathering.Detail.EventsHeading')}
       </h3>
-      <label class="gathering-detail-search">
-        <i class="fas fa-search" aria-hidden="true"></i>
-        <input
-          type="search"
-          bind:value={eventSearchTerm}
-          placeholder={localize('FABRICATE.App.Gathering.Detail.EventSearchPlaceholder')}
-          aria-label={localize('FABRICATE.App.Gathering.Detail.EventSearchLabel')}
-          data-gathering-event-search
-        />
-      </label>
+      <ManagerSearchField
+        class="gathering-detail-search"
+        bind:value={eventSearchTerm}
+        placeholder={localize('FABRICATE.App.Gathering.Detail.EventSearchPlaceholder')}
+        ariaLabel={localize('FABRICATE.App.Gathering.Detail.EventSearchLabel')}
+        inputProps={{ 'data-gathering-event-search': '' }}
+      />
     </header>
 
     {#if filteredEvents.length === 0}
@@ -183,17 +182,6 @@
 {/if}
 
 <style>
-  .gathering-detail-event {
-    flex: 0 0 auto;
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-2);
-    padding: var(--fab-space-3);
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface-soft);
-  }
-
   .gathering-detail-event-danger {
     display: flex;
     align-items: center;
@@ -284,31 +272,10 @@
     min-width: 0;
   }
 
-  /* Search box, mirroring the left column's environment search. */
-  .gathering-detail-search {
-    position: relative;
+  /* The field's slot in this wrapping row; its box is the shared field's own. */
+  .gathering-detail-section-head > :global(.gathering-detail-search) {
     flex: 1 1 160px;
     min-width: 140px;
-  }
-
-  .gathering-detail-search i {
-    position: absolute;
-    left: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--fab-text-muted);
-    pointer-events: none;
-  }
-
-  .gathering-detail-search input {
-    width: 100%;
-    height: 32px;
-    box-sizing: border-box;
-    padding: 0 10px 0 32px;
-    border: 1px solid var(--fab-border);
-    border-radius: 6px;
-    background: var(--fab-surface);
-    color: var(--fab-text);
   }
 
   .gathering-detail-event-list {
@@ -316,118 +283,5 @@
     flex-direction: column;
     gap: var(--fab-space-2);
     min-width: 0;
-  }
-
-  .gathering-detail-pagination {
-    flex: 0 0 auto;
-  }
-
-  /*
-    Pagination.svelte renders .manager-pagination* + .manager-icon-button markup.
-    Theme it here with base --fab-* tokens (mirrors the left column). Scoped Svelte
-    styles do NOT leak from the parent, so each panel carries its own copy of this
-    :global override block. (Written before issue 1502, when that markup really was
-    .fabricate-manager-scoped and so unstyled here; see the note below.)
-  */
-  /*
-    ISSUE 1502 — THE PAGER'S SHEET RULES NOW REACH THIS BLOCK, and the `1502 base` declarations
-    below are what stops that moving the frame. `Pagination` and `IconButton` are rooted at the
-    classes they emit, so `styles/fabricate.css` paints this player-app pager where it previously
-    only painted the manager's — the markup is no longer "unstyled" here, which is why that word
-    is gone from the sentence above. Every property this block already declares still WINS (a
-    Svelte `:global` block is injected unlayered; the sheet is imported at `layer(modules)`), so
-    only the remainder is newly painted — and each `1502 base` declaration restates what the
-    remainder rendered BEFORE the widening, which for this control is Foundry core's own `button`
-    / `select` chrome. The per-property audit for all six player callers is in
-    `components/Pagination.svelte`'s docblock.
-  */
-  .gathering-detail-pagination :global(.manager-pagination) {
-    display: flex;
-    flex-wrap: nowrap;
-    align-items: center;
-    gap: var(--fab-space-2);
-    padding: var(--fab-space-2) 0 0;
-    border-top: 1px solid var(--fab-border);
-    font-size: 12px;
-    color: var(--fab-text-muted);
-    /* 1502 base: the sheet's `background: var(--fab-overlay-light-03)` is newly painted here
-       and this bar has always been transparent. */
-    background: transparent;
-  }
-
-  .gathering-detail-pagination :global(.manager-pagination-summary) {
-    flex: 0 1 auto;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .gathering-detail-pagination :global(.manager-pagination-nav) {
-    flex: 0 0 auto;
-    display: inline-flex;
-    gap: 4px;
-    align-items: center;
-  }
-
-  .gathering-detail-pagination :global(.manager-pagination-page) {
-    color: var(--fab-text);
-    white-space: nowrap;
-    /* 1502 base: the sheet newly paints `min-width: 96px` and `font-weight: 700` on this
-       label. It has always been a content-width flex item at the inherited weight; the
-       sheet's `text-align: center` is adopted and is inert on a content-width box. */
-    min-width: auto;
-    font-weight: 400;
-  }
-
-  .gathering-detail-pagination :global(.manager-pagination-size) {
-    flex: 0 0 auto;
-    display: inline-flex;
-    gap: 6px;
-    align-items: center;
-    margin-left: auto;
-    white-space: nowrap;
-  }
-
-  /* 1504: the per-page control is a `<Select size="inline">`, so its height, corner, border
-     and colour come from the sheet's `.fabricate-select*` family rather than from this block.
-     Its height (30) and corner (7) are the `inline` rung's, where this block declared 26 and 6;
-     only the border and the ink are unchanged. Only the FILL is this pager's own, and the
-     sheet's family note records how this block still beats the family for it. */
-  .gathering-detail-pagination :global(.manager-pagination-size .fabricate-select-trigger) {
-    background: var(--fab-surface);
-    /* And this row REFUSES the pager's 64px width floor, as it refused the same floor on the
-       native select it replaces: the footer is one nowrap line in a narrow column, and a floor
-       is the thing that would wrap it. */
-    min-width: 0;
-  }
-
-  .gathering-detail-pagination :global(.manager-icon-button) {
-    /* 1502 base: Foundry core's `button` rule gives every button `min-height: 2em` and
-       `font-size: var(--font-size-14)`, and the sheet newly overrides both with
-       `min-height: 0` and `font: inherit`. Restated, so the arrow keeps its 28px box (the
-       core minimum, not the 26px below) and the chevron keeps its 14px glyph. */
-    min-height: var(--button-size, 2em);
-    font-size: var(--font-size-14, 0.875rem);
-    flex: 0 0 auto;
-    width: 26px;
-    height: 26px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid var(--fab-border);
-    border-radius: 7px; /* 1504: the specimen's icon rung, so the pager reads as one pair */
-    background: var(--fab-surface);
-    color: var(--fab-text);
-    cursor: pointer;
-  }
-
-  .gathering-detail-pagination :global(.manager-icon-button:disabled) {
-    opacity: 0.5;
-    cursor: default;
-  }
-
-  .gathering-detail-pagination :global(.manager-icon-button:hover:not(:disabled)) {
-    background: var(--fab-surface-raised);
   }
 </style>

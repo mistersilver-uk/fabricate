@@ -453,8 +453,9 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
     });
 
     await selectGatheringEnvironment('Moonlit Blind Grove');
+    // The blind gather is the centre header's one primary (issue 1518).
     await appShell
-      .locator('[data-gathering-blind-card]')
+      .locator('[data-gathering-blind-attempt]')
       .first()
       .waitFor({ state: 'visible', timeout: 10_000 });
     await captureCurrentPlayerGathering('player-gathering-blind');

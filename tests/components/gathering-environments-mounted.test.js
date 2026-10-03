@@ -202,7 +202,13 @@ describe('GatheringView mounted behavior', () => {
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskRow.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEventRow.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEventDetail.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDetailTabs.svelte');
+    // The tab strip and the shared EditorTabs it renders (issue 1518).
+    for (const tabStrip of [
+      'src/ui/svelte/apps/gathering/GatheringDetailTabs.svelte',
+      'src/ui/svelte/components/EditorTabs.svelte',
+    ]) {
+      writeCompiledSvelte(tabStrip);
+    }
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTasksPanel.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEventsPanel.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDetail.svelte');

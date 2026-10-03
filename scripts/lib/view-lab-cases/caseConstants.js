@@ -92,7 +92,7 @@ const CRAFTING_MODE_FILES = Object.freeze({
 /** The one not-yet-ready chrome all five player views draw (issue 1514). */
 export const PLAYER_VIEW_STATE = /^src\/ui\/svelte\/apps\/PlayerViewState\.svelte$/;
 
-/** The identity row the crafting, inventory and journal detail panes lead with (issue 1518). */
+/** The identity row every player detail pane leads with (issue 1518). */
 export const PLAYER_DETAIL_HEADER = /^src\/ui\/svelte\/apps\/PlayerDetailHeader\.svelte$/;
 
 /** Everything under `crafting/` that is not one mode's own body. Applies to every crafting case. */

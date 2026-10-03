@@ -17,6 +17,7 @@ import {
   SELECT_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { assertIdentityHeader, primaryButtons } from '../helpers/playerDetailHeaderAssertions.js';
 import { assertWholeHeaderDisclosure } from '../helpers/wholeHeaderDisclosure.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -282,7 +283,13 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskRow.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEventRow.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEventDetail.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDetailTabs.svelte');
+    // The tab strip and the shared EditorTabs it renders (issue 1518).
+    for (const tabStrip of [
+      'src/ui/svelte/apps/gathering/GatheringDetailTabs.svelte',
+      'src/ui/svelte/components/EditorTabs.svelte',
+    ]) {
+      writeCompiledSvelte(tabStrip);
+    }
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTasksPanel.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEventsPanel.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDetail.svelte');
@@ -380,14 +387,19 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(panelDesc.textContent.includes('NoTaskDescription'), 'inspector shows the localized fallback');
   });
 
-  it('renders the success-chance bar in-line with the right-column Attempt button', async () => {
+  // Issue 1518: one primary per pane, in its identity row.
+  it('leads each pane with one identity row: the task inspector’s holds the Attempt, the centre’s none', async () => {
     const { services } = makeServices(listing([environment()]));
     await mountView(services);
 
-    const action = target.querySelector('[data-gathering-task-detail] .gathering-task-detail-action');
-    assert.ok(action, 'the inspector action row renders');
-    assert.ok(action.querySelector('[data-gathering-success-value]'), 'success-chance bar sits in the action row');
-    assert.ok(action.querySelector('[data-gathering-attempt]'), 'attempt button sits in the same action row');
+    const centre = target.querySelector('[data-gathering-detail-state="selected"]');
+    assertIdentityHeader(centre, { primaries: 0, name: 'Sunlit Meadow' });
+
+    const inspector = target.querySelector('[data-gathering-task-detail]');
+    const row = assertIdentityHeader(inspector, { primaries: 1, name: 'Gather Iron' });
+    assert.ok(row.querySelector('[data-gathering-attempt]'), 'the one primary is the Attempt');
+    assert.ok(inspector.querySelector('[data-gathering-success-value]'), 'the success-chance bar renders');
+    assert.ok(!row.querySelector('[data-gathering-success-value]'), 'beneath the row, not in it');
   });
 
   it('renders "What you might find" with per-drop mini bars, award/event hints, and expandable modifiers', async () => {
@@ -400,7 +412,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
 
     // The inspector success bar adopts the personalized aggregate from the
     // breakdown (1.0) rather than the listing's base value (0.5).
-    const successBar = target.querySelector('[data-gathering-task-detail] .gathering-task-detail-action [data-gathering-success-value]');
+    const successBar = target.querySelector('[data-gathering-task-detail] [data-gathering-success-value]');
     assert.equal(successBar.getAttribute('data-gathering-success-value'), '100', 'success chance reflects the modifier-adjusted aggregate');
 
     const section = target.querySelector('[data-gathering-task-detail] [data-gathering-drops]');
@@ -660,8 +672,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(blockedAttempt.disabled, 'inspector attempt button disabled on a blocked task');
     assert.equal(blockedAttempt.getAttribute('data-gathering-attempt-blocked'), 'true');
     assert.ok(blockedAttempt.querySelector('.fa-ban'), 'blocked attempt shows the ban icon');
-    const attemptWrap = target.querySelector('[data-gathering-task-detail] .gathering-task-detail-attempt-wrap');
-    assert.ok((attemptWrap.getAttribute('title') || '').includes('Conditions'), 'tooltip explains the block reason');
+    assert.ok((blockedAttempt.getAttribute('title') || '').includes('Conditions'), 'tooltip explains the block reason');
   });
 
   it('lists a selected task\'s required tools in the right inspector, not inline in the center row', async () => {
@@ -902,7 +913,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.equal(row.querySelector('[data-gathering-scene]'), null, 'no linked-scene panel inside the task card');
   });
 
-  it('renders the blind attempt button and the Discovered Tasks section', async () => {
+  it('puts the blind gather in the centre’s identity row, so the blind pane draws one Attempt', async () => {
     const blindEnv = environment({
       id: 'env-blind',
       selectionMode: 'blind',
@@ -915,11 +926,10 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     const { services } = makeServices(listing([blindEnv]));
     await mountView(services);
 
-    const blindCard = target.querySelector('[data-gathering-blind-card]');
-    assert.ok(blindCard, 'blind attempt is wrapped in a call-to-action card');
-    assert.ok(blindCard.querySelector('[data-gathering-blind-attempt]'), 'attempt button lives in the card');
-    assert.ok(blindCard.textContent.includes('BlindAttemptPrompt'), 'card shows the blind prompt');
-    assert.ok(blindCard.querySelector('.gathering-detail-blind-card-divider'), 'card has the divider');
+    const centre = target.querySelector('[data-gathering-detail-state="selected"]');
+    const row = assertIdentityHeader(centre, { primaries: 1 });
+    assert.ok(row.querySelector('[data-gathering-blind-attempt]'), 'the one primary is the blind gather');
+    assert.equal(target.querySelectorAll('[data-gathering-blind-attempt]').length, 1, 'one blind Attempt');
     const discovered = target.querySelector('[data-gathering-discovered]');
     assert.ok(discovered, 'discovered section present for blind + reveal != never');
     assert.ok(discovered.textContent.includes('1/3') || discovered.textContent.includes('"x":1'), 'discovered heading carries the counts');
@@ -939,6 +949,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
 
     assert.ok(target.querySelector('[data-gathering-blind-attempt]'), 'blind attempt button still present');
     assert.equal(target.querySelector('[data-gathering-discovered]'), null, 'no discovered section when reveal is never');
+    assert.equal(primaryButtons(target).length, 1, 'the view shows ONE Attempt, with no task to inspect');
   });
 
   it('wires the right-column Attempt to startGatheringAttempt and re-fetches the listing', async () => {
@@ -1125,6 +1136,24 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.equal(target.querySelector('[data-gathering-tasks-section]'), null, 'tasks panel hidden on the Events tab');
   });
 
+  // Issue 1518: the strip is the shared `EditorTabs`, which owns the arrow keys.
+  it('moves focus and selection to the next tab on ArrowRight', async () => {
+    const events = [{ id: 'h', name: 'Rockslide', description: '', img: 'icons/svg/hazard.svg', dangerTags: ['unsafe'], risk: 'unsafe', chance: 0.4 }];
+    const { services } = makeServices(listing([environment({ eventChance: 0.4, events })]));
+    await mountView(services);
+
+    const tasksTab = target.querySelector('[data-gathering-detail-tab="tasks"]');
+    tasksTab.focus();
+    tasksTab.dispatchEvent(new globalThis.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    flushSync();
+
+    const eventsTab = target.querySelector('[data-gathering-detail-tab="events"]');
+    assert.equal(eventsTab.getAttribute('aria-selected'), 'true', 'selection moved to Events');
+    assert.ok(globalThis.document.activeElement === eventsTab, 'focus moved to Events');
+    assert.ok(globalThis.document.querySelector(`#${eventsTab.getAttribute('aria-controls')}`), 'its panel is in the document');
+    assert.ok(target.querySelector('[data-gathering-event-section]'), 'the Events panel renders');
+  });
+
   it('renders a selectable, searchable, paginated events list on the Events tab', async () => {
     const events = Array.from({ length: 7 }, (_, i) => ({
       id: `haz-${i}`,
@@ -1173,7 +1202,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     const panel = target.querySelector('[data-gathering-task-detail-column] [data-gathering-event-detail]');
     assert.ok(panel, 'right column shows the event inspector');
     assert.equal(panel.getAttribute('data-detail-event-id'), 'haz-1');
-    assert.ok(panel.textContent.includes('Rockslide'), 'inspector shows the first event');
+    assertIdentityHeader(panel, { primaries: 0, name: 'Rockslide' });
     const weatherGroup = panel.querySelector('[data-gathering-event-match="weather"]');
     assert.ok(weatherGroup, 'matching weather surfaced for the first event');
     // The weather chip renders the shared icon + capitalized i18n label (not the raw id).

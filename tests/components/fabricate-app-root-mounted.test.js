@@ -190,6 +190,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/gathering/EnvironmentCard.svelte',
     'src/ui/svelte/apps/gathering/GatheringDetail.svelte',
     'src/ui/svelte/apps/gathering/GatheringDetailTabs.svelte',
+    'src/ui/svelte/components/EditorTabs.svelte',
     'src/ui/svelte/apps/gathering/GatheringDropModifiers.svelte',
     'src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte',
     'src/ui/svelte/apps/gathering/GatheringEventDetail.svelte',

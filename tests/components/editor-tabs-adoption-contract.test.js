@@ -15,6 +15,9 @@ import {
 const repoRoot = resolve(import.meta.dirname, '../..');
 const PRIMITIVE = 'src/ui/svelte/components/EditorTabs.svelte';
 const MANAGER_DIRECTORY = 'src/ui/svelte/apps/manager/';
+/** The player directories whose tab strips converted (issue 1518); none may write a raw tablist. */
+const PLAYER_DIRECTORIES = Object.freeze(['src/ui/svelte/apps/gathering/']);
+const WALKED_DIRECTORIES = Object.freeze([MANAGER_DIRECTORY, ...PLAYER_DIRECTORIES]);
 
 /** EMPTY, and the empty array is the claim. */
 const RAW_BUTTON_ALLOWLIST = Object.freeze([]);
@@ -75,14 +78,16 @@ definePrimitiveAdoptionContract({
 });
 
 /**
- * Every raw element under `apps/manager/` — plus the primitive itself — carrying `role="tablist"`.
+ * Every raw element under a walked directory — plus the primitive itself — carrying
+ * `role="tablist"`.
  *
  * @returns {{file: string, element: string}[]} one entry per raw tablist element, with the tag
  */
 function rawTablistElements() {
   const found = [];
   for (const [file, source] of Object.entries(SOURCES)) {
-    if (!file.startsWith(MANAGER_DIRECTORY) && file !== PRIMITIVE) continue;
+    const walked = WALKED_DIRECTORIES.some((directory) => file.startsWith(directory));
+    if (!walked && file !== PRIMITIVE) continue;
     walkTemplate(parse(source, { modern: true, filename: join(repoRoot, file) }).fragment, (node) => {
       if (node.type === 'Component') return;
       const role = (node.attributes ?? []).find(
@@ -121,6 +126,10 @@ test('the manager tablist walk is alive, so the clause below is not vacuous', ()
     managerFiles.length > 50,
     `the walk reached ${managerFiles.length} files under ${MANAGER_DIRECTORY}, so it is not walking`
   );
+  for (const directory of PLAYER_DIRECTORIES) {
+    const playerFiles = Object.keys(SOURCES).filter((file) => file.startsWith(directory));
+    assert.ok(playerFiles.length > 10, `the walk reached ${playerFiles.length} files under ${directory}`);
+  }
   // The walk must find the PRIMITIVE's own tablist. If it found nothing at all.
   assert.ok(
     rawManagerTablists().includes(PRIMITIVE),
@@ -128,11 +137,11 @@ test('the manager tablist walk is alive, so the clause below is not vacuous', ()
   );
 });
 
-test('no manager component outside the pinned set hand-rolls a role="tablist"', () => {
+test('no manager or converted player component outside the pinned set hand-rolls a role="tablist"', () => {
   assert.deepEqual(
     [...new Set(rawManagerTablists())],
     [...TABLIST_HOSTS],
-    'a manager component writes a raw `role="tablist"`. That is a hand-rolled tab strip ' +
+    'a walked component writes a raw `role="tablist"`. That is a hand-rolled tab strip ' +
       'whatever classes it carries, which is why this clause keys on the ROLE and the class ' +
       'clause above cannot replace it. Render `<EditorTabs>`; a capability it lacks is a prop to ' +
       'add there, never a second strip. Removing an entry from the pinned list is the direction ' +
