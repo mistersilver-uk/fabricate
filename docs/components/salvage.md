@@ -92,6 +92,26 @@ Routed and Progressive modes keep the full list, where each result group maps to
 > This is the true stored state being shown for the first time rather than a setting that has been lost, and nothing has been reset or migrated.
 > Turn the toggle on for each component you want salvageable.
 
+### Salvage Result Rows
+
+Each result a component yields is one row in the **Salvage** panel.
+A row names the component it recovers and the amount.
+
+A flat result row has a **Fixed | Rolled** amount.
+**Fixed** recovers the same number every time.
+**Rolled** takes a dice expression such as `1d4+1`, and the roll decides how many the player recovers.
+A progressive stage has no amount, because a progressive salvage always recovers one of the stage's component.
+
+**Add result** opens a component picker, so you choose the component you are adding.
+A flat row cannot clear its component, so to change one, remove the row and add another.
+Adding a component that the set already produces raises that row's quantity by one, unless that row is rolled, in which case Fabricate adds a new row.
+A progressive stage can swap its component in place.
+
+Fabricate marks a row whose expression cannot be rolled, or can never come out above zero.
+While salvage is enabled, saving the component with such a row is refused until you fix it.
+A component with salvage disabled still saves.
+The editor wraps a row onto two lines where the column is narrow.
+
 ### The Salvage Override
 
 When the salvage check applies, a component can override the difficulty that check uses for it alone.
@@ -245,6 +265,10 @@ When a required tool is missing, the button is disabled and a note directly bene
 Pressing it opens the standard roll prompt, where the player picks Advantage, Normal or Disadvantage when the formula allows it, adds a situational bonus, and chooses a roll mode.
 The roll is posted to chat, so Dice So Nice animates it.
 There is no reroll and no separate confirmation step.
+
+A salvage result that cannot be rolled for the salvaging character refuses the salvage, and nothing is consumed.
+It reports the same "Invalid salvage configuration" message as any other unfinished salvage setup.
+A timed salvage that resumes after the character's data changed, so that a result can no longer be rolled, is failed with that reason rather than left running.
 
 Dismissing the prompt cancels the attempt.
 Nothing is consumed, no tool breaks, and no message is shown.
