@@ -1,4 +1,4 @@
-/** CHARACTERIZATION suite for `TintPopover` (issue 1036). */
+/** CHARACTERIZATION suite for `TintPicker` (issue 1036). */
 
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -18,8 +18,8 @@ const harness = createMountedComponentHarness({
   // labels through it, so it is a static import of the component under test; the harness's
   // own closure validator reports the omission by name rather than hanging on it.
   rawModules: [...SEARCHABLE_POPOVER_RAW_MODULES, 'src/ui/svelte/util/managerColorTokens.js'],
-  compiledModules: ['src/ui/svelte/components/TintPopover.svelte'],
-  componentPath: 'src/ui/svelte/components/TintPopover.svelte',
+  compiledModules: ['src/ui/svelte/components/TintPicker.svelte'],
+  componentPath: 'src/ui/svelte/components/TintPicker.svelte',
 });
 
 /** The shipped palette, in its shipped order, with its shipped English labels. */
@@ -38,7 +38,7 @@ function presetCells(target) {
   return [...target.querySelectorAll('[data-manager-color-token]')];
 }
 
-describe('1036 TintPopover — characterization', () => {
+describe('1036 TintPicker — characterization', () => {
   before(async () => {
     await harness.setup();
   });

@@ -12735,7 +12735,7 @@
   overflow: visible;
 }
 
-/* === THE COLOUR PICKER'S OWN ROOTS (issue 1470) === `fabricate-color-picker` is written by `components/TintPicker.svelte` and `fabricate-color-picker-popover` by `components/TintPopover.svelte`. */
+/* === THE COLOUR PICKER'S OWN ROOTS (issue 1470) === `fabricate-color-picker` is written by `components/TintPickerButton.svelte` and `fabricate-color-picker-popover` by `components/TintPicker.svelte`. */
 .fabricate-color-picker .manager-color-swatch,
 .fabricate-color-picker-popover .manager-color-swatch {
   display: inline-flex;
@@ -12855,7 +12855,7 @@
 
 /* The hex field paints its OWN chrome, which is the one place this family needed a declaration rather than a new root (issue 1470). */
 
-/* skin census (issue 1523): not an adopter — this node is portaled (`TintPopover.svelte`) and can fall back to `document.body` outside `.fabricate`, where an ancestor-scoped skin would stop matching. */
+/* skin census (issue 1523): not an adopter — this node is portaled (`TintPicker.svelte`) and can fall back to `document.body` outside `.fabricate`, where an ancestor-scoped skin would stop matching. */
 .fabricate-color-picker-popover .manager-color-custom input {
   appearance: none;
   -webkit-appearance: none;

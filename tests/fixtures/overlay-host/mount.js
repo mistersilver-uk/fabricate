@@ -7,7 +7,7 @@ import EssenceSourceSelector from '../../../src/ui/svelte/components/EssenceSour
 import IconPicker from '../../../src/ui/svelte/components/IconPicker.svelte';
 import RecipeDurationEditor from '../../../src/ui/svelte/apps/manager/recipe/RecipeDurationEditor.svelte';
 import SearchablePopover from '../../../src/ui/svelte/components/SearchablePopover.svelte';
-import TintPicker from '../../../src/ui/svelte/components/TintPicker.svelte';
+import TintPickerButton from '../../../src/ui/svelte/components/TintPickerButton.svelte';
 
 const params = new URLSearchParams(globalThis.location.search);
 const hostKind = params.get('host') ?? 'manager';
@@ -134,7 +134,7 @@ const COMPONENTS = {
       onChange: () => {},
     },
   ],
-  color: [TintPicker, { colorToken: 'sage', ariaLabel: 'Choose a colour' }],
+  color: [TintPickerButton, { colorToken: 'sage', ariaLabel: 'Choose a colour' }],
   // THE SIXTH COPY OF THE POSITIONING PASS (issue 1500), and the only one of the six that had no
   // row here.
   duration: [

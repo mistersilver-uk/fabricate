@@ -181,7 +181,7 @@ A primitive that renders THROUGH another primitive's root element writes its own
 The two families must then be measurably DISJOINT, because the gate tells a namespace root from an application root BY NAME and by exact membership, so each root is an APPLICATION root to the other's entry and a rule naming both would be gated on both.
 A change that creates such a pair publishes the measured count of selectors naming both classes, and asserts it as a standing invariant rather than leaving it as a property that happens to hold.
 
-Every shared picker satisfies this requirement: `SearchablePopover` emits `fabricate-picker` and `fabricate-picker-popover`, `IconPicker` emits `fabricate-icon-picker` and `fabricate-icon-picker-popover`, `EssenceSourceSelector` emits `fabricate-source-picker` and `fabricate-source-picker-popover`, `Select` emits the `fabricate-select` family, and `TintPicker` and `TintPopover` emit `fabricate-color-picker` and `fabricate-color-picker-popover` between them.
+Every shared picker satisfies this requirement: `SearchablePopover` emits `fabricate-picker` and `fabricate-picker-popover`, `IconPicker` emits `fabricate-icon-picker` and `fabricate-icon-picker-popover`, `EssenceSourceSelector` emits `fabricate-source-picker` and `fabricate-source-picker-popover`, `Select` emits the `fabricate-select` family, and `TintPickerButton` and `TintPicker` emit `fabricate-color-picker` and `fabricate-color-picker-popover` between them.
 
 `Select` is the family that made three corollaries of this requirement explicit rather than incidental.
 

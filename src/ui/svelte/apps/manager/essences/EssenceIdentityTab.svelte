@@ -2,7 +2,7 @@
   The essence editor's IDENTITY tab: icon, name, description, colour palette and the Enabled row.
 
   THE COLOUR PALETTE IS INLINE AND HAS A NO-COLOUR CELL, rendered through
-  `TintPopover`'s gated `layout="inline"` with `allowNone`, because an inline palette
+  `TintPicker`'s gated `layout="inline"` with `allowNone`, because an inline palette
   without that cell is a one-way door: once a colour is chosen there is no route back to the accent
   default. Both props are off by default, so the biome popover and the modifier picker are
   untouched. Unset is a FIRST-CLASS state, not a failure — an essence with no colour renders in the
@@ -14,7 +14,7 @@
 <script>
   import Field from '../../../components/Field.svelte';
   import IconPicker from '../../../components/IconPicker.svelte';
-  import TintPopover from '../../../components/TintPopover.svelte';
+  import TintPicker from '../../../components/TintPicker.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import ToggleCard from '../../../components/ToggleCard.svelte';
   import { localize } from '../../../util/foundryBridge.js';
@@ -149,7 +149,7 @@
         )}</span
       >
     </div>
-    <TintPopover
+    <TintPicker
       layout="inline"
       allowNone
       allowCustom={false}

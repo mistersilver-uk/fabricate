@@ -659,7 +659,7 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/components/IconPicker.svelte',
   'src/ui/svelte/components/ModifierPillSelect.svelte',
   'src/ui/svelte/components/SearchField.svelte',
-  'src/ui/svelte/components/TintPicker.svelte',
+  'src/ui/svelte/components/TintPickerButton.svelte',
   'src/ui/svelte/components/ToggleCard.svelte',
 ];
 

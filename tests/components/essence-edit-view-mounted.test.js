@@ -103,7 +103,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
-    'src/ui/svelte/components/TintPopover.svelte',
+    'src/ui/svelte/components/TintPicker.svelte',
     'src/ui/svelte/components/Medallion.svelte',
     // THE shared picker both of the two above now render (issue 1503). `IconPicker` and
     // `EssenceSourceSelector` are `SearchablePopover` call sites, so the primitive is a STATIC

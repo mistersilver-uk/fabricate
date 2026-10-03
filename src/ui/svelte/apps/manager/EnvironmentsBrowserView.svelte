@@ -11,8 +11,8 @@
   import Pagination from '../../components/Pagination.svelte';
   import Button from '../../components/Button.svelte';
   import IconPicker from '../../components/IconPicker.svelte';
+  import TintPickerButton from '../../components/TintPickerButton.svelte';
   import TintPicker from '../../components/TintPicker.svelte';
-  import TintPopover from '../../components/TintPopover.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
   import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
   import GatheringTasksBrowserView from './GatheringTasksBrowserView.svelte';
@@ -152,8 +152,8 @@
   let biomeColorTriggerButton = $state(null);
   // The popover root, registered via registerBiomeColorPopoverNode. It is what `anchoredPopover`
   // portals and positions below, and it is ALSO fed as an `additionalNodes` entry to the
-  // dismissOnOutsideClick wrapping the trigger, the same pattern TintPicker uses for its
-  // own popover. TintPopover's own internal dismissal is disabled here
+  // dismissOnOutsideClick wrapping the trigger, the same pattern TintPickerButton uses for its
+  // own popover. TintPicker's own internal dismissal is disabled here
   // (`manageDismiss={false}`) so this is the single outside-click authority; without it, a
   // mousedown on the trigger itself would count as "outside" (the trigger is not inside the
   // portaled popover), dismiss on mousedown, then the trigger's own contextmenu handler would
@@ -636,8 +636,8 @@
   }
 
   // `anchoredPopover` is driven from HERE rather than with `use:` on the panel, for the reason
-  // `TintPicker` records against its own copy of this shape: the panel is
-  // `TintPopover`, a shared component this view does not own the markup of and whose
+  // `TintPickerButton` records against its own copy of this shape: the panel is
+  // `TintPicker`, a shared component this view does not own the markup of and whose
   // other call sites render it inline. An action is a plain function, so this view applies it to
   // the node the popover registers — same contract, same teardown, no new prop on that component.
   //
@@ -1276,7 +1276,7 @@
                 )}
                 onChange={(icon) => (biomeIconInput = icon)}
               />
-              <TintPicker
+              <TintPickerButton
                 colorToken={biomeColorTokenInput}
                 customColor={biomeCustomColorInput}
                 ariaLabel={text(
@@ -1360,7 +1360,7 @@
                         )}
                     />
                     {#if openBiomeColorPickerId === valueId}
-                      <TintPopover
+                      <TintPicker
                         colorToken={biomeColorToken(option)}
                         customColor={biomeCustomColor(option)}
                         presetGridLabel={text(

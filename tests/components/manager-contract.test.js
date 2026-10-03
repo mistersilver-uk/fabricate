@@ -1829,7 +1829,7 @@ describe('CraftingSystemManager source contract', () => {
   // The settings tab is where a world's condition and vocabulary values are authored, through the
   // shared pickers rather than through bespoke inputs.
   defineStructureContract('authors global conditions and vocabularies on the settings tab', ENVIRONMENTS_BROWSER, {
-    renders: ['TintPicker', 'IconPicker'],
+    renders: ['TintPickerButton', 'IconPicker'],
     writes: ['data-gathering-condition-panel', 'data-gathering-vocabulary-panel'],
     calls: [
       'onToggleGatheringConditionEnabled',

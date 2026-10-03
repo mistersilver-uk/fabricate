@@ -210,7 +210,7 @@ const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/components/Pagination.svelte',
   'src/ui/svelte/components/SegmentedControl.svelte',
   'src/ui/svelte/components/TintPicker.svelte',
-  'src/ui/svelte/components/TintPopover.svelte',
+  'src/ui/svelte/components/TintPickerButton.svelte',
 ];
 
 test('the inputs every property below quantifies over are alive', () => {

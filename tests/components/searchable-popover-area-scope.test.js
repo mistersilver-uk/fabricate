@@ -138,10 +138,10 @@ const PRIMITIVES = Object.freeze([
     ]),
   }),
   Object.freeze({
-    name: 'TintPicker + TintPopover',
+    name: 'TintPickerButton + TintPicker',
     components: Object.freeze([
+      'src/ui/svelte/components/TintPickerButton.svelte',
       'src/ui/svelte/components/TintPicker.svelte',
-      'src/ui/svelte/components/TintPopover.svelte',
     ]),
     roots: Object.freeze(['fabricate-color-picker', 'fabricate-color-picker-popover']),
     family: 'manager-color-[\\w-]+',
@@ -2059,7 +2059,7 @@ test('each primitive’s own scoped styles name no application root either', () 
     `only ${blocks} of the twenty-three component files hold a REAL scoped \`<style>\` block — one ` +
       'opened after `</script>`. Seven do today: `SearchablePopover` and the ' +
       '`SearchablePopoverPanel` its compact presentation moved to (issue 1719), ' +
-      '`TintPopover` and ' +
+      '`TintPicker` and ' +
       '— since issue 1509 put entries on them — `EditorTabs`, whose block is the two ' +
       '`:global(.manager-editor-tab-button.is-danger)` rules that tint a failing validation ' +
       'tab, `RadioCardGroup`, whose block is the one `.manager-resolution-option-meta` ' +
