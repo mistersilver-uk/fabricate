@@ -1,10 +1,11 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  CraftButton is the run summary's craft action: "Craft another", or "Craft next step" on a
-  progressive run. The disabled state carries an accessible reason (title + aria-label) so a
-  player learns why a craft is blocked, and `busy` reflects store.craftInFlight.
+  The run summary's craft action: "Craft another", or "Craft next step" on a progressive run. It
+  is a ghost, because the pane's one primary is the recipe header's. A blocked craft names its
+  reason in the title and the accessible name, and `busy` reflects store.craftInFlight.
 -->
 <script>
+  import ManagerButton from '../../components/ManagerButton.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { withRollPromptOrigin } from '../../util/rollPromptOrigin.js';
 
@@ -26,10 +27,10 @@
   );
 </script>
 
-<button
-  type="button"
-  class="crafting-craft-button"
-  data-crafting-craft
+<ManagerButton
+  role="ghost"
+  fullWidth
+  data-crafting-craft=""
   data-crafting-craft-disabled={blocked ? 'true' : 'false'}
   disabled={blocked}
   title={accessibleLabel}
@@ -43,42 +44,4 @@
     <i class="fas fa-hammer" aria-hidden="true"></i>
     <span>{label}</span>
   {/if}
-</button>
-
-<style>
-  .crafting-craft-button {
-    box-sizing: border-box;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    width: 100%;
-    height: auto;
-    min-height: 44px;
-    padding: 8px 16px;
-    border: 1px solid var(--fab-accent);
-    border-radius: 8px;
-    background: var(--fab-accent);
-    color: var(--fab-on-accent, var(--fab-surface));
-    font-weight: 600;
-    font-size: 14px;
-    cursor: pointer;
-  }
-
-  .crafting-craft-button:hover:not(:disabled) {
-    filter: brightness(1.05);
-  }
-
-  .crafting-craft-button:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: 2px;
-  }
-
-  .crafting-craft-button:disabled {
-    cursor: not-allowed;
-    opacity: 0.55;
-    border-color: var(--fab-border);
-    background: var(--fab-surface-raised);
-    color: var(--fab-text-muted);
-  }
-</style>
+</ManagerButton>

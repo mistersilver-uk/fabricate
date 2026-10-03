@@ -150,8 +150,7 @@ describe('CraftingView mounted behavior', () => {
     );
   });
 
-  // The run summary's own "Craft another" sits outside the detail pane and is the one extra
-  // craft action allowed beside the header primary until Phase 4 of issue 1518 makes it a ghost.
+  // The run summary repeats the verb as a ghost, so the whole view has one primary.
   it('hands the roll to the detail, which renames its one primary Craft another', async () => {
     const store = fakeCraftingStore({
       recipes: [recipe()],
@@ -164,7 +163,11 @@ describe('CraftingView mounted behavior', () => {
       })
     );
     assert.equal(primary.textContent.trim(), 'FABRICATE.App.Crafting.Button.CraftAnother');
-    assertIdentityHeader(target, { primaries: 1, outside: 1 });
+    assertIdentityHeader(target, { primaries: 1 });
+    const summary = target.querySelector('[data-crafting-run-summary]');
+    const again = summary.querySelector('[data-crafting-craft]');
+    assert.ok(again.matches('.fab-manager-button.is-ghost'), 'the summary repeats it as a ghost');
+    assert.ok(summary.querySelector('[data-crafting-run-dismiss]').matches('.is-ghost'));
   });
 
   it('disables the run summary "Craft another" when the selection is no longer craftable (non-progressive)', async () => {
