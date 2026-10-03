@@ -40,19 +40,37 @@ The results a recipe produces are chosen on their own tab.
 
 ### Result Amounts: Fixed or Rolled
 
-A result's amount is either **fixed**, a plain number set on the result, or **rolled**, a dice expression resolved fresh each time the recipe is crafted.
+Each result row on the Results tab has a **Fixed** and **Rolled** choice beside its amount.
+A **fixed** amount is a plain number, set with the stepper.
+A **rolled** amount is a dice expression such as `1d4+1`, resolved fresh each time the result is awarded.
+Switching a row to Rolled swaps the stepper for an expression field.
+Switching back to Fixed keeps the number you set, and switching to Rolled again restores the expression you typed.
+A Rolled row left empty saves as Fixed.
 
 A rolled amount uses the same [expression syntax]({% link expressions.md %}) as everywhere else in Fabricate, including an optional reference to the crafting character's own data.
 It is resolved once, at the moment the result is awarded, against the character doing the crafting.
+A character value the character does not have counts as 0.
 
 A rolled amount can come up as zero.
 When it does, nothing is created, and the crafting or salvage chat card names the roll and states that nothing was produced, rather than leaving the result off the card.
 Fabricate refuses to save a rolled amount that could never produce anything at all, such as an expression with no dice and no character reference that can only ever total zero or less.
 An expression that reads the crafting character's own data is accepted as long as it can be rolled at all, because no value can be known in advance without a character to roll it against.
 
+An expression that cannot be rolled, or that can never award a positive amount, is marked on its row with a message, and the save is refused until you fix or clear it.
+
+A craft is also refused, before anything is consumed, when its rolled amount cannot be rolled for the crafting character.
+Examples are an expression that reads a text value from the character, or one that divides by a value that is zero for that character.
+The player sees the craft refused, and their ingredients stay where they are.
+
 {: .note }
-> Choosing between a fixed and a rolled amount on the Results tab is planned and not yet available.
-> Until then, a rolled amount can only reach a recipe by importing one that already has one, or through the API.
+> A progressive recipe has no amount on its stage rows, because each stage is produced once or not at all.
+> Any rolled amount on a progressive recipe is ignored.
+
+A result row names its component and cannot be cleared.
+To change a result, remove the row and add another.
+A progressive stage is the exception, because it can swap its component in place and so keep its place in the order.
+Adding a component that a result set already produces raises that row's quantity.
+If that row is rolled, a second row is added instead.
 
 ## Enabling and Disabling Recipes
 
