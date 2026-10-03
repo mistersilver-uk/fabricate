@@ -104,7 +104,7 @@ A progressive stage has no amount, because a progressive salvage always recovers
 
 **Add result** opens a component picker, so you choose the component you are adding.
 A flat row cannot clear its component, so to change one, remove the row and add another.
-Adding a component that the set already produces raises that row's quantity by one, unless that row is rolled, in which case Fabricate adds a new row.
+Adding a component that the result group already produces raises that row's quantity by one, unless that row is rolled, in which case Fabricate adds a new row.
 A progressive stage can swap its component in place.
 
 Fabricate marks a row whose expression cannot be rolled, or can never come out above zero.
