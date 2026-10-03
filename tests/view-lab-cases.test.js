@@ -705,6 +705,8 @@ const ROW_GEOMETRY_LAYOUT_CASE_IDS = [
   'manager-recipe-edit-results-progressive',
   'manager-recipe-edit-results-narrow',
   'manager-gathering-task-editor-straight-rolled',
+  'manager-component-edit-salvage-rolled-narrow',
+  'manager-component-edit-salvage-narrow',
 ];
 const LAYOUT_CASE_IDS = [
   ...ROW_GEOMETRY_LAYOUT_CASE_IDS,
@@ -2546,6 +2548,8 @@ const ANCHORED_POPOVER_FRAMES = [
   'manager-books-scrolls-cap-filter-list',
   'manager-checks-trigger-operator-list',
   'manager-component-edit-category-list',
+  'manager-component-edit-salvage-kind-list',
+  'manager-component-edit-salvage-suggestions',
   'manager-components-essence-filter-list',
   'manager-environment-danger-level-list',
   'manager-environment-edit-automatic-force-add',

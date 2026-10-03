@@ -19,6 +19,9 @@ manager-component-edit-salvage
 manager-component-edit-salvage-narrow
 manager-component-edit-salvage-off
 manager-component-edit-salvage-simple
+manager-component-edit-salvage-rolled-narrow
+manager-component-edit-salvage-suggestions
+manager-component-edit-salvage-kind-list
 manager-component-complications-empty
 manager-component-complications-collapsed
 manager-component-complications-expanded
