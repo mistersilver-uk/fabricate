@@ -249,6 +249,9 @@ export const PLAYER_APP_COMPILED_MODULES = Object.freeze([
   // The identity row every player detail pane leads with (issue 1518), and the primary it draws.
   'src/ui/svelte/apps/PlayerDetailHeader.svelte',
   'src/ui/svelte/components/ManagerButton.svelte',
+  // The search field and card box the player controls converted onto (issue 1518).
+  'src/ui/svelte/components/ManagerSearchField.svelte',
+  'src/ui/svelte/components/InspectorCard.svelte',
   // The requirement chooser the crafting rail renders (issue 1518), and the tile it draws.
   'src/ui/svelte/components/RequirementChooser.svelte',
   'src/ui/svelte/components/SlotTile.svelte',
@@ -418,6 +421,9 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   ...SELECT_COMPILED_MODULES,
   // The manager's icon-only push-button (issue 1422).
   'src/ui/svelte/components/IconButton.svelte',
+  // The search field and the card box the crafting controls converted onto (issue 1518).
+  'src/ui/svelte/components/ManagerSearchField.svelte',
+  'src/ui/svelte/components/InspectorCard.svelte',
   // The shared numeric stepper the essence pool's per-carrier rows are built on (issue 917).
   'src/ui/svelte/components/Stepper.svelte',
   // The two marks this tree reaches (issue 1505): the eyebrow nine `detail/` components render, and

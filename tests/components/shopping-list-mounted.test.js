@@ -241,7 +241,10 @@ describe('ShoppingList mounted behavior', () => {
       onIncrement: (id) => inc.push(id)
     });
 
-    target.querySelector('.crafting-shopping-remove').click();
+    const remove = target.querySelector('.crafting-shopping-remove');
+    assert.ok(remove.classList.contains('fabricate-icon-button'), 'the shared icon button');
+    assert.match(remove.getAttribute('aria-label'), /Shopping\.Remove/);
+    remove.click();
     flushSync();
     assert.deepEqual(removed, ['recipe-1'], 'onRemove called with the recipe id');
     assert.deepEqual(
@@ -644,6 +647,9 @@ describe('ShoppingList currency rows (issue 1493)', () => {
       entries: [ENTRY],
     });
 
+    const cards = [...target.querySelectorAll('.crafting-shopping-card')];
+    assert.ok(cards.every((card) => card.matches('section.fabricate-card.manager-inspector-card')));
+    assert.ok(target.querySelector('.crafting-shopping-clear.fab-manager-button.is-ghost'));
     const kickers = [...target.querySelectorAll('.crafting-shopping-card .fab-kicker')];
     assert.equal(
       kickers.length,

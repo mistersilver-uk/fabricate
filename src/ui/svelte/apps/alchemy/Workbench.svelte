@@ -20,11 +20,11 @@
   the focus/hover `−` control REMOVES one; and the `×` button REMOVES ALL (it
   `stopPropagation`s so it never also adds). The status pill is `aria-live="polite"`;
   the drop zone has an accessible name/role plus a non-color dragover cue (the
-  dashed border thickens). The ready-state `brewpulse` animation honors
-  prefers-reduced-motion.
+  dashed border thickens).
 -->
 <script>
   import Kicker from '../../components/Kicker.svelte';
+  import ManagerButton from '../../components/ManagerButton.svelte';
   import Medallion from '../../components/Medallion.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import EssenceChips from './EssenceChips.svelte';
@@ -178,16 +178,15 @@
       <i class="fas fa-mortar-pestle" aria-hidden="true"></i>
       <h2>{localize('FABRICATE.App.Alchemy.Workbench')}</h2>
     </div>
-    <button
-      type="button"
-      class="alchemy-clear"
-      data-alchemy-clear
+    <ManagerButton
+      role="ghost"
+      data-alchemy-clear=""
       disabled={benchEmpty}
       onclick={() => onClear?.()}
     >
       <i class="fas fa-arrow-rotate-left" aria-hidden="true"></i>
       {localize('FABRICATE.App.Alchemy.Clear')}
-    </button>
+    </ManagerButton>
   </div>
   <p class="alchemy-workbench-intro">{localize('FABRICATE.App.Alchemy.WorkbenchIntro')}</p>
 
@@ -396,10 +395,8 @@
 
   <div class="alchemy-brew-area">
     {#if lastBrew}
-      <!-- The wrapper survives the conversion carrying ONE property, and it is the
-           caller's own layout rather than the notice's geometry: `.alchemy-brew-area` is
-           a plain block, so this 12px is the only separation between the banner and the
-           52px Brew button beneath it. -->
+      <!-- The wrapper carries the caller's own layout, not the notice's geometry: in the plain
+           `.alchemy-brew-area` block this 12px is all that separates the banner from Brew. -->
       <div class="alchemy-banner">
         <Notice
           tone={bannerTone}
@@ -410,17 +407,16 @@
         />
       </div>
     {/if}
-    <button
-      type="button"
-      class="alchemy-brew"
-      class:is-ready={mode === 'ready'}
-      data-alchemy-brew
+    <ManagerButton
+      role="primary"
+      fullWidth
+      data-alchemy-brew=""
       disabled={!brewEnabled || brewInFlight}
       onclick={(event) => onBrew?.(event)}
     >
       <i class="fas {brewInFlight ? 'fa-spinner fa-spin' : brewIcon}" aria-hidden="true"></i>
       {brewLabel}
-    </button>
+    </ManagerButton>
   </div>
 </div>
 
@@ -463,26 +459,6 @@
     font-weight: 600;
     color: var(--fab-text);
     border: none;
-  }
-
-  .alchemy-clear {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    height: 30px;
-    padding: 0 12px;
-    border-radius: 8px;
-    border: 1px solid var(--fab-border);
-    background: var(--fab-surface-soft);
-    color: var(--fab-text-secondary);
-    font-size: 11px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-
-  .alchemy-clear:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
   }
 
   .alchemy-workbench-intro {
@@ -820,48 +796,5 @@
      Brew button, which `.alchemy-brew-area` does not provide. */
   .alchemy-banner {
     margin-bottom: 12px;
-  }
-
-  .alchemy-brew {
-    width: 100%;
-    height: 52px;
-    border-radius: 11px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    font-size: 15px;
-    font-weight: 700;
-    cursor: pointer;
-    border: 1px solid var(--fab-accent-border);
-    background: var(--fab-accent);
-    color: var(--fab-on-accent);
-  }
-
-  .alchemy-brew:disabled {
-    cursor: not-allowed;
-    border-color: var(--fab-border);
-    background: var(--fab-surface-soft);
-    color: var(--fab-text-disabled);
-  }
-
-  .alchemy-brew.is-ready:not(:disabled) {
-    animation: alchemy-brewpulse 2.2s ease-in-out infinite;
-  }
-
-  @keyframes alchemy-brewpulse {
-    0%,
-    100% {
-      box-shadow: 0 0 0 0 transparent;
-    }
-    50% {
-      box-shadow: 0 0 0 4px var(--fab-accent-soft);
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .alchemy-brew.is-ready:not(:disabled) {
-      animation: none;
-    }
   }
 </style>

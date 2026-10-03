@@ -8,6 +8,9 @@
   repair. Fully-owned components never appear.
 -->
 <script>
+  import IconButton from '../../components/IconButton.svelte';
+  import InspectorCard from '../../components/InspectorCard.svelte';
+  import ManagerButton from '../../components/ManagerButton.svelte';
   import Medallion from '../../components/Medallion.svelte';
   import { resolveCraftingArt } from '../../util/craftingArtResolution.js';
   import { normalizeEssenceIcon } from '../../util/essenceIcons.js';
@@ -200,9 +203,9 @@
   <header class="crafting-shopping-head">
     <p class="crafting-shopping-title">{localize('FABRICATE.App.Crafting.Shopping.Title')}</p>
     {#if !isEmpty}
-      <button type="button" class="crafting-shopping-clear" onclick={() => onClear?.()}>
+      <ManagerButton role="ghost" class="crafting-shopping-clear" onclick={() => onClear?.()}>
         {localize('FABRICATE.App.Crafting.Shopping.Clear')}
-      </button>
+      </ManagerButton>
     {/if}
   </header>
 
@@ -252,7 +255,7 @@
     </div>
   {:else}
     <div class="crafting-shopping-scroll">
-      <div class="crafting-shopping-card">
+      <InspectorCard class="crafting-shopping-card">
         <Kicker as="p">
           {localize('FABRICATE.App.Crafting.Shopping.RecipesTitle')}
         </Kicker>
@@ -285,22 +288,21 @@
                 <span class="crafting-shopping-entry-name">{entry.name}</span>
                 <span class="crafting-shopping-entry-qty">×{entry.quantity}</span>
               </button>
-              <button
-                type="button"
-                class="crafting-shopping-remove"
+              <IconButton
+                class="crafting-shopping-remove is-ghost"
+                ariaLabel={localize('FABRICATE.App.Crafting.Shopping.Remove')}
                 title={localize('FABRICATE.App.Crafting.Shopping.Remove')}
-                aria-label={localize('FABRICATE.App.Crafting.Shopping.Remove')}
                 onclick={() => onEntryRemove(entry.recipeId)}
               >
                 <i class="fas fa-xmark" aria-hidden="true"></i>
-              </button>
+              </IconButton>
             </li>
           {/each}
         </ul>
-      </div>
+      </InspectorCard>
 
       {#if acquireComponents.length > 0}
-        <div class="crafting-shopping-card" data-shopping-acquire-components>
+        <InspectorCard class="crafting-shopping-card" data-shopping-acquire-components="">
           <Kicker as="p">
             {localize('FABRICATE.App.Crafting.Shopping.AcquireComponents')}
           </Kicker>
@@ -323,11 +325,11 @@
               </li>
             {/each}
           </ul>
-        </div>
+        </InspectorCard>
       {/if}
 
       {#if acquireTools.length > 0}
-        <div class="crafting-shopping-card" data-shopping-acquire-tools>
+        <InspectorCard class="crafting-shopping-card" data-shopping-acquire-tools="">
           <Kicker as="p">
             {localize('FABRICATE.App.Crafting.Shopping.AcquireTools')}
           </Kicker>
@@ -351,7 +353,7 @@
               </li>
             {/each}
           </ul>
-        </div>
+        </InspectorCard>
       {/if}
     </div>
   {/if}
@@ -382,24 +384,6 @@
     font-weight: 600;
   }
 
-  .crafting-shopping-clear {
-    box-sizing: border-box;
-    height: auto;
-    min-height: 28px;
-    padding: 2px 10px;
-    border: 1px solid var(--fab-border);
-    border-radius: 6px;
-    background: var(--fab-surface-soft);
-    color: var(--fab-text-muted);
-    font-size: 12px;
-    cursor: pointer;
-  }
-
-  .crafting-shopping-clear:hover {
-    background: var(--fab-surface-raised);
-    color: var(--fab-text);
-  }
-
   /* The grid the three always-visible summary cards sit in. Each card is a `<StatBox>`
      and owns its own box, figure and label; this rule owns only the grid. */
   .crafting-shopping-summary {
@@ -428,16 +412,6 @@
     flex-direction: column;
     gap: var(--fab-space-3);
     padding-right: 2px;
-  }
-
-  .crafting-shopping-card {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: var(--fab-space-3);
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface-soft);
   }
 
   .crafting-shopping-queue,
@@ -531,8 +505,7 @@
      this is (0,3,0) and beats that module rule at (0,2,1) — which is held at
      single-class specificity for exactly this purpose, and stayed there when issue 1501
      collapsed the `.fabricate-app` pair onto the module root, so this argument survives
-     the rename unchanged. `.crafting-shopping-remove:focus-visible` below is the same
-     pattern. The module rule's `:focus` half already covers the mouse case, so
+     the rename unchanged. The module rule's `:focus` half already covers the mouse case, so
      `:focus-visible` alone is enough. */
   .crafting-shopping-entry-main:focus-visible {
     outline: none;
@@ -552,33 +525,6 @@
     font-variant-numeric: tabular-nums;
     font-weight: 600;
     color: var(--fab-text-muted);
-  }
-
-  .crafting-shopping-remove {
-    box-sizing: border-box;
-    flex: 0 0 auto;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 26px;
-    height: 26px;
-    min-height: 26px;
-    padding: 0;
-    border: 1px solid transparent;
-    border-radius: 6px;
-    background: transparent;
-    color: var(--fab-text-muted);
-    cursor: pointer;
-  }
-
-  .crafting-shopping-remove:hover {
-    background: var(--fab-surface-raised);
-    color: var(--fab-text);
-  }
-
-  .crafting-shopping-remove:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: 1px;
   }
 
   .crafting-shopping-acquire-row {

@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 
+import { injectedCss } from '../helpers/chipPaint.js';
 import {
   createMountedComponentHarness,
   CRAFTING_APP_RAW_MODULES,
@@ -153,10 +154,18 @@ describe('RecipeBrowser mounted behavior', () => {
     });
 
     const input = target.querySelector('.crafting-browser-search input');
+    assert.ok(input.closest('.fabricate-search.manager-search'), 'the shared search field');
     input.value = 'heal';
     input.dispatchEvent(new window.Event('input', { bubbles: true }));
     flushSync();
     assert.deepEqual(searches, ['heal'], 'onSearch called with the typed value');
+  });
+
+  // Issue 1518: the pager paints itself; the browser keeps only its layout slot.
+  it('declares nothing for the shared pager’s own markup', async () => {
+    const target = await harness.mount({ recipes: [recipe()], totalCount: 30, pageSize: 12 });
+    assert.ok(target.querySelector(':scope .crafting-browser-pagination .fabricate-pagination'));
+    assert.ok(!/crafting-browser-pagination[^{]*manager-/.test(injectedCss()));
   });
 
   it('selects a recipe on row click', async () => {

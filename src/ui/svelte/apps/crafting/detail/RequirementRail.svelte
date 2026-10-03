@@ -33,6 +33,7 @@
   import { normalizeEssenceIcon } from '../../../util/essenceIcons.js';
   import { SLOT_KIND, SLOT_STATE } from '../../../util/requirementSlots.js';
   import { haveOfNeedText } from '../../../util/craftingQuantityReading.js';
+  import ManagerButton from '../../../components/ManagerButton.svelte';
   import RequirementChooser from '../../../components/RequirementChooser.svelte';
   import Kicker from '../../../components/Kicker.svelte';
 
@@ -204,16 +205,16 @@
       {#if canPickForMe}
         <!-- No aria-label: the visible span names the button and `title` carries the hint, so
              the accessible name contains the visible label (WCAG 2.5.3). -->
-        <button
-          type="button"
+        <ManagerButton
+          role="ghost"
           class="requirement-rail-wand"
-          data-requirement-pick-for-me
+          data-requirement-pick-for-me=""
           title={localize('FABRICATE.App.Crafting.Slots.PickForMeHint')}
           onclick={() => onPickForMe?.()}
         >
           <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
           <span>{localize('FABRICATE.App.Crafting.Slots.PickForMe')}</span>
-        </button>
+        </ManagerButton>
       {/if}
     </div>
 
@@ -267,38 +268,6 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--fab-space-2);
-  }
-
-  /* Foundry's global button chrome pins a fixed height and centres content; reset it
-     the same way the shipped .crafting-alt-option does. */
-  .requirement-rail-wand {
-    appearance: none;
-    -webkit-appearance: none;
-    box-sizing: border-box;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    height: auto;
-    min-height: 26px;
-    padding: 2px var(--fab-space-2);
-    border: 1px solid var(--fab-accent-border);
-    border-radius: 999px;
-    background: var(--fab-accent-soft);
-    color: var(--fab-accent);
-    font: inherit;
-    font-size: 11px;
-    font-weight: 600;
-    line-height: 1.2;
-    white-space: nowrap;
-    cursor: pointer;
-  }
-
-  .requirement-rail-wand:hover {
-    background: var(--fab-surface-active);
-  }
-
-  .requirement-rail-wand i {
-    font-size: 10px;
   }
 
   .requirement-rail-hint {

@@ -8,6 +8,7 @@
   is NO Journal cross-link in this PR.
 -->
 <script>
+  import ManagerButton from '../../components/ManagerButton.svelte';
   import Medallion from '../../components/Medallion.svelte';
   import { resolveCraftingArt } from '../../util/craftingArtResolution.js';
   import { localize } from '../../util/foundryBridge.js';
@@ -43,17 +44,10 @@
 <section class="crafting-run" data-crafting-run-summary>
   <header class="crafting-run-head">
     <p class="crafting-run-title">{localize('FABRICATE.App.Crafting.Run.Title')}</p>
-    <button
-      type="button"
-      class="crafting-run-back"
-      data-crafting-run-dismiss
-      title={localize('FABRICATE.App.Crafting.Run.Dismiss')}
-      aria-label={localize('FABRICATE.App.Crafting.Run.Dismiss')}
-      onclick={() => onDismiss?.()}
-    >
+    <ManagerButton role="ghost" data-crafting-run-dismiss="" onclick={() => onDismiss?.()}>
       <i class="fas fa-arrow-left" aria-hidden="true"></i>
       <span>{localize('FABRICATE.App.Crafting.Run.Dismiss')}</span>
-    </button>
+    </ManagerButton>
   </header>
 
   <div class="crafting-run-recipe">
@@ -97,32 +91,6 @@
     margin: 0;
     font-size: 14px;
     font-weight: 600;
-  }
-
-  .crafting-run-back {
-    box-sizing: border-box;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    height: auto;
-    min-height: 28px;
-    padding: 2px 10px;
-    border: 1px solid var(--fab-border);
-    border-radius: 6px;
-    background: var(--fab-surface-soft);
-    color: var(--fab-text-muted);
-    font-size: 12px;
-    cursor: pointer;
-  }
-
-  .crafting-run-back:hover {
-    background: var(--fab-surface-raised);
-    color: var(--fab-text);
-  }
-
-  .crafting-run-back:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: 2px;
   }
 
   .crafting-run-recipe {

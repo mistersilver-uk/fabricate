@@ -100,6 +100,7 @@ const harness = createMountedComponentHarness({
   ],
   compiledModules: [
     'src/ui/svelte/components/Medallion.svelte',
+    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/SlotTile.svelte',
     'src/ui/svelte/components/RequirementChooser.svelte',
     // The shared eyebrow (issue 1505). The rail's header title is a `<Kicker>`.
@@ -326,6 +327,7 @@ describe('RequirementRail mounted behavior', () => {
     const target = await harness.mount({ slots: slots() });
     const wand = target.querySelector('[data-requirement-pick-for-me]');
     assert.ok(!wand.hasAttribute('aria-label'), 'the visible span is the accessible name');
+    assert.ok(wand.matches('.fab-manager-button.is-ghost'), 'a secondary verb, so a ghost');
     assert.match(wand.textContent.trim(), /Slots\.PickForMe$/, 'and it is the short label');
     assert.match(wand.getAttribute('title'), /Slots\.PickForMeHint/);
   });

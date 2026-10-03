@@ -630,8 +630,8 @@ describe('RecipeDetail mounted behavior', () => {
     );
     assert.ok(target.querySelector('[data-check-formula-error]'), 'error note rendered');
     assert.ok(
-      target.querySelector('.crafting-check-card.is-formula-error'),
-      'the check card is marked as an error'
+      target.querySelector('section.fabricate-card.crafting-check-card.is-formula-error'),
+      'the check card is the shared card box, marked as an error'
     );
   });
 

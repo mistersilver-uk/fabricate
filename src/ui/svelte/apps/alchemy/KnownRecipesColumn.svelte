@@ -15,6 +15,8 @@
 <script>
   import Callout from '../../components/Callout.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
+  import ManagerButton from '../../components/ManagerButton.svelte';
+  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
   import Medallion from '../../components/Medallion.svelte';
   import { localize } from '../../util/foundryBridge.js';
 
@@ -65,15 +67,10 @@
     <div class="alchemy-known-system">
       <span class="alchemy-known-system-name">{activeSystemName}</span>
       {#if canSwitch}
-        <button
-          type="button"
-          class="alchemy-switch"
-          data-alchemy-switch
-          onclick={() => onSwitch?.()}
-        >
+        <ManagerButton data-alchemy-switch="" onclick={() => onSwitch?.()}>
           <i class="fas fa-arrow-right-arrow-left" aria-hidden="true"></i>
           {localize('FABRICATE.App.Alchemy.SwitchDiscipline')}
-        </button>
+        </ManagerButton>
       {/if}
     </div>
   {/if}
@@ -83,16 +80,13 @@
     <span class="alchemy-known-count">{knownCount}</span>
   </div>
 
-  <label class="alchemy-known-search">
-    <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
-    <input
-      type="text"
-      value={search}
-      placeholder={localize('FABRICATE.App.Alchemy.SearchKnown')}
-      aria-label={localize('FABRICATE.App.Alchemy.SearchKnown')}
-      oninput={(event) => onSearch?.(event.target.value)}
-    />
-  </label>
+  <ManagerSearchField
+    class="alchemy-known-search"
+    value={search}
+    onChange={(value) => onSearch?.(value)}
+    placeholder={localize('FABRICATE.App.Alchemy.SearchKnown')}
+    ariaLabel={localize('FABRICATE.App.Alchemy.SearchKnown')}
+  />
 
   {#if recipes.length === 0 && knownCount > 0}
     <!--
@@ -240,55 +234,11 @@
     text-overflow: ellipsis;
   }
 
-  .alchemy-switch {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 10px;
-    border-radius: 8px;
-    border: 1px solid var(--fab-border);
-    background: var(--fab-surface);
-    color: var(--fab-text-secondary);
-    font-size: 11px;
-    font-weight: 600;
-    cursor: pointer;
-    white-space: nowrap;
-  }
-
-  .alchemy-switch:hover {
-    background: var(--fab-surface-active);
-  }
-
-  .alchemy-known-search {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 0 11px;
-    height: 36px;
-    background: var(--fab-surface);
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    margin-bottom: 12px;
-    color: var(--fab-text-subtle);
-    flex: 0 0 auto;
-  }
-
-  .alchemy-known-search input {
-    flex: 1;
+  /* The field's family basis is a toolbar width, which in this column would be its height. */
+  .alchemy-known > :global(.alchemy-known-search) {
+    flex: none;
     min-width: 0;
-    background: transparent;
-    border: 0;
-    color: var(--fab-text);
-    font-size: 12.5px;
-  }
-
-  /* The wrapper draws the field, so focus lights the wrapper and the input draws no ring. */
-  .alchemy-known-search:focus-within {
-    border-color: var(--fab-accent);
-  }
-
-  .alchemy-known-search input:focus-visible {
-    outline: none;
+    margin-bottom: 12px;
   }
 
   .alchemy-known-list {

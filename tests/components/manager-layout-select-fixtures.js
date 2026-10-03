@@ -255,15 +255,16 @@ export const CONVERTED_PAGER_SITES = Object.freeze([
     floored: false,
     declaredArrow: 26,
   }),
+  // The recipe browser's re-theme is deleted (issue 1518), so its pager paints itself.
   Object.freeze({
     probe: 'recipes',
-    padding: '8px',
+    padding: '12px',
     area: 'fabricate-app',
     wrapper: 'crafting-browser-pagination',
     component: 'src/ui/svelte/apps/crafting/RecipeBrowser.svelte',
-    fill: 'surface',
-    floored: false,
-    declaredArrow: 26,
+    fill: 'bg-2',
+    floored: true,
+    declaredArrow: 28,
   }),
   Object.freeze({
     probe: 'environments',
