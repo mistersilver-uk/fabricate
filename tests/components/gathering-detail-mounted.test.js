@@ -170,7 +170,7 @@ function assertDescribedBlocker(button, { label, reason }) {
   const name = button.getAttribute('aria-label') ?? button.textContent;
   assert.ok(name.includes(label), `its accessible name keeps its visible label ${label}`);
   const ids = (button.getAttribute('aria-describedby') || '').split(/\s+/u).filter(Boolean);
-  const described = ids.map((id) => globalThis.document.getElementById(id)).filter(Boolean);
+  const described = ids.map((id) => globalThis.document.querySelector(`[id="${id}"]`)).filter(Boolean);
   assert.ok(described.length > 0, 'it is described by an element in the document');
   assert.ok(described.some((el) => el.textContent.includes(reason)), `its description names ${reason}`);
   for (const el of described) {

@@ -715,7 +715,9 @@ describe('GatheringView mounted behavior', () => {
       await tick();
       await tick();
       flushSync();
-      const headerArt = target.querySelector('[data-gathering-detail-state="selected"] [data-player-detail-header] img');
+      const headerArt = target.querySelector(
+        ':scope [data-gathering-detail-state="selected"] [data-player-detail-header] img'
+      );
       assert.equal(headerArt?.getAttribute('src'), 'scenes/cave-thumb.webp', 'the identity header draws the card’s image');
     } finally {
       delete globalThis.fromUuid;

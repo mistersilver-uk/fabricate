@@ -273,12 +273,19 @@ describe('RequirementChooser mounted behavior', () => {
       alternativesLabel: 'Hardwood alternatives',
     });
     const buttons = alternativesIn(target).map((entry) => entry.querySelector('button'));
-    const well = target.querySelector('[data-requirement-panel] .fab-well');
+    const well = target.querySelector(':scope [data-requirement-panel] .fab-well');
     assert.equal(well.getAttribute('role'), 'group');
     assert.equal(well.getAttribute('aria-label'), 'Hardwood alternatives');
-    assert.equal(well.querySelector('.fab-well-label').textContent.trim(), 'Hardwood alternatives', 'named visibly');
+    assert.equal(
+      well.querySelector('.fab-well-label').textContent.trim(),
+      'Hardwood alternatives',
+      'named visibly'
+    );
     const row = well.querySelector('.fab-requirement-alternatives');
-    assert.ok(Boolean(row) && !row.hasAttribute('role'), 'the tile row sits in the well and is no second group');
+    assert.ok(
+      Boolean(row) && !row.hasAttribute('role'),
+      'the tile row sits in the well and is no second group'
+    );
     assert.deepEqual(
       buttons.map((button) => button.getAttribute('aria-pressed')),
       ['true', 'false']
@@ -322,7 +329,10 @@ describe('RequirementChooser mounted behavior', () => {
     assert.ok(!target.querySelector('[data-requirement-shortfall="oak"]'), 'a met one states none');
     const reading = target.querySelector('[data-requirement-shortfall="bog"]');
     assert.ok(reading.id.length > 0);
-    assert.ok(Boolean(reading.closest('.fab-well')), 'the reading sits beneath its tiles, in their well');
+    assert.ok(
+      Boolean(reading.closest('.fab-well')),
+      'the reading sits beneath its tiles, in their well'
+    );
     assert.equal(
       button.getAttribute('aria-describedby'),
       reading.id,
