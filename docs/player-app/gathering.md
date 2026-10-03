@@ -71,15 +71,19 @@ GMs can see real blind task names through GM-facing surfaces.
 ## Detail Column
 
 Selecting an environment fills the center **detail** column.
-It opens with an environment header (the name, a short description, and info pips for any present biome and danger level) plus a mode hint describing how that environment is gathered.
+It opens with an environment header (the environment's picture, its name, and info pips for any present biome and danger level), then a short description and a mode hint describing how that environment is gathered.
 
 How the rest of the column reads depends on the selection mode:
 
 - **Targeted environments** show a list of task rows.
-  Each row carries the task name, description, a **success-chance bar**, and an **Attempt** button.
-  A task that is currently blocked stays visible but greyed, with its blocking reasons (such as required time of day, required weather, or missing tools) shown inline and its Attempt button disabled.
-- **Blind environments** show a single **Attempt gathering** button that resolves one hidden task at random.
-  When the system reveals discovered tasks, a **Discovered Tasks** section lists the tasks this character has already revealed as their own visible rows (each with its own success-chance bar and Attempt button), with a count of how many have been discovered out of the full pool.
+  Each row carries the task name, description, and a **success-chance bar**.
+  Selecting a row opens the task in the right-hand column, whose header carries the task's **Attempt** button.
+  A task that is currently blocked stays visible but greyed, with its blocking reasons (such as required time of day, required weather, or missing tools) shown inline.
+  Its Attempt button stays in the header but is disabled, and a **Can't attempt** note directly beneath the header says why.
+- **Blind environments** carry a single **Attempt gathering** button in the environment header that resolves one hidden task at random.
+  When it is unavailable it stays in place, disabled, with a general note beneath the header, because the reason may come from a task you cannot see.
+  When the system reveals discovered tasks, a **Discovered Tasks** section lists the tasks this character has already revealed as their own visible rows, each with its own success-chance bar, with a count of how many have been discovered out of the full pool.
+  Selecting a discovered task opens it in the right-hand column with that task's own Attempt button.
   Before anything has been revealed the section reads as nothing discovered yet.
 
 The success-chance bar shows the chance that at least one item drops.

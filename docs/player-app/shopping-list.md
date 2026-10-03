@@ -25,6 +25,7 @@ It sits in the right-hand column of the Crafting tab and is the default view the
 The list shows three summary cards at the top, for the recipes you have queued, the components you are still missing, and the tools you cannot yet use.
 Below them it lists the components and essences you still need to acquire, and the tools you need to acquire or repair.
 Components you already own in full drop off the list, so only shortfalls remain.
+Each shortfall ends in a solid chip stating how many you own against how many you need, so the count stays readable beside any item picture.
 
 {% include screenshot.html case="player-crafting-essence-shopping" caption="A queued recipe and the two shortfalls it left behind, an ingot and an essence amount." %}
 
