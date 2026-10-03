@@ -203,7 +203,7 @@ export const TYPEAHEAD_RUNE_MODULES = Object.freeze([
 export const SEARCHABLE_POPOVER_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/components/EmptyState.svelte',
-  'src/ui/svelte/components/ManagerButton.svelte',
+  'src/ui/svelte/components/Button.svelte',
   'src/ui/svelte/components/SearchablePopover.svelte',
   'src/ui/svelte/components/SearchablePopoverPanel.svelte'
 ]);
@@ -215,7 +215,7 @@ export const SELECT_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Field.svelte',
   'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/components/EmptyState.svelte',
-  'src/ui/svelte/components/ManagerButton.svelte',
+  'src/ui/svelte/components/Button.svelte',
   'src/ui/svelte/components/SearchablePopover.svelte',
   'src/ui/svelte/components/SearchablePopoverPanel.svelte'
 ]);
@@ -404,7 +404,7 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Pagination.svelte',
   // Select's own compiled closure (issue 1504), spread rather than copied: `Pagination`'s page-size
   // control is a `<Select>` now, so this PLAYER-app list reaches `Select`, `Field`,
-  // `SearchablePopover`, the `ManagerButton` `SearchablePopover` renders its trigger through (issue
+  // `SearchablePopover`, the `Button` `SearchablePopover` renders its trigger through (issue
   // 1371), and the `Chip`/`EmptyState` pair the popover's list renders — the same route
   // `IconButton` below arrives by.
   ...SELECT_COMPILED_MODULES,

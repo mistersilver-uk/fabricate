@@ -4,8 +4,8 @@ import assert from 'node:assert/strict';
 
 import { definePrimitiveAdoptionContract } from '../helpers/primitiveAdoptionContract.js';
 
-const TOOLBAR_PATH = 'src/ui/svelte/components/ManagerToolbar.svelte';
-const FIELD_PATH = 'src/ui/svelte/components/ManagerSearchField.svelte';
+const TOOLBAR_PATH = 'src/ui/svelte/components/FilterBar.svelte';
+const FIELD_PATH = 'src/ui/svelte/components/SearchField.svelte';
 
 /** The bar has NO allowlist, and the empty array is the claim rather than an omission. */
 const RAW_TOOLBAR_ALLOWLIST = Object.freeze([]);
@@ -65,7 +65,7 @@ function detectorSource({ contract, prefixed, tag }) {
 
 const toolbar = definePrimitiveAdoptionContract({
   label: 'manager-toolbar',
-  tag: 'ManagerToolbar',
+  tag: 'FilterBar',
   primitive: TOOLBAR_PATH,
   contractClass: 'manager-toolbar',
   allowlist: RAW_TOOLBAR_ALLOWLIST,
@@ -76,7 +76,7 @@ const toolbar = definePrimitiveAdoptionContract({
     source: detectorSource({
       contract: 'manager-toolbar',
       prefixed: 'manager-toolbar-pills',
-      tag: 'ManagerToolbar',
+      tag: 'FilterBar',
     }),
     expected: 2,
     lowered: ['<section class="manager-toolbar">', '<section class="manager-bar">'],
@@ -84,7 +84,7 @@ const toolbar = definePrimitiveAdoptionContract({
   },
   rawRemedy:
     'these components hand-roll the `.manager-toolbar` bar that ' +
-    '`src/ui/svelte/components/ManagerToolbar.svelte` owns. Render `<ManagerToolbar ' +
+    '`src/ui/svelte/components/FilterBar.svelte` owns. Render `<FilterBar ' +
     'ariaLabel={…}>` instead — a per-site modifier travels as a pass-through on the `class` ' +
     'prop, the row `<div>` stays at the call site because `BulkSelectionToolbar` renders its ' +
     'own, and a `data-*` hook rides the rest spread',
@@ -98,7 +98,7 @@ const toolbar = definePrimitiveAdoptionContract({
 
 const field = definePrimitiveAdoptionContract({
   label: 'manager-search',
-  tag: 'ManagerSearchField',
+  tag: 'SearchField',
   primitive: FIELD_PATH,
   contractClass: 'manager-search',
   allowlist: RAW_SEARCH_ALLOWLIST,
@@ -109,7 +109,7 @@ const field = definePrimitiveAdoptionContract({
     source: detectorSource({
       contract: 'manager-search',
       prefixed: 'manager-search-row',
-      tag: 'ManagerSearchField',
+      tag: 'SearchField',
     }),
     expected: 2,
     lowered: ['<section class="manager-search">', '<section class="manager-box">'],
@@ -117,7 +117,7 @@ const field = definePrimitiveAdoptionContract({
   },
   rawRemedy:
     'these components hand-roll the `.manager-search` pill that ' +
-    '`src/ui/svelte/components/ManagerSearchField.svelte` owns. Render `<ManagerSearchField ' +
+    '`src/ui/svelte/components/SearchField.svelte` owns. Render `<SearchField ' +
     'ariaLabel={…} placeholder={…}>` instead — `density="compact"` emits `is-compact`, a bespoke class ' +
     'travels on `class`, a label hook rides the rest spread and an INPUT hook goes in ' +
     '`inputProps`. If the site is a combobox with its own suggestion list, it belongs to ' +
@@ -130,8 +130,8 @@ const field = definePrimitiveAdoptionContract({
 
 /** Every call site of both primitives, tagged with the primitive it belongs to. */
 const NAMED = Object.freeze([
-  Object.freeze({ tag: 'ManagerToolbar', sites: toolbar.callSites }),
-  Object.freeze({ tag: 'ManagerSearchField', sites: field.callSites }),
+  Object.freeze({ tag: 'FilterBar', sites: toolbar.callSites }),
+  Object.freeze({ tag: 'SearchField', sites: field.callSites }),
 ]);
 
 test('every filter bar and every search field passes an accessible name', () => {
@@ -156,9 +156,9 @@ test('every filter bar and every search field passes an accessible name', () => 
   assert.deepEqual(
     offenders.sort(),
     [],
-    'a `<ManagerToolbar>` without `ariaLabel` renders a `<section>` with no accessible name, ' +
+    'a `<FilterBar>` without `ariaLabel` renders a `<section>` with no accessible name, ' +
       'which is not a `region` landmark at all — it disappears from the landmark list while ' +
-      'looking identical. A `<ManagerSearchField>` without one renders a `<label>` that wraps ' +
+      'looking identical. A `<SearchField>` without one renders a `<label>` that wraps ' +
       'an icon and an input and no text, so the control is announced as "search" and nothing ' +
       'else. Neither is visible in a frame and neither is a compiler error, which is why it is ' +
       `a source clause:\n  ${offenders.join('\n  ')}`

@@ -200,7 +200,7 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Field.svelte',
   // The shared button primitive. Every list in the studio is extended by the prototype's
   // full-width dashed control, which is this primitive's `dashed` role (issue 1096).
-  'src/ui/svelte/components/ManagerButton.svelte',
+  'src/ui/svelte/components/Button.svelte',
   // The shared on/off switch (issue 1040).
   'src/ui/svelte/components/StatusToggle.svelte',
   // The shared card shell (issue 1427).

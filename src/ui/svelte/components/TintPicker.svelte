@@ -1,6 +1,7 @@
 <!--
-  The manager's colour palette, rendered as a POPOVER by three pickers and INLINE by two editors. It
-  takes already-localized strings, never keys.
+  The manager's colour palette and the library's `<TintPicker>` specimen, rendered as a popover by
+  three pickers and inline by two editors; `TintPickerButton.svelte` is its single-caller trigger.
+  It takes already-localized strings, never keys.
 
   Props:
   | prop | values | default | contract |

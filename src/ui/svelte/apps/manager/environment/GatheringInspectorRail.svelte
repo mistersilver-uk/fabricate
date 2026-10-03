@@ -14,7 +14,7 @@
   import GatheringEventInspector from './GatheringEventInspector.svelte';
   import GatheringRulesInspector from './GatheringRulesInspector.svelte';
   import GatheringTaskInspector from './GatheringTaskInspector.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import TravelInspector from '../world/TravelInspector.svelte';
   import { localize } from '../../../util/foundryBridge.js';
 
@@ -379,7 +379,7 @@
         'Environment resources'
       )}
     >
-      <ManagerButton
+      <Button
         tag="a"
         href="https://mistersilver-uk.github.io/fabricate/gathering/environments"
         target="_blank"
@@ -392,8 +392,8 @@
             'Gathering docs'
           )}</span
         >
-      </ManagerButton>
-      <ManagerButton
+      </Button>
+      <Button
         tag="a"
         href="https://mistersilver-uk.github.io/fabricate/help/quickstart"
         target="_blank"
@@ -403,7 +403,7 @@
         <span
           >{text('FABRICATE.Admin.Manager.Environment.EmptySetup.Quickstart', 'Quickstart')}</span
         >
-      </ManagerButton>
+      </Button>
     </div>
   </section>
 {:else}

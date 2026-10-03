@@ -58,7 +58,7 @@ Other Chip presentations MUST retain their default geometry.
 Chip's `density="list"` MUST explicitly use the rendered library specimen's 1.6 line-height with 9px/600 type, 1px/space-2 padding and stadium radius: 18.4px bordered or 16.4px bare for a single text line.
 The independently specified icon-only list square MUST remain 15px; the default density's line-height MUST remain 1.
 IconButton's opt-in numeric `size={24}` and `size={26}` MUST each own a square border-box of that side, both minimum dimensions, zero padding and a fixed flex-basis of that side; other callers retain their existing default or pager geometry.
-ManagerModal's close MUST be the 26px square, unfilled at radius 7 in `--fab-text-muted` ink with an 11px glyph, under a 60px header, by maintainer ruling (2026-09-28).
+The shared `Modal`'s close MUST be the 26px square, unfilled at radius 7 in `--fab-text-muted` ink with an 11px glyph, under a 60px header, by maintainer ruling (2026-09-28).
 EmptyState's opt-in `fill` MUST stretch its border-box to the bounded host's full width and height with a zero minimum height while preserving its chosen variant's appearance and content.
 The host owns that allocation and MUST NOT derive it from the current page's record count.
 
@@ -181,7 +181,7 @@ A primitive that renders THROUGH another primitive's root element writes its own
 The two families must then be measurably DISJOINT, because the gate tells a namespace root from an application root BY NAME and by exact membership, so each root is an APPLICATION root to the other's entry and a rule naming both would be gated on both.
 A change that creates such a pair publishes the measured count of selectors naming both classes, and asserts it as a standing invariant rather than leaving it as a property that happens to hold.
 
-Every shared picker satisfies this requirement: `SearchablePopover` emits `fabricate-picker` and `fabricate-picker-popover`, `IconPicker` emits `fabricate-icon-picker` and `fabricate-icon-picker-popover`, `EssenceSourceSelector` emits `fabricate-source-picker` and `fabricate-source-picker-popover`, `Select` emits the `fabricate-select` family, and `ManagerColorPicker` and `ManagerColorPopover` emit `fabricate-color-picker` and `fabricate-color-picker-popover` between them.
+Every shared picker satisfies this requirement: `SearchablePopover` emits `fabricate-picker` and `fabricate-picker-popover`, `IconPicker` emits `fabricate-icon-picker` and `fabricate-icon-picker-popover`, `EssenceSourceSelector` emits `fabricate-source-picker` and `fabricate-source-picker-popover`, `Select` emits the `fabricate-select` family, and `TintPickerButton` and `TintPicker` emit `fabricate-color-picker` and `fabricate-color-picker-popover` between them.
 
 `Select` is the family that made three corollaries of this requirement explicit rather than incidental.
 
@@ -211,16 +211,16 @@ The CASCADE forces a corollary.
 A caller rule that must out-rank the primitive's own is deepened at the CALLER's own namespace roots.
 It is never deepened by putting the primitive's root in front of the caller's class, which is an application root from the caller's point of view and is refused.
 A PRIMITIVE-owned rule may DOUBLE the primitive's own root for the same purpose, because that root is its own.
-The three most-imported controls satisfy it too: `ManagerButton` emits `fabricate-button`, `IconButton` emits `fabricate-icon-button`, and `Pagination` emits `fabricate-pagination`.
+The three most-imported controls satisfy it too: `Button` emits `fabricate-button`, `IconButton` emits `fabricate-icon-button`, and `Pagination` emits `fabricate-pagination`.
 None of the three portals anything, so each needs one root, and each writes it on the element that already carries the family class — for the two buttons as the leading literal of the `classes` array the component composes, for the pager inline on its root `<section>`.
-Six more satisfy it as of issue 1508: `Field` emits `fabricate-field`, `ManagerSearchField` emits `fabricate-search`, `ManagerToolbar` emits `fabricate-filter-bar`, `InspectorCard` emits `fabricate-card`, `StatusToggle` emits `fabricate-toggle` and `ChanceSlider` emits `fabricate-slider`.
+Six more satisfy it as of issue 1508: `Field` emits `fabricate-field`, `SearchField` emits `fabricate-search`, `FilterBar` emits `fabricate-filter-bar`, `InspectorCard` emits `fabricate-card`, `StatusToggle` emits `fabricate-toggle` and `ChanceSlider` emits `fabricate-slider`.
 None of the six portals anything either, so each needs exactly one root.
 All six are pure CAPABILITIES today in the sense stated below, and that is measured rather than assumed: no importer of any of the six lies outside `src/ui/svelte/apps/manager/` and `src/ui/svelte/components/`, and the one `components/` chain that reaches a player application does not render one.
 That is a measured FACT about where those importers happen to live, and it MUST NOT be read as a prohibition on an application root importing from `apps/manager/`.
 The tree still contradicts such a prohibition: `apps/crafting/detail/ProgressiveStageList.svelte` and `apps/inventory/bulk/InventoryBulkComplicationGroup.svelte` both import `apps/manager/ComplicationSummaryRow.svelte` and are reachable from the player application's root.
 The absence of a prohibition is a fact about scope, not about the primitive's directory.
 So an adoption whose primitive still lives in `apps/manager/` is deferred on SCOPE — the move into `components/` with a shared scope is the shape and the mechanism of the change that owns it, and it carries its own path-repair surface — never on reachability.
-After issue 2046 exactly one member row scoped `shared` lives under `apps/manager/`: `ComplicationSummaryRow.svelte`; `ManagerModal.svelte`, which the player crafting application's roll prompt renders, moved into `components/` with that change.
+After issue 2046 exactly one member row scoped `shared` lives under `apps/manager/`: `ComplicationSummaryRow.svelte`; `Modal.svelte`, which the player crafting application's roll prompt renders, moved into `components/` with that change.
 Issue 2005 adds a second outside `components/`, under `apps/crafting/detail/`: `CheckEvidenceRows.svelte`, the executed check's evidence rows, which the crafting result box and the salvage summary both render, each row through `JournalFactRow`'s keyed `.k-fact` form.
 `JournalFactRow`'s keyed form takes a per-site `prose` prop for a value that is a sentence rather than a figure (issue 2134): the value sets in the inherited body face at 12px with tabular numerals and wraps by word, and every other keyed row keeps the atom's 13px mono, so the prop extends the one row rather than forking it.
 `CheckEvidenceRows` passes it for a counting check's `Count`, `Pool` and `Result` rows.
@@ -235,7 +235,7 @@ A family reached only through another primitive is reached, so the `Pagination` 
 The sentence it qualifies still stands as written, because it is scoped to the PLAYER application, whose `<Select>`s are all unlabelled inline ones: the pager's, and the six that issue 1511 converted, every one of which passes `ariaLabelledBy` at a caption its caller already draws rather than a `label`, so `labelled` computes false at all seven and the `<Field as="label">` form still never renders there.
 What the interactables config window changes is the corpus that statement is true of, not the statement.
 The fifth phase discharged three more, and their importer paths are recorded because the claim is about where an importer lives rather than about how many there are.
-`src/ui/svelte/apps/InteractableBrowserRoot.svelte` imports `ManagerSearchField` and `ManagerToolbar` from `src/ui/svelte/components/` and renders the browser's search pill inside its filter bar; `src/ui/svelte/apps/interactables/InteractablesManagerRoot.svelte` imports `InspectorCard` from the same directory and renders the promote panel as one.
+`src/ui/svelte/apps/InteractableBrowserRoot.svelte` imports `SearchField` and `FilterBar` from `src/ui/svelte/components/` and renders the browser's search pill inside its filter bar; `src/ui/svelte/apps/interactables/InteractablesManagerRoot.svelte` imports `InspectorCard` from the same directory and renders the promote panel as one.
 Both paths lie outside `apps/manager/` and `components/`, which is the whole of what the claim asked for.
 `InspectorCard` moved to the second file rather than to the browser because the browser has no card-shaped surface: its rows are horizontal `<li>` children of a `<ul>`, and the primitive renders a `<section>` with no host prop, so converting them would have produced invalid list markup and lost the list semantics a screen reader announces.
 One remains a claim.
@@ -263,7 +263,7 @@ The picker is therefore held to the geometry as well as the markup — its panel
 
 The test for "exercised" is TRANSITIVE, and stating it is what separates the three re-rooted controls from one another.
 A primitive rendered by another primitive that a second application renders is exercised in that application, because the cascade reaches it there by the same route and knows nothing about which component wrote the markup.
-`ManagerButton` is the only pure capability of the three: 63 of its 64 importers are under `src/ui/svelte/apps/manager/`, and the 64th is `components/SearchablePopover.svelte`, which renders it only for a caller that passes `triggerButton` — no caller outside the manager does, so nothing outside the manager renders it today and its re-root is a claim the tree does not yet exercise.
+`Button` is the only pure capability of the three: 63 of its 64 importers are under `src/ui/svelte/apps/manager/`, and the 64th is `components/SearchablePopover.svelte`, which renders it only for a caller that passes `triggerButton` — no caller outside the manager does, so nothing outside the manager renders it today and its re-root is a claim the tree does not yet exercise.
 `Pagination` is exercised DIRECTLY — six of its 25 importers are player-app components — and `IconButton` is exercised TRANSITIVELY, because `Pagination` renders two of them as its page arrows and those six player components render that pager.
 A capability that nothing exercises is still worth having, and is not debt: it is the state a primitive is in between being made portable and being carried somewhere, and the requirement is what keeps the two from being confused.
 
@@ -289,7 +289,7 @@ A recorded decision to LOCATE a component outside the shared directory rests on 
 The component then moves, rather than keeping a location whose stated reason no longer holds, and the docblock that recorded the premise is restated rather than left to contradict the tree.
 `ToggleCard` recorded exactly that premise — that it wears classes styled only under `.fabricate-manager` and would render as an unstyled div anywhere else — and the change that rooted those classes at `fabricate-toggle-card` is the change that moved it.
 A component may also be MOVED into the shared directory WITHOUT gaining a root of its own, when the family it writes is ANOTHER primitive's already-rooted one.
-`ArmedDangerButton` writes `fabricate-button manager-button is-danger` and nothing else, so the `ManagerButton` entry already roots every rule that paints it.
+`ArmedDangerButton` writes `fabricate-button manager-button is-danger` and nothing else, so the `Button` entry already roots every rule that paints it.
 Giving such a component a root would create a class owning NO rule, which the gate's family and owned floors correctly refuse, and which is an application root BY NAME to the entry that does own them.
 The ASYMMETRY belongs beside that corollary, because the two are related without being converse: one is about a component's LOCATION, the other about a family's OWNERSHIP AT SCALE despite partial primitive authorship.
 A class family WRITTEN BY a shared primitive is still not the primitive's to root while hand-written callers carry the same family at scale.
@@ -307,8 +307,8 @@ WHERE that rule is ROOTED is part of the requirement rather than a formatting ch
 It is declared at the FAMILY ROOT ALONE — high enough to beat the user agent's own button font in a host that declares nothing, and deliberately too low to beat a caller's per-site rule on a class the primitive merely passes through.
 Written at the family's own compound specificity it instead TIES every such rule and wins on source order against each one declared earlier in the sheet: that is how issue 1502's first attempt silently deleted the recipe row's `manager-recipe-lock` and `manager-recipe-edit` 0.68rem and rendered both glyphs 28.7% larger.
 The FAMILY ROOT ALONE is the button families' form of a rule that generalises on RANK: a floor is written at the LOWEST specificity that reaches the control the family owns.
-Where the family root IS the control, that is the root alone, (0,1,0) — `ManagerButton`, `IconButton` and `StatusToggle`.
-Where the root is NOT the control, it is the family root PLUS the bare element the family owns, (0,1,1) — `Field`, `ManagerSearchField` and `ChanceSlider`, each of which roots a wrapper around an `input`, a `select` or a `textarea` that is the control it owns.
+Where the family root IS the control, that is the root alone, (0,1,0) — `Button`, `IconButton` and `StatusToggle`.
+Where the root is NOT the control, it is the family root PLUS the bare element the family owns, (0,1,1) — `Field`, `SearchField` and `ChanceSlider`, each of which roots a wrapper around an `input`, a `select` or a `textarea` that is the control it owns.
 Both forms sit below a caller's per-site class rule at (0,2,0), which is the property the recipe-browser regression established, so the requirement is the SPECIFICITY BOUND and not the literal selector shape.
 CONTENT follows from rank.
 A floor at (0,1,1) TIES the area's own bare-element baseline rather than losing to it, so it declares ONLY declarations that baseline also declares — `font: inherit`, and nothing else.
@@ -331,7 +331,7 @@ A change refusing a floor on this ground proves it, by watching the control take
 
 The same argument owns the FOCUS RING, and it is the reason a ring is a primitive's business rather than an area's.
 The module ring is a bare-element selector a Fabricate root declares for itself, so a re-rooted control keeps its paint and loses its ring the moment it renders in a host carrying no Fabricate root at all — a control that is styled and unfocusable-looking, which is worse than one that is neither.
-`ManagerButton` and `IconButton` therefore declare their own `:focus-visible` ring, and `Pagination` declares one for the BUTTONS it contains only.
+`Button` and `IconButton` therefore declare their own `:focus-visible` ring, and `Pagination` declares one for the BUTTONS it contains only.
 The chrome a primitive declares is the PAIR, not the repaint alone: a `:focus` rule that STRIPS the host's own focus treatment, and a `:focus-visible` rule that REPAINTS the primitive's, exactly as the module root pairs them and as CONTRIBUTING.md's rule states.
 Foundry core paints every focused button with an outline and a glow of its own, and the module reset removes that only inside a Fabricate window; a primitive that declared the repaint alone would lay its ring OVER core's treatment in any host carrying no Fabricate root, rather than replacing it.
 The module pair is (0,2,1) and a family pair is (0,2,0), so wherever a Fabricate root is an ancestor the module pair wins; because the declarations are copied from it verbatim, nothing moves, and what the family pair paints is the host that has no Fabricate root.
@@ -347,13 +347,13 @@ The STRIP half is declared on the element that can TAKE focus, which is not alwa
 A `:has()` ring on a non-focusable host pairs with a strip on the descendant control it watches: the checkbox host of `StatusToggle` paints its ring on the `label` through `:has()` and strips the host's own treatment on the transparent `input` inside it, so one pair spans two elements while strip-above-repaint still holds.
 
 A re-rooted family that owns NO control of its own declares NEITHER a floor nor a pair, and stating that is what keeps the two rules above from being read as obligations on every family.
-`ManagerToolbar` and `InspectorCard` render `section`s whose controls are all the caller's, so chrome declared for them would displace an area's chrome for a control the primitive does not own — which the sentence above already forbids for the pager's `select`.
+`FilterBar` and `InspectorCard` render `section`s whose controls are all the caller's, so chrome declared for them would displace an area's chrome for a control the primitive does not own — which the sentence above already forbids for the pager's `select`.
 No rule rooted at the family reaches a caller's control either: a caller that lifts its own select to the 38px rung does so in a rule keyed on its own bar, beside the scoped catalogue's lead row.
 
 The PAIR half of that sentence is a RULE rather than three case-by-case calls, and stating it that way is what stops a later change reading a refusal as an oversight.
 A family declares a focus pair ONLY for a control it renders ITSELF.
 The reason is not that there would be nothing to paint: a pair would be actively WRONG, because `<root> <element>:focus-visible` is (0,2,1) and OUT-RANKS a composed primitive's own `<root>:focus-visible` at (0,2,0), so it REPLACES that primitive's ring on every control the composing family contains.
-`fabricate-link-field` is the measured instance — a pair there would have displaced `IconButton`'s ring on both of the link field's action buttons, and `fabricate-validation`'s would have done the same to the `ManagerButton` its row composes.
+`fabricate-link-field` is the measured instance — a pair there would have displaced `IconButton`'s ring on both of the link field's action buttons, and `fabricate-validation`'s would have done the same to the shared `Button` its row composes.
 THE RANK ARITHMETIC IS NOT THE RULE, and a change refusing a pair must not generalise it.
 `fabricate-toggle-card` composes a `StatusToggle` whose repaint is written at THREE classes, (0,3,0), so the hypothetical pair there would LOSE rather than displace — and the refusal still stands, on OWNERSHIP alone, because the one control that card contains belongs to another primitive either way.
 A rank argument that happens to hold today would silently become false the day the composed primitive wrote its pair at two classes rather than three.
@@ -689,7 +689,7 @@ Focus MUST be expressed as `:focus-visible` and never `:focus`, so a pointer act
 Its one exemption is SUPPRESSING Foundry core's own focus ring, which the global sheet does for ONE root — `.fabricate` itself, the shared module root every Fabricate window emits — and it is recognised by the SHAPE of that block — one root class crossed with a published list of element targets — rather than by naming lines, so appending a seventh selector to an exempt block breaks the shape instead of inheriting the exemption.
 It named five roots until the three interactables windows and the roll-prompt dialog had their copies deleted, and the rule that reduction establishes is general: a per-area copy of a suppression the module root already writes reaches the same elements at the same rank, so which one paints is decided by source order rather than by anything a reader of either block can see, and the copy is deleted by the change that proves the module rule reaches it.
 The licence extends to COPIES and not to VARIANTS.
-Where an area rule declares a DIFFERENT treatment it is not a copy and it survives while it has a carrier: the roll-prompt dialog kept a `:focus-visible` ring of its own on `select`, painting an inset `box-shadow` where the module ring paints an outset `outline`, because an outset ring on a `<select>` flush to that dialog's overflow-clipped edge is clipped and reads as a one-sided flash; it went with the dialog when issue 2021 moved the prompt into `ManagerModal`.
+Where an area rule declares a DIFFERENT treatment it is not a copy and it survives while it has a carrier: the roll-prompt dialog kept a `:focus-visible` ring of its own on `select`, painting an inset `box-shadow` where the module ring paints an outset `outline`, because an outset ring on a `<select>` flush to that dialog's overflow-clipped edge is clipped and reads as a one-sided flash; it went with the dialog when issue 2021 moved the prompt into the shared `Modal`.
 So the dialog left the reset exemption and stayed in the ring population in the same commit, and the ratchet cannot tell the two cases apart on its own — its population is keyed on ELEMENTS, which is the part a variant shares with the rule it varies from, so membership is never a licence to delete.
 A TEXT FIELD — a text-like `input` or a `textarea` — is the module ring's one stated variant: its ring is a 1px accent `outline` at a NEGATIVE offset, drawn on the field's own border, because the outset ring on a field flush with a scrolling ancestor loses its left and right arms to that ancestor's clip (issue 2157).
 The variant adds no glow and no second line: a field whose wrapper draws the box suppresses the input's own ring and lights the wrapper's border while the field inside holds focus, so an inset shadow on the input would paint a box inside the box.
@@ -1730,9 +1730,9 @@ The modal portals into the application root so it stacks above the window rather
 It dismisses on an outside click; a step that would lose work confirms first.
 
 The interactive roll prompt also renders in this chrome, and it is a decision rather than a flow: one header, a scrolling body and a footer rail of equal actions, drawn as the library's banded Modal.
-ManagerModal draws ONE frame, the library's banded Modal, with no unbanded option: the import report, the import folder mapping and the add-from-catalogue picker draw it too, by maintainer ruling (2026-09-28), so every Fabricate dialog shares one header, body and footer treatment.
+The shared `Modal` draws ONE frame, the library's banded Modal specimen, with no unbanded option: the import report, the import folder mapping and the add-from-catalogue picker draw it too, by maintainer ruling (2026-09-28), so every Fabricate dialog shares one header, body and footer treatment.
 It mounts over the Fabricate window the player started the roll from — the one the starting control recorded, whether it was clicked or activated from the keyboard, with focus and then, when focus is nowhere, the pointer as fallbacks — and otherwise over a themed standalone layer on the page, which stays frontmost; it answers as a dismissal when the window hosting it closes.
-Its behavioural differences from the flow are additive `ManagerModal` props whose defaults leave every other caller unchanged: a stray outside click never dismisses it, focus enters it, Tab stays inside it, it owns every key while open, Escape and the close control dismiss it, and focus returns to the opener, or to the window hosting it while the opener is still disabled.
+Its behavioural differences from the flow are additive `Modal` props whose defaults leave every other caller unchanged: a stray outside click never dismisses it, focus enters it, Tab stays inside it, it owns every key while open, Escape and the close control dismiss it, and focus returns to the opener, or to the window hosting it while the opener is still disabled.
 
 #### Scenario: An import needs two steps
 
@@ -1891,7 +1891,7 @@ Widening the composition with a background prop for one such caller is not the a
 
 A nested container inside a card MUST be drawn by `<Well>` (`src/ui/svelte/components/Well.svelte`, issue 2008), the level below `<Card>` that the library specifies, and never hand-rolled at a call site.
 Its geometry is fixed — a 1px `--fab-border` frame, radius 9 and `--fab-space-3` padding on `--fab-bg-1` — and it takes no radius, padding or fill prop, because a well a caller could re-shape would be the drift the pair exists to end.
-On a modal body (`ManagerModal`), which is itself `--fab-bg-1`, the well takes the next background level, `--fab-bg-2`, by a rule `Well.svelte` scopes to the modal, so its fill and hairline stay distinct from the body.
+On a modal body (the shared `Modal`), which is itself `--fab-bg-1`, the well takes the next background level, `--fab-bg-2`, by a rule `Well.svelte` scopes to the modal, so its fill and hairline stay distinct from the body.
 An optional `label` draws a kicker at its head and names the well as a group; it renders a plain element, never a section, and its rest spread lands last so a caller's role, name and hooks win.
 The Checks Studio's titled option groups and the roll prompt's additional-dice control draw their frame through it.
 

@@ -3,7 +3,7 @@
 <!-- The shell renders it, because no page can reach `.manager-header`; Save is `is-primary` and -->
 <!-- is disabled with nothing to flush. `danger` is an OPTIONAL snippet between the two verbs. -->
 <script>
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
 
   let {
     onBack = () => {},
@@ -23,12 +23,12 @@
   const saveHook = $derived({ [saveAttribute]: '' });
 </script>
 
-<ManagerButton {...backHook} onclick={() => onBack()}>
+<Button {...backHook} onclick={() => onBack()}>
   <i class="fas fa-arrow-left" aria-hidden="true"></i>
   <span>{backLabel}</span>
-</ManagerButton>
+</Button>
 {#if danger}{@render danger()}{/if}
-<ManagerButton
+<Button
   role="primary"
   {...saveHook}
   disabled={saveDisabled || saving === true}
@@ -36,4 +36,4 @@
 >
   <i class="fas fa-floppy-disk" aria-hidden="true"></i>
   <span>{saveLabel}</span>
-</ManagerButton>
+</Button>

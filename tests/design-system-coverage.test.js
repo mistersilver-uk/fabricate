@@ -438,19 +438,19 @@ const MANAGER_DIRECTORY = 'src/ui/svelte/apps/manager/';
  * 1502).
  */
 const RE_ROOTED_ROWS = [
+  'src/ui/svelte/components/Button.svelte',
   'src/ui/svelte/components/ChanceSlider.svelte',
   'src/ui/svelte/components/EditorTabs.svelte',
   'src/ui/svelte/components/EditorValidationSurface.svelte',
   'src/ui/svelte/components/Field.svelte',
+  'src/ui/svelte/components/FilterBar.svelte',
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/InspectorCard.svelte',
   'src/ui/svelte/components/ItemDropZone.svelte',
-  'src/ui/svelte/components/ManagerButton.svelte',
-  'src/ui/svelte/components/ManagerSearchField.svelte',
-  'src/ui/svelte/components/ManagerToolbar.svelte',
   'src/ui/svelte/components/ModifierPillSelect.svelte',
   'src/ui/svelte/components/Pagination.svelte',
   'src/ui/svelte/components/RadioCardGroup.svelte',
+  'src/ui/svelte/components/SearchField.svelte',
   'src/ui/svelte/components/SortableList.svelte',
   'src/ui/svelte/components/StatusToggle.svelte',
   'src/ui/svelte/components/ToggleCard.svelte',
@@ -657,9 +657,9 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/components/EssenceSourceSelector.svelte',
   'src/ui/svelte/components/FillBar.svelte',
   'src/ui/svelte/components/IconPicker.svelte',
-  'src/ui/svelte/components/ManagerColorPicker.svelte',
-  'src/ui/svelte/components/ManagerSearchField.svelte',
   'src/ui/svelte/components/ModifierPillSelect.svelte',
+  'src/ui/svelte/components/SearchField.svelte',
+  'src/ui/svelte/components/TintPickerButton.svelte',
   'src/ui/svelte/components/ToggleCard.svelte',
 ];
 

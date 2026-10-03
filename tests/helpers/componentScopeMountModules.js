@@ -72,7 +72,7 @@ export const SEARCHABLE_POPOVER_RAW_MODULES = Object.freeze([
 export const SCOPED_SHARED_COMPILED_MODULES = Object.freeze([
   // Select's own compiled closure (issue 1504), spread rather than copied: `Pagination` draws its
   // page-size list through `Select` now, so every tree that renders a pager also renders `Field`,
-  // `SearchablePopover`, the `ManagerButton` it renders its trigger through, and the `Chip`/
+  // `SearchablePopover`, the `Button` it renders its trigger through, and the `Chip`/
   // `EmptyState` pair the popover's list renders.
   ...SELECT_COMPILED_MODULES,
   // issue 1371 r18-colour: the tinted essence chip (M29) is rendered by the system inspector,
@@ -80,8 +80,8 @@ export const SCOPED_SHARED_COMPILED_MODULES = Object.freeze([
   // mounts one of those trees (`# cancelled`) rather than failing it.
   'src/ui/svelte/apps/manager/components/EssenceChip.svelte',
   'src/ui/svelte/components/IconButton.svelte',
-  'src/ui/svelte/components/ManagerSearchField.svelte',
-  'src/ui/svelte/components/ManagerToolbar.svelte',
+  'src/ui/svelte/components/SearchField.svelte',
+  'src/ui/svelte/components/FilterBar.svelte',
   'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/Pagination.svelte',
   // `Select`, `Field` and `SearchablePopover` are already in this list via the

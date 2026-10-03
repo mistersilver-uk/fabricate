@@ -494,7 +494,7 @@ Code that resolves a macro reference synchronously — the additional-dice readi
 Every write is read-then-`update`, so two clients writing the same path at nearly the same moment can both read the pre-write value, and one decrement is lost.
 The additional-dice spend queue (`additionalDice.js`, keyed by actor UUID plus path, or by the spend-macro UUID alone) only serializes spends issued from ONE client.
 It cannot, and does not claim to, serialize across clients, which is a documented and accepted limitation rather than a defect (issue 2008).
-- **`ManagerModal`'s `initialFocus` is a single selector LIST resolved with one `querySelector` call, which returns the first match in DOCUMENT order, not the order the selectors are listed in** (`src/ui/svelte/components/ManagerModal.svelte`).
+- **The shared `Modal`'s `initialFocus` is a single selector LIST resolved with one `querySelector` call, which returns the first match in DOCUMENT order, not the order the selectors are listed in** (`src/ui/svelte/components/Modal.svelte`).
 A selector meant as a fallback must already sit later in the markup than the control it falls back from, or it wins first regardless of where it sits in the comma-separated selector list.
 - **Core `Macro#execute` binds `speaker`, `actor`, `token` and `character` locals in addition to `scope`; Fabricate's shared `MacroExecutor` (`src/utils/MacroExecutor.js`) binds only `scope`, `context` and `args`, all identical by reference.**
 A macro ported from ordinary Foundry use that reads a bare `actor` or `token` is `undefined` on every Fabricate-run path, the Additional Dice Macro Contract (`data-models/spec.md` § Additional Dice Macro Contract) included, so such a macro must read everything from its payload argument instead.
@@ -631,7 +631,7 @@ Its impact is computed in the store and passed in as a prop rather than derived 
 
 ### Root-hosted manager dialogs keep their state between opens
 
-A dialog mounted unconditionally at `CraftingSystemManagerRoot.svelte` with `open` passed as a prop is never unmounted: `ManagerModal.svelte` gates only its chrome behind `{#if open}`, so the caller component instance, and every `$state` it declares, lives for the whole manager session.
+A dialog mounted unconditionally at `CraftingSystemManagerRoot.svelte` with `open` passed as a prop is never unmounted: `Modal.svelte` gates only its chrome behind `{#if open}`, so the caller component instance, and every `$state` it declares, lives for the whole manager session.
 Per-open state must therefore be re-seeded by an `$effect` keyed on `open` AND the dialog's subject, never on `open` alone, or a cancelled selection re-arms against whatever subject is selected next.
 `ImportFolderMappingModal.svelte` is the precedent (keyed on `open` plus the folder set), and `ComponentAddFromCatalogueDialog.svelte` follows it with `seededOpenKey` keyed on `open` plus `systemId`, after review found two rows ticked in one crafting system still ticked, with the primary enabled, when the picker reopened on another (issue 1371, Foundry review finding 1).
 A mounted suite that calls `remount()` before every case cannot see this class of defect, because the remount is the one thing the live root never does; drive the reopen through `setProps` in at least one case.

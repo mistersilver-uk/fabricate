@@ -236,7 +236,7 @@ test('manager gathering settings condition panels use a two-column responsive gr
     '.fabricate-manager .manager-condition-pill .essence-icon-picker-trigger.icon-only.manager-biome-combined-trigger i'
   );
   // Issue 1470 re-rooted the colour family off `.fabricate-manager` and onto the namespace
-  // classes `ManagerColorPicker` and `ManagerColorPopover` write, so the two shared components
+  // classes `TintPickerButton` and `TintPicker` write, so the two shared components
   // paint in whatever application they are mounted in. Same declarations, same specificity, same
   // place in the file — only the root moved, and these lookups follow it.
   const colorPickerPopoverBlock = blockFor(

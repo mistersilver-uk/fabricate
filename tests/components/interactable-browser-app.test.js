@@ -37,7 +37,7 @@ const iconButtonSource = readFileSync(
   'utf8'
 );
 const searchFieldSource = readFileSync(
-  resolve(__dirname, '../../src/ui/svelte/components/ManagerSearchField.svelte'),
+  resolve(__dirname, '../../src/ui/svelte/components/SearchField.svelte'),
   'utf8'
 );
 const selectSource = readFileSync(
@@ -368,12 +368,12 @@ describe('InteractableBrowserRoot body', () => {
   });
 
   it('surfaces a search filter and the Alt-override discoverability hint', () => {
-    // The bare `<input type="search">` is `ManagerSearchField` now (issue 1520).
+    // The bare `<input type="search">` is `SearchField` now (issue 1520).
     assert.ok(
       rootSource.includes("ariaLabel={text('FABRICATE.Canvas.Browser.SearchLabel', 'Search')}"),
       'the caller names the search control'
     );
-    // THE ELEMENT, not the string. `ManagerSearchField`'s own docblock writes `<input
+    // THE ELEMENT, not the string. `SearchField`'s own docblock writes `<input
     // type="search">` twice in prose - describing the CSS convention it replaced and one of the
     // hand-rolled twins it declines to convert - so a bare `includes` reads the documentation and
     // stays green after the markup has been changed to a text input. Proved by mutation.
@@ -386,7 +386,7 @@ describe('InteractableBrowserRoot body', () => {
 
   // THE FILTER BAR IS ONE CONTROL RUNG AND ONE CONTROL WIDTH (issue 1520 review).
   it('puts its filter controls on one rung and gives the picker trigger the field width', () => {
-    const searchTag = /<ManagerSearchField\b[\s\S]*?\/>/.exec(emittingHalfOf(rootSource));
+    const searchTag = /<SearchField\b[\s\S]*?\/>/.exec(emittingHalfOf(rootSource));
     assert.ok(searchTag, 'the filter bar still renders the shared search field');
     assert.ok(
       searchTag[0].includes('size={38}'),

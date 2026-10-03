@@ -24,7 +24,7 @@
   import { dragDrop } from '../../../actions/dragDrop.js';
   import { resolveDropData } from '../../../util/dropUtils.js';
   import IconPicker from '../../../components/IconPicker.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import IconButton from '../../../components/IconButton.svelte';
   import Select from '../../../components/Select.svelte';
 
@@ -449,11 +449,11 @@
       </div>
       {#if !currencyUnitsReadOnly}
         <div class="manager-character-modifier-card-header-actions">
-          <ManagerButton role="primary" data-add-currency-unit onclick={handleAddCurrencyUnit}>
+          <Button role="primary" data-add-currency-unit onclick={handleAddCurrencyUnit}>
             <i class="fa-solid fa-plus" aria-hidden="true"></i>
             {text('FABRICATE.Admin.Manager.CurrencyUnits.Add', 'Add currency unit')}
-          </ManagerButton>
-          <ManagerButton
+          </Button>
+          <Button
             data-seed-currency-presets
             disabled={!currencyPresetsSupported}
             data-tooltip={!currencyPresetsSupported
@@ -466,7 +466,7 @@
           >
             <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
             {text('FABRICATE.Admin.Manager.CurrencyUnits.SeedPresets', 'Seed presets')}
-          </ManagerButton>
+          </Button>
         </div>
       {/if}
     </header>
@@ -1019,19 +1019,17 @@
                   {/if}
 
                   <div class="manager-character-modifier-actions">
-                    <ManagerButton
-                      data-currency-unit-done
-                      onclick={() => (currencyExpandedUnitId = '')}
-                      >{text('FABRICATE.Admin.Manager.Done', 'Done')}</ManagerButton
+                    <Button data-currency-unit-done onclick={() => (currencyExpandedUnitId = '')}
+                      >{text('FABRICATE.Admin.Manager.Done', 'Done')}</Button
                     >
-                    <ManagerButton
+                    <Button
                       role="danger"
                       data-currency-unit-delete
                       onclick={() => handleDeleteCurrencyUnit(unit.id)}
                       >{text(
                         'FABRICATE.Admin.Manager.CurrencyUnits.Delete',
                         'Delete currency unit'
-                      )}</ManagerButton
+                      )}</Button
                     >
                   </div>
                 </div>

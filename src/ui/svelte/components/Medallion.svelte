@@ -21,7 +21,7 @@
     gradient, so a `backgroundColor` compare against it stays a recorded deviation.
   - THE TINT RECOLOURS THE GLYPH ALONE, which also raises glyph-to-ground contrast, and it is
     validated to a bare palette key before interpolation into the `style` attribute; the leading
-    `--fab-tag-` is tolerated because `ManagerColorPicker` accepts both spellings.
+    `--fab-tag-` is tolerated because `TintPickerButton` accepts both spellings.
   - THE `glyph-chip` VARIANT OWNS ONE THING, THE ABSENT BORDER, which is what a caller cannot
     otherwise express; its size and colour stay the existing props.
 -->

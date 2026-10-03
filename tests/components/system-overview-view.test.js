@@ -18,10 +18,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Chip.svelte',
     // THE manager's labelled push-button (issue 1118). Named AHEAD of the conversion that
     // puts it in this tree: `SystemOverviewView`'s deep-link control is one of the sweep's
-    // forgotten-role repairs, and the moment it becomes a `<ManagerButton>` an omission here
+    // forgotten-role repairs, and the moment it becomes a `<Button>` an omission here
     // costs a HUNG suite reported as `# cancelled`, not a failing one. Compiling a module the
     // tree does not yet render is free; discovering the omission from a cancelled count is not.
-    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/apps/manager/SystemOverviewView.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/manager/SystemOverviewView.svelte'
@@ -147,7 +147,7 @@ describe('SystemOverviewView (mounted)', () => {
       const kind = link.getAttribute('data-overview-link');
       assert.ok(
         link.classList.contains('fab-manager-button'),
-        `the ${kind} deep link renders through the ManagerButton primitive, got ${link.className}`
+        `the ${kind} deep link renders through the Button primitive, got ${link.className}`
       );
       assert.ok(
         link.classList.contains('is-ghost'),

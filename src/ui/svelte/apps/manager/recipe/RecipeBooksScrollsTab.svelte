@@ -15,7 +15,7 @@
 -->
 <script>
   import EmptyState from '../../../components/EmptyState.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { DEFAULT_RECIPE_IMAGE } from '../../../util/recipeImageIcons.js';
   import IconButton from '../../../components/IconButton.svelte';
@@ -183,7 +183,7 @@
       />
     {/if}
 
-    <ManagerButton
+    <Button
       class="manager-recipe-tab-action"
       data-recipe-open-books
       onclick={() => onOpenBooksScrolls()}
@@ -196,7 +196,7 @@
         )}</span
       >
       <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
-    </ManagerButton>
+    </Button>
   </div>
 </section>
 

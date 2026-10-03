@@ -373,11 +373,11 @@ test('the Tools browser writes ONE search field, and it is inside the search car
   const styleAt = source.indexOf('<style>');
   const markup = source.slice(0, styleAt === -1 ? source.length : styleAt);
 
-  const fields = [...markup.matchAll(/<ManagerSearchField(?![\w-])/gu)];
+  const fields = [...markup.matchAll(/<SearchField(?![\w-])/gu)];
   assert.equal(
     fields.length,
     1,
-    `ToolsBrowserView renders ${fields.length} \`<ManagerSearchField>\`, not one. Every extra ` +
+    `ToolsBrowserView renders ${fields.length} \`<SearchField>\`, not one. Every extra ` +
       'one under a `.manager-tools-library-card` takes the three rewritten Tools-browser rules, ' +
       'which the retired `[data-manager-tools-search]` form would not have reached. Re-decide ' +
       'the rewrite — do not widen it by adding a field.'
@@ -399,7 +399,7 @@ test('the Tools browser writes ONE search field, and it is inside the search car
   );
   assert.ok(
     fields[0].index > cardAt && fields[0].index < cardEnds,
-    'the one `<ManagerSearchField>` must sit INSIDE the `data-manager-tools-search` card. ' +
+    'the one `<SearchField>` must sit INSIDE the `data-manager-tools-search` card. ' +
       'Outside it the attribute form and the class form stop selecting the same field, which is ' +
       'the premise the rewrite was measured on.'
   );
@@ -412,7 +412,7 @@ test('the Tools browser renders its search and its filter through the shared bar
   const styleAt = source.indexOf('<style>');
   const markup = source.slice(0, styleAt === -1 ? source.length : styleAt);
 
-  const bars = [...markup.matchAll(/<ManagerToolbar(?![\w-])/gu)];
+  const bars = [...markup.matchAll(/<FilterBar(?![\w-])/gu)];
   assert.equal(bars.length, 1, `ToolsBrowserView renders ${bars.length} filter bars, not one`);
 
   const cardOpens = '<section class="manager-tools-library-card" data-manager-tools-search>';
@@ -429,14 +429,14 @@ test('the Tools browser renders its search and its filter through the shared bar
       'overrides in `styles/fabricate.css` reach the field through.'
   );
 
-  const barEnds = markup.indexOf('</ManagerToolbar>', bars[0].index);
+  const barEnds = markup.indexOf('</FilterBar>', bars[0].index);
   assert.ok(barEnds > bars[0].index, 'the filter bar closing tag was not found');
   const inBar = (needle) => {
     const at = markup.indexOf(needle, bars[0].index);
     return at > bars[0].index && at < barEnds;
   };
   assert.ok(
-    inBar('<ManagerSearchField'),
+    inBar('<SearchField'),
     'the search field renders inside the filter bar: a browse screen`s search and its filters ' +
       'ARE that band, and a control left outside it is a second bar the recipe does not have'
   );

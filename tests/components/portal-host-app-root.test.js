@@ -198,7 +198,7 @@ test('the portal population is the set of components that actually portal', () =
 
   for (const anchor of [
     'src/ui/svelte/components/SearchablePopover.svelte',
-    'src/ui/svelte/components/ManagerModal.svelte',
+    'src/ui/svelte/components/Modal.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
     // A SCREEN REGION rather than a shared component.
     'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte',
@@ -219,7 +219,7 @@ test('the portal population is the set of components that actually portal', () =
     files.length >= 9,
     `only ${files.length} files were detected as portaling. Nine do since issue 1500 re-keyed ` +
       'six of them onto the anchored-popover action, moved the clipping selectors into their own ' +
-      'module and left `ManagerColorPopover` a plain panel its caller positions; a lower number ' +
+      'module and left `TintPicker` a plain panel its caller positions; a lower number ' +
       'means the membership test has narrowed and this gate is guarding a subset.'
   );
 });

@@ -11,7 +11,7 @@
 -->
 <script>
   import Chip from '../../components/Chip.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
   import { localize } from '../../util/foundryBridge.js';
 
   let {
@@ -282,14 +282,14 @@
                      nothing. One per issue row, in a list whose SEVERITY CHIP is the loud
                      thing: a solid control repeated down every row out-shouts the ranking
                      the list exists to present. -->
-                <ManagerButton
+                <Button
                   role="ghost"
                   class="manager-system-overview-link"
                   data-overview-link={issue.kind}
                   onclick={() => onSelectIssue(issue)}
                 >
                   {kindLinkLabel(issue.kind)}
-                </ManagerButton>
+                </Button>
               {/if}
             </li>
           {/each}

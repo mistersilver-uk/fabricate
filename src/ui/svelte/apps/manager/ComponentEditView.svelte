@@ -9,7 +9,7 @@
   import { componentRulesValidationPresentation } from './component/componentRulesValidation.js';
   import { localize } from '../../util/foundryBridge.js';
   import ToggleCard from '../../components/ToggleCard.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
   import Stepper from '../../components/Stepper.svelte';
   import SubjectModifierPicker from './SubjectModifierPicker.svelte';
   import SearchablePopover from '../../components/SearchablePopover.svelte';
@@ -1580,7 +1580,7 @@
              ever be true. One definition, rendered as the list's footer while there are stages and
              under the empty message otherwise (issue 1512). -->
         {#snippet salvageStageAdder()}
-          <ManagerButton
+          <Button
             role="dashed"
             fullWidth
             data-add-salvage-result
@@ -1595,7 +1595,7 @@
                 'Add result'
               )}</span
             >
-          </ManagerButton>
+          </Button>
         {/snippet}
 
         {#snippet salvageComponentPicker(groupId, result)}
@@ -2083,7 +2083,7 @@
                           </p>
                         {/if}
 
-                        <ManagerButton
+                        <Button
                           role="dashed"
                           fullWidth
                           data-add-salvage-result
@@ -2097,7 +2097,7 @@
                               'Add result'
                             )}</span
                           >
-                        </ManagerButton>
+                        </Button>
                       </li>
                     {/each}
                   </ul>
@@ -2112,7 +2112,7 @@
                 <!-- HIDDEN at the Simple one-success-group cap (issue 764). Routed keeps the
                multi-group list; Simple with no success group yet still shows it. -->
                 {#if !salvageHideAddGroup}
-                  <ManagerButton
+                  <Button
                     role="dashed"
                     fullWidth
                     data-add-salvage-group
@@ -2126,7 +2126,7 @@
                         'Add group'
                       )}</span
                     >
-                  </ManagerButton>
+                  </Button>
                 {/if}
               {/if}
             </Field>

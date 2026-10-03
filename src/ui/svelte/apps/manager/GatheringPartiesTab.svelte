@@ -19,7 +19,7 @@
   import EmptyState from '../../components/EmptyState.svelte';
   import Notice from '../../components/Notice.svelte';
   import Pagination from '../../components/Pagination.svelte';
-  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import SearchField from '../../components/SearchField.svelte';
   import PartyExpandedBody from './PartyExpandedBody.svelte';
   import { tick } from 'svelte';
   import { localize } from '../../util/foundryBridge.js';
@@ -164,7 +164,7 @@
     scrollPaneToTop();
   }
 
-  // `ManagerSearchField` hands its caller the NEXT VALUE rather than the event (issue 1515);
+  // `SearchField` hands its caller the NEXT VALUE rather than the event (issue 1515);
   // it has already written the string, so this only has to react to it.
   function onSearchInput(next) {
     searchTerm = next;
@@ -260,7 +260,7 @@
       </EmptyState>
     {:else}
       {#if showSearch}
-        <!-- THE SHARED SEARCH FIELD (issue 1515), which `ManagerSearchField`'s own docblock
+        <!-- THE SHARED SEARCH FIELD (issue 1515), which `SearchField`'s own docblock
              listed as one of five hand-rolled twins it declined to convert because doing so
              "would be a re-skin rather than a conversion — a change with visible output and its
              own review". This is that review: the row was a bordered 32px box holding a
@@ -276,7 +276,7 @@
              spread belongs to the `<label>`: the capture hook the View Lab case types into, and
              the `aria-describedby` that ties the field to that counter. -->
         <div class="manager-travel-parties-search">
-          <ManagerSearchField
+          <SearchField
             value={searchTerm}
             onChange={onSearchInput}
             placeholder={text(
@@ -433,7 +433,7 @@
   /* THE ROW IS LAYOUT NOW AND NOTHING ELSE (issue 1515). It used to BE the field — a bordered
      32px box on `--fab-bg-0` at an 8px corner, holding a bare glyph and a borderless input
      pinned to its height because Foundry core gives every input an `--input-height` that
-     overflows a hand-built row. `ManagerSearchField` paints all of that, at the shipped 34px
+     overflows a hand-built row. `SearchField` paints all of that, at the shipped 34px
      rung, so what is left here is a flex row holding the field and the match counter. */
   .manager-travel-parties-search {
     display: flex;

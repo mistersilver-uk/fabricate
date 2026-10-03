@@ -335,7 +335,7 @@ const gatheringHarness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/components/ChanceSlider.svelte',
-    'src/ui/svelte/components/ManagerSearchField.svelte',
+    'src/ui/svelte/components/SearchField.svelte',
     'src/ui/svelte/components/Pagination.svelte',
     // Issue 1504: the shared `<Select>`'s whole compiled closure.
     ...SELECT_COMPILED_MODULES,

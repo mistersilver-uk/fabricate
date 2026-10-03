@@ -19,7 +19,7 @@
   import { currencyUnitIcon, currencyUnitLabel } from '../../../util/recipeCurrency.js';
   import PickerRow from './PickerRow.svelte';
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   // The ONE kind table, shared with the row's plate and kind select: the `or…` menu's entries and
   // the choice group's adders read their glyph, tint class and one-word name from it.
   import { fromValue, kindMarkClass, kindMeta, toValue } from './pickerRowKinds.js';
@@ -253,41 +253,41 @@
          order the row's own select offers, because inside an `ANY ONE OF` group every one of
          them appends an ALTERNATIVE. The `data-recipe-add` marker family is preserved. -->
     <div class="manager-recipe-requirement-adds">
-      <ManagerButton
+      <Button
         role="dashed"
         data-recipe-add="alternative-component"
         onclick={() => appendAlternative('component')}
       >
         <i class={kindMeta('component').icon} aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.AltComponent', 'alt component')}</span>
-      </ManagerButton>
-      <ManagerButton
+      </Button>
+      <Button
         role="dashed"
         data-recipe-add="alternative-tag"
         onclick={() => appendAlternative('tags')}
       >
         <i class={kindMeta('tags').icon} aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.AltTag', 'alt tag')}</span>
-      </ManagerButton>
+      </Button>
       {#if hasEssences}
-        <ManagerButton
+        <Button
           role="dashed"
           data-recipe-add="alternative-essence"
           onclick={() => appendAlternative('essence')}
         >
           <i class={kindMeta('essence').icon} aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Recipe.AltEssence', 'alt essence')}</span>
-        </ManagerButton>
+        </Button>
       {/if}
       {#if canAddCost}
-        <ManagerButton
+        <Button
           role="dashed"
           data-recipe-add="alternative-cost"
           onclick={() => appendAlternative('currency')}
         >
           <i class={kindMeta('currency').icon} aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Recipe.AltCurrency', 'alt currency')}</span>
-        </ManagerButton>
+        </Button>
       {/if}
     </div>
   {:else}

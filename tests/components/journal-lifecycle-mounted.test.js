@@ -81,10 +81,10 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     ...SELECT_COMPILED_MODULES,
     ...PLAYER_APP_COMPILED_MODULES,
-    'src/ui/svelte/components/ManagerSearchField.svelte',
+    'src/ui/svelte/components/SearchField.svelte',
     component('Pagination'),
     'src/ui/svelte/components/IconButton.svelte',
-    component('ManagerButton'),
+    component('Button'),
     'src/ui/svelte/components/InspectorCard.svelte',
     component('RunActionBar'),
     component('SlotTile'),

@@ -17,7 +17,7 @@
 <script>
   import Field from '../../components/Field.svelte';
   import Chip from '../../components/Chip.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import SystemEditorTabs from './system/SystemEditorTabs.svelte';
@@ -322,7 +322,7 @@
                        GM and changes no record, and this control is literally an Open. It
                        sits inside a blocker callout that already carries the alarm, so at
                        the base weight it competed with the copy explaining it. -->
-                  <ManagerButton
+                  <Button
                     role="ghost"
                     class="manager-system-edit-blocker-link"
                     data-system-edit-blocker-link
@@ -332,7 +332,7 @@
                     }}
                   >
                     {text('FABRICATE.Admin.Manager.SystemEdit.BlockerLink', 'Open system overview')}
-                  </ManagerButton>
+                  </Button>
                 </div>
               {/if}
               <section class="manager-edit-card">
@@ -351,7 +351,7 @@
                         >{text('FABRICATE.Admin.Manager.SystemEdit.Dirty', 'Unsaved')}</Chip
                       >
                     {/if}
-                    <ManagerButton role="primary" type="submit" data-system-details-save>
+                    <Button role="primary" type="submit" data-system-details-save>
                       <i class="fas fa-save" aria-hidden="true"></i>
                       <span
                         >{text(
@@ -359,7 +359,7 @@
                           'Save details'
                         )}</span
                       >
-                    </ManagerButton>
+                    </Button>
                   </div>
                 </div>
                 <div class="manager-edit-grid">

@@ -343,7 +343,7 @@ export function createManagerQueries(getTarget) {
     assert.ok(Boolean(back), `${route} should render its header Back control at ${hook}`);
     assert.ok(
       back.classList.contains('fab-manager-button'),
-      `${route}'s Back should render through the ManagerButton primitive, not a hand-written class`
+      `${route}'s Back should render through the Button primitive, not a hand-written class`
     );
     assert.ok(
       back.classList.contains('is-ghost'),

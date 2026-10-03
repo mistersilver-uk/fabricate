@@ -15,7 +15,7 @@
   // the offer to the row's catalogue. The adder gates on the unfiltered roster, because a system
   // whose essences are all disabled must keep the match type.
   import RecipeIngredientGroupCard from './RecipeIngredientGroupCard.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import IconButton from '../../../components/IconButton.svelte';
 
   let {
@@ -166,43 +166,43 @@
        token family is PRESERVED across roughly twenty-five call sites, so `cost` and
        `essence-requirement` still name the currency and essence adders. -->
   <div class="manager-recipe-ingredient-set-add">
-    <ManagerButton
+    <Button
       role="dashed"
       data-recipe-add="component"
       onclick={() => addRequirement({ type: 'component', componentId: null })}
     >
       <i class="fas fa-cube" aria-hidden="true"></i>
       <span>{text('FABRICATE.Admin.Manager.Recipe.AddComponent', 'Add component')}</span>
-    </ManagerButton>
-    <ManagerButton
+    </Button>
+    <Button
       role="dashed"
       data-recipe-add="tag-requirement"
       onclick={() => addRequirement({ type: 'tags', tags: [], tagMatch: 'any' })}
     >
       <i class="fas fa-tags" aria-hidden="true"></i>
       <span>{text('FABRICATE.Admin.Manager.Recipe.AddTagShort', 'Add tag')}</span>
-    </ManagerButton>
+    </Button>
     {#if canAddEssence}
       <!-- The set-level essence add appends a single-option essence GROUP, an AND-required
            requirement, and an essence may repeat across groups. -->
-      <ManagerButton
+      <Button
         role="dashed"
         data-recipe-add="essence-requirement"
         onclick={() => addRequirement({ type: 'essence', essenceId: '', amount: 1 })}
       >
         <i class="fas fa-flask-vial" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.AddEssenceShort', 'Add essence')}</span>
-      </ManagerButton>
+      </Button>
     {/if}
     {#if canAddCost}
-      <ManagerButton
+      <Button
         role="dashed"
         data-recipe-add="cost"
         onclick={() => addRequirement({ type: 'currency', unit: '', amount: 1 })}
       >
         <i class="fa-solid fa-coins" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.AddCurrency', 'Add currency')}</span>
-      </ManagerButton>
+      </Button>
     {/if}
   </div>
 </div>

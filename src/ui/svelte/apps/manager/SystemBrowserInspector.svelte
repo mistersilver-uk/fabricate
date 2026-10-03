@@ -23,7 +23,7 @@
 <script>
   import Chip from '../../components/Chip.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
   import { localize } from '../../util/foundryBridge.js';
 
   let {
@@ -356,7 +356,7 @@
       class="manager-setup-links"
       aria-label={text('FABRICATE.Admin.Manager.EmptySetup.Resources', 'Resources')}
     >
-      <ManagerButton
+      <Button
         tag="a"
         href="https://mistersilver-uk.github.io/fabricate/help/quickstart"
         target="_blank"
@@ -364,8 +364,8 @@
       >
         <i class="fas fa-book-open" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.EmptySetup.Quickstart', 'Quickstart')}</span>
-      </ManagerButton>
-      <ManagerButton
+      </Button>
+      <Button
         tag="a"
         href="https://mistersilver-uk.github.io/fabricate"
         target="_blank"
@@ -373,7 +373,7 @@
       >
         <i class="fas fa-circle-question" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.EmptySetup.Docs', 'Docs')}</span>
-      </ManagerButton>
+      </Button>
     </div>
   </section>
 {:else}

@@ -362,7 +362,7 @@ describe('BulkSelectionToolbar hook and row-class parameters (issue 1010)', () =
   });
 
   it('renders the shipped band for an unrecognised scope rather than deleting its box', async () => {
-    // The closed-set contract `Chip`'s tone and `ManagerButton`'s role both state.
+    // The closed-set contract `Chip`'s tone and `Button`'s role both state.
     for (const selectAllScope of ['results', 'Shown', 'page', '', undefined]) {
       const root = await toolbar.mount({ count: 2, selectAllScope });
       assert.ok(

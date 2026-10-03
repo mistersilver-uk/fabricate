@@ -351,12 +351,12 @@ function surfaceRowAction() {
 
   const buttons = [];
   walkTemplate(ast.fragment, (node) => {
-    if (node.type === 'Component' && node.name === 'ManagerButton') buttons.push(node);
+    if (node.type === 'Component' && node.name === 'Button') buttons.push(node);
   });
   assert.equal(
     buttons.length,
     1,
-    `${SURFACE_PATH} renders ${buttons.length} <ManagerButton>s; the row action is one button ` +
+    `${SURFACE_PATH} renders ${buttons.length} <Button>s; the row action is one button ` +
       'and the clauses below read it by being the only one'
   );
   return { defaults, constants, button: buttons[0], source };

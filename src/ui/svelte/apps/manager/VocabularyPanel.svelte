@@ -20,9 +20,9 @@
   import IconPicker from '../../components/IconPicker.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import InlineVocabularyAdd from './InlineVocabularyAdd.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
   import IconButton from '../../components/IconButton.svelte';
-  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import SearchField from '../../components/SearchField.svelte';
   import { createVocabularyBrowserState } from '../../../model/managerBrowserViewState.js';
 
   let {
@@ -209,7 +209,7 @@
   />
 
   <div class="manager-vocabulary-search-row">
-    <ManagerSearchField
+    <SearchField
       class="manager-vocabulary-search"
       value={searchTerm}
       onChange={(next) => (ui.searchTerm = next)}
@@ -290,13 +290,10 @@
           >
             <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
             <span class="manager-vocabulary-confirm-copy">{confirmSentence(row)}</span>
-            <ManagerButton data-vocabulary-cancel-remove onclick={cancelRemove}
-              >{cancelRemoveLabel}</ManagerButton
+            <Button data-vocabulary-cancel-remove onclick={cancelRemove}>{cancelRemoveLabel}</Button
             >
-            <ManagerButton
-              role="danger"
-              data-vocabulary-confirm-remove
-              onclick={() => confirmRemove(row)}>{confirmRemoveLabel}</ManagerButton
+            <Button role="danger" data-vocabulary-confirm-remove onclick={() => confirmRemove(row)}
+              >{confirmRemoveLabel}</Button
             >
           </div>
         {/if}

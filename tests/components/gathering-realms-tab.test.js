@@ -85,8 +85,8 @@ describe('GatheringRealmsTab mounted behavior', () => {
       writeCompiledSvelte(selectModule);
     }
     writeCompiledSvelte('src/ui/svelte/components/IconButton.svelte');
-    writeCompiledSvelte('src/ui/svelte/components/ManagerSearchField.svelte');
-    writeCompiledSvelte('src/ui/svelte/components/ManagerToolbar.svelte');
+    writeCompiledSvelte('src/ui/svelte/components/SearchField.svelte');
+    writeCompiledSvelte('src/ui/svelte/components/FilterBar.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/RealmEnvironmentsEditor.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringRealmsTab.svelte');
     const mod = await import(pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/GatheringRealmsTab.svelte.js')).href);

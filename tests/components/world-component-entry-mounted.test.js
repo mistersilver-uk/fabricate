@@ -1956,7 +1956,7 @@ describe('world Component entry editor (issue 1371)', () => {
 
     it('and the vocabulary exit is a bare text action, not a filled button', async () => {
       // `proto:886` draws it as accent ink with a trailing external-link mark. Round 3 drew a
-      // filled 34px `ManagerButton` with a leading `fa-tags`.
+      // filled 34px `Button` with a leading `fa-tags`.
       const { target } = await open('ingot');
       const exit = target.querySelector('[data-scoped-entry-vocabulary-exit]');
       assert.ok(exit.classList.contains('manager-inline-link'), `it read "${exit.className}"`);

@@ -30,8 +30,8 @@
     pickDefaultSystemId,
   } from '../util/systemDisambiguation.js';
   import IconButton from '../components/IconButton.svelte';
-  import ManagerSearchField from '../components/ManagerSearchField.svelte';
-  import ManagerToolbar from '../components/ManagerToolbar.svelte';
+  import SearchField from '../components/SearchField.svelte';
+  import FilterBar from '../components/FilterBar.svelte';
   import Select from '../components/Select.svelte';
 
   let { services = null } = $props();
@@ -236,12 +236,12 @@
     </p>
   </header>
 
-  <!-- THE CONTROL ROW IS THE SHARED FILTER BAR (issue 1520). `ManagerToolbar` is a `<section>`
+  <!-- THE CONTROL ROW IS THE SHARED FILTER BAR (issue 1520). `FilterBar` is a `<section>`
        landmark, so it needs its own accessible name and the source contract gates that; the
        browser had no filter-bar string, so `FABRICATE.Canvas.Browser.FiltersLabel` is added
        beside the manager browsers' own `Filters` keys rather than borrowing the window title,
        which would announce the same name twice. -->
-  <ManagerToolbar
+  <FilterBar
     class="fab-ib-controls"
     ariaLabel={text('FABRICATE.Canvas.Browser.FiltersLabel', 'Interactable browser filters')}
   >
@@ -267,14 +267,14 @@
          excuses it. The field publishes that rung as the opt-in a caller uses for exactly this
          pairing, which is why it is passed here rather than restated as a per-window CSS
          override. -->
-    <ManagerSearchField
+    <SearchField
       bind:value={search}
       size={38}
       placeholder={text('FABRICATE.Canvas.Browser.SearchPlaceholder', 'Search entries…')}
       ariaLabel={text('FABRICATE.Canvas.Browser.SearchLabel', 'Search')}
       inputProps={{ 'data-interactable-browser-search': '' }}
     />
-  </ManagerToolbar>
+  </FilterBar>
 
   {#if systems.length === 0}
     <p class="fab-ib-empty">

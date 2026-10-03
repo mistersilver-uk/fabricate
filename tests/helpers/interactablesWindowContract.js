@@ -28,7 +28,7 @@ export const CONFIG_PANEL_CONTRACT = Object.freeze({
   primitives: Object.freeze([
     ['Chip', '../components/Chip.svelte'],
     ['Field', '../components/Field.svelte'],
-    ['ManagerButton', '../components/ManagerButton.svelte'],
+    ['Button', '../components/Button.svelte'],
     ['Notice', '../components/Notice.svelte'],
     ['Select', '../components/Select.svelte'],
     ['StatusToggle', '../components/StatusToggle.svelte'],
@@ -66,8 +66,8 @@ export const BROWSER_WINDOW_CONTRACT = Object.freeze({
   residueDescription: "this window's own layout and its tablist residue",
   primitives: Object.freeze([
     ['IconButton', '../components/IconButton.svelte'],
-    ['ManagerSearchField', '../components/ManagerSearchField.svelte'],
-    ['ManagerToolbar', '../components/ManagerToolbar.svelte'],
+    ['SearchField', '../components/SearchField.svelte'],
+    ['FilterBar', '../components/FilterBar.svelte'],
     ['Select', '../components/Select.svelte'],
   ]),
   layoutClasses: Object.freeze([
@@ -104,7 +104,7 @@ export const MANAGE_PANEL_CONTRACT = Object.freeze({
     ['Field', '../../components/Field.svelte'],
     ['IconButton', '../../components/IconButton.svelte'],
     ['InspectorCard', '../../components/InspectorCard.svelte'],
-    ['ManagerButton', '../../components/ManagerButton.svelte'],
+    ['Button', '../../components/Button.svelte'],
     ['SegmentedControl', '../../components/SegmentedControl.svelte'],
     ['Select', '../../components/Select.svelte'],
   ]),

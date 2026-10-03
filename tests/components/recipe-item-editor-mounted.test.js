@@ -107,7 +107,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte',
     // THE validation surface and the push-button its View rows render (issue 1444). The
     // Validation tab hands the surface its checks and renders no markup itself, so omitting
-    // either HANGS this suite (# cancelled) rather than failing it. `ManagerButton` is already
+    // either HANGS this suite (# cancelled) rather than failing it. `Button` is already
     // listed above via the `SELECT_COMPILED_MODULES` spread.
     'src/ui/svelte/components/EditorValidationSurface.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemValidationTab.svelte',

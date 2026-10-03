@@ -18,7 +18,7 @@ const SHARED_PRIMITIVES = [
   // The manager's ONE modal-dialog chrome (issue 877). Both import-flow modals render
   // through it, so adding it to a third screen would silently pull it into every suite
   // that mounts a tree containing that screen.
-  'src/ui/svelte/components/ManagerModal.svelte',
+  'src/ui/svelte/components/Modal.svelte',
   // The manager's ONE "how this surface works" explainer card and ONE icon fact row
   // (issue 881). Both are side-panel primitives, so the shared scoped-entity preview and the
   // essence on-craft tab already pull them into two different mounted trees and the next side
@@ -55,12 +55,12 @@ const SHARED_PRIMITIVES = [
   // mounted tree. Two screens use it today — the Modifiers card in `SystemEditView` and the
   // Tool Studio header, which is the authority the primitive reproduces — and they already
   // sit in four different mounted trees between them.
-  'src/ui/svelte/components/ManagerButton.svelte',
+  'src/ui/svelte/components/Button.svelte',
   // THE manager's icon-only push-button (issue 1422).
   'src/ui/svelte/components/IconButton.svelte',
   // THE manager's editor tab strip (issue 1362).
   'src/ui/svelte/components/EditorTabs.svelte',
-  // THE manager's on/off switch (issue 1040). Sharper again than `ManagerButton`.
+  // THE manager's on/off switch (issue 1040). Sharper again than `Button`.
   'src/ui/svelte/components/StatusToggle.svelte',
   // THE manager's card shell (issue 1427).
   'src/ui/svelte/components/InspectorCard.svelte',
@@ -74,8 +74,8 @@ const SHARED_PRIMITIVES = [
   // tasks and events, realms, books-and-scrolls, access and both world scoped-entity lists —
   // and the field reaches four editors and two rosters on top of that, so between them they sit
   // in more mounted trees than any entry above except `Chip`.
-  'src/ui/svelte/components/ManagerSearchField.svelte',
-  'src/ui/svelte/components/ManagerToolbar.svelte',
+  'src/ui/svelte/components/SearchField.svelte',
+  'src/ui/svelte/components/FilterBar.svelte',
   // THE editor validation surface (issue 1444).
   // BOTH FIGURES ARE RE-DERIVED FROM THE TREE rather than adjusted, because the pair this note
   // replaced had drifted in opposite directions — it said seven renderers and four direct

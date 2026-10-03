@@ -138,10 +138,10 @@ const PRIMITIVES = Object.freeze([
     ]),
   }),
   Object.freeze({
-    name: 'ManagerColorPicker + ManagerColorPopover',
+    name: 'TintPickerButton + TintPicker',
     components: Object.freeze([
-      'src/ui/svelte/components/ManagerColorPicker.svelte',
-      'src/ui/svelte/components/ManagerColorPopover.svelte',
+      'src/ui/svelte/components/TintPickerButton.svelte',
+      'src/ui/svelte/components/TintPicker.svelte',
     ]),
     roots: Object.freeze(['fabricate-color-picker', 'fabricate-color-picker-popover']),
     family: 'manager-color-[\\w-]+',
@@ -164,13 +164,13 @@ const PRIMITIVES = Object.freeze([
     ]),
   }),
   Object.freeze({
-    name: 'ManagerButton',
-    components: Object.freeze(['src/ui/svelte/components/ManagerButton.svelte']),
+    name: 'Button',
+    components: Object.freeze(['src/ui/svelte/components/Button.svelte']),
     roots: Object.freeze(['fabricate-button']),
     // Two exact class names, not a shared prefix.
     family: 'manager-button|fab-manager-button',
     anchors: Object.freeze(['manager-button', 'fab-manager-button']),
-    // COMPOSES its family in `const classes = $derived([…])` (`ManagerButton.svelte`) rather
+    // COMPOSES its family in `const classes = $derived([…])` (`Button.svelte`) rather
     // than in markup — `classesWrittenBy` and the root-emission clause's `attributes` local both
     // read `composedClassRegion` for this entry as well as the (here, empty) markup region.
     composesClasses: true,
@@ -300,9 +300,9 @@ const PRIMITIVES = Object.freeze([
     mirrored: Object.freeze([Object.freeze({ anchor: 'manager-field', root: 'fabricate-field' })]),
   }),
   Object.freeze({
-    // ── MANAGERSEARCHFIELD (issue 1508). Owns its own `<input type="search">`.
-    name: 'ManagerSearchField',
-    components: Object.freeze(['src/ui/svelte/components/ManagerSearchField.svelte']),
+    // ── SEARCHFIELD (issue 1508). Owns its own `<input type="search">`.
+    name: 'SearchField',
+    components: Object.freeze(['src/ui/svelte/components/SearchField.svelte']),
     roots: Object.freeze(['fabricate-search']),
     // One exact class name; `manager-tag-search`.
     family: 'manager-search',
@@ -318,13 +318,13 @@ const PRIMITIVES = Object.freeze([
     ]),
   }),
   Object.freeze({
-    // ── MANAGERTOOLBAR (issue 1508). The manager's filter bar, rooted at the class it emits.
+    // ── FILTERBAR (issue 1508). The manager's filter bar, rooted at the class it emits.
     // It declares NO font floor and NO focus pair, and that is a positive decision rather than a
     // gap: the bar renders `{@render children?.()}` and owns no control of its own, and
     // `openspec/specs/design-system/spec.md` forbids a primitive displacing an area's chrome for
     // a control it does not own, and no family rule reaches one.
-    name: 'ManagerToolbar',
-    components: Object.freeze(['src/ui/svelte/components/ManagerToolbar.svelte']),
+    name: 'FilterBar',
+    components: Object.freeze(['src/ui/svelte/components/FilterBar.svelte']),
     roots: Object.freeze(['fabricate-filter-bar']),
     // One exact class name. `manager-toolbar-pills` (`fabricate.css:4194`) and
     // `manager-toolbar-primary` are CALLER classes: `pickerSelectors` anchors on
@@ -700,7 +700,7 @@ function classAttributeValues(markup) {
 /**
  * The text of a `composesClasses` primitive's `const classes = $derived([…])` array literal —
  * the region `classesWrittenBy` and the root-emission clause read for a primitive that builds its
- * `class` attribute in `<script>` rather than writing it in markup. `ManagerButton` and
+ * `class` attribute in `<script>` rather than writing it in markup. `Button` and
  * `IconButton` both render `class={classes}` — an identifier, not a `class="…"` string or a
  * `` class={`…`} `` template — so `classAttributeValues(markupRegion(file))` finds nothing for
  * either on its own; the family and the root live in this array instead.
@@ -966,7 +966,7 @@ test('every primitive writes the namespace roots its rules are anchored on', () 
     // own literals) rather than from the markup text, because every one of these components also
     // NAMES its roots in a comment explaining them. A prose mention would satisfy a substring
     // search while the class itself had been deleted, which is precisely the state this clause
-    // exists to catch. `attributes` moves with the same widening: for `ManagerButton` and
+    // exists to catch. `attributes` moves with the same widening: for `Button` and
     // `IconButton` the only markup class attribute is `class={classes}`, an identifier the plain
     // extractor cannot read, so `attributes` would otherwise be empty and the non-vacuity guard
     // below would hard-fail for both — deriving it from the composed region too is what makes it
@@ -1206,13 +1206,13 @@ test('the composed-class region is read from the actual array literal, not the m
   // A reader that stops finding the array must RED rather than fall back to treating the
   // (empty, for these two) markup region as the whole story — silence there would declare the
   // sheet clean by examining a family of zero classes instead of reporting the regression.
-  const managerButton = PRIMITIVES.find((entry) => entry.name === 'ManagerButton');
+  const managerButton = PRIMITIVES.find((entry) => entry.name === 'Button');
   const managerButtonRegion = composedClassRegion(managerButton.components[0]);
   assert.ok(
     managerButtonRegion.includes("'manager-button'") &&
       managerButtonRegion.includes("'fab-manager-button'"),
     `${managerButton.components[0]}'s composed-class array no longer contains the literals ` +
-      '`classesWrittenBy` reads for ManagerButton, so a reader that stops finding the array ' +
+      '`classesWrittenBy` reads for Button, so a reader that stops finding the array ' +
       'would examine an empty family instead of reporting the regression'
   );
 
@@ -1227,7 +1227,7 @@ test('the composed-class region is read from the actual array literal, not the m
 
   // The root-emission clause's OWN non-vacuity local (`attributes`, above) is derived from this
   // same region for a `composesClasses` entry, so it reads these same literals: deleting
-  // `'fabricate-button'` from `ManagerButton.svelte`'s array reds `every primitive writes the
+  // `'fabricate-button'` from `Button.svelte`'s array reds `every primitive writes the
   // namespace roots its rules are anchored on` above, not this test — the two are the same
   // reading, exercised by a different assertion.
   for (const primitive of [managerButton, iconButton]) {
@@ -1512,7 +1512,7 @@ test('the status card`s root stays off every rule the switch owns', () => {
 });
 
 test('the application-root-attribute clause names a caller’s own container', () => {
-  const managerButton = PRIMITIVES.find((entry) => entry.name === 'ManagerButton');
+  const managerButton = PRIMITIVES.find((entry) => entry.name === 'Button');
   const pagination = PRIMITIVES.find((entry) => entry.name === 'Pagination');
 
   // FIRES: an application root qualified by a per-view attribute is a caller's own container,
@@ -1524,7 +1524,7 @@ test('the application-root-attribute clause names a caller’s own container', (
   );
 
   // DOES NOT FIRE: an attribute that qualifies the FAMILY's own compound is not an application
-  // root at all — `fabricate.css`'s `data-essence-sort-direction` control on ManagerButton's own
+  // root at all — `fabricate.css`'s `data-essence-sort-direction` control on Button's own
   // family compound, which must stay gate-owned and re-rooted like its unattributed siblings.
   assert.ok(
     !namesCallersOwnContainer(
@@ -1633,7 +1633,7 @@ const DETECTOR_FIXTURE_EXEMPTIONS = Object.freeze([
   }),
   Object.freeze({
     file: 'tests/components/manager-filter-bar-source-contract.test.js',
-    primitive: 'ManagerSearchField',
+    primitive: 'SearchField',
     attributeCount: 1,
     elementCount: 1,
     why:
@@ -1656,7 +1656,7 @@ const DETECTOR_FIXTURE_EXEMPTIONS = Object.freeze([
   }),
   Object.freeze({
     file: 'tests/components/manager-filter-bar-source-contract.test.js',
-    primitive: 'ManagerToolbar',
+    primitive: 'FilterBar',
     attributeCount: 1,
     elementCount: 1,
     why:
@@ -1677,7 +1677,7 @@ const DETECTOR_FIXTURE_EXEMPTIONS = Object.freeze([
  * module level because both clauses need the same subset, and two copies of one filter is the
  * duplication `tests/helpers/primitiveSourceContract.js` exists to have stopped repeating.
  *
- * @type {ReadonlyArray<import('../helpers/managerButtonFixtureAllowlist.js').ManagerButtonFixtureExemption>}
+ * @type {ReadonlyArray<import('../helpers/managerButtonFixtureAllowlist.js').ButtonFixtureExemption>}
  */
 const ROOT_LESS_FIXTURE_EXEMPTIONS = Object.freeze(
   FIXTURE_ALLOWLIST.filter((entry) =>
@@ -1803,9 +1803,9 @@ test('hand-built fixture markup carries the namespace roots the primitive writes
       'the tab strip’s own root element, in three files, and two are the strip and the negative ' +
       'control that change added to `re-rooted-controls-host-independence.test.js`. Before that: ' +
       '181 against 169 before ' +
-      '`StatusToggle` and `ChanceSlider` joined the array, 143 before `ManagerToolbar` and ' +
+      '`StatusToggle` and `ChanceSlider` joined the array, 143 before `FilterBar` and ' +
       '`InspectorCard` did and 113 before `Field` and ' +
-      '`ManagerSearchField` did. The floor stood at 54 against a population that had already ' +
+      '`SearchField` did. The floor stood at 54 against a population that had already ' +
       'grown to 113 — issue 1504 added `Select` without re-measuring — so the phase-1 raise was ' +
       'both a raise for two new families and the repair of a margin that had drifted to half ' +
       'the population, and each raise since keeps it at the ten per cent this file states as its ' +
@@ -1831,7 +1831,7 @@ test('hand-built fixture markup carries the namespace roots the primitive writes
     );
   }
 
-  // The ManagerButton unconverted-probe exemptions are a SEPARATE, larger ledger.
+  // The Button unconverted-probe exemptions are a SEPARATE, larger ledger.
   const expectedAllowlistAttributeCount = ROOT_LESS_FIXTURE_EXEMPTIONS.reduce((total, entry) => total + entry.count, 0);
   const totalAllowlistHits = [...allowlistHits.values()].reduce((total, hits) => total + hits, 0);
   assert.equal(
@@ -1933,9 +1933,9 @@ test('every fixture element in a picker’s family sits under one of its namespa
       'thirteen against the attribute clause’s four is the gap the two clauses exist to keep ' +
       'apart: a strip fixture brings its buttons, its counts and its badges with it. Before ' +
       'that: 321 against 270 ' +
-      'before `StatusToggle` and `ChanceSlider` joined the array, 244 before `ManagerToolbar` and ' +
+      'before `StatusToggle` and `ChanceSlider` joined the array, 244 before `FilterBar` and ' +
       '`InspectorCard` did and 214 before `Field` and ' +
-      '`ManagerSearchField` did — the same drifted margin the attribute floor above records, ' +
+      '`SearchField` did — the same drifted margin the attribute floor above records, ' +
       'kept at the ten per cent this file states as its convention. This clause grows faster ' +
       'than the attribute one for both new families, and that is the difference the two clauses ' +
       'exist to keep apart: it counts every fixture ELEMENT in a family, so a switch fixture ' +
@@ -2059,7 +2059,7 @@ test('each primitive’s own scoped styles name no application root either', () 
     `only ${blocks} of the twenty-three component files hold a REAL scoped \`<style>\` block — one ` +
       'opened after `</script>`. Seven do today: `SearchablePopover` and the ' +
       '`SearchablePopoverPanel` its compact presentation moved to (issue 1719), ' +
-      '`ManagerColorPopover` and ' +
+      '`TintPicker` and ' +
       '— since issue 1509 put entries on them — `EditorTabs`, whose block is the two ' +
       '`:global(.manager-editor-tab-button.is-danger)` rules that tint a failing validation ' +
       'tab, `RadioCardGroup`, whose block is the one `.manager-resolution-option-meta` ' +

@@ -46,7 +46,7 @@ function triggerClasses() {
   return [...trigger.classList].filter((name) => !name.startsWith('svelte-'));
 }
 
-describe('1371 SearchablePopover — the ManagerButton trigger form', () => {
+describe('1371 SearchablePopover — the Button trigger form', () => {
   before(harness.setup);
   after(harness.teardown);
 
@@ -61,7 +61,7 @@ describe('1371 SearchablePopover — the ManagerButton trigger form', () => {
     harness.remount();
   });
 
-  it('renders the real ManagerButton when asked, appending the caller`s class', async () => {
+  it('renders the real Button when asked, appending the caller`s class', async () => {
     await mountPicker({
       triggerButton: { size: '38' },
       triggerClass: 'manager-world-component-register-action',
@@ -75,7 +75,7 @@ describe('1371 SearchablePopover — the ManagerButton trigger form', () => {
         'is-size-38',
         'manager-world-component-register-action',
       ],
-      '`triggerClass` reaches `ManagerButton`s `class` prop, which APPENDS — a caller class ' +
+      '`triggerClass` reaches `Button`s `class` prop, which APPENDS — a caller class ' +
         'that REPLACED the primitive`s own would unstyle the button while every data-* ' +
         'selector kept resolving'
     );
@@ -171,13 +171,13 @@ describe('1371 SearchablePopover — the ManagerButton trigger form', () => {
       'utf8'
     );
     const button = readFileSync(
-      resolve(repoRoot, 'src/ui/svelte/components/ManagerButton.svelte'),
+      resolve(repoRoot, 'src/ui/svelte/components/Button.svelte'),
       'utf8'
     );
     assert.match(
       popover,
-      /<ManagerButton\s+bind:element=\{triggerElement\}/,
-      'the ManagerButton trigger must bind its node, or the panel anchors on the picker root'
+      /<Button\s+bind:element=\{triggerElement\}/,
+      'the Button trigger must bind its node, or the panel anchors on the picker root'
     );
     assert.match(
       popover,
@@ -191,7 +191,7 @@ describe('1371 SearchablePopover — the ManagerButton trigger form', () => {
     assert.match(
       button,
       /element = \$bindable\(null\)/,
-      '`ManagerButton` must PUBLISH that binding: `bind:this` on a component yields the instance'
+      '`Button` must PUBLISH that binding: `bind:this` on a component yields the instance'
     );
     assert.match(
       button,

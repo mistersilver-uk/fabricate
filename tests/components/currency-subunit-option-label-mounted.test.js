@@ -50,7 +50,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/SearchablePopoverPanel.svelte',
     'src/ui/svelte/components/Field.svelte',
     // THE manager's labelled push-button (issue 1118). The currency card header and each expanded unit render it.
-    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte'
   ],

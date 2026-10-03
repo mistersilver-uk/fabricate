@@ -932,7 +932,7 @@ describe('the catalogue shell FORWARDS what it declares', () => {
     const source = sourceOf(FRAME);
     assert.match(
       source,
-      /<ManagerSearchField\b[\s\S]{0,200}?size=\{toolbarLeadSize\}/,
+      /<SearchField\b[\s\S]{0,200}?size=\{toolbarLeadSize\}/,
       'the search field takes the rung as its own `size` prop'
     );
     assert.match(

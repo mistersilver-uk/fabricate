@@ -42,12 +42,12 @@
   import { localize } from '../../util/foundryBridge.js';
   import { dragDrop } from '../../actions/dragDrop.js';
   import { resolveDropData } from '../../util/dropUtils.js';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
   import Pagination from '../../components/Pagination.svelte';
   import IconButton from '../../components/IconButton.svelte';
-  import ManagerToolbar from '../../components/ManagerToolbar.svelte';
-  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import FilterBar from '../../components/FilterBar.svelte';
+  import SearchField from '../../components/SearchField.svelte';
   import Select from '../../components/Select.svelte';
   import {
     buildCapOptions,
@@ -301,10 +301,10 @@
     </span>
   </section>
 
-  <ManagerToolbar
+  <FilterBar
     ariaLabel={text('FABRICATE.Admin.Manager.BooksScrolls.Filters', 'Recipe item filters')}
   >
-    <ManagerSearchField
+    <SearchField
       value={searchTerm}
       onChange={(next) => {
         searchTerm = next;
@@ -369,16 +369,16 @@
         .replace('{total}', (recipeItems || []).length)}</Chip
     >
     {#if filtersActive}
-      <ManagerButton
+      <Button
         class="manager-clear-filters"
         data-clear-filters="books-scrolls"
         onclick={clearFilters}
       >
         <i class="fas fa-times" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</span>
-      </ManagerButton>
+      </Button>
     {/if}
-  </ManagerToolbar>
+  </FilterBar>
 
   <section
     class="manager-table-scroll manager-books-scrolls-scroll"
@@ -407,8 +407,8 @@
         )}
         data-books-scrolls-empty-filtered
       >
-        <ManagerButton onclick={clearFilters}
-          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</ManagerButton
+        <Button onclick={clearFilters}
+          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</Button
         >
       </EmptyState>
     {:else}

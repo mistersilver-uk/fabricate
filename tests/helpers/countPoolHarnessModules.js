@@ -29,7 +29,7 @@ export const COUNT_POOL_RAW_MODULES = Object.freeze([
 export const COUNT_POOL_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/EmptyState.svelte',
   'src/ui/svelte/components/Field.svelte',
-  'src/ui/svelte/components/ManagerButton.svelte',
+  'src/ui/svelte/components/Button.svelte',
   'src/ui/svelte/components/Select.svelte',
   'src/ui/svelte/components/SearchablePopover.svelte',
   'src/ui/svelte/components/SearchablePopoverPanel.svelte',

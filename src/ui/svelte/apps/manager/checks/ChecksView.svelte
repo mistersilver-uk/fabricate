@@ -13,7 +13,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import EmptyState from '../../../components/EmptyState.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
   import ToggleCard from '../../../components/ToggleCard.svelte';
   import CheckFailurePolicy from './CheckFailurePolicy.svelte';
@@ -1123,7 +1123,7 @@
         )}
       </p>
     {/if}
-    <ManagerButton
+    <Button
       data-gathering-failure-outcome-link
       disabled={!previewedGatheringTask}
       onclick={() => onOpenGatheringTask(previewedGatheringTask?.id || '')}
@@ -1135,7 +1135,7 @@
           'Open this task'
         )}</span
       >
-    </ManagerButton>
+    </Button>
   </InspectorCard>
 {/snippet}
 
@@ -1248,14 +1248,14 @@
               'This system can roll a check here, but it is switched off. Every attempt that meets its requirements succeeds outright — no formula, no DC, no failure policy.'
             )}
           >
-            <ManagerButton
+            <Button
               role="primary"
               data-checks-turn-on
               onclick={() => onToggleCheckActive(activity, true)}
             >
               <i class="fas fa-power-off" aria-hidden="true"></i>
               <span>{text('FABRICATE.Admin.Manager.Checks.Off.TurnOn', 'Turn this check on')}</span>
-            </ManagerButton>
+            </Button>
           </EmptyState>
         </div>
       {:else if activity === 'crafting' && craftingAlchemy}

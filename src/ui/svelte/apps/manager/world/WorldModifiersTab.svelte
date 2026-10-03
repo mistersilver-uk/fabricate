@@ -15,7 +15,7 @@
   import EmptyState from '../../../components/EmptyState.svelte';
   import RollDataExpressionInput from '../RollDataExpressionInput.svelte';
   import IconPicker from '../../../components/IconPicker.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
   import { localize } from '../../../util/foundryBridge.js';
@@ -237,11 +237,11 @@
            keeps its primary role; `Seed presets` stays NEUTRAL, which is what its bare
            `manager-button` already rendered. -->
       <div class="manager-character-modifier-card-header-actions">
-        <ManagerButton role="primary" onclick={handleAdd}>
+        <Button role="primary" onclick={handleAdd}>
           <i class="fa-solid fa-plus" aria-hidden="true"></i>
           {text('FABRICATE.Admin.Manager.Modifiers.Add', 'Add modifier')}
-        </ManagerButton>
-        <ManagerButton
+        </Button>
+        <Button
           disabled={!presetsSupported}
           data-tooltip={!presetsSupported
             ? text(
@@ -253,7 +253,7 @@
         >
           <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
           {text('FABRICATE.Admin.Manager.Modifiers.SeedPresets', 'Seed presets')}
-        </ManagerButton>
+        </Button>
       </div>
     </header>
 
@@ -525,20 +525,17 @@
                        the Tool Studio is danger. The roles are copied from `ToolEditView`'s
                        header rather than chosen here. -->
                   <div class="manager-character-modifier-actions">
-                    <ManagerButton
+                    <Button
                       role="ghost"
                       data-world-modifier-done={entry.id}
                       onclick={() => (editingId = '')}
-                      >{text('FABRICATE.Admin.Manager.Done', 'Done')}</ManagerButton
+                      >{text('FABRICATE.Admin.Manager.Done', 'Done')}</Button
                     >
-                    <ManagerButton
+                    <Button
                       role="danger"
                       data-world-modifier-delete={entry.id}
                       onclick={() => handleDelete(entry.id)}
-                      >{text(
-                        'FABRICATE.Admin.Manager.Modifiers.Delete',
-                        'Delete modifier'
-                      )}</ManagerButton
+                      >{text('FABRICATE.Admin.Manager.Modifiers.Delete', 'Delete modifier')}</Button
                     >
                   </div>
                 </div>

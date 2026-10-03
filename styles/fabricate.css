@@ -1258,7 +1258,7 @@
   font-weight: 700;
 }
 
-/* ── The tool studio's treatment, released from its ancestor ── `ManagerButton.svelte` emits `fab-manager-button` beside `manager-button`, and the rules below re-declare the tool studio's values against that class with NO ancestor requirement (issue 1096). */
+/* ── The tool studio's treatment, released from its ancestor ── `Button.svelte` emits `fab-manager-button` beside `manager-button`, and the rules below re-declare the tool studio's values against that class with NO ancestor requirement (issue 1096). */
 
 /* THE RADIUS JOINS THE HEIGHT (issue 1371, maintainer ruling M12a). This rule declared the 34px control and no corner, so every converted manager button fell through to the base `.fabricate-button.manager-button` rule's 6px — and `design-system/spec.md`'s radius ladder puts 6 on a chip AT OR BELOW 24px and 9 on a control in the 34-38px band. */
 .fabricate-button.manager-button.fab-manager-button {
@@ -1729,7 +1729,7 @@
   min-width: 0;
 }
 
-/* The head's action, LINK-STYLED. `ManagerButton` is still the primitive — it owns the `<button>` semantics, the type and the disabled contract — and this is an extra-class rule in the global sheet, which is the adaptation route that component's header names. */
+/* The head's action, LINK-STYLED. `Button` is still the primitive — it owns the `<button>` semantics, the type and the disabled contract — and this is an extra-class rule in the global sheet, which is the adaptation route that component's header names. */
 .fabricate-button.manager-button.fab-manager-button.manager-checks-card-head-link {
   appearance: none;
   -webkit-appearance: none;
@@ -2537,7 +2537,7 @@
   font-weight: 500;
 }
 
-/* The simulator's roll action. It renders through `ManagerButton`, so its type scale and tone come from the primitive; what stays here is the FOUNDRY RESET the primitive cannot carry — core's `button` rule centres content and pins a fixed height, and this button is a full-width icon+label pair inside a card rather than a chrome control. */
+/* The simulator's roll action. It renders through `Button`, so its type scale and tone come from the primitive; what stays here is the FOUNDRY RESET the primitive cannot carry — core's `button` rule centres content and pins a fixed height, and this button is a full-width icon+label pair inside a card rather than a chrome control. */
 .fabricate-button.manager-button.fab-manager-button.manager-checks-simulator-roll {
   justify-content: center;
   width: 100%;
@@ -10590,7 +10590,7 @@
   flex: 0 0 24px;
 }
 
-/* The banded Modal's close (maintainer ruling 2026-09-28); its paint is `ManagerModal`'s. */
+/* The banded Modal's close (maintainer ruling 2026-09-28); its paint is `Modal`'s. */
 .fabricate-icon-button.manager-icon-button.is-size-26 {
   box-sizing: border-box;
   width: 26px;
@@ -12735,7 +12735,7 @@
   overflow: visible;
 }
 
-/* === THE COLOUR PICKER'S OWN ROOTS (issue 1470) === `fabricate-color-picker` is written by `components/ManagerColorPicker.svelte` and `fabricate-color-picker-popover` by `components/ManagerColorPopover.svelte`. */
+/* === THE COLOUR PICKER'S OWN ROOTS (issue 1470) === `fabricate-color-picker` is written by `components/TintPickerButton.svelte` and `fabricate-color-picker-popover` by `components/TintPicker.svelte`. */
 .fabricate-color-picker .manager-color-swatch,
 .fabricate-color-picker-popover .manager-color-swatch {
   display: inline-flex;
@@ -12855,7 +12855,7 @@
 
 /* The hex field paints its OWN chrome, which is the one place this family needed a declaration rather than a new root (issue 1470). */
 
-/* skin census (issue 1523): not an adopter — this node is portaled (`ManagerColorPopover.svelte`) and can fall back to `document.body` outside `.fabricate`, where an ancestor-scoped skin would stop matching. */
+/* skin census (issue 1523): not an adopter — this node is portaled (`TintPicker.svelte`) and can fall back to `document.body` outside `.fabricate`, where an ancestor-scoped skin would stop matching. */
 .fabricate-color-picker-popover .manager-color-custom input {
   appearance: none;
   -webkit-appearance: none;
@@ -18225,7 +18225,7 @@
   line-height: 1.35;
 }
 
-/* ── THE PANEL'S TWO BUTTONS, ON THE DESIGN'S OWN FIGURES ── Both are `ManagerButton`s, so their geometry is stated here rather than in the panel's own scoped block: the primitive writes the `<button>`, so a rule in the panel's block would need `:global()` to reach it and would then be a second implementation of a control's geometry (issue 1373). */
+/* ── THE PANEL'S TWO BUTTONS, ON THE DESIGN'S OWN FIGURES ── Both are `Button`s, so their geometry is stated here rather than in the panel's own scoped block: the primitive writes the `<button>`, so a rule in the panel's block would need `:global()` to reach it and would then be a second implementation of a control's geometry (issue 1373). */
 .fabricate-manager[data-manager-view="tools"]
   .manager-tool-browser-inspector
   [data-tool-inspector-edit-world] {

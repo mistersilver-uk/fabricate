@@ -13,7 +13,7 @@
   | `value` | option id, or an ARRAY of ids in `multiple` mode | `''` | One prop rather than two, because a picker has one selection whichever cardinality it has. The scalar path is a BRANCH rather than a normalization: coercing into a set would change the answer for an option whose `id` is `''`. |
   | `multiple` / `stayOpen` / `disabled` | booleans | `false` | `multiple` turns on THREE things at once, because a panel with any two of them lies about itself: `aria-selected` by membership, `aria-multiselectable` on the listbox, and the panel staying open across choices. `stayOpen` is that last gate ALONE — `multiple` implies it and it does not imply `multiple`. `disabled` is a native disabled trigger that refuses to open. |
   | `triggerClass` / `valueClass` / `pickerClass` / `popoverClass` / `searchClass` / `listClass` / `optionClass` | class strings | `''` | Extra classes beside this component's own, so an adopting picker keeps the class family its mounted suites, the View Lab registry and the smoke already address. `option.class` is appended AFTER `optionClass`, being a fact about the DATA rather than the caller's plumbing. |
-  | `triggerChip` / `triggerButton` | boolean / `{ role, size, fullWidth }` or `null` | `false` / `null` | Render the trigger through `Chip` or through `ManagerButton`, in that primitive's own prop names. A chip is only a chip when it renders through that component, because its scale lives in its scoped block. |
+  | `triggerChip` / `triggerButton` | boolean / `{ role, size, fullWidth }` or `null` | `false` / `null` | Render the trigger through `Chip` or through `Button`, in that primitive's own prop names. A chip is only a chip when it renders through that component, because its scale lives in its scoped block. |
   | `triggerIcon` / `triggerImg` / `triggerLabel` / `triggerMeta` / `showChevron` | strings / boolean | `''` / `true` | The bare trigger's leading glyph, portrait, current-selection text, second line, and open/closed chevron. |
   | `showSearch` | boolean | `true` | Render the query field. With it off, `search` stays `''`, the filter degrades to the full list, and the TRIGGER becomes the focus holder. |
   | `inlineSearchTrigger` / `inlineCloseLabel` | boolean / string | `false` / `''` | The trigger REPLACES ITSELF with the query field while open and the panel's search row is suppressed, so there is exactly one query in exactly one field; it wins over every trigger form while open. |
@@ -72,7 +72,7 @@
   import { tick } from 'svelte';
   import { createAttachmentKey } from 'svelte/attachments';
   import Chip from './Chip.svelte';
-  import ManagerButton from './ManagerButton.svelte';
+  import Button from './Button.svelte';
   import SearchablePopoverPanel from './SearchablePopoverPanel.svelte';
   import { hostRelativePopoverLayout } from '../actions/anchoredPopover.js';
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
@@ -453,13 +453,13 @@
       >{@render triggerBody()}</Chip
     >
   {:else if triggerButton}
-    <ManagerButton
+    <Button
       bind:element={triggerElement}
       {...triggerAttributes}
       role={triggerButton.role ?? 'neutral'}
       size={triggerButton.size ?? ''}
       fullWidth={triggerButton.fullWidth ?? false}
-      class={triggerClass}>{@render triggerBody()}</ManagerButton
+      class={triggerClass}>{@render triggerBody()}</Button
     >
   {:else}
     <button bind:this={triggerElement} class={triggerClass} {...triggerAttributes}>

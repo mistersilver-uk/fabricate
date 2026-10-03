@@ -30,7 +30,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Chip.svelte',
     // Each issue row's "View" renders through the manager's push-button primitive
     // (issue 1118).
-    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/Button.svelte',
     // THE validation surface (issue 1444). This tab hands it the readiness and renders
     // none of the markup itself, so omitting it here CANCELS the suite.
     'src/ui/svelte/components/EditorValidationSurface.svelte',
@@ -339,7 +339,7 @@ describe('EditorValidationSurface row action (mounted)', () => {
     rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
     compiledModules: [
       'src/ui/svelte/components/Chip.svelte',
-      'src/ui/svelte/components/ManagerButton.svelte',
+      'src/ui/svelte/components/Button.svelte',
       'src/ui/svelte/components/EditorValidationSurface.svelte'
     ],
     componentPath: 'src/ui/svelte/components/EditorValidationSurface.svelte'

@@ -144,7 +144,7 @@ const RECIPE_COMPILED = [
   // The manager's labelled push-button (issue 1118). Eight components in this tree render
   // their adds, deep-links and issue views through it, and a `.svelte` the tree renders but
   // the harness omits HANGS the suite (# cancelled) rather than failing it.
-  'src/ui/svelte/components/ManagerButton.svelte',
+  'src/ui/svelte/components/Button.svelte',
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/SearchablePopover.svelte',
   'src/ui/svelte/components/SearchablePopoverPanel.svelte',
@@ -227,7 +227,7 @@ const stepsHarness = createMountedComponentHarness({
     // The card's two step fields render through the labelled-field primitive (issue 1428).
     'src/ui/svelte/components/Field.svelte',
     // The card's "Add a step" footer renders through the primitive (issue 1118).
-    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/Button.svelte',
     // `RecipeStepAccordion`'s per-step delete is an `<IconButton>` (issue 1422). This is the
     // SECOND module list in this file, and the first one already names the primitive — a
     // `.svelte` the tree renders but a harness omits HANGS that harness's suite

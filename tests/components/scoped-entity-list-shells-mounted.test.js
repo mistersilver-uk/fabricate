@@ -62,8 +62,8 @@ const FRAME_MODULES = [
   // Select's own compiled closure (issue 1504) is spread beside this list wherever it is used
   // (`...FRAME_MODULES, ...SELECT_COMPILED_MODULES`), not folded in here.
   'src/ui/svelte/components/SelectionCheckbox.svelte',
-  'src/ui/svelte/components/ManagerSearchField.svelte',
-  'src/ui/svelte/components/ManagerToolbar.svelte',
+  'src/ui/svelte/components/SearchField.svelte',
+  'src/ui/svelte/components/FilterBar.svelte',
   'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
   // THE MEMBERSHIP FILTER IS A SEGMENTED TRACK SINCE ISSUE 1373, not a `<select>`.
   'src/ui/svelte/components/SegmentedControl.svelte',

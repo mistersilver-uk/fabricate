@@ -13,7 +13,7 @@
   import { localize } from '../../util/foundryBridge.js';
   import RecipeStepAccordion from './recipe/RecipeStepAccordion.svelte';
   import RecipeDurationSteppers from './recipe/RecipeDurationSteppers.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
 
   let {
     steps = [],
@@ -91,10 +91,10 @@
 
     {#snippet footer()}
       <li class="manager-recipe-steps-add">
-        <ManagerButton role="dashed" fullWidth data-recipe-step-add onclick={() => onAddStep()}>
+        <Button role="dashed" fullWidth data-recipe-step-add onclick={() => onAddStep()}>
           <i class="fas fa-plus" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Recipe.AddStep', 'Add a step')}</span>
-        </ManagerButton>
+        </Button>
       </li>
     {/snippet}
   </RecipeStepAccordion>

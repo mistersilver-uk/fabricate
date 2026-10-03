@@ -18,11 +18,11 @@
   import EmptyState from '../../../components/EmptyState.svelte';
   import EssenceBehaviorPreview from '../essences/EssenceBehaviorPreview.svelte';
   import ItemDropZone from '../../../components/ItemDropZone.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import Chip from '../../../components/Chip.svelte';
   import { essenceValidationPresentation } from '../essences/essenceStudio.js';
   import IconPicker from '../../../components/IconPicker.svelte';
-  import ManagerColorPopover from '../../../components/ManagerColorPopover.svelte';
+  import TintPicker from '../../../components/TintPicker.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import { DEFAULT_ESSENCE_ICON, normalizeEssenceIcon } from '../../../util/essenceIcons.js';
   import { resolveDropUuid } from '../../../util/dropUtils.js';
@@ -527,9 +527,9 @@
       )}
       data-scoped-entry-state="missing"
     >
-      <ManagerButton data-scoped-entry-back onclick={() => onBackToCatalogue()}>
+      <Button data-scoped-entry-back onclick={() => onBackToCatalogue()}>
         {text('FABRICATE.Admin.Manager.Scoped.Essence.BackToCatalogue', 'Back to the catalogue')}
-      </ManagerButton>
+      </Button>
     </EmptyState>
   {:else}
     <!--
@@ -659,10 +659,10 @@
                     <span class="manager-scoped-entry-label"
                       >{text('FABRICATE.Admin.Manager.Scoped.Essence.FieldColour', 'Colour')}</span
                     >
-                    <!-- `ManagerColorPopover` takes `layout="inline"` here exactly as
+                    <!-- `TintPicker` takes `layout="inline"` here exactly as
                   `EssenceIdentityTab` does: the popover chrome is applied by the global sheet,
                   which this lane may not open, and inline strips it and nothing else. -->
-                    <ManagerColorPopover
+                    <TintPicker
                       layout="inline"
                       allowNone
                       allowCustom={false}

@@ -19,7 +19,7 @@
 -->
 <script>
   import Chip from '../../components/Chip.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
   import ManagerHeaderCraftingActions from './ManagerHeaderCraftingActions.svelte';
   import ManagerHeaderGatheringActions from './ManagerHeaderGatheringActions.svelte';
   import ScopedEntryHeaderActions from './scoped/ScopedEntryHeaderActions.svelte';
@@ -176,14 +176,14 @@
       />
     {:else if currentView === 'world-essences'}
       <!-- Create takes no name field. -->
-      <ManagerButton role="primary" data-world-essence-create onclick={createWorldEssence}>
+      <Button role="primary" data-world-essence-create onclick={createWorldEssence}>
         <i class="fas fa-plus" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Scoped.Essence.New', 'New essence')}</span>
-      </ManagerButton>
+      </Button>
     {:else if currentView === 'world-downtime'}
       {#if downtimeCoreFallback}
         <!-- The promotional pill sits at the top of every Downtime screen. -->
-        <ManagerButton
+        <Button
           tag="a"
           class="manager-downtime-unlock"
           data-downtime-unlock
@@ -194,7 +194,7 @@
           <i class="fas fa-crown" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.World.Downtime.Unlock', 'Unlock with Premium')}</span
           >
-        </ManagerButton>
+        </Button>
       {:else}
         <!-- The status chip leads the group, where every core editor puts its own chip. -->
         {#if downtimeHeaderStatus}
@@ -306,38 +306,38 @@
         {saveGatheringEventDraft}
       />
     {:else if currentView === 'world'}
-      <ManagerButton role="primary" onclick={createParty} disabled={travelSaving}>
+      <Button role="primary" onclick={createParty} disabled={travelSaving}>
         <i class="fas fa-plus" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.World.Parties.CreateAction', 'New party')}</span>
-      </ManagerButton>
+      </Button>
     {:else if isWorldTravelRoute && worldTravelTab === 'realms'}
-      <ManagerButton role="primary" onclick={createTravelRealm} disabled={travelSaving}>
+      <Button role="primary" onclick={createTravelRealm} disabled={travelSaving}>
         <i class="fas fa-plus" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Travel.CreateRealm', 'Create realm')}</span>
-      </ManagerButton>
+      </Button>
     {:else if isWorldTravelRoute}
       <!-- Map Region Links has no create action: a Scene Region is authored in Foundry. -->
     {:else if currentView === 'system-edit'}
       <!-- `ghost` here rests on the verb, not on a neighbour. -->
-      <ManagerButton role="ghost" data-system-edit-back onclick={backToSystemsBrowser}>
+      <Button role="ghost" data-system-edit-back onclick={backToSystemsBrowser}>
         <i class="fas fa-arrow-left" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.SystemEdit.BackToSystems', 'Back to systems')}</span>
-      </ManagerButton>
+      </Button>
     {:else}
       <!-- `data-manager-import-system` is a zero-behaviour hook: the only other handle on this
            button is `manager-button`, which a dozen header controls share. -->
-      <ManagerButton data-manager-import-system onclick={importSystem}>
+      <Button data-manager-import-system onclick={importSystem}>
         <i class="fas fa-file-import" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Import', 'Import')}</span>
-      </ManagerButton>
-      <ManagerButton onclick={exportSelectedSystem} disabled={!selectedSystemId}>
+      </Button>
+      <Button onclick={exportSelectedSystem} disabled={!selectedSystemId}>
         <i class="fas fa-file-export" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Export', 'Export')}</span>
-      </ManagerButton>
-      <ManagerButton role="primary" onclick={createSystem}>
+      </Button>
+      <Button role="primary" onclick={createSystem}>
         <i class="fas fa-plus" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Create', 'Create')}</span>
-      </ManagerButton>
+      </Button>
     {/if}
   </div>
 {/if}

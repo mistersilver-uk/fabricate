@@ -50,7 +50,7 @@
   // is, so this chrome opened from another application portaled into a DIFFERENT WINDOW and the
   // `|| document.body` fallback made that silent.
   function getHost(node) {
-    return resolveOverlayHost(node, { component: 'ManagerModal' });
+    return resolveOverlayHost(node, { component: 'Modal' });
   }
 
   function focusables(node) {
