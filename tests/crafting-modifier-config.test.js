@@ -218,7 +218,7 @@ function assertMirrored(pairs, expectedCount, what) {
   for (const { key, fallback } of pairs) assert.equal(langText(key), fallback, `${key} drifted`);
 }
 
-/** The `text('FABRICATE…', '…')` calls a component localizes inline, both arguments literal. */
+/** The `localizeOr('FABRICATE…', '…')` calls a component localizes inline, both arguments literal. */
 const inlineCopy = (component) =>
   staticTextCalls(component).filter(({ key }) => key.startsWith('FABRICATE.'));
 
