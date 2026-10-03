@@ -203,9 +203,9 @@ export const BARE_NUMBER_FIELD_REGISTER = Object.freeze([
   }),
 ]);
 
-/** The shared component rendering the character-modifier Min / Max pair for BOTH scopes. */
+/** The panel whose local `boundsRow` snippet renders the Min / Max pair for BOTH scopes. */
 export const CHARACTER_MODIFIER_BOUNDS_PATH =
-  'src/ui/svelte/apps/manager/environment/CharacterModifierBoundsRow.svelte';
+  'src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte';
 
 /** The shared panel that renders the bounds row, once, for both scopes (issue 1707). */
 export const CHARACTER_MODIFIER_PANEL_PATH =
@@ -273,7 +273,7 @@ export const UNSET_VALUE_CALL_SITES = Object.freeze(
     {
       id: 'character modifier bounds',
       path: CHARACTER_MODIFIER_BOUNDS_PATH,
-      anchor: ['bound.patch(next)'],
+      anchor: ['{ [bound.key]: next }'],
       kind: 'genuine-absence',
       evidence:
         'an unbounded modifier bound persists as literal null, and 0 is itself a legitimate '

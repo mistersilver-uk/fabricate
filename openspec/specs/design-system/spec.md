@@ -2010,7 +2010,7 @@ A part that would need a specimen of its own is not a part; it is a candidate, a
 
 Candidates reviewed and declined MUST be recorded with the reasoning that declined them, so that the absence of a primitive is legible as a decision.
 
-The following are recorded as compositions and MUST NOT be reintroduced as components: a member row, which is a list row with a leading slot; an actor picker, which is a trigger plus the search popover; an add button, whose dashed treatment is a role on the button primitive; a rail card, which is a well, a kicker and a button; a feature card, which is option cards rendered non-interactive; a bounds input, which is two steppers; and a currency input, which is a stepper and a select.
+The following are recorded as compositions and MUST NOT be reintroduced as components: a member row, which is a list row with a leading slot; an actor picker, which is a trigger plus the search popover; an add button, whose dashed treatment is a role on the button primitive; a rail card, which is a well, a kicker and a button; a feature card, which is option cards rendered non-interactive; a bounds input, which is two steppers, and whose last component form was inlined at issue 1521; and a currency input, which is a stepper and a select.
 
 A premium panel is recorded as out of scope rather than as a composition: its only original content is marketing copy, which is a product decision, and binding copy to a component makes the offer untranslatable against a codebase where every primitive takes pre-localized strings.
 A toast and a bespoke destructive-confirmation panel are recorded as surfaces Foundry already owns.
