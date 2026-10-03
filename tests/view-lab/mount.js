@@ -120,6 +120,8 @@ function readParams() {
     rollPromptState: params.get('rollPromptState') ?? null,
     // A success-counting Checks Studio state seeded onto Karrun Forgecraft (issue 2004).
     checkPreviewState: params.get('checkPreviewState') ?? null,
+    // Brenna holds a knowledge book she can learn whole, for the Read & learn header action.
+    learnableBook: params.get('learnableBook') === '1',
     journalCaseState: params.get('journalCaseState') ?? null,
     // TWO things, and the name says only the second: a world seeded with NO crafting systems, and
     // the persisted selection cleared through the real admin store after construction.
@@ -915,6 +917,7 @@ async function boot() {
         checkOverride: params.checkOverride,
         journalCaseState: params.journalCaseState,
         checkPreviewState: params.checkPreviewState,
+        learnableBook: params.learnableBook,
       });
   await seedRollPromptFixture(world, params.rollPromptState);
   if (params.longDowntimeLabels) applyLongDowntimeLocalization(world);

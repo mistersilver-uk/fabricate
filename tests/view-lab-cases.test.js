@@ -668,10 +668,11 @@ function caseSelectors(viewCase) {
   return selectors;
 }
 
-// The five player cases whose layout expectation asserts "this STACKED at 1024px": one
+// The six player cases whose layout expectation asserts "this STACKED at 1024px": one
 // resolved track, inside a 960px content box.
 const RESPONSIVE_LAYOUT_CASE_IDS = [
   'player-inventory-bulk-mixed-narrow',
+  'player-inventory-book-read-learn-stacked',
   'player-gathering-stacked',
   'player-crafting-stacked',
   'player-alchemy-stacked',

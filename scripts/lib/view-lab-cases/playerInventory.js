@@ -18,6 +18,8 @@ import {
   responsiveLayout,
 } from './caseFactories.js';
 
+/** A book's Read & learn, which is its identity header's one primary. */
+const READ_LEARN_ACTION = '[data-player-detail-header] [data-inventory-learn-all]';
 /** The bulk roll prompt: Fabricate's own modal over the player window. */
 const BULK_PROMPT = '.fabricate-app .manager-modal[data-roll-prompt="bulk"]';
 /** The help line under the bonus field, then the batch list holding each `[name, need]` row. */
@@ -206,6 +208,39 @@ export const CASES = Object.freeze([
       ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
+  ...[
+    { id: 'player-inventory-book-read-learn', label: '' },
+    {
+      id: 'player-inventory-book-read-learn-stacked',
+      label: ', stacked',
+      position: { width: 1024, height: 860 },
+      kinds: ['responsive'],
+      expectLayout: responsiveLayout('.inventory-view-container', '.inventory-view-grid'),
+    },
+  ].map(({ id, label, kinds = [], ...variant }) =>
+    playerCase({
+      id,
+      label: `Player app — Inventory book, Read & learn${label}`,
+      smokeLabels: [],
+      reaches: 'beyond',
+      // A held knowledge book whose learn cap covers its three recipes (issue 1518).
+      query: { tab: 'inventory', learnableBook: '1' },
+      steps: [
+        { selector: '[data-inventory-search]', fill: 'Hedgerow' },
+        { selector: CARD_BUTTON('recipeitem:lab-herbalism:hb-herbal') },
+      ],
+      expectSelector: READ_LEARN_ACTION,
+      expectCenterHit: READ_LEARN_ACTION,
+      kinds: ['player', 'inventory', ...kinds],
+      sourceMatches: [
+        /^src\/ui\/svelte\/apps\/inventory\//,
+        /^src\/ui\/svelte\/stores\/inventory/,
+        /^src\/ui\/svelte\/util\/bookRecipeBrowse\.js$/,
+        PLAYER_DETAIL_HEADER,
+      ],
+      ...variant,
+    })
+  ),
   playerCase({
     id: 'player-salvage',
     label: 'Player app — Salvage',
