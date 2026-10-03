@@ -5,7 +5,8 @@
  * zero, and a zero is an empty award: no item is created and the award still states it. `rolled`
  * is `{ formula, total }` only because run records persist it, and `total` is the roll's own
  * total, not the clamped amount; the live `roll` is for the chat message and never persisted.
- * An absent `Roll` throws: awarding the authored fallback without dice is a wrong number.
+ * An absent `Roll`, or a total that is not finite (a path resolving to a string, a division by a
+ * zero-valued path), throws: the award is refused rather than given a wrong number.
  */
 export async function resolveRolledAmount(
   { quantity, quantityFormula } = {},
@@ -20,7 +21,10 @@ export async function resolveRolledAmount(
   const roll = await new Roll(formula, actor?.getRollData?.() ?? {}).evaluate({
     allowInteractive: false,
   });
-  const total = Number(roll?.total) || 0;
+  const total = Number(roll?.total);
+  if (!Number.isFinite(total)) {
+    throw new RangeError(`Fabricate | The rolled amount "${formula}" totalled ${roll?.total}`);
+  }
   return { amount: Math.max(0, Math.floor(total)), rolled: { formula, total }, roll };
 }
 
