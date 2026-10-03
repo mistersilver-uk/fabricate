@@ -79,9 +79,8 @@
   }
 
   // The INCLUDED vocabulary, from its one home (issue 1321). It answers "does the Included
-  // list show this", which is a different question from "does it compose" even though issue 1315
-  // leaves the two sets with the same four members: `includedNotMatching` belongs here because a
-  // manual pick composes whether or not it matches, and the GM still needs to see which is which.
+  // list show this", not "does it compose", though issue 1315 gives both sets the same four
+  // members: `includedNotMatching` is here because a manual pick composes matching or not.
   const included = $derived(
     records.filter((entry) => ENVIRONMENT_INCLUDED_COMPOSITION_STATES.has(entry.compositionState))
   );
@@ -89,12 +88,26 @@
     included.reduce((total, entry) => total + weightFor(entry.id), 0)
   );
   const excluded = $derived(records.filter((entry) => entry.compositionState === 'excluded'));
-  const inState = (states) => records.filter((entry) => states.includes(entry.compositionState));
-  const nonMatching = $derived(inState(['notMatching', 'libraryDisabled']));
-  // Grouped rather than in record order: the candidates, then the non-matching, then the disabled.
-  const availableToAdd = $derived(
-    ['candidate', 'notMatching', 'libraryDisabled'].flatMap((state) => inState([state]))
+  const nonMatching = $derived(
+    records.filter(
+      (entry) =>
+        entry.compositionState === 'notMatching' || entry.compositionState === 'libraryDisabled'
+    )
   );
+  const availableToAddMatching = $derived(
+    records.filter((entry) => entry.compositionState === 'candidate')
+  );
+  const availableToAddNonMatching = $derived(
+    records.filter((entry) => entry.compositionState === 'notMatching')
+  );
+  const availableToAddLibraryDisabled = $derived(
+    records.filter((entry) => entry.compositionState === 'libraryDisabled')
+  );
+  const availableToAdd = $derived([
+    ...availableToAddMatching,
+    ...availableToAddNonMatching,
+    ...availableToAddLibraryDisabled,
+  ]);
   const paginatedNonMatching = $derived(
     nonMatching.slice(
       nonMatchingPageIndex * nonMatchingPageSize,
@@ -129,15 +142,12 @@
   );
 
   // ── THE FOUR OVERFLOW MENUS, AS DATA (issue 1477) ────────────────────────────────────────
-  // The four hand-rolled `role="menu"` blocks this file carried are one `<ActionMenu>` each now,
-  // and the only thing that ever differed between them was WHICH VERBS they offered. So the
-  // difference is expressed as four item lists rather than as four copies of a menu, and the
-  // shared primitive owns the ARIA and the keyboard contract that all four had to restate.
-  //
+  // The four hand-rolled `role="menu"` blocks are one `<ActionMenu>` each now; only WHICH VERBS
+  // they offered ever differed, so that is four item lists, and the shared primitive owns the
+  // ARIA and keyboard contract all four had to restate.
   // Every `data-action` hook is preserved verbatim — `include`, `force-include`, `exclude`,
-  // `restore` — because mounted suites and the View Lab's automatic-force-add case address these
-  // rows by them. They ride the primitive's per-item `data` map, which is spread onto the item
-  // button before the primitive's own attributes.
+  // `restore` — because mounted suites and the View Lab's automatic-force-add case address rows
+  // by them. They ride the primitive's per-item `data` map, spread onto the item button first.
   const moreActionsLabel = $derived(
     localizeOr('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoreActions', 'More actions')
   );
@@ -158,9 +168,9 @@
     return { id: 'open-source', label: openSourceLabel(), icon: 'fas fa-up-right-from-square' };
   }
 
-  // The library gate precedes both composition modes, so a disabled record offers a NOTE rather
-  // than a verb. It is a disabled `menuitem` with no icon: the primitive renders the icon cell
-  // regardless, which is what keeps its label in the same text column as every other row.
+  // The library gate precedes both composition modes, so a disabled record offers a NOTE, not a
+  // verb: a disabled `menuitem` with no icon (the primitive renders the icon cell regardless,
+  // keeping its label in the same text column).
   function libraryDisabledNote() {
     return {
       id: 'library-disabled',
@@ -197,11 +207,9 @@
 
   // The Available-to-add and Non-matching menus are ONE SHAPE offering two different verbs: an add
   // verb when the row can be composed, the library note when the library gate blocks it, and
-  // Open source either way. Stated once, because the two are otherwise token-identical bodies
-  // differing only in their predicates and their verb — which is a copy the SonarCloud duplication
-  // gate counts and, more to the point, is how the four menus in this file drifted apart before.
-  // Each caller keeps its OWN predicate at its own call site, so the two questions ("does manual
-  // mode allow a plain add?" and "does automatic mode allow a force?") stay visible.
+  // Open source either way. Stated once: token-identical bodies are a copy the SonarCloud
+  // duplication gate counts, and are how the four menus drifted apart before. Each caller keeps
+  // its OWN predicate at its own call site, so the two questions stay visible.
   function gatedAddMenuItems(verb, allowed, blockedByLibrary) {
     const items = [];
     if (allowed) items.push(verb);
@@ -257,9 +265,8 @@
     );
   }
 
-  // ONE dispatcher for all four menus, because the verbs are shared across them: `open-source`
-  // appears in every one and `include` in two. A per-menu handler would be four copies of this
-  // switch with different subsets, which is how the four menus drifted apart in the first place.
+  // ONE dispatcher for all four menus: `open-source` appears in every one and `include` in two,
+  // and a per-menu handler would be four copies of this switch with different subsets.
   function runMenuAction(id, entry) {
     if (id === 'open-source') onOpenSource(kind, entry.id);
     else if (id === 'include') onInclude(kind, entry.id);
@@ -275,8 +282,8 @@
   }
 
   // The caller's per-record state, on the row element the primitive owns (issue 1512), under the
-  // caller's own family class: a state rule keyed on the primitive's row class behind an
-  // application root is the app-rooting the rooting requirement refuses.
+  // caller's own family class: a rule keyed on the primitive's row class behind an application
+  // root is the app-rooting the rooting requirement refuses.
   function includedRowClasses(entry) {
     return [
       'manager-environment-comp-entry',
@@ -292,10 +299,9 @@
     return entry?.compositionState === 'candidate' ? 'candidate' : 'non-matching';
   }
 
-  // This list is manual-mode only (its section is gated on `mode === 'manual'`), and manual
-  // mode composes exactly what the GM picks, matching or not. So a non-matching record is
-  // plainly added here — there is no filter for a force to override, and no `'force-include'`
-  // for this function to return. Force add belongs to automatic mode's Non-matching section.
+  // This list is manual-mode only (gated on `mode === 'manual'`), which composes exactly what the
+  // GM picks, matching or not. So a non-matching record is plainly added here: no filter for a
+  // force to override, no `'force-include'` to return. Force add belongs to automatic mode.
   // `libraryDisabled` is still not addable: the library gate precedes both modes.
   function availableRowAction(entry) {
     if (entry?.compositionState === 'candidate' || entry?.compositionState === 'notMatching')
