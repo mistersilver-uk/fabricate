@@ -88,12 +88,18 @@ async function assertRowGeometry(page, expectation, label) {
   if (oneLineRows) {
     const rows = await measureAll(page, oneLineRows, { label, measure: childSpans });
     for (const [index, spans] of rows.entries()) {
-      const lowestTop = Math.max(...spans.map(([top]) => top));
-      const highestBottom = Math.min(...spans.map(([, bottom]) => bottom));
-      if (lowestTop >= highestBottom) {
+      if (spans.length === 0) {
+        throw new Error(`${label}: ${oneLineRows} #${index + 1} has no visible children`);
+      }
+      const [bandTop, bandBottom] = spans[0];
+      const stray = spans.find(([top, bottom]) => {
+        const centre = (top + bottom) / 2;
+        return centre < bandTop || centre > bandBottom;
+      });
+      if (stray) {
         throw new Error(
-          `${label}: ${oneLineRows} #${index + 1} wraps: a direct child starts at ${lowestTop}px, ` +
-            `at or below another child's bottom ${highestBottom}px`
+          `${label}: ${oneLineRows} #${index + 1} wraps: a direct child centred at ` +
+            `${(stray[0] + stray[1]) / 2}px lies outside the first child's ${bandTop}-${bandBottom}px`
         );
       }
     }

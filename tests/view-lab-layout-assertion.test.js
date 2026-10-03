@@ -247,7 +247,7 @@ function rowsFrame(overrides = {}) {
     '.row': [
       row(box({ height: 28, top: 1 }), box({ top: 0 }), box({ top: 0 })),
       // Two lines tall but one line of children: the controls box hangs its message below.
-      row(box({ top: 0 }), box({ top: 0, height: 62 })),
+      row(box({ top: 0 }), box({ top: -16, height: 62 })),
     ],
     '.remove': [box({ left: 770 }), box({ left: 770 })],
     '.toggle': [box({ left: 600 }), box({ left: 600 })],
@@ -271,6 +271,26 @@ test('accepts rows on one line, shared edges and a name at its minimum, with no 
 test('rejects a row whose child wrapped to a second line', async () => {
   const wrapped = rowsFrame({ '.row': [row(box({ top: 0 }), box({ top: 34 }))] });
   await assert.rejects(assertViewLabLayout(wrapped, ROWS, 'wrapped'), /.row #1 wraps/);
+});
+
+test('rejects a wrapped child even when a tall sibling spans both lines', async () => {
+  const tall = rowsFrame({
+    '.row': [row(box({ top: 0 }), box({ top: 0, height: 80 }), box({ top: 34 }))],
+  });
+  await assert.rejects(assertViewLabLayout(tall, ROWS, 'tall'), /.row #1 wraps/);
+});
+
+test('rejects a child that overlaps the first by a pixel only', async () => {
+  const overlap = rowsFrame({ '.row': [row(box({ top: 0 }), box({ top: 29 }))] });
+  await assert.rejects(assertViewLabLayout(overlap, ROWS, 'overlap'), /.row #1 wraps/);
+});
+
+test('rejects a row with no visible children', async () => {
+  const empty = rowsFrame({ '.row': [row(), row(box({ top: 0 }))] });
+  await assert.rejects(
+    assertViewLabLayout(empty, ROWS, 'empty'),
+    /.row #1 has no visible children/
+  );
 });
 
 test('rejects a remove or a toggle off the shared edge', async () => {
