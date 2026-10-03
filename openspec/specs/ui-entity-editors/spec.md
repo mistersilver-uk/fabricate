@@ -278,7 +278,7 @@ Rows contain Tool identity and removal only: Recipe data exposes no breakage, co
 
 #### The requirement row
 
-ONE row shape authors every requirement and every result, on every surface that authors one: the recipe editor's ingredient list, the Tool Breakage tab's repair set and the world Tool entry's copy of that same set, and, on the result side, a recipe's result sets and a gathering task's result sets.
+ONE row shape authors every requirement and every result, on every surface that authors one: the recipe editor's ingredient list, the Tool Breakage tab's repair set and the world Tool entry's copy of that same set, and, on the result side, a recipe's result sets, a gathering task's result sets and a component's salvage result sets.
 Its anatomy is the kind FIRST and the value second:
 
 ```text
@@ -598,7 +598,5 @@ Gathering: `progressive` and `routed` render all five; `d100` renders Modifiers 
   The badge is read-only because the difficulty belongs to the **result** component, whose own editor owns its save lifecycle.
 - A progressive result row — recipe or salvage — renders **no quantity control**, because `resolution-modes` normalizes every awarded progressive entry to a single item; the GM expresses "more of X" by listing X again and ordering the list.
   The `simple` and `routed` salvage rows KEEP their quantity, which those modes award as authored.
-- A salvage result row picks its component through a **searchable popover whose trigger carries the component's image and its name**, not a native `<select>`.
-  The image is required: a `<select>` can only present a text list, on a surface where every other component is shown with its art.
-  The trigger is ONE control over both facts, and an art-less component falls back to a glyph rather than emitting an image element with no source.
-  The popover is portaled to the manager host so it escapes the editor panel's `overflow: hidden`.
+- A salvage result row is **the requirement row**: it names its component through the row's name field, whose named pill carries the component's image and its name, never a native `<select>`.
+  An art-less component falls back to a glyph rather than emitting an image element with no source.
