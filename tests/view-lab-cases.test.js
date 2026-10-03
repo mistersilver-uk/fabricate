@@ -982,7 +982,7 @@ test('all Journal lifecycle captures assert defining product state rather than a
     'essence-overshoot',
     'past-routed-stage',
     'future-routed-stage',
-    'kind-menu-open',
+    'kind-toggles',
     'history-settling',
   ]) {
     assert.ok(byState.has(state), `issue #1648 v4 explicitly requires ${state}`);

@@ -3,9 +3,9 @@
   import { localize, subscribeSceneChange, subscribeWorldTime } from '../../util/foundryBridge.js';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
   import Notice from '../../components/Notice.svelte';
-  import Select from '../../components/Select.svelte';
   import SegmentedControl from '../../components/SegmentedControl.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
+  import StatusToggle from '../../components/StatusToggle.svelte';
   import PlayerViewState from '../PlayerViewState.svelte';
   import ActiveRunsList from './ActiveRunsList.svelte';
   import HistoryList from './HistoryList.svelte';
@@ -42,13 +42,20 @@
     }
   );
 
-  const kindOptions = $derived([
-    { value: 'all', label: localize('FABRICATE.App.Journal.Filters.Kind.All') },
-    { value: 'crafting', label: localize('FABRICATE.App.Journal.Filters.Kind.Crafting') },
-    { value: 'gathering', label: localize('FABRICATE.App.Journal.Filters.Kind.Gathering') },
-    { value: 'salvage', label: localize('FABRICATE.App.Journal.Filters.Kind.Salvage') },
-    { value: 'alchemy', label: localize('FABRICATE.App.Journal.Filters.Kind.Alchemy') },
+  // One independent toggle per run kind; the store holds the shown set and owns the union.
+  const KIND_TOGGLES = Object.freeze([
+    { kind: 'crafting', labelKey: 'FABRICATE.App.Journal.Filters.Kind.Crafting' },
+    { kind: 'gathering', labelKey: 'FABRICATE.App.Journal.Filters.Kind.Gathering' },
+    { kind: 'salvage', labelKey: 'FABRICATE.App.Journal.Filters.Kind.Salvage' },
+    { kind: 'alchemy', labelKey: 'FABRICATE.App.Journal.Filters.Kind.Alchemy' },
   ]);
+  const shownKinds = $derived(
+    Array.isArray(journal?.kindFilter)
+      ? journal.kindFilter
+      : KIND_TOGGLES.map((toggle) => toggle.kind)
+  );
+  const kindFiltered = $derived(KIND_TOGGLES.some((toggle) => !shownKinds.includes(toggle.kind)));
+  const instanceId = $props.id();
   const statusOptions = $derived([
     {
       value: 'all',
@@ -129,17 +136,24 @@
                 data-journal-search="true"
               />
             </div>
-            <div class="journal-kind-field">
-              <Select
-                size="inline"
-                minWidth={240}
-                maxWidth={340}
-                value={journal?.kindFilter ?? 'all'}
-                options={kindOptions}
-                ariaLabel={localize('FABRICATE.App.Journal.Filters.Kind.Label')}
-                triggerProps={{ 'data-journal-kind-filter': true }}
-                onChange={(value) => journal?.setKindFilter?.(value)}
-              />
+            <div
+              class="journal-kind-field"
+              role="group"
+              aria-label={localize('FABRICATE.App.Journal.Filters.Kind.Label')}
+              data-journal-kind-filter=""
+            >
+              {#each KIND_TOGGLES as toggle (toggle.kind)}
+                {@const labelId = `${instanceId}-kind-${toggle.kind}`}
+                <span class="journal-kind-toggle">
+                  <StatusToggle
+                    on={shownKinds.includes(toggle.kind)}
+                    aria-labelledby={labelId}
+                    data-journal-kind-toggle={toggle.kind}
+                    onclick={() => journal?.toggleKind?.(toggle.kind)}
+                  />
+                  <span id={labelId} class="journal-kind-label">{localize(toggle.labelKey)}</span>
+                </span>
+              {/each}
             </div>
           </div>
           <SegmentedControl
@@ -156,7 +170,7 @@
             <ActiveRunsList
               runs={activeRuns}
               filtered={Boolean(journal?.search?.trim()) ||
-                (journal?.kindFilter ?? 'all') !== 'all' ||
+                kindFiltered ||
                 (journal?.activeStatusFilter ?? 'all') !== 'all'}
               totalCount={journal?.activeCount ?? activeRuns.length}
               {selectedRunKey}
@@ -172,8 +186,7 @@
             />
             <HistoryList
               runs={historyRuns}
-              filtered={Boolean(journal?.search?.trim()) ||
-                (journal?.kindFilter ?? 'all') !== 'all'}
+              filtered={Boolean(journal?.search?.trim()) || kindFiltered}
               totalCount={journal?.historyCount ?? historyRuns.length}
               pageIndex={journal?.historyPage ?? 0}
               pageSize={journal?.historyPageSize ?? 4}
@@ -251,13 +264,24 @@
     min-width: 0;
   }
   .journal-kind-field {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--fab-space-2) var(--fab-space-3);
     min-width: 0;
   }
-  .journal-kind-field > :global(.fabricate-select) {
-    width: 100%;
+  .journal-kind-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--fab-space-2);
+    min-width: 0;
   }
-  .journal-kind-field > :global(.fabricate-select .fabricate-select-trigger) {
-    width: 100%;
+  .journal-kind-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    color: var(--fab-text-muted);
   }
   .journal-browse-lists {
     display: grid;

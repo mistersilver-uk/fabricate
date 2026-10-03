@@ -17,7 +17,6 @@ import {
   stockJournalPrototype,
   JOURNAL_PROTOTYPE_BINDINGS,
 } from '../view-lab/world/labJournalPrototype.js';
-import { chooseSelectOption } from '../helpers/select-control.js';
 import {
   PLAYER_APP_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
@@ -82,7 +81,7 @@ const harness = createMountedComponentHarness({
     ...SELECT_COMPILED_MODULES,
     ...PLAYER_APP_COMPILED_MODULES,
     'src/ui/svelte/components/ManagerSearchField.svelte',
-    component('Pagination'),
+    'src/ui/svelte/components/Pagination.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     component('ManagerButton'),
     'src/ui/svelte/components/InspectorCard.svelte',
@@ -2346,8 +2345,11 @@ describe('Journal versioned lifecycle (mounted)', () => {
 
     harness.remount();
     const salvage = await mountState('salvage');
-    chooseSelectOption(salvage.target, '[data-journal-kind-filter]', 'salvage');
-    assert.equal(salvage.store.kindFilter, 'salvage');
+    for (const kind of ['crafting', 'gathering', 'alchemy']) {
+      salvage.target.querySelector(`[data-journal-kind-toggle="${kind}"]`).click();
+    }
+    flushSync();
+    assert.deepEqual(salvage.store.kindFilter, ['salvage']);
     assert.ok(salvage.target.querySelector('[data-history-run-id="lab-v1-salvage"]'));
   });
 

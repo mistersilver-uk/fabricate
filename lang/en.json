@@ -1274,7 +1274,6 @@
           "SearchLabel": "Search runs",
           "Kind": {
             "Label": "Kind",
-            "All": "All kinds",
             "Crafting": "Crafting",
             "Gathering": "Gathering",
             "Salvage": "Salvage",

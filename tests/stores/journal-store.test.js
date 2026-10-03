@@ -138,8 +138,8 @@ const JOURNAL_STORE_SHAPE = {
     'advance', 'beginStep', 'cancel', 'dismiss', 'execute', 'load', 'pause', 'resume',
     'retryCommandError', 'returnToCurrentStage', 'select', 'setActivePage', 'setActivePageSize',
     'setActiveSort', 'setActiveStatusFilter', 'setCompletionMode', 'setHistoryPage',
-    'setHistoryPageSize', 'setHistorySort', 'setKindFilter', 'setSearch', 'setSelection',
-    'tickWorldTime', 'viewStage',
+    'setHistoryPageSize', 'setHistorySort', 'setSearch', 'setSelection', 'tickWorldTime',
+    'toggleKind', 'viewStage',
   ],
 };
 
@@ -297,7 +297,7 @@ describe('journalStore', () => {
     ];
     const store = await loadedStore(makeServices({ listing: baseListing({ activeRuns, history: [] }) }));
 
-    store.setKindFilter('crafting');
+    for (const kind of ['gathering', 'salvage', 'alchemy']) store.toggleKind(kind);
     store.setSearch('silver');
     store.setActiveStatusFilter('paused');
     flushSync();
@@ -390,7 +390,7 @@ describe('journalStore', () => {
     const setup = makeServices({ listing: baseListing({ activeRuns, history: [] }) });
     const store = await loadedStore(setup);
     store.select(activeRuns[6]);
-    store.setKindFilter('crafting');
+    store.toggleKind('alchemy');
     store.setSearch('no-match');
     flushSync();
 
