@@ -922,14 +922,11 @@
   --fab-cluster-gap: var(--fab-space-3);
 }
 
-/* Active-run count badge on the Journal nav rail entry. The player nav rail is a
-   fixed-width column of square icon buttons (no collapsible rail, unlike the
-   manager's .manager-nav-count), so the badge floats in the button's top-right
-   corner. Tokenized green to match the run-ready/active semantics. */
+/* The rail's count pip: filled, on the icon well's outer corner and ringed in the rail's ground so it never covers the glyph. The fill stays success for the run-ready meaning (maintainer ruling, 2026-09-19). */
 .fabricate-app .fabricate-app-nav-count {
   position: absolute;
-  top: 4px;
-  right: 4px;
+  top: -3px;
+  right: -3px;
   min-width: 16px;
   height: 16px;
   padding: 0 4px;
@@ -938,12 +935,13 @@
   justify-content: center;
   box-sizing: border-box;
   border-radius: 999px;
-  border: 1px solid var(--fab-success-border);
-  font-size: 10px;
-  font-weight: 700;
+  font-family: var(--fab-font-mono);
+  font-size: 9px;
+  font-weight: 500;
   line-height: 1;
   color: var(--fab-on-success);
   background: var(--fab-success);
+  box-shadow: 0 0 0 2px var(--fab-bg-1);
 }
 
 /* Journal fact cards share header geometry across active and recorded accounts. */

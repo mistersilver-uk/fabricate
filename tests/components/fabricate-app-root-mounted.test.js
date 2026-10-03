@@ -1,6 +1,7 @@
 /** The player shell's mounted tier. */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { tick } from '../../node_modules/svelte/src/index-client.js';
 import {
@@ -774,23 +775,52 @@ describe('FabricateAppRoot (mounted, against a real player registry)', () => {
     );
   });
 
-  it('lets the rail button yield the scrollbar gutter rather than overflowing the 84px column', async () => {
-    // ASSERTED AS A DECLARATION, not as measured overflow.
+  it('draws the rail as 72px of 44px wells that yield the scrollbar gutter', async () => {
+    // Asserted as declarations: headless Chromium's overlay scrollbars take no layout width.
     const { root } = await mountOnCompanionTab();
     const css = shellStyleSheet(root);
 
-    assert.match(
-      ruleBody(css, 'fabricate-app-nav-item'),
-      /width:\s*min\(64px,\s*100%\)/,
-      'a non-shrinkable 64px button inside a 68px content box puts a VISIBLE horizontal '
-        + 'scrollbar in the rail once a thin classic scrollbar takes its ~12px'
-    );
+    assert.match(ruleBody(css, 'fabricate-app-nav'), /flex:\s*0 0 72px/, 'the rail is 72px');
     assert.match(
       ruleBody(css, 'fabricate-app-nav'),
       /scrollbar-gutter:\s*stable/,
-      'and the gutter is reserved up front, so crossing the entry count that starts the scroll '
-        + 'does not reflow the whole column'
+      'the gutter is reserved up front, so crossing the entry count that starts the scroll does '
+        + 'not reflow the column'
     );
+    const well = ruleBody(css, 'fabricate-app-nav-well');
+    assert.match(well, /height:\s*44px/, 'each item is a 44px icon well');
+    assert.match(well, /border-radius:\s*9px/, 'at radius 9');
+    assert.match(
+      well,
+      /width:\s*min\(44px,\s*100%\)/,
+      'a well that cannot shrink below 44px inside a 60px rail puts a visible horizontal '
+        + 'scrollbar in it once a thin classic scrollbar takes its ~12px'
+    );
+    assert.match(ruleBody(css, 'fabricate-app-nav-label'), /font-size:\s*10px/, 'labels are 10px');
+  });
+
+  it("puts the journal count pip on the well's outer corner with a ground ring", async () => {
+    const registry = createPlayerExtensionsRegistry({ emitHook: () => {} });
+    const props = makeHost(registry).props();
+    props.services.journal.navCount = 3;
+    const root = await harness.mount(props);
+
+    const pip = root.querySelector('[data-nav-count="journal"]');
+    assert.equal(pip?.textContent, '3', 'the journal entry renders its active-run count');
+    assert.ok(
+      pip.parentElement.classList.contains('fabricate-app-nav-well'),
+      'the pip is positioned against the icon well, never against the whole item'
+    );
+    const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
+    const pipRule = /\.fabricate-app \.fabricate-app-nav-count\s*\{([^}]*)\}/.exec(sheet)?.[1] ?? '';
+    assert.match(pipRule, /top:\s*-3px/, 'the pip overhangs the top edge of the well');
+    assert.match(pipRule, /right:\s*-3px/, 'and its right edge, clear of the glyph');
+    assert.match(
+      pipRule,
+      /box-shadow:\s*0 0 0 2px var\(--fab-bg-1\)/,
+      'a 2px ring in the rail ground separates the pip from the well it overhangs'
+    );
+    assert.match(pipRule, /min-width:\s*16px/, 'the pip is at least 16px');
   });
 });
 
