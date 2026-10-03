@@ -40,7 +40,7 @@ describe('GatheringEventsBrowserView source contract', () => {
     // 1039), so the browser is asserted to RENDER the primitive rather than to write the
     // input itself — a source assertion left pointing at moved markup passes for the wrong
     // reason or fails for one.
-    assert.ok(browserSource.includes('<SearchField'), 'browser should render the shared search field');
+    assert.ok(/<SearchField[\s/>]/.test(browserSource), 'browser should render the shared search field');
     // The term is no longer this component's to own (issue 1438).
     assert.ok(browserSource.includes('value={searchTerm}'), 'browser should render the search term');
     assert.ok(

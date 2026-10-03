@@ -84,7 +84,7 @@ test('no .svelte under src writes the manager-button class literal', () => {
   // NON-VACUITY, in the precedent's own style and for the precedent's own reason: an absence check
   // over an empty corpus passes forever and reports itself satisfied.
   const callSiteFiles = svelte.filter((path) =>
-    readFileSync(join(repoRoot, path), 'utf8').includes('<Button')
+    /<Button[\s/>]/.test(readFileSync(join(repoRoot, path), 'utf8'))
   );
   assert.ok(
     callSiteFiles.length >= 41,

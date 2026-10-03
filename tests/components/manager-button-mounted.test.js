@@ -189,7 +189,7 @@ describe('Button emits the element and classes its call sites are styled against
       assert.ok(!button().hasAttribute('disabled'), 'an anchor must not carry disabled');
       // Silently dropping it would leave a call site believing it had disabled the control.
       assert.ok(
-        warnings.some((warning) => warning.includes('Button')),
+        warnings.some((warning) => warning.includes('Fabricate | Button:')),
         `expected a named warning, got ${JSON.stringify(warnings)}`
       );
     } finally {

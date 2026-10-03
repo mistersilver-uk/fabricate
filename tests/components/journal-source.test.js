@@ -99,7 +99,7 @@ describe('JournalView layout + effects', () => {
       ),
       'the search primitive can fit the compact search/kind grid without overlapping the kind control'
     );
-    assert.ok(viewSource.includes('<SearchField'));
+    assert.ok(/<SearchField[\s/>]/.test(viewSource));
     assert.ok(viewSource.includes('class="journal-search-control"'));
     assert.ok(viewSource.includes('size="30"'));
     assert.ok(viewSource.includes('<div class="journal-kind-field">'));
