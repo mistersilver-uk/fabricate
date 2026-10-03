@@ -256,7 +256,7 @@ export const CONVERTED_PAGER_SITES = Object.freeze([
     floored: true,
     declaredArrow: 28,
   }),
-  // The recipe browser's re-theme is deleted (issue 1518), so its pager paints itself.
+  // No re-theme: the pager paints itself (issue 1518).
   Object.freeze({
     probe: 'recipes',
     padding: '12px',
@@ -267,7 +267,7 @@ export const CONVERTED_PAGER_SITES = Object.freeze([
     floored: true,
     declaredArrow: 28,
   }),
-  // The three gathering re-themes are deleted too (issue 1518).
+  // Nor do the gathering pagers.
   Object.freeze({
     probe: 'environments',
     padding: '12px',

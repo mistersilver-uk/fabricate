@@ -1,7 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <!--
   The held-stack picker in an open requirement's panel: when the group's chosen option is a tag
-  matching several held stacks, it lets the player choose WHICH held item the craft consumes. The
+  matching several held stacks, it lets the player choose which held item the craft consumes. The
   group's alternatives themselves are the requirement chooser's tiles, drawn above it.
 
   Props:
