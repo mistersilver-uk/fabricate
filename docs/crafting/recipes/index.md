@@ -63,7 +63,7 @@ Examples are an expression that reads a text value from the character, or one th
 The player sees the craft refused, and their ingredients stay where they are.
 
 {: .note }
-> A progressive recipe has no amount on its stage rows, because each stage is produced once or not at all.
+> A progressive recipe has no amount on its stage rows, because a progressive award drops every formula.
 > Any rolled amount on a progressive recipe is ignored.
 
 A result row names its component and cannot be cleared.
@@ -71,6 +71,7 @@ To change a result, remove the row and add another.
 A progressive stage is the exception, because it can swap its component in place and so keep its place in the order.
 Adding a component that a result set already produces raises that row's quantity.
 If that row is rolled, a second row is added instead.
+A progressive recipe always adds a new stage, so repeat a component there to produce it again.
 
 ## Enabling and Disabling Recipes
 
