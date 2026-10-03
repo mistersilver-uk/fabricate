@@ -5348,7 +5348,7 @@
   min-width: 0;
 }
 
-/* These chain `.fabricate-button` into the selector (raising specificity to 0,3,0) so they beat the base `.fabricate-button.fabricate-button` rule declared LATER in this file (0,2,0) — which otherwise wins on source order and repaints every one of them the dark overlay surface, collapsing Edit's accent fill and Delete's danger text into the same flat button (issues 643, 1118). */
+/* These chain the doubled root and `fab-manager-button` into the selector (0,4,0) so they beat the base `.fabricate-button.fabricate-button` rule declared LATER in this file (0,2,0) — which otherwise wins on source order and repaints every one of them the dark overlay surface, collapsing Edit's accent fill and Delete's danger text into the same flat button (issues 643, 1118). */
 
 /* Dark secondary: the panel surface, a subtle border, normal text. The font-size and weight match the Edit button so all three action buttons read at one size. */
 .fabricate-button.fabricate-button.fab-manager-button.manager-recipe-browser-inspector-duplicate,
