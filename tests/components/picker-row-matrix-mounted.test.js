@@ -417,40 +417,75 @@ describe('PickerRow: every reachable cell acts', () => {
 describe('PickerRow: the amount toggle is one named radio group', () => {
   const config = SURFACES['recipe result'];
 
-  it('draws the caller’s segment words and names, falling back to the stepper’s name', async () => {
-    const stored = { ...unnamed('component'), id: 'c-iron', quantityFormula: '1d4' };
-    const { target } = await mountRow(config, stored, {
-      amount: {
-        fixedLabel: 'Fixed',
-        rolledLabel: 'Rolled',
-        modeAriaLabel: 'Amount for Iron ingot',
-        formulaAriaLabel: 'Rolled amount for Iron ingot',
-      },
+  it('names every control for the subject, or the kind while unnamed', async () => {
+    const names = (target) => ({
+      kind: target.querySelector('[data-recipe-option-kind]').getAttribute('aria-label'),
+      toggle: target.querySelector('[role="radiogroup"]').getAttribute('aria-label'),
+      words: [...target.querySelectorAll(`${TOGGLE} .manager-segment-label`)].map(
+        (node) => node.textContent
+      ),
+      formula: target.querySelector(FORMULA).getAttribute('aria-label'),
+      remove: target.querySelector('[data-recipe-remove]').getAttribute('aria-label'),
     });
-    const group = target.querySelector('[role="radiogroup"]');
-    assert.equal(group.getAttribute('aria-label'), 'Amount for Iron ingot');
-    assert.deepEqual(
-      [...group.querySelectorAll('.manager-segment-label')].map((node) => node.textContent),
-      ['Fixed', 'Rolled']
-    );
-    assert.equal(
-      target.querySelector(FORMULA).getAttribute('aria-label'),
-      'Rolled amount for Iron ingot'
-    );
+    const stored = { ...unnamed('component'), id: 'c-iron', quantityFormula: '1d4' };
+    const { target } = await mountRow(config, stored);
+    assert.deepEqual(names(target), {
+      kind: 'Kind of Iron ingot',
+      toggle: 'Amount for Iron ingot',
+      words: ['Fixed', 'Rolled'],
+      formula: 'Rolled amount for Iron ingot',
+      remove: 'Remove Iron ingot',
+    });
+    const clear = target.querySelector('[data-recipe-option-clear]');
+    assert.equal(clear.getAttribute('aria-label'), 'Clear Iron ingot');
+    assert.equal(clear.getAttribute('title'), 'Clear and search again');
+    // The hint names no roll-data path, and says what an absent one is worth.
+    const hint = target.querySelector(FORMULA).getAttribute('title');
+    assert.match(hint, /missing character value counts as 0/);
+    assert.doesNotMatch(`${hint} ${target.querySelector(FORMULA).placeholder}`, /@|abilities/);
     harness.remount();
 
-    const bare = await mountRow(config, stored, {
-      amount: { ariaLabel: 'Quantity for Iron ingot' },
+    const open = await mountRow(config, { ...unnamed('component'), quantityFormula: '1d4' });
+    assert.deepEqual(names(open.target), {
+      kind: 'Kind of Component',
+      toggle: 'Amount for Component',
+      words: ['Fixed', 'Rolled'],
+      formula: 'Rolled amount for Component',
+      remove: 'Remove Component',
     });
+    harness.remount();
+
+    // Caller copy overrides each name.
+    const overridden = await mountRow(config, stored, {
+      amount: {
+        fixedLabel: 'Set',
+        rolledLabel: 'Dice',
+        modeAriaLabel: 'How many',
+        formulaAriaLabel: 'Dice for Iron',
+      },
+    });
+    assert.deepEqual(names(overridden.target), {
+      kind: 'Kind of Iron ingot',
+      toggle: 'How many',
+      words: ['Set', 'Dice'],
+      formula: 'Dice for Iron',
+      remove: 'Remove Iron ingot',
+    });
+    harness.remount();
+
+    // On Fixed the stepper is named for the subject too.
+    const fixed = await mountRow(config, { ...unnamed('component'), id: 'c-iron' });
     assert.equal(
-      bare.target.querySelector('[role="radiogroup"]').getAttribute('aria-label'),
+      fixed.target.querySelector('[data-stepper-input]').getAttribute('aria-label'),
       'Quantity for Iron ingot'
     );
-    assert.equal(
-      bare.target.querySelector(FORMULA).getAttribute('aria-label'),
-      'Quantity for Iron ingot',
-      'a control is never left unnamed'
-    );
+  });
+
+  it('draws the toggle on the 30px inline rung', async () => {
+    const { target } = await mountRow(config, unnamed('component'));
+    const track = target.querySelector('[role="radiogroup"]');
+    assert.ok(track.classList.contains('is-inline'), 'the rung no taller than the row’s controls');
+    assert.ok(!track.classList.contains('is-compact'));
   });
 
   it('gives each row its own group, whose keyboard entry point is the checked radio', async () => {
@@ -681,6 +716,19 @@ describe('PickerRow: the remaining branches', () => {
     assert.equal(changes.length, 0);
   });
 
+  it('clearable=false drops the named pill’s clear, and removeHook re-marks the remove', async () => {
+    const stored = { ...unnamed('component'), id: 'c-iron' };
+    const { target } = await mountRow(SURFACES['recipe result'], stored, {
+      clearable: false,
+      removeHook: 'result-item',
+    });
+    assert.ok(Boolean(target.querySelector('[data-recipe-option-chosen]')), 'still named');
+    assert.ok(!target.querySelector('[data-recipe-option-clear]'), 'with no clear');
+    const remove = target.querySelector('[data-recipe-remove]');
+    assert.equal(remove.getAttribute('data-recipe-remove'), 'result-item');
+    assert.equal(remove.getAttribute('data-keyboard-focus'), 'true', 'declared focused to Foundry');
+  });
+
   it('an unrecognised kind is drawn as a misconfiguration, never as a component', async () => {
     const { target, removes, changes } = await mountRow(SURFACES['recipe result'], {
       ...unnamed('knowledge'),
@@ -705,6 +753,17 @@ describe('PickerRow: the remaining branches', () => {
       target.querySelector('.manager-recipe-option-lead').className,
       'manager-recipe-option-lead is-unknown'
     );
+
+    // The field says so in words, and the kind select is described by why.
+    const tag = target.querySelector(
+      ':scope [data-recipe-option-misconfigured] .manager-recipe-req-tag'
+    );
+    assert.equal(tag.textContent.trim(), 'Unknown kind');
+    const hint =
+      'Fabricate does not recognise the kind "knowledge". Remove this row or correct the data.';
+    assert.equal(tag.getAttribute('title'), hint);
+    const describedBy = target.querySelector(KIND_TRIGGER).getAttribute('aria-describedby');
+    assert.equal(target.querySelector(`[id="${describedBy}"]`).textContent, hint);
 
     // The kind select states the raw kind, takes focus and refuses to open.
     const trigger = target.querySelector(KIND_TRIGGER);

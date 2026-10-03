@@ -250,6 +250,8 @@ Result data is validated as part of recipe validation and consumed by the crafti
 > The formula is a roll expression, resolved once per result per award against the crafting character, and it can reference the character's own roll data.
 > `Result.validate({ Roll })` accepts `Roll` as an injected dependency and rejects a formula with no character reference whose maximum possible roll can never exceed zero.
 > With no `Roll` supplied, validation reports nothing about `quantityFormula`.
+> `Recipe.validate({ Roll, progressive })` and `Recipe.validateStructure({ Roll, progressive })` pass `Roll` down to every result.
+> With `progressive: true` they skip formula checks, because a progressive award drops every formula.
 > An empty, whitespace-only, or absent `quantityFormula` leaves the amount fixed at `quantity`, which is the state of every result created before this field existed.
 
 **Related methods:**

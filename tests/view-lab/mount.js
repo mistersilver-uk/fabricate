@@ -114,6 +114,8 @@ function readParams() {
     // Which crafting system the manager opens on.
     system: params.get('system') ?? null,
     gatheringTaskMode: params.get('gatheringTaskMode') ?? null,
+    // A recipe result naming no component, for the result row's suggestion list (issue 1516).
+    resultRowState: params.get('resultRowState') ?? null,
     // Ashfall Runework's routed crafting check graded roll-under (issue 2005).
     runeworkCheckMode: params.get('runeworkCheckMode') ?? null,
     checkOverride: params.get('checkOverride') ?? null,
@@ -913,6 +915,7 @@ async function boot() {
         noInteractables: params.noInteractables,
         noSceneRegions: params.noSceneRegions,
         gatheringTaskMode: params.gatheringTaskMode,
+        resultRowState: params.resultRowState,
         runeworkCheckMode: params.runeworkCheckMode,
         checkOverride: params.checkOverride,
         journalCaseState: params.journalCaseState,

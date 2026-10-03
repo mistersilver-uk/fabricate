@@ -278,12 +278,23 @@ Rows contain Tool identity and removal only: Recipe data exposes no breakage, co
 
 #### The requirement row
 
-ONE row shape authors every requirement, on every surface that authors one: the recipe editor's ingredient list, the Tool Breakage tab's repair set, and the world Tool entry's copy of that same set.
+ONE row shape authors every requirement and every result, on every surface that authors one: the recipe editor's ingredient list, the Tool Breakage tab's repair set and the world Tool entry's copy of that same set, and, on the result side, a recipe's result sets and a gathering task's result sets.
 Its anatomy is the kind FIRST and the value second:
 
 ```text
-[plate] [kind select] [name field] [quantity] [or…] [remove]
+[plate] [kind select] [name field] [fixed | rolled] [amount] [or…] [remove]
 ```
+
+The fixed-or-rolled toggle is drawn on result rows alone; a progressive result row draws neither it nor an amount, and carries its stage's read-only DC and its Edit link where the remove would be, because a stage's delete is its ordered list's own.
+
+- **A result's amount is fixed or rolled.**
+Rolled swaps the stepper for a roll expression in the same slot, at the same width and height, so the toggle moves nothing else in the row; Fixed removes the expression from the result and keeps its quantity, and switching back restores what was typed.
+Opening Rolled and typing nothing writes nothing.
+The expression's placeholder is a dice expression and names no roll-data path, and its hint says a missing character value counts as 0.
+An expression that cannot be rolled, or can never award a positive amount, is marked invalid on the row with its reason on a line of its own, and the save refuses it.
+- **A flat result row names its component and cannot clear it.**
+Its name field has no clear: a flat result is re-pointed by removing it and adding another, while a progressive stage swaps its component in place so that it keeps its position in the order.
+Adding a component the set already produces raises that row's quantity, unless that row's amount is rolled, in which case a second row is added.
 
 - **Each kind carries its own tint, on every glyph the row draws for its subject.**
 The plate, the named pill's mark and each suggestion's take one colour per kind — component, tag, essence and currency are four distinct hues — so a mixed list reads as one list with four marks in it.

@@ -886,3 +886,27 @@ test('the lab roll-prompt answerer stops answering once disconnected', async () 
     await window.happyDOM.abort();
   }
 });
+
+test('1516: evaluateSync reads dice at an extreme and skips modifiers, as core does', async () => {
+  const { quantityFormulaErrors } = await import('../src/models/Result.js');
+  const Roll = makeRoll();
+  const maximum = (formula) => new Roll(formula).evaluateSync({ maximize: true }).total;
+  assert.equal(maximum('1d4+1'), 5);
+  assert.equal(maximum('2d6kh1'), 12, 'core’s sync path skips modifiers');
+  assert.equal(maximum('2d20cs<=0'), 40, 'a count modifier too');
+  assert.equal(maximum('@abilities.str.mod + 1'), 1, 'a missing path reads 0');
+  assert.throws(() => maximum('1000d4'), /999 dice/, 'core caps one term at 999 dice');
+  assert.equal(new Roll('2d6 + 1').evaluateSync({ minimize: true }).total, 3);
+  assert.throws(() => new Roll('1d4').evaluateSync(), /synchronously/, 'dice need an extreme');
+  assert.equal(new Roll('2 + 3').evaluateSync().total, 5, 'a dice-free formula needs none');
+
+  // The floor the amount field's error and the save path both read.
+  assert.deepEqual(quantityFormulaErrors('1d4+1', Roll), []);
+  assert.deepEqual(quantityFormulaErrors('0', Roll), [
+    'quantity formula can never award a positive amount',
+  ]);
+  assert.deepEqual(quantityFormulaErrors('max(, 2)', Roll), ['quantity formula cannot be rolled']);
+  assert.deepEqual(quantityFormulaErrors('1d4 / @x', Roll), ['quantity formula cannot be rolled']);
+  const divided = await new Roll('1d4 / @x').evaluate();
+  assert.equal(Number.isFinite(divided.total), false, 'and the async total is left as computed');
+});

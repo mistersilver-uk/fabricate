@@ -64,7 +64,7 @@ function normalizeComponentEssences(essences) {
 }
 
 /** The admin store's `_buildRecipeList` projection, from `toJSON()`, plus `incomplete`. */
-function projectRecipe(recipe) {
+function projectRecipe(recipe, system) {
   const raw = typeof recipe?.toJSON === 'function' ? recipe.toJSON() : recipe || {};
   return {
     id: raw.id,
@@ -75,7 +75,7 @@ function projectRecipe(recipe) {
     resultGroups: asArray(raw.resultGroups),
     resultSelection: raw.resultSelection || null,
     toolIds: asArray(raw.toolIds),
-    incomplete: isRecipeIncomplete(recipe, raw),
+    incomplete: isRecipeIncomplete(recipe, raw, system?.resolutionMode === 'progressive'),
     structureKey: raw.structureKey,
   };
 }
@@ -84,9 +84,9 @@ function projectRecipe(recipe) {
  * A persistable but uncraftable shell, per the model's `validate()` and `validateStructure()` when
  * present, else a count-only fallback (the admin store's `_isRecipeIncomplete`).
  */
-function isRecipeIncomplete(recipe, raw) {
+function isRecipeIncomplete(recipe, raw, progressive) {
   if (typeof recipe?.validate === 'function' && typeof recipe?.validateStructure === 'function') {
-    const injected = { Roll: diceEngine() };
+    const injected = { Roll: diceEngine(), progressive };
     return (
       recipe.validate(injected).valid === false && recipe.validateStructure(injected).valid === true
     );
@@ -177,7 +177,7 @@ function collectRecipeIssues(system, recipes, systemComponents) {
   const mode = system?.resolutionMode || 'simple';
   const issues = [];
   for (const recipe of asArray(recipes)) {
-    const projected = projectRecipe(recipe);
+    const projected = projectRecipe(recipe, system);
     // The routing basis is the system MODE: `routedByCheck`, and alchemy with a tiered
     // `alchemy.checkMode`, route by the check; every other mode routes by neither.
     let routingProvider = null;

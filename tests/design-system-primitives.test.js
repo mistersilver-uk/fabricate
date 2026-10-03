@@ -148,6 +148,8 @@ const EXPECTED_OVERRIDE_KEYS = [
   // rather than for a new piece of vocabulary. Its entry names fifteen frames against the
   // parent's ten, because every caller that opens a panel draws this file and only this file.
   'src/ui/svelte/components/SearchablePopoverPanel.svelte',
+  // Issue 1516: the track, whose 30px inline rung only the requirement row's amount toggle draws.
+  'src/ui/svelte/components/SegmentedControl.svelte',
   // Issue 1504: the app's own select.
   'src/ui/svelte/components/Select.svelte',
   // Issue 1373, round 5: the box's `sm` SIZE has one caller — the Tool Studio's prerequisite row
@@ -213,7 +215,6 @@ const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/components/ArmedDangerButton.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
   'src/ui/svelte/components/FillBar.svelte',
-  'src/ui/svelte/components/SegmentedControl.svelte',
   'src/ui/svelte/components/TintPicker.svelte',
   'src/ui/svelte/components/TintPickerButton.svelte',
 ];
@@ -236,10 +237,11 @@ test('the inputs every property below quantifies over are alive', () => {
   // executed check evidence rows; 70 as of issue 2006, whose result boxes promoted the die tiles;
   // 72 as of issue 2008: the Formula card's option well, and the `<Well>` on its second caller.
   // 73 as of issue 1518: the slot tile, on the requirement chooser as its second importer.
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 73, 'the shipped primitive set changed size');
-  // 17: issue 1516 recorded the requirement row as `PickerRow` with one importer; issue 1518
-  // promoted the slot tile out and recorded the requirement chooser, with one importer, in.
-  assert.equal(NOT_A_PRIMITIVE.length, 17, 'the recorded non-member set changed size');
+  // 74 as of issue 1516: `PickerRow` on its second importer, the result card.
+  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 74, 'the shipped primitive set changed size');
+  // 16: issue 1518 promoted the slot tile out and recorded the requirement chooser, with one
+  // importer, in; issue 1516 moved `PickerRow` to the member table on its second importer.
+  assert.equal(NOT_A_PRIMITIVE.length, 16, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(
     PUBLISHING_CASE_IDS.size > 0,

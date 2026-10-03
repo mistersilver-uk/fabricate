@@ -96,6 +96,10 @@ The task editor lets you set:
 Progressive task result difficulty comes from the chosen component's own difficulty.
 Result rows do not store their own difficulty.
 
+Each task result row has the same **Fixed** and **Rolled** amount choice as a recipe result.
+See [Result Amounts]({% link crafting/recipes/index.md %}#result-amounts-fixed-or-rolled) for how a rolled amount is written, checked and refused.
+A task's results have no amount when the task is resolved progressively.
+
 New environments start as disabled drafts.
 Library-backed automatic environments can be set up without a placeholder task.
 Once a task is enabled, saving requires complete configuration for the way it is resolved.

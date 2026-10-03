@@ -1,4 +1,7 @@
-/** Assert one View Lab layout from its declarative case expectation. */
+/**
+ * Assert one View Lab layout from its declarative case expectation. `gridSelector` is optional: a
+ * case may assert only the row geometry keys, each of which measures every match of its selector.
+ */
 export async function assertViewLabLayout(page, expectation, label) {
   if (!expectation) return;
 
@@ -30,6 +33,9 @@ export async function assertViewLabLayout(page, expectation, label) {
       );
     }
   }
+
+  await assertRowGeometry(page, expectation, label);
+  if (!gridSelector) return;
 
   const grid = await requiredLocator(page, gridSelector, 'grid', label);
   const gridTemplateColumns = await grid.evaluate((element) =>
@@ -70,6 +76,87 @@ async function assertFillsGrid(page, grid, { gridSelector, fillSelector }, label
         `${gridBottom}px`
     );
   }
+}
+
+/**
+ * The requirement row's geometry (issue 1516): `oneLineRows` rows whose direct children share a
+ * line, `alignedRight` and `alignedLeft` controls on one edge, and `minInlineSize`
+ * `{ selector, pixels }` fields no narrower than their stated minimum.
+ */
+async function assertRowGeometry(page, expectation, label) {
+  const { oneLineRows, alignedRight, alignedLeft, minInlineSize } = expectation;
+  if (oneLineRows) {
+    const rows = await measureAll(page, oneLineRows, { label, measure: childSpans });
+    for (const [index, spans] of rows.entries()) {
+      if (spans.length === 0) {
+        throw new Error(`${label}: ${oneLineRows} #${index + 1} has no visible children`);
+      }
+      const [bandTop, bandBottom] = spans[0];
+      const stray = spans.find(([top, bottom]) => {
+        const centre = (top + bottom) / 2;
+        return centre < bandTop || centre > bandBottom;
+      });
+      if (stray) {
+        throw new Error(
+          `${label}: ${oneLineRows} #${index + 1} wraps: a direct child centred at ` +
+            `${(stray[0] + stray[1]) / 2}px lies outside the first child's ${bandTop}-${bandBottom}px`
+        );
+      }
+    }
+  }
+  for (const [selector, edge] of [
+    [alignedRight, 'right'],
+    [alignedLeft, 'left'],
+  ]) {
+    if (!selector) continue;
+    const edges = await measureAll(page, selector, {
+      label,
+      least: 2,
+      measure: boxEdge,
+      arg: edge,
+    });
+    if (Math.max(...edges) - Math.min(...edges) > 0.5) {
+      throw new Error(
+        `${label}: ${selector} must share one ${edge} edge; got ${edges.join(', ')}px`
+      );
+    }
+  }
+  if (minInlineSize) {
+    const { selector, pixels } = minInlineSize;
+    const widths = await measureAll(page, selector, { label, measure: boxEdge, arg: 'width' });
+    const narrowest = Math.min(...widths);
+    if (narrowest < pixels) {
+      throw new Error(
+        `${label}: ${selector} is ${narrowest}px wide, under its ${pixels}px minimum`
+      );
+    }
+  }
+}
+
+// Both run in the page, so each is self-contained: no closure reaches back into this module.
+function childSpans(rows) {
+  return rows.map((row) =>
+    [...row.children]
+      .map((child) => child.getBoundingClientRect())
+      .filter((box) => box.width > 0 && box.height > 0)
+      .map((box) => [box.top, box.bottom])
+  );
+}
+
+function boxEdge(elements, key) {
+  return elements.map((element) => element.getBoundingClientRect()[key]);
+}
+
+/** Every match of `selector` through `measure`; fewer than `least` would make the check vacuous. */
+async function measureAll(page, selector, { label, least = 1, measure, arg = null }) {
+  const locator = page.locator(selector);
+  const count = await locator.count();
+  if (count < least) {
+    throw new Error(
+      `${label}: "${selector}" matched ${count}, fewer than the ${least} it measures`
+    );
+  }
+  return locator.evaluateAll(measure, arg);
 }
 
 async function requiredLocator(page, selector, kind, label) {

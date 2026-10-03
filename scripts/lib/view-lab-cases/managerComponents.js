@@ -716,7 +716,7 @@ export const CASES = Object.freeze([
       '.fabricate-manager [data-recipe-result-complications] [data-complication-row="readonly-gm"]',
     kinds: ['manager', 'recipes', 'complications'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeResultItemRow\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeResultGroupCard\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ComplicationSummaryRow\.svelte$/,
     ],
   }),

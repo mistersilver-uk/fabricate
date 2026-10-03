@@ -155,8 +155,7 @@ Dice So Nice animates that roll along with the rest, the same way it animates th
 A roll that comes up zero or lower still gets its own row, naming the roll and stating that nothing was produced, rather than leaving the item off the list.
 A gathering result's amount can also be rolled, but the gathering chat message does not state the roll.
 See [Journal]({% link player-app/journal.md %}) for where a gathered amount's roll is recorded.
-Setting up a recipe result with a rolled amount is not yet offered in the recipe editor.
-Today it can only be brought in by importing a recipe that already has one, or through the API.
+You set a recipe result's rolled amount on the Results tab of the recipe editor.
 
 Chat messages appear as if spoken by the crafting actor.
 

@@ -1,4 +1,5 @@
 <!-- Svelte 5 runes mode -->
+<!-- ratchet-exempt(design-system): PickerRow is promoted to a manager-only primitive at target, because the recipe ingredient card and the result card now both draw it (issue 1516) -->
 <!--
   The one requirement row: a kind plate, a kind select, a name field that is a search until it is
   named and a pill after, an amount, and the caller's trailing controls. Its anatomy is specified in
@@ -15,6 +16,7 @@
   | `invalid` | `{ amount?: string }` | `{}` | Marks the amount control invalid and describes it with the message. |
   | `amount` | `false` \| `{ min, max, unit, inputProps, ariaLabel, … }` | `{}` | `false` draws no amount; the object's keys, which carry the amount slot's localized copy, are stated in `PickerRowAmount.svelte`. |
   | `rollable` / `removable` | booleans | `false` / `true` | The Fixed \| Rolled toggle on a `component` row; and the remove button. |
+  | `clearable` / `removeHook` | boolean / string | `true` / `'alternative'` | The named pill's clear; and the remove's `data-recipe-remove` value. The remove is `Remove {name}` and the kind select `Kind of {name}`, `{name}` being the subject's or, unnamed, the kind's. |
 
   Snippets:
   - `convert` — the requirement's "or…" control, after the amount and a divider.
@@ -73,6 +75,8 @@
     amount = {},
     rollable = false,
     removable = true,
+    clearable = true,
+    removeHook = 'alternative',
     class: className = '',
     convert = null,
     trailing = null,
@@ -104,6 +108,7 @@
     value?.id ? entries.find((entry) => entry.id === value.id) || null : null
   );
   const named = $derived(Boolean(chosen));
+  const subjectName = $derived(chosen?.label || kindWord(matchType));
 
   // The tag picker offers system tags not already on this option.
   const tagPickerOptions = $derived(
@@ -209,10 +214,18 @@
   );
   const extraClass = $derived(className ? ` ${className}` : '');
 
-  const removeLabel = $derived(
-    matchType === 'component'
-      ? text('FABRICATE.Admin.Manager.Recipe.RemoveComponent', 'Remove component')
-      : text('FABRICATE.Admin.Manager.Recipe.RemoveAlternative', 'Remove alternative')
+  const forSubject = (key, fallback) => text(key, fallback).replace('{name}', subjectName);
+  const removeName = $derived(
+    forSubject('FABRICATE.Admin.Manager.Recipe.RemoveNamed', 'Remove {name}')
+  );
+  const clearName = $derived(
+    forSubject('FABRICATE.Admin.Manager.Recipe.ClearNamed', 'Clear {name}')
+  );
+  const unknownHint = $derived(
+    text(
+      'FABRICATE.Admin.Manager.Recipe.UnknownKindHint',
+      'Fabricate does not recognise the kind "{kind}". Remove this row or correct the data.'
+    ).replace('{kind}', matchType)
   );
   const tagPolicyWord = $derived(
     tagMatch === 'all'
@@ -220,7 +233,7 @@
       : text('FABRICATE.Admin.Manager.Recipe.TagMatchAny', 'Any of')
   );
   const kindLabel = $derived(
-    text('FABRICATE.Admin.Manager.Recipe.RequirementKind', 'Requirement kind')
+    forSubject('FABRICATE.Admin.Manager.Recipe.KindFor', 'Kind of {name}')
   );
 
   // The SAME two strings the policy word above reads, so the control and the sentence it writes
@@ -240,9 +253,10 @@
   <button
     type="button"
     class="manager-recipe-option-remove"
-    data-recipe-remove="alternative"
-    aria-label={removeLabel}
-    title={removeLabel}
+    data-recipe-remove={removeHook}
+    data-keyboard-focus="true"
+    aria-label={removeName}
+    title={removeName}
     {disabled}
     onclick={() => onRemove()}><i class="fas fa-xmark" aria-hidden="true"></i></button
   >
@@ -270,6 +284,7 @@
     triggerProps={{ 'data-recipe-option-kind': '' }}
     onChange={setKind}
     readonly={misconfigured}
+    ariaDescribedBy={misconfigured ? `picker-row-unknown-${tagMatchGroupId}` : ''}
     {disabled}
   />
 
@@ -329,7 +344,10 @@
   {:else if misconfigured}
     <!-- A kind the table does not name: stated, never drawn as a component. -->
     <span class="manager-recipe-option-name-field" data-recipe-option-misconfigured={matchType}>
-      <span class="manager-recipe-req-tag is-disabled">{matchType}</span>
+      <span class="manager-recipe-req-tag is-disabled" title={unknownHint}
+        >{text('FABRICATE.Admin.Manager.Recipe.UnknownKind', 'Unknown kind')}</span
+      >
+      <span id={`picker-row-unknown-${tagMatchGroupId}`} hidden>{unknownHint}</span>
     </span>
   {:else if readonly}
     <!-- Currency feature disabled: a static label rather than a searchable field, flagged inert,
@@ -369,18 +387,16 @@
           <span class="manager-recipe-option-chosen-name">{chosen.label}</span>
           <!-- A REAL BUTTON nested INSIDE the pill rather than made of it: the pill is a `<span>`,
                never a `role="button"` wrapper, which would be a nested interactive. -->
-          <button
-            type="button"
-            class="manager-recipe-option-clear"
-            data-recipe-option-clear
-            aria-label={text(
-              'FABRICATE.Admin.Manager.Recipe.ClearChoice',
-              'Clear and search again'
-            )}
-            title={text('FABRICATE.Admin.Manager.Recipe.ClearChoice', 'Clear and search again')}
-            {disabled}
-            onclick={() => choose('')}><i class="fa-solid fa-xmark" aria-hidden="true"></i></button
-          >
+          {#if clearable}<button
+              type="button"
+              class="manager-recipe-option-clear"
+              data-recipe-option-clear
+              aria-label={clearName}
+              title={text('FABRICATE.Admin.Manager.Recipe.ClearChoice', 'Clear and search again')}
+              {disabled}
+              onclick={() => choose('')}
+              ><i class="fa-solid fa-xmark" aria-hidden="true"></i></button
+            >{/if}
         </span>
       {:else}
         <!-- The degraded face every world starts in is stated on the placeholder: a second
@@ -450,6 +466,7 @@
       <PickerRowAmount
         {value}
         {amount}
+        name={subjectName}
         {rollable}
         {readonly}
         {disabled}
@@ -463,12 +480,7 @@
       {@render convert()}
     {/if}
 
-    <!-- Nested rather than a sibling block, so a row with no `trailing` gains no text node. -->
-    {#if trailing}
-      {@render trailing()}
-      {#if removable}{@render remove()}{/if}
-    {:else if removable}
-      {@render remove()}
-    {/if}
+    <!-- One line, so a row with no `trailing` gains no text node. -->
+    {@render trailing?.()}{#if removable}{@render remove()}{/if}
   </div>
 </div>

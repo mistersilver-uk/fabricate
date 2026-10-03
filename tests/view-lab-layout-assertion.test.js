@@ -28,7 +28,8 @@ function frame(elements, queried = []) {
       queried.push(selector);
       const target = elements[selector];
       return {
-        count: async () => (target ? 1 : 0),
+        count: async () => (Array.isArray(target) ? target.length : target ? 1 : 0),
+        evaluateAll: async (callback, arg) => callback(target ?? [], arg),
         evaluate: async (callback) => {
           const previous = globalThis.getComputedStyle;
           globalThis.getComputedStyle = (node) => node.computedStyle;
@@ -217,4 +218,109 @@ test('never queries for a fill element when the case declares none', async () =>
     )
   );
   assert.deepEqual(queried, ['.layout-container', '.layout-grid']);
+});
+
+// The requirement row's geometry (issue 1516): optional keys, each measuring every match, with no
+// grid at all.
+const box = ({ left = 0, width = 30, top = 0, height = 30 }) => ({
+  getBoundingClientRect: () => ({
+    left,
+    right: left + width,
+    width,
+    top,
+    bottom: top + height,
+    height,
+  }),
+});
+const row = (...children) => ({ children });
+const ROWS = Object.freeze({
+  containerSelector: '.rows',
+  oneLineRows: '.row',
+  alignedRight: '.remove',
+  alignedLeft: '.toggle',
+  minInlineSize: { selector: '.name', pixels: 140 },
+});
+
+function rowsFrame(overrides = {}) {
+  return frame({
+    '.rows': element({ width: 800 }),
+    '.row': [
+      row(box({ height: 28, top: 1 }), box({ top: 0 }), box({ top: 0 })),
+      // Two lines tall but one line of children: the controls box hangs its message below.
+      row(box({ top: 0 }), box({ top: -16, height: 62 })),
+    ],
+    '.remove': [box({ left: 770 }), box({ left: 770 })],
+    '.toggle': [box({ left: 600 }), box({ left: 600 })],
+    '.name': [box({ width: 140 }), box({ width: 300 })],
+    ...overrides,
+  });
+}
+
+test('accepts rows on one line, shared edges and a name at its minimum, with no grid', async () => {
+  const queried = [];
+  const page = rowsFrame();
+  const original = page.locator;
+  page.locator = (selector) => {
+    queried.push(selector);
+    return original(selector);
+  };
+  await assert.doesNotReject(assertViewLabLayout(page, ROWS, 'rows'));
+  assert.ok(!queried.includes(undefined), 'no grid is queried when the case names none');
+});
+
+test('rejects a row whose child wrapped to a second line', async () => {
+  const wrapped = rowsFrame({ '.row': [row(box({ top: 0 }), box({ top: 34 }))] });
+  await assert.rejects(assertViewLabLayout(wrapped, ROWS, 'wrapped'), /.row #1 wraps/);
+});
+
+test('rejects a wrapped child even when a tall sibling spans both lines', async () => {
+  const tall = rowsFrame({
+    '.row': [row(box({ top: 0 }), box({ top: 0, height: 80 }), box({ top: 34 }))],
+  });
+  await assert.rejects(assertViewLabLayout(tall, ROWS, 'tall'), /.row #1 wraps/);
+});
+
+test('rejects a child that overlaps the first by a pixel only', async () => {
+  const overlap = rowsFrame({ '.row': [row(box({ top: 0 }), box({ top: 29 }))] });
+  await assert.rejects(assertViewLabLayout(overlap, ROWS, 'overlap'), /.row #1 wraps/);
+});
+
+test('rejects a row with no visible children', async () => {
+  const empty = rowsFrame({ '.row': [row(), row(box({ top: 0 }))] });
+  await assert.rejects(
+    assertViewLabLayout(empty, ROWS, 'empty'),
+    /.row #1 has no visible children/
+  );
+});
+
+test('rejects a remove or a toggle off the shared edge', async () => {
+  const removeDropped = rowsFrame({ '.remove': [box({ left: 770 }), box({ left: 560 })] });
+  await assert.rejects(
+    assertViewLabLayout(removeDropped, ROWS, 'remove'),
+    /.remove must share one right edge; got 800, 590px/
+  );
+  const toggleShifted = rowsFrame({ '.toggle': [box({ left: 600 }), box({ left: 592 })] });
+  await assert.rejects(
+    assertViewLabLayout(toggleShifted, ROWS, 'toggle'),
+    /.toggle must share one left edge/
+  );
+});
+
+test('rejects a name field under its minimum', async () => {
+  const squeezed = rowsFrame({ '.name': [box({ width: 139 })] });
+  await assert.rejects(
+    assertViewLabLayout(squeezed, ROWS, 'squeezed'),
+    /.name is 139px wide, under its 140px minimum/
+  );
+});
+
+test('rejects a geometry selector too thin to measure anything', async () => {
+  await assert.rejects(
+    assertViewLabLayout(rowsFrame({ '.remove': [box({ left: 770 })] }), ROWS, 'one'),
+    /".remove" matched 1, fewer than the 2 it measures/
+  );
+  await assert.rejects(
+    assertViewLabLayout(rowsFrame({ '.row': [] }), ROWS, 'none'),
+    /".row" matched 0, fewer than the 1 it measures/
+  );
 });

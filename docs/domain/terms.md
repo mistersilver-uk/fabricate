@@ -108,6 +108,8 @@ Spec reference: openspec/specs/design-system/spec.md, openspec/specs/resolution-
 Presence of `quantityFormula` IS the mode: absent or empty leaves the amount fixed at `quantity`, which stays the AUTHORED amount, is never omitted from disk, and is what a cleared formula returns to.
 The RESOLVED amount is a different value from the authored one and only it may be zero — an **empty award**, which creates no item, is still stated on the chat card with the roll that produced nothing, and writes no award receipt, because there was no Item write to acknowledge.
 Validation is rollability and never parsability: `Roll.validate` passes expressions that cannot evaluate, so the floor is a maximised evaluation of the formula AS AUTHORED, applied by the authoring surface and by the gathering data boundary alike.
+A craft is also refused before anything is consumed when a non-progressive result's formula cannot total finitely against the crafting character's roll data, maximised and minimised (`validateCraft`, `src/systems/rolledAmountResolver.js`).
+A progressive system skips that check, because its award drops every formula.
 Result-only — a requirement amount and a gathering drop row's quantity are always fixed, and a progressive or salvage-progressive award strips the formula and awards 1.
 
 Canonical mapping: `Result.quantityFormula`, `Result.quantity`, `quantityFormulaErrors` (`src/models/Result.js`); `resolveRolledAmount` (`src/systems/rolledAmountResolver.js`); `maximisedTotal` (`src/utils/rollFormulaRollability.js`)

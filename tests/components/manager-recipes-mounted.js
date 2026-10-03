@@ -845,6 +845,40 @@ export function registerRecipesCases() {
     );
   });
 
+  it('saves a result’s typed rolled amount through the header Save, quantity untouched (issue 1516)', async () => {
+    const calls = [];
+    const target = await openRecipeEditor(calls, {
+      recipeOverrides: {
+        resultGroups: [
+          { id: 'g1', name: 'Primary', results: [{ id: 'res-1', componentId: 'c1', quantity: 3 }] },
+        ],
+      },
+    });
+    target.querySelector('#recipe-tab-results').click();
+    await tick();
+    flushSync();
+    const row = target.querySelector('[data-recipe-result-item]');
+    const rolled = row.querySelector(':scope [data-recipe-option-amount-mode="rolled"] input');
+    rolled.checked = true;
+    rolled.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+    const field = row.querySelector('[data-recipe-option-formula]');
+    field.value = '1d4+1';
+    field.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+
+    headerSaveButton(target).click();
+    await tick();
+    flushSync();
+    const updateCalls = calls.filter((call) => call[0] === 'updateRecipe');
+    assert.equal(updateCalls.length, 1, 'Save fires exactly one store.updateRecipe');
+    assert.deepEqual(updateCalls[0][2].resultGroups[0].results, [
+      { id: 'res-1', componentId: 'c1', quantity: 3, quantityFormula: '1d4+1' },
+    ]);
+  });
+
   it('gives a step seeded by switching to multi-step a stable id (so step-scoped edits route to the step, not the recipe)', async () => {
     const calls = [];
     const target = await openRecipeEditor(calls, {

@@ -218,7 +218,7 @@ export async function rollPublicly(page, { bonus = '', choice = null } = {}) {
  * The rolls the messages `messageIds` name actually carry, read back through `game.messages.get`
  * (which reconstructs each via `Roll.fromData`) rather than the live objects `craftAndCollect`
  * captured — issue 2007's proof that the round trip preserves the keep transform's formula and
- * dice.
+ * dice, and issue 1516's that a rolled amount's total survives it.
  */
 export async function readBackAllRolls(page, messageIds) {
   return await page.evaluate(
@@ -227,6 +227,7 @@ export async function readBackAllRolls(page, messageIds) {
         (game.messages.get(id)?.rolls ?? []).map((roll) => ({
           className: roll.constructor?.name ?? null,
           formula: roll.formula ?? null,
+          total: roll.total ?? null,
           results: (roll.dice?.[0]?.results ?? []).map(({ result, active }) => ({
             result,
             active: active !== false,

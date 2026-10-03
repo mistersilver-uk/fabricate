@@ -8,6 +8,8 @@ import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
   TYPEAHEAD_RUNE_MODULES,
+  RESULT_ROW_COMPILED_MODULES,
+  RESULT_ROW_RAW_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import {
@@ -331,6 +333,7 @@ const gatheringHarness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/component/taskOverrideCopy.js',
     'src/systems/countCheck.js',
     'src/systems/countEvaluation.js',
+    ...RESULT_ROW_RAW_MODULES,
   ],
   compiledModules: [
     'src/ui/svelte/components/Stepper.svelte',
@@ -348,7 +351,7 @@ const gatheringHarness = createMountedComponentHarness({
     'src/ui/svelte/components/SortableList.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeStageComplicationBand.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte',
-    'src/ui/svelte/apps/manager/recipe/RecipeResultItemRow.svelte',
+    ...RESULT_ROW_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte',
     'src/ui/svelte/apps/manager/SubjectModifierPicker.svelte',
     'src/ui/svelte/components/SelectionCheckbox.svelte',

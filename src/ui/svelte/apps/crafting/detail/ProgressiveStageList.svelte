@@ -602,10 +602,9 @@
     padding: var(--fab-space-2);
   }
 
-  /* NO `margin-top`. The band's `border-top` IS the divider between it and the line above,
-     and a rule only reads as a divider when the two surfaces meet — a gap in the row's own
-     fill turns it into a short line floating above a detached panel. This is the structure
-     `RecipeResultItemRow` already ships, and the player prototype draws the same one. */
+  /* No `margin-top`: the band's `border-top` is the divider between it and the line above, and a
+     rule only reads as a divider when the two surfaces meet. The manager's stage band
+     (`RecipeStageComplicationBand`) and the player prototype draw the same structure. */
   .crafting-stage-complications {
     display: flex;
     flex-direction: column;
