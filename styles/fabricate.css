@@ -8833,8 +8833,6 @@
   margin-left: auto;
 }
 
-/* `.manager-salvage-stage-component` and the salvage yield picker are retired: both salvage rows name their component through the requirement row's name field (issue 1516). */
-
 /* The "Edit ↗" deep link to the yield component's own editor. It is the ONLY way to change the DC shown beside it (the DC belongs to the yield component, whose own editor owns its save lifecycle), so it has to read as a legible link rather than a 0.56rem speck — it was smaller than the caption text next to it. */
 .fabricate-manager .manager-salvage-stage-edit,
 .fabricate-manager .manager-recipe-stage-edit {

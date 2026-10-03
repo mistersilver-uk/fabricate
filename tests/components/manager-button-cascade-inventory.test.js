@@ -671,8 +671,6 @@ const REVIEWED = [
       'The Checks preview actor popover trigger. `SearchablePopover` renders it from a class ' +
       'string, so it never gains `fab-manager-button`.',
   },
-  // REMOVED at issue 1516: the salvage component popover trigger's rule went with its site, the
-  // salvage rows naming their component through the requirement row.
   {
     id: globalRule('.fabricate-button.fabricate-button.manager-tool-replacement-component-trigger'),
     disposition: 'EXCLUDE',
