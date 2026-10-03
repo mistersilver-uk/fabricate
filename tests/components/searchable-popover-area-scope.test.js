@@ -926,12 +926,20 @@ const isOtherPrimitiveClass = (cls, primitive) =>
   !isNamespaceClass(cls, primitive) &&
   PRIMITIVES.some((entry) => entry !== primitive && isNamespaceClass(cls, entry));
 
+/** The container exemption holds only when no real application root also leads the selector. */
 function isPrimitiveOwned(selector, written, primitive) {
   if (compoundsOf(selector).some((compound) => namesCallersOwnContainer(compound, primitive))) {
     return false;
   }
-  return classesOf(selector)
-    .filter((cls) => !isApplicationRoot(cls, primitive) || isOtherPrimitiveClass(cls, primitive))
+  const classes = classesOf(selector);
+  const appRooted = classes.some(
+    (cls) => isApplicationRoot(cls, primitive) && !isOtherPrimitiveClass(cls, primitive)
+  );
+  return classes
+    .filter(
+      (cls) =>
+        !isApplicationRoot(cls, primitive) || (!appRooted && isOtherPrimitiveClass(cls, primitive))
+    )
     .every((cls) => written.has(cls) || isNamespaceClass(cls, primitive) || cls.startsWith('is-'));
 }
 
@@ -1552,6 +1560,28 @@ test('the application-root-attribute clause names a caller’s own container', (
       'the clause has stopped recognising ' +
       'them and they would wrongly enter the owned set below.'
   );
+});
+
+test('another entry’s root is a caller container only when no application root leads', () => {
+  const owns = (name, selector) => {
+    const primitive = PRIMITIVES.find((entry) => entry.name === name);
+    return isPrimitiveOwned(selector, classesWrittenBy(primitive), primitive);
+  };
+  assert.ok(
+    !owns('IconButton', '.fabricate-pagination .fabricate-icon-button'),
+    'the pager’s rule over the button it composes is read as IconButton’s own, so the gate would ' +
+      'demand the pager drop its root from its own rule'
+  );
+  for (const [name, selector] of [
+    ['Button', '.fabricate-manager .fabricate-card .fabricate-button.fab-manager-button'],
+    ['StatusToggle', '.fabricate-manager .fabricate-sortable-list .fabricate-toggle'],
+  ]) {
+    assert.ok(
+      owns(name, selector),
+      `\`${selector}\` leads with \`fabricate-manager\`, yet the composing primitive’s class ` +
+        `exempts it, so the gated clause never sees a rule that paints ${name} only in the manager`
+    );
+  }
 });
 
 test('every rule a primitive owns is rooted at the primitive, not at an application', () => {
