@@ -18,6 +18,24 @@ const COMPONENT_NAME_FIELD =
 /** The `n`th flat result row of a result set, as a child and from the page. */
 const RESULT_ROW_CHILD = (n) => `[data-recipe-result-item]:nth-child(${n})`;
 const RESULT_ROW = (n) => `.manager-recipe-ingredient-set-groups > ${RESULT_ROW_CHILD(n)}`;
+const RESULT_ROWS = '.manager-recipe-ingredient-set-groups > [data-recipe-result-item]';
+
+/** A flat result list's row geometry: one line per row, and every remove and toggle in a column. */
+const FLAT_RESULT_GEOMETRY = Object.freeze({
+  containerSelector: '.manager-recipe-ingredient-set-groups',
+  oneLineRows: RESULT_ROWS,
+  alignedRight: `${RESULT_ROWS} .manager-recipe-option-remove`,
+  alignedLeft: `${RESULT_ROWS} [role="radiogroup"]`,
+});
+
+/** A progressive stage list's row geometry, its name field held at the row's stated minimum. */
+const STAGE_ROWS = '[data-recipe-result-row] [data-recipe-result-item]';
+const STAGE_RESULT_GEOMETRY = Object.freeze({
+  containerSelector: '[data-recipe-set]:has([data-recipe-result-row])',
+  oneLineRows: STAGE_ROWS,
+  alignedRight: '[data-recipe-result-row] [data-recipe-remove="result-item"]',
+  minInlineSize: { selector: `${STAGE_ROWS} .manager-recipe-option-name-field`, pixels: 140 },
+});
 
 export const CASES = Object.freeze([
   managerCase({
@@ -710,6 +728,7 @@ export const CASES = Object.freeze([
     expectView: 'recipe-edit',
     expectSelector:
       '.fabricate-manager .fabricate-sortable-list-row[data-recipe-result-row] [data-sortable-move="down"]',
+    expectLayout: STAGE_RESULT_GEOMETRY,
     position: { width: 1024, height: 640 },
     kinds: ['manager', 'recipes', 'responsive'],
     sourceMatches: [
@@ -784,20 +803,21 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
     ],
   }),
-  // The fixed-or-rolled amount on recipe results (issue 1516): the horseshoe's own row rolled, a
-  // second row opened on Rolled with nothing typed, and a third holding an unrollable expression.
+  // The fixed-or-rolled amount on recipe results (issue 1516): the horseshoe's own row Fixed, a
+  // second rolled, a third opened on Rolled with nothing typed, and a fourth holding an unrollable
+  // expression, captured after the field loses focus so its invalid paint is the resting one.
   ...[
     {
       suffix: '',
       position: null,
       themeVariants: ['hearth-herb'],
-      hit: `${RESULT_ROW(3)} [data-recipe-option-amount-mode="rolled"]`,
+      hit: `${RESULT_ROW(4)} [data-recipe-option-amount-mode="rolled"]`,
     },
     {
       suffix: '-narrow',
       position: { width: 1024, height: 640 },
       themeVariants: [],
-      hit: `${RESULT_ROW(1)} .manager-recipe-option-remove`,
+      hit: `${RESULT_ROW(4)} .manager-recipe-option-remove`,
     },
   ].map(({ suffix, position, themeVariants, hit }) =>
     managerCase({
@@ -814,32 +834,38 @@ export const CASES = Object.freeze([
         { selector: '.manager-travel-option:has-text("Iron Ingot")' },
         { selector: '[data-recipe-add="result-item"]' },
         { selector: '.manager-travel-option:has-text("Steel Ingot")' },
-        { selector: `${RESULT_ROW(1)} [data-recipe-option-amount-mode="rolled"]` },
-        { selector: `${RESULT_ROW(1)} [data-recipe-option-formula]`, fill: '1d4+1' },
+        { selector: '[data-recipe-add="result-item"]' },
+        { selector: '.manager-travel-option:has-text("Silver Ingot")' },
         { selector: `${RESULT_ROW(2)} [data-recipe-option-amount-mode="rolled"]` },
+        { selector: `${RESULT_ROW(2)} [data-recipe-option-formula]`, fill: '1d4+1' },
         { selector: `${RESULT_ROW(3)} [data-recipe-option-amount-mode="rolled"]` },
-        { selector: `${RESULT_ROW(3)} [data-recipe-option-formula]`, fill: 'max(, 2)' },
+        { selector: `${RESULT_ROW(4)} [data-recipe-option-amount-mode="rolled"]` },
+        { selector: `${RESULT_ROW(4)} [data-recipe-option-formula]`, fill: 'max(, 2)' },
+        // A click on the selected tab moves focus off the field without changing the screen.
+        { selector: '#recipe-tab-results' },
       ],
       expectView: 'recipe-edit',
-      // Three rows on Rolled, and only the third marked invalid with its message.
+      // The first row Fixed, the next three on Rolled, and only the fourth marked invalid.
       expectSelector:
-        `.manager-recipe-ingredient-set-groups:has(> ${RESULT_ROW_CHILD(1)} [data-recipe-option-formula])` +
+        `.manager-recipe-ingredient-set-groups:not(:has(> ${RESULT_ROW_CHILD(1)} [data-recipe-option-formula]))` +
         `:has(> ${RESULT_ROW_CHILD(2)} [data-recipe-option-formula])` +
-        `:not(:has(> ${RESULT_ROW_CHILD(2)} [data-recipe-option-invalid]))` +
-        ` > ${RESULT_ROW_CHILD(3)} [data-recipe-option-invalid]`,
+        `:has(> ${RESULT_ROW_CHILD(3)} [data-recipe-option-formula])` +
+        `:not(:has(> ${RESULT_ROW_CHILD(3)} [data-recipe-option-invalid]))` +
+        ` > ${RESULT_ROW_CHILD(4)} [data-recipe-option-invalid]`,
       expectAttributes: [
         {
-          selector: `${RESULT_ROW(1)} [data-recipe-option-formula]`,
+          selector: `${RESULT_ROW(2)} [data-recipe-option-formula]`,
           name: 'aria-invalid',
           value: null,
         },
         {
-          selector: `${RESULT_ROW(3)} [data-recipe-option-formula]`,
+          selector: `${RESULT_ROW(4)} [data-recipe-option-formula]`,
           name: 'aria-invalid',
           value: 'true',
         },
       ],
-      expectContained: [1, 2, 3].map((row) => ({
+      expectLayout: FLAT_RESULT_GEOMETRY,
+      expectContained: [1, 2, 3, 4].map((row) => ({
         container: RESULT_ROW(row),
         target: `${RESULT_ROW(row)} .manager-recipe-option-remove`,
       })),
@@ -938,6 +964,7 @@ export const CASES = Object.freeze([
     expectView: 'recipe-edit',
     // The stage row's Edit link sits in the requirement row's trailing controls (issue 1516).
     expectCenterHit: '[data-recipe-result-row] [data-recipe-result-edit]',
+    expectLayout: STAGE_RESULT_GEOMETRY,
     kinds: ['manager', 'recipes'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
