@@ -220,6 +220,26 @@ export const SELECT_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/SearchablePopoverPanel.svelte'
 ]);
 
+// THE RESULT CARD'S ROWS beyond `<Select>` (issue 1516): the requirement row, its amount slot and
+// the amount floor the card reads. A tree rendering `RecipeResultGroupCard` spreads both lists.
+export const RESULT_ROW_RAW_MODULES = Object.freeze([
+  'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
+  'src/systems/characterModifierPrerequisiteCopy.js',
+  'src/systems/characterPrerequisites.js',
+  'src/utils/scalars.js',
+  'src/models/Result.js',
+  'src/models/reconstructibleDefaults.js',
+  'src/utils/rollFormulaRollability.js'
+]);
+
+export const RESULT_ROW_COMPILED_MODULES = Object.freeze([
+  'src/ui/svelte/components/SegmentedControl.svelte',
+  'src/ui/svelte/components/Stepper.svelte',
+  'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
+  'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte',
+  'src/ui/svelte/apps/manager/recipe/PickerRow.svelte'
+]);
+
 // THE ONE TONE MAP the retired status pill's call sites read (issue 1506). THE QUANTITY READINGS
 // RIDE WITH IT (issue 1506).
 export const STATUS_TONE_RAW_MODULES = Object.freeze([

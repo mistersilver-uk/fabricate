@@ -1,16 +1,24 @@
 <!-- Svelte 5 runes mode -->
 <!--
   One result group. A recipe produces ANY one group's items, the producing group being chosen at
-  craft time by outcome routing; each group is a flat list of component + quantity. This renders
-  the group name, its items, an "Add item" picker and a remove-group button, and emits a
-  shallow-updated copy via `onChange(nextGroup)` with new items appended id-less for the store to
-  normalize. Empty groups and component-less items are gated at the model/save path
+  craft time by outcome routing; each item is a `PickerRow` naming a component, with a fixed or
+  rolled amount, or on a progressive stage a DC and an Edit link in its `trailing`. It emits a
+  shallow-updated copy via `onChange(nextGroup)`; every item it creates carries an id and a
+  `componentId`. Empty groups and component-less items are gated at the model/save path
   (`Recipe.validate`), not at readiness, so an empty group being edited here is expected — and on a
   non-terminal step it is a legal finished state rather than a draft (issue 1907).
+
+  Invariants:
+  - Rows are keyed by item id, because a row's Fixed | Rolled state is per instance — pinned by
+    `tests/components/recipe-result-card-mounted.test.js`.
+  - A row's amount error is the save path's own floor, `quantityFormulaErrors`.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import RecipeResultItemRow from './RecipeResultItemRow.svelte';
+  import { normalizeQuantityFormula, quantityFormulaErrors } from '../../../../../models/Result.js';
+  import { diceEngine, maximisedTotal } from '../../../../../utils/rollFormulaRollability.js';
+  import PickerRow from './PickerRow.svelte';
+  import { fromValue, toValue } from './pickerRowKinds.js';
   import RecipeRoutingAssignment from './RecipeRoutingAssignment.svelte';
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
   import IconButton from '../../../components/IconButton.svelte';
@@ -117,6 +125,44 @@
     onChange({ ...group, checkOutcomeIds: checkOutcomeIds.filter((tierId) => tierId !== id) });
   }
 
+  // A result names a component and nothing else until `Result.kind` lands (issue 1773).
+  const RESULT_KINDS = ['component'];
+  const catalogue = $derived({
+    component: (componentOptions || []).map((option) => ({
+      id: option.id,
+      label: option.name,
+      img: option.img,
+      icon: 'fas fa-cube',
+    })),
+  });
+
+  function componentFor(item) {
+    return (componentOptions || []).find((option) => option.id === item?.componentId) || null;
+  }
+
+  // `difficulty` is projected onto the component options; one never given reads as unset, not 0.
+  function difficultyOf(item) {
+    const difficulty = Number(componentFor(item)?.difficulty);
+    return componentFor(item) && Number.isFinite(difficulty) ? difficulty : null;
+  }
+
+  function amountInvalid(item) {
+    const formula = normalizeQuantityFormula(item?.quantityFormula);
+    if (quantityFormulaErrors(formula, diceEngine()).length === 0) return {};
+    return {
+      amount:
+        maximisedTotal(formula) === null
+          ? text(
+              'FABRICATE.Admin.Manager.Recipe.AmountUnrollable',
+              'This expression cannot be rolled.'
+            )
+          : text(
+              'FABRICATE.Admin.Manager.Recipe.AmountNeverPositive',
+              'This expression can never award a positive amount.'
+            ),
+    };
+  }
+
   const componentPickerOptions = $derived(
     (componentOptions || []).map((option) => ({
       id: option.id,
@@ -144,14 +190,17 @@
   }
 
   // Adding a component the group already produces bumps that item's quantity rather than
-  // appending a duplicate. Progressive is the exception: its award loop ignores `quantity`
-  // entirely, so repeating a component IS how the GM asks for more of it — always append.
+  // appending a duplicate, unless that item's amount is rolled, which a bump would not change.
+  // Progressive always appends: its award loop ignores `quantity` entirely, so repeating a
+  // component IS how the GM asks for more of it.
   function addItem(id) {
     if (progressive) {
       onChange({ ...group, results: [...results, { id: newId(), componentId: id }] });
       return;
     }
-    const existingIndex = results.findIndex((item) => item?.componentId === id);
+    const existingIndex = results.findIndex(
+      (item) => item?.componentId === id && !normalizeQuantityFormula(item?.quantityFormula)
+    );
     if (existingIndex !== -1) {
       const existing = results[existingIndex];
       const nextQuantity = Math.min(
@@ -317,13 +366,21 @@
         rowData={() => ({ 'data-recipe-result-row': '' })}
       >
         {#snippet row(item, index)}
-          <RecipeResultItemRow
-            {item}
-            {componentOptions}
-            {progressive}
-            {onOpenComponent}
-            onChange={(nextItem) => updateItem(index, nextItem)}
-          />
+          <PickerRow
+            value={toValue(item)}
+            kinds={RESULT_KINDS}
+            {catalogue}
+            amount={false}
+            removable={false}
+            clearable={false}
+            class="is-result"
+            data-recipe-result-item=""
+            onChange={(value) => updateItem(index, fromValue(item, value))}
+          >
+            {#snippet trailing()}
+              {@render stageControls(item)}
+            {/snippet}
+          </PickerRow>
         {/snippet}
         {#snippet body(item)}
           <RecipeStageComplicationBand
@@ -338,10 +395,17 @@
     {:else}
       <div class="manager-recipe-ingredient-set-groups">
         {#each results as item, index (item?.id || index)}
-          <RecipeResultItemRow
-            {item}
-            {componentOptions}
-            onChange={(nextItem) => updateItem(index, nextItem)}
+          <PickerRow
+            value={toValue(item)}
+            kinds={RESULT_KINDS}
+            {catalogue}
+            rollable
+            clearable={false}
+            removeHook="result-item"
+            invalid={amountInvalid(item)}
+            class="is-result"
+            data-recipe-result-item=""
+            onChange={(value) => updateItem(index, fromValue(item, value))}
             onRemove={() => removeItem(index)}
           />
         {/each}
@@ -355,6 +419,35 @@
     <div class="manager-recipe-ingredient-set-add">{@render resultAdder()}</div>
   {/if}
 </div>
+
+<!-- A stage's read-only `DC n` and its separate Edit deep link: the component editor's Difficulty
+     card owns `component.difficulty`, so the link is the only route to changing it. -->
+{#snippet stageControls(item)}
+  <span
+    class="manager-recipe-stage-dc"
+    data-recipe-result-difficulty={difficultyOf(item) === null ? '' : String(difficultyOf(item))}
+    >{difficultyOf(item) === null
+      ? text('FABRICATE.Admin.Manager.Recipe.DifficultyUnset', 'No difficulty')
+      : `${text('FABRICATE.Admin.Manager.Recipe.DifficultyShort', 'DC')} ${difficultyOf(item)}`}</span
+  >
+  {#if componentFor(item)}
+    <button
+      type="button"
+      data-keyboard-focus="true"
+      class="manager-recipe-stage-edit"
+      data-recipe-result-edit={item.componentId}
+      aria-label={`${text('FABRICATE.Admin.Manager.Recipe.OpenComponentDifficulty', 'Edit difficulty on the component')} — ${componentFor(item).name}`}
+      title={text(
+        'FABRICATE.Admin.Manager.Recipe.OpenComponentDifficulty',
+        'Edit difficulty on the component'
+      )}
+      onclick={() => onOpenComponent(item.componentId)}
+    >
+      <span>{text('FABRICATE.Admin.Manager.Recipe.EditDifficulty', 'Edit')}</span>
+      <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
+    </button>
+  {/if}
+{/snippet}
 
 {#snippet resultAdder()}
   <SearchablePopover

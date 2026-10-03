@@ -229,10 +229,10 @@ test('the inputs every property below quantifies over are alive', () => {
   // had crossed the membership bar with nobody adjudicating it.
   // 68 as of issue 2005, which promoted the shared Preview-as picker, the Player sees block and the
   // executed check evidence rows; 70 as of issue 2006, whose result boxes promoted the die tiles;
-  // 72 as of issue 2008: the Formula card's option well, and the `<Well>` on its second caller.
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 72, 'the shipped primitive set changed size');
-  // 17 as of issue 1516: the requirement row promoted as `PickerRow`, with one importer.
-  assert.equal(NOT_A_PRIMITIVE.length, 17, 'the recorded non-member set changed size');
+  // 73 as of issue 1516: `PickerRow` on its second importer, the result card.
+  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 73, 'the shipped primitive set changed size');
+  // 16 as of issue 1516: `PickerRow` left for the member table.
+  assert.equal(NOT_A_PRIMITIVE.length, 16, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(
     PUBLISHING_CASE_IDS.size > 0,

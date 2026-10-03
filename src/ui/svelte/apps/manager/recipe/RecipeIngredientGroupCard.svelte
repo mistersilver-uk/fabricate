@@ -122,6 +122,12 @@
     ...(canAddCost ? [orMenuChoice('currency', 'alternative-currency')] : []),
   ]);
 
+  // An ingredient row's remove names its kind rather than the row's default subject name.
+  const removeLabelFor = (option) =>
+    toValue(option).kind === 'component'
+      ? text('FABRICATE.Admin.Manager.Recipe.RemoveComponent', 'Remove component')
+      : text('FABRICATE.Admin.Manager.Recipe.RemoveAlternative', 'Remove alternative');
+
   function updateOption(index, nextOption) {
     onChange({
       ...group,
@@ -244,6 +250,7 @@
           {kinds}
           {catalogue}
           {readonlyKinds}
+          removeLabel={removeLabelFor(option)}
           onChange={(value) => updateOption(index, fromValue(option, value))}
           onRemove={() => removeOption(index)}
         />
@@ -299,6 +306,7 @@
           {kinds}
           {catalogue}
           {readonlyKinds}
+          removeLabel={removeLabelFor(option)}
           convert={orMenu}
           onChange={(value) => updateOption(index, fromValue(option, value))}
           onRemove={() => removeOption(index)}

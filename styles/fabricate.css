@@ -8756,29 +8756,6 @@
   margin: 0;
 }
 
-/* Subtle × remove on a result item (§C7), never a red fa-minus. */
-.fabricate-manager .manager-recipe-result-remove {
-  appearance: none;
-  -webkit-appearance: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  min-height: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 6px;
-  color: var(--fab-text-subtle);
-  background: transparent;
-  cursor: pointer;
-}
-
-.fabricate-manager .manager-recipe-result-remove:hover {
-  color: var(--fab-danger-text);
-  background: var(--fab-danger-soft);
-}
-
 /* Uppercase "DIFFICULTY" micro-label beside the read-only badge (§C4). */
 
 /* Nested ingredient editor: sets -> groups -> options + per-set essences. */
@@ -8838,15 +8815,13 @@
 
 /* THE NAME-LENGTH CAP LIVES HERE, once, for every component picker in the studio. */
 .fabricate-manager .manager-salvage-component-picker,
-.fabricate-manager .manager-recipe-option-component,
 .fabricate-manager .manager-recipe-component-picker {
   min-width: 0;
   max-width: 360px;
 }
 
-/* THE ONE COMPONENT-PICKER TRIGGER, for every component picker in the studio: the recipe ingredient rows, the recipe result rows (flat and progressive stage) and both salvage yield rows (issue 676). */
+/* THE ONE COMPONENT-PICKER TRIGGER, for the component pickers that are not a requirement row: both salvage yield rows and the tool replacement (issue 676). */
 .fabricate-button.manager-button.manager-salvage-component-trigger,
-.fabricate-button.manager-button.manager-recipe-component-trigger,
 .fabricate-button.manager-button.manager-tool-replacement-component-trigger {
   justify-content: flex-start;
   width: max-content;
@@ -8859,7 +8834,6 @@
 }
 
 .fabricate-manager .manager-salvage-component-trigger .manager-travel-portrait,
-.fabricate-manager .manager-recipe-component-trigger .manager-travel-portrait,
 .fabricate-manager .manager-tool-replacement-component-trigger .manager-travel-portrait {
   width: 24px;
   height: 24px;
@@ -8867,8 +8841,6 @@
 
 /* The name INSIDE the trigger. It grows with the (max-content) trigger and ellipsizes once the trigger hits its cap, so a long name degrades to a truncation rather than to a row-wide button. */
 .fabricate-manager .manager-salvage-component-name,
-.fabricate-manager .manager-recipe-component-name,
-.fabricate-manager .manager-recipe-stage-trigger-name,
 .fabricate-manager .manager-tool-replacement-component-name {
   flex: 1 1 auto;
   min-width: 0;
@@ -8881,8 +8853,7 @@
 /* The two progressive stage rows are the same surface — an ordered, quantity-less list of single results whose position is the authored data — and `fabricate-sortable-list-row` draws that surface for both as of issue 1512, so the box they shared here is retired rather than restated behind two caller classes. */
 
 /* THE PICKER IS CONTENT-SIZED ON A STAGE ROW, NOT GREEDY. The shared field is `flex: 1 1 auto`, which is right on the simple/routed row (a picker, a stepper and an ×) but wrong here: a stage row carries four more controls, so a greedy field took ~85% of the row and crushed DC/Edit/× into the last scraps. */
-.fabricate-manager .manager-salvage-stage-row .manager-salvage-component-field,
-.fabricate-manager .manager-recipe-stage-row .manager-recipe-option-target {
+.fabricate-manager .manager-salvage-stage-row .manager-salvage-component-field {
   flex: 0 1 auto;
   min-width: 0;
 }
@@ -8895,8 +8866,7 @@
 /* Extra separation between the trailing controls, on top of the row's 12px gap: a read-only fact, a deep link and a delete packed at 8px read as one undifferentiated clump (issue 1286). The reorder rocker left both rows at issue 1512, so its two selectors went with it. */
 .fabricate-manager .manager-salvage-stage-row .manager-salvage-stage-edit,
 .fabricate-manager .manager-salvage-stage-row > .manager-icon-button,
-.fabricate-manager .manager-recipe-stage-row .manager-recipe-stage-edit,
-.fabricate-manager .manager-recipe-stage-row .manager-recipe-result-remove {
+.fabricate-manager .manager-recipe-stage-row .manager-recipe-stage-edit {
   margin-left: var(--fab-space-1);
 }
 
@@ -9563,14 +9533,6 @@
   background: var(--fab-purple-soft);
 }
 
-.fabricate-manager .manager-recipe-option-target {
-  flex: 1 1 auto;
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  min-width: 0;
-}
-
 /* The row's small end-of-row type pill. Only ONE face of it is still emitted: the disabled one, the `Currency off` flag on a cost authored before the system turned currency off (issues 676, 1373). */
 .fabricate-manager .manager-recipe-req-tag {
   display: inline-flex;
@@ -9614,6 +9576,43 @@
   gap: var(--fab-space-2);
 }
 
+/* THE AMOUNT SLOT HAS ONE SIZE: the horizontal `Stepper`'s own 102 x 28 (two 22px adjuncts, a 48px input, two 2px gaps, 2px padding and a 1px border each side), so a Rolled row is exactly as tall and as wide as a Fixed one. */
+.fabricate-manager .manager-recipe-option-controls input[data-recipe-option-formula] {
+  box-sizing: border-box;
+  width: 102px;
+  height: 28px;
+  min-height: 0;
+  margin: 0;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 7px;
+  background: var(--fab-surface-soft);
+  color: var(--fab-text);
+}
+
+/* The unit after the amount, in the stepper's own mono type. */
+.fabricate-manager .manager-recipe-option-unit {
+  flex: 0 0 auto;
+  color: var(--fab-text-muted);
+  font-family: var(--fab-font-mono);
+  font-size: 0.74rem;
+}
+
+/* THE INVALID MESSAGE TAKES ITS OWN LINE inside the controls and adds nothing to their width: `contain: inline-size` gives it no intrinsic width, so a sentence-length message wraps under the amount instead of squeezing the name field. */
+.fabricate-manager .manager-recipe-option-controls:has(> .manager-recipe-option-invalid) {
+  flex-wrap: wrap;
+}
+
+.fabricate-manager .manager-recipe-option-controls > .manager-recipe-option-invalid {
+  flex: 1 0 100%;
+  contain: inline-size;
+}
+
+/* A result row's name keeps a stated minimum: the field is the row's only flexible item, and below this the row wraps its controls instead of shrinking the name to an ellipsis. */
+.fabricate-manager .manager-recipe-ingredient-option-row.is-result .manager-recipe-option-name-field {
+  min-width: 140px;
+}
+
 /* Vertical divider between the stepper and the inline "or…". */
 .fabricate-manager .manager-recipe-option-divider {
   flex: 0 0 auto;
@@ -9625,16 +9624,6 @@
 /* `.manager-recipe-option-tag-name` and `.manager-recipe-option-tags-detail` are retired: `proto:2252` draws the summary, the pill, the forced second line and its empty state on the row itself. */
 
 /* The Any/All tag-match toggle's own track and segment rules are gone; it renders the shipped `SegmentedControl`, which carries its own scoped styles. */
-
-/* `.manager-button.manager-recipe-component-trigger` and `.manager-recipe-component-name` are retired: the name renders INSIDE the trigger now, and both join the shared component-picker rules the salvage yield picker owns. */
-
-/* The option's match editor wraps the picker. */
-.fabricate-manager .manager-recipe-option-component {
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  min-width: 0;
-}
 
 /* The requirement's single "or..." control (issue 643): one popover per requirement offering the ingredient kinds this system can honour, replacing the loose per-row and footer add-buttons. */
 .fabricate-manager .manager-recipe-requirement-adds {
@@ -13832,12 +13821,6 @@
   min-width: 0;
   max-width: 100%;
   box-sizing: border-box;
-}
-
-.fabricate-manager .manager-tool-repair .manager-recipe-option-target {
-  flex: 1 1 180px;
-  min-width: 0;
-  max-width: 100%;
 }
 
 .fabricate-manager .manager-tool-repair .manager-recipe-option-controls {
