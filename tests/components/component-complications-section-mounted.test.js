@@ -24,6 +24,7 @@ import { createMountedComponentHarness } from '../helpers/svelte-component-harne
 import {
   COMPONENT_EDIT_VIEW_COMPILED_MODULES,
   COMPONENT_EDIT_VIEW_RAW_MODULES,
+  COMPONENT_EDIT_VIEW_RUNE_MODULES,
 } from '../helpers/componentEditViewModules.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 // The trigger clause and the dice-condition comparator are the shared `<Select>` since issue 1510,
@@ -1002,6 +1003,7 @@ const editorHarness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-complications-editor-',
   rawModules: COMPONENT_EDIT_VIEW_RAW_MODULES,
+  runeModules: COMPONENT_EDIT_VIEW_RUNE_MODULES,
   compiledModules: COMPONENT_EDIT_VIEW_COMPILED_MODULES,
   componentPath: 'src/ui/svelte/apps/manager/ComponentEditView.svelte',
 });

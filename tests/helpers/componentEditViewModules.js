@@ -2,7 +2,11 @@
 
 import { COMPONENT_SCOPE_LEAF_MODULES } from './componentScopeMountModules.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from './foundryBridgeModules.js';
-import { CHECK_TARGET_RAW_MODULES } from './svelte-component-harness.js';
+import {
+  CHECK_TARGET_RAW_MODULES,
+  RESULT_ROW_COMPILED_MODULES,
+  RESULT_ROW_RAW_MODULES,
+} from './svelte-component-harness.js';
 
 /** Raw (uncompiled) modules the harness copies into the temp tree verbatim. */
 export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
@@ -73,7 +77,13 @@ export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/dropUtils.js',
   // The rules editor's own Validation tab model (issue 1371, parity round 4).
   'src/ui/svelte/apps/manager/component/componentRulesValidation.js',
+  // Both salvage result rows are the requirement row (issue 1516), whose search is a typeahead.
+  ...RESULT_ROW_RAW_MODULES,
+  'src/ui/svelte/actions/typeaheadPanel.js',
 ]);
+
+/** Rune modules the harness compiles: the requirement row's typeahead. */
+export { TYPEAHEAD_RUNE_MODULES as COMPONENT_EDIT_VIEW_RUNE_MODULES } from './svelte-component-harness.js';
 
 /** `.svelte` modules the harness compiles. */
 export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
@@ -152,5 +162,6 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Kicker.svelte',
   'src/ui/svelte/apps/manager/component/OverridePlayerSees.svelte',
   'src/ui/svelte/apps/manager/component/CheckOverrideField.svelte',
+  ...RESULT_ROW_COMPILED_MODULES,
   'src/ui/svelte/apps/manager/ComponentEditView.svelte',
 ]);

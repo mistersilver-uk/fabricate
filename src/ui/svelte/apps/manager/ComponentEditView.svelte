@@ -23,6 +23,9 @@
   import ComplicationSummaryRow from './ComplicationSummaryRow.svelte';
   import { complicationSummary } from '../../../model/complicationSummary.js';
   import SortableList from '../../components/SortableList.svelte';
+  import PickerRow from './recipe/PickerRow.svelte';
+  import { fromValue, toValue } from './recipe/pickerRowKinds.js';
+  import { componentCatalogue, resultAmountInvalid, withAddedResult } from './recipe/resultRows.js';
   // The shared essence quantity card (issue 772). It lives under `components/` because the
   // browser's bulk-edit panel renders it too, and the screenshot evidence map names it there.
   import EssenceQuantityCard from './components/EssenceQuantityCard.svelte';
@@ -937,11 +940,8 @@
     });
   }
 
-  function addSalvageResult(groupId) {
-    updateSalvageGroupResults(groupId, (results) => [
-      ...results,
-      { id: newId(), componentId: componentOptions[0]?.id || '', quantity: 1 },
-    ]);
+  function addSalvageResult(groupId, componentId) {
+    updateSalvageGroupResults(groupId, (results) => withAddedResult(results, componentId, newId()));
   }
 
   function removeSalvageResult(groupId, resultId) {
@@ -950,9 +950,11 @@
     );
   }
 
-  function updateSalvageResult(groupId, resultId, patch) {
+  // `next` replaces the result whole, because `fromValue` removes a formula by deleting its key.
+  function updateSalvageResult(groupId, result, value) {
+    const next = fromValue(result, value);
     updateSalvageGroupResults(groupId, (results) =>
-      results.map((result) => (result.id === resultId ? { ...result, ...patch } : result))
+      results.map((entry) => (entry.id === result.id ? next : entry))
     );
   }
 
@@ -1092,9 +1094,15 @@
     });
   }
 
-  // The yield picker's option list (issue 676). `icon` is the fallback for a component whose linked
-  // item has no art: `SearchablePopover` renders a raw `<img>` only when `img` is truthy.
-  const salvageComponentPickerOptions = $derived(
+  // A salvage result names a component and nothing else, as a recipe result does (issue 1516).
+  const SALVAGE_RESULT_KINDS = ['component'];
+  const salvageCatalogue = $derived(componentCatalogue(componentOptions));
+  const SALVAGE_NAME_HOOK = { 'data-salvage-result-component': '' };
+  const SALVAGE_AMOUNT = { inputProps: { 'data-salvage-result-quantity': '' } };
+
+  // The adder's option list (issue 676). `icon` is the fallback for a component whose linked item
+  // has no art: `SearchablePopover` renders a raw `<img>` only when `img` is truthy.
+  const salvageAdderOptions = $derived(
     (componentOptions || []).map((option) => ({
       id: option.id,
       label: option.name,
@@ -1568,12 +1576,6 @@
           </section>
         {/if}
 
-        <!-- The yield picker, shared by BOTH salvage result rows (issue 676). A `{#snippet}` rather
-         than a new `.svelte` file: the call sites differ only in which group they write to, and a new
-         component would need registering in every mount harness, where a missing entry HANGS the
-         suite. NOT a `<select>`: the native control can show the NAME but never the IMAGE, and the
-         popover is portaled to `.fabricate-manager` so it escapes the panel's `overflow: hidden`.
-         No "clear" entry, matching `RecipeResultItemRow`: the row's × removes it properly. -->
         <!-- `data-add-salvage-group` rides this button only while there is no backing group,
              because in that state this IS the add-group control: it takes a progressive component
              from zero groups to one, which the normalizer's clamp requires before `enabled` can
@@ -1598,47 +1600,44 @@
           </Button>
         {/snippet}
 
-        {#snippet salvageComponentPicker(groupId, result)}
-          {@const selected = salvageComponentOption(result.componentId)}
-          <span class="manager-salvage-component-field" data-salvage-result-component>
-            <SearchablePopover
-              options={salvageComponentPickerOptions}
-              value={result.componentId}
+        <!-- A stage's read-only DC and its Edit link, the row's `trailing`: `difficulty` belongs to
+             the result component, whose own editor owns its save lifecycle, so the link is the way
+             to change it. The navigation is guarded (the `component-edit` row of
+             `ROUTE_EXIT_GUARDS` waives no navigation), so a dirty draft prompts. The DC's fallback
+             matches the lang value `DifficultyUnset` resolves to, as the recipe stage row's does. -->
+        {#snippet salvageStageControls(result)}
+          {@const difficulty = salvageResultDifficulty(result.componentId)}
+          <span
+            class="manager-salvage-result-difficulty"
+            data-salvage-result-difficulty={difficulty === null ? '' : String(difficulty)}
+            >{difficulty === null
+              ? text(
+                  'FABRICATE.Admin.Manager.Component.SalvageEditor.DifficultyUnset',
+                  'No difficulty'
+                )
+              : `${text('FABRICATE.Admin.Manager.Component.SalvageEditor.DifficultyShort', 'DC')} ${difficulty}`}</span
+          >
+          {#if result.componentId}
+            <button
+              type="button"
+              class="manager-salvage-stage-edit"
+              data-salvage-result-edit={result.componentId}
+              data-keyboard-focus="true"
+              aria-label={text(
+                'FABRICATE.Admin.Manager.Component.SalvageEditor.EditResult',
+                'Edit {name}'
+              ).replace('{name}', salvageComponentName(result.componentId))}
+              title={text(
+                'FABRICATE.Admin.Manager.Component.SalvageEditor.EditDcHint',
+                'Set on this component in its editor'
+              )}
+              onclick={() => onOpenComponent(result.componentId)}
               disabled={saving}
-              pickerClass="manager-salvage-component-picker"
-              triggerClass="fabricate-button manager-salvage-component-trigger"
-              triggerImg={selected?.img || ''}
-              triggerIcon={selected?.img ? '' : 'fas fa-cube'}
-              triggerLabel={selected?.name ||
-                text(
-                  'FABRICATE.Admin.Manager.Component.SalvageEditor.SelectComponent',
-                  'Select a component'
-                )}
-              valueClass="manager-salvage-component-name"
-              triggerTitle={selected?.name || ''}
-              ariaLabel={text(
-                'FABRICATE.Admin.Manager.Component.SalvageEditor.ResultComponent',
-                'Result component'
-              )}
-              panelLabel={text(
-                'FABRICATE.Admin.Manager.Component.SalvageEditor.ResultComponent',
-                'Result component'
-              )}
-              searchPlaceholder={text(
-                'FABRICATE.Admin.Manager.Component.SalvageEditor.ComponentSearchPlaceholder',
-                'Search components...'
-              )}
-              searchLabel={text(
-                'FABRICATE.Admin.Manager.Component.SalvageEditor.ComponentSearchPlaceholder',
-                'Search components...'
-              )}
-              emptyHint={text(
-                'FABRICATE.Admin.Manager.Component.SalvageEditor.NoComponentsDefined',
-                'No components defined'
-              )}
-              onSelect={(id) => updateSalvageResult(groupId, result.id, { componentId: id })}
-            />
-          </span>
+            >
+              <span>{text('FABRICATE.Admin.Manager.Component.SalvageEditor.Edit', 'Edit')}</span>
+              <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
+            </button>
+          {/if}
         {/snippet}
 
         {#if showSalvage}
@@ -1784,7 +1783,9 @@
                 {#if salvageStages.length > 0}
                   <SortableList
                     items={salvageStages}
-                    itemLabel={(result) => salvageComponentName(result.componentId)}
+                    itemLabel={(result) =>
+                      salvageComponentName(result.componentId) ||
+                      text('FABRICATE.Admin.Manager.Recipe.UnnamedResult', 'this result')}
                     numbered
                     alwaysOpen
                     reorderable={!saving}
@@ -1809,61 +1810,23 @@
                     })}
                   >
                     {#snippet row(result)}
-                      {@render salvageComponentPicker(salvageStageGroup.id, result)}
-
-                      <!-- No quantity here (issue 676): progressive awards one entry at a time, so
-                           "two of X" is authored by listing X twice.
-                           `CraftingEngine._resolveSalvageResultGroups` forces `quantity: 1` on
-                           every awarded progressive entry, so this hides nothing awardable. -->
-
-                      <!-- Read-only: `difficulty` belongs to the result component, whose own editor
-                           owns its save lifecycle. The "Edit" link is the way to change it. -->
-                      <span
-                        class="manager-salvage-result-difficulty"
-                        data-salvage-result-difficulty={salvageResultDifficulty(
-                          result.componentId
-                        ) === null
-                          ? ''
-                          : String(salvageResultDifficulty(result.componentId))}
-                        ><!-- The fallback must match the lang value, or the two disagree and the
-                           fallback describes a string nobody sees: `DifficultyUnset` resolves to
-                           "No difficulty". The recipe stage row reads the same. -->
-                        {salvageResultDifficulty(result.componentId) === null
-                          ? text(
-                              'FABRICATE.Admin.Manager.Component.SalvageEditor.DifficultyUnset',
-                              'No difficulty'
-                            )
-                          : `${text('FABRICATE.Admin.Manager.Component.SalvageEditor.DifficultyShort', 'DC')} ${salvageResultDifficulty(result.componentId)}`}</span
+                      <!-- No amount (issue 676): progressive awards one entry at a time, so "two
+                           of X" is authored by listing X twice. The clear stays, because a stage
+                           swaps its component in place to keep its order. -->
+                      <PickerRow
+                        value={toValue(result)}
+                        kinds={SALVAGE_RESULT_KINDS}
+                        catalogue={salvageCatalogue}
+                        amount={false}
+                        removable={false}
+                        disabled={saving}
+                        nameProps={SALVAGE_NAME_HOOK}
+                        class="is-result"
+                        onChange={(value) =>
+                          updateSalvageResult(salvageStageGroup.id, result, value)}
                       >
-
-                      {#if result.componentId}
-                        <!-- Opens the referenced yield component's editor. The navigation is
-                             guarded (the `component-edit` row of `ROUTE_EXIT_GUARDS` waives no
-                             navigation), so a dirty draft prompts rather than being discarded. -->
-                        <button
-                          type="button"
-                          class="manager-salvage-stage-edit"
-                          data-salvage-result-edit={result.componentId}
-                          aria-label={text(
-                            'FABRICATE.Admin.Manager.Component.SalvageEditor.EditResult',
-                            'Edit {name}'
-                          ).replace('{name}', salvageComponentName(result.componentId))}
-                          title={text(
-                            'FABRICATE.Admin.Manager.Component.SalvageEditor.EditDcHint',
-                            'Set on this component in its editor'
-                          )}
-                          onclick={() => onOpenComponent(result.componentId)}
-                          disabled={saving}
-                        >
-                          <span
-                            >{text(
-                              'FABRICATE.Admin.Manager.Component.SalvageEditor.Edit',
-                              'Edit'
-                            )}</span
-                          >
-                          <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
-                        </button>
-                      {/if}
+                        {#snippet trailing()}{@render salvageStageControls(result)}{/snippet}
+                      </PickerRow>
                     {/snippet}
                     {#snippet body(result)}
                       {@const stageComplications = salvageComplicationsFor(result.componentId)}
@@ -2024,56 +1987,29 @@
                         </div>
 
                         {#if (group.results || []).length > 0}
-                          <ul class="manager-salvage-result-list">
+                          <div class="manager-recipe-ingredient-set-groups">
                             {#each group.results as result (result.id)}
-                              <li
-                                class="manager-salvage-result-row"
+                              <!-- The quantity STAYS in simple and routed: these modes award the
+                                   whole group as authored. Only progressive drops it. -->
+                              <PickerRow
+                                value={toValue(result)}
+                                kinds={SALVAGE_RESULT_KINDS}
+                                catalogue={salvageCatalogue}
+                                amount={SALVAGE_AMOUNT}
+                                rollable
+                                clearable={false}
+                                removeHook="salvage-result"
+                                invalid={resultAmountInvalid(result, text)}
+                                disabled={saving}
+                                nameProps={SALVAGE_NAME_HOOK}
+                                removeProps={{ 'data-remove-salvage-result': '' }}
+                                class="is-result"
                                 data-salvage-result={result.id}
-                              >
-                                {@render salvageComponentPicker(group.id, result)}
-                                <!-- The quantity STAYS in simple and routed: these modes award the
-                               whole group as authored. Only progressive drops it. -->
-                                <Stepper
-                                  value={result.quantity}
-                                  min={1}
-                                  ariaLabel={text(
-                                    'FABRICATE.Admin.Manager.Component.SalvageEditor.ResultQuantity',
-                                    'Quantity for {name}'
-                                  ).replace('{name}', salvageComponentName(result.componentId))}
-                                  decrementLabel={text(
-                                    'FABRICATE.Admin.Manager.Component.SalvageEditor.DecrementResult',
-                                    'Decrease quantity'
-                                  )}
-                                  incrementLabel={text(
-                                    'FABRICATE.Admin.Manager.Component.SalvageEditor.IncrementResult',
-                                    'Increase quantity'
-                                  )}
-                                  max={9999}
-                                  disabled={saving}
-                                  inputProps={{
-                                    'data-salvage-result-quantity': '',
-                                    class: 'fab-stepper-input manager-component-stepper-quantity',
-                                  }}
-                                  onChange={(next) =>
-                                    updateSalvageResult(group.id, result.id, {
-                                      quantity: clampSalvageQuantity(next),
-                                    })}
-                                />
-                                <IconButton
-                                  class="is-danger"
-                                  ariaLabel={text(
-                                    'FABRICATE.Admin.Manager.Component.SalvageEditor.RemoveResult',
-                                    'Remove result'
-                                  )}
-                                  data-remove-salvage-result=""
-                                  onclick={() => removeSalvageResult(group.id, result.id)}
-                                  disabled={saving}
-                                >
-                                  <i class="fas fa-xmark" aria-hidden="true"></i>
-                                </IconButton>
-                              </li>
+                                onChange={(value) => updateSalvageResult(group.id, result, value)}
+                                onRemove={() => removeSalvageResult(group.id, result.id)}
+                              />
                             {/each}
-                          </ul>
+                          </div>
                         {:else}
                           <p class="manager-muted">
                             {text(
@@ -2083,21 +2019,48 @@
                           </p>
                         {/if}
 
-                        <Button
-                          role="dashed"
-                          fullWidth
-                          data-add-salvage-result
-                          onclick={() => addSalvageResult(group.id)}
+                        <!-- Adding a component the set already produces raises that row's
+                             quantity, unless that row is rolled (`withAddedResult`). -->
+                        <SearchablePopover
+                          options={salvageAdderOptions}
+                          panelLabel={text(
+                            'FABRICATE.Admin.Manager.Component.SalvageEditor.ResultComponent',
+                            'Result component'
+                          )}
+                          searchPlaceholder={text(
+                            'FABRICATE.Admin.Manager.Component.SalvageEditor.ComponentSearchPlaceholder',
+                            'Search components...'
+                          )}
+                          searchLabel={text(
+                            'FABRICATE.Admin.Manager.Component.SalvageEditor.ComponentSearchPlaceholder',
+                            'Search components...'
+                          )}
+                          emptyHint={text(
+                            'FABRICATE.Admin.Manager.Component.SalvageEditor.NoComponentsDefined',
+                            'No components defined'
+                          )}
                           disabled={saving}
+                          onSelect={(id) => addSalvageResult(group.id, id)}
                         >
-                          <i class="fas fa-plus" aria-hidden="true"></i>
-                          <span
-                            >{text(
-                              'FABRICATE.Admin.Manager.Component.SalvageEditor.AddResult',
-                              'Add result'
-                            )}</span
-                          >
-                        </Button>
+                          {#snippet trigger({ attributes })}
+                            <!-- ratchet-exempt(design-system): the spread is the popover's own trigger contract (type, ARIA state, handlers, element attachment), never a caller's name -->
+                            <Button
+                              role="dashed"
+                              fullWidth
+                              data-add-salvage-result
+                              disabled={saving}
+                              {...attributes}
+                            >
+                              <i class="fas fa-plus" aria-hidden="true"></i>
+                              <span
+                                >{text(
+                                  'FABRICATE.Admin.Manager.Component.SalvageEditor.AddResult',
+                                  'Add result'
+                                )}</span
+                              >
+                            </Button>
+                          {/snippet}
+                        </SearchablePopover>
                       </li>
                     {/each}
                   </ul>
