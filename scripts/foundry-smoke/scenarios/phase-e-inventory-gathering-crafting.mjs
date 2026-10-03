@@ -662,18 +662,24 @@ export async function runPhaseEInventoryGatheringAndCrafting(ctx) {
         await screenshot(page, 'player-crafting-essence-alternative');
         await screenshot(page, 'player-crafting-alternatives');
 
-        // Nice-to-have "switched" variant: click the second alternative so the
-        // selection tick moves, evidencing the player choosing the other option.
-        const altOptions = appShell.locator('.crafting-alt-option');
-        if ((await altOptions.count()) > 1) {
-          await altOptions
-            .nth(1)
-            .click({ timeout: 5000 })
-            .catch(() => {});
-          await page.waitForTimeout(250);
-          await assertNoScreenshotOverlays(page);
-          await screenshot(page, 'player-crafting-alternatives-switched');
-        }
+        // The player presses the second alternative tile: a real hit-tested click, then its press.
+        const altTile = appShell
+          .locator('[data-requirement-panel] [data-requirement-alternative].crafting-alt-option')
+          .nth(1);
+        const altButton = altTile.locator('button');
+        await assertPointerTarget(
+          page,
+          altButton,
+          '[data-requirement-alternative] button',
+          'Requirement chooser alternative tile'
+        );
+        await altButton.click({ timeout: 5000 });
+        await altTile
+          .locator('[aria-pressed="true"]')
+          .first()
+          .waitFor({ state: 'visible', timeout: 5000 });
+        await assertNoScreenshotOverlays(page);
+        await screenshot(page, 'player-crafting-alternatives-switched');
         // Restore the unfiltered recipe list for the subsequent stacked frame.
         await recipeSearch.fill('').catch(() => {});
         await page.waitForTimeout(200);

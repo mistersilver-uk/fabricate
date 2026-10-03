@@ -54,6 +54,18 @@ export const CASES = Object.freeze([
     ],
   }),
   playerCase({
+    id: 'player-alchemy-brew-enabled',
+    label: 'Player app — Alchemy workbench with Brew enabled',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'alchemy' },
+    // One component on the bench is an experiment, which Brew offers: the view's one primary, live.
+    steps: [{ selector: '[data-alchemy-inventory-row="al-sulphur"]' }],
+    expectSelector: '.alchemy-workbench:has([data-alchemy-chip]) [data-alchemy-brew]:not([disabled])',
+    kinds: ['player', 'alchemy'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/alchemy\//],
+  }),
+  playerCase({
     id: 'player-alchemy-stacked',
     label: 'Player app — Alchemy stacked',
     smokeLabels: ['player-alchemy-stacked'],

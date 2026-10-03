@@ -1103,8 +1103,10 @@ export const CASES = Object.freeze([
       { selector: '[data-requirement-slot][data-slot-kind="essence"]' },
       { selector: '[data-requirement-slot][data-slot-kind="choice"]' },
       {
+        // The smoke walk's selector, so its shape is proven against the rendered chooser.
         selector:
-          '[data-requirement-panel="sm-set-tidebound-g2"] .crafting-alt-option[data-option-index="1"] button',
+          '[data-requirement-panel="sm-set-tidebound-g2"] ' +
+          '[data-requirement-alternative].crafting-alt-option[data-option-index="1"] button',
       },
     ],
     expectSelector:
