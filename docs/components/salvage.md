@@ -238,8 +238,10 @@ This cannot be undone.
 
 ### Making the Attempt
 
-The footer holds a single button that rolls and commits in one press.
+With the **Salvage** tab open, the item's header holds a single button that rolls and commits in one press.
 It reads **Salvage** when the mode needs no roll, and **Salvage roll** when it has a usable check.
+A note at the foot of the tab states what pressing it costs.
+When a required tool is missing, the button is disabled and a note directly beneath the tabs says why.
 Pressing it opens the standard roll prompt, where the player picks Advantage, Normal or Disadvantage when the formula allows it, adds a situational bonus, and chooses a roll mode.
 The roll is posted to chat, so Dice So Nice animates it.
 There is no reroll and no separate confirmation step.

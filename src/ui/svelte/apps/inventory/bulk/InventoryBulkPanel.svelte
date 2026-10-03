@@ -47,6 +47,8 @@
   never moved to the blocked list, and it never names a "repair it first" remedy,
   which Fabricate has no action for.
 
+  ## Controls
+
   Clear, Done, the commit and the destroy trigger are shared `ManagerButton`s: the
   commit and Done are the pane's one primary, Destroy the plain danger role, since its
   confirmation is the dialog upstream. The per-row remove stays a 20px hand-rolled

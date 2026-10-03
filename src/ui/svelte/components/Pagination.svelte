@@ -1,6 +1,6 @@
 <!--
   THE browse-screen pager: a range summary, a prev/page/next nav, and a per-page `<Select>`.
-  Area-agnostic — six player-app components render it as well as the manager's browse screens.
+  Area-agnostic — the player app's lists render it as well as the manager's browse screens.
 
   Props:
   | prop | values | default | contract |
