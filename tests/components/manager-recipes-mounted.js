@@ -341,7 +341,9 @@ export function registerRecipesCases() {
       0,
       'the inspector sections are micro-labels on the panel, not nested cards'
     );
-    // The positive half: the same selector finds a card once one sits in that column.
+    // This proves only that the selector can match. The real pair is the liveness test in
+    // `tests/retired-manager-classes.test.js`, which reds when `InspectorCard` stops writing
+    // `fabricate-card`.
     const rail = target.ownerDocument.createElement('div');
     rail.innerHTML = '<aside class="manager-recipe-browser-inspector"><section class="fabricate-card"></section></aside>';
     assert.ok(Boolean(rail.querySelector(':scope .manager-recipe-browser-inspector .fabricate-card')), 'it can match');

@@ -637,7 +637,9 @@ describe('CheckTriggers (mounted): the collapsed head', () => {
       Boolean(root.querySelector('[data-check-triggers] > .manager-checks-trigger-list')),
       'the list is a direct child of the route wrapper'
     );
-    // The positive half: the same selector finds a trigger once a card does wrap it.
+    // This proves only that the selector can match. The real pair is the liveness test in
+    // `tests/retired-manager-classes.test.js`, which reds when `InspectorCard` stops writing
+    // `fabricate-card`.
     const host = root.ownerDocument.createElement('div');
     host.innerHTML = '<section class="fabricate-card"></section>';
     host.firstChild.append(root.querySelector('[data-trigger]').cloneNode(true));

@@ -1147,7 +1147,9 @@ describe('RecipeBrowserInspector (mounted)', () => {
       0,
       'a panel inside a window does not also need five boxes'
     );
-    // The positive half: the same selector counts a card once one is there.
+    // This proves only that the selector can match. The real pair is the liveness test in
+    // `tests/retired-manager-classes.test.js`, which reds when `InspectorCard` stops writing
+    // `fabricate-card`.
     const box = root.ownerDocument.createElement('div');
     box.innerHTML = '<section class="fabricate-card"></section>';
     assert.equal(box.querySelectorAll('.fabricate-card').length, 1, 'the selector can count a card');

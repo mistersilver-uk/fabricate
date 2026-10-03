@@ -1769,7 +1769,10 @@ describe('CraftingSystemManager source contract', () => {
   // The per-system condition shortcut card moved with the systems inspector chain (issue 1721).
   defineStructureContract('draws the global condition shortcuts', SYSTEM_BROWSER_INSPECTOR, {
     names: ['selectedGatheringConditionShortcuts'],
-    // The positive half of the recipe inspector's `spellsNo` card shell: a hand-written card.
+    // A hand-written card, so the recipe inspector's `spellsNo` card shell reads a token the
+    // reader can find. The real pair is the liveness test in
+    // `tests/retired-manager-classes.test.js`, which reds when `InspectorCard` stops writing
+    // `fabricate-card`.
     spells: ['fabricate-card'],
     calls: ['buildSelectedGatheringConditionShortcuts'],
     writes: ['data-systems-gathering-conditions', 'data-systems-gathering-condition'],
