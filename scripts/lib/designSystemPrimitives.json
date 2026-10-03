@@ -161,6 +161,14 @@
       "why": "The labelled icon-and-fact row (5 callers). `<StatBox>` (`library.html:860`) is the nearest mark, but a stat box is a boxed value and this is a row of label-plus-fact, so the correspondence is not made. Scoped `manager-only`: every measured importer is a manager inspector or editor. Issue 2080 extends it by prop rather than forking it, for the Checks simulator's \"What happens\" list: an opt-in `density=\"line\"` draws one line with the subtitle trailing as mono meta, the row tones `success`, `danger`, `warning`, `neutral` and `muted`, named as the design system's chip tones are, ink the glyph from each family's token, and `metaAttr`/`metaValue` hook the meta span as `titleAttr` hooks the title. A row that asks for none of them renders byte-identical HTML."
     },
     {
+      "path": "src/ui/svelte/apps/manager/InlineRenameField.svelte",
+      "library": null,
+      "status": "target",
+      "evidence": "targeted",
+      "scope": "manager-only",
+      "why": "The always-editable record name (2 callers, issue 1521): `PartyExpandedBody.svelte` draws its bare branch on a World › Parties card and `world/TravelInspector.svelte` its `labelled` branch in the realm inspector, the two that were `PartyNameField` and `RealmNameField` until one draft, commit and revert rule replaced them. Each branch keeps the classes and hooks its predecessor rendered, so the DOM is unchanged save the Svelte scope hash. No `library.html` entry names an inline rename field; `<Field>` is the labelled branch's host, not this. Targeted: `manager-world-parties-normal`, `manager-world-parties-realm-override-picker` and `manager-world-travel-realm-open` claim it in `sourceMatches`. Scoped `manager-only`: it renames a world record, which only the GM manager does."
+    },
+    {
       "path": "src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte",
       "library": null,
       "status": "target",

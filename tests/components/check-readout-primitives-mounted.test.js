@@ -32,8 +32,7 @@ describe('IconFactRow: the line density, row tones and meta hook', () => {
       subtitle: 'by trigger',
       density: 'line',
       tone: 'danger',
-      dataAttr: 'data-checks-simulator-fact',
-      dataValue: 'tools',
+      'data-checks-simulator-fact': 'tools',
       metaAttr: 'data-checks-simulator-fact-meta',
     });
     const node = target.querySelector('[data-checks-simulator-fact="tools"]');

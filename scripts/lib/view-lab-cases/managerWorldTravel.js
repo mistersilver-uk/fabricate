@@ -104,6 +104,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringRealmsTab)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/InlineRenameField\.svelte$/,
     ],
   }),
   managerCase({

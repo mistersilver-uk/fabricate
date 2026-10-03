@@ -1,37 +1,58 @@
 /**
- * `CharacterModifierBoundsRow` MOUNTED (issue 1050) — the forwarding contract.
- *   patch: (next) => ({ min: next })
+ * The character-modifier bounds row MOUNTED through `GatheringModifierEditor`, at both subjects
+ * (issues 1050, 1521): each bound forwards its own patch, and a cleared bound is `null`, never `0`.
  */
-import { after, afterEach, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
+import { after, afterEach, before, describe, it } from 'node:test';
 
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import {
+  createMountedComponentHarness,
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  TYPEAHEAD_RUNE_MODULES,
+} from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
-const ROW_PATH = 'src/ui/svelte/apps/manager/environment/CharacterModifierBoundsRow.svelte';
-const STEPPER_PATH = 'src/ui/svelte/components/Stepper.svelte';
+const EDITOR_PATH = 'src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte';
 
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-character-modifier-bounds-row-',
-  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES, 'src/ui/svelte/components/stepperLabels.js'],
-  // `Field.svelte` is THE manager's labelled form field (issue 1428).
-  compiledModules: ['src/ui/svelte/components/Field.svelte', STEPPER_PATH, ROW_PATH],
-  componentPath: ROW_PATH,
+  rawModules: [
+    ...SEARCHABLE_POPOVER_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
+    'src/ui/svelte/components/stepperLabels.js',
+  ],
+  runeModules: [...TYPEAHEAD_RUNE_MODULES],
+  compiledModules: [
+    'src/ui/svelte/components/EmptyState.svelte',
+    'src/ui/svelte/components/Field.svelte',
+    'src/ui/svelte/components/Stepper.svelte',
+    EDITOR_PATH,
+  ],
+  componentPath: EDITOR_PATH,
 });
 
 before(() => harness.setup());
 after(() => harness.teardown());
 afterEach(() => harness.remount());
 
-/** Mount the row and return its two Stepper inputs plus the recorded `onChange` patches. */
-async function mountRow(props) {
+/** Mount the editor with one reference row and return its two bound inputs and the patches. */
+async function mountRow(subject, bounds) {
   const patches = [];
-  const root = await harness.mount({ ...props, onChange: (patch) => patches.push(patch) });
-  const inputs = [...root.querySelectorAll('[data-stepper-input]')];
-  return { patches, minInput: inputs[0], maxInput: inputs[1] };
+  const root = await harness.mount({
+    subject,
+    rowCharacterModifiers: () => [{ id: 'ref-1', modifierId: 'mod-1', ...bounds }],
+    characterModifierLibraryEntry: () => ({ id: 'mod-1' }),
+    onUpdateCharacterModifier: (id, patch) => {
+      patches.push([id, patch]);
+    },
+  });
+  const inputs = [
+    ...root.querySelectorAll(':scope .manager-character-modifier-row-bounds [data-stepper-input]'),
+  ];
+  return { patches, minInput: inputs[0], maxInput: inputs[1], count: inputs.length };
 }
 
 /** Type `raw` into the field the way a user would, firing the real `input` event. */
@@ -40,39 +61,40 @@ function type(input, raw) {
   input.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
 }
 
-// ── One shared shape for both bounds.
 const BOUND_CASES = [
   { key: 'min', field: 'minInput', value: 5 },
   { key: 'max', field: 'maxInput', value: 20 },
 ];
 
-describe('CharacterModifierBoundsRow forwarding contract (issue 1050)', () => {
-  for (const { key, field, value } of BOUND_CASES) {
-    it(`clearing the ${key} bound emits { ${key}: null }, not { ${key}: 0 }`, async () => {
-      const { patches, [field]: input } = await mountRow({ [key]: value });
-      type(input, '');
-      assert.deepEqual(
-        patches,
-        [{ [key]: null }],
-        `clearing ${key} must forward absence through the row's own patch, not a coerced 0`
-      );
-      assert.notDeepEqual(patches, [{ [key]: 0 }], `a cleared ${key} bound is not a bound of 0`);
+for (const subject of ['drop', 'event']) {
+  describe(`the ${subject} subject's bounds row`, () => {
+    it('renders one stepper per bound', async () => {
+      const { count } = await mountRow(subject, { min: 5, max: 20 });
+      assert.equal(count, 2);
     });
 
-    it(`entering a real number for ${key} emits that number, so the callback is proven to fire`, async () => {
-      const { patches, [field]: input } = await mountRow({ [key]: null });
-      type(input, '7');
-      assert.deepEqual(
-        patches,
-        [{ [key]: 7 }],
-        `a real edit to ${key} must reach the update callback with the typed number`
-      );
-    });
-  }
+    for (const { key, field, value } of BOUND_CASES) {
+      it(`clearing the ${key} bound emits { ${key}: null }, not { ${key}: 0 }`, async () => {
+        const mounted = await mountRow(subject, { [key]: value });
+        const { patches } = mounted;
+        const input = mounted[field];
+        type(input, '');
+        assert.deepEqual(patches, [['ref-1', { [key]: null }]], 'a cleared bound is no bound');
+      });
 
-  it('keeps the two bounds independent — editing min never emits a max patch and vice versa', async () => {
-    const { patches, minInput } = await mountRow({ min: 5, max: 20 });
-    type(minInput, '');
-    assert.deepEqual(patches, [{ min: null }], 'only the edited bound is patched');
+      it(`entering a number for ${key} emits that number`, async () => {
+        const mounted = await mountRow(subject, { [key]: null });
+        const { patches } = mounted;
+        const input = mounted[field];
+        type(input, '7');
+        assert.deepEqual(patches, [['ref-1', { [key]: 7 }]]);
+      });
+    }
+
+    it('patches only the bound that was edited', async () => {
+      const { patches, minInput } = await mountRow(subject, { min: 5, max: 20 });
+      type(minInput, '');
+      assert.deepEqual(patches, [['ref-1', { min: null }]]);
+    });
   });
-});
+}
