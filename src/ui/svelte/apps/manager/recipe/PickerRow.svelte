@@ -218,6 +218,9 @@
   const removeName = $derived(
     forSubject('FABRICATE.Admin.Manager.Recipe.RemoveNamed', 'Remove {name}')
   );
+  const clearName = $derived(
+    forSubject('FABRICATE.Admin.Manager.Recipe.ClearNamed', 'Clear {name}')
+  );
   const unknownHint = $derived(
     text(
       'FABRICATE.Admin.Manager.Recipe.UnknownKindHint',
@@ -388,10 +391,7 @@
               type="button"
               class="manager-recipe-option-clear"
               data-recipe-option-clear
-              aria-label={text(
-                'FABRICATE.Admin.Manager.Recipe.ClearChoice',
-                'Clear and search again'
-              )}
+              aria-label={clearName}
               title={text('FABRICATE.Admin.Manager.Recipe.ClearChoice', 'Clear and search again')}
               {disabled}
               onclick={() => choose('')}

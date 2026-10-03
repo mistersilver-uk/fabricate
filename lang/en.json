@@ -3017,6 +3017,7 @@
           "EssenceTypeLabel": "Essence",
           "CurrencyTypeLabel": "Currency",
           "ClearChoice": "Clear and search again",
+          "ClearNamed": "Clear {name}",
           "NoMatches": "No matches",
           "QuantityDecrement": "Decrease quantity",
           "QuantityIncrement": "Increase quantity",

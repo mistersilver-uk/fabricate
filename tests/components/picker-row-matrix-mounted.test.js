@@ -436,6 +436,9 @@ describe('PickerRow: the amount toggle is one named radio group', () => {
       formula: 'Rolled amount for Iron ingot',
       remove: 'Remove Iron ingot',
     });
+    const clear = target.querySelector('[data-recipe-option-clear]');
+    assert.equal(clear.getAttribute('aria-label'), 'Clear Iron ingot');
+    assert.equal(clear.getAttribute('title'), 'Clear and search again');
     // The hint names no roll-data path, and says what an absent one is worth.
     const hint = target.querySelector(FORMULA).getAttribute('title');
     assert.match(hint, /missing character value counts as 0/);
