@@ -6416,11 +6416,9 @@ export class CraftingEngine {
 
   /**
    * The salvage pipeline for a component: validate, tool check, salvage check, failure policy,
-   * consume, create results, record the run.
-   *
-   * It performs no ownership check (issue 675): it resolves `actorUuid` through `fromUuid` and
-   * mutates that actor's Items. The only gate is `Fabricate#salvageComponent`, which takes an
-   * actor id, so no UI may plumb a uuid here.
+   * consume, create results, record the run. It performs no ownership check (issue 675): it
+   * resolves `actorUuid` through `fromUuid` and mutates that actor's Items. The only gate is
+   * `Fabricate#salvageComponent`, which takes an actor id, so no UI may plumb a uuid here.
    *
    * @param {object|null} [options.rollDecision] A pre-resolved roll decision so one prompt drives
    *   every roll of a bulk run (issue 859).
