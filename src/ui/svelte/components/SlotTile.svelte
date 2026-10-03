@@ -47,6 +47,7 @@
     {#if pip}
       <span class="fab-slot-pip is-{pipKind === 'candidate' ? 'candidate' : 'ratio'}">{pip}</span>
     {/if}
+    {#if pressed}<i class="fab-slot-tick fa-solid fa-circle-check" aria-hidden="true"></i>{/if}
   </svelte:element>
   <span class="fab-slot-caption">{label}</span>
   {#if interactive && affordance}
@@ -96,6 +97,16 @@
   .fab-slot-tile.is-selected {
     outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
+  }
+
+  .fab-slot-tick {
+    position: absolute;
+    right: -5px;
+    bottom: -5px;
+    font-size: 13px;
+    color: var(--fab-accent);
+    background: var(--fab-bg-1);
+    border-radius: 50%;
   }
 
   .fab-slot-tile :global(.fab-medallion) {

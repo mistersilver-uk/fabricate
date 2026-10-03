@@ -1,6 +1,6 @@
 <!--
   The player-side requirement chooser: one row of slot tiles, and beneath it the single open
-  slot's panel — its alternatives as tiles, then whatever the caller draws for that slot.
+  slot's panel — its alternatives as tiles in a `Well`, then whatever the caller draws for that slot.
 
   Props:
   | prop | values | default | contract |
@@ -9,7 +9,7 @@
   | `openSlotId` | slot id | `null` | The one open slot. The caller owns it and this component never writes it, so two open choosers cannot be represented. |
   | `readOnly` | boolean | `false` | Renders every slot as a labelled image and opens no panel. |
   | `panelId` | DOM id | `null` | The open panel's id, which the open tile names through `aria-controls`. |
-  | `ariaLabel` / `alternativesLabel` | localized strings | `''` | The accessible names of the tile group and of the alternatives group. |
+  | `ariaLabel` / `alternativesLabel` | localized strings | `''` | The accessible name of the tile group, and the visible kicker that names the alternatives' `Well`. |
   | `class` | class string | `''` | An extra class on the root. |
 
   An alternative carries `id`, `name`, `label`, `art` / `icon` / `tint`, `pip`, `selected`, `short`,
@@ -40,6 +40,7 @@
 -->
 <script>
   import SlotTile from './SlotTile.svelte';
+  import Well from './Well.svelte';
 
   let {
     slots = [],
@@ -161,45 +162,43 @@
       data-requirement-panel={opened.slotId}
     >
       {#if alternatives.length > 0}
-        <div
-          class="fab-requirement-alternatives"
-          role="group"
-          aria-label={alternativesLabel || undefined}
-        >
-          {#each alternatives as alternative (alternative.id)}
-            {@const { class: hookClass = '', ...hooks } = alternative.wrapperProps ?? {}}
-            <div
-              class={['fab-requirement-alternative', hookClass]}
-              class:is-short={alternative.short === true}
-              data-requirement-alternative={alternative.id}
-              data-alternative-state={alternative.short ? 'short' : 'met'}
-              use:describedBy={shortfalls.includes(alternative) ? shortfallId(alternative) : null}
-              {...hooks}
+        <Well label={alternativesLabel}>
+          <div class="fab-requirement-alternatives">
+            {#each alternatives as alternative (alternative.id)}
+              {@const { class: hookClass = '', ...hooks } = alternative.wrapperProps ?? {}}
+              <div
+                class={['fab-requirement-alternative', hookClass]}
+                class:is-short={alternative.short === true}
+                data-requirement-alternative={alternative.id}
+                data-alternative-state={alternative.short ? 'short' : 'met'}
+                use:describedBy={shortfalls.includes(alternative) ? shortfallId(alternative) : null}
+                {...hooks}
+              >
+                <SlotTile
+                  label={alternative.name}
+                  ariaLabel={alternative.label}
+                  art={alternative.art || ''}
+                  icon={alternative.icon || 'fas fa-circle'}
+                  tint={alternative.tint || ''}
+                  state={alternative.short ? 'short' : 'met'}
+                  pip={alternative.pip || ''}
+                  interactive
+                  pressed={alternative.selected === true}
+                  onActivate={() => onChoose?.(opened, alternative)}
+                />
+              </div>
+            {/each}
+          </div>
+          {#each shortfalls as alternative (alternative.id)}
+            <p
+              class="fab-requirement-shortfall"
+              id={shortfallId(alternative)}
+              data-requirement-shortfall={alternative.id}
             >
-              <SlotTile
-                label={alternative.name}
-                ariaLabel={alternative.label}
-                art={alternative.art || ''}
-                icon={alternative.icon || 'fas fa-circle'}
-                tint={alternative.tint || ''}
-                state={alternative.short ? 'short' : 'met'}
-                pip={alternative.pip || ''}
-                interactive
-                pressed={alternative.selected === true}
-                onActivate={() => onChoose?.(opened, alternative)}
-              />
-            </div>
+              {alternative.reading}
+            </p>
           {/each}
-        </div>
-        {#each shortfalls as alternative (alternative.id)}
-          <p
-            class="fab-requirement-shortfall"
-            id={shortfallId(alternative)}
-            data-requirement-shortfall={alternative.id}
-          >
-            {alternative.reading}
-          </p>
-        {/each}
+        </Well>
       {/if}
       {@render panel?.(opened)}
     </div>
@@ -277,7 +276,7 @@
   }
 
   .fab-requirement-shortfall {
-    margin: 0;
+    margin: var(--fab-space-2) 0 0;
     color: var(--fab-danger-text);
     font-size: 10.5px;
   }

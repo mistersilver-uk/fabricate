@@ -103,6 +103,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/SlotTile.svelte',
     'src/ui/svelte/components/RequirementChooser.svelte',
+    'src/ui/svelte/components/Well.svelte',
     // The shared eyebrow (issue 1505). The rail's header title is a `<Kicker>`.
     'src/ui/svelte/components/Kicker.svelte',
     'src/ui/svelte/apps/crafting/detail/RequirementRail.svelte',

@@ -253,9 +253,10 @@ export const PLAYER_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/ManagerSearchField.svelte',
   'src/ui/svelte/components/InspectorCard.svelte',
   'src/ui/svelte/components/StatusToggle.svelte',
-  // The requirement chooser the crafting rail renders (issue 1518), and the tile it draws.
+  // The requirement chooser the crafting rail renders (issue 1518), the tile it draws and its well.
   'src/ui/svelte/components/RequirementChooser.svelte',
   'src/ui/svelte/components/SlotTile.svelte',
+  'src/ui/svelte/components/Well.svelte',
 ]);
 
 // The raw `.js` modules the player Crafting tab tree needs in a mounted test.
@@ -446,6 +447,7 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/crafting/detail/RequirementRail.svelte',
   'src/ui/svelte/components/RequirementChooser.svelte',
   'src/ui/svelte/components/SlotTile.svelte',
+  'src/ui/svelte/components/Well.svelte',
   'src/ui/svelte/apps/crafting/detail/EssencePoolPanel.svelte',
   'src/ui/svelte/apps/crafting/detail/ConsumptionPlanPanel.svelte',
   // The one "N Radiant" contribution chip both of the two panels above render. They

@@ -16,6 +16,8 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/SlotTile.svelte',
+    'src/ui/svelte/components/Kicker.svelte',
+    'src/ui/svelte/components/Well.svelte',
     'src/ui/svelte/components/RequirementChooser.svelte',
   ],
   componentPath: 'src/ui/svelte/components/RequirementChooser.svelte',
@@ -271,13 +273,20 @@ describe('RequirementChooser mounted behavior', () => {
       alternativesLabel: 'Hardwood alternatives',
     });
     const buttons = alternativesIn(target).map((entry) => entry.querySelector('button'));
-    assert.equal(
-      target.querySelector('.fab-requirement-alternatives').getAttribute('aria-label'),
-      'Hardwood alternatives'
-    );
+    const well = target.querySelector('[data-requirement-panel] .fab-well');
+    assert.equal(well.getAttribute('role'), 'group');
+    assert.equal(well.getAttribute('aria-label'), 'Hardwood alternatives');
+    assert.equal(well.querySelector('.fab-well-label').textContent.trim(), 'Hardwood alternatives', 'named visibly');
+    const row = well.querySelector('.fab-requirement-alternatives');
+    assert.ok(Boolean(row) && !row.hasAttribute('role'), 'the tile row sits in the well and is no second group');
     assert.deepEqual(
       buttons.map((button) => button.getAttribute('aria-pressed')),
       ['true', 'false']
+    );
+    assert.deepEqual(
+      buttons.map((button) => button.querySelector('.fab-slot-tick[aria-hidden="true"]') !== null),
+      [true, false],
+      'the pressed tile carries a tick beside its ring, so it never reads as focus alone'
     );
     assert.deepEqual(
       buttons.map((button) => button.getAttribute('aria-label')),
@@ -313,6 +322,7 @@ describe('RequirementChooser mounted behavior', () => {
     assert.ok(!target.querySelector('[data-requirement-shortfall="oak"]'), 'a met one states none');
     const reading = target.querySelector('[data-requirement-shortfall="bog"]');
     assert.ok(reading.id.length > 0);
+    assert.ok(Boolean(reading.closest('.fab-well')), 'the reading sits beneath its tiles, in their well');
     assert.equal(
       button.getAttribute('aria-describedby'),
       reading.id,
