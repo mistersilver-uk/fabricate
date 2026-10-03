@@ -123,10 +123,8 @@ function snippetTriggerName(site) {
       if (found || (node.type !== 'RegularElement' && node.type !== 'Component')) return;
       const attributes = node.attributes ?? [];
       if (attributes.every((attribute) => attribute.type !== 'SpreadAttribute')) return;
-      // A primitive takes its name as `ariaLabel` (issue 2164's convention); an element as `aria-label`.
-      const nameAttribute = node.type === 'Component' ? 'ariaLabel' : 'aria-label';
       const label = attributes.find(
-        (attribute) => attribute.type === 'Attribute' && attribute.name === nameAttribute
+        (attribute) => attribute.type === 'Attribute' && attribute.name === 'aria-label'
       );
       if (label) found = snippet.slice(label.start, label.end);
     }

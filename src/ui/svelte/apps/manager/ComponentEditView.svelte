@@ -2046,7 +2046,7 @@
                               role="dashed"
                               fullWidth
                               data-add-salvage-result
-                              ariaLabel={text(
+                              aria-label={text(
                                 'FABRICATE.Admin.Manager.Component.SalvageEditor.AddResult',
                                 'Add result'
                               )}
