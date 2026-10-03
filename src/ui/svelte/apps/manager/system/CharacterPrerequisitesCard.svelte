@@ -19,7 +19,7 @@
   import { tick } from 'svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import IconPicker from '../../../components/IconPicker.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import {
     PREREQUISITE_OPERATORS,
     DEFAULT_PREREQUISITE_ICON,
@@ -140,11 +140,11 @@
       </p>
     </div>
     <div class="manager-character-modifier-card-header-actions">
-      <ManagerButton role="primary" data-add-prerequisite onclick={handleAdd}>
+      <Button role="primary" data-add-prerequisite onclick={handleAdd}>
         <i class="fa-solid fa-plus" aria-hidden="true"></i>
         {text('FABRICATE.Admin.Manager.CharacterPrerequisites.Add', 'Add prerequisite')}
-      </ManagerButton>
-      <ManagerButton
+      </Button>
+      <Button
         data-seed-prerequisite-presets
         disabled={!presetsSupported}
         data-tooltip={!presetsSupported
@@ -157,7 +157,7 @@
       >
         <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
         {text('FABRICATE.Admin.Manager.CharacterPrerequisites.SeedPresets', 'Seed presets')}
-      </ManagerButton>
+      </Button>
     </div>
   </header>
 

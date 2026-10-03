@@ -250,7 +250,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/journal/TimeRemainingBox.svelte',
     'src/ui/svelte/apps/journal/WhatToExpect.svelte',
     'src/ui/svelte/apps/ActorSelectTopBar.svelte',
-    'src/ui/svelte/components/ManagerSearchField.svelte',
+    'src/ui/svelte/components/SearchField.svelte',
     'src/ui/svelte/components/RunActionBar.svelte',
     'src/ui/svelte/components/SlotTile.svelte',
     'src/ui/svelte/components/ChoiceOptionList.svelte',

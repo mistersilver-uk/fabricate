@@ -230,7 +230,7 @@ When `true`, the shared system-agnostic dialog (`src/ui/svelte/apps/crafting/rol
 This is the PR #497 per-call-flag decision, consumed uniformly by the crafting store, salvage (inventory) store, alchemy store, gathering view, and the Journal Trigger Next Step path; `CraftingEngine.craft` discards any phantom run created by a cancelled interactive call.
 
 - **One modal, one header.**
-The prompt renders in Fabricate's shared modal chrome (`ManagerModal`), never in a Foundry dialog, so it has one header: the activity check as its title and the actor and subject beneath it.
+The prompt renders in Fabricate's shared modal chrome, the `Modal` component, never in a Foundry dialog, so it has one header: the activity check as its title and the actor and subject beneath it.
 It mounts over the Fabricate window the player started the roll from, unless that window is minimized, whatever the input device: the control that starts a roll records its own window for as long as the roll it started runs.
 Only when no control recorded one does it fall back to the window holding focus or, when focus is nowhere, the window under the pointer.
 Any other call, such as a companion or macro, mounts it on a themed standalone layer on the page that stays frontmost and that closing removes.

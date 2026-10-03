@@ -14,7 +14,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import Pagination from '../../../components/Pagination.svelte';
   import MembershipActions from './MembershipActions.svelte';
-  import ManagerSearchField from '../../../components/ManagerSearchField.svelte';
+  import SearchField from '../../../components/SearchField.svelte';
 
   let {
     rows = [],
@@ -124,7 +124,7 @@
   -->
   <div class="manager-scoped-roster-card" class:is-recessed={recessed}>
     <!-- NO ELLIPSIS ON THE PLACEHOLDER: the design's field reads `Search systems` (`proto:2025`). -->
-    <ManagerSearchField
+    <SearchField
       class={searchWell
         ? 'manager-scoped-roster-search manager-scoped-roster-search-well'
         : 'manager-scoped-roster-search'}
@@ -254,7 +254,7 @@
   }
 
   /* Only the field's row sizing is stated here; the global rule sizes it for a toolbar. Chained
-     `:global`, because the class travels to `ManagerSearchField`'s own `<label>`, and the chain
+     `:global`, because the class travels to `SearchField`'s own `<label>`, and the chain
      keeps the specificity at (0,2,0), which is what the scoped form compiled to. */
   :global(.manager-search.manager-scoped-roster-search) {
     flex: 0 0 auto;

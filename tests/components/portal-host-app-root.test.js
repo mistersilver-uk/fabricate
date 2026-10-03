@@ -198,12 +198,12 @@ test('the portal population is the set of components that actually portal', () =
 
   for (const anchor of [
     'src/ui/svelte/components/SearchablePopover.svelte',
-    'src/ui/svelte/components/ManagerModal.svelte',
+    'src/ui/svelte/components/Modal.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
     // A SCREEN REGION rather than a shared component.
     'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte',
     // A typeahead combobox, which names neither earlier route.
-    'src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte',
+    'src/ui/svelte/apps/manager/recipe/PickerRow.svelte',
     // The selectors themselves, which is the shape the clipping boundary took when it left the
     // components. Without this file the offence clause reads no boundary selector at all.
     'src/ui/svelte/util/overlayBounds.js',
@@ -219,7 +219,7 @@ test('the portal population is the set of components that actually portal', () =
     files.length >= 9,
     `only ${files.length} files were detected as portaling. Nine do since issue 1500 re-keyed ` +
       'six of them onto the anchored-popover action, moved the clipping selectors into their own ' +
-      'module and left `ManagerColorPopover` a plain panel its caller positions; a lower number ' +
+      'module and left `TintPicker` a plain panel its caller positions; a lower number ' +
       'means the membership test has narrowed and this gate is guarding a subset.'
   );
 });

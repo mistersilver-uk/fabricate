@@ -30,7 +30,7 @@ const OPTIONAL_ACTION_FIELDS = Object.freeze(['icon', 'tooltip']);
 const BOOLEAN_ACTION_FIELDS = Object.freeze(['primary', 'disabled']);
 // Named after the treatment rather than a colour, so a theme may repaint one without renaming it.
 export const ACTION_TONES = Object.freeze(['primary', 'ghost', 'danger', 'neutral']);
-// `fab-manager-button` is absent deliberately: it marks a control the `ManagerButton` primitive
+// `fab-manager-button` is absent deliberately: it marks a control the `Button` primitive
 // rendered, and this hands a class list to a `<button>` the Manager root writes by hand.
 const HEADER_ACTION_BASE_CLASSES = 'fabricate-button manager-button';
 

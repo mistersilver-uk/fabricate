@@ -14,7 +14,7 @@
   import EmptyState from '../../components/EmptyState.svelte';
   import InspectorCard from '../../components/InspectorCard.svelte';
   import Kicker from '../../components/Kicker.svelte';
-  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import SearchField from '../../components/SearchField.svelte';
   import Pagination from '../../components/Pagination.svelte';
   import GatheringEventRow from './GatheringEventRow.svelte';
   import ChanceBar from './ChanceBar.svelte';
@@ -130,7 +130,7 @@
       <h3 class="gathering-detail-section-title">
         {localize('FABRICATE.App.Gathering.Detail.EventsHeading')}
       </h3>
-      <ManagerSearchField
+      <SearchField
         class="gathering-detail-search"
         bind:value={eventSearchTerm}
         placeholder={localize('FABRICATE.App.Gathering.Detail.EventSearchPlaceholder')}

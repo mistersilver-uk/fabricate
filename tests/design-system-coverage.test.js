@@ -190,15 +190,15 @@ test('every manifest library name resolves to a library entry', () => {
 });
 
 /**
- * The 24 library entries with no shipped implementation (issue 1505). Re-derived from the array
- * rather than carried forward: `SortableList` left it at issue 1512, `Well` at issue 2008 and
- * `RequirementChooser` at issue 1518, when each specified primitive shipped, and the count this
- * docblock states is the array's own length.
+ * The 23 library entries with no shipped implementation (issue 1505). Re-derived from the array
+ * rather than carried forward: `SortableList` left it at issue 1512, `Well` at issue 2008,
+ * `PickerRow` at issue 1516 and `RequirementChooser` at issue 1518, when each specified primitive
+ * shipped, and the count this docblock states is the array's own length.
  */
 const SPECIFIED_ONLY = [
   'AppRail', 'AppTitleBar', 'BandedBar', 'BrowseCard', 'ChoiceGroup',
   'DataTable', 'InfoStrip', 'LogList', 'Menu',
-  'Meter', 'NavSidebar', 'PageHeader', 'PickerRow', 'Rail',
+  'Meter', 'NavSidebar', 'PageHeader', 'Rail',
   'RuleRow', 'RuleSentence', 'Search', 'SetPicker',
   'StageBars', 'TierTrack', 'ValidationList', 'ValidationSummary',
   'ViewToggle', 'XrefList',
@@ -439,19 +439,19 @@ const MANAGER_DIRECTORY = 'src/ui/svelte/apps/manager/';
  * 1502).
  */
 const RE_ROOTED_ROWS = [
+  'src/ui/svelte/components/Button.svelte',
   'src/ui/svelte/components/ChanceSlider.svelte',
   'src/ui/svelte/components/EditorTabs.svelte',
   'src/ui/svelte/components/EditorValidationSurface.svelte',
   'src/ui/svelte/components/Field.svelte',
+  'src/ui/svelte/components/FilterBar.svelte',
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/InspectorCard.svelte',
   'src/ui/svelte/components/ItemDropZone.svelte',
-  'src/ui/svelte/components/ManagerButton.svelte',
-  'src/ui/svelte/components/ManagerSearchField.svelte',
-  'src/ui/svelte/components/ManagerToolbar.svelte',
   'src/ui/svelte/components/ModifierPillSelect.svelte',
   'src/ui/svelte/components/Pagination.svelte',
   'src/ui/svelte/components/RadioCardGroup.svelte',
+  'src/ui/svelte/components/SearchField.svelte',
   'src/ui/svelte/components/SortableList.svelte',
   'src/ui/svelte/components/StatusToggle.svelte',
   'src/ui/svelte/components/ToggleCard.svelte',
@@ -658,9 +658,9 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/components/EssenceSourceSelector.svelte',
   'src/ui/svelte/components/FillBar.svelte',
   'src/ui/svelte/components/IconPicker.svelte',
-  'src/ui/svelte/components/ManagerColorPicker.svelte',
-  'src/ui/svelte/components/ManagerSearchField.svelte',
   'src/ui/svelte/components/ModifierPillSelect.svelte',
+  'src/ui/svelte/components/SearchField.svelte',
+  'src/ui/svelte/components/TintPickerButton.svelte',
   'src/ui/svelte/components/ToggleCard.svelte',
 ];
 

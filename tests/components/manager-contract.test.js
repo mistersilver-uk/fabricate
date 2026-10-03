@@ -638,12 +638,12 @@ describe('CraftingSystemManager source contract', () => {
   });
 
   defineStructureContract('draws the crafting studios’ header actions', MANAGER_HEADER_CRAFTING_ACTIONS, {
-    renders: ['ManagerButton', 'ComponentEditorHeader'],
+    renders: ['Button', 'ComponentEditorHeader'],
     writes: ['data-checks-save', 'data-component-add-from-catalogue'],
   });
 
   defineStructureContract('draws the gathering studios’ header actions', MANAGER_HEADER_GATHERING_ACTIONS, {
-    renders: ['ManagerButton', 'Chip'],
+    renders: ['Button', 'Chip'],
     writes: ['data-environment-edit-back', 'data-gathering-task-back', 'data-gathering-event-back'],
   });
 
@@ -672,7 +672,7 @@ describe('CraftingSystemManager source contract', () => {
   defineStructureContract('gives a browse route the same main column', MANAGER_VIEWS, {
     spells: ['manager-main', 'manager-filter'],
     spellsExactly: ['FABRICATE.Admin.Manager.Environment.EmptyTitle'],
-    renders: ['ManagerToolbar', 'EmptyState'],
+    renders: ['FilterBar', 'EmptyState'],
     imports: ['../../components/EmptyState.svelte'],
   });
 
@@ -1225,7 +1225,7 @@ describe('CraftingSystemManager source contract', () => {
       declaresAttribute(node, 'data-manager-import-system', { directives: false })
     );
     assert.ok(Boolean(importButton), 'the system library header still renders Import');
-    assert.equal(importButton.name, 'ManagerButton', 'through the shared button primitive');
+    assert.equal(importButton.name, 'Button', 'through the shared button primitive');
     assert.equal(attributeExpression(importButton, 'onclick')?.name, 'importSystem');
 
   });
@@ -1829,7 +1829,7 @@ describe('CraftingSystemManager source contract', () => {
   // The settings tab is where a world's condition and vocabulary values are authored, through the
   // shared pickers rather than through bespoke inputs.
   defineStructureContract('authors global conditions and vocabularies on the settings tab', ENVIRONMENTS_BROWSER, {
-    renders: ['ManagerColorPicker', 'IconPicker'],
+    renders: ['TintPickerButton', 'IconPicker'],
     writes: ['data-gathering-condition-panel', 'data-gathering-vocabulary-panel'],
     calls: [
       'onToggleGatheringConditionEnabled',
@@ -2075,13 +2075,13 @@ describe('CraftingSystemManager source contract', () => {
 
   // The destructive role, read off one element rather than off two strings that happen to sit
   // within 200 characters of each other. The class literal the old match keyed on left the file
-  // entirely when this toolbar moved onto `ManagerButton` (issue 1118).
-  it('renders the task delete as one danger ManagerButton wired to the draft delete', () => {
+  // entirely when this toolbar moved onto `Button` (issue 1118).
+  it('renders the task delete as one danger Button wired to the draft delete', () => {
     const [remove] = templateNodes(componentAstOf(MANAGER_HEADER_GATHERING_ACTIONS)).filter(
       (node) => declaresAttribute(node, 'data-gathering-task-delete', { directives: false })
     );
     assert.ok(Boolean(remove), 'the task editor toolbar still renders its delete control');
-    assert.equal(remove.name, 'ManagerButton', 'through the shared button primitive');
+    assert.equal(remove.name, 'Button', 'through the shared button primitive');
     assert.equal(attributeValue(remove, 'role'), 'danger', 'in the destructive role');
     assert.equal(
       attributeExpression(remove, 'onclick')?.name,

@@ -64,7 +64,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
     'src/ui/svelte/components/SegmentedControl.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
-    'src/ui/svelte/components/ManagerColorPopover.svelte',
+    'src/ui/svelte/components/TintPicker.svelte',
     'src/ui/svelte/apps/manager/essences/EssenceBulkEditPanel.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/essences/EssenceBulkEditPanel.svelte',

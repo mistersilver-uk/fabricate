@@ -17,9 +17,9 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import { componentSourceLine } from './componentScoped.js';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
-  import ManagerModal from '../../../components/ManagerModal.svelte';
-  import ManagerSearchField from '../../../components/ManagerSearchField.svelte';
+  import Button from '../../../components/Button.svelte';
+  import Modal from '../../../components/Modal.svelte';
+  import SearchField from '../../../components/SearchField.svelte';
   import SelectionCheckbox from '../../../components/SelectionCheckbox.svelte';
 
   let {
@@ -58,7 +58,7 @@
 
   /**
    * Land keyboard focus on the picker's search field once the portaled panel has mounted. A
-   * QUERY rather than a `bind:this`, because neither `ManagerModal` nor `ManagerSearchField`
+   * QUERY rather than a `bind:this`, because neither `Modal` nor `SearchField`
    * publishes an element seam and a wrapper would break `.manager-search`'s flex sizing; it goes
    * through this dialog's own two hooks. `queueMicrotask` because the panel is PORTALED.
    */
@@ -183,7 +183,7 @@
   );
 </script>
 
-<ManagerModal
+<Modal
   {open}
   title={format(
     'FABRICATE.Admin.Manager.Component.AddFrom.Title',
@@ -200,7 +200,7 @@
   onClose={dismiss}
 >
   {#snippet body()}
-    <ManagerSearchField
+    <SearchField
       bind:value={query}
       placeholder={text(
         'FABRICATE.Admin.Manager.Component.AddFrom.SearchPlaceholder',
@@ -308,10 +308,10 @@
         count: selectedCount,
       })}
     </span>
-    <ManagerButton data-component-add-from-catalogue-cancel disabled={applying} onclick={dismiss}>
+    <Button data-component-add-from-catalogue-cancel disabled={applying} onclick={dismiss}>
       {text('FABRICATE.Admin.Manager.Cancel', 'Cancel')}
-    </ManagerButton>
-    <ManagerButton
+    </Button>
+    <Button
       role="primary"
       data-component-add-from-catalogue-apply
       disabled={applying || selectedCount === 0}
@@ -322,12 +322,12 @@
         <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
       {/if}
       <span>{applyLabel}</span>
-    </ManagerButton>
+    </Button>
   {/snippet}
-</ManagerModal>
+</Modal>
 
 <style>
-  /* `ManagerModal` owns the panel, header and footer rail; this block owns the two between them. */
+  /* `Modal` owns the panel, header and footer rail; this block owns the two between them. */
 
   .manager-component-add-from-list {
     display: flex;

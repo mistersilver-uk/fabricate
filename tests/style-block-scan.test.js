@@ -240,9 +240,9 @@ test('a <style> opener must be the whole line, and prose naming one opens nothin
   );
 });
 
-test('the ManagerButton prose trap stays shut', () => {
+test('the Button prose trap stays shut', () => {
   // A PINNED proof against the real tree rather than a fixture of it.
-  const file = 'src/ui/svelte/components/ManagerButton.svelte';
+  const file = 'src/ui/svelte/components/Button.svelte';
   const source = readFileSync(join(repoRoot, file), 'utf8');
 
   assert.ok(source.includes('<style'), `${file} no longer names <style> in prose; retarget this`);

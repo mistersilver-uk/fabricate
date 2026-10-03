@@ -4,7 +4,7 @@
   create — a category and tags per folder, or skip one. Match-by-name is ON by default and pre-fills
   each row; the primary `Import N items` commits, and its count updates live as folders are skipped.
 
-  The dialog chrome comes from the shared `ManagerModal` primitive (issue 877), so this modal and
+  The dialog chrome comes from the shared `Modal` primitive (issue 877), so this modal and
   the post-import reference report are ONE implementation of "manager modal dialog"; this file owns
   only the mapping body, and each row mirrors the compact `RecipeRoutingAssignment` +
   `SearchablePopover` "assign X per Y" pattern.
@@ -15,8 +15,8 @@
   import { localize } from '../../util/foundryBridge.js';
   import { matchFolderNameToVocabulary } from '../../../model/matchFolderVocabulary.js';
   import InlineVocabularyAdd from './InlineVocabularyAdd.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
-  import ManagerModal from '../../components/ManagerModal.svelte';
+  import Button from '../../components/Button.svelte';
+  import Modal from '../../components/Modal.svelte';
   import RecipeRoutingAssignment from './recipe/RecipeRoutingAssignment.svelte';
   import SelectionCheckbox from '../../components/SelectionCheckbox.svelte';
   import Select from '../../components/Select.svelte';
@@ -230,7 +230,7 @@
   }
 </script>
 
-<ManagerModal
+<Modal
   {open}
   title={text('FABRICATE.Admin.Items.ImportMapping.Title', 'Categorize imported folders')}
   subtitle={text(
@@ -284,7 +284,7 @@
             >
               {itemCountLabel(row.group.itemCount)}
             </Chip>
-            <ManagerButton
+            <Button
               class={`is-subtle manager-import-mapping-skip ${row.state.skipped ? 'is-active' : ''}`}
               data-import-mapping-skip
               aria-pressed={row.state.skipped}
@@ -297,7 +297,7 @@
                   ? text('FABRICATE.Admin.Items.ImportMapping.Unskip', 'Include')
                   : text('FABRICATE.Admin.Items.ImportMapping.Skip', 'Skip')}
               </span>
-            </ManagerButton>
+            </Button>
           </div>
 
           {#if !row.state.skipped}
@@ -319,7 +319,7 @@
                   onChange={(next) => setCategory(row.index, next)}
                 />
               </Field>
-              <ManagerButton
+              <Button
                 class="is-subtle manager-import-mapping-new-category"
                 data-import-mapping-new-category
                 onclick={() =>
@@ -327,7 +327,7 @@
               >
                 <i class="fas fa-plus" aria-hidden="true"></i>
                 <span>{text('FABRICATE.Admin.Items.ImportMapping.NewCategory', 'New')}</span>
-              </ManagerButton>
+              </Button>
 
               <RecipeRoutingAssignment
                 options={tagOptionsFor(row.state)}
@@ -385,22 +385,17 @@
   {/snippet}
 
   {#snippet footer()}
-    <ManagerButton data-import-mapping-cancel onclick={() => onClose()}>
+    <Button data-import-mapping-cancel onclick={() => onClose()}>
       {text('FABRICATE.Admin.Manager.Cancel', 'Cancel')}
-    </ManagerButton>
-    <ManagerButton
-      role="primary"
-      data-import-mapping-commit
-      disabled={importDisabled}
-      onclick={commit}
-    >
+    </Button>
+    <Button role="primary" data-import-mapping-commit disabled={importDisabled} onclick={commit}>
       <i class="fas fa-file-import" aria-hidden="true"></i>
       <span>
         {commitLabel(importCount)}
       </span>
-    </ManagerButton>
+    </Button>
   {/snippet}
-</ManagerModal>
+</Modal>
 
 <style>
   /* One control scale for the whole dialog (issue 772): it is dense, and it sits between surfaces

@@ -2401,7 +2401,7 @@ describe('world Component Catalogue (issue 1371)', () => {
       assert.ok(Boolean(field), 'the search field is the shared primitive');
       assert.ok(
         field.classList.contains('is-size-38'),
-        'and it carries the rung `ManagerSearchField` emits for size="38"'
+        'and it carries the rung `SearchField` emits for size="38"'
       );
 
       // ISSUE 1504 MOVED THE TOKEN OFF THE ELEMENT AND ONTO THE SELECT ROOT. These controls are

@@ -2,7 +2,7 @@
 <!--
   One result item inside a result group — the component this recipe produces plus a quantity.
   Result items have no name/tags/currency, so this mirrors only the `component` branch of
-  `RecipeIngredientOption`: one `SearchablePopover` trigger carrying the component's image AND
+  `PickerRow`: one `SearchablePopover` trigger carrying the component's image AND
   name, a capped quantity stepper and a remove control. Items have no id of their own, so the
   parent keys them by index and owns the option list, and this row emits the whole updated item
   via `onChange(nextItem)`.

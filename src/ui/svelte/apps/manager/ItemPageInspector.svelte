@@ -20,7 +20,7 @@
 -->
 <script>
   import Chip from '../../components/Chip.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
   import InspectorCard from '../../components/InspectorCard.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
@@ -286,7 +286,7 @@
       </div>
     </InspectorCard>
 
-    <ManagerButton
+    <Button
       role="primary"
       class="manager-books-scrolls-edit-action"
       data-item-page-edit
@@ -294,7 +294,7 @@
     >
       <i class="fas fa-pen" aria-hidden="true"></i>
       <span>{text('FABRICATE.Admin.Manager.BooksScrolls.EditRecipeItem', 'Edit recipe item')}</span>
-    </ManagerButton>
+    </Button>
   {/if}
 </div>
 
@@ -380,7 +380,7 @@
   }
 
   /* `:global()` AND CHAINED (issue 1427), for the reason the `.manager-books-scrolls-edit-action`
-     rule below states for `<ManagerButton>`. The quick-limits card is an `<InspectorCard>` now,
+     rule below states for `<Button>`. The quick-limits card is an `<InspectorCard>` now,
      so `manager-books-scrolls-quick-limits` rides the `class` prop onto an element THIS
      component does not write, and Svelte stamps its `svelte-<hash>` only onto the ones it does.
      This half of the sweep was the LOUD one — the component spreads no attributes onto a regular
@@ -407,7 +407,7 @@
   }
 
   /* `:global()` AND CHAINED (issue 1118), for the two reasons `BulkEditPanelShell` gives at
-     length. `:global()` because this is a `<ManagerButton>` now, and Svelte stamps its
+     length. `:global()` because this is a `<Button>` now, and Svelte stamps its
      `svelte-<hash>` class onto the elements this component WRITES rather than onto a child
      component's internals — a scoped selector would have matched nothing while the compiler,
      `lint:svelte:warnings` and every hand-stamped fixture all reported clean, and this

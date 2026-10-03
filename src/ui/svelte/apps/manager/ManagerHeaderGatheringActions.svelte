@@ -19,7 +19,7 @@
 -->
 <script>
   import Chip from '../../components/Chip.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
 
   let {
     text = () => '',
@@ -55,37 +55,29 @@
 </script>
 
 {#if currentView === 'environments' && displayedGatheringTab === 'tasks'}
-  <ManagerButton
-    role="primary"
-    onclick={createGatheringTaskForSystem}
-    disabled={!canShowEnvironments}
-  >
+  <Button role="primary" onclick={createGatheringTaskForSystem} disabled={!canShowEnvironments}>
     <i class="fas fa-plus" aria-hidden="true"></i>
     <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.Create', 'Create gathering task')}</span>
-  </ManagerButton>
+  </Button>
 {:else if currentView === 'environments' && displayedGatheringTab === 'encounters'}
-  <ManagerButton
-    role="primary"
-    onclick={createGatheringEventForSystem}
-    disabled={!canShowEnvironments}
-  >
+  <Button role="primary" onclick={createGatheringEventForSystem} disabled={!canShowEnvironments}>
     <i class="fas fa-plus" aria-hidden="true"></i>
     <span
       >{text('FABRICATE.Admin.Manager.Environment.Events.Create', 'Create gathering event')}</span
     >
-  </ManagerButton>
+  </Button>
 {:else if currentView === 'environments'}
-  <ManagerButton role="primary" onclick={createEnvironment} disabled={!canShowEnvironments}>
+  <Button role="primary" onclick={createEnvironment} disabled={!canShowEnvironments}>
     <i class="fas fa-plus" aria-hidden="true"></i>
     <span>{text('FABRICATE.Admin.Manager.Environment.Create', 'Create environment')}</span>
-  </ManagerButton>
+  </Button>
 {:else if currentView === 'environment-edit'}
   {#if environmentDraftDirty}
     <Chip tone="warning" density="action"
       >{text('FABRICATE.Admin.Manager.Environment.Dirty', 'Unsaved')}</Chip
     >
   {/if}
-  <ManagerButton
+  <Button
     role="ghost"
     data-environment-edit-back
     onclick={backToEnvironmentsBrowse}
@@ -93,8 +85,8 @@
   >
     <i class="fas fa-arrow-left" aria-hidden="true"></i>
     <span>{text('FABRICATE.Admin.Manager.Environment.BackToBrowse', 'Back to environments')}</span>
-  </ManagerButton>
-  <ManagerButton
+  </Button>
+  <Button
     role="danger"
     data-action="delete-environment"
     onclick={deleteEnvironmentDraft}
@@ -102,22 +94,22 @@
   >
     <i class="fas fa-trash" aria-hidden="true"></i>
     <span>{text('FABRICATE.Admin.Manager.Environment.Delete', 'Delete environment')}</span>
-  </ManagerButton>
-  <ManagerButton
+  </Button>
+  <Button
     role="primary"
     onclick={saveEnvironmentEdit}
     disabled={!environmentDraftDirty || environmentSaving}
   >
     <i class={environmentSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
     <span>{text('FABRICATE.Admin.Environments.Save', 'Save')}</span>
-  </ManagerButton>
+  </Button>
 {:else if currentView === 'gathering-task-edit'}
   {#if gatheringTaskDraftDirty}
     <Chip tone="warning" density="action"
       >{text('FABRICATE.Admin.Manager.Environment.Tasks.Dirty', 'Unsaved')}</Chip
     >
   {/if}
-  <ManagerButton role="ghost" data-gathering-task-back onclick={backToGatheringTaskLibrary}>
+  <Button role="ghost" data-gathering-task-back onclick={backToGatheringTaskLibrary}>
     <i class="fas fa-arrow-left" aria-hidden="true"></i>
     <span
       >{text(
@@ -125,8 +117,8 @@
         'Back to task library'
       )}</span
     >
-  </ManagerButton>
-  <ManagerButton
+  </Button>
+  <Button
     role="danger"
     data-gathering-task-delete
     onclick={deleteGatheringTaskDraft}
@@ -135,8 +127,8 @@
   >
     <i class="fas fa-trash" aria-hidden="true"></i>
     <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.Delete', 'Delete gathering task')}</span>
-  </ManagerButton>
-  <ManagerButton
+  </Button>
+  <Button
     role="primary"
     onclick={saveGatheringTaskDraft}
     disabled={!gatheringTaskDraftDirty || !gatheringTaskValidation.valid || gatheringTaskSaving}
@@ -145,7 +137,7 @@
     <i class={gatheringTaskSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"
     ></i>
     <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.Save', 'Save task')}</span>
-  </ManagerButton>
+  </Button>
   <!-- The same failed-save alert the recipe item editor draws, in the same place (issue 919). -->
   {#if gatheringTaskSaveError}
     <p class="manager-header-save-error" role="alert" data-gathering-task-save-error>
@@ -158,7 +150,7 @@
       >{text('FABRICATE.Admin.Manager.Environment.Events.Dirty', 'Unsaved')}</Chip
     >
   {/if}
-  <ManagerButton role="ghost" data-gathering-event-back onclick={backToGatheringEventLibrary}>
+  <Button role="ghost" data-gathering-event-back onclick={backToGatheringEventLibrary}>
     <i class="fas fa-arrow-left" aria-hidden="true"></i>
     <span
       >{text(
@@ -166,8 +158,8 @@
         'Back to event library'
       )}</span
     >
-  </ManagerButton>
-  <ManagerButton
+  </Button>
+  <Button
     role="danger"
     onclick={deleteGatheringEventDraft}
     disabled={!selectedGatheringEventId || gatheringEventSaving}
@@ -175,8 +167,8 @@
   >
     <i class="fas fa-trash" aria-hidden="true"></i>
     <span>{text('FABRICATE.Admin.Manager.Environment.Events.Delete', 'Delete event')}</span>
-  </ManagerButton>
-  <ManagerButton
+  </Button>
+  <Button
     role="primary"
     onclick={saveGatheringEventDraft}
     disabled={!gatheringEventDraftDirty || !gatheringEventValidation.valid || gatheringEventSaving}
@@ -185,7 +177,7 @@
     <i class={gatheringEventSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"
     ></i>
     <span>{text('FABRICATE.Admin.Manager.Environment.Events.Save', 'Save event')}</span>
-  </ManagerButton>
+  </Button>
   <!-- The same failed-save alert the recipe item editor draws, in the same place (issue 919). -->
   {#if gatheringEventSaveError}
     <p class="manager-header-save-error" role="alert" data-gathering-event-save-error>

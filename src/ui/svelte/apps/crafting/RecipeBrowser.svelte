@@ -7,7 +7,7 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
-  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import SearchField from '../../components/SearchField.svelte';
   import Pagination from '../../components/Pagination.svelte';
   import Select from '../../components/Select.svelte';
   import RecipeListRow from './RecipeListRow.svelte';
@@ -106,7 +106,7 @@
 <section class="crafting-browser" data-crafting-browser>
   <header class="crafting-browser-header">
     <p class="crafting-browser-title">{localize('FABRICATE.App.Crafting.Browser.Title')}</p>
-    <ManagerSearchField
+    <SearchField
       class="crafting-browser-search"
       value={search}
       onChange={(value) => onSearch?.(value)}

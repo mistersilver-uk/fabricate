@@ -21,7 +21,7 @@
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
   import Chip from '../../../components/Chip.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import ModifierLibraryRow from '../ModifierLibraryRow.svelte';
@@ -322,7 +322,7 @@
           {text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierNamedHeading', 'Named modifiers')}
         </h3>
         {#if onEditLibrary}
-          <ManagerButton
+          <Button
             class="manager-checks-card-head-link"
             data-crafting-modifier-edit-link
             onclick={() => onEditLibrary()}
@@ -332,7 +332,7 @@
               'Edit in system settings'
             )}
             <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
-          </ManagerButton>
+          </Button>
         {/if}
       </div>
       <!-- The RULE'S OWN SENTENCE, above the rows that do the marking rather than under the grid

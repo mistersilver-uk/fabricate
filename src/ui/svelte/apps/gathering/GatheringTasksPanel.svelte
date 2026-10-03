@@ -18,7 +18,7 @@
   import Callout from '../../components/Callout.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import InspectorCard from '../../components/InspectorCard.svelte';
-  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import SearchField from '../../components/SearchField.svelte';
   import Pagination from '../../components/Pagination.svelte';
   import GatheringTaskRow from './GatheringTaskRow.svelte';
   import ChanceBar from './ChanceBar.svelte';
@@ -122,7 +122,7 @@
         </h3>
       {/if}
       {#if activeTasks.length > 0}
-        <ManagerSearchField
+        <SearchField
           class="gathering-detail-search"
           bind:value={taskSearchTerm}
           placeholder={localize('FABRICATE.App.Gathering.Detail.TaskSearchPlaceholder')}

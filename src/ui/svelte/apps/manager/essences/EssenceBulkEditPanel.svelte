@@ -29,7 +29,7 @@
   import Callout from '../../../components/Callout.svelte';
   import Chip from '../../../components/Chip.svelte';
   import IconPicker from '../../../components/IconPicker.svelte';
-  import ManagerColorPopover from '../../../components/ManagerColorPopover.svelte';
+  import TintPicker from '../../../components/TintPicker.svelte';
   import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import {
@@ -325,7 +325,7 @@
          palette renders INLINE with the No-colour cell on, its only route back to unset; both are
          gated props, so the environments biome popover is untouched. -->
     <div class="manager-essence-bulk-colour" data-essence-bulk-colour={colourValue || 'unchanged'}>
-      <ManagerColorPopover
+      <TintPicker
         layout="inline"
         allowNone
         allowCustom={false}

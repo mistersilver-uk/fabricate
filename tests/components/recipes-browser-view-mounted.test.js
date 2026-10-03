@@ -74,8 +74,8 @@ const RECIPE_PRIMITIVES = [
   'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
   'src/ui/svelte/components/IconButton.svelte',
-  'src/ui/svelte/components/ManagerSearchField.svelte',
-  'src/ui/svelte/components/ManagerToolbar.svelte',
+  'src/ui/svelte/components/SearchField.svelte',
+  'src/ui/svelte/components/FilterBar.svelte',
   'src/ui/svelte/components/StatusToggle.svelte'
 ];
 

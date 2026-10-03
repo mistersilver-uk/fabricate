@@ -1,7 +1,7 @@
 <!-- Browsing a stage changes the viewed stage, never the executable stage. -->
 <script>
   import IconButton from './IconButton.svelte';
-  import ManagerButton from './ManagerButton.svelte';
+  import Button from './Button.svelte';
 
   let {
     stages = [],
@@ -75,14 +75,14 @@
       <span class="fab-stage-nav-position">{positionLabel(safeView, count)}</span>
     {/if}
     {#if safeView !== safeCurrent}
-      <ManagerButton
+      <Button
         class="fab-stage-nav-return"
         data-stage-nav-return
         onclick={() => select(safeCurrent)}
       >
         <i class="fas fa-bullseye" aria-hidden="true"></i>
         {returnLabel(safeCurrent)}
-      </ManagerButton>
+      </Button>
     {/if}
   </nav>
 {/if}

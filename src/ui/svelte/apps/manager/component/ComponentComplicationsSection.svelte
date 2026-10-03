@@ -31,7 +31,7 @@
   import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import ComplicationEffectRow from '../ComplicationEffectRow.svelte';
   import ComplicationSummaryRow from '../ComplicationSummaryRow.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
   import { localize } from '../../../util/foundryBridge.js';
@@ -1062,7 +1062,7 @@
     <!-- Dashed and fullWidth: the append-a-row verb, the same shape as `RecipeStepsCard`'s "Add a
          step". The bespoke scoped rule it replaced declared nothing the role and `fullWidth` do
          not already state, so it is retired rather than re-chained under `:global(...)`. -->
-    <ManagerButton
+    <Button
       role="dashed"
       fullWidth
       data-complications-add
@@ -1071,7 +1071,7 @@
     >
       <i class="fas fa-plus" aria-hidden="true"></i>
       <span>{text('FABRICATE.Admin.Manager.Component.Complications.Add', 'Add complication')}</span>
-    </ManagerButton>
+    </Button>
   </section>
 {/if}
 

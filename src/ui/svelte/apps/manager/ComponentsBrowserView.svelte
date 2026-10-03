@@ -3,14 +3,14 @@
   import { dragDrop } from '../../actions/dragDrop.js';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
   import CollapsibleGroupHeader from '../../components/CollapsibleGroupHeader.svelte';
   import SegmentedControl from '../../components/SegmentedControl.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
   import ComponentRow from './components/ComponentRow.svelte';
   import BulkSelectionToolbar from './BulkSelectionToolbar.svelte';
-  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
-  import ManagerToolbar from '../../components/ManagerToolbar.svelte';
+  import SearchField from '../../components/SearchField.svelte';
+  import FilterBar from '../../components/FilterBar.svelte';
   import Select from '../../components/Select.svelte';
   import { createBulkSelection } from './bulkSelection.svelte.js';
   import { createBrowserListState } from './browserListState.svelte.js';
@@ -531,7 +531,7 @@
   -->
   <!-- `tabindex="-1"` makes this landmark a FOCUS TARGET without making it a tab stop (issue 1157).
        The manager root lands the keyboard here when an action empties the bulk selection. -->
-  <ManagerToolbar
+  <FilterBar
     class="manager-component-toolbar"
     tabindex="-1"
     data-keyboard-focus="true"
@@ -542,14 +542,14 @@
       <!--
         THREE CONTROLS AT 38px, a published rung (26 / 28 / 30 / 34 / 38 / 44) and what the reference
         draws: the field takes `size="38"` and each filter's `Select` root carries `is-size-38`. The
-        asymmetry is the primitives' shape — `ManagerSearchField` publishes a size prop, while
+        asymmetry is the primitives' shape — `SearchField` publishes a size prop, while
         `Select` publishes three rungs and no 38, so the opt-in is this bar's rule: it lifts the
         `toolbar` rung's 34px trigger to 38 beside the scoped catalogue's lead row, which takes the
         same rule for the same reason.
       -->
       <!-- The capture registry's narrowing hook: a case that has to reach a specific component types
            into this field rather than depending on where that component happens to sort. -->
-      <ManagerSearchField
+      <SearchField
         size="38"
         data-component-search=""
         value={itemSearchTerm || ''}
@@ -667,7 +667,7 @@
           triggerProps={{ 'data-component-sort': '' }}
           onChange={setSortKey}
         />
-        <ManagerButton
+        <Button
           class="manager-component-sort-direction"
           data-component-sort-direction={ui.sortDirection}
           aria-label={text(
@@ -687,13 +687,13 @@
               ? text('FABRICATE.Admin.Manager.Component.SortAsc', 'Asc')
               : text('FABRICATE.Admin.Manager.Component.SortDesc', 'Desc')}</span
           >
-        </ManagerButton>
+        </Button>
       </div>
       <!-- THE COUNT AND THE BODY AGREE, IN BOTH COHORTS: `{shown} of {total} catalogue entries`, or
         `{shown} shown · {mine} of {all} in this system` once widened, over the rows actually drawn. -->
       <span class="manager-component-count" data-component-count>{countText}</span>
     </div>
-  </ManagerToolbar>
+  </FilterBar>
 
   <section
     class="manager-table-scroll"
@@ -721,8 +721,8 @@
           'No components match these filters.'
         )}
       >
-        <ManagerButton data-clear-filters="components" onclick={clearFilters}
-          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</ManagerButton
+        <Button data-clear-filters="components" onclick={clearFilters}
+          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</Button
         >
       </EmptyState>
     {:else}

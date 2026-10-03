@@ -16,6 +16,8 @@ manager-recipe-edit-ingredients
 manager-recipe-edit-ingredients-kind-list
 manager-recipe-edit-ingredients-suggestions
 manager-recipe-edit-ingredients-cost
+manager-recipe-edit-ingredients-choice-group
+manager-recipe-edit-ingredients-currency-off
 manager-recipe-edit-tag-picker
 manager-recipe-edit-ingredients-or-menu
 manager-recipe-edit-validation

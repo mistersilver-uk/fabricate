@@ -12,7 +12,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import ArmedDangerButton from '../../../components/ArmedDangerButton.svelte';
   import Chip from '../../../components/Chip.svelte';
@@ -186,7 +186,7 @@
       role="group"
       aria-label={text('FABRICATE.Admin.Manager.Knowledge.RowActions', 'Copy actions')}
     >
-      <ManagerButton
+      <Button
         data-knowledge-expend={copy.itemId}
         disabled={!copy.canExpend}
         title={expendTitle(copy)}
@@ -196,7 +196,7 @@
         <!-- NOT `fa-fire-flame-curved`: that is the uses chip's glyph, one element away. -->
         <i class="fas fa-fire" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Knowledge.Expend', 'Expend use')}</span>
-      </ManagerButton>
+      </Button>
       <ArmedDangerButton
         token={deleteToken}
         armed={armedToken === deleteToken}

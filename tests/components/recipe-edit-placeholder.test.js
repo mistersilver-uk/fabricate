@@ -63,10 +63,10 @@ describe('recipe row keeps a single Edit affordance; Duplicate/Delete stay inspe
 
   it('renders exactly three inspector action buttons ordered Duplicate -> Edit -> Delete', () => {
     const block = inspectorActionBlock();
-    // `<ManagerButton`, not `<button` (issue 1118). The three actions render through the
+    // `<Button`, not `<button` (issue 1118). The three actions render through the
     // shared primitive now, and a count of the raw element would read 0 while the group is
     // intact — a guard going VACUOUS, which is worse than one going red.
-    const buttonCount = (block.match(/<ManagerButton[\s/>]/g) || []).length;
+    const buttonCount = (block.match(/<Button[\s/>]/g) || []).length;
     assert.equal(buttonCount, 3, 'inspector action group should contain exactly three buttons');
     const copyIdx = block.indexOf('fa-copy');
     const penIdx = block.indexOf('fa-pen');
@@ -84,7 +84,7 @@ describe('recipe row keeps a single Edit affordance; Duplicate/Delete stay inspe
     // `.join(' ')`, and each site passes only its BESPOKE class through the appending `class`
     // prop. So the three are counted by the class each one still contributes — the class the
     // rules below are keyed on — rather than by a string the component no longer writes.
-    assert.equal((block.match(/<ManagerButton[\s/>]/g) || []).length, 3, 'three controls');
+    assert.equal((block.match(/<Button[\s/>]/g) || []).length, 3, 'three controls');
     for (const bespoke of [
       'manager-recipe-browser-inspector-duplicate',
       'manager-recipe-browser-inspector-edit',

@@ -479,6 +479,65 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
     ],
   }),
+  // The `Any one of` box: a requirement with two alternatives, its pill, its hint and its adders.
+  managerCase({
+    id: 'manager-recipe-edit-ingredients-choice-group',
+    label: 'Manager — Recipe edit ingredients, a choice group of two alternatives',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Crafting',
+      { selector: '[data-recipe-edit="hb-r-tincture"]' },
+      { selector: '#recipe-tab-ingredients' },
+      { selector: '[data-recipe-any-one-of]', scroll: true },
+    ],
+    expectView: 'recipe-edit',
+    // Two member rows inside the box, and neither draws the convert control the bare row carries.
+    expectSelector:
+      '[data-recipe-group].has-alternatives:has([data-recipe-any-one-of])' +
+      ':has([data-recipe-option] ~ [data-recipe-option])' +
+      ':not(:has(.manager-recipe-or-trigger)) [data-recipe-add="alternative-component"]',
+    expectContained: [
+      {
+        container: '[data-recipe-group].has-alternatives',
+        target: '[data-recipe-group].has-alternatives [data-recipe-option]',
+      },
+    ],
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+    ],
+  }),
+  // The read-only face: the system's currency feature is switched off first, so the authored cost
+  // stays visible with a static unit, a `Currency off` tag and a static amount.
+  managerCase({
+    id: 'manager-recipe-edit-ingredients-currency-off',
+    label: 'Manager — Recipe edit ingredients, a currency cost with the currency feature off',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'System Overview',
+      { selector: '#system-tab-settings' },
+      { selector: '.manager-feature-tile[data-feature-key="currency"] button' },
+      'Crafting',
+      { selector: '[data-recipe-edit="hb-r-tincture"]' },
+      { selector: '#recipe-tab-ingredients' },
+      { selector: '[data-recipe-currency-readonly]', scroll: true },
+    ],
+    expectView: 'recipe-edit',
+    // The static unit, the tag and the static amount on one row: a toggle that did not land leaves a stepper.
+    expectSelector:
+      '[data-recipe-option]:has([data-recipe-currency-readonly])' +
+      ':has([data-recipe-currency-disabled]) [data-recipe-currency-readonly-amount]',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+    ],
+  }),
   managerCase({
     id: 'manager-recipe-edit-tag-picker',
     label: 'Manager — Recipe edit, the tag picker open over a system vocabulary',

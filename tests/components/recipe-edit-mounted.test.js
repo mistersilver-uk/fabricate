@@ -78,7 +78,9 @@ const RAW_MODULES = [
   // Ingredient + recipeReadiness dispatch through the match-type registry.
   'src/models/match/matchTypes.js',
   // The ONE ingredient-kind table (issue 1373, round 8).
-  'src/ui/svelte/apps/manager/recipe/ingredientKindMeta.js',
+  'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
+  // The row's amount slot imports the roll-expression field, which reads these display helpers.
+  'src/systems/characterModifierPrerequisiteCopy.js',
   // The validation tab consumes the pure readiness evaluator.
   'src/ui/svelte/apps/manager/recipe/recipeReadiness.js',
   // RecipeEditView resolves, focuses and marks the control a validation row addresses
@@ -142,7 +144,7 @@ const RECIPE_COMPILED = [
   // The manager's labelled push-button (issue 1118). Eight components in this tree render
   // their adds, deep-links and issue views through it, and a `.svelte` the tree renders but
   // the harness omits HANGS the suite (# cancelled) rather than failing it.
-  'src/ui/svelte/components/ManagerButton.svelte',
+  'src/ui/svelte/components/Button.svelte',
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/SearchablePopover.svelte',
   'src/ui/svelte/components/SearchablePopoverPanel.svelte',
@@ -162,7 +164,9 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/apps/manager/recipe/RecipeIngredientsSection.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeIngredientSetCard.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeIngredientGroupCard.svelte',
-  'src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte',
+  'src/ui/svelte/apps/manager/recipe/PickerRow.svelte',
+  'src/ui/svelte/apps/manager/recipe/PickerRowAmount.svelte',
+  'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte',
@@ -223,7 +227,7 @@ const stepsHarness = createMountedComponentHarness({
     // The card's two step fields render through the labelled-field primitive (issue 1428).
     'src/ui/svelte/components/Field.svelte',
     // The card's "Add a step" footer renders through the primitive (issue 1118).
-    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/Button.svelte',
     // `RecipeStepAccordion`'s per-step delete is an `<IconButton>` (issue 1422). This is the
     // SECOND module list in this file, and the first one already names the primitive — a
     // `.svelte` the tree renders but a harness omits HANGS that harness's suite
@@ -5011,6 +5015,68 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  it('edits a member of a choice group in place, keeping the rest of the requirement', async () => {
+    const first = { id: 'opt-a', quantity: 2, match: { type: 'component', componentId: 'cmp-herb' } };
+    const second = { id: 'opt-b', quantity: 1, match: { type: 'component', componentId: null } };
+    const { target, patches } = await mountSingleGroup([first, second], {
+      props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS },
+    });
+    const rows = target
+      .querySelector('[data-recipe-group-id="grp-1"]')
+      .querySelectorAll('[data-recipe-option]');
+    assert.equal(rows.length, 2, 'both members draw inside the box');
+    // The parent owns recipe state, so each edit below is forwarded against the mounted group.
+    const emitted = () => {
+      assert.equal(patches.length, 1, 'one edit forwards one patch');
+      return patches.pop().ingredientSets[0].ingredientGroups[0];
+    };
+
+    rows[1].querySelector('[data-stepper-increment]').click();
+    await flushRender();
+    assert.deepEqual(emitted(), { id: 'grp-1', options: [first, { ...second, quantity: 2 }] });
+
+    const field = rows[1].querySelector('[data-recipe-option-search]');
+    await typeInto(field, 'Water');
+    suggestionListOf(field).querySelector('[data-recipe-option-suggestion="cmp-water"]').click();
+    await flushRender();
+    assert.deepEqual(emitted(), {
+      id: 'grp-1',
+      options: [first, { ...second, match: { type: 'component', componentId: 'cmp-water' } }],
+    });
+
+    // The first row in the document is the first member.
+    chooseSelectOption(target, KIND_TRIGGER, 'tags');
+    await flushRender();
+    assert.deepEqual(emitted(), {
+      id: 'grp-1',
+      options: [{ ...first, match: { type: 'tags', tags: [], tagMatch: 'any' } }, second],
+    });
+    editHarness.remount();
+  });
+
+  it('offers a row only the kinds the system can author', async () => {
+    const cases = [
+      [{}, ['component', 'tags']],
+      [{ essenceOptions: ESSENCE_OPTIONS }, ['component', 'tags', 'essence']],
+      [
+        { essenceOptions: ESSENCE_OPTIONS, currencyUnits: CURRENCY_UNITS, currencyEnabled: false },
+        ['component', 'tags', 'essence'],
+      ],
+      [{ currencyUnits: CURRENCY_UNITS, currencyEnabled: true }, ['component', 'tags', 'currency']],
+      [
+        { essenceOptions: ESSENCE_OPTIONS, currencyUnits: CURRENCY_UNITS, currencyEnabled: true },
+        ['component', 'tags', 'essence', 'currency'],
+      ],
+    ];
+    for (const [props, kinds] of cases) {
+      const { target } = await mountSingleGroup([UNNAMED_COMPONENT_ROW], {
+        props: { componentOptions: COMPONENT_OPTIONS, itemTags: ITEM_TAGS, ...props },
+      });
+      assert.deepEqual(selectOptionValues(target, KIND_TRIGGER), kinds, JSON.stringify(props));
+      editHarness.remount();
+    }
+  });
+
   // Issue 1036, criteria 2 and 18 — the add-new offer withholds a DISABLED essence
   // from the three recipe-side controls, while the `essenceOptions` PROP stays whole.
 
@@ -5114,8 +5180,8 @@ describe('RecipeEditView (mounted)', () => {
       { props: { essenceOptions: MIXED_ESSENCE_OPTIONS } }
     );
 
-    // The PROP boundary: `RecipeIngredientOption` resolves its display through the
-    // unfiltered `essenceOptions`, so an authored requirement on a disabled essence reads
+    // The PROP boundary: `PickerRow` resolves its display through the whole essence
+    // catalogue the group card builds, so an authored requirement on a disabled essence reads
     // back by NAME on its chip. Filtering the prop would leave the row on its empty search
     // face, showing a GM a blank field where their own authored requirement used to be.
     const chosen = target.querySelector(

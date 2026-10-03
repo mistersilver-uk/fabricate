@@ -13,7 +13,7 @@
 -->
 <script>
   import EmptyState from '../../components/EmptyState.svelte';
-  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import SearchField from '../../components/SearchField.svelte';
   import Medallion from '../../components/Medallion.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import EssenceChips from './EssenceChips.svelte';
@@ -34,7 +34,7 @@
     <div class="alchemy-inventory-hint">{localize('FABRICATE.App.Alchemy.TapToPlace')}</div>
   </div>
 
-  <ManagerSearchField
+  <SearchField
     class="alchemy-inventory-search"
     value={search}
     onChange={(value) => onSearch?.(value)}

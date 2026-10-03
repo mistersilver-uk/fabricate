@@ -100,7 +100,7 @@ const harness = createMountedComponentHarness({
   ],
   compiledModules: [
     'src/ui/svelte/components/Medallion.svelte',
-    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/components/SlotTile.svelte',
     'src/ui/svelte/components/RequirementChooser.svelte',
     'src/ui/svelte/components/Well.svelte',

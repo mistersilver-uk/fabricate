@@ -1,7 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize, subscribeSceneChange, subscribeWorldTime } from '../../util/foundryBridge.js';
-  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import SearchField from '../../components/SearchField.svelte';
   import Notice from '../../components/Notice.svelte';
   import SegmentedControl from '../../components/SegmentedControl.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
@@ -126,7 +126,7 @@
         <aside class="journal-browse" aria-label={localize('FABRICATE.App.Journal.Browse.Label')}>
           <div class="journal-browse-controls">
             <div class="journal-search-field">
-              <ManagerSearchField
+              <SearchField
                 class="journal-search-control"
                 size="30"
                 value={journal?.search ?? ''}

@@ -3,7 +3,7 @@
   import EmptyState from '../../../components/EmptyState.svelte';
   import IconFactRow from '../IconFactRow.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { projectToolBehaviorFacts, projectToolRow } from './toolStudio.js';
 
@@ -219,14 +219,14 @@
          system entirely, to where identity and the world defaults are authored once, and the
          second is the one WRITE this panel makes and its terminal action. -->
     <div class="manager-tool-inspector-routes">
-      <ManagerButton
+      <Button
         fullWidth
         data-tool-inspector-edit-world={subjectId}
         onclick={() => onEditWorldTool(subjectId)}
       >
         <i class="fas fa-globe" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Tools.EditWorldTool', 'Edit the world Tool')}</span>
-      </ManagerButton>
+      </Button>
     </div>
     <!-- THE PANEL'S ONE TERMINAL ACTION, IN THE BAND THE DESIGN PINS IT TO, for BOTH membership
          states: the member's primary sat in the SCROLL FLOW with no band while only the
@@ -235,7 +235,7 @@
          is ambiguous where a Tool has rules in several at once. -->
     <div class="manager-tool-inspector-foot">
       {#if row}
-        <ManagerButton
+        <Button
           role="primary"
           fullWidth
           data-tool-inspector-edit={row.id}
@@ -248,9 +248,9 @@
                 'Edit rules in {system}'
               )
             : text('FABRICATE.Admin.Manager.Tools.EditRules', 'Edit rules')}
-        </ManagerButton>
+        </Button>
       {:else}
-        <ManagerButton
+        <Button
           role="primary"
           fullWidth
           data-tool-inspector-add={subjectId}
@@ -261,7 +261,7 @@
             { tool: subjectName, system: systemName },
             'Add {tool} to {system}'
           )}
-        </ManagerButton>
+        </Button>
       {/if}
     </div>
   </InspectorCard>

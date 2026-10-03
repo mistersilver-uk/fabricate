@@ -115,12 +115,12 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-environment-edit-blind-weights',
   ]),
   // The manager's filter bar (issue 1039), extracted from 11 hand-written toolbar sections.
-  'src/ui/svelte/components/ManagerToolbar.svelte': Object.freeze([
+  'src/ui/svelte/components/FilterBar.svelte': Object.freeze([
     'world-component-catalogue',
     'manager-environments-browse-normal',
   ]),
   // The manager's search field (issue 1039).
-  'src/ui/svelte/components/ManagerSearchField.svelte': Object.freeze([
+  'src/ui/svelte/components/SearchField.svelte': Object.freeze([
     'manager-gathering-task-editor-normal',
     'manager-knowledge-owned-copies',
   ]),
@@ -261,7 +261,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'player-salvage',
   ]),
   // The modal chrome's banded frame (issue 2021), which every dialog draws since epic 1997.
-  'src/ui/svelte/components/ManagerModal.svelte': Object.freeze([
+  'src/ui/svelte/components/Modal.svelte': Object.freeze([
     'player-crafting-roll-prompt-basic',
     'player-crafting-roll-prompt-compact',
     'manager-import-report',
@@ -277,7 +277,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // The player window's chips (issue 1518): the recipe header's status chip and each row's icon-only one.
   'src/ui/svelte/components/Chip.svelte': Object.freeze(['player-crafting-simple']),
   // The player window draws it in the journal's run action bar: the primary, then the danger and neutral pair.
-  'src/ui/svelte/components/ManagerButton.svelte': Object.freeze([
+  'src/ui/svelte/components/Button.svelte': Object.freeze([
     'fabricate-journal-lifecycle-ready-single',
     'fabricate-journal-lifecycle-cancel-confirmation',
   ]),

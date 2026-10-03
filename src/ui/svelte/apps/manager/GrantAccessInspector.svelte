@@ -14,7 +14,7 @@
   import { getRecipeCategoryLabel } from '../../../../utils/recipeCategories.js';
   import RosterRow from './RosterRow.svelte';
   import Pagination from '../../components/Pagination.svelte';
-  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import SearchField from '../../components/SearchField.svelte';
   import { createRecipeAccessBrowserState } from '../../../model/managerBrowserViewState.js';
 
   // Fixed roster page size (design: 6 per roster). THE SEARCH FIELD IS UNCONDITIONAL WITH RESPECT
@@ -235,7 +235,7 @@
              `slice.filtered`, because a field that removed itself once a query matched nothing
              would trap the GM with no way to clear the term they typed. -->
         {#if section.rows.length > 0}
-          <ManagerSearchField
+          <SearchField
             class="manager-access-roster-search"
             value={section.query}
             onChange={(next) => section.onSearch(next)}

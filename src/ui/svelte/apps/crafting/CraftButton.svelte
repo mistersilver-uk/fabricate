@@ -5,7 +5,7 @@
   reason in the title and the accessible name, and `busy` reflects store.craftInFlight.
 -->
 <script>
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { withRollPromptOrigin } from '../../util/rollPromptOrigin.js';
 
@@ -27,7 +27,7 @@
   );
 </script>
 
-<ManagerButton
+<Button
   role="ghost"
   fullWidth
   data-crafting-craft=""
@@ -44,4 +44,4 @@
     <i class="fas fa-hammer" aria-hidden="true"></i>
     <span>{label}</span>
   {/if}
-</ManagerButton>
+</Button>

@@ -11,7 +11,7 @@ const PRIMARY_SELECTOR = [
 const PRIMARY_FILL_STYLE = /background(?:-color)?\s*:[^;]*var\(\s*--fab-(?:accent|success)\s*[,)]/u;
 
 /**
- * Every primary action rendered under `root`: a `ManagerButton role="primary"`, a hand-rolled
+ * Every primary action rendered under `root`: a `Button role="primary"`, a hand-rolled
  * `.is-primary` button, a Craft verb that is not a ghost, a gathering Attempt, or a button whose
  * inline style fills it with the accent or success colour. happy-dom computes no cascade, so a
  * fill reached only through a stylesheet rule is not seen.

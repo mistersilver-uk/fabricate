@@ -11,7 +11,7 @@
   import { localize } from '../../util/foundryBridge.js';
   import EmptyState from '../../components/EmptyState.svelte';
   import EnvironmentCard from './EnvironmentCard.svelte';
-  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import SearchField from '../../components/SearchField.svelte';
   import Pagination from '../../components/Pagination.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
 
@@ -104,7 +104,7 @@
     <p class="gathering-env-list-hint">
       {localize('FABRICATE.App.Gathering.Environments.Hint')}
     </p>
-    <ManagerSearchField
+    <SearchField
       class="gathering-env-search"
       bind:value={searchTerm}
       placeholder={localize('FABRICATE.App.Gathering.Environments.SearchPlaceholder')}

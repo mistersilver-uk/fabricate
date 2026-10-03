@@ -32,7 +32,7 @@
   import { buildSystemLabelMap, systemDisplayLabel } from '../util/systemDisambiguation.js';
   import Chip from '../components/Chip.svelte';
   import Field from '../components/Field.svelte';
-  import ManagerButton from '../components/ManagerButton.svelte';
+  import Button from '../components/Button.svelte';
   import Notice from '../components/Notice.svelte';
   import Select from '../components/Select.svelte';
   import StatusToggle from '../components/StatusToggle.svelte';
@@ -403,7 +403,7 @@
           <h3 class="fab-ic-section-title">
             {text('FABRICATE.Canvas.Interactable.Config.Identity.Heading', 'Source')}
           </h3>
-          <ManagerButton
+          <Button
             aria-expanded={identityOpen}
             onclick={() => (identityOpen = !identityOpen)}
             data-interactable-identity-toggle=""
@@ -411,7 +411,7 @@
             {identityOpen
               ? text('FABRICATE.Canvas.Interactable.Config.Identity.Hide', 'Hide')
               : text('FABRICATE.Canvas.Interactable.Config.Identity.Retarget', 'Change source')}
-          </ManagerButton>
+          </Button>
         </div>
       {/if}
 
@@ -465,7 +465,7 @@
           {/if}
 
           <div class="fab-ic-actions fab-ic-actions-inline">
-            <ManagerButton
+            <Button
               role="primary"
               disabled={!canApplyIdentity}
               onclick={applyIdentity}
@@ -475,7 +475,7 @@
               <span
                 >{text('FABRICATE.Canvas.Interactable.Config.Identity.Apply', 'Apply source')}</span
               >
-            </ManagerButton>
+            </Button>
           </div>
         </div>
       {/if}
@@ -687,10 +687,10 @@
             </p>
           {:else}
             <div class="fab-ic-actions fab-ic-actions-inline">
-              <ManagerButton onclick={restockFull} data-interactable-node-restock="">
+              <Button onclick={restockFull} data-interactable-node-restock="">
                 <i class="fas fa-arrows-rotate" aria-hidden="true"></i>
                 <span>{text('FABRICATE.Canvas.Interactable.Config.Node.Restock', 'Restock')}</span>
-              </ManagerButton>
+              </Button>
             </div>
           {/if}
         {/if}
@@ -717,31 +717,31 @@
 
       {#if visualStatus.severity === 'missing'}
         <div class="fab-ic-actions fab-ic-actions-inline">
-          <ManagerButton onclick={() => run(() => services?.createReplacementTile?.())}>
+          <Button onclick={() => run(() => services?.createReplacementTile?.())}>
             {text('FABRICATE.Canvas.Interactable.Config.RecreateTile', 'Recreate tile')}
-          </ManagerButton>
-          <ManagerButton onclick={() => run(() => services?.createDrawingMarker?.())}>
+          </Button>
+          <Button onclick={() => run(() => services?.createDrawingMarker?.())}>
             {text(
               'FABRICATE.Canvas.Interactable.Config.CreateDrawingMarker',
               'Create drawing marker'
             )}
-          </ManagerButton>
-          <ManagerButton onclick={() => run(() => services?.relinkSelected?.())}>
+          </Button>
+          <Button onclick={() => run(() => services?.relinkSelected?.())}>
             {text('FABRICATE.Canvas.Interactable.Config.RelinkSelected', 'Relink selected')}
-          </ManagerButton>
-          <ManagerButton onclick={() => run(() => services?.removeVisualMarker?.())}>
+          </Button>
+          <Button onclick={() => run(() => services?.removeVisualMarker?.())}>
             {text('FABRICATE.Canvas.Interactable.Config.ClearVisualLink', 'Clear visual link')}
-          </ManagerButton>
+          </Button>
         </div>
       {:else if visualStatus.severity === 'none'}
         <!-- Region-only (no marker): offer an upgrade to a linked Tile or Drawing. -->
         <div class="fab-ic-actions fab-ic-actions-inline">
-          <ManagerButton onclick={() => run(() => services?.createMarker?.())}>
+          <Button onclick={() => run(() => services?.createMarker?.())}>
             <i class="fas fa-map-pin" aria-hidden="true"></i>
             <span>{text('FABRICATE.Canvas.Interactable.Config.CreateMarker', 'Create marker')}</span
             >
-          </ManagerButton>
-          <ManagerButton onclick={() => run(() => services?.createDrawingMarker?.())}>
+          </Button>
+          <Button onclick={() => run(() => services?.createDrawingMarker?.())}>
             <i class="fas fa-draw-polygon" aria-hidden="true"></i>
             <span
               >{text(
@@ -749,24 +749,24 @@
                 'Create drawing marker'
               )}</span
             >
-          </ManagerButton>
-          <ManagerButton onclick={() => run(() => services?.relinkSelected?.())}>
+          </Button>
+          <Button onclick={() => run(() => services?.relinkSelected?.())}>
             {text('FABRICATE.Canvas.Interactable.Config.RelinkSelected', 'Relink selected')}
-          </ManagerButton>
+          </Button>
         </div>
       {:else if visualStatus.severity === 'ok'}
         <!-- Resolved (healthy) marker: still offer relink-to-a-different-doc and
              remove-from-panel, mirroring the missing-state affordances. -->
         <div class="fab-ic-actions fab-ic-actions-inline">
-          <ManagerButton onclick={() => run(() => services?.relinkSelected?.())}>
+          <Button onclick={() => run(() => services?.relinkSelected?.())}>
             {text('FABRICATE.Canvas.Interactable.Config.RelinkSelected', 'Relink selected')}
-          </ManagerButton>
-          <ManagerButton onclick={() => run(() => services?.removeVisualMarker?.())}>
+          </Button>
+          <Button onclick={() => run(() => services?.removeVisualMarker?.())}>
             {text(
               'FABRICATE.Canvas.Interactable.Config.RemoveVisualMarker',
               'Remove visual marker'
             )}
-          </ManagerButton>
+          </Button>
         </div>
       {/if}
 
@@ -824,16 +824,16 @@
 
     <!-- Primary action row -->
     <section class="fab-ic-section fab-ic-actions">
-      <ManagerButton role="primary" onclick={() => run(() => services?.testAsPlayer?.())}>
+      <Button role="primary" onclick={() => run(() => services?.testAsPlayer?.())}>
         <i class="fas fa-play" aria-hidden="true"></i>
         <span>{text('FABRICATE.Canvas.Interactable.Config.TestAsPlayer', 'Test as player')}</span>
-      </ManagerButton>
-      <ManagerButton onclick={() => services?.jumpToRegion?.()}>
+      </Button>
+      <Button onclick={() => services?.jumpToRegion?.()}>
         {text('FABRICATE.Canvas.Interactable.Config.JumpToRegion', 'Jump to region')}
-      </ManagerButton>
-      <ManagerButton onclick={() => services?.jumpToVisual?.()}>
+      </Button>
+      <Button onclick={() => services?.jumpToVisual?.()}>
         {text('FABRICATE.Canvas.Interactable.Config.JumpToVisual', 'Jump to marker')}
-      </ManagerButton>
+      </Button>
     </section>
 
     <!-- State toggle row. These two are PRESSED BUTTONS and stay pressed buttons, which is the
@@ -866,25 +866,25 @@
          second `is-active` class saying the same thing twice. That is the same correction this
          change made for the Manage panel's promote disclosure. -->
     <section class="fab-ic-section fab-ic-actions">
-      <ManagerButton
+      <Button
         aria-pressed={view.state.enabled === false}
         onclick={() => run(() => services?.setEnabled?.(!view.state.enabled))}
       >
         {view.state.enabled
           ? text('FABRICATE.Canvas.Interactable.Config.Disable', 'Disable')
           : text('FABRICATE.Canvas.Interactable.Config.Enable', 'Enable')}
-      </ManagerButton>
-      <ManagerButton
+      </Button>
+      <Button
         aria-pressed={view.state.locked === true}
         onclick={() => run(() => services?.setLocked?.(!view.state.locked))}
       >
         {view.state.locked
           ? text('FABRICATE.Canvas.Interactable.Config.Unlock', 'Unlock')
           : text('FABRICATE.Canvas.Interactable.Config.Lock', 'Lock')}
-      </ManagerButton>
-      <ManagerButton role="danger" onclick={() => run(() => services?.deleteInteractable?.())}>
+      </Button>
+      <Button role="danger" onclick={() => run(() => services?.deleteInteractable?.())}>
         {text('FABRICATE.Canvas.Interactable.Config.Delete', 'Delete interactable')}
-      </ManagerButton>
+      </Button>
     </section>
   {/if}
 </div>
@@ -1099,7 +1099,7 @@
      state and the announced state cannot drift; the same correction the Manage panel's promote
      disclosure took for its `aria-expanded` edge.
 
-     `:global(...)` because the element is `ManagerButton`'s, anchored on a class this file
+     `:global(...)` because the element is `Button`'s, anchored on a class this file
      writes so Svelte's hash lands on the ancestor. SEVEN elements carry `.fab-ic-actions` in
      this panel - five inline rows inside the identity, node and visual sections, plus the
      primary action row and the state row - and the compound still reaches exactly two buttons,

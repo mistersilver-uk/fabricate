@@ -99,7 +99,7 @@ describe('EnvironmentOverviewTab multi-realm selector', () => {
     writeCompiledSvelte('src/ui/svelte/components/Select.svelte');
     writeCompiledSvelte('src/ui/svelte/components/SearchablePopover.svelte');
     writeCompiledSvelte('src/ui/svelte/components/SearchablePopoverPanel.svelte');
-    writeCompiledSvelte('src/ui/svelte/components/ManagerButton.svelte');
+    writeCompiledSvelte('src/ui/svelte/components/Button.svelte');
     writeCompiledSvelte('src/ui/svelte/components/Chip.svelte');
     writeCompiledSvelte('src/ui/svelte/components/Field.svelte');
     writeCompiledSvelte('src/ui/svelte/components/EmptyState.svelte');

@@ -19,7 +19,7 @@
   import LibraryShelf from './library/LibraryShelf.svelte';
   import SegmentedControl from '../../components/SegmentedControl.svelte';
   import BulkSelectionToolbar from './BulkSelectionToolbar.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
   import EssenceRow from './essences/EssenceRow.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import {
@@ -32,8 +32,8 @@
   import { createBrowserListState } from './browserListState.svelte.js';
   import { ESSENCE_VIEW_MODE_SEGMENTS } from './essences/essenceStudio.js';
   import { essenceShortValueName, essenceSystemState } from './scoped/essenceScoped.js';
-  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
-  import ManagerToolbar from '../../components/ManagerToolbar.svelte';
+  import SearchField from '../../components/SearchField.svelte';
+  import FilterBar from '../../components/FilterBar.svelte';
   import Select from '../../components/Select.svelte';
 
   let {
@@ -361,7 +361,7 @@
 <main class="manager-main" aria-label={text('FABRICATE.Admin.Manager.Essence.Title', 'Essences')}>
   <!-- `tabindex="-1"` makes this landmark a FOCUS TARGET without making it a tab stop (issue
        1157): emptying the bulk selection unmounts the panel and the Clear that was pressed. -->
-  <ManagerToolbar
+  <FilterBar
     class="manager-essence-toolbar"
     tabindex="-1"
     data-keyboard-focus="true"
@@ -369,7 +369,7 @@
     ariaLabel={text('FABRICATE.Admin.Manager.Essence.Filters', 'Essence filters')}
   >
     <div class="manager-essence-filter-row">
-      <ManagerSearchField
+      <SearchField
         value={searchTerm}
         onChange={(next) => {
           ui.searchTerm = next;
@@ -426,7 +426,7 @@
           triggerProps={{ 'data-essence-sort': '' }}
           onChange={(next) => (ui.sortKey = next)}
         />
-        <ManagerButton
+        <Button
           data-essence-sort-direction={ui.sortDirection}
           aria-label={text(
             'FABRICATE.Admin.Manager.Essence.ToggleSortDirection',
@@ -445,7 +445,7 @@
               ? text('FABRICATE.Admin.Manager.Essence.SortAscending', 'Asc')
               : text('FABRICATE.Admin.Manager.Essence.SortDescending', 'Desc')}</span
           >
-        </ManagerButton>
+        </Button>
       </div>
 
       <!-- ICON-ONLY (issue 1036): a list glyph and a grid glyph ARE the two layouts. The compact
@@ -522,7 +522,7 @@
       onSelectAllResults={selection.selectAllResults}
       onClear={selection.clear}
     />
-  </ManagerToolbar>
+  </FilterBar>
 
   <!-- The paginated rows and columns are the shared `LibraryShelf`. This studio still supplies its
        own ENTRY, its own hook class and view attribute, and its own grid template — the parts that
@@ -562,11 +562,8 @@
           'No essences match these filters.'
         )}
       >
-        <ManagerButton
-          data-clear-filters="essences"
-          disabled={!filtersActive}
-          onclick={clearFilters}
-          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</ManagerButton
+        <Button data-clear-filters="essences" disabled={!filtersActive} onclick={clearFilters}
+          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</Button
         >
       </EmptyState>
     {/snippet}

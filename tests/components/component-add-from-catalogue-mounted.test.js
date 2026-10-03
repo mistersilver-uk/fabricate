@@ -24,14 +24,14 @@ const dialog = createComponentScopeHarness({
   repoRoot,
   tmpPrefix: 'fabricate-component-add-from-',
   componentPath: 'src/ui/svelte/apps/manager/scoped/ComponentAddFromCatalogueDialog.svelte',
-  // `ManagerModal`'s own three leaves. A `.svelte` (or a module it transitively imports) the tree
+  // `Modal`'s own three leaves. A `.svelte` (or a module it transitively imports) the tree
   // renders and the manifest omits HANGS this suite as `# cancelled` rather than failing it.
   rawExtras: [
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
     'src/ui/svelte/util/overlayHost.js',
   ],
-  compiledExtras: ['src/ui/svelte/components/ManagerModal.svelte'],
+  compiledExtras: ['src/ui/svelte/components/Modal.svelte'],
 });
 
 /** A world corpus in which `sys-forge` holds EXACTLY ONE of the four records. */
@@ -49,7 +49,7 @@ function offerScope() {
   });
 }
 
-/** The portaled dialog root. `ManagerModal` portals out of the mount point. */
+/** The portaled dialog root. `Modal` portals out of the mount point. */
 function panel() {
   return document.querySelector('[data-component-add-from-catalogue-dialog]');
 }
@@ -362,7 +362,7 @@ describe('ComponentAddFromCatalogueDialog (mounted, issue 1371 M9)', () => {
 
   it('re-seeds itself on the open transition, so a cancelled tick cannot re-arm on another system', async () => {
     // FOUNDRY 1 (r9). The root mounts this dialog UNCONDITIONALLY and passes `open` as a prop,
-    // and `ManagerModal` gates only its chrome behind `{#if open}` — so the component instance,
+    // and `Modal` gates only its chrome behind `{#if open}` — so the component instance,
     // and with it `query`/`selectedIds`/`applying`, lives for the whole manager session. `apply`
     // cleared the selection; `dismiss` cleared nothing. Tick two rows in Forge, Cancel, select
     // Alchemy, reopen: both rows were still ticked and the primary read an ENABLED
@@ -529,7 +529,7 @@ describe('ComponentAddFromCatalogueDialog (mounted, issue 1371 M9)', () => {
 
   // ── issue 1371 r17 ──────────────────────────────────────────────────────────────────────
   it('pins a run to the system it started against, and holds the re-seed until the run lands', async () => {
-    // FOUNDRY 1 (r13) and REVIEWER 3 (r13). `ManagerModal` draws no backdrop.
+    // FOUNDRY 1 (r13) and REVIEWER 3 (r13). `Modal` draws no backdrop.
     const recorder = recordingAdd({ gated: true, withSystem: true });
     const { closed } = await open({ recorder });
     tick('orphan');
@@ -586,7 +586,7 @@ describe('ComponentAddFromCatalogueDialog (mounted, issue 1371 M9)', () => {
     await open();
     const root = panel();
     assert.ok(root.hasAttribute('data-manager-modal'), 'it IS the shared chrome');
-    // Maintainer rulings 2026-09-28: ManagerModal draws one frame, the library's banded Modal.
+    // Maintainer rulings 2026-09-28: Modal draws one frame, the library's banded Modal.
     assert.ok(root.querySelector('.manager-modal-body [data-component-add-from-catalogue-search]'));
     assert.ok(
       document.querySelector('[data-manager-modal-close]').classList.contains('is-size-26'),

@@ -670,7 +670,7 @@ export function registerRailCases() {
     },
   ];
 
-  /** Drive a `ManagerSearchField` the way a GM does: type into its input. */
+  /** Drive a `SearchField` the way a GM does: type into its input. */
   function typeIntoSearch(ariaLabel, value) {
     const input = target.querySelector(`input[type="search"][aria-label="${ariaLabel}"]`);
     assert.ok(input, `no search field is labelled "${ariaLabel}"`);

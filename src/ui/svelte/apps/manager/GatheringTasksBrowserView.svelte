@@ -6,12 +6,12 @@
   import { localize } from '../../util/foundryBridge.js';
   import { biomeChipStyle } from '../../util/gatheringFormat.js';
   import Pagination from '../../components/Pagination.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
   import IconButton from '../../components/IconButton.svelte';
   import ActionMenu from '../../components/ActionMenu.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
-  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
-  import ManagerToolbar from '../../components/ManagerToolbar.svelte';
+  import SearchField from '../../components/SearchField.svelte';
+  import FilterBar from '../../components/FilterBar.svelte';
   import Select from '../../components/Select.svelte';
   import {
     DEFAULT_BROWSER_PAGE_SIZE,
@@ -333,11 +333,11 @@
   aria-labelledby={labelledBy}
   data-gathering-tasks-browser
 >
-  <ManagerToolbar
+  <FilterBar
     class="manager-task-toolbar"
     ariaLabel={text('FABRICATE.Admin.Manager.Environment.Tasks.Filters', 'Gathering task filters')}
   >
-    <ManagerSearchField
+    <SearchField
       value={searchTerm}
       onChange={(next) => (ui.searchTerm = next)}
       placeholder={text(
@@ -394,16 +394,16 @@
         .replace('{total}', taskList.length)}</Chip
     >
     {#if filtersActive}
-      <ManagerButton
+      <Button
         class="manager-clear-filters"
         data-clear-filters="gathering-tasks"
         onclick={clearFilters}
       >
         <i class="fas fa-times" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</span>
-      </ManagerButton>
+      </Button>
     {/if}
-  </ManagerToolbar>
+  </FilterBar>
 
   <section
     class="manager-table-scroll"
@@ -421,7 +421,7 @@
           'Create gathering tasks before attaching them to environments.'
         )}
       >
-        <ManagerButton role="primary" onclick={() => onCreateTask(selectedSystemId)}>
+        <Button role="primary" onclick={() => onCreateTask(selectedSystemId)}>
           <i class="fas fa-plus" aria-hidden="true"></i>
           <span
             >{text(
@@ -429,7 +429,7 @@
               'Create gathering task'
             )}</span
           >
-        </ManagerButton>
+        </Button>
       </EmptyState>
     {:else if filteredTasks.length === 0}
       <EmptyState
@@ -443,8 +443,8 @@
           'Clear search and filters to show all gathering tasks in this system.'
         )}
       >
-        <ManagerButton onclick={clearFilters}
-          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</ManagerButton
+        <Button onclick={clearFilters}
+          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</Button
         >
       </EmptyState>
     {:else}

@@ -32,7 +32,7 @@ const vocabularyHarness = createMountedComponentHarness({
     'src/ui/svelte/components/EmptyState.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/components/SearchablePopoverPanel.svelte',
-    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte',

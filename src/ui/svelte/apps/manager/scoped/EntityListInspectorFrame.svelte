@@ -23,7 +23,7 @@
     SYSTEM_MEMBERSHIP_FILTERS,
     WORLD_MEMBERSHIP_FILTERS,
   } from '../../../../model/scopedEntityListModel.js';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import Pagination from '../../../components/Pagination.svelte';
   import Select from '../../../components/Select.svelte';
@@ -35,8 +35,8 @@
   import Callout from '../../../components/Callout.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
   import IconButton from '../../../components/IconButton.svelte';
-  import ManagerSearchField from '../../../components/ManagerSearchField.svelte';
-  import ManagerToolbar from '../../../components/ManagerToolbar.svelte';
+  import SearchField from '../../../components/SearchField.svelte';
+  import FilterBar from '../../../components/FilterBar.svelte';
   import SegmentedControl from '../../../components/SegmentedControl.svelte';
   import { createScopedListBrowserState } from '../../../../model/managerBrowserViewState.js';
 
@@ -96,7 +96,7 @@
     splitToolbar = false,
     // ── THE LEAD ROW'S CONTROL RUNG (issue 1371 r9-cat, maintainer ruling M12b) ──────────────
     // The control HEIGHT the search field and the lead row's lane-filter selects take, named after
-    // the rung rather than after an adjective, exactly as `ManagerSearchField`'s own `size` is:
+    // the rung rather than after an adjective, exactly as `SearchField`'s own `size` is:
     // `''` is the shipped 34px control and `'38'` is the ladder's next rung up
     // (`design-system/spec.md`: 26 / 28 / 30 / 34 / 38 / 44).
     toolbarLeadSize = '',
@@ -558,7 +558,7 @@
           />
         </div>
       {:else}
-        <ManagerToolbar
+        <FilterBar
           class="manager-scoped-list-toolbar"
           data-scoped-list-toolbar=""
           ariaLabel={text('FABRICATE.Admin.Manager.Scoped.List.Filters', 'List filters')}
@@ -671,7 +671,7 @@
               onClear={clearSelection}
             />
           {/if}
-        </ManagerToolbar>
+        </FilterBar>
 
         {#if bulk && !inspectorBody && selection.count > 0}
           <!-- With no inspector column there is nowhere else for a bulk body to go, so it sits
@@ -696,9 +696,9 @@
               )}
               data-scoped-list-state="filtered"
             >
-              <ManagerButton data-scoped-list-clear-filters onclick={clearFilters}>
+              <Button data-scoped-list-clear-filters onclick={clearFilters}>
                 {text('FABRICATE.Admin.Manager.Scoped.List.ClearFilters', 'Clear filters')}
-              </ManagerButton>
+              </Button>
             </EmptyState>
           {:else if page.rows.length === 0}
             <EmptyState {icon} title={emptyTitle} hint={emptyHint} data-scoped-list-state="empty" />
@@ -948,7 +948,7 @@
 
 <!-- THE TWO TOOLBAR CONTROLS THAT MOVE ROW, WRITTEN ONCE (issue 1371 r8-cat). -->
 {#snippet searchField()}
-  <ManagerSearchField
+  <SearchField
     value={query}
     size={toolbarLeadSize}
     onChange={(next) => changeQuery(next)}

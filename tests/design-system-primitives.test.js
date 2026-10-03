@@ -84,6 +84,8 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/ActionMenu.svelte',
   // Issue 1506: an actor's portrait, and the FIRST key this list gains by a primitive ARRIVING.
   'src/ui/svelte/components/Avatar.svelte',
+  // Issue 1518: the button, on the two journal frames whose run action bar draws its roles.
+  'src/ui/svelte/components/Button.svelte',
   // Issue 1505: the widened standing statement, the FIRST entry whose primitive earned its frames by
   // re-authoring rather than by a new state, and — with `EmptyState` — moved here by issue 1710.
   'src/ui/svelte/components/Callout.svelte',
@@ -104,6 +106,7 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/EssencePool.svelte',
   'src/ui/svelte/components/EssenceSourceSelector.svelte',
   'src/ui/svelte/components/Field.svelte',
+  'src/ui/svelte/components/FilterBar.svelte',
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/IconPicker.svelte',
   'src/ui/svelte/components/InspectorCard.svelte',
@@ -111,15 +114,11 @@ const EXPECTED_OVERRIDE_KEYS = [
   // Issue 1505: the uppercase micro-label, on sixteen converted eyebrow sites.
   'src/ui/svelte/components/Kicker.svelte',
   'src/ui/svelte/components/ListRow.svelte',
-  // Issue 1518: the button, on the two journal frames whose run action bar draws its roles.
-  'src/ui/svelte/components/ManagerButton.svelte',
-  // Issue 2021: the modal chrome's banded frame, which every dialog draws since epic 1997.
-  'src/ui/svelte/components/ManagerModal.svelte',
-  'src/ui/svelte/components/ManagerSearchField.svelte',
-  'src/ui/svelte/components/ManagerToolbar.svelte',
   // Issue 1506: the app's ONE art tile, after it absorbed both crafting thumbnails. ONE frame,
   // because one STATE is what neither representative frame reaches: a TINTED glyph-chip tile.
   'src/ui/svelte/components/Medallion.svelte',
+  // Issue 2021: the modal chrome's banded frame, which every dialog draws since epic 1997.
+  'src/ui/svelte/components/Modal.svelte',
   // Issue 1458: the pill multi-select's add menu became a `SearchablePopover`, which left the
   // component exactly one painted rule of its own — the at-cap trigger treatment — and that rule
   // had to be re-anchored through `:global()` because the button is the primitive's element now.
@@ -142,6 +141,7 @@ const EXPECTED_OVERRIDE_KEYS = [
   // override itself and everything about where it sorts.
   'src/ui/svelte/components/RunActionBar.svelte',
   'src/ui/svelte/components/RunProgress.svelte',
+  'src/ui/svelte/components/SearchField.svelte',
   'src/ui/svelte/components/SearchablePopover.svelte',
   // Issue 1719: the picker's portaled panel, extracted as an internal part of the entry above. It
   // sorts immediately after its parent, which is the whole reason the part is named for the part
@@ -213,9 +213,9 @@ const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/components/ArmedDangerButton.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
   'src/ui/svelte/components/FillBar.svelte',
-  'src/ui/svelte/components/ManagerColorPicker.svelte',
-  'src/ui/svelte/components/ManagerColorPopover.svelte',
   'src/ui/svelte/components/SegmentedControl.svelte',
+  'src/ui/svelte/components/TintPicker.svelte',
+  'src/ui/svelte/components/TintPickerButton.svelte',
 ];
 
 test('the inputs every property below quantifies over are alive', () => {
@@ -237,10 +237,9 @@ test('the inputs every property below quantifies over are alive', () => {
   // 72 as of issue 2008: the Formula card's option well, and the `<Well>` on its second caller.
   // 73 as of issue 1518: the slot tile, on the requirement chooser as its second importer.
   assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 73, 'the shipped primitive set changed size');
-  // 16 as of issue 2006's die tiles, and again once issue 2008 promoted the `<Well>` it built.
-  // Still 16 at issue 1518: the slot tile left on promotion and the requirement chooser, with one
-  // importer, arrived.
-  assert.equal(NOT_A_PRIMITIVE.length, 16, 'the recorded non-member set changed size');
+  // 17: issue 1516 recorded the requirement row as `PickerRow` with one importer; issue 1518
+  // promoted the slot tile out and recorded the requirement chooser, with one importer, in.
+  assert.equal(NOT_A_PRIMITIVE.length, 17, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(
     PUBLISHING_CASE_IDS.size > 0,
@@ -365,7 +364,7 @@ test('(a) the three player-window overrides name a frame that draws the primitiv
   const expectations = [
     ['src/ui/svelte/components/Chip.svelte', ['player-crafting-simple']],
     [
-      'src/ui/svelte/components/ManagerButton.svelte',
+      'src/ui/svelte/components/Button.svelte',
       [
         'fabricate-journal-lifecycle-ready-single',
         'fabricate-journal-lifecycle-cancel-confirmation',
@@ -384,13 +383,13 @@ test('(a) the three player-window overrides name a frame that draws the primitiv
   }
 
   // The button's frames anchor on the controls the run action bar renders through it.
-  const anchors = BROAD_SIGNAL_CASE_OVERRIDES['src/ui/svelte/components/ManagerButton.svelte']
+  const anchors = BROAD_SIGNAL_CASE_OVERRIDES['src/ui/svelte/components/Button.svelte']
     .map((id) => VIEW_LAB_CASES.find((viewCase) => viewCase.id === id)?.expectSelector ?? '')
     .join(' ');
   for (const action of ['primary', 'cancel-confirm', 'cancel-keep']) {
     assert.ok(
       anchors.includes(`[data-run-action="${action}"]`),
-      `no ManagerButton frame anchors on the run action bar's ${action} control`
+      `no Button frame anchors on the run action bar's ${action} control`
     );
   }
 });

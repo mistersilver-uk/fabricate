@@ -49,7 +49,7 @@
 
   ## Controls
 
-  Clear, Done, the commit and the destroy trigger are shared `ManagerButton`s: the
+  Clear, Done, the commit and the destroy trigger are shared `Button`s: the
   commit and Done are the pane's one primary, Destroy the plain danger role, since its
   confirmation is the dialog upstream. The per-row remove stays a 20px hand-rolled
   button, because a 34px icon button would grow every queue row.
@@ -70,7 +70,7 @@
   import { statusChipTone } from '../../../util/statusChipTone.js';
   import Chip from '../../../components/Chip.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import InventoryDetailHeader from '../detail/InventoryDetailHeader.svelte';
   import InventoryBulkSection from './InventoryBulkSection.svelte';
   import InventoryBulkRow from './InventoryBulkRow.svelte';
@@ -294,7 +294,7 @@
 </script>
 
 {#snippet clearAction()}
-  <ManagerButton
+  <Button
     role="ghost"
     data-inventory-bulk-clear=""
     disabled={busy}
@@ -302,7 +302,7 @@
   >
     <i class="fas fa-xmark" aria-hidden="true"></i>
     <span>{localize('FABRICATE.App.Inventory.Bulk.Clear')}</span>
-  </ManagerButton>
+  </Button>
 {/snippet}
 
 {#snippet complicationCountLabel()}
@@ -501,7 +501,7 @@
          entirely once a report stands, leaving only Done. -->
     <div class="bulk-footer" data-inventory-bulk-footer={state}>
       {#if state === 'report'}
-        <ManagerButton
+        <Button
           role="primary"
           fullWidth
           data-inventory-bulk-done=""
@@ -509,7 +509,7 @@
         >
           <i class="fas fa-check" aria-hidden="true"></i>
           <span>{localize('FABRICATE.App.Inventory.Bulk.Done')}</span>
-        </ManagerButton>
+        </Button>
       {:else}
         <p class="bulk-footer-note" data-inventory-bulk-footer-note>
           {localize('FABRICATE.App.Inventory.Bulk.FooterNote')}
@@ -525,7 +525,7 @@
           {/if}
         </p>
         <div class="bulk-footer-actions">
-          <ManagerButton
+          <Button
             role="danger"
             fullWidth
             data-inventory-bulk-destroy=""
@@ -535,8 +535,8 @@
           >
             <i class="fas fa-trash" aria-hidden="true"></i>
             <span>{destroyLabel}</span>
-          </ManagerButton>
-          <ManagerButton
+          </Button>
+          <Button
             role="primary"
             fullWidth
             data-inventory-bulk-salvage=""
@@ -552,7 +552,7 @@
               aria-hidden="true"
             ></i>
             <span>{localize('FABRICATE.App.Inventory.Bulk.SalvageAction')}</span>
-          </ManagerButton>
+          </Button>
         </div>
       {/if}
     </div>

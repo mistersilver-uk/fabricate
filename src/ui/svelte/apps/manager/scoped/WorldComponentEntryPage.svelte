@@ -16,7 +16,7 @@
   import EditorTabs from '../../../components/EditorTabs.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import ScopedValidationTab from './ScopedValidationTab.svelte';
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
@@ -560,9 +560,9 @@
       )}
       data-scoped-entry-state="missing"
     >
-      <ManagerButton data-scoped-entry-back onclick={() => onBackToCatalogue()}>
+      <Button data-scoped-entry-back onclick={() => onBackToCatalogue()}>
         {text('FABRICATE.Admin.Manager.Scoped.Component.BackToCatalogue', 'Back to the catalogue')}
-      </ManagerButton>
+      </Button>
     </EmptyState>
   {:else}
     <!--

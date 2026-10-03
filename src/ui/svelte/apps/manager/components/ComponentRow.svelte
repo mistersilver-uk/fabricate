@@ -8,7 +8,7 @@
   import EssenceChip from './EssenceChip.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import SelectionCheckbox from '../../../components/SelectionCheckbox.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
 
   let {
     component = null,
@@ -141,7 +141,7 @@
        the row's action cluster", which a vanished cluster would make unassertable. -->
   <span class="manager-action-group">
     {#if member}
-      <ManagerButton
+      <Button
         class="manager-component-row-open"
         data-component-edit={component?.id}
         aria-label={editNamedLabel}
@@ -150,9 +150,9 @@
       >
         <span>{editLabel}</span>
         <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
-      </ManagerButton>
+      </Button>
     {:else}
-      <ManagerButton
+      <Button
         role="primary"
         class="manager-component-row-add"
         data-component-ghost-add={component?.id}
@@ -162,7 +162,7 @@
       >
         <i class="fas fa-plus" aria-hidden="true"></i>
         <span>{addLabel}</span>
-      </ManagerButton>
+      </Button>
     {/if}
   </span>
 </li>

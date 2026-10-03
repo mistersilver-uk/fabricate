@@ -46,7 +46,7 @@ const harness = createMountedComponentHarness({
     // Issue 1515: the pane's search is the shared field and its refusal banner the shared
     // notice. A component the tree renders and this list omits HANGS the suite (reported as
     // `# cancelled`) rather than failing it.
-    'src/ui/svelte/components/ManagerSearchField.svelte',
+    'src/ui/svelte/components/SearchField.svelte',
     'src/ui/svelte/components/Notice.svelte',
     'src/ui/svelte/apps/manager/RealmOverridePicker.svelte',
     'src/ui/svelte/apps/manager/PartyNameField.svelte',
@@ -91,7 +91,7 @@ function cards(root) {
   return root.querySelectorAll('.manager-travel-parties-row');
 }
 
-// The hook on the INPUT (issue 1515). The field is `ManagerSearchField` now.
+// The hook on the INPUT (issue 1515). The field is `SearchField` now.
 function typeSearch(root, value) {
   const input = root.querySelector('[data-manager-party-search]');
   input.value = value;

@@ -30,7 +30,7 @@
     `tests/manager-browser-view-state-contract.test.js`.
 -->
 <script>
-  import ManagerToolbar from '../../components/ManagerToolbar.svelte';
+  import FilterBar from '../../components/FilterBar.svelte';
   import Select from '../../components/Select.svelte';
   import { createVocabularyBrowserState } from '../../../model/managerBrowserViewState.js';
   import { localize } from '../../util/foundryBridge.js';
@@ -77,7 +77,7 @@
     </div>
   </header>
 
-  <ManagerToolbar class="manager-scoped-list-toolbar" ariaLabel={sortToolbarLabel}>
+  <FilterBar class="manager-scoped-list-toolbar" ariaLabel={sortToolbarLabel}>
     <!-- A `<span>` rather than a `<label>`: it names TWO controls, and a `<label>` may point at
          one. Its id is PER PANEL, since three copies of one id would collapse the references. -->
     <span class="manager-vocabulary-shell-sort-label" id={sortLabelId}>
@@ -94,7 +94,7 @@
     <!-- The direction is a TOGGLE that states its position. `data-keyboard-focus="true"` is not
          decoration: `KeyboardManager#hasFocus` reads `!!focused.form` for a BUTTON and neither
          route renders a `<form>` around it, so without it Space pauses the game behind the
-         manager. It stays a bare `<button>` rather than a `ManagerButton` for that reason. -->
+         manager. It stays a bare `<button>` rather than a `Button` for that reason. -->
     <button
       type="button"
       class="manager-vocabulary-shell-direction"
@@ -112,7 +112,7 @@
         <span>{text('FABRICATE.Admin.Manager.Scoped.List.SortDesc', 'Desc')}</span>
       {/if}
     </button>
-  </ManagerToolbar>
+  </FilterBar>
 
   <VocabularyPanel {...rest} rows={sortedRows} hint="" bind:browserState />
 </section>

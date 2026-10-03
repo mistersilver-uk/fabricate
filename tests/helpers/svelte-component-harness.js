@@ -203,7 +203,7 @@ export const TYPEAHEAD_RUNE_MODULES = Object.freeze([
 export const SEARCHABLE_POPOVER_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/components/EmptyState.svelte',
-  'src/ui/svelte/components/ManagerButton.svelte',
+  'src/ui/svelte/components/Button.svelte',
   'src/ui/svelte/components/SearchablePopover.svelte',
   'src/ui/svelte/components/SearchablePopoverPanel.svelte'
 ]);
@@ -215,7 +215,7 @@ export const SELECT_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Field.svelte',
   'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/components/EmptyState.svelte',
-  'src/ui/svelte/components/ManagerButton.svelte',
+  'src/ui/svelte/components/Button.svelte',
   'src/ui/svelte/components/SearchablePopover.svelte',
   'src/ui/svelte/components/SearchablePopoverPanel.svelte'
 ]);
@@ -248,9 +248,9 @@ export const PLAYER_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Notice.svelte',
   // The identity row every player detail pane leads with (issue 1518), and the primary it draws.
   'src/ui/svelte/apps/PlayerDetailHeader.svelte',
-  'src/ui/svelte/components/ManagerButton.svelte',
+  'src/ui/svelte/components/Button.svelte',
   // The search field, card box and switch the player controls converted onto (issue 1518).
-  'src/ui/svelte/components/ManagerSearchField.svelte',
+  'src/ui/svelte/components/SearchField.svelte',
   'src/ui/svelte/components/InspectorCard.svelte',
   'src/ui/svelte/components/StatusToggle.svelte',
   // The requirement chooser the crafting rail renders (issue 1518), the tile it draws and its well.
@@ -417,14 +417,14 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Pagination.svelte',
   // Select's own compiled closure (issue 1504), spread rather than copied: `Pagination`'s page-size
   // control is a `<Select>` now, so this PLAYER-app list reaches `Select`, `Field`,
-  // `SearchablePopover`, the `ManagerButton` `SearchablePopover` renders its trigger through (issue
+  // `SearchablePopover`, the `Button` `SearchablePopover` renders its trigger through (issue
   // 1371), and the `Chip`/`EmptyState` pair the popover's list renders — the same route
   // `IconButton` below arrives by.
   ...SELECT_COMPILED_MODULES,
   // The manager's icon-only push-button (issue 1422).
   'src/ui/svelte/components/IconButton.svelte',
   // The search field and the card box the crafting controls converted onto (issue 1518).
-  'src/ui/svelte/components/ManagerSearchField.svelte',
+  'src/ui/svelte/components/SearchField.svelte',
   'src/ui/svelte/components/InspectorCard.svelte',
   // The shared numeric stepper the essence pool's per-carrier rows are built on (issue 917).
   'src/ui/svelte/components/Stepper.svelte',

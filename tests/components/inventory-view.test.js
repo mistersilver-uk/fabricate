@@ -668,7 +668,7 @@ describe('InventoryView (mounted)', () => {
     await settle();
 
     const input = target.querySelector(':scope [data-inventory-filters] [data-inventory-search]');
-    assert.ok(Boolean(input.closest('.fabricate-search')), 'the field is ManagerSearchField');
+    assert.ok(Boolean(input.closest('.fabricate-search')), 'the field is SearchField');
     input.value = 'gland';
     input.dispatchEvent(new Event('input', { bubbles: true }));
     assert.deepEqual(searched, ['gland']);
@@ -1086,7 +1086,7 @@ describe('InventoryView (mounted) — recipe-item books', () => {
     await settle();
 
     const input = target.querySelector('[data-inventory-recipe-search]');
-    assert.ok(Boolean(input.closest('.fabricate-search')), 'the field is ManagerSearchField');
+    assert.ok(Boolean(input.closest('.fabricate-search')), 'the field is SearchField');
     input.value = 'recipe 7';
     input.dispatchEvent(new Event('input', { bubbles: true }));
     await settle();

@@ -26,7 +26,7 @@ const harness = createMountedComponentHarness({
     // every tab, not just Crafting.
     'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/components/EmptyState.svelte',
-    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/components/SearchablePopoverPanel.svelte',
     // The two the bar reaches as of issue 1514's crafting phase. `FillBar` is the stamina

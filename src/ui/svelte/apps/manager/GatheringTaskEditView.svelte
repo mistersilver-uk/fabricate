@@ -7,7 +7,7 @@
   import { DEFAULT_GATHERING_TASK_IMG } from '../../../../gatheringImageDefaults.js';
   import { dragDrop } from '../../actions/dragDrop.js';
   import ChanceSlider from '../../components/ChanceSlider.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
   import Pagination from '../../components/Pagination.svelte';
   import Select from '../../components/Select.svelte';
   import Stepper from '../../components/Stepper.svelte';
@@ -27,7 +27,7 @@
   } from './gatheringTaskSelectOptions.js';
   import { dropRateTierClass, dropRateTierColor } from '../../util/dropRateTier.js';
   import IconButton from '../../components/IconButton.svelte';
-  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import SearchField from '../../components/SearchField.svelte';
   import SearchablePopover from '../../components/SearchablePopover.svelte';
   import RadioCardGroup from '../../components/RadioCardGroup.svelte';
   import RecipeResultsSection from './recipe/RecipeResultsSection.svelte';
@@ -428,7 +428,7 @@
     );
   }
 
-  // Takes the value rather than the event: `<ManagerSearchField>` hands its `onChange` the new
+  // Takes the value rather than the event: `<SearchField>` hands its `onChange` the new
   // string, having already updated its own `value`.
   function onToolSearchInput(next) {
     toolSearchTerm = next;
@@ -1389,7 +1389,7 @@
               <!-- Dashed, and deliberately NOT `fullWidth` (issue 1118): it is the add-a-row verb
                    at the foot of the modifier list, and a full-width dashed control under a column
                    of grid rows would read as a fourth row rather than as the slot that adds one. -->
-              <ManagerButton
+              <Button
                 role="dashed"
                 disabled={(characterModifierLibrary || []).length === 0}
                 onclick={addStaminaCostModifier}
@@ -1397,7 +1397,7 @@
               >
                 <i class="fas fa-plus" aria-hidden="true"></i>
                 <span>{text('FABRICATE.Admin.Manager.Economy.AddModifier', 'Add modifier')}</span>
-              </ManagerButton>
+              </Button>
             </div>
           </Field>
         </div>
@@ -1880,7 +1880,7 @@
                it, so the hook used to name a `<label>`, which is focusable only through the
                browser's own label delegation. `Chip`'s contract says nothing about delegation, and
                the input is the control the GM lands on. -->
-          <ManagerSearchField
+          <SearchField
             density="compact"
             value={toolSearchTerm}
             onChange={onToolSearchInput}
@@ -2079,7 +2079,7 @@
               'Add a named set for each gathering-check tier that can produce results.'
             )}
           >
-            <ManagerButton
+            <Button
               role="dashed"
               fullWidth
               data-gathering-add-result-set="empty"
@@ -2092,7 +2092,7 @@
                   'Add result set'
                 )}</span
               >
-            </ManagerButton>
+            </Button>
           </EmptyState>
         {:else}
           <ul class="manager-recipe-result-groups">
@@ -2107,7 +2107,7 @@
               </li>
             {/each}
           </ul>
-          <ManagerButton
+          <Button
             role="dashed"
             fullWidth
             data-gathering-add-result-set="footer"
@@ -2120,7 +2120,7 @@
                 'Add result set'
               )}</span
             >
-          </ManagerButton>
+          </Button>
         {/if}
       </section>
     {/if}
@@ -2140,7 +2140,7 @@
             </p>
           </div>
           <div class="manager-task-component-browser-controls">
-            <ManagerSearchField
+            <SearchField
               density="compact"
               value={componentSearchTerm}
               onChange={onComponentSearchInput}
@@ -2336,7 +2336,7 @@
             </p>
           </div>
           <div class="manager-task-drop-controls">
-            <ManagerSearchField
+            <SearchField
               density="compact"
               bind:value={searchTerm}
               placeholder={text(
@@ -2352,12 +2352,12 @@
                the loud one, and the identical verb in this screen's own empty state — same
                `onAddDrop`, same label — was already `is-primary`. Two spellings of one verb
                on one screen is exactly the drift the primitive exists to end. -->
-            <ManagerButton role="primary" onclick={onAddDrop} data-gathering-add-drop="toolbar">
+            <Button role="primary" onclick={onAddDrop} data-gathering-add-drop="toolbar">
               <i class="fas fa-plus" aria-hidden="true"></i>
               <span
                 >{text('FABRICATE.Admin.Manager.Environment.Tasks.AddDrop', 'Add drop rule')}</span
               >
-            </ManagerButton>
+            </Button>
           </div>
         </div>
 
@@ -2376,11 +2376,11 @@
                 'No drops have been added.'
               )}
             >
-              <ManagerButton role="primary" onclick={onAddDrop} data-gathering-add-drop="empty"
+              <Button role="primary" onclick={onAddDrop} data-gathering-add-drop="empty"
                 >{text(
                   'FABRICATE.Admin.Manager.Environment.Tasks.AddDrop',
                   'Add drop rule'
-                )}</ManagerButton
+                )}</Button
               >
             </EmptyState>
           {:else if filteredRows.length === 0}

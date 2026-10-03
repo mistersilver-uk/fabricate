@@ -34,7 +34,7 @@
   import EmptyState from '../../components/EmptyState.svelte';
   import Notice from '../../components/Notice.svelte';
   import { localize } from '../../util/foundryBridge.js';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
   import Avatar from '../../components/Avatar.svelte';
   import KnowledgeTabs from './knowledge/KnowledgeTabs.svelte';
   import KnowledgeRoster from './knowledge/KnowledgeRoster.svelte';
@@ -292,7 +292,7 @@
             'Knowledge reset actions'
           )}
         >
-          <ManagerButton
+          <Button
             role="danger"
             data-knowledge-reset="system"
             onclick={() => {
@@ -303,8 +303,8 @@
             <i class="fas fa-rotate-left" aria-hidden="true"></i>
             <span>{text('FABRICATE.Admin.Manager.Knowledge.ResetSystem', 'Reset this system')}</span
             >
-          </ManagerButton>
-          <ManagerButton
+          </Button>
+          <Button
             role="danger"
             data-knowledge-reset="all"
             onclick={() => {
@@ -314,7 +314,7 @@
           >
             <i class="fas fa-eraser" aria-hidden="true"></i>
             <span>{text('FABRICATE.Admin.Manager.Knowledge.ResetAll', 'Reset all systems')}</span>
-          </ManagerButton>
+          </Button>
         </div>
       </header>
 

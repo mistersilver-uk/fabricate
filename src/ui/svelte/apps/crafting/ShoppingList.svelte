@@ -10,7 +10,7 @@
 <script>
   import IconButton from '../../components/IconButton.svelte';
   import InspectorCard from '../../components/InspectorCard.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
   import Medallion from '../../components/Medallion.svelte';
   import { resolveCraftingArt } from '../../util/craftingArtResolution.js';
   import { normalizeEssenceIcon } from '../../util/essenceIcons.js';
@@ -203,9 +203,9 @@
   <header class="crafting-shopping-head">
     <p class="crafting-shopping-title">{localize('FABRICATE.App.Crafting.Shopping.Title')}</p>
     {#if !isEmpty}
-      <ManagerButton role="ghost" class="crafting-shopping-clear" onclick={() => onClear?.()}>
+      <Button role="ghost" class="crafting-shopping-clear" onclick={() => onClear?.()}>
         {localize('FABRICATE.App.Crafting.Shopping.Clear')}
-      </ManagerButton>
+      </Button>
     {/if}
   </header>
 

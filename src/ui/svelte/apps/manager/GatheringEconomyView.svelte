@@ -14,7 +14,7 @@
   import Field from '../../components/Field.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
   import Stepper from '../../components/Stepper.svelte';
   import { stepperLabels } from '../../components/stepperLabels.js';
   import IconButton from '../../components/IconButton.svelte';
@@ -417,12 +417,12 @@
               <span class="manager-economy-actor-col-label"
                 >{text('FABRICATE.Admin.Manager.Economy.Max', 'Max (override)')}</span
               >
-              <ManagerButton
+              <Button
                 role="primary"
                 class="manager-economy-bulk-save"
                 onclick={saveAll}
                 data-economy-bulk-save
-                >{text('FABRICATE.Admin.Manager.Economy.Save', 'Save')}</ManagerButton
+                >{text('FABRICATE.Admin.Manager.Economy.Save', 'Save')}</Button
               >
             </li>
             {#each pagedActors as actor (actor.actorId)}

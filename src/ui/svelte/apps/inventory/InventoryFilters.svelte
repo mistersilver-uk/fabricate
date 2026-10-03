@@ -12,11 +12,11 @@
   markup below for the two props that reproduce its construction and its paint.
 
   THE SORT CONTROL IS THE SHARED `Select` (issue 1511), so the list it opens is the app's own
-  rather than the operating system's, and the search is the shared `ManagerSearchField`.
+  rather than the operating system's, and the search is the shared `SearchField`.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
-  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import SearchField from '../../components/SearchField.svelte';
   import Select from '../../components/Select.svelte';
   import SegmentedControl from '../../components/SegmentedControl.svelte';
 
@@ -99,7 +99,7 @@
 </script>
 
 <div class="inventory-filters" data-inventory-filters>
-  <ManagerSearchField
+  <SearchField
     class="inventory-search"
     value={search}
     onChange={(next) => onSearch?.(next)}

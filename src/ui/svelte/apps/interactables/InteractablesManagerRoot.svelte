@@ -30,7 +30,7 @@
   import Field from '../../components/Field.svelte';
   import IconButton from '../../components/IconButton.svelte';
   import InspectorCard from '../../components/InspectorCard.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
   import Select from '../../components/Select.svelte';
   import SegmentedControl from '../../components/SegmentedControl.svelte';
 
@@ -301,18 +301,18 @@
   </header>
 
   <div class="fab-im-toolbar">
-    <!-- THE OPEN STATE RIDES `aria-expanded`, NOT A CLASS (issue 1520). `ManagerButton`'s role
+    <!-- THE OPEN STATE RIDES `aria-expanded`, NOT A CLASS (issue 1520). `Button`'s role
          vocabulary is about what a verb MEANS, not about whether its disclosure is open, so the
          `is-active` accent edge this button drew is restated below against the attribute that
          already announces the state — a hook that cannot drift from the behaviour it describes. -->
-    <ManagerButton
+    <Button
       aria-expanded={showPromote}
       onclick={() => (showPromote = !showPromote)}
       data-interactable-manager-promote-toggle=""
     >
       <i class="fas fa-plus" aria-hidden="true"></i>
       <span>{text('FABRICATE.Canvas.Manage.PromoteToggle', 'Promote region to interactable')}</span>
-    </ManagerButton>
+    </Button>
   </div>
 
   {#if showPromote}
@@ -428,20 +428,17 @@
       {/if}
 
       <div class="fab-im-promote-actions">
-        <ManagerButton
+        <Button
           role="primary"
           disabled={!canPromote}
           onclick={confirmPromote}
           data-interactable-manager-promote-confirm=""
         >
           {text('FABRICATE.Canvas.Manage.PromoteConfirm', 'Promote region')}
-        </ManagerButton>
-        <ManagerButton
-          onclick={() => (showPromote = false)}
-          data-interactable-manager-promote-cancel=""
-        >
+        </Button>
+        <Button onclick={() => (showPromote = false)} data-interactable-manager-promote-cancel="">
           {text('FABRICATE.Canvas.Manage.PromoteCancel', 'Cancel')}
-        </ManagerButton>
+        </Button>
       </div>
     </InspectorCard>
   {/if}
@@ -565,7 +562,7 @@
   /* THE OPEN DISCLOSURE'S ACCENT EDGE, restated against `aria-expanded` (issue 1520). The
      button's `is-active` class said the same thing twice — once to a reader of the markup and
      once to assistive technology — and only the attribute is the behaviour's own. `:global(...)`
-     because the element is `ManagerButton`'s; anchored on `.fab-im-toolbar`, which this file
+     because the element is `Button`'s; anchored on `.fab-im-toolbar`, which this file
      writes, so the hash lands there. */
   .fab-im-toolbar :global(.fabricate-button[aria-expanded='true']) {
     border-color: var(--fab-accent);

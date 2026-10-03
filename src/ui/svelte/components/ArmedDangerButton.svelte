@@ -23,7 +23,7 @@
   Invariants:
   - It is a real `<button type="button">`, and it WRITES THE FAMILY ROOT, `fabricate-button`, FIRST:
     it is a consumer of the `manager-button`
-    CSS contract rather than of `ManagerButton.svelte` — a deferral
+    CSS contract rather than of `Button.svelte` — a deferral
     `tests/manager-button-source-contract.test.js` pins — and a carrier spelling `manager-button`
     without the root matches nothing in the family. It is shared without being a family root of its
     own, which `openspec/specs/design-system/spec.md` admits.

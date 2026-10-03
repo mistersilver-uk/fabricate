@@ -9,7 +9,7 @@
 -->
 <script>
   import Chip from '../../../components/Chip.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import RealmNameField from '../RealmNameField.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
   import { localize } from '../../../util/foundryBridge.js';
@@ -54,14 +54,10 @@
       </div>
 
       <div class="manager-travel-inspector-actions">
-        <ManagerButton
-          role="danger"
-          disabled={travelSaving}
-          onclick={() => onDeleteRealm(realm.id)}
-        >
+        <Button role="danger" disabled={travelSaving} onclick={() => onDeleteRealm(realm.id)}>
           <i class="fas fa-trash" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Travel.Realms.Delete', 'Delete realm')}</span>
-        </ManagerButton>
+        </Button>
       </div>
 
       <section class="fabricate-card manager-inspector-card">

@@ -83,7 +83,7 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/scoped/InheritRow.svelte',
   'src/ui/svelte/components/StatusToggle.svelte',
   'src/ui/svelte/components/Medallion.svelte',
-  'src/ui/svelte/components/ManagerButton.svelte',
+  'src/ui/svelte/components/Button.svelte',
   // The manager's ONE chip (issue 883).
   'src/ui/svelte/components/Chip.svelte',
   // The manager's ONE icon-only push-button (issue 1422).
@@ -115,7 +115,7 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Field.svelte',
   // The manager's ONE labelled push-button (issue 1096); every salvage add control and
   // the Manage presets link render through it since issue 1118 task 9.
-  'src/ui/svelte/components/ManagerButton.svelte',
+  'src/ui/svelte/components/Button.svelte',
   // The manager's ONE on/off switch (issue 1040). Reached twice over: the salvage gate
   // renders it directly, and `ToggleCard` above renders it too.
   'src/ui/svelte/components/StatusToggle.svelte',

@@ -13,7 +13,7 @@
   import Chip from '../../../components/Chip.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
   import GatheringModifierEditor from './GatheringModifierEditor.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import { localize } from '../../../util/foundryBridge.js';
 
   let {
@@ -237,7 +237,7 @@
             </div>
           </div>
           <div class="manager-drop-editor-actions">
-            <ManagerButton
+            <Button
               aria-label={text(
                 'FABRICATE.Admin.Manager.Environment.Tasks.DuplicateDrop',
                 'Duplicate'
@@ -251,15 +251,15 @@
                   'Duplicate'
                 )}</span
               >
-            </ManagerButton>
-            <ManagerButton
+            </Button>
+            <Button
               role="danger"
               aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.DeleteDrop', 'Delete')}
               onclick={() => onDeleteDrop(selectedDrop.id)}
             >
               <i class="fas fa-trash" aria-hidden="true"></i>
               <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.DeleteDrop', 'Delete')}</span>
-            </ManagerButton>
+            </Button>
           </div>
         </section>
 

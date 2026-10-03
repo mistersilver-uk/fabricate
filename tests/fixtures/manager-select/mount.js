@@ -14,7 +14,7 @@ import CharacterPrerequisitesCard from '../../../src/ui/svelte/apps/manager/syst
 import GatheringEconomyView from '../../../src/ui/svelte/apps/manager/GatheringEconomyView.svelte';
 import SystemsBrowserView from '../../../src/ui/svelte/apps/manager/SystemsBrowserView.svelte';
 import ImportFolderMappingModal from '../../../src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte';
-import RecipeIngredientOption from '../../../src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte';
+import PickerRow from '../../../src/ui/svelte/apps/manager/recipe/PickerRow.svelte';
 import EnvironmentOverviewTab from '../../../src/ui/svelte/apps/manager/environment/EnvironmentOverviewTab.svelte';
 import EnvironmentsBrowserView from '../../../src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte';
 import GatheringEventsBrowserView from '../../../src/ui/svelte/apps/manager/GatheringEventsBrowserView.svelte';
@@ -478,15 +478,21 @@ const SUBJECTS = {
     }),
   // One requirement row, so the kind picker renders inside the row's own flex line.
   'recipe-option': () =>
-    mount(RecipeIngredientOption, {
+    mount(PickerRow, {
       target: mountPoint,
       props: {
-        option: {
+        value: {
+          kind: startValue === 'tags' ? 'tags' : 'component',
+          id: startValue === 'tags' ? '' : 'cmp-iron',
+          tags: [],
+          tagMatch: 'any',
           quantity: 2,
-          match: { type: startValue === 'tags' ? 'tags' : 'component', componentId: 'cmp-iron' },
         },
-        componentOptions: [{ id: 'cmp-iron', name: 'Iron ingot' }],
-        itemTags: ['herb', 'rare'],
+        kinds: ['component', 'tags'],
+        catalogue: {
+          component: [{ id: 'cmp-iron', label: 'Iron ingot', icon: 'fas fa-cube' }],
+          tags: ['herb', 'rare'].map((tag) => ({ id: tag, label: tag, icon: 'fas fa-tag' })),
+        },
       },
     }),
   // The overview's three: two add controls measurable only at their sentinel, and the ceiling.

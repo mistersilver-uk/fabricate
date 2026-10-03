@@ -31,7 +31,7 @@ const harness = createMountedComponentHarness({
     // Issue 1504: the shared `<Select>`'s whole compiled closure, spread rather than copied.
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/IconButton.svelte',
-    'src/ui/svelte/components/ManagerSearchField.svelte',
+    'src/ui/svelte/components/SearchField.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/apps/gathering/EnvironmentCard.svelte',
     'src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte'

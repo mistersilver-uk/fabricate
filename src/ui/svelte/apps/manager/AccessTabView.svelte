@@ -18,14 +18,14 @@
 <script>
   import Chip from '../../components/Chip.svelte';
   import Medallion from '../../components/Medallion.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import { resolveRecipeImage } from '../../util/craftingImageDefaults.js';
   import { getRecipeCategoryLabel } from '../../../../utils/recipeCategories.js';
-  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
-  import ManagerToolbar from '../../components/ManagerToolbar.svelte';
+  import SearchField from '../../components/SearchField.svelte';
+  import FilterBar from '../../components/FilterBar.svelte';
   import Select from '../../components/Select.svelte';
 
   let {
@@ -121,8 +121,8 @@
   class="manager-main"
   aria-label={text('FABRICATE.Admin.Manager.Access.Title', 'Recipe access')}
 >
-  <ManagerToolbar ariaLabel={text('FABRICATE.Admin.Manager.Access.Filters', 'Access filters')}>
-    <ManagerSearchField
+  <FilterBar ariaLabel={text('FABRICATE.Admin.Manager.Access.Filters', 'Access filters')}>
+    <SearchField
       value={recipeSearchTerm || ''}
       onChange={(next) => onSearchChange(next)}
       placeholder={text('FABRICATE.Admin.Manager.Recipe.SearchPlaceholder', 'Search recipes...')}
@@ -164,16 +164,12 @@
         .replace('{total}', (recipes || []).length)}</Chip
     >
     {#if filtersActive}
-      <ManagerButton
-        class="manager-clear-filters"
-        data-clear-filters="access"
-        onclick={clearFilters}
-      >
+      <Button class="manager-clear-filters" data-clear-filters="access" onclick={clearFilters}>
         <i class="fas fa-times" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</span>
-      </ManagerButton>
+      </Button>
     {/if}
-  </ManagerToolbar>
+  </FilterBar>
 
   <section
     class="manager-table-scroll manager-access-scroll"
@@ -200,8 +196,8 @@
           'Clear search and filters to show every recipe in this system.'
         )}
       >
-        <ManagerButton onclick={clearFilters}
-          >{text('FABRICATE.Admin.Manager.ClearSearch', 'Clear search')}</ManagerButton
+        <Button onclick={clearFilters}
+          >{text('FABRICATE.Admin.Manager.ClearSearch', 'Clear search')}</Button
         >
       </EmptyState>
     {:else}

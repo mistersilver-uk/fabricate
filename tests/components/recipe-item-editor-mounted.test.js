@@ -102,7 +102,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/inventory/detail/InventorySystemSelector.svelte',
     'src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte',
     // The book's recipe search (issue 1518).
-    'src/ui/svelte/components/ManagerSearchField.svelte',
+    'src/ui/svelte/components/SearchField.svelte',
     'src/ui/svelte/apps/inventory/InventoryDetail.svelte',
     // The promoted tab-strip primitive (issue 1362), a dependency of the tab strip below.
     'src/ui/svelte/components/EditorTabs.svelte',
@@ -113,7 +113,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte',
     // THE validation surface and the push-button its View rows render (issue 1444). The
     // Validation tab hands the surface its checks and renders no markup itself, so omitting
-    // either HANGS this suite (# cancelled) rather than failing it. `ManagerButton` is already
+    // either HANGS this suite (# cancelled) rather than failing it. `Button` is already
     // listed above via the `SELECT_COMPILED_MODULES` spread.
     'src/ui/svelte/components/EditorValidationSurface.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemValidationTab.svelte',

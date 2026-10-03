@@ -38,7 +38,7 @@ const FIXTURE = `
               <span class="manager-component-filter-label">Sort by</span>
               <div class="fabricate-picker manager-travel-picker fabricate-select"><button type="button" class="fabricate-select-trigger fabricate-select-trigger-toolbar" data-m="sort-select" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-label="Sort components"><span class="manager-travel-picker-value fabricate-select-value">Name</span><i class="fas fa-chevron-down" aria-hidden="true"></i></button></div>
               <!-- Carries fab-manager-button because the shipped control does (issue 1118):
-                   ComponentsBrowserView renders this toggle through ManagerButton, and the
+                   ComponentsBrowserView renders this toggle through Button, and the
                    .manager-button.manager-component-sort-direction rule was chained onto the
                    primitive class so its 9px radius and compact scale stop depending on source
                    order. Note this fixture still measured 11.52px WITHOUT the marker, because

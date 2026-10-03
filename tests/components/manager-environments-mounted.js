@@ -1631,7 +1631,7 @@ export function registerEnvironmentsCases() {
       assert.ok(Boolean(add), `the gathering settings tab should render an add control at ${hook}`);
       assert.ok(
         add.classList.contains('fab-manager-button'),
-        `${hook} should render through the ManagerButton primitive, not a hand-written class`
+        `${hook} should render through the Button primitive, not a hand-written class`
       );
       assert.ok(
         add.classList.contains('is-primary'),
@@ -2876,7 +2876,7 @@ export function registerEnvironmentsCases() {
       assert.ok(Boolean(action), `the validation tab renders a View ${kind} deep link`);
       assert.ok(
         action.classList.contains('fab-manager-button'),
-        `the View ${kind} link renders through the ManagerButton primitive, got ${action.className}`
+        `the View ${kind} link renders through the Button primitive, got ${action.className}`
       );
       assert.ok(
         action.classList.contains('is-ghost'),

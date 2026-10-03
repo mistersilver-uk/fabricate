@@ -39,8 +39,8 @@ const harness = createMountedComponentHarness({
     // Issue 1504: the shared `<Select>`'s whole compiled closure.
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/IconButton.svelte',
-    'src/ui/svelte/components/ManagerSearchField.svelte',
-    'src/ui/svelte/components/ManagerToolbar.svelte',
+    'src/ui/svelte/components/SearchField.svelte',
+    'src/ui/svelte/components/FilterBar.svelte',
     'src/ui/svelte/apps/manager/AccessTabView.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/manager/AccessTabView.svelte'

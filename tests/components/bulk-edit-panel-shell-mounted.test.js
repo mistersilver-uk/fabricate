@@ -15,7 +15,7 @@ const shell = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-bulk-edit-panel-shell-',
   rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
-  compiledModules: [SHELL_PATH, 'src/ui/svelte/components/ManagerButton.svelte'],
+  compiledModules: [SHELL_PATH, 'src/ui/svelte/components/Button.svelte'],
   componentPath: SHELL_PATH
 });
 

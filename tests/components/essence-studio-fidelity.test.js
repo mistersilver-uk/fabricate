@@ -10,7 +10,7 @@ const repoRoot = resolve(__dirname, '../..');
 
 const read = (relative) => readFileSync(resolve(repoRoot, relative), 'utf8');
 
-const colourPopoverSource = read('src/ui/svelte/components/ManagerColorPopover.svelte');
+const colourPopoverSource = read('src/ui/svelte/components/TintPicker.svelte');
 const browserSource = read('src/ui/svelte/apps/manager/EssenceBrowserView.svelte');
 const rowSource = read('src/ui/svelte/apps/manager/essences/EssenceRow.svelte');
 // The GRID card's anatomy and look now live in the shared studio-library primitive.

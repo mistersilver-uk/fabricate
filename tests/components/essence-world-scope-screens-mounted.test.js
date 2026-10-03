@@ -68,8 +68,8 @@ const SHELL_MODULES = [
   // frame below both render it now, so it and `SearchablePopover` are transitive dependencies of
   // this shell rather than new controls on these screens.
   'src/ui/svelte/components/SelectionCheckbox.svelte',
-  'src/ui/svelte/components/ManagerSearchField.svelte',
-  'src/ui/svelte/components/ManagerToolbar.svelte',
+  'src/ui/svelte/components/SearchField.svelte',
+  'src/ui/svelte/components/FilterBar.svelte',
   // THE manager's on/off switch (issue 1040). Not mounted directly by anything here.
   'src/ui/svelte/components/StatusToggle.svelte',
   'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
@@ -133,7 +133,7 @@ const entryHarness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/essences/EssenceBehaviorPreview.svelte',
     'src/ui/svelte/apps/inventory/InventoryItemCard.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
-    'src/ui/svelte/components/ManagerColorPopover.svelte',
+    'src/ui/svelte/components/TintPicker.svelte',
     'src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte',
     'src/ui/svelte/apps/manager/scoped/ScopedEntrySystemsCard.svelte',
     'src/ui/svelte/apps/manager/scoped/WorldEssenceEntryPage.svelte',

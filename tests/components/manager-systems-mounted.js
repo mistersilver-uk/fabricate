@@ -1618,7 +1618,7 @@ export function registerSystemsCases() {
     // secondary verb beside something that outranks it.
     assert.ok(
       blockerLink.classList.contains('fab-manager-button'),
-      `the blocker link renders through the ManagerButton primitive, got ${blockerLink.className}`
+      `the blocker link renders through the Button primitive, got ${blockerLink.className}`
     );
     assert.ok(
       blockerLink.classList.contains('is-ghost'),

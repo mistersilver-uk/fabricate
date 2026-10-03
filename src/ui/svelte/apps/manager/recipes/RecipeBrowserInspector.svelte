@@ -18,7 +18,7 @@
 <script>
   import Chip from '../../../components/Chip.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import Medallion from '../../../components/Medallion.svelte';
   import { resolveRecipeImage } from '../../../util/craftingImageDefaults.js';
@@ -680,23 +680,23 @@
          dark secondary above it, and Delete below in danger ink — NOT a text link, so a GM never
          fires it by reflex, but still a real action rather than a demoted afterthought. -->
     <div class="manager-recipe-browser-inspector-actions">
-      <ManagerButton
+      <Button
         class="manager-recipe-browser-inspector-duplicate"
         data-recipe-action="duplicate"
         onclick={() => onDuplicate()}
       >
         <i class="fas fa-copy" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.Duplicate', 'Duplicate recipe')}</span>
-      </ManagerButton>
-      <ManagerButton
+      </Button>
+      <Button
         class="manager-recipe-browser-inspector-edit"
         data-recipe-action="edit"
         onclick={() => onEdit()}
       >
         <i class="fas fa-pen" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.Edit', 'Edit recipe')}</span>
-      </ManagerButton>
-      <ManagerButton
+      </Button>
+      <Button
         role="danger"
         class="manager-recipe-browser-inspector-delete"
         data-recipe-action="delete"
@@ -704,7 +704,7 @@
       >
         <i class="fas fa-trash" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.Delete', 'Delete recipe')}</span>
-      </ManagerButton>
+      </Button>
     </div>
   </section>
 {:else if recipeCount === 0}
@@ -781,7 +781,7 @@
       aria-label={text('FABRICATE.Admin.Manager.Recipe.EmptySetup.Resources', 'Recipe resources')}
     >
       {#if componentCount <= 0}
-        <ManagerButton role="primary" onclick={() => onAddComponents()}>
+        <Button role="primary" onclick={() => onAddComponents()}>
           <i class="fas fa-boxes" aria-hidden="true"></i>
           <span
             >{text(
@@ -789,24 +789,24 @@
               'Add components'
             )}</span
           >
-        </ManagerButton>
+        </Button>
       {/if}
-      <ManagerButton
+      <Button
         tag="a"
         href="https://mistersilver-uk.github.io/fabricate/crafting/recipes/"
         target="_blank"
       >
         <i class="fas fa-book-open" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.EmptySetup.RecipeDocs', 'Recipe docs')}</span>
-      </ManagerButton>
-      <ManagerButton
+      </Button>
+      <Button
         tag="a"
         href="https://mistersilver-uk.github.io/fabricate/help/quickstart"
         target="_blank"
       >
         <i class="fas fa-circle-question" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.EmptySetup.Quickstart', 'Quickstart')}</span>
-      </ManagerButton>
+      </Button>
     </div>
   </section>
 {:else}

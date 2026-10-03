@@ -142,7 +142,7 @@ export function registerToolsCases() {
       ['in', 'all', 'over']
     );
     // THE BROWSE ARCHETYPE'S FILTER BAR (issue 1515). The search and the membership filter are
-    // the screen's two filters and render in one `ManagerToolbar` INSIDE the search card, which
+    // the screen's two filters and render in one `FilterBar` INSIDE the search card, which
     // is why the band above still reports as `search`: the card is unchanged and the bar nests
     // in it. Identity rather than presence, because two `.manager-toolbar` elements on one
     // screen - a bar per control - is the failure this reads for, and `querySelector` would

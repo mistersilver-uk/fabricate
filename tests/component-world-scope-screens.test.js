@@ -25,7 +25,7 @@ const CRAFTING_ACTIONS = `${MANAGER}/ManagerHeaderCraftingActions.svelte`;
 const ADMIN_STORE = 'src/ui/svelte/stores/adminStore.js';
 const BROWSER_VIEW = `${MANAGER}/ComponentsBrowserView.svelte`;
 const EDIT_VIEW = `${MANAGER}/ComponentEditView.svelte`;
-const ADD_BUTTON = { at: 'ManagerButton', where: ['data-component-add-from-catalogue', true] };
+const ADD_BUTTON = { at: 'Button', where: ['data-component-add-from-catalogue', true] };
 
 /** EVERY route token the gateway enumerated on `origin/main`, pinned as a literal list. */
 const ROUTE_TOKENS = Object.freeze([
@@ -82,11 +82,11 @@ describe('requirement 7 correction — the reopened gateways grew seams, not scr
             '../../../model/componentBulkEditModel.js',
             // Moved by issue 1509's file move, and it is neither a screen nor a new dependency.
             '../../components/ArmedDangerButton.svelte',
+            '../../components/Button.svelte',
             // `ChanceSlider.svelte` left in issue 1707 phase 2 with the drop-rate slider that imported
             // it; `EmptyState` moved by issue 1710's file move.
             '../../components/EmptyState.svelte',
             // `Kicker.svelte` and `Medallion.svelte` left in issue 1720 with the page header.
-            '../../components/ManagerButton.svelte',
             '../../util/componentEditor.js',
             './ComponentEditView.svelte',
             './ComponentsBrowserView.svelte',

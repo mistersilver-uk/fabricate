@@ -33,7 +33,7 @@
   import { normalizeEssenceIcon } from '../../../util/essenceIcons.js';
   import { SLOT_KIND, SLOT_STATE } from '../../../util/requirementSlots.js';
   import { haveOfNeedText } from '../../../util/craftingQuantityReading.js';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import Button from '../../../components/Button.svelte';
   import RequirementChooser from '../../../components/RequirementChooser.svelte';
   import Kicker from '../../../components/Kicker.svelte';
 
@@ -205,7 +205,7 @@
       {#if canPickForMe}
         <!-- No aria-label: the visible span names the button and `title` carries the hint, so
              the accessible name contains the visible label (WCAG 2.5.3). -->
-        <ManagerButton
+        <Button
           role="ghost"
           class="requirement-rail-wand"
           data-requirement-pick-for-me=""
@@ -214,7 +214,7 @@
         >
           <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
           <span>{localize('FABRICATE.App.Crafting.Slots.PickForMe')}</span>
-        </ManagerButton>
+        </Button>
       {/if}
     </div>
 

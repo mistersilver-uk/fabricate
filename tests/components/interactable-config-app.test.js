@@ -694,9 +694,9 @@ describe('InteractableConfigRoot body', () => {
 
   // The two controls that declined the conversion.
   defineStructureContract('keeps Disable and Lock as pressed buttons, state on aria-pressed', ROOT, {
-    passesProps: [['ManagerButton', 'onclick']],
+    passesProps: [['Button', 'onclick']],
     writes: ['aria-pressed'],
-    passesPropsNo: [['ManagerButton', 'on']],
+    passesPropsNo: [['Button', 'on']],
     compares: [false],
     styleDeclares: [
       [
@@ -708,7 +708,7 @@ describe('InteractableConfigRoot body', () => {
   });
 
   it('asks every pressed button for the inverse of the flag it announces', () => {
-    const pressed = renderedNodes(componentAstOf(ROOT), 'ManagerButton').filter((node) =>
+    const pressed = renderedNodes(componentAstOf(ROOT), 'Button').filter((node) =>
       attributeExpression(node, 'aria-pressed')
     );
     assert.ok(pressed.length > 0, 'at least one button announces a pressed state');
@@ -764,7 +764,7 @@ describe('InteractableConfigRoot body', () => {
   );
 
   it('and gates Apply until the selection is complete', () => {
-    const gated = renderedNodes(componentAstOf(ROOT), 'ManagerButton').filter((node) =>
+    const gated = renderedNodes(componentAstOf(ROOT), 'Button').filter((node) =>
       identifierNames(attributeExpression(node, 'disabled') ?? {}).has('canApplyIdentity')
     );
     assert.equal(gated.length, 1, 'exactly one button is disabled until the selection completes');

@@ -110,7 +110,7 @@
   $effect(() => {
     if (resolvedTag === 'a' && disabled) {
       console.warn(
-        'Fabricate | ManagerButton: `disabled` is not a valid attribute on an anchor and was ignored. ' +
+        'Fabricate | Button: `disabled` is not a valid attribute on an anchor and was ignored. ' +
           'Render a <button> (drop `tag="a"`, or leave `href` empty) if the control needs a disabled state.'
       );
     }

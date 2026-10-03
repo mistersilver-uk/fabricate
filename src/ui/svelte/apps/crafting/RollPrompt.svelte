@@ -1,5 +1,5 @@
 <!--
-  The interactive check prompt, single or bulk, in the shared `ManagerModal` chrome: one header, a
+  The interactive check prompt, single or bulk, in the shared `Modal` chrome: one header, a
   scrolling body and a footer of Disadvantage / Roll / Advantage as the check's advantage offer
   allows, or one Roll.
 
@@ -20,7 +20,7 @@
   import Field from '../../components/Field.svelte';
   import Select from '../../components/Select.svelte';
   import SelectionCheckbox from '../../components/SelectionCheckbox.svelte';
-  import ManagerModal from '../../components/ManagerModal.svelte';
+  import Modal from '../../components/Modal.svelte';
   import Notice from '../../components/Notice.svelte';
   import { modifierValue, rollPromptTarget } from './rollPromptTarget.js';
   import RollPromptAdditionalDice from './RollPromptAdditionalDice.svelte';
@@ -90,7 +90,7 @@
   }
 </script>
 
-<ManagerModal
+<Modal
   open
   title={data.title}
   subtitle={data.subtitle}
@@ -265,7 +265,7 @@
       onAction={answer}
     />
   {/snippet}
-</ManagerModal>
+</Modal>
 
 <style>
   .fabricate-roll-prompt {

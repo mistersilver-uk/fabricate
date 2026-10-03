@@ -24,7 +24,7 @@
 -->
 <script>
   import Kicker from '../../components/Kicker.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
   import Medallion from '../../components/Medallion.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import EssenceChips from './EssenceChips.svelte';
@@ -178,7 +178,7 @@
       <i class="fas fa-mortar-pestle" aria-hidden="true"></i>
       <h2>{localize('FABRICATE.App.Alchemy.Workbench')}</h2>
     </div>
-    <ManagerButton
+    <Button
       role="ghost"
       data-alchemy-clear=""
       disabled={benchEmpty}
@@ -186,7 +186,7 @@
     >
       <i class="fas fa-arrow-rotate-left" aria-hidden="true"></i>
       {localize('FABRICATE.App.Alchemy.Clear')}
-    </ManagerButton>
+    </Button>
   </div>
   <p class="alchemy-workbench-intro">{localize('FABRICATE.App.Alchemy.WorkbenchIntro')}</p>
 
@@ -407,7 +407,7 @@
         />
       </div>
     {/if}
-    <ManagerButton
+    <Button
       role="primary"
       fullWidth
       data-alchemy-brew=""
@@ -416,7 +416,7 @@
     >
       <i class="fas {brewInFlight ? 'fa-spinner fa-spin' : brewIcon}" aria-hidden="true"></i>
       {brewLabel}
-    </ManagerButton>
+    </Button>
   </div>
 </div>
 

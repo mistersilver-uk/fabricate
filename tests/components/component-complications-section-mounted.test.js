@@ -105,7 +105,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/SegmentedControl.svelte',
     'src/ui/svelte/apps/manager/ComplicationEffectRow.svelte',
     'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
-    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/components/SelectionCheckbox.svelte',
@@ -492,11 +492,11 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
   });
 
   it('has no scoped rule left to check for the Add control, and the primitive states none', async () => {
-    // The Add control converted to `<ManagerButton>` (issue 1118). Its own
+    // The Add control converted to `<Button>` (issue 1118). Its own
     // `.fab-complications-add` scoped rule declared nothing the role and `fullWidth` did not
     // already state, so it was retired rather than re-chained under `:global(...)` — the
     // previous test in this file asserted its ABSENCE of a `margin` from source; now there is
-    // no rule at all to read. `ManagerButton.svelte` itself deliberately carries no scoped
+    // no rule at all to read. `Button.svelte` itself deliberately carries no scoped
     // `<style>` — a second source of truth for the control is the failure the primitive
     // exists to end — so this checks the two GLOBAL rules that give the control its geometry
     // instead: `is-dashed` and `is-full-width` neither one adds a `margin`, which is what
@@ -869,7 +869,7 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
     assert.equal(added.when.checkTrigger, null, 'the trigger clause is an ID, never a boolean');
   });
 
-  it('renders the Add control as a dashed, full-width ManagerButton (issue 1118)', async () => {
+  it('renders the Add control as a dashed, full-width Button (issue 1118)', async () => {
     // Bound to the `data-complications-add` hook rather than any positional or class
     // selector, so a future markup reshuffle cannot silently retarget this at a neighbour.
     // `dashed` is the append-a-row verb at the foot of `.fab-complications-list`, and
@@ -879,7 +879,7 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
     const { target } = await mountSection({ complications: [] });
     const add = target.querySelector('[data-complications-add]');
     assert.ok(add, 'the hook resolves to an element');
-    assert.equal(add.tagName, 'BUTTON', 'ManagerButton renders a real <button> by default');
+    assert.equal(add.tagName, 'BUTTON', 'Button renders a real <button> by default');
     assert.ok(add.classList.contains('manager-button'), 'the manager control contract');
     assert.ok(add.classList.contains('fab-manager-button'), 'the primitive`s own class');
     assert.ok(add.classList.contains('is-dashed'), 'the append-a-row role');

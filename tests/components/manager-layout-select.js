@@ -787,7 +787,7 @@ test('the composed picker cascade resolves to the shared panel and the callers o
     // ── THE z-index BAND, MEASURED RATHER THAN ASSERTED EMPTY IN PROSE ─────────────────
     // The panel's stacking rung moved 120 → 4000, so every rule in this sheet declaring a
     // z-index in [120, 4000) is one whose relationship to the panel changed. The delta expected
-    // that set to be EMPTY. Measured, it is not: `ManagerColorPicker`'s panel is the one other
+    // that set to be EMPTY. Measured, it is not: `TintPickerButton`'s panel is the one other
     // popover still on the old rung.
     assert.deepEqual(
       report.band,

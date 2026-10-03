@@ -662,11 +662,11 @@ describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
     );
   });
 
-  it('renders Delete as a ManagerButton carrying the danger destructive role', () => {
-    const [deleteButton] = renderedNodes(componentAstOf(CRAFTING_ACTIONS), 'ManagerButton').filter(
+  it('renders Delete as a Button carrying the danger destructive role', () => {
+    const [deleteButton] = renderedNodes(componentAstOf(CRAFTING_ACTIONS), 'Button').filter(
       (node) => attributeExpression(node, 'onclick')?.name === 'deleteRecipeFromEdit'
     );
-    assert.ok(deleteButton, 'the recipe-edit header renders Delete as a ManagerButton');
+    assert.ok(deleteButton, 'the recipe-edit header renders Delete as a Button');
     assert.equal(attributeValue(deleteButton, 'role'), 'danger');
   });
 

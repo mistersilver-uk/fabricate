@@ -1,5 +1,5 @@
 <!-- Svelte 5 runes mode -->
-<!-- ratchet-exempt(design-system): PlayerDetailHeader is a composition of design-system members (Medallion, Avatar and ManagerButton, with the caller's own Chip row), so it draws no control of its own and takes no manifest row -->
+<!-- ratchet-exempt(design-system): PlayerDetailHeader is a composition of design-system members (Medallion, Avatar and Button, with the caller's own Chip row), so it draws no control of its own and takes no manifest row -->
 <!--
   The identity row a player detail pane leads with: the art tile, the name, optional meta and
   chips, and at most one primary action. Zero primaries is a correct state; two never is.
@@ -28,12 +28,12 @@
   - `{...rest}` lands on the root `div`, written after `class={…}`.
 
   Invariants:
-  - The primary is a `ManagerButton role="primary"` this row renders itself, so a caller cannot
+  - The primary is a `Button role="primary"` this row renders itself, so a caller cannot
     pass a second one — pinned by `tests/components/player-detail-header-mounted.test.js`.
 -->
 <script>
   import Avatar from '../components/Avatar.svelte';
-  import ManagerButton from '../components/ManagerButton.svelte';
+  import Button from '../components/Button.svelte';
   import Medallion from '../components/Medallion.svelte';
 
   let {
@@ -82,11 +82,11 @@
   </div>
   {#if primaryLabel}
     <div class="player-detail-header-action">
-      <!-- ratchet-exempt(design-system): the spread is `primaryProps`, the caller's extra `class` and the `data-*`, `title` and `aria-*` ManagerButton takes through rest -->
-      <ManagerButton role="primary" disabled={primaryDisabled} {onclick} {...primaryProps}>
+      <!-- ratchet-exempt(design-system): the spread is `primaryProps`, the caller's extra `class` and the `data-*`, `title` and `aria-*` Button takes through rest -->
+      <Button role="primary" disabled={primaryDisabled} {onclick} {...primaryProps}>
         {#if primaryIcon}<i class={primaryIcon} aria-hidden="true"></i>{/if}
         <span>{primaryLabel}</span>
-      </ManagerButton>
+      </Button>
     </div>
   {/if}
 </div>

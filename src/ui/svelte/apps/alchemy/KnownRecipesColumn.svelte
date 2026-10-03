@@ -15,8 +15,8 @@
 <script>
   import Callout from '../../components/Callout.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
-  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import Button from '../../components/Button.svelte';
+  import SearchField from '../../components/SearchField.svelte';
   import Medallion from '../../components/Medallion.svelte';
   import { localize } from '../../util/foundryBridge.js';
 
@@ -67,10 +67,10 @@
     <div class="alchemy-known-system">
       <span class="alchemy-known-system-name">{activeSystemName}</span>
       {#if canSwitch}
-        <ManagerButton data-alchemy-switch="" onclick={() => onSwitch?.()}>
+        <Button data-alchemy-switch="" onclick={() => onSwitch?.()}>
           <i class="fas fa-arrow-right-arrow-left" aria-hidden="true"></i>
           {localize('FABRICATE.App.Alchemy.SwitchDiscipline')}
-        </ManagerButton>
+        </Button>
       {/if}
     </div>
   {/if}
@@ -80,7 +80,7 @@
     <span class="alchemy-known-count">{knownCount}</span>
   </div>
 
-  <ManagerSearchField
+  <SearchField
     class="alchemy-known-search"
     value={search}
     onChange={(value) => onSearch?.(value)}

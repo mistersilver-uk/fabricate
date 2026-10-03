@@ -600,7 +600,7 @@ export const VIEW_RECIPES = Object.freeze([
   },
   // Issue 877 turned the report from a raw-HTML DialogV2 into a Svelte modal, so the
   // rendering file is now `ImportReportModal.svelte` rather than the app shell's HTML
-  // builder — and `ManagerModal.svelte`, the chrome BOTH import-flow modals render
+  // builder — and `Modal.svelte`, the chrome BOTH import-flow modals render
   // through, changes this frame's appearance too. All four are load-bearing.
   {
     id: 'manager-import-report',
@@ -612,7 +612,7 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/ui\/managerServices\.js$/,
       /^src\/ui\/presenters\/importReportContent\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/ImportReportModal\.svelte$/,
-      /^src\/ui\/svelte\/components\/ManagerModal\.svelte$/,
+      /^src\/ui\/svelte\/components\/Modal\.svelte$/,
       // The model that opens both import-flow modals (issue 1721).
       /^src\/ui\/svelte\/apps\/manager\/importFlowModel\.svelte\.js$/,
     ],
@@ -626,7 +626,7 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-import-folder-mapping'],
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/ImportFolderMappingModal\.svelte$/,
-      /^src\/ui\/svelte\/components\/ManagerModal\.svelte$/,
+      /^src\/ui\/svelte\/components\/Modal\.svelte$/,
       /^src\/ui\/SvelteCraftingSystemManagerApp\.svelte\.js$/,
       /^src\/ui\/managerServices\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/importFlowModel\.svelte\.js$/,

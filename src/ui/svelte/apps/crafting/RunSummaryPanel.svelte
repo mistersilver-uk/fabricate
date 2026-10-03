@@ -8,7 +8,7 @@
   is NO Journal cross-link in this PR.
 -->
 <script>
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Button from '../../components/Button.svelte';
   import Medallion from '../../components/Medallion.svelte';
   import { resolveCraftingArt } from '../../util/craftingArtResolution.js';
   import { localize } from '../../util/foundryBridge.js';
@@ -44,10 +44,10 @@
 <section class="crafting-run" data-crafting-run-summary>
   <header class="crafting-run-head">
     <p class="crafting-run-title">{localize('FABRICATE.App.Crafting.Run.Title')}</p>
-    <ManagerButton role="ghost" data-crafting-run-dismiss="" onclick={() => onDismiss?.()}>
+    <Button role="ghost" data-crafting-run-dismiss="" onclick={() => onDismiss?.()}>
       <i class="fas fa-arrow-left" aria-hidden="true"></i>
       <span>{localize('FABRICATE.App.Crafting.Run.Dismiss')}</span>
-    </ManagerButton>
+    </Button>
   </header>
 
   <div class="crafting-run-recipe">

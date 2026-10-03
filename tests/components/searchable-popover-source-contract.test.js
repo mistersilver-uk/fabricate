@@ -33,7 +33,7 @@ const RAW_ALLOWLIST = Object.freeze([
     sites: 1,
     why:
       'The primitive itself. Its picker root writes the token inside a TEMPLATE LITERAL — ' +
-      '`class={`manager-travel-picker ${pickerClass}`}` — so unlike `ManagerToolbar`, whose ' +
+      '`class={`manager-travel-picker ${pickerClass}`}` — so unlike `FilterBar`, whose ' +
       'class comes from a bare identifier, the source-text detector sees it. Exactly one ' +
       'element in the component carries it; a second would mean a second root.',
   }),

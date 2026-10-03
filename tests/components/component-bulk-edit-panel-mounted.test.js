@@ -38,7 +38,7 @@ const panel = createMountedComponentHarness({
     'src/ui/svelte/components/Stepper.svelte',
     // The shared inset's `stepper` rows lead with a `Medallion` tile (issue 1371 r16-cat, M25).
     'src/ui/svelte/components/Medallion.svelte',
-    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/Button.svelte',
     'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
     'src/ui/svelte/apps/manager/BulkEditSection.svelte',
     // The three insets (issue 1371 r16-list) and the dock's danger control. Both are STATIC

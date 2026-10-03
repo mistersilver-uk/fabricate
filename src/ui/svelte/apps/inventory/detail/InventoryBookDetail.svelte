@@ -24,7 +24,7 @@
   Prop-driven; learning routes back through the store seams.
 -->
 <script>
-  import ManagerSearchField from '../../../components/ManagerSearchField.svelte';
+  import SearchField from '../../../components/SearchField.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import Pagination from '../../../components/Pagination.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
@@ -295,7 +295,7 @@
       </div>
     {:else}
       {#if searchableRecipes}
-        <ManagerSearchField
+        <SearchField
           class="inventory-detail-recipe-search"
           value={recipeSearch}
           onChange={onRecipeSearch}

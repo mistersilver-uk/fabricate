@@ -51,7 +51,7 @@
   import Callout from '../../../../components/Callout.svelte';
   import EmptyState from '../../../../components/EmptyState.svelte';
   import Kicker from '../../../../components/Kicker.svelte';
-  import ManagerButton from '../../../../components/ManagerButton.svelte';
+  import Button from '../../../../components/Button.svelte';
 
   let {
     stages = [],
@@ -221,14 +221,14 @@
         data-inventory-salvage-reorder-note
       >
         {#snippet actions()}
-          <ManagerButton
+          <Button
             role="ghost"
             data-inventory-salvage-reorder-reset=""
             disabled={!canResetOrder}
             onclick={() => onResetOrder?.()}
           >
             {localize('FABRICATE.App.Inventory.Salvage.StageOrderReset')}
-          </ManagerButton>
+          </Button>
         {/snippet}
       </Callout>
     {/if}

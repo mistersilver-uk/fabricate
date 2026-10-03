@@ -5,10 +5,12 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
 
+import { measureImporters } from '../scripts/lib/componentImporters.js';
 import { selectableEssenceOptions, visibleEssenceOptions } from '../src/ui/model/essenceValidation.js';
 
 const repoRoot = resolve(import.meta.dirname, '..');
 const uiRoot = join(repoRoot, 'src/ui');
+const PICKER_ROW = 'src/ui/svelte/apps/manager/recipe/PickerRow.svelte';
 
 /** The enumerated consumers, each with the projection it applies. */
 const CONSUMERS = Object.freeze([
@@ -18,12 +20,15 @@ const CONSUMERS = Object.freeze([
     'src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte',
     'visibleEssenceOptions',
   ],
-  ['src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte', 'visibleEssenceOptions'],
+  ['src/ui/svelte/apps/manager/recipe/RecipeIngredientGroupCard.svelte', 'visibleEssenceOptions'],
   // The world Component entry's `Essence contribution` card (issue 1371 r18-entry, maintainer
   // ruling M31): the same quantity grid over the WORLD essence catalogue, whose `enabled` is the
   // world master switch — an offer and the editing surface for the world map at once.
   ['src/ui/svelte/apps/manager/scoped/WorldComponentEntryPage.svelte', 'visibleEssenceOptions'],
 ]);
+
+/** Importers of `PickerRow.svelte` that hand it no essence catalogue: path to the reason. */
+const ROW_CALLERS_WITHOUT_ESSENCES = Object.freeze({});
 
 // TWO ENTRIES LEFT WITH THE CHOICE THEY MADE (issue 1373, maintainer round 5), and the removal is
 // recorded rather than performed silently.
@@ -73,6 +78,22 @@ test('1036/18: the consumer list is CLOSED — no unlisted file renders an essen
     /class="essence-card"/,
   ];
   const listed = new Set(CONSUMERS.map(([path]) => path));
+  // `PickerRow` draws the essence field from its caller's catalogue, so every importer is the
+  // consumer in its place unless it is excluded with a reason.
+  const rowCallers = measureImporters(repoRoot).importersOf(PICKER_ROW);
+  assert.ok(rowCallers.length > 0, 'nothing imports the row, so the clause below is vacuous');
+  assert.deepEqual(
+    rowCallers.filter(
+      (path) => !listed.has(path) && !Object.hasOwn(ROW_CALLERS_WITHOUT_ESSENCES, path)
+    ),
+    [],
+    'an importer of the row is neither a listed consumer nor excluded with a reason'
+  );
+  for (const [path, reason] of Object.entries(ROW_CALLERS_WITHOUT_ESSENCES)) {
+    assert.ok(rowCallers.includes(path), `${path} is excluded and no longer imports the row`);
+    assert.ok(!listed.has(path), `${path} is both a consumer and excluded`);
+    assert.ok(String(reason).trim() !== '', `${path} is excluded without a reason`);
+  }
 
   const rendering = uiSourceFiles().filter((path) => {
     const source = read(path);
@@ -81,7 +102,7 @@ test('1036/18: the consumer list is CLOSED — no unlisted file renders an essen
 
   assert.ok(rendering.length > 0, 'the markers still match something — a vacuous scan proves nothing');
   assert.deepEqual(
-    rendering.filter((path) => !listed.has(path)),
+    rendering.filter((path) => !listed.has(path) && path !== PICKER_ROW),
     [],
     'an essence add-affordance exists in a file the offer projection does not cover'
   );

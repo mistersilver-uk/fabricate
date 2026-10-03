@@ -15,7 +15,7 @@ const SHELL_PATH = 'src/ui/svelte/apps/inventory/detail/InventoryDetailHeader.sv
 /** The row and the three members it composes: its whole compiled closure. */
 const HEADER_CLOSURE = [
   HEADER_PATH,
-  ...['Avatar', 'ManagerButton', 'Medallion'].map(
+  ...['Avatar', 'Button', 'Medallion'].map(
     (name) => `src/ui/svelte/components/${name}.svelte`
   ),
 ];
