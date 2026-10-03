@@ -941,7 +941,11 @@
   line-height: 1;
   color: var(--fab-on-success);
   background: var(--fab-success);
-  box-shadow: 0 0 0 2px var(--fab-bg-1);
+
+  /* ratchet-exempt(design-system): a zero-blur ring that separates the pip from the well it overhangs, not elevation; the rail's ground is the surface over the shell ground. */
+  box-shadow:
+    0 0 0 2px var(--fab-surface-soft),
+    0 0 0 2px var(--fab-bg-1);
 }
 
 /* Journal fact cards share header geometry across active and recorded accounts. */

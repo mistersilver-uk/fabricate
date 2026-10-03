@@ -683,7 +683,7 @@
     align-items: center;
     gap: var(--fab-space-chip);
     margin: 0;
-    padding: var(--fab-space-2) var(--fab-space-1) var(--fab-space-chip);
+    padding: var(--fab-space-2) 0 var(--fab-space-chip);
     width: 100%;
     height: auto;
     font: inherit;

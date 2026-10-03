@@ -190,7 +190,7 @@ A tool the salvaging character holds but which is broken also reads **Unavailabl
 {% include screenshot.html case="player-salvage-tools" %}
 
 While any required tool reads **Unavailable**, the **Salvage** button stays disabled.
-The footer then carries a note explaining that a required tool is missing, in place of the footer's usual one-shot reminder.
+A note directly beneath the Info | Salvage tabs then explains that a required tool is missing, and it replaces the one-shot reminder at the foot of the tab.
 Bringing the tool onto the salvaging character clears the block and makes the button usable.
 
 This is separate from salvaging a broken tool, covered in [Broken Tools](#broken-tools).

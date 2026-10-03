@@ -227,7 +227,7 @@ Issue 2005 adds a second outside `components/`, under `apps/crafting/detail/`: `
 The library's routing rule decides WHICH primitive an adoption wants; the deferral decides only WHEN the move happens, and the two answers are recorded separately.
 `Pagination.svelte:262-270` renders `<Select size="inline">` with no `label`, `hint` or `error`, so `Select.svelte:220` computes `labelled` false and the `<Field as="label">` at `Select.svelte:442-451` never renders.
 That CHAIN, rather than the importer list alone, is what makes the new `.fabricate-field` floor and chrome unreachable in the player application today.
-Issue 1518 and issue 1520 are the changes that turn all six from claims into facts, and issue 1520 has now turned five of them.
+Issue 1520 turned five of the six from claims into facts; the sixth, `ChanceSlider`, is recorded below.
 `src/ui/svelte/apps/InteractableConfigRoot.svelte` imports `Field` and `StatusToggle` from `src/ui/svelte/components/` and renders four fields and three switches, and that importer path lies outside both `apps/manager/` and `components/` — which is the whole of what the claim asked for.
 The same file discharges the CHAIN half as well, and the chain is what the two sentences above record as the reason the field family was unreachable rather than merely un-imported.
 It renders eight `<Select>`s that each pass a `label`, so `labelled` computes TRUE and `Select`'s own `<Field as="label">` renders — putting the `.fabricate-field` box, its element-typed chrome and its focus pair on a screen through a component that never writes `Field` at its call site.
@@ -624,7 +624,7 @@ Moving a hand-rolled tile onto the art or portrait primitive MUST preserve the r
 The site is pre-existing debt becoming VISIBLE: the tile was already that size and only the conversion puts it where the census can see it.
 Resizing to the nearest rung in the same change would smuggle a layout move into a conversion, and the two must be separable so that a reviewer can approve one without the other.
 The scenario below therefore binds a NEW or RESIZED geometry and not a conversion that preserves one.
-Issue 1519's sweep discharged the six player identity tiles: `apps/PlayerDetailHeader.svelte` draws a record at the art ladder's 38 and an actor at the portrait ladder's 32.
+Issue 1519's sweep discharged the six player identity tiles: `apps/PlayerDetailHeader.svelte` draws its record tile at the art ladder's 38.
 It also reconciled the census with the two ladders this requirement publishes: `design-system-debt-ratchets.test.js` holds each art-tile component to its own kind's ladder, `Medallion` to the art ladder and `Avatar` to the portrait ladder.
 The remaining population is 57 off-ladder art tiles across 39 files, at 14 distinct sizes and one non-literal size, and 4 off-ladder portraits at 34, 40 and 50; 36 of those 61 sites lie outside `apps/manager/`, and each keeps its shipped size until a change resizes it.
 A conversion onto a shared primitive takes that primitive's shipped geometry, and a conflict the library's planned-migrations table records as open stays open: the conversion never settles it by drawing the specimen's value.

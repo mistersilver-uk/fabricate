@@ -419,13 +419,14 @@ Do not render a full-width solid tier colour for a progress-style chance control
 
 ### 5.9 Nav rail item (Player, 72px rail)
 
-Active = accent-soft fill + accent-border.
-Count badge = success pill, top-right.
+Active = the item takes `--fab-surface-active`, and the 44×44 well at radius 9 takes `--fab-accent-soft`, with a 20px accent glyph and a 10/600 label.
+No border.
+Count = a filled success pip on the well's outer corner, with a 2px ring in the rail's ground colour.
 
 ```html
-<div style="display:flex;flex-direction:column;align-items:center;gap:4px;width:60px;padding:10px 0;border-radius:8px;background:var(--fab-accent-soft);border:1px solid var(--fab-accent-border);color:var(--fab-accent)"><i class="fa-solid fa-hammer" style="font-size:16px"></i><span style="font:600 10px var(--sans)">Crafting</span></div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:100%;padding:8px 0 6px;border-radius:9px;background:var(--fab-surface-active);color:var(--fab-accent)"><span style="display:grid;place-items:center;width:44px;height:44px;border-radius:9px;background:var(--fab-accent-soft)"><i class="fa-solid fa-hammer" style="font-size:20px"></i></span><span style="font:600 10px var(--sans)">Crafting</span></div>
 
-<div style="display:flex;flex-direction:column;align-items:center;gap:4px;width:60px;padding:10px 0;border-radius:8px;color:var(--fab-text-muted);position:relative"><i class="fa-solid fa-book-open" style="font-size:16px"></i><span style="font:500 10px var(--sans)">Journal</span><span style="position:absolute;top:6px;right:8px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:var(--fab-success);border:1px solid var(--fab-success-border);color:var(--fab-on-accent);font:700 9px/16px var(--sans);text-align:center">2</span></div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:100%;padding:8px 0 6px;border-radius:9px;color:var(--fab-text-muted)"><span style="position:relative;display:grid;place-items:center;width:44px;height:44px;border-radius:9px"><i class="fa-solid fa-book-open" style="font-size:20px"></i><span style="position:absolute;top:-3px;right:-3px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:var(--fab-success);box-shadow:0 0 0 2px var(--fab-surface-soft),0 0 0 2px var(--fab-bg-1);color:var(--fab-on-success);font:500 9px/16px var(--fab-font-mono);text-align:center">2</span></span><span style="font:600 10px var(--sans)">Journal</span></div>
 ```
 
 ### 5.10 Stat box

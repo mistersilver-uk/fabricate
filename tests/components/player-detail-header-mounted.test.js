@@ -15,7 +15,7 @@ const SHELL_PATH = 'src/ui/svelte/apps/inventory/detail/InventoryDetailHeader.sv
 /** The row and the three members it composes: its whole compiled closure. */
 const HEADER_CLOSURE = [
   HEADER_PATH,
-  ...['Avatar', 'Button', 'Medallion'].map((name) => `src/ui/svelte/components/${name}.svelte`),
+  ...['Button', 'Medallion'].map((name) => `src/ui/svelte/components/${name}.svelte`),
 ];
 
 const snippet = (html) => createRawSnippet(() => ({ render: () => html }));
@@ -109,13 +109,6 @@ describe('PlayerDetailHeader', () => {
       parts.map((part) => part.textContent),
       ['12 total', 'Component']
     );
-  });
-
-  it('draws an actor as a 32px portrait, with initials when there is no artwork', async () => {
-    const target = await header.mount({ name: 'Akra Vey', portrait: true });
-    const row = assertIdentityHeader(target, { primaries: 0, name: 'Akra Vey' });
-    assert.equal(row.querySelector('.fab-avatar').textContent.trim(), 'AV');
-    assert.ok(!row.querySelector('.fab-medallion'));
   });
 
   it('appends the caller’s class and forwards the rest to the root', async () => {

@@ -787,7 +787,12 @@ describe('FabricateAppRoot (mounted, against a real player registry)', () => {
       'the gutter is reserved up front, so crossing the entry count that starts the scroll does '
         + 'not reflow the column'
     );
+    const item = ruleBody(css, 'fabricate-app-nav-item');
+    assert.match(item, /width:\s*100%/, 'an item fills the rail column rather than capping at 64px');
+    assert.match(item, /height:\s*auto/, 'and grows with its well and label rather than a fixed 64px');
+    assert.doesNotMatch(item, /position\s*:/, "the item declares no position, so it is never the pip's containing block");
     const well = ruleBody(css, 'fabricate-app-nav-well');
+    assert.match(well, /position:\s*relative/, "the well is the pip's containing block");
     assert.match(well, /height:\s*44px/, 'each item is a 44px icon well');
     assert.match(well, /border-radius:\s*9px/, 'at radius 9');
     assert.match(
@@ -817,7 +822,7 @@ describe('FabricateAppRoot (mounted, against a real player registry)', () => {
     assert.match(pipRule, /right:\s*-3px/, 'and its right edge, clear of the glyph');
     assert.match(
       pipRule,
-      /box-shadow:\s*0 0 0 2px var\(--fab-bg-1\)/,
+      /box-shadow:\s*0 0 0 2px var\(--fab-surface-soft\),\s*0 0 0 2px var\(--fab-bg-1\)/,
       'a 2px ring in the rail ground separates the pip from the well it overhangs'
     );
     assert.match(pipRule, /min-width:\s*16px/, 'the pip is at least 16px');

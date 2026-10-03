@@ -24,7 +24,7 @@ export const primaryButtons = (root) => {
 };
 
 /**
- * Assert `pane` leads with one identity row carrying one `h2` and a tile on its ladder's rung (38 for a record, 32 for a portrait), that the row holds
+ * Assert `pane` leads with one identity row carrying one `h2` and a Medallion on the art ladder's 38, that the row holds
  * exactly `primaries` primary buttons, and that the pane draws none beyond it. `outside` is for
  * the journal's run action bar beside the row, whose primary issue 1644 owns.
  *
@@ -39,13 +39,12 @@ export function assertIdentityHeader(pane, { primaries, outside = 0, name = unde
   assert.equal(headings.length, 1, 'the identity row names its record on exactly one h2');
   if (name !== undefined) assert.equal(headings[0].textContent, name);
 
-  const tile = row.querySelector('.fab-medallion, .fab-avatar');
+  const tile = row.querySelector('.fab-medallion');
   assert.ok(Boolean(tile), 'the identity row leads with an art tile');
-  const rung = tile.classList.contains('fab-avatar') ? 32 : 38;
   assert.match(
     tile.getAttribute('style'),
-    new RegExp(String.raw`width:\s*${rung}px;\s*height:\s*${rung}px`, 'u'),
-    'at the art ladder’s 38, or the portrait ladder’s 32'
+    /width:\s*38px;\s*height:\s*38px/u,
+    'at the art ladder’s 38'
   );
 
   assert.equal(primaryButtons(row).length, primaries, 'primaries in the identity row');

@@ -850,6 +850,20 @@ const ART_TILE_COMPONENTS = new Map([
 ]);
 
 /**
+ * The art-tile component each local name in `source` imports, keyed by that LOCAL name, so an
+ * aliased import (`import Portrait from '../components/Avatar.svelte'`) is still held to its ladder.
+ */
+function artTileImports(source) {
+  const locals = new Map();
+  for (const match of source.matchAll(
+    /import\s+(\w+)\s+from\s+['"][^'"]*\/(Medallion|Avatar)\.svelte['"]/gu
+  )) {
+    locals.set(match[1], match[2]);
+  }
+  return locals;
+}
+
+/**
  * Every art-tile render site, as `{ file, line, kind, size }` with `size` a number or `dynamic`.
  *
  * @returns {{ file: string, line: number, kind: 'art'|'portrait', size: number|'dynamic' }[]}
@@ -857,9 +871,10 @@ const ART_TILE_COMPONENTS = new Map([
 function artTileSizes(templates) {
   const found = [];
   for (const { file, source, ast } of templates) {
+    const imports = artTileImports(source);
     walkElements(ast.fragment ?? ast, (element) => {
-      if (element.type !== 'Component' || !ART_TILE_COMPONENTS.has(element.name)) return;
-      const { kind, defaultSize } = ART_TILE_COMPONENTS.get(element.name);
+      if (element.type !== 'Component' || !imports.has(element.name)) return;
+      const { kind, defaultSize } = ART_TILE_COMPONENTS.get(imports.get(element.name));
       const text = attributeText(source, element, 'size');
       const line = lineOf(source, element.start);
       // An absent `size` takes the primitive's OWN default.
@@ -890,17 +905,21 @@ const ART_SIZE_GATE = templateGate((templates) =>
 test('each art tile is held to its own kind of ladder', () => {
   const fixture = templatesOf(
     () =>
+      "<script>import Avatar from '../components/Avatar.svelte';" +
+      "import Medallion from './Medallion.svelte';" +
+      "import Portrait from '../components/Avatar.svelte';</script>" +
       '<Avatar size={32} /><Avatar size={38} /><Avatar size={size} />' +
-      '<Medallion size={38} /><Medallion size={32} /><Medallion />',
+      '<Medallion size={38} /><Medallion size={32} /><Medallion />' +
+      '<Portrait size={50} />',
     ['src/ui/svelte/Fixture.svelte']
   );
   assert.deepEqual(
     artTileSizes(fixture)
       .filter((site) => !isOnLadder(site))
       .map((site) => `${site.kind} ${site.size}`),
-    ['portrait 38', 'portrait dynamic', 'art 32', 'art 40'],
+    ['portrait 38', 'portrait dynamic', 'art 32', 'art 40', 'portrait 50'],
     'a portrait at its 32px rung is on its ladder and a 38px portrait is not, while a record tile ' +
-      'is held to the art ladder and its 40px default is off it'
+      'is held to the art ladder and its 40px default is off it, and an aliased import is held to the ladder of the file it imports'
   );
 });
 

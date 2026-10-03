@@ -1,5 +1,5 @@
 <!-- Svelte 5 runes mode -->
-<!-- ratchet-exempt(design-system): PlayerDetailHeader is a composition of design-system members (Medallion, Avatar and Button, with the caller's own Chip row), so it draws no control of its own and takes no manifest row -->
+<!-- ratchet-exempt(design-system): PlayerDetailHeader is a composition of design-system members (Medallion and Button, with the caller's own Chip row), so it draws no control of its own and takes no manifest row -->
 <!--
   The identity row a player detail pane leads with: the art tile, the name, optional meta and
   chips, and at most one primary action. Zero primaries is a correct state; two never is.
@@ -8,8 +8,7 @@
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `name` | string | `''` | The record's name, drawn on the row's one `h2`. |
-  | `art` / `icon` / `tint` | resolved image path / Font Awesome classes / bare `--fab-tag-*` key | `''` / the tile's own / `''` | Forwarded to the tile: a 38px record tile, or a 32px portrait. The caller resolves the image. |
-  | `portrait` | boolean | `false` | The subject is an actor, so the tile is an `Avatar` drawing initials from `name` when `art` is empty. |
+  | `art` / `icon` / `tint` | resolved image path / Font Awesome classes / bare `--fab-tag-*` key | `''` / the tile's own / `''` | Forwarded to the tile: a 38px record tile. The caller resolves the image. |
   | `artDimmed` | boolean | `false` | Fades the artwork beneath `tileOverlay`, never the overlay itself. |
   | `primaryLabel` | string | `''` | The primary's visible text. Empty renders no primary at all. |
   | `primaryIcon` / `primaryDisabled` | Font Awesome classes / boolean | `''` / `false` | The primary's leading glyph and its disabled state. |
@@ -32,7 +31,6 @@
     pass a second one — pinned by `tests/components/player-detail-header-mounted.test.js`.
 -->
 <script>
-  import Avatar from '../components/Avatar.svelte';
   import Button from '../components/Button.svelte';
   import Medallion from '../components/Medallion.svelte';
 
@@ -41,7 +39,6 @@
     art = '',
     icon = undefined,
     tint = '',
-    portrait = false,
     artDimmed = false,
     primaryLabel = '',
     primaryIcon = '',
@@ -63,11 +60,7 @@
 >
   <span class="player-detail-header-tile" class:is-dimmed={artDimmed}>
     <span class="player-detail-header-art">
-      {#if portrait}
-        <Avatar {art} {name} alt="" size={32} />
-      {:else}
-        <Medallion {art} {icon} {tint} alt="" size={38} />
-      {/if}
+      <Medallion {art} {icon} {tint} alt="" size={38} />
     </span>
     {@render tileOverlay?.()}
   </span>
