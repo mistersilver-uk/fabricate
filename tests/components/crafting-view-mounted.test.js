@@ -15,6 +15,7 @@ import {
   listing,
   recipe
 } from '../helpers/crafting-fixtures.js';
+import { assertIdentityHeader, primaryButtons } from '../helpers/playerDetailHeaderAssertions.js';
 import { assertViewErrorTreatment } from '../helpers/playerViewStateAssertions.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -149,6 +150,26 @@ describe('CraftingView mounted behavior', () => {
     );
   });
 
+  // The run summary repeats the verb as a ghost, so the whole view has one primary.
+  it('hands the roll to the detail, which renames its one primary Craft another', async () => {
+    const store = fakeCraftingStore({
+      recipes: [recipe()],
+      lastRollResult: { 'recipe-1': { success: true, items: [] } },
+    });
+    const target = await harness.mount({ services: services(store) });
+    const [primary] = primaryButtons(
+      assertIdentityHeader(target.querySelector('[data-crafting-detail-state="selected"]'), {
+        primaries: 1,
+      })
+    );
+    assert.equal(primary.textContent.trim(), 'FABRICATE.App.Crafting.Button.CraftAnother');
+    assertIdentityHeader(target, { primaries: 1 });
+    const summary = target.querySelector('[data-crafting-run-summary]');
+    const again = summary.querySelector('[data-crafting-craft]');
+    assert.ok(again.matches('.fab-manager-button.is-ghost'), 'the summary repeats it as a ghost');
+    assert.ok(summary.querySelector('[data-crafting-run-dismiss]').matches('.is-ghost'));
+  });
+
   it('disables the run summary "Craft another" when the selection is no longer craftable (non-progressive)', async () => {
     const built = recipe({
       ingredientSets: [{ id: 'set-a', label: 'Option A', craftability: craftability({ canCraft: false }) }]
@@ -247,6 +268,45 @@ describe('CraftingView mounted behavior', () => {
     assert.deepEqual(calls.allocate.at(-1), ['Item.dusk-1', 2]);
   });
 
+  // The listing is baked per load; the store re-evaluates craftability on an option override
+  // and on a pool allocation. The header follows the live reading.
+  for (const [name, live] of [
+    [
+      'an override to a short alternative',
+      craftability({
+        canCraft: false,
+        ingredientStates: [
+          {
+            groupId: 'g-herb',
+            name: 'Blue Herb',
+            img: null,
+            need: 1,
+            have: 0,
+            satisfied: false,
+            hasChoice: true,
+            choiceCount: 2,
+          },
+        ],
+      }),
+    ],
+    ['a pool stepped below its need', essenceCraftability()],
+  ]) {
+    it(`drops the ready chip and the primary, and says why, after ${name}`, async () => {
+      const store = fakeCraftingStore({ recipes: [recipe()], selectedCraftability: live });
+      const target = await harness.mount({ services: services(store) });
+      const header = target.querySelector('[data-recipe-header]');
+      assert.ok(!header.querySelector('[data-crafting-craft]'), 'no Craft primary');
+      assert.ok(
+        !header.querySelector(':scope .player-detail-header-meta [data-crafting-status]'),
+        'and no chip that still reads Ready to craft'
+      );
+      const notice = header.querySelector('[data-recipe-blocking]');
+      assert.equal(notice.getAttribute('data-notice-tone'), 'danger');
+      assert.ok(notice.textContent.includes('FABRICATE.App.Crafting.Blocking.MissingMaterials'));
+      assert.ok(!notice.hasAttribute('data-recipe-authority-blocked'));
+    });
+  }
+
   // Issue 1648, the reported bug's own header. EVERY player-app craft routes through the
   // versioned-run authority, so "Ready to craft" over a refused authority promised something
   // the Craft button could only refuse. The header now drops the chip and leads its blocking
@@ -262,7 +322,7 @@ describe('CraftingView mounted behavior', () => {
       const target = await harness.mount({
         services: services(store, { getJournalRunAuthorityAvailability: () => availability }),
       });
-      const chip = target.querySelector('.crafting-detail-header-meta [data-crafting-status]');
+      const chip = target.querySelector('.player-detail-header-meta [data-crafting-status]');
       assert.equal(Boolean(chip), ready, `the ready chip is ${ready ? 'kept' : 'withheld'}`);
       const notice = target.querySelector('[data-recipe-blocking]');
       assert.equal(

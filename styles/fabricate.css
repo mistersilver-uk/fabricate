@@ -156,7 +156,6 @@
   --fab-overlay-light-08: rgb(241 209 181 / 8%);
   --fab-overlay-light-10: rgb(241 209 181 / 10%);
   --fab-overlay-light-12: rgb(241 209 181 / 12%);
-  --fab-overlay-light-14: rgb(241 209 181 / 14%);
   --fab-overlay-light-28: rgb(241 209 181 / 28%);
   --fab-overlay-light-96: rgb(241 209 181 / 96%);
   --fab-warning-focus: rgb(231 219 177 / 78%);
@@ -256,7 +255,6 @@
   --fab-overlay-light-08: rgb(255 255 255 / 8%);
   --fab-overlay-light-10: rgb(255 255 255 / 10%);
   --fab-overlay-light-12: rgb(255 255 255 / 12%);
-  --fab-overlay-light-14: rgb(255 255 255 / 14%);
   --fab-overlay-light-28: rgb(255 255 255 / 28%);
   --fab-overlay-light-96: rgb(255 255 255 / 96%);
   --fab-warning-focus: rgb(246 176 72 / 78%);
@@ -356,7 +354,6 @@
   --fab-overlay-light-08: rgb(240 226 212 / 8%);
   --fab-overlay-light-10: rgb(240 226 212 / 10%);
   --fab-overlay-light-12: rgb(240 226 212 / 12%);
-  --fab-overlay-light-14: rgb(240 226 212 / 14%);
   --fab-overlay-light-28: rgb(240 226 212 / 28%);
   --fab-overlay-light-96: rgb(240 226 212 / 96%);
   --fab-warning-focus: rgb(214 192 142 / 78%);
@@ -456,7 +453,6 @@
   --fab-overlay-light-08: rgb(241 233 216 / 8%);
   --fab-overlay-light-10: rgb(241 233 216 / 10%);
   --fab-overlay-light-12: rgb(241 233 216 / 12%);
-  --fab-overlay-light-14: rgb(241 233 216 / 14%);
   --fab-overlay-light-28: rgb(241 233 216 / 28%);
   --fab-overlay-light-96: rgb(241 233 216 / 96%);
   --fab-warning-focus: rgb(231 216 162 / 78%);
@@ -556,7 +552,6 @@
   --fab-overlay-light-08: rgb(242 236 255 / 8%);
   --fab-overlay-light-10: rgb(242 236 255 / 10%);
   --fab-overlay-light-12: rgb(242 236 255 / 12%);
-  --fab-overlay-light-14: rgb(242 236 255 / 14%);
   --fab-overlay-light-28: rgb(242 236 255 / 28%);
   --fab-overlay-light-96: rgb(242 236 255 / 96%);
   --fab-warning-focus: rgb(230 224 200 / 78%);
@@ -658,7 +653,6 @@
   --fab-overlay-light-08: rgb(243 243 245 / 8%);
   --fab-overlay-light-10: rgb(243 243 245 / 10%);
   --fab-overlay-light-12: rgb(243 243 245 / 12%);
-  --fab-overlay-light-14: rgb(243 243 245 / 14%);
   --fab-overlay-light-28: rgb(243 243 245 / 28%);
   --fab-overlay-light-96: rgb(243 243 245 / 96%);
   --fab-warning-focus: rgb(193 150 110 / 72%);
@@ -758,7 +752,6 @@
   --fab-overlay-light-08: rgb(228 192 102 / 8%);
   --fab-overlay-light-10: rgb(228 192 102 / 10%);
   --fab-overlay-light-12: rgb(228 192 102 / 12%);
-  --fab-overlay-light-14: rgb(228 192 102 / 14%);
   --fab-overlay-light-28: rgb(228 192 102 / 28%);
   --fab-overlay-light-96: rgb(228 192 102 / 96%);
   --fab-warning-focus: rgb(230 208 138 / 78%);
@@ -929,14 +922,11 @@
   --fab-cluster-gap: var(--fab-space-3);
 }
 
-/* Active-run count badge on the Journal nav rail entry. The player nav rail is a
-   fixed-width column of square icon buttons (no collapsible rail, unlike the
-   manager's .manager-nav-count), so the badge floats in the button's top-right
-   corner. Tokenized green to match the run-ready/active semantics. */
+/* The rail's count pip: filled, on the icon well's outer corner and ringed in the rail's ground so it never covers the glyph. The fill stays success for the run-ready meaning (maintainer ruling, 2026-09-19). */
 .fabricate-app .fabricate-app-nav-count {
   position: absolute;
-  top: 4px;
-  right: 4px;
+  top: -3px;
+  right: -3px;
   min-width: 16px;
   height: 16px;
   padding: 0 4px;
@@ -945,12 +935,17 @@
   justify-content: center;
   box-sizing: border-box;
   border-radius: 999px;
-  border: 1px solid var(--fab-success-border);
-  font-size: 10px;
-  font-weight: 700;
+  font-family: var(--fab-font-mono);
+  font-size: 9px;
+  font-weight: 500;
   line-height: 1;
   color: var(--fab-on-success);
   background: var(--fab-success);
+
+  /* ratchet-exempt(design-system): a zero-blur ring that separates the pip from the well it overhangs, not elevation; the rail's ground is the surface over the shell ground. */
+  box-shadow:
+    0 0 0 2px var(--fab-surface-soft),
+    0 0 0 2px var(--fab-bg-1);
 }
 
 /* Journal fact cards share header geometry across active and recorded accounts. */

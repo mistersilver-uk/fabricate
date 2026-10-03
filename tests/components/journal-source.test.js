@@ -82,7 +82,7 @@ describe('JournalView layout + effects', () => {
     assert.ok(viewSource.includes('.journal-detail-pane {\n      min-height: 220px;'), 'Detail remains reachable below both lists');
   });
 
-  it('composes the required shared search, kind, status, and independent pager controls', () => {
+  it('composes the required shared search, status, and independent pager controls', () => {
     assert.ok(viewSource.includes('<div class="journal-search-field">'));
     assert.equal(
       viewSource.includes('<Field as="div" class="journal-search-field">'),
@@ -102,7 +102,6 @@ describe('JournalView layout + effects', () => {
     assert.ok(/<SearchField[\s/>]/.test(viewSource));
     assert.ok(viewSource.includes('class="journal-search-control"'));
     assert.ok(viewSource.includes('size="30"'));
-    assert.ok(viewSource.includes('<div class="journal-kind-field">'));
     assert.equal(viewSource.includes("import Field from '../../components/Field.svelte'"), false);
     assert.equal(viewSource.includes('Filters.SearchKicker'), false, 'the accessible search name is not duplicated as a visible kicker');
     assert.ok(

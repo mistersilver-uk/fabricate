@@ -3,7 +3,7 @@
   AlchemyView — the player Alchemy tab content. It reads the shared services.alchemy
   store and renders one of: loading, error, no-actor, the discipline chooser (>1
   discipline, none chosen), or the three-column workbench (known . workbench .
-  inventory). The 84px nav rail is the shell's (FabricateAppRoot), NOT this grid, so
+  inventory). The nav rail is the shell's (FabricateAppRoot), not this grid, so
   the content grid is three columns with compressible sides and a floored center,
   mirroring CraftingView / GatheringView.
 -->

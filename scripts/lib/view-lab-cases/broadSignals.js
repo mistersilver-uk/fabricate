@@ -274,6 +274,23 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-checks-v3-count-under',
     'player-crafting-roll-prompt-count-additional',
   ]),
+  // The player window's chips (issue 1518): the recipe header's status chip and each row's icon-only one.
+  'src/ui/svelte/components/Chip.svelte': Object.freeze(['player-crafting-simple']),
+  // The player window draws it in the journal's run action bar: the primary, then the danger and neutral pair.
+  'src/ui/svelte/components/Button.svelte': Object.freeze([
+    'fabricate-journal-lifecycle-ready-single',
+    'fabricate-journal-lifecycle-cancel-confirmation',
+  ]),
+  // The pager's two player forms: the inventory's persistent bar and the recipe browser's threshold one.
+  'src/ui/svelte/components/Pagination.svelte': Object.freeze([
+    'player-inventory',
+    'player-crafting-simple',
+  ]),
+  // The requirement chooser (issue 1518): open on a choice slot, and the rail's three slot states.
+  'src/ui/svelte/components/RequirementChooser.svelte': Object.freeze([
+    'player-crafting-chooser-open',
+    'player-crafting-slot-rail',
+  ]),
   // The sheet itself, and the first entry here whose key is not a component (issue 1515).
   'styles/fabricate.css': Object.freeze([
     'manager-gathering-task-editor-normal',

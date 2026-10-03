@@ -245,35 +245,38 @@ export function selectPanelFixture(area, rung, { ticked }) {
 
 // THE CONVERTED PAGER'S SEVEN SITES.
 export const CONVERTED_PAGER_SITES = Object.freeze([
+  // The inventory grid's re-theme is deleted (issue 1518), so its pager paints itself.
   Object.freeze({
     probe: 'inventory',
     padding: '12px',
     area: 'fabricate-app',
     wrapper: 'inventory-grid-pagination',
     component: 'src/ui/svelte/apps/inventory/InventoryGrid.svelte',
-    fill: 'surface',
-    floored: false,
-    declaredArrow: 26,
+    fill: 'bg-2',
+    floored: true,
+    declaredArrow: 28,
   }),
+  // No re-theme: the pager paints itself (issue 1518).
   Object.freeze({
     probe: 'recipes',
-    padding: '8px',
+    padding: '12px',
     area: 'fabricate-app',
     wrapper: 'crafting-browser-pagination',
     component: 'src/ui/svelte/apps/crafting/RecipeBrowser.svelte',
-    fill: 'surface',
-    floored: false,
-    declaredArrow: 26,
+    fill: 'bg-2',
+    floored: true,
+    declaredArrow: 28,
   }),
+  // Nor do the gathering pagers.
   Object.freeze({
     probe: 'environments',
     padding: '12px',
     area: 'fabricate-app',
     wrapper: 'gathering-env-pagination',
     component: 'src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte',
-    fill: 'surface',
-    floored: false,
-    declaredArrow: 26,
+    fill: 'bg-2',
+    floored: true,
+    declaredArrow: 28,
   }),
   Object.freeze({
     probe: 'tasks',
@@ -281,9 +284,9 @@ export const CONVERTED_PAGER_SITES = Object.freeze([
     area: 'fabricate-app',
     wrapper: 'gathering-detail-pagination',
     component: 'src/ui/svelte/apps/gathering/GatheringTasksPanel.svelte',
-    fill: 'surface',
-    floored: false,
-    declaredArrow: 26,
+    fill: 'bg-2',
+    floored: true,
+    declaredArrow: 28,
   }),
   Object.freeze({
     probe: 'events',
@@ -291,9 +294,9 @@ export const CONVERTED_PAGER_SITES = Object.freeze([
     area: 'fabricate-app',
     wrapper: 'gathering-detail-pagination',
     component: 'src/ui/svelte/apps/gathering/GatheringEventsPanel.svelte',
-    fill: 'surface',
-    floored: false,
-    declaredArrow: 26,
+    fill: 'bg-2',
+    floored: true,
+    declaredArrow: 28,
   }),
   Object.freeze({
     probe: 'journal',

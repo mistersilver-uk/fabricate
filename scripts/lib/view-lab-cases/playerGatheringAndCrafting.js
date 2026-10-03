@@ -9,6 +9,7 @@ import {
   CRAFTING_ROUTED_CHECK,
   CRAFTING_ROUTED_INGREDIENTS,
   CRAFTING_SHARED,
+  PLAYER_DETAIL_HEADER,
   CRAFTING_SIMPLE,
 } from './caseConstants.js';
 import { playerCase, responsiveLayout } from './caseFactories.js';
@@ -609,7 +610,7 @@ export const CASES = Object.freeze([
       { selector: '[data-gathering-detail-tab="events"]' },
     ],
     kinds: ['player', 'gathering'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//, PLAYER_DETAIL_HEADER],
   }),
   playerCase({
     id: 'player-gathering-task-ready',
@@ -623,7 +624,7 @@ export const CASES = Object.freeze([
       { selector: '.gathering-task-row[data-task-id="hb-task-ridgemoss"] .gathering-task-summary' },
     ],
     kinds: ['player', 'gathering'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//, PLAYER_DETAIL_HEADER],
   }),
   playerCase({
     id: 'player-gathering-after-success',
@@ -729,10 +730,10 @@ export const CASES = Object.freeze([
     smokeLabels: ['player-gathering-blind'],
     reaches: 'exact',
     query: { tab: 'gathering' },
-    // A blind-selection environment redacts its task list: one opaque attempt card, with the mask chip above it.
+    // A blind-selection environment redacts its task list; its one generic Attempt is the header's primary.
     steps: [{ selector: '.gathering-env-card[data-environment-id="hb-env-thicket"]' }],
     kinds: ['player', 'gathering'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//, PLAYER_DETAIL_HEADER],
   }),
   playerCase({
     id: 'player-gathering-realm-locked',
@@ -766,7 +767,11 @@ export const CASES = Object.freeze([
     steps: [],
     position: { width: 1100, height: 760 },
     kinds: ['player', 'crafting'],
-    sourceMatches: [CRAFTING_SHARED, /^src\/ui\/svelte\/stores\/craftingStore/],
+    sourceMatches: [
+      CRAFTING_SHARED,
+      /^src\/ui\/svelte\/stores\/craftingStore/,
+      PLAYER_DETAIL_HEADER,
+    ],
   }),
   // The Crafting header withholds `Ready to craft` and leads the blocking callout with the authority's own reason.
   playerCase({
@@ -871,7 +876,12 @@ export const CASES = Object.freeze([
       { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
     ],
     kinds: ['player', 'crafting'],
-    sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
+    sourceMatches: [
+      CRAFTING_SHARED,
+      CRAFTING_SIMPLE,
+      /^src\/ui\/svelte\/stores\/craftingStore/,
+      PLAYER_DETAIL_HEADER,
+    ],
   }),
   playerCase({
     id: 'player-crafting-roll-result',
@@ -1006,7 +1016,7 @@ export const CASES = Object.freeze([
     id: 'player-crafting-essence-alternative',
     label: 'Player app — Crafting essence alternative',
     smokeLabels: ['player-crafting-essence-alternative'],
-    // The counterpart wants an open alternatives radiogroup whose essence option draws the glyph face.
+    // The counterpart wants an open choice slot whose essence alternative draws the glyph face.
     reaches: 'exact',
     query: { tab: 'crafting' },
     steps: [
@@ -1079,6 +1089,35 @@ export const CASES = Object.freeze([
     sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),
   playerCase({
+    id: 'player-crafting-chooser-open',
+    label: 'Player app — Crafting requirement chooser open on a choice slot',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting' },
+    // The chooser opened by pressing the choice tile, not by auto-advance, on a slot the player has
+    // picked from: the picked alternative is selected, and the other is short and still offered.
+    // No fixture group pairs a met alternative with a short one, so both read short.
+    steps: [
+      { selector: '.crafting-browser-search input', fill: 'Temper a Tidebound' },
+      { selector: '.crafting-recipe-row[data-recipe-id="sm-r-tidebound"]' },
+      { selector: '[data-requirement-slot][data-slot-kind="essence"]' },
+      { selector: '[data-requirement-slot][data-slot-kind="choice"]' },
+      {
+        // The smoke walk's selector, so its shape is proven against the rendered chooser.
+        selector:
+          '[data-requirement-panel="sm-set-tidebound-g2"] ' +
+          '[data-requirement-alternative].crafting-alt-option[data-option-index="1"] button',
+      },
+    ],
+    expectSelector:
+      '[data-recipe-section="requirement-rail"]' +
+      ':has([data-requirement-slot][data-slot-kind="choice"][aria-expanded="true"])' +
+      ':has(.crafting-alt-option[data-option-index="1"] [aria-pressed="true"])' +
+      ':has(.crafting-alt-option.is-short[data-option-index="0"])',
+    kinds: ['player', 'crafting'],
+    sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
+  }),
+  playerCase({
     id: 'player-crafting-tag-unmatched',
     label: 'Player app — Crafting tag unmatched',
     smokeLabels: ['player-crafting-tag-unmatched'],
@@ -1101,6 +1140,67 @@ export const CASES = Object.freeze([
     steps: [{ selector: '.crafting-recipe-row[data-recipe-id="sm-r-deepbind"]' }],
     kinds: ['player', 'crafting'],
     sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
+  }),
+  playerCase({
+    id: 'player-crafting-unmet-by-allocation',
+    label: 'Player app — Crafting recipe the player stepped below its need',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting' },
+    // A ready recipe whose pool the player stepped down: no Craft primary, no ready chip, and the
+    // header states the missing materials.
+    steps: [
+      { selector: '.crafting-recipe-row[data-recipe-id="sm-r-deepbind"]' },
+      {
+        selector:
+          '.essence-pool-carrier[data-essence-carrier="Item.sm-iron-ore"] .fab-stepper-input',
+        fill: '0',
+      },
+    ],
+    expectSelector:
+      '[data-recipe-header]' +
+      ':has([data-recipe-blocking][data-notice-tone="danger"])' +
+      ':has(.player-detail-header-tile [data-crafting-status="missingMaterials"])' +
+      ':not(:has([data-crafting-craft]))' +
+      ':not(:has(.player-detail-header-meta [data-crafting-status]))',
+    kinds: ['player', 'crafting'],
+    sourceMatches: [
+      CRAFTING_SHARED,
+      CRAFTING_SIMPLE,
+      PLAYER_DETAIL_HEADER,
+      /^src\/ui\/svelte\/stores\/craftingStore/,
+    ],
+  }),
+  playerCase({
+    id: 'player-crafting-essence-overshoot',
+    label: 'Player app — Crafting essence pool funded past its need',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting' },
+    // Four Steel Ingots give 8 Earth of 6 and 8 Fire of 3: one surplus sentence per essence.
+    steps: [
+      { selector: '.crafting-recipe-row[data-recipe-id="sm-r-deepbind"]' },
+      {
+        selector:
+          '.essence-pool-carrier[data-essence-carrier="Item.sm-steel-ingot"] .fab-stepper-input',
+        fill: '4',
+      },
+      { selector: '[data-essence-overshoot="fire"]', scroll: true },
+    ],
+    expectSelector:
+      '[data-recipe-section="essence-pool"]' +
+      ':has([data-essence-overshoot="earth"])' +
+      ':has([data-essence-overshoot="fire"])',
+    expectContained: [
+      { container: '[data-crafting-detail-scroll]', target: '[data-essence-overshoot="fire"]' },
+    ],
+    kinds: ['player', 'crafting'],
+    sourceMatches: [
+      CRAFTING_SHARED,
+      CRAFTING_SIMPLE,
+      /^src\/ui\/svelte\/apps\/crafting\/detail\/essenceOvershoot\.js$/,
+      /^src\/ui\/svelte\/stores\/craftingStore/,
+    ],
   }),
   playerCase({
     id: 'player-crafting-pick-for-me',
@@ -1312,7 +1412,11 @@ export const CASES = Object.freeze([
     position: { width: 1024, height: 860 },
     kinds: ['player', 'crafting', 'responsive'],
     expectLayout: responsiveLayout('.crafting-view-container', '.crafting-view-grid'),
-    sourceMatches: [CRAFTING_SHARED, /^src\/ui\/svelte\/stores\/craftingStore/],
+    sourceMatches: [
+      CRAFTING_SHARED,
+      /^src\/ui\/svelte\/stores\/craftingStore/,
+      PLAYER_DETAIL_HEADER,
+    ],
   }),
   ...playerCountResultCases(),
   ...playerAdvantagePromptCases(),

@@ -18,7 +18,11 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-check-card-count-',
   rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
-  compiledModules: ['src/ui/svelte/components/Kicker.svelte', CHECK_CARD],
+  compiledModules: [
+    'src/ui/svelte/components/Kicker.svelte',
+    'src/ui/svelte/components/InspectorCard.svelte',
+    CHECK_CARD,
+  ],
   componentPath: CHECK_CARD,
   rootClass: 'fabricate fabricate-app',
 });

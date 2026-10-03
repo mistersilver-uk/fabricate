@@ -31,10 +31,11 @@ Select a row in either list to read its detail.
 The lists and selected detail scroll independently, with sort controls and page controls kept outside the scrolling lists.
 In a narrow window they stack in the order Active, Finished, then detail.
 
-Use **Search runs** and **Kind** to filter both lists.
-Kind distinguishes Crafting, Alchemy, Gathering, and Salvage.
+Use **Search runs** and the four kind switches to filter both lists.
+Each switch shows or hides one kind of run, **Crafting**, **Alchemy**, **Gathering**, or **Salvage**, and any combination is allowed.
+All four start on each time the window opens, and switching a kind returns both lists to their first page.
 The Active status filter selects one of **All**, **Ready**, **In progress**, or **Paused**.
-Its counts describe the selected kind before search or paging, so a search can show fewer rows than the status count.
+Its counts describe the kinds switched on before search or paging, so a search can show fewer rows than the status count.
 
 Both lists start with four runs per page and have independent page sizes and page controls.
 You can choose 4, 6, 12, or 25 runs per page.
@@ -68,7 +69,7 @@ Where a run needs something from **you**, a second badge sits beside the status 
 You can sort the active list by **Soonest Ready** or by **Newest**.
 Soonest Ready puts the runs you can act on first, then the ones that will be ready soonest.
 
-A live count badge on the **Journal** tab shows how many active runs the selected character has.
+A live count badge on the corner of the **Journal** icon in the window's left rail shows how many active runs the selected character has.
 The badge stays accurate even while the Journal tab is closed, and it disappears when there are no active runs.
 It also keeps pace when another player or your GM starts, advances, or finishes a run for that character, so the count and the run lists update on their own once that character's data reaches your client, with no need to reload the window.
 

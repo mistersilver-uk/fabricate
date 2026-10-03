@@ -42,6 +42,7 @@ const FACT_ROW = 'src/ui/svelte/apps/journal/JournalFactRow.svelte';
 const EVIDENCE = 'src/ui/svelte/apps/crafting/detail/CheckEvidenceRows.svelte';
 const TILES = 'src/ui/svelte/components/DiceTiles.svelte';
 const MEDALLION = 'src/ui/svelte/components/Medallion.svelte';
+const INSPECTOR_CARD = 'src/ui/svelte/components/InspectorCard.svelte';
 const RESULT_BOX = 'src/ui/svelte/apps/crafting/detail/RollResultBox.svelte';
 const SALVAGE_SUMMARY = 'src/ui/svelte/apps/inventory/detail/salvage/SalvageRollSummary.svelte';
 const CHECK_CARD = 'src/ui/svelte/apps/crafting/detail/CraftingCheckCard.svelte';
@@ -114,7 +115,7 @@ describe('RollResultBox evidence rows', () => {
   const harness = createMountedComponentHarness({
     ...SHARED,
     tmpPrefix: 'fabricate-roll-result-evidence-',
-    compiledModules: [MEDALLION, FACT_ROW, TILES, EVIDENCE, RESULT_BOX],
+    compiledModules: [MEDALLION, INSPECTOR_CARD, FACT_ROW, TILES, EVIDENCE, RESULT_BOX],
     componentPath: RESULT_BOX,
   });
   before(async () => {
@@ -130,6 +131,7 @@ describe('RollResultBox evidence rows', () => {
     const root = await harness.mount({ result: { ...result(executedCheck()), message: 'Made.' } });
     assert.deepEqual(rowsOf(root), UNDER_ROWS);
     const box = root.querySelector('[data-recipe-section="roll-result"]');
+    assert.ok(box.matches('section.fabricate-card.crafting-roll-box.is-success'), 'a shared card');
     const order = [...box.children].map((child) => child.className.split(' ', 1)[0]);
     assert.deepEqual(order, [
       'crafting-roll-head',
@@ -536,7 +538,7 @@ describe('CraftingCheckCard target line', () => {
   const harness = createMountedComponentHarness({
     ...SHARED,
     tmpPrefix: 'fabricate-check-card-target-',
-    compiledModules: ['src/ui/svelte/components/Kicker.svelte', CHECK_CARD],
+    compiledModules: ['src/ui/svelte/components/Kicker.svelte', INSPECTOR_CARD, CHECK_CARD],
     componentPath: CHECK_CARD,
   });
   before(async () => {

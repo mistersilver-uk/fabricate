@@ -31,6 +31,7 @@
     quantityText,
   } from './runDetailPresentation.js';
   import { reconcileRetainedClaim, retainedClaimPrompt } from './runRecovery.js';
+  import PlayerDetailHeader from '../PlayerDetailHeader.svelte';
   import ActionsPanel from './ActionsPanel.svelte';
   import JournalFactRow from './JournalFactRow.svelte';
   import StepDetails from './StepDetails.svelte';
@@ -387,31 +388,29 @@
        floating beside the buttons it talks about. -->
   <section class="journal-detail-state">
     <header class="journal-detail-header">
-      <div class="journal-detail-identity">
-        <Medallion art={run?.img ?? ''} icon="fas fa-hammer" alt="" size={38} />
-        <div>
-          <h2>{run?.names?.title ?? ''}</h2>
-          <div class="journal-detail-meta">
-            {#if run?.names?.subtitle}<span>{run.names.subtitle}</span>{/if}
-            {#if resolutionModeLabel}<span>{resolutionModeLabel}</span>{/if}
-            {#if terminal && finishedLabel}<span>{finishedLabel}</span>{/if}
-            <Chip
+      <PlayerDetailHeader name={run?.names?.title ?? ''} art={run?.img ?? ''} icon="fas fa-hammer">
+        {#snippet meta()}
+          {#if run?.names?.subtitle}<span>{run.names.subtitle}</span>{/if}
+          {#if resolutionModeLabel}<span>{resolutionModeLabel}</span>{/if}
+          {#if terminal && finishedLabel}<span>{finishedLabel}</span>{/if}
+        {/snippet}
+        {#snippet chips()}
+          <Chip
+            density="list"
+            tone={statusChipTone(statusView.tone)}
+            icon={`fas ${statusView.icon}`}>{localize(statusView.labelKey)}</Chip
+          >
+          {#if attention}<Chip
               density="list"
-              tone={statusChipTone(statusView.tone)}
-              icon={`fas ${statusView.icon}`}>{localize(statusView.labelKey)}</Chip
-            >
-            {#if attention}<Chip
-                density="list"
-                tone={statusChipTone(attention.tone)}
-                icon={`fas ${attention.icon}`}
-                data-run-attention={attention.kind}>{localize(attention.labelKey)}</Chip
-              >{/if}
-            {#if run?.blindSecretPreview}<Chip density="list" tone="warning" icon="fas fa-eye-slash"
-                >{localize('FABRICATE.App.Journal.BlindSecret.Badge')}</Chip
-              >{/if}
-          </div>
-        </div>
-      </div>
+              tone={statusChipTone(attention.tone)}
+              icon={`fas ${attention.icon}`}
+              data-run-attention={attention.kind}>{localize(attention.labelKey)}</Chip
+            >{/if}
+          {#if run?.blindSecretPreview}<Chip density="list" tone="warning" icon="fas fa-eye-slash"
+              >{localize('FABRICATE.App.Journal.BlindSecret.Badge')}</Chip
+            >{/if}
+        {/snippet}
+      </PlayerDetailHeader>
       {#if showActions}<ActionsPanel {run} {journal} {now} />{/if}
     </header>
 
@@ -771,27 +770,6 @@
     justify-content: space-between;
     flex-wrap: wrap;
     gap: var(--fab-space-3);
-  }
-  .journal-detail-identity {
-    display: flex;
-    align-items: center;
-    min-width: 0;
-    gap: var(--fab-space-3);
-  }
-  .journal-detail-identity h2 {
-    margin: 0 0 var(--fab-space-1);
-    color: var(--fab-text);
-    font-family: var(--fab-font-serif);
-    font-size: 22px;
-    font-weight: 600;
-  }
-  .journal-detail-meta {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: var(--fab-space-2);
-    color: var(--fab-text-subtle);
-    font-size: 11px;
   }
   .journal-detail-stages {
     display: grid;

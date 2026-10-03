@@ -5,7 +5,11 @@ import { createPageWindow } from './browseListing.svelte.js';
 
 const PAGE_SIZES = Object.freeze([4, 6, 12, 25]);
 const RECENT_TERMINAL_LIMIT = 3;
-const KIND_FILTERS = new Set(['all', 'crafting', 'alchemy', 'gathering', 'salvage']);
+/**
+ * The four run kinds, in toggle order. The kind filter is the session-only subset of them shown;
+ * every kind starts shown and nothing persists the set.
+ */
+const RUN_KINDS = Object.freeze(['crafting', 'gathering', 'salvage', 'alchemy']);
 /**
  * The player-facing Active status tabs. `inProgress` selects BOTH projected statuses that wear
  * the merged `In progress` badge (issue 1648, D-029): before the merge there was no tab for
@@ -21,7 +25,7 @@ const ACTIVE_STATUS_MEMBERS = Object.freeze({
 });
 
 /**
- * Status counts use the kind cohort before search, status filtering or paging.
+ * Status counts use the union of the shown kinds before search, status filtering or paging.
  * Native run keys retain selected detail off-page or filtered out until removal/dismissal.
  */
 export function createJournalStore({ services } = {}) {
@@ -31,7 +35,7 @@ export function createJournalStore({ services } = {}) {
   let selectedRunId = $state('');
   let selectedRunKey = $state('');
   let search = $state('');
-  let kindFilter = $state('all');
+  let kindFilter = $state.raw(RUN_KINDS);
   let activeStatusFilter = $state('all');
   let activeSort = $state('soonestReady');
   let historySort = $state('newest');
@@ -183,9 +187,9 @@ export function createJournalStore({ services } = {}) {
     historyWindow.resetPage();
   }
 
-  function setKindFilter(next) {
-    if (!KIND_FILTERS.has(next)) return;
-    kindFilter = next;
+  function toggleKind(kind) {
+    if (!RUN_KINDS.includes(kind)) return;
+    kindFilter = toggledKinds(kindFilter, kind);
     activeWindow.resetPage();
     historyWindow.resetPage();
   }
@@ -539,7 +543,7 @@ export function createJournalStore({ services } = {}) {
     load,
     select,
     setSearch,
-    setKindFilter,
+    toggleKind,
     setActiveStatusFilter,
     setActiveSort,
     setHistorySort,
@@ -567,8 +571,13 @@ function notifyEach(services, messages) {
   for (const message of messages) if (message) services?.notify?.(message);
 }
 
-function matchesKind(kind) {
-  return (run) => kind === 'all' || activityKind(run) === kind;
+/** `kinds` with `kind` flipped in or out, the others untouched, in `RUN_KINDS` order. */
+function toggledKinds(kinds, kind) {
+  return Object.freeze(RUN_KINDS.filter((entry) => kinds.includes(entry) !== (entry === kind)));
+}
+
+function matchesKind(kinds) {
+  return (run) => kinds.includes(activityKind(run));
 }
 
 function matchesSearch(query) {

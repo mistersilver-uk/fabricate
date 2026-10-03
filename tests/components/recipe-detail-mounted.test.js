@@ -1,5 +1,6 @@
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 
@@ -8,6 +9,7 @@ import {
   CRAFTING_APP_RAW_MODULES,
   CRAFTING_APP_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
+import { chipGroundAlpha, themeTokens } from '../helpers/chipPaint.js';
 import { chipToneOf } from '../helpers/chipTone.js';
 import {
   craftability,
@@ -16,8 +18,10 @@ import {
   recipe,
   steppedEssenceRecipe,
 } from '../helpers/crafting-fixtures.js';
+import { assertIdentityHeader, primaryButtons } from '../helpers/playerDetailHeaderAssertions.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
+const THEMES = themeTokens(readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8'));
 
 const harness = createMountedComponentHarness({
   repoRoot,
@@ -120,17 +124,87 @@ describe('RecipeDetail mounted behavior', () => {
           `${testCase.mode} body renders the ${section} section`
         );
       }
-      assert.ok(target.querySelector('[data-crafting-craft]'), 'craft button present');
-      // The craft button is a fixed footer OUTSIDE the scrolling detail region.
+      // The Craft primary lives in the identity header, outside the scrolling detail region.
+      assert.ok(
+        target.querySelector('[data-recipe-header]').querySelector('[data-crafting-craft]'),
+        'the craft primary is in the header'
+      );
       const scroll = target.querySelector('[data-crafting-detail-scroll]');
       assert.ok(scroll, 'the detail content has a dedicated scroll region');
-      assert.equal(
-        scroll.querySelector('[data-crafting-craft]'),
-        null,
-        'the craft button is not inside the scroll region'
+      assert.ok(
+        !scroll.querySelector('[data-crafting-craft]'),
+        'the craft primary is not inside the scroll region'
       );
     });
   }
+
+  for (const testCase of MODE_CASES) {
+    it(`draws one primary for a craftable ${testCase.mode} recipe, in the identity header`, async () => {
+      const crafted = [];
+      const target = await harness.mount({
+        recipe: testCase.fixture,
+        selectedSetId: testCase.fixture.defaultSetId,
+        craftability: craftability(),
+        onCraft: () => {
+          crafted.push(testCase.mode);
+        },
+      });
+
+      const pane = target.querySelector('[data-crafting-detail-state="selected"]');
+      const row = assertIdentityHeader(pane, { primaries: 1, name: testCase.fixture.name });
+      const [primary] = primaryButtons(row);
+      assert.ok(primary.hasAttribute('data-crafting-craft'), 'and it is the Craft verb');
+      assert.equal(primary.getAttribute('data-crafting-craft-disabled'), 'false');
+      primary.click();
+      assert.deepEqual(crafted, [testCase.mode]);
+    });
+  }
+
+  it('names the primary Craft before a roll and Craft another after one', async () => {
+    const label = (target) => primaryButtons(target)[0].textContent.trim();
+    const fresh = await harness.mount({ recipe: recipe(), craftability: craftability() });
+    assert.equal(label(fresh), 'FABRICATE.App.Crafting.Button.Craft');
+    harness.remount();
+    const again = await harness.mount({
+      recipe: recipe(),
+      craftability: craftability(),
+      rollResult: { success: true, items: [] },
+    });
+    assert.equal(label(again), 'FABRICATE.App.Crafting.Button.CraftAnother');
+  });
+
+  // Availability is a cache the boot and journal hooks refresh, so a stale refusal must not
+  // remove the pane's only way forward: the primary stays live beside the stated refusal.
+  it('keeps the primary live under an authority refusal', async () => {
+    const target = await harness.mount({
+      recipe: recipe(),
+      craftability: craftability(),
+      authorityRefusal: 'No GM is connected.',
+    });
+    const [primary] = primaryButtons(assertIdentityHeader(target, { primaries: 1 }));
+    assert.equal(primary.disabled, false);
+    assert.ok(
+      target.querySelector('[data-recipe-blocking]').hasAttribute('data-recipe-authority-blocked')
+    );
+  });
+
+  it('keeps the one primary, disabled and renamed, while a craft is in flight', async () => {
+    const target = await harness.mount({
+      recipe: recipe(),
+      selectedSetId: recipe().defaultSetId,
+      craftability: craftability({ canCraft: false }),
+      busy: true,
+    });
+
+    const [primary] = primaryButtons(assertIdentityHeader(target, { primaries: 1 }));
+    assert.equal(primary.disabled, true);
+    assert.equal(primary.getAttribute('data-crafting-craft-disabled'), 'true');
+    assert.match(primary.textContent, /Button\.Crafting/u);
+    assert.ok(Boolean(primary.querySelector('i.fa-spinner')));
+    // The inputs a craft in flight has spent are not a shortfall.
+    assert.ok(!target.querySelector('.crafting-detail-pip'), 'no missing-materials pip');
+    assert.ok(!target.querySelector('[data-recipe-blocking]'), 'and no missing-materials notice');
+  });
 
   it('renders ingredients as rail slot tiles with state-coloured borders and pips', async () => {
     const target = await harness.mount({
@@ -168,18 +242,23 @@ describe('RecipeDetail mounted behavior', () => {
     assert.equal(sufficient.getAttribute('data-slot-state'), 'met');
     assert.equal(short.getAttribute('data-slot-state'), 'short');
     // A fixed requirement is not selectable.
-    assert.equal(sufficient.getAttribute('role'), 'img', 'a fixed slot is not a button');
-    assert.ok(sufficient.getAttribute('aria-label').includes('Iron'), 'and carries a name');
+    assert.notEqual(sufficient.tagName, 'BUTTON', 'a fixed slot is not a button');
+    assert.ok(
+      sufficient.querySelector('[role="img"]').getAttribute('aria-label').includes('Iron'),
+      'and its tile carries a name'
+    );
 
     assert.ok(sufficient.querySelector('[data-medallion="image"] img'), 'tile renders the image');
     assert.equal(
-      sufficient.querySelector('.requirement-slot-pip').textContent.trim(),
+      sufficient.querySelector('.fab-slot-pip').textContent.trim(),
       '2/2',
       'pip shows have/need'
     );
-    const shortPip = short.querySelector('.requirement-slot-pip');
-    assert.equal(shortPip.textContent.trim(), '1/3', 'short pip shows have/need');
-    assert.ok(shortPip.classList.contains('is-short'), 'short pip is red');
+    assert.equal(short.querySelector('.fab-slot-pip').textContent.trim(), '1/3');
+    assert.ok(
+      short.querySelector('.fab-slot-tile').classList.contains('is-short'),
+      'the short tile paints from the danger state'
+    );
   });
 
   it('renders authored essence glyphs with fallback while preserving ordinary images', async () => {
@@ -225,7 +304,7 @@ describe('RecipeDetail mounted behavior', () => {
     assert.ok(!tiles[0].querySelector('img'), 'essence does not render an image');
     // `delivered`, never `have`: the essence branch upstream stopped answering the
     // have question, so a `have` read would print 0/2 on a partly funded tile.
-    assert.equal(tiles[0].querySelector('.requirement-slot-pip').textContent.trim(), '1/2');
+    assert.equal(tiles[0].querySelector('.fab-slot-pip').textContent.trim(), '1/2');
     assert.equal(
       tiles[1].querySelector('[data-medallion="image"] img').getAttribute('src'),
       'icons/iron.webp'
@@ -551,8 +630,8 @@ describe('RecipeDetail mounted behavior', () => {
     );
     assert.ok(target.querySelector('[data-check-formula-error]'), 'error note rendered');
     assert.ok(
-      target.querySelector('.crafting-check-card.is-formula-error'),
-      'the check card is marked as an error'
+      target.querySelector('section.fabricate-card.crafting-check-card.is-formula-error'),
+      'the check card is the shared card box, marked as an error'
     );
   });
 
@@ -697,7 +776,10 @@ describe('RecipeDetail mounted behavior', () => {
     );
     // Every rail in the list gets its OWN DOM id namespace.
     assert.equal(
-      steps[0].querySelector('[data-recipe-section="essence-pool"]').getAttribute('id'),
+      steps[0]
+        .querySelector('[data-recipe-section="essence-pool"]')
+        .closest('[role="region"]')
+        .getAttribute('id'),
       'fabricate-req-step-step-ess-1-panel'
     );
   });
@@ -808,7 +890,7 @@ describe('RecipeDetail mounted behavior', () => {
     });
 
     const chip = target.querySelector(
-      '.crafting-detail-header-meta [data-recipe-duration]'
+      '.player-detail-header-meta [data-recipe-duration]'
     );
     assert.ok(chip, 'the pre-craft duration chip renders for a timed recipe');
     // Largest-unit-first compact formatting (mirrors the manager Overview).
@@ -929,14 +1011,12 @@ describe('RecipeDetail mounted behavior', () => {
         'most ONE reason for every browse status there is, so the bulleted list was always a ' +
         'one-item list. A second reason would land in `detail` rather than being dropped'
     );
-    // A non-craftable recipe still renders a (disabled) craft button.
-    const craftButton = target.querySelector('[data-crafting-craft]');
-    assert.ok(craftButton, 'craft button present');
-    assert.equal(
-      craftButton.getAttribute('data-crafting-craft-disabled'),
-      'true',
-      'craft button disabled when materials missing'
+    // An unavailable commit verb leaves the header with no primary, and nothing takes its place.
+    assert.ok(
+      !target.querySelector('[data-crafting-craft]'),
+      'no craft primary while the materials are missing'
     );
+    assert.equal(primaryButtons(target).length, 0, 'and no second-choice primary in its place');
   });
 
   it('moves the status onto a thumbnail pip and drops the header badge when uncraftable', async () => {
@@ -952,11 +1032,22 @@ describe('RecipeDetail mounted behavior', () => {
 
     const header = target.querySelector('[data-recipe-header]');
     assert.ok(
-      header.querySelector('.crafting-detail-thumb.is-uncraftable .crafting-detail-pip'),
+      header.querySelector('.player-detail-header-tile.is-dimmed .crafting-detail-pip'),
       'error pip overlays the faded thumbnail'
     );
+    // The pip is the shared icon-only chip at its published default square, not a local disc.
+    const pip = header.querySelector(':scope .crafting-detail-pip > .manager-chip');
+    assert.deepEqual(
+      ['is-icon-only', 'is-solid', 'is-danger'].filter((name) => !pip.classList.contains(name)),
+      []
+    );
+    assert.ok(!pip.classList.contains('is-list') && !pip.classList.contains('is-row'));
+    assert.equal(pip.getAttribute('role'), 'img');
+    assert.match(pip.getAttribute('aria-label'), /Status\.MissingMaterials/);
+    assert.equal(pip.getAttribute('data-crafting-status'), 'missingMaterials');
+    assert.equal(chipGroundAlpha(pip, THEMES), 1, 'opaque over the artwork it covers');
     assert.equal(
-      header.querySelector('.crafting-detail-header-meta [data-crafting-status]'),
+      header.querySelector('.player-detail-header-meta [data-crafting-status]'),
       null,
       'the labelled status badge is dropped in favour of the pip'
     );
@@ -968,15 +1059,78 @@ describe('RecipeDetail mounted behavior', () => {
     );
   });
 
+  // The listing bakes `available`; an override to a short alternative, a short set or a pool
+  // stepped below its need re-evaluates craftability without reloading the listing.
+  it('reads a listed-available recipe the live evaluation refuses as missing materials', async () => {
+    const target = await harness.mount({
+      recipe: recipe({ browseStatus: 'available', blockingReasons: [] }),
+      selectedSetId: recipe().defaultSetId,
+      craftability: craftability({ canCraft: false }),
+    });
+
+    const header = target.querySelector('[data-recipe-header]');
+    assert.equal(primaryButtons(target).length, 0, 'the commit verb is unavailable');
+    assert.ok(
+      !header.querySelector(':scope .player-detail-header-meta [data-crafting-status]'),
+      'so no chip may still say the recipe is ready'
+    );
+    const tile = header.querySelector('.player-detail-header-tile.is-dimmed');
+    assert.ok(Boolean(tile.querySelector('.crafting-detail-pip')), 'the status moves to the pip');
+    assert.equal(
+      tile.querySelector('[data-crafting-status]').getAttribute('data-crafting-status'),
+      'missingMaterials',
+      'which states the live status, not the listed one'
+    );
+    const notice = header.querySelector('[data-recipe-blocking]');
+    assert.equal(notice.getAttribute('data-notice-tone'), 'danger');
+    assert.ok(
+      notice.textContent.includes('FABRICATE.App.Crafting.Blocking.MissingMaterials'),
+      'and the absent primary is explained in words'
+    );
+  });
+
+  it('leads the callout with the live shortfall when the authority also refuses', async () => {
+    const target = await harness.mount({
+      recipe: recipe({ browseStatus: 'available', blockingReasons: [] }),
+      selectedSetId: recipe().defaultSetId,
+      craftability: craftability({ canCraft: false }),
+      authorityRefusal: 'No GM is connected.',
+    });
+    const text = target.querySelector('[data-recipe-blocking]').textContent;
+    const shortfall = text.indexOf('Blocking.MissingMaterials');
+    assert.ok(
+      shortfall !== -1 && shortfall < text.indexOf('No GM is connected.'),
+      'the blocker the player can act on comes first'
+    );
+  });
+
+  // No craftability is no evaluation, as on the no-actor view: no readiness claim, no shortfall
+  // claim, and no commit verb.
+  it('claims neither readiness nor a shortfall when nothing evaluated the recipe', async () => {
+    const target = await harness.mount({
+      recipe: recipe({ browseStatus: 'available', blockingReasons: [] }),
+      selectedSetId: recipe().defaultSetId,
+      craftability: null,
+    });
+
+    const header = target.querySelector('[data-recipe-header]');
+    assert.equal(primaryButtons(target).length, 0, 'no commit verb without a craftable reading');
+    assert.ok(!header.querySelector('[data-crafting-status]'), 'no ready chip and no status pip');
+    assert.ok(!header.querySelector('.crafting-detail-pip'));
+    assert.ok(!header.querySelector('[data-recipe-blocking]'), 'and no invented shortfall');
+    assert.ok(Boolean(header.querySelector('.crafting-detail-mode-chip')), 'the facts remain');
+  });
+
   it('keeps the labelled status badge (no pip) for a craftable recipe', async () => {
     const target = await harness.mount({
       recipe: recipe({ browseStatus: 'available' }),
       selectedSetId: recipe().defaultSetId,
+      craftability: craftability(),
     });
 
     const header = target.querySelector('[data-recipe-header]');
     assert.ok(
-      header.querySelector('.crafting-detail-header-meta [data-crafting-status]'),
+      header.querySelector('.player-detail-header-meta [data-crafting-status]'),
       'craftable recipe keeps the labelled status badge'
     );
     assert.equal(
@@ -991,9 +1145,10 @@ describe('RecipeDetail mounted behavior', () => {
     const target = await harness.mount({
       recipe: recipe({ browseStatus: 'available' }),
       selectedSetId: recipe().defaultSetId,
+      craftability: craftability(),
     });
 
-    const chip = target.querySelector('.crafting-detail-header-meta [data-crafting-status]');
+    const chip = target.querySelector('.player-detail-header-meta [data-crafting-status]');
     assert.ok(chip.classList.contains('manager-chip'), 'the badge IS the shared chip now');
     assert.equal(chipToneOf(chip), 'positive', 'and an available recipe still reads as green');
     assert.ok(chip.classList.contains('is-list'), 'at the browser row scale');

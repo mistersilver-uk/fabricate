@@ -253,8 +253,8 @@ describe('FabricateAppRoot shell', () => {
       !rootSource.includes("'ArrowLeft'") && !rootSource.includes("'ArrowRight'"),
       'the rail is aria-orientation="vertical", so the horizontal pair would be wrong'
     );
-    // A third-party label is unbounded and the rail column is 84px wide with a fixed 64px
-    // button, so the label must truncate rather than put a horizontal scrollbar in the rail.
+    // A third-party label is unbounded and the rail column is 72px wide, so the label must
+    // truncate rather than put a horizontal scrollbar in the rail.
     assert.ok(
       /\.fabricate-app-nav-label \{[^}]*overflow: hidden;[^}]*text-overflow: ellipsis;/s.test(
         rootSource

@@ -138,8 +138,8 @@ const JOURNAL_STORE_SHAPE = {
     'advance', 'beginStep', 'cancel', 'dismiss', 'execute', 'load', 'pause', 'resume',
     'retryCommandError', 'returnToCurrentStage', 'select', 'setActivePage', 'setActivePageSize',
     'setActiveSort', 'setActiveStatusFilter', 'setCompletionMode', 'setHistoryPage',
-    'setHistoryPageSize', 'setHistorySort', 'setKindFilter', 'setSearch', 'setSelection',
-    'tickWorldTime', 'viewStage',
+    'setHistoryPageSize', 'setHistorySort', 'setSearch', 'setSelection', 'tickWorldTime',
+    'toggleKind', 'viewStage',
   ],
 };
 
@@ -297,7 +297,7 @@ describe('journalStore', () => {
     ];
     const store = await loadedStore(makeServices({ listing: baseListing({ activeRuns, history: [] }) }));
 
-    store.setKindFilter('crafting');
+    for (const kind of ['gathering', 'salvage', 'alchemy']) store.toggleKind(kind);
     store.setSearch('silver');
     store.setActiveStatusFilter('paused');
     flushSync();
@@ -307,6 +307,35 @@ describe('journalStore', () => {
     store.setActiveStatusFilter('ready');
     flushSync();
     assert.deepEqual(store.activeRuns, [], 'search is applied after the pre-filter counts');
+  });
+
+  it('returns both lists to their first page when a kind is toggled', async () => {
+    const crafting = (prefix, index, extra = {}) =>
+      run({ id: `${prefix}-craft-${index}`, startedAt: index, ...extra });
+    const salvage = (prefix, extra = {}) =>
+      run({ id: `${prefix}-salvage`, runType: 'salvage', activityKind: 'salvage', ...extra });
+    const finished = { derivedStatus: 'succeeded', actions: { dismiss: true } };
+    const activeRuns = [
+      ...Array.from({ length: 6 }, (_unused, index) => crafting('a', index)),
+      salvage('a'),
+    ];
+    const hist = [
+      ...Array.from({ length: 6 }, (_unused, index) =>
+        crafting('h', index, { ...finished, finishedAt: 100 - index })
+      ),
+      salvage('h', { ...finished, finishedAt: 10 }),
+    ];
+    const store = await loadedStore(makeServices({ listing: baseListing({ activeRuns, history: hist }) }));
+    store.setActivePage(1);
+    store.setHistoryPage(1);
+    flushSync();
+    assert.deepEqual([store.activePage, store.historyPage], [1, 1], 'both lists on page 2');
+
+    store.toggleKind('crafting');
+    flushSync();
+    assert.deepEqual([store.activePage, store.historyPage], [0, 0], 'both back on page 1');
+    assert.deepEqual(store.activePageItems.map((entry) => entry.id), ['a-salvage']);
+    assert.deepEqual(store.historyPageItems.map((entry) => entry.id), ['h-salvage']);
   });
 
   // `Waiting` and `In progress` wear one badge, so the filter vocabulary must match it.
@@ -390,7 +419,7 @@ describe('journalStore', () => {
     const setup = makeServices({ listing: baseListing({ activeRuns, history: [] }) });
     const store = await loadedStore(setup);
     store.select(activeRuns[6]);
-    store.setKindFilter('crafting');
+    store.toggleKind('alchemy');
     store.setSearch('no-match');
     flushSync();
 

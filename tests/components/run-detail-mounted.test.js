@@ -17,6 +17,7 @@ import { GatheringEngine } from '../../src/systems/GatheringEngine.js';
 import { CraftingRunManager } from '../../src/systems/CraftingRunManager.js';
 import { IngredientSet } from '../../src/models/IngredientSet.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { assertIdentityHeader, primaryButtons } from '../helpers/playerDetailHeaderAssertions.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -147,6 +148,22 @@ describe('RunDetail mounted behavior', () => {
     // It is not a refusal and not a choice: nothing is blocked and nothing is unpicked.
     assert.ok(!settled.querySelector('[data-journal-awaiting-choice]'));
     assert.ok(!settled.querySelector('[data-journal-action-blocker]'));
+  });
+
+  it('leads with an identity row that carries no primary, in flight or finished', async () => {
+    // A run in flight spends its primary in the action bar beside the row, never inside it.
+    const active = await harness.mount({ run: stageWaitingOn('iron',
+      [{ id: 'iron', uuid: 'Actor.a.Item.iron', name: 'Iron', system: { quantity: 4 } }]) });
+    const header = active.querySelector('.journal-detail-header');
+    const inBar = primaryButtons(header.querySelector('[data-journal-actions]'));
+    assert.equal(inBar.length, 1, 'the begin control is the run’s primary');
+    const row = assertIdentityHeader(active, { primaries: 0, outside: 1, name: 'Iron Sword' });
+    assert.ok(header.contains(row), 'the row and the action bar share the detail header');
+    assert.equal(row.querySelector('[data-run-attention]').dataset.runAttention, 'start');
+
+    harness.remount();
+    const finished = await harness.mount({ run: makeSucceededRun() });
+    assertIdentityHeader(finished, { primaries: 0 });
   });
 
   it('renders the real settled d100 writer output after source/configuration lookup removal', async () => {

@@ -13,6 +13,7 @@
 -->
 <script>
   import EmptyState from '../../components/EmptyState.svelte';
+  import SearchField from '../../components/SearchField.svelte';
   import Medallion from '../../components/Medallion.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import EssenceChips from './EssenceChips.svelte';
@@ -33,16 +34,13 @@
     <div class="alchemy-inventory-hint">{localize('FABRICATE.App.Alchemy.TapToPlace')}</div>
   </div>
 
-  <label class="alchemy-inventory-search">
-    <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
-    <input
-      type="text"
-      value={search}
-      placeholder={localize('FABRICATE.App.Alchemy.SearchComponents')}
-      aria-label={localize('FABRICATE.App.Alchemy.SearchComponents')}
-      oninput={(event) => onSearch?.(event.target.value)}
-    />
-  </label>
+  <SearchField
+    class="alchemy-inventory-search"
+    value={search}
+    onChange={(value) => onSearch?.(value)}
+    placeholder={localize('FABRICATE.App.Alchemy.SearchComponents')}
+    ariaLabel={localize('FABRICATE.App.Alchemy.SearchComponents')}
+  />
 
   {#if components.length === 0 && !hasComponents}
     <!--
@@ -158,36 +156,11 @@
     margin-top: 2px;
   }
 
-  .alchemy-inventory-search {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin: 0 12px 10px;
-    padding: 0 11px;
-    height: 34px;
-    background: var(--fab-surface);
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    color: var(--fab-text-subtle);
-    flex: 0 0 auto;
-  }
-
-  .alchemy-inventory-search input {
-    flex: 1;
+  /* The field's family basis is a toolbar width, which in this column would be its height. */
+  .alchemy-inventory > :global(.alchemy-inventory-search) {
+    flex: none;
     min-width: 0;
-    background: transparent;
-    border: 0;
-    color: var(--fab-text);
-    font-size: 12.5px;
-  }
-
-  /* The wrapper draws the field, so focus lights the wrapper and the input draws no ring. */
-  .alchemy-inventory-search:focus-within {
-    border-color: var(--fab-accent);
-  }
-
-  .alchemy-inventory-search input:focus-visible {
-    outline: none;
+    margin: 0 12px 10px;
   }
 
   .alchemy-inventory-list {

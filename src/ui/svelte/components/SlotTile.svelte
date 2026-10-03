@@ -1,3 +1,4 @@
+<!-- ratchet-exempt(design-system): promoted on its second importer, RequirementChooser (issue 1518); its partial face and rendered acceptance stay with issue 1644 -->
 <!-- Material-choice tiles retain the library's 56px image and overlaid quantity pip. -->
 <script>
   import Medallion from './Medallion.svelte';
@@ -46,6 +47,7 @@
     {#if pip}
       <span class="fab-slot-pip is-{pipKind === 'candidate' ? 'candidate' : 'ratio'}">{pip}</span>
     {/if}
+    {#if pressed}<i class="fab-slot-tick fa-solid fa-circle-check" aria-hidden="true"></i>{/if}
   </svelte:element>
   <span class="fab-slot-caption">{label}</span>
   {#if interactive && affordance}
@@ -97,6 +99,16 @@
     outline-offset: 2px;
   }
 
+  .fab-slot-tick {
+    position: absolute;
+    right: -5px;
+    bottom: -5px;
+    font-size: 13px;
+    color: var(--fab-accent);
+    background: var(--fab-bg-1);
+    border-radius: 50%;
+  }
+
   .fab-slot-tile :global(.fab-medallion) {
     border: 0;
     border-radius: 11px;
@@ -112,7 +124,7 @@
     transform: translateX(-50%);
     border-radius: 999px;
     background: var(--fab-success);
-    color: var(--fab-bg-0);
+    color: var(--fab-on-success);
     font-family: var(--fab-font-mono);
     font-size: 9px;
     font-weight: 500;
@@ -123,10 +135,12 @@
 
   .is-short .fab-slot-pip {
     background: var(--fab-danger);
+    color: var(--fab-on-danger);
   }
 
   .fab-slot-pip.is-candidate {
     background: var(--fab-accent);
+    color: var(--fab-on-accent);
   }
 
   .fab-slot-caption {

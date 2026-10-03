@@ -6,6 +6,7 @@ import {
   ANCHORED_POPOVER_SOURCES,
   COUNT_ADVANTAGE_FOOTER,
   JOURNAL_SOURCES,
+  PLAYER_DETAIL_HEADER,
   PLAYER_VIEW_STATE,
 } from './caseConstants.js';
 import { playerCase, responsiveLayout } from './caseFactories.js';
@@ -51,6 +52,19 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/crafting\/ComponentSourcesBar\.svelte$/,
       PLAYER_VIEW_STATE,
     ],
+  }),
+  playerCase({
+    id: 'player-alchemy-brew-enabled',
+    label: 'Player app — Alchemy workbench with Brew enabled',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'alchemy' },
+    // One component on the bench is an experiment, which Brew offers: the view's one primary, live.
+    steps: [{ selector: '[data-alchemy-inventory-row="al-sulphur"]' }],
+    expectSelector:
+      '.alchemy-workbench:has([data-alchemy-chip]) [data-alchemy-brew]:not([disabled])',
+    kinds: ['player', 'alchemy'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/alchemy\//],
   }),
   playerCase({
     id: 'player-alchemy-stacked',
@@ -123,7 +137,11 @@ export const CASES = Object.freeze([
     expectSelector:
       '[data-journal-detail][data-run-key*="lab-run-succeeded-multi"]:has([data-history-stages]):not(:has([data-stage-nav]))',
     kinds: ['player', 'journal'],
-    sourceMatches: [JOURNAL_SOURCES, /^src\/ui\/svelte\/stores\/journalStore/],
+    sourceMatches: [
+      JOURNAL_SOURCES,
+      /^src\/ui\/svelte\/stores\/journalStore/,
+      PLAYER_DETAIL_HEADER,
+    ],
   }),
   playerCase({
     id: 'player-journal-check-roll-prompt',
@@ -376,7 +394,7 @@ export const CASES = Object.freeze([
     ],
     expectTab: 'journal',
     expectSelector:
-      '[data-journal-detail]:has(.journal-detail-meta span:text-is("Standard check"))' +
+      '[data-journal-detail]:has(.player-detail-header-meta span:text-is("Standard check"))' +
       ':has-text("1d20 = 11 · target 14 · margin +3")',
     kinds: ['player', 'journal'],
     sourceMatches: [
@@ -485,7 +503,7 @@ export const CASES = Object.freeze([
     ],
     expectTab: 'journal',
     expectSelector:
-      '[data-journal-detail]:has(.journal-detail-meta span:text-is("Standard check"))' +
+      '[data-journal-detail]:has(.player-detail-header-meta span:text-is("Standard check"))' +
       ':has-text("3 successes, 2 needed")',
     kinds: ['player', 'journal'],
     sourceMatches: [
@@ -509,7 +527,7 @@ export const CASES = Object.freeze([
     steps: [{ selector: '[data-history-run-id="lab-v1-finished-routed-count"]' }],
     expectTab: 'journal',
     expectSelector:
-      '[data-journal-detail]:has(.journal-detail-meta span:text-is("Routed by Check"))' +
+      '[data-journal-detail]:has(.player-detail-header-meta span:text-is("Routed by Check"))' +
       ' [data-journal-history-detail]:has-text("6 successes, 2 needed")',
     kinds: ['player', 'journal'],
     sourceMatches: [

@@ -7,6 +7,7 @@ import { resolve } from 'node:path';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { essencePool } from '../helpers/crafting-fixtures.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { installLangBackedI18n } from '../helpers/langBackedI18n.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -21,6 +22,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/essenceIcons.js',
     // The essence colour fold: the pool meters tint to the essence being filled.
     'src/ui/svelte/util/essenceTint.js',
+    'src/ui/svelte/apps/crafting/detail/essenceOvershoot.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
   'src/ui/svelte/util/foundryIconCatalogue.js',
   'src/ui/svelte/util/foundryIconCatalogue.json',
@@ -114,15 +116,48 @@ describe('EssencePoolPanel mounted behavior', () => {
     );
   });
 
-  it('labels the panel back at the tile that opened it', async () => {
-    const target = await harness.mount({
-      pool: SHARED,
-      panelId: 'panel-1',
-      labelledBy: 'fabricate-slot-g-radiant',
-    });
+  // The chooser's panel region is the named one, so the pool carries no identity of its own.
+  it('leaves the panel identity to the region that holds it', async () => {
+    const target = await harness.mount({ pool: SHARED });
     const panel = target.querySelector('[data-recipe-section="essence-pool"]');
-    assert.equal(panel.getAttribute('id'), 'panel-1');
-    assert.equal(panel.getAttribute('aria-labelledby'), 'fabricate-slot-g-radiant');
+    assert.ok(!panel.hasAttribute('id'));
+    assert.ok(!panel.hasAttribute('aria-labelledby'));
+  });
+
+  describe('an overshoot', () => {
+    // Two units of Duskcrystal deliver four Radiant against a need of two.
+    function overshot() {
+      const [dusk, ...rest] = SHARED.carriers;
+      return { ...SHARED, carriers: [{ ...dusk, allocatedUnits: 2 }, ...rest] };
+    }
+
+    it('is a sentence beneath the source list naming the essence and the surplus', async () => {
+      const restoreI18n = installLangBackedI18n(repoRoot);
+      try {
+        const target = await harness.mount({ pool: overshot() });
+        const sentence = target.querySelector('[data-essence-overshoot="radiant"]');
+        assert.equal(sentence.textContent.trim(), 'Radiant: 2 more than required');
+        assert.equal(
+          target.querySelector('.essence-pool-carriers').compareDocumentPosition(sentence) & 4,
+          4,
+          'beneath the carrier list'
+        );
+      } finally {
+        restoreI18n();
+      }
+    });
+
+    it('is stated by neither the ratio nor the bar, which stop at the need', async () => {
+      const target = await harness.mount({ pool: overshot() });
+      const meter = target.querySelector('[data-essence-meter="radiant"]');
+      assert.equal(meter.querySelector('.essence-pool-meter-ratio').textContent.trim(), '2/2');
+      assert.equal(meter.querySelector('[role="progressbar"]').getAttribute('aria-valuenow'), '2');
+    });
+
+    it('is absent while the allocation delivers no more than the need', async () => {
+      const target = await harness.mount({ pool: SHARED });
+      assert.ok(!target.querySelector('[data-essence-overshoot]'));
+    });
   });
 
   // A RATIO meter, not a percentage one: `aria-valuemax` is the requirement's need.

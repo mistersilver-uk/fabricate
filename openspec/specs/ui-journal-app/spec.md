@@ -32,7 +32,7 @@ Scope:
 ### Run Monitoring
 
 - The view resolves the selected actor through the shared Actor selection top bar and shows a no-actor empty state when none is selected.
-- Active runs and history are shown across all three run types (crafting, gathering, salvage) in one unified surface.
+- Active runs and history are shown across all four run types (crafting, alchemy, gathering, salvage) in one unified surface.
 Active rows retain title, run type, status pill, crafting progress and a time-remaining/countdown where a `timeGate` exists.
 The crafting progress reading MUST NOT be conditioned on that gate: a run whose current stage has not begun holds no gate, and its rail reads completed stages over total with the current stage at zero, because between the stages of a multi-step run the rail is the only thing on the row that says how far through the run is.
 A countdown MUST NOT be shown for a stage with no deadline, because the matured-wait wording would then describe a clock that has not started.
@@ -48,10 +48,12 @@ Succeeded, failed and cancelled remain distinct; absent or unrecognized terminal
 Active and Finished lists scroll independently, with their sort controls and pagers outside the scrolling bodies; the detail scrolls independently.
 At content widths at or below 960px, stack Active, Finished and detail while preserving access to every control.
 The stacked layout MUST remain usable at the real 1024px minimum application-window width; the container breakpoint describes inner content rather than the outer window.
-- One shared search and kind filter covers crafting, gathering, salvage and alchemy.
+- One shared search covers all four kinds, and the kind filter is four independent toggles, one per kind, each a pressed-state button named by its own visible label.
+The lists show the union of the kinds switched on; every kind starts on, the choice is not persisted, and any combination is valid, so a filter switched down to no kind shows the filtered empty state rather than an error.
 Active status filters are mutually exclusive All, Ready, In progress and Paused, and MUST use the same words as the badges, so that no tab names a badge the player is never shown and no badge names a tab that does not exist.
 The In progress tab selects BOTH merged statuses and counts them together; every active run MUST be reachable from exactly one tab, which a tab vocabulary omitting `inProgress` did not satisfy.
-Status counts use the selected kind cohort before search, active-status filtering, paging or selection.
+Status counts use the union of the active kinds before search, active-status filtering, paging or selection.
+Toggling a kind returns both lists to their first page.
 - Each list defaults to four rows per page and retains existing page-size and sorting choices.
 Both pagers MUST use the shared compact single-row presentation with independently named region and navigation landmarks, accessible page-size choice and at least 24px interactive targets.
 At the populated wide layout, all four default Active and all four default Finished entries MUST fit visibly in their panes without undersizing shared primitives.

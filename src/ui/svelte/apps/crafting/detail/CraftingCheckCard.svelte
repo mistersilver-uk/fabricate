@@ -9,6 +9,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import InspectorCard from '../../../components/InspectorCard.svelte';
   import Kicker from '../../../components/Kicker.svelte';
 
   let { check = null } = $props();
@@ -32,14 +33,21 @@
   const shownFormula = $derived(
     !formulaError && hasResolvedFormula ? check.resolvedFormula : check?.rollFormula
   );
+  const cardClass = $derived(
+    [
+      'crafting-check-card',
+      mandatory && 'is-mandatory',
+      check?.usable !== true && 'is-unusable',
+      formulaError && 'is-formula-error',
+    ]
+      .filter(Boolean)
+      .join(' ')
+  );
 </script>
 
 {#if check}
-  <section
-    class="crafting-check-card"
-    class:is-mandatory={mandatory}
-    class:is-unusable={check.usable !== true}
-    class:is-formula-error={formulaError}
+  <InspectorCard
+    class={cardClass}
     data-recipe-section="check"
     data-check-mandatory={mandatory ? 'true' : 'false'}
     data-check-usable={check.usable === true ? 'true' : 'false'}
@@ -115,21 +123,12 @@
         {localize('FABRICATE.App.Crafting.Check.FormulaUnresolved')}
       </p>
     {/if}
-  </section>
+  </InspectorCard>
 {/if}
 
 <style>
-  .crafting-check-card {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: var(--fab-space-3);
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface-soft);
-  }
-
-  .crafting-check-card.is-mandatory {
+  /* The box is the shared card's; these are its two tone fills. */
+  :global(.crafting-check-card.is-mandatory) {
     border-color: var(--fab-info-border);
     background: var(--fab-info-soft);
   }
@@ -193,7 +192,7 @@
   }
 
   /* An unresolvable formula for the selected actor reads as an error. */
-  .crafting-check-card.is-formula-error {
+  :global(.crafting-check-card.is-formula-error) {
     border-color: var(--fab-danger-border);
     background: var(--fab-danger-soft);
   }
