@@ -139,7 +139,7 @@ const managerButtonBaseClasses = (() => {
   const base = [...literal[1].matchAll(/'([a-z][\w-]*)'/g)].map(([, token]) => token);
   assert.ok(
     base.includes('fabricate-button') && base.includes('fab-manager-button'),
-    'Button must emit the family root and the primitive class, ' + `got ${base.join(' ')}`
+    `Button must emit the family root and the primitive class, got ${base.join(' ')}`
   );
   return base;
 })();
