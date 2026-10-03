@@ -3848,7 +3848,7 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('names an ingredient row’s remove by its kind, as it always has, not by its subject (issue 1516)', async () => {
+  it('names an ingredient row’s remove for its subject, as a result row’s is (issue 1516)', async () => {
     for (const options of [
       [{ quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } }],
       [
@@ -3859,11 +3859,16 @@ describe('RecipeEditView (mounted)', () => {
       const { target } = await mountSingleGroup(options, {
         props: { componentOptions: COMPONENT_OPTIONS },
       });
+      const removes = [
+        ...target.querySelectorAll('[data-recipe-option] [data-recipe-remove="alternative"]'),
+      ];
       assert.deepEqual(
-        [...target.querySelectorAll('[data-recipe-option] [data-recipe-remove="alternative"]')].map(
-          (button) => button.getAttribute('aria-label')
-        ),
-        ['Remove component', 'Remove alternative'].slice(0, options.length)
+        removes.map((button) => button.getAttribute('aria-label')),
+        ['Remove Mountain Herb', 'Remove Tag'].slice(0, options.length)
+      );
+      assert.ok(
+        removes.every((button) => button.dataset.keyboardFocus === 'true'),
+        'each remove paints the shared keyboard focus ring'
       );
       editHarness.remount();
     }
@@ -4333,8 +4338,8 @@ describe('RecipeEditView (mounted)', () => {
     );
     assert.equal(
       qty.getAttribute('aria-label'),
-      'Quantity',
-      'the quantity input carries an aria-label'
+      'Quantity for Mountain Herb',
+      'the quantity input is named for its subject'
     );
     const row = qty.closest('[data-recipe-option]');
     assert.equal(
@@ -4699,7 +4704,7 @@ describe('RecipeEditView (mounted)', () => {
     );
     assert.equal(
       assertSelectHasResolvedName(target, KIND_TRIGGER),
-      'Requirement kind',
+      'Kind of Mountain Herb',
       'the bare call site keeps its own `aria-label` verbatim'
     );
     chooseSelectOption(target, KIND_TRIGGER, 'tags');

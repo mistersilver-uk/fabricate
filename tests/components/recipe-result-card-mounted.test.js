@@ -140,6 +140,40 @@ describe('RecipeResultGroupCard: the retired row’s hooks', () => {
     row.querySelector('[data-recipe-result-edit]').click();
     assert.deepEqual(opened, ['cmp-herb']);
   });
+
+  it('a progressive stage swaps its component in place, and its delete is named for it', async () => {
+    const { target, groups } = await mountCard(
+      [
+        { id: 's1', componentId: 'cmp-herb' },
+        { id: 's2', componentId: 'cmp-water' },
+      ],
+      { progressive: true }
+    );
+    const deletes = () => [
+      ...target.querySelectorAll(
+        ':scope [data-recipe-result-row] [data-recipe-remove="result-item"]'
+      ),
+    ];
+    assert.deepEqual(
+      deletes().map((button) => button.getAttribute('aria-label')),
+      ['Remove Mountain Herb', 'Remove Pure Water']
+    );
+
+    rows(target)[0].querySelector('[data-recipe-option-clear]').click();
+    await settle();
+    await type(rows(target)[0].querySelector('[data-recipe-option-search]'), 'water');
+    target.ownerDocument.querySelector('[data-recipe-option-suggestion="cmp-water"]').click();
+    await settle();
+    assert.deepEqual(
+      groups.at(-1).results.map(({ id, componentId }) => [id, componentId]),
+      [
+        ['s1', 'cmp-water'],
+        ['s2', 'cmp-water'],
+      ],
+      'the first stage keeps its id and its place in the order'
+    );
+    assert.equal(deletes()[0].getAttribute('aria-label'), 'Remove Pure Water');
+  });
 });
 
 describe('RecipeResultGroupCard: Fixed | Rolled through the card', () => {

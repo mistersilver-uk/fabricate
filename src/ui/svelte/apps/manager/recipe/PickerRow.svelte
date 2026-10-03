@@ -16,7 +16,7 @@
   | `invalid` | `{ amount?: string }` | `{}` | Marks the amount control invalid and describes it with the message. |
   | `amount` | `false` \| `{ min, max, unit, inputProps, ariaLabel, … }` | `{}` | `false` draws no amount; the object's keys, which carry the amount slot's localized copy, are stated in `PickerRowAmount.svelte`. |
   | `rollable` / `removable` | booleans | `false` / `true` | The Fixed \| Rolled toggle on a `component` row; and the remove button. |
-  | `clearable` / `removeHook` / `removeLabel` | boolean / strings | `true` / `'alternative'` / `''` | The named pill's clear; the remove's `data-recipe-remove` value; and its name, which is otherwise `Remove {name}`, `{name}` being the subject's or, unnamed, the kind's. |
+  | `clearable` / `removeHook` | boolean / string | `true` / `'alternative'` | The named pill's clear; and the remove's `data-recipe-remove` value. The remove is `Remove {name}` and the kind select `Kind of {name}`, `{name}` being the subject's or, unnamed, the kind's. |
 
   Snippets:
   - `convert` — the requirement's "or…" control, after the amount and a divider.
@@ -77,7 +77,6 @@
     removable = true,
     clearable = true,
     removeHook = 'alternative',
-    removeLabel = '',
     class: className = '',
     convert = null,
     trailing = null,
@@ -215,12 +214,9 @@
   );
   const extraClass = $derived(className ? ` ${className}` : '');
 
+  const forSubject = (key, fallback) => text(key, fallback).replace('{name}', subjectName);
   const removeName = $derived(
-    removeLabel ||
-      text('FABRICATE.Admin.Manager.Recipe.RemoveNamed', 'Remove {name}').replace(
-        '{name}',
-        subjectName
-      )
+    forSubject('FABRICATE.Admin.Manager.Recipe.RemoveNamed', 'Remove {name}')
   );
   const unknownHint = $derived(
     text(
@@ -234,7 +230,7 @@
       : text('FABRICATE.Admin.Manager.Recipe.TagMatchAny', 'Any of')
   );
   const kindLabel = $derived(
-    text('FABRICATE.Admin.Manager.Recipe.RequirementKind', 'Requirement kind')
+    forSubject('FABRICATE.Admin.Manager.Recipe.KindFor', 'Kind of {name}')
   );
 
   // The SAME two strings the policy word above reads, so the control and the sentence it writes
@@ -484,12 +480,7 @@
       {@render convert()}
     {/if}
 
-    <!-- Nested rather than a sibling block, so a row with no `trailing` gains no text node. -->
-    {#if trailing}
-      {@render trailing()}
-      {#if removable}{@render remove()}{/if}
-    {:else if removable}
-      {@render remove()}
-    {/if}
+    <!-- One line, so a row with no `trailing` gains no text node. -->
+    {@render trailing?.()}{#if removable}{@render remove()}{/if}
   </div>
 </div>

@@ -1,12 +1,10 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  One result group. A recipe produces ANY one group's items, the producing group being chosen at
-  craft time by outcome routing; each item is a `PickerRow` naming a component, with a fixed or
-  rolled amount, or on a progressive stage a DC and an Edit link in its `trailing`. It emits a
-  shallow-updated copy via `onChange(nextGroup)`; every item it creates carries an id and a
-  `componentId`. Empty groups and component-less items are gated at the model/save path
-  (`Recipe.validate`), not at readiness, so an empty group being edited here is expected — and on a
-  non-terminal step it is a legal finished state rather than a draft (issue 1907).
+  One result group, each item a `PickerRow` naming a component with a fixed or rolled amount, or on
+  a progressive stage a DC and an Edit link in its `trailing`, emitted as a shallow-updated copy
+  through `onChange(nextGroup)` with an id and a `componentId` on every item it creates. An empty
+  group or a component-less item is gated at the save path (`Recipe.validate`), not here, and on a
+  non-terminal step an empty group is a finished state rather than a draft (issue 1907).
 
   Invariants:
   - Rows are keyed by item id, because a row's Fixed | Rolled state is per instance — pinned by
@@ -141,10 +139,17 @@
   }
 
   // `difficulty` is projected onto the component options; one never given reads as unset, not 0.
-  function difficultyOf(item) {
-    const difficulty = Number(componentFor(item)?.difficulty);
-    return componentFor(item) && Number.isFinite(difficulty) ? difficulty : null;
+  function difficultyOf(component) {
+    const difficulty = Number(component?.difficulty);
+    return component && Number.isFinite(difficulty) ? difficulty : null;
   }
+
+  // A stage's delete names its component, as a flat row's remove does.
+  const removeNameFor = (item) =>
+    text('FABRICATE.Admin.Manager.Recipe.RemoveNamed', 'Remove {name}').replace(
+      '{name}',
+      componentNameFor(item)
+    );
 
   function amountInvalid(item) {
     const formula = normalizeQuantityFormula(item?.quantityFormula);
@@ -354,10 +359,10 @@
         removable
         onReorder={(from, to) => reorderItem(from, to)}
         onRemove={(item) => removeItem(results.indexOf(item))}
-        removeData={() => ({
+        removeData={(item) => ({
           'data-recipe-remove': 'result-item',
-          ariaLabel: text('FABRICATE.Admin.Manager.Recipe.RemoveResultItem', 'Remove item'),
-          title: text('FABRICATE.Admin.Manager.Recipe.RemoveResultItem', 'Remove item'),
+          ariaLabel: removeNameFor(item),
+          title: removeNameFor(item),
         })}
         rowClass={(item) =>
           stageComplicationsFor(item).length > 0
@@ -372,7 +377,6 @@
             {catalogue}
             amount={false}
             removable={false}
-            clearable={false}
             class="is-result"
             data-recipe-result-item=""
             onChange={(value) => updateItem(index, fromValue(item, value))}
@@ -423,20 +427,22 @@
 <!-- A stage's read-only `DC n` and its separate Edit deep link: the component editor's Difficulty
      card owns `component.difficulty`, so the link is the only route to changing it. -->
 {#snippet stageControls(item)}
+  {@const component = componentFor(item)}
+  {@const difficulty = difficultyOf(component)}
   <span
     class="manager-recipe-stage-dc"
-    data-recipe-result-difficulty={difficultyOf(item) === null ? '' : String(difficultyOf(item))}
-    >{difficultyOf(item) === null
+    data-recipe-result-difficulty={difficulty === null ? '' : String(difficulty)}
+    >{difficulty === null
       ? text('FABRICATE.Admin.Manager.Recipe.DifficultyUnset', 'No difficulty')
-      : `${text('FABRICATE.Admin.Manager.Recipe.DifficultyShort', 'DC')} ${difficultyOf(item)}`}</span
+      : `${text('FABRICATE.Admin.Manager.Recipe.DifficultyShort', 'DC')} ${difficulty}`}</span
   >
-  {#if componentFor(item)}
+  {#if component}
     <button
       type="button"
       data-keyboard-focus="true"
       class="manager-recipe-stage-edit"
       data-recipe-result-edit={item.componentId}
-      aria-label={`${text('FABRICATE.Admin.Manager.Recipe.OpenComponentDifficulty', 'Edit difficulty on the component')} — ${componentFor(item).name}`}
+      aria-label={`${text('FABRICATE.Admin.Manager.Recipe.OpenComponentDifficulty', 'Edit difficulty on the component')} — ${component.name}`}
       title={text(
         'FABRICATE.Admin.Manager.Recipe.OpenComponentDifficulty',
         'Edit difficulty on the component'

@@ -8820,7 +8820,7 @@
   max-width: 360px;
 }
 
-/* THE ONE COMPONENT-PICKER TRIGGER, for the component pickers that are not a requirement row: both salvage yield rows and the tool replacement (issue 676). */
+/* The one component-picker trigger, for the component pickers that are not a requirement row: both salvage yield rows and the tool replacement (issue 676). */
 .fabricate-button.manager-button.manager-salvage-component-trigger,
 .fabricate-button.manager-button.manager-tool-replacement-component-trigger {
   justify-content: flex-start;
@@ -9576,7 +9576,7 @@
   gap: var(--fab-space-2);
 }
 
-/* THE AMOUNT SLOT HAS ONE SIZE: the horizontal `Stepper`'s own 102 x 28 (two 22px adjuncts, a 48px input, two 2px gaps, 2px padding and a 1px border each side), so a Rolled row is exactly as tall and as wide as a Fixed one. */
+/* The amount slot has one size: the horizontal `Stepper`'s own 102 x 28 (two 22px adjuncts, a 48px input, two 2px gaps, 2px padding and a 1px border each side), so a Rolled row is exactly as tall and as wide as a Fixed one. */
 .fabricate-manager .manager-recipe-option-controls input[data-recipe-option-formula] {
   box-sizing: border-box;
   width: 102px;
@@ -9590,6 +9590,12 @@
   color: var(--fab-text);
 }
 
+/* Invalid at rest, not only while focused, as `.fabricate-select-trigger[aria-invalid="true"]` is. */
+.fabricate-manager .manager-recipe-option-controls input[data-recipe-option-formula][aria-invalid="true"] {
+  border-color: var(--fab-danger-border);
+  background: var(--fab-danger-soft);
+}
+
 /* The unit after the amount, in the stepper's own mono type. */
 .fabricate-manager .manager-recipe-option-unit {
   flex: 0 0 auto;
@@ -9598,14 +9604,22 @@
   font-size: 0.74rem;
 }
 
-/* THE INVALID MESSAGE TAKES ITS OWN LINE inside the controls and adds nothing to their width: `contain: inline-size` gives it no intrinsic width, so a sentence-length message wraps under the amount instead of squeezing the name field. */
+/* The invalid message hangs on a second line under the toggle, after the remove: `order` moves non-focusable text only, so tab order and `aria-describedby` are unchanged. `contain: inline-size` gives it no intrinsic width and the negative end margin cancels the gap it would add, so the controls keep a valid row's width. */
 .fabricate-manager .manager-recipe-option-controls:has(> .manager-recipe-option-invalid) {
   flex-wrap: wrap;
+  row-gap: var(--fab-space-1);
 }
 
 .fabricate-manager .manager-recipe-option-controls > .manager-recipe-option-invalid {
-  flex: 1 0 100%;
+  order: 1;
+  flex: 0 0 100%;
+  margin-inline-end: calc(-1 * var(--fab-space-2));
   contain: inline-size;
+}
+
+/* An invalid row's first-line items stay top-aligned rather than centring on its two lines. */
+.fabricate-manager .manager-recipe-ingredient-option-row:has(> .manager-recipe-option-controls > .manager-recipe-option-invalid) {
+  align-items: flex-start;
 }
 
 /* A result row's name keeps a stated minimum: the field is the row's only flexible item, and below this the row wraps its controls instead of shrinking the name to an ellipsis. */
@@ -11013,10 +11027,13 @@
   overflow: auto;
 }
 
-/* `[type="range"]` is excluded for the same reason `.manager-drop-editor-card` excludes it: a range input is drawn by the chance slider, which paints its own 6px track and a coloured fill BEHIND the input and relies on the input itself being transparent (issue 883). Both legs lost their `select` token at issue 1510, when this editor's seven selects became `<Select>` triggers: the rungs paint the box and neither element-typed leg could reach a `<button>` anyway. */
+/* `[type="range"]` is excluded for the same reason `.manager-drop-editor-card` excludes it: a range input is drawn by the chance slider, which paints its own 6px track and a coloured fill BEHIND the input and relies on the input itself being transparent (issue 883). Both legs lost their `select` token at issue 1510, when this editor's seven selects became `<Select>` triggers: the rungs paint the box and neither element-typed leg could reach a `<button>` anyway. The requirement row states its own formula and search boxes, so both legs leave them alone (issue 1516). */
 .fabricate-manager
   .manager-gathering-task-edit-view
-  :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea) {
+  :is(
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([data-recipe-option-formula]):not([data-recipe-option-search]),
+    textarea
+  ) {
   width: 100%;
   min-width: 0;
   border: 1px solid var(--fab-border);
@@ -11027,7 +11044,9 @@
   font: inherit;
 }
 
-.fabricate-manager .manager-gathering-task-edit-view input:not([type="checkbox"]):not([type="radio"]) {
+.fabricate-manager
+  .manager-gathering-task-edit-view
+  input:not([type="checkbox"]):not([type="radio"]):not([data-recipe-option-formula]):not([data-recipe-option-search]) {
   min-height: 32px;
   padding: var(--fab-space-1) var(--fab-space-2);
 }

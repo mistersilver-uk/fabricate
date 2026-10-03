@@ -417,8 +417,9 @@ describe('PickerRow: every reachable cell acts', () => {
 describe('PickerRow: the amount toggle is one named radio group', () => {
   const config = SURFACES['recipe result'];
 
-  it('names the toggle, the expression and remove for the subject, or the kind while unnamed', async () => {
+  it('names every control for the subject, or the kind while unnamed', async () => {
     const names = (target) => ({
+      kind: target.querySelector('[data-recipe-option-kind]').getAttribute('aria-label'),
       toggle: target.querySelector('[role="radiogroup"]').getAttribute('aria-label'),
       words: [...target.querySelectorAll(`${TOGGLE} .manager-segment-label`)].map(
         (node) => node.textContent
@@ -429,6 +430,7 @@ describe('PickerRow: the amount toggle is one named radio group', () => {
     const stored = { ...unnamed('component'), id: 'c-iron', quantityFormula: '1d4' };
     const { target } = await mountRow(config, stored);
     assert.deepEqual(names(target), {
+      kind: 'Kind of Iron ingot',
       toggle: 'Amount for Iron ingot',
       words: ['Fixed', 'Rolled'],
       formula: 'Rolled amount for Iron ingot',
@@ -442,6 +444,7 @@ describe('PickerRow: the amount toggle is one named radio group', () => {
 
     const open = await mountRow(config, { ...unnamed('component'), quantityFormula: '1d4' });
     assert.deepEqual(names(open.target), {
+      kind: 'Kind of Component',
       toggle: 'Amount for Component',
       words: ['Fixed', 'Rolled'],
       formula: 'Rolled amount for Component',
@@ -451,7 +454,6 @@ describe('PickerRow: the amount toggle is one named radio group', () => {
 
     // Caller copy overrides each name.
     const overridden = await mountRow(config, stored, {
-      removeLabel: 'Remove component',
       amount: {
         fixedLabel: 'Set',
         rolledLabel: 'Dice',
@@ -460,11 +462,20 @@ describe('PickerRow: the amount toggle is one named radio group', () => {
       },
     });
     assert.deepEqual(names(overridden.target), {
+      kind: 'Kind of Iron ingot',
       toggle: 'How many',
       words: ['Set', 'Dice'],
       formula: 'Dice for Iron',
-      remove: 'Remove component',
+      remove: 'Remove Iron ingot',
     });
+    harness.remount();
+
+    // On Fixed the stepper is named for the subject too.
+    const fixed = await mountRow(config, { ...unnamed('component'), id: 'c-iron' });
+    assert.equal(
+      fixed.target.querySelector('[data-stepper-input]').getAttribute('aria-label'),
+      'Quantity for Iron ingot'
+    );
   });
 
   it('draws the toggle on the 30px inline rung', async () => {

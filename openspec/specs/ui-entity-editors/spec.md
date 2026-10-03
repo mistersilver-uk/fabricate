@@ -292,8 +292,8 @@ Rolled swaps the stepper for a roll expression in the same slot, at the same wid
 Opening Rolled and typing nothing writes nothing.
 The expression's placeholder is a dice expression and names no roll-data path, and its hint says a missing character value counts as 0.
 An expression that cannot be rolled, or can never award a positive amount, is marked invalid on the row with its reason on a line of its own, and the save refuses it.
-- **A result row names its component and cannot clear it.**
-Its name field has no clear: a result is re-pointed by removing it and adding another.
+- **A flat result row names its component and cannot clear it.**
+Its name field has no clear: a flat result is re-pointed by removing it and adding another, while a progressive stage swaps its component in place so that it keeps its position in the order.
 Adding a component the set already produces raises that row's quantity, unless that row's amount is rolled, in which case a second row is added.
 
 - **Each kind carries its own tint, on every glyph the row draws for its subject.**
