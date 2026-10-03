@@ -1802,10 +1802,6 @@
                     })}
                     removeData={() => ({
                       'data-remove-salvage-result': '',
-                      ariaLabel: text(
-                        'FABRICATE.Admin.Manager.Component.SalvageEditor.RemoveResult',
-                        'Remove result'
-                      ),
                       disabled: saving,
                     })}
                   >

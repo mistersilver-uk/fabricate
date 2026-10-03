@@ -3631,7 +3631,6 @@
             "EditResult": "Edit {name}",
             "Difficulty": "Difficulty",
             "DifficultyUnset": "No difficulty",
-            "RemoveResult": "Remove result",
             "NoResults": "No results in this group yet.",
             "AddResult": "Add result",
             "NoGroups": "No result groups yet.",

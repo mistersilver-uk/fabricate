@@ -393,6 +393,11 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
       assert.equal(control.getAttribute('type'), 'button', control.getAttribute('aria-label'));
       assert.equal(control.getAttribute('data-keyboard-focus'), 'true');
     }
+    assert.match(
+      row.querySelector('[data-remove-salvage-result]').getAttribute('aria-label'),
+      /SortableList\.Remove.*Scrap Metal/,
+      'the stage remove names its component, as the list names every remove'
+    );
     harness.remount();
   });
 
