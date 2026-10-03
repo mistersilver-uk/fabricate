@@ -40,6 +40,8 @@ const RETIRED_TOKEN = new RegExp(
   'u'
 );
 
+const RETIRED_TOKENS = new RegExp(RETIRED_TOKEN.source, 'gu');
+
 /** Every line naming a retired token, less the allowlisted historical ones, as `file:line text`. */
 function retiredTokenLines(corpus, allowlist = HISTORICAL_LINES) {
   const hits = [];
@@ -48,7 +50,10 @@ function retiredTokenLines(corpus, allowlist = HISTORICAL_LINES) {
     if (SKIPPED.some((prefix) => file.startsWith(prefix))) continue;
     for (const [index, line] of text.split('\n').entries()) {
       if (!RETIRED_TOKEN.test(line)) continue;
-      const entry = allowlist.find((item) => item.file === file && line.includes(item.includes));
+      const tokens = line.match(RETIRED_TOKENS).length;
+      const entry = allowlist.find(
+        (item) => item.file === file && line.includes(item.includes) && item.tokens === tokens
+      );
       if (entry) allowed.set(entry, allowed.get(entry) + 1);
       else hits.push(`${file}:${index + 1} ${line.trim().slice(0, 140)}`);
     }
@@ -74,10 +79,16 @@ test('no retired manager root class is written in code, styles, tests, scripts o
   );
 });
 
-test('every allowlisted historical line still names a retired class', () => {
+test('every allowlisted historical line matches exactly one line naming a retired class', () => {
   const { allowed } = retiredTokenLines(corpus);
-  const stale = [...allowed].filter(([, count]) => count === 0).map(([entry]) => entry.includes);
-  assert.deepEqual(stale, [], 'these allowlist entries match no line naming a retired class');
+  const unmatched = [...allowed]
+    .filter(([, count]) => count !== 1)
+    .map(([entry, count]) => `${entry.includes} (${count} lines)`);
+  assert.deepEqual(
+    unmatched,
+    [],
+    'these allowlist entries do not match exactly one line with their `tokens` count'
+  );
   for (const entry of HISTORICAL_LINES) {
     assert.ok(entry.why?.length > 20, `${entry.file} allowlists a line with no stated reason`);
   }
