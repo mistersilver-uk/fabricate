@@ -143,15 +143,17 @@
               data-journal-kind-filter=""
             >
               {#each KIND_TOGGLES as toggle (toggle.kind)}
-                {@const labelId = `${instanceId}-kind-${toggle.kind}`}
+                {@const toggleId = `${instanceId}-kind-${toggle.kind}`}
                 <span class="journal-kind-toggle">
                   <StatusToggle
+                    id={toggleId}
                     on={shownKinds.includes(toggle.kind)}
-                    aria-labelledby={labelId}
                     data-journal-kind-toggle={toggle.kind}
                     onclick={() => journal?.toggleKind?.(toggle.kind)}
                   />
-                  <span id={labelId} class="journal-kind-label">{localize(toggle.labelKey)}</span>
+                  <label for={toggleId} class="journal-kind-label"
+                    >{localize(toggle.labelKey)}</label
+                  >
                 </span>
               {/each}
             </div>
@@ -265,7 +267,7 @@
   }
   .journal-kind-field {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
     gap: var(--fab-space-2) var(--fab-space-3);
     min-width: 0;
   }
@@ -282,6 +284,7 @@
     white-space: nowrap;
     font-size: 12px;
     color: var(--fab-text-muted);
+    cursor: pointer;
   }
   .journal-browse-lists {
     display: grid;

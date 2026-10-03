@@ -1123,6 +1123,18 @@ describe('JournalView mounted behavior', () => {
       assert.deepEqual(shown(target, 'data-run-id'), ['a-brew']);
     });
 
+    it('names each kind toggle by a visible label that presses it', async () => {
+      const { store, target } = await mountStore();
+      const toggle = toggleOf(target, 'gathering');
+      const label = target.querySelector(`label[for="${toggle.id}"]`);
+      assert.match(label.textContent, /Kind\.Gathering/u, 'the label is the kind name');
+      assert.ok(!toggle.hasAttribute('aria-labelledby'), 'named by the label, not by an id ref');
+      label.click();
+      await settle();
+      assert.equal(toggle.getAttribute('aria-pressed'), 'false', 'clicking the label toggles it');
+      assert.ok(!store.kindFilter.includes('gathering'));
+    });
+
     it('draws the empty state for both lists when no kind is shown', async () => {
       const { target } = await mountStore();
       await showOnly(target, []);
