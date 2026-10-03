@@ -531,9 +531,13 @@ function salvageToken(page, forge, crafterId) {
   );
 }
 
-/** Salvage step 1: two refused expressions, then `1d4+1` saved and read back in the editor. */
+/**
+ * Salvage step 1: the forge's salvage armed, two refused expressions, then `1d4+1` saved and read
+ * back in the editor. Arming here keeps a failure to arm out of the recipe and gather steps.
+ */
 async function proveSalvageEditorFloor(ctx, forge) {
   const { page } = ctx;
+  Object.assign(forge, await armSalvage(page, forge));
   const row = await openSalvageRow(page, forge);
   await clickSegment(row, 'data-recipe-option-amount-mode', 'rolled');
   for (const refused of REFUSED_FORMULAS) {
@@ -635,7 +639,6 @@ export async function runRolledAmountCards(ctx) {
       ? { ...executionFixtures.gather, systemId: craftingSetup.systemId }
       : null;
     await armManualD4(page, forge.systemId);
-    Object.assign(forge, await armSalvage(page, forge));
     if (gather) {
       gather.taskName = await makeTaskDirect(page, {
         ...gather,
