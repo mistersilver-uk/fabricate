@@ -64,6 +64,16 @@ export const CASES = Object.freeze([
         target: '[data-component-inspector-kicker]',
       },
     ],
+    // The rail's one verb on the manager button's rung, in the success family (issue 1521).
+    expectLayout: {
+      controls: [
+        {
+          selector: '[data-component-edit-system-rules]',
+          styles:
+            'min-height: 34px; border-radius: 9px; font-size: 0.72rem; background-color: var(--fab-success)',
+        },
+      ],
+    },
     kinds: ['manager', 'components'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Component/,

@@ -4,6 +4,7 @@ import { afterEach, before, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { flushSync, mount, tick, unmount } from 'svelte';
+import { assertInspectorVerbs } from '../helpers/inspectorVerbRoles.js';
 import { createStore } from '../helpers/manager/managerStoreFake.js';
 import { createManagerQueries } from '../helpers/manager/managerQueries.js';
 import { managerComponents, settleBetweenTests } from './manager-mounted-shared.js';
@@ -397,22 +398,17 @@ export function registerEssencesCases() {
     const unlinkSourceAction = inspectorSourceActions.querySelector(
       '[data-essence-action="unlink-source"]'
     );
-    // The AMBER survives the extraction (issue 1036, maintainer round 2). Both source
-    // actions now render through `InspectorActionButton`, the shared right-inspector button,
-    // and the modifier moved with them: `.fabricate-button.is-warning-action` was the global
-    // sheet's, `is-warning` is the primitive's own tone. Unlinking breaks a reference and
-    // destroys nothing, so it must not land in the danger family on the way across.
-    assert.ok(
-      unlinkSourceAction.classList.contains('fab-inspector-action'),
-      'unlink source should render through the shared right-inspector button'
-    );
-    assert.ok(
-      unlinkSourceAction.classList.contains('is-warning'),
-      'and keep the amber warning tone rather than becoming destructive'
-    );
-    assert.ok(
-      copySourceAction.classList.contains('fab-inspector-action'),
-      'as should its copy-uuid partner'
+    // Every verb on the rail is a full-width `Button` in the role its verb names (issue 1521).
+    // Unlinking breaks a reference the GM can re-make and destroys nothing, so it is the CAUTION
+    // verb, `is-warning-action`, and never `is-danger`.
+    assertInspectorVerbs(
+      target.querySelector('[data-essence-browser-inspector]').closest('.manager-inspector'),
+      [
+        ['[data-essence-action="edit"]', 'primary'],
+        ['[data-essence-action="delete"]', 'danger'],
+        ['[data-essence-action="copy-source"]', 'ghost'],
+        ['[data-essence-action="unlink-source"]', 'warning'],
+      ]
     );
     unlinkSourceAction.click();
     await tick();

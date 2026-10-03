@@ -623,7 +623,6 @@ const UNDOCUMENTED_ROWS = [
   // Issue 1521's one rename field for the party card and the realm inspector.
   'src/ui/svelte/apps/manager/InlineRenameField.svelte',
   'src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte',
-  'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
   // The world modifier library's entry row (issue 1373, maintainer round 4).
   'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte',
   'src/ui/svelte/apps/manager/SubjectModifierPicker.svelte',
