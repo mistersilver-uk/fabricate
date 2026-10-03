@@ -161,7 +161,7 @@ function hookOf({ row, attributes }, source) {
     const rendered = value ? (literal.startsWith('"') ? literal : `${literal} || true`) : true;
     return [row, JSON.parse(valueOf(name, source)), rendered];
   }
-  const hooks = [...attributes.values()].filter((a) => a.name.startsWith('data-'));
+  const hooks = [...attributes.values()].filter((a) => a.name?.startsWith('data-'));
   return hooks.length === 1 ? [row, hooks[0].name, valueOf(hooks[0], source)] : null;
 }
 

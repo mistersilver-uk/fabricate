@@ -1,14 +1,10 @@
-import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { describe, it, before, after, afterEach } from 'node:test';
+
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
-import {
-  createMountedComponentHarness,
-  SEARCHABLE_POPOVER_RAW_MODULES,
-  SELECT_COMPILED_MODULES,
-  LOCALIZE_OR_RAW_MODULES,
-} from '../helpers/svelte-component-harness.js';
+import { LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import { stepMigratedNumberField } from '../helpers/numericKeyboardStep.js';
 // The five converted controls are driven by open-then-click on a portaled panel (issue 1510).
 import {
@@ -18,6 +14,11 @@ import {
   selectOptionValues,
   selectTriggerText,
 } from '../helpers/select-control.js';
+import {
+  createMountedComponentHarness,
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
+} from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 

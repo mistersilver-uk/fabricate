@@ -360,8 +360,9 @@
               class="manager-character-modifier-stale-warning"
               data-tooltip={localizeOr(
                 'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.UnknownModifier',
-                'Unknown modifier ({id})'
-              ).replace('{id}', ref.modifierId)}
+                'Unknown modifier ({id})',
+                { id: ref.modifierId }
+              )}
             >
               <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
             </span>

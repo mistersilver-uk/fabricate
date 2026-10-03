@@ -203,10 +203,6 @@ export const BARE_NUMBER_FIELD_REGISTER = Object.freeze([
   }),
 ]);
 
-/** The panel whose local `boundsRow` snippet renders the Min / Max pair for BOTH scopes. */
-export const CHARACTER_MODIFIER_BOUNDS_PATH =
-  'src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte';
-
 /** The shared panel that renders the bounds row, once, for both scopes (issue 1707). */
 export const CHARACTER_MODIFIER_PANEL_PATH =
   'src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte';
@@ -272,7 +268,7 @@ export const UNSET_VALUE_CALL_SITES = Object.freeze(
     },
     {
       id: 'character modifier bounds',
-      path: CHARACTER_MODIFIER_BOUNDS_PATH,
+      path: CHARACTER_MODIFIER_PANEL_PATH,
       anchor: ['{ [bound.key]: next }'],
       kind: 'genuine-absence',
       evidence:

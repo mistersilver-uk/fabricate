@@ -6,9 +6,10 @@
 
   `icon` / `title` / `subtitle` are the row (omit `icon` to release the glyph column); `titleAttr`,
   `metaAttr`, `metaValue` are hooks; `badge` / `badgeTone` draw a trailing chip; `class` is appended
-  to the root's own and `{...rest}` lands on the root after it, carrying the caller's `data-*` hook. `tile`, `density="rule"` and `density="line"` (one line, the subtitle trailing as mono
-  meta) are OPT-IN, because the design distinguishes them and the call sites were not all in the
-  parity pass. `tone="info"` marks a value that came from SOMEWHERE ELSE, on the theme's own
+  to the root's own and `{...rest}` lands on the root after it, carrying the caller's `data-*`
+  hook. `tile`, `density="rule"` and `density="line"` (one line, the subtitle trailing as
+  mono meta) are OPT-IN, because the design distinguishes them and the call sites were not all in
+  the parity pass. `tone="info"` marks a value that came from SOMEWHERE ELSE, on the theme's own
   `--fab-info`; `success|danger|warning|neutral|muted` ink the glyph by what the row states, each
   from its token and never a literal. The row owns only its own well; how a container
   STACKS rows stays with the container, and a caller override is not available either —
