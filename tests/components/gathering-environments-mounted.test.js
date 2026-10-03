@@ -710,6 +710,13 @@ describe('GatheringView mounted behavior', () => {
       // An environment without a linked scene keeps its own image.
       const plainThumb = target.querySelector('[data-environment-id="env-plain"] .gathering-env-card-thumb');
       assert.equal(plainThumb.getAttribute('src'), 'icons/svg/sun.svg', 'no linked scene keeps the environment image');
+
+      target.querySelector('[data-environment-id="env-scene"]').click();
+      await tick();
+      await tick();
+      flushSync();
+      const headerArt = target.querySelector('[data-gathering-detail-state="selected"] [data-player-detail-header] img');
+      assert.equal(headerArt?.getAttribute('src'), 'scenes/cave-thumb.webp', 'the identity header draws the card’s image');
     } finally {
       delete globalThis.fromUuid;
     }

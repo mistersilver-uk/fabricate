@@ -45,8 +45,8 @@
   const img = $derived(String(task?.img ?? ''));
   const attemptable = $derived(task?.attemptable === true);
 
-  // A blocked task (not merely an in-flight `busy` attempt) gets a ban icon + a
-  // tooltip naming the reason. Reuse the center-row callout vocabulary.
+  // A blocked task (not merely an in-flight `busy` attempt) gets a ban icon and a
+  // visible reason, in the center-row callout vocabulary.
   const blocked = $derived(task != null && !attemptable);
   const blockedReasons = $derived(Array.isArray(task?.blockedReasons) ? task.blockedReasons : []);
 
@@ -95,13 +95,15 @@
       : ''
   );
   const blockReason = $derived(blocked ? describeBlockedReasons(blockedReasons, localize) : '');
-  // A disabled primary still names WHY, on its own title and accessible name.
+  // A disabled Attempt keeps its visible label as its name; the reason is visible text it is described by.
+  const uid = $props.id();
+  const reasonId = `${uid}-attempt-reason`;
   const attemptProps = $derived({
     class: 'gathering-task-detail-attempt',
     'data-gathering-attempt': '',
     'data-gathering-attempt-blocked': blocked ? 'true' : 'false',
     title: blocked ? blockReason : undefined,
-    'aria-label': blocked ? blockReason : undefined,
+    'aria-describedby': blocked ? reasonId : undefined,
   });
 
   // Lazily resolve the per-drop "What you might find" breakdown for the selected
@@ -198,6 +200,15 @@
       primaryProps={attemptProps}
       onclick={handleAttempt}
     />
+    {#if blocked}
+      <Notice
+        tone="warning"
+        icon="fa-solid fa-ban"
+        title={blockReason}
+        id={reasonId}
+        data-gathering-attempt-reason=""
+      />
+    {/if}
 
     <p class="gathering-task-detail-description" class:is-fallback={!hasDescription}>
       {descriptionText}
@@ -329,6 +340,11 @@
     box-sizing: border-box;
     overflow-y: auto;
     color: var(--fab-text);
+  }
+
+  /* The header grows along its own row; in this column it must not take the free height. */
+  .gathering-task-detail > :global(.player-detail-header) {
+    flex: none;
   }
 
   .gathering-task-detail-description {

@@ -3,8 +3,25 @@ import test from 'node:test';
 
 import {
   normalizeSceneOption,
-  sceneDocumentImage
+  sceneDocumentImage,
+  watchSceneImage
 } from '../src/ui/svelte/util/sceneImages.js';
+
+test('watchSceneImage reports the resolved image and drops a cancelled lookup', async () => {
+  const previous = globalThis.fromUuid;
+  globalThis.fromUuid = async (uuid) => ({ thumb: `${uuid}.webp` });
+  try {
+    const seen = [];
+    watchSceneImage('Scene.a', (image) => seen.push(image));
+    const cancel = watchSceneImage('Scene.b', (image) => seen.push(image));
+    cancel();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.deepEqual(seen, ['', '', 'Scene.a.webp']);
+    assert.equal(watchSceneImage('', (image) => seen.push(image)), undefined, 'no uuid, no lookup');
+  } finally {
+    globalThis.fromUuid = previous;
+  }
+});
 
 test('normalizeSceneOption does not read deprecated Scene#background getter', () => {
   let deprecatedGetterTouched = false;

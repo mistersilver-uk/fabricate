@@ -164,6 +164,21 @@ async function renderDetail(props = {}) {
   flushSync();
 }
 
+// A disabled start action is named by its visible label and described by visible reason text.
+function assertDescribedBlocker(button, { label, reason }) {
+  assert.ok(button.disabled, 'the start action is disabled');
+  const name = button.getAttribute('aria-label') ?? button.textContent;
+  assert.ok(name.includes(label), `its accessible name keeps its visible label ${label}`);
+  const ids = (button.getAttribute('aria-describedby') || '').split(/\s+/u).filter(Boolean);
+  const described = ids.map((id) => globalThis.document.getElementById(id)).filter(Boolean);
+  assert.ok(described.length > 0, 'it is described by an element in the document');
+  assert.ok(described.some((el) => el.textContent.includes(reason)), `its description names ${reason}`);
+  for (const el of described) {
+    assert.ok(!el.closest('.visually-hidden, [hidden], [aria-hidden="true"]'), 'the reason is visible text');
+  }
+  return described;
+}
+
 // Switch the center column to a given tab ('tasks' | 'events').
 function clickTab(tab) {
   target.querySelector(`[data-gathering-detail-tab="${tab}"]`).click();
@@ -371,6 +386,8 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(inspectorAttempt && !inspectorAttempt.disabled, 'right-column attempt enabled for the attemptable task');
     assert.equal(inspectorAttempt.querySelector('.fa-ban'), null, 'no ban icon on an attemptable task');
     assert.equal(inspectorAttempt.getAttribute('data-gathering-attempt-blocked'), 'false');
+    assert.ok(!inspectorAttempt.hasAttribute('aria-describedby'), 'an attemptable task is described by no blocker');
+    assert.ok(!target.querySelector('[data-gathering-attempt-reason]'), 'and the inspector states none');
   });
 
   it('shows a fallback description (center row + inspector) when a task has none', async () => {
@@ -673,6 +690,8 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.equal(blockedAttempt.getAttribute('data-gathering-attempt-blocked'), 'true');
     assert.ok(blockedAttempt.querySelector('.fa-ban'), 'blocked attempt shows the ban icon');
     assert.ok((blockedAttempt.getAttribute('title') || '').includes('Conditions'), 'tooltip explains the block reason');
+    const [reason] = assertDescribedBlocker(blockedAttempt, { label: 'Detail.Attempt', reason: 'Callout.Conditions' });
+    assert.ok(reason.matches('[data-gathering-attempt-reason]'), 'the reason is the inspector’s notice');
   });
 
   it('lists a selected task\'s required tools in the right inspector, not inline in the center row', async () => {
@@ -913,7 +932,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.equal(row.querySelector('[data-gathering-scene]'), null, 'no linked-scene panel inside the task card');
   });
 
-  it('puts the blind gather in the centre’s identity row, so the blind pane draws one Attempt', async () => {
+  it('puts the blind gather in the centre’s identity row, one primary per pane with a discovered task selected', async () => {
     const blindEnv = environment({
       id: 'env-blind',
       selectionMode: 'blind',
@@ -930,6 +949,11 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     const row = assertIdentityHeader(centre, { primaries: 1 });
     assert.ok(row.querySelector('[data-gathering-blind-attempt]'), 'the one primary is the blind gather');
     assert.equal(target.querySelectorAll('[data-gathering-blind-attempt]').length, 1, 'one blind Attempt');
+    assert.ok(!target.querySelector('[data-gathering-blind-attempt-reason]'), 'an attemptable blind gather names no blocker');
+    const inspector = target.querySelector('[data-gathering-task-detail]');
+    assert.equal(inspector?.getAttribute('data-detail-task-id'), 'disc-1', 'the discovered task is selected');
+    const inspectorRow = assertIdentityHeader(inspector, { primaries: 1 });
+    assert.ok(inspectorRow.querySelector('[data-gathering-attempt]'), 'the inspector’s one primary is its task’s Attempt');
     const discovered = target.querySelector('[data-gathering-discovered]');
     assert.ok(discovered, 'discovered section present for blind + reveal != never');
     assert.ok(discovered.textContent.includes('1/3') || discovered.textContent.includes('"x":1'), 'discovered heading carries the counts');
@@ -949,7 +973,28 @@ describe('GatheringDetail (center column) mounted behavior', () => {
 
     assert.ok(target.querySelector('[data-gathering-blind-attempt]'), 'blind attempt button still present');
     assert.equal(target.querySelector('[data-gathering-discovered]'), null, 'no discovered section when reveal is never');
-    assert.equal(primaryButtons(target).length, 1, 'the view shows ONE Attempt, with no task to inspect');
+    assert.equal(primaryButtons(target).length, 1, 'the view shows one Attempt, with no task to inspect');
+  });
+
+  it('names a generic blocker for a blind gather that cannot run, never a task-derived one', async () => {
+    const toolBlocked = [{ code: 'TOOL_BLOCKED', message: 'Needs the Glass Alembic', data: {} }];
+    const blindEnv = environment({
+      id: 'env-blind-blocked',
+      selectionMode: 'blind',
+      revealPolicy: 'never',
+      attemptable: false,
+      blockedReasons: toolBlocked,
+      tasks: [{ action: 'blindGather', label: 'Blind', blind: true, attemptable: false, blockedReasons: toolBlocked }],
+      discoveredTasks: []
+    });
+    const { services } = makeServices(listing([blindEnv]));
+    await mountView(services);
+
+    const attempt = target.querySelector('[data-gathering-blind-attempt]');
+    const [reason] = assertDescribedBlocker(attempt, { label: 'Detail.BlindAttempt', reason: 'Detail.Blocked' });
+    assert.ok(reason.matches('[data-gathering-blind-attempt-reason]'), 'the reason is the centre’s notice');
+    const centre = target.querySelector('[data-gathering-detail-state="selected"]');
+    assert.ok(!/MissingTools|Glass Alembic/u.test(centre.textContent), 'no task-derived blocker reaches the blind pane');
   });
 
   it('wires the right-column Attempt to startGatheringAttempt and re-fetches the listing', async () => {
@@ -1151,6 +1196,11 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.equal(eventsTab.getAttribute('aria-selected'), 'true', 'selection moved to Events');
     assert.ok(globalThis.document.activeElement === eventsTab, 'focus moved to Events');
     assert.ok(globalThis.document.querySelector(`#${eventsTab.getAttribute('aria-controls')}`), 'its panel is in the document');
+    assert.equal(
+      target.querySelector('[data-gathering-detail-tab="tasks"]').hasAttribute('aria-controls'),
+      false,
+      'an unselected tab names no absent panel'
+    );
     assert.ok(target.querySelector('[data-gathering-event-section]'), 'the Events panel renders');
   });
 

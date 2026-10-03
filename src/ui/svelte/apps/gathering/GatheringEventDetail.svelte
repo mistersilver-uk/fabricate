@@ -238,6 +238,11 @@
     color: var(--fab-text);
   }
 
+  /* The header grows along its own row; in this column it must not take the free height. */
+  .gathering-event-detail > :global(.player-detail-header) {
+    flex: none;
+  }
+
   .gathering-event-detail-tags {
     list-style: none;
     margin: 0;

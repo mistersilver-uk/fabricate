@@ -71,6 +71,25 @@ export function sceneDocumentImage(scene) {
     || stringValue(source?.thumbnail);
 }
 
+/**
+ * Report a linked scene's image to `onImage`: `''` at once, then the resolved image. Returns the
+ * cancel function an `$effect` returns, so a lookup for a superseded uuid never lands.
+ */
+export function watchSceneImage(sceneUuid, onImage) {
+  onImage('');
+  const uuid = stringValue(sceneUuid);
+  if (!uuid || typeof globalThis.fromUuid !== 'function') return undefined;
+  let cancelled = false;
+  Promise.resolve(globalThis.fromUuid(uuid))
+    .then((doc) => {
+      if (!cancelled && doc) onImage(sceneDocumentImage(doc) || '');
+    })
+    .catch(() => {});
+  return () => {
+    cancelled = true;
+  };
+}
+
 export function normalizeSceneOption(scene) {
   const source = sourceObject(scene);
   const thumbnail = stringValue(scene?.thumb)

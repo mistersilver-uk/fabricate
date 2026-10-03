@@ -30,11 +30,13 @@
   import { localize } from '../../util/foundryBridge.js';
   import { withRollPromptOrigin } from '../../util/rollPromptOrigin.js';
   import { riskClass, riskLabel, biomeChipStyle } from '../../util/gatheringFormat.js';
+  import { watchSceneImage } from '../../util/sceneImages.js';
   import PlayerDetailHeader from '../PlayerDetailHeader.svelte';
   import GatheringDetailTabs from './GatheringDetailTabs.svelte';
   import GatheringTasksPanel from './GatheringTasksPanel.svelte';
   import GatheringEventsPanel from './GatheringEventsPanel.svelte';
   import LinkedScene from './LinkedScene.svelte';
+  import Notice from '../../components/Notice.svelte';
 
   let {
     environment = null,
@@ -56,6 +58,9 @@
   const description = $derived(String(env?.description ?? ''));
   const isBlind = $derived(env?.selectionMode === 'blind');
   const sceneUuid = $derived(String(env?.sceneUuid ?? ''));
+  // The header tile draws what the environment's card draws: the linked scene's image first.
+  let sceneThumb = $state('');
+  $effect(() => watchSceneImage(sceneUuid, (image) => (sceneThumb = image)));
   // The linked scene is an environment-level restriction: show its banner once,
   // above the task list, exactly when the environment is scene-gated.
   const envBlockedReasons = $derived(Array.isArray(env?.blockedReasons) ? env.blockedReasons : []);
@@ -69,6 +74,10 @@
   const discoveredTaskCount = $derived(Number(env?.discoveredTaskCount ?? discoveredTasks.length));
   const composedTaskCount = $derived(Number(env?.composedTaskCount ?? 0));
   const blindAttemptable = $derived(env?.attemptable === true);
+  // A blind gather that cannot run names a generic reason only: its blockers may be task-derived.
+  const blindBlocked = $derived(isBlind && !blindAttemptable);
+  const uid = $props.id();
+  const blindReasonId = `${uid}-blind-reason`;
 
   // System limitation flags + (when stamina enabled) the actor's pool, surfaced
   // as a strip beneath the header. Both flags off shows nothing; both on shows
@@ -166,7 +175,7 @@
     <header class="gathering-detail-header">
       <PlayerDetailHeader
         {name}
-        art={img || DEFAULT_GATHERING_ENVIRONMENT_IMG}
+        art={sceneThumb || img || DEFAULT_GATHERING_ENVIRONMENT_IMG}
         chips={hasPips ? pips : null}
         primaryLabel={isBlind ? localize('FABRICATE.App.Gathering.Detail.BlindAttempt') : ''}
         primaryIcon="fas fa-dice"
@@ -174,10 +183,21 @@
         primaryProps={{
           class: 'gathering-detail-blind-attempt',
           'data-gathering-blind-attempt': '',
+          title: blindBlocked ? localize('FABRICATE.App.Gathering.Detail.Blocked') : undefined,
+          'aria-describedby': blindBlocked ? blindReasonId : undefined,
         }}
         onclick={(event) =>
           withRollPromptOrigin(event, () => onAttempt?.({ environmentId: envId, taskId: null }))}
       />
+      {#if blindBlocked}
+        <Notice
+          tone="warning"
+          icon="fa-solid fa-ban"
+          title={localize('FABRICATE.App.Gathering.Detail.Blocked')}
+          id={blindReasonId}
+          data-gathering-blind-attempt-reason=""
+        />
+      {/if}
 
       {#if description !== ''}
         <p class="gathering-detail-description">{description}</p>
