@@ -185,9 +185,10 @@ describe('a recipe result’s rolled amount through the admin store', () => {
     });
 
     it(`${scope}: Rolled opened and left empty saves no formula key`, async () => {
-      // The row forwards nothing for an opened-but-empty field, so the draft is the clean one.
-      const draft = draftOf(recipe.id);
-      assert.equal(await store.updateRecipe(recipe.id, draft, { allowIncomplete: true }), true);
+      // A blank expression is the most an opened-but-empty field can forward.
+      const blank = editedDraft((result) => rowEdit(result, { quantityFormula: '' }));
+      assert.equal(Object.hasOwn(groups(blank)[0].results[0], 'quantityFormula'), false);
+      assert.equal(await store.updateRecipe(recipe.id, blank, { allowIncomplete: true }), true);
       assert.equal(Object.hasOwn(savedResult(), 'quantityFormula'), false);
     });
 
@@ -270,6 +271,7 @@ describe('a recipe result’s rolled amount through the admin store', () => {
 describe('a gathering task result’s rolled amount through the admin store', () => {
   let gatheringConfig;
   let writes;
+  let errors;
 
   const TASK = Object.freeze({
     id: 'task-straight',
@@ -289,6 +291,13 @@ describe('a gathering task result’s rolled amount through the admin store', ()
           if (key !== 'gatheringConfig') return;
           writes += 1;
           gatheringConfig = structuredClone(value);
+        },
+        notify: {
+          info: () => {},
+          warn: () => {},
+          error: (message) => {
+            errors.push(message);
+          },
         },
       })
     );
@@ -313,6 +322,7 @@ describe('a gathering task result’s rolled amount through the admin store', ()
     });
     gatheringConfig = { systems: { sys1: { tasks: [structuredClone(TASK)] } } };
     writes = 0;
+    errors = [];
   });
 
   it(`'1d4+1' survives save → reload → unrelated edit → save byte for byte`, async () => {
@@ -330,9 +340,11 @@ describe('a gathering task result’s rolled amount through the admin store', ()
     assert.deepEqual(savedTask(), { ...saved, name: 'Mine rich ore' });
   });
 
-  it('an untouched draft writes no key, and Rolled → Fixed removes it and keeps quantity', async () => {
+  it('a blank expression writes no key, and Rolled → Fixed removes it and keeps quantity', async () => {
     const store = await loadStore();
-    await store.updateGatheringLibraryTask('sys1', TASK.id, { name: 'Unrelated' });
+    const blank = resultPatch(draftOf(store), { quantityFormula: '' });
+    assert.equal(Object.hasOwn(blank.resultGroups[0].results[0], 'quantityFormula'), false);
+    await store.updateGatheringLibraryTask('sys1', TASK.id, blank);
     assert.equal(Object.hasOwn(savedTask().resultGroups[0].results[0], 'quantityFormula'), false);
     await store.updateGatheringLibraryTask(
       'sys1',
@@ -361,5 +373,6 @@ describe('a gathering task result’s rolled amount through the admin store', ()
     }
     assert.equal(writes, 0);
     assert.deepEqual(savedTask(), TASK);
+    assert.equal(errors.length, 2, 'and each refusal told the GM');
   });
 });

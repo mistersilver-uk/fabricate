@@ -140,6 +140,8 @@ const EXPECTED_OVERRIDE_KEYS = [
   // rather than for a new piece of vocabulary. Its entry names fifteen frames against the
   // parent's ten, because every caller that opens a panel draws this file and only this file.
   'src/ui/svelte/components/SearchablePopoverPanel.svelte',
+  // Issue 1516: the track, whose 30px inline rung only the requirement row's amount toggle draws.
+  'src/ui/svelte/components/SegmentedControl.svelte',
   // Issue 1504: the app's own select.
   'src/ui/svelte/components/Select.svelte',
   // Issue 1373, round 5: the box's `sm` SIZE has one caller — the Tool Studio's prerequisite row
@@ -208,7 +210,6 @@ const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
   'src/ui/svelte/components/FillBar.svelte',
   'src/ui/svelte/components/Pagination.svelte',
-  'src/ui/svelte/components/SegmentedControl.svelte',
   'src/ui/svelte/components/TintPicker.svelte',
   'src/ui/svelte/components/TintPickerButton.svelte',
 ];

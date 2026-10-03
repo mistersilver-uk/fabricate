@@ -220,7 +220,7 @@ export const SELECT_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/SearchablePopoverPanel.svelte'
 ]);
 
-// THE RESULT CARD'S ROWS beyond `<Select>` (issue 1516): the requirement row, its amount slot and
+// The result card's rows beyond `<Select>` (issue 1516): the requirement row, its amount slot and
 // the amount floor the card reads. A tree rendering `RecipeResultGroupCard` spreads both lists.
 export const RESULT_ROW_RAW_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',

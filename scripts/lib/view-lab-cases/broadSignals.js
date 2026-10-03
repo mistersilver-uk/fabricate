@@ -274,6 +274,10 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-checks-v3-count-under',
     'player-crafting-roll-prompt-count-additional',
   ]),
+  // The track (issue 1516): its 30px inline rung is drawn only by the requirement row's amount toggle.
+  'src/ui/svelte/components/SegmentedControl.svelte': Object.freeze([
+    'manager-recipe-edit-results-rolled',
+  ]),
   // The sheet itself, and the first entry here whose key is not a component (issue 1515).
   'styles/fabricate.css': Object.freeze([
     'manager-gathering-task-editor-normal',

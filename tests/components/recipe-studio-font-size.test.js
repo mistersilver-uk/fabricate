@@ -46,7 +46,7 @@ const FIXTURE = `
           <button class="fabricate-button manager-button fab-manager-button is-dashed" data-m="dashed-add"><span>Add tag requirement</span></button>
         </div>
         <p class="manager-muted" data-m="muted">The components, tags and essences this recipe consumes.</p>
-        <!-- A FLAT result row names its component in the requirement row's pill (issue 1516),
+        <!-- A flat result row names its component in the requirement row's pill (issue 1516),
              as an ingredient row does, so its name reads at the pill's own size. -->
         <div class="manager-recipe-ingredient-option-row is-component is-result">
           <span class="manager-recipe-option-lead is-component" data-m="option-lead"><i class="fa-solid fa-cube"></i></span>
