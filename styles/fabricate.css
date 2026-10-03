@@ -15762,6 +15762,17 @@
   color: var(--fab-danger);
 }
 
+/* A headed panel holds the heading and the `role="menu"` list, which stacks its items as the bare panel does. */
+.fabricate-action-menu-panel .manager-action-menu-heading {
+  padding: var(--fab-space-1) var(--fab-space-2) var(--fab-space-2xs);
+}
+
+.fabricate-action-menu-panel .manager-action-menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+}
+
 /* Matching evidence — chips (compact) + table (inspector) */
 .fabricate-manager .manager-environment-evidence.is-chips {
   display: flex;
