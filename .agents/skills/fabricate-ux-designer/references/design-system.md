@@ -417,7 +417,7 @@ Distinguish the two supported track meanings:
 Do not apply a value-width clip to a green-to-red risk scale, because that falsely hides the future semantic range.
 Do not render a full-width solid tier colour for a progress-style chance control, because that falsely implies the entire scale has the current value.
 
-### 5.9 Nav rail item (Player, 60–84px)
+### 5.9 Nav rail item (Player, 72px rail)
 
 Active = accent-soft fill + accent-border.
 Count badge = success pill, top-right.
@@ -452,13 +452,13 @@ An uppercase micro-label over a value or meter.
 
 ### 6.1 Player shell — three-column triptych
 
-Dark titlebar → actor + conditions bar → **84px icon rail · browse · detail · inspector**.
+Dark titlebar → actor + conditions bar → **72px icon rail · browse · detail · inspector**.
 Left and right are fixed, the middle flexes.
-Rail **84px** · browse **300–340px** · inspector **300–336px** · min-window **1024×640**.
+Rail **72px** · browse **300–340px** · inspector **300–336px** · min-window **1024×640**.
 Panels step darker left → right: bg-1 · bg-1 · **bg-2**.
 
 ```html
-<div style="display:grid;grid-template-columns:84px 320px minmax(0,1fr) 320px;min-height:100vh">
+<div style="display:grid;grid-template-columns:72px 320px minmax(0,1fr) 320px;min-height:100vh">
   <nav style="background:var(--fab-bg-0);border-right:1px solid var(--fab-border)">…rail…</nav>
   <section style="background:var(--fab-bg-1);border-right:1px solid var(--fab-border)">…browse…</section>
   <main style="background:var(--fab-bg-1);border-right:1px solid var(--fab-border)">…detail…</main>
