@@ -2551,6 +2551,7 @@ const ANCHORED_POPOVER_FRAMES = [
   'manager-recipe-edit-ingredients-kind-list',
   'manager-recipe-edit-ingredients-or-menu',
   'manager-recipe-edit-ingredients-suggestions',
+  'manager-recipe-edit-results-suggestions',
   'manager-recipe-edit-tag-picker',
   'manager-recipe-item-contents-picker',
   'manager-recipes-bulk-edit-check-tier',

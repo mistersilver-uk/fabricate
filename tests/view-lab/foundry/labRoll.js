@@ -232,6 +232,33 @@ export function createLabRoll({ random, replaceFormulaData, validate }) {
       return this;
     }
 
+    /**
+     * Core's `evaluateSync`: `maximize` or `minimize` reads every kept die at a face extreme, which
+     * is how the rollability floor proves a formula; dice under neither option throw, as core's
+     * do. The total is left as computed, so a non-finite one reaches the caller.
+     *
+     * @param {{ maximize?: boolean, minimize?: boolean }} [options] Options.
+     * @returns {LabRoll} This roll.
+     */
+    evaluateSync({ maximize = false, minimize = false } = {}) {
+      const masked = this.formula.replaceAll(FLAVOUR_SPAN, '');
+      const extreme = masked.replaceAll(DIE_TERM, (match, count, faces, keep, keepCount) => {
+        const shape = dieShape(count, faces);
+        if (!shape) return match;
+        if (!maximize && !minimize) {
+          throw new Error(`View Lab Roll cannot evaluate "${this.formula}" synchronously`);
+        }
+        const kept = keep
+          ? Math.min(keepCount === '' ? 1 : Number(keepCount), shape.number)
+          : shape.number;
+        return String(kept * (maximize ? shape.sides : 1));
+      });
+      this.total = evaluateNumericExpression(extreme);
+      this.result = extreme;
+      this._evaluated = true;
+      return this;
+    }
+
     /** Core's `clone`: a fresh, unevaluated Roll of the cached `_formula`. */
     clone() {
       return new this.constructor(this._formula, this.data, this.options);

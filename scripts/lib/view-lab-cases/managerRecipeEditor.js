@@ -15,6 +15,10 @@ import { managerCase } from './caseFactories.js';
 const COMPONENT_NAME_FIELD =
   '.manager-recipe-option-name-field:not([data-recipe-option-essence]):not([data-recipe-option-currency])';
 
+/** The `n`th flat result row of a result set, as a child and from the page. */
+const RESULT_ROW_CHILD = (n) => `[data-recipe-result-item]:nth-child(${n})`;
+const RESULT_ROW = (n) => `.manager-recipe-ingredient-set-groups > ${RESULT_ROW_CHILD(n)}`;
+
 export const CASES = Object.freeze([
   managerCase({
     id: 'manager-recipe-edit-normal',
@@ -780,6 +784,103 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
     ],
   }),
+  // The fixed-or-rolled amount on recipe results (issue 1516): the horseshoe's own row rolled, a
+  // second row opened on Rolled with nothing typed, and a third holding an unrollable expression.
+  ...[
+    {
+      suffix: '',
+      position: null,
+      themeVariants: ['hearth-herb'],
+      hit: `${RESULT_ROW(3)} [data-recipe-option-amount-mode="rolled"]`,
+    },
+    {
+      suffix: '-narrow',
+      position: { width: 1024, height: 640 },
+      themeVariants: [],
+      hit: `${RESULT_ROW(1)} .manager-recipe-option-remove`,
+    },
+  ].map(({ suffix, position, themeVariants, hit }) =>
+    managerCase({
+      id: `manager-recipe-edit-results-rolled${suffix}`,
+      label: `Manager — Recipe edit results, rolled, opened and invalid amounts${suffix ? ', at the declared floor' : ''}`,
+      smokeLabels: [],
+      reaches: 'beyond',
+      query: { system: 'lab-smithing' },
+      steps: [
+        'Crafting',
+        { selector: '[data-recipe-edit="sm-r-horseshoe"]' },
+        { selector: '#recipe-tab-results' },
+        { selector: '[data-recipe-add="result-item"]' },
+        { selector: '.manager-travel-option:has-text("Iron Ingot")' },
+        { selector: '[data-recipe-add="result-item"]' },
+        { selector: '.manager-travel-option:has-text("Steel Ingot")' },
+        { selector: `${RESULT_ROW(1)} [data-recipe-option-amount-mode="rolled"]` },
+        { selector: `${RESULT_ROW(1)} [data-recipe-option-formula]`, fill: '1d4+1' },
+        { selector: `${RESULT_ROW(2)} [data-recipe-option-amount-mode="rolled"]` },
+        { selector: `${RESULT_ROW(3)} [data-recipe-option-amount-mode="rolled"]` },
+        { selector: `${RESULT_ROW(3)} [data-recipe-option-formula]`, fill: 'max(, 2)' },
+      ],
+      expectView: 'recipe-edit',
+      // Three rows on Rolled, and only the third marked invalid with its message.
+      expectSelector:
+        `.manager-recipe-ingredient-set-groups:has(> ${RESULT_ROW_CHILD(1)} [data-recipe-option-formula])` +
+        `:has(> ${RESULT_ROW_CHILD(2)} [data-recipe-option-formula])` +
+        `:not(:has(> ${RESULT_ROW_CHILD(2)} [data-recipe-option-invalid]))` +
+        ` > ${RESULT_ROW_CHILD(3)} [data-recipe-option-invalid]`,
+      expectAttributes: [
+        {
+          selector: `${RESULT_ROW(1)} [data-recipe-option-formula]`,
+          name: 'aria-invalid',
+          value: null,
+        },
+        {
+          selector: `${RESULT_ROW(3)} [data-recipe-option-formula]`,
+          name: 'aria-invalid',
+          value: 'true',
+        },
+      ],
+      expectContained: [1, 2, 3].map((row) => ({
+        container: RESULT_ROW(row),
+        target: `${RESULT_ROW(row)} .manager-recipe-option-remove`,
+      })),
+      expectCenterHit: hit,
+      expectNoHorizontalOverflow: '.manager-recipe-ingredient-set-groups',
+      ...(position && { position }),
+      ...(themeVariants.length > 0 && { themeVariants }),
+      kinds: ['manager', 'recipes', ...(position ? ['responsive'] : [])],
+      sourceMatches: [
+        /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+        /^src\/ui\/svelte\/apps\/manager\/RollDataExpressionInput\.svelte$/,
+      ],
+    })
+  ),
+  // A result naming no component (an item-only one, the one way a result row is unnamed) opens the
+  // row's suggestion list beneath it, whose last suggestion must own its pointer target.
+  managerCase({
+    id: 'manager-recipe-edit-results-suggestions',
+    label: 'Manager — Recipe edit results, an unnamed result row’s suggestion list open',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', resultRowState: 'unnamed' },
+    steps: [
+      'Crafting',
+      { selector: '[data-recipe-edit="sm-r-horseshoe"]' },
+      { selector: '#recipe-tab-results' },
+      { selector: `${RESULT_ROW(1)} [data-recipe-option-search]`, fill: 'ingot' },
+    ],
+    expectView: 'recipe-edit',
+    expectSelector: REQUIREMENT_SUGGESTION,
+    expectContained: [
+      { container: '.fabricate-manager', target: '.manager-recipe-option-suggestions' },
+    ],
+    expectCenterHit: `${REQUIREMENT_SUGGESTION}:last-child`,
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+      TYPEAHEAD_COMBOBOX_SOURCE,
+      ...ANCHORED_POPOVER_SOURCES,
+    ],
+  }),
   managerCase({
     id: 'manager-multistep-disable-confirm',
     label: 'Manager — Multistep disable confirm',
@@ -835,6 +936,8 @@ export const CASES = Object.freeze([
       { selector: '#recipe-tab-results' },
     ],
     expectView: 'recipe-edit',
+    // The stage row's Edit link sits in the requirement row's trailing controls (issue 1516).
+    expectCenterHit: '[data-recipe-result-row] [data-recipe-result-edit]',
     kinds: ['manager', 'recipes'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,

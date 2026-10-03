@@ -23,6 +23,8 @@ const OPEN_PROSPECT_TASK = Object.freeze([
   },
 ]);
 const TASK_PREVIEW = '[data-gathering-task-dc] [data-override-preview-actor]';
+/** The first result row of a Direct task's one result set. */
+const STRAIGHT_RESULT = '[data-gathering-task-results="straight"] [data-recipe-result-item]';
 const taskOverrideCase = ({ id, label, field, frame, sees, claim = '' }) =>
   managerCase({
     id,
@@ -372,6 +374,35 @@ export const CASES = Object.freeze([
       GATHERING_ROUTE_MODEL_PATTERN,
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|ManagerHeaderActions|ManagerHeaderBreadcrumbs|ManagerHeaderCraftingActions|ManagerHeaderGatheringActions|ManagerPageHeader|GatheringTaskEditView)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe\/Recipe(ResultGroupCard|ResultsSection)\.svelte$/,
+    ],
+  }),
+  // A Direct task's result on Rolled (issue 1516): the gathering surface of the result row.
+  managerCase({
+    id: 'manager-gathering-task-editor-straight-rolled',
+    label: 'Manager — Gathering task Direct yields, a rolled amount',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-herbalism', gatheringTaskMode: 'straight' },
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-tasks' },
+      {
+        selector:
+          '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
+      },
+      { selector: '[data-gathering-task-results]', scroll: true },
+      { selector: `${STRAIGHT_RESULT} [data-recipe-option-amount-mode="rolled"]` },
+      { selector: `${STRAIGHT_RESULT} [data-recipe-option-formula]`, fill: '1d4+1' },
+    ],
+    expectView: 'gathering-task-edit',
+    expectSelector: `${STRAIGHT_RESULT} [data-recipe-option-formula]:not([aria-invalid])`,
+    expectContained: [
+      { container: STRAIGHT_RESULT, target: `${STRAIGHT_RESULT} .manager-recipe-option-remove` },
+    ],
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/(Recipe(ResultGroupCard|ResultsSection)|PickerRow|PickerRowAmount)\.svelte$/,
     ],
   }),
   ...['selector', 'straight', 'routed'].map((mode) =>

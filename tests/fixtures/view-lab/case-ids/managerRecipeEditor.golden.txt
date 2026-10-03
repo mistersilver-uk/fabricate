@@ -28,6 +28,10 @@ manager-recipe-edit-results-narrow
 manager-recipe-edit-results
 manager-recipe-edit-results-multistep
 manager-recipe-edit-results-empty-step
+manager-recipe-edit-results-rolled
+manager-recipe-edit-results-rolled-hearth-herb
+manager-recipe-edit-results-rolled-narrow
+manager-recipe-edit-results-suggestions
 manager-multistep-disable-confirm
 manager-recipe-edit-collapsed
 manager-recipe-edit-results-progressive

@@ -21,6 +21,7 @@ import { installLabTheme, readLabTheme } from './view-lab/labTheme.js';
 
 const VARIANTS = Object.freeze({
   'manager-gathering-task-editor-normal-hearth-herb': 'manager-gathering-task-editor-normal',
+  'manager-recipe-edit-results-rolled-hearth-herb': 'manager-recipe-edit-results-rolled',
   'manager-tool-prerequisites-selected-1280x720-hearth-herb':
     'manager-tool-prerequisites-selected-1280x720',
 });
@@ -37,7 +38,7 @@ afterEach(() => {
   teardownDOM();
 });
 
-test('the two hearth-herb variants reuse their base case under another palette', () => {
+test('the three hearth-herb variants reuse their base case under another palette', () => {
   assert.deepEqual(
     themedCases()
       .map((viewCase) => viewCase.id)
