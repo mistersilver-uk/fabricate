@@ -4,7 +4,45 @@
  */
 export async function assertViewLabLayout(page, expectation, label) {
   if (!expectation) return;
+  if (expectation.containerSelector !== undefined || expectation.gridSelector !== undefined) {
+    await assertGridLayout(page, expectation, label);
+  }
+  for (const control of expectation.controls ?? []) await assertControlStyles(page, control, label);
+}
 
+/**
+ * One control's computed style against `styles`, a CSS declaration list. Each declared value is
+ * resolved by a hidden probe inside the control, so `0.72rem` and `var(--fab-success)` compare in
+ * the control's own context.
+ */
+async function assertControlStyles(page, { selector, styles }, label) {
+  const control = await requiredLocator(page, selector, 'control', label);
+  const declarations = String(styles)
+    .split(';')
+    .map((declaration) => declaration.split(':').map((part) => part.trim()))
+    .filter(([property]) => property);
+  const mismatches = await control.evaluate((element, declared) => {
+    const probe = element.ownerDocument.createElement('span');
+    probe.style.setProperty('display', 'none');
+    element.append(probe);
+    try {
+      const measured = globalThis.getComputedStyle(element);
+      return declared.flatMap(([property, value]) => {
+        probe.style.setProperty(property, value);
+        const expected = globalThis.getComputedStyle(probe).getPropertyValue(property);
+        const actual = measured.getPropertyValue(property);
+        return actual === expected ? [] : [`${property} is ${actual}, not ${value} (${expected})`];
+      });
+    } finally {
+      probe.remove();
+    }
+  }, declarations);
+  if (mismatches.length > 0) {
+    throw new Error(`${label}: ${selector} ${mismatches.join('; ')}`);
+  }
+}
+
+async function assertGridLayout(page, expectation, label) {
   const {
     containerSelector,
     gridSelector,

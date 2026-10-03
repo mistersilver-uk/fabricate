@@ -3,12 +3,21 @@
  * M12b), held as a contract over the sheet and over the one primitive that emits the opt-in.
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { importedModules, literalStrings, walkNodes } from '../helpers/moduleAst.js';
+import { componentAstOf, sourceAstEntriesUnder } from '../helpers/parsedSource.js';
+import { renderedNodes } from '../helpers/structureShapes.js';
 import { stripCssComments } from '../helpers/styleBlockScan.js';
+import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  attributeValue,
+  declaresAttribute,
+  rendersComponent,
+  styleRules
+} from '../helpers/svelteStructureContract.js';
 import { LADDER_RUNGS } from './control-height-known-literals.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -321,48 +330,98 @@ describe('M12b — the 38px rung is reachable on the toolbar controls the refere
   });
 });
 
-describe('M12a — the inspector rail’s action button takes the corner its height is on', () => {
-  const ACTION = 'src/ui/svelte/apps/manager/InspectorActionButton.svelte';
+describe('M12a — an inspector rail’s verbs take the manager button’s rung (issue 1521)', () => {
+  const MANAGER = 'src/ui/svelte/apps/manager';
+  /** The eight verbs the retired rail button drew: file, hook, hook value and role. */
+  const SITES = [
+    [`${MANAGER}/essences/EssenceBrowserInspector.svelte`, 'data-essence-action', 'edit', 'primary'],
+    [`${MANAGER}/essences/EssenceBrowserInspector.svelte`, 'data-essence-action', 'delete', 'danger'],
+    [`${MANAGER}/essences/EssenceBrowserInspector.svelte`, 'data-essence-action', 'copy-source', 'ghost'],
+    [
+      `${MANAGER}/essences/EssenceBrowserInspector.svelte`,
+      'data-essence-action',
+      'unlink-source',
+      'warning'
+    ],
+    [`${MANAGER}/components/ComponentBrowserInspector.svelte`, 'data-component-edit-system-rules', '', 'primary'],
+    [`${MANAGER}/scoped/WorldComponentCataloguePage.svelte`, 'data-scoped-component-open-entry', true, 'primary'],
+    [`${MANAGER}/scoped/WorldEssenceCataloguePage.svelte`, 'data-scoped-essence-open-entry', true, 'primary'],
+    [`${MANAGER}/scoped/WorldToolCataloguePage.svelte`, 'data-scoped-tool-open-entry', true, 'primary']
+  ];
+  const FILES = [...new Set(SITES.map(([file]) => file))];
+  const GEOMETRY = new Set(['min-height', 'height', 'border-radius', 'font-size', 'padding']);
+  const BUTTON_CLASSES = new Set(['fabricate-button', 'fab-manager-button', 'is-full-width']);
 
-  /** One rule body from a component's own scoped block, comments stripped. */
-  function scopedRule(componentPath, selector) {
-    const source = readFileSync(resolve(repoRoot, componentPath), 'utf8');
-    const block = stripCssComments(source.slice(source.search(/^<style>$/m) + '<style>'.length));
-    const found = [...block.matchAll(/([^{}]+)\{([^{}]*)\}/g)].filter(
-      ([, head]) => head.trim().replaceAll(/\s+/g, ' ') === selector
-    );
-    assert.equal(found.length, 1, `${componentPath} still declares exactly one \`${selector}\` rule`);
-    return found[0][2];
+  /** The value a bare attribute (`true`) or a static one gives, for matching a site's hook. */
+  function hookValue(node, name) {
+    const attribute = (node.attributes ?? []).find((candidate) => candidate.name === name);
+    if (!attribute) return undefined;
+    return attribute.value === true ? true : (attributeValue(node, name) ?? '');
   }
 
-  it('states the 34px control AND the band’s 9px corner on one rule', () => {
-    const body = scopedRule(ACTION, '.fab-inspector-action');
-    assert.equal(pixels(valueOf(body, 'min-height')), 34, 'this is still the rule that sizes the control');
-    assert.equal(
-      pixels(valueOf(body, 'border-radius')),
-      9,
-      'a 34px control is painting the chip rung the ladder gives to something at or below 24px'
-    );
+  it('renders each of the eight verbs as a full-width Button in the role its verb names', () => {
+    for (const [file, hook, value, role] of SITES) {
+      const matches = renderedNodes(componentAstOf(file), 'Button').filter(
+        (node) => hookValue(node, hook) === value
+      );
+      assert.equal(matches.length, 1, `${file} renders one Button carrying ${hook}`);
+      assert.equal(attributeValue(matches[0], 'role'), role, `${file} ${hook}=${value} is ${role}`);
+      assert.ok(declaresAttribute(matches[0], 'fullWidth'), `${file} ${hook} spans its rail`);
+    }
   });
 
-  it('is unreachable from the sheet, which is why the fix is in the component', () => {
-    // The measurement, not an opinion.
-    const declarations = css
-      .split('}')
-      .filter((block) => /\.fab-inspector-action[^{]*\{/.test(block));
-    assert.deepEqual(
-      declarations,
-      [],
-      'a rule in the global sheet targets this primitive’s own element, where it cannot win'
-    );
+  it('keeps the primary on the 34px rung and the band’s 9px corner, with no rung of its own', () => {
+    const [primitive] = bodiesOf('.fabricate-button.fabricate-button.fab-manager-button');
+    assert.equal(pixels(valueOf(primitive, 'min-height')), 34);
+    assert.equal(pixels(valueOf(primitive, 'border-radius')), 9);
+    assert.equal(valueOf(primitive, 'font-size'), '0.72rem');
+    // The retired 36px primary is gone; `control-height-ladder.test.js` reports it as shrunk.
+    for (const body of bodiesOf('.fabricate-button.fabricate-button.fab-manager-button.is-primary')) {
+      assert.equal(valueOf(body, 'min-height'), null, 'the primary states no height of its own');
+      assert.equal(valueOf(body, 'border-radius'), null, 'and no corner of its own');
+    }
   });
 
-  it('leaves the primary’s retired 36px rung exactly as it stands, which is booked debt', () => {
-    // 36 is NOT on the ladder — `control-height-ladder.test.js` already holds it as debt.
-    const body = scopedRule(ACTION, '.fab-inspector-action.is-primary');
-    assert.equal(pixels(valueOf(body, 'min-height')), 36, 'the primary’s height is unchanged by this edit');
-    assert.ok(!LADDER_RUNGS.includes(36), '36 is still a retired rung, so this stays booked debt');
-    assert.equal(valueOf(body, 'border-radius'), null, 'and it states no corner, so it takes the 9 above');
+  it('lets no rail restate a verb’s geometry in its own scoped block', () => {
+    const offenders = [];
+    for (const file of FILES) {
+      for (const rule of styleRules(componentAstOf(file))) {
+        const names = [...walkNodes(rule.prelude)]
+          .filter((node) => node.type === 'ClassSelector')
+          .map((node) => node.name);
+        if (names.every((name) => !BUTTON_CLASSES.has(name))) continue;
+        const restated = (rule.block?.children ?? []).filter(
+          (node) => node.type === 'Declaration' && GEOMETRY.has(node.property)
+        );
+        for (const node of restated) offenders.push(`${file}: ${node.property} ${node.value}`);
+      }
+    }
+    assert.deepEqual(offenders, [], 'a scoped rule moves a verb off the primitive’s rung');
+  });
+
+  it('retires the rail button: no file, import or render of it remains', () => {
+    const retired = 'InspectorActionButton';
+    assert.equal(existsSync(resolve(repoRoot, `${MANAGER}/${retired}.svelte`)), false);
+    const users = [...sourceAstEntriesUnder('src'), ...sourceAstEntriesUnder('scripts')]
+      .filter(
+        ([, ast]) =>
+          importedModules(ast).some((specifier) => specifier.endsWith(`/${retired}.svelte`)) ||
+          (ast.fragment !== undefined && rendersComponent(ast, retired))
+      )
+      .map(([path]) => path);
+    assert.deepEqual(users, []);
+  });
+
+  it('leaves the two removal verbs on ArmedDangerButton', () => {
+    for (const [file, key] of [
+      [`${MANAGER}/scoped/MembershipActions.svelte`, 'FABRICATE.Admin.Manager.Scoped.Membership.Remove'],
+      [`${MANAGER}/tools/ToolBreakageTab.svelte`, 'FABRICATE.Admin.Manager.Tools.Editor.RemoveFromSystem']
+    ]) {
+      const armed = renderedNodes(componentAstOf(file), 'ArmedDangerButton').filter((node) =>
+        literalStrings(node.attributes).includes(key)
+      );
+      assert.equal(armed.length, 1, `${file} arms ${key} through ArmedDangerButton`);
+    }
   });
 });
 

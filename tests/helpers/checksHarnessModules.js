@@ -214,7 +214,6 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   // for its trailing badge, so it is now in the row's STATIC closure.
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
   'src/ui/svelte/components/Chip.svelte',
-  'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
   'src/ui/svelte/apps/manager/ExplainerCard.svelte',
   'src/ui/svelte/components/RadioCardGroup.svelte',
   'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',

@@ -30,11 +30,11 @@ function frame(elements, queried = []) {
       return {
         count: async () => (Array.isArray(target) ? target.length : target ? 1 : 0),
         evaluateAll: async (callback, arg) => callback(target ?? [], arg),
-        evaluate: async (callback) => {
+        evaluate: async (callback, argument) => {
           const previous = globalThis.getComputedStyle;
           globalThis.getComputedStyle = (node) => node.computedStyle;
           try {
-            return callback(target);
+            return callback(target, argument);
           } finally {
             globalThis.getComputedStyle = previous;
           }
@@ -372,4 +372,74 @@ test('rejects a control off its stated line, and a row missing one', async () =>
     assertViewLabLayout(wrappedFrame([missing]), WRAPPED, 'missing'),
     /.row #1 has no visible .amount/
   );
+});
+
+// A control's computed style, each declared value resolved in the control's own context (issue
+// 1521): the fake probe resolves a declared value through `RESOLVED`, as the browser would.
+const RESOLVED = { '0.72rem': '11.52px', 'var(--fab-success)': 'rgb(80, 160, 90)' };
+
+function controlFrame(measured, { probes = [], queried = [] } = {}) {
+  const styleOf = (lookup) => ({ getPropertyValue: lookup });
+  const control = {
+    ownerDocument: {
+      createElement: () => {
+        const declared = {};
+        const probe = {
+          style: { setProperty: (property, value) => (declared[property] = value) },
+          remove: () => (probe.removed = true),
+          computedStyle: styleOf((property) => RESOLVED[declared[property]] ?? declared[property]),
+        };
+        probes.push(probe);
+        return probe;
+      },
+    },
+    append: () => {},
+    computedStyle: styleOf((property) => measured[property]),
+  };
+  return frame({ '[data-verb]': control }, queried);
+}
+
+const PRIMARY_VERB = {
+  controls: [
+    {
+      selector: '[data-verb]',
+      styles: 'min-height: 34px; font-size: 0.72rem; background-color: var(--fab-success);',
+    },
+  ],
+};
+
+test('accepts a control whose computed styles resolve to the declared values', async () => {
+  const probes = [];
+  const measured = {
+    'min-height': '34px',
+    'font-size': '11.52px',
+    'background-color': 'rgb(80, 160, 90)',
+  };
+  await assert.doesNotReject(
+    assertViewLabLayout(controlFrame(measured, { probes }), PRIMARY_VERB, 'verb')
+  );
+  assert.ok(probes.length === 1 && probes[0].removed, 'the probe is removed before the capture');
+});
+
+test('rejects a control whose computed style differs, naming each property', async () => {
+  const measured = {
+    'min-height': '36px',
+    'font-size': '11.52px',
+    'background-color': 'rgb(200, 120, 90)',
+  };
+  await assert.rejects(
+    assertViewLabLayout(controlFrame(measured), PRIMARY_VERB, 'accent-primary'),
+    /min-height is 36px, not 34px \(34px\); background-color is rgb\(200, 120, 90\), not var\(--fab-success\)/
+  );
+});
+
+test('checks controls without a grid when the case declares none', async () => {
+  const queried = [];
+  const measured = {
+    'min-height': '34px',
+    'font-size': '11.52px',
+    'background-color': 'rgb(80, 160, 90)',
+  };
+  await assertViewLabLayout(controlFrame(measured, { queried }), PRIMARY_VERB, 'controls-only');
+  assert.deepEqual(queried, ['[data-verb]']);
 });
