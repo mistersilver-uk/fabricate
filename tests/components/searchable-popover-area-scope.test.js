@@ -1659,9 +1659,6 @@ const DETECTOR_FIXTURE_EXEMPTIONS = Object.freeze([
       'the fixture depict a CONVERTED site, at which point the contract counts 0 raw sites and ' +
       'passes over a tree that could have any number.',
   }),
-  // The `Field`, `SearchField` and `FilterBar` detector fixtures left this ledger at issue 1507:
-  // the raw spelling those contracts detect is now the root itself, so their fixtures carry it
-  // and register no hit here, while each contract still discriminates a raw site from the tag.
 ]);
 
 /**
@@ -1773,10 +1770,8 @@ test('hand-built fixture markup carries the namespace roots the primitive writes
     attributes >= 131,
     `only ${attributes} fixture class attributes copy a primitive's root markup, against a floor ` +
       'of 131. A lower number means the scan is not reading the fixtures and the assertion below ' +
-      'holds over nothing. RE-MEASURED at issue 1507: 146 today, because the nine classes that ' +
-      'issue retired left `mirrored` with it — a pair whose anchor is its own root holds by ' +
-      'construction — and `Button`s anchor is `fab-manager-button` now. Before that, at issue ' +
-      '1509 phase 4: 203, against the 195 before ' +
+      'holds over nothing. RE-MEASURED at issue 1507: 146 today. At issue 1509 phase 4: 203, ' +
+      'against the 195 before ' +
       '`ToggleCard` and `ItemDropZone` joined the array. EIGHT arrived and NOT ONE of them was ' +
       'already in the tree: both families had a fixture population of ZERO in this clause and in ' +
       'the ancestry clause alike before this change — measured, and published as the answer ' +
