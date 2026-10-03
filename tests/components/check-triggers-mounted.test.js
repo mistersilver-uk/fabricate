@@ -7,6 +7,7 @@ import {
   createMountedComponentHarness,
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
+  LOCALIZE_OR_RAW_MODULES,
 } from '../helpers/svelte-component-harness.js';
 import { stepMigratedNumberField } from '../helpers/numericKeyboardStep.js';
 // The five converted controls are driven by open-then-click on a portaled panel (issue 1510).
@@ -33,6 +34,7 @@ const harness = createMountedComponentHarness({
   rawModules: [
     // The popover closure the shared picker composes (issue 1510); it spreads the Foundry bridge.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/components/stepperLabels.js',
     'src/utils/craftingCheckExpression.js',

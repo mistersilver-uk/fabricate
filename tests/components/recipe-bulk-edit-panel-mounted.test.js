@@ -6,7 +6,8 @@ import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import {
   createMountedComponentHarness,
   SEARCHABLE_POPOVER_RAW_MODULES,
-  SELECT_COMPILED_MODULES
+  SELECT_COMPILED_MODULES,
+  LOCALIZE_OR_RAW_MODULES,
 } from '../helpers/svelte-component-harness.js';
 import { createRecipeBulkDraft } from '../../src/ui/model/recipeBulkEditModel.js';
 import {
@@ -24,6 +25,7 @@ const panel = createMountedComponentHarness({
   rawModules: [
     // The book axis is a `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     // `BulkDeleteCard`'s shared focus/announce ordering rule (issue 1157).
     'src/ui/svelte/util/announceAfterFocus.js',
     'src/utils/recipeCategories.js',

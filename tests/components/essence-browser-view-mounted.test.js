@@ -21,7 +21,7 @@ import { describeBrowserBulkSelection } from '../helpers/browserBulkSelectionCas
 import { describeBrowserListState } from '../helpers/browserListStateCases.js';
 import { createEssenceBrowserState } from '../../src/ui/model/essenceBrowserModel.js';
 import { makeEssenceRow } from '../helpers/makeEssenceRow.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 import {
   assertSelectHasResolvedName,
   chooseSelectOption,
@@ -45,6 +45,7 @@ const harness = createMountedComponentHarness({
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...FOUNDRY_BRIDGE_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/managerColorTokens.js',
     // The lifted browse state's default page size, which the browse-list composable reads.

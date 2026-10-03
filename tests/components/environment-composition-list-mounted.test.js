@@ -13,7 +13,7 @@ import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
-import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES, LOCALIZE_OR_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -172,6 +172,7 @@ describe('CompositionList mounted layout', () => {
       'src/utils/scalars.js',
       'src/ui/svelte/apps/manager/environment/compositionStateMeta.js',
       ...FOUNDRY_BRIDGE_RAW_MODULES,
+      ...LOCALIZE_OR_RAW_MODULES,
       'src/ui/svelte/util/listReorderAnnouncement.js',
       'src/ui/svelte/components/stepperLabels.js',
       'src/ui/svelte/actions/dismissOnOutsideClick.js',

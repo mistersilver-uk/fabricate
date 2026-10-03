@@ -12,7 +12,7 @@
 -->
 <script>
   import EmptyState from '../../../components/EmptyState.svelte';
-  import { localize } from '../../../util/foundryBridge.js';
+  import { localizeOr } from '../../../util/localizeOr.js';
   import RecipeResultGroupCard from './RecipeResultGroupCard.svelte';
   import Button from '../../../components/Button.svelte';
 
@@ -44,11 +44,6 @@
     idPrefix = '',
   } = $props();
 
-  function text(key, fallback) {
-    const translated = localize(key);
-    return translated && translated !== key ? translated : fallback;
-  }
-
   // An id eagerly at add time, rather than at the store's save normalization, so a brand-new
   // result set is immediately routable.
   function newId() {
@@ -62,7 +57,7 @@
 
   function setDisplayName(set, index) {
     const name = String(set?.name || '').trim();
-    return name || `${text('FABRICATE.Admin.Manager.Recipe.SetLabel', 'Set')} ${index + 1}`;
+    return name || `${localizeOr('FABRICATE.Admin.Manager.Recipe.SetLabel', 'Set')} ${index + 1}`;
   }
 
   // Ingredient-set options for one group: a set routes to at most one, so an already-routed
@@ -169,7 +164,7 @@
         {componentOptions}
         {onOpenComponent}
         hideRemove={true}
-        staticLabel={text('FABRICATE.Admin.Manager.Recipe.AlchemyOnSuccess', 'On success')}
+        staticLabel={localizeOr('FABRICATE.Admin.Manager.Recipe.AlchemyOnSuccess', 'On success')}
         onChange={(nextGroup) => updateAlchemyPair('success', nextGroup)}
       />
       <RecipeResultGroupCard
@@ -179,7 +174,10 @@
         reserved={true}
         hideRemove={true}
         roleAccent="warning"
-        staticLabel={text('FABRICATE.Admin.Manager.Recipe.AlchemyOnFailure', 'On a failed check')}
+        staticLabel={localizeOr(
+          'FABRICATE.Admin.Manager.Recipe.AlchemyOnFailure',
+          'On a failed check'
+        )}
         onChange={(nextGroup) => updateAlchemyPair('failure', nextGroup)}
       />
     </div>
@@ -200,8 +198,8 @@
     <EmptyState
       compact
       icon="fas fa-gift"
-      title={text('FABRICATE.Admin.Manager.Recipe.ResultsEmpty', 'No results yet')}
-      hint={text(
+      title={localizeOr('FABRICATE.Admin.Manager.Recipe.ResultsEmpty', 'No results yet')}
+      hint={localizeOr(
         'FABRICATE.Admin.Manager.Recipe.ResultsEmptyHint',
         'Add a set of items this recipe can produce.'
       )}
@@ -209,7 +207,7 @@
     >
       <Button role="dashed" fullWidth data-recipe-add="result-set" onclick={() => addGroup()}>
         <i class="fas fa-plus" aria-hidden="true"></i>
-        <span>{text('FABRICATE.Admin.Manager.Recipe.AddResultSet', 'Add result set')}</span>
+        <span>{localizeOr('FABRICATE.Admin.Manager.Recipe.AddResultSet', 'Add result set')}</span>
       </Button>
     </EmptyState>
   {:else}
@@ -240,7 +238,7 @@
     </ul>
     <Button role="dashed" fullWidth data-recipe-add="result-set" onclick={() => addGroup()}>
       <i class="fas fa-plus" aria-hidden="true"></i>
-      <span>{text('FABRICATE.Admin.Manager.Recipe.AddResultSet', 'Add result set')}</span>
+      <span>{localizeOr('FABRICATE.Admin.Manager.Recipe.AddResultSet', 'Add result set')}</span>
     </Button>
   {/if}
 </section>

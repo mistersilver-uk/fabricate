@@ -26,6 +26,7 @@ import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
   TYPEAHEAD_RUNE_MODULES,
+  LOCALIZE_OR_RAW_MODULES,
 } from '../helpers/svelte-component-harness.js';
 
 const harness = createMountedComponentHarness({
@@ -34,6 +35,7 @@ const harness = createMountedComponentHarness({
   rawModules: [
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     ...KIND_MENU_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     'src/ui/svelte/apps/manager/recipe/pickerRowKinds.js',
     // The roll-expression field's display helpers, and what they import.
     'src/systems/characterModifierPrerequisiteCopy.js',

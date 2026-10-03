@@ -16,7 +16,7 @@
 -->
 <script>
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
-  import { localize } from '../../../util/foundryBridge.js';
+  import { localizeOr } from '../../../util/localizeOr.js';
   import { NO_ACTOR_ID } from './previewActorId.js';
 
   let {
@@ -26,13 +26,11 @@
     onChoose = () => {},
   } = $props();
 
-  function text(key, fallback) {
-    const translated = localize(key);
-    return translated && translated !== key ? translated : fallback;
-  }
-
-  const noActorLabel = text('FABRICATE.Admin.Manager.Checks.PreviewAs.NoActor', 'No actor');
-  const actorLabel = text('FABRICATE.Admin.Manager.Checks.PreviewAs.Actor', 'Preview as actor');
+  const noActorLabel = localizeOr('FABRICATE.Admin.Manager.Checks.PreviewAs.NoActor', 'No actor');
+  const actorLabel = localizeOr(
+    'FABRICATE.Admin.Manager.Checks.PreviewAs.Actor',
+    'Preview as actor'
+  );
   const selected = $derived(
     value === NO_ACTOR_ID ? null : (actors.find((actor) => actor.id === value) ?? null)
   );
@@ -61,15 +59,15 @@
   triggerLabel={selected?.name || noActorLabel}
   ariaLabel={actorLabel}
   panelLabel={actorLabel}
-  searchPlaceholder={text(
+  searchPlaceholder={localizeOr(
     'FABRICATE.Admin.Manager.Checks.PreviewAs.ActorSearchPlaceholder',
     'Search characters...'
   )}
-  searchLabel={text(
+  searchLabel={localizeOr(
     'FABRICATE.Admin.Manager.Checks.PreviewAs.ActorSearchLabel',
     'Search characters'
   )}
-  emptyHint={text(
+  emptyHint={localizeOr(
     'FABRICATE.Admin.Manager.Checks.PreviewAs.NoActorMatches',
     'No characters match your search.'
   )}

@@ -17,7 +17,7 @@
   - `{...rest}` lands on the radiogroup root, written after `class`, and carries a caller's hook.
 -->
 <script>
-  import { localize } from '../util/foundryBridge.js';
+  import { localizeOr } from '../util/localizeOr.js';
 
   let {
     options = [],
@@ -38,12 +38,6 @@
   } = $props();
 
   const extraClasses = $derived(extraClass ? ` ${extraClass}` : '');
-
-  function text(key, fallback) {
-    if (!key) return fallback ?? '';
-    const translated = localize(key);
-    return translated && translated !== key ? translated : (fallback ?? key);
-  }
 
   function select(next) {
     if (next !== value) onChange(next);
@@ -68,7 +62,7 @@
          gives the a11y tree; `undefined` omits it, so a labelled consumer's markup is untouched. -->
     <label
       class={segmentClass(option)}
-      title={iconOnly ? text(option.labelKey, option.fallback) : undefined}
+      title={iconOnly ? localizeOr(option.labelKey, option.fallback) : undefined}
       {...optionDataAttr ? { [optionDataAttr]: option.value } : {}}
     >
       <input
@@ -82,7 +76,7 @@
         onchange={() => select(option.value)}
       />
       {#if option.icon}<i class={option.icon} aria-hidden="true"></i>{/if}
-      <span class="manager-segment-label">{text(option.labelKey, option.fallback)}</span>
+      <span class="manager-segment-label">{localizeOr(option.labelKey, option.fallback)}</span>
       {#if Number.isFinite(option.count)}
         <span class="manager-segment-count" data-segment-count={option.count}>{option.count}</span>
       {/if}

@@ -9,6 +9,7 @@ import {
   SELECT_COMPILED_MODULES,
   STATUS_TONE_RAW_MODULES,
   createMountedComponentHarness,
+  LOCALIZE_OR_RAW_MODULES,
 } from '../helpers/svelte-component-harness.js';
 import { makeCraftingRun, makeGatheringRun, makeSucceededRun } from '../helpers/journal-fixtures.js';
 import { RunJournalBuilder } from '../../src/ui/presenters/RunJournalBuilder.js';
@@ -24,6 +25,7 @@ const harness = createMountedComponentHarness({
   rawModules: [
     'src/ui/svelte/util/rollPromptOrigin.js',
     ...SEARCHABLE_POPOVER_RAW_MODULES,
+    ...LOCALIZE_OR_RAW_MODULES,
     ...STATUS_TONE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/formatDuration.js',
