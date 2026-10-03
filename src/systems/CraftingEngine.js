@@ -135,7 +135,12 @@ import {
 import { planFirstFitDrain, pooledItemOrder } from './pooledAllocation.js';
 import { resolveCheckTriggerMatches } from './ResolutionModeService.js';
 import { postResultCard } from './resultCardPost.js';
-import { resolveRolledAmount, rolledAwardRecord, validateCraft } from './rolledAmountResolver.js';
+import {
+  resolveRolledAmount,
+  rolledAwardRecord,
+  validateCraft,
+  validateSalvage,
+} from './rolledAmountResolver.js';
 import { getCommittedExecutionOutcome, observeExecutionJournal } from './runExecutionJournal.js';
 import {
   attachAwardReceipts,
@@ -6514,18 +6519,13 @@ export class CraftingEngine {
       return ctx;
     }
 
-    const resolutionService =
-      this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
-    if (resolutionService) {
-      const validation = resolutionService.validateSalvage(ctx.component, ctx.system);
-      if (!validation.valid) {
-        // The same discriminator the misconfigured-check abort carries (issue 859), so a caller
-        // does not read a config error as a rolled failure.
-        ctx.refusal = salvageRefusal(
-          `Invalid salvage configuration: ${validation.errors.join(', ')}`,
-          { misconfigured: true }
-        );
-      }
+    const validation = validateSalvage(ctx, this.resolutionModeService);
+    if (!validation.valid) {
+      // Issue 859's discriminator, so a caller does not read a config error as a rolled failure.
+      ctx.refusal = salvageRefusal(
+        `Invalid salvage configuration: ${validation.errors.join(', ')}`,
+        { misconfigured: true }
+      );
     }
     return ctx;
   }
