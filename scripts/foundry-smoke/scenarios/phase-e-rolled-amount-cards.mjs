@@ -411,7 +411,10 @@ export async function runRolledAmountCards(ctx) {
   let snapshot;
   try {
     snapshot = await snapshotWorld(page);
-    forge = await seedChatCardForge(page, cleanup.crafterId, ROLLED_FORGE);
+    forge = {
+      ...ROLLED_FORGE,
+      ...(await seedChatCardForge(page, cleanup.crafterId, ROLLED_FORGE)),
+    };
   } catch (error) {
     ctx.results.steps.push({ step: 'rolled-amount-seed', passed: false, error: error.message });
     return;
