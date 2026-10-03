@@ -47,7 +47,10 @@ export function rollDataRollClass() {
       const expression = this.formula
         .replaceAll(/@([\w.-]+)/g, (_match, path) => {
           const value = read(this.data, path) ?? 0;
-          if (!Number.isFinite(Number(value))) throw new Error(`Unresolved StringTerm ${value}`);
+          const numeric = typeof value === 'number' || typeof value === 'string';
+          if (!numeric || String(value).trim() === '' || !Number.isFinite(Number(value))) {
+            throw new Error(`Unresolved StringTerm ${value}`);
+          }
           return `(${Number(value)})`;
         })
         .replaceAll(/(\d*)d(\d+)/g, (_match, count, faces) =>

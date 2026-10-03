@@ -159,3 +159,20 @@ test('1516: a gathering amount the character breaks fails at plan time and award
   assert.equal(gathered.response.accepted, true, 'the control: a character it reads gathers');
   assert.equal(gathered.actor.items.length, 1);
 });
+
+test('1516: the dice double splices roll data as core does', () => {
+  const total = (formula, data, options = {}) =>
+    new Roll(formula, data).evaluateSync(options).total;
+  assert.equal(total('@n + 1', { n: '3' }), 4, 'a numeric string substitutes');
+  assert.equal(total('@n', { n: 0 }), 0, 'zero is a value, not a gap');
+  assert.equal(total('@missing + 1', {}), 1, 'a missing path counts as 0');
+  assert.equal(total('2d6 + @n', { n: 1 }), 3, 'dice sit at 1 when minimised');
+  assert.equal(
+    total('2d6 + @n', { n: 1 }, { maximize: true }),
+    13,
+    'and at the face when maximised'
+  );
+  for (const value of ['', ' ', true, false, 'Elf']) {
+    assert.throws(() => total('@n + 1', { n: value }), /Unresolved StringTerm/, String(value));
+  }
+});
