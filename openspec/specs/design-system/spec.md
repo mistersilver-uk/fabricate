@@ -157,11 +157,11 @@ Choosing an existing app root, or a second ancestor picked for reach, is the sam
 
 Re-rooting this way is specificity-neutral by construction: one class replaces one class at the same position in the sheet, so nothing in the owning screen's cascade moves.
 A rule whose ancestor chain names a CALLER's own container is exempt and stays where it is, because it can only ever match inside that caller's app and is reachable there whatever the primitive does.
-An application root QUALIFIED BY AN ATTRIBUTE names such a container: `.fabricate-manager[data-manager-view='world-essences'] .manager-pagination` selects one ROUTE of one application, which is a place the caller owns and the primitive cannot be rendered outside of, so it is exempt on the same basis as a named container class.
+An application root QUALIFIED BY AN ATTRIBUTE names such a container: `.fabricate-manager[data-manager-view='world-essences'] .fabricate-pagination` selects one ROUTE of one application, which is a place the caller owns and the primitive cannot be rendered outside of, so it is exempt on the same basis as a named container class.
 The boundary matters as much as the rule.
-An attribute that qualifies anything ELSE — including the family's own compound, as in `.manager-button.fab-manager-button[data-essence-sort-direction]` — states a variant of the PRIMITIVE rather than a place in a caller, earns no exemption, and is re-rooted with the rest of the family.
+An attribute that qualifies anything ELSE — including the family's own compound, as in `.manager-button.fab-manager-button[data-essence-sort-direction]`, written before issue 1507 retired `manager-button` — states a variant of the PRIMITIVE rather than a place in a caller, earns no exemption, and is re-rooted with the rest of the family.
 One further case belongs in this paragraph, and recording it does not widen the exemption.
-A caller's own container is sometimes selected by an ATTRIBUTE that sits on THAT CONTAINER rather than on the application root, as in `.fabricate-manager [data-manager-tools-search] .manager-search`.
+A caller's own container is sometimes selected by an ATTRIBUTE that sits on THAT CONTAINER rather than on the application root, as in `.fabricate-manager [data-manager-tools-search] .manager-search`, written before issue 1507 retired `manager-search`.
 The prose above already covers such a rule — it can only ever match inside that caller's app — but the family compound then stands THIRD, so neither re-rooting form is available: a root at position one matches nothing, because the root sits on the family element, which is a descendant of the attributed one; and dropping the application root leaves the first compound with no namespace class at all.
 The resolution is to name the caller's container by a class the caller writes ON THAT SAME ELEMENT, at the same rank and the same position, leaving the rule app-rooted and exempt.
 That is not the "second ancestor picked for reach" this requirement forbids above: it is the SAME ancestor named a different way, and the change that does it MUST publish the measured match set of both forms.
@@ -211,6 +211,9 @@ The CASCADE forces a corollary.
 A caller rule that must out-rank the primitive's own is deepened at the CALLER's own namespace roots.
 It is never deepened by putting the primitive's root in front of the caller's class, which is an application root from the caller's point of view and is refused.
 A PRIMITIVE-owned rule may DOUBLE the primitive's own root for the same purpose, because that root is its own.
+As of issue 1507 nine primitives write no second family class on the element carrying their root: `manager-button`, `manager-icon-button`, `manager-search`, `manager-toolbar`, `manager-field`, `manager-inspector-card`, `manager-status-toggle`, `manager-pagination` and `manager-action-menu` are retired, and a rule that named one names the root in its place, doubling it where the root was already in the compound so specificity does not move.
+The retirement is of those nine exact tokens; family descendants, `fab-manager-button` and the un-rooted `manager-modal` family remain, owned by issues 1523 and 1779.
+`tests/retired-manager-classes.test.js` holds that absence across `src/`, `styles/`, `tests/`, `scripts/` and `openspec/specs/`, bar the historical lines it lists, and asserts that each of the nine primitives' templates still writes its root.
 The three most-imported controls satisfy it too: `Button` emits `fabricate-button`, `IconButton` emits `fabricate-icon-button`, and `Pagination` emits `fabricate-pagination`.
 None of the three portals anything, so each needs one root, and each writes it on the element that already carries the family class — for the two buttons as the leading literal of the `classes` array the component composes, for the pager inline on its root `<section>`.
 Six more satisfy it as of issue 1508: `Field` emits `fabricate-field`, `SearchField` emits `fabricate-search`, `FilterBar` emits `fabricate-filter-bar`, `InspectorCard` emits `fabricate-card`, `StatusToggle` emits `fabricate-toggle` and `ChanceSlider` emits `fabricate-slider`.
@@ -289,7 +292,7 @@ A recorded decision to LOCATE a component outside the shared directory rests on 
 The component then moves, rather than keeping a location whose stated reason no longer holds, and the docblock that recorded the premise is restated rather than left to contradict the tree.
 `ToggleCard` recorded exactly that premise — that it wears classes styled only under `.fabricate-manager` and would render as an unstyled div anywhere else — and the change that rooted those classes at `fabricate-toggle-card` is the change that moved it.
 A component may also be MOVED into the shared directory WITHOUT gaining a root of its own, when the family it writes is ANOTHER primitive's already-rooted one.
-`ArmedDangerButton` writes `fabricate-button manager-button is-danger` and nothing else, so the `Button` entry already roots every rule that paints it.
+`ArmedDangerButton` writes `fabricate-button is-danger` and nothing else, so the `Button` entry already roots every rule that paints it.
 Giving such a component a root would create a class owning NO rule, which the gate's family and owned floors correctly refuse, and which is an application root BY NAME to the entry that does own them.
 The ASYMMETRY belongs beside that corollary, because the two are related without being converse: one is about a component's LOCATION, the other about a family's OWNERSHIP AT SCALE despite partial primitive authorship.
 A class family WRITTEN BY a shared primitive is still not the primitive's to root while hand-written callers carry the same family at scale.
