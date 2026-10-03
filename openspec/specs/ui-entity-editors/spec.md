@@ -295,6 +295,9 @@ An expression that cannot be rolled, or can never award a positive amount, is ma
 - **A flat result row names its component and cannot clear it.**
 Its name field has no clear: a flat result is re-pointed by removing it and adding another, while a progressive stage swaps its component in place so that it keeps its position in the order.
 Adding a component the set already produces raises that row's quantity, unless that row's amount is rolled, in which case a second row is added.
+- **A result row too narrow for one line wraps by rule, never by overflow.**
+Where its list is narrower than one line needs, a flat row puts its plate, kind and name on the first line with the remove at its end, the toggle and amount on the second at the stepper's width, and any error across the row below.
+A stage row moves its DC and Edit below rather than squeeze its name under the name's minimum, and moves the name below the kind where even that does not fit.
 
 - **Each kind carries its own tint, on every glyph the row draws for its subject.**
 The plate, the named pill's mark and each suggestion's take one colour per kind — component, tag, essence and currency are four distinct hues — so a mixed list reads as one list with four marks in it.

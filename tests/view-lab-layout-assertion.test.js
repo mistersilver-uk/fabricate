@@ -324,3 +324,52 @@ test('rejects a geometry selector too thin to measure anything', async () => {
     /".row" matched 0, fewer than the 1 it measures/
   );
 });
+
+// A wrapped row's lines: each line's boxes share its first box's band, each below the line before.
+const wrappedRow = (boxes) => ({ querySelector: (selector) => boxes[selector] ?? null });
+const WRAPPED = Object.freeze({
+  containerSelector: '.rows',
+  wrappedRows: {
+    rows: '.row',
+    lines: [
+      ['.kind', '.remove'],
+      ['.toggle', '.amount'],
+    ],
+  },
+});
+const twoLines = (overrides = {}) =>
+  wrappedRow({
+    '.kind': box({ top: 0 }),
+    '.remove': box({ top: 4, height: 22 }),
+    '.toggle': box({ top: 38 }),
+    '.amount': box({ top: 39, height: 28 }),
+    ...overrides,
+  });
+const wrappedFrame = (rows) => frame({ '.rows': element({ width: 400 }), '.row': rows });
+
+test('accepts rows whose named controls sit on their stated lines', async () => {
+  await assert.doesNotReject(
+    assertViewLabLayout(wrappedFrame([twoLines(), twoLines()]), WRAPPED, 'wrapped')
+  );
+});
+
+test('rejects a wrapped row whose second line rides up onto the first', async () => {
+  const oneLine = twoLines({ '.toggle': box({ top: 0 }), '.amount': box({ top: 1, height: 28 }) });
+  await assert.rejects(
+    assertViewLabLayout(wrappedFrame([twoLines(), oneLine]), WRAPPED, 'one-line'),
+    /.row #2: line 2 starts at 0px, above line 1's 30px end/
+  );
+});
+
+test('rejects a control off its stated line, and a row missing one', async () => {
+  const dropped = twoLines({ '.remove': box({ top: 38 }) });
+  await assert.rejects(
+    assertViewLabLayout(wrappedFrame([dropped]), WRAPPED, 'dropped'),
+    /.row #1: .remove is off line 1/
+  );
+  const missing = twoLines({ '.amount': undefined });
+  await assert.rejects(
+    assertViewLabLayout(wrappedFrame([missing]), WRAPPED, 'missing'),
+    /.row #1 has no visible .amount/
+  );
+});

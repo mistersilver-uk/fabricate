@@ -8116,8 +8116,8 @@
   min-height: 34px;
 }
 
-/* `:not(.fab-stepper-input)` — the shared `Stepper` supplies its OWN borderless chrome (48px wide, 22px tall, transparent) from its component-scoped \3c style> (issue 883). */
-.fabricate-field.fabricate-field input:not(.fab-stepper-input):not([type='radio'], [type='checkbox']):not([type='range']),
+/* `:not(.fab-stepper-input)` — the shared `Stepper` supplies its OWN borderless chrome (48px wide, 22px tall, transparent) from its component-scoped \3c style> (issue 883), and the requirement row's rolled amount is sized to that stepper by its own rule (issue 1516). */
+.fabricate-field.fabricate-field input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox']):not([type='range']),
 .fabricate-field.fabricate-field select,
 .fabricate-field.fabricate-field textarea {
   width: 100%;
@@ -8129,7 +8129,7 @@
 }
 
 /* Same exclusion, same reason, and this half is why the event editor's slider also stood 36px tall with 8px of side padding instead of the 28px/0 the control asks for (issue 1523). */
-.fabricate-field.fabricate-field input:not(.fab-stepper-input):not([type='radio'], [type='checkbox']):not([type='range']),
+.fabricate-field.fabricate-field input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox']):not([type='range']),
 .fabricate-field.fabricate-field select {
   height: 36px;
   padding: 0 var(--fab-space-2);
@@ -9093,11 +9093,11 @@
 }
 
 
-/* A progressive stage IS the shared list's row, so the item row inside it drops its own border / fill / padding — no double box — and hugs one compact line (issues 643, 676). */
+/* A progressive stage IS the shared list's row, so the item row inside it drops its own border / fill / padding — no double box (issues 643, 676). It wraps where the name would fall under its minimum: the DC and Edit first, then the name (issue 1516). */
 .fabricate-manager .manager-recipe-stage-row .manager-recipe-ingredient-option-row,
 .fabricate-manager .manager-salvage-stage-row .manager-recipe-ingredient-option-row {
   flex: 1 1 auto;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
 
   /* 12px, not the ingredient row's 8px: a stage row runs on the salvage row's 12px rhythm end to end, and the 8px here was the one place the two spacings met. */
   gap: var(--fab-space-3);
@@ -9578,6 +9578,43 @@
 /* A result row's name keeps a stated minimum: the field is the row's only flexible item, and below this the row wraps its controls instead of shrinking the name to an ellipsis. */
 .fabricate-manager .manager-recipe-ingredient-option-row.is-result .manager-recipe-option-name-field {
   min-width: 140px;
+}
+
+/* A flat result row's list is the container its row wraps against (issue 1516). */
+.fabricate-manager .manager-recipe-ingredient-set-groups:has(> .manager-recipe-ingredient-option-row.is-result) {
+  container: fabricate-result-rows / inline-size;
+}
+
+/* Under the width one line needs, the row takes two: the plate, kind and name with the remove at the end, then the toggle and the amount, with any error across the row below. The controls box steps aside so `order` places its children, and `::after` is the line break. */
+@container fabricate-result-rows (max-width: 600px) {
+  .fabricate-manager .manager-recipe-ingredient-set-groups > .manager-recipe-ingredient-option-row.is-result {
+    align-items: center;
+    row-gap: var(--fab-space-1);
+  }
+
+  .fabricate-manager .manager-recipe-ingredient-set-groups > .manager-recipe-ingredient-option-row.is-result::after {
+    content: '';
+    flex-basis: 100%;
+    order: 2;
+  }
+
+  .fabricate-manager .manager-recipe-ingredient-set-groups > .is-result > .manager-recipe-option-controls {
+    /* stylelint-disable-next-line plugin/no-unsupported-browser-features */
+    display: contents;
+  }
+
+  .fabricate-manager .manager-recipe-ingredient-set-groups > .is-result > .manager-recipe-option-controls > * {
+    order: 3;
+  }
+
+  .fabricate-manager .manager-recipe-ingredient-set-groups > .is-result > .manager-recipe-option-controls > .manager-recipe-option-remove {
+    order: 1;
+  }
+
+  .fabricate-manager .manager-recipe-ingredient-set-groups > .is-result > .manager-recipe-option-controls > .manager-recipe-option-invalid {
+    order: 4;
+    margin-inline-end: 0;
+  }
 }
 
 /* Vertical divider between the stepper and the inline "or…". */

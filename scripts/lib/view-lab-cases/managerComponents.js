@@ -16,19 +16,44 @@ const SALVAGE_LIST = '[data-salvage-group] .manager-recipe-ingredient-set-groups
 const SALVAGE_ROWS = `${SALVAGE_LIST} > [data-salvage-result]`;
 const SALVAGE_ROW = (n) => `${SALVAGE_ROWS}:nth-child(${n})`;
 
-/** A flat salvage list's row geometry: one line per row, and every remove and toggle in a column. */
+/**
+ * A flat salvage list's row geometry at 1024, where the list is too narrow for one line: the plate,
+ * kind, name and remove on the first, the toggle and amount on the second, every remove and toggle
+ * in a column.
+ */
 const SALVAGE_GEOMETRY = Object.freeze({
   containerSelector: SALVAGE_LIST,
-  oneLineRows: SALVAGE_ROWS,
+  wrappedRows: {
+    rows: SALVAGE_ROWS,
+    lines: [
+      [
+        '.manager-recipe-option-lead',
+        '.manager-recipe-option-kind',
+        '[data-salvage-result-component]',
+        '[data-remove-salvage-result]',
+      ],
+      ['[role="radiogroup"]', '[data-salvage-result-quantity], [data-recipe-option-formula]'],
+    ],
+  },
   alignedRight: `${SALVAGE_ROWS} .manager-recipe-option-remove`,
   alignedLeft: `${SALVAGE_ROWS} [role="radiogroup"]`,
 });
 
-/** A progressive salvage's stage rows, the name field held at the row's stated minimum. */
+/**
+ * A progressive salvage's stage rows at 1024: the plate and kind, the name below them at its stated
+ * minimum, then the DC and Edit.
+ */
 const SALVAGE_STAGES = '.fabricate-sortable-list-row[data-salvage-result]';
 const SALVAGE_STAGE_GEOMETRY = Object.freeze({
   containerSelector: '[data-salvage-result-groups]',
-  oneLineRows: `${SALVAGE_STAGES} [data-recipe-option]`,
+  wrappedRows: {
+    rows: `${SALVAGE_STAGES} [data-recipe-option]`,
+    lines: [
+      ['.manager-recipe-option-lead', '.manager-recipe-option-kind'],
+      ['[data-salvage-result-component]'],
+      ['[data-salvage-result-difficulty]', '[data-salvage-result-edit]'],
+    ],
+  },
   alignedRight: `${SALVAGE_STAGES} [data-remove-salvage-result]`,
   minInlineSize: {
     selector: `${SALVAGE_STAGES} [data-salvage-result-component]`,
@@ -579,9 +604,12 @@ export const CASES = Object.freeze([
       { selector: '[data-salvage-routing]', scroll: true },
     ],
     expectView: 'component-edit',
+    // The flat row in view after the scroll; its amount toggle is the requirement row's (issue 1516).
+    expectCenterHit:
+      '[data-salvage-group="rw-salv-partial"] [data-salvage-result] [data-recipe-option-amount-mode="rolled"]',
     kinds: ['manager', 'components'],
     // The shared subject check-modifier picker does not render here, and this list used to claim it did (issue 1095).
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+    sourceMatches: SALVAGE_ROW_SOURCES,
   }),
   managerCase({
     id: 'manager-component-edit-salvage-narrow',
@@ -602,9 +630,9 @@ export const CASES = Object.freeze([
     expectView: 'component-edit',
     expectSelector:
       '.fabricate-manager .fabricate-sortable-list-row[data-salvage-result] [data-sortable-move="up"]',
-    // The stage's Edit link sits in the requirement row's trailing controls (issue 1516).
+    // The second stage's Edit link, in view after the scroll, is the row's trailing control (issue 1516).
     expectLayout: SALVAGE_STAGE_GEOMETRY,
-    expectCenterHit: `${SALVAGE_STAGES} [data-salvage-result-edit]`,
+    expectCenterHit: `${SALVAGE_STAGES}[data-salvage-stage="2"] [data-salvage-result-edit]`,
     position: { width: 1024, height: 640 },
     kinds: ['manager', 'components', 'responsive'],
     sourceMatches: SALVAGE_ROW_SOURCES,
@@ -638,10 +666,8 @@ export const CASES = Object.freeze([
       },
     ],
     expectView: 'component-edit',
-    // A salvage row's amount toggle is the requirement row's (issue 1516).
-    expectCenterHit: `${SALVAGE_ROW(1)} [data-recipe-option-amount-mode="rolled"]`,
     kinds: ['manager', 'components'],
-    sourceMatches: SALVAGE_ROW_SOURCES,
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
   }),
   // The fixed-or-rolled amount on salvage results (issue 1516): Steel Ingot Fixed, Tanned Leather
   // rolled, a third row opened on Rolled with nothing typed, and a fourth holding an unrollable

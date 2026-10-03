@@ -1457,7 +1457,7 @@ test('manager system edit view defines scoped stable form and toggle layout', ()
   const gridBlock = blockFor('.fabricate-manager .manager-edit-grid');
   // `:not(.fab-stepper-input)` (issue 676); `:not([type='radio'], [type='checkbox'])` (issue 2151).
   const fieldInputBlock = blockFor(
-    ".fabricate-field.fabricate-field input:not(.fab-stepper-input):not([type='radio'], [type='checkbox']):not([type='range']),\n" +
+    ".fabricate-field.fabricate-field input:not(.fab-stepper-input, [data-recipe-option-formula]):not([type='radio'], [type='checkbox']):not([type='range']),\n" +
       '.fabricate-field.fabricate-field select'
   );
   const toggleListBlock = blockFor('.fabricate-manager .manager-toggle-list');
