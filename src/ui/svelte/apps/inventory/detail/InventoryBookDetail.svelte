@@ -4,7 +4,8 @@
   (`isRecipeItem`). It shows the book's access badge, its learning requirements,
   its flavour text, and the recipes it can teach — a single recipe inline, or
   several in a searchable, paginated accordion — each with a Learn button
-  (knowledge mode) or a Craft button (item mode).
+  (knowledge mode) or a Craft button (item mode). "Read & learn" every recipe is
+  the header's primary when the reader can learn the whole book.
 
   Extracted from the former double-duty `InventoryDetail.svelte` (issue 675).
   `InventoryDetail` remains the entry point that routes here, which is what keeps
@@ -23,6 +24,7 @@
   Prop-driven; learning routes back through the store seams.
 -->
 <script>
+  import ManagerSearchField from '../../../components/ManagerSearchField.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import Select from '../../../components/Select.svelte';
   import EmptyState from '../../../components/EmptyState.svelte';
@@ -108,6 +110,22 @@
   function learnAll() {
     if (learningRecipeId == null && learnableIds.length > 0) onLearnAll?.(learnableIds);
   }
+  const headerPrimary = $derived(
+    canLearnAll
+      ? {
+          primaryLabel:
+            recipeTotal === 1
+              ? localize('FABRICATE.App.Inventory.Detail.ReadLearnAllRecipeSingular')
+              : localize('FABRICATE.App.Inventory.Detail.ReadLearnAllRecipes', {
+                  total: recipeTotal,
+                }),
+          primaryIcon: 'fas fa-graduation-cap',
+          primaryDisabled: learningRecipeId != null,
+          primaryProps: { 'data-inventory-learn-all': '' },
+          onclick: learnAll,
+        }
+      : {}
+  );
   function craftRecipe(recipeId) {
     if (recipeId) onOpenRecipe?.(recipeId);
   }
@@ -141,8 +159,8 @@
   function learnRecipe(recipeId) {
     if (recipeId && learningRecipeId == null) onLearn?.(recipeId);
   }
-  function onRecipeSearch(event) {
-    recipeSearch = event.currentTarget.value;
+  function onRecipeSearch(next) {
+    recipeSearch = next;
     recipePage = 0;
   }
   // The caption the trigger is named by, per instance: two book inspectors can render in one
@@ -219,6 +237,7 @@
     count: Number(item.totalQuantity ?? 0),
   })}
   chips={headerChips}
+  primary={headerPrimary}
 >
   <!-- Requirements + description span the FULL detail width below the header (not
        squeezed into the narrow heading column beside the thumbnail). -->
@@ -259,26 +278,6 @@
     <p class="inventory-detail-book-desc">{bookDescription}</p>
   {/if}
 
-  {#if canLearnAll}
-    <button
-      type="button"
-      data-keyboard-focus="true"
-      class="inventory-detail-read-learn"
-      data-inventory-learn-all
-      disabled={learningRecipeId != null}
-      onclick={learnAll}
-    >
-      <i class="fas fa-graduation-cap" aria-hidden="true"></i>
-      <span
-        >{recipeTotal === 1
-          ? localize('FABRICATE.App.Inventory.Detail.ReadLearnAllRecipeSingular')
-          : localize('FABRICATE.App.Inventory.Detail.ReadLearnAllRecipes', {
-              total: recipeTotal,
-            })}</span
-      >
-    </button>
-  {/if}
-
   <section class="inventory-detail-section" data-inventory-section="learn">
     <p class="inventory-detail-section-title">
       {localize('FABRICATE.App.Inventory.Detail.RecipesTitle')}
@@ -305,17 +304,14 @@
       </div>
     {:else}
       {#if searchableRecipes}
-        <div class="inventory-detail-recipe-search">
-          <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
-          <input
-            type="text"
-            value={recipeSearch}
-            placeholder={localize('FABRICATE.App.Inventory.Detail.RecipeSearchPlaceholder')}
-            aria-label={localize('FABRICATE.App.Inventory.Detail.RecipeSearchLabel')}
-            oninput={onRecipeSearch}
-            data-inventory-recipe-search
-          />
-        </div>
+        <ManagerSearchField
+          class="inventory-detail-recipe-search"
+          value={recipeSearch}
+          onChange={onRecipeSearch}
+          placeholder={localize('FABRICATE.App.Inventory.Detail.RecipeSearchPlaceholder')}
+          ariaLabel={localize('FABRICATE.App.Inventory.Detail.RecipeSearchLabel')}
+          inputProps={{ 'data-inventory-recipe-search': '' }}
+        />
       {/if}
       {#if filteredRecipes.length === 0}
         <!-- `note`, not `filtered`, although a zero-result recipe SEARCH is a filtered empty:
@@ -400,6 +396,7 @@
             <InventoryDetailPager
               list={filteredRecipes}
               sectionKey="recipes"
+              ariaLabel={localize('FABRICATE.App.Inventory.Detail.RecipesTitle')}
               page={Math.min(recipePage, recipePageCount - 1)}
               pageSize={recipePageSize}
               onPage={(value) => (recipePage = value)}
@@ -426,43 +423,6 @@
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 4;
     overflow: hidden;
-  }
-
-  /* The "Read & learn" (knowledge) / "Use" (item) call-to-action that expands the
-     recipe list — mirrors the GM "How players see it" preview CTA: a large, centered,
-     solid-accent button. */
-  .inventory-detail-read-learn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--fab-space-2);
-    width: 100%;
-    box-sizing: border-box;
-    padding: 13px 16px;
-    min-height: 48px;
-    border: 1px solid var(--fab-accent-border);
-    border-radius: 8px;
-    background: var(--fab-accent);
-    color: var(--fab-on-accent);
-    font-size: 14px;
-    font-weight: 700;
-    cursor: pointer;
-    text-align: center;
-  }
-
-  .inventory-detail-read-learn:hover {
-    filter: brightness(1.08);
-  }
-
-  .inventory-detail-read-learn:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: 2px;
-  }
-
-  .inventory-detail-read-learn:disabled {
-    opacity: 0.5;
-    cursor: default;
-    filter: none;
   }
 
   /* The static (non-toggle) headline for a single-recipe book, mirroring the
@@ -563,29 +523,9 @@
     color: var(--fab-danger-text, var(--fab-text-muted));
   }
 
-  .inventory-detail-recipe-search {
-    position: relative;
-    display: flex;
-    align-items: center;
-  }
-
-  .inventory-detail-recipe-search i {
-    position: absolute;
-    left: 10px;
-    font-size: 12px;
-    color: var(--fab-text-muted);
-    pointer-events: none;
-  }
-
-  .inventory-detail-recipe-search input {
-    width: 100%;
-    box-sizing: border-box;
-    padding: 6px 10px 6px 28px;
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface);
-    color: var(--fab-text);
-    font-size: 13px;
+  /* The field's family basis is a toolbar width, which in this column would be its height. */
+  .inventory-detail-section > :global(.inventory-detail-recipe-search) {
+    flex: none;
   }
 
   .inventory-detail-accordion {

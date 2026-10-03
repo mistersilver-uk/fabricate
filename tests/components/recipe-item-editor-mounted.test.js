@@ -22,6 +22,8 @@ const harness = createMountedComponentHarness({
   runeModules: TYPEAHEAD_RUNE_MODULES,
   rawModules: [
     'src/ui/svelte/util/rollPromptOrigin.js',
+    // The salvage action's state the inspector header and panel share (issue 1518).
+    'src/ui/svelte/apps/inventory/detail/salvage/salvageAction.js',
     // Issue 1506: the one tone map the converted status pills read at a dynamic site.
     ...STATUS_TONE_RAW_MODULES,
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
@@ -99,6 +101,8 @@ const harness = createMountedComponentHarness({
     // The multi-system participation selector InventoryComponentDetail imports (issue 766).
     'src/ui/svelte/apps/inventory/detail/InventorySystemSelector.svelte',
     'src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte',
+    // The book's recipe search (issue 1518).
+    'src/ui/svelte/components/ManagerSearchField.svelte',
     'src/ui/svelte/apps/inventory/InventoryDetail.svelte',
     // The promoted tab-strip primitive (issue 1362), a dependency of the tab strip below.
     'src/ui/svelte/components/EditorTabs.svelte',

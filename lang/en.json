@@ -818,8 +818,6 @@
           "RequiredForEmpty": "Not required as a tool by any known recipe.",
           "ProducedByTitle": "Produced by",
           "ProducedByEmpty": "Not produced by any known recipe, salvage, or gathering.",
-          "PagePrevious": "Previous page",
-          "PageNext": "Next page",
           "RoleIngredient": "Ingredient",
           "RoleTool": "Tool",
           "RoleEssence": "Essence",

@@ -29,7 +29,7 @@ import {
   multiSystemProgressiveCardRow,
 } from '../helpers/inventoryCollapseFixtures.js';
 import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
-import { assertIdentityHeader } from '../helpers/playerDetailHeaderAssertions.js';
+import { assertIdentityHeader, primaryButtons } from '../helpers/playerDetailHeaderAssertions.js';
 import { assertWholeHeaderDisclosure } from '../helpers/wholeHeaderDisclosure.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -43,6 +43,8 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-inventory-view-',
   rawModules: [
     'src/ui/svelte/util/rollPromptOrigin.js',
+    // The salvage action's state the inspector header and panel share (issue 1518).
+    'src/ui/svelte/apps/inventory/detail/salvage/salvageAction.js',
     // Issue 1506: the one tone map the converted status pills read at a dynamic site.
     ...STATUS_TONE_RAW_MODULES,
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
@@ -101,6 +103,8 @@ const harness = createMountedComponentHarness({
     // card (issue 766). A `.svelte` leaf, so it lives in compiledModules — NOT
     // CRAFTING_APP_RAW_MODULES; an omission HANGS this suite (# cancelled), never fails.
     'src/ui/svelte/apps/inventory/detail/InventorySystemSelector.svelte',
+    // The Info | Salvage strip (issue 1518).
+    'src/ui/svelte/components/EditorTabs.svelte',
     'src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte',
     'src/ui/svelte/apps/inventory/InventoryDetail.svelte',
     // The bulk tree (issue 859). `InventoryView` renders the panel as a SIBLING of
@@ -370,19 +374,26 @@ describe('InventoryView (mounted)', () => {
     assert.match(detail.textContent, /Carve Bone Idol/, 'detail lists the tool recipe');
   });
 
-  it('leads the detail with the identity row and draws no primary outside it', async () => {
-    const { services } = makeServices(makeItem());
+  it('leads the detail with the identity row, and puts Salvage in it only on the salvage tab', async () => {
+    const { services, calls } = salvageServices(salvageItem());
     const target = await harness.mount({ services });
     await settle();
 
-    // No inventory verb is a `ManagerButton role="primary"` yet, so the budget is spent nowhere.
-    const detail = target.querySelector('[data-inventory-detail="sys:c1"]');
-    const row = assertIdentityHeader(detail, { primaries: 0, name: 'Mordant Gland' });
+    const detail = () => target.querySelector('[data-inventory-detail="sys:c1"]');
+    const row = assertIdentityHeader(detail(), { primaries: 0, name: 'Mordant Gland' });
     assert.ok(Boolean(row.querySelector('.inventory-detail-total')), 'the total is its meta');
 
-    target.querySelector('[data-inventory-detail-tab="salvage"]')?.click();
+    target.querySelector('[data-inventory-detail-tab="salvage"]').click();
     await settle();
-    assertIdentityHeader(target.querySelector('[data-inventory-detail="sys:c1"]'), { primaries: 0 });
+    const salvageRow = assertIdentityHeader(detail(), { primaries: 1 });
+    const action = salvageRow.querySelector('[data-inventory-salvage-action]');
+    assert.ok(Boolean(action), 'the one primary is the salvage action');
+    action.click();
+    assert.deepEqual(calls.salvage, ['c1'], 'and it salvages');
+
+    target.querySelector('[data-inventory-detail-tab="info"]').click();
+    await settle();
+    assertIdentityHeader(detail(), { primaries: 0 });
   });
 
   it('hides the Required for section for a non-tool component', async () => {
@@ -647,6 +658,22 @@ describe('InventoryView (mounted)', () => {
     );
   });
 
+  it('routes the inventory search through the shared search field to the store', async () => {
+    const { services, store } = makeServices(makeItem());
+    const searched = [];
+    store.setSearch = (value) => {
+      searched.push(value);
+    };
+    const target = await harness.mount({ services });
+    await settle();
+
+    const input = target.querySelector(':scope [data-inventory-filters] [data-inventory-search]');
+    assert.ok(Boolean(input.closest('.fabricate-search')), 'the field is ManagerSearchField');
+    input.value = 'gland';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    assert.deepEqual(searched, ['gland']);
+  });
+
   it('paginates a detail list at 6 with a working next control', async () => {
     const item = makeItem();
     // 8 using recipes → 2 pages of 6 + 2.
@@ -669,6 +696,13 @@ describe('InventoryView (mounted)', () => {
     );
     const pager = detail.querySelector('[data-inventory-pager="used"]');
     assert.ok(pager, 'renders a pager for the used-by section');
+    assert.ok(Boolean(pager.querySelector('.fabricate-pagination')), 'through the shared pager');
+    assert.ok(!pager.querySelector('[data-pagination-size]'), 'with no page-size choice');
+    assert.equal(pager.querySelector('[data-pagination-prev]').disabled, true, 'first page');
+    assert.ok(
+      !detail.querySelector('[data-inventory-pager="sources"]'),
+      'a list that fits one page draws no pager'
+    );
     assert.ok(detail.querySelector('[data-inventory-used-by="u0"]'), 'shows the first-page rows');
     assert.equal(
       detail.querySelector('[data-inventory-used-by="u7"]'),
@@ -677,7 +711,7 @@ describe('InventoryView (mounted)', () => {
     );
 
     // Advance to the next page: the last 2 rows show.
-    pager.querySelectorAll('.inventory-detail-pager-btn')[1].click();
+    pager.querySelector('[data-pagination-next]').click();
     flushSync();
     assert.equal(
       detail.querySelectorAll('[data-inventory-used-by]').length,
@@ -834,6 +868,8 @@ describe('InventoryView (mounted) — recipe-item books', () => {
       !/ReadLearnAllRecipes/.test(learnAll.textContent),
       'not the plural "...all {n} recipes"'
     );
+    const row = assertIdentityHeader(detail, { primaries: 1 });
+    assert.ok(row.contains(learnAll), 'Read & learn is the identity row’s one primary');
     learnAll.click();
     await settle();
     assert.deepEqual(calls.learnAll, [['r1']], 'learn-all passes the unlearned recipe ids');
@@ -899,6 +935,7 @@ describe('InventoryView (mounted) — recipe-item books', () => {
       null,
       'no learn-all convenience when the budget is spent'
     );
+    assertIdentityHeader(detail, { primaries: 0 });
   });
 
   it('renders a DISABLED Learn button (not an enumeration chip) for a requirement-blocked recipe (issue 544)', async () => {
@@ -992,6 +1029,31 @@ describe('InventoryView (mounted) — recipe-item books', () => {
       detail.querySelector('[data-inventory-recipe-body="r1"]').textContent,
       /Description 1/,
       'expanding the row reveals the description'
+    );
+  });
+
+  it('narrows the recipe list through the shared search field', async () => {
+    const recipes = Array.from({ length: 8 }, (_, i) => ({
+      id: `r${i + 1}`,
+      name: `Recipe ${i + 1}`,
+      description: '',
+      img: null,
+      learned: false,
+    }));
+    const { services } = makeBookServices(makeBook(recipes));
+    const target = await harness.mount({ services });
+    await settle();
+
+    const input = target.querySelector('[data-inventory-recipe-search]');
+    assert.ok(Boolean(input.closest('.fabricate-search')), 'the field is ManagerSearchField');
+    input.value = 'recipe 7';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await settle();
+    assert.deepEqual(
+      [...target.querySelectorAll('[data-inventory-learn-recipe]')].map(
+        (row) => row.dataset.inventoryLearnRecipe
+      ),
+      ['r7']
     );
   });
 
@@ -1312,6 +1374,31 @@ describe('InventoryView (mounted) — player salvage surface', () => {
 
     assert.equal(target.querySelector('[role="tablist"]'), null);
     assert.equal(target.querySelector('[data-inventory-detail-tab="salvage"]'), null);
+  });
+
+  it('moves focus and selection to the next tab on ArrowRight, through the shared strip', async () => {
+    const { services } = salvageServices(salvageItem());
+    const target = await harness.mount({ services });
+    await settle();
+
+    const strip = target.querySelector('[role="tablist"]');
+    assert.ok(strip.classList.contains('fabricate-tabs'), 'the strip is EditorTabs');
+    const info = target.querySelector('[data-inventory-detail-tab="info"]');
+    info.focus();
+    info.dispatchEvent(
+      new globalThis.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })
+    );
+    await settle();
+
+    const salvage = target.querySelector('[data-inventory-detail-tab="salvage"]');
+    assert.equal(salvage.getAttribute('aria-selected'), 'true', 'selection moved');
+    assert.equal(document.activeElement, salvage, 'and focus moved with it');
+    assert.equal(salvage.getAttribute('aria-controls'), 'inventory-detail-panel-salvage');
+    assert.ok(
+      !target.querySelector('[data-inventory-detail-tab="info"]').hasAttribute('aria-controls'),
+      'only the shown panel is named, since the other is not in the document'
+    );
+    assert.ok(Boolean(target.querySelector('#inventory-detail-panel-salvage')));
   });
 
   it('switching to Salvage renders the panel in a labelled tabpanel', async () => {
@@ -3033,6 +3120,43 @@ describe('InventoryView (mounted) — bulk salvage and destroy (issue 859)', () 
       ['sys:b', 'subtle'],
       ['sys:c', 'subtle'],
     ]);
+  });
+
+  it('spends the pane’s one primary on the commit, and on Done once a report stands', async () => {
+    const queued = { selectedKeys: ['sys:c1'], entries: [bulkEntry()], salvageable: [bulkEntry()] };
+    const counts = { selected: 1, salvageable: 1, blocked: 0, atMax: false };
+    const { services } = makeServices(makeItem(), { ...queued, counts });
+    const target = await harness.mount({ services });
+    await settle();
+
+    // The commit stays in the sticky footer: the panel's structure is not this change's to move.
+    const preview = target.querySelector('[data-inventory-bulk-panel]');
+    assert.deepEqual(
+      primaryButtons(preview).map((button) => button.hasAttribute('data-inventory-bulk-salvage')),
+      [true],
+      'Salvage is the one primary'
+    );
+    assert.ok(
+      target.querySelector('[data-inventory-bulk-destroy]').classList.contains('is-danger'),
+      'Destroy is the plain danger role'
+    );
+    assert.ok(
+      target.querySelector('[data-inventory-bulk-clear]').classList.contains('is-ghost'),
+      'Clear is a ghost'
+    );
+
+    harness.remount();
+    const report = { mode: 'salvage', cancelled: false, counts: { total: 1, succeeded: 1 } };
+    const done = makeServices(makeItem(), { ...queued, counts, report: { ...report, items: [] } });
+    const reported = await harness.mount({ services: done.services });
+    await settle();
+    assert.deepEqual(
+      primaryButtons(reported.querySelector('[data-inventory-bulk-panel]')).map((button) =>
+        button.hasAttribute('data-inventory-bulk-done')
+      ),
+      [true],
+      'Done is the one primary'
+    );
   });
 
   it('shows only Done in the REPORT state, and no footer actions', async () => {

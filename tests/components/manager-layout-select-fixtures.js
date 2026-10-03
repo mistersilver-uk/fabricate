@@ -245,15 +245,16 @@ export function selectPanelFixture(area, rung, { ticked }) {
 
 // THE CONVERTED PAGER'S SEVEN SITES.
 export const CONVERTED_PAGER_SITES = Object.freeze([
+  // The inventory grid's re-theme is deleted (issue 1518), so its pager paints itself.
   Object.freeze({
     probe: 'inventory',
     padding: '12px',
     area: 'fabricate-app',
     wrapper: 'inventory-grid-pagination',
     component: 'src/ui/svelte/apps/inventory/InventoryGrid.svelte',
-    fill: 'surface',
-    floored: false,
-    declaredArrow: 26,
+    fill: 'bg-2',
+    floored: true,
+    declaredArrow: 28,
   }),
   // The recipe browser's re-theme is deleted (issue 1518), so its pager paints itself.
   Object.freeze({

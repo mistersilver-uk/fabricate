@@ -4,7 +4,8 @@
   Fabricate has ever had. It lives INLINE in the inspector; there is no modal.
 
   Structure: mode banner -> read-only roll summary (after resolution only) -> the
-  per-mode body -> the one-shot footer.
+  per-mode body -> the footer note. The one-shot action it explains is the inspector
+  header's primary (`salvageAction.js` holds its state for both).
 
   BODY DISPATCH IS ON THE PAIR `(mode, checkUsable)`, not a four-way taxonomy. A check
   is usable iff its mode's roll formula is authored, and that is the only gate the
@@ -17,14 +18,13 @@
   `features.salvage` + `component.salvage.enabled`, which is the condition for this
   panel existing at all.
 
-  THE FOOTER IS ONE-SHOT FOR EVERY MODE. `promptCheckRoll` IS the roll step, so
+  THE ACTION IS ONE-SHOT FOR EVERY MODE. `promptCheckRoll` IS the roll step, so
   pressing it rolls and commits in a single gesture: no reroll, no separate confirm.
   Every value it presents is decided builder-side — this component never re-derives a
   mode, a DC, or a threshold, and never hardcodes a formula.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import { withRollPromptOrigin } from '../../../util/rollPromptOrigin.js';
   import Callout from '../../../components/Callout.svelte';
   import Kicker from '../../../components/Kicker.svelte';
   import SalvageMisconfiguredBody from './salvage/SalvageMisconfiguredBody.svelte';
@@ -37,10 +37,10 @@
   let {
     salvage = null,
     actingSystemName = '',
-    busy = false,
     depleted = false,
     result = null,
-    onSalvage = null,
+    // The header action's tool block, from `salvageAction`, so the note explains the button.
+    toolBlocked = false,
     onReset = null,
     stages = [],
     announcement = '',
@@ -59,23 +59,16 @@
   // prerequisite is worth disclosing in every state.
   const toolStates = $derived(Array.isArray(salvage?.toolStates) ? salvage.toolStates : []);
   const hasToolRequirements = $derived(toolStates.length > 0);
-  // A missing required tool blocks the pre-roll action so the one-shot roll is never spent
-  // on an attempt the engine will reject. Threaded from the view-model, never re-derived.
-  const toolsAvailable = $derived(salvage?.toolsAvailable !== false);
-  const toolBlocked = $derived(hasToolRequirements && !toolsAvailable);
   // The builder's discriminator (issue 764): the misconfigured body dispatches on it, so
   // a Simple multi-group misconfig renders Simple-specific copy rather than routed copy.
   const misconfiguredReason = $derived(salvage?.misconfiguredReason ?? null);
   // The ribbon is up: the attempt resolved and awarded. "Salvage again" resets.
   const committed = $derived(result?.state === 'success');
   // Salvaging the last copy leaves nothing to break down again. The ribbon still
-  // shows what was recovered, but the way back to rolling must be withheld — and the
-  // pre-roll footer's action disabled — because there is no stock left to salvage
-  // (issue 675 defect). `depleted` is the store's post-salvage remaining, threaded in.
+  // shows what was recovered, but the way back to rolling must be withheld because
+  // there is no stock left to salvage (issue 675 defect). `depleted` is the store's
+  // post-salvage remaining, threaded in.
   const canSalvageAgain = $derived(!depleted);
-  // A time-gated run has STARTED and awarded nothing. No ribbon, and no "Salvage
-  // again" — that would only re-enter the time gate.
-  const waiting = $derived(result?.state === 'waiting');
 
   // Names the acting participation when the card spans more than one system (issue 766), so
   // the player knows which system's salvage this panel drives. Empty for a single-system
@@ -147,16 +140,6 @@
                 ? 'FABRICATE.App.Inventory.Salvage.BannerSimpleRule'
                 : 'FABRICATE.App.Inventory.Salvage.BannerNoCheckRule'
         )
-  );
-
-  // "Salvage" with no usable check; "Salvage roll" with one — the label names the
-  // gesture the player is about to make.
-  const actionLabel = $derived(
-    localize(
-      checkUsable
-        ? 'FABRICATE.App.Inventory.Salvage.ActionRoll'
-        : 'FABRICATE.App.Inventory.Salvage.Action'
-    )
   );
 
   // The note explains what pressing the button COSTS, and that cost is not the same in
@@ -273,30 +256,12 @@
       {/if}
     </p>
   {:else}
-    <!-- A ruled row, not a full-width slab: the note explains the gesture's cost on the
-         left and the action sits right, at its own width. -->
+    <!-- A ruled row closing the panel: what pressing the header's action costs, or why it is
+         off. The header action names this note by its id. -->
     <div class="salvage-footer">
       <p class="salvage-footer-note" id="salvage-footer-note" data-inventory-salvage-footer-note>
         {footerNote}
       </p>
-      <button
-        type="button"
-        class="salvage-action"
-        data-inventory-salvage-action
-        disabled={busy || misconfigured || waiting || depleted || !toolsAvailable}
-        aria-describedby={toolBlocked ? 'salvage-footer-note' : undefined}
-        aria-busy={busy}
-        onclick={(event) => withRollPromptOrigin(event, () => onSalvage?.())}
-      >
-        <i
-          class="fas"
-          class:fa-spinner={busy}
-          class:fa-spin={busy}
-          class:fa-recycle={!busy}
-          aria-hidden="true"
-        ></i>
-        <span>{actionLabel}</span>
-      </button>
     </div>
   {/if}
 </div>
@@ -317,13 +282,7 @@
     padding-bottom: var(--fab-space-6);
   }
 
-  /* The prototype's ruled action row: a note left, the action right. */
   .salvage-footer {
-    display: flex;
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: center;
-    gap: var(--fab-space-3);
     border-top: 1px solid var(--fab-border);
     padding-top: var(--fab-space-3);
   }
@@ -337,11 +296,8 @@
     color: var(--fab-text-subtle);
   }
 
-  /* Foundry's global `.app button` pins a fixed height and centers content; a button
-     that sets only min-height gets CROPPED — its content spills past the border.
-     Reset the inherited box (the EnvironmentCard pattern). Mounted tests cannot see
-     this class of bug; it reproduces only in real Foundry. */
-  .salvage-action,
+  /* Foundry's global `.app button` pins a fixed height and centers content; reset the
+     inherited box or the inline reset is cropped. */
   .salvage-again {
     box-sizing: border-box;
     appearance: none;
@@ -353,44 +309,9 @@
     cursor: pointer;
   }
 
-  /* CraftButton's spec — the house action primitive — rather than a fourth private one:
-     radius 8, an --accent border, 600/14. It differs only where it must: this button
-     sits in a row at its own width, so it is not the primitive's full-width 44px slab. */
-  .salvage-action {
-    flex: 0 0 auto;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--fab-space-2);
-    min-height: 30px;
-    padding: 6px 14px;
-    border: 1px solid var(--fab-accent);
-    border-radius: 8px;
-    background: var(--fab-accent);
-    color: var(--fab-on-accent);
-    font-size: 14px;
-    font-weight: 600;
-    white-space: nowrap;
-  }
-
-  .salvage-action:hover:not(:disabled) {
-    filter: brightness(1.05);
-  }
-
-  .salvage-action:focus-visible,
   .salvage-again:focus-visible {
     outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
-  }
-
-  /* CraftButton's disabled treatment, so a blocked salvage reads like a blocked craft. */
-  .salvage-action:disabled {
-    cursor: not-allowed;
-    opacity: 0.55;
-    border-color: var(--fab-border);
-    background: var(--fab-surface-raised);
-    color: var(--fab-text-muted);
-    filter: none;
   }
 
   /* An inline text button inside the ribbon: no box of its own. */
@@ -406,7 +327,7 @@
   }
 
   .salvage-again:hover {
-    filter: brightness(1.1);
+    text-decoration-thickness: 2px;
   }
 
   /* The depleted stand-in for "Salvage again": same slot, same weight, but a quiet

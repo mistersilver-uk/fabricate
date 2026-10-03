@@ -15,8 +15,12 @@ import {
 const repoRoot = resolve(import.meta.dirname, '../..');
 const PRIMITIVE = 'src/ui/svelte/components/EditorTabs.svelte';
 const MANAGER_DIRECTORY = 'src/ui/svelte/apps/manager/';
-/** The player directories whose tab strips converted (issue 1518); none may write a raw tablist. */
-const PLAYER_DIRECTORIES = Object.freeze(['src/ui/svelte/apps/gathering/']);
+/** The five player directories (issue 1518); none may write a raw tablist. */
+const PLAYER_DIRECTORIES = Object.freeze(
+  ['alchemy', 'crafting', 'gathering', 'inventory', 'journal'].map(
+    (name) => `src/ui/svelte/apps/${name}/`
+  )
+);
 const WALKED_DIRECTORIES = Object.freeze([MANAGER_DIRECTORY, ...PLAYER_DIRECTORIES]);
 
 /** EMPTY, and the empty array is the claim. */
@@ -126,9 +130,10 @@ test('the manager tablist walk is alive, so the clause below is not vacuous', ()
     managerFiles.length > 50,
     `the walk reached ${managerFiles.length} files under ${MANAGER_DIRECTORY}, so it is not walking`
   );
+  // `alchemy/` is the smallest walked directory, at six files.
   for (const directory of PLAYER_DIRECTORIES) {
     const playerFiles = Object.keys(SOURCES).filter((file) => file.startsWith(directory));
-    assert.ok(playerFiles.length > 10, `the walk reached ${playerFiles.length} files under ${directory}`);
+    assert.ok(playerFiles.length > 4, `the walk reached ${playerFiles.length} files under ${directory}`);
   }
   // The walk must find the PRIMITIVE's own tablist. If it found nothing at all.
   assert.ok(
