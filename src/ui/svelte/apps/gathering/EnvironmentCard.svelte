@@ -22,7 +22,7 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
-  import { watchSceneImage } from '../../util/sceneImages.js';
+  import { watchSceneImage } from './linkedSceneImage.js';
   import { riskClass, riskLabel, biomeChipStyle } from '../../util/gatheringFormat.js';
   import { DEFAULT_GATHERING_ENVIRONMENT_IMG } from '../../../../gatheringImageDefaults.js';
 

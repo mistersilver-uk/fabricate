@@ -30,7 +30,7 @@
   import { localize } from '../../util/foundryBridge.js';
   import { withRollPromptOrigin } from '../../util/rollPromptOrigin.js';
   import { riskClass, riskLabel, biomeChipStyle } from '../../util/gatheringFormat.js';
-  import { watchSceneImage } from '../../util/sceneImages.js';
+  import { watchSceneImage } from './linkedSceneImage.js';
   import PlayerDetailHeader from '../PlayerDetailHeader.svelte';
   import GatheringDetailTabs from './GatheringDetailTabs.svelte';
   import GatheringTasksPanel from './GatheringTasksPanel.svelte';

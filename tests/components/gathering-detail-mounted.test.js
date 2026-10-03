@@ -243,6 +243,10 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     const sceneImagesDestination = join(tempRoot, 'src/ui/svelte/util/sceneImages.js');
     mkdirSync(dirname(sceneImagesDestination), { recursive: true });
     writeFileSync(sceneImagesDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/sceneImages.js'), 'utf8'));
+    // The linked-scene image the environment card and the centre header share (issue 1518).
+    const linkedSceneImage = 'src/ui/svelte/apps/gathering/linkedSceneImage.js';
+    mkdirSync(dirname(join(tempRoot, linkedSceneImage)), { recursive: true });
+    writeFileSync(join(tempRoot, linkedSceneImage), readFileSync(resolve(repoRoot, linkedSceneImage), 'utf8'));
 
     // GatheringTaskDetail imports the calendar-aware respawn-ETA duration
     // formatter, which in turn imports the pure foundryCalendar helpers; copy

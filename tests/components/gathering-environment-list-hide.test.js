@@ -22,6 +22,7 @@ const harness = createMountedComponentHarness({
     ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/sceneImages.js',
+    'src/ui/svelte/apps/gathering/linkedSceneImage.js',
     'src/ui/svelte/util/gatheringFormat.js',
     'src/gatheringImageDefaults.js'
   ],
