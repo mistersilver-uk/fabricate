@@ -9,6 +9,7 @@ import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
 import { CraftingSystemManager } from '../../src/systems/CraftingSystemManager.js';
+import { normalizeSalvageResult } from '../../src/systems/normalize/salvage.js';
 import {
   COMPONENT_EDIT_VIEW_COMPILED_MODULES,
   COMPONENT_EDIT_VIEW_RAW_MODULES,
@@ -170,6 +171,30 @@ describe('ComponentEditView salvage rows are the requirement row (issue 1516)', 
         ':scope [data-salvage-result-component] [data-recipe-option-search]'
       ),
       'the cleared stage searches again, in its place'
+    );
+    harness.remount();
+  });
+
+  it('a cleared stage stages no component, its stored alias included', async () => {
+    const drafts = [];
+    const stored = [{ ...results()[0], systemItemId: 'cmp-scrap' }, results()[1]];
+    const target = await harness.mount(
+      props({
+        mode: 'progressive',
+        rows: stored,
+        onDraftChange: (draft) => {
+          drafts.push(draft);
+        },
+      })
+    );
+    stageRows(target)[0].querySelector('[data-recipe-option-clear]').click();
+    await settle();
+    const [cleared] = drafts.at(-1).updates.salvage.resultGroups[0].results;
+    assert.equal(cleared.componentId, null);
+    assert.equal(
+      normalizeSalvageResult(cleared).componentId,
+      null,
+      'the saved stage does not come back as its old component'
     );
     harness.remount();
   });

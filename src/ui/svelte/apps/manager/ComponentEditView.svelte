@@ -950,9 +950,11 @@
     );
   }
 
-  // `next` replaces the result whole, because `fromValue` removes a formula by deleting its key.
+  // `next` replaces the result whole, because `fromValue` removes a formula by deleting its key. The
+  // normalizer falls back to `systemItemId`, so that alias leaves with the component.
   function updateSalvageResult(groupId, result, value) {
     const next = fromValue(result, value);
+    if (next.componentId !== result.componentId) delete next.systemItemId;
     updateSalvageGroupResults(groupId, (results) =>
       results.map((entry) => (entry.id === result.id ? next : entry))
     );
