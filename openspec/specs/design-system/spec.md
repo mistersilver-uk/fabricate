@@ -940,6 +940,9 @@ A record's ART is an icon chip, and an ACTOR's art — a person, a party, a vehi
 The two are separate entries rather than one tile taking a `kind` prop, because they differ in the corner and in what they draw with no artwork: a record's tile falls back to a GLYPH and an actor's to INITIALS.
 
 A choice between two to four named things is a segmented control, or option cards when each choice needs a sentence.
+An on/off property of the record in its own editor, drawn as a card, is the toggle card — the settings-row toggle at card scale.
+Option cards are the two-to-four-way choice above, used when each side needs its own sentence.
+Neither is a mode of the other.
 Independent criteria that narrow a list are filter toggles, because any combination is valid.
 A one-of-N SCOPE the list is always in — rather than a filter that can be cleared — is a segmented control in the same bar; a segmented whose value could be "none" is a toggle in disguise.
 The journal's kind filter is therefore four independent toggles, because any combination of kinds is a valid view, while its active-status filter stays a segmented control, because its four values are mutually exclusive.
