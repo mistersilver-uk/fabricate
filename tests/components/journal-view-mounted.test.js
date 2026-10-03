@@ -1039,8 +1039,7 @@ describe('JournalView mounted behavior', () => {
       ));
     });
 
-    async function mountStore() {
-      const listing = kindListing();
+    async function mountStore(listing = kindListing()) {
       const store = createJournalStore({
         services: {
           listJournalForActor: async () => listing,
@@ -1121,6 +1120,24 @@ describe('JournalView mounted behavior', () => {
       await settle();
       assert.deepEqual(checked(), ['paused'], 'choosing a second status releases the first');
       assert.deepEqual(shown(target, 'data-run-id'), ['a-brew']);
+    });
+
+    it('words an empty list as filtered while any kind is hidden, and as plain when none is', async () => {
+      const partial = kindListing();
+      partial.history = partial.history.filter((entry) => entry.activityKind !== 'alchemy');
+      const { target } = await mountStore(partial);
+      await showOnly(target, ['alchemy']);
+      assert.match(
+        target.querySelector('[data-journal-empty="history"]').textContent,
+        /Empty\.MatchingHistory/u,
+        'one kind shown over no run of it is a filtered empty'
+      );
+      harness.remount();
+
+      const { target: allOn } = await mountStore({ ...kindListing(), activeRuns: [], history: [] });
+      const plain = allOn.querySelector('[data-journal-empty="history"]').textContent;
+      assert.match(plain, /Empty\.History/u, 'every kind shown over an empty journal is plain');
+      assert.doesNotMatch(plain, /Matching/u);
     });
 
     it('names each kind toggle by a visible label that presses it', async () => {

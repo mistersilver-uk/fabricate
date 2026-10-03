@@ -720,6 +720,36 @@ describe('InventoryView (mounted)', () => {
     );
     assert.ok(detail.querySelector('[data-inventory-used-by="u7"]'), 'shows the second-page rows');
   });
+
+  it('clamps a section page when the chosen system’s list is shorter than the page it was on', async () => {
+    const item = multiSystemCardRow();
+    const rows = (prefix, count) =>
+      Array.from({ length: count }, (_, i) => ({
+        recipeId: `${prefix}${i}`,
+        recipeName: `Recipe ${prefix}${i}`,
+        recipeImg: null,
+        role: 'ingredient',
+      }));
+    item.systems[0].usedBy = rows('a', 8);
+    item.systems[1].usedBy = rows('b', 2);
+    const { services } = makeServices(item);
+    const target = await harness.mount({ services });
+    await settle();
+    target.querySelector(':scope [data-inventory-pager="used"] [data-pagination-next]').click();
+    await settle();
+    assert.ok(target.querySelector('[data-inventory-used-by="a7"]'), 'on the second page of A');
+
+    const { services: onB, store } = makeServices(item);
+    store.selectedSystemId = SYS_B;
+    await harness.setProps({ services: onB });
+    await settle();
+    assert.deepEqual(
+      [...target.querySelectorAll('[data-inventory-used-by]')].map((row) => row.dataset.inventoryUsedBy),
+      ['b0', 'b1'],
+      'both of B’s rows render rather than an empty second page'
+    );
+    assert.ok(!target.querySelector('[data-inventory-pager="used"]'), 'and B’s list draws no pager');
+  });
 });
 
 // Build a store whose selected item is a recipe-item "book".
@@ -873,6 +903,17 @@ describe('InventoryView (mounted) — recipe-item books', () => {
     learnAll.click();
     await settle();
     assert.deepEqual(calls.learnAll, [['r1']], 'learn-all passes the unlearned recipe ids');
+  });
+
+  it('words a book that teaches nothing as an empty list, with no primary and no search', async () => {
+    const { services } = makeBookServices(makeBook([]));
+    const target = await harness.mount({ services });
+    await settle();
+    const detail = target.querySelector('[data-inventory-recipe-item]');
+    assertIdentityHeader(detail, { primaries: 0 });
+    assert.ok(!detail.querySelector('[data-inventory-recipe-search]'), 'no recipe search');
+    const empty = detail.querySelector(':scope [data-inventory-section="learn"] .manager-empty');
+    assert.match(empty.textContent, /Detail\.NoRecipes/, 'the shared empty state says so');
   });
 
   it('uses the plural learn-all CTA for a multi-recipe book', async () => {
@@ -1851,7 +1892,7 @@ describe('InventoryView (mounted) — player salvage surface', () => {
     const target = await openSalvage(services);
 
     assert.ok(target.querySelector('[data-inventory-salvage-ribbon]'));
-    assert.equal(target.querySelector('[data-inventory-salvage-action]'), null, 'one-shot: no reroll');
+    assert.ok(!target.querySelector('[data-inventory-salvage-action]'), 'one-shot: no reroll');
     assert.equal(
       target.querySelector('[data-inventory-salvage-depleted]'),
       null,
